@@ -29,7 +29,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get("header").attributes("aria-label")).toBe("Workbook tools");
     expect(wrapper.get("nav").attributes("aria-label")).toBe("Ribbon categories");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("Home");
-    expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(5);
+    expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(6);
     expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-labelledby")).toBe(
       wrapper.get('[data-ribbon-category="home"]').attributes("id"),
     );
@@ -239,12 +239,16 @@ describe("SpreadsheetRibbon", () => {
     await wrapper.get('[data-ribbon-action="open-data-tools"]').trigger("click");
     expect(wrapper.get('[data-ribbon-category="data"]').attributes("aria-selected")).toBe("true");
     await wrapper.get('[data-ribbon-category="data"]').trigger("keydown", { key: "ArrowRight" });
+    expect(wrapper.get('[data-ribbon-category="review"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="review"]').trigger("keydown", { key: "ArrowRight" });
     expect(wrapper.get('[data-ribbon-category="view"]').attributes("aria-selected")).toBe("true");
     await wrapper.get('[data-ribbon-category="view"]').trigger("keydown", { key: "ArrowRight" });
     expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
     await wrapper.get('[data-ribbon-category="home"]').trigger("keydown", { key: "End" });
     expect(wrapper.get('[data-ribbon-category="view"]').attributes("aria-selected")).toBe("true");
     await wrapper.get('[data-ribbon-category="view"]').trigger("keydown", { key: "ArrowLeft" });
+    expect(wrapper.get('[data-ribbon-category="review"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="review"]').trigger("keydown", { key: "ArrowLeft" });
     expect(wrapper.get('[data-ribbon-category="data"]').attributes("aria-selected")).toBe("true");
     await wrapper.get('[data-ribbon-category="data"]').trigger("keydown", { key: "Home" });
     expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
@@ -265,6 +269,8 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
     await wrapper.get('[data-ribbon-category="data"]').trigger("click");
     await wrapper.get('[data-ribbon-category="data"]').trigger("keydown", { key: "ArrowRight" });
+    expect(wrapper.get('[data-ribbon-category="review"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="review"]').trigger("keydown", { key: "ArrowRight" });
     expect(wrapper.get("[data-view-panel]").text()).toBe("视图设置");
     await wrapper.get('[data-ribbon-category="view"]').trigger("keydown", { key: "ArrowRight" });
     expect(wrapper.get("[data-table-panel]").text()).toBe("表格快捷设置");

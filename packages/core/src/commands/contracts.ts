@@ -8,7 +8,7 @@ import type {
   CellStyle,
   CellStylePatch,
 } from "../style.js";
-import type { CellHyperlink, CellNamedStyleBinding } from "../workbook.js";
+import type { CellHyperlink, CellNamedStyleBinding, CellNote } from "../workbook.js";
 import type {
   CellAddress,
   CellRange,
@@ -42,6 +42,7 @@ export type CellContentChange = {
   style?: CellStyle | null;
   namedStyle?: CellNamedStyleBinding | null;
   hyperlink?: CellHyperlink | null;
+  note?: CellNote | null;
 };
 
 export type SetCellContentsCommand = {
@@ -178,6 +179,12 @@ export type SetCellHyperlinkCommand = {
     namedStyle: CellNamedStyleBinding | null;
     hyperlink: CellHyperlink | null;
   };
+};
+
+export type SetCellNotesCommand = {
+  type: "setCellNotes";
+  sheetId: string;
+  changes: Array<{ address: CellAddress; note: CellNote | null }>;
 };
 
 export type MarkCellHyperlinkVisitedCommand = {
@@ -762,6 +769,7 @@ export type WorkbookCommand =
   | BatchDeleteSheetAxesCommand
   | ApplyCellStyleCommand
   | SetCellHyperlinkCommand
+  | SetCellNotesCommand
   | MarkCellHyperlinkVisitedCommand
   | ApplyCellBordersCommand
   | ApplyCellFormatCommand
@@ -836,6 +844,7 @@ export type WorkbookOperation =
   | "table.styles"
   | "history.restore"
   | "format.cells"
+  | "review.note"
   | "format.borders"
   | "dimensions.resize"
   | "dimensions.hide"
@@ -912,6 +921,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "adjustCellNumberFormatDecimals":
     case "adjustCellIndent":
       return "format.cells";
+    case "setCellNotes":
+      return "review.note";
     case "applyCellBorders":
       return "format.borders";
     case "applyCellFormat":

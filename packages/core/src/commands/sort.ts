@@ -3,6 +3,8 @@ import { isFormulaError, type CellContent, type FormulaValue } from "../formula/
 import {
   cloneCellContent,
   cloneCellHyperlink,
+  cloneCellNote,
+  getCellNote,
   cloneCellNamedStyleBinding,
   createWorkbookEvaluator,
   createSheetEvaluator,
@@ -11,6 +13,7 @@ import {
   getCellStyle,
   getCellNamedStyle,
   setCellHyperlink,
+  setCellNote,
   setCellNamedStyle,
   setCellContent,
   type CellAddress,
@@ -575,6 +578,7 @@ export function applySortSheetRangeCommand(
         ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
         ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
         ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+        ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
       },
     ];
   });
@@ -586,6 +590,7 @@ export function applySortSheetRangeCommand(
       style?: CellStyle;
       namedStyle?: import("../workbook.js").CellNamedStyleBinding;
       hyperlink?: import("../workbook.js").CellHyperlink;
+      note?: import("../workbook.js").CellNote;
     }
   >();
   const affected = new Map<string, CellAddress>();
@@ -604,6 +609,7 @@ export function applySortSheetRangeCommand(
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
       ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+      ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
     });
     affected.set(getCellBorderTargetKey(cell.address), cell.address);
     affected.set(key, address);
@@ -620,6 +626,7 @@ export function applySortSheetRangeCommand(
       style: cloneCellStyle(getCellStyle(sheet, address) as CellStyle | undefined) ?? null,
       namedStyle: cloneCellNamedStyleBinding(getCellNamedStyle(sheet, address)) ?? null,
       hyperlink: cloneCellHyperlink(getCellHyperlink(sheet, address)) ?? null,
+      note: cloneCellNote(getCellNote(sheet, address)) ?? null,
     });
   };
   for (const [key, address] of affected) {
@@ -628,6 +635,7 @@ export function applySortSheetRangeCommand(
     setCellContent(sheet, address, next?.content ?? null);
     setCellNamedStyle(sheet, address, next?.style ?? null, next?.namedStyle ?? null);
     setCellHyperlink(sheet, address, next?.hyperlink ?? null);
+    setCellNote(sheet, address, next?.note ?? null);
   }
 
   const mergeResolver = new MergedCellRangeResolver(sheet.mergedCells);

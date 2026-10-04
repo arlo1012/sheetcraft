@@ -131,6 +131,21 @@ export function paintSheetScene(
         context.fill();
       }
     }
+    context.fillStyle = "#e53935";
+    for (const cell of paneScene.cells) {
+      if (!cell.hasNote) continue;
+      const rect = cell.contentRect;
+      const size = Math.min(8, rect.width - 1, rect.height - 1);
+      if (size <= 0) continue;
+      const right = rect.x + rect.width - 1;
+      const top = rect.y + 1;
+      context.beginPath();
+      context.moveTo(right - size, top);
+      context.lineTo(right, top);
+      context.lineTo(right, top + size);
+      context.closePath();
+      context.fill();
+    }
     context.restore();
   }
   options.images.retain(visibleImageUrls);

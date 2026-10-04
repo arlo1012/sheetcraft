@@ -24,6 +24,7 @@ export type CanvasCellContent = {
 
 export type CanvasCell = {
   address: CellAddress;
+  hasNote: boolean;
   /** Sheet coordinates, before a pane's scroll transform. */
   rect: Rect;
   contentRect: Rect;
@@ -245,7 +246,12 @@ export function createSheetCanvasScene(
         retained.add(key);
         const rect = merged
           ? layout.getRangeRect(getPaneRange(merged, id, layout))
-          : { x: column.offset, y: row.offset, width: column.size, height: row.size };
+          : {
+              x: column.offset,
+              y: row.offset,
+              width: column.size,
+              height: row.size,
+            };
         if (!rect) continue;
         const span = merged ? undefined : cache.getSpan(anchor);
         const contentRect =
@@ -258,6 +264,7 @@ export function createSheetCanvasScene(
         retained.add(`${source.row}:${source.column}`);
         cells.push({
           address: anchor,
+          hasNote: Boolean(options.display.sheet.cells.get(key)?.note),
           rect,
           contentRect,
           content: cache.getContent(source, contentRect, span),

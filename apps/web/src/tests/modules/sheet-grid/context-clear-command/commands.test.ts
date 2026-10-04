@@ -11,9 +11,11 @@ import {
   getActiveSheet,
   getCellContent,
   getCellStyle,
+  getCellNote,
   MAX_SHEET_ROWS,
   setCellContent,
   setCellStyle,
+  setCellNote,
   setCellValue,
 } from "@idea10/core/workbook";
 import { createContextClearCommand } from "../../../../modules/sheet-grid/context-clear-command";
@@ -46,6 +48,7 @@ describe("context menu clear commands", () => {
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 3, column: 2 }, "remove");
     setCellStyle(sheet, { row: 3, column: 2 }, { bold: true });
+    setCellNote(sheet, { row: 3, column: 2 }, { text: "remove note" });
     setCellValue(sheet, { row: 4, column: 2 }, "keep");
     const before = createSheetSparseState(sheet);
     executeWorkbookCommand(
@@ -66,5 +69,26 @@ describe("context menu clear commands", () => {
     expect(createSheetSparseState(sheet)).toEqual(before);
     expect(redoWorkbookCommand(session)).toBe(true);
     expect(sheet.cells.has("3:2")).toBe(false);
+  });
+
+  test("clears contents while retaining notes, and clears notes only with clear all", () => {
+    const session = createWorkbookSession({ idFactory: createSequentialIdFactory() });
+    const sheet = getActiveSheet(session.workbook);
+    const address = { row: 3, column: 2 };
+    setCellValue(sheet, address, "remove");
+    setCellNote(sheet, address, { text: "keep until clear all" });
+
+    executeWorkbookCommand(
+      session,
+      createContextClearCommand(sheet, { start: address, end: address }, "contents"),
+    );
+    expect(getCellContent(sheet, address)).toBeNull();
+    expect(getCellNote(sheet, address)).toEqual({ text: "keep until clear all" });
+
+    executeWorkbookCommand(
+      session,
+      createContextClearCommand(sheet, { start: address, end: address }, "all"),
+    );
+    expect(getCellNote(sheet, address)).toBeUndefined();
   });
 });

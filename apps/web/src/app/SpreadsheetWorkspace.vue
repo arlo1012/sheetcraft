@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import ReviewToolbar from "../modules/review-tools/components/ReviewToolbar.vue";
+import NoteEditorDialog from "../modules/review-tools/components/NoteEditorDialog.vue";
+import NoteListPanel from "../modules/review-tools/components/NoteListPanel.vue";
+import { useReviewController } from "../modules/review-tools/useReviewController";
 import { formatCellAddress } from "@idea10/core/coordinates";
 import { cloneConditionalFormatRule } from "@idea10/core/conditional-formatting";
 import type { SheetGoToOptions } from "@idea10/core/go-to";
@@ -329,6 +333,28 @@ const hyperlinkActions = useHyperlinksController({
   focus: focusCellEditor,
 });
 const { draft: hyperlinkDraft, error: hyperlinkError } = hyperlinkActions;
+const reviewActions = useReviewController({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getAddress: () => activeAddress.value,
+  getSelection: () => activeSelectionRange.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  finishEditing: () => cellEditSession.finish(),
+  execute: executeCommand,
+  navigate: (address) => navigateToAddress(formatCellAddress(address)),
+  focus: focusCellEditor,
+});
+const {
+  draft: noteDraft,
+  error: noteError,
+  notes: reviewNotes,
+  showingNotes,
+  hasNote,
+  hasSelectedNotes,
+  activeAddress: noteActiveAddress,
+} = reviewActions;
 const cellStyleActions = useCellStylesController({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1661,7 +1687,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     (pageSetupVisible.value && !pickingPageSetupRange.value) ||
     formulaEditorVisible.value ||
     formulaInsertVisible.value ||
-    hyperlinkDraft.value
+    hyperlinkDraft.value ||
+    noteDraft.value
   )
     return;
   const picker = activeRangePicker.value;
@@ -1789,6 +1816,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         !!cellFormatSelection ||
         !!conditionalFormattingSelection ||
         !!hyperlinkDraft ||
+        !!noteDraft ||
         cellStylesModalOpen ||
         tableModalOpen ||
         !!findFormatDraft ||
@@ -1866,6 +1894,29 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @delete-pivot-style="tableActions.deletePivotStyle"
           @clear-style="tableActions.clearStyle"
           @settings="tableActions.openSettings"
+        />
+      </template>
+      <template #review-tools>
+        <ReviewToolbar
+          :busy="loading || fileBusy || xlsxBusy"
+          :read-only="activeSheet.properties.protected"
+          :has-note="hasNote"
+          :has-selected-notes="hasSelectedNotes"
+          :has-notes="reviewNotes.length > 0"
+          :showing-notes="showingNotes"
+          :edit-session-id="cellEditSession.id"
+          @proofread="dataTools.openDataProofreading"
+          @edit-note="reviewActions.edit()"
+          @delete-notes="reviewActions.remove()"
+          @previous-note="reviewActions.step(-1)"
+          @next-note="reviewActions.step(1)"
+          @toggle-notes="reviewActions.toggleNotes"
+          @toggle-protection="
+            changeSheetProperties({
+              sheetId: activeSheet.id,
+              patch: { protected: !activeSheet.properties.protected },
+            })
+          "
         />
       </template>
       <template #page-tools>
@@ -2599,6 +2650,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         !!findFormatDraft ||
         pickingReferenceRange ||
         !!hyperlinkDraft ||
+        !!noteDraft ||
         cellStylesModalOpen ||
         tableModalOpen ||
         dataToolsModalOpen ||
@@ -2718,6 +2770,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         !!findFormatDraft ||
         dataToolsModalOpen ||
         !!hyperlinkDraft ||
+        !!noteDraft ||
         cellStylesModalOpen ||
         (tableModalOpen && !pickingTableRange) ||
         formulaEditorVisible ||
@@ -2773,6 +2826,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @filter-column-request="dataTools.openColumnFilter($event)"
         @table-expand-request="tableActions.expandTable"
         @open-hyperlink="hyperlinkActions.open"
+        @edit-note="reviewActions.edit($event)"
+        @delete-note="reviewActions.remove($event)"
         @validation-choose="chooseValidationValue"
         @outline-toggle="toggleOutline"
         @outline-level="showOutlineLevel"
@@ -2820,7 +2875,28 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @selection-dragging-change="setSelectionDragging"
         @horizontal-scroll-change="updateHorizontalScrollState"
       />
+      <NoteListPanel
+        v-if="showingNotes"
+        :notes="reviewNotes"
+        :active-address="noteActiveAddress"
+        :read-only="activeSheet.properties.protected || loading || fileBusy || xlsxBusy"
+        @navigate="reviewActions.navigate"
+        @edit="reviewActions.edit"
+        @delete="reviewActions.remove"
+        @close="showingNotes = false"
+      />
     </div>
+    <NoteEditorDialog
+      v-if="noteDraft"
+      :visible="true"
+      :address="noteDraft.address"
+      :text="noteDraft.text"
+      :author="noteDraft.author"
+      :error="noteError"
+      :read-only="activeSheet.properties.protected || loading || fileBusy || xlsxBusy"
+      @save="reviewActions.save"
+      @close="reviewActions.close"
+    />
     <PagePrintPreview
       :theme="workbookTheme"
       v-if="printPreviewVisible"
@@ -2918,6 +2994,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         xlsxBusy ||
         !!cellFormatSelection ||
         !!hyperlinkDraft ||
+        !!noteDraft ||
         cellStylesModalOpen ||
         (tableModalOpen && !pickingTableRange)
       "
@@ -2966,6 +3043,13 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
   }
 
   &__grid {
+    display: flex;
+
+    > :first-child {
+      flex: 1;
+      min-width: 0;
+    }
+
     min-width: 0;
     min-height: 0;
 

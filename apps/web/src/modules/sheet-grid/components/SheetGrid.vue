@@ -166,6 +166,7 @@ type AxisContextMenuState = {
 type CellContextMenuState = {
   anchor: FloatingReference;
   imageAddress?: CellAddress;
+  noteAddress: CellAddress;
 };
 
 const CLIPBOARD_MESSAGE_KEYS: Record<GridClipboardFeedback, MessageKey> = {
@@ -272,6 +273,8 @@ const emit = defineEmits<{
   deleteFloatingImage: [id: string];
   convertFloatingImageToCell: [id: string];
   convertCellImageToFloating: [address: CellAddress];
+  editNote: [address: CellAddress];
+  deleteNote: [address: CellAddress];
   imageFeedback: [key: MessageKey];
   pasteImageFile: [file: File, mode: ImageInsertMode, address?: CellAddress];
   pasteFloatingImage: [image: FloatingImage, mode: ImageInsertMode, address?: CellAddress];
@@ -2152,12 +2155,14 @@ function openCellContextMenu(address: CellAddress, event: MouseEvent): void {
   }
 
   axisContextMenu.value = undefined;
+  const noteAddress = layout.value.getAnchorForAddress(address);
   const contextElement = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
   cellContextMenu.value = {
     imageAddress:
       getCellContent(props.sheet, layout.value.getAnchorForAddress(address))?.kind === "image"
         ? layout.value.getAnchorForAddress(address)
         : undefined,
+    noteAddress,
     anchor: markRaw(createContextMenuPoint(event, rootRef.value ?? contextElement ?? undefined)),
   };
 }
@@ -2176,11 +2181,13 @@ function openActiveCellContextMenu(): void {
   const x = bounds.left + (rect.x + Math.min(16, rect.width / 2)) * scale.value;
   const y = bounds.top + (rect.y + rect.height) * scale.value;
   axisContextMenu.value = undefined;
+  const noteAddress = layout.value.getAnchorForAddress(activeCell.value);
   cellContextMenu.value = {
     imageAddress:
       getCellContent(props.sheet, activeCell.value)?.kind === "image"
         ? { ...activeCell.value }
         : undefined,
+    noteAddress,
     anchor: markRaw(createContextMenuPoint({ clientX: x, clientY: y }, scroller)),
   };
 }
@@ -2262,6 +2269,16 @@ function requestCellImageAction(action: "preview" | "float"): void {
     const content = getCellContent(props.sheet, address);
     if (content?.kind === "image") openImagePreview(content.image);
   }
+}
+
+function requestCellNote(action: "edit" | "delete"): void {
+  if (props.readOnly) return;
+  const address = cellContextMenu.value?.noteAddress;
+  cellContextMenu.value = undefined;
+  if (!address) return;
+  if (action === "edit") emit("editNote", address);
+  else emit("deleteNote", address);
+  focusEditor();
 }
 
 function requestCellClear(): void {
@@ -2585,6 +2602,19 @@ function onEditorKeydown(event: KeyboardEvent): void {
   if (event.key === "Enter" || event.key === "Tab") {
     event.preventDefault();
     traverseSelection(event.key, event.shiftKey, false);
+    return;
+  }
+
+  if (
+    event.key === "F2" &&
+    event.shiftKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    getSelectionMode(selection.value) === "cells"
+  ) {
+    event.preventDefault();
+    emit("editNote", layout.value.getAnchorForAddress(activeCell.value));
     return;
   }
 
@@ -3029,6 +3059,13 @@ defineExpose({
       :range="selectedRange"
       @action="requestContextAction"
       :has-image="Boolean(cellContextMenu.imageAddress)"
+      :has-note="
+        Boolean(
+          sheet.cells.get(
+            `${cellContextMenu.noteAddress.row}:${cellContextMenu.noteAddress.column}`,
+          )?.note,
+        )
+      "
       :read-only="readOnly"
       :paste-special-disabled="clipboardMode === 'cut'"
       :paste-formats-disabled="!canPasteFormats"
@@ -3042,6 +3079,8 @@ defineExpose({
       @paste-formats="requestCellClipboard('paste-formats')"
       @convert-image-to-floating="requestCellImageAction('float')"
       @preview-image="requestCellImageAction('preview')"
+      @edit-note="requestCellNote('edit')"
+      @delete-note="requestCellNote('delete')"
       @clear="requestCellClear"
       @close="closeCellContextMenu"
     />

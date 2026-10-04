@@ -6,6 +6,7 @@ import {
   createSheet,
   createSheetEvaluator,
   setCellContent,
+  setCellNote,
   setCellStyle,
   setCellValue,
 } from "@idea10/core/workbook";
@@ -69,6 +70,17 @@ function fixture() {
 }
 
 describe("Canvas cell presentation cache", () => {
+  test("exposes notes for normal and merged-cell corner indicators", () => {
+    const { sheet, render, refreshDisplay } = fixture();
+    setCellNote(sheet, { row: 0, column: 0 }, { text: "normal" });
+    sheet.mergedCells = [{ start: { row: 1, column: 1 }, end: { row: 2, column: 2 } }];
+    setCellNote(sheet, { row: 1, column: 1 }, { text: "merged" });
+    refreshDisplay();
+
+    expect(cell(render(), 0, 0).hasNote).toBe(true);
+    expect(cell(render(), 1, 1).hasNote).toBe(true);
+  });
+
   test("refreshes existing header text when a table style is applied, changed, and cleared", () => {
     const { sheet, render, refreshDisplay } = fixture();
     setCellValue(sheet, { row: 0, column: 0 }, "Amount");

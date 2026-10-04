@@ -3,6 +3,7 @@ import {
   MAX_SHEET_ROWS,
   cloneCellContent,
   cloneCellHyperlink,
+  cloneCellNote,
   cloneCellNamedStyleBinding,
   cloneFloatingImage,
   cloneSheetTable,
@@ -182,6 +183,7 @@ function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
       ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+      ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
     })),
     dimensions: slice.dimensions.map((dimension) => ({ ...dimension })),
     ...(slice.hiddenIndexes ? { hiddenIndexes: [...slice.hiddenIndexes] } : {}),
@@ -920,6 +922,7 @@ function captureSheetAxisSlice(
             ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
             ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
             ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+            ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
           },
         ]
       : [];
@@ -973,7 +976,13 @@ function restoreSheetAxisSlice(
   for (const cell of slice.cells) {
     const key = createCellKey(cell.address);
     const current = sheet.cells.get(key);
-    if (current?.content === cell.content && current?.style === cell.style) {
+    if (
+      JSON.stringify(current?.content) === JSON.stringify(cell.content) &&
+      JSON.stringify(current?.style) === JSON.stringify(cell.style) &&
+      JSON.stringify(current?.namedStyle) === JSON.stringify(cell.namedStyle) &&
+      JSON.stringify(current?.hyperlink) === JSON.stringify(cell.hyperlink) &&
+      JSON.stringify(current?.note) === JSON.stringify(cell.note)
+    ) {
       continue;
     }
     sheet.cells.set(key, {
@@ -981,6 +990,7 @@ function restoreSheetAxisSlice(
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
       ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+      ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
     });
     changed = true;
   }

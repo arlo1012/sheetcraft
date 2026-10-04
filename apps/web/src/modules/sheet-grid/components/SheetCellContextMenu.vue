@@ -20,6 +20,8 @@ import {
   Image as ImageIcon,
   ListChecks,
   ListMinus,
+  MessageSquarePlus,
+  MessageSquareX,
   MoveUpRight,
   Paintbrush,
   Plus,
@@ -55,6 +57,7 @@ const props = withDefaults(
     pasteFormatsDisabled?: boolean;
     cutDisabledReason?: string;
     hasImage?: boolean;
+    hasNote?: boolean;
     readOnly?: boolean;
     state?: SheetContextMenuState;
     sheet?: Sheet;
@@ -70,6 +73,8 @@ const emit = defineEmits<{
   pasteFormats: [];
   convertImageToFloating: [];
   previewImage: [];
+  editNote: [];
+  deleteNote: [];
   clear: [];
   action: [action: SheetContextAction];
   close: [restoreFocus: boolean];
@@ -288,6 +293,21 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
             >{{ t("image.convertToFloating") }}</MenuItem
           ><MenuSeparator
         /></template>
+        <MenuSeparator />
+        <MenuItem data-cell-action="edit-note" :disabled="readOnly" @select="emit('editNote')"
+          ><template #icon><MessageSquarePlus :size="16" /></template
+          >{{ t(hasNote ? "review.editNote" : "review.newNote") }}</MenuItem
+        >
+        <MenuItem
+          v-if="hasNote"
+          data-cell-action="delete-note"
+          danger
+          :disabled="readOnly"
+          @select="emit('deleteNote')"
+          ><template #icon><MessageSquareX :size="16" /></template
+          >{{ t("review.deleteNotes") }}</MenuItem
+        >
+        <MenuSeparator />
         <MenuItem
           data-cell-action="format-painter"
           :disabled="formatActionDisabled"

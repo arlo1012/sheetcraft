@@ -91,6 +91,7 @@ import {
   applyMarkCellHyperlinkVisitedCommand,
   applySetCellHyperlinkCommand,
 } from "./hyperlinks.js";
+import { applySetCellNotesCommand } from "./notes.js";
 import { applyDeleteDefinedNameCommand, applyUpsertDefinedNameCommand } from "./names.js";
 import { applySetDefinedNamesCommand } from "./names-from-selection.js";
 import {
@@ -309,6 +310,8 @@ export function applyWorkbookCommand(
         return applyCellStyleCommand(workbook, command);
       case "setCellHyperlink":
         return applySetCellHyperlinkCommand(workbook, command);
+      case "setCellNotes":
+        return applySetCellNotesCommand(workbook, command);
       case "markCellHyperlinkVisited":
         return applyMarkCellHyperlinkVisitedCommand(workbook, command);
       case "applyCellBorders":

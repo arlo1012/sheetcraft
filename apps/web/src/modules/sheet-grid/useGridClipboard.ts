@@ -2,11 +2,13 @@ import { computed, shallowRef, watch, type ComputedRef } from "vue";
 import {
   getCellMatrixSize,
   getCellRangeContents,
+  getCellRangeNotes,
   parseTsvToCellTexts,
   parseTsvToCellValues,
   serializeCellValuesToTsv,
   tileCellMatrix,
   type CellContentMatrix,
+  type CellNoteMatrix,
   type CellValueMatrix,
   type PastePlan,
 } from "@idea10/core/clipboard";
@@ -84,6 +86,7 @@ export type GridPastePayload =
       styles?: CellStyleMatrix;
       namedStyles?: CellNamedStyleMatrix;
       hyperlinks?: CellHyperlinkMatrix;
+      notes?: CellNoteMatrix;
       conditionalFormats?: SheetConditionalFormatRule[];
       /** Original external TSV fields for Text-number-format targets. */
       rawTextValues?: string[][];
@@ -132,6 +135,7 @@ type PendingClipboard = {
   styles: CellStyleMatrix;
   namedStyles: CellNamedStyleMatrix;
   hyperlinks: CellHyperlinkMatrix;
+  notes: CellNoteMatrix;
   conditionalFormats: SheetConditionalFormatRule[];
   sourceRows?: number[];
   revision: number;
@@ -291,6 +295,7 @@ export function useGridClipboard(options: {
     const styles: CellStyleMatrix = [];
     const namedStyles: CellNamedStyleMatrix = [];
     const hyperlinks: CellHyperlinkMatrix = [];
+    const notes: CellNoteMatrix = [];
     const evaluator = options.getEvaluator?.() ?? createSheetEvaluator(sheet);
     for (const row of rows) {
       const rowRange = {
@@ -309,6 +314,7 @@ export function useGridClipboard(options: {
       styles.push(getCellRangeStyles(sheet, rowRange)[0]!);
       namedStyles.push(getCellRangeNamedStyles(sheet, rowRange)[0]!);
       hyperlinks.push(getCellRangeHyperlinks(sheet, rowRange)[0]!);
+      notes.push(getCellRangeNotes(sheet, rowRange)[0]!);
     }
     const text = serializeCellValuesToTsv(values);
     const token = createToken();
@@ -323,6 +329,7 @@ export function useGridClipboard(options: {
       styles,
       namedStyles,
       hyperlinks,
+      notes,
       conditionalFormats: (sheet.conditionalFormats ?? []).map(cloneConditionalFormatRule),
       sourceRows: compressed ? rows : undefined,
       revision: getRevision(),
@@ -624,6 +631,10 @@ export function useGridClipboard(options: {
       axis && isMatchingLocalClipboard && pending
         ? extendAxisMatrix(pending.hyperlinks, axis, targetRange, null)
         : pending?.hyperlinks;
+    const plannedNotes =
+      axis && isMatchingLocalClipboard && pending
+        ? extendAxisMatrix(pending.notes, axis, targetRange, null)
+        : pending?.notes;
     const plannedSourceRange =
       axis && isMatchingLocalClipboard && pending
         ? extendAxisRange(pending.range, axis, targetRange)
@@ -726,6 +737,10 @@ export function useGridClipboard(options: {
                   plannedHyperlinks ?? pending.hyperlinks,
                   getCellMatrixSize(plan.values),
                 )
+              : undefined,
+          notes:
+            isMatchingLocalClipboard && pending
+              ? tileCellMatrix(plannedNotes ?? pending.notes, getCellMatrixSize(plan.values))
               : undefined,
           ...(isMatchingLocalClipboard && pending
             ? { conditionalFormats: pending.conditionalFormats }

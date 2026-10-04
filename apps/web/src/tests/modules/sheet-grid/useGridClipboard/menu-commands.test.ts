@@ -5,6 +5,7 @@ import {
   getActiveSheet,
   setCellHyperlink,
   setCellNamedStyle,
+  setCellNote,
   setCellContent,
   setCellStyle,
   setCellValue,
@@ -291,6 +292,7 @@ describe("useGridClipboard menu commands", () => {
       target: "https://example.com/report",
       tooltip: "Open report",
     });
+    setCellNote(fixture.sheet, source, { text: "Check this", author: "Ada" });
 
     await fixture.clipboard.copySelection();
     fixture.setSelection(createCellSelection({ row: 2, column: 3 }));
@@ -300,6 +302,7 @@ describe("useGridClipboard menu commands", () => {
       kind: "all",
       namedStyles: [[{ styleId: "report-label", includes: ["font"] }]],
       hyperlinks: [[{ target: "https://example.com/report", tooltip: "Open report" }]],
+      notes: [[{ text: "Check this", author: "Ada" }]],
     });
   });
 

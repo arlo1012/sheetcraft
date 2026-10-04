@@ -26,6 +26,7 @@ import {
   replaceSheetSparseState,
   type CellAddress,
   type CellHyperlink,
+  type CellNote,
   type CellNamedStyleBinding,
   type CellRange,
   type CellValue,
@@ -45,6 +46,7 @@ import {
   type SheetTable,
   type Workbook,
   normalizeCellHyperlink,
+  normalizeCellNote,
   normalizeCellNamedStyleBinding,
   type DefinedName,
 } from "./workbook.js";
@@ -138,6 +140,7 @@ export type WorkbookSnapshotV5 = Omit<WorkbookSnapshotV4, "version" | "sheets"> 
 export type CellSnapshotV6 = CellSnapshotV5 & {
   namedStyle?: CellNamedStyleBinding;
   hyperlink?: CellHyperlink;
+  note?: CellNote;
 };
 export type SheetSnapshotV6 = Omit<SheetSnapshotV5, "cells"> & {
   cells: CellSnapshotV6[];
@@ -190,8 +193,9 @@ export type WorkbookSnapshotV18 = Omit<WorkbookSnapshotV17, "version"> & {
 };
 /** Theme schemes and live cell-style bindings are versioned to preserve them across clients. */
 export type WorkbookSnapshotV19 = Omit<WorkbookSnapshotV18, "version"> & { version: 19 };
+export type WorkbookSnapshotV20 = Omit<WorkbookSnapshotV19, "version"> & { version: 20 };
 /** Current write format. Earlier versions remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV19;
+export type WorkbookSnapshot = WorkbookSnapshotV20;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -224,7 +228,8 @@ type SnapshotVersion =
   | 16
   | 17
   | 18
-  | 19;
+  | 19
+  | 20;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -365,9 +370,10 @@ function parseCell(value: unknown, path: string, version: SnapshotVersion): Cell
   }
   const hasNamedStyle = version >= 15 && Object.hasOwn(record, "namedStyle");
   const hasHyperlink = version >= 15 && Object.hasOwn(record, "hyperlink");
+  const hasNote = version >= 20 && Object.hasOwn(record, "note");
   if (
     (version === 1 && !hasValue && !hasStyle) ||
-    (version !== 1 && !hasContent && !hasStyle && !hasNamedStyle && !hasHyperlink)
+    (version !== 1 && !hasContent && !hasStyle && !hasNamedStyle && !hasHyperlink && !hasNote)
   ) {
     return fail(path, "Expected content or style.");
   }
@@ -393,6 +399,7 @@ function parseCell(value: unknown, path: string, version: SnapshotVersion): Cell
     ...(hasHyperlink
       ? { hyperlink: normalizeCellHyperlink(record.hyperlink as CellHyperlink) }
       : {}),
+    ...(hasNote ? { note: normalizeCellNote(record.note as CellNote) } : {}),
   };
 }
 
@@ -674,20 +681,25 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       ? 1
       : cells.some((cell) => {
             const item = asRecord(cell, `${path}.cells`);
-            return Object.hasOwn(item, "namedStyle") || Object.hasOwn(item, "hyperlink");
+            return Object.hasOwn(item, "note");
           })
-        ? 15
-        : Object.hasOwn(record, "pageDecoration")
-          ? 17
-          : Object.hasOwn(record, "tables") || Object.hasOwn(record, "pageSetup")
-            ? 13
-            : Object.hasOwn(record, "conditionalFormats")
-              ? 12
-              : Object.hasOwn(record, "properties")
-                ? 7
-                : Object.hasOwn(record, "floatingImages")
-                  ? 6
-                  : 3;
+        ? 20
+        : cells.some((cell) => {
+              const item = asRecord(cell, `${path}.cells`);
+              return Object.hasOwn(item, "namedStyle") || Object.hasOwn(item, "hyperlink");
+            })
+          ? 15
+          : Object.hasOwn(record, "pageDecoration")
+            ? 17
+            : Object.hasOwn(record, "tables") || Object.hasOwn(record, "pageSetup")
+              ? 13
+              : Object.hasOwn(record, "conditionalFormats")
+                ? 12
+                : Object.hasOwn(record, "properties")
+                  ? 7
+                  : Object.hasOwn(record, "floatingImages")
+                    ? 6
+                    : 3;
   }
   const id = asIdentifier(record.id, `${path}.id`);
   let name: string;
@@ -730,7 +742,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 19,
+    version: 20,
     calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
     theme: cloneWorkbookTheme(workbook.theme),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
@@ -777,7 +789,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 16 &&
     record.version !== 17 &&
     record.version !== 18 &&
-    record.version !== 19
+    record.version !== 19 &&
+    record.version !== 20
   ) {
     throw new WorkbookDomainError(
       {

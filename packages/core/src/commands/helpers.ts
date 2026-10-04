@@ -6,6 +6,7 @@ import { cloneSheetPageDecoration } from "../page-decoration.js";
 import {
   cloneCellContent,
   cloneCellHyperlink,
+  cloneCellNote,
   cloneCellNamedStyleBinding,
   cloneFloatingImage,
   cloneSheetTable,
@@ -117,6 +118,7 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
       ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+      ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
     })),
     rowHeights: state.rowHeights.map((dimension) => ({ ...dimension })),
     columnWidths: state.columnWidths.map((dimension) => ({ ...dimension })),

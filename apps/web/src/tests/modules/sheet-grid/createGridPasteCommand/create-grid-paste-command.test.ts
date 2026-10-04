@@ -14,9 +14,11 @@ import {
   getCellContent,
   getCellHyperlink,
   getCellNamedStyle,
+  getCellNote,
   getCellStyle,
   setCellHyperlink,
   setCellNamedStyle,
+  setCellNote,
   setCellContent,
   setCellStyle,
   setCellValue,
@@ -77,6 +79,7 @@ describe("createGridPasteCommand", () => {
       { styleId: "source-style", includes: ["font"] },
     );
     setCellHyperlink(sheet, source, { target: "https://example.com/source" });
+    setCellNote(sheet, source, { text: "source note", author: "Ada" });
     setCellValue(sheet, destination, "destination");
     setCellNamedStyle(
       sheet,
@@ -85,6 +88,7 @@ describe("createGridPasteCommand", () => {
       { styleId: "destination-style", includes: ["font"] },
     );
     setCellHyperlink(sheet, destination, { target: "https://example.com/destination" });
+    setCellNote(sheet, destination, { text: "destination note" });
 
     const session = execute(sheet, {
       kind: "all",
@@ -98,6 +102,7 @@ describe("createGridPasteCommand", () => {
       styles: [[{ bold: true }]],
       namedStyles: [[{ styleId: "source-style", includes: ["font"] }]],
       hyperlinks: [[{ target: "https://example.com/source" }]],
+      notes: [[{ text: "source note", author: "Ada" }]],
     });
 
     expect(getCellNamedStyle(sheet, destination)).toEqual({
@@ -105,6 +110,7 @@ describe("createGridPasteCommand", () => {
       includes: ["font"],
     });
     expect(getCellHyperlink(sheet, destination)).toEqual({ target: "https://example.com/source" });
+    expect(getCellNote(sheet, destination)).toEqual({ text: "source note", author: "Ada" });
     expect(undoWorkbookCommand(session)).toBe(true);
     expect(getCellNamedStyle(sheet, destination)).toEqual({
       styleId: "destination-style",
@@ -113,6 +119,7 @@ describe("createGridPasteCommand", () => {
     expect(getCellHyperlink(sheet, destination)).toEqual({
       target: "https://example.com/destination",
     });
+    expect(getCellNote(sheet, destination)).toEqual({ text: "destination note" });
   });
 
   test("keeps target metadata for values only and retains its hyperlink for formats only", () => {
@@ -126,6 +133,7 @@ describe("createGridPasteCommand", () => {
       { styleId: "target-style", includes: ["font"] },
     );
     setCellHyperlink(sheet, address, { target: "https://example.com/target" });
+    setCellNote(sheet, address, { text: "target note" });
 
     execute(sheet, {
       kind: "values",
@@ -137,6 +145,7 @@ describe("createGridPasteCommand", () => {
       includes: ["font"],
     });
     expect(getCellHyperlink(sheet, address)).toEqual({ target: "https://example.com/target" });
+    expect(getCellNote(sheet, address)).toEqual({ text: "target note" });
 
     execute(sheet, {
       kind: "formats",
@@ -149,6 +158,7 @@ describe("createGridPasteCommand", () => {
       includes: ["font"],
     });
     expect(getCellHyperlink(sheet, address)).toEqual({ target: "https://example.com/target" });
+    expect(getCellNote(sheet, address)).toEqual({ text: "target note" });
   });
 
   test("clears sparse destination column tail cells represented by a whole-column copy", () => {
@@ -188,6 +198,7 @@ describe("createGridPasteCommand", () => {
     const sheet = getActiveSheet(createWorkbook({ idFactory: createSequentialIdFactory() }));
     setCellValue(sheet, { row: 2, column: 1 }, "move");
     setCellStyle(sheet, { row: 2, column: 1 }, { bold: true });
+    setCellNote(sheet, { row: 2, column: 1 }, { text: "move note" });
 
     const session = execute(sheet, {
       kind: "all",
@@ -205,12 +216,14 @@ describe("createGridPasteCommand", () => {
       value: "move",
     });
     expect(getCellStyle(sheet, { row: 2, column: 4 })).toEqual({ bold: true });
+    expect(getCellNote(sheet, { row: 2, column: 4 })).toEqual({ text: "move note" });
     expect(undoWorkbookCommand(session)).toBe(true);
     expect(getCellContent(sheet, { row: 2, column: 1 })).toEqual({
       kind: "literal",
       value: "move",
     });
     expect(getCellStyle(sheet, { row: 2, column: 1 })).toEqual({ bold: true });
+    expect(getCellNote(sheet, { row: 2, column: 1 })).toEqual({ text: "move note" });
     expect(redoWorkbookCommand(session)).toBe(true);
     expect(getCellContent(sheet, { row: 2, column: 4 })).toEqual({
       kind: "literal",

@@ -291,16 +291,18 @@ function createCellPasteCommand(
     if (payload.styles) assertMatrixShape(payload.styles, plan);
     if (payload.namedStyles) assertMatrixShape(payload.namedStyles, plan);
     if (payload.hyperlinks) assertMatrixShape(payload.hyperlinks, plan);
+    if (payload.notes) assertMatrixShape(payload.notes, plan);
     if (!payload.plan.preserveHiddenRows) {
       return createPasteCellContentsCommand(
         sheet.id,
         payload.plan.anchor,
         contents,
-        payload.styles || payload.namedStyles || payload.hyperlinks
+        payload.styles || payload.namedStyles || payload.hyperlinks || payload.notes
           ? {
               ...(payload.styles ? { styles: payload.styles } : {}),
               ...(payload.namedStyles ? { namedStyles: payload.namedStyles } : {}),
               ...(payload.hyperlinks ? { hyperlinks: payload.hyperlinks } : {}),
+              ...(payload.notes ? { notes: payload.notes } : {}),
             }
           : undefined,
       );
@@ -318,6 +320,7 @@ function createCellPasteCommand(
           ...(payload.hyperlinks
             ? { hyperlink: payload.hyperlinks[rowIndex]?.[columnIndex] ?? null }
             : {}),
+          ...(payload.notes ? { note: payload.notes[rowIndex]?.[columnIndex] ?? null } : {}),
         })),
       ),
     );

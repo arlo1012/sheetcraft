@@ -1,3 +1,4 @@
+import { reviewEnUS } from "../../../modules/review-tools/review-messages.en-US";
 import { pageDecorationEnUS } from "../../../modules/page-decorations/page-decoration-messages.en-US";
 import { pagePrintEnUS } from "../../../modules/page-layout/page-print-messages.en-US";
 import { pageToolsEnUS } from "../../../modules/page-layout/page-tools-messages.en-US";
@@ -13,6 +14,7 @@ import { tableStylesEnUS } from "../../../modules/table-styles/table-style-messa
 import { tablesEnUS } from "../../../modules/table-styles/table-messages.en-US";
 
 export const enUS = {
+  ...reviewEnUS,
   ...pageDecorationEnUS,
   ...pagePrintEnUS,
   ...pageToolsEnUS,

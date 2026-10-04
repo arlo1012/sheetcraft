@@ -150,9 +150,19 @@ describe("XLSX ZIP preflight", () => {
     );
   });
 
-  test("reports known unsupported but inert package parts", async () => {
-    const report = await preflightXlsxArchive(
+  test("accepts classic notes and reports threaded comments as unsupported", async () => {
+    const classicNotes = await preflightXlsxArchive(
       storedZip([{ name: "xl/comments1.xml", content: "<comments/>" }]),
+    );
+    expect(classicNotes.issues).toEqual([]);
+
+    const report = await preflightXlsxArchive(
+      storedZip([
+        {
+          name: "xl/threadedComments/threadedComment1.xml",
+          content: "<ThreadedComments/>",
+        },
+      ]),
     );
     expect(report.issues).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: "feature-omitted" })]),

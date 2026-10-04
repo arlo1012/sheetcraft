@@ -298,6 +298,7 @@ export type Cell = {
   /** A named style remains a reference so future style edits can update this cell. */
   namedStyle?: CellNamedStyleBinding;
   hyperlink?: CellHyperlink;
+  note?: CellNote;
 };
 
 export type CellNamedStyleBinding = {
@@ -311,6 +312,12 @@ export type CellHyperlink = {
   target: string;
   tooltip?: string;
   visited?: boolean;
+};
+
+/** A classic cell note used for review annotations. */
+export type CellNote = {
+  text: string;
+  author?: string;
 };
 
 export type SheetProperties = {
@@ -352,6 +359,7 @@ export type SheetSparseCell = {
   style?: CellStyle;
   namedStyle?: CellNamedStyleBinding;
   hyperlink?: CellHyperlink;
+  note?: CellNote;
 };
 
 export type SheetSparseDimension = {
@@ -1607,6 +1615,10 @@ export function getCellHyperlink(
   return getCell(sheet, address)?.hyperlink;
 }
 
+export function getCellNote(sheet: Sheet, address: CellAddress): Readonly<CellNote> | undefined {
+  return getCell(sheet, address)?.note;
+}
+
 export function normalizeCellNamedStyleBinding(
   value: CellNamedStyleBinding | null | undefined,
 ): CellNamedStyleBinding | undefined {
@@ -1727,6 +1739,30 @@ export function cloneCellHyperlink(
   return normalized && { ...normalized };
 }
 
+export function normalizeCellNote(value: CellNote | null | undefined): CellNote | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (!value || typeof value !== "object" || typeof value.text !== "string") {
+    throw new TypeError("Cell note must be an object with text.");
+  }
+  const text = value.text;
+  if (!text.trim() || text.length > 32_767) {
+    throw new TypeError("Cell note text must be between 1 and 32767 characters.");
+  }
+  if (
+    value.author !== undefined &&
+    (typeof value.author !== "string" || value.author.length > 255)
+  ) {
+    throw new TypeError("Cell note author is invalid.");
+  }
+  const author = value.author?.trim();
+  return { text, ...(author ? { author } : {}) };
+}
+
+export function cloneCellNote(value: CellNote | null | undefined): CellNote | undefined {
+  const normalized = normalizeCellNote(value);
+  return normalized && { ...normalized };
+}
+
 export function setCellValue(sheet: Sheet, address: CellAddress, value: CellValue): boolean {
   return setCellContent(
     sheet,
@@ -1746,11 +1782,12 @@ export function setCellContent(
   const cell = sheet.cells.get(key);
   if (areCellContentsEqual(cell?.content, normalizedContent)) return false;
   if (!normalizedContent) {
-    if (cell?.style || cell?.namedStyle || cell?.hyperlink)
+    if (cell?.style || cell?.namedStyle || cell?.hyperlink || cell?.note)
       sheet.cells.set(key, {
         ...(cell.style ? { style: cell.style } : {}),
         ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
         ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+        ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
       });
     else sheet.cells.delete(key);
   } else {
@@ -1759,6 +1796,7 @@ export function setCellContent(
       ...(cell?.style ? { style: cell.style } : {}),
       ...(cell?.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(cell?.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+      ...(cell?.note ? { note: cloneCellNote(cell.note) } : {}),
     });
   }
   return true;
@@ -1781,11 +1819,13 @@ export function setCellStyle(
       content: cell.content,
       ...(normalizedStyle ? { style: normalizedStyle } : {}),
       ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+      ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
     });
-  } else if (normalizedStyle || cell?.hyperlink) {
+  } else if (normalizedStyle || cell?.hyperlink || cell?.note) {
     sheet.cells.set(key, {
       ...(normalizedStyle ? { style: normalizedStyle } : {}),
       ...(cell?.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+      ...(cell?.note ? { note: cloneCellNote(cell.note) } : {}),
     });
   } else {
     sheet.cells.delete(key);
@@ -1808,12 +1848,19 @@ export function setCellNamedStyle(
     JSON.stringify(cell?.namedStyle) === JSON.stringify(normalizedBinding)
   )
     return false;
-  if (cell?.content !== undefined || normalizedStyle || normalizedBinding || cell?.hyperlink) {
+  if (
+    cell?.content !== undefined ||
+    normalizedStyle ||
+    normalizedBinding ||
+    cell?.hyperlink ||
+    cell?.note
+  ) {
     sheet.cells.set(key, {
       ...(cell?.content !== undefined ? { content: cell.content } : {}),
       ...(normalizedStyle ? { style: normalizedStyle } : {}),
       ...(normalizedBinding ? { namedStyle: normalizedBinding } : {}),
       ...(cell?.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+      ...(cell?.note ? { note: cloneCellNote(cell.note) } : {}),
     });
   } else sheet.cells.delete(key);
   return true;
@@ -1828,12 +1875,41 @@ export function setCellHyperlink(
   const key = createCellKey(address);
   const cell = sheet.cells.get(key);
   if (JSON.stringify(cell?.hyperlink) === JSON.stringify(normalized)) return false;
-  if (cell?.content !== undefined || cell?.style || cell?.namedStyle || normalized) {
+  if (cell?.content !== undefined || cell?.style || cell?.namedStyle || normalized || cell?.note) {
     sheet.cells.set(key, {
       ...(cell?.content !== undefined ? { content: cell.content } : {}),
       ...(cell?.style ? { style: cloneCellStyle(cell.style) } : {}),
       ...(cell?.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(normalized ? { hyperlink: normalized } : {}),
+      ...(cell?.note ? { note: cloneCellNote(cell.note) } : {}),
+    });
+  } else sheet.cells.delete(key);
+  return true;
+}
+
+export function setCellNote(
+  sheet: Sheet,
+  address: CellAddress,
+  note: CellNote | null | undefined,
+): boolean {
+  if (!isCellAddressInBounds(address)) throw new RangeError("Cell address is outside the sheet.");
+  const normalized = normalizeCellNote(note);
+  const key = createCellKey(address);
+  const cell = sheet.cells.get(key);
+  if (JSON.stringify(cell?.note) === JSON.stringify(normalized)) return false;
+  if (
+    cell?.content !== undefined ||
+    cell?.style ||
+    cell?.namedStyle ||
+    cell?.hyperlink ||
+    normalized
+  ) {
+    sheet.cells.set(key, {
+      ...(cell?.content !== undefined ? { content: cloneCellContent(cell.content) } : {}),
+      ...(cell?.style ? { style: cloneCellStyle(cell.style) } : {}),
+      ...(cell?.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
+      ...(cell?.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+      ...(normalized ? { note: normalized } : {}),
     });
   } else sheet.cells.delete(key);
   return true;
@@ -2738,8 +2814,11 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     const style = normalizeCellStyle(cell.style);
     const namedStyle = cloneCellNamedStyleBinding(cell.namedStyle);
     const hyperlink = cloneCellHyperlink(cell.hyperlink);
-    if (content === undefined && !style && !namedStyle && !hyperlink) {
-      throw new Error("Sparse state cells must contain content, style, named style, or hyperlink.");
+    const note = cloneCellNote(cell.note);
+    if (content === undefined && !style && !namedStyle && !hyperlink && !note) {
+      throw new Error(
+        "Sparse state cells must contain content, style, named style, hyperlink, or note.",
+      );
     }
     const address = { ...cell.address };
     const key = createCellKey(address);
@@ -2753,6 +2832,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
       ...(style ? { style } : {}),
       ...(namedStyle ? { namedStyle } : {}),
       ...(hyperlink ? { hyperlink } : {}),
+      ...(note ? { note } : {}),
     };
   });
 
@@ -2864,7 +2944,8 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
         areCellContentsEqual(cell.content, right.cells[index]?.content) &&
         areCellStylesEqual(cell.style, right.cells[index]?.style) &&
         JSON.stringify(cell.namedStyle) === JSON.stringify(right.cells[index]?.namedStyle) &&
-        JSON.stringify(cell.hyperlink) === JSON.stringify(right.cells[index]?.hyperlink),
+        JSON.stringify(cell.hyperlink) === JSON.stringify(right.cells[index]?.hyperlink) &&
+        JSON.stringify(cell.note) === JSON.stringify(right.cells[index]?.note),
     ) &&
     left.rowHeights.every(
       (dimension, index) =>
@@ -2897,6 +2978,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
         ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
         ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
         ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+        ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
       };
     }),
     rowHeights: [...sheet.rowHeights].map(([index, size]) => ({ index, size })),
@@ -2957,6 +3039,7 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
       ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
+      ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
     });
   }
   for (const dimension of nextState.rowHeights) {

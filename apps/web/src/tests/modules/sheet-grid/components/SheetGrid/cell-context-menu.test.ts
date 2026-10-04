@@ -1,6 +1,6 @@
 import { DOMWrapper } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
-import { getCellValue, setCellValue } from "@idea10/core/workbook";
+import { getCellValue, setCellNote, setCellValue } from "@idea10/core/workbook";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import {
   activeCell,
@@ -19,6 +19,30 @@ function rangeWidth(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]): numb
 }
 
 describe("SheetGrid cell context menu", () => {
+  test("offers note actions for the context cell and forwards its merged-cell anchor", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    sheet.mergedCells = [{ start: { row: 1, column: 1 }, end: { row: 1, column: 2 } }];
+    setCellNote(sheet, { row: 1, column: 1 }, { text: "Review me" });
+
+    await triggerCell(wrapper, { row: 1, column: 2 }, "contextmenu", {
+      clientX: 200,
+      clientY: 48,
+    });
+    const menu = getFloatingMenu();
+    expect(menu.get('[data-cell-action="edit-note"]').text()).toContain("Edit Note");
+    expect(menu.get('[data-cell-action="delete-note"]').text()).toContain("Delete Notes");
+    await menu.get('[data-cell-action="edit-note"]').trigger("click");
+
+    expect(wrapper.emitted("editNote")).toEqual([[{ row: 1, column: 1 }]]);
+  });
+
+  test("uses Shift+F2 to request note editing for the active cell", async () => {
+    const { wrapper } = mountSheetGrid();
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "F2", shiftKey: true });
+
+    expect(wrapper.emitted("editNote")).toEqual([[{ row: 0, column: 0 }]]);
+  });
+
   test("preserves a cell range when right-clicking inside it and clears it atomically", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
     setCellValue(sheet, { row: 0, column: 0 }, "A");

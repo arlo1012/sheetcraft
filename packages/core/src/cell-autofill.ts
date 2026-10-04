@@ -7,10 +7,12 @@ import { cloneCellStyle, type CellStyle } from "./style.js";
 import {
   cloneCellContent,
   cloneCellHyperlink,
+  cloneCellNote,
   cloneCellNamedStyleBinding,
   getCellContent,
   getCellStyle,
   getCellHyperlink,
+  getCellNote,
   getCellNamedStyle,
   isCellAddressInBounds,
   type CellAddress,
@@ -57,6 +59,7 @@ type CapturedCell = Readonly<{
   style: CellStyle | undefined;
   namedStyle: import("./workbook.js").CellNamedStyleBinding | undefined;
   hyperlink: import("./workbook.js").CellHyperlink | undefined;
+  note: import("./workbook.js").CellNote | undefined;
 }>;
 export type CellFillPlan = Readonly<{
   sheetId: string;
@@ -214,6 +217,7 @@ export function captureCellFill(
       style: cloneCellStyle(getCellStyle(sheet, address) as CellStyle | undefined),
       namedStyle: cloneCellNamedStyleBinding(getCellNamedStyle(sheet, address)),
       hyperlink: cloneCellHyperlink(getCellHyperlink(sheet, address)),
+      note: cloneCellNote(getCellNote(sheet, address)),
     };
   };
   const source = addresses(sourceRange).map(capture),
@@ -519,6 +523,7 @@ export function createCellFillCommand(
             ? (original.namedStyle ?? null)
             : (source.namedStyle ?? null),
         hyperlink: mode === "copy" ? (source.hyperlink ?? null) : (original.hyperlink ?? null),
+        note: mode === "copy" ? (source.note ?? null) : (original.note ?? null),
       };
     }),
     { reconcileBorders: true },

@@ -71,6 +71,7 @@ import {
 import { readXlsxCellStyles, readXlsxNamedCellStyleBindings } from "./cell-styles.js";
 import { readXlsxThemeStyleBindings } from "./theme-style-bindings.js";
 import { readXlsxHyperlinks, readXlsxWorksheetStyleIds } from "./hyperlinks.js";
+import { readXlsxCellNotes, withExcelJsCompatibleCellNotes } from "./cell-notes.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
   createXlsxImageExporter,
@@ -90,6 +91,7 @@ type BrowserCell = {
   formula?: string;
   result?: unknown;
   style?: Record<string, unknown>;
+  note?: string | { texts?: Array<{ text: string }> };
 };
 type BrowserRow = {
   height?: number;
@@ -128,6 +130,7 @@ type BrowserWorksheet = XlsxImageWorksheet & {
     value: unknown;
     style: Record<string, unknown>;
     numFmt?: string;
+    note?: string | { texts?: Array<{ text: string }> };
   };
 };
 
@@ -616,8 +619,11 @@ export async function decodeWithExcelJs(
     add(report, "feature-omitted", `worksheet${sheetIndex + 1}.hyperlink:${reference}`),
   );
   const rawStyleIds = readXlsxWorksheetStyleIds(archive);
+  const rawNotes = readXlsxCellNotes(archive, (sheetIndex, reference) =>
+    add(report, "feature-omitted", `worksheet${sheetIndex + 1}.note:${reference}`),
+  );
   const source = new ExcelJS.Workbook();
-  await source.xlsx.load(withoutTableAutoFiltersForExcelJs(bytes));
+  await source.xlsx.load(withoutTableAutoFiltersForExcelJs(withExcelJsCompatibleCellNotes(bytes)));
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
   const pageSetups = readXlsxPageSetups(bytes, source.worksheets, report);
   const dateSystem = source.properties.date1904 ? "1904" : "1900";
@@ -635,11 +641,13 @@ export async function decodeWithExcelJs(
       style?: CellStyle;
       hyperlink?: import("@idea10/core/workbook").CellHyperlink;
       namedStyle?: import("@idea10/core/workbook").CellNamedStyleBinding;
+      note?: import("@idea10/core/workbook").CellNote;
     }> = [];
     const rowHeights: Array<{ index: number; size: number }> = [];
     const columnWidths: Array<{ index: number; size: number }> = [];
     const hiddenRows: number[] = [];
     const hiddenColumns: number[] = [];
+    const importedCellAddresses = new Set<string>();
     const metadata = rawDataMetadata[sheetIndex];
     const derivedColorSetRows = new Set(metadata?.colorSetHiddenRows ?? []);
     const conditionalFormats = rawConditionalFormats[sheetIndex]?.rules ?? [];
@@ -717,7 +725,8 @@ export async function decodeWithExcelJs(
         const namedStyle = namedStyleBindings.get(
           rawStyleIds[sheetIndex]?.get(modelCell.address.toUpperCase()) ?? -1,
         );
-        if (content || style || hyperlink) {
+        const note = rawNotes[sheetIndex]?.get(modelCell.address.toUpperCase());
+        if (content || style || hyperlink || note) {
           importedCells += 1;
           if (importedCells > MAX_SPARSE_CELLS) {
             report.add("archive-limit", "block", issueLocation);
@@ -732,9 +741,28 @@ export async function decodeWithExcelJs(
             ...(style ? { style } : {}),
             ...(hyperlink ? { hyperlink } : {}),
             ...(namedStyle ? { namedStyle } : {}),
+            ...(note ? { note } : {}),
           });
+          importedCellAddresses.add(modelCell.address.toUpperCase());
         }
       }
+    }
+    for (const [reference, note] of rawNotes[sheetIndex] ?? []) {
+      if (importedCellAddresses.has(reference)) continue;
+      const cellAddress = parseAddress(reference);
+      if (!cellAddress) {
+        add(report, "feature-omitted", `${sourceSheet.name}!${reference}`);
+        continue;
+      }
+      importedCells += 1;
+      if (importedCells > MAX_SPARSE_CELLS) {
+        report.add("archive-limit", "block", `${sourceSheet.name}!${reference}`);
+        throw new XlsxCompatibilityError(
+          "The workbook exceeds the XLSX v1 cell limit.",
+          report.build(),
+        );
+      }
+      cells.push({ address: cellAddress, note });
     }
     for (const column of sourceSheet.columns ?? []) {
       const index = column.number;
@@ -1131,6 +1159,7 @@ export async function encodeWithExcelJs(
         });
       }
       writeStyle(outputCell, cell.style, issueLocation, report);
+      if (cell.note) outputCell.note = { texts: [{ text: cell.note.text }] };
     }
     // ExcelJS shares the anchor's current style when merging. Apply styles first
     // so every physical cell in the merged area receives its perimeter borders.

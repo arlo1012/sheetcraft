@@ -14,7 +14,9 @@ import {
   MAX_SHEET_ROWS,
   createSheetEvaluator,
   cloneCellContent,
+  cloneCellNote,
   getCellContent,
+  getCellNote,
   type CellAddress,
   type CellRange,
   type CellValue,
@@ -24,6 +26,7 @@ import {
 
 export type CellValueMatrix = CellValue[][];
 export type CellContentMatrix = (CellContent | null)[][];
+export type CellNoteMatrix = (import("./workbook.js").CellNote | null)[][];
 export type CellComputedValueMatrix = FormulaValue[][];
 
 export type CellMatrixSize = {
@@ -77,6 +80,20 @@ export function getCellRangeContents(sheet: Sheet, range: CellRange): CellConten
   }
 
   return contents;
+}
+
+/** A cloned sparse-note projection that follows the copied cell rectangle. */
+export function getCellRangeNotes(sheet: Sheet, range: CellRange): CellNoteMatrix {
+  const normalized = normalizeRange(range);
+  const notes: CellNoteMatrix = [];
+  for (let row = normalized.start.row; row <= normalized.end.row; row += 1) {
+    const rowNotes: Array<import("./workbook.js").CellNote | null> = [];
+    for (let column = normalized.start.column; column <= normalized.end.column; column += 1) {
+      rowNotes.push(cloneCellNote(getCellNote(sheet, { row, column })) ?? null);
+    }
+    notes.push(rowNotes);
+  }
+  return notes;
 }
 
 export function getCellRangeComputedValues(

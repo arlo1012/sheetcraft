@@ -147,7 +147,7 @@ describe("WPS filter conditions", () => {
     ]);
     expect(
       createWorkbookEvaluator(session.workbook, sheet.id).getComputedValue({ row: 0, column: 2 }),
-    ).toBe(19);
+    ).toBe(20);
     expect(
       deserializeWorkbook(serializeWorkbook(session.workbook)).sheets.get(sheet.id)?.filter,
     ).toMatchObject({

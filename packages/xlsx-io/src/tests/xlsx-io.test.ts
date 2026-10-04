@@ -7,10 +7,12 @@ import {
   getActiveSheet,
   getCellContent,
   getCellHyperlink,
+  getCellNote,
   getCellStyle,
   getColumnWidth,
   getRowHeight,
   setCellContent,
+  setCellNote,
   setCellStyle,
   setColumnWidth,
   type Workbook,
@@ -27,7 +29,11 @@ type BrowserWorkbook = {
     name: string,
     options?: { views?: Record<string, unknown>[] },
   ) => {
-    getCell: (address: string) => { value: unknown; numFmt?: string };
+    getCell: (address: string) => {
+      value: unknown;
+      numFmt?: string;
+      note?: string | { texts?: Array<{ text: string }> };
+    };
     getColumn: (index: number) => { width?: number };
     getRow: (index: number) => { height?: number };
     mergeCells: (range: string) => void;
@@ -70,6 +76,29 @@ async function formulaCacheBytes(): Promise<Uint8Array> {
   sheet.getCell("B1").value = { formula: "1=1", result: false };
   const bytes = await workbook.xlsx.writeBuffer();
   return bytes instanceof Uint8Array ? new Uint8Array(bytes) : new Uint8Array(bytes);
+}
+
+async function noteFixtureBytes(): Promise<Uint8Array> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Notes");
+  sheet.getCell("B2").value = "review me";
+  sheet.getCell("B2").note = { texts: [{ text: "First line\nSecond line" }] };
+  sheet.getCell("D4").note = { texts: [{ text: "Blank cell note" }] };
+  const bytes = await workbook.xlsx.writeBuffer();
+  const entries = unzipSync(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
+  const comments = strFromU8(entries["xl/comments1.xml"]!);
+  const commentPart = "xl/review/comments/note-part.xml";
+  entries[commentPart] = strToU8(
+    comments.replace("<author>Author</author>", "<author>Ada Lovelace</author>"),
+  );
+  delete entries["xl/comments1.xml"];
+  entries["xl/worksheets/_rels/sheet1.xml.rels"] = strToU8(
+    strFromU8(entries["xl/worksheets/_rels/sheet1.xml.rels"]!).replace(
+      'Target="../comments1.xml"',
+      'Target="/xl/review/comments/note-part.xml"',
+    ),
+  );
+  return zipSync(entries);
 }
 
 function storedZip(name: string): Uint8Array {
@@ -115,6 +144,49 @@ function xlsxEntryText(bytes: Uint8Array, targetName: string): string {
 }
 
 describe("XLSX IO", () => {
+  test("imports classic notes with their multiline text and author", async () => {
+    const result = await decodeXlsx(await noteFixtureBytes());
+    const sheet = [...result.workbook.sheets.values()][0]!;
+    expect(getCellNote(sheet, { row: 1, column: 1 })).toEqual({
+      text: "First line\nSecond line",
+      author: "Ada Lovelace",
+    });
+    expect(getCellNote(sheet, { row: 3, column: 3 })).toEqual({
+      text: "Blank cell note",
+      author: "Ada Lovelace",
+    });
+  });
+
+  test("exports classic notes with their multiline text and author", async () => {
+    const workbook = createWorkbook({ id: "notes", sheetId: "notes-sheet" });
+    const sheet = getActiveSheet(workbook);
+    setCellContent(sheet, { row: 1, column: 1 }, { kind: "literal", value: "review me" });
+    setCellNote(
+      sheet,
+      { row: 1, column: 1 },
+      {
+        text: "First line\nSecond line",
+        author: "Ada Lovelace",
+      },
+    );
+    setCellNote(sheet, { row: 3, column: 3 }, { text: "Blank cell note" });
+
+    const encoded = await encodeXlsx(workbook);
+    const comments = xlsxEntryText(encoded.bytes, "xl/comments1.xml");
+    expect(comments).toContain("<author>Ada Lovelace</author>");
+    expect(comments).toMatch(/<comment ref="B2" authorId="0">/);
+    expect(comments).toMatch(/<comment ref="D4" authorId="1">/);
+
+    const restored = await decodeXlsx(encoded.bytes);
+    expect(getCellNote(getActiveSheet(restored.workbook), { row: 1, column: 1 })).toEqual({
+      text: "First line\nSecond line",
+      author: "Ada Lovelace",
+    });
+    expect(getCellNote(getActiveSheet(restored.workbook), { row: 3, column: 3 })).toEqual({
+      text: "Blank cell note",
+    });
+  });
+
   test("uses the published browser artifact to decode supported values and reports uncalculated formula cache", async () => {
     const input = await fixtureBytes();
     const original = new Uint8Array(input);
@@ -223,9 +295,7 @@ describe("XLSX IO", () => {
     expect(worksheet).toContain("<hyperlinks>");
     expect(worksheet).toContain('<pageSetup paperSize="9" orientation="landscape"');
     expect(worksheet).toContain("<headerFooter>");
-    expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain(
-      'name="Integration Blue"',
-    );
+    expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain('name="Integration Blue"');
 
     const restored = getActiveSheet((await decodeXlsx(encoded.bytes)).workbook);
     expect(restored.tables).toEqual([

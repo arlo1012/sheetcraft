@@ -30,6 +30,7 @@ export function createContextClearCommand(
         address: { row, column },
         content: mode === "all" ? null : (cell.content ?? null),
         style: null,
+        ...(mode === "all" ? { note: null } : {}),
       },
     ];
   });

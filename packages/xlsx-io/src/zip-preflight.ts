@@ -341,7 +341,15 @@ export async function preflightXlsxArchive(
   const names = new Set(materialEntries.map((entry) => entry.name.toLowerCase()));
   if ([...names].some((name) => name === "xl/vbaproject.bin" || name.endsWith(".xlsm")))
     fail("macro-content", report);
-  if ([...names].some((name) => name.startsWith("xl/drawings/") || name.startsWith("xl/media/")))
+  if (
+    [...names].some(
+      (name) =>
+        (!name.endsWith("/") &&
+          name.startsWith("xl/drawings/") &&
+          !/^xl\/drawings\/vmldrawing\d+\.vml$/i.test(name)) ||
+        name.startsWith("xl/media/"),
+    )
+  )
     fail("drawing-or-media", report);
   if (
     [...names].some(
@@ -360,7 +368,6 @@ export async function preflightXlsxArchive(
       report.add("macro-content", "block", entry.name);
     if (
       name.startsWith("xl/tables/") ||
-      name.startsWith("xl/comments") ||
       name.startsWith("xl/pivot") ||
       name.startsWith("xl/charts") ||
       name.startsWith("customxml/") ||
@@ -378,6 +385,7 @@ export async function preflightXlsxArchive(
       name.startsWith("xl/_rels/") ||
       name.startsWith("xl/worksheets/") ||
       name.startsWith("xl/theme/") ||
+      /^xl\/drawings\/vmldrawing\d+\.vml$/i.test(name) ||
       name.startsWith("xl/tables/") ||
       name.startsWith("xl/comments") ||
       name.startsWith("xl/pivot") ||
