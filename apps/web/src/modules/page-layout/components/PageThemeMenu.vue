@@ -634,6 +634,10 @@ watch(
   padding: 0 4px;
   background: var(--idea-surface-panel);
   text-align: left;
+
+  &:hover {
+    background: var(--idea-surface-hover);
+  }
 }
 .page-theme-menu__font-row {
   grid-template-columns: 44px minmax(0, 1fr);
