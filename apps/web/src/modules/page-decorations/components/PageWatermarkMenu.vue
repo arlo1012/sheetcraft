@@ -334,6 +334,10 @@ function deletePreset(preset: WatermarkPreset): void {
     border-radius: var(--idea-radius-small);
     cursor: pointer;
 
+    &:hover:not(:disabled) {
+      background: var(--idea-surface-hover);
+    }
+
     &:focus-visible:not(:disabled) {
       border-color: var(--idea-action-primary);
       outline: none;
