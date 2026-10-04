@@ -87,18 +87,19 @@ watch(
     :header="t('pageTools.customThemeFonts')"
     :confirm-btn="t('pageTools.save')"
     :cancel-btn="t('pageTools.cancel')"
-    width="min(720px, calc(100vw - 32px))"
+    width="min(660px, calc(100vw - 32px))"
     placement="center"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
     @confirm="save"
     @close="close"
   >
-    <TForm class="custom-theme-fonts-dialog" label-align="top">
-      <TFormItem :label="t('pageTools.themeSchemeName')"
-        ><span ref="nameInputRef"
-          ><TInput v-model="draft.name" autofocus :status="error ? 'error' : undefined" /></span
-      ></TFormItem>
+    <TForm class="custom-theme-fonts-dialog idea-form-grid" label-align="top">
+      <TFormItem :label="t('pageTools.themeSchemeName')" label-align="left" label-width="48px">
+        <div ref="nameInputRef" class="custom-theme-fonts-dialog__name">
+          <TInput v-model="draft.name" autofocus clearable :status="error ? 'error' : undefined" />
+        </div>
+      </TFormItem>
       <p v-if="error" class="custom-theme-fonts-dialog__error" role="alert">{{ error }}</p>
       <div class="custom-theme-fonts-dialog__content">
         <div class="custom-theme-fonts-dialog__fields">
@@ -123,15 +124,16 @@ watch(
         </div>
         <section class="custom-theme-fonts-dialog__preview" :aria-label="t('pageTools.preview')">
           <strong>{{ t("pageTools.preview") }}</strong>
-          <div>
-            <span>{{ t("pageTools.westernFonts") }}</span>
-            <p :style="westernHeadingStyle">Heading</p>
-            <p :style="westernBodyStyle">Body text, body text, body text.</p>
-          </div>
-          <div>
-            <span>{{ t("pageTools.chineseFonts") }}</span>
-            <p :style="eastAsiaHeadingStyle">{{ t("pageTools.headingPreview") }}</p>
-            <p :style="eastAsiaBodyStyle">{{ t("pageTools.bodyPreview") }}</p>
+          <span>{{ t("pageTools.customStylePreview") }}</span>
+          <div class="custom-theme-fonts-dialog__preview-sheet">
+            <section :aria-label="t('pageTools.westernFonts')">
+              <p :style="westernHeadingStyle">Heading</p>
+              <p :style="westernBodyStyle">Body text, body text, body text.</p>
+            </section>
+            <section :aria-label="t('pageTools.chineseFonts')">
+              <p :style="eastAsiaHeadingStyle">{{ t("pageTools.headingPreview") }}</p>
+              <p :style="eastAsiaBodyStyle">{{ t("pageTools.bodyPreview") }}</p>
+            </section>
           </div>
         </section>
       </div>
@@ -147,10 +149,13 @@ watch(
 
   display: grid;
   max-height: calc(100vh - 180px);
-  gap: 12px;
+  gap: 24px;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 4px;
+}
+.custom-theme-fonts-dialog__name {
+  width: 100%;
 }
 .custom-theme-fonts-dialog__error {
   margin: -8px 0 0;
@@ -160,12 +165,12 @@ watch(
 }
 .custom-theme-fonts-dialog__content {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.9fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 .custom-theme-fonts-dialog__fields {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 .custom-theme-fonts-dialog__fields section {
   display: grid;
@@ -178,28 +183,46 @@ watch(
 }
 .custom-theme-fonts-dialog__preview {
   display: grid;
-  align-content: start;
-  gap: 14px;
-  padding: 16px;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+}
+.custom-theme-fonts-dialog__preview-sheet {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  min-height: 240px;
+  padding: 24px 32px;
+  background: var(--idea-surface-panel);
   border: 1px solid var(--idea-border-subtle);
   border-radius: var(--idea-radius-default);
 }
-.custom-theme-fonts-dialog__preview div {
+.custom-theme-fonts-dialog__preview-sheet section {
   display: grid;
-  gap: 4px;
+  align-content: center;
+  gap: 12px;
+  padding: 16px 0;
+
+  + section {
+    border-top: 1px solid var(--idea-border-subtle);
+  }
 }
 .custom-theme-fonts-dialog__preview span {
-  color: var(--idea-text-secondary);
   font-size: 12px;
-  line-height: 18px;
+  line-height: 20px;
 }
 .custom-theme-fonts-dialog__preview p {
   margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 20px;
+}
+.custom-theme-fonts-dialog__preview p:first-of-type {
   font-size: 14px;
   line-height: 22px;
 }
-.custom-theme-fonts-dialog__preview p:first-of-type {
-  font-size: 20px;
-  line-height: 28px;
+@media (max-width: 560px) {
+  .custom-theme-fonts-dialog__content {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

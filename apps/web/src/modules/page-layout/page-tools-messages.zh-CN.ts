@@ -55,6 +55,7 @@ export const pageToolsZhCN = {
     chineseHeadingFont: "中文标题字体",
     chineseBodyFont: "中文正文字体",
     preview: "预览",
+    customStylePreview: "自定义样式预览",
     themeColorSlots: "主题颜色",
     lightModePreview: "浅色模式 {index}",
     darkModePreview: "深色模式 {index}",

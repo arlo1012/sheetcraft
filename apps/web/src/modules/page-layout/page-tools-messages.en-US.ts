@@ -56,6 +56,7 @@ export const pageToolsEnUS = {
     chineseHeadingFont: "Chinese heading font",
     chineseBodyFont: "Chinese body font",
     preview: "Preview",
+    customStylePreview: "Custom style preview",
     themeColorSlots: "Theme colors",
     lightModePreview: "Light mode {index}",
     darkModePreview: "Dark mode {index}",

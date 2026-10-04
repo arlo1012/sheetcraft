@@ -53,6 +53,7 @@ export type PageToolsMessageSchema = {
     chineseHeadingFont: string;
     chineseBodyFont: string;
     preview: string;
+    customStylePreview: string;
     themeColorSlots: string;
     lightModePreview: string;
     darkModePreview: string;
