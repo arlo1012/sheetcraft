@@ -26,8 +26,10 @@ export type PageDecorationMessageSchema = {
     workbook: string;
     preview: string;
     protectedSheets: string;
-    draft: string;
     confidential: string;
+    topSecret: string;
+    noCopy: string;
+    internalUse: string;
     customWatermark: string;
     watermarkText: string;
     fontSize: string;

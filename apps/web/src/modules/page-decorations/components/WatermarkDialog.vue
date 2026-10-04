@@ -35,6 +35,7 @@ const imageEnabled = ref(false);
 const scope = ref<"sheet" | "workbook">("workbook");
 const imageInput = ref<HTMLInputElement>();
 const imageFile = ref<File>();
+const imageDragOver = ref(false);
 const imageDraft = ref({ assetId: "", scale: null as number | null, washout: true, angle: 0 });
 const previewCanvas = ref<HTMLCanvasElement>();
 const localImageUrl = ref<string>();
@@ -125,7 +126,21 @@ function imageChanged(event: Event): void {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = "";
-  if (!file || !file.type.startsWith("image/")) return;
+  if (file) selectImageFile(file);
+}
+function imageDraggedOver(event: DragEvent): void {
+  imageDragOver.value = !props.busy;
+  if (event.dataTransfer) event.dataTransfer.dropEffect = props.busy ? "none" : "copy";
+}
+function imageDropped(event: DragEvent): void {
+  imageDragOver.value = false;
+  const file = Array.from(event.dataTransfer?.files ?? []).find((file) =>
+    file.type.startsWith("image/"),
+  );
+  if (file) selectImageFile(file);
+}
+function selectImageFile(file: File): void {
+  if (props.busy || !file.type.startsWith("image/")) return;
   clearLocalImage();
   imageFile.value = file;
   localImageUrl.value = URL.createObjectURL(file);
@@ -156,6 +171,7 @@ function save(): void {
 watch(
   () => [props.visible, props.watermark] as const,
   ([visible, watermark]) => {
+    imageDragOver.value = false;
     if (!visible) return;
     clearLocalImage();
     draft.value = copyWatermark(watermark);
@@ -205,9 +221,13 @@ onBeforeUnmount(clearLocalImage);
         <div class="watermark-dialog__image-controls" :class="{ 'is-disabled': !imageEnabled }">
           <button
             class="watermark-dialog__choose-image"
+            :class="{ 'is-drag-over': imageDragOver }"
             type="button"
-            :disabled="!imageEnabled || busy"
+            :disabled="busy"
             @click="chooseImage"
+            @dragover.prevent.stop="imageDraggedOver"
+            @dragleave="imageDragOver = false"
+            @drop.prevent.stop="imageDropped"
           >
             {{ draft.image ? t("pageDecoration.changeImage") : t("pageDecoration.chooseImage") }}
           </button>
@@ -266,14 +286,15 @@ onBeforeUnmount(clearLocalImage);
               v-model="draft.text"
               :disabled="!textEnabled || busy"
               :options="[
-                { label: t('pageDecoration.draft'), value: t('pageDecoration.draft') },
                 {
                   label: t('pageDecoration.confidential'),
                   value: t('pageDecoration.confidential'),
                 },
+                { label: t('pageDecoration.topSecret'), value: t('pageDecoration.topSecret') },
+                { label: t('pageDecoration.noCopy'), value: t('pageDecoration.noCopy') },
+                { label: t('pageDecoration.internalUse'), value: t('pageDecoration.internalUse') },
               ]"
               :input-props="{ maxlength: 256 }"
-              filterable
             />
           </TFormItem>
           <TFormItem :label="t('pageDecoration.fontFamily')">
@@ -377,6 +398,11 @@ onBeforeUnmount(clearLocalImage);
   }
   &__choose-image:disabled {
     cursor: default;
+  }
+  &__choose-image.is-drag-over {
+    border-color: var(--idea-action-primary);
+    background: var(--idea-action-primary-subtle);
+    color: var(--idea-action-primary);
   }
   &__form {
     margin-top: 10px;

@@ -56,11 +56,17 @@ function remove(): void {
         :label="t('pageDecoration.watermark')"
         class="page-watermark-menu__surface"
       >
-        <MenuItem @select="apply(t('pageDecoration.draft'))">{{
-          t("pageDecoration.draft")
-        }}</MenuItem>
         <MenuItem @select="apply(t('pageDecoration.confidential'))">{{
           t("pageDecoration.confidential")
+        }}</MenuItem>
+        <MenuItem @select="apply(t('pageDecoration.topSecret'))">{{
+          t("pageDecoration.topSecret")
+        }}</MenuItem>
+        <MenuItem @select="apply(t('pageDecoration.noCopy'))">{{
+          t("pageDecoration.noCopy")
+        }}</MenuItem>
+        <MenuItem @select="apply(t('pageDecoration.internalUse'))">{{
+          t("pageDecoration.internalUse")
         }}</MenuItem>
         <MenuSeparator />
         <MenuItem @select="custom">{{ t("pageDecoration.customWatermark") }}</MenuItem>
