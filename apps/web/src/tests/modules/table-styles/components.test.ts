@@ -117,6 +117,20 @@ describe("table style gallery", () => {
     document.body.replaceChildren();
   });
 
+  test("opens the same custom-style actions from Shift+F10", async () => {
+    const wrapper = mount(TableStyleGallery, {
+      attachTo: document.body,
+      props: { styles: [editableStyle] },
+      global: { plugins: [createAppI18n("en-US")] },
+    });
+    const tile = wrapper.get(`[data-table-style-id="${editableStyle.id}"]`);
+    await tile.trigger("keydown", { key: "F10", shiftKey: true });
+    await new DOMWrapper(document.body).get('[data-custom-style-action="delete"]').trigger("click");
+    expect(wrapper.emitted("delete")).toEqual([[editableStyle]]);
+    wrapper.unmount();
+    document.body.replaceChildren();
+  });
+
   test("moves through the seven-column gallery with the arrow and boundary keys", async () => {
     const wrapper = mount(TableStyleGallery, {
       attachTo: document.body,

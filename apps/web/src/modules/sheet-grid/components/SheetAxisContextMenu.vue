@@ -14,11 +14,11 @@ import {
   Settings2,
   Trash2,
 } from "lucide-vue-next";
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 import type { CellRange, Sheet, SheetDimensionAxis } from "@idea10/core/workbook";
-import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
+import { useContextMenu } from "../../../shared/menu/useContextMenu";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -63,7 +63,11 @@ const panelRef = ref<HTMLElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const isOpen = ref(true);
 const menuAnchor = computed(() => props.anchor);
-const { floatingStyles: menuStyle } = useDismissibleFloatingPanel(menuAnchor, panelRef, isOpen, {
+const { floatingStyles: menuStyle } = useContextMenu({
+  anchor: menuAnchor,
+  panelRef,
+  open: isOpen,
+  surfaceRef: menuSurfaceRef,
   offset: 4,
   onDismiss: ({ restoreFocus }) => close(restoreFocus),
 });
@@ -129,7 +133,6 @@ function requestClear(mode: "contents" | "formats" | "all"): void {
   if (mode === "contents" && !props.state) emit("clear");
   dispatch({ type: "clear", mode });
 }
-onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
 </script>
 
 <template>
@@ -276,7 +279,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
 
 <style scoped lang="scss">
 .sheet-axis-context-menu-panel {
-  z-index: 100;
+  z-index: var(--idea-layer-context-menu);
   display: grid;
   gap: 6px;
   width: max-content;

@@ -96,6 +96,33 @@ Use CSS pixels at 100% scale; size and line height are a pair.
   shadow. Text menus size to content; reserve fixed widths for inputs, searchable
   lists, and compact preset grids.
 
+## Floating content and context menus
+
+Use the shared primitives before adding any floating UI. `FloatingPanelSurface`
+owns a plain popover/panel surface; `useMenu` plus `MenuSurface` owns a command
+menu; `useContextMenu` opens that menu from a pointer or keyboard anchor; and
+`useSubmenu` owns submenu disclosure and focus transfer. `MenuSurface` body and
+footer slots support searchable/scrolling content and fixed actions without a
+feature recreating the surface. Use `bodyScrollable=false` when the body contains
+independently scrolling groups, as in theme colors. A feature owns its commands, variable content,
+placement, and size limits; the primitives own positioning, dismissal, focus
+return, menu roles, rows, surface treatment, and overlay layer.
+
+- Search `shared/floating` and `shared/menu` first. If the behavior is missing,
+  extend the closest primitive with a typed prop, emit, composable option, or
+  named slot that can serve another consumer. Do not import Floating UI directly
+  outside `shared/floating`, or create a feature-local document dismissal loop.
+- Use `--idea-layer-menu`, `--idea-layer-submenu`, `--idea-layer-context-menu`,
+  `--idea-layer-context-submenu`, `--idea-layer-popover`, and
+  `--idea-layer-popover-submenu`, `--idea-layer-toolbar`, and
+  `--idea-layer-sheet-menu` for document-level overlays. Numeric `z-index` values
+  through 30 are only for local composition within a component; values above that
+  threshold are reserved and rejected by `bun run check:web-ui`.
+- Use `MenuSurface` for menu semantics. `BorderLineStylePanel` is the intentional
+  shared exception because its grid has specialized radio-item interaction. Use
+  native TDesign dialogs directly when their public API fits; this policy does
+  not introduce wrappers for ordinary dialogs.
+
 ## Review
 
 Before committing, remove copied controls/CSS, undefined tokens, and unexplained

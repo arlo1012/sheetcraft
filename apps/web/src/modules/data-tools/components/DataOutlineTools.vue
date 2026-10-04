@@ -149,8 +149,7 @@ function onClearOutline(): void {
 .data-outline-tools {
   display: contents;
   &__menu {
-    position: fixed;
-    z-index: 80;
+    z-index: var(--idea-layer-menu);
   }
 }
 </style>

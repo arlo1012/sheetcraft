@@ -9,13 +9,14 @@ import type {
   CellBorderPreset,
 } from "@idea10/core/style";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
-import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
+import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useRovingFocus } from "../../../shared/focus/useRovingFocus";
 import { useAppI18n } from "../../../shared/i18n";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import { useSubmenu } from "../../../shared/menu/useSubmenu";
 import BorderColorPanel from "./BorderColorPanel.vue";
 import BorderLineStylePanel from "../../../shared/borders/BorderLineStylePanel.vue";
 import BorderPresetGrid from "./BorderPresetGrid.vue";
@@ -41,46 +42,47 @@ const splitActionRef = ref<InstanceType<typeof RibbonSplitButton> | null>(null);
 const triggerRef = computed(() => splitActionRef.value?.menuElement ?? null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuRef = computed(() => menuSurfaceRef.value?.rootElement ?? null);
-const submenuRef = ref<HTMLDivElement | null>(null);
+const submenuRef = ref<InstanceType<typeof FloatingPanelSurface> | null>(null);
 const open = ref(false);
-const activeSubmenu = ref<BorderSubmenu | null>(null);
 const stackedSubmenu = ref(false);
 const lineStyle = ref<CellBorderLineStyle | null>(DEFAULT_BORDER.style);
 const color = ref(DEFAULT_BORDER.color);
 const lastPreset = ref<CellBorderPreset>("bottom");
 const menuId = `cell-border-menu-${useId().replaceAll(":", "")}`;
 const submenuId = `cell-border-submenu-${useId().replaceAll(":", "")}`;
-const submenuOpen = computed(() => activeSubmenu.value !== null);
 function menuRow(row: "color" | "style"): HTMLElement | null {
   return menuRef.value?.querySelector<HTMLElement>(`[data-border-menu-row="${row}"]`) ?? null;
 }
-const submenuAnchorRef = computed(() => {
-  if (stackedSubmenu.value) return menuRef.value;
-  if (activeSubmenu.value === "color") return menuRow("color");
-  if (activeSubmenu.value === "style") return menuRow("style");
-  return menuRow("style");
-});
 const submenuPlacement = computed(() =>
   stackedSubmenu.value ? ("bottom-end" as const) : ("right-start" as const),
 );
+const {
+  activeSubmenu,
+  submenuElement,
+  submenuStyles,
+  openSubmenu,
+  closeSubmenu: closeSharedSubmenu,
+  onSubmenuKeydown: onSharedSubmenuKeydown,
+} = useSubmenu<BorderSubmenu>({
+  parentOpen: open,
+  submenuSurfaceRef: submenuRef,
+  getAnchor: (submenu) => (stackedSubmenu.value ? menuRef.value : menuRow(submenu)),
+  placement: submenuPlacement,
+  offset: 4,
+  focus: () => submenuItems()[0]?.focus(),
+});
 const { floatingStyles: menuStyles, dismiss: dismissMenu } = useDismissibleFloatingPanel(
   triggerRef,
   menuRef,
   open,
   {
     offset: 4,
-    additionalInside: () => [splitActionRef.value?.rootElement, submenuRef.value],
+    additionalInside: () => [splitActionRef.value?.rootElement, submenuElement.value],
     onDismiss: () => {
       activeSubmenu.value = null;
       open.value = false;
     },
   },
-);
-const { floatingStyles: submenuStyles } = useFloatingPanel(
-  submenuAnchorRef,
-  submenuRef,
-  submenuOpen,
-  { placement: submenuPlacement, offset: 4 },
 );
 const { move: moveRovingFocus } = useRovingFocus();
 const DOCUMENT_FOCUS_TARGET_SELECTOR = [
@@ -97,8 +99,8 @@ function menuItems(): HTMLElement[] {
 }
 function submenuItems(): HTMLElement[] {
   return Array.from(
-    submenuRef.value?.querySelectorAll<HTMLElement>(
-      "button:not(:disabled), input:not(:disabled)",
+    submenuElement.value?.querySelectorAll<HTMLElement>(
+      '[role="menuitemradio"]:not([aria-disabled="true"]), button:not(:disabled), input:not(:disabled)',
     ) ?? [],
   );
 }
@@ -110,14 +112,7 @@ function closeAll(restoreFocus: boolean): void {
   dismissMenu("programmatic", restoreFocus);
 }
 function closeSubmenu(restoreFocus: boolean): void {
-  const row =
-    activeSubmenu.value === "color"
-      ? menuRow("color")
-      : activeSubmenu.value === "style"
-        ? menuRow("style")
-        : menuRow("style");
-  activeSubmenu.value = null;
-  if (restoreFocus) void nextTick(() => row?.focus());
+  closeSharedSubmenu(restoreFocus);
 }
 function openMenu(preferred: "first" | "last" = "first"): void {
   if (!props.disabled) {
@@ -157,10 +152,6 @@ function applyLastPreset(): void {
       : { preset, border: { style: lineStyle.value ?? DEFAULT_BORDER.style, color: color.value } },
   );
   closeAll(false);
-}
-function openSubmenu(submenu: BorderSubmenu): void {
-  activeSubmenu.value = submenu;
-  void nextTick(() => submenuItems()[0]?.focus());
 }
 function selectPreset(action: CellBorderAction): void {
   if (props.disabled) return;
@@ -247,12 +238,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
   const isColorPaletteEvent =
     event.target instanceof HTMLElement && event.target.closest(".color-palette");
   if (event.defaultPrevented || (isColorPaletteEvent && event.key !== "Escape")) return;
-  if (event.key === "Escape" || event.key === "ArrowLeft") {
-    event.preventDefault();
-    event.stopPropagation();
-    closeSubmenu(true);
-    return;
-  }
+  if (onSharedSubmenuKeydown(event)) return;
   if (event.key === "Tab") {
     event.preventDefault();
     moveFocusFromTrigger(event.shiftKey ? -1 : 1);
@@ -357,15 +343,17 @@ onBeforeUnmount(() => {
         </MenuItem>
       </MenuSurface>
 
-      <div
+      <FloatingPanelSurface
         v-if="activeSubmenu"
         :id="submenuId"
         ref="submenuRef"
         class="cell-border-menu__submenu"
         :class="`is-${activeSubmenu}`"
         :style="submenuStyles"
-        :role="activeSubmenu === 'style' ? 'menu' : 'dialog'"
-        :aria-label="
+        layer="submenu"
+        :role="activeSubmenu === 'style' ? 'group' : 'dialog'"
+        :padding="activeSubmenu === 'style' ? 'tool' : 'none'"
+        :label="
           activeSubmenu === 'color'
             ? t('format.borderColor')
             : activeSubmenu === 'style'
@@ -387,7 +375,7 @@ onBeforeUnmount(() => {
           :color="color"
           @select="selectLineStyle"
         />
-      </div>
+      </FloatingPanelSurface>
     </Teleport>
   </span>
 </template>
@@ -401,18 +389,8 @@ onBeforeUnmount(() => {
 
 .cell-border-menu {
   &__panel {
-    z-index: 100;
     width: 174px;
     max-height: calc(100vh - 16px);
-  }
-  &__submenu {
-    z-index: 100;
-    max-height: calc(100vh - 16px);
-    overflow-y: auto;
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-medium);
-    box-shadow: var(--idea-shadow-floating);
   }
   &__presets {
     padding: 0 var(--idea-tool-panel-padding);
@@ -420,12 +398,10 @@ onBeforeUnmount(() => {
   }
   &__submenu {
     width: 178px;
-    padding: var(--idea-tool-panel-padding);
   }
   &__submenu.is-color {
     width: max-content;
     min-width: 208px;
-    padding: 0;
   }
 }
 </style>

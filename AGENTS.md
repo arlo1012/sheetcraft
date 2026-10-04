@@ -29,6 +29,10 @@
   Consider future reuse; extract loosely coupled components for clear repeated
   contracts and shared primitives for real duplication. Keep features independently
   understandable and one-off behavior local.
+- Build floating content with `shared/floating` and menus with `shared/menu`;
+  extend their explicit slots or composables before introducing new positioning,
+  dismissal, menu semantics, or overlay layers. Keep TDesign dialogs as direct
+  library use unless a repeated product contract exists.
 - Prefer typed props, emits, and slots. Keep files focused; avoid barrels that hide
   ownership and implementation-heavy index files. Package entrypoints must be thin,
   explicit public APIs. Add dependencies only for implemented requirements.

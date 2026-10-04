@@ -19,6 +19,8 @@ import {
 } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { vIconAction } from "../../../shared/focus/icon-action";
+import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
+import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import type { Sheet, SheetProperties } from "@idea10/core/workbook";
 import { getVisibleSheets } from "../sheet-navigation";
 import { getSheetTabColorStyles } from "../sheet-tab-color";
@@ -73,10 +75,7 @@ const canScrollRight = ref(false);
 let resizeObserver: ResizeObserver | undefined;
 const openMenuSheetId = ref<string>();
 const menuSheet = computed(() => props.sheets.find((sheet) => sheet.id === openMenuSheetId.value));
-const menuAnchor = computed(() =>
-  openMenuSheetId.value ? (tabButtons.get(openMenuSheetId.value) ?? null) : null,
-);
-const menuPosition = ref({ left: 4, bottom: 34 });
+const menuAnchor = ref<FloatingReference | null>(null);
 const draggedSheetId = ref<string>();
 const dropTarget = ref<{ sheetId: string; side: "before" | "after" }>();
 let suppressNextTabClick = false;
@@ -116,25 +115,15 @@ function cancelRename(): void {
 function closeMenu(restoreFocus = false): void {
   const sheetId = openMenuSheetId.value;
   openMenuSheetId.value = undefined;
+  menuAnchor.value = null;
   if (restoreFocus && sheetId) {
     void nextTick(() => tabButtons.get(sheetId)?.focus());
   }
 }
 
-function setMenuPosition(clientX: number, clientY: number): void {
-  menuPosition.value = {
-    left: Math.max(8, Math.min(clientX, window.innerWidth - 184)),
-    bottom: Math.max(4, Math.min(window.innerHeight - clientY + 4, window.innerHeight - 76)),
-  };
-}
-
 function openMenu(sheet: Sheet, pointer?: { clientX: number; clientY: number }): void {
-  if (pointer) {
-    setMenuPosition(pointer.clientX, pointer.clientY);
-  } else {
-    const rect = tabButtons.get(sheet.id)?.getBoundingClientRect();
-    setMenuPosition(rect?.left ?? 4, rect?.top ?? window.innerHeight - 30);
-  }
+  const trigger = tabButtons.get(sheet.id) ?? null;
+  menuAnchor.value = pointer ? createContextMenuPoint(pointer, trigger) : trigger;
   openMenuSheetId.value = sheet.id;
 }
 
@@ -548,7 +537,6 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
       :can-hide="visibleSheets.length > 1"
       :can-delete="visibleSheets.length > 1"
       :is-open="true"
-      :position="menuPosition"
       @duplicate="duplicateFromMenu(menuSheet)"
       @rename="renameFromMenu(menuSheet)"
       @move-left="moveFromMenu(menuSheet, -1)"

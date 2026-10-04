@@ -10,9 +10,9 @@ import {
   TableCellsMerge,
   TextAlignCenter,
 } from "lucide-vue-next";
-import { computed, nextTick, ref, useId } from "vue";
+import { computed, ref, useId } from "vue";
 import type { CellMergeMode } from "@idea10/core/commands";
-import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
+import { useSubmenu } from "../../../shared/menu/useSubmenu";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
@@ -31,11 +31,9 @@ const triggerRef = computed(() => splitActionRef.value?.menuElement ?? null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const sameSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuRef = computed<HTMLElement | null>(() => menuSurfaceRef.value?.rootElement ?? null);
-const sameRef = computed<HTMLElement | null>(() => sameSurfaceRef.value?.rootElement ?? null);
 const sameAnchorRef = computed<HTMLElement | null>(
   () => menuRef.value?.querySelector<HTMLElement>('[data-merge-action="same"]') ?? null,
 );
-const sameOpen = ref(false);
 const menuId = `merge-cells-menu-${useId().replaceAll(":", "")}`;
 const sameMenuId = `merge-cells-same-${useId().replaceAll(":", "")}`;
 
@@ -61,15 +59,24 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   disabled: menuDisabled,
   additionalInside: () => [splitActionRef.value?.rootElement, sameRef.value],
   onDismiss: () => {
-    sameOpen.value = false;
+    closeSameMenu(false);
   },
   onOpen: () => {
-    sameOpen.value = false;
+    closeSameMenu(false);
   },
 });
-const { floatingStyles: sameStyles } = useFloatingPanel(sameAnchorRef, sameRef, sameOpen, {
-  placement: "right-start",
-  offset: 4,
+const {
+  submenuOpen: sameOpen,
+  submenuElement: sameRef,
+  submenuStyles: sameStyles,
+  openSubmenu,
+  closeSubmenu: closeSameMenu,
+  onParentFocusin,
+  onSubmenuKeydown: onSameMenuKeydown,
+} = useSubmenu<"same">({
+  parentOpen: open,
+  submenuSurfaceRef: sameSurfaceRef,
+  getAnchor: () => sameAnchorRef.value,
 });
 
 function closeAll(restoreFocus: boolean): void {
@@ -78,13 +85,7 @@ function closeAll(restoreFocus: boolean): void {
 
 function openSameMenu(): void {
   if (!sameEnabled.value || props.disabled) return;
-  sameOpen.value = true;
-  void nextTick(() => sameSurfaceRef.value?.focusFirstItem());
-}
-
-function closeSameMenu(restoreFocus: boolean): void {
-  sameOpen.value = false;
-  if (restoreFocus) void nextTick(() => sameAnchorRef.value?.focus());
+  openSubmenu("same");
 }
 
 function merge(mode: CellMergeMode, restoreFocus = true): void {
@@ -113,16 +114,7 @@ function onMenuKeydown(event: KeyboardEvent): void {
 
 function onMenuFocusin(event: FocusEvent): void {
   const target = event.target instanceof Element ? event.target : null;
-  if (sameOpen.value && !target?.closest('[data-merge-action="same"]')) {
-    closeSameMenu(false);
-  }
-}
-
-function onSameMenuKeydown(event: KeyboardEvent): void {
-  if (event.key !== "Escape" && event.key !== "ArrowLeft") return;
-  event.preventDefault();
-  event.stopPropagation();
-  closeSameMenu(true);
+  onParentFocusin(target?.closest('[data-merge-action="same"]') ? "same" : undefined);
 }
 </script>
 
@@ -253,11 +245,10 @@ function onSameMenuKeydown(event: KeyboardEvent): void {
 }
 
 .merge-cells-menu {
-  position: fixed;
-  z-index: 80;
+  z-index: var(--idea-layer-menu);
 
   &--same {
-    z-index: 81;
+    z-index: var(--idea-layer-submenu);
   }
 }
 </style>

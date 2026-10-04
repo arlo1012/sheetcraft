@@ -149,7 +149,7 @@ describe("DataFillTool", () => {
     expect(wrapper.emitted("currentDate")).toEqual([["yyyy年mm月dd日"]]);
   });
 
-  test("supports right and left submenu navigation, then closes the whole menu on Escape", async () => {
+  test("supports right and left submenu navigation, then closes one menu level per Escape", async () => {
     const wrapper = mountTool();
     const trigger = wrapper.get<HTMLElement>('[data-data-action="fill"]');
     await trigger.trigger("click");
@@ -168,6 +168,12 @@ describe("DataFillTool", () => {
 
     await text.trigger("keydown", { key: "ArrowRight" });
     await submenu().trigger("keydown", { key: "Escape" });
+    await nextTick();
+    expect(document.body.querySelector('[id^="data-fill-submenu-"]')).toBeNull();
+    expect(rootMenu().element.isConnected).toBe(true);
+    expect(document.activeElement).toBe(text.element);
+
+    await rootMenu().trigger("keydown", { key: "Escape" });
     await nextTick();
     expect(document.body.querySelector('[id^="data-fill-"]')).toBeNull();
     expect(document.activeElement).toBe(trigger.element);

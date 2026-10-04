@@ -183,7 +183,7 @@ describe("CellBorderMenu interaction", () => {
     expect(style.findAll('[role="menuitemradio"]')).toHaveLength(14);
     expect(style.get('[data-border-line-option="thin"]').attributes("aria-checked")).toBe("true");
     expect(style.get('[data-border-line-option="none"]').text()).toBe("无");
-    expect(style.findAll("button")).toHaveLength(14);
+    expect(style.findAll("button")).toHaveLength(1);
     await style.get('[data-border-line-option="double"]').trigger("click");
     expect(document.body.querySelector('[data-border-submenu="style"]')).toBeNull();
     expect(document.activeElement).toBe(styleRow.element);

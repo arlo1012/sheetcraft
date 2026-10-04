@@ -146,7 +146,7 @@ function fitSelection(): void {
 
 <style scoped lang="scss">
 .sheet-zoom-menu {
-  z-index: 90;
+  z-index: var(--idea-layer-toolbar);
   width: 176px;
   &__trigger {
     display: inline-flex;

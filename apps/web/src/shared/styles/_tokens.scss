@@ -1,5 +1,13 @@
 @layer theme {
   :root {
+    --idea-layer-menu: 80;
+    --idea-layer-submenu: 81;
+    --idea-layer-toolbar: 90;
+    --idea-layer-context-menu: 100;
+    --idea-layer-context-submenu: 101;
+    --idea-layer-sheet-menu: 120;
+    --idea-layer-popover: 2200;
+    --idea-layer-popover-submenu: 2201;
     --idea-tool-panel-padding: var(--idea-space-4);
     --idea-dialog-content-padding-block: var(--idea-space-5);
     --idea-menu-padding: var(--idea-space-4) 0;

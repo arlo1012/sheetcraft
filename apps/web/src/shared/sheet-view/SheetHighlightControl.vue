@@ -6,6 +6,7 @@ import ColorPalette from "../color/ColorPalette.vue";
 import { getContrastingForeground, mixHexColors } from "../color/contrast";
 import { normalizeColor } from "../color/palette";
 import { useDismissibleFloatingPanel } from "../floating/useDismissibleFloatingPanel";
+import FloatingPanelSurface from "../floating/FloatingPanelSurface.vue";
 import { vIconAction } from "../focus/icon-action";
 import { useAppI18n } from "../i18n";
 import RibbonButton from "../ribbon/RibbonButton.vue";
@@ -48,7 +49,8 @@ const emit = defineEmits<{
 }>();
 const { t } = useAppI18n();
 const colorTriggerRef = ref<HTMLElement | null>(null);
-const colorPanelRef = ref<HTMLDivElement | null>(null);
+const colorPanelSurfaceRef = ref<InstanceType<typeof FloatingPanelSurface> | null>(null);
+const colorPanelRef = computed(() => colorPanelSurfaceRef.value?.rootElement ?? null);
 const colorPickerOpen = ref(false);
 const colorPanelId = `sheet-highlight-color-${useId().replaceAll(":", "")}`;
 const colorTriggerRefValue = computed(() => colorTriggerRef.value);
@@ -159,15 +161,14 @@ function selectHighlightColor(value: string | null): void {
     </span>
   </div>
   <Teleport to="body"
-    ><div
+    ><FloatingPanelSurface
       v-if="colorPickerOpen"
       :id="colorPanelId"
-      ref="colorPanelRef"
+      ref="colorPanelSurfaceRef"
       class="sheet-highlight-control__color-panel"
       :style="floatingStyles"
-      role="dialog"
-      :aria-label="t('statusBar.highlightColor')"
-      tabindex="-1"
+      :label="t('statusBar.highlightColor')"
+      layer="toolbar"
       :data-cell-edit-session="
         colorTriggerRef?.closest('[data-cell-edit-session]')?.getAttribute('data-cell-edit-session')
       "
@@ -179,8 +180,7 @@ function selectHighlightColor(value: string | null): void {
         :columns="9"
         compact
         clearable
-        @select="selectHighlightColor"
-      /></div
+        @select="selectHighlightColor" /></FloatingPanelSurface
   ></Teleport>
 </template>
 
@@ -220,9 +220,6 @@ function selectHighlightColor(value: string | null): void {
     color: var(--highlight-foreground);
     background: var(--highlight-background);
     border-radius: var(--idea-radius-small);
-  }
-  &__color-panel {
-    z-index: 90;
   }
 }
 </style>

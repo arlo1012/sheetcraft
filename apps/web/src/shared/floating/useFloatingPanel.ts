@@ -30,7 +30,11 @@ export function useFloatingPanel(
     open,
     placement: options.placement ?? "bottom-start",
     strategy: "fixed",
-    middleware: [offset(options.offset ?? 6), flip({ padding }), shift({ padding })],
+    middleware: [
+      offset(options.offset ?? 6),
+      flip({ padding }),
+      shift({ padding, crossAxis: true }),
+    ],
     whileElementsMounted: autoUpdate,
   });
 }

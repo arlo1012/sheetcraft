@@ -36,6 +36,7 @@ import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
 import { getSelectionFitZoom } from "../selection-zoom";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
+import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 import {
   isExplicitWarningConfirmationKey,
@@ -2052,10 +2053,7 @@ function openAxisContextMenu(
     axis,
     index: start,
     count: end - start + 1,
-    anchor: markRaw({
-      contextElement: rootRef.value ?? trigger,
-      getBoundingClientRect: () => new DOMRect(clientX, clientY, 0, 0),
-    }),
+    anchor: markRaw(createContextMenuPoint({ clientX, clientY }, rootRef.value ?? trigger)),
     trigger,
   };
 }
@@ -2157,10 +2155,7 @@ function openCellContextMenu(address: CellAddress, event: MouseEvent): void {
       getCellContent(props.sheet, layout.value.getAnchorForAddress(address))?.kind === "image"
         ? layout.value.getAnchorForAddress(address)
         : undefined,
-    anchor: markRaw({
-      contextElement: rootRef.value ?? contextElement ?? undefined,
-      getBoundingClientRect: () => new DOMRect(event.clientX, event.clientY, 0, 0),
-    }),
+    anchor: markRaw(createContextMenuPoint(event, rootRef.value ?? contextElement ?? undefined)),
   };
 }
 
@@ -2183,10 +2178,7 @@ function openActiveCellContextMenu(): void {
       getCellContent(props.sheet, activeCell.value)?.kind === "image"
         ? { ...activeCell.value }
         : undefined,
-    anchor: markRaw({
-      contextElement: scroller,
-      getBoundingClientRect: () => new DOMRect(x, y, 0, 0),
-    }),
+    anchor: markRaw(createContextMenuPoint({ clientX: x, clientY: y }, scroller)),
   };
 }
 

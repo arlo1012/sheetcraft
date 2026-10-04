@@ -336,12 +336,20 @@ describe("HomeFormatToolbar", () => {
       "automation",
       "utility",
     ]);
-    for (const groupName of ["history", "cell", "alignment", "number", "styles"]) {
+    for (const groupName of ["history", "cell", "alignment", "number"] as const) {
       const group = wrapper.get(`[data-ribbon-group="${groupName}"]`);
       expect(
-        group.findAll(":scope > [data-ribbon-row]").map((row) => row.attributes("data-ribbon-row")),
+        Array.from(group.element.children)
+          .filter((child) => child.hasAttribute("data-ribbon-row"))
+          .map((row) => row.getAttribute("data-ribbon-row")),
       ).toEqual(["1", "2"]);
     }
+    const stylesGroup = wrapper.get('[data-ribbon-group="styles"]');
+    expect(
+      Array.from(stylesGroup.get(".home-styles-group__styles").element.children)
+        .filter((child) => child.hasAttribute("data-ribbon-row"))
+        .map((row) => row.getAttribute("data-ribbon-row")),
+    ).toEqual(["1", "2"]);
 
     const cellGroup = wrapper.get('[data-ribbon-group="cell"]');
     const cellFirstRow = cellGroup.get(':scope > [data-ribbon-row="1"]');
@@ -366,7 +374,7 @@ describe("HomeFormatToolbar", () => {
 
     const tallActions = {
       data: ["filter", "protect"],
-      insert: ["insert", "image"],
+      insert: ["image"],
       automation: ["quick-tools", "generate-icon"],
       utility: ["print"],
     };
@@ -391,6 +399,8 @@ describe("HomeFormatToolbar", () => {
         expect(action.attributes("data-ribbon-span")).toBe("2");
       }
     }
+    const insertHyperlink = wrapper.get('[data-ribbon-action="insert-hyperlink"]');
+    expect(insertHyperlink.classes()).toContain("is-tall");
 
     for (const [stackName, actionNames] of [
       ["freeze-sort", ["freeze", "sort"]],
@@ -440,8 +450,21 @@ describe("HomeFormatToolbar", () => {
     expect(
       wrapper.get('[data-ribbon-group="alignment"] [data-ribbon-action="wrap-text"]'),
     ).toBeTruthy();
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(12);
-    for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
+    const placeholders = wrapper.findAll("[data-ribbon-placeholder]");
+    expect(
+      placeholders.map((placeholder) => placeholder.attributes("data-ribbon-placeholder")),
+    ).toEqual([
+      "chart",
+      "pivot-table",
+      "quick-tools",
+      "generate-icon",
+      "smart-table",
+      "pdf-to-editable",
+      "app-generator",
+      "pdf-to-image",
+      "print",
+    ]);
+    for (const placeholder of placeholders) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({
         type: "button",

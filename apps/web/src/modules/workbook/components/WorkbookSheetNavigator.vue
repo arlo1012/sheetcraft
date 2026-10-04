@@ -199,7 +199,7 @@ watch(open, (isOpen) => {
 
   &__menu {
     position: fixed;
-    z-index: 80;
+    z-index: var(--idea-layer-menu);
     display: flex;
     flex-direction: column;
     width: min(180px, calc(100vw - var(--idea-space-4) - var(--idea-space-4)));

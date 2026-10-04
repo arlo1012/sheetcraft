@@ -172,7 +172,7 @@ function selectMode(mode: CellFillMode): void {
 .sheet-auto-fill-options {
   &__trigger {
     position: absolute;
-    z-index: 95;
+    z-index: var(--idea-layer-toolbar);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -200,7 +200,7 @@ function selectMode(mode: CellFillMode): void {
   }
 
   &__menu {
-    z-index: 96;
+    z-index: var(--idea-layer-context-menu);
     outline: none;
   }
 }

@@ -265,12 +265,12 @@ describe("RowColumnOperationsMenu", () => {
     );
     const confirm = submenu().get('[data-axis-insert-confirm="insert-rows-above"]');
     await input.setValue("0");
-    expect(confirm.attributes("disabled")).toBeDefined();
+    expect(confirm.attributes("aria-disabled")).toBe("true");
     await confirm.trigger("click");
     expect(wrapper.emitted("insert")).toBeUndefined();
 
     await input.setValue("3");
-    expect(confirm.attributes("disabled")).toBeUndefined();
+    expect(confirm.attributes("aria-disabled")).toBe("false");
     await confirm.trigger("click");
     expect(wrapper.emitted("insert")).toEqual([[{ axis: "row", index: 2, count: 3 }]]);
   });

@@ -11,8 +11,9 @@ import {
   Trash2,
 } from "lucide-vue-next";
 import { computed, nextTick, ref, watch, type ComponentPublicInstance } from "vue";
-import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
+import { useContextMenu } from "../../../shared/menu/useContextMenu";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -22,11 +23,10 @@ import SheetTabColorPanel from "./SheetTabColorPanel.vue";
 const { t } = useAppI18n();
 const props = defineProps<{
   sheet: Sheet;
-  anchor: HTMLElement | null;
+  anchor: FloatingReference | null;
   sheetCount: number;
   sheetIndex: number;
   isOpen: boolean;
-  position: { left: number; bottom: number };
   canMoveLeft?: boolean;
   canMoveRight?: boolean;
   canHide?: boolean;
@@ -49,25 +49,24 @@ const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const colorActionRef = ref<HTMLElement | null>(null);
 const colorPanelOpen = ref(false);
 const menuRoot = computed<HTMLElement | null>(() => menuSurfaceRef.value?.rootElement ?? null);
+const menuOpen = computed(() => props.isOpen);
 const dismissibleOpen = computed(() => props.isOpen && !colorPanelOpen.value);
 const canMoveLeft = computed(() => props.canMoveLeft ?? props.sheetIndex > 0);
 const canMoveRight = computed(() => props.canMoveRight ?? props.sheetIndex < props.sheetCount - 1);
 const canHide = computed(() => props.canHide ?? props.sheetCount > 1);
 const canDelete = computed(() => props.canDelete ?? props.sheetCount > 1);
-const menuStyle = computed(() => ({
-  left: `${props.position.left}px`,
-  bottom: `${props.position.bottom}px`,
-  maxHeight: `min(360px, calc(100vh - ${props.position.bottom + 8}px))`,
-}));
-useDismissibleFloatingPanel(anchor, menuRoot, dismissibleOpen, {
+const { floatingStyles: menuStyle } = useContextMenu({
+  anchor,
+  panelRef: menuRoot,
+  open: dismissibleOpen,
+  focusOpen: menuOpen,
+  surfaceRef: menuSurfaceRef,
+  offset: 4,
   onDismiss: ({ restoreFocus }) => emit("close", restoreFocus),
 });
 
 function menuId(): string {
   return `workbook-sheet-menu-${props.sheet.id}`;
-}
-function focusFirstMenuItem(): void {
-  menuSurfaceRef.value?.focusFirstItem();
 }
 function setColorAction(instance: Element | ComponentPublicInstance | null): void {
   if (instance instanceof HTMLElement) {
@@ -102,11 +101,8 @@ function applyTabColor(value: string | null): void {
 
 watch(
   () => props.isOpen,
-  (open) => {
+  () => {
     colorPanelOpen.value = false;
-    if (open) {
-      void nextTick(focusFirstMenuItem);
-    }
   },
   { flush: "post", immediate: true },
 );
@@ -191,12 +187,3 @@ watch(
     @apply="applyTabColor"
   />
 </template>
-
-<style scoped lang="scss">
-.workbook-sheet-tabs {
-  &__menu {
-    position: fixed;
-    z-index: 80;
-  }
-}
-</style>

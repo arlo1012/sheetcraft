@@ -2,6 +2,7 @@
 import { ChevronDown } from "lucide-vue-next";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
+import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 
 const props = defineProps<{
@@ -12,7 +13,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ select: [color: string | null] }>();
 const triggerRef = ref<HTMLButtonElement | null>(null);
-const panelRef = ref<HTMLDivElement | null>(null);
+const panelSurfaceRef = ref<InstanceType<typeof FloatingPanelSurface> | null>(null);
+const panelRef = computed(() => panelSurfaceRef.value?.rootElement ?? null);
 const open = ref(false);
 const panelId = `error-indicator-color-${useId().replaceAll(":", "")}`;
 const color = computed(() => props.modelValue ?? "var(--idea-status-success)");
@@ -71,15 +73,15 @@ watch(
       </span>
       <ChevronDown :size="14" aria-hidden="true" />
     </button>
-    <div
+    <FloatingPanelSurface
       v-if="open"
       :id="panelId"
-      ref="panelRef"
+      ref="panelSurfaceRef"
       class="error-indicator-color-control__panel"
       :style="floatingStyles"
-      role="dialog"
-      :aria-label="label"
-      tabindex="-1"
+      :label="label"
+      viewport-inset="16px"
+      layer="context-submenu"
       @keydown="onPanelKeydown"
     >
       <ColorPalette
@@ -88,7 +90,7 @@ watch(
         :default-label="automaticLabel"
         @select="select"
       />
-    </div>
+    </FloatingPanelSurface>
   </div>
 </template>
 
@@ -126,16 +128,6 @@ watch(
     height: 14px;
     border: 1px solid var(--idea-border-control);
     border-radius: var(--idea-radius-small);
-  }
-  &__panel {
-    z-index: 110;
-    max-width: calc(100vw - 32px);
-    max-height: calc(100vh - 32px);
-    overflow: auto;
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-medium);
-    box-shadow: var(--idea-shadow-menu);
   }
 }
 </style>

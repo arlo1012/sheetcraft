@@ -125,7 +125,7 @@ function custom(): void {
 
 <style scoped lang="scss">
 .filter-color-sort-menu {
-  z-index: 2201;
+  z-index: var(--idea-layer-popover-submenu);
   width: max-content;
 
   &__label {

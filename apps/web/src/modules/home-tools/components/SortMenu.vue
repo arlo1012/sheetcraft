@@ -74,7 +74,6 @@ function select(direction: "ascending" | "descending"): void {
 }
 
 .sort-menu {
-  position: fixed;
-  z-index: 80;
+  z-index: var(--idea-layer-menu);
 }
 </style>

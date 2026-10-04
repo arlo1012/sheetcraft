@@ -13,13 +13,13 @@ import {
   WandSparkles,
 } from "lucide-vue-next";
 import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
-import { computed, nextTick, ref, useId } from "vue";
-import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
+import { computed, ref, useId } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
+import { useSubmenu } from "../../../shared/menu/useSubmenu";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import { formatFillDateSample, type FillDateFormat } from "../fill-date-formats";
 
@@ -42,35 +42,37 @@ const triggerRef = computed(() => trigger.value?.rootElement ?? null);
 const surface = ref<InstanceType<typeof MenuSurface> | null>(null);
 const submenuSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuRef = computed(() => surface.value?.rootElement ?? null);
-const submenuRef = computed(() => submenuSurface.value?.rootElement ?? null);
 const menuId = `data-fill-${useId().replaceAll(":", "")}`;
 const submenuId = `data-fill-submenu-${useId().replaceAll(":", "")}`;
 const unavailable = computed(() => props.disabled);
-const activeSubmenu = ref<FillSubmenu | null>(null);
-const submenuOpen = computed(() => activeSubmenu.value !== null);
 const menuDate = ref(new Date());
-const submenuAnchor = computed(() => {
-  const submenu = activeSubmenu.value;
-  return submenu
-    ? (menuRef.value?.querySelector<HTMLElement>(`[data-data-fill="${submenu}"]`) ?? null)
-    : null;
-});
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef: surface,
   disabled: unavailable,
   additionalInside: () => [submenuRef.value],
   onOpen: () => {
-    activeSubmenu.value = null;
     menuDate.value = new Date();
   },
-  onDismiss: () => {
-    activeSubmenu.value = null;
-  },
 });
-const { floatingStyles: submenuStyles } = useFloatingPanel(submenuAnchor, submenuRef, submenuOpen, {
-  placement: "right-start",
+const {
+  activeSubmenu,
+  submenuElement: submenuRef,
+  submenuStyles,
+  openSubmenu: openSharedSubmenu,
+  onParentKeydown,
+  onParentFocusin,
+  onParentMouseover,
+  onSubmenuKeydown: onSharedSubmenuKeydown,
+} = useSubmenu<FillSubmenu>({
+  parentOpen: open,
+  submenuSurfaceRef: submenuSurface,
+  getAnchor: (submenu) =>
+    menuRef.value?.querySelector<HTMLElement>(`[data-data-fill="${submenu}"]`) ?? null,
   offset: 4,
+  onOpen: (submenu) => {
+    if (submenu === "current-date") menuDate.value = new Date();
+  },
 });
 
 function choose(direction: FillDirection): void {
@@ -108,19 +110,7 @@ function chooseTool(tool: "series" | "numberSequence" | "rank" | "blanks" | "fla
 
 function openSubmenu(submenu: FillSubmenu, focus = true): void {
   if (unavailable.value) return;
-  activeSubmenu.value = submenu;
-  if (submenu === "current-date") menuDate.value = new Date();
-  if (focus) void nextTick(() => submenuSurface.value?.focusFirstItem());
-}
-
-function closeSubmenu(restoreFocus: boolean): void {
-  const submenu = activeSubmenu.value;
-  activeSubmenu.value = null;
-  if (restoreFocus && submenu) {
-    void nextTick(() =>
-      menuRef.value?.querySelector<HTMLElement>(`[data-data-fill="${submenu}"]`)?.focus(),
-    );
-  }
+  openSharedSubmenu(submenu, focus);
 }
 
 function dateLabel(format: FillDateFormat): string {
@@ -150,17 +140,13 @@ function onMenuKeydown(event: KeyboardEvent): void {
     closeAll(true);
     return;
   }
-  if (event.key !== "ArrowRight") return;
   const submenu =
     event.target instanceof HTMLElement
       ? (event.target.closest<HTMLElement>("[data-data-fill]")?.dataset.dataFill as
           | FillSubmenu
           | undefined)
       : undefined;
-  if (submenu === "insert-text" || submenu === "current-date") {
-    event.preventDefault();
-    openSubmenu(submenu);
-  }
+  onParentKeydown(event, submenu);
 }
 
 function onMenuFocusin(event: FocusEvent): void {
@@ -170,7 +156,7 @@ function onMenuFocusin(event: FocusEvent): void {
           | FillSubmenu
           | undefined)
       : undefined;
-  if (activeSubmenu.value && submenu !== activeSubmenu.value) activeSubmenu.value = null;
+  onParentFocusin(submenu);
 }
 
 function onMenuMouseover(event: MouseEvent): void {
@@ -180,25 +166,11 @@ function onMenuMouseover(event: MouseEvent): void {
           | FillSubmenu
           | undefined)
       : undefined;
-  if (submenu === "insert-text" || submenu === "current-date") {
-    if (activeSubmenu.value !== submenu) openSubmenu(submenu, false);
-  } else {
-    activeSubmenu.value = null;
-  }
+  onParentMouseover(submenu);
 }
 
 function onSubmenuKeydown(event: KeyboardEvent): void {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    event.stopPropagation();
-    closeAll(true);
-    return;
-  }
-  if (event.key === "ArrowLeft") {
-    event.preventDefault();
-    event.stopPropagation();
-    closeSubmenu(true);
-  }
+  onSharedSubmenuKeydown(event);
 }
 </script>
 
@@ -377,13 +349,9 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
   display: contents;
 
   &__menu {
-    position: fixed;
-    z-index: 80;
   }
 
   &__submenu {
-    position: fixed;
-    z-index: 81;
   }
 }
 </style>

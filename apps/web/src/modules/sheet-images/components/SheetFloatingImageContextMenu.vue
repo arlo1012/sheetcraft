@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
-import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
+import { useContextMenu } from "../../../shared/menu/useContextMenu";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 
@@ -24,12 +24,14 @@ const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuRef = computed<HTMLElement | null>(() => menuSurfaceRef.value?.rootElement ?? null);
 const menuAnchor = computed(() => props.anchor);
 const menuOpen = computed(() => true);
-const { floatingStyles } = useDismissibleFloatingPanel(menuAnchor, menuRef, menuOpen, {
+const { floatingStyles } = useContextMenu({
+  anchor: menuAnchor,
+  panelRef: menuRef,
+  open: menuOpen,
+  surfaceRef: menuSurfaceRef,
   offset: 4,
   onDismiss: ({ restoreFocus }) => emit("close", restoreFocus),
 });
-
-onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
 
 function onKeydown(event: KeyboardEvent): void {
   if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
@@ -89,6 +91,6 @@ function onKeydown(event: KeyboardEvent): void {
 
 <style scoped lang="scss">
 .sheet-floating-image-context-menu {
-  z-index: 100;
+  z-index: var(--idea-layer-context-menu);
 }
 </style>

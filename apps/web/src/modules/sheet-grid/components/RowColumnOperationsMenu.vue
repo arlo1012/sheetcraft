@@ -33,12 +33,12 @@ import AxisInsertMenuItem from "./AxisInsertMenuItem.vue";
 import SheetDimensionInput from "./SheetDimensionInput.vue";
 import CellOperationDialog from "./CellOperationDialog.vue";
 import { useAppI18n } from "../../../shared/i18n";
-import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
+import { useSubmenu } from "../../../shared/menu/useSubmenu";
 
 const props = defineProps<{
   sheet: Sheet;
@@ -86,22 +86,30 @@ const sizeTarget = ref<AxisSizeTarget>();
 const sizeDraft = ref<number>();
 const standardWidthDraft = ref<number>();
 const isStandardWidthDialogOpen = ref(false);
-const activeSubmenu = ref<AxisOperationSubmenu | null>(null);
 const isSizeDialogOpen = computed(() => sizeTarget.value !== undefined);
 const rowCount = computed(() => props.range.end.row - props.range.start.row + 1);
 const columnCount = computed(() => props.range.end.column - props.range.start.column + 1);
-const submenuRef = computed(() => submenuSurfaceRef.value?.rootElement ?? null);
-const submenuAnchor = computed(() => {
-  const action = activeSubmenu.value;
-  return action
-    ? (menuSurfaceRef.value?.rootElement?.querySelector<HTMLElement>(
-        `[data-row-column-action="${action}"]`,
-      ) ?? null)
-    : null;
+const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
+  triggerRef,
+  menuSurfaceRef,
+  disabled: computed(() => props.disabled),
+  additionalInside: () => [submenuRef.value],
 });
-const submenuOpen = computed(() => activeSubmenu.value !== null);
-const { floatingStyles: submenuStyles } = useFloatingPanel(submenuAnchor, submenuRef, submenuOpen, {
-  placement: "right-start",
+const {
+  activeSubmenu,
+  submenuElement: submenuRef,
+  submenuStyles,
+  openSubmenu,
+  onParentKeydown,
+  onParentFocusin,
+  onSubmenuKeydown: onSharedSubmenuKeydown,
+} = useSubmenu<AxisOperationSubmenu>({
+  parentOpen: open,
+  submenuSurfaceRef,
+  getAnchor: (action) =>
+    menuSurfaceRef.value?.rootElement?.querySelector<HTMLElement>(
+      `[data-row-column-action="${action}"]`,
+    ) ?? null,
   offset: 4,
 });
 const rowSizeEnabled = computed(() => !props.disabled && rowCount.value > 0);
@@ -112,15 +120,6 @@ function maximumInsertCount(axis: SheetDimensionAxis, direction: "before" | "aft
   const index = axis === "row" ? address.row : address.column;
   return maximum - index - (direction === "after" ? 1 : 0);
 }
-const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
-  triggerRef,
-  menuSurfaceRef,
-  disabled: computed(() => props.disabled),
-  additionalInside: () => [submenuRef.value],
-  onDismiss: () => {
-    activeSubmenu.value = null;
-  },
-});
 
 function closeSizeDialog(restoreFocus = true): void {
   sizeTarget.value = undefined;
@@ -262,52 +261,24 @@ function requestVisibility(axis: SheetDimensionAxis, hidden: boolean): void {
   dismiss();
 }
 
-function openSubmenu(submenu: AxisOperationSubmenu, focus = true): void {
-  if (props.disabled) return;
-  activeSubmenu.value = submenu;
-  if (focus) void nextTick(() => submenuSurfaceRef.value?.focusFirstItem());
-}
-
-function closeSubmenu(restoreFocus: boolean): void {
-  const action = activeSubmenu.value;
-  activeSubmenu.value = null;
-  if (restoreFocus && action) {
-    void nextTick(() =>
-      menuSurfaceRef.value?.rootElement
-        ?.querySelector<HTMLElement>(`[data-row-column-action="${action}"]`)
-        ?.focus(),
-    );
-  }
-}
-
 function onMenuKeydown(event: KeyboardEvent): void {
-  if (event.key !== "ArrowRight") return;
   const action = (
     event.target instanceof HTMLElement
       ? event.target.closest<HTMLElement>("[data-row-column-action]")?.dataset.rowColumnAction
       : undefined
   ) as AxisOperationSubmenu | undefined;
-  if (action === "insert" || action === "delete" || action === "visibility") {
-    event.preventDefault();
-    openSubmenu(action);
-  }
+  onParentKeydown(event, action);
 }
 
 function onMenuFocusin(event: FocusEvent): void {
   const target = event.target instanceof HTMLElement ? event.target : null;
   const action = target?.closest<HTMLElement>("[data-row-column-action]")?.dataset.rowColumnAction;
-  if (activeSubmenu.value && action !== activeSubmenu.value) {
-    activeSubmenu.value = null;
-  }
+  onParentFocusin(action as AxisOperationSubmenu | undefined);
 }
 
 function onSubmenuKeydown(event: KeyboardEvent): void {
   if (event.key === "ArrowLeft" && event.target instanceof HTMLInputElement) return;
-  if (event.key === "Escape" || event.key === "ArrowLeft") {
-    event.preventDefault();
-    event.stopPropagation();
-    closeSubmenu(true);
-  }
+  onSharedSubmenuKeydown(event);
 }
 
 watch(
@@ -670,10 +641,6 @@ watch(
 
 .row-column-operations-menu {
   @include ribbon.tool;
-
-  &__surface {
-    z-index: 80;
-  }
 
   &__submenu {
     width: max-content;

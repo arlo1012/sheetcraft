@@ -85,4 +85,27 @@ describe("MenuSurface", () => {
       wrapper.unmount();
     }
   });
+
+  test("keeps a structured menu footer outside its independently scrollable body", async () => {
+    const wrapper = mount(MenuSurface, {
+      attachTo: document.body,
+      props: { label: "Style gallery" },
+      slots: {
+        body: '<div data-gallery-body><button type="button">Style</button></div>',
+        footer: '<li role="menuitem" tabindex="-1">New style</li>',
+      },
+    });
+
+    try {
+      expect(wrapper.element.tagName).toBe("UL");
+      expect(wrapper.classes()).toContain("idea-menu-surface--structured");
+      expect(wrapper.get(".idea-menu-surface__body").attributes("role")).toBe("none");
+      expect(wrapper.get(".idea-menu-surface__footer").text()).toBe("New style");
+      const footerItem = wrapper.get<HTMLElement>('[role="menuitem"]');
+      await footerItem.trigger("keydown", { key: "ArrowDown" });
+      expect(document.activeElement).toBe(footerItem.element);
+    } finally {
+      wrapper.unmount();
+    }
+  });
 });

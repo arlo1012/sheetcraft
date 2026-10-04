@@ -124,8 +124,7 @@ function openErrorCheckOptions(): void {
 .data-duplicates-tool {
   display: contents;
   &__menu {
-    position: fixed;
-    z-index: 80;
+    z-index: var(--idea-layer-menu);
   }
 }
 </style>

@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, useId, watch } from "vue";
 import type { ThemeColorReference } from "@idea10/core/workbook-theme";
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
+import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
@@ -24,7 +25,8 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 const triggerComponentRef = ref<InstanceType<typeof RibbonSplitButton> | null>(null);
 const triggerRef = computed(() => triggerComponentRef.value?.menuElement ?? null);
-const panelRef = ref<HTMLDivElement | null>(null);
+const panelSurfaceRef = ref<InstanceType<typeof FloatingPanelSurface> | null>(null);
+const panelRef = computed(() => panelSurfaceRef.value?.rootElement ?? null);
 const open = ref(false);
 const panelId = `cell-color-picker-${useId().replaceAll(":", "")}`;
 const { floatingStyles, dismiss } = useDismissibleFloatingPanel(triggerRef, panelRef, open, {
@@ -104,16 +106,15 @@ watch(
     </RibbonSplitButton>
 
     <Teleport to="body">
-      <div
+      <FloatingPanelSurface
         v-if="open"
         :id="panelId"
-        ref="panelRef"
+        ref="panelSurfaceRef"
         class="cell-color-picker__panel"
         :style="floatingStyles"
-        role="dialog"
         aria-modal="false"
-        :aria-label="label"
-        tabindex="-1"
+        :label="label"
+        layer="context-submenu"
       >
         <ColorPalette
           :model-value="value"
@@ -121,7 +122,7 @@ watch(
           :default-label="defaultLabel"
           @select="selectColor"
         />
-      </div>
+      </FloatingPanelSurface>
     </Teleport>
   </span>
 </template>
@@ -134,15 +135,5 @@ watch(
 }
 
 .cell-color-picker {
-  &__panel {
-    z-index: 100;
-    max-width: calc(100vw - var(--idea-space-4) - var(--idea-space-4));
-    max-height: calc(100vh - var(--idea-space-4) - var(--idea-space-4));
-    overflow: auto;
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-medium);
-    box-shadow: var(--idea-shadow-floating);
-  }
 }
 </style>

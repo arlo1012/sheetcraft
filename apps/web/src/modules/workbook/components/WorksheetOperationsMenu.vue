@@ -359,8 +359,7 @@ watch(
 }
 
 .worksheet-operations-menu {
-  position: fixed;
-  z-index: 80;
+  z-index: var(--idea-layer-menu);
 }
 .worksheet-operations-menu__hidden-sheets {
   display: grid;

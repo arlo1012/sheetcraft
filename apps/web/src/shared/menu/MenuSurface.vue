@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, useSlots } from "vue";
 import { useRovingFocus } from "../focus/useRovingFocus";
 
-defineProps<{
-  label: string;
-}>();
+withDefaults(
+  defineProps<{
+    label: string;
+    bodyScrollable?: boolean;
+  }>(),
+  { bodyScrollable: true },
+);
 
+const slots = useSlots();
+const hasStructuredContent = computed(() => Boolean(slots.header || slots.body || slots.footer));
 const rootElement = ref<HTMLUListElement | null>(null);
 const { move: moveRovingFocus } = useRovingFocus();
 let itemObserver: MutationObserver | undefined;
@@ -20,17 +26,24 @@ function menuItems(): HTMLElement[] {
   if (!root) {
     return [];
   }
-  return [...root.children].flatMap((child) => {
-    if (!(child instanceof HTMLElement)) {
-      return [];
-    }
-    if (isMenuItem(child)) {
-      return [child];
-    }
-    return [...child.children].filter(
-      (nested): nested is HTMLElement => nested instanceof HTMLElement && isMenuItem(nested),
-    );
-  });
+  if (!hasStructuredContent.value) {
+    return [...root.children].flatMap((child) => {
+      if (!(child instanceof HTMLElement)) {
+        return [];
+      }
+      if (isMenuItem(child)) {
+        return [child];
+      }
+      return [...child.children].filter(
+        (nested): nested is HTMLElement => nested instanceof HTMLElement && isMenuItem(nested),
+      );
+    });
+  }
+  return [
+    ...root.querySelectorAll<HTMLElement>(
+      '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]',
+    ),
+  ].filter((item) => isMenuItem(item) && item.closest('[role="menu"]') === root);
 }
 
 function enabledItems(): HTMLElement[] {
@@ -72,6 +85,9 @@ function onFocusin(event: FocusEvent): void {
 }
 
 function onKeydown(event: KeyboardEvent): void {
+  if (event.defaultPrevented) {
+    return;
+  }
   if (
     event.target instanceof HTMLInputElement ||
     event.target instanceof HTMLTextAreaElement ||
@@ -104,13 +120,30 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
   <ul
     ref="rootElement"
     class="idea-menu-surface"
+    :class="{
+      'idea-menu-surface--structured': hasStructuredContent,
+      'idea-menu-surface--contained-body': !bodyScrollable,
+    }"
     role="menu"
     :aria-label="label"
     @contextmenu.prevent
     @focusin="onFocusin"
     @keydown="onKeydown"
   >
-    <slot />
+    <template v-if="hasStructuredContent">
+      <li v-if="$slots.header" class="idea-menu-surface__header" role="none">
+        <slot name="header" />
+      </li>
+      <li v-if="$slots.body" class="idea-menu-surface__body" role="none">
+        <slot name="body" />
+      </li>
+      <li v-if="$slots.footer" class="idea-menu-surface__footer" role="none">
+        <ul class="idea-menu-surface__footer-list" role="presentation">
+          <slot name="footer" />
+        </ul>
+      </li>
+    </template>
+    <slot v-else />
   </ul>
 </template>
 
@@ -126,6 +159,7 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
   max-height: calc(100vh - var(--idea-space-4) - var(--idea-space-4));
   padding: var(--idea-menu-padding);
   margin: 0;
+  z-index: var(--idea-layer-menu);
   overflow-y: auto;
   overscroll-behavior: contain;
   list-style: none;
@@ -134,5 +168,38 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
   outline: none;
   border-radius: var(--idea-radius-default);
   box-shadow: var(--idea-shadow-menu);
+
+  &--structured {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  &__header,
+  &__footer {
+    flex: 0 0 auto;
+  }
+
+  &__footer-list {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  &__body {
+    @include option-list.scrollbar;
+
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  &--contained-body > &__body {
+    display: grid;
+    flex: 1 1 auto;
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+  }
 }
 </style>

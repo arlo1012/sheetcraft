@@ -65,8 +65,7 @@ function choose(action: "toggle" | "advanced"): void {
 .data-filter-tool {
   display: contents;
   &__menu {
-    position: fixed;
-    z-index: 80;
+    z-index: var(--idea-layer-menu);
   }
 }
 </style>

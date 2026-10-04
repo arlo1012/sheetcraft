@@ -74,8 +74,7 @@ function select(orientation: SheetPageSetup["orientation"]): void {
 .page-orientation-menu {
   @include ribbon.tool;
   &__surface {
-    position: fixed;
-    z-index: 80;
+    z-index: var(--idea-layer-menu);
     min-width: 150px;
   }
 }

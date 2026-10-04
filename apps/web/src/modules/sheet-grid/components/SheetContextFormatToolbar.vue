@@ -9,6 +9,7 @@ import {
 } from "@idea10/core/style";
 import type { CellMergeMode } from "@idea10/core/commands";
 import { useAppI18n } from "../../../shared/i18n";
+import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import CellBorderPresetIcon from "../../../shared/borders/CellBorderPresetIcon.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
@@ -156,14 +157,21 @@ function getPopupAttach(): HTMLElement {
             <Baseline :size="18" aria-hidden="true" />
           </span>
         </RibbonButton>
-        <ColorPalette
+        <FloatingPanelSurface
           v-if="activePanel === 'text-color'"
           class="sheet-context-format-toolbar__panel"
-          :model-value="currentTextColor"
-          :default-color="DEFAULT_CELL_TEXT_COLOR"
-          :default-label="t('cellFormat.automatic')"
-          @select="selectColor('text', $event)"
-        />
+          :label="t('format.textColor')"
+          layer="context-submenu"
+          :scrollable="false"
+          :constrain-to-viewport="false"
+        >
+          <ColorPalette
+            :model-value="currentTextColor"
+            :default-color="DEFAULT_CELL_TEXT_COLOR"
+            :default-label="t('cellFormat.automatic')"
+            @select="selectColor('text', $event)"
+          />
+        </FloatingPanelSurface>
       </span>
       <span class="sheet-context-format-toolbar__color-control">
         <RibbonButton
@@ -181,14 +189,21 @@ function getPopupAttach(): HTMLElement {
             <PaintBucket :size="18" aria-hidden="true" />
           </span>
         </RibbonButton>
-        <ColorPalette
+        <FloatingPanelSurface
           v-if="activePanel === 'fill-color'"
           class="sheet-context-format-toolbar__panel"
-          :model-value="currentFillColor"
-          :default-color="DEFAULT_CELL_FILL_COLOR"
-          :default-label="t('cellFormat.noFill')"
-          @select="selectColor('fill', $event)"
-        />
+          :label="t('format.fillColor')"
+          layer="context-submenu"
+          :scrollable="false"
+          :constrain-to-viewport="false"
+        >
+          <ColorPalette
+            :model-value="currentFillColor"
+            :default-color="DEFAULT_CELL_FILL_COLOR"
+            :default-label="t('cellFormat.noFill')"
+            @select="selectColor('fill', $event)"
+          />
+        </FloatingPanelSurface>
       </span>
       <span class="sheet-context-format-toolbar__color-control">
         <RibbonButton
@@ -199,12 +214,17 @@ function getPopupAttach(): HTMLElement {
         >
           <CellBorderPresetIcon preset="bottom" />
         </RibbonButton>
-        <BorderPresetGrid
+        <FloatingPanelSurface
           v-if="activePanel === 'border'"
           class="sheet-context-format-toolbar__panel sheet-context-format-toolbar__panel--borders"
-          :border="{ style: 'thin', color: '#20242c' }"
-          @select="applyBorder"
-        />
+          :label="t('format.borderPresets')"
+          layer="context-submenu"
+          padding="tool"
+          :scrollable="false"
+          :constrain-to-viewport="false"
+        >
+          <BorderPresetGrid :border="{ style: 'thin', color: '#20242c' }" @select="applyBorder" />
+        </FloatingPanelSurface>
       </span>
       <RibbonButton
         :label="mergeLabel"
@@ -219,7 +239,11 @@ function getPopupAttach(): HTMLElement {
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/floating/floating-panel" as panel;
+
 .sheet-context-format-toolbar {
+  @include panel.toolbar-surface(var(--idea-layer-context-menu), 0, none);
+
   --cell-format-font-width: 130px;
   --cell-format-font-size-width: 52px;
   --cell-format-gap: 0px;
@@ -231,9 +255,7 @@ function getPopupAttach(): HTMLElement {
   width: 302px;
   gap: 4px;
   padding: 6px 8px;
-  background: var(--idea-surface-panel);
   border-bottom: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-default);
 
   &__row {
     display: grid;
@@ -286,18 +308,12 @@ function getPopupAttach(): HTMLElement {
 
   &__panel {
     position: absolute;
-    z-index: 2;
     top: calc(100% + 4px);
     right: 0;
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-medium);
-    box-shadow: var(--idea-shadow-floating);
   }
 
   &__panel--borders {
     width: 128px;
-    padding: var(--idea-tool-panel-padding);
-    background: var(--idea-surface-panel);
   }
 }
 </style>

@@ -57,6 +57,26 @@ describe("cell styles components", () => {
     document.body.replaceChildren();
   });
 
+  test("opens the same custom-style actions from Shift+F10", async () => {
+    const custom = {
+      id: "custom-report",
+      name: "Report",
+      category: "custom" as const,
+      style: {},
+    };
+    const wrapper = mount(CellStyleGallery, {
+      attachTo: document.body,
+      props: { styles: [custom] },
+      global: { plugins: [createAppI18n("en-US")] },
+    });
+    const tile = wrapper.get('[data-cell-style-id="custom-report"]');
+    await tile.trigger("keydown", { key: "F10", shiftKey: true });
+    await new DOMWrapper(document.body).get('[data-custom-style-action="delete"]').trigger("click");
+    expect(wrapper.emitted("delete")).toEqual([[custom]]);
+    wrapper.unmount();
+    document.body.replaceChildren();
+  });
+
   test("creates an automatically named custom style and retains its supplied format", async () => {
     const wrapper = mount(NewCellStyleDialog, {
       attachTo: document.body,

@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
+import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { computed, nextTick, ref, toRef, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 
-const props = defineProps<{ anchor: HTMLElement | null; open: boolean; value?: string }>();
+const props = defineProps<{
+  anchor: HTMLElement | null;
+  open: boolean;
+  value?: string;
+}>();
 const emit = defineEmits<{
   apply: [value: string | null];
   close: [
@@ -13,7 +18,8 @@ const emit = defineEmits<{
   ];
 }>();
 const { t } = useAppI18n();
-const panelRef = ref<HTMLElement | null>(null);
+const panelSurfaceRef = ref<InstanceType<typeof FloatingPanelSurface> | null>(null);
+const panelRef = computed(() => panelSurfaceRef.value?.rootElement ?? null);
 const panelOpen = toRef(props, "open");
 const anchorRef = computed(() => props.anchor);
 const { floatingStyles, dismiss } = useDismissibleFloatingPanel(anchorRef, panelRef, panelOpen, {
@@ -47,14 +53,13 @@ defineExpose({ dismiss, rootElement: panelRef });
 
 <template>
   <Teleport to="body">
-    <div
+    <FloatingPanelSurface
       v-if="open"
-      ref="panelRef"
+      ref="panelSurfaceRef"
       class="sheet-tab-color-panel"
       :style="floatingStyles"
-      role="dialog"
-      :aria-label="t('sheetTabs.tabColorAction')"
-      tabindex="-1"
+      :label="t('sheetTabs.tabColorAction')"
+      layer="toolbar"
       @keydown="onKeydown"
     >
       <ColorPalette
@@ -63,19 +68,6 @@ defineExpose({ dismiss, rootElement: panelRef });
         :default-label="t('format.resetColor')"
         @select="apply"
       />
-    </div>
+    </FloatingPanelSurface>
   </Teleport>
 </template>
-
-<style scoped lang="scss">
-.sheet-tab-color-panel {
-  z-index: 90;
-  max-width: calc(100vw - var(--idea-space-4) - var(--idea-space-4));
-  max-height: calc(100vh - var(--idea-space-4) - var(--idea-space-4));
-  overflow: auto;
-  background: var(--idea-surface-panel);
-  border: 1px solid var(--idea-border-control);
-  border-radius: var(--idea-radius-medium);
-  box-shadow: var(--idea-shadow-floating);
-}
-</style>

@@ -96,21 +96,26 @@ function merge(): void {
         :label="t('cellStyles.title')"
         :data-cell-edit-session="editSessionId"
       >
-        <CellStyleGallery
-          ref="galleryRef"
-          :styles="styles"
-          :disabled="disabled"
-          @select="apply"
-          @edit="edit"
-          @delete="deleteStyle"
-        />
-        <MenuSeparator />
-        <MenuItem @select="create"
-          ><template #icon><Plus /></template>{{ t("cellStyles.actions.newStyle") }}</MenuItem
-        >
-        <MenuItem @select="merge"
-          ><template #icon><Combine /></template>{{ t("cellStyles.actions.mergeStyles") }}</MenuItem
-        >
+        <template #body>
+          <CellStyleGallery
+            ref="galleryRef"
+            :styles="styles"
+            :disabled="disabled"
+            @select="apply"
+            @edit="edit"
+            @delete="deleteStyle"
+          />
+        </template>
+        <template #footer>
+          <MenuSeparator />
+          <MenuItem @select="create"
+            ><template #icon><Plus /></template>{{ t("cellStyles.actions.newStyle") }}</MenuItem
+          >
+          <MenuItem @select="merge"
+            ><template #icon><Combine /></template
+            >{{ t("cellStyles.actions.mergeStyles") }}</MenuItem
+          >
+        </template>
       </MenuSurface>
     </Teleport>
   </div>
@@ -121,9 +126,6 @@ function merge(): void {
   display: contents;
 }
 .cell-styles-menu__surface {
-  z-index: 50;
   width: min(440px, calc(100vw - 24px));
-  max-height: calc(100vh - 32px);
-  overflow-y: auto;
 }
 </style>

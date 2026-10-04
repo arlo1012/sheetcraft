@@ -267,7 +267,6 @@ function onFileChange(event: Event): void {
 }
 
 .workbook-file-menu {
-  position: fixed;
-  z-index: 80;
+  z-index: var(--idea-layer-menu);
 }
 </style>

@@ -27,6 +27,7 @@ import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import type { DefinedNameLabelPosition } from "@idea10/core/commands";
 import type { WorkbookCalculationSettings } from "@idea10/core/workbook";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -71,11 +72,13 @@ const sumMenuOpen = ref(false);
 const browserOpen = ref(false);
 const nameQuickCreateRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const nameTriggerRef = computed(() => nameQuickCreateRef.value?.rootElement ?? null);
-const namePanelRef = ref<HTMLElement | null>(null);
+const namePanelSurfaceRef = ref<InstanceType<typeof FloatingPanelSurface> | null>(null);
+const namePanelRef = computed(() => namePanelSurfaceRef.value?.rootElement ?? null);
 const nameMenuOpen = ref(false);
 const calculationSplitRef = ref<InstanceType<typeof RibbonSplitButton> | null>(null);
 const calculationTriggerRef = computed(() => calculationSplitRef.value?.menuElement ?? null);
-const calculationPanelRef = ref<HTMLElement | null>(null);
+const calculationPanelSurfaceRef = ref<InstanceType<typeof FloatingPanelSurface> | null>(null);
+const calculationPanelRef = computed(() => calculationPanelSurfaceRef.value?.rootElement ?? null);
 const calculationMenuOpen = ref(false);
 const sumMenuId = `formula-sum-${Math.random().toString(36).slice(2)}`;
 const nameMenuId = `formula-name-create-${Math.random().toString(36).slice(2)}`;
@@ -148,7 +151,12 @@ function closeBrowser(): void {
 function openNameMenu(): void {
   if (props.disabled || !props.nameCreationEnabled) return;
   if (!nameMenuOpen.value) {
-    namePositions.value = { top: true, left: false, bottom: false, right: false };
+    namePositions.value = {
+      top: true,
+      left: false,
+      bottom: false,
+      right: false,
+    };
     nameMenuOpen.value = true;
   } else {
     nameMenuOpen.value = false;
@@ -373,15 +381,14 @@ function insertFunction(name: string): void {
         ><Plus
       /></RibbonMenuButton>
       <Teleport to="body"
-        ><section
+        ><FloatingPanelSurface
           v-if="nameMenuOpen"
           :id="nameMenuId"
-          ref="namePanelRef"
+          ref="namePanelSurfaceRef"
           class="formula-toolbar__name-menu"
-          role="dialog"
-          :aria-label="t('formulaTools.createNamesFromSelection')"
-          tabindex="-1"
+          :label="t('formulaTools.createNamesFromSelection')"
           :style="nameMenuStyles"
+          padding="tool"
           :data-cell-edit-session="editSessionId"
         >
           <p>{{ t("formulaTools.createNamesFromSelection") }}</p>
@@ -409,7 +416,7 @@ function insertFunction(name: string): void {
               >{{ t("formulaTools.createNamesFromSelection") }}</TButton
             >
           </div>
-        </section></Teleport
+        </FloatingPanelSurface></Teleport
       >
       <RibbonSplitButton
         ref="calculationSplitRef"
@@ -427,15 +434,14 @@ function insertFunction(name: string): void {
         ><Calculator
       /></RibbonSplitButton>
       <Teleport to="body"
-        ><section
+        ><FloatingPanelSurface
           v-if="calculationMenuOpen && calculationSettings"
           :id="calculationMenuId"
-          ref="calculationPanelRef"
+          ref="calculationPanelSurfaceRef"
           class="formula-toolbar__calculation-menu"
-          role="dialog"
-          :aria-label="t('formulaTools.calculationOptions')"
-          tabindex="-1"
+          :label="t('formulaTools.calculationOptions')"
           :style="calculationMenuStyles"
+          padding="tool"
           :data-cell-edit-session="editSessionId"
         >
           <div
@@ -493,8 +499,7 @@ function insertFunction(name: string): void {
               :disabled="!calculationSettings.iterative"
               :input-props="{ name: 'maxChange' }"
               @change="updateNumericCalculationSetting('maxChange', $event)"
-            />
-          </div></section
+            /></div></FloatingPanelSurface
       ></Teleport>
       <RibbonButton
         variant="tall"
@@ -528,23 +533,17 @@ function insertFunction(name: string): void {
     min-width: 86px;
   }
   &__sum-menu {
-    z-index: 40;
+    z-index: var(--idea-layer-menu);
   }
   &__name-menu,
   &__calculation-menu {
-    z-index: 40;
+    color: var(--idea-text-primary);
+    font-size: var(--idea-font-size-body-medium);
   }
   &__name-menu {
     display: grid;
     gap: 7px;
     min-width: 210px;
-    padding: var(--idea-tool-panel-padding);
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
-    box-shadow: var(--idea-shadow-floating);
-    color: var(--idea-text-primary);
-    font-size: var(--idea-font-size-body-medium);
     p {
       margin: 0 0 2px;
       color: var(--idea-text-secondary);
@@ -561,13 +560,6 @@ function insertFunction(name: string): void {
     display: grid;
     gap: 10px;
     width: 280px;
-    padding: var(--idea-tool-panel-padding);
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
-    box-shadow: var(--idea-shadow-floating);
-    color: var(--idea-text-primary);
-    font-size: var(--idea-font-size-body-medium);
   }
   &__calculation-mode {
     display: grid;

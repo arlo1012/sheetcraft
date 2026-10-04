@@ -69,8 +69,7 @@ function select(action: "set" | "clear" | "openSetup"): void {
 .page-print-area-menu {
   @include ribbon.tool;
   &__surface {
-    position: fixed;
-    z-index: 80;
+    z-index: var(--idea-layer-menu);
   }
 }
 </style>

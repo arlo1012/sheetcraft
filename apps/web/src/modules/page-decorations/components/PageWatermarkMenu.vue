@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useId } from "vue";
+import { computed, ref, useId } from "vue";
 import { Droplets, Ellipsis, Plus } from "lucide-vue-next";
 import {
   DEFAULT_SHEET_WATERMARK,
@@ -12,8 +12,8 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
-import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import { useMenu } from "../../../shared/menu/useMenu";
+import { useSubmenu } from "../../../shared/menu/useSubmenu";
 
 const props = withDefaults(
   defineProps<{
@@ -37,14 +37,9 @@ const { t } = useAppI18n();
 const trigger = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const surface = ref<InstanceType<typeof MenuSurface> | null>(null);
 const submenuSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
-const activePreset = ref<WatermarkPreset>();
 const actionTriggers = new Map<string, HTMLButtonElement>();
 const menuId = `page-watermark-${useId()}`;
 const submenuId = `page-watermark-actions-${useId()}`;
-const submenuRef = computed(() => submenuSurface.value?.rootElement ?? null);
-const submenuAnchor = computed<HTMLElement | null>(() =>
-  activePreset.value ? (actionTriggers.get(activePreset.value.id) ?? null) : null,
-);
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef: computed(() => trigger.value?.rootElement ?? null),
   menuSurfaceRef: surface,
@@ -52,16 +47,20 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   additionalInside: () => [submenuRef.value],
   defaultFocus: "menu",
   pointerFocus: "menu",
-  onDismiss: () => {
-    activePreset.value = undefined;
-  },
 });
-const { floatingStyles: submenuStyles } = useFloatingPanel(
-  submenuAnchor,
-  submenuRef,
-  computed(() => activePreset.value !== undefined),
-  { placement: "right-start", offset: 4 },
-);
+const {
+  activeSubmenu: activePreset,
+  submenuElement: submenuRef,
+  submenuStyles,
+  openSubmenu: openPresetActions,
+  closeSubmenu: closePresetActions,
+  onSubmenuKeydown,
+} = useSubmenu<WatermarkPreset>({
+  parentOpen: open,
+  submenuSurfaceRef: submenuSurface,
+  getAnchor: (preset) => actionTriggers.get(preset.id) ?? null,
+  offset: 4,
+});
 
 const builtinWatermarks = computed(() => [
   { id: "confidential", text: t("pageDecoration.confidential") },
@@ -99,38 +98,33 @@ function actionTriggerRef(id: string) {
     else actionTriggers.delete(id);
   };
 }
-function openPresetActions(preset: WatermarkPreset, focus = false): void {
-  if (props.disabled) return;
-  activePreset.value = preset;
-  if (focus) void nextTick(() => submenuSurface.value?.focusFirstItem());
-}
 function togglePresetActions(preset: WatermarkPreset): void {
   if (activePreset.value?.id === preset.id) {
-    activePreset.value = undefined;
+    closePresetActions(false);
     return;
   }
-  openPresetActions(preset);
+  if (!props.disabled) openPresetActions(preset, false);
 }
 function openPresetActionsFromKeyboard(event: KeyboardEvent, preset: WatermarkPreset): void {
   if (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey)) return;
   event.preventDefault();
-  openPresetActions(preset, true);
+  if (!props.disabled) openPresetActions(preset, true);
 }
 function applyPreset(preset: WatermarkPreset, scope: "sheet" | "workbook"): void {
   if (props.disabled) return;
-  activePreset.value = undefined;
+  closePresetActions(false);
   dismiss("programmatic", true);
   emit("applyPreset", preset, scope);
 }
 function editPreset(preset: WatermarkPreset): void {
   if (props.disabled) return;
-  activePreset.value = undefined;
+  closePresetActions(false);
   dismiss("programmatic", true);
   emit("editPreset", preset);
 }
 function deletePreset(preset: WatermarkPreset): void {
   if (props.disabled) return;
-  activePreset.value = undefined;
+  closePresetActions(false);
   emit("deletePreset", preset);
 }
 </script>
@@ -179,7 +173,7 @@ function deletePreset(preset: WatermarkPreset): void {
                   :title="preset.name"
                   :aria-label="preset.name"
                   @click="applyPreset(preset, 'sheet')"
-                  @contextmenu.prevent="openPresetActions(preset)"
+                  @contextmenu.prevent="openPresetActions(preset, false)"
                   @keydown="openPresetActionsFromKeyboard($event, preset)"
                 >
                   <img
@@ -273,6 +267,7 @@ function deletePreset(preset: WatermarkPreset): void {
         class="page-watermark-menu__preset-actions"
         :style="submenuStyles"
         :label="activePreset.name"
+        @keydown="onSubmenuKeydown"
       >
         <MenuItem @select="applyPreset(activePreset, 'workbook')">
           {{ t("pageDecoration.applyToWorkbook") }}
@@ -299,8 +294,6 @@ function deletePreset(preset: WatermarkPreset): void {
   @include ribbon.tool;
 
   &__surface {
-    position: fixed;
-    z-index: 80;
     width: 410px;
     max-width: calc(100vw - 16px);
     padding: 0 0 var(--idea-menu-padding);
@@ -417,7 +410,6 @@ function deletePreset(preset: WatermarkPreset): void {
   }
 
   &__preset-actions {
-    z-index: 100;
   }
 }
 </style>

@@ -78,8 +78,7 @@ function choose(action: DataComparisonAction): void {
   display: contents;
 
   &__menu {
-    position: fixed;
-    z-index: 80;
+    z-index: var(--idea-layer-menu);
   }
 }
 </style>

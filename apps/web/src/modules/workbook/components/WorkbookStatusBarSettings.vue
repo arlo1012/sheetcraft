@@ -176,8 +176,7 @@ function selectNumberFormat(numberFormat: StatusBarNumberFormat): void {
   }
 
   &__menu {
-    position: fixed;
-    z-index: 80;
+    z-index: var(--idea-layer-menu);
   }
 }
 </style>

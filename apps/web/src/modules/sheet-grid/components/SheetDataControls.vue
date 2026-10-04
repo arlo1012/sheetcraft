@@ -553,7 +553,7 @@ watch(
 
   &__validation-menu {
     @include option-list.scrollbar;
-    z-index: 120;
+    z-index: var(--idea-layer-sheet-menu);
     display: flex;
     flex-direction: column;
     max-height: min(320px, calc(100vh - var(--idea-space-4) - var(--idea-space-4)));

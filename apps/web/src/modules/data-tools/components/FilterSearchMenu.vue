@@ -104,7 +104,7 @@ function change(options: Partial<FilterSearchOptions>): void {
 
 <style scoped lang="scss">
 .filter-search-menu {
-  z-index: 2201;
+  z-index: var(--idea-layer-popover-submenu);
 
   &__trigger {
     width: 32px;

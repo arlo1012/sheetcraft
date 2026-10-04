@@ -135,7 +135,7 @@ function isSelectedSort(
 
 <style scoped lang="scss">
 .filter-settings-menu {
-  z-index: 2201;
+  z-index: var(--idea-layer-popover-submenu);
 
   &__trigger {
     width: 24px;

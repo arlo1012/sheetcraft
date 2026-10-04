@@ -168,111 +168,106 @@ function manage(): void {
         :label="t('tableStyles.title')"
         :data-cell-edit-session="editSessionId"
       >
-        <div class="table-styles-menu__header">
-          <span>{{ t("tableStyles.allStyles") }}</span>
-          <div class="table-styles-menu__view">
-            <span>{{ t("tableStyles.themeStyles") }}</span>
-            <Switch
-              :model-value="!expanded"
-              size="small"
-              role="switch"
-              :tabindex="0"
-              :aria-checked="!expanded"
-              :aria-label="t('tableStyles.themeStyles')"
-              @change="expanded = !$event"
-              @keydown.space.stop.prevent="expanded = !expanded"
-              @keydown.enter.stop.prevent="expanded = !expanded"
-            />
+        <template #header>
+          <div class="table-styles-menu__header">
+            <span>{{ t("tableStyles.allStyles") }}</span>
+            <div class="table-styles-menu__view">
+              <span>{{ t("tableStyles.themeStyles") }}</span>
+              <Switch
+                :model-value="!expanded"
+                size="small"
+                role="switch"
+                :tabindex="0"
+                :aria-checked="!expanded"
+                :aria-label="t('tableStyles.themeStyles')"
+                @change="expanded = !$event"
+                @keydown.space.stop.prevent="expanded = !expanded"
+                @keydown.enter.stop.prevent="expanded = !expanded"
+              />
+            </div>
           </div>
-        </div>
-        <section
-          v-if="!expanded"
-          class="table-styles-menu__theme"
-          :aria-label="t('tableStyles.themeColors')"
-        >
-          <span>{{ t("tableStyles.themeColors") }}</span>
-          <div role="radiogroup" :aria-label="t('tableStyles.themeColors')">
-            <button
-              v-for="color in TABLE_STYLE_THEME_COLORS"
-              :key="color"
-              type="button"
-              class="table-styles-menu__color"
-              :class="{ 'is-selected': !expanded && accentColor === color }"
-              :style="{ backgroundColor: color }"
-              role="radio"
-              :aria-checked="!expanded && accentColor === color"
-              :aria-label="color"
-              @click="selectTheme(color)"
-            />
-          </div>
-        </section>
-        <div class="table-styles-menu__galleries">
-          <TableStyleGallery
-            ref="galleryRef"
-            class="table-styles-menu__gallery"
-            :styles="visibleStyles"
-            :selected-style-id="selectedStyleId"
-            show-categories
-            :columns="expanded ? 7 : 4"
-            :compact="expanded"
-            @select="apply"
-            @edit="edit"
-            @delete="deleteStyle"
-          />
           <section
-            v-if="customPivotStyles.length"
-            class="table-styles-menu__pivot"
-            :aria-label="t('tableStyles.pivotStyles')"
+            v-if="!expanded"
+            class="table-styles-menu__theme"
+            :aria-label="t('tableStyles.themeColors')"
           >
-            <span>{{ t("tableStyles.pivotStyles") }}</span>
-            <TableStyleGallery
-              ref="pivotGalleryRef"
-              kind="pivot"
-              :styles="customPivotStyles"
-              show-categories
-              compact
-              :columns="4"
-              @select="editPivot"
-              @edit="editPivot"
-              @delete="deletePivot"
-            />
+            <span>{{ t("tableStyles.themeColors") }}</span>
+            <div role="radiogroup" :aria-label="t('tableStyles.themeColors')">
+              <button
+                v-for="color in TABLE_STYLE_THEME_COLORS"
+                :key="color"
+                type="button"
+                class="table-styles-menu__color"
+                :class="{ 'is-selected': !expanded && accentColor === color }"
+                :style="{ backgroundColor: color }"
+                role="radio"
+                :aria-checked="!expanded && accentColor === color"
+                :aria-label="color"
+                @click="selectTheme(color)"
+              />
+            </div>
           </section>
-        </div>
-        <MenuSeparator />
-        <MenuItem @select="create"
-          ><template #icon><Plus /></template>{{ t("tableStyles.newStyle") }}</MenuItem
-        >
-        <MenuItem @select="createPivot"
-          ><template #icon><Plus /></template>{{ t("tableStyles.newPivotStyle") }}</MenuItem
-        >
-        <MenuItem v-if="hasTable" @select="manage"
-          ><template #icon><Settings2 /></template>{{ t("tables.settings") }}</MenuItem
-        >
-        <MenuItem v-if="hasTable" @select="clear"
-          ><template #icon><Eraser /></template>{{ t("tableStyles.clearStyle") }}</MenuItem
-        >
+        </template>
+        <template #body>
+          <div class="table-styles-menu__galleries">
+            <TableStyleGallery
+              ref="galleryRef"
+              class="table-styles-menu__gallery"
+              :styles="visibleStyles"
+              :selected-style-id="selectedStyleId"
+              show-categories
+              :columns="expanded ? 7 : 4"
+              :compact="expanded"
+              @select="apply"
+              @edit="edit"
+              @delete="deleteStyle"
+            />
+            <section
+              v-if="customPivotStyles.length"
+              class="table-styles-menu__pivot"
+              :aria-label="t('tableStyles.pivotStyles')"
+            >
+              <span>{{ t("tableStyles.pivotStyles") }}</span>
+              <TableStyleGallery
+                ref="pivotGalleryRef"
+                kind="pivot"
+                :styles="customPivotStyles"
+                show-categories
+                compact
+                :columns="4"
+                @select="editPivot"
+                @edit="editPivot"
+                @delete="deletePivot"
+              />
+            </section>
+          </div>
+        </template>
+        <template #footer>
+          <MenuSeparator />
+          <MenuItem @select="create"
+            ><template #icon><Plus /></template>{{ t("tableStyles.newStyle") }}</MenuItem
+          >
+          <MenuItem @select="createPivot"
+            ><template #icon><Plus /></template>{{ t("tableStyles.newPivotStyle") }}</MenuItem
+          >
+          <MenuItem v-if="hasTable" @select="manage"
+            ><template #icon><Settings2 /></template>{{ t("tables.settings") }}</MenuItem
+          >
+          <MenuItem v-if="hasTable" @select="clear"
+            ><template #icon><Eraser /></template>{{ t("tableStyles.clearStyle") }}</MenuItem
+          >
+        </template>
       </MenuSurface>
     </Teleport>
   </div>
 </template>
 
 <style scoped lang="scss">
-@use "../../../shared/option-list/option-list";
-
 .table-styles-menu {
   display: contents;
 
   &__surface {
-    display: flex;
-    flex-direction: column;
-    z-index: 50;
     width: 400px;
-    max-height: calc(100vh - 32px);
-    overflow: hidden;
-
-    > * {
-      flex-shrink: 0;
-    }
 
     &--expanded {
       width: 520px;
@@ -280,12 +275,6 @@ function manage(): void {
   }
 
   &__galleries {
-    @include option-list.scrollbar;
-
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
     padding-bottom: 4px;
 
     > * + * {

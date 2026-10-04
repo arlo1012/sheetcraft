@@ -2,6 +2,7 @@
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import {
@@ -24,7 +25,8 @@ const emit = defineEmits<{ insertFunction: [name: string] }>();
 const { t } = useAppI18n();
 const triggerRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const triggerElement = computed(() => triggerRef.value?.rootElement ?? null);
-const panelRef = ref<HTMLElement | null>(null);
+const panelSurfaceRef = ref<InstanceType<typeof FloatingPanelSurface> | null>(null);
+const panelRef = computed(() => panelSurfaceRef.value?.rootElement ?? null);
 const menuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const searchInputRef = ref<{ focus(): void } | null>(null);
 const open = ref(false);
@@ -121,14 +123,15 @@ watch(open, (isOpen) => {
       <slot name="icon" />
     </RibbonMenuButton>
     <Teleport to="body">
-      <div
+      <FloatingPanelSurface
         v-if="open"
         :id="panelId"
-        ref="panelRef"
+        ref="panelSurfaceRef"
         class="formula-category-menu__panel"
-        role="presentation"
-        tabindex="-1"
+        :label="label"
         :style="floatingStyles"
+        padding="menu"
+        :scrollable="false"
         :data-cell-edit-session="editSessionId"
       >
         <div v-if="hasSearch" class="formula-category-menu__search">
@@ -165,7 +168,7 @@ watch(open, (isOpen) => {
             {{ t("formulaTools.noFunctions") }}
           </li>
         </MenuSurface>
-      </div>
+      </FloatingPanelSurface>
     </Teleport>
   </div>
 </template>
@@ -183,17 +186,10 @@ watch(open, (isOpen) => {
   }
 
   &__panel {
-    z-index: 40;
     display: flex;
     flex-direction: column;
     max-width: calc(100vw - 24px);
     max-height: min(360px, calc(100vh - 24px));
-    padding: var(--idea-menu-padding);
-    overflow: hidden;
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
-    box-shadow: var(--idea-shadow-menu);
   }
 
   &__list {

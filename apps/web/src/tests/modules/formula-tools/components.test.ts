@@ -203,8 +203,17 @@ describe("NamedRangesDialog", () => {
     await wrapper.get("[data-formula-reference] input").setValue("Budget!A1:A5");
     await wrapper.find("form").trigger("submit");
     await flushPromises();
-    expect(wrapper.emitted("save")).toEqual([
-      [{ name: "Revenue", scopeSheetId: "sheet-1", reference: "Budget!A1:A5" }],
-    ]);
+    const save = wrapper.emitted("save");
+    expect(save).toHaveLength(1);
+    expect(save?.[0]?.[0]).toEqual({
+      name: "Revenue",
+      scopeSheetId: "sheet-1",
+      reference: "Budget!A1:A5",
+    });
+    const onSaved = save?.[0]?.[1];
+    expect(onSaved).toBeTypeOf("function");
+    (onSaved as (id: string) => void)("range-1");
+    await nextTick();
+    expect(wrapper.find("form").exists()).toBe(false);
   });
 });

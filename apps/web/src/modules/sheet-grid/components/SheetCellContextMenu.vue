@@ -28,19 +28,17 @@ import {
   Settings2,
   Trash2,
 } from "lucide-vue-next";
-import { computed, nextTick, onMounted, ref, useId } from "vue";
+import { computed, ref, useId } from "vue";
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   type CellRange,
   type Sheet,
 } from "@idea10/core/workbook";
-import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
-import {
-  useFloatingPanel,
-  type FloatingReference,
-} from "../../../shared/floating/useFloatingPanel";
+import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
+import { useContextMenu } from "../../../shared/menu/useContextMenu";
+import { useSubmenu } from "../../../shared/menu/useSubmenu";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -81,27 +79,35 @@ const panelRef = ref<HTMLElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const submenuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuRef = computed<HTMLElement | null>(() => menuSurfaceRef.value?.rootElement ?? null);
-const submenuRef = computed<HTMLElement | null>(() => submenuSurfaceRef.value?.rootElement ?? null);
-const activeSubmenu = ref<Submenu>(null);
 const isOpen = ref(true);
 const submenuId = `sheet-cell-context-submenu-${useId().replaceAll(":", "")}`;
 const menuAnchor = computed(() => props.anchor);
-const submenuTrigger = computed<HTMLElement | null>(() =>
-  activeSubmenu.value
-    ? (menuRef.value?.querySelector(`[data-cell-action="${activeSubmenu.value}"]`) ?? null)
-    : null,
-);
-const { floatingStyles } = useDismissibleFloatingPanel(menuAnchor, panelRef, isOpen, {
+const { floatingStyles } = useContextMenu({
+  anchor: menuAnchor,
+  panelRef,
+  open: isOpen,
+  surfaceRef: menuSurfaceRef,
   offset: 4,
   additionalInside: () => [submenuRef.value],
   onDismiss: ({ restoreFocus }) => close(restoreFocus),
 });
-const { floatingStyles: submenuStyles } = useFloatingPanel(
-  submenuTrigger,
-  submenuRef,
-  computed(() => activeSubmenu.value !== null),
-  { placement: "right-start", offset: 4 },
-);
+const {
+  activeSubmenu,
+  submenuElement: submenuRef,
+  submenuStyles,
+  openSubmenu: revealSubmenu,
+  onParentFocusin,
+  onParentKeydown,
+  onParentMouseover,
+  onSubmenuKeydown: handleSubmenuKeydown,
+} = useSubmenu<Exclude<Submenu, null>>({
+  parentOpen: isOpen,
+  submenuSurfaceRef,
+  getAnchor: (name) =>
+    menuRef.value?.querySelector<HTMLElement>(`[data-cell-action="${name}"]`) ?? null,
+  placement: "right-start",
+  offset: 4,
+});
 const insertRowCount = computed(() =>
   props.range ? props.range.end.row - props.range.start.row + 1 : 1,
 );
@@ -124,7 +130,6 @@ const formatActionDisabled = computed(
 function close(restoreFocus: boolean): void {
   if (!isOpen.value) return;
   isOpen.value = false;
-  activeSubmenu.value = null;
   emit("close", restoreFocus);
 }
 function dispatch(action: SheetContextAction): void {
@@ -135,19 +140,18 @@ function requestClear(mode: "contents" | "formats" | "all"): void {
   if (mode === "contents" && !props.state) emit("clear");
   dispatch({ type: "clear", mode });
 }
+function submenuName(target: EventTarget | null): Exclude<Submenu, null> | undefined {
+  if (!(target instanceof HTMLElement)) return undefined;
+  const name = target.closest<HTMLElement>("[data-cell-action]")?.dataset.cellAction;
+  return name === "insert" || name === "delete" || name === "clear" || name === "sort"
+    ? name
+    : undefined;
+}
+function canOpenSubmenu(name: Exclude<Submenu, null>): boolean {
+  return !props.readOnly && (name !== "sort" || Boolean(props.state?.data.sortEnabled));
+}
 function openSubmenu(name: Exclude<Submenu, null>): void {
-  if (isOpen.value && !props.readOnly) {
-    activeSubmenu.value = name;
-    void nextTick(() => submenuSurfaceRef.value?.focusFirstItem());
-  }
-}
-function openSubmenuOnHover(name: Exclude<Submenu, null>): void {
-  if (isOpen.value && !props.readOnly) activeSubmenu.value = name;
-}
-function closeSubmenu(): void {
-  const trigger = submenuTrigger.value;
-  activeSubmenu.value = null;
-  void nextTick(() => trigger?.focus());
+  if (canOpenSubmenu(name)) revealSubmenu(name);
 }
 function onMenuKeydown(event: KeyboardEvent): void {
   if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
@@ -160,22 +164,19 @@ function onMenuKeydown(event: KeyboardEvent): void {
       return;
     }
   }
-  if (event.key === "ArrowRight" && event.target instanceof HTMLElement) {
-    const name = event.target.dataset.cellAction as Submenu;
-    if (name === "insert" || name === "delete" || name === "clear" || name === "sort") {
-      event.preventDefault();
-      openSubmenu(name);
-    }
-  }
+  const name = submenuName(event.target);
+  if (name && canOpenSubmenu(name)) onParentKeydown(event, name);
+}
+function onMenuFocusin(event: FocusEvent): void {
+  onParentFocusin(submenuName(event.target));
+}
+function onMenuMouseover(event: MouseEvent): void {
+  const name = submenuName(event.target);
+  onParentMouseover(name && canOpenSubmenu(name) ? name : undefined);
 }
 function onSubmenuKeydown(event: KeyboardEvent): void {
-  if (event.key !== "Escape" && event.key !== "ArrowLeft") return;
-  if (event.key === "ArrowLeft" && event.target instanceof HTMLInputElement) return;
-  event.preventDefault();
-  event.stopPropagation();
-  closeSubmenu();
+  handleSubmenuKeydown(event, !(event.target instanceof HTMLInputElement));
 }
-onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
 </script>
 
 <template>
@@ -191,7 +192,9 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
         ref="menuSurfaceRef"
         class="sheet-cell-context-menu"
         :label="t('cellMenu.actions')"
+        @focusin="onMenuFocusin"
         @keydown="onMenuKeydown"
+        @mouseover="onMenuMouseover"
       >
         <li role="none">
           <ContextClipboardActions
@@ -213,7 +216,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :aria-expanded="activeSubmenu === 'insert'"
           :aria-controls="activeSubmenu === 'insert' ? submenuId : undefined"
           :disabled="readOnly"
-          @mouseenter="openSubmenuOnHover('insert')"
+          @mouseenter="onMenuMouseover"
           @select="openSubmenu('insert')"
           ><template #icon><Plus :size="16" /></template>{{ t("contextMenu.insert")
           }}<template #shortcut><ChevronRight :size="15" /></template
@@ -225,7 +228,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :aria-expanded="activeSubmenu === 'delete'"
           :aria-controls="activeSubmenu === 'delete' ? submenuId : undefined"
           :disabled="readOnly"
-          @mouseenter="openSubmenuOnHover('delete')"
+          @mouseenter="onMenuMouseover"
           @select="openSubmenu('delete')"
           ><template #icon><Trash2 :size="16" /></template>{{ t("contextMenu.delete")
           }}<template #shortcut><ChevronRight :size="15" /></template
@@ -236,7 +239,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :aria-expanded="activeSubmenu === 'clear'"
           :aria-controls="activeSubmenu === 'clear' ? submenuId : undefined"
           :disabled="readOnly"
-          @mouseenter="openSubmenuOnHover('clear')"
+          @mouseenter="onMenuMouseover"
           @select="openSubmenu('clear')"
           ><template #icon><Eraser :size="16" /></template>{{ t("contextMenu.clear")
           }}<template #shortcut><ChevronRight :size="15" /></template
@@ -268,7 +271,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :aria-expanded="activeSubmenu === 'sort'"
           :aria-controls="activeSubmenu === 'sort' ? submenuId : undefined"
           :disabled="!state?.data.sortEnabled || readOnly"
-          @mouseenter="openSubmenuOnHover('sort')"
+          @mouseenter="onMenuMouseover"
           @select="openSubmenu('sort')"
           ><template #icon><ArrowDownUp :size="16" /></template>{{ t("contextMenu.sort")
           }}<template #shortcut><ChevronRight :size="15" /></template
@@ -426,7 +429,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
 
 <style scoped lang="scss">
 .sheet-cell-context-menu-panel {
-  z-index: 100;
+  z-index: var(--idea-layer-context-menu);
   display: grid;
   gap: 6px;
   width: max-content;
@@ -435,7 +438,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
   width: max-content;
   border-radius: var(--idea-radius-default);
   &--submenu {
-    z-index: 101;
+    z-index: var(--idea-layer-context-submenu);
     width: max-content;
     border-radius: var(--idea-radius-default);
   }

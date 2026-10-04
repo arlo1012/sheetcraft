@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useId } from "vue";
+import { computed, ref, useId } from "vue";
 import {
   ArrowDownUp,
   BetweenHorizontalEnd,
@@ -23,12 +23,12 @@ import {
 } from "lucide-vue-next";
 import type { ConditionalFormatPresetKind } from "../conditional-format-presets";
 import ConditionalFormatPresetGallery from "./ConditionalFormatPresetGallery.vue";
-import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
+import { useSubmenu } from "../../../shared/menu/useSubmenu";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 
 export type ConditionalFormatQuickRule =
@@ -79,45 +79,31 @@ const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const submenuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const triggerElement = computed(() => triggerRef.value?.rootElement ?? null);
 const menuRef = computed(() => menuSurfaceRef.value?.rootElement ?? null);
-const submenuRef = computed(() => submenuSurfaceRef.value?.rootElement ?? null);
 const panelId = `conditional-formatting-menu-${useId().replaceAll(":", "")}`;
 const submenuId = `conditional-formatting-submenu-${useId().replaceAll(":", "")}`;
-const activeSubmenu = ref<Submenu>(null);
 const disabled = computed(() => props.disabled);
-const submenuTrigger = computed<HTMLElement | null>(() =>
-  activeSubmenu.value
-    ? (menuRef.value?.querySelector(`[data-conditional-format-action="${activeSubmenu.value}"]`) ??
-      null)
-    : null,
-);
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef: triggerElement,
   menuSurfaceRef,
   disabled,
   placement: "bottom-start",
   additionalInside: () => [submenuRef.value],
-  onDismiss: () => {
-    activeSubmenu.value = null;
-  },
 });
-const { floatingStyles: submenuStyles } = useFloatingPanel(
-  submenuTrigger,
-  submenuRef,
-  computed(() => activeSubmenu.value !== null),
-  { placement: "right-start", offset: 4 },
-);
-function openSubmenu(name: Exclude<Submenu, null>, focus = true): void {
-  activeSubmenu.value = name;
-  if (focus) void nextTick(() => submenuSurfaceRef.value?.focusFirstItem());
-}
-function openSubmenuOnHover(name: Exclude<Submenu, null>): void {
-  if (open.value) activeSubmenu.value = name;
-}
-function closeSubmenu(): void {
-  const trigger = submenuTrigger.value;
-  activeSubmenu.value = null;
-  void nextTick(() => trigger?.focus());
-}
+const {
+  activeSubmenu,
+  submenuElement: submenuRef,
+  submenuStyles,
+  openSubmenu,
+  openSubmenuOnHover,
+  onParentKeydown,
+  onSubmenuKeydown,
+} = useSubmenu<Exclude<Submenu, null>>({
+  parentOpen: open,
+  submenuSurfaceRef,
+  getAnchor: (name) =>
+    menuRef.value?.querySelector<HTMLElement>(`[data-conditional-format-action="${name}"]`) ?? null,
+  offset: 4,
+});
 function create(kind: ConditionalFormatQuickRule): void {
   dismiss("programmatic", true);
   emit("create", kind);
@@ -131,18 +117,12 @@ function clear(scope: "selection" | "sheet"): void {
   emit("clear", scope);
 }
 function onMenuKeydown(event: KeyboardEvent): void {
-  if (event.key !== "ArrowRight" || !(event.target instanceof HTMLElement)) return;
-  const submenu = event.target.dataset.conditionalFormatAction as Submenu;
-  if (submenu) {
-    event.preventDefault();
-    openSubmenu(submenu);
-  }
-}
-function onSubmenuKeydown(event: KeyboardEvent): void {
-  if (event.key !== "Escape" && event.key !== "ArrowLeft") return;
-  event.preventDefault();
-  event.stopPropagation();
-  closeSubmenu();
+  const submenu =
+    event.target instanceof HTMLElement
+      ? (event.target.closest<HTMLElement>("[data-conditional-format-action]")?.dataset
+          .conditionalFormatAction as Exclude<Submenu, null> | undefined)
+      : undefined;
+  onParentKeydown(event, submenu);
 }
 </script>
 
@@ -363,11 +343,9 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
   display: contents;
   &__surface,
   &__submenu {
-    z-index: 50;
     width: max-content;
   }
   &__submenu {
-    z-index: 51;
     max-height: calc(100vh - 32px);
     overflow-y: auto;
   }

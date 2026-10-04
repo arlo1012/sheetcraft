@@ -1,4 +1,5 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { DEFAULT_WORKBOOK_THEME } from "@idea10/core/workbook-theme";
 import PageThemeMenu from "../../../../../modules/page-layout/components/PageThemeMenu.vue";
@@ -104,6 +105,23 @@ describe("PageThemeMenu", () => {
       expect(new DOMWrapper(document.body).find(".page-theme-menu__root").exists()).toBe(true);
       await wrapper.setProps({ disabled: true });
       expect(new DOMWrapper(document.body).find(".page-theme-menu__root").exists()).toBe(false);
+    } finally {
+      wrapper.unmount();
+      document.body.replaceChildren();
+    }
+  });
+
+  test("closes a hovered child when parent focus moves to another category", async () => {
+    const wrapper = mountMenu();
+    try {
+      await wrapper.get('[data-ribbon-action="page-theme"]').trigger("click");
+      const body = new DOMWrapper(document.body);
+      await body.get('[data-theme-category="colors"]').trigger("mouseenter");
+      expect(body.find(".page-theme-menu__submenu").exists()).toBe(true);
+
+      await body.get('[data-theme-category="fonts"]').trigger("focusin");
+      await nextTick();
+      expect(body.find(".page-theme-menu__submenu").exists()).toBe(false);
     } finally {
       wrapper.unmount();
       document.body.replaceChildren();

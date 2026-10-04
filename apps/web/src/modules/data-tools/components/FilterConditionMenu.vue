@@ -130,6 +130,6 @@ function select(action: FilterConditionAction): void {
 
 <style scoped lang="scss">
 .filter-condition-menu {
-  z-index: 2201;
+  z-index: var(--idea-layer-popover-submenu);
 }
 </style>

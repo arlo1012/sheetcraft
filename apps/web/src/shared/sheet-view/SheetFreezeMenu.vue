@@ -94,7 +94,6 @@ function unfreeze(): void {
   @include ribbon.tool;
 }
 .sheet-freeze-menu__surface {
-  position: fixed;
-  z-index: 80;
+  z-index: var(--idea-layer-menu);
 }
 </style>

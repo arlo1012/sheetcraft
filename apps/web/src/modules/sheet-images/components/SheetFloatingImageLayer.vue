@@ -26,6 +26,7 @@ import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import type { Point } from "@idea10/sheet-engine/geometry";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
+import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import SheetFloatingImageContextMenu from "./SheetFloatingImageContextMenu.vue";
 import SheetFloatingImageSelection from "./SheetFloatingImageSelection.vue";
 import type { DrawingThemeEffects } from "../drawing-theme-effects";
@@ -385,24 +386,26 @@ function closeContextMenu(restoreFocus: boolean): void {
   }
 }
 
-function openContextMenu(image: FloatingImage, trigger: HTMLElement, x: number, y: number): void {
+function openContextMenu(
+  image: FloatingImage,
+  trigger: HTMLElement,
+  anchor: FloatingReference = trigger,
+): void {
   if (gesture.value || crop.value) return;
   emit("select", image.id);
   trigger.focus({ preventScroll: true });
   contextMenu.value = {
     imageId: image.id,
     trigger,
-    anchor: markRaw({
-      contextElement: layerRef.value ?? trigger,
-      getBoundingClientRect: () => new DOMRect(x, y, 0, 0),
-    }),
+    anchor,
   };
 }
 
 function onImageContextMenu(image: FloatingImage, event: MouseEvent): void {
   event.preventDefault();
   event.stopPropagation();
-  openContextMenu(image, event.currentTarget as HTMLElement, event.clientX, event.clientY);
+  const trigger = event.currentTarget as HTMLElement;
+  openContextMenu(image, trigger, createContextMenuPoint(event, layerRef.value ?? trigger));
 }
 
 function openImageKeyboardContextMenu(image: FloatingImage, event: KeyboardEvent): boolean {
@@ -410,13 +413,7 @@ function openImageKeyboardContextMenu(image: FloatingImage, event: KeyboardEvent
   event.preventDefault();
   event.stopPropagation();
   const trigger = event.currentTarget as HTMLElement;
-  const rect = trigger.getBoundingClientRect();
-  openContextMenu(
-    image,
-    trigger,
-    rect.left + Math.min(16, rect.width / 2),
-    rect.top + Math.min(16, rect.height / 2),
-  );
+  openContextMenu(image, trigger);
   return true;
 }
 
@@ -540,7 +537,8 @@ function handleSurfaceContextMenu(event: MouseEvent, point: Point): boolean {
   const image = hitTestFloatingImage(point);
   if (!image) return false;
   event.preventDefault();
-  openContextMenu(image, layerRef.value ?? document.body, event.clientX, event.clientY);
+  const trigger = layerRef.value ?? document.body;
+  openContextMenu(image, trigger, createContextMenuPoint(event, trigger));
   return true;
 }
 

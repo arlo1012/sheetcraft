@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 import type { FloatingReference } from "../floating/useFloatingPanel";
-import { useDismissibleFloatingPanel } from "../floating/useDismissibleFloatingPanel";
 import MenuItem from "../menu/MenuItem.vue";
 import MenuSurface from "../menu/MenuSurface.vue";
+import { useContextMenu } from "../menu/useContextMenu";
 
 const props = defineProps<{
   anchor: FloatingReference;
@@ -20,12 +20,14 @@ const surfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const surfaceElement = computed<HTMLElement | null>(() => surfaceRef.value?.rootElement ?? null);
 const anchor = computed(() => props.anchor);
 const open = computed(() => true);
-const { floatingStyles } = useDismissibleFloatingPanel(anchor, surfaceElement, open, {
+const { floatingStyles } = useContextMenu({
+  anchor,
+  panelRef: surfaceElement,
+  open,
+  surfaceRef,
   offset: 4,
   onDismiss: ({ restoreFocus }) => emit("close", restoreFocus),
 });
-
-onMounted(() => void nextTick(() => surfaceRef.value?.focusFirstItem()));
 
 defineExpose({ rootElement: surfaceElement });
 </script>
@@ -50,6 +52,6 @@ defineExpose({ rootElement: surfaceElement });
 
 <style scoped lang="scss">
 .custom-style-context-menu {
-  z-index: 100;
+  z-index: var(--idea-layer-context-menu);
 }
 </style>

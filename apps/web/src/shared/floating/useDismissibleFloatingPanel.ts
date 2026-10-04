@@ -12,6 +12,10 @@ export type DismissibleFloatingPanelOptions = FloatingPanelOptions & {
   onDismiss: (payload: { reason: FloatingDismissReason; restoreFocus: boolean }) => void;
 };
 
+// Teleported children are siblings in the DOM. Track opening order so one Escape
+// closes only the most recently opened panel, regardless of listener mount order.
+const openPanels: symbol[] = [];
+
 export function useDismissibleFloatingPanel(
   reference: Readonly<Ref<FloatingReference | null>>,
   floating: Readonly<Ref<HTMLElement | null>>,
@@ -21,6 +25,12 @@ export function useDismissibleFloatingPanel(
   const { additionalInside, onDismiss, ...floatingOptions } = options;
   const floatingPanel = useFloatingPanel(reference, floating, open, floatingOptions);
   let focusDismissArmed = false;
+  const panelId = Symbol("floating-panel");
+
+  function removeFromOpenPanels(): void {
+    const index = openPanels.indexOf(panelId);
+    if (index >= 0) openPanels.splice(index, 1);
+  }
 
   function containsTarget(target: EventTarget | null): boolean {
     if (!(target instanceof Node)) {
@@ -65,17 +75,26 @@ export function useDismissibleFloatingPanel(
   }
 
   function onDocumentKeydown(event: KeyboardEvent): void {
-    if (open.value && event.key === "Escape") {
+    if (
+      open.value &&
+      event.key === "Escape" &&
+      !event.defaultPrevented &&
+      openPanels.at(-1) === panelId
+    ) {
       event.preventDefault();
       dismiss("escape", true);
     }
   }
 
-  watch(open, (isOpen) => {
-    if (!isOpen) {
-      focusDismissArmed = false;
-    }
-  });
+  watch(
+    open,
+    (isOpen) => {
+      removeFromOpenPanels();
+      if (isOpen) openPanels.push(panelId);
+      else focusDismissArmed = false;
+    },
+    { immediate: true, flush: "sync" },
+  );
 
   onMounted(() => {
     document.addEventListener("pointerdown", onDocumentPointerDown);
@@ -84,6 +103,7 @@ export function useDismissibleFloatingPanel(
   });
 
   onBeforeUnmount(() => {
+    removeFromOpenPanels();
     document.removeEventListener("pointerdown", onDocumentPointerDown);
     document.removeEventListener("focusin", onDocumentFocusIn);
     document.removeEventListener("keydown", onDocumentKeydown);

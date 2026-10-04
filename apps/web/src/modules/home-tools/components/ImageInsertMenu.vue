@@ -78,7 +78,6 @@ function insertImage(mode: "cell" | "floating"): void {
 }
 
 .image-insert-menu {
-  position: fixed;
-  z-index: 80;
+  z-index: var(--idea-layer-menu);
 }
 </style>

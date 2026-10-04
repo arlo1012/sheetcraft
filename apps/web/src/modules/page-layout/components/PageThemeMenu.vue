@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useId, watch } from "vue";
+import { computed, ref, useId, watch } from "vue";
 import { ChevronRight, Palette, Sparkles, Type } from "lucide-vue-next";
 import type {
   WorkbookCustomColor,
@@ -7,12 +7,12 @@ import type {
   WorkbookTheme,
 } from "@idea10/core/workbook-theme";
 import { useAppI18n } from "../../../shared/i18n";
-import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
+import { useSubmenu } from "../../../shared/menu/useSubmenu";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import {
   PAGE_THEME_COLOR_PRESETS,
@@ -39,18 +39,11 @@ const surfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const submenuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const triggerElement = computed(() => triggerRef.value?.rootElement ?? null);
 const menuElement = computed(() => surfaceRef.value?.rootElement ?? null);
-const submenuElement = computed(() => submenuSurfaceRef.value?.rootElement ?? null);
 const panelId = `page-theme-menu-${useId().replaceAll(":", "")}`;
 const submenuId = `${panelId}-submenu`;
-const activeCategory = ref<Category | null>(null);
 const colorsDialogVisible = ref(false);
 const fontsDialogVisible = ref(false);
 const recommendationOffset = ref(0);
-const submenuTrigger = computed<HTMLElement | null>(() =>
-  activeCategory.value
-    ? (menuElement.value?.querySelector(`[data-theme-category="${activeCategory.value}"]`) ?? null)
-    : null,
-);
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef: triggerElement,
   menuSurfaceRef: surfaceRef,
@@ -58,12 +51,25 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   placement: "bottom-start",
   additionalInside: () => [submenuElement.value],
 });
-const { floatingStyles: submenuStyles } = useFloatingPanel(
-  submenuTrigger,
+const {
+  activeSubmenu: activeCategory,
   submenuElement,
-  computed(() => activeCategory.value !== null),
-  { placement: "right-start", offset: 4, padding: 8 },
-);
+  submenuStyles,
+  openSubmenu: setCategory,
+  openSubmenuOnHover: setCategoryOnHover,
+  onParentKeydown,
+  onParentFocusin,
+  onSubmenuKeydown,
+} = useSubmenu<Category>({
+  parentOpen: open,
+  submenuSurfaceRef,
+  getAnchor: (category) =>
+    menuElement.value?.querySelector<HTMLElement>(`[data-theme-category="${category}"]`) ?? null,
+  offset: 4,
+  padding: 8,
+  focus: (surface) =>
+    surface.rootElement?.querySelector<HTMLElement>("[data-theme-choice]")?.focus(),
+});
 const defaultColors = computed<ThemeColorScheme>(() => {
   const colors = props.theme.colors;
   return {
@@ -98,21 +104,9 @@ const recommendedColors = computed(() =>
       ]!,
   ),
 );
-function setCategory(category: Category, focus = false): void {
-  activeCategory.value = category;
-  if (focus)
-    void nextTick(() =>
-      submenuElement.value?.querySelector<HTMLElement>("[data-theme-choice]")?.focus(),
-    );
-}
 function closeMenu(): void {
   activeCategory.value = null;
   dismiss("programmatic", true);
-}
-function closeSubmenu(): void {
-  const trigger = submenuTrigger.value;
-  activeCategory.value = null;
-  void nextTick(() => trigger?.focus());
 }
 function themeWith(patch: Partial<WorkbookTheme>): WorkbookTheme {
   return { ...props.theme, ...patch };
@@ -196,18 +190,22 @@ function moveGridFocus(event: KeyboardEvent, index: number, total: number): void
   submenuElement.value?.querySelectorAll<HTMLElement>("[data-theme-grid]")[next]?.focus();
 }
 function onRootKeydown(event: KeyboardEvent): void {
-  if (event.key !== "ArrowRight" || !(event.target instanceof HTMLElement)) return;
-  const category = event.target.dataset.themeCategory as Category | undefined;
-  if (!category) return;
-  event.preventDefault();
-  setCategory(category, true);
+  const category =
+    event.target instanceof HTMLElement
+      ? (event.target.closest<HTMLElement>("[data-theme-category]")?.dataset.themeCategory as
+          | Category
+          | undefined)
+      : undefined;
+  onParentKeydown(event, category);
 }
-function onSubmenuKeydown(event: KeyboardEvent): void {
-  if (event.key === "ArrowLeft" || event.key === "Escape") {
-    event.preventDefault();
-    event.stopPropagation();
-    closeSubmenu();
-  }
+function onRootFocusin(event: FocusEvent): void {
+  const category =
+    event.target instanceof HTMLElement
+      ? (event.target.closest<HTMLElement>("[data-theme-category]")?.dataset.themeCategory as
+          | Category
+          | undefined)
+      : undefined;
+  onParentFocusin(category);
 }
 watch([colorsDialogVisible, fontsDialogVisible], ([colorsOpen, fontsOpen]) =>
   emit("update:dialogVisible", colorsOpen || fontsOpen),
@@ -258,13 +256,14 @@ watch(
         class="page-theme-menu__root"
         :style="floatingStyles"
         :label="t('pageTools.theme')"
+        @focusin="onRootFocusin"
         @keydown="onRootKeydown"
       >
         <MenuItem
           data-theme-category="theme"
           :aria-controls="activeCategory === 'theme' ? submenuId : undefined"
           :aria-expanded="activeCategory === 'theme'"
-          @mouseenter="setCategory('theme')"
+          @mouseenter="setCategoryOnHover('theme')"
           @select="setCategory('theme', true)"
           ><template #icon><Palette /></template>{{ t("pageTools.theme")
           }}<template #shortcut><ChevronRight /></template
@@ -273,7 +272,7 @@ watch(
           data-theme-category="colors"
           :aria-controls="activeCategory === 'colors' ? submenuId : undefined"
           :aria-expanded="activeCategory === 'colors'"
-          @mouseenter="setCategory('colors')"
+          @mouseenter="setCategoryOnHover('colors')"
           @select="setCategory('colors', true)"
           ><template #icon><Palette /></template>{{ t("pageTools.themeColors")
           }}<template #shortcut><ChevronRight /></template
@@ -282,7 +281,7 @@ watch(
           data-theme-category="fonts"
           :aria-controls="activeCategory === 'fonts' ? submenuId : undefined"
           :aria-expanded="activeCategory === 'fonts'"
-          @mouseenter="setCategory('fonts')"
+          @mouseenter="setCategoryOnHover('fonts')"
           @select="setCategory('fonts', true)"
           ><template #icon><Type /></template>{{ t("pageTools.themeFonts")
           }}<template #shortcut><ChevronRight /></template
@@ -291,7 +290,7 @@ watch(
           data-theme-category="effects"
           :aria-controls="activeCategory === 'effects' ? submenuId : undefined"
           :aria-expanded="activeCategory === 'effects'"
-          @mouseenter="setCategory('effects')"
+          @mouseenter="setCategoryOnHover('effects')"
           @select="setCategory('effects', true)"
           ><template #icon><Sparkles /></template>{{ t("pageTools.themeEffects")
           }}<template #shortcut><ChevronRight /></template
@@ -302,6 +301,7 @@ watch(
         :id="submenuId"
         ref="submenuSurfaceRef"
         class="page-theme-menu__submenu"
+        :body-scrollable="activeCategory !== 'colors'"
         :class="{
           'page-theme-menu__submenu--with-action':
             activeCategory === 'colors' || activeCategory === 'fonts',
@@ -318,169 +318,173 @@ watch(
         "
         @keydown="onSubmenuKeydown"
       >
-        <li v-if="activeCategory === 'theme'" class="page-theme-menu__content" role="none">
-          <div
-            class="page-theme-menu__gallery"
-            role="radiogroup"
-            :aria-label="t('pageTools.theme')"
-          >
-            <button
-              v-for="(preset, index) in PAGE_THEME_PRESETS"
-              :key="preset.id"
-              data-theme-choice
-              data-theme-grid
-              type="button"
-              class="page-theme-menu__theme-preview"
-              :class="{ 'is-selected': preset.id === theme.id }"
-              role="radio"
-              :aria-checked="preset.id === theme.id"
-              @click="applyTheme(preset)"
-              @keydown="moveGridFocus($event, index, PAGE_THEME_PRESETS.length)"
+        <template #body>
+          <div v-if="activeCategory === 'theme'" class="page-theme-menu__content" role="none">
+            <div
+              class="page-theme-menu__gallery"
+              role="radiogroup"
+              :aria-label="t('pageTools.theme')"
             >
-              <span :style="{ fontFamily: preset.fonts.headingEastAsia || preset.headingFont }"
-                >文文</span
-              ><i
-                v-for="(color, colorIndex) in preset.accentColors"
-                :key="colorIndex"
-                :style="{ backgroundColor: color }"
-              /><em>{{ preset.name }}</em>
-            </button>
-          </div>
-        </li>
-        <li
-          v-else-if="activeCategory === 'colors'"
-          class="page-theme-menu__content page-theme-menu__colors-panel"
-          role="none"
-        >
-          <GallerySection :title="t('pageTools.themeColors')" scrollable>
-            <div class="page-theme-menu__color-list">
               <button
-                v-for="preset in [...PAGE_THEME_COLOR_PRESETS, ...customColors]"
+                v-for="(preset, index) in PAGE_THEME_PRESETS"
+                :key="preset.id"
+                data-theme-choice
+                data-theme-grid
+                type="button"
+                class="page-theme-menu__theme-preview"
+                :class="{ 'is-selected': preset.id === theme.id }"
+                role="radio"
+                :aria-checked="preset.id === theme.id"
+                @click="applyTheme(preset)"
+                @keydown="moveGridFocus($event, index, PAGE_THEME_PRESETS.length)"
+              >
+                <span :style="{ fontFamily: preset.fonts.headingEastAsia || preset.headingFont }"
+                  >文文</span
+                ><i
+                  v-for="(color, colorIndex) in preset.accentColors"
+                  :key="colorIndex"
+                  :style="{ backgroundColor: color }"
+                /><em>{{ preset.name }}</em>
+              </button>
+            </div>
+          </div>
+          <div
+            v-else-if="activeCategory === 'colors'"
+            class="page-theme-menu__content page-theme-menu__colors-panel"
+            role="none"
+          >
+            <GallerySection :title="t('pageTools.themeColors')" scrollable>
+              <div class="page-theme-menu__color-list">
+                <button
+                  v-for="preset in [...PAGE_THEME_COLOR_PRESETS, ...customColors]"
+                  :key="preset.id"
+                  data-theme-choice
+                  type="button"
+                  class="page-theme-menu__color-row"
+                  :class="{ 'is-selected': preset.name === defaultColors.name }"
+                  :aria-pressed="preset.name === defaultColors.name"
+                  @click="applyColors(preset)"
+                >
+                  <span class="page-theme-menu__color-swatches"
+                    ><i :style="{ backgroundColor: preset.dark1 }" /><i
+                      :style="{ backgroundColor: preset.light1 }" /><i
+                      v-for="(color, colorIndex) in preset.accentColors"
+                      :key="colorIndex"
+                      :style="{ backgroundColor: color }" /></span
+                  ><span>{{ preset.name }}</span>
+                </button>
+              </div>
+            </GallerySection>
+            <GallerySection :title="t('pageTools.themeColorRecommendation')" scrollable>
+              <template #actions>
+                <button
+                  class="page-theme-menu__refresh"
+                  type="button"
+                  @click="refreshRecommendations"
+                >
+                  {{ t("pageTools.themeRefreshRecommendations") }}
+                </button>
+              </template>
+              <div class="page-theme-menu__color-list">
+                <button
+                  v-for="preset in recommendedColors"
+                  :key="`recommended-${preset.id}`"
+                  data-theme-choice
+                  type="button"
+                  class="page-theme-menu__color-row"
+                  @click="applyColors(preset)"
+                >
+                  <span class="page-theme-menu__color-swatches"
+                    ><i :style="{ backgroundColor: preset.dark1 }" /><i
+                      :style="{ backgroundColor: preset.light1 }" /><i
+                      v-for="(color, colorIndex) in preset.accentColors"
+                      :key="colorIndex"
+                      :style="{ backgroundColor: color }" /></span
+                  ><span>{{ preset.name }}</span>
+                </button>
+              </div>
+            </GallerySection>
+          </div>
+          <div
+            v-else-if="activeCategory === 'fonts'"
+            class="page-theme-menu__content page-theme-menu__fonts-scroll"
+            role="none"
+          >
+            <section class="page-theme-menu__fonts-panel">
+              <button
+                v-for="preset in [...PAGE_THEME_FONT_PRESETS, ...customFonts]"
                 :key="preset.id"
                 data-theme-choice
                 type="button"
-                class="page-theme-menu__color-row"
-                :class="{ 'is-selected': preset.name === defaultColors.name }"
-                :aria-pressed="preset.name === defaultColors.name"
-                @click="applyColors(preset)"
+                class="page-theme-menu__font-row"
+                :class="{ 'is-selected': preset.name === defaultFonts.name }"
+                :aria-pressed="preset.name === defaultFonts.name"
+                @click="applyFonts(preset)"
               >
-                <span class="page-theme-menu__color-swatches"
-                  ><i :style="{ backgroundColor: preset.dark1 }" /><i
-                    :style="{ backgroundColor: preset.light1 }" /><i
-                    v-for="(color, colorIndex) in preset.accentColors"
-                    :key="colorIndex"
-                    :style="{ backgroundColor: color }" /></span
-                ><span>{{ preset.name }}</span>
+                <span
+                  class="page-theme-menu__font-sample"
+                  :style="{ fontFamily: preset.headingEastAsia || preset.headingFont }"
+                  >文文</span
+                ><span
+                  ><strong :style="{ fontFamily: preset.headingEastAsia || preset.headingFont }">{{
+                    preset.name
+                  }}</strong
+                  ><em :style="{ fontFamily: preset.headingEastAsia || preset.headingFont }">{{
+                    preset.headingEastAsia || preset.headingFont
+                  }}</em
+                  ><em :style="{ fontFamily: preset.bodyEastAsia || preset.bodyFont }">{{
+                    preset.bodyEastAsia || preset.bodyFont
+                  }}</em></span
+                >
               </button>
-            </div>
-          </GallerySection>
-          <GallerySection :title="t('pageTools.themeColorRecommendation')" scrollable>
-            <template #actions>
-              <button
-                class="page-theme-menu__refresh"
-                type="button"
-                @click="refreshRecommendations"
-              >
-                {{ t("pageTools.themeRefreshRecommendations") }}
-              </button>
-            </template>
-            <div class="page-theme-menu__color-list">
-              <button
-                v-for="preset in recommendedColors"
-                :key="`recommended-${preset.id}`"
-                data-theme-choice
-                type="button"
-                class="page-theme-menu__color-row"
-                @click="applyColors(preset)"
-              >
-                <span class="page-theme-menu__color-swatches"
-                  ><i :style="{ backgroundColor: preset.dark1 }" /><i
-                    :style="{ backgroundColor: preset.light1 }" /><i
-                    v-for="(color, colorIndex) in preset.accentColors"
-                    :key="colorIndex"
-                    :style="{ backgroundColor: color }" /></span
-                ><span>{{ preset.name }}</span>
-              </button>
-            </div>
-          </GallerySection>
-        </li>
-        <li
-          v-else-if="activeCategory === 'fonts'"
-          class="page-theme-menu__content page-theme-menu__fonts-scroll"
-          role="none"
-        >
-          <section class="page-theme-menu__fonts-panel">
-            <button
-              v-for="preset in [...PAGE_THEME_FONT_PRESETS, ...customFonts]"
-              :key="preset.id"
-              data-theme-choice
-              type="button"
-              class="page-theme-menu__font-row"
-              :class="{ 'is-selected': preset.name === defaultFonts.name }"
-              :aria-pressed="preset.name === defaultFonts.name"
-              @click="applyFonts(preset)"
-            >
-              <span
-                class="page-theme-menu__font-sample"
-                :style="{ fontFamily: preset.headingEastAsia || preset.headingFont }"
-                >文文</span
-              ><span
-                ><strong :style="{ fontFamily: preset.headingEastAsia || preset.headingFont }">{{
-                  preset.name
-                }}</strong
-                ><em :style="{ fontFamily: preset.headingEastAsia || preset.headingFont }">{{
-                  preset.headingEastAsia || preset.headingFont
-                }}</em
-                ><em :style="{ fontFamily: preset.bodyEastAsia || preset.bodyFont }">{{
-                  preset.bodyEastAsia || preset.bodyFont
-                }}</em></span
-              >
-            </button>
-          </section>
-        </li>
-        <li v-else class="page-theme-menu__content" role="none">
-          <div
-            class="page-theme-menu__gallery"
-            role="radiogroup"
-            :aria-label="t('pageTools.themeEffects')"
-          >
-            <button
-              v-for="(effect, index) in PAGE_THEME_EFFECT_PRESETS"
-              :key="effect.id"
-              data-theme-choice
-              data-theme-grid
-              type="button"
-              class="page-theme-menu__effect-preview"
-              :class="{ 'is-selected': effect.id === theme.effects?.id }"
-              role="radio"
-              :aria-checked="effect.id === theme.effects?.id"
-              @click="applyEffect(effect)"
-              @keydown="moveGridFocus($event, index, PAGE_THEME_EFFECT_PRESETS.length)"
-            >
-              <ThemeEffectPreview v-bind="effect" /><em>{{ effect.name }}</em>
-            </button>
+            </section>
           </div>
-        </li>
-        <MenuSeparator v-if="activeCategory === 'colors' || activeCategory === 'fonts'" />
-        <MenuItem
-          v-if="activeCategory === 'colors'"
-          @select="
-            closeMenu();
-            colorsDialogVisible = true;
-          "
-        >
-          {{ t("pageTools.customizeColors") }}
-        </MenuItem>
-        <MenuItem
-          v-if="activeCategory === 'fonts'"
-          class="page-theme-menu__custom-action"
-          @select="
-            closeMenu();
-            fontsDialogVisible = true;
-          "
-        >
-          {{ t("pageTools.customizeFonts") }}
-        </MenuItem>
+          <div v-else class="page-theme-menu__content" role="none">
+            <div
+              class="page-theme-menu__gallery"
+              role="radiogroup"
+              :aria-label="t('pageTools.themeEffects')"
+            >
+              <button
+                v-for="(effect, index) in PAGE_THEME_EFFECT_PRESETS"
+                :key="effect.id"
+                data-theme-choice
+                data-theme-grid
+                type="button"
+                class="page-theme-menu__effect-preview"
+                :class="{ 'is-selected': effect.id === theme.effects?.id }"
+                role="radio"
+                :aria-checked="effect.id === theme.effects?.id"
+                @click="applyEffect(effect)"
+                @keydown="moveGridFocus($event, index, PAGE_THEME_EFFECT_PRESETS.length)"
+              >
+                <ThemeEffectPreview v-bind="effect" /><em>{{ effect.name }}</em>
+              </button>
+            </div>
+          </div>
+        </template>
+        <template v-if="activeCategory === 'colors' || activeCategory === 'fonts'" #footer>
+          <MenuSeparator v-if="activeCategory === 'colors' || activeCategory === 'fonts'" />
+          <MenuItem
+            v-if="activeCategory === 'colors'"
+            @select="
+              closeMenu();
+              colorsDialogVisible = true;
+            "
+          >
+            {{ t("pageTools.customizeColors") }}
+          </MenuItem>
+          <MenuItem
+            v-if="activeCategory === 'fonts'"
+            class="page-theme-menu__custom-action"
+            @select="
+              closeMenu();
+              fontsDialogVisible = true;
+            "
+          >
+            {{ t("pageTools.customizeFonts") }}
+          </MenuItem>
+        </template>
       </MenuSurface>
     </Teleport>
     <CustomThemeColorsDialog
@@ -497,13 +501,10 @@ watch(
 </template>
 
 <style scoped lang="scss">
-@use "../../../shared/option-list/option-list";
-
 .page-theme-menu {
   min-width: 0;
 }
 .page-theme-menu__root {
-  z-index: 50;
   width: 132px;
 }
 .page-theme-menu__root :deep(.idea-menu-item__trailing) {
@@ -515,13 +516,12 @@ watch(
   height: 15px;
 }
 .page-theme-menu__submenu {
-  z-index: 51;
+  z-index: var(--idea-layer-submenu);
   width: min(480px, calc(100vw - 24px));
   max-height: min(700px, calc(100vh - 16px));
   padding: 8px;
 }
 .page-theme-menu__submenu--with-action {
-  grid-template-rows: minmax(0, 1fr) auto auto;
   height: min(700px, calc(100vh - 16px));
   padding: 0;
   overflow: hidden;
@@ -532,12 +532,8 @@ watch(
   min-height: 0;
 }
 .page-theme-menu__fonts-scroll {
-  @include option-list.scrollbar;
-
   min-height: 0;
   padding: var(--idea-tool-panel-padding);
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 .page-theme-menu__content {
   list-style: none;

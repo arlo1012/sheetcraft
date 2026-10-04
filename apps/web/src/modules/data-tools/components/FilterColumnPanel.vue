@@ -9,6 +9,7 @@ import type { ExcelDateSystem } from "@idea10/core/formula";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { createFilterConditionDraft, type FilterConditionOperator } from "../filter-conditions";
 import type { FilterConditionAction } from "../filter-condition-actions";
@@ -40,7 +41,10 @@ const props = withDefaults(
     values: readonly DataToolFilterValueOption[];
     appliedKeys: readonly SheetFilterValue[];
     criteria?: DataToolFilterCriteria;
-    colors?: { cellColors: readonly (string | null)[]; fontColors: readonly string[] };
+    colors?: {
+      cellColors: readonly (string | null)[];
+      fontColors: readonly string[];
+    };
     preferredKind: "text" | "number" | "date";
     hasCriteria: boolean;
     canSort: boolean;
@@ -73,12 +77,15 @@ const emit = defineEmits<{
   close: [];
 }>();
 const { t } = useAppI18n();
-const root = ref<HTMLElement | null>(null);
+const rootSurfaceRef = ref<InstanceType<typeof FloatingPanelSurface> | null>(null);
+const root = computed(() => rootSurfaceRef.value?.rootElement ?? null);
 const valueListRef = ref<InstanceType<typeof FilterValueList> | null>(null);
 const colorSortMenuRef = ref<InstanceType<typeof FilterColorSortMenu> | null>(null);
 const conditionMenuRef = ref<InstanceType<typeof FilterConditionMenu> | null>(null);
 const query = ref("");
-const searchOptions = ref<FilterSearchOptions>({ ...DEFAULT_FILTER_SEARCH_OPTIONS });
+const searchOptions = ref<FilterSearchOptions>({
+  ...DEFAULT_FILTER_SEARCH_OPTIONS,
+});
 const selected = ref<SheetFilterValue[]>([]);
 const colorDraft = ref<ColorCondition>();
 const tab = ref<"values" | "color">("values");
@@ -279,13 +286,15 @@ onBeforeUnmount(() => {
 </script>
 <template>
   <Teleport to="body">
-    <section
+    <FloatingPanelSurface
       v-if="open"
-      ref="root"
+      ref="rootSurfaceRef"
       class="filter-column-panel"
-      role="dialog"
-      :aria-label="t('dataTools.filter.filterValues') + ' ' + columnLabel"
+      :label="t('dataTools.filter.filterValues') + ' ' + columnLabel"
       :style="floatingStyles"
+      padding="tool"
+      layer="popover"
+      viewport-inset="8px"
     >
       <header class="filter-column-panel__heading">
         <div class="filter-column-panel__sort" role="group" :aria-label="t('dataTools.sort.title')">
@@ -371,7 +380,11 @@ onBeforeUnmount(() => {
           class="filter-column-panel__criteria"
           :title="criteriaSummary"
         >
-          {{ t("dataTools.filter.criteriaSummary", { condition: criteriaSummary }) }}
+          {{
+            t("dataTools.filter.criteriaSummary", {
+              condition: criteriaSummary,
+            })
+          }}
         </p>
         <footer>
           <span
@@ -386,7 +399,10 @@ onBeforeUnmount(() => {
                     query.trim()
                       ? "dataTools.filter.searchSelectionSummary"
                       : "dataTools.filter.selectionSummary",
-                    { selected: includedKeys.length, total: matchingValues.length },
+                    {
+                      selected: includedKeys.length,
+                      total: matchingValues.length,
+                    },
                   )
             }}
           </span>
@@ -398,7 +414,7 @@ onBeforeUnmount(() => {
           }}</TButton>
         </footer>
       </div>
-    </section>
+    </FloatingPanelSurface>
   </Teleport>
   <FilterConditionDialog
     v-if="visible && editing && editingAction !== 'rank'"
@@ -423,21 +439,10 @@ onBeforeUnmount(() => {
   />
 </template>
 <style scoped lang="scss">
-@use "../../../shared/option-list/option-list";
-
 .filter-column-panel {
-  @include option-list.scrollbar;
-  z-index: 2200;
   display: grid;
   gap: var(--idea-space-4);
   width: min(420px, calc(100vw - 16px));
-  max-height: calc(100vh - 16px);
-  padding: var(--idea-tool-panel-padding);
-  overflow: auto;
-  background: var(--idea-surface-panel);
-  border: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-default);
-  box-shadow: var(--idea-shadow-menu);
   &__heading {
     display: flex;
     align-items: center;

@@ -246,7 +246,7 @@ watch(
   }
 
   &__surface {
-    z-index: 120;
+    z-index: var(--idea-layer-sheet-menu);
     width: min(184px, calc(100vw - 32px));
   }
 

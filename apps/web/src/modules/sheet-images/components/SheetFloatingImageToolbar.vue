@@ -219,18 +219,17 @@ watch(
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/floating/floating-panel" as panel;
+
 .sheet-floating-image-toolbar {
+  @include panel.toolbar-surface(var(--idea-layer-toolbar));
+
   position: fixed;
-  z-index: 90;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   min-height: 30px;
   padding: 2px;
-  background: var(--idea-surface-panel);
-  border: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-default);
-  box-shadow: var(--idea-shadow-menu);
 
   &__action {
     position: relative;
@@ -275,7 +274,7 @@ watch(
 
   &__rotate-menu {
     position: fixed;
-    z-index: 91;
+    z-index: var(--idea-layer-sheet-menu);
   }
 }
 </style>

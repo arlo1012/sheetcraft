@@ -154,8 +154,7 @@ function clearFilter(): void {
 }
 
 .filter-value-menu {
-  position: fixed;
-  z-index: 80;
+  z-index: var(--idea-layer-menu);
   min-width: 220px;
   max-height: min(360px, calc(100vh - 16px));
 }

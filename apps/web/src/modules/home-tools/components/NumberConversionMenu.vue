@@ -72,7 +72,7 @@ function convert(mode: CellValueConversionMode): void {
   @include ribbon.tool;
 
   &__surface {
-    z-index: 80;
+    z-index: var(--idea-layer-menu);
   }
 }
 </style>

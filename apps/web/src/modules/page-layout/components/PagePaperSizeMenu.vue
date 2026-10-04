@@ -96,8 +96,7 @@ function openSetup(): void {
 .page-paper-size-menu {
   @include ribbon.tool;
   &__surface {
-    position: fixed;
-    z-index: 80;
+    z-index: var(--idea-layer-menu);
     min-width: 150px;
   }
 }

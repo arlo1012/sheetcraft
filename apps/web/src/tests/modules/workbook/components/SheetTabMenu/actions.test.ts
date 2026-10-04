@@ -22,7 +22,6 @@ function mountMenu() {
       sheetCount: 2,
       sheetIndex: 0,
       isOpen: true,
-      position: { left: 8, bottom: 30 },
       canMoveLeft: false,
       canMoveRight: true,
       canHide: true,

@@ -1,0 +1,27 @@
+@use "../option-list/option-list";
+
+@mixin surface {
+  @include option-list.scrollbar;
+
+  z-index: var(--idea-layer-menu);
+  max-width: calc(100vw - var(--idea-floating-panel-inset) - var(--idea-floating-panel-inset));
+  max-height: calc(100vh - var(--idea-floating-panel-inset) - var(--idea-floating-panel-inset));
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--idea-surface-panel);
+  border: 1px solid var(--idea-border-control);
+  border-radius: var(--idea-radius-medium);
+  box-shadow: var(--idea-shadow-floating);
+}
+
+@mixin toolbar-surface(
+  $layer: var(--idea-layer-menu),
+  $border: 1px solid var(--idea-border-subtle),
+  $shadow: var(--idea-shadow-menu)
+) {
+  z-index: $layer;
+  background: var(--idea-surface-panel);
+  border: $border;
+  border-radius: var(--idea-radius-default);
+  box-shadow: $shadow;
+}

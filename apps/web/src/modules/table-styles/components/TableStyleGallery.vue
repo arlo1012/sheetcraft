@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { TableStyleDefinition } from "@idea10/core/table-styles";
 import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
-import { computed, markRaw, nextTick, shallowRef } from "vue";
+import { nextTick, shallowRef } from "vue";
 import { MoreHorizontal } from "lucide-vue-next";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import CustomStyleContextMenu from "../../../shared/gallery/CustomStyleContextMenu.vue";
-import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
+import { useGalleryContextMenu } from "../../../shared/gallery/useGalleryContextMenu";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import TableStylePreview from "./TableStylePreview.vue";
 
@@ -44,12 +44,13 @@ const categoryLabels = {
   custom: "tableStyles.custom",
 } satisfies Record<(typeof categories)[number], MessageKey>;
 const buttons = new Map<string, HTMLButtonElement>();
-const contextMenu = shallowRef<{
-  style: TableStyleDefinition | PivotTableStyleDefinition;
-  trigger: HTMLElement;
-  anchor: FloatingReference;
-}>();
-const contextStyle = computed(() => contextMenu.value?.style);
+const {
+  contextMenu,
+  contextItem: contextStyle,
+  openAtElement,
+  openAtPoint,
+  close: closeContextMenu,
+} = useGalleryContextMenu<TableStyleDefinition | PivotTableStyleDefinition>();
 const contextMenuRef = shallowRef<InstanceType<typeof CustomStyleContextMenu> | null>(null);
 const orderedStyles = () =>
   categories.flatMap((category) => props.styles.filter((style) => style.category === category));
@@ -79,21 +80,6 @@ function setButtonRef(style: TableStyleDefinition | PivotTableStyleDefinition) {
     else buttons.delete(style.id);
   };
 }
-function openContextMenu(
-  style: TableStyleDefinition | PivotTableStyleDefinition,
-  trigger: HTMLElement,
-  x: number,
-  y: number,
-): void {
-  contextMenu.value = {
-    style,
-    trigger,
-    anchor: markRaw({
-      contextElement: trigger,
-      getBoundingClientRect: () => new DOMRect(x, y, 0, 0),
-    }),
-  };
-}
 function onTileContextMenu(
   event: MouseEvent,
   style: TableStyleDefinition | PivotTableStyleDefinition,
@@ -101,7 +87,7 @@ function onTileContextMenu(
   event.preventDefault();
   if (style.category !== "custom") return;
   event.stopPropagation();
-  openContextMenu(style, event.currentTarget as HTMLButtonElement, event.clientX, event.clientY);
+  openAtPoint(style, event.currentTarget as HTMLButtonElement, event);
 }
 function onMoreClick(
   event: MouseEvent,
@@ -110,14 +96,7 @@ function onMoreClick(
   event.preventDefault();
   event.stopPropagation();
   const trigger = event.currentTarget as HTMLElement;
-  const rect = trigger.getBoundingClientRect();
-  openContextMenu(style, trigger, rect.left, rect.bottom);
-}
-function closeContextMenu(restoreFocus: boolean): void {
-  const trigger = contextMenu.value?.trigger;
-  contextMenu.value = undefined;
-  if (restoreFocus && trigger?.isConnected)
-    void nextTick(() => trigger.focus({ preventScroll: true }));
+  openAtElement(style, trigger);
 }
 function editContextStyle(): void {
   const style = contextStyle.value;
@@ -139,7 +118,7 @@ function onTileKeydown(
   ) {
     event.preventDefault();
     event.stopPropagation();
-    emit("edit", style);
+    openAtElement(style, event.currentTarget as HTMLButtonElement);
     return;
   }
   const all = orderedStyles();
