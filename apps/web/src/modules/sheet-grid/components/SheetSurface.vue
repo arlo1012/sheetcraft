@@ -218,7 +218,6 @@ function paint(): void {
     paintBackground();
     paintScene(props.showGridLines);
     context.restore();
-    paintSheetWatermark(context, props.pageDecoration, frame, props.pageView, watermarkImage);
   } else if (pageBreakPreview) {
     const printed = paintPageBreakPreviewBackground(
       context,
@@ -235,11 +234,11 @@ function paint(): void {
     clipPageBreakPreviewOutside(context, printed, frame.layout.viewportSize);
     paintScene(false);
     context.restore();
-    paintSheetWatermark(context, props.pageDecoration, frame, props.pageView, watermarkImage);
   } else {
     paintBackground();
     paintScene(props.showGridLines);
   }
+  paintSheetWatermark(context, props.pageDecoration, frame, props.pageView, watermarkImage);
   context.restore();
   paintSheetUnderlay(context, frame, props.overlays, props.environment.overlays);
   context.save();

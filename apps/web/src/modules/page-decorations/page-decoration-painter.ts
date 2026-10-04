@@ -137,7 +137,7 @@ export function paintWatermarkInRect(
   context.restore();
 }
 
-/** A watermark is part of page content and repeats for each visible page. */
+/** Normal views anchor the pattern to sheet coordinates; page views anchor it to each page. */
 export function paintSheetWatermark(
   context: CanvasRenderingContext2D,
   decoration: SheetPageDecoration | undefined,
@@ -147,7 +147,29 @@ export function paintSheetWatermark(
 ): void {
   const watermark = decoration?.watermark;
   if (!watermark || (!watermark.text && !watermark.image)) return;
-  if (!pageView) return;
+  if (!pageView || pageView.mode === "normal") {
+    for (const pane of Object.values(frame.panes)) {
+      const { clip, translation } = pane;
+      if (clip.width <= 0 || clip.height <= 0) continue;
+      context.save();
+      context.beginPath();
+      context.rect(clip.x, clip.y, clip.width, clip.height);
+      context.clip();
+      paintWatermarkInRect(
+        context,
+        watermark,
+        {
+          x: translation.x,
+          y: translation.y,
+          width: clip.x + clip.width - translation.x,
+          height: clip.y + clip.height - translation.y,
+        },
+        { image, viewport: clip },
+      );
+      context.restore();
+    }
+    return;
+  }
   const scroll = frame.layout.bodyScrollPosition;
   if (pageView.mode === "page-layout") {
     for (const page of pageView.pages)

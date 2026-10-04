@@ -39,6 +39,61 @@ const textWatermark = {
 } as SheetWatermark;
 
 describe("page decoration painter", () => {
+  test("renders in normal view and keeps frozen and scrolling pane patterns anchored to the sheet", () => {
+    const draw = (scrollX: number) => {
+      const raw = context();
+      paintSheetWatermark(
+        raw as unknown as CanvasRenderingContext2D,
+        { watermark: textWatermark },
+        {
+          panes: {
+            topLeft: { clip: { x: 0, y: 0, width: 110, height: 110 }, translation: { x: 0, y: 0 } },
+            body: {
+              clip: { x: 110, y: 110, width: 220, height: 220 },
+              translation: { x: -scrollX, y: -20 },
+            },
+          },
+        } as never,
+        undefined,
+      );
+      return raw;
+    };
+    const first = draw(45);
+    const scrolled = draw(60);
+    expect(first.fillText.mock.calls.length).toBeGreaterThan(1);
+    expect(first.rect).toHaveBeenCalledWith(0, 0, 110, 110);
+    expect(first.rect).toHaveBeenCalledWith(110, 110, 220, 220);
+    // The frozen origin stays fixed while the body's grid shifts by the scroll delta.
+    expect(scrolled.translate.mock.calls[0]).toEqual(first.translate.mock.calls[0]);
+    const bodyPosition = first.translate.mock.calls.find(([, y]) => y === -20)!;
+    expect(bodyPosition).toBeDefined();
+    expect(scrolled.translate).toHaveBeenCalledWith(bodyPosition[0] - 15, bodyPosition[1]);
+  });
+
+  test("renders image-only watermarks in normal view", () => {
+    const raw = context();
+    const image = { naturalWidth: 100, naturalHeight: 50 } as HTMLImageElement;
+    paintSheetWatermark(
+      raw as unknown as CanvasRenderingContext2D,
+      {
+        watermark: {
+          ...textWatermark,
+          text: "",
+          image: { assetId: "logo", scale: null, washout: true, angle: 0 },
+        },
+      },
+      {
+        panes: {
+          body: { clip: { x: 0, y: 0, width: 330, height: 220 }, translation: { x: 0, y: 0 } },
+        },
+      } as never,
+      undefined,
+      image,
+    );
+    expect(raw.fillText).not.toHaveBeenCalled();
+    expect(raw.drawImage.mock.calls.length).toBeGreaterThan(1);
+  });
+
   test("tiles a small diagonal text watermark across the page", () => {
     const raw = context();
     paintWatermarkInRect(raw as unknown as CanvasRenderingContext2D, textWatermark, {
