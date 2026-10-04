@@ -38,7 +38,7 @@ describe("workspace zoom gestures", () => {
 
       await wrapper.get('[data-view-control="zoom-menu"]').trigger("click");
       const input = new DOMWrapper(document.body).get<HTMLInputElement>(
-        ".workbook-zoom-menu input",
+        ".sheet-zoom-menu__custom input",
       );
       await input.setValue("73");
       await input.trigger("keydown", { key: "Enter", code: "Enter" });

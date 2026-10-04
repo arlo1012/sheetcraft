@@ -111,14 +111,15 @@ export function useHeaderInteraction(options: HeaderInteractionOptions) {
     if (!frame) return undefined;
     const quickTools = options.getQuickTools();
     const gutter = quickTools.gutter;
-    const rowLabelStart = gutter + (quickTools.rowOutlineGutter ?? 0);
-    const columnLabelStart = gutter + (quickTools.columnOutlineGutter ?? 0);
-    if (point.x >= gutter && point.x < rowLabelStart) return undefined;
+    const origin = frame.headingOrigin;
+    const rowLabelStart = origin.x + gutter + (quickTools.rowOutlineGutter ?? 0);
+    const columnLabelStart = origin.y + gutter + (quickTools.columnOutlineGutter ?? 0);
+    if (point.x >= origin.x + gutter && point.x < rowLabelStart) return undefined;
     if (
       point.x >= rowLabelStart &&
       point.y >= columnLabelStart &&
-      point.x < frame.headerSize.width &&
-      point.y < frame.headerSize.height
+      point.x < origin.x + frame.headingSize.width &&
+      point.y < origin.y + frame.headingSize.height
     ) {
       return { axis: "corner", action: "corner" };
     }
@@ -143,10 +144,10 @@ export function useHeaderInteraction(options: HeaderInteractionOptions) {
             (state.hovered?.axis === axis &&
               (state.hovered.ownerIndex ?? state.hovered.index) === item.index);
           if (quickTools.enabled && focusedOrHovered) {
-            const beforeX = axis === "row" ? gutter / 2 : item.offset;
-            const beforeY = axis === "row" ? item.offset : gutter / 2;
+            const beforeX = axis === "row" ? origin.x + gutter / 2 : item.offset;
+            const beforeY = axis === "row" ? item.offset : origin.y + gutter / 2;
             const afterX = axis === "row" ? gutter / 2 : itemEnd;
-            const afterY = axis === "row" ? itemEnd : gutter / 2;
+            const afterY = axis === "row" ? itemEnd : origin.y + gutter / 2;
             if (
               shouldShowBoundary(axis, item.index, true, options.getSelection()) &&
               isInControlRadius(point, beforeX, beforeY)
@@ -164,8 +165,8 @@ export function useHeaderInteraction(options: HeaderInteractionOptions) {
             axis === "row" ? point.x >= rowLabelStart : point.y >= columnLabelStart;
           if (!inMainArea) {
             if (!quickTools.enabled) continue;
-            const gripX = axis === "row" ? gutter / 2 : item.offset + item.size / 2;
-            const gripY = axis === "row" ? item.offset + item.size / 2 : gutter / 2;
+            const gripX = axis === "row" ? origin.x + gutter / 2 : item.offset + item.size / 2;
+            const gripY = axis === "row" ? item.offset + item.size / 2 : origin.y + gutter / 2;
             if (isInControlRadius(point, gripX, gripY)) {
               return { axis, index: item.index, ownerIndex: item.index, action: "grip" };
             }

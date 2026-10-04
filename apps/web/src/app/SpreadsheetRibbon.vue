@@ -90,13 +90,14 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-type Category = "home" | "formulas" | "data" | "table";
+type Category = "home" | "formulas" | "data" | "view" | "table";
 const activeCategory = ref<Category>("home");
 let previousCategory: Exclude<Category, "table"> = "home";
 const homeTab = ref<HTMLButtonElement>();
 const formulaTab = ref<HTMLButtonElement>();
 const dataTab = ref<HTMLButtonElement>();
 const tableTab = ref<HTMLButtonElement>();
+const viewTab = ref<HTMLButtonElement>();
 const tabId = useId();
 
 watch(activeCategory, (category) => {
@@ -113,8 +114,8 @@ function onCategoryKeydown(event: KeyboardEvent): void {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
   event.preventDefault();
   const categories: Category[] = props.hasTable
-    ? ["home", "formulas", "data", "table"]
-    : ["home", "formulas", "data"];
+    ? ["home", "formulas", "data", "view", "table"]
+    : ["home", "formulas", "data", "view"];
   const current = categories.indexOf(activeCategory.value);
   const index =
     event.key === "Home"
@@ -123,7 +124,7 @@ function onCategoryKeydown(event: KeyboardEvent): void {
         ? categories.length - 1
         : (current + (event.key === "ArrowRight" ? 1 : -1) + categories.length) % categories.length;
   activeCategory.value = categories[index]!;
-  void nextTick(() => [homeTab, formulaTab, dataTab, tableTab][index]?.value?.focus());
+  void nextTick(() => [homeTab, formulaTab, dataTab, viewTab, tableTab][index]?.value?.focus());
 }
 
 defineSlots<{
@@ -132,6 +133,7 @@ defineSlots<{
   "worksheet-tools"?: () => unknown;
   "data-tools"?: () => unknown;
   "table-tools"?: () => unknown;
+  "view-tools"?: () => unknown;
 }>();
 </script>
 
@@ -190,6 +192,21 @@ defineSlots<{
             @click="activeCategory = 'data'"
           >
             {{ t("ribbon.data") }}
+          </button>
+          <button
+            :id="`${tabId}-view`"
+            ref="viewTab"
+            class="spreadsheet-ribbon__category"
+            :class="{ 'is-active': activeCategory === 'view' }"
+            data-ribbon-category="view"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'view'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'view' ? 0 : -1"
+            @click="activeCategory = 'view'"
+          >
+            {{ t("ribbon.view") }}
           </button>
           <button
             v-if="hasTable"
@@ -294,6 +311,7 @@ defineSlots<{
         @interaction-end="emit('formulaInteractionEnd')"
       />
       <slot v-else-if="activeCategory === 'data'" name="data-tools" />
+      <slot v-else-if="activeCategory === 'view'" name="view-tools" />
       <slot v-else name="table-tools" />
     </section>
   </header>

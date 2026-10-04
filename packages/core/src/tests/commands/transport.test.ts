@@ -27,6 +27,7 @@ import {
   type WorkbookCommand,
 } from "../../commands/index.js";
 import { WorkbookDomainError, type WorkbookErrorCode } from "../../errors.js";
+import { DEFAULT_SHEET_PAGE_SETUP } from "../../page-setup.js";
 import {
   executeWorkbookCommand,
   redoWorkbookCommand,
@@ -66,6 +67,7 @@ describe("workbook command transport", () => {
       duplicateRules: [],
       conditionalFormats: [],
       tables: [],
+      pageSetup: DEFAULT_SHEET_PAGE_SETUP,
       floatingImages: [],
     });
     expectTransportSafe(command);

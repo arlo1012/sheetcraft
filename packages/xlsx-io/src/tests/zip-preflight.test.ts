@@ -174,7 +174,7 @@ describe("XLSX ZIP preflight", () => {
     expect(report.issues).toEqual([]);
   });
 
-  test("reports a customized page setup", async () => {
+  test("accepts page setup fields handled by the XLSX codec", async () => {
     const report = await preflightXlsxArchive(
       storedZip([
         {
@@ -183,9 +183,7 @@ describe("XLSX ZIP preflight", () => {
         },
       ]),
     );
-    expect(report.issues).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: "feature-omitted" })]),
-    );
+    expect(report.issues).toEqual([]);
   });
 
   test("cancels aborted DEFLATE reads and absorbs rejected stream writes", async () => {

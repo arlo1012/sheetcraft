@@ -31,6 +31,7 @@ import type { TableStyleDefinition } from "../table-styles.js";
 import type { PivotTableStyleDefinition } from "../pivot-table-styles.js";
 import type { CellStyleDefinition } from "../cell-styles.js";
 import type { ConditionalFormatIconSet } from "../conditional-formatting.js";
+import type { SheetPageSetup } from "../page-setup.js";
 
 export type CellContentChange = {
   sheetId: string;
@@ -648,6 +649,11 @@ export type SetSheetConditionalFormatsCommand = {
   sheetId: string;
   rules: SheetConditionalFormatRule[];
 };
+export type SetSheetPageSetupCommand = {
+  type: "setSheetPageSetup";
+  sheetId: string;
+  pageSetup: SheetPageSetup;
+};
 export type ClearSheetConditionalFormatsCommand = {
   type: "clearSheetConditionalFormats";
   sheetId: string;
@@ -746,6 +752,7 @@ export type WorkbookCommand =
   | SetSheetDuplicateRulesCommand
   | ClearSheetDuplicateRulesCommand
   | SetSheetConditionalFormatsCommand
+  | SetSheetPageSetupCommand
   | ClearSheetConditionalFormatsCommand
   | ClearSheetDataValidationsCommand
   | AddSheetOutlineGroupCommand
@@ -794,6 +801,7 @@ export type WorkbookOperation =
   | "dimensions.reset"
   | "dimensions.defaultWidth"
   | "view.freeze"
+  | "page.setup"
   | "cells.merge"
   | "cells.unmerge"
   | "data.filter"
@@ -881,6 +889,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "history.restore";
     case "setSheetFreezePanes":
       return "view.freeze";
+    case "setSheetPageSetup":
+      return "page.setup";
     case "mergeCells":
       return "cells.merge";
     case "unmergeCells":

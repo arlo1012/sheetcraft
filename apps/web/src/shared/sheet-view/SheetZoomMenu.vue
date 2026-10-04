@@ -1,33 +1,41 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronUp, Maximize2 } from "lucide-vue-next";
+import { ChevronDown, ChevronUp, Maximize2, ZoomIn } from "lucide-vue-next";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
-import { ref, useId } from "vue";
-import { useMenu } from "../../../shared/menu/useMenu";
-import { useAppI18n } from "../../../shared/i18n";
-import { MAX_SHEET_ZOOM, MIN_SHEET_ZOOM } from "../../../shared/sheet-view/zoom";
-import MenuItem from "../../../shared/menu/MenuItem.vue";
-import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
-import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import { computed, ref, useId } from "vue";
+import { useAppI18n } from "../i18n";
+import MenuItem from "../menu/MenuItem.vue";
+import MenuRadioItem from "../menu/MenuRadioItem.vue";
+import MenuSurface from "../menu/MenuSurface.vue";
+import { useMenu } from "../menu/useMenu";
+import RibbonMenuButton from "../ribbon/RibbonMenuButton.vue";
+import { MAX_SHEET_ZOOM, MIN_SHEET_ZOOM } from "./zoom";
 
-const props = defineProps<{ zoom: number }>();
+const props = withDefaults(defineProps<{ zoom: number; variant?: "status" | "ribbon" }>(), {
+  variant: "status",
+});
 const emit = defineEmits<{ select: [zoom: number]; fitSelection: [] }>();
 const { t } = useAppI18n();
-const triggerRef = ref<HTMLButtonElement | null>(null);
+const statusTriggerRef = ref<HTMLButtonElement | null>(null);
+const ribbonTriggerRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
+const triggerRef = computed(() =>
+  props.variant === "ribbon"
+    ? (ribbonTriggerRef.value?.rootElement ?? null)
+    : statusTriggerRef.value,
+);
 const menuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const customZoom = ref<InputNumberValue>(props.zoom);
-const menuId = `workbook-zoom-menu-${useId().replaceAll(":", "")}`;
+const menuId = `sheet-zoom-menu-${useId().replaceAll(":", "")}`;
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef: menuRef,
   offset: 6,
-  placement: "top-end",
+  placement: props.variant === "ribbon" ? "bottom-start" : "top-end",
   defaultFocus: "selected",
   onOpen: () => {
     customZoom.value = props.zoom;
   },
 });
-
 function isSelected(value: number): boolean {
   return props.zoom === value;
 }
@@ -49,10 +57,24 @@ function fitSelection(): void {
 </script>
 
 <template>
+  <RibbonMenuButton
+    v-if="variant === 'ribbon'"
+    ref="ribbonTriggerRef"
+    variant="tall"
+    :label="t('viewTools.zoom')"
+    :text="`${zoom}%`"
+    :expanded="open"
+    :menu-id="menuId"
+    data-view-tool="zoom-menu"
+    @activate="toggleMenu"
+    @keydown="onTriggerKeydown"
+    ><ZoomIn aria-hidden="true"
+  /></RibbonMenuButton>
   <button
-    ref="triggerRef"
+    v-else
+    ref="statusTriggerRef"
     type="button"
-    class="workbook-zoom-menu__trigger"
+    class="sheet-zoom-menu__trigger"
     :aria-label="t('statusBar.zoomLevel', { value: zoom })"
     :aria-controls="open ? menuId : undefined"
     :aria-expanded="open"
@@ -62,18 +84,23 @@ function fitSelection(): void {
     @click="toggleMenu"
     @keydown="onTriggerKeydown"
   >
-    <span>{{ zoom }}%</span>
-    <ChevronUp v-if="open" :size="12" aria-hidden="true" />
-    <ChevronDown v-else :size="12" aria-hidden="true" />
+    <span>{{ zoom }}%</span><ChevronUp v-if="open" :size="12" aria-hidden="true" /><ChevronDown
+      v-else
+      :size="12"
+      aria-hidden="true"
+    />
   </button>
   <Teleport to="body">
     <MenuSurface
       v-if="open"
       :id="menuId"
       ref="menuRef"
-      class="workbook-zoom-menu"
+      class="sheet-zoom-menu"
       :style="floatingStyles"
       :label="t('statusBar.zoomMenu')"
+      :data-cell-edit-session="
+        triggerRef?.closest('[data-cell-edit-session]')?.getAttribute('data-cell-edit-session')
+      "
     >
       <MenuRadioItem :checked="isSelected(200)" data-zoom-preset="200" @select="selectZoom(200)"
         >200%</MenuRadioItem
@@ -94,11 +121,11 @@ function fitSelection(): void {
         ><template #icon><Maximize2 :size="15" /></template
         >{{ t("statusBar.fitSelection") }}</MenuItem
       >
-      <li class="workbook-zoom-menu__custom" role="none">
+      <li class="sheet-zoom-menu__custom" role="none">
         <div role="group" :aria-label="t('statusBar.customZoom')">
-          <span>{{ t("statusBar.customZoom") }}</span>
-          <TInputNumber
-            class="workbook-zoom-menu__custom-input idea-input-number--persistent-controls"
+          <span>{{ t("statusBar.customZoom") }}</span
+          ><TInputNumber
+            class="sheet-zoom-menu__custom-input idea-input-number--persistent-controls"
             :model-value="customZoom"
             :min="MIN_SHEET_ZOOM"
             :max="MAX_SHEET_ZOOM"
@@ -118,10 +145,9 @@ function fitSelection(): void {
 </template>
 
 <style scoped lang="scss">
-.workbook-zoom-menu {
+.sheet-zoom-menu {
   z-index: 90;
   width: 176px;
-
   &__trigger {
     display: inline-flex;
     flex: 0 0 auto;
@@ -139,35 +165,27 @@ function fitSelection(): void {
     border: 0;
     border-radius: 2px;
     cursor: pointer;
-
     &:hover,
     &[aria-expanded="true"] {
       background: var(--idea-icon-button-hover-bg);
     }
   }
-
   &__custom {
     padding: 8px 14px 0;
     color: var(--idea-text-secondary);
     font-size: var(--idea-font-size-body-medium);
     line-height: var(--idea-line-height-body-medium);
     list-style: none;
-
     > [role="group"] {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       gap: 6px;
-
-      > span {
-        font-weight: var(--idea-font-weight-regular);
-      }
-
-      > .workbook-zoom-menu__custom-input {
-        width: 100px;
-        max-width: 100%;
-        min-width: 0;
-      }
     }
+  }
+  &__custom-input {
+    width: 100px;
+    max-width: 100%;
+    min-width: 0;
   }
 }
 </style>

@@ -10,22 +10,62 @@ import {
   type CellUnderlineStyle,
 } from "@idea10/core/style";
 import type { SelectionCellStyleState, ToggleStyleState } from "@idea10/core/style-state";
-import {
-  CELL_FONT_FAMILY_PRESETS,
-  CELL_FONT_SIZE_PRESETS,
-} from "../../../shared/cell-text/font-catalog";
-import { useAppI18n } from "../../../shared/i18n";
-import { findOptionMatch } from "../../../shared/option-list/option-list";
+import { CELL_FONT_FAMILY_PRESETS, CELL_FONT_SIZE_PRESETS } from "../cell-text/font-catalog";
+import { useAppI18n } from "../i18n";
+import { findOptionMatch } from "../option-list/option-list";
 
-type Props = Readonly<{ state: SelectionCellStyleState; patch: CellStylePatch }>;
+type FontFormatKey =
+  | "fontFamily"
+  | "fontSize"
+  | "bold"
+  | "italic"
+  | "underline"
+  | "textColor"
+  | "strikethrough"
+  | "fontScript";
+export type FontFormatPatch = Pick<CellStylePatch, FontFormatKey>;
+export type FontFormatState = Pick<
+  SelectionCellStyleState,
+  Exclude<FontFormatKey, "underline"> | "underlineStyle"
+>;
+export type FontUnderlineChoice =
+  | "none"
+  | "single"
+  | "double"
+  | "singleAccounting"
+  | "doubleAccounting";
+export type FontFormatOptions = {
+  defaultFontFamily?: string;
+  defaultFontSize?: number;
+  defaultColor?: string;
+  minFontSize?: number;
+  maxFontSize?: number;
+  sizeUnit?: "px" | "pt";
+  underlineStyles?: readonly FontUnderlineChoice[];
+};
+type Props = Readonly<{
+  state: FontFormatState;
+  patch: FontFormatPatch;
+  options?: FontFormatOptions;
+}>;
 type FontStyleChoice = "regular" | "italic" | "bold" | "boldItalic";
 
-export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch) => void) {
+export function useFontFormatPanel(props: Props, update: (patch: FontFormatPatch) => void) {
   const { t } = useAppI18n();
-  function hasPatch(key: keyof CellStyle): boolean {
+  const defaultFamily = computed(
+    () => props.options?.defaultFontFamily ?? DEFAULT_CELL_FONT_FAMILY,
+  );
+  const defaultSize = computed(() => props.options?.defaultFontSize ?? DEFAULT_CELL_FONT_SIZE);
+  const defaultColor = computed(() => props.options?.defaultColor ?? "#20242c");
+  const minSize = computed(() => props.options?.minFontSize ?? MIN_CELL_FONT_SIZE);
+  const maxSize = computed(() => props.options?.maxFontSize ?? MAX_CELL_FONT_SIZE);
+  function hasPatch(key: keyof FontFormatPatch): boolean {
     return Object.hasOwn(props.patch, key);
   }
-  function read<Key extends keyof CellStyle>(key: Key, fallback: CellStyle[Key]): CellStyle[Key] {
+  function read<Key extends keyof FontFormatPatch>(
+    key: Key,
+    fallback: CellStyle[Key],
+  ): CellStyle[Key] {
     if (!hasPatch(key)) return fallback;
     const value = props.patch[key];
     return value === null || value === false ? undefined : (value as CellStyle[Key]);
@@ -40,12 +80,12 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
   const family = computed(() =>
     familyMixed.value
       ? undefined
-      : (read("fontFamily", props.state.fontFamily.value) ?? DEFAULT_CELL_FONT_FAMILY),
+      : (read("fontFamily", props.state.fontFamily.value) ?? defaultFamily.value),
   );
   const size = computed(() =>
     sizeMixed.value
       ? undefined
-      : (read("fontSize", props.state.fontSize.value) ?? DEFAULT_CELL_FONT_SIZE),
+      : (read("fontSize", props.state.fontSize.value) ?? defaultSize.value),
   );
   const color = computed(() =>
     colorMixed.value ? undefined : read("textColor", props.state.textColor.value),
@@ -92,13 +132,19 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
     { code: "bold", label: t("format.bold") },
     { code: "boldItalic", label: t("cellFormat.fontBoldItalic") },
   ]);
-  const underlineOptions = computed(() => [
-    { value: "none", label: t("cellFormat.underlineNone") },
-    { value: "single", label: t("cellFormat.underlineSingle") },
-    { value: "double", label: t("cellFormat.underlineDouble") },
-    { value: "singleAccounting", label: t("cellFormat.underlineSingleAccounting") },
-    { value: "doubleAccounting", label: t("cellFormat.underlineDoubleAccounting") },
-  ]);
+  const underlineOptions = computed(() => {
+    const options: Array<{ value: FontUnderlineChoice; label: string }> = [
+      { value: "none", label: t("cellFormat.underlineNone") },
+      { value: "single", label: t("cellFormat.underlineSingle") },
+      { value: "double", label: t("cellFormat.underlineDouble") },
+      { value: "singleAccounting", label: t("cellFormat.underlineSingleAccounting") },
+      { value: "doubleAccounting", label: t("cellFormat.underlineDoubleAccounting") },
+    ];
+    return options.filter(
+      ({ value }) =>
+        !props.options?.underlineStyles || props.options.underlineStyles.includes(value),
+    );
+  });
   const sizeInput = ref("");
   const familyInput = ref("");
   const fontStyleInput = ref("");
@@ -115,7 +161,7 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
     if (!name || name.length > 80) return;
     familyInput.value = name;
     if (familyMixed.value || name !== family.value)
-      update({ fontFamily: name === DEFAULT_CELL_FONT_FAMILY ? null : name });
+      update({ fontFamily: name === defaultFamily.value ? null : name });
   }
   function updateFamilyInput(value: string | number): void {
     familyInput.value = String(value);
@@ -133,18 +179,29 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
     if (
       !value.trim() ||
       !Number.isInteger(parsed) ||
-      parsed < MIN_CELL_FONT_SIZE ||
-      parsed > MAX_CELL_FONT_SIZE
+      parsed < minSize.value ||
+      parsed > maxSize.value
     )
       return;
     if (sizeMixed.value || parsed !== size.value)
-      update({ fontSize: parsed === DEFAULT_CELL_FONT_SIZE ? null : parsed });
+      update({ fontSize: parsed === defaultSize.value ? null : parsed });
   }
   function updateSizeInput(value: string | number): void {
     sizeInput.value = String(value);
     setSize(sizeInput.value);
   }
   function commitSizeInput(): void {
+    const typedSize = Number(sizeInput.value);
+    if (
+      sizeInput.value.trim() &&
+      Number.isInteger(typedSize) &&
+      typedSize >= minSize.value &&
+      typedSize <= maxSize.value
+    ) {
+      sizeInput.value = String(typedSize);
+      setSize(sizeInput.value);
+      return;
+    }
     const match = findOptionMatch(sizeOptions.value, sizeInput.value);
     if (match) {
       sizeInput.value = match.code;
@@ -156,10 +213,7 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
       sizeInput.value = size.value === undefined ? "" : String(size.value);
       return;
     }
-    const normalized = Math.min(
-      MAX_CELL_FONT_SIZE,
-      Math.max(MIN_CELL_FONT_SIZE, Math.round(parsed)),
-    );
+    const normalized = Math.min(maxSize.value, Math.max(minSize.value, Math.round(parsed)));
     sizeInput.value = String(normalized);
     setSize(sizeInput.value);
   }
@@ -195,9 +249,9 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
     update({ textColor: value });
   }
   const previewStyle = computed<CellStyle>(() => ({
-    fontFamily: family.value ?? DEFAULT_CELL_FONT_FAMILY,
-    fontSize: size.value ?? DEFAULT_CELL_FONT_SIZE,
-    textColor: color.value ?? "#20242c",
+    fontFamily: family.value ?? defaultFamily.value,
+    fontSize: size.value ?? defaultSize.value,
+    textColor: color.value ?? defaultColor.value,
     bold: toggleState("bold") === "on" ? true : undefined,
     italic: toggleState("italic") === "on" ? true : undefined,
     underline:
@@ -210,6 +264,7 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
     fontScript: script.value,
   }));
   return {
+    defaultColor,
     family,
     familyInput,
     familyMixed,

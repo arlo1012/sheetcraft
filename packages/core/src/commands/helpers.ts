@@ -1,6 +1,7 @@
 import { WorkbookDomainError, toWorkbookErrorDetail } from "../errors.js";
 import { cloneCellStyle, type CellStyle } from "../style.js";
 import { cloneConditionalFormatRule } from "../conditional-formatting.js";
+import { cloneSheetPageSetup, DEFAULT_SHEET_PAGE_SETUP } from "../page-setup.js";
 import {
   cloneCellContent,
   cloneCellHyperlink,
@@ -199,6 +200,7 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
       ? { conditionalFormats: state.conditionalFormats.map(cloneConditionalFormatRule) }
       : {}),
     ...(state.tables ? { tables: state.tables.map(cloneSheetTable) } : {}),
+    pageSetup: cloneSheetPageSetup(state.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     floatingImages: state.floatingImages.map(cloneFloatingImage),
   };
 }

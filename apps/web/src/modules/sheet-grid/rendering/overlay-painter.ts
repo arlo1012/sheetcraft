@@ -4,6 +4,7 @@ import type { SheetRenderFrame } from "./sheet-render-frame";
 import type { FreezeHandleTarget, SheetOverlayPalette, SheetOverlayState } from "./overlay-types";
 
 import { paintGripIcon } from "./grip-painter";
+import { createCanvasPixelGrid } from "../../../shared/canvas/pixel-grid";
 
 const BODY_PANES = ["topLeft", "top", "left", "body"] as const;
 
@@ -44,7 +45,8 @@ function withBodyFragment(
   context.save();
   context.translate(frame.body.x, frame.body.y);
   context.beginPath();
-  context.rect(clip.x, clip.y, clip.width, clip.height);
+  const alignedClip = createCanvasPixelGrid(context).snapRect(clip);
+  context.rect(alignedClip.x, alignedClip.y, alignedClip.width, alignedClip.height);
   context.clip();
   paint();
   context.restore();
@@ -80,30 +82,30 @@ function paintRangeOutline(
 ): void {
   context.save();
   context.strokeStyle = color;
-  context.lineWidth = width;
   context.lineCap = "square";
-  context.setLineDash(dash ? [...dash] : []);
-  context.lineDashOffset = dashOffset;
+  context.setLineDash(dash ? dash.map((length) => length / frame.scale) : []);
+  context.lineDashOffset = dashOffset / frame.scale;
   for (const fragment of fragments) {
     const { rect } = fragment;
     withBodyFragment(context, frame, fragment, () => {
-      // Match the former CSS border box (x - 1, y - 1, width + 1, height + 1),
-      // with stroke edges aligned to backing pixels at the current zoom and DPR.
-      const transform = context.getTransform();
-      const strokeWidth = Math.max(1, Math.round(width * transform.a)) / transform.a;
-      const snapX = (x: number) =>
-        (Math.round(x * transform.a + transform.e) - transform.e) / transform.a;
-      const snapY = (y: number) =>
-        (Math.round(y * transform.d + transform.f) - transform.f) / transform.d;
+      // Keep the border box's one-screen-pixel outer inset and align its edges
+      // using the body translation as well as the backing density.
+      const pixels = createCanvasPixelGrid(context, frame.scale);
+      const strokeWidth = pixels.screenStrokeWidth(width);
+      const inset = 1 / frame.scale;
       const half = strokeWidth / 2;
-      const left = hasNeighbour(rect, fragments, "left") ? rect.x : snapX(rect.x - 1) + half;
-      const top = hasNeighbour(rect, fragments, "top") ? rect.y : snapY(rect.y - 1) + half;
+      const left = hasNeighbour(rect, fragments, "left")
+        ? pixels.snapX(rect.x)
+        : pixels.snapX(rect.x - inset) + half;
+      const top = hasNeighbour(rect, fragments, "top")
+        ? pixels.snapY(rect.y)
+        : pixels.snapY(rect.y - inset) + half;
       const right = hasNeighbour(rect, fragments, "right")
-        ? rect.x + rect.width
-        : snapX(rect.x + rect.width) - half;
+        ? pixels.snapX(rect.x + rect.width)
+        : pixels.snapX(rect.x + rect.width) - half;
       const bottom = hasNeighbour(rect, fragments, "bottom")
-        ? rect.y + rect.height
-        : snapY(rect.y + rect.height) - half;
+        ? pixels.snapY(rect.y + rect.height)
+        : pixels.snapY(rect.y + rect.height) - half;
       context.lineWidth = strokeWidth;
       const edges: readonly Edge[] = ["top", "right", "bottom", "left"];
       for (const edge of edges) {
@@ -207,6 +209,36 @@ function isHandleActive(state: SheetOverlayState, target: FreezeHandleTarget): b
   );
 }
 
+function fillScreenRule(
+  context: CanvasRenderingContext2D,
+  frame: SheetRenderFrame,
+  axis: "row" | "column",
+  position: number,
+  start: number,
+  length: number,
+  width: number,
+): void {
+  const pixels = createCanvasPixelGrid(context, frame.scale);
+  const thickness = pixels.screenStrokeWidth(width);
+  if (axis === "row") {
+    const x = pixels.snapX(start);
+    context.fillRect(
+      x,
+      pixels.strokeY(position, thickness) - thickness / 2,
+      pixels.snapX(start + length) - x,
+      thickness,
+    );
+  } else {
+    const y = pixels.snapY(start);
+    context.fillRect(
+      pixels.strokeX(position, thickness) - thickness / 2,
+      y,
+      thickness,
+      pixels.snapY(start + length) - y,
+    );
+  }
+}
+
 function paintFreezeHandles(
   context: CanvasRenderingContext2D,
   frame: SheetRenderFrame,
@@ -232,18 +264,18 @@ function paintFreezeHandles(
     }
     const color = disabled ? palette.mutedText : active ? palette.actionPrimary : palette.mutedText;
     context.globalAlpha = disabled ? 0.45 : 1;
-    paintGripIcon(context, point.x, point.y, horizontal, color);
+    paintGripIcon(context, point.x, point.y, horizontal, color, frame.scale);
     context.restore();
   }
   const rowBoundary = frame.body.y + frame.layout.frozenSize.height;
   const columnBoundary = frame.body.x + frame.layout.frozenSize.width;
   if (frame.layout.freeze.rows > 0 && isHandleActive(state, "rowBoundary")) {
     context.fillStyle = palette.actionPrimary;
-    context.fillRect(0, rowBoundary - 0.5, frame.size.width, 1);
+    fillScreenRule(context, frame, "row", rowBoundary, 0, frame.size.width, 1);
   }
   if (frame.layout.freeze.columns > 0 && isHandleActive(state, "columnBoundary")) {
     context.fillStyle = palette.actionPrimary;
-    context.fillRect(columnBoundary - 0.5, 0, 1, frame.size.height);
+    fillScreenRule(context, frame, "column", columnBoundary, 0, frame.size.height, 1);
   }
 }
 
@@ -253,6 +285,7 @@ function paintLabel(
   y: number,
   label: string,
   palette: SheetOverlayPalette,
+  screenScale: number,
 ): void {
   context.save();
   context.font = "12px sans-serif";
@@ -260,9 +293,19 @@ function paintLabel(
   const width = Math.ceil(context.measureText(label).width) + 14;
   context.fillStyle = palette.panel;
   context.strokeStyle = palette.actionPrimary;
-  context.lineWidth = 1;
+  const pixels = createCanvasPixelGrid(context, screenScale);
+  const lineWidth = pixels.screenStrokeWidth(1);
+  context.lineWidth = lineWidth;
   context.beginPath();
-  context.roundRect(x, y, width, 24, 3);
+  const left = pixels.strokeX(x, lineWidth);
+  const top = pixels.strokeY(y, lineWidth);
+  context.roundRect(
+    left,
+    top,
+    pixels.strokeX(x + width, lineWidth) - left,
+    pixels.strokeY(y + 24, lineWidth) - top,
+    3,
+  );
   context.fill();
   context.stroke();
   context.fillStyle = palette.actionPrimary;
@@ -301,9 +344,25 @@ export function paintSheetChrome(
   context.fillStyle = palette.mutedText;
   context.globalAlpha = 0.72;
   if (frame.layout.freeze.rows > 0)
-    context.fillRect(0, frame.body.y + frame.layout.frozenSize.height - 0.5, frame.size.width, 1);
+    fillScreenRule(
+      context,
+      frame,
+      "row",
+      frame.body.y + frame.layout.frozenSize.height,
+      0,
+      frame.size.width,
+      1,
+    );
   if (frame.layout.freeze.columns > 0)
-    context.fillRect(frame.body.x + frame.layout.frozenSize.width - 0.5, 0, 1, frame.size.height);
+    fillScreenRule(
+      context,
+      frame,
+      "column",
+      frame.body.x + frame.layout.frozenSize.width,
+      0,
+      frame.size.height,
+      1,
+    );
   context.restore();
 
   paintFreezeHandles(context, frame, state, palette);
@@ -312,7 +371,7 @@ export function paintSheetChrome(
     context.fillStyle = palette.actionPrimary;
     if (freezeDrag.axis === "row") {
       const y = frame.body.y + freezeDrag.previewPosition;
-      context.fillRect(frame.body.x, y - 1, frame.body.width, 2);
+      fillScreenRule(context, frame, "row", y, frame.body.x, frame.body.width, 2);
       context.save();
       context.font = "12px sans-serif";
       const width = Math.ceil(context.measureText(freezeDrag.label).width) + 12;
@@ -320,7 +379,7 @@ export function paintSheetChrome(
       paintFreezeDragLabel(context, frame.size.width - width - 8, y + 4, freezeDrag.label, palette);
     } else {
       const x = frame.body.x + freezeDrag.previewPosition;
-      context.fillRect(x - 1, frame.body.y, 2, frame.body.height);
+      fillScreenRule(context, frame, "column", x, frame.body.y, frame.body.height, 2);
       paintFreezeDragLabel(context, x + 4, frame.size.height - 30, freezeDrag.label, palette);
     }
     return;
@@ -330,23 +389,25 @@ export function paintSheetChrome(
   context.fillStyle = palette.actionPrimary;
   if (preview.axis === "row") {
     const y = frame.body.y + preview.offset;
-    context.fillRect(frame.body.x, y - 1, frame.body.width, 2);
+    fillScreenRule(context, frame, "row", y, frame.body.x, frame.body.width, 2);
     paintLabel(
       context,
       frame.body.x + 8,
       frame.body.y + Math.min(preview.offset + 6, Math.max(0, frame.body.height - 28)),
       preview.label,
       palette,
+      frame.scale,
     );
   } else {
     const x = frame.body.x + preview.offset;
-    context.fillRect(x - 1, frame.body.y, 2, frame.body.height);
+    fillScreenRule(context, frame, "column", x, frame.body.y, frame.body.height, 2);
     paintLabel(
       context,
       frame.body.x + Math.min(preview.offset + 6, Math.max(0, frame.body.width - 180)),
       frame.body.y + 8,
       preview.label,
       palette,
+      frame.scale,
     );
   }
 }

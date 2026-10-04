@@ -10,6 +10,7 @@ export * from "./images.js";
 export * from "./filter.js";
 export * from "./advanced-filter.js";
 export * from "./metadata.js";
+export * from "./page-setup.js";
 export * from "./names.js";
 export * from "./names-from-selection.js";
 export * from "./sheets.js";

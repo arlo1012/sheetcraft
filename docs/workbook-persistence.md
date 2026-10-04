@@ -40,6 +40,16 @@ edits through Core commands. Selection, navigation, copying, image preview,
 sheet management, and undo/redo remain available. It is a local editing guard;
 it does not implement accounts, passwords, or access control.
 
+V13 snapshots also persist each sheet's paper, margins, print scale, print range,
+manual page breaks, and header/footer text. Earlier snapshots receive the default
+page setup. V14 adds first/odd/even header/footer variants and behavior options;
+V13 snapshots migrate with default options. V14 also stores custom paper size,
+fit page counts, first-page number, quality, centering and printing options, and
+repeated-title ranges. Existing V14 snapshots receive defaults for missing fields.
+View mode, rulers, white-space
+visibility, and margin-handle visibility remain session state. See
+[Worksheet page views](features/page-views.md).
+
 ## Save And Restore
 
 Startup validates the saved snapshot before replacing the initial workbook.
@@ -59,17 +69,21 @@ only the displayed "Saved locally" state confirms that a transaction finished.
 
 ## Files And Failures
 
-Export downloads `idea10-workbook.json`: an image-free V13 snapshot, or a versioned
+Export downloads `idea10-workbook.json`: an image-free V16 snapshot, or a versioned
 portable envelope containing that snapshot and every referenced image as base64.
 Image blobs are stored separately in the `idea10-image-assets` IndexedDB database.
 Blobs are saved before document references and retained through undoable deletion.
-Import accepts image-free V1–V13 snapshots and portable image envelopes. It
+Import accepts image-free V1–V16 snapshots and portable image envelopes. It
 validates and decodes all images, derives asset metadata from the bytes, and
 remaps their IDs before storing them. It then asks for
 confirmation. Invalid or unsupported files never replace the open workbook.
 Canceling a valid import leaves both the document and saved copy unchanged.
 
-V1/V2 documents default to the 1900 date system on read. V3–V13 require an explicit
+V16 writes tables, workbook style libraries, hyperlinks, and per-sheet page
+setup together. Earlier V13–V15 snapshots can come from either feature branch;
+missing fields restore to their canonical defaults.
+
+V1/V2 documents default to the 1900 date system on read. V3–V16 require an explicit
 `dateSystem` (`1900` or `1904`) and preserve error content separately from
 error-looking text and explicit empty strings. Formula source remains raw text;
 computed values are not saved. Older builds cannot open newer snapshot versions, so keep original backups when upgrading. See

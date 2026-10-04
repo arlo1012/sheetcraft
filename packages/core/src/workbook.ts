@@ -69,6 +69,12 @@ import {
 } from "./image-transform.js";
 import { normalizeOutlineGroups } from "./data-outline.js";
 import {
+  cloneSheetPageSetup,
+  DEFAULT_SHEET_PAGE_SETUP,
+  normalizeSheetPageSetup,
+  type SheetPageSetup,
+} from "./page-setup.js";
+import {
   cloneConditionalFormatRule,
   normalizeConditionalFormatRules,
   type SheetConditionalFormatRule,
@@ -179,6 +185,7 @@ export type SheetMetadata = {
   duplicateRules?: SheetDuplicateRule[];
   conditionalFormats?: SheetConditionalFormatRule[];
   tables?: SheetTable[];
+  pageSetup?: SheetPageSetup;
 };
 
 export type SheetTableColumn = { id: string; name: string };
@@ -322,6 +329,7 @@ export type Sheet = {
   duplicateRules?: SheetDuplicateRule[];
   conditionalFormats?: SheetConditionalFormatRule[];
   tables?: SheetTable[];
+  pageSetup?: SheetPageSetup;
   floatingImages: FloatingImage[];
 };
 
@@ -354,6 +362,7 @@ export type SheetSparseState = {
   duplicateRules?: SheetDuplicateRule[];
   conditionalFormats?: SheetConditionalFormatRule[];
   tables?: SheetTable[];
+  pageSetup?: SheetPageSetup;
   floatingImages: FloatingImage[];
 };
 
@@ -412,6 +421,7 @@ export function createSheet(name = "Sheet1", id?: string, idFactory?: IdFactory)
     duplicateRules: [],
     conditionalFormats: [],
     tables: [],
+    pageSetup: cloneSheetPageSetup(DEFAULT_SHEET_PAGE_SETUP),
     floatingImages: [],
   };
 }
@@ -2476,6 +2486,7 @@ function normalizeSheetMetadata(
     | "duplicateRules"
     | "conditionalFormats"
     | "tables"
+    | "pageSetup"
   >,
 ): SheetMetadata {
   const freezePanes = normalizeFreezePanes(state.freezePanes);
@@ -2590,6 +2601,7 @@ function normalizeSheetMetadata(
     tableIds.add(table.id);
     tableNames.add(table.name.toLocaleLowerCase("en-US"));
   }
+  const pageSetup = normalizeSheetPageSetup(state.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
   if (new Set(dataValidations.map((rule) => rule.id)).size !== dataValidations.length)
     throw new Error("Duplicate data validation ID.");
   const outlineGroups = normalizeOutlineGroups(state.outlineGroups ?? []);
@@ -2636,6 +2648,7 @@ function normalizeSheetMetadata(
     duplicateRules,
     conditionalFormats,
     tables,
+    pageSetup,
   };
 }
 
@@ -2673,6 +2686,7 @@ export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean
   }));
   sheet.conditionalFormats = (normalized.conditionalFormats ?? []).map(cloneConditionalFormatRule);
   sheet.tables = (normalized.tables ?? []).map(cloneSheetTable);
+  sheet.pageSetup = cloneSheetPageSetup(normalized.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
   return true;
 }
 
@@ -2792,6 +2806,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     duplicateRules: metadata.duplicateRules ?? [],
     conditionalFormats: metadata.conditionalFormats ?? [],
     tables: metadata.tables ?? [],
+    pageSetup: cloneSheetPageSetup(metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     floatingImages,
   };
 }
@@ -2891,6 +2906,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
     })),
     conditionalFormats: (sheet.conditionalFormats ?? []).map(cloneConditionalFormatRule),
     tables: (sheet.tables ?? []).map(cloneSheetTable),
+    pageSetup: cloneSheetPageSetup(sheet.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     floatingImages: sheet.floatingImages.map(cloneFloatingImage),
   });
 }
@@ -2950,6 +2966,8 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
   }));
   sheet.conditionalFormats = (nextState.conditionalFormats ?? []).map(cloneConditionalFormatRule);
   sheet.tables = (nextState.tables ?? []).map(cloneSheetTable);
+  sheet.tables = (nextState.tables ?? []).map(cloneSheetTable);
+  sheet.pageSetup = cloneSheetPageSetup(nextState.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
   sheet.floatingImages = nextState.floatingImages.map(cloneFloatingImage);
   return true;
 }

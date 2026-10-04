@@ -15,6 +15,10 @@
       "types": "./dist/geometry.d.ts",
       "import": "./dist/geometry.js"
     },
+    "./page-layout": {
+      "types": "./dist/page-layout.d.ts",
+      "import": "./dist/page-layout.js"
+    },
     "./axis-interactions": {
       "types": "./dist/axis-interactions.d.ts",
       "import": "./dist/axis-interactions.js"

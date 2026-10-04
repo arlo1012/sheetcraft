@@ -27,6 +27,7 @@ import {
 } from "@idea10/core/workbook";
 import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
+import type { SheetPageSetup } from "@idea10/core/page-setup";
 import {
   CELL_FILL_PATTERNS,
   DEFAULT_CELL_FONT_SIZE,
@@ -47,6 +48,11 @@ import {
 import { CompatibilityReportBuilder } from "./report.js";
 import { finalizeXlsxExport } from "./export-finalizer.js";
 import { collectDefinedNames, readDefinedNames } from "./defined-names.js";
+import {
+  collectPrintAreaDefinedNames,
+  collectPrintTitleDefinedNames,
+  readXlsxPageSetups,
+} from "./page-setup.js";
 import { readWorkbookCalculationSettings } from "./workbook-calculation.js";
 import {
   readRawWorksheetFormulas,
@@ -610,6 +616,7 @@ export async function decodeWithExcelJs(
   const source = new ExcelJS.Workbook();
   await source.xlsx.load(withoutTableAutoFiltersForExcelJs(bytes));
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
+  const pageSetups = readXlsxPageSetups(bytes, source.worksheets, report);
   const dateSystem = source.properties.date1904 ? "1904" : "1900";
   const calculation = readWorkbookCalculationSettings(bytes);
   let importedCells = 0;
@@ -794,6 +801,7 @@ export async function decodeWithExcelJs(
       })),
       conditionalFormats,
       tables,
+      ...(pageSetups[sheetIndex] ? { pageSetup: pageSetups[sheetIndex] } : {}),
       floatingImages: [],
     });
     return sheet;
@@ -965,10 +973,12 @@ export async function encodeWithExcelJs(
     Omit<XlsxDataMetadata, "unsupportedFilters" | "unsupportedValidations">
   > = [];
   const conditionalFormats: SheetConditionalFormatRule[][] = [];
+  const pageSetups: Array<SheetPageSetup | undefined> = [];
   target.properties.date1904 = workbook.dateSystem === "1904";
   target.calcProperties.fullCalcOnLoad = true;
   let encodedCells = 0;
   for (const [sheetIndex, sheet] of [...workbook.sheets.values()].entries()) {
+    pageSetups.push(sheet.pageSetup);
     const evaluator = createSheetEvaluator(sheet);
     const isFormulaCacheEligible = createFormulaCacheEligibility(sheet);
     const output = target.addWorksheet(sheet.name, {
@@ -1124,7 +1134,11 @@ export async function encodeWithExcelJs(
     bytes: finalizeXlsxExport(
       new Uint8Array(bytes),
       cellImages,
-      collectDefinedNames(workbook, report),
+      [
+        ...collectDefinedNames(workbook, report),
+        ...collectPrintAreaDefinedNames(workbook),
+        ...collectPrintTitleDefinedNames(workbook),
+      ],
       workbook.calculation,
       dataMetadata,
       conditionalFormats,
@@ -1134,6 +1148,7 @@ export async function encodeWithExcelJs(
       workbook.pivotTableStyles ?? [],
       workbook.defaultPivotTableStyleId,
       workbook.cellStyles,
+      pageSetups,
       report,
     ),
     report: report.build(),

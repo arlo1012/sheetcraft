@@ -46,6 +46,12 @@ import {
   transformMergedCellRangesForAxisInsert,
 } from "../merged-cells.js";
 import { cloneCellStyle } from "../style.js";
+import {
+  cloneSheetPageSetup,
+  DEFAULT_SHEET_PAGE_SETUP,
+  type SheetPrintTitleRange,
+  type SheetPageSetup,
+} from "../page-setup.js";
 import type {
   DeleteSheetAxisCommand,
   InsertSheetAxisCommand,
@@ -256,6 +262,8 @@ function cloneSheetMetadata(metadata: SheetMetadata): SheetMetadata {
       range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
     })),
     conditionalFormats: (metadata.conditionalFormats ?? []).map(cloneConditionalFormatRule),
+    tables: (metadata.tables ?? []).map(cloneSheetTable),
+    pageSetup: cloneSheetPageSetup(metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
   };
 }
 
@@ -609,6 +617,14 @@ function transformSheetMetadataForAxis(
     operation === "insert"
       ? transformMergedCellRangesForAxisInsert(metadata.mergedCells, axis, index, count)
       : transformMergedCellRangesForAxisDelete(metadata.mergedCells, axis, index, count);
+  const pageSetup = transformPageSetupForAxis(
+    metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP,
+    axis,
+    index,
+    count,
+    maximum,
+    operation,
+  );
   return {
     freezePanes:
       axis === "row"
@@ -693,7 +709,61 @@ function transformSheetMetadataForAxis(
       const filter = transformFilterForAxis(table.filter, axis, index, count, maximum, operation);
       return [{ ...cloneSheetTable(table), range, columns: transformTableColumns(table), filter }];
     }),
+    pageSetup,
   };
+}
+
+function transformPageSetupForAxis(
+  pageSetup: SheetPageSetup,
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  maximum: number,
+  operation: "insert" | "delete",
+): SheetPageSetup {
+  const setup = cloneSheetPageSetup(pageSetup);
+  const range = setup.printArea
+    ? transformRangeForAxis(setup.printArea, axis, index, count, maximum, operation)
+    : null;
+  const transformBreaks = (breaks: number[]) =>
+    breaks.flatMap((value) => {
+      const next = transformAxisIndex(value, index, count, maximum, operation);
+      return next === null || next === 0 ? [] : [next];
+    });
+  const transformTitle = (
+    title: SheetPrintTitleRange | null,
+    titleAxis: SheetDimensionAxis,
+  ): SheetPrintTitleRange | null => {
+    if (!title || axis !== titleAxis) return title;
+    const titleRange: CellRange =
+      axis === "row"
+        ? {
+            start: { row: title.start, column: 0 },
+            end: { row: title.end, column: MAX_SHEET_COLUMNS - 1 },
+          }
+        : {
+            start: { row: 0, column: title.start },
+            end: { row: MAX_SHEET_ROWS - 1, column: title.end },
+          };
+    const transformed = transformRangeForAxis(titleRange, axis, index, count, maximum, operation);
+    return transformed
+      ? axis === "row"
+        ? { start: transformed.start.row, end: transformed.end.row }
+        : { start: transformed.start.column, end: transformed.end.column }
+      : null;
+  };
+  const titles = setup.printTitles!;
+  return cloneSheetPageSetup({
+    ...setup,
+    printArea: range,
+    rowBreaks: axis === "row" ? transformBreaks(setup.rowBreaks) : setup.rowBreaks,
+    columnBreaks: axis === "column" ? transformBreaks(setup.columnBreaks) : setup.columnBreaks,
+    printTitles: {
+      rows: transformTitle(titles.rows, "row"),
+      columns: transformTitle(titles.columns, "column"),
+      bottomRows: transformTitle(titles.bottomRows, "row"),
+    },
+  });
 }
 
 function compareAxisEntries(
@@ -1418,6 +1488,13 @@ function transformSheetMetadataForAxisMove(
   const map = (value: number) => transformAxisIndexForMove(value, index, count, toIndex);
   const moveRange = (range: CellRange) =>
     transformRangeForAxisMove(range, axis, index, count, toIndex);
+  const pageSetup = transformPageSetupForAxisMove(
+    metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP,
+    axis,
+    index,
+    count,
+    toIndex,
+  );
   return {
     freezePanes: { ...metadata.freezePanes },
     filter,
@@ -1530,7 +1607,60 @@ function transformSheetMetadataForAxisMove(
         );
       return { ...cloneSheetTable(table), range };
     }),
+    pageSetup,
   };
+}
+
+function transformPageSetupForAxisMove(
+  pageSetup: SheetPageSetup,
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  toIndex: number,
+): SheetPageSetup {
+  const setup = cloneSheetPageSetup(pageSetup);
+  const map = (value: number) => transformAxisIndexForMove(value, index, count, toIndex);
+  const range = setup.printArea
+    ? transformRangeForAxisMove(setup.printArea, axis, index, count, toIndex)
+    : null;
+  const transformTitle = (
+    title: SheetPrintTitleRange | null,
+    titleAxis: SheetDimensionAxis,
+  ): SheetPrintTitleRange | null => {
+    if (!title || axis !== titleAxis) return title;
+    const titleRange: CellRange =
+      axis === "row"
+        ? {
+            start: { row: title.start, column: 0 },
+            end: { row: title.end, column: MAX_SHEET_COLUMNS - 1 },
+          }
+        : {
+            start: { row: 0, column: title.start },
+            end: { row: MAX_SHEET_ROWS - 1, column: title.end },
+          };
+    const transformed = transformRangeForAxisMove(titleRange, axis, index, count, toIndex);
+    if (!transformed)
+      throw invalidCommandPayload("axis", axis, "Moving this band would split print titles.");
+    return axis === "row"
+      ? { start: transformed.start.row, end: transformed.end.row }
+      : { start: transformed.start.column, end: transformed.end.column };
+  };
+  const titles = setup.printTitles!;
+  return cloneSheetPageSetup({
+    ...setup,
+    printArea: range,
+    rowBreaks:
+      axis === "row" ? setup.rowBreaks.map(map).filter((value) => value > 0) : setup.rowBreaks,
+    columnBreaks:
+      axis === "column"
+        ? setup.columnBreaks.map(map).filter((value) => value > 0)
+        : setup.columnBreaks,
+    printTitles: {
+      rows: transformTitle(titles.rows, "row"),
+      columns: transformTitle(titles.columns, "column"),
+      bottomRows: transformTitle(titles.bottomRows, "row"),
+    },
+  });
 }
 
 function assertFormulaRangesCanMove(
@@ -1640,6 +1770,8 @@ export function applyMoveSheetAxisCommand(
     subtotalMetadata: metadata.subtotalMetadata,
     duplicateRules: metadata.duplicateRules,
     conditionalFormats: metadata.conditionalFormats,
+    tables: metadata.tables,
+    pageSetup: metadata.pageSetup,
     floatingImages: previousState.floatingImages.map((image) => ({
       ...image,
       anchor:

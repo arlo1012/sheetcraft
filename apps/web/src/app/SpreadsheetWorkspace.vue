@@ -2,12 +2,24 @@
 import { formatCellAddress } from "@idea10/core/coordinates";
 import { cloneConditionalFormatRule } from "@idea10/core/conditional-formatting";
 import type { SheetGoToOptions } from "@idea10/core/go-to";
-import { computed, nextTick, ref, shallowRef, shallowReactive, useId, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  ref,
+  shallowRef,
+  shallowReactive,
+  useId,
+  watch,
+  type ComponentPublicInstance,
+} from "vue";
 import {
   createSetSheetOutlineGroupCollapsedCommand,
   createSetSheetOutlineLevelCommand,
+  createSetSheetPageSetupCommand,
   type CellFormatChange,
 } from "@idea10/core/commands";
+import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@idea10/core/page-setup";
+import type { SheetViewMode } from "@idea10/sheet-engine/page-layout";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { useWorkbookFullscreen } from "../modules/workbook/composables/useWorkbookFullscreen";
 import { useEyeComfortMode } from "../modules/workbook/composables/useEyeComfortMode";
@@ -37,6 +49,14 @@ import GoalSeekDialog from "../modules/data-tools/components/GoalSeekDialog.vue"
 import PlanningSolverDialog from "../modules/data-tools/components/PlanningSolverDialog.vue";
 import DataProofreadingDialog from "../modules/data-tools/components/DataProofreadingDialog.vue";
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
+import ViewToolbar from "../modules/view-tools/components/ViewToolbar.vue";
+import PageSetupDialog from "../modules/page-layout/components/PageSetupDialog.vue";
+import {
+  formatPickedPageSetupReference,
+  type PageSetupReferenceField,
+} from "../modules/page-layout/page-setup-inputs";
+import type { HeaderFooterEditTarget } from "../modules/page-layout/header-footer-editor";
+import type { PageLayoutRulerUnit } from "../modules/page-layout/components/PageLayoutRulers.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
 import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
 import ConsolidateDialog from "../modules/data-tools/components/ConsolidateDialog.vue";
@@ -141,11 +161,13 @@ const findMode = ref<WorkbookFindMode>("find");
 
 function restoreSearchFocus(): void {
   if (!findDialogVisible.value) {
-    formulaBarRef.value?.focusSearch();
+    if (showFormulaBar.value) formulaBarRef.value?.focusSearch();
+    else focusCellEditor();
   }
 }
 const gridId = `workbook-grid-${useId()}`;
 const zoom = ref(100);
+const showFormulaBar = ref(true);
 const showHeaders = ref(true);
 const showGridLines = ref(true);
 const showAxisQuickTools = ref(false);
@@ -329,6 +351,81 @@ const { active: pickingTableRange, reference: pickedTableReference } = tableRang
 watch(tableModalOpen, (open) => {
   if (!open) tableRangePicker.cancel();
 });
+const pageViewModes = shallowReactive(new Map<string, SheetViewMode>());
+const pageSetupVisible = ref(false);
+const pageSetupRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingPageSetupRange, reference: pickedPageSetupReference } = pageSetupRangePicker;
+const pageSetupRangeField = ref<PageSetupReferenceField>("printArea");
+async function selectPageSetupReference(
+  current: string,
+  field: PageSetupReferenceField,
+): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const generation = workbookGeneration.value;
+  const sheetId = activeSheet.value.id;
+  pageSetupRangeField.value = field;
+  const selected = await pageSetupRangePicker.selectReference(current);
+  if (
+    selected === undefined ||
+    !pageSetupVisible.value ||
+    session.workbook !== workbook ||
+    workbookGeneration.value !== generation
+  )
+    return undefined;
+  const resolved = resolveRangeReference(workbook, selected, sheetId);
+  if (!resolved || resolved.sheetId !== sheetId) return undefined;
+  return formatPickedPageSetupReference(resolved.range, field);
+}
+watch(pageSetupVisible, (visible) => {
+  if (!visible) pageSetupRangePicker.cancel();
+});
+const showPageRulers = ref(true);
+const showPageMargins = ref(false);
+const showPageWhiteSpace = ref(true);
+const pageRulerUnit = ref<PageLayoutRulerUnit>("cm");
+const pageSetupTab = ref<"page" | "margins" | "header-footer" | "sheet">("page");
+const headerFooterTarget = shallowRef<HeaderFooterEditTarget>();
+const sheetGridRef = shallowRef<InstanceType<typeof SheetGrid> | null>(null);
+function setSheetGridRef(value: Element | ComponentPublicInstance | null): void {
+  sheetGridRef.value = value as InstanceType<typeof SheetGrid> | null;
+  setGridNavigator(value);
+}
+function setPageWhiteSpace(value: boolean): void {
+  if (sheetGridRef.value?.flushPendingEdit() === false) return;
+  showPageWhiteSpace.value = value;
+}
+function openHeaderFooter(target: HeaderFooterEditTarget): void {
+  if (activeSheet.value.properties.protected || sheetGridRef.value?.flushPendingEdit() === false)
+    return;
+  pageSetupTab.value = "header-footer";
+  headerFooterTarget.value = target;
+  pageSetupVisible.value = true;
+}
+const activeViewMode = computed(() => pageViewModes.get(activeSheet.value.id) ?? "normal");
+const activePageSetup = computed(() => activeSheet.value.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
+function setViewMode(mode: SheetViewMode): void {
+  if (sheetGridRef.value?.flushPendingEdit() === false) return;
+  pageViewModes.set(activeSheet.value.id, mode);
+  void nextTick(focusCellEditor);
+}
+function applyPageSetup(setup: SheetPageSetup): void {
+  executeCommand(createSetSheetPageSetupCommand(activeSheet.value.id, setup));
+}
+function savePageSetup(setup: SheetPageSetup): void {
+  applyPageSetup(setup);
+  pageSetupVisible.value = false;
+  void nextTick(focusCellEditor);
+}
+watch(workbookGeneration, () => {
+  pageViewModes.clear();
+  pageSetupVisible.value = false;
+});
+watch(
+  () => activeSheet.value.id,
+  () => {
+    pageSetupVisible.value = false;
+  },
+);
 const duplicateInputError = computed(() => {
   const feedback = validationFeedback.value;
   if (feedback?.source !== "duplicate" || feedback.target.sheetId !== activeSheet.value.id)
@@ -659,7 +756,7 @@ function onSelectSheet(sheetId: string): void {
   if (cellEditSession.state.active && cellEditSession.state.draft.startsWith("=")) {
     cellEditSession.activateSurface("formula-bar");
     selectSheet(sheetId);
-    void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
+    void nextTick(focusFormulaBarOrGrid);
     return;
   }
   if (cellEditSession.finish()) selectSheet(sheetId);
@@ -737,7 +834,7 @@ const formulaTools = useFormulaToolsController({
   editSession: cellEditSession,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
   execute: executeCommand,
-  focusFormulaBar: () => formulaBarRef.value?.focus({ preserveSelection: true }),
+  focusFormulaBar: focusFormulaBarOrGrid,
   recalculate,
 });
 const duplicateErrorChecks = useDuplicateErrorChecks({
@@ -805,7 +902,7 @@ function ignoreAllDuplicateErrors(): void {
 }
 function editErrorInFormulaBar(): void {
   if (!activeSheet.value.properties.protected) {
-    void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
+    void nextTick(focusFormulaBarOrGrid);
   }
 }
 watch([workbookGeneration, () => activeSheet.value.id], () => {
@@ -1257,9 +1354,7 @@ function chooseValidationValue(payload: {
 function retryValidationInput(): void {
   dismissValidationInput();
   void nextTick(() =>
-    cellEditSession.state.surface === "formula-bar"
-      ? formulaBarRef.value?.focus({ preserveSelection: true })
-      : focusCellEditor(),
+    cellEditSession.state.surface === "formula-bar" ? focusFormulaBarOrGrid() : focusCellEditor(),
   );
 }
 
@@ -1301,7 +1396,7 @@ const formulaInsertVisible = ref(false);
 
 function closeFormulaInsert(): void {
   formulaInsertVisible.value = false;
-  void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
+  void nextTick(focusFormulaBarOrGrid);
 }
 
 function insertFunctionFromBar(name: string): void {
@@ -1315,7 +1410,7 @@ const formulaEditor = useFormulaEditorController({
   getAddress: () => activeAddress.value,
   editSession: cellEditSession,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
-  focusFormulaBar: () => formulaBarRef.value?.focus({ preserveSelection: true }),
+  focusFormulaBar: focusFormulaBarOrGrid,
 });
 const {
   visible: formulaEditorVisible,
@@ -1337,6 +1432,7 @@ const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
 const activeRangePicker = computed(() => {
   if (pickingTableRange.value) return tableRangePicker;
+  if (pickingPageSetupRange.value) return pageSetupRangePicker;
   if (pickingFindFormat.value) return findFormatPicker;
   if (pickingSimulationRange.value) return simulationRangePicker;
   if (pickingProofreadingRange.value) return proofreadingRangePicker;
@@ -1375,8 +1471,28 @@ function onWorkspaceWheel(event: WheelEvent): void {
   );
 }
 
+function focusFormulaBarOrGrid(): void {
+  if (showFormulaBar.value) formulaBarRef.value?.focus({ preserveSelection: true });
+  else focusCellEditor();
+}
+
+function setShowFormulaBar(visible: boolean): void {
+  if (showFormulaBar.value === visible || (!visible && cellEditSession.state.composing)) return;
+  const transferDraft =
+    !visible && cellEditSession.state.active && cellEditSession.state.surface === "formula-bar";
+  if (transferDraft) cellEditSession.activateSurface("grid");
+  showFormulaBar.value = visible;
+  if (transferDraft) void nextTick(focusCellEditor);
+}
+
 function onWorkspaceKeydown(event: KeyboardEvent): void {
-  if (formulaEditorVisible.value || formulaInsertVisible.value || hyperlinkDraft.value) return;
+  if (
+    (pageSetupVisible.value && !pickingPageSetupRange.value) ||
+    formulaEditorVisible.value ||
+    formulaInsertVisible.value ||
+    hyperlinkDraft.value
+  )
+    return;
   const picker = activeRangePicker.value;
   if (picker) {
     if (event.key === "Escape") picker.cancel();
@@ -1435,7 +1551,10 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     event.preventDefault();
     event.stopPropagation();
     if (cellEditSession.state.surface === "formula-bar") focusCellEditor();
-    else formulaBarRef.value?.focus({ preserveSelection: true });
+    else {
+      showFormulaBar.value = true;
+      void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
+    }
     return;
   }
   if (event.key !== "Escape" || !formatPainterActive.value) {
@@ -1450,6 +1569,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
 <template>
   <section
     class="spreadsheet-workspace"
+    :class="{
+      'is-formula-bar-hidden': !showFormulaBar,
+    }"
     :aria-label="t('workspace.editor')"
     :aria-busy="loading || fileBusy || imageBusy || xlsxBusy"
     @keydown.capture="onWorkspaceKeydown"
@@ -1569,6 +1691,39 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @settings="tableActions.openSettings"
         />
       </template>
+      <template #view-tools>
+        <ViewToolbar
+          :view-mode="activeViewMode"
+          @update:view-mode="setViewMode"
+          v-model:show-page-rulers="showPageRulers"
+          v-model:show-page-margins="showPageMargins"
+          :show-page-white-space="showPageWhiteSpace"
+          @update:show-page-white-space="setPageWhiteSpace"
+          v-model:page-ruler-unit="pageRulerUnit"
+          :edit-session-id="cellEditSession.id"
+          :show-formula-bar="showFormulaBar"
+          @update:show-formula-bar="setShowFormulaBar"
+          v-model:show-headers="showHeaders"
+          v-model:show-grid-lines="showGridLines"
+          v-model:eye-comfort-enabled="eyeComfortEnabled"
+          v-model:highlight-enabled="highlightEnabled"
+          v-model:highlight-color="highlightColor"
+          v-model:zoom="zoom"
+          :fullscreen="fullscreen"
+          :fullscreen-available="fullscreenAvailable"
+          @toggle-fullscreen="toggleFullscreen"
+          @fit-selection="fitSelectionToViewport"
+          :freeze-disabled="
+            activeViewMode !== 'normal' ||
+            activeSheet.properties.protected ||
+            !dataToolState.freezeEnabled
+          "
+          :active-cell="activeAddress"
+          :freeze-panes="activeSheet.freezePanes"
+          @freeze="freeze"
+          @unfreeze="unfreeze"
+        />
+      </template>
       <template #data-tools>
         <DataToolbar
           :disabled="dataToolsDisabled"
@@ -1671,6 +1826,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         </WorkbookFileActions>
       </template>
     </SpreadsheetRibbon>
+
     <DataToolsDialogs
       :sort-visible="dataSortVisible"
       :text-to-columns-visible="dataTextToColumnsVisible"
@@ -2166,6 +2322,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       />
     </div>
     <WorkbookFormulaBar
+      v-show="showFormulaBar"
       :read-only="formulaReadOnly"
       :key="workbookGeneration"
       ref="formulaBarRef"
@@ -2300,10 +2457,21 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         (tableModalOpen && !pickingTableRange) ||
         formulaEditorVisible ||
         formulaInsertVisible ||
+        (pageSetupVisible && !pickingPageSetupRange) ||
         !!modalValidationFeedback
       "
     >
       <SheetGrid
+        :view-mode="activeViewMode"
+        :page-setup="activePageSetup"
+        @page-setup-change="applyPageSetup"
+        :show-page-rulers="showPageRulers"
+        :show-page-margins="showPageMargins"
+        :show-page-white-space="showPageWhiteSpace"
+        @update:show-page-white-space="setPageWhiteSpace"
+        :page-ruler-unit="pageRulerUnit"
+        file-name="workbook.xlsx"
+        @open-header-footer="openHeaderFooter"
         v-model:zoom="zoom"
         :show-headers="showHeaders"
         :show-grid-lines="showGridLines"
@@ -2314,7 +2482,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         external-horizontal-scrollbar
         :read-only="activeSheet.properties.protected"
         :key="workbookGeneration"
-        :ref="setGridNavigator"
+        :ref="setSheetGridRef"
         :sheet="activeSheet"
         :evaluator="activeSheetEvaluator"
         :context-menu-state="contextMenuState"
@@ -2382,6 +2550,34 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @horizontal-scroll-change="updateHorizontalScrollState"
       />
     </div>
+    <PageSetupDialog
+      v-model:visible="pageSetupVisible"
+      :setup="activePageSetup"
+      :initial-tab="pageSetupTab"
+      :header-footer-target="headerFooterTarget"
+      :sheet-name="activeSheet.name"
+      file-name="workbook.xlsx"
+      :suspended="pickingPageSetupRange"
+      :select-reference="selectPageSetupReference"
+      @confirm="savePageSetup"
+    />
+    <RangeReferencePicker
+      v-if="pickingPageSetupRange"
+      :reference="pickedPageSetupReference"
+      :title="
+        t(
+          pageSetupRangeField === 'printArea'
+            ? 'pageLayout.printArea'
+            : pageSetupRangeField === 'titleColumns'
+              ? 'pageLayout.titleColumns'
+              : pageSetupRangeField === 'bottomTitleRows'
+                ? 'pageLayout.bottomTitleRows'
+                : 'pageLayout.titleRows',
+        )
+      "
+      @confirm="pageSetupRangePicker.confirm"
+      @cancel="pageSetupRangePicker.cancel"
+    />
     <SheetColumnStatisticsDialog
       v-if="statisticsRange"
       :sheet="activeSheet"
@@ -2409,6 +2605,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     />
     <WorkbookStatusBar
       :sheet-tabs-disabled="pickingTableRange"
+      :view-mode="activeViewMode"
+      @update:view-mode="setViewMode"
       :edit-session-id="
         cellEditSession.state.draft.startsWith('=') ? cellEditSession.id : undefined
       "
@@ -2467,6 +2665,10 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
   min-height: 360px;
   overflow: hidden;
   background: var(--idea-surface-panel);
+
+  &.is-formula-bar-hidden {
+    grid-template-rows: auto auto minmax(0, 1fr) 49px;
+  }
 
   &__image-input {
     display: none;

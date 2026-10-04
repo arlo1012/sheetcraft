@@ -2,6 +2,7 @@ import { columnIndexToLabel } from "@idea10/core/coordinates";
 import type { SheetDimensionAxis } from "@idea10/core/workbook";
 import type { SelectionMode } from "@idea10/sheet-engine/selection";
 import type { Rect } from "@idea10/sheet-engine/geometry";
+import { createCanvasPixelGrid } from "../../../shared/canvas/pixel-grid";
 import type { HeaderItem, HeaderPane, SheetRenderFrame } from "./sheet-render-frame";
 import { paintGripIcon } from "./grip-painter";
 
@@ -76,6 +77,8 @@ export type HeaderPaintState = Readonly<{
   hovered?: HeaderHit;
   focused?: HeaderFocus;
   palette: SheetHeaderPalette;
+  /** Separated paper keeps non-heading space on the desktop backdrop. */
+  backdrop?: string;
 }>;
 
 function isAxisSelected(
@@ -133,6 +136,7 @@ function paintPlus(
   y: number,
   palette: SheetHeaderPalette,
   active: boolean,
+  pixelGrid: ReturnType<typeof createCanvasPixelGrid>,
 ): void {
   context.save();
   context.beginPath();
@@ -140,7 +144,7 @@ function paintPlus(
   context.fillStyle = active ? palette.action : palette.panel;
   context.fill();
   context.strokeStyle = active ? palette.action : palette.border;
-  context.lineWidth = 1;
+  context.lineWidth = pixelGrid.screenStrokeWidth(1);
   context.stroke();
   if (active) {
     context.strokeStyle = palette.panel;
@@ -158,15 +162,19 @@ function paintFocus(
   context: CanvasRenderingContext2D,
   rect: Rect,
   palette: SheetHeaderPalette,
+  pixelGrid: ReturnType<typeof createCanvasPixelGrid>,
 ): void {
   context.save();
   context.strokeStyle = palette.action;
-  context.lineWidth = 2;
+  const width = pixelGrid.screenStrokeWidth(2);
+  const left = pixelGrid.strokeX(rect.x + 1, width);
+  const top = pixelGrid.strokeY(rect.y + 1, width);
+  context.lineWidth = width;
   context.strokeRect(
-    rect.x + 1,
-    rect.y + 1,
-    Math.max(0, rect.width - 2),
-    Math.max(0, rect.height - 2),
+    left,
+    top,
+    Math.max(0, pixelGrid.strokeX(rect.x + rect.width - 1, width) - left),
+    Math.max(0, pixelGrid.strokeY(rect.y + rect.height - 1, width) - top),
   );
   context.restore();
 }
@@ -192,24 +200,27 @@ function paintAxisItem(
   item: HeaderItem,
   frame: SheetRenderFrame,
   state: HeaderPaintState,
+  pixelGrid: ReturnType<typeof createCanvasPixelGrid>,
 ): void {
   const { palette, quickTools, selection, hovered, focused } = state;
   const gutter = quickTools.gutter;
-  const rowLabelStart = gutter + (quickTools.rowOutlineGutter ?? 0);
-  const columnLabelStart = gutter + (quickTools.columnOutlineGutter ?? 0);
+  const rowLabelInset = gutter + (quickTools.rowOutlineGutter ?? 0);
+  const columnLabelInset = gutter + (quickTools.columnOutlineGutter ?? 0);
+  const rowLabelStart = frame.headingOrigin.x + rowLabelInset;
+  const columnLabelStart = frame.headingOrigin.y + columnLabelInset;
   const rect =
     axis === "row"
       ? {
           x: rowLabelStart,
           y: item.offset,
-          width: Math.max(0, frame.headerSize.width - rowLabelStart - 1),
+          width: Math.max(0, frame.headingSize.width - rowLabelInset - 1),
           height: item.size,
         }
       : {
           x: item.offset,
           y: columnLabelStart,
           width: item.size,
-          height: Math.max(0, frame.headerSize.height - columnLabelStart - 1),
+          height: Math.max(0, frame.headingSize.height - columnLabelInset - 1),
         };
   if (rect.width <= 0 || rect.height <= 0) return;
   const axisSelected = isAxisSelected(axis, item.index, selection);
@@ -231,55 +242,73 @@ function paintAxisItem(
   );
   context.beginPath();
   context.strokeStyle = palette.subtleBorder;
-  context.lineWidth = 1;
+  const separatorWidth = pixelGrid.screenStrokeWidth(1);
+  context.lineWidth = separatorWidth;
   if (axis === "row") {
-    const y = item.offset + item.size - 0.5;
-    context.moveTo(rect.x, y);
-    context.lineTo(rect.x + rect.width, y);
+    const y = pixelGrid.strokeY(item.offset + item.size - separatorWidth / 2, separatorWidth);
+    context.moveTo(pixelGrid.snapX(rect.x), y);
+    context.lineTo(pixelGrid.snapX(rect.x + rect.width), y);
   } else {
-    const x = item.offset + item.size - 0.5;
-    context.moveTo(x, rect.y);
-    context.lineTo(x, rect.y + rect.height);
+    const x = pixelGrid.strokeX(item.offset + item.size - separatorWidth / 2, separatorWidth);
+    context.moveTo(x, pixelGrid.snapY(rect.y));
+    context.lineTo(x, pixelGrid.snapY(rect.y + rect.height));
   }
   context.stroke();
   if (selected) {
     context.fillStyle = palette.action;
-    if (axis === "row") context.fillRect(rect.x + rect.width - 2, rect.y, 2, rect.height);
-    else context.fillRect(rect.x, rect.y + rect.height - 2, rect.width, 2);
+    const selectedWidth = pixelGrid.screenStrokeWidth(2);
+    if (axis === "row") {
+      context.fillRect(
+        pixelGrid.snapX(rect.x + rect.width) - selectedWidth,
+        rect.y,
+        selectedWidth,
+        rect.height,
+      );
+    } else {
+      context.fillRect(
+        rect.x,
+        pixelGrid.snapY(rect.y + rect.height) - selectedWidth,
+        rect.width,
+        selectedWidth,
+      );
+    }
   }
 
   const revealed = quickTools.enabled && isRevealedItem(axis, item.index, hovered, focused);
   if (revealed) {
-    const gripX = axis === "row" ? gutter / 2 : item.offset + item.size / 2;
-    const gripY = axis === "row" ? item.offset + item.size / 2 : gutter / 2;
+    const gripX = axis === "row" ? frame.headingOrigin.x + gutter / 2 : item.offset + item.size / 2;
+    const gripY = axis === "row" ? item.offset + item.size / 2 : frame.headingOrigin.y + gutter / 2;
     paintGripIcon(
       context,
       gripX,
       gripY,
       axis === "column",
       selected ? palette.action : palette.mutedText,
+      frame.scale,
     );
     const hoverIsBoundary = hovered?.axis === axis && hovered.action === "quickInsert";
     if (shouldShowBoundary(axis, item.index, true, selection)) {
       paintPlus(
         context,
-        axis === "row" ? gutter / 2 : item.offset,
-        axis === "row" ? item.offset : gutter / 2,
+        axis === "row" ? frame.headingOrigin.x + gutter / 2 : item.offset,
+        axis === "row" ? item.offset : frame.headingOrigin.y + gutter / 2,
         palette,
         hoverIsBoundary && hovered?.index === item.index,
+        pixelGrid,
       );
     }
     if (shouldShowBoundary(axis, item.index, false, selection)) {
       paintPlus(
         context,
-        axis === "row" ? gutter / 2 : item.offset + item.size,
-        axis === "row" ? item.offset + item.size : gutter / 2,
+        axis === "row" ? frame.headingOrigin.x + gutter / 2 : item.offset + item.size,
+        axis === "row" ? item.offset + item.size : frame.headingOrigin.y + gutter / 2,
         palette,
         hoverIsBoundary && hovered?.index === item.index + 1,
+        pixelGrid,
       );
     }
   }
-  if (isFocusedItem(focused, axis, item.index)) paintFocus(context, rect, palette);
+  if (isFocusedItem(focused, axis, item.index)) paintFocus(context, rect, palette, pixelGrid);
 }
 
 function paintAxisHeaders(
@@ -287,12 +316,14 @@ function paintAxisHeaders(
   axis: SheetDimensionAxis,
   panes: readonly HeaderPane[],
   state: HeaderPaintState,
+  pixelGrid: ReturnType<typeof createCanvasPixelGrid>,
 ): void {
   for (const pane of panes) {
     if (pane.clip.width <= 0 || pane.clip.height <= 0) continue;
     context.save();
-    clip(context, pane.clip);
-    for (const item of pane.items) paintAxisItem(context, axis, item, state.frame, state);
+    clip(context, pixelGrid.snapRect(pane.clip));
+    for (const item of pane.items)
+      paintAxisItem(context, axis, item, state.frame, state, pixelGrid);
     context.restore();
   }
 }
@@ -303,37 +334,45 @@ export function paintSheetHeaders(
   state: HeaderPaintState,
 ): void {
   const { frame, palette, quickTools, selection, focused, hovered } = state;
+  const pixelGrid = createCanvasPixelGrid(context, frame.scale);
   const { width, height } = frame.size;
   context.save();
-  context.fillStyle = palette.background;
+  context.fillStyle = state.backdrop ?? palette.background;
   context.fillRect(0, 0, width, frame.headerSize.height);
   context.fillRect(0, 0, frame.headerSize.width, height);
-  paintAxisHeaders(context, "column", frame.columnHeaders, state);
-  paintAxisHeaders(context, "row", frame.rowHeaders, state);
+  paintAxisHeaders(context, "column", frame.columnHeaders, state, pixelGrid);
+  paintAxisHeaders(context, "row", frame.rowHeaders, state, pixelGrid);
 
-  const rowLabelStart = quickTools.gutter + (quickTools.rowOutlineGutter ?? 0);
-  const columnLabelStart = quickTools.gutter + (quickTools.columnOutlineGutter ?? 0);
+  const rowLabelInset = quickTools.gutter + (quickTools.rowOutlineGutter ?? 0);
+  const columnLabelInset = quickTools.gutter + (quickTools.columnOutlineGutter ?? 0);
+  const rowLabelStart = frame.headingOrigin.x + rowLabelInset;
+  const columnLabelStart = frame.headingOrigin.y + columnLabelInset;
   const corner = {
     x: rowLabelStart,
     y: columnLabelStart,
-    width: Math.max(0, frame.headerSize.width - rowLabelStart),
-    height: Math.max(0, frame.headerSize.height - columnLabelStart),
+    width: Math.max(0, frame.headingSize.width - rowLabelInset),
+    height: Math.max(0, frame.headingSize.height - columnLabelInset),
   };
   context.fillStyle =
     selection.mode === "all"
       ? palette.actionFocus
       : hovered?.axis === "corner"
         ? palette.hover
-        : palette.background;
+        : (state.backdrop ?? palette.background);
   context.fillRect(corner.x, corner.y, corner.width, corner.height);
   context.strokeStyle = palette.border;
-  context.lineWidth = 1;
-  context.beginPath();
-  context.moveTo(frame.headerSize.width - 0.5, corner.y);
-  context.lineTo(frame.headerSize.width - 0.5, height);
-  context.moveTo(corner.x, frame.headerSize.height - 0.5);
-  context.lineTo(width, frame.headerSize.height - 0.5);
-  context.stroke();
+  const separatorWidth = pixelGrid.screenStrokeWidth(1);
+  context.lineWidth = separatorWidth;
+  if (!state.backdrop) {
+    context.beginPath();
+    const x = pixelGrid.strokeX(frame.headerSize.width - separatorWidth / 2, separatorWidth);
+    const y = pixelGrid.strokeY(frame.headerSize.height - separatorWidth / 2, separatorWidth);
+    context.moveTo(x, pixelGrid.snapY(corner.y));
+    context.lineTo(x, pixelGrid.snapY(height));
+    context.moveTo(pixelGrid.snapX(corner.x), y);
+    context.lineTo(pixelGrid.snapX(width), y);
+    context.stroke();
+  }
   context.fillStyle = selection.mode === "all" ? palette.action : palette.cornerText;
   context.beginPath();
   const triangleRight = corner.x + corner.width - 7;
@@ -343,6 +382,6 @@ export function paintSheetHeaders(
   context.lineTo(triangleRight - 8, triangleBottom);
   context.closePath();
   context.fill();
-  if (focused?.axis === "corner") paintFocus(context, corner, palette);
+  if (focused?.axis === "corner") paintFocus(context, corner, palette, pixelGrid);
   context.restore();
 }

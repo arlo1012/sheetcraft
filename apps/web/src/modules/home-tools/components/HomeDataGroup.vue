@@ -3,7 +3,7 @@ import { Database, LockKeyhole, Sigma } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import type { FilterValueKey, HomeDataToolState } from "./data-tool-state";
 import FilterValueMenu from "./FilterValueMenu.vue";
-import FreezeMenu from "./FreezeMenu.vue";
+import SheetFreezeMenu from "../../../shared/sheet-view/SheetFreezeMenu.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import SortMenu from "./SortMenu.vue";
 
@@ -42,7 +42,7 @@ const emit = defineEmits<{
     />
 
     <div class="home-data-group__stack" data-ribbon-stack="freeze-sort">
-      <FreezeMenu
+      <SheetFreezeMenu
         :disabled="readOnly || !state.freezeEnabled"
         :active-cell="state.activeCell"
         :freeze="state.freeze"

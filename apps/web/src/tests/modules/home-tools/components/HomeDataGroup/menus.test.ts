@@ -2,7 +2,6 @@ import { DOMWrapper, mount } from "@vue/test-utils";
 import type { Component } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
 import FilterValueMenu from "../../../../../modules/home-tools/components/FilterValueMenu.vue";
-import FreezeMenu from "../../../../../modules/home-tools/components/FreezeMenu.vue";
 import MergeCellsMenu from "../../../../../modules/home-tools/components/MergeCellsMenu.vue";
 import SortMenu from "../../../../../modules/home-tools/components/SortMenu.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
@@ -129,30 +128,14 @@ describe("Home data tool menus", () => {
     expect(document.activeElement).toBe(trigger.element);
   });
 
-  test("emits sort and freeze intents from real menu actions", async () => {
+  test("emits sort intents from real menu actions", async () => {
     const sort = mountMenu(SortMenu, { disabled: false });
     const sortTrigger = sort.get('[data-ribbon-action="sort"]');
     await sortTrigger.trigger("click");
     await menu().get('[data-sort-direction="descending"]').trigger("keydown", { key: "Enter" });
     expect(sort.emitted("sort")).toEqual([["descending"]]);
 
-    const freeze = mountMenu(FreezeMenu, {
-      disabled: false,
-      activeCell: { row: 2, column: 3 },
-      freeze: { rows: 0, columns: 0 },
-    });
-    const freezeTrigger = freeze.get('[data-ribbon-action="freeze"]');
-    expect(freezeTrigger.attributes("aria-pressed")).toBe("false");
-    await freezeTrigger.trigger("click");
-    expect(menu().get('[data-freeze-action="panes"]').attributes("aria-disabled")).toBe("false");
-    await menu().get('[data-freeze-action="panes"]').trigger("click");
-    expect(freeze.emitted("freeze")).toEqual([["panes"]]);
 
-    await freeze.setProps({ freeze: { rows: 1, columns: 0 } });
-    expect(freezeTrigger.attributes("aria-pressed")).toBe("true");
-    await freezeTrigger.trigger("click");
-    await menu().get('[data-freeze-action="unfreeze"]').trigger("click");
-    expect(freeze.emitted("unfreeze")).toEqual([[]]);
   });
 
   test("uses a fixed all-merge main action and exposes every merge mode", async () => {

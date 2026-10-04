@@ -7,6 +7,7 @@ import { paintCellText } from "./cell-text-painter";
 import type { SheetCanvasScene } from "./cell-scene";
 import { paintCellImage, type CanvasImageCache } from "./image-painter";
 import { paintGridLines } from "./grid-line-painter";
+import { createCanvasPixelGrid } from "../../../shared/canvas/pixel-grid";
 
 export type SheetCanvasPalette = {
   background: string;
@@ -29,6 +30,8 @@ export function paintSheetScene(
   options: {
     palette: SheetCanvasPalette;
     showGridLines: boolean;
+    screenScale?: number;
+    skipBackground?: boolean;
     editingCell?: CellAddress;
     errorCells?: ReadonlySet<string>;
     imageUrls?: ReadonlyMap<string, string>;
@@ -37,8 +40,10 @@ export function paintSheetScene(
   },
 ): void {
   const { palette } = options;
-  context.fillStyle = palette.background;
-  context.fillRect(0, 0, layout.viewportSize.width, layout.viewportSize.height);
+  if (!options.skipBackground) {
+    context.fillStyle = palette.background;
+    context.fillRect(0, 0, layout.viewportSize.width, layout.viewportSize.height);
+  }
   const visibleImageUrls = new Set<string>();
   for (const paneScene of scene.panes) {
     const pane = layout.panes[paneScene.id];
@@ -52,12 +57,14 @@ export function paintSheetScene(
         ? layout.frozenSize.height + layout.bodyScrollPosition.y - pane.clip.y
         : 0;
     context.save();
-    clipRect(context, pane.clip);
+    clipRect(context, createCanvasPixelGrid(context).snapRect(pane.clip));
     context.translate(-scrollX, -scrollY);
+    const pixels = createCanvasPixelGrid(context);
     for (const cell of paneScene.cells) paintCellFill(context, cell.rect, cell.style);
     for (const cell of paneScene.cells)
       paintConditionalFormatVisual(context, cell.rect, cell.content.conditionalFormatVisual);
-    if (options.showGridLines) paintGridLines(context, paneScene.cells, palette.gridLine);
+    if (options.showGridLines)
+      paintGridLines(context, paneScene.cells, palette.gridLine, options.screenScale);
     const drawnSpans = new Set<string>();
     for (const cell of paneScene.cells) {
       const { content, contentRect, span } = cell;
@@ -71,12 +78,15 @@ export function paintSheetScene(
       }
       if (!content.image && !content.textLayout) continue;
       context.save();
-      clipRect(context, {
-        x: contentRect.x,
-        y: contentRect.y,
-        width: Math.max(0, contentRect.width - 1),
-        height: Math.max(0, contentRect.height - 1),
-      });
+      clipRect(
+        context,
+        pixels.snapRect({
+          x: contentRect.x,
+          y: contentRect.y,
+          width: Math.max(0, contentRect.width - 1),
+          height: Math.max(0, contentRect.height - 1),
+        }),
+      );
       if (content.image) {
         const url = options.imageUrls?.get(content.image.assetId);
         if (url) visibleImageUrls.add(url);

@@ -1,10 +1,12 @@
 import ExcelJSImport from "exceljs/dist/exceljs.min.js";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
 import { inflateRawSync } from "node:zlib";
 import {
   createSheet,
   createWorkbook,
   getActiveSheet,
   getCellContent,
+  getCellHyperlink,
   getCellStyle,
   getColumnWidth,
   getRowHeight,
@@ -13,8 +15,10 @@ import {
   setColumnWidth,
   type Workbook,
 } from "@idea10/core/workbook";
+import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx, XlsxCompatibilityError } from "../index.js";
+import { writeXlsxPageSetups } from "../page-setup.js";
 
 type BrowserWorkbook = {
   properties: { date1904?: boolean };
@@ -156,6 +160,329 @@ describe("XLSX IO", () => {
     expect(xml).toContain('iterateCount="37"');
     expect(xml).toContain('iterateDelta="0.00025"');
     expect((await decodeXlsx(encoded.bytes)).workbook.calculation).toEqual(workbook.calculation);
+  });
+
+  test("roundtrips tables, hyperlinks, and page setup through shared worksheet writers", async () => {
+    const workbook = createWorkbook({ id: "combined-worksheet-writers", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    const tableStyle = {
+      id: "integration-table-style",
+      name: "Integration Blue",
+      category: "custom" as const,
+      elements: {
+        headerRow: { style: { fillColor: "#123456", textColor: "#ffffff", bold: true } },
+      },
+    };
+    for (const [row, values] of [
+      ["Resource", "Visits"],
+      ["Product home", 120],
+      ["Release notes", 80],
+    ].entries())
+      values.forEach((value, column) =>
+        setCellContent(sheet, { row, column }, { kind: "literal", value }),
+      );
+    sheet.cells.set("1:0", {
+      content: { kind: "literal", value: "Product home" },
+      hyperlink: { target: "https://example.test/product", tooltip: "Open product" },
+    });
+    sheet.tables = [
+      {
+        id: "resource-table",
+        name: "Resources",
+        range: { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } },
+        columns: [
+          { id: "resource", name: "Resource" },
+          { id: "visits", name: "Visits" },
+        ],
+        style: tableStyle,
+        headerRow: true,
+        totalRow: false,
+        firstColumn: false,
+        lastColumn: false,
+        bandedRows: true,
+        bandedColumns: false,
+        filterButton: true,
+        filter: {
+          range: { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } },
+          columns: [],
+        },
+      },
+    ];
+    sheet.pageSetup = {
+      ...DEFAULT_SHEET_PAGE_SETUP,
+      orientation: "landscape",
+      printArea: { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } },
+      header: { left: "Resources", center: "", right: "Page &P" },
+      footer: { left: "", center: "Internal", right: "" },
+    };
+
+    const encoded = await encodeXlsx(workbook);
+    const entries = unzipSync(encoded.bytes);
+    const worksheet = strFromU8(entries["xl/worksheets/sheet1.xml"]!);
+    expect(worksheet).toContain('<tableParts count="1"');
+    expect(worksheet).toContain("<hyperlinks>");
+    expect(worksheet).toContain('<pageSetup paperSize="9" orientation="landscape"');
+    expect(worksheet).toContain("<headerFooter>");
+    expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain(
+      'name="Integration Blue"',
+    );
+
+    const restored = getActiveSheet((await decodeXlsx(encoded.bytes)).workbook);
+    expect(restored.tables).toEqual([
+      expect.objectContaining({
+        name: "Resources",
+        style: expect.objectContaining({ name: "Integration Blue" }),
+      }),
+    ]);
+    expect(getCellHyperlink(restored, { row: 1, column: 0 })).toEqual({
+      target: "https://example.test/product",
+      tooltip: "Open product",
+    });
+    expect(restored.pageSetup).toMatchObject({
+      orientation: "landscape",
+      printArea: { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } },
+      header: { left: "Resources", center: "", right: "Page &P" },
+      footer: { left: "", center: "Internal", right: "" },
+    });
+  });
+
+  test("preserves disabled first and even page header/footer content", async () => {
+    const workbook = createWorkbook({ id: "disabled-header-footer", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    sheet.pageSetup = {
+      ...DEFAULT_SHEET_PAGE_SETUP,
+      headerFooter: {
+        ...DEFAULT_SHEET_PAGE_SETUP.headerFooter!,
+        firstHeader: { left: "First retained", center: "", right: "" },
+        evenFooter: { left: "", center: "Even retained", right: "" },
+      },
+    };
+
+    const encoded = await encodeXlsx(workbook);
+    const worksheet = xlsxEntryText(encoded.bytes, "xl/worksheets/sheet1.xml");
+    expect(worksheet).toContain("<headerFooter>");
+    expect(worksheet).not.toContain('differentFirst="1"');
+    expect(worksheet).not.toContain('differentOddEven="1"');
+    expect(worksheet).toContain("<firstHeader>&amp;LFirst retained&amp;C&amp;R</firstHeader>");
+    expect(worksheet).toContain("<evenFooter>&amp;L&amp;CEven retained&amp;R</evenFooter>");
+    expect(
+      getActiveSheet((await decodeXlsx(encoded.bytes)).workbook).pageSetup?.headerFooter,
+    ).toEqual(sheet.pageSetup.headerFooter);
+  });
+
+  test("imports a page setup when print options, fit-to-page, or print titles are its only setting", async () => {
+    const workbook = createWorkbook({
+      id: "page-setup-presence",
+      sheetId: "sheet",
+      sheetName: "Plan",
+    });
+    const encoded = await encodeXlsx(workbook);
+
+    const decodeWith = async (worksheetPatch: string, workbookPatch = "") => {
+      const entries = unzipSync(encoded.bytes);
+      entries["xl/worksheets/sheet1.xml"] = strToU8(
+        strFromU8(entries["xl/worksheets/sheet1.xml"]!).replace(
+          "</worksheet>",
+          `${worksheetPatch}</worksheet>`,
+        ),
+      );
+      if (workbookPatch)
+        entries["xl/workbook.xml"] = strToU8(
+          strFromU8(entries["xl/workbook.xml"]!).replace(
+            "</workbook>",
+            `${workbookPatch}</workbook>`,
+          ),
+        );
+      return getActiveSheet((await decodeXlsx(zipSync(entries))).workbook).pageSetup;
+    };
+
+    await expect(decodeWith('<printOptions gridLines="1"/>')).resolves.toMatchObject({
+      printOptions: { gridLines: true },
+    });
+    await expect(
+      decodeWith('<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'),
+    ).resolves.toMatchObject({ fitToPage: { width: 1, height: 1 } });
+    await expect(
+      decodeWith(
+        "",
+        '<definedNames><definedName name="_xlnm.Print_Titles" localSheetId="0">&apos;Plan&apos;!$1:$2</definedName></definedNames>',
+      ),
+    ).resolves.toMatchObject({ printTitles: { rows: { start: 0, end: 1 }, columns: null } });
+  });
+
+  test("keeps existing self-closing sheet properties when fit-to-page is disabled", async () => {
+    const workbook = createWorkbook({ id: "sheet-properties", sheetId: "sheet" });
+    const encoded = await encodeXlsx(workbook);
+    const entries = unzipSync(encoded.bytes);
+    entries["xl/worksheets/sheet1.xml"] = strToU8(
+      strFromU8(entries["xl/worksheets/sheet1.xml"]!).replace(
+        /<worksheet\b([^>]*)>/,
+        '<worksheet$1><sheetPr codeName="Keep" filterMode="1" published="1"/>',
+      ),
+    );
+    writeXlsxPageSetups(entries, [{ ...DEFAULT_SHEET_PAGE_SETUP, fitToPage: null }]);
+    expect(strFromU8(entries["xl/worksheets/sheet1.xml"]!)).toContain(
+      '<sheetPr codeName="Keep" filterMode="1" published="1"/>',
+    );
+  });
+
+  test("roundtrips standard extended worksheet print settings", async () => {
+    const workbook = createWorkbook({
+      id: "extended-page-setup",
+      sheetId: "sheet",
+      sheetName: "Print plan",
+    });
+    const sheet = getActiveSheet(workbook);
+    sheet.pageSetup = {
+      ...DEFAULT_SHEET_PAGE_SETUP,
+      paperSize: "custom",
+      customPaperSize: { width: 210.5, height: 320.25 },
+      fitToPage: { width: 1, height: 0 },
+      firstPageNumber: 4,
+      printQuality: 300,
+      printOptions: {
+        horizontalCentered: true,
+        verticalCentered: true,
+        gridLines: true,
+        blackAndWhite: true,
+        headings: true,
+        cellComments: "atEnd",
+        errors: "dash",
+      },
+      printTitles: {
+        rows: { start: 0, end: 2 },
+        columns: { start: 0, end: 1 },
+        bottomRows: { start: 10, end: 11 },
+      },
+    };
+    const encoded = await encodeXlsx(workbook);
+    const worksheet = xlsxEntryText(encoded.bytes, "xl/worksheets/sheet1.xml");
+    expect(encoded.report.issues).toContainEqual(
+      expect.objectContaining({
+        code: "feature-omitted",
+        locations: ["sheet1.printTitles.bottomRows"],
+      }),
+    );
+    expect(worksheet).toContain('<pageSetup paperWidth="210.5mm" paperHeight="320.25mm"');
+    expect(worksheet).toContain('fitToWidth="1" fitToHeight="0"');
+    expect(worksheet).toContain('firstPageNumber="4" useFirstPageNumber="1"');
+    expect(worksheet).toContain('horizontalDpi="300" verticalDpi="300"');
+    expect(worksheet).toContain(
+      '<printOptions horizontalCentered="1" verticalCentered="1" gridLines="1" headings="1"/>',
+    );
+    expect(xlsxEntryText(encoded.bytes, "xl/workbook.xml")).toContain(
+      '<definedName name="_xlnm.Print_Titles" localSheetId="0">&apos;Print plan&apos;!$1:$3,&apos;Print plan&apos;!$A:$B</definedName>',
+    );
+    const restored = getActiveSheet((await decodeXlsx(encoded.bytes)).workbook).pageSetup!;
+    expect(restored.printTitles).toEqual({
+      rows: { start: 0, end: 2 },
+      columns: { start: 0, end: 1 },
+      bottomRows: null,
+    });
+    expect(restored).toMatchObject({
+      paperSize: "custom",
+      customPaperSize: { width: 210.5, height: 320.25 },
+      fitToPage: { width: 1, height: 0 },
+      firstPageNumber: 4,
+      printQuality: 300,
+      printOptions: sheet.pageSetup.printOptions,
+    });
+  });
+
+  test("roundtrips supported worksheet page setup and merges subtotal page breaks", async () => {
+    const workbook = createWorkbook({
+      id: "page-setup",
+      sheetId: "sheet",
+      sheetName: "Print plan",
+    });
+    const sheet = getActiveSheet(workbook);
+    sheet.pageSetup = {
+      ...DEFAULT_SHEET_PAGE_SETUP,
+      paperSize: "legal",
+      orientation: "landscape",
+      margins: { top: 12.7, bottom: 25.4, left: 19.05, right: 6.35, header: 5.08, footer: 10.16 },
+      scale: 85,
+      printArea: { start: { row: 1, column: 2 }, end: { row: 8, column: 5 } },
+      rowBreaks: [3, 6],
+      columnBreaks: [2],
+      header: {
+        left: '&"Arial"&12&B&I&U&KFF0000&D &T &F &Z &A &&',
+        center: "Page &P of &N",
+        right: "Research && Development",
+      },
+      footer: { left: "Internal", center: "Page", right: "Confidential" },
+      headerFooter: {
+        ...DEFAULT_SHEET_PAGE_SETUP.headerFooter!,
+        differentFirst: true,
+        differentOddEven: true,
+        scaleWithDocument: false,
+        alignWithMargins: false,
+        firstHeader: { left: "First &P", center: "", right: "" },
+        firstFooter: { left: "", center: "First footer", right: "" },
+        evenHeader: { left: "Even &A", center: "", right: "" },
+        evenFooter: { left: "", center: "Even footer", right: "" },
+      },
+      pageOrder: "overThenDown",
+    };
+    sheet.subtotalMetadata = [
+      {
+        id: "subtotal",
+        range: { start: { row: 0, column: 0 }, end: { row: 9, column: 0 } },
+        generatedRows: [],
+        pageBreakRows: [5],
+      },
+    ];
+
+    const encoded = await encodeXlsx(workbook);
+    const worksheet = xlsxEntryText(encoded.bytes, "xl/worksheets/sheet1.xml");
+    expect(worksheet).toContain(
+      '<pageMargins left="0.75" right="0.25" top="0.5" bottom="1" header="0.2" footer="0.4"/>',
+    );
+    expect(worksheet).toContain(
+      '<pageSetup paperSize="5" orientation="landscape" scale="85" horizontalDpi="600" verticalDpi="600" pageOrder="overThenDown"/>',
+    );
+    expect(worksheet).toContain(
+      '<headerFooter differentFirst="1" differentOddEven="1" scaleWithDoc="0" alignWithMargins="0"><oddHeader>&amp;L&amp;&quot;Arial&quot;&amp;12&amp;B&amp;I&amp;U&amp;KFF0000&amp;D &amp;T &amp;F &amp;Z &amp;A &amp;&amp;&amp;CPage &amp;P of &amp;N&amp;RResearch &amp;&amp; Development</oddHeader>',
+    );
+    expect(worksheet).toContain("<evenHeader>&amp;LEven &amp;A&amp;C&amp;R</evenHeader>");
+    expect(worksheet).toContain("<firstFooter>&amp;L&amp;CFirst footer&amp;R</firstFooter>");
+    expect(worksheet).toContain('<brk id="3" max="16383" man="1"/>');
+    expect(worksheet).toContain('<brk id="5" max="16383" man="1"/>');
+    expect(worksheet).toContain('<brk id="6" max="16383" man="1"/>');
+    expect(worksheet).toContain('<brk id="2" min="0" max="1048575" man="1"/>');
+    expect(xlsxEntryText(encoded.bytes, "xl/workbook.xml")).toContain(
+      '<definedName name="_xlnm.Print_Area" localSheetId="0">&apos;Print plan&apos;!$C$2:$F$9</definedName>',
+    );
+
+    const restored = getActiveSheet((await decodeXlsx(encoded.bytes)).workbook);
+    expect(restored.pageSetup).toEqual({
+      ...sheet.pageSetup,
+      rowBreaks: [3, 5, 6],
+    });
+
+    const entries = unzipSync(encoded.bytes);
+    const worksheetXml = strFromU8(entries["xl/worksheets/sheet1.xml"]!);
+    entries["xl/worksheets/sheet1.xml"] = strToU8(
+      worksheetXml.replace("</rowBreaks>", '<brk id="4" max="16383" man="0"/></rowBreaks>'),
+    );
+    expect(
+      getActiveSheet((await decodeXlsx(zipSync(entries))).workbook).pageSetup?.rowBreaks,
+    ).toEqual([3, 5, 6]);
+
+    const imageEntries = unzipSync(encoded.bytes);
+    imageEntries["xl/worksheets/sheet1.xml"] = strToU8(
+      strFromU8(imageEntries["xl/worksheets/sheet1.xml"]!)
+        .replace("<oddHeader>", "<oddHeader>&amp;G")
+        .replace("</worksheet>", '<legacyDrawingHF r:id="rId1"/></worksheet>'),
+    );
+    expect((await decodeXlsx(zipSync(imageEntries))).report.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "feature-omitted",
+          locations: expect.arrayContaining(["Print plan.headerFooter.image"]),
+        }),
+      ]),
+    );
   });
 
   test("retains whole-axis and dynamic-array formula sources without materializing spills", async () => {

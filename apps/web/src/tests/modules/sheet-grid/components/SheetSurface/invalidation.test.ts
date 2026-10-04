@@ -55,8 +55,8 @@ function installCanvasHost() {
 
 const mountedWrappers: Array<{ unmount(): void }> = [];
 
-function mountCanvasGrid() {
-  const result = mountSheetGrid();
+function mountCanvasGrid(options?: Parameters<typeof mountSheetGrid>[0]) {
+  const result = mountSheetGrid(options);
   mountedWrappers.push(result.wrapper);
   return result;
 }
@@ -68,6 +68,68 @@ afterEach(() => {
 });
 
 describe("SheetSurface invalidation", () => {
+  test("increases the backing resolution with zoom while passing screen scale to the painters", async () => {
+    vi.stubGlobal("devicePixelRatio", 2);
+    const host = installCanvasHost();
+    const paint = vi.spyOn(scenePainter, "paintSheetScene");
+    const { wrapper } = mountCanvasGrid();
+    host.flush();
+    await wrapper.vm.$nextTick();
+    host.flush();
+    for (const zoom of [125, 200, 400]) {
+      await wrapper.setProps({ zoom });
+      host.flush();
+      const surface = wrapper.findComponent({ name: "SheetSurface" });
+      const { frame, environment } = surface.props();
+      const canvas = wrapper.get<HTMLCanvasElement>("[data-sheet-canvas]").element;
+      expect(environment.density).toBe(2);
+      expect(canvas.width).toBe(Math.ceil((frame.size.width * 2 * zoom) / 100));
+      expect(canvas.height).toBe(Math.ceil((frame.size.height * 2 * zoom) / 100));
+      expect(paint.mock.calls.at(-1)?.[3].screenScale).toBe(zoom / 100);
+    }
+  });
+
+  test("refreshes the canvas palette when an ancestor display mode changes", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const getStyle = vi.fn(() => {
+      const eyeComfort = host.classList.contains("is-eye-comfort");
+      return {
+        fontFamily: "Arial",
+        getPropertyValue(name: string) {
+          if (name === "--idea-surface-panel") return eyeComfort ? "#f3f0dd" : "#ffffff";
+          if (name === "--idea-surface-secondary") return eyeComfort ? "#e8e5cc" : "#f5f6f7";
+          if (name === "--idea-border-subtle") return eyeComfort ? "#d8d3ad" : "#e5e7eb";
+          return "";
+        },
+      } as CSSStyleDeclaration;
+    });
+    vi.stubGlobal("getComputedStyle", getStyle);
+    const canvas = installCanvasHost();
+    const paint = vi.spyOn(scenePainter, "paintSheetScene");
+    const { wrapper } = mountCanvasGrid({ attachTo: host });
+    canvas.flush();
+    await wrapper.vm.$nextTick();
+    canvas.flush();
+    paint.mockClear();
+
+    host.classList.add("has-unrelated-layout-state");
+    await Promise.resolve();
+    await wrapper.vm.$nextTick();
+    canvas.flush();
+    expect(paint).not.toHaveBeenCalled();
+
+    host.classList.add("is-eye-comfort");
+    await Promise.resolve();
+    await wrapper.vm.$nextTick();
+    canvas.flush();
+
+    expect(getStyle).toHaveBeenCalled();
+    expect(paint).toHaveBeenCalledOnce();
+    expect(paint.mock.calls[0]?.[3].palette.background).toBe("#f3f0dd");
+    host.remove();
+  });
+
   test("repaints one canvas with cached content and borders when the selection changes", async () => {
     const host = installCanvasHost();
     const createScene = vi.spyOn(cellScene, "createSheetCanvasScene");

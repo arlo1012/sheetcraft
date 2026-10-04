@@ -120,6 +120,12 @@ export function readDefinedNames(
   )) {
     const attrs = attributes(match[1] ?? "");
     const name = attrs.name;
+    // Print area is sheet page-setup state, not a user-defined name. It has a
+    // dedicated OOXML reader so a continuous range survives XLSX roundtrips.
+    if (name?.toLowerCase() === "_xlnm.print_area") {
+      index += 1;
+      continue;
+    }
     const localSheetId = attrs.localSheetId === undefined ? undefined : Number(attrs.localSheetId);
     const reference = parseReference(decodeXmlEntities(match[2] ?? "").trim(), sheets);
     const scopeSheet = localSheetId === undefined ? undefined : sheets[localSheetId];

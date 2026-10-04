@@ -68,6 +68,46 @@ describe("workbook snapshots", () => {
     expect(() => clone(snapshot)).not.toThrow();
   });
 
+  test("writes tables, page setup, and custom cell styles together in V16", () => {
+    const workbook = createWorkbook({ id: "workbook", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    const tableStyle = createBuiltinTableStyles()[0]!;
+    sheet.tables = [
+      {
+        id: "table-1",
+        name: "Sales",
+        range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+        columns: [{ id: "amount", name: "Amount" }],
+        style: tableStyle,
+        headerRow: true,
+        totalRow: false,
+        firstColumn: false,
+        lastColumn: false,
+        bandedRows: true,
+        bandedColumns: false,
+        filterButton: true,
+        filter: null,
+      },
+    ];
+    sheet.pageSetup = { ...sheet.pageSetup!, orientation: "landscape" };
+    workbook.cellStyles = [
+      {
+        id: "custom-emphasis",
+        name: "Custom Emphasis",
+        category: "custom",
+        style: { bold: true, fillColor: "#d9eaf7" },
+      },
+    ];
+
+    const snapshot = serializeWorkbook(workbook);
+    const restored = deserializeWorkbook(snapshot);
+
+    expect(snapshot.version).toBe(16);
+    expect(restored.sheets.get(sheet.id)?.tables).toEqual(sheet.tables);
+    expect(restored.sheets.get(sheet.id)?.pageSetup?.orientation).toBe("landscape");
+    expect(restored.cellStyles).toEqual(workbook.cellStyles);
+  });
+
   test("rejects malformed workbook table-style libraries", () => {
     const snapshot = serializeWorkbook(createWorkbook({ id: "workbook", sheetId: "sheet" }));
     const invalid = {
@@ -451,7 +491,7 @@ describe("workbook snapshots", () => {
       { kind: "formula", formula: { source: "=SUM(" } },
     );
     const snapshot = serializeWorkbook(migrated);
-    expect(snapshot.version).toBe(15);
+    expect(snapshot.version).toBe(16);
     expect(snapshot.dateSystem).toBe("1900");
     expect(snapshot.sheets[0]?.cells).toContainEqual({
       address: { row: 0, column: 1 },
@@ -564,9 +604,9 @@ describe("workbook snapshots", () => {
   });
 
   test("rejects unknown snapshot versions with a stable error code", () => {
-    expect(() => deserializeWorkbook({ version: 16 })).toThrowError(
+    expect(() => deserializeWorkbook({ version: 17 })).toThrowError(
       expect.objectContaining<Partial<WorkbookDomainError>>({
-        data: { code: "unsupported_snapshot_version", details: { version: 16 } },
+        data: { code: "unsupported_snapshot_version", details: { version: 17 } },
       }),
     );
   });

@@ -5,6 +5,7 @@ import type { SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geome
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import type { FrozenPaneId } from "@idea10/sheet-engine/frozen-layout";
 import type { RowVisibilityIndex } from "@idea10/sheet-engine/visibility";
+import { createCanvasPixelGrid } from "../../../shared/canvas/pixel-grid";
 import { getBorderLinePresentation } from "../../../shared/borders/borderPresentation";
 import {
   resolveBorderJunctions,
@@ -30,6 +31,7 @@ type BorderLinePart = {
 };
 
 type BorderLinePaintInstruction = {
+  orientation: "horizontal" | "vertical" | "diagonal";
   thickness: number;
   color: string;
   strokeWidth: number;
@@ -63,6 +65,7 @@ function getDashArray(dashArray: string | undefined): number[] {
 function createOrthogonalLineInstruction(segment: SheetBorderSegment): BorderLinePaintInstruction {
   const presentation = getBorderLinePresentation(segment.style);
   return {
+    orientation: segment.orientation,
     thickness: segment.thickness,
     color: segment.color,
     strokeWidth: presentation.strokeWidth,
@@ -97,6 +100,7 @@ function createDiagonalLineInstruction(
   const normalX = -(y2 - y1) / segment.length;
   const normalY = (x2 - x1) / segment.length;
   return {
+    orientation: "diagonal",
     thickness: segment.thickness,
     color: segment.color,
     strokeWidth: presentation.strokeWidth,
@@ -178,22 +182,47 @@ export function createBorderPaintPlan(
 function paintLineInstruction(
   context: CanvasRenderingContext2D,
   instruction: BorderLinePaintInstruction,
+  pixelGrid: ReturnType<typeof createCanvasPixelGrid>,
 ): void {
   context.strokeStyle = instruction.color;
-  context.lineWidth = instruction.strokeWidth;
+  const strokeWidth = pixelGrid.strokeWidth(instruction.strokeWidth);
+  context.lineWidth = strokeWidth;
   context.lineCap = instruction.lineCap;
   context.setLineDash(instruction.dashArray);
   for (const part of instruction.parts) {
     context.beginPath();
-    context.moveTo(part.x1, part.y1);
-    context.lineTo(part.x2, part.y2);
+    if (instruction.orientation === "horizontal") {
+      const y = pixelGrid.strokeY(part.y1, strokeWidth);
+      context.moveTo(pixelGrid.snapX(part.x1), y);
+      context.lineTo(pixelGrid.snapX(part.x2), y);
+    } else if (instruction.orientation === "vertical") {
+      const x = pixelGrid.strokeX(part.x1, strokeWidth);
+      context.moveTo(x, pixelGrid.snapY(part.y1));
+      context.lineTo(x, pixelGrid.snapY(part.y2));
+    } else {
+      // Diagonals retain their natural anti-aliasing; snapping their endpoints
+      // independently would bend the intended angle at fractional zoom levels.
+      context.moveTo(part.x1, part.y1);
+      context.lineTo(part.x2, part.y2);
+    }
     context.stroke();
   }
 }
 
-function paintJunction(context: CanvasRenderingContext2D, junction: SheetBorderJunction): void {
+function paintJunction(
+  context: CanvasRenderingContext2D,
+  junction: SheetBorderJunction,
+  pixelGrid: ReturnType<typeof createCanvasPixelGrid>,
+): void {
   context.fillStyle = junction.color;
-  context.fillRect(junction.x, junction.y, 1, 1);
+  const left = pixelGrid.snapX(junction.x);
+  const top = pixelGrid.snapY(junction.y);
+  context.fillRect(
+    left,
+    top,
+    pixelGrid.snapX(junction.x + 1) - left,
+    pixelGrid.snapY(junction.y + 1) - top,
+  );
 }
 
 export function paintSheetBorders(
@@ -206,20 +235,17 @@ export function paintSheetBorders(
     const currentScrollPosition = getPaneScrollPosition(layout, pane.id);
     context.save();
     context.beginPath();
-    context.rect(
-      currentPane.clip.x,
-      currentPane.clip.y,
-      currentPane.clip.width,
-      currentPane.clip.height,
-    );
+    const clip = createCanvasPixelGrid(context).snapRect(currentPane.clip);
+    context.rect(clip.x, clip.y, clip.width, clip.height);
     context.clip();
     context.translate(
       pane.scrollPosition.x - currentScrollPosition.x,
       pane.scrollPosition.y - currentScrollPosition.y,
     );
+    const pixelGrid = createCanvasPixelGrid(context);
 
-    for (const line of pane.lines) paintLineInstruction(context, line);
-    for (const junction of pane.junctions) paintJunction(context, junction);
+    for (const line of pane.lines) paintLineInstruction(context, line, pixelGrid);
+    for (const junction of pane.junctions) paintJunction(context, junction, pixelGrid);
     context.restore();
   }
 }

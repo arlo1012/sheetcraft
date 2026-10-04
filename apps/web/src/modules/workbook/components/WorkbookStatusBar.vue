@@ -18,6 +18,7 @@ const props = withDefaults(
     editSessionId?: string;
     selectionSummary: SelectionSummary;
     zoom?: number;
+    viewMode?: "normal" | "page-break-preview" | "page-layout";
     showHeaders?: boolean;
     showGridLines?: boolean;
     showAxisQuickTools?: boolean;
@@ -29,6 +30,7 @@ const props = withDefaults(
   }>(),
   {
     zoom: 100,
+    viewMode: "normal",
     showHeaders: true,
     showGridLines: true,
     showAxisQuickTools: false,
@@ -50,6 +52,7 @@ const emit = defineEmits<{
   updateProperties: [payload: { sheetId: string; patch: Partial<SheetProperties> }];
   restore: [sheetId: string];
   "update:zoom": [value: number];
+  "update:viewMode": [value: "normal" | "page-break-preview" | "page-layout"];
   "update:showHeaders": [value: boolean];
   "update:showGridLines": [value: boolean];
   "update:showAxisQuickTools": [value: boolean];
@@ -204,6 +207,7 @@ function formatNumber(value: number): string {
         <WorkbookViewControls
           class="workbook-status-bar__view-controls"
           :zoom="zoom"
+          :view-mode="viewMode"
           :show-headers="showHeaders"
           :show-grid-lines="showGridLines"
           :show-axis-quick-tools="showAxisQuickTools"
@@ -217,6 +221,7 @@ function formatNumber(value: number): string {
           :fullscreen="fullscreen"
           :fullscreen-available="fullscreenAvailable"
           @update:zoom="emit('update:zoom', $event)"
+          @update:view-mode="emit('update:viewMode', $event)"
           @fit-selection="emit('fitSelection')"
           @update:highlight-enabled="emit('update:highlightEnabled', $event)"
           @update:highlight-color="emit('update:highlightColor', $event)"

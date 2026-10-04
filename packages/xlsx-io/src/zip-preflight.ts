@@ -119,27 +119,6 @@ function xmlAttributeValues(xml: string, localName: string): string[] {
   return [...xml.matchAll(expression)].map((match) => decodeXmlEntities(match[2] ?? ""));
 }
 
-function hasCustomizedPageSetup(xml: string): boolean {
-  const defaultAttributes: Record<string, string> = {
-    orientation: "portrait",
-    horizontaldpi: "4294967295",
-    verticaldpi: "4294967295",
-    scale: "100",
-    fittowidth: "1",
-    fittoheight: "1",
-  };
-  const pageSetupElements = xml.matchAll(/<\s*(?:[a-z_][\w.-]*:)?pageSetup\b([^>]*)>/gi);
-  for (const element of pageSetupElements) {
-    const attributes = element[1] ?? "";
-    const attributeExpression = /([a-z_][\w.:-]*)\s*=\s*(["'])([\s\S]*?)\2/gi;
-    for (const attribute of attributes.matchAll(attributeExpression)) {
-      const localName = (attribute[1] ?? "").split(":").at(-1)?.toLowerCase() ?? "";
-      if (defaultAttributes[localName] !== decodeXmlEntities(attribute[3] ?? "")) return true;
-    }
-  }
-  return false;
-}
-
 function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBuilder): void {
   const normalized = decodeXmlEntities(xml);
   const externalRelationship = /<Relationship\b([^>]*)\/?\s*>/gi;
@@ -168,16 +147,8 @@ function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBu
   )
     report.add("feature-omitted", "warning", name);
   if (
-    (worksheetPart &&
-      [
-        "sheetProtection",
-        "protectedRanges",
-        "rowBreaks",
-        "colBreaks",
-        "headerFooter",
-        "printOptions",
-      ].some((feature) => hasXmlElement(xml, feature))) ||
-    hasCustomizedPageSetup(xml)
+    worksheetPart &&
+    ["sheetProtection", "protectedRanges"].some((feature) => hasXmlElement(xml, feature))
   )
     report.add("feature-omitted", "warning", name);
 }

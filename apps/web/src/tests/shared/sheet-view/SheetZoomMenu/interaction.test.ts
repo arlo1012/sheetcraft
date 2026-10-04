@@ -1,11 +1,11 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import WorkbookZoomMenu from "../../../../../modules/workbook/components/WorkbookZoomMenu.vue";
-import { createAppI18n } from "../../../../../shared/i18n";
+import SheetZoomMenu from "../../../../shared/sheet-view/SheetZoomMenu.vue";
+import { createAppI18n } from "../../../../shared/i18n";
 
 const wrappers: ReturnType<typeof mount>[] = [];
 function mountMenu(zoom = 75) {
-  const wrapper = mount(WorkbookZoomMenu, {
+  const wrapper = mount(SheetZoomMenu, {
     attachTo: document.body,
     global: { plugins: [createAppI18n("en-US")] },
     props: { zoom },
@@ -18,7 +18,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-describe("WorkbookZoomMenu", () => {
+describe("SheetZoomMenu", () => {
   test("opens a compact radio menu and selects all explicit presets", async () => {
     const wrapper = mountMenu();
     await wrapper.get('[data-view-control="zoom-menu"]').trigger("click");

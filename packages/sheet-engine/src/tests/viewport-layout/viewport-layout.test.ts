@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { createSheetGeometry } from "../../geometry.js";
 import { createSheetViewportLayout } from "../../viewport-layout.js";
-import { createRowVisibilityIndex } from "../../visibility.js";
+import { createRowVisibilityIndex, type RowVisibilityIndex } from "../../visibility.js";
 
 function createLayout(options?: {
   rowCount?: number;
@@ -65,6 +65,66 @@ describe("sheet viewport layout", () => {
       height: 20,
     });
     expect(layout.getCellAtViewportPoint({ x: 319, y: 119 })).toEqual({ row: 5, column: 3 });
+  });
+
+  test("does not freeze a projected row origin when no rows are frozen", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 6,
+      columnCount: 4,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const source = createRowVisibilityIndex({ rowCount: 6, defaultRowHeight: 20 });
+    const leadingSpace = 24;
+    const rows: RowVisibilityIndex = {
+      ...source,
+      getVisibleRow(row) {
+        const visible = source.getVisibleRow(row);
+        return visible ? { ...visible, offset: visible.offset + leadingSpace } : null;
+      },
+      getRowOffset(row) {
+        const offset = source.getRowOffset(row);
+        return offset === null ? null : offset + leadingSpace;
+      },
+      getVisibleOffset(index) {
+        const offset = source.getVisibleOffset(index);
+        return offset === null ? null : offset + leadingSpace;
+      },
+      getBoundaryOffset(row) {
+        const offset = source.getBoundaryOffset(row);
+        return offset === null ? null : offset + leadingSpace;
+      },
+      getLogicalRowAtOffset(offset) {
+        return source.getLogicalRowAtOffset(offset - leadingSpace);
+      },
+      getVisibleRowsInViewport(offset, height, overscan) {
+        return source
+          .getVisibleRowsInViewport(offset - leadingSpace, height, overscan)
+          .map((row) => ({ ...row, offset: row.offset + leadingSpace }));
+      },
+      getTotalHeight: () => source.getTotalHeight() + leadingSpace,
+    };
+    const layout = createSheetViewportLayout({
+      geometry,
+      rows,
+      freeze: { rows: 0, columns: 0 },
+      bodyScrollPosition: { x: 0, y: 20 },
+      viewportSize: { width: 160, height: 100 },
+    });
+    const atEnd = createSheetViewportLayout({
+      geometry,
+      rows,
+      freeze: { rows: 0, columns: 0 },
+      bodyScrollPosition: { x: 0, y: 999 },
+      viewportSize: { width: 160, height: 100 },
+    });
+
+    expect(layout.frozenSize).toEqual({ width: 0, height: 0 });
+    expect(layout.panes.body.clip).toEqual({ x: 0, y: 0, width: 160, height: 100 });
+    expect(layout.getCellViewportRect({ row: 0, column: 0 })).toMatchObject({ y: 4 });
+    expect(layout.getCellAtViewportPoint({ x: 1, y: 4 })).toEqual({ row: 0, column: 0 });
+    expect(atEnd.bodyScrollPosition.y).toBe(44);
+    expect(atEnd.getCellViewportRect({ row: 5, column: 0 })).toMatchObject({ y: 80 });
   });
 
   test("maps discontinuous rows through frozen panes and body-relative scrolling", () => {
