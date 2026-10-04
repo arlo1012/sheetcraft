@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createWorkbook, getActiveSheet } from "@idea10/core/workbook";
 import { DEFAULT_SHEET_WATERMARK } from "@idea10/core/page-decoration";
+import { createSetSheetPageDecorationCommand } from "@idea10/core/commands";
+import {
+  createWorkbookSession,
+  executeWorkbookCommand,
+  undoWorkbookCommand,
+} from "@idea10/core/history";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { prepareImageAsset } from "../../../modules/image-assets/prepareImageAsset";
@@ -14,7 +20,64 @@ const file = new File(["PNG"], "background.png", { type: "image/png" });
 const asset = { id: "asset-background", mimeType: "image/png", width: 8, height: 8, blob: file };
 
 describe("page decoration image actions", () => {
-  beforeEach(() => vi.mocked(prepareImageAsset).mockReset());
+  beforeEach(() => {
+    vi.mocked(prepareImageAsset).mockReset();
+  });
+
+  test.each(["independent", "remove"] as const)(
+    "resolves background conflict with %s atomically and restores it on undo",
+    async (resolution) => {
+      vi.mocked(prepareImageAsset).mockResolvedValue(asset);
+      const session = createWorkbookSession({ idFactory: createSequentialIdFactory() });
+      const sheet = getActiveSheet(session.workbook);
+      const watermark = { ...DEFAULT_SHEET_WATERMARK, text: "Confidential" };
+      sheet.pageDecoration = { watermark };
+      const actions = usePageDecorationActions({
+        assetStore: createMemoryImageAssetStore(),
+        getWorkbook: () => session.workbook,
+        getSheet: () => sheet,
+        flushPendingEdits: () => true,
+        setDecoration: (id, decoration) => {
+          executeWorkbookCommand(session, createSetSheetPageDecorationCommand(id, decoration));
+        },
+        setWatermarks: vi.fn(),
+        setPresets: vi.fn(),
+      });
+      await actions.setBackgroundFile(file);
+      expect(prepareImageAsset).not.toHaveBeenCalled();
+      expect(sheet.pageDecoration).toEqual({ watermark });
+      await actions.setBackgroundFile(file, resolution);
+      expect(sheet.pageDecoration).toEqual({
+        backgroundAssetId: asset.id,
+        ...(resolution === "independent"
+          ? { watermark: { ...watermark, mode: "independent" } }
+          : {}),
+      });
+      expect(undoWorkbookCommand(session)).toBe(true);
+      expect(sheet.pageDecoration).toEqual({ watermark });
+      expect(session.history.undoStack).toHaveLength(0);
+    },
+  );
+
+  test("failed background decoding never deletes an existing watermark", async () => {
+    vi.mocked(prepareImageAsset).mockRejectedValue(new Error("decode failed"));
+    const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
+    const sheet = getActiveSheet(workbook);
+    sheet.pageDecoration = { watermark: { ...DEFAULT_SHEET_WATERMARK, text: "Confidential" } };
+    const setDecoration = vi.fn();
+    const actions = usePageDecorationActions({
+      assetStore: createMemoryImageAssetStore(),
+      getWorkbook: () => workbook,
+      getSheet: () => sheet,
+      flushPendingEdits: () => true,
+      setDecoration,
+      setWatermarks: vi.fn(),
+      setPresets: vi.fn(),
+    });
+    await actions.setBackgroundFile(file, "remove");
+    expect(setDecoration).not.toHaveBeenCalled();
+    expect(actions.feedback.value).toBe("failed");
+  });
 
   test("does not apply a background to a replacement workbook after image decoding", async () => {
     let resolve!: (value: typeof asset) => void;

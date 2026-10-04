@@ -23,7 +23,14 @@ describe("sheet page decorations", () => {
     const sheet = getActiveSheet(session.workbook);
     const decoration = {
       backgroundAssetId: "asset-background",
-      watermark: { text: "Internal", fontSize: 52, color: "#336699", opacity: 0.3, angle: -45 },
+      watermark: {
+        mode: "independent" as const,
+        text: "Internal",
+        fontSize: 52,
+        color: "#336699",
+        opacity: 0.3,
+        angle: -45,
+      },
     };
     expect(
       executeWorkbookCommand(session, createSetSheetPageDecorationCommand(sheet.id, decoration)),

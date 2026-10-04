@@ -4,6 +4,16 @@ export const pageDecorationEnUS = {
     backgroundImage: "Background",
     chooseBackground: "Choose background image",
     removeBackground: "Remove background",
+    backgroundWatermarkConflictTitle: "Cannot set background directly",
+    backgroundWatermarkConflictPrompt:
+      "This worksheet already has a watermark. Choose how to resolve the conflict:",
+    switchWatermarkMode: "Switch watermark mode and insert",
+    switchWatermarkModeDescription:
+      "Switch the watermark to independent display, keep it, and insert the background image.",
+    removeWatermarkAndInsert: "Remove watermark and insert",
+    removeWatermarkAndInsertDescription:
+      "Remove the watermark from the current worksheet, then insert the background image.",
+    continue: "Continue",
     watermark: "Watermark",
     imageWatermark: "Picture watermark",
     textWatermark: "Text watermark",

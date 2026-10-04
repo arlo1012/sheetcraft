@@ -50,9 +50,14 @@ export function usePageDecorationActions(options: {
     options.setDecoration(sheet.id, decoration);
   }
 
-  async function setBackgroundFile(file: File): Promise<void> {
+  async function setBackgroundFile(
+    file: File,
+    resolution?: "independent" | "remove",
+  ): Promise<void> {
     const sheet = options.getSheet();
     if (busy.value || sheet.properties.protected || !options.flushPendingEdits()) return;
+    if (current.value.watermark && current.value.watermark.mode !== "independent" && !resolution)
+      return;
     const workbook = options.getWorkbook();
     const generation = options.getGeneration?.();
     busy.value = true;
@@ -62,7 +67,17 @@ export function usePageDecorationActions(options: {
       if (!isCurrent(workbook, sheet.id, generation)) return;
       await options.assetStore.put(asset);
       if (!isCurrent(workbook, sheet.id, generation)) return;
-      options.setDecoration(sheet.id, { ...current.value, backgroundAssetId: asset.id });
+      const { watermark, ...decoration } = current.value;
+      options.setDecoration(sheet.id, {
+        ...decoration,
+        backgroundAssetId: asset.id,
+        ...(watermark && resolution !== "remove"
+          ? {
+              watermark:
+                resolution === "independent" ? { ...watermark, mode: "independent" } : watermark,
+            }
+          : {}),
+      });
     } catch (error) {
       feedback.value = error instanceof ImageAssetError ? "invalidImage" : "failed";
     } finally {

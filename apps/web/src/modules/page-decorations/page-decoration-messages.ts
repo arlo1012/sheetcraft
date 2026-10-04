@@ -5,6 +5,13 @@ export type PageDecorationMessageSchema = {
     backgroundImage: string;
     chooseBackground: string;
     removeBackground: string;
+    backgroundWatermarkConflictTitle: string;
+    backgroundWatermarkConflictPrompt: string;
+    switchWatermarkMode: string;
+    switchWatermarkModeDescription: string;
+    removeWatermarkAndInsert: string;
+    removeWatermarkAndInsertDescription: string;
+    continue: string;
     watermark: string;
     imageWatermark: string;
     textWatermark: string;

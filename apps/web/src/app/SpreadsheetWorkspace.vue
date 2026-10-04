@@ -407,6 +407,7 @@ const showPageBreaks = computed({
 });
 const printPreviewVisible = ref(false);
 const watermarkVisible = ref(false);
+const backgroundConflictVisible = ref(false);
 const editingWatermarkPreset = shallowRef<WatermarkPreset>();
 const watermarkDialogValue = shallowRef<SheetWatermark>();
 const showPageRulers = ref(true);
@@ -1631,6 +1632,7 @@ function setShowFormulaBar(visible: boolean): void {
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (
+    backgroundConflictVisible.value ||
     printPreviewVisible.value ||
     watermarkVisible.value ||
     (pageSetupVisible.value && !pickingPageSetupRange.value) ||
@@ -1872,6 +1874,11 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
               @apply="pageThemeController.apply"
             />
             <PageBackgroundMenu
+              :background-conflict="
+                !!pageDecoration.watermark && pageDecoration.watermark.mode !== 'independent'
+              "
+              :context-key="`${workbookGeneration}:${activeSheet.id}`"
+              @update:conflict-visible="backgroundConflictVisible = $event"
               :has-background="!!pageDecoration.backgroundAssetId"
               :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
               :busy="decorationBusy"
@@ -2690,6 +2697,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         formulaEditorVisible ||
         formulaInsertVisible ||
         printPreviewVisible ||
+        backgroundConflictVisible ||
         watermarkVisible ||
         (pageSetupVisible && !pickingPageSetupRange) ||
         !!modalValidationFeedback

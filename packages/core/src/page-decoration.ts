@@ -1,5 +1,7 @@
 /** Screen and print decorations owned by an individual worksheet. */
 export type SheetWatermark = {
+  /** Independent watermarks can coexist with a worksheet background image. */
+  mode?: "independent";
   text: string;
   /** Point-like visual size in canvas pixels at 100% scale. */
   fontSize: number;
@@ -65,6 +67,8 @@ export function normalizeSheetPageDecoration(value: unknown): SheetPageDecoratio
     throw new TypeError("Background asset ID must be a non-empty string.");
   if (!decoration.watermark) return backgroundAssetId ? { backgroundAssetId } : {};
   const watermark = decoration.watermark;
+  if (watermark.mode !== undefined && watermark.mode !== "independent")
+    throw new TypeError("Watermark mode is invalid.");
   const text = typeof watermark.text === "string" ? watermark.text.trim() : "";
   if (text.length > 256) throw new TypeError("Watermark text is too long.");
   if (!finiteInRange(watermark.fontSize, 8, 288))
@@ -95,6 +99,7 @@ export function normalizeSheetPageDecoration(value: unknown): SheetPageDecoratio
   return {
     ...(backgroundAssetId ? { backgroundAssetId } : {}),
     watermark: {
+      ...(watermark.mode ? { mode: watermark.mode } : {}),
       text,
       fontSize: watermark.fontSize,
       ...(fontFamily ? { fontFamily } : {}),
