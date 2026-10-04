@@ -205,7 +205,7 @@ function setQuality(value: SelectValue): void {
             :model-value="setup.customPaperSize?.width"
             :aria-label="t('pageLayout.paperWidth')"
             theme="column"
-            class="idea-input-number--persistent-controls"
+            class="idea-input-number--persistent-controls page-setup-page__paper-dimension"
             :min="1"
             :max="5000"
             :decimal-places="2"
@@ -218,7 +218,7 @@ function setQuality(value: SelectValue): void {
             :model-value="setup.customPaperSize?.height"
             :aria-label="t('pageLayout.paperHeight')"
             theme="column"
-            class="idea-input-number--persistent-controls"
+            class="idea-input-number--persistent-controls page-setup-page__paper-dimension"
             :min="1"
             :max="5000"
             :decimal-places="2"
@@ -309,6 +309,10 @@ function setQuality(value: SelectValue): void {
   &__fit-dimensions {
     display: grid;
     gap: var(--idea-space-2);
+  }
+  &__paper-dimension {
+    width: 160px;
+    max-width: 100%;
   }
 }
 </style>
