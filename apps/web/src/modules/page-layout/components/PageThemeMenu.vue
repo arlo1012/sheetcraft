@@ -8,6 +8,7 @@ import type {
 } from "@idea10/core/workbook-theme";
 import { useAppI18n } from "../../../shared/i18n";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
+import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
@@ -300,6 +301,7 @@ watch(
         :id="submenuId"
         ref="submenuSurfaceRef"
         class="page-theme-menu__submenu"
+        :class="{ 'page-theme-menu__submenu--colors': activeCategory === 'colors' }"
         :style="submenuStyles"
         :label="
           activeCategory === 'theme'
@@ -341,49 +343,64 @@ watch(
             </button>
           </div>
         </li>
-        <li v-else-if="activeCategory === 'colors'" class="page-theme-menu__content" role="none">
-          <section class="page-theme-menu__list-panel">
-            <div class="page-theme-menu__list-heading">{{ t("pageTools.themeColors") }}</div>
-            <button
-              v-for="preset in [...PAGE_THEME_COLOR_PRESETS, ...customColors]"
-              :key="preset.id"
-              data-theme-choice
-              type="button"
-              class="page-theme-menu__color-row"
-              :class="{ 'is-selected': preset.name === defaultColors.name }"
-              :aria-pressed="preset.name === defaultColors.name"
-              @click="applyColors(preset)"
-            >
-              <span class="page-theme-menu__color-swatches"
-                ><i :style="{ backgroundColor: preset.dark1 }" /><i
-                  :style="{ backgroundColor: preset.light1 }" /><i
-                  v-for="(color, colorIndex) in preset.accentColors"
-                  :key="colorIndex"
-                  :style="{ backgroundColor: color }" /></span
-              ><span>{{ preset.name }}</span>
-            </button>
-            <div class="page-theme-menu__recommendation">
-              <span>{{ t("pageTools.themeColorRecommendation") }}</span
-              ><button type="button" @click="refreshRecommendations">
-                {{ t("pageTools.themeRefreshRecommendations") }}
+        <li
+          v-else-if="activeCategory === 'colors'"
+          class="page-theme-menu__content page-theme-menu__colors-panel"
+          role="none"
+        >
+          <GallerySection :title="t('pageTools.themeColors')" scrollable>
+            <div class="page-theme-menu__color-list">
+              <button
+                v-for="preset in [...PAGE_THEME_COLOR_PRESETS, ...customColors]"
+                :key="preset.id"
+                data-theme-choice
+                type="button"
+                class="page-theme-menu__color-row"
+                :class="{ 'is-selected': preset.name === defaultColors.name }"
+                :aria-pressed="preset.name === defaultColors.name"
+                @click="applyColors(preset)"
+              >
+                <span class="page-theme-menu__color-swatches"
+                  ><i :style="{ backgroundColor: preset.dark1 }" /><i
+                    :style="{ backgroundColor: preset.light1 }" /><i
+                    v-for="(color, colorIndex) in preset.accentColors"
+                    :key="colorIndex"
+                    :style="{ backgroundColor: color }" /></span
+                ><span>{{ preset.name }}</span>
               </button>
             </div>
+          </GallerySection>
+          <GallerySection :title="t('pageTools.themeColorRecommendation')" scrollable>
+            <template #actions>
+              <button
+                class="page-theme-menu__refresh"
+                type="button"
+                @click="refreshRecommendations"
+              >
+                {{ t("pageTools.themeRefreshRecommendations") }}
+              </button>
+            </template>
+            <div class="page-theme-menu__color-list">
+              <button
+                v-for="preset in recommendedColors"
+                :key="`recommended-${preset.id}`"
+                data-theme-choice
+                type="button"
+                class="page-theme-menu__color-row"
+                @click="applyColors(preset)"
+              >
+                <span class="page-theme-menu__color-swatches"
+                  ><i :style="{ backgroundColor: preset.dark1 }" /><i
+                    :style="{ backgroundColor: preset.light1 }" /><i
+                    v-for="(color, colorIndex) in preset.accentColors"
+                    :key="colorIndex"
+                    :style="{ backgroundColor: color }" /></span
+                ><span>{{ preset.name }}</span>
+              </button>
+            </div>
+          </GallerySection>
+          <div class="page-theme-menu__colors-footer">
             <button
-              v-for="preset in recommendedColors"
-              :key="`recommended-${preset.id}`"
-              data-theme-choice
-              type="button"
-              class="page-theme-menu__color-row"
-              @click="applyColors(preset)"
-            >
-              <span class="page-theme-menu__color-swatches"
-                ><i :style="{ backgroundColor: preset.dark1 }" /><i
-                  :style="{ backgroundColor: preset.light1 }" /><i
-                  v-for="(color, colorIndex) in preset.accentColors"
-                  :key="colorIndex"
-                  :style="{ backgroundColor: color }" /></span
-              ><span>{{ preset.name }}</span></button
-            ><button
               type="button"
               class="page-theme-menu__custom-action"
               @click="
@@ -393,7 +410,7 @@ watch(
             >
               {{ t("pageTools.customizeColors") }}
             </button>
-          </section>
+          </div>
         </li>
         <li v-else-if="activeCategory === 'fonts'" class="page-theme-menu__content" role="none">
           <section class="page-theme-menu__fonts-panel">
@@ -494,6 +511,27 @@ watch(
   max-height: min(700px, calc(100vh - 16px));
   padding: 8px;
 }
+.page-theme-menu__submenu--colors {
+  height: min(700px, calc(100vh - 16px));
+  padding: 0;
+  overflow: hidden;
+}
+.page-theme-menu__colors-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr) auto;
+  min-height: 0;
+}
+.page-theme-menu__colors-footer {
+  padding: var(--idea-space-1) var(--idea-tool-panel-padding);
+  border-top: 1px solid var(--idea-border-subtle);
+  background: var(--idea-surface-panel);
+
+  .page-theme-menu__custom-action {
+    position: static;
+    width: 100%;
+    margin: 0;
+  }
+}
 .page-theme-menu__content {
   list-style: none;
 }
@@ -545,25 +583,12 @@ watch(
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.page-theme-menu__list-panel,
+.page-theme-menu__color-list,
 .page-theme-menu__fonts-panel {
   display: grid;
   gap: 2px;
 }
-.page-theme-menu__list-heading,
-.page-theme-menu__recommendation {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 24px;
-  color: var(--idea-text-secondary);
-  font-size: 12px;
-}
-.page-theme-menu__recommendation {
-  margin-top: 6px;
-  border-top: 1px solid var(--idea-border-subtle);
-}
-.page-theme-menu__recommendation button,
+.page-theme-menu__refresh,
 .page-theme-menu__custom-action {
   border: 0;
   background: transparent;
