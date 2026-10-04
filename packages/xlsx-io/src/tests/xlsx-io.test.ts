@@ -147,7 +147,7 @@ describe("XLSX IO", () => {
   test("imports classic notes with their multiline text and author", async () => {
     const result = await decodeXlsx(await noteFixtureBytes());
     const sheet = [...result.workbook.sheets.values()][0]!;
-    expect(getCellNote(sheet, { row: 1, column: 1 })).toEqual({
+    expect(getCellNote(sheet, { row: 1, column: 1 })).toMatchObject({
       text: "First line\nSecond line",
       author: "Ada Lovelace",
     });
@@ -167,6 +167,7 @@ describe("XLSX IO", () => {
       {
         text: "First line\nSecond line",
         author: "Ada Lovelace",
+        box: { offsetX: 12, offsetY: 8, width: 240, height: 120 },
       },
     );
     setCellNote(sheet, { row: 3, column: 3 }, { text: "Blank cell note" });
@@ -176,11 +177,16 @@ describe("XLSX IO", () => {
     expect(comments).toContain("<author>Ada Lovelace</author>");
     expect(comments).toMatch(/<comment ref="B2" authorId="0">/);
     expect(comments).toMatch(/<comment ref="D4" authorId="1">/);
+    const vml = xlsxEntryText(encoded.bytes, "xl/drawings/vmlDrawing1.vml");
+    expect(vml).toContain("margin-left:153pt");
+    expect(vml).toContain("width:180pt");
+    expect(vml).toContain("2, 128, 1, 85, 4, 640, 6, 85");
 
     const restored = await decodeXlsx(encoded.bytes);
     expect(getCellNote(getActiveSheet(restored.workbook), { row: 1, column: 1 })).toEqual({
       text: "First line\nSecond line",
       author: "Ada Lovelace",
+      box: { offsetX: 12, offsetY: 8, width: 240, height: 120 },
     });
     expect(getCellNote(getActiveSheet(restored.workbook), { row: 3, column: 3 })).toEqual({
       text: "Blank cell note",

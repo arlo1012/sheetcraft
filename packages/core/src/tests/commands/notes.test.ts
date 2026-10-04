@@ -39,32 +39,45 @@ describe("cell notes", () => {
         createSetCellNoteCommand(session.workbook, sheet.id, address, {
           text: "Please confirm this amount.",
           author: "Mia",
+          box: { offsetX: 12, offsetY: -8, width: 260, height: 140 },
         }),
       ),
     ).toBe(true);
     expect(getCellNote(sheet, address)).toEqual({
       text: "Please confirm this amount.",
       author: "Mia",
+      box: { offsetX: 12, offsetY: -8, width: 260, height: 140 },
     });
     expect(undoWorkbookCommand(session)).toBe(true);
     expect(getCellNote(sheet, address)).toBeUndefined();
     expect(redoWorkbookCommand(session)).toBe(true);
     expect(getCellNote(sheet, address)?.author).toBe("Mia");
+    expect(getCellNote(sheet, address)?.box).toEqual({
+      offsetX: 12,
+      offsetY: -8,
+      width: 260,
+      height: 140,
+    });
   });
 
-  test("round-trips notes in V20 snapshots and copies, pastes, and clears them with cells", () => {
+  test("round-trips notes in V21 snapshots and copies, pastes, and clears them with cells", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const source = { row: 0, column: 0 };
     const target = { row: 1, column: 1 };
     setCellValue(sheet, source, "Source");
-    setCellNote(sheet, source, { text: "Review source", author: "Mia" });
+    setCellNote(sheet, source, {
+      text: "Review source",
+      author: "Mia",
+      box: { offsetX: 16, offsetY: 4, width: 240, height: 120 },
+    });
 
     const snapshot = serializeWorkbook(session.workbook);
-    expect(snapshot.version).toBe(20);
+    expect(snapshot.version).toBe(21);
     expect(deserializeWorkbook(snapshot).sheets.get(sheet.id)?.cells.get("0:0")?.note).toEqual({
       text: "Review source",
       author: "Mia",
+      box: { offsetX: 16, offsetY: 4, width: 240, height: 120 },
     });
 
     expect(
@@ -75,7 +88,11 @@ describe("cell notes", () => {
         }),
       ),
     ).toBe(true);
-    expect(getCellNote(sheet, target)).toEqual({ text: "Review source", author: "Mia" });
+    expect(getCellNote(sheet, target)).toEqual({
+      text: "Review source",
+      author: "Mia",
+      box: { offsetX: 16, offsetY: 4, width: 240, height: 120 },
+    });
 
     expect(
       executeWorkbookCommand(
@@ -127,6 +144,37 @@ describe("cell notes", () => {
     expect(getCellNote(deserializeSheet(serializeSheet(sheet)), { row: 0, column: 0 })?.text).toBe(
       "Standalone",
     );
+  });
+
+  test("loads V20 notes without geometry and infers V21 standalone geometry", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const address = { row: 0, column: 0 };
+    setCellNote(sheet, address, { text: "Old note", author: "Ada" });
+    const snapshot = { ...serializeWorkbook(session.workbook), version: 20 };
+    expect(getCellNote(getActiveSheet(deserializeWorkbook(snapshot)), address)).toEqual({
+      text: "Old note",
+      author: "Ada",
+    });
+    const box = { offsetX: -40, offsetY: 20, width: 128, height: 80 };
+    setCellNote(sheet, address, { text: "Positioned note", box });
+    expect(getCellNote(deserializeSheet(serializeSheet(sheet)), address)?.box).toEqual(box);
+  });
+
+  test("rejects invalid note geometry before recording history", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    expect(() =>
+      createSetCellNoteCommand(
+        session.workbook,
+        sheet.id,
+        { row: 0, column: 0 },
+        {
+          text: "Invalid",
+          box: { offsetX: Number.NaN, offsetY: 0, width: 80, height: 40 },
+        },
+      ),
+    ).toThrow();
   });
 
   test("carries notes through axes, sorting, and copy autofill", () => {

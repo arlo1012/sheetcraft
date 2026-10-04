@@ -64,6 +64,7 @@ import {
   getDefaultColumnWidth,
   type FloatingImage,
   type CellAddress,
+  type CellNoteBox,
   type ImageTransform,
   type CellRange,
   type Sheet,
@@ -113,6 +114,7 @@ import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 import type { ImageInsertMode } from "../../sheet-images/useSheetImageActions";
 import SheetFloatingImageLayer from "../../sheet-images/components/SheetFloatingImageLayer.vue";
 import SheetImagePreview from "../../sheet-images/components/SheetImagePreview.vue";
+import SheetCellNote from "./SheetCellNote.vue";
 import { useFloatingImageClipboard } from "../../sheet-images/useFloatingImageClipboard";
 import { areGridClipboardTextsEqual, createBrowserGridClipboardPort } from "../gridClipboardPort";
 import { readFloatingImageClipboard } from "../../sheet-images/imageClipboard";
@@ -242,6 +244,8 @@ const props = withDefaults(
     activeCellError?: CellErrorDescription;
     inputError?: { address: CellAddress; title: string; message: string };
     errorIndicatorColor?: string | null;
+    noteDraft?: { address: CellAddress; text: string; author: string; box?: CellNoteBox };
+    noteError?: string;
     /** Whether selecting a noted cell shows its classic note preview. */
     showActiveNote?: boolean;
     /** Suppresses the selected-cell note preview while a workspace interaction owns focus. */
@@ -285,6 +289,9 @@ const emit = defineEmits<{
   convertCellImageToFloating: [address: CellAddress];
   editNote: [address: CellAddress];
   deleteNote: [address: CellAddress];
+  saveNote: [payload: { text: string; author: string; restoreFocus?: boolean }];
+  cancelNote: [];
+  updateNoteBox: [payload: { address: CellAddress; box: CellNoteBox }];
   imageFeedback: [key: MessageKey];
   pasteImageFile: [file: File, mode: ImageInsertMode, address?: CellAddress];
   pasteFloatingImage: [image: FloatingImage, mode: ImageInsertMode, address?: CellAddress];
@@ -1288,7 +1295,10 @@ const activeCellRect = computed(
     },
 );
 const notePreviewAddress = computed(
-  () => hoveredNoteAddress.value ?? layout.value.getAnchorForAddress(activeCell.value),
+  () =>
+    props.noteDraft?.address ??
+    hoveredNoteAddress.value ??
+    layout.value.getAnchorForAddress(activeCell.value),
 );
 const notePreview = computed(() => {
   // Workbook maps are intentionally non-reactive; revision is the document-change signal.
@@ -1296,10 +1306,17 @@ const notePreview = computed(() => {
   return props.sheet.cells.get(`${notePreviewAddress.value.row}:${notePreviewAddress.value.column}`)
     ?.note;
 });
+const noteBox = computed<CellNoteBox>(
+  () =>
+    props.noteDraft?.box ??
+    notePreview.value?.box ?? { offsetX: 15, offsetY: -10, width: 128, height: 80 },
+);
+const noteBoxPreview = shallowRef<CellNoteBox>();
+const displayedNoteBox = computed(() => noteBoxPreview.value ?? noteBox.value);
 const notePreviewEnabled = computed(
   () =>
-    Boolean(notePreview.value) &&
-    (Boolean(hoveredNoteAddress.value) || props.showActiveNote) &&
+    (Boolean(props.noteDraft) || Boolean(notePreview.value)) &&
+    (Boolean(props.noteDraft) || Boolean(hoveredNoteAddress.value) || props.showActiveNote) &&
     !props.notePreviewDisabled &&
     !isEditing.value &&
     !selectionDragging.value &&
@@ -1329,29 +1346,138 @@ const notePreviewAnchor = computed<FloatingReference | null>(() => {
   const bottom = Math.min(rect.y + rect.height, pane.clip.y + pane.clip.height);
   if (right <= left || bottom <= top) return null;
   const bounds = root.getBoundingClientRect();
-  const x = bounds.left + (renderFrame.value.body.x + right) * scale.value;
-  const y = bounds.top + (renderFrame.value.body.y + top) * scale.value;
+  const box = displayedNoteBox.value;
+  const x = bounds.left + (renderFrame.value.body.x + right + box.offsetX) * scale.value;
+  const y = bounds.top + (renderFrame.value.body.y + top + box.offsetY) * scale.value;
   return markRaw({
     getBoundingClientRect: () => new DOMRect(x, y, 0, 0),
   });
 });
 const notePreviewOpen = computed(() => Boolean(notePreviewAnchor.value));
 const notePreviewRef = ref<HTMLElement | null>(null);
-const { floatingStyles: notePreviewStyles, placement: notePreviewPlacement } = useFloatingPanel(
+const noteEditorRef = ref<InstanceType<typeof SheetCellNote> | null>(null);
+const { floatingStyles: notePreviewStyles } = useFloatingPanel(
   notePreviewAnchor,
   notePreviewRef,
   notePreviewOpen,
-  { placement: "right-start", offset: 8 },
-);
-const notePreviewAuthor = computed(
-  () => notePreview.value?.author?.trim() || t("review.anonymous"),
+  { placement: "right-start", offset: 0, avoidCollisions: false },
 );
 const notePreviewAddressLabel = computed(() => getCellAddressLabel(notePreviewAddress.value));
+
+function editPreviewNote(): void {
+  if (!props.noteDraft && notePreview.value && !props.readOnly) {
+    emit("editNote", notePreviewAddress.value);
+  }
+}
+
+function savePreviewNote(payload: { text: string; author: string; restoreFocus?: boolean }): void {
+  emit("saveNote", payload);
+}
+
+function cancelPreviewNote(): void {
+  emit("cancelNote");
+}
+
+const noteBoxSelected = ref(false);
+function onNotePreviewPointerDown(event: PointerEvent): void {
+  event.stopPropagation();
+  if (!props.readOnly) noteBoxSelected.value = true;
+  onNoteBoxPointerDown(event);
+}
+
+function onDocumentPointerDown(event: PointerEvent): void {
+  if (notePreviewRef.value?.contains(event.target as Node)) return;
+  noteBoxSelected.value = false;
+  if (props.noteDraft) noteEditorRef.value?.dismiss();
+}
+let noteBoxGesture:
+  | {
+      pointerId: number;
+      address: CellAddress;
+      startX: number;
+      startY: number;
+      box: CellNoteBox;
+      handle?: string;
+    }
+  | undefined;
+function clearNoteBoxGesture(): void {
+  window.removeEventListener("pointermove", onNoteBoxPointerMove);
+  window.removeEventListener("pointerup", onNoteBoxPointerUp);
+  window.removeEventListener("pointercancel", cancelNoteBoxGesture);
+  noteBoxGesture = undefined;
+  noteBoxPreview.value = undefined;
+}
+function cancelNoteBoxGesture(event?: PointerEvent): void {
+  if (event && noteBoxGesture?.pointerId !== event.pointerId) return;
+  clearNoteBoxGesture();
+}
+function onNoteBoxPointerDown(event: PointerEvent): void {
+  if (props.readOnly || event.button !== 0) return;
+  if (event.target instanceof HTMLElement && event.target.closest("input, textarea, button"))
+    return;
+  const handle = event.target instanceof HTMLElement ? event.target.dataset.noteResize : undefined;
+  noteBoxGesture = {
+    pointerId: event.pointerId,
+    address: { ...notePreviewAddress.value },
+    startX: event.clientX,
+    startY: event.clientY,
+    box: { ...displayedNoteBox.value },
+    handle,
+  };
+  notePreviewRef.value?.setPointerCapture(event.pointerId);
+  window.addEventListener("pointermove", onNoteBoxPointerMove);
+  window.addEventListener("pointerup", onNoteBoxPointerUp);
+  window.addEventListener("pointercancel", cancelNoteBoxGesture);
+  event.preventDefault();
+}
+function onNoteBoxPointerMove(event: PointerEvent): void {
+  const gesture = noteBoxGesture;
+  if (!gesture || event.pointerId !== gesture.pointerId) return;
+  const dx = (event.clientX - gesture.startX) / scale.value;
+  const dy = (event.clientY - gesture.startY) / scale.value;
+  const box = { ...gesture.box };
+  if (!gesture.handle) {
+    box.offsetX += dx;
+    box.offsetY += dy;
+  } else {
+    if (gesture.handle.includes("e")) box.width = Math.min(2000, Math.max(80, box.width + dx));
+    if (gesture.handle.includes("s")) box.height = Math.min(2000, Math.max(40, box.height + dy));
+    if (gesture.handle.includes("w")) {
+      box.width = Math.min(2000, Math.max(80, box.width - dx));
+      box.offsetX += gesture.box.width - box.width;
+    }
+    if (gesture.handle.includes("n")) {
+      box.height = Math.min(2000, Math.max(40, box.height - dy));
+      box.offsetY += gesture.box.height - box.height;
+    }
+  }
+  noteBoxPreview.value = box;
+}
+function onNoteBoxPointerUp(event: PointerEvent): void {
+  const gesture = noteBoxGesture;
+  if (!gesture || event.pointerId !== gesture.pointerId) return;
+  const box = noteBoxPreview.value;
+  clearNoteBoxGesture();
+  if (box) emit("updateNoteBox", { address: gesture.address, box });
+}
+const noteConnectorStyle = computed(() => {
+  const box = displayedNoteBox.value;
+  return { left: `${-box.offsetX * scale.value}px`, top: `${-box.offsetY * scale.value}px` };
+});
+const noteConnectorEnd = computed(() => {
+  const box = displayedNoteBox.value;
+  return {
+    x: (box.offsetX + (box.offsetX + box.width / 2 < 0 ? box.width : 0)) * scale.value,
+    y: (box.offsetY + Math.min(10, box.height / 2)) * scale.value,
+  };
+});
 
 watch(
   () => `${props.sheet.id}:${activeCell.value.row}:${activeCell.value.column}`,
   () => {
     hoveredNoteAddress.value = undefined;
+    noteBoxSelected.value = false;
+    clearNoteBoxGesture();
   },
 );
 const selectedRangeRects = computed(() => layout.value.getRangeFragments(selectedRange.value));
@@ -2821,6 +2947,7 @@ onMounted(() => {
   restoreViewState(props.viewState);
   observeViewport();
   focusEditor();
+  document.addEventListener("pointerdown", onDocumentPointerDown, true);
 });
 
 watch(horizontalScrollState, (state) => emit("horizontalScrollChange", state), {
@@ -2829,6 +2956,7 @@ watch(horizontalScrollState, (state) => emit("horizontalScrollChange", state), {
 });
 
 onBeforeUnmount(() => {
+  clearNoteBoxGesture();
   stopObservingViewport();
   stopGeometryWatching();
   stopDragSelection();
@@ -2837,6 +2965,7 @@ onBeforeUnmount(() => {
   clearHyperlinkPointerGesture();
   cancelNotePreviewLeave();
   clearPendingClipboard();
+  document.removeEventListener("pointerdown", onDocumentPointerDown, true);
 });
 
 defineExpose({
@@ -3199,38 +3328,54 @@ defineExpose({
     />
     <Teleport to="body">
       <div
-        v-if="notePreviewOpen && notePreview"
+        v-if="notePreviewOpen && (notePreview || noteDraft)"
         ref="notePreviewRef"
         class="sheet-note-preview"
-        :class="{ 'is-left-placement': notePreviewPlacement.startsWith('left') }"
-        :style="notePreviewStyles"
+        :class="{ 'is-selected': noteBoxSelected || noteDraft }"
+        :style="[
+          notePreviewStyles,
+          {
+            '--note-width': `${displayedNoteBox.width * scale}px`,
+            '--note-height': `${displayedNoteBox.height * scale}px`,
+            '--note-scale': scale,
+          },
+        ]"
         @pointerenter="cancelNotePreviewLeave"
         @pointerleave="scheduleNotePreviewLeave"
+        @pointerdown="onNotePreviewPointerDown"
       >
-        <span class="sheet-note-preview__pointer" aria-hidden="true" />
+        <svg class="sheet-note-preview__connector" :style="noteConnectorStyle" aria-hidden="true">
+          <line x1="0" y1="0" :x2="noteConnectorEnd.x" :y2="noteConnectorEnd.y" />
+        </svg>
         <FloatingPanelSurface
           appearance="note"
           :label="`${t('review.noteText')} · ${t('review.address')}: ${notePreviewAddressLabel}`"
           role="group"
           layer="popover"
           :scrollable="false"
+          :constrain-to-viewport="false"
           class="sheet-note-preview__surface"
         >
-          <div class="sheet-note-preview__body">
-            <div class="sheet-note-preview__author">
-              <span class="ui-visually-hidden">{{ t("review.author") }}</span>
-              <strong>{{ notePreviewAuthor }}</strong
-              >:
-              <span class="ui-visually-hidden"
-                >{{ t("review.address") }}: {{ notePreviewAddressLabel }}</span
-              >
-            </div>
-            <div class="sheet-note-preview__text">
-              <span class="ui-visually-hidden">{{ t("review.noteText") }}</span>
-              {{ notePreview.text }}
-            </div>
-          </div>
+          <SheetCellNote
+            ref="noteEditorRef"
+            :note="notePreview"
+            :draft="noteDraft"
+            :error="noteError"
+            :read-only="readOnly"
+            @edit="editPreviewNote"
+            @save="savePreviewNote"
+            @cancel="cancelPreviewNote"
+          />
         </FloatingPanelSurface>
+        <template v-if="!readOnly && (noteBoxSelected || noteDraft)">
+          <span
+            v-for="handle in ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']"
+            :key="handle"
+            class="sheet-note-preview__handle"
+            :class="`is-${handle}`"
+            :data-note-resize="handle"
+          />
+        </template>
       </div>
     </Teleport>
   </section>
@@ -3332,69 +3477,76 @@ defineExpose({
   position: fixed;
   z-index: var(--idea-layer-popover);
 
-  &__pointer {
+  width: var(--note-width);
+  height: var(--note-height);
+  cursor: move;
+  touch-action: none;
+
+  &__connector {
     position: absolute;
-    top: 10px;
-    left: -8px;
-    z-index: 1;
-    width: 0;
-    height: 0;
-    border-top: 7px solid transparent;
-    border-right: 8px solid var(--idea-note-border);
-    border-bottom: 7px solid transparent;
-
-    &::after {
-      position: absolute;
-      top: -6px;
-      left: 2px;
-      width: 0;
-      height: 0;
-      border-top: 6px solid transparent;
-      border-right: 7px solid var(--idea-note-background);
-      border-bottom: 6px solid transparent;
-      content: "";
-    }
-  }
-
-  &.is-left-placement &__pointer {
-    right: -8px;
-    left: auto;
-    border-right: 0;
-    border-left: 8px solid var(--idea-note-border);
-
-    &::after {
-      right: 2px;
-      left: auto;
-      border-right: 0;
-      border-left: 7px solid var(--idea-note-background);
-    }
+    width: 1px;
+    height: 1px;
+    overflow: visible;
+    pointer-events: none;
+    stroke: var(--idea-note-border);
+    stroke-width: 1px;
   }
 
   &__surface {
-    width: 220px;
-    min-height: 100px;
-    max-height: 240px;
-  }
-
-  &__body {
+    overflow: hidden;
+    width: var(--note-width);
+    height: var(--note-height);
     box-sizing: border-box;
-    min-height: 100px;
-    max-height: 240px;
-    padding: 8px 10px;
-    overflow: auto;
-    color: var(--idea-note-text);
-    font-size: 12px;
-    line-height: 20px;
   }
 
-  &__author,
-  &__text {
-    overflow-wrap: anywhere;
-    white-space: pre-wrap;
+  &__handle {
+    position: absolute;
+    z-index: 2;
+    width: 6px;
+    height: 6px;
+    margin: -3px;
+    border: 1px solid var(--idea-note-border);
+    background: var(--idea-note-background);
   }
-
-  &__text {
-    margin-top: 4px;
+  &__handle.is-n {
+    top: 0;
+    left: 50%;
+    cursor: ns-resize;
+  }
+  &__handle.is-ne {
+    top: 0;
+    right: 0;
+    cursor: nesw-resize;
+  }
+  &__handle.is-e {
+    top: 50%;
+    right: 0;
+    cursor: ew-resize;
+  }
+  &__handle.is-se {
+    right: 0;
+    bottom: 0;
+    cursor: nwse-resize;
+  }
+  &__handle.is-s {
+    bottom: 0;
+    left: 50%;
+    cursor: ns-resize;
+  }
+  &__handle.is-sw {
+    bottom: 0;
+    left: 0;
+    cursor: nesw-resize;
+  }
+  &__handle.is-w {
+    top: 50%;
+    left: 0;
+    cursor: ew-resize;
+  }
+  &__handle.is-nw {
+    top: 0;
+    left: 0;
+    cursor: nwse-resize;
   }
 }
 </style>

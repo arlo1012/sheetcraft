@@ -16,6 +16,7 @@ export type FloatingPanelOptions = {
   placement?: MaybeReadonlyRefOrGetter<Placement>;
   offset?: number;
   padding?: number;
+  avoidCollisions?: boolean;
 };
 
 export function useFloatingPanel(
@@ -32,8 +33,9 @@ export function useFloatingPanel(
     strategy: "fixed",
     middleware: [
       offset(options.offset ?? 6),
-      flip({ padding }),
-      shift({ padding, crossAxis: true }),
+      ...(options.avoidCollisions === false
+        ? []
+        : [flip({ padding }), shift({ padding, crossAxis: true })]),
     ],
     whileElementsMounted: autoUpdate,
   });

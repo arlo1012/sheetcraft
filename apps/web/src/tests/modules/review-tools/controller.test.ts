@@ -95,6 +95,41 @@ describe("review controller", () => {
     undoWorkbookCommand(f.session);
     expect(getCellNote(f.sheet, { row: 0, column: 0 })).toBeUndefined();
   });
+  test("moves an existing note with one undo and keeps its box when editing text", () => {
+    const f = fixture();
+    f.add(0, 0, "original");
+    const box = { offsetX: 36, offsetY: -12, width: 220, height: 100 };
+    f.execute.mockClear();
+    f.review.updateBox({ address: f.address.value, box });
+    expect(f.execute).toHaveBeenCalledTimes(1);
+    expect(getCellNote(f.sheet, f.address.value)?.box).toEqual(box);
+    undoWorkbookCommand(f.session);
+    f.revision.value++;
+    expect(getCellNote(f.sheet, f.address.value)?.box).toBeUndefined();
+    f.review.updateBox({ address: f.address.value, box });
+    f.review.edit();
+    f.review.save({ text: "updated", author: "Alice", restoreFocus: false });
+    expect(getCellNote(f.sheet, f.address.value)).toEqual({
+      text: "updated",
+      author: "Alice",
+      box,
+    });
+  });
+  test("keeps inline draft text and geometry in one save and discards cancelled geometry", () => {
+    const f = fixture();
+    f.review.edit();
+    const box = { offsetX: 80, offsetY: 20, width: 180, height: 120 };
+    f.review.updateBox({ address: f.address.value, box });
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.review.draft.value?.box).toEqual(box);
+    f.review.save({ text: "note", author: "Alice" });
+    expect(f.execute).toHaveBeenCalledTimes(1);
+    expect(getCellNote(f.sheet, f.address.value)?.box).toEqual(box);
+    f.review.edit();
+    f.review.updateBox({ address: f.address.value, box: { ...box, width: 300 } });
+    f.review.close(false);
+    expect(getCellNote(f.sheet, f.address.value)?.box).toEqual(box);
+  });
   test("navigates notes in row-major order and wraps without workbook commands", () => {
     const f = fixture();
     f.add(4, 0, "last");

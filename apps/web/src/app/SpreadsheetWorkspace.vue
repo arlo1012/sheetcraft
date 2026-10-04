@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import ReviewToolbar from "../modules/review-tools/components/ReviewToolbar.vue";
-import NoteEditorDialog from "../modules/review-tools/components/NoteEditorDialog.vue";
 import { useReviewController } from "../modules/review-tools/useReviewController";
 import { formatCellAddress } from "@idea10/core/coordinates";
 import { cloneConditionalFormatRule } from "@idea10/core/conditional-formatting";
@@ -1769,7 +1768,6 @@ const gridInert = computed(
     !!findFormatDraft.value ||
     dataToolsModalOpen.value ||
     !!hyperlinkDraft.value ||
-    !!noteDraft.value ||
     cellStylesModalOpen.value ||
     (tableModalOpen.value && !pickingTableRange.value) ||
     formulaEditorVisible.value ||
@@ -1835,7 +1833,6 @@ const gridInert = computed(
         !!cellFormatSelection ||
         !!conditionalFormattingSelection ||
         !!hyperlinkDraft ||
-        !!noteDraft ||
         cellStylesModalOpen ||
         tableModalOpen ||
         !!findFormatDraft ||
@@ -2669,7 +2666,6 @@ const gridInert = computed(
         !!findFormatDraft ||
         pickingReferenceRange ||
         !!hyperlinkDraft ||
-        !!noteDraft ||
         cellStylesModalOpen ||
         tableModalOpen ||
         dataToolsModalOpen ||
@@ -2784,6 +2780,8 @@ const gridInert = computed(
       :inert="gridInert"
     >
       <SheetGrid
+        :note-draft="noteDraft"
+        :note-error="noteError"
         :show-active-note="showActiveNote"
         :note-preview-disabled="gridInert"
         :theme="workbookTheme"
@@ -2829,6 +2827,9 @@ const gridInert = computed(
         @table-expand-request="tableActions.expandTable"
         @open-hyperlink="hyperlinkActions.open"
         @edit-note="reviewActions.edit($event)"
+        @save-note="reviewActions.save"
+        @cancel-note="reviewActions.close(false)"
+        @update-note-box="reviewActions.updateBox"
         @delete-note="reviewActions.remove($event)"
         @validation-choose="chooseValidationValue"
         @outline-toggle="toggleOutline"
@@ -2878,17 +2879,6 @@ const gridInert = computed(
         @horizontal-scroll-change="updateHorizontalScrollState"
       />
     </div>
-    <NoteEditorDialog
-      v-if="noteDraft"
-      :visible="true"
-      :address="noteDraft.address"
-      :text="noteDraft.text"
-      :author="noteDraft.author"
-      :error="noteError"
-      :read-only="activeSheet.properties.protected || loading || fileBusy || xlsxBusy"
-      @save="reviewActions.save"
-      @close="reviewActions.close"
-    />
     <PagePrintPreview
       :theme="workbookTheme"
       v-if="printPreviewVisible"
@@ -2986,7 +2976,6 @@ const gridInert = computed(
         xlsxBusy ||
         !!cellFormatSelection ||
         !!hyperlinkDraft ||
-        !!noteDraft ||
         cellStylesModalOpen ||
         (tableModalOpen && !pickingTableRange)
       "

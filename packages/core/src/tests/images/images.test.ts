@@ -185,7 +185,7 @@ describe("sheet images", () => {
     legacyV4.version = 4 as never;
     delete legacyV4.sheets[0]?.floatingImages[0]?.transform;
     const migrated = serializeWorkbook(deserializeWorkbook(legacyV4));
-    expect(migrated.version).toBe(20);
+    expect(migrated.version).toBe(21);
     expect(migrated.sheets[0]?.floatingImages[0]?.transform).toBeUndefined();
     const v5WithFlips = structuredClone(serializeWorkbook(session.workbook));
     v5WithFlips.version = 5 as never;
@@ -391,7 +391,7 @@ describe("sheet images", () => {
       ),
     );
     const snapshot = serializeWorkbook(session.workbook);
-    expect(snapshot.version).toBe(20);
+    expect(snapshot.version).toBe(21);
     expect(JSON.stringify(snapshot)).not.toContain("data:");
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
   });

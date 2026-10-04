@@ -10,12 +10,13 @@ import {
   getCellNote,
   type CellAddress,
   type CellRange,
+  type CellNote,
   type Sheet,
   type Workbook,
 } from "@idea10/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 
-type NoteDraft = { address: string; text: string; author: string };
+type NoteDraft = { address: CellAddress; text: string; author: string; box?: CellNote["box"] };
 type NoteTarget = { sheetId: string; address: CellAddress; revision: number };
 export type ReviewNote = CellAddress & { address: string; text: string; author?: string };
 
@@ -64,14 +65,14 @@ export function useReviewController(options: {
     );
   });
 
-  function close(): void {
+  function close(restoreFocus = true): void {
     const wasOpen = Boolean(draft.value);
     draft.value = undefined;
     target = undefined;
     error.value = "";
-    if (wasOpen) void nextTick(options.focus);
+    if (wasOpen && restoreFocus) void nextTick(options.focus);
   }
-  watch([options.getGeneration, () => options.getSheet().id], close);
+  watch([options.getGeneration, () => options.getSheet().id], () => close(false));
   watch(
     [
       options.getGeneration,
@@ -91,13 +92,14 @@ export function useReviewController(options: {
     const note = getCellNote(options.getSheet(), cell);
     target = { sheetId: options.getSheet().id, address: cell, revision: options.getRevision() };
     draft.value = {
-      address: formatCellAddress(cell),
+      address: cell,
       text: note?.text ?? "",
-      author: note?.author ?? "",
+      author: note?.author ?? "Administrator",
+      ...(note?.box ? { box: { ...note.box } } : {}),
     };
     error.value = "";
   }
-  function save(value: { text: string; author: string }): void {
+  function save(value: { text: string; author: string; restoreFocus?: boolean }): void {
     if (!target || !draft.value || options.isBusy()) return;
     const sheet = options.getWorkbook().sheets.get(target.sheetId);
     if (!sheet || sheet.properties.protected || options.getRevision() !== target.revision) {
@@ -112,20 +114,40 @@ export function useReviewController(options: {
       const note = {
         text: value.text,
         ...(value.author.trim() ? { author: value.author.trim() } : {}),
+        ...(draft.value.box ? { box: { ...draft.value.box } } : {}),
       };
       const existing = getCellNote(sheet, target.address);
       if (
-        (existing?.text === note.text && (existing.author ?? "") === (note.author ?? "")) ||
+        (existing?.text === note.text &&
+          (existing.author ?? "") === (note.author ?? "") &&
+          JSON.stringify(existing.box) === JSON.stringify(note.box)) ||
         options.execute(
           createSetCellNoteCommand(options.getWorkbook(), sheet.id, target.address, note),
         )
       ) {
         showActiveNote.value = true;
-        close();
+        close(value.restoreFocus !== false);
       } else error.value = t("review.failed");
     } catch {
       error.value = t("review.failed");
     }
+  }
+  function updateBox(value: { address: CellAddress; box: NonNullable<CellNote["box"]> }): void {
+    if (options.isBusy() || options.getSheet().properties.protected) return;
+    const cell = anchor(value.address);
+    if (draft.value && target?.address.row === cell.row && target.address.column === cell.column) {
+      draft.value = { ...draft.value, box: { ...value.box } };
+      return;
+    }
+    const sheet = options.getSheet();
+    const note = getCellNote(sheet, cell);
+    if (!note) return;
+    options.execute(
+      createSetCellNoteCommand(options.getWorkbook(), sheet.id, cell, {
+        ...note,
+        box: { ...value.box },
+      }),
+    );
   }
   function remove(address?: CellAddress): void {
     if (options.isBusy() || options.getSheet().properties.protected || !options.finishEditing())
@@ -166,6 +188,7 @@ export function useReviewController(options: {
     edit,
     close,
     save,
+    updateBox,
     remove,
     navigate,
     step,

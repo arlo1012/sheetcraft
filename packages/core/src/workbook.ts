@@ -318,6 +318,15 @@ export type CellHyperlink = {
 export type CellNote = {
   text: string;
   author?: string;
+  /** Logical CSS pixels at 100% zoom, positioned from the anchor cell's top-right corner. */
+  box?: CellNoteBox;
+};
+
+export type CellNoteBox = {
+  offsetX: number;
+  offsetY: number;
+  width: number;
+  height: number;
 };
 
 export type SheetProperties = {
@@ -1754,13 +1763,30 @@ export function normalizeCellNote(value: CellNote | null | undefined): CellNote 
   ) {
     throw new TypeError("Cell note author is invalid.");
   }
+  const box = normalizeCellNoteBox(value.box);
   const author = value.author?.trim();
-  return { text, ...(author ? { author } : {}) };
+  return { text, ...(author ? { author } : {}), ...(box ? { box } : {}) };
+}
+
+function normalizeCellNoteBox(value: CellNoteBox | undefined): CellNoteBox | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object") throw new TypeError("Cell note box is invalid.");
+  const { offsetX, offsetY, width, height } = value;
+  if (!Number.isFinite(offsetX) || !Number.isFinite(offsetY)) {
+    throw new TypeError("Cell note box offsets must be finite numbers.");
+  }
+  if (!Number.isFinite(width) || width < 80 || width > 2_000) {
+    throw new TypeError("Cell note box width must be between 80 and 2000.");
+  }
+  if (!Number.isFinite(height) || height < 40 || height > 2_000) {
+    throw new TypeError("Cell note box height must be between 40 and 2000.");
+  }
+  return { offsetX, offsetY, width, height };
 }
 
 export function cloneCellNote(value: CellNote | null | undefined): CellNote | undefined {
   const normalized = normalizeCellNote(value);
-  return normalized && { ...normalized };
+  return normalized && { ...normalized, ...(normalized.box ? { box: { ...normalized.box } } : {}) };
 }
 
 export function setCellValue(sheet: Sheet, address: CellAddress, value: CellValue): boolean {

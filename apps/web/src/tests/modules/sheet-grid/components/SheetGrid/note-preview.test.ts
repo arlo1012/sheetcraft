@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { mountSheetGrid, triggerCell } from "./fixture";
 
 function noteText(): string | undefined {
-  return document.body.querySelector(".sheet-note-preview__text")?.textContent?.trim();
+  return document.body.querySelector(".sheet-cell-note__view")?.textContent?.trim();
 }
 
 describe("SheetGrid note preview", () => {
@@ -64,6 +64,62 @@ describe("SheetGrid note preview", () => {
     await wrapper.setProps({ workbookRevision: 1 });
     expect(noteText()).toContain("Edited note");
 
+    wrapper.unmount();
+  });
+
+  test("uses a draft at its target address and saves it from the in-place editor", async () => {
+    const { wrapper } = mountSheetGrid({
+      attachTo: document.body,
+      beforeMount: (sheet) => sheet.cells.set("1:1", { note: { text: "Existing note" } }),
+    });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
+
+    await wrapper.setProps({
+      noteDraft: {
+        address: { row: 1, column: 1 },
+        author: "Ada",
+        text: "Draft note",
+      },
+      noteError: "Save failed",
+    });
+    await nextTick();
+
+    const author = document.body.querySelector<HTMLInputElement>(".sheet-cell-note__author-input")!;
+    const text = document.body.querySelector<HTMLTextAreaElement>(".sheet-cell-note__text-input")!;
+    expect(author.value).toBe("Ada");
+    expect(text.value).toBe("Draft note");
+    expect(document.body.textContent).toContain("Save failed");
+
+    text.value = "Edited note";
+    text.dispatchEvent(new Event("input", { bubbles: true }));
+    await nextTick();
+    text.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }),
+    );
+
+    expect(wrapper.emitted("saveNote")?.[0]).toEqual([
+      { author: "Ada", text: "Edited note", restoreFocus: true },
+    ]);
+    wrapper.unmount();
+  });
+  test("keeps a new note's unsaved text while its draft box changes and saves on outside click", async () => {
+    const { wrapper } = mountSheetGrid({ attachTo: document.body });
+    const draft = { address: { row: 0, column: 0 }, author: "Ada", text: "" };
+    await wrapper.setProps({ noteDraft: draft });
+    await nextTick();
+    const text = document.body.querySelector<HTMLTextAreaElement>(".sheet-cell-note__text-input")!;
+    expect(text).not.toBeNull();
+    text.value = "First line\nSecond line";
+    text.dispatchEvent(new Event("input", { bubbles: true }));
+    await nextTick();
+    await wrapper.setProps({
+      noteDraft: { ...draft, box: { offsetX: 40, offsetY: 20, width: 208, height: 120 } },
+    });
+    expect(text.value).toBe("First line\nSecond line");
+    document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    expect(wrapper.emitted("saveNote")?.[0]).toEqual([
+      { text: "First line\nSecond line", author: "Ada", restoreFocus: false },
+    ]);
     wrapper.unmount();
   });
 });

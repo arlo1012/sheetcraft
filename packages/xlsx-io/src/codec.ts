@@ -19,6 +19,7 @@ import {
   createSheetEvaluator,
   getDefaultColumnWidth,
   normalizeCellHyperlink,
+  normalizeCellNote,
   replaceSheetSparseState,
   type CellRange,
   type Sheet,
@@ -71,7 +72,11 @@ import {
 import { readXlsxCellStyles, readXlsxNamedCellStyleBindings } from "./cell-styles.js";
 import { readXlsxThemeStyleBindings } from "./theme-style-bindings.js";
 import { readXlsxHyperlinks, readXlsxWorksheetStyleIds } from "./hyperlinks.js";
-import { readXlsxCellNotes, withExcelJsCompatibleCellNotes } from "./cell-notes.js";
+import {
+  readXlsxCellNoteVmlBoxes,
+  readXlsxCellNotes,
+  withExcelJsCompatibleCellNotes,
+} from "./cell-notes.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
   createXlsxImageExporter,
@@ -622,6 +627,7 @@ export async function decodeWithExcelJs(
   const rawNotes = readXlsxCellNotes(archive, (sheetIndex, reference) =>
     add(report, "feature-omitted", `worksheet${sheetIndex + 1}.note:${reference}`),
   );
+  const rawNoteBoxes = readXlsxCellNoteVmlBoxes(archive);
   const source = new ExcelJS.Workbook();
   await source.xlsx.load(withoutTableAutoFiltersForExcelJs(withExcelJsCompatibleCellNotes(bytes)));
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
@@ -785,6 +791,49 @@ export async function decodeWithExcelJs(
       const size = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, pixels));
       if (size !== defaultColumnWidth) columnWidths.push({ index: columnIndex - 1, size });
       add(report, "dimension-approximated", `${sourceSheet.name}!${columnLabel(columnIndex - 1)}`);
+    }
+    const columnSizes = new Map(columnWidths.map(({ index, size }) => [index, size]));
+    const rowSizes = new Map(rowHeights.map(({ index, size }) => [index, size]));
+    const sourceDefaultRowHeight = sourceSheet.properties.defaultRowHeight;
+    const defaultRowHeight =
+      typeof sourceDefaultRowHeight === "number" && Number.isFinite(sourceDefaultRowHeight)
+        ? (sourceDefaultRowHeight * 4) / 3
+        : DEFAULT_ROW_HEIGHT;
+    const offsetBefore = (index: number, sizes: ReadonlyMap<number, number>, fallback: number) => {
+      let offset = 0;
+      for (let current = 0; current < index; current += 1) offset += sizes.get(current) ?? fallback;
+      return offset;
+    };
+    for (const cell of cells) {
+      if (!cell.note) continue;
+      const reference = address(cell.address.row, cell.address.column);
+      const geometry = rawNoteBoxes[sheetIndex]?.get(reference);
+      // ExcelJS synthesizes this fixed VML rectangle for notes without an
+      // explicit product box. Keep `box` absent so ordinary notes roundtrip
+      // without acquiring a misleading geometry contract.
+      if (
+        !geometry ||
+        (Math.abs(geometry.left - 140.4) < 0.01 &&
+          Math.abs(geometry.top - 14) < 0.01 &&
+          Math.abs(geometry.width - 130.4) < 0.01 &&
+          Math.abs(geometry.height - 78.8) < 0.01)
+      )
+        continue;
+      try {
+        cell.note = normalizeCellNote({
+          ...cell.note,
+          box: {
+            offsetX:
+              geometry.left -
+              offsetBefore(cell.address.column + 1, columnSizes, defaultColumnWidth),
+            offsetY: geometry.top - offsetBefore(cell.address.row, rowSizes, defaultRowHeight),
+            width: geometry.width,
+            height: geometry.height,
+          },
+        });
+      } catch {
+        add(report, "feature-omitted", `${sourceSheet.name}!${reference}.note.box`);
+      }
     }
     const view = (sourceSheet.views ?? []).find((candidate) => candidate.state === "frozen");
     const freezePanes = {

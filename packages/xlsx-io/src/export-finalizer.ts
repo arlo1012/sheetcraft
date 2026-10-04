@@ -12,7 +12,7 @@ import { writeXlsxTableMetadata } from "./table-styles.js";
 import { writeXlsxCellStyles, writeXlsxNamedCellStyleBindings } from "./cell-styles.js";
 import { writeXlsxThemeStyleBindings } from "./theme-style-bindings.js";
 import { writeXlsxHyperlinks } from "./hyperlinks.js";
-import { writeXlsxCellNotes } from "./cell-notes.js";
+import { writeXlsxCellNoteVmlBoxes, writeXlsxCellNotes } from "./cell-notes.js";
 import { writeXlsxPageSetups } from "./page-setup.js";
 import type { CompatibilityReportBuilder } from "./report.js";
 import type { Sheet, WorkbookCalculationSettings } from "@idea10/core/workbook";
@@ -90,6 +90,7 @@ export function finalizeXlsxExport(
   );
   writeXlsxHyperlinks(entries, sheets);
   writeXlsxCellNotes(entries, sheets);
+  writeXlsxCellNoteVmlBoxes(entries, sheets);
   const projectedCellStyles = cellStyles?.map((definition) => ({
     ...definition,
     style:
