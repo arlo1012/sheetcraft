@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createWorkbook, getActiveSheet } from "@idea10/core/workbook";
+import { DEFAULT_SHEET_WATERMARK } from "@idea10/core/page-decoration";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { prepareImageAsset } from "../../../modules/image-assets/prepareImageAsset";
@@ -31,6 +32,7 @@ describe("page decoration image actions", () => {
       getGeneration: () => 0,
       flushPendingEdits: () => true,
       setDecoration,
+      setWatermarks: vi.fn(),
     });
     const pending = actions.setBackgroundFile(file);
     workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
@@ -38,5 +40,63 @@ describe("page decoration image actions", () => {
     await pending;
     expect(setDecoration).not.toHaveBeenCalled();
     expect(actions.busy.value).toBe(false);
+  });
+
+  test("stores a custom watermark image before applying to all target sheets", async () => {
+    vi.mocked(prepareImageAsset).mockResolvedValue(asset);
+    const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
+    const store = createMemoryImageAssetStore();
+    const setWatermarks = vi.fn();
+    const actions = usePageDecorationActions({
+      assetStore: store,
+      getWorkbook: () => workbook,
+      getSheet: () => getActiveSheet(workbook),
+      flushPendingEdits: () => true,
+      setDecoration: vi.fn(),
+      setWatermarks,
+    });
+    const watermark = {
+      ...DEFAULT_SHEET_WATERMARK,
+      text: "",
+      image: { assetId: "preview", scale: null, washout: true, angle: 0 },
+    };
+    expect(await actions.applyWatermark(watermark, "workbook", file)).toBe(true);
+    expect(await store.get(asset.id)).toBe(asset);
+    expect(setWatermarks).toHaveBeenCalledWith([...workbook.sheets.keys()], {
+      ...watermark,
+      image: { ...watermark.image, assetId: asset.id },
+    });
+    expect(watermark.image.assetId).toBe("preview");
+  });
+
+  test("cancelling a pending custom image leaves workbook state untouched", async () => {
+    let resolve!: (value: typeof asset) => void;
+    vi.mocked(prepareImageAsset).mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
+    const setWatermarks = vi.fn();
+    const actions = usePageDecorationActions({
+      assetStore: createMemoryImageAssetStore(),
+      getWorkbook: () => workbook,
+      getSheet: () => getActiveSheet(workbook),
+      flushPendingEdits: () => true,
+      setDecoration: vi.fn(),
+      setWatermarks,
+    });
+    const pending = actions.applyWatermark(
+      {
+        ...DEFAULT_SHEET_WATERMARK,
+        image: { assetId: "preview", scale: null, washout: true, angle: 0 },
+      },
+      "sheet",
+      file,
+    );
+    actions.cancelWatermark();
+    resolve(asset);
+    expect(await pending).toBe(false);
+    expect(setWatermarks).not.toHaveBeenCalled();
   });
 });

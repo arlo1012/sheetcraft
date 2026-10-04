@@ -7,7 +7,11 @@ import {
   type Workbook,
 } from "@idea10/core/workbook";
 import type { ImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
-import { useImageAssetUrls } from "../../../modules/image-assets/useImageAssetUrls";
+import {
+  collectWorkbookImageAssetIds,
+  useImageAssetUrls,
+} from "../../../modules/image-assets/useImageAssetUrls";
+import { DEFAULT_SHEET_WATERMARK } from "@idea10/core/page-decoration";
 function imageWorkbook(id: string): Workbook {
   const workbook = createWorkbook({ id: `book-${id}`, sheetId: "sheet", sheetName: "Sheet" });
   setCellContent(
@@ -44,6 +48,16 @@ const asset = (id: string) => ({
 });
 afterEach(() => vi.unstubAllGlobals());
 describe("useImageAssetUrls", () => {
+  test("collects image-only watermarks for display and portable saves", () => {
+    const workbook = createWorkbook({ id: "watermarked", sheetId: "sheet" });
+    getActiveSheet(workbook).pageDecoration = {
+      watermark: {
+        ...DEFAULT_SHEET_WATERMARK,
+        image: { assetId: "logo", scale: null, washout: true, angle: 0 },
+      },
+    };
+    expect(collectWorkbookImageAssetIds(workbook)).toEqual(new Set(["logo"]));
+  });
   test("keeps a URL for the same image through unrelated workbook edits", async () => {
     const workbook = ref(imageWorkbook("asset"));
     const create = vi.fn(() => "blob:asset");

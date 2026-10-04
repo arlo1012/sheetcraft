@@ -983,7 +983,7 @@ export async function encodeWithExcelJs(
   let encodedCells = 0;
   for (const [sheetIndex, sheet] of [...workbook.sheets.values()].entries()) {
     pageSetups.push(sheet.pageSetup);
-    // Text watermarks have no native worksheet field; do not silently claim XLSX fidelity.
+    // Tiled watermarks have no native worksheet field; do not silently claim XLSX fidelity.
     if (sheet.pageDecoration?.watermark) add(report, "feature-omitted", `${sheet.name}.watermark`);
     sheetBackgrounds.push(
       sheet.pageDecoration?.backgroundAssetId

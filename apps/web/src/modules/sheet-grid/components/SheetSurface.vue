@@ -101,6 +101,7 @@ let context: CanvasRenderingContext2D | null = null;
 let scheduler: ReturnType<typeof createSheetRenderScheduler> | undefined;
 const images = createCanvasImageCache(() => invalidate());
 const backgroundImages = createCanvasImageCache(() => invalidate());
+const watermarkImages = createCanvasImageCache(() => invalidate());
 const sizeStyle = computed(() => ({
   width: `${props.frame.size.width}px`,
   height: `${props.frame.size.height}px`,
@@ -171,6 +172,10 @@ function paint(): void {
   const backgroundUrl = props.pageDecoration?.backgroundAssetId
     ? props.imageAssetUrls?.get(props.pageDecoration.backgroundAssetId)
     : undefined;
+  const watermarkUrl = props.pageDecoration?.watermark?.image?.assetId
+    ? props.imageAssetUrls?.get(props.pageDecoration.watermark.image.assetId)
+    : undefined;
+  const watermarkImage = watermarkUrl ? watermarkImages.get(watermarkUrl) : undefined;
   const paintBackground = () =>
     paintSheetBackground(
       context!,
@@ -205,11 +210,15 @@ function paint(): void {
       props.environment.cells.background,
       frame.scale,
     );
+    // Cells stay inside the printable content. Restore this clip before painting
+    // the watermark so its page-paper overlay remains visible in the margins.
+    context.save();
     clipPageContents(context, props.pageView, frame.layout.bodyScrollPosition);
     // Background images tile on-screen only; a page-layout view still represents the sheet surface.
     paintBackground();
-    paintSheetWatermark(context, props.pageDecoration, frame, props.pageView);
     paintScene(props.showGridLines);
+    context.restore();
+    paintSheetWatermark(context, props.pageDecoration, frame, props.pageView, watermarkImage);
   } else if (pageBreakPreview) {
     const printed = paintPageBreakPreviewBackground(
       context,
@@ -219,7 +228,6 @@ function paint(): void {
       props.environment.cells.background,
     );
     paintBackground();
-    paintSheetWatermark(context, props.pageDecoration, frame, props.pageView);
     context.save();
     if (clipPageBreakPreviewPrintArea(context, printed)) paintScene(props.showGridLines);
     context.restore();
@@ -227,6 +235,7 @@ function paint(): void {
     clipPageBreakPreviewOutside(context, printed, frame.layout.viewportSize);
     paintScene(false);
     context.restore();
+    paintSheetWatermark(context, props.pageDecoration, frame, props.pageView, watermarkImage);
   } else {
     paintBackground();
     paintScene(props.showGridLines);
@@ -315,6 +324,7 @@ onBeforeUnmount(() => {
   scheduler?.dispose();
   images.dispose();
   backgroundImages.dispose();
+  watermarkImages.dispose();
 });
 defineExpose({ invalidate });
 </script>

@@ -1,10 +1,11 @@
 import { computed, readonly, ref } from "vue";
-import type { SheetPageDecoration } from "@idea10/core/page-decoration";
+import type { SheetPageDecoration, SheetWatermark } from "@idea10/core/page-decoration";
 import type { Sheet, Workbook } from "@idea10/core/workbook";
 import type { ImageAssetStore } from "../image-assets/imageAssetStore";
 import { ImageAssetError, prepareImageAsset } from "../image-assets/prepareImageAsset";
 
-export type PageDecorationFeedback = "invalidImage" | "failed";
+export type PageDecorationFeedback = "invalidImage" | "failed" | "protectedSheets";
+export type WatermarkScope = "sheet" | "workbook";
 
 /** Owns file preparation only; Core owns the resulting sheet-state command and undo entry. */
 export function usePageDecorationActions(options: {
@@ -14,9 +15,11 @@ export function usePageDecorationActions(options: {
   getGeneration?: () => number;
   flushPendingEdits: () => boolean;
   setDecoration: (sheetId: string, decoration: SheetPageDecoration) => void;
+  setWatermarks: (sheetIds: string[], watermark: SheetWatermark | undefined) => void;
 }) {
   const busy = ref(false);
   const feedback = ref<PageDecorationFeedback>();
+  let watermarkRequest = 0;
   const current = computed(() => options.getSheet().pageDecoration ?? {});
   const isCurrent = (workbook: Workbook, sheetId: string, generation: number | undefined) =>
     options.getWorkbook() === workbook &&
@@ -65,6 +68,56 @@ export function usePageDecorationActions(options: {
     update({ watermark });
   }
 
+  async function applyWatermark(
+    watermark: SheetWatermark,
+    scope: WatermarkScope,
+    imageFile?: File,
+  ): Promise<boolean> {
+    if (busy.value || !options.flushPendingEdits()) return false;
+    const workbook = options.getWorkbook();
+    const sheetId = options.getSheet().id;
+    const generation = options.getGeneration?.();
+    const sheetIds = scope === "workbook" ? [...workbook.sheets.keys()] : [sheetId];
+    feedback.value = undefined;
+    const editable = () =>
+      sheetIds.every((id) => {
+        const target = workbook.sheets.get(id);
+        return target && !target.properties.protected;
+      });
+    if (!editable()) {
+      feedback.value = "protectedSheets";
+      return false;
+    }
+    const request = ++watermarkRequest;
+    busy.value = true;
+    try {
+      const draft = { ...watermark, ...(watermark.image ? { image: { ...watermark.image } } : {}) };
+      if (imageFile && draft.image) {
+        const asset = await prepareImageAsset(imageFile);
+        if (request !== watermarkRequest || !isCurrent(workbook, sheetId, generation)) return false;
+        await options.assetStore.put(asset);
+        draft.image.assetId = asset.id;
+      }
+      if (request !== watermarkRequest || !isCurrent(workbook, sheetId, generation)) return false;
+      if (!editable()) {
+        feedback.value = "protectedSheets";
+        return false;
+      }
+      options.setWatermarks(sheetIds, draft);
+      return true;
+    } catch (error) {
+      if (request === watermarkRequest)
+        feedback.value = error instanceof ImageAssetError ? "invalidImage" : "failed";
+      return false;
+    } finally {
+      busy.value = false;
+    }
+  }
+
+  function cancelWatermark(): void {
+    watermarkRequest += 1;
+  }
+
   function removeWatermark(): void {
     const { watermark: _watermark, ...rest } = current.value;
     replace(rest);
@@ -77,6 +130,8 @@ export function usePageDecorationActions(options: {
     setBackgroundFile,
     removeBackground,
     setWatermark,
+    applyWatermark,
+    cancelWatermark,
     removeWatermark,
   };
 }

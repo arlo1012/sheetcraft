@@ -14,6 +14,7 @@ import {
   readWorkbookBundleFile,
 } from "../../../../modules/workbook-persistence/workbookJsonTransfer";
 import { serializeWorkbook } from "@idea10/core/serialization";
+import { DEFAULT_SHEET_WATERMARK } from "@idea10/core/page-decoration";
 import { createMemoryImageAssetStore } from "../../../../modules/image-assets/imageAssetStore";
 
 function createTestWorkbook() {
@@ -88,6 +89,12 @@ describe("workbook JSON transfer", () => {
 
   test("derives imported image identity and dimensions from real PNG bytes", async () => {
     const workbook = createTestWorkbook();
+    getActiveSheet(workbook).pageDecoration = {
+      watermark: {
+        ...DEFAULT_SHEET_WATERMARK,
+        image: { assetId: "untrusted-id", scale: null, washout: true, angle: 0 },
+      },
+    };
     setCellContent(
       getActiveSheet(workbook),
       { row: 1, column: 1 },
@@ -131,6 +138,9 @@ describe("workbook JSON transfer", () => {
     });
     expect((content as { kind: "image"; image: { assetId: string } }).image.assetId).not.toBe(
       "untrusted-id",
+    );
+    expect(getActiveSheet(imported).pageDecoration?.watermark?.image?.assetId).toBe(
+      (content as { kind: "image"; image: { assetId: string } }).image.assetId,
     );
   });
 

@@ -417,17 +417,26 @@ function drawHeaderFooter(
   drawHeaderFooterPart(context, footer.right, "right", right, footerY, document, number);
 }
 
-function drawWatermark(context: CanvasRenderingContext2D, document: PrintPreviewDocument): void {
+function drawWatermark(
+  context: CanvasRenderingContext2D,
+  document: PrintPreviewDocument,
+  imageAssetUrls: ReadonlyMap<string, string> | undefined,
+  images: ReturnType<typeof createCanvasImageCache>,
+): void {
   const decoration = document.sheet.pageDecoration;
   const watermark = decoration?.watermark;
-  if (!watermark?.text) return;
+  if (!watermark || (!watermark.text && !watermark.image)) return;
   const paper = document.pagination.paperSize;
+  const imageUrl = watermark.image?.assetId
+    ? imageAssetUrls?.get(watermark.image.assetId)
+    : undefined;
   paintWatermarkInRect(
     context,
     watermark,
     { x: 0, y: 0, width: paper.width, height: paper.height },
     {
       fontScale: 1 / document.pagination.printScale,
+      image: imageUrl ? images.get(imageUrl) : undefined,
     },
   );
 }
@@ -529,7 +538,6 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
       document.pagination.printScale * previewScale,
       document.pagination.printScale * previewScale,
     );
-    drawWatermark(context, document);
     drawHeaderFooter(context, document, page);
     const offset = {
       x: (document.setup.margins.left * PX_PER_MM) / document.pagination.printScale,
@@ -653,6 +661,7 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
     paintFragment(page.row, page.column, titleWidth, titleHeight);
     drawPrintHeadings(context, document, page, titleWidth, titleHeight);
     context.restore();
+    drawWatermark(context, document, options.imageAssetUrls, images);
     context.restore();
   }
   function dispose(): void {

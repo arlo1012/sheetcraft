@@ -32,7 +32,7 @@ import type { PivotTableStyleDefinition } from "../pivot-table-styles.js";
 import type { CellStyleDefinition } from "../cell-styles.js";
 import type { ConditionalFormatIconSet } from "../conditional-formatting.js";
 import type { SheetPageSetup } from "../page-setup.js";
-import type { SheetPageDecoration } from "../page-decoration.js";
+import type { SheetPageDecoration, SheetWatermark } from "../page-decoration.js";
 import type { WorkbookTheme } from "../workbook-theme.js";
 
 export type CellContentChange = {
@@ -661,6 +661,15 @@ export type SetSheetPageDecorationCommand = {
   sheetId: string;
   decoration: SheetPageDecoration;
 };
+/** Sets or clears one watermark across multiple sheets as one history action. */
+export type SetSheetsWatermarkCommand = {
+  type: "setSheetsWatermark";
+  sheetIds: string[];
+  /** Omitted to remove each target's watermark while retaining its background. */
+  watermark?: SheetWatermark;
+  /** Internal per-sheet inverse for lossless undo. */
+  watermarks?: Array<{ sheetId: string; watermark?: SheetWatermark }>;
+};
 export type ClearSheetConditionalFormatsCommand = {
   type: "clearSheetConditionalFormats";
   sheetId: string;
@@ -775,6 +784,7 @@ export type WorkbookCommand =
   | SetSheetConditionalFormatsCommand
   | SetSheetPageSetupCommand
   | SetSheetPageDecorationCommand
+  | SetSheetsWatermarkCommand
   | ClearSheetConditionalFormatsCommand
   | ClearSheetDataValidationsCommand
   | AddSheetOutlineGroupCommand
@@ -918,6 +928,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "setSheetPageSetup":
       return "page.setup";
     case "setSheetPageDecoration":
+      return "page.decoration";
+    case "setSheetsWatermark":
       return "page.decoration";
     case "mergeCells":
       return "cells.merge";

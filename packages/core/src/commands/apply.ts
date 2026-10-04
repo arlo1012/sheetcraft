@@ -25,7 +25,10 @@ import {
 } from "./dimensions.js";
 import { applySetSheetFilterCommand } from "./filter.js";
 import { applySetSheetPageSetupCommand } from "./page-setup.js";
-import { applySetSheetPageDecorationCommand } from "./page-decoration.js";
+import {
+  applySetSheetPageDecorationCommand,
+  applySetSheetsWatermarkCommand,
+} from "./page-decoration.js";
 import { applyAdvancedFilterCommand } from "./advanced-filter.js";
 import { applySplitColumnCommand, applyRemoveDuplicatesCommand } from "./data-transforms.js";
 import { applyApplySubtotalsCommand, applyRemoveSubtotalsCommand } from "./subtotal.js";
@@ -166,9 +169,11 @@ function assertCommandDoesNotModifyProtectedSheet(
         ]
       : command.type === "advancedFilter" && command.mode === "copy" && command.destination
         ? [command.destination.sheetId]
-        : "sheetId" in command
-          ? [command.sheetId]
-          : [];
+        : command.type === "setSheetsWatermark"
+          ? command.sheetIds
+          : "sheetId" in command
+            ? [command.sheetId]
+            : [];
   const blocked = sheetIds.find((sheetId) => workbook.sheets.get(sheetId)?.properties.protected);
   if (!blocked) return;
   switch (command.type) {
@@ -201,6 +206,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "setSheetFreezePanes":
     case "setSheetPageSetup":
     case "setSheetPageDecoration":
+    case "setSheetsWatermark":
     case "mergeCells":
     case "unmergeCells":
     case "setSheetFilter":
@@ -329,6 +335,8 @@ export function applyWorkbookCommand(
         return applySetSheetPageSetupCommand(workbook, command);
       case "setSheetPageDecoration":
         return applySetSheetPageDecorationCommand(workbook, command);
+      case "setSheetsWatermark":
+        return applySetSheetsWatermarkCommand(workbook, command);
       case "mergeCells":
         return applyMergeCellsCommand(workbook, command);
       case "unmergeCells":

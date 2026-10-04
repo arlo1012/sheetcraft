@@ -119,6 +119,8 @@ async function print(): Promise<void> {
     const assetIds = new Set(document.sheet.floatingImages.map((image) => image.assetId));
     for (const cell of document.sheet.cells.values())
       if (cell.content?.kind === "image") assetIds.add(cell.content.image.assetId);
+    const watermarkAssetId = document.sheet.pageDecoration?.watermark?.image?.assetId;
+    if (watermarkAssetId) assetIds.add(watermarkAssetId);
     const urls = [...assetIds].map((id) => props.imageAssetUrls?.get(id));
     if (urls.some((url) => !url)) throw new Error("Image assets are not ready.");
     await renderer.prepareImages(urls as string[]);

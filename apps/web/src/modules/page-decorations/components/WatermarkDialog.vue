@@ -1,118 +1,428 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
+import { AutoComplete as TAutoComplete } from "tdesign-vue-next/es/auto-complete";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
-import { Input as TInput } from "tdesign-vue-next/es/input";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
+import { Select as TSelect } from "tdesign-vue-next/es/select";
+import { Slider as TSlider } from "tdesign-vue-next/es/slider";
 import type { SheetWatermark } from "@idea10/core/page-decoration";
 import { DEFAULT_SHEET_WATERMARK } from "@idea10/core/page-decoration";
+import {
+  CELL_FONT_FAMILY_PRESETS,
+  CELL_FONT_SIZE_PRESETS,
+} from "../../../shared/cell-text/font-catalog";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { useAppI18n } from "../../../shared/i18n";
-import ColorPalette from "../../../shared/color/ColorPalette.vue";
+import { paintWatermarkInRect } from "../page-decoration-painter";
 
-const props = defineProps<{ visible: boolean; watermark?: SheetWatermark }>();
+const previewAssetId = "watermark-preview";
+const props = defineProps<{
+  visible: boolean;
+  watermark?: SheetWatermark;
+  imageAssetUrls?: ReadonlyMap<string, string>;
+  busy?: boolean;
+}>();
 const emit = defineEmits<{
   "update:visible": [value: boolean];
-  save: [watermark: SheetWatermark];
-  remove: [];
+  save: [watermark: SheetWatermark, scope: "sheet" | "workbook", imageFile?: File];
 }>();
 const { locale, t } = useAppI18n();
 const draft = ref<SheetWatermark>({ ...DEFAULT_SHEET_WATERMARK });
-watch(
-  () => [props.visible, props.watermark] as const,
-  ([visible, watermark]) => {
-    if (visible) draft.value = { ...DEFAULT_SHEET_WATERMARK, ...watermark };
-  },
-  { immediate: true },
-);
+const textEnabled = ref(true);
+const imageEnabled = ref(false);
+const scope = ref<"sheet" | "workbook">("workbook");
+const imageInput = ref<HTMLInputElement>();
+const imageFile = ref<File>();
+const imageDraft = ref({ assetId: "", scale: null as number | null, washout: true, angle: 0 });
+const previewCanvas = ref<HTMLCanvasElement>();
+const localImageUrl = ref<string>();
+const previewImage = ref<HTMLImageElement>();
 const labelWidth = computed(() => (locale.value === "zh-CN" ? 72 : 104));
+const fontOptions = computed(() =>
+  CELL_FONT_FAMILY_PRESETS.map((value) => ({ label: value, value })),
+);
+const fontSizeOptions = CELL_FONT_SIZE_PRESETS.map((value) => ({ label: String(value), value }));
 const opacityPercent = computed({
-  get: () => Math.round(draft.value.opacity * 100),
+  get: () => 100 - Math.round(draft.value.opacity * 100),
   set: (value: number) => {
-    draft.value.opacity = Math.max(0, Math.min(1, value / 100));
+    draft.value.opacity = Math.max(0, Math.min(1, 1 - value / 100));
   },
 });
+const imageScale = computed<"auto" | number>({
+  get: () => imageDraft.value.scale ?? "auto",
+  set: (value) => {
+    imageDraft.value.scale = value === "auto" ? null : value;
+  },
+});
+const currentImageUrl = computed(
+  () =>
+    localImageUrl.value ??
+    (draft.value.image ? props.imageAssetUrls?.get(draft.value.image.assetId) : undefined),
+);
+const canSave = computed(
+  () =>
+    (textEnabled.value && draft.value.text.trim().length > 0) ||
+    (imageEnabled.value && !!draft.value.image),
+);
+
+function copyWatermark(watermark?: SheetWatermark): SheetWatermark {
+  return {
+    ...DEFAULT_SHEET_WATERMARK,
+    ...watermark,
+    ...(watermark?.image ? { image: { ...watermark.image } } : {}),
+  };
+}
+function clearLocalImage(): void {
+  if (localImageUrl.value) URL.revokeObjectURL(localImageUrl.value);
+  localImageUrl.value = undefined;
+  imageFile.value = undefined;
+}
+function loadPreviewImage(url: string | undefined): void {
+  previewImage.value = undefined;
+  if (!url) return;
+  const image = new Image();
+  image.onload = () => {
+    if (currentImageUrl.value !== url) return;
+    previewImage.value = image;
+    drawPreview();
+  };
+  image.src = url;
+}
+function drawPreview(): void {
+  const canvas = previewCanvas.value;
+  if (!canvas) return;
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  const scale = window.devicePixelRatio || 1;
+  const { width, height } = canvas.getBoundingClientRect();
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  context.setTransform(scale, 0, 0, scale, 0, 0);
+  context.clearRect(0, 0, width, height);
+  const watermark: SheetWatermark = {
+    ...draft.value,
+    text: textEnabled.value ? draft.value.text : "",
+    ...(imageEnabled.value && draft.value.image
+      ? { image: { ...draft.value.image, ...imageDraft.value } }
+      : { image: undefined }),
+  };
+  paintWatermarkInRect(
+    context,
+    watermark,
+    { x: 0, y: 0, width, height },
+    {
+      fontScale: width / 794,
+      image: previewImage.value,
+    },
+  );
+}
+function chooseImage(): void {
+  imageInput.value?.click();
+}
+function imageChanged(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !file.type.startsWith("image/")) return;
+  clearLocalImage();
+  imageFile.value = file;
+  localImageUrl.value = URL.createObjectURL(file);
+  imageDraft.value = { assetId: previewAssetId, scale: null, washout: true, angle: 0 };
+  draft.value.image = { ...imageDraft.value };
+  imageEnabled.value = true;
+  loadPreviewImage(localImageUrl.value);
+}
 function close(): void {
   emit("update:visible", false);
 }
 function save(): void {
-  if (!draft.value.text.trim()) return;
-  emit("save", { ...draft.value, text: draft.value.text.trim() });
-  close();
+  if (!canSave.value || props.busy) return;
+  emit(
+    "save",
+    {
+      ...draft.value,
+      text: textEnabled.value ? draft.value.text.trim() : "",
+      ...(imageEnabled.value && draft.value.image
+        ? { image: { ...draft.value.image, ...imageDraft.value } }
+        : { image: undefined }),
+    },
+    scope.value,
+    imageEnabled.value ? imageFile.value : undefined,
+  );
 }
+
+watch(
+  () => [props.visible, props.watermark] as const,
+  ([visible, watermark]) => {
+    if (!visible) return;
+    clearLocalImage();
+    draft.value = copyWatermark(watermark);
+    imageDraft.value = draft.value.image
+      ? { ...draft.value.image }
+      : { assetId: "", scale: null, washout: true, angle: 0 };
+    textEnabled.value = watermark ? !!draft.value.text : true;
+    imageEnabled.value = !!draft.value.image;
+    scope.value = "workbook";
+    loadPreviewImage(currentImageUrl.value);
+    void nextTick(drawPreview);
+  },
+  { immediate: true },
+);
+watch(currentImageUrl, (url) => loadPreviewImage(url));
+watch([draft, imageDraft, textEnabled, imageEnabled], () => void nextTick(drawPreview), {
+  deep: true,
+});
+watch(previewCanvas, (canvas) => {
+  if (canvas) void nextTick(drawPreview);
+});
+onBeforeUnmount(clearLocalImage);
 </script>
+
 <template>
   <Dialog
     :visible="visible"
-    :header="t('pageDecoration.watermark')"
-    :confirm-btn="{ content: t('pageDecoration.confirm'), disabled: !draft.text.trim() }"
+    :header="t('pageDecoration.customWatermark')"
+    :confirm-btn="{
+      content: t('pageDecoration.confirm'),
+      disabled: !canSave || busy,
+      loading: busy,
+    }"
     :cancel-btn="t('pageDecoration.cancel')"
-    width="440px"
+    width="900px"
     placement="center"
     @confirm="save"
     @close="close"
+    @opened="drawPreview"
   >
-    <TForm :data="draft" label-align="right" :label-width="labelWidth" class="watermark-dialog">
-      <TFormItem name="text" :label="t('pageDecoration.watermarkText')"
-        ><TInput v-model="draft.text" maxlength="256" data-watermark-text
-      /></TFormItem>
-      <TFormItem name="fontSize" :label="t('pageDecoration.fontSize')"
-        ><TInputNumber
-          v-model="draft.fontSize"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="8"
-          :max="288"
-          :decimal-places="0"
-      /></TFormItem>
-      <TFormItem name="color" :label="t('pageDecoration.color')"
-        ><ColorPalette
-          :model-value="draft.color"
-          default-color="#808080"
-          :default-label="t('pageDecoration.color')"
-          @select="draft.color = $event ?? '#808080'"
-      /></TFormItem>
-      <TFormItem name="opacity" :label="t('pageDecoration.opacity')"
-        ><TInputNumber
-          v-model="opacityPercent"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="0"
-          :max="100"
-          :step="5"
-          :decimal-places="0"
-      /></TFormItem>
-      <TFormItem name="angle" :label="t('pageDecoration.angle')"
-        ><TInputNumber
-          v-model="draft.angle"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="-360"
-          :max="360"
-          :decimal-places="0"
-      /></TFormItem>
-      <TFormItem v-if="watermark" :label-width="0"
-        ><button
-          type="button"
-          class="watermark-dialog__remove"
-          @click="
-            emit('remove');
-            close();
-          "
+    <div class="watermark-dialog">
+      <section class="watermark-dialog__settings">
+        <input ref="imageInput" type="file" accept="image/*" hidden @change="imageChanged" />
+        <TCheckbox v-model="imageEnabled" :disabled="busy">{{
+          t("pageDecoration.imageWatermark")
+        }}</TCheckbox>
+        <div class="watermark-dialog__image-controls" :class="{ 'is-disabled': !imageEnabled }">
+          <button
+            class="watermark-dialog__choose-image"
+            type="button"
+            :disabled="!imageEnabled || busy"
+            @click="chooseImage"
+          >
+            {{ draft.image ? t("pageDecoration.changeImage") : t("pageDecoration.chooseImage") }}
+          </button>
+          <TForm
+            :data="imageDraft"
+            label-align="right"
+            :label-width="labelWidth"
+            class="watermark-dialog__form"
+          >
+            <TFormItem :label="t('pageDecoration.scale')">
+              <TSelect
+                v-model="imageScale"
+                :disabled="!imageEnabled || !draft.image || busy"
+                :options="[
+                  { label: t('pageDecoration.auto'), value: 'auto' },
+                  { label: '50%', value: 50 },
+                  { label: '100%', value: 100 },
+                  { label: '150%', value: 150 },
+                  { label: '200%', value: 200 },
+                ]"
+              />
+            </TFormItem>
+            <TFormItem :label="t('pageDecoration.layout')">
+              <div class="watermark-dialog__inline-options">
+                <TSelect
+                  class="watermark-dialog__image-layout"
+                  v-model="imageDraft.angle"
+                  :disabled="!imageEnabled || !draft.image || busy"
+                  :options="[
+                    { label: t('pageDecoration.horizontal'), value: 0 },
+                    { label: t('pageDecoration.diagonal'), value: -45 },
+                  ]"
+                />
+                <TCheckbox
+                  v-model="imageDraft.washout"
+                  :disabled="!imageEnabled || !draft.image || busy"
+                  >{{ t("pageDecoration.washout") }}</TCheckbox
+                >
+              </div>
+            </TFormItem>
+          </TForm>
+        </div>
+
+        <TCheckbox v-model="textEnabled" :disabled="busy">{{
+          t("pageDecoration.textWatermark")
+        }}</TCheckbox>
+        <TForm
+          :data="draft"
+          label-align="right"
+          :label-width="labelWidth"
+          class="watermark-dialog__form"
+          :class="{ 'is-disabled': !textEnabled }"
         >
-          {{ t("pageDecoration.removeWatermark") }}
-        </button></TFormItem
-      >
-    </TForm>
+          <TFormItem :label="t('pageDecoration.watermarkText')">
+            <TAutoComplete
+              v-model="draft.text"
+              :disabled="!textEnabled || busy"
+              :options="[
+                { label: t('pageDecoration.draft'), value: t('pageDecoration.draft') },
+                {
+                  label: t('pageDecoration.confidential'),
+                  value: t('pageDecoration.confidential'),
+                },
+              ]"
+              :input-props="{ maxlength: 256 }"
+              filterable
+            />
+          </TFormItem>
+          <TFormItem :label="t('pageDecoration.fontFamily')">
+            <TAutoComplete
+              v-model="draft.fontFamily"
+              :disabled="!textEnabled || busy"
+              :options="fontOptions"
+              filterable
+            />
+          </TFormItem>
+          <TFormItem :label="t('pageDecoration.fontSize')">
+            <TSelect
+              v-model="draft.fontSize"
+              :disabled="!textEnabled || busy"
+              :options="fontSizeOptions"
+            />
+          </TFormItem>
+          <TFormItem :label="t('pageDecoration.color')">
+            <ColorPaletteSelect
+              :model-value="draft.color"
+              :label="t('pageDecoration.color')"
+              default-color="#c0c0c0"
+              :disabled="!textEnabled || busy"
+              @select="draft.color = $event ?? '#c0c0c0'"
+            />
+          </TFormItem>
+          <TFormItem :label="t('pageDecoration.layout')">
+            <TSelect
+              v-model="draft.angle"
+              :disabled="!textEnabled || busy"
+              :options="[
+                { label: t('pageDecoration.horizontal'), value: 0 },
+                { label: t('pageDecoration.diagonal'), value: -45 },
+              ]"
+            />
+          </TFormItem>
+          <TFormItem :label="t('pageDecoration.opacity')">
+            <div class="watermark-dialog__opacity">
+              <TSlider
+                v-model="opacityPercent"
+                :disabled="!textEnabled || busy"
+                :min="0"
+                :max="100"
+              />
+              <TInputNumber
+                v-model="opacityPercent"
+                theme="column"
+                class="idea-input-number--persistent-controls"
+                :disabled="!textEnabled || busy"
+                :min="0"
+                :max="100"
+                :decimal-places="0"
+                suffix="%"
+              />
+            </div>
+          </TFormItem>
+        </TForm>
+        <TForm :label-width="labelWidth" label-align="right" class="watermark-dialog__scope">
+          <TFormItem :label="t('pageDecoration.applyTo')">
+            <TSelect
+              v-model="scope"
+              :disabled="busy"
+              :options="[
+                { label: t('pageDecoration.currentSheet'), value: 'sheet' },
+                { label: t('pageDecoration.workbook'), value: 'workbook' },
+              ]"
+            />
+          </TFormItem>
+        </TForm>
+      </section>
+      <section class="watermark-dialog__preview">
+        <h3>{{ t("pageDecoration.preview") }}</h3>
+        <div class="watermark-dialog__paper"><canvas ref="previewCanvas" /></div>
+      </section>
+    </div>
   </Dialog>
 </template>
+
 <style scoped lang="scss">
 .watermark-dialog {
-  &__remove {
-    border: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(240px, 0.85fr);
+  gap: 36px;
+  min-height: 420px;
+  &__settings {
+    min-width: 0;
+  }
+  &__image-controls {
+    margin: 10px 0 18px;
+    padding: 12px 0 0;
+    border-top: 1px dashed var(--idea-border-control);
+  }
+  &__choose-image {
+    width: 100%;
+    min-height: 42px;
+    border: 1px dashed var(--idea-border-control);
+    border-radius: 6px;
     background: transparent;
-    color: var(--idea-status-error);
-    padding: 0;
+    color: var(--idea-text-secondary);
     cursor: pointer;
+  }
+  &__choose-image:disabled {
+    cursor: default;
+  }
+  &__form {
+    margin-top: 10px;
+  }
+  &__scope {
+    margin-top: 18px;
+    padding-top: 12px;
+    border-top: 1px solid var(--idea-border-control);
+  }
+  &__opacity {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 90px;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+  }
+  &__inline-options {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+  }
+  &__image-layout {
+    flex: 1;
+    min-width: 0;
+  }
+  &__preview h3 {
+    margin: 0 0 16px;
+    font-size: 14px;
+    color: var(--idea-text-primary);
+  }
+  &__paper {
+    aspect-ratio: 210 / 297;
+    overflow: hidden;
+    border: 1px solid var(--idea-border-control);
+    border-radius: 6px;
+    background: white;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 4%);
+  }
+  &__paper canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .is-disabled {
+    opacity: 0.5;
   }
 }
 </style>

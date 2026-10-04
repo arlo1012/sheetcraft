@@ -17,6 +17,7 @@ import {
   createSetSheetOutlineLevelCommand,
   createSetSheetPageSetupCommand,
   createSetSheetPageDecorationCommand,
+  createSetSheetsWatermarkCommand,
   type CellFormatChange,
 } from "@idea10/core/commands";
 import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@idea10/core/page-setup";
@@ -58,7 +59,10 @@ import PageBackgroundMenu from "../modules/page-decorations/components/PageBackg
 import type { SheetWatermark } from "@idea10/core/page-decoration";
 import PageWatermarkMenu from "../modules/page-decorations/components/PageWatermarkMenu.vue";
 import WatermarkDialog from "../modules/page-decorations/components/WatermarkDialog.vue";
-import { usePageDecorationActions } from "../modules/page-decorations/usePageDecorationActions";
+import {
+  usePageDecorationActions,
+  type WatermarkScope,
+} from "../modules/page-decorations/usePageDecorationActions";
 import PageToolbar from "../modules/page-layout/components/PageToolbar.vue";
 import TableStylesMenu from "../modules/table-styles/components/TableStylesMenu.vue";
 import {
@@ -476,6 +480,17 @@ function applyWatermark(watermark: SheetWatermark): void {
   decorations.setWatermark(watermark);
   setViewMode("page-layout");
 }
+async function saveCustomWatermark(
+  watermark: SheetWatermark,
+  scope: WatermarkScope,
+  imageFile?: File,
+): Promise<void> {
+  if (loading.value || fileBusy.value || xlsxBusy.value) return;
+  if (await decorations.applyWatermark(watermark, scope, imageFile)) {
+    watermarkVisible.value = false;
+    setViewMode("page-layout");
+  }
+}
 function openWatermark(): void {
   if (loading.value || fileBusy.value || xlsxBusy.value || activeSheet.value.properties.protected)
     return;
@@ -881,6 +896,11 @@ const decorations = usePageDecorationActions({
   flushPendingEdits: () => cellEditSession.finish(),
   setDecoration: (sheetId, decoration) =>
     executeCommand(createSetSheetPageDecorationCommand(sheetId, decoration)),
+  setWatermarks: (sheetIds, watermark) =>
+    executeCommand(createSetSheetsWatermarkCommand(sheetIds, watermark)),
+});
+watch(watermarkVisible, (visible) => {
+  if (!visible) decorations.cancelWatermark();
 });
 const { busy: decorationBusy, current: pageDecoration, feedback: decorationFeedback } = decorations;
 watch(decorationFeedback, (feedback) => {
@@ -2750,8 +2770,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     <WatermarkDialog
       v-model:visible="watermarkVisible"
       :watermark="pageDecoration.watermark"
-      @save="applyWatermark"
-      @remove="decorations.removeWatermark"
+      :image-asset-urls="imageAssetUrls"
+      :busy="decorationBusy"
+      @save="saveCustomWatermark"
     />
     <PageSetupDialog
       v-model:visible="pageSetupVisible"

@@ -86,6 +86,9 @@ function rewriteImageReferences(workbook: Workbook, ids: ReadonlyMap<string, str
     if (sheet.pageDecoration?.backgroundAssetId)
       sheet.pageDecoration.backgroundAssetId =
         ids.get(sheet.pageDecoration.backgroundAssetId) ?? sheet.pageDecoration.backgroundAssetId;
+    const watermarkImage = sheet.pageDecoration?.watermark?.image;
+    if (watermarkImage)
+      watermarkImage.assetId = ids.get(watermarkImage.assetId) ?? watermarkImage.assetId;
     for (const cell of sheet.cells.values()) {
       if (cell.content?.kind === "image")
         cell.content.image.assetId =

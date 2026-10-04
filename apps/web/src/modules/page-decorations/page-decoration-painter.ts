@@ -49,21 +49,91 @@ export function paintWatermarkInRect(
   context: CanvasRenderingContext2D,
   watermark: NonNullable<SheetPageDecoration["watermark"]>,
   rect: { x: number; y: number; width: number; height: number },
-  options: { fontScale?: number } = {},
+  options: {
+    fontScale?: number;
+    image?: HTMLImageElement;
+    /** Visible portion of the canvas; avoids visiting off-screen page tiles. */
+    viewport?: { x: number; y: number; width: number; height: number };
+  } = {},
 ): void {
   if (rect.width <= 0 || rect.height <= 0) return;
+  const scale = options.fontScale ?? 1;
+  const fontSize = Math.max(8, watermark.fontSize) * scale;
+  const hasText = Boolean(watermark.text);
+  const image = watermark.image && options.image;
+  if (!hasText && !image) return;
+
   context.save();
   context.beginPath();
   context.rect(rect.x, rect.y, rect.width, rect.height);
   context.clip();
-  context.translate(rect.x + rect.width / 2, rect.y + rect.height / 2);
-  context.rotate((watermark.angle * Math.PI) / 180);
-  context.globalAlpha = watermark.opacity;
-  context.fillStyle = watermark.color;
-  context.font = `${Math.max(8, watermark.fontSize * (options.fontScale ?? 1))}px sans-serif`;
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.fillText(watermark.text, 0, 0, Math.max(0, rect.width * 0.9));
+  context.font = `${fontSize}px ${JSON.stringify(watermark.fontFamily ?? "sans-serif")}`;
+  const textMetrics = hasText ? context.measureText(watermark.text) : undefined;
+  const textWidth = textMetrics?.width ?? 0;
+  const textHeight = textMetrics
+    ? Math.max(fontSize, textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent)
+    : 0;
+  const imageWidth = image
+    ? image.naturalWidth *
+      scale *
+      (watermark.image?.scale == null
+        ? 100 / Math.max(image.naturalWidth, image.naturalHeight)
+        : watermark.image.scale / 100)
+    : 0;
+  const imageHeight = image
+    ? image.naturalHeight *
+      scale *
+      (watermark.image?.scale == null
+        ? 100 / Math.max(image.naturalWidth, image.naturalHeight)
+        : watermark.image.scale / 100)
+    : 0;
+  const itemWidth = Math.max(textWidth, imageWidth);
+  const itemHeight = Math.max(textHeight, imageHeight);
+  const diagonal = Math.hypot(itemWidth, itemHeight);
+  // WPS keeps a small, diagonal watermark lattice across the complete page. The
+  // fixed floor avoids a dense pattern for short labels; the measured extent
+  // prevents larger custom labels or pictures from colliding.
+  const step = Math.max(110 * scale, diagonal + 36 * scale);
+  const viewport = options.viewport;
+  const left = Math.max(rect.x, viewport?.x ?? rect.x);
+  const top = Math.max(rect.y, viewport?.y ?? rect.y);
+  const right = Math.min(
+    rect.x + rect.width,
+    (viewport?.x ?? rect.x) + (viewport?.width ?? rect.width),
+  );
+  const bottom = Math.min(
+    rect.y + rect.height,
+    (viewport?.y ?? rect.y) + (viewport?.height ?? rect.height),
+  );
+  if (right <= left || bottom <= top) {
+    context.restore();
+    return;
+  }
+  const startX = rect.x + Math.floor((left - rect.x) / step) * step - step;
+  const startY = rect.y + Math.floor((top - rect.y) / step) * step - step;
+  for (let y = startY; y < bottom + step; y += step) {
+    for (let x = startX; x < right + step; x += step) {
+      if (hasText) {
+        context.save();
+        context.globalAlpha = watermark.opacity;
+        context.translate(x, y);
+        context.rotate((watermark.angle * Math.PI) / 180);
+        context.fillStyle = watermark.color;
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText(watermark.text, 0, 0);
+        context.restore();
+      }
+      if (image) {
+        context.save();
+        context.translate(x, y);
+        context.rotate(((watermark.image?.angle ?? watermark.angle) * Math.PI) / 180);
+        context.globalAlpha = watermark.image?.washout ? 0.2 : 1;
+        context.drawImage(image, -imageWidth / 2, -imageHeight / 2, imageWidth, imageHeight);
+        context.restore();
+      }
+    }
+  }
   context.restore();
 }
 
@@ -73,9 +143,10 @@ export function paintSheetWatermark(
   decoration: SheetPageDecoration | undefined,
   frame: SheetRenderFrame,
   pageView: PageViewPaintState | undefined,
+  image?: HTMLImageElement,
 ): void {
   const watermark = decoration?.watermark;
-  if (!watermark?.text) return;
+  if (!watermark || (!watermark.text && !watermark.image)) return;
   if (!pageView) return;
   const scroll = frame.layout.bodyScrollPosition;
   if (pageView.mode === "page-layout") {
@@ -83,15 +154,33 @@ export function paintSheetWatermark(
       paintWatermarkInRect(
         context,
         watermark,
-        { ...page.contentRect, x: page.contentRect.x - scroll.x, y: page.contentRect.y - scroll.y },
-        { fontScale: pageView.uiScale ?? 1 },
+        { ...page.paperRect, x: page.paperRect.x - scroll.x, y: page.paperRect.y - scroll.y },
+        {
+          fontScale: pageView.uiScale ?? 1,
+          image,
+          viewport: {
+            x: 0,
+            y: 0,
+            width: frame.layout.viewportSize.width,
+            height: frame.layout.viewportSize.height,
+          },
+        },
       );
   } else if (pageView.mode === "page-break-preview") {
     for (const page of pageView.pages)
-      paintWatermarkInRect(context, watermark, {
-        ...page.sheetRect,
-        x: page.sheetRect.x - scroll.x,
-        y: page.sheetRect.y - scroll.y,
-      });
+      paintWatermarkInRect(
+        context,
+        watermark,
+        { ...page.sheetRect, x: page.sheetRect.x - scroll.x, y: page.sheetRect.y - scroll.y },
+        {
+          image,
+          viewport: {
+            x: 0,
+            y: 0,
+            width: frame.layout.viewportSize.width,
+            height: frame.layout.viewportSize.height,
+          },
+        },
+      );
   }
 }
