@@ -21,11 +21,6 @@ export type ReviewMessageSchema = {
     noteText: string;
     save: string;
     cancel: string;
-    close: string;
-    notesTitle: string;
-    noNotes: string;
-    edit: string;
-    delete: string;
     anonymous: string;
     emptyText: string;
     failed: string;

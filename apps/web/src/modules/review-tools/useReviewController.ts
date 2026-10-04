@@ -33,7 +33,7 @@ export function useReviewController(options: {
   focus: () => void;
 }) {
   const { t } = useAppI18n();
-  const showingNotes = ref(false);
+  const showActiveNote = ref(true);
   const draft = shallowRef<NoteDraft>();
   const error = ref("");
   let target: NoteTarget | undefined;
@@ -53,7 +53,6 @@ export function useReviewController(options: {
     void options.getRevision();
     return Boolean(getCellNote(options.getSheet(), anchor(options.getAddress())));
   });
-  const activeAddress = computed(() => formatCellAddress(anchor(options.getAddress())));
   const hasSelectedNotes = computed(() => {
     const range = options.getSelection();
     return notes.value.some(
@@ -73,9 +72,17 @@ export function useReviewController(options: {
     if (wasOpen) void nextTick(options.focus);
   }
   watch([options.getGeneration, () => options.getSheet().id], close);
-  watch(options.getGeneration, () => {
-    showingNotes.value = false;
-  });
+  watch(
+    [
+      options.getGeneration,
+      () => options.getSheet().id,
+      () => options.getAddress().row,
+      () => options.getAddress().column,
+    ],
+    () => {
+      showActiveNote.value = true;
+    },
+  );
 
   function edit(address = options.getAddress()): void {
     if (options.isBusy() || options.getSheet().properties.protected || !options.finishEditing())
@@ -112,9 +119,10 @@ export function useReviewController(options: {
         options.execute(
           createSetCellNoteCommand(options.getWorkbook(), sheet.id, target.address, note),
         )
-      )
+      ) {
+        showActiveNote.value = true;
         close();
-      else error.value = t("review.failed");
+      } else error.value = t("review.failed");
     } catch {
       error.value = t("review.failed");
     }
@@ -132,7 +140,7 @@ export function useReviewController(options: {
   function navigate(address: CellAddress): void {
     if (options.isBusy() || !options.finishEditing()) return;
     options.navigate(address);
-    showingNotes.value = true;
+    showActiveNote.value = true;
   }
   function step(direction: -1 | 1): void {
     if (!notes.value.length) return;
@@ -144,24 +152,23 @@ export function useReviewController(options: {
         : ([...notes.value].reverse().find((value) => compare(value) < 0) ?? notes.value.at(-1)!);
     navigate({ row: note.row, column: note.column });
   }
-  function toggleNotes(): void {
+  function toggleNote(): void {
     if (options.isBusy() || !options.finishEditing()) return;
-    showingNotes.value = !showingNotes.value;
+    showActiveNote.value = !showActiveNote.value;
   }
   return {
     notes,
     draft,
     error,
-    showingNotes,
+    showActiveNote,
     hasNote,
     hasSelectedNotes,
-    activeAddress,
     edit,
     close,
     save,
     remove,
     navigate,
     step,
-    toggleNotes,
+    toggleNote,
   };
 }

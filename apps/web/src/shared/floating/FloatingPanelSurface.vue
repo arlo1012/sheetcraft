@@ -23,6 +23,7 @@ const props = withDefaults(
     constrainToViewport?: boolean;
     viewportInset?: string;
     layer?: FloatingPanelLayer;
+    appearance?: "default" | "note";
     tabindex?: number | string;
   }>(),
   {
@@ -32,6 +33,7 @@ const props = withDefaults(
     constrainToViewport: true,
     viewportInset: "var(--idea-space-4)",
     layer: "menu",
+    appearance: "default",
     tabindex: -1,
   },
 );
@@ -49,6 +51,7 @@ defineExpose({ rootElement });
       'idea-floating-panel-surface',
       `idea-floating-panel-surface--padding-${padding}`,
       `idea-floating-panel-surface--layer-${layer}`,
+      { 'idea-floating-panel-surface--note': appearance === 'note' },
       {
         'idea-floating-panel-surface--scrollable': scrollable,
         'idea-floating-panel-surface--constrained': constrainToViewport,
@@ -71,6 +74,14 @@ defineExpose({ rootElement });
   @include panel.surface;
 
   outline: none;
+
+  &--note {
+    color: var(--idea-note-text);
+    background: var(--idea-note-background);
+    border: 1px solid var(--idea-note-border);
+    border-radius: 0;
+    box-shadow: none;
+  }
 
   &--padding-compact {
     padding: var(--idea-space-2);

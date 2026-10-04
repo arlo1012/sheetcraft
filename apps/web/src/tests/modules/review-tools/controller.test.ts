@@ -107,9 +107,23 @@ describe("review controller", () => {
     expect(f.navigate).toHaveBeenLastCalledWith({ row: 4, column: 0 });
     f.review.step(1);
     expect(f.navigate).toHaveBeenLastCalledWith({ row: 0, column: 3 });
-    expect(f.review.showingNotes.value).toBe(true);
+    expect(f.review.showActiveNote.value).toBe(true);
     expect(f.execute).not.toHaveBeenCalled();
   });
+  test("shows a selected note by default and restores viewing after switching cells", async () => {
+    const f = fixture();
+    f.add(0, 0, "First");
+    f.add(1, 1, "Second");
+    f.execute.mockClear();
+    expect(f.review.showActiveNote.value).toBe(true);
+    f.review.toggleNote();
+    expect(f.review.showActiveNote.value).toBe(false);
+    f.address.value = { row: 1, column: 1 };
+    await nextTick();
+    expect(f.review.showActiveNote.value).toBe(true);
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
   test("deletes only selected notes atomically and one undo restores the range", () => {
     const f = fixture();
     f.add(0, 0, "a");

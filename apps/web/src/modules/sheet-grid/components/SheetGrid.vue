@@ -35,7 +35,11 @@ import { columnIndexToLabel, getCellAddressLabel } from "@idea10/core/coordinate
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
 import { getSelectionFitZoom } from "../selection-zoom";
-import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
+import {
+  useFloatingPanel,
+  type FloatingReference,
+} from "../../../shared/floating/useFloatingPanel";
+import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 import {
@@ -238,6 +242,10 @@ const props = withDefaults(
     activeCellError?: CellErrorDescription;
     inputError?: { address: CellAddress; title: string; message: string };
     errorIndicatorColor?: string | null;
+    /** Whether selecting a noted cell shows its classic note preview. */
+    showActiveNote?: boolean;
+    /** Suppresses the selected-cell note preview while a workspace interaction owns focus. */
+    notePreviewDisabled?: boolean;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -261,6 +269,8 @@ const props = withDefaults(
     showPageWhiteSpace: true,
     pageRulerUnit: "cm",
     dateSystem: "1900",
+    showActiveNote: true,
+    notePreviewDisabled: false,
   },
 );
 
@@ -600,12 +610,16 @@ const pageUiScale = computed(() =>
     ? (pagination.value?.printScale ?? pageSetup.value.scale / 100)
     : 1,
 );
+const selectionDragging = ref(false);
 const { start: startDragSelection, stop: stopDragSelection } = useDragSelection({
   getScale: () => scale.value,
   getCellAtClientPoint,
   getScroller: () => scrollerRef.value,
   getViewportSize: () => viewportSize,
-  onDraggingChange: (dragging) => emit("selectionDraggingChange", dragging),
+  onDraggingChange: (dragging) => {
+    selectionDragging.value = dragging;
+    emit("selectionDraggingChange", dragging);
+  },
   onComplete: () => {
     if (props.formatPainterActive && !props.readOnly) {
       emit("formatPainterTarget", getSelectionRange(selection.value));
@@ -1108,6 +1122,23 @@ const overlayState = computed<SheetOverlayState>(() => {
 });
 const imageHoverCursor = ref<string>();
 const hoveredHyperlink = shallowRef<{ address: CellAddress; title: string }>();
+const hoveredNoteAddress = shallowRef<CellAddress>();
+let notePreviewLeaveTimer: number | undefined;
+
+function cancelNotePreviewLeave(): void {
+  if (notePreviewLeaveTimer === undefined) return;
+  window.clearTimeout(notePreviewLeaveTimer);
+  notePreviewLeaveTimer = undefined;
+}
+
+function scheduleNotePreviewLeave(): void {
+  cancelNotePreviewLeave();
+  notePreviewLeaveTimer = window.setTimeout(() => {
+    hoveredNoteAddress.value = undefined;
+    notePreviewLeaveTimer = undefined;
+  }, 120);
+}
+
 const hyperlinkPointerGesture = shallowRef<{
   address: CellAddress;
   pointerId: number;
@@ -1167,6 +1198,7 @@ function onSurfacePointerDown(event: PointerEvent): void {
   }
 }
 function onSurfacePointerMove(event: PointerEvent): void {
+  cancelNotePreviewLeave();
   pageBreakDrag.hover(event);
   if (isRulerPoint(surfacePoint(event))) {
     headerInput.onPointerLeave();
@@ -1179,12 +1211,18 @@ function onSurfacePointerMove(event: PointerEvent): void {
   hoveredHyperlink.value = hyperlink
     ? { address, title: hyperlink.tooltip || hyperlink.target }
     : undefined;
+  const noteAddress = address && layout.value.getAnchorForAddress(address);
+  hoveredNoteAddress.value =
+    noteAddress && props.sheet.cells.get(`${noteAddress.row}:${noteAddress.column}`)?.note
+      ? noteAddress
+      : undefined;
 }
 function onSurfacePointerLeave(): void {
   pageBreakDrag.clearHover();
   headerInput.onPointerLeave();
   imageHoverCursor.value = undefined;
   hoveredHyperlink.value = undefined;
+  scheduleNotePreviewLeave();
 }
 function clearHyperlinkPointerGesture(): void {
   hyperlinkPointerGesture.value = undefined;
@@ -1248,6 +1286,73 @@ const activeCellRect = computed(
       width: 0,
       height: 0,
     },
+);
+const notePreviewAddress = computed(
+  () => hoveredNoteAddress.value ?? layout.value.getAnchorForAddress(activeCell.value),
+);
+const notePreview = computed(() => {
+  // Workbook maps are intentionally non-reactive; revision is the document-change signal.
+  void props.workbookRevision;
+  return props.sheet.cells.get(`${notePreviewAddress.value.row}:${notePreviewAddress.value.column}`)
+    ?.note;
+});
+const notePreviewEnabled = computed(
+  () =>
+    Boolean(notePreview.value) &&
+    (Boolean(hoveredNoteAddress.value) || props.showActiveNote) &&
+    !props.notePreviewDisabled &&
+    !isEditing.value &&
+    !selectionDragging.value &&
+    !freezeDragging.value &&
+    !dimensionResize.value &&
+    !axisMoveDrag.value?.active &&
+    !cellContextMenu.value &&
+    !axisContextMenu.value,
+);
+const notePreviewAnchor = computed<FloatingReference | null>(() => {
+  if (!notePreviewEnabled.value) return null;
+  const rect = layout.value.getCellViewportRect(notePreviewAddress.value);
+  const root = rootRef.value;
+  if (!root || !rect || rect.width === 0 || rect.height === 0) return null;
+  const { row, column } = notePreviewAddress.value;
+  const pane =
+    row < effectiveFreeze.value.rows
+      ? column < effectiveFreeze.value.columns
+        ? renderFrame.value.panes.topLeft
+        : renderFrame.value.panes.top
+      : column < effectiveFreeze.value.columns
+        ? renderFrame.value.panes.left
+        : renderFrame.value.panes.body;
+  const left = Math.max(rect.x, pane.clip.x);
+  const top = Math.max(rect.y, pane.clip.y);
+  const right = Math.min(rect.x + rect.width, pane.clip.x + pane.clip.width);
+  const bottom = Math.min(rect.y + rect.height, pane.clip.y + pane.clip.height);
+  if (right <= left || bottom <= top) return null;
+  const bounds = root.getBoundingClientRect();
+  const x = bounds.left + (renderFrame.value.body.x + right) * scale.value;
+  const y = bounds.top + (renderFrame.value.body.y + top) * scale.value;
+  return markRaw({
+    getBoundingClientRect: () => new DOMRect(x, y, 0, 0),
+  });
+});
+const notePreviewOpen = computed(() => Boolean(notePreviewAnchor.value));
+const notePreviewRef = ref<HTMLElement | null>(null);
+const { floatingStyles: notePreviewStyles, placement: notePreviewPlacement } = useFloatingPanel(
+  notePreviewAnchor,
+  notePreviewRef,
+  notePreviewOpen,
+  { placement: "right-start", offset: 8 },
+);
+const notePreviewAuthor = computed(
+  () => notePreview.value?.author?.trim() || t("review.anonymous"),
+);
+const notePreviewAddressLabel = computed(() => getCellAddressLabel(notePreviewAddress.value));
+
+watch(
+  () => `${props.sheet.id}:${activeCell.value.row}:${activeCell.value.column}`,
+  () => {
+    hoveredNoteAddress.value = undefined;
+  },
 );
 const selectedRangeRects = computed(() => layout.value.getRangeFragments(selectedRange.value));
 
@@ -2730,6 +2835,7 @@ onBeforeUnmount(() => {
   stopFormulaReferenceDrag();
   stopDimensionResize();
   clearHyperlinkPointerGesture();
+  cancelNotePreviewLeave();
   clearPendingClipboard();
 });
 
@@ -3091,6 +3197,42 @@ defineExpose({
       :transform="imagePreview.transform"
       @close="closeImagePreview"
     />
+    <Teleport to="body">
+      <div
+        v-if="notePreviewOpen && notePreview"
+        ref="notePreviewRef"
+        class="sheet-note-preview"
+        :class="{ 'is-left-placement': notePreviewPlacement.startsWith('left') }"
+        :style="notePreviewStyles"
+        @pointerenter="cancelNotePreviewLeave"
+        @pointerleave="scheduleNotePreviewLeave"
+      >
+        <span class="sheet-note-preview__pointer" aria-hidden="true" />
+        <FloatingPanelSurface
+          appearance="note"
+          :label="`${t('review.noteText')} · ${t('review.address')}: ${notePreviewAddressLabel}`"
+          role="group"
+          layer="popover"
+          :scrollable="false"
+          class="sheet-note-preview__surface"
+        >
+          <div class="sheet-note-preview__body">
+            <div class="sheet-note-preview__author">
+              <span class="ui-visually-hidden">{{ t("review.author") }}</span>
+              <strong>{{ notePreviewAuthor }}</strong
+              >:
+              <span class="ui-visually-hidden"
+                >{{ t("review.address") }}: {{ notePreviewAddressLabel }}</span
+              >
+            </div>
+            <div class="sheet-note-preview__text">
+              <span class="ui-visually-hidden">{{ t("review.noteText") }}</span>
+              {{ notePreview.text }}
+            </div>
+          </div>
+        </FloatingPanelSurface>
+      </div>
+    </Teleport>
   </section>
 </template>
 
@@ -3183,6 +3325,76 @@ defineExpose({
       background: var(--idea-action-primary);
       content: "";
     }
+  }
+}
+
+.sheet-note-preview {
+  position: fixed;
+  z-index: var(--idea-layer-popover);
+
+  &__pointer {
+    position: absolute;
+    top: 10px;
+    left: -8px;
+    z-index: 1;
+    width: 0;
+    height: 0;
+    border-top: 7px solid transparent;
+    border-right: 8px solid var(--idea-note-border);
+    border-bottom: 7px solid transparent;
+
+    &::after {
+      position: absolute;
+      top: -6px;
+      left: 2px;
+      width: 0;
+      height: 0;
+      border-top: 6px solid transparent;
+      border-right: 7px solid var(--idea-note-background);
+      border-bottom: 6px solid transparent;
+      content: "";
+    }
+  }
+
+  &.is-left-placement &__pointer {
+    right: -8px;
+    left: auto;
+    border-right: 0;
+    border-left: 8px solid var(--idea-note-border);
+
+    &::after {
+      right: 2px;
+      left: auto;
+      border-right: 0;
+      border-left: 7px solid var(--idea-note-background);
+    }
+  }
+
+  &__surface {
+    width: 220px;
+    min-height: 100px;
+    max-height: 240px;
+  }
+
+  &__body {
+    box-sizing: border-box;
+    min-height: 100px;
+    max-height: 240px;
+    padding: 8px 10px;
+    overflow: auto;
+    color: var(--idea-note-text);
+    font-size: 12px;
+    line-height: 20px;
+  }
+
+  &__author,
+  &__text {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  &__text {
+    margin-top: 4px;
   }
 }
 </style>

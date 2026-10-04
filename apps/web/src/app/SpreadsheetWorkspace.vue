@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import ReviewToolbar from "../modules/review-tools/components/ReviewToolbar.vue";
 import NoteEditorDialog from "../modules/review-tools/components/NoteEditorDialog.vue";
-import NoteListPanel from "../modules/review-tools/components/NoteListPanel.vue";
 import { useReviewController } from "../modules/review-tools/useReviewController";
 import { formatCellAddress } from "@idea10/core/coordinates";
 import { cloneConditionalFormatRule } from "@idea10/core/conditional-formatting";
@@ -350,10 +349,9 @@ const {
   draft: noteDraft,
   error: noteError,
   notes: reviewNotes,
-  showingNotes,
+  showActiveNote,
   hasNote,
   hasSelectedNotes,
-  activeAddress: noteActiveAddress,
 } = reviewActions;
 const cellStyleActions = useCellStylesController({
   getWorkbook: () => session.workbook,
@@ -1762,6 +1760,27 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
   event.stopPropagation();
   cancelFormatPainter();
 }
+const gridInert = computed(
+  () =>
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    !!cellFormatSelection.value ||
+    !!findFormatDraft.value ||
+    dataToolsModalOpen.value ||
+    !!hyperlinkDraft.value ||
+    !!noteDraft.value ||
+    cellStylesModalOpen.value ||
+    (tableModalOpen.value && !pickingTableRange.value) ||
+    formulaEditorVisible.value ||
+    formulaInsertVisible.value ||
+    printPreviewVisible.value ||
+    backgroundConflictVisible.value ||
+    themeDialogVisible.value ||
+    watermarkVisible.value ||
+    (pageSetupVisible.value && !pickingPageSetupRange.value) ||
+    !!modalValidationFeedback.value,
+);
 </script>
 
 <template>
@@ -1903,14 +1922,14 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           :has-note="hasNote"
           :has-selected-notes="hasSelectedNotes"
           :has-notes="reviewNotes.length > 0"
-          :showing-notes="showingNotes"
+          :show-active-note="showActiveNote"
           :edit-session-id="cellEditSession.id"
           @proofread="dataTools.openDataProofreading"
           @edit-note="reviewActions.edit()"
           @delete-notes="reviewActions.remove()"
           @previous-note="reviewActions.step(-1)"
           @next-note="reviewActions.step(1)"
-          @toggle-notes="reviewActions.toggleNotes"
+          @toggle-note="reviewActions.toggleNote"
           @toggle-protection="
             changeSheetProperties({
               sheetId: activeSheet.id,
@@ -2762,28 +2781,11 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     <div
       class="spreadsheet-workspace__grid"
       :class="{ 'is-eye-comfort': eyeComfortEnabled }"
-      :inert="
-        loading ||
-        fileBusy ||
-        xlsxBusy ||
-        !!cellFormatSelection ||
-        !!findFormatDraft ||
-        dataToolsModalOpen ||
-        !!hyperlinkDraft ||
-        !!noteDraft ||
-        cellStylesModalOpen ||
-        (tableModalOpen && !pickingTableRange) ||
-        formulaEditorVisible ||
-        formulaInsertVisible ||
-        printPreviewVisible ||
-        backgroundConflictVisible ||
-        themeDialogVisible ||
-        watermarkVisible ||
-        (pageSetupVisible && !pickingPageSetupRange) ||
-        !!modalValidationFeedback
-      "
+      :inert="gridInert"
     >
       <SheetGrid
+        :show-active-note="showActiveNote"
+        :note-preview-disabled="gridInert"
         :theme="workbookTheme"
         :show-page-breaks="showPageBreaks"
         :view-mode="activeViewMode"
@@ -2874,16 +2876,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @view-state-change="updateActiveSheetViewState"
         @selection-dragging-change="setSelectionDragging"
         @horizontal-scroll-change="updateHorizontalScrollState"
-      />
-      <NoteListPanel
-        v-if="showingNotes"
-        :notes="reviewNotes"
-        :active-address="noteActiveAddress"
-        :read-only="activeSheet.properties.protected || loading || fileBusy || xlsxBusy"
-        @navigate="reviewActions.navigate"
-        @edit="reviewActions.edit"
-        @delete="reviewActions.remove"
-        @close="showingNotes = false"
       />
     </div>
     <NoteEditorDialog
@@ -3043,13 +3035,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
   }
 
   &__grid {
-    display: flex;
-
-    > :first-child {
-      flex: 1;
-      min-width: 0;
-    }
-
     min-width: 0;
     min-height: 0;
 

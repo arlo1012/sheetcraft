@@ -3,7 +3,7 @@ import {
   ClipboardCheck,
   FileLock2,
   FileKey2,
-  List,
+  MessageSquareText,
   MessageSquarePlus,
   Pencil,
   Trash2,
@@ -22,7 +22,7 @@ const props = withDefaults(
     hasNote: boolean;
     hasNotes: boolean;
     hasSelectedNotes?: boolean;
-    showingNotes: boolean;
+    showActiveNote: boolean;
     editSessionId?: string;
   }>(),
   { hasSelectedNotes: undefined, editSessionId: undefined },
@@ -33,14 +33,14 @@ const emit = defineEmits<{
   deleteNotes: [];
   previousNote: [];
   nextNote: [];
-  toggleNotes: [];
+  toggleNote: [];
   toggleProtection: [];
 }>();
 const { t } = useAppI18n();
 const canDeleteNotes = computed(() => props.hasSelectedNotes ?? props.hasNote);
 const noteActionLabel = computed(() => t(props.hasNote ? "review.editNote" : "review.newNote"));
 const notesVisibilityLabel = computed(() =>
-  t(props.showingNotes ? "review.hideNotes" : "review.showNotes"),
+  t(props.hasNote && props.showActiveNote ? "review.hideNotes" : "review.showNotes"),
 );
 const protectionLabel = computed(() =>
   t(props.readOnly ? "review.unprotectSheet" : "review.protectSheet"),
@@ -113,13 +113,13 @@ const protectionLabel = computed(() =>
       </div>
       <RibbonButton
         variant="tall"
-        :disabled="busy"
-        :pressed="showingNotes"
+        :disabled="busy || !hasNote"
+        :pressed="hasNote && showActiveNote"
         :label="notesVisibilityLabel"
-        :text="t('review.notesTitle')"
-        data-review-action="toggle-notes"
-        @activate="emit('toggleNotes')"
-        ><List
+        :text="notesVisibilityLabel"
+        data-review-action="toggle-note"
+        @activate="emit('toggleNote')"
+        ><MessageSquareText
       /></RibbonButton>
     </section>
     <section

@@ -2,7 +2,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import NoteEditorDialog from "../../../modules/review-tools/components/NoteEditorDialog.vue";
-import NoteListPanel from "../../../modules/review-tools/components/NoteListPanel.vue";
+import ReviewToolbar from "../../../modules/review-tools/components/ReviewToolbar.vue";
 import { createAppI18n } from "../../../shared/i18n";
 
 let wrapper: ReturnType<typeof mount> | undefined;
@@ -36,21 +36,18 @@ describe("review note components", () => {
     ]);
   });
 
-  test("navigates from the list and hides edit actions while it is read-only", async () => {
-    wrapper = mount(NoteListPanel, {
-      props: {
-        activeAddress: "B2",
-        readOnly: true,
-        notes: [
-          { address: "B2", row: 1, column: 1, text: "Check total", author: "Alice" },
-          { address: "C3", row: 2, column: 2, text: "Confirm date" },
-        ],
-      },
+  test("offers current-note visibility without a notes-list action, including on locked sheets", async () => {
+    wrapper = mount(ReviewToolbar, {
+      props: { busy: false, readOnly: true, hasNote: true, hasNotes: true, showActiveNote: true },
       global: { plugins: [createAppI18n("en-US")] },
     });
-    await wrapper.findAll(".note-list-panel__navigate")[1]!.trigger("click");
-    expect(wrapper.emitted("navigate")).toEqual([[{ row: 2, column: 2 }]]);
-    expect(wrapper.find(".note-list-panel__actions").exists()).toBe(false);
-    expect(wrapper.find('[aria-current="true"]').text()).toContain("B2");
+    const toggle = wrapper.get('[data-review-action="toggle-note"]');
+    expect(toggle.attributes("disabled")).toBeUndefined();
+    expect(toggle.attributes("aria-label")).toBe("Hide Note");
+    await toggle.trigger("click");
+    expect(wrapper.emitted("toggleNote")).toEqual([[]]);
+    expect(wrapper.find('[data-review-action="toggle-notes"]').exists()).toBe(false);
+    await wrapper.setProps({ hasNote: false });
+    expect(toggle.attributes("disabled")).toBeDefined();
   });
 });
