@@ -485,6 +485,34 @@ describe("XLSX IO", () => {
     );
   });
 
+  test("roundtrips supported named paper sizes with OOXML paper IDs", async () => {
+    const paperSizes = [
+      ["letter", 1],
+      ["tabloid", 3],
+      ["legal", 5],
+      ["statement", 6],
+      ["executive", 7],
+      ["a3", 8],
+      ["a4", 9],
+      ["a5", 11],
+      ["b4-jis", 12],
+      ["b5-jis", 13],
+    ] as const;
+
+    for (const [paperSize, paperId] of paperSizes) {
+      const workbook = createWorkbook({ id: `paper-${paperSize}`, sheetId: "sheet" });
+      getActiveSheet(workbook).pageSetup = { ...DEFAULT_SHEET_PAGE_SETUP, paperSize };
+
+      const encoded = await encodeXlsx(workbook);
+      expect(xlsxEntryText(encoded.bytes, "xl/worksheets/sheet1.xml")).toContain(
+        `<pageSetup paperSize="${paperId}"`,
+      );
+      expect(getActiveSheet((await decodeXlsx(encoded.bytes)).workbook).pageSetup?.paperSize).toBe(
+        paperSize,
+      );
+    }
+  });
+
   test("retains whole-axis and dynamic-array formula sources without materializing spills", async () => {
     const workbook = createWorkbook({ id: "modern-formulas", sheetId: "sheet" });
     const sheet = getActiveSheet(workbook);

@@ -987,6 +987,13 @@ export type MessageSchema = ToolMessageSchema & {
     paperA3: string;
     paperLetter: string;
     paperLegal: string;
+    paperTabloid: string;
+    paperStatement: string;
+    paperExecutive: string;
+    paperA5: string;
+    paperB4Jis: string;
+    paperB5Jis: string;
+    otherPaperSizes: string;
     scaling: string;
     normalSize: string;
     fitToPages: string;

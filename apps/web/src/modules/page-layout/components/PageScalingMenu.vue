@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { Maximize2 } from "lucide-vue-next";
+import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
+import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import { computed, ref, useId } from "vue";
 import type { SheetPageFitToPage, SheetPageSetup } from "@idea10/core/page-setup";
 import { useAppI18n } from "../../../shared/i18n";
@@ -40,6 +42,12 @@ function selectNoScaling(): void {
 function select(preset: FitPreset): void {
   emit("change", { fitToPage: { ...presets[preset] } });
   dismiss("programmatic", true);
+}
+function setScale(value: InputNumberValue): void {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 10 || value > 400) {
+    return;
+  }
+  emit("change", { scale: value, fitToPage: null });
 }
 function openSetup(): void {
   dismiss("programmatic", false);
@@ -95,6 +103,24 @@ function openSetup(): void {
           @select="select('rows')"
           >{{ t("pageLayout.fitAllRows") }}</MenuRadioItem
         >
+        <li class="page-scaling-menu__scale" role="none">
+          <div role="group" :aria-label="t('pageLayout.scale')">
+            <span>{{ t("pageLayout.scale") }}</span>
+            <TInputNumber
+              :model-value="setup.scale"
+              class="page-scaling-menu__scale-input idea-input-number--persistent-controls"
+              :aria-label="t('pageLayout.scale')"
+              data-page-scaling="scale"
+              theme="column"
+              :min="10"
+              :max="400"
+              :decimal-places="0"
+              :step="1"
+              suffix="%"
+              @update:model-value="setScale"
+            />
+          </div>
+        </li>
         <MenuSeparator />
         <MenuItem data-page-scaling="custom" @select="openSetup">{{
           t("pageTools.customScaling")
@@ -111,6 +137,24 @@ function openSetup(): void {
   &__surface {
     z-index: var(--idea-layer-menu);
     min-width: 220px;
+  }
+  &__scale {
+    padding: 4px 14px;
+    color: var(--idea-text-primary);
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
+    list-style: none;
+
+    > [role="group"] {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+    }
+  }
+  &__scale-input {
+    width: 96px;
+    min-width: 0;
   }
 }
 </style>

@@ -8,8 +8,14 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { File } from "lucide-vue-next";
-import { getPagePaperSize, type SheetPageSetup } from "@idea10/core/page-setup";
+import {
+  getPagePaperSize,
+  PAGE_PAPER_SIZES_MM,
+  type SheetPageSetup,
+  type SheetPaperSize,
+} from "@idea10/core/page-setup";
 import { useAppI18n } from "../../../shared/i18n";
+import { PAGE_PAPER_LABELS } from "../page-paper-labels";
 
 const setup = defineModel<SheetPageSetup>("setup", { required: true });
 const { t, locale } = useAppI18n();
@@ -21,10 +27,7 @@ const fitting = computed(
   () => setup.value.fitToPage !== null && setup.value.fitToPage !== undefined,
 );
 const paperOptions = computed(() => [
-  { label: t("pageLayout.paperA4"), value: "a4" },
-  { label: t("pageLayout.paperA3"), value: "a3" },
-  { label: t("pageLayout.paperLetter"), value: "letter" },
-  { label: t("pageLayout.paperLegal"), value: "legal" },
+  ...Object.entries(PAGE_PAPER_LABELS).map(([value, label]) => ({ value, label: t(label) })),
   { label: t("pageLayout.paperCustom"), value: "custom" },
 ]);
 const fitOptions = computed(() => [
@@ -82,8 +85,8 @@ function customPaper(): void {
 }
 function setPaperSize(value: SelectValue): void {
   if (value === "custom") customPaper();
-  else if (value === "a4" || value === "a3" || value === "letter" || value === "legal")
-    patch({ paperSize: value });
+  else if (typeof value === "string" && Object.hasOwn(PAGE_PAPER_SIZES_MM, value))
+    patch({ paperSize: value as SheetPaperSize });
 }
 function setPaperDimension(axis: "width" | "height", value: number | undefined): void {
   if (typeof value === "number")

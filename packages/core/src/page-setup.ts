@@ -1,7 +1,18 @@
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./sheet-limits.js";
 import type { CellRange } from "./workbook.js";
 
-export type SheetPaperSize = "a4" | "a3" | "letter" | "legal" | "custom";
+export type SheetPaperSize =
+  | "a4"
+  | "a3"
+  | "a5"
+  | "letter"
+  | "tabloid"
+  | "legal"
+  | "statement"
+  | "executive"
+  | "b4-jis"
+  | "b5-jis"
+  | "custom";
 export type SheetCustomPaperSize = { width: number; height: number };
 export type SheetPageFitToPage = { width: number; height: number };
 export type SheetPagePrintOptions = {
@@ -101,8 +112,14 @@ export const PAGE_PAPER_SIZES_MM: Record<
 > = {
   a4: { width: 210, height: 297 },
   a3: { width: 297, height: 420 },
+  a5: { width: 148, height: 210 },
   letter: { width: 215.9, height: 279.4 },
+  tabloid: { width: 279.4, height: 431.8 },
   legal: { width: 215.9, height: 355.6 },
+  statement: { width: 139.7, height: 215.9 },
+  executive: { width: 184.15, height: 266.7 },
+  "b4-jis": { width: 257, height: 364 },
+  "b5-jis": { width: 182, height: 257 },
 };
 
 export const DEFAULT_SHEET_PAGE_SETUP: SheetPageSetup = {

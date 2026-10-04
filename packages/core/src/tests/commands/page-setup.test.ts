@@ -84,6 +84,30 @@ describe("sheet page setup", () => {
       width: 279.4,
       height: 215.9,
     });
+    expect(getPagePaperSize({ paperSize: "tabloid", orientation: "portrait" })).toEqual({
+      width: 279.4,
+      height: 431.8,
+    });
+    expect(getPagePaperSize({ paperSize: "statement", orientation: "landscape" })).toEqual({
+      width: 215.9,
+      height: 139.7,
+    });
+    expect(getPagePaperSize({ paperSize: "executive", orientation: "portrait" })).toEqual({
+      width: 184.15,
+      height: 266.7,
+    });
+    expect(getPagePaperSize({ paperSize: "a5", orientation: "portrait" })).toEqual({
+      width: 148,
+      height: 210,
+    });
+    expect(getPagePaperSize({ paperSize: "b4-jis", orientation: "portrait" })).toEqual({
+      width: 257,
+      height: 364,
+    });
+    expect(getPagePaperSize({ paperSize: "b5-jis", orientation: "portrait" })).toEqual({
+      width: 182,
+      height: 257,
+    });
   });
 
   test("does not mutate the shared default and rejects protected or invalid page settings", () => {

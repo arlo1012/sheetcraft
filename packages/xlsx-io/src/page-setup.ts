@@ -11,10 +11,16 @@ import type { CompatibilityReportBuilder } from "./report.js";
 
 const MILLIMETRES_PER_INCH = 25.4;
 const PAPER_SIZES = new Map<number, SheetPageSetup["paperSize"]>([
-  [9, "a4"],
-  [8, "a3"],
   [1, "letter"],
+  [3, "tabloid"],
   [5, "legal"],
+  [6, "statement"],
+  [7, "executive"],
+  [8, "a3"],
+  [9, "a4"],
+  [11, "a5"],
+  [12, "b4-jis"],
+  [13, "b5-jis"],
 ]);
 const OOXML_PAPER_SIZES = new Map<SheetPageSetup["paperSize"], number>(
   [...PAPER_SIZES.entries()].map(([id, size]) => [size, id]),
