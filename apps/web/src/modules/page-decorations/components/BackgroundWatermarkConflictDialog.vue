@@ -46,7 +46,7 @@ watch(
     }"
     :cancel-btn="t('pageDecoration.cancel')"
     :close-on-overlay-click="false"
-    width="min(640px, calc(100vw - 32px))"
+    width="min(480px, calc(100vw - 32px))"
     placement="center"
     @confirm="continueWithSelection"
     @close="close"
@@ -87,7 +87,7 @@ watch(
 
   &__choices {
     display: grid;
-    gap: 8px;
+    gap: 16px;
   }
 
   &__choice {
@@ -95,14 +95,7 @@ watch(
     align-items: start;
     gap: 8px;
     margin: 0;
-    padding: 16px;
-    border: 1px solid var(--td-component-border);
-    border-radius: var(--td-radius-medium);
-    transition: background-color var(--td-anim-duration-base) var(--td-anim-time-fn-easing);
-
-    &:hover {
-      background: var(--td-bg-color-container-hover);
-    }
+    padding: 0;
 
     &-content {
       display: grid;
