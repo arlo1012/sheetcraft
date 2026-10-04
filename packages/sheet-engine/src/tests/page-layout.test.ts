@@ -46,6 +46,58 @@ function fixture(options?: {
 }
 
 describe("page layout", () => {
+  test("keeps grid page-break guides beyond a one-cell print range without adding printed pages", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 100,
+      columnCount: 30,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const rows = createRowVisibilityIndex({ rowCount: 100, defaultRowHeight: 20 });
+    const pagination = createSheetPagination({
+      geometry,
+      rows,
+      setup: DEFAULT_SHEET_PAGE_SETUP,
+      printRange: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+      layoutRange: { start: { row: 0, column: 0 }, end: { row: 99, column: 29 } },
+    });
+
+    expect(pagination.layoutRowBreaks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "automatic", index: 48, offset: 960 }),
+      ]),
+    );
+    expect(pagination.layoutColumnBreaks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "automatic", index: 8, offset: 640 }),
+      ]),
+    );
+    expect(pagination.rowBreaks).toEqual([]);
+    expect(pagination.columnBreaks).toEqual([]);
+    expect(pagination.pageCount).toBe(1);
+    expect(pagination.getPage(1, 0)?.pageNumber).toBeUndefined();
+    expect(pagination.getPage(0, 1)?.pageNumber).toBeUndefined();
+  });
+
+  test("preserves print-range manual breaks while exposing later grid guides", () => {
+    const { geometry, rows, pagination: printed } = fixture({ rowBreaks: [4], columnBreaks: [3] });
+    const pagination = createSheetPagination({
+      geometry,
+      rows,
+      setup: { ...DEFAULT_SHEET_PAGE_SETUP, scale: 400, rowBreaks: [4], columnBreaks: [3] },
+      printRange: { start: { row: 0, column: 0 }, end: { row: 10, column: 3 } },
+      layoutRange: printed.printRange,
+    });
+
+    expect(pagination.layoutRowBreaks).toContainEqual({ index: 4, offset: 80, kind: "manual" });
+    expect(pagination.layoutColumnBreaks).toContainEqual({ index: 3, offset: 240, kind: "manual" });
+    expect(pagination.layoutRowBreaks.some((line) => line.index > 10)).toBe(true);
+    expect(pagination.layoutColumnBreaks.some((line) => line.index > 3)).toBe(true);
+    expect(pagination.rowBreaks.every((line) => line.index <= 10)).toBe(true);
+    expect(pagination.columnBreaks.every((line) => line.index <= 3)).toBe(true);
+    expect(pagination.printScale).toBe(4);
+  });
+
   test("rounds a compact editable range through complete terminal paper cells without adding print pages", () => {
     const geometry = createSheetGeometry({
       rowCount: 100,

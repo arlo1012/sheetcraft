@@ -855,9 +855,12 @@ const renderFrame = computed(() =>
     headingOrigin.value,
   ),
 );
-const pageBreakGuides = computed(() =>
-  props.viewMode === "normal" && props.showPageBreaks ? pagination.value : undefined,
-);
+const pageBreakGuides = computed(() => {
+  if (props.viewMode !== "normal" || !props.showPageBreaks) return undefined;
+  const pages = pagination.value;
+  if (!pages) return undefined;
+  return { rowBreaks: pages.layoutRowBreaks, columnBreaks: pages.layoutColumnBreaks };
+});
 const pageView = computed<PageViewPaintState | undefined>(() => {
   if (props.viewMode === "normal") return undefined;
   const pages = pagination.value;

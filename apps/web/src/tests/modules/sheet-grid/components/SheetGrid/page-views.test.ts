@@ -1,6 +1,7 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
+import { DEFAULT_ROW_HEIGHT } from "@idea10/core/workbook";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import {
   activeCell,
@@ -17,6 +18,11 @@ type PageView = {
     contentRect: { x: number; y: number; width: number; height: number };
   }[];
   rowBreaks: readonly { index: number; offset: number }[];
+};
+
+type PageBreakGuides = {
+  rowBreaks: readonly { kind: string }[];
+  columnBreaks: readonly { kind: string }[];
 };
 
 function pageView(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]): PageView {
@@ -51,16 +57,8 @@ function dispatchPointer(
 }
 
 describe("SheetGrid page views", () => {
-  test("calculates normal-view pagination only while page breaks are shown", async () => {
-    const { wrapper } = mountSheetGrid({
-      beforeMount(sheet) {
-        sheet.pageSetup = {
-          ...DEFAULT_SHEET_PAGE_SETUP,
-          scale: 400,
-          printArea: { start: { row: 0, column: 0 }, end: { row: 59, column: 3 } },
-        };
-      },
-    });
+  test("shows both automatic normal-view guides on an empty sheet only while enabled", async () => {
+    const { wrapper } = mountSheetGrid();
     const surface = wrapper.getComponent(SheetSurface);
     expect(surface.props("pageView")).toBeUndefined();
     expect(surface.props("pageBreakGuides")).toBeUndefined();
@@ -68,11 +66,36 @@ describe("SheetGrid page views", () => {
     await wrapper.setProps({ showPageBreaks: true });
 
     expect(surface.props("pageView")).toBeUndefined();
-    expect(
-      (
-        surface.props("pageBreakGuides") as { rowBreaks: readonly { kind: string }[] }
-      ).rowBreaks.some((line) => line.kind === "automatic"),
-    ).toBe(true);
+    const guides = surface.props("pageBreakGuides") as PageBreakGuides;
+    expect(guides.rowBreaks.some((line) => line.kind === "automatic")).toBe(true);
+    expect(guides.columnBreaks.some((line) => line.kind === "automatic")).toBe(true);
+
+    await wrapper.setProps({ showPageBreaks: false });
+    expect(surface.props("pageBreakGuides")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  test("shows both normal-view guides for a single-row wide sheet without expanding its print rows", async () => {
+    const { wrapper } = mountSheetGrid({
+      beforeMount(sheet) {
+        sheet.cells.set("0:0", { content: { kind: "literal", value: "first" } });
+        sheet.cells.set("0:20", { content: { kind: "literal", value: "last" } });
+      },
+    });
+    const surface = wrapper.getComponent(SheetSurface);
+
+    await wrapper.setProps({ showPageBreaks: true });
+
+    const guides = surface.props("pageBreakGuides") as PageBreakGuides;
+    expect(guides.rowBreaks.some((line) => line.kind === "automatic")).toBe(true);
+    expect(guides.columnBreaks.some((line) => line.kind === "automatic")).toBe(true);
+
+    await wrapper.setProps({ viewMode: "page-break-preview" });
+    const preview = pageView(wrapper);
+    expect(preview.printRect.height).toBe(DEFAULT_ROW_HEIGHT);
+    expect(preview.rowBreaks).toEqual([]);
+    expect(surface.props("pageBreakGuides")).toBeUndefined();
+    wrapper.unmount();
   });
 
   test("maps a page-layout cell click to its logical address while paper margins and gaps keep the selection", async () => {

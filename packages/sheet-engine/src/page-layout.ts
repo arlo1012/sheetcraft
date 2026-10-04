@@ -55,6 +55,10 @@ export type SheetPagination = {
   printRange: CellRange;
   pageRows: readonly PageAxis[];
   pageColumns: readonly PageAxis[];
+  /** Breaks across the allocated grid, including blank pages in normal view. */
+  layoutRowBreaks: readonly PageBreak[];
+  layoutColumnBreaks: readonly PageBreak[];
+  /** Breaks inside printRange, used by printing and page-break preview. */
   rowBreaks: readonly PageBreak[];
   columnBreaks: readonly PageBreak[];
   pageCount: number;
@@ -976,6 +980,8 @@ export function createSheetPagination(options: {
     printRange,
     pageRows: rowPages.axes,
     pageColumns: columnPages.axes,
+    layoutRowBreaks: rowPages.breaks,
+    layoutColumnBreaks: columnPages.breaks,
     rowBreaks: rowPages.breaks.filter(
       (item) => item.index > printRange.start.row && item.index <= printRange.end.row,
     ),
