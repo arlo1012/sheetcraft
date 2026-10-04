@@ -1,16 +1,26 @@
 <script setup lang="ts">
-import { Ruler } from "lucide-vue-next";
+import { Ruler, Settings2 } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
-import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@idea10/core/page-setup";
+import { getPagePaperSize, type SheetPageSetup } from "@idea10/core/page-setup";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
-import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
+import GallerySection from "../../../shared/gallery/GallerySection.vue";
+import PageMarginsOption from "./PageMarginsOption.vue";
+import {
+  PAGE_MARGIN_PRESETS as presets,
+  pageMarginsMatch,
+  type PageMargins,
+} from "../page-margin-presets";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 
-const props = defineProps<{ setup: SheetPageSetup; disabled: boolean }>();
+const props = defineProps<{
+  setup: SheetPageSetup;
+  disabled: boolean;
+  lastCustomMargins?: PageMargins;
+}>();
 const emit = defineEmits<{ change: [patch: Partial<SheetPageSetup>]; openSetup: [] }>();
 const { t } = useAppI18n();
 const buttonRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
@@ -18,11 +28,7 @@ const triggerRef = computed(() => buttonRef.value?.rootElement ?? null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `page-margins-menu-${useId().replaceAll(":", "")}`;
 
-const presets = {
-  normal: DEFAULT_SHEET_PAGE_SETUP.margins,
-  narrow: { top: 12.7, bottom: 12.7, left: 12.7, right: 12.7, header: 7.62, footer: 7.62 },
-  wide: { top: 25.4, bottom: 25.4, left: 50.8, right: 50.8, header: 7.62, footer: 7.62 },
-} satisfies Record<string, SheetPageSetup["margins"]>;
+const paper = computed(() => getPagePaperSize(props.setup));
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef,
@@ -31,12 +37,10 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
 });
 
 function matches(value: SheetPageSetup["margins"]): boolean {
-  return (Object.keys(value) as Array<keyof SheetPageSetup["margins"]>).every(
-    (key) => props.setup.margins[key] === value[key],
-  );
+  return pageMarginsMatch(props.setup.margins, value);
 }
-function select(preset: keyof typeof presets): void {
-  emit("change", { margins: { ...presets[preset] } });
+function select(margins: PageMargins): void {
+  emit("change", { margins: { ...margins } });
   dismiss("programmatic", true);
 }
 function openSetup(): void {
@@ -69,28 +73,60 @@ function openSetup(): void {
         :style="floatingStyles"
         :label="t('pageLayout.margins')"
       >
-        <MenuRadioItem
-          :checked="matches(presets.normal)"
-          data-page-margins="normal"
-          @select="select('normal')"
-          >{{ t("pageTools.marginsNormal") }}</MenuRadioItem
-        >
-        <MenuRadioItem
-          :checked="matches(presets.narrow)"
-          data-page-margins="narrow"
-          @select="select('narrow')"
-          >{{ t("pageTools.marginsNarrow") }}</MenuRadioItem
-        >
-        <MenuRadioItem
-          :checked="matches(presets.wide)"
-          data-page-margins="wide"
-          @select="select('wide')"
-          >{{ t("pageTools.marginsWide") }}</MenuRadioItem
-        >
-        <MenuSeparator />
-        <MenuItem data-page-margins="custom" @select="openSetup">{{
-          t("pageTools.customMargins")
-        }}</MenuItem>
+        <template #body>
+          <GallerySection :title="t('pageTools.marginsPresets')" :content-inset="false">
+            <ul class="page-margins-menu__options" role="presentation">
+              <PageMarginsOption
+                :label="t('pageTools.marginsNormal')"
+                :margins="presets.normal"
+                :paper="paper"
+                :checked="matches(presets.normal)"
+                data-page-margins="normal"
+                @select="select(presets.normal)"
+              />
+              <PageMarginsOption
+                :label="t('pageTools.marginsNarrow')"
+                :margins="presets.narrow"
+                :paper="paper"
+                :checked="matches(presets.narrow)"
+                data-page-margins="narrow"
+                @select="select(presets.narrow)"
+              />
+              <PageMarginsOption
+                :label="t('pageTools.marginsWide')"
+                :margins="presets.wide"
+                :paper="paper"
+                :checked="matches(presets.wide)"
+                data-page-margins="wide"
+                @select="select(presets.wide)"
+              />
+            </ul>
+          </GallerySection>
+          <GallerySection
+            v-if="lastCustomMargins"
+            :title="t('pageTools.marginsCustomSettings')"
+            :content-inset="false"
+          >
+            <ul class="page-margins-menu__options" role="presentation">
+              <PageMarginsOption
+                :label="t('pageTools.marginsLastCustom')"
+                :margins="lastCustomMargins"
+                :paper="paper"
+                :checked="matches(lastCustomMargins)"
+                custom
+                data-page-margins="last-custom"
+                @select="select(lastCustomMargins)"
+              />
+            </ul>
+          </GallerySection>
+        </template>
+        <template #footer>
+          <MenuSeparator />
+          <MenuItem data-page-margins="custom" @select="openSetup">
+            <template #icon><Settings2 /></template>
+            {{ t("pageTools.customMargins") }}
+          </MenuItem>
+        </template>
       </MenuSurface>
     </Teleport>
   </span>
@@ -102,7 +138,12 @@ function openSetup(): void {
   @include ribbon.tool;
   &__surface {
     z-index: var(--idea-layer-menu);
-    min-width: 180px;
+    min-width: min(320px, calc(100vw - 32px));
+  }
+  &__options {
+    padding: 0;
+    margin: 0;
+    list-style: none;
   }
 }
 </style>

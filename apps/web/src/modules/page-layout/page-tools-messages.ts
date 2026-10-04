@@ -18,6 +18,15 @@ export type PageToolsMessageSchema = {
     marginsNarrow: string;
     marginsWide: string;
     customMargins: string;
+    marginsPresets: string;
+    marginsCustomSettings: string;
+    marginsLastCustom: string;
+    marginTopLabel: string;
+    marginBottomLabel: string;
+    marginLeftLabel: string;
+    marginRightLabel: string;
+    marginHeaderLabel: string;
+    marginFooterLabel: string;
     noScaling: string;
     customScaling: string;
     beautify: string;

@@ -6,6 +6,7 @@ import { DEFAULT_SHEET_PAGE_PRINT_OPTIONS, type SheetPageSetup } from "@idea10/c
 import type { CellAddress } from "@idea10/core/workbook";
 import type { SelectionMode } from "@idea10/sheet-engine/selection";
 import type { SheetViewMode } from "@idea10/sheet-engine/page-layout";
+import type { PageMargins } from "../page-margin-presets";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
@@ -19,6 +20,7 @@ import PageBreakMenu from "./PageBreakMenu.vue";
 import type { PageBreakAction, PageSetupTab } from "../page-toolbar-actions";
 const props = defineProps<{
   setup: SheetPageSetup;
+  lastCustomMargins?: PageMargins;
   disabled: boolean;
   busy: boolean;
   activeCell: CellAddress;
@@ -66,6 +68,7 @@ function setPrintOption(key: "gridLines" | "headings", value: boolean): void {
       /></RibbonButton>
       <PageMarginsMenu
         :setup="setup"
+        :last-custom-margins="lastCustomMargins"
         :disabled="disabled"
         @change="emit('change', $event)"
         @open-setup="emit('openSetup', 'margins')"

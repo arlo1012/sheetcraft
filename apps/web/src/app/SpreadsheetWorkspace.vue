@@ -67,6 +67,15 @@ import {
   type WatermarkScope,
 } from "../modules/page-decorations/usePageDecorationActions";
 import PageToolbar from "../modules/page-layout/components/PageToolbar.vue";
+import {
+  isPresetPageMargins,
+  pageMarginsMatch,
+  type PageMargins,
+} from "../modules/page-layout/page-margin-presets";
+import {
+  readPageMarginHistory,
+  recordPageMarginHistory,
+} from "../modules/page-layout/page-margin-history";
 import TableStylesMenu from "../modules/table-styles/components/TableStylesMenu.vue";
 import {
   getPageBreakPatch,
@@ -436,13 +445,18 @@ function openHeaderFooter(target: HeaderFooterEditTarget): void {
 }
 const activeViewMode = computed(() => pageViewModes.get(activeSheet.value.id) ?? "normal");
 const activePageSetup = computed(() => activeSheet.value.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
+const lastCustomMargins = ref<PageMargins | undefined>(readPageMarginHistory());
 function setViewMode(mode: SheetViewMode): void {
   if (sheetGridRef.value?.flushPendingEdit() === false) return;
   pageViewModes.set(activeSheet.value.id, mode);
   void nextTick(focusCellEditor);
 }
 function applyPageSetup(setup: SheetPageSetup): void {
-  executeCommand(createSetSheetPageSetupCommand(activeSheet.value.id, setup));
+  const marginsChanged = !pageMarginsMatch(activePageSetup.value.margins, setup.margins);
+  const changed = executeCommand(createSetSheetPageSetupCommand(activeSheet.value.id, setup));
+  if (changed && marginsChanged && !isPresetPageMargins(setup.margins)) {
+    lastCustomMargins.value = recordPageMarginHistory(setup.margins);
+  }
 }
 function openPageSetup(tab: PageSetupTab): void {
   if (
@@ -1857,6 +1871,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       <template #page-tools>
         <PageToolbar
           :setup="activePageSetup"
+          :last-custom-margins="lastCustomMargins"
           :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
           :busy="loading || fileBusy || xlsxBusy"
           :active-cell="activeAddress"
