@@ -478,7 +478,6 @@ function changePageBreak(action: PageBreakAction): void {
 }
 function applyWatermark(watermark: SheetWatermark): void {
   decorations.setWatermark(watermark);
-  setViewMode("page-layout");
 }
 async function saveCustomWatermark(
   watermark: SheetWatermark,
@@ -488,7 +487,6 @@ async function saveCustomWatermark(
   if (loading.value || fileBusy.value || xlsxBusy.value) return;
   if (await decorations.applyWatermark(watermark, scope, imageFile)) {
     watermarkVisible.value = false;
-    setViewMode("page-layout");
   }
 }
 function openWatermark(): void {
