@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ConditionalFormatIconSet } from "@idea10/core/conditional-formatting";
 import { paintConditionalFormatVisual } from "../../../shared/conditional-formatting/conditional-format-painter";
+import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import {
   colorScalePresetTiles,
@@ -132,83 +133,82 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
     class="conditional-format-gallery"
     :aria-label="t('conditionalFormatting.dataBars')"
   >
-    <h3>{{ t("conditionalFormatting.gradient") }}</h3>
-    <div class="conditional-format-gallery__tiles conditional-format-gallery__tiles--three">
-      <button
-        v-for="preset in dataBarPresetTiles.filter((tile) => tile.gradient)"
-        :key="preset.kind"
-        type="button"
-        role="menuitem"
-        class="conditional-format-gallery__tile"
-        :aria-label="`${labelForBar(preset.color)} · ${t('conditionalFormatting.gradient')}`"
-        :title="`${labelForBar(preset.color)} · ${t('conditionalFormatting.gradient')}`"
-        @click="emit('select', preset.kind)"
-      >
-        <span
-          class="mini-sheet mini-sheet--bar"
-          aria-hidden="true"
-          :style="{ '--bar-color': preset.color }"
-          ><i v-for="width in [86, 58, 32]" :key="width" :style="{ width: `${width}%` }"
-        /></span>
-      </button>
-    </div>
-    <h3>{{ t("conditionalFormatting.solid") }}</h3>
-    <div class="conditional-format-gallery__tiles conditional-format-gallery__tiles--three">
-      <button
-        v-for="preset in dataBarPresetTiles.filter((tile) => !tile.gradient)"
-        :key="preset.kind"
-        type="button"
-        role="menuitem"
-        class="conditional-format-gallery__tile"
-        :aria-label="`${labelForBar(preset.color)} · ${t('conditionalFormatting.solid')}`"
-        :title="`${labelForBar(preset.color)} · ${t('conditionalFormatting.solid')}`"
-        @click="emit('select', preset.kind)"
-      >
-        <span
-          class="mini-sheet mini-sheet--bar mini-sheet--solid"
-          aria-hidden="true"
-          :style="{ '--bar-color': preset.color }"
-          ><i v-for="width in [86, 58, 32]" :key="width" :style="{ width: `${width}%` }"
-        /></span>
-      </button>
-    </div>
+    <GallerySection :title="t('conditionalFormatting.gradient')">
+      <div class="conditional-format-gallery__tiles conditional-format-gallery__tiles--three">
+        <button
+          v-for="preset in dataBarPresetTiles.filter((tile) => tile.gradient)"
+          :key="preset.kind"
+          type="button"
+          role="menuitem"
+          class="conditional-format-gallery__tile"
+          :aria-label="`${labelForBar(preset.color)} · ${t('conditionalFormatting.gradient')}`"
+          :title="`${labelForBar(preset.color)} · ${t('conditionalFormatting.gradient')}`"
+          @click="emit('select', preset.kind)"
+        >
+          <span
+            class="mini-sheet mini-sheet--bar"
+            aria-hidden="true"
+            :style="{ '--bar-color': preset.color }"
+            ><i v-for="width in [86, 58, 32]" :key="width" :style="{ width: `${width}%` }"
+          /></span>
+        </button>
+      </div>
+    </GallerySection>
+    <GallerySection :title="t('conditionalFormatting.solid')">
+      <div class="conditional-format-gallery__tiles conditional-format-gallery__tiles--three">
+        <button
+          v-for="preset in dataBarPresetTiles.filter((tile) => !tile.gradient)"
+          :key="preset.kind"
+          type="button"
+          role="menuitem"
+          class="conditional-format-gallery__tile"
+          :aria-label="`${labelForBar(preset.color)} · ${t('conditionalFormatting.solid')}`"
+          :title="`${labelForBar(preset.color)} · ${t('conditionalFormatting.solid')}`"
+          @click="emit('select', preset.kind)"
+        >
+          <span
+            class="mini-sheet mini-sheet--bar mini-sheet--solid"
+            aria-hidden="true"
+            :style="{ '--bar-color': preset.color }"
+            ><i v-for="width in [86, 58, 32]" :key="width" :style="{ width: `${width}%` }"
+          /></span>
+        </button>
+      </div>
+    </GallerySection>
   </section>
   <section
     v-else-if="props.kind === 'colorScales'"
     class="conditional-format-gallery"
     :aria-label="t('conditionalFormatting.colorScales')"
   >
-    <div class="conditional-format-gallery__tiles conditional-format-gallery__tiles--three">
-      <button
-        v-for="preset in colorScalePresetTiles"
-        :key="preset.kind"
-        type="button"
-        role="menuitem"
-        class="conditional-format-gallery__tile"
-        :aria-label="labelForScale(preset.kind)"
-        :title="labelForScale(preset.kind)"
-        @click="emit('select', preset.kind)"
-      >
-        <span class="mini-sheet mini-sheet--scale" aria-hidden="true"
-          ><i
-            v-for="(color, index) in scaleSamples(preset.colors)"
-            :key="`${color}-${index}`"
-            :style="{ backgroundColor: color }"
-        /></span>
-      </button>
-    </div>
+    <GallerySection>
+      <div class="conditional-format-gallery__tiles conditional-format-gallery__tiles--three">
+        <button
+          v-for="preset in colorScalePresetTiles"
+          :key="preset.kind"
+          type="button"
+          role="menuitem"
+          class="conditional-format-gallery__tile"
+          :aria-label="labelForScale(preset.kind)"
+          :title="labelForScale(preset.kind)"
+          @click="emit('select', preset.kind)"
+        >
+          <span class="mini-sheet mini-sheet--scale" aria-hidden="true"
+            ><i
+              v-for="(color, index) in scaleSamples(preset.colors)"
+              :key="`${color}-${index}`"
+              :style="{ backgroundColor: color }"
+          /></span>
+        </button>
+      </div>
+    </GallerySection>
   </section>
   <section
     v-else
     class="conditional-format-gallery conditional-format-gallery--icons"
     :aria-label="t('conditionalFormatting.iconSets')"
   >
-    <div
-      v-for="group in iconGroups"
-      :key="group.label"
-      class="conditional-format-gallery__icon-group"
-    >
-      <h3>{{ t(group.label) }}</h3>
+    <GallerySection v-for="group in iconGroups" :key="group.label" :title="t(group.label)">
       <div class="conditional-format-gallery__tiles conditional-format-gallery__tiles--two">
         <button
           v-for="iconSet in group.sets"
@@ -228,7 +228,7 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
           />
         </button>
       </div>
-    </div>
+    </GallerySection>
   </section>
 </template>
 
@@ -236,20 +236,9 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
 .conditional-format-gallery {
   width: 240px;
 
-  h3 {
-    margin: 0;
-    padding: 2px 12px;
-    background: var(--idea-surface-secondary);
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-medium);
-    font-weight: var(--idea-font-weight-medium);
-  }
-
   &__tiles {
     display: grid;
     gap: 2px 4px;
-    padding: 6px 8px;
   }
   &__tiles--three {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -260,7 +249,6 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
   &__tiles--two {
     row-gap: 6px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding-block: 4px;
   }
 
   &__tile,

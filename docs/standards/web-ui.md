@@ -1,120 +1,103 @@
 # Web UI Standards
 
-## Reuse first
+## Reuse and ownership
 
-- Before implementation, inspect and name the existing UI to reuse; user references
-  take priority. Prefer **project components → TDesign public APIs → new components
-  for confirmed gaps**. Routine reuse needs no approval; avoid native replacements
-  and one-to-one wrappers for existing controls.
-- Share implementations, not copied feature CSS or imports of another feature's
-  private components. Keep business state local; extract repeated contracts into
-  shared components or SCSS primitives.
-- Features own layout, placement, and size limits. Shared components own typography,
-  padding, borders, radii, shadows, scrollbars, and interaction states. Use product
-  tokens; keep TDesign adaptations in the shared adapter, never feature `.t-*`
-  overrides. Prefer public props/local variables and preserve nested defaults.
-- Before committing, remove duplicated controls, undefined tokens, and unexplained
-  differences from the reference. Static checks do not establish visual consistency;
-  follow the repository's scoped verification policy.
+- Before building, find the closest existing UI; user references take priority.
+  Prefer project components, then
+  TDesign public APIs, then a new component for a real gap. Do not replace a
+  fitting library control or wrap it one-for-one.
+- Repeated visible structure belongs in a shared component with typed props,
+  emits, and slots. Features keep their data, commands, and domain
+  interactions; consumers supply variable content through slots rather than copied
+  markup or CSS. Gallery titles span the surface; only the content owns insets.
+- Keep shared contracts small and explicit. Do not import another feature's
+  private components or copy its styles. One-off behavior stays local; extract
+  only stable duplication. Concrete Vue components must be explicitly composed;
+  do not use visual registries or `<component :is>` factories.
+- Features own placement, layout, and size limits. Shared components own type,
+  padding, border, radius, shadow, scrollbar, and interaction states. Use product
+  tokens; TDesign adaptation belongs in the shared adapter, never a feature-local
+  `.t-*` override.
 
-| Pattern                 | Reference / implementation                                                                                                               |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Option lists            | `CellFormatDialog` number categories/date types; `shared/option-list/OptionList.vue` and SCSS                                            |
-| Searchable menus        | `WorkbookSheetNavigator`, `shared/menu/MenuSearch.vue`, shared menu components                                                           |
-| Inputs / dialog actions | TDesign controls and `CellFormatDialog` defaults; preserve sizes, spacing, themes, and cancel-before-confirm order in custom footers too |
+| Pattern                   | Reference                                                        |
+| ------------------------- | ---------------------------------------------------------------- |
+| Grouped preset galleries  | `shared/gallery/GallerySection.vue`                              |
+| Option lists              | `shared/option-list/OptionList.vue`, `CellFormatDialog`          |
+| Searchable menus          | `shared/menu/MenuSearch.vue`, `WorkbookSheetNavigator`           |
+| Inputs and dialog actions | TDesign controls and `CellFormatDialog`; cancel precedes confirm |
 
 ## Typography
 
-CSS pixels at 100% scale; size and line height are a pair.
+Use CSS pixels at 100% scale; size and line height are a pair.
 
-| Role                | Size / line height | Weight | Uses                                                                   |
-| ------------------- | ------------------ | ------ | ---------------------------------------------------------------------- |
-| Supporting          | 12px / 18px        | 400    | Status, shortcuts, hints, tooltips, group captions, row/column headers |
-| Interface (default) | 12px / 20px        | 400    | Controls, menus, tabs, labels, formula/address/search inputs           |
-| Section heading     | 14px / 22px        | 600    | Panels and popovers                                                    |
-| Dialog heading      | 16px / 24px        | 600    | Dialog titles                                                          |
+| Role            | Size / line height | Weight | Uses                                            |
+| --------------- | ------------------ | ------ | ----------------------------------------------- |
+| Supporting      | 12px / 18px        | 400    | Hints, shortcuts, group captions, sheet headers |
+| Interface       | 12px / 20px        | 400    | Controls, menus, tabs, inputs                   |
+| Section heading | 14px / 22px        | 600    | Panels and popovers                             |
+| Dialog heading  | 16px / 24px        | 600    | Dialog titles                                   |
 
-- Use product typography tokens and `--idea-font-sans`, mapped through the TDesign
-  adapter. Selected navigation/small group headings use weight 500; interaction
-  states must not change text size or line height. No 11px interface text.
-- A default 28px control uses 12px / 20px text. Adjust its container, not the text;
-  icon sizes remain independent. Numeric samples may use 14px / 22px at weight 400.
-- Cell content, editors, document fonts, row measurement, export, and cell-style
-  previews follow workbook typography. Header text retains Sheet zoom behavior;
-  `fx`, `+`, and narrow-cell image placeholders are not additional text roles.
+- Use product typography tokens and `--idea-font-sans`. Selected navigation and
+  small group headings may use 500. States never change text size or line
+  height; do not use 11px interface text.
+- A 28px control uses 12px / 20px. Change its container, not its text. Numeric
+  samples may use 14px / 22px at 400. Workbook content, editors, row sizing,
+  exports, and style previews follow workbook typography; sheet headers retain zoom.
 
-## Spacing and integration
+## Surfaces, controls, and focus
 
-| Surface        | Padding                      | Owner                                                                                       |
-| -------------- | ---------------------------- | ------------------------------------------------------------------------------------------- |
-| Content panels | 8px all sides, inside border | `--idea-tool-panel-padding`                                                                 |
-| List menus     | 8px vertical, 0 horizontal   | `--idea-menu-padding`; rows own text/icon insets                                            |
-| Dialog frame   | 16px all sides               | Shared TDesign adapter                                                                      |
-| Dialog content | 12px vertical                | `--idea-dialog-content-padding-block`; shared adapter, or tab content when it owns the body |
+| Surface        | Padding                    | Owner                                                             |
+| -------------- | -------------------------- | ----------------------------------------------------------------- |
+| Content panel  | 8px, inside border         | `--idea-tool-panel-padding`                                       |
+| List menu      | 8px vertical, 0 horizontal | `--idea-menu-padding`; rows own insets                            |
+| Dialog frame   | 16px                       | Shared TDesign adapter                                            |
+| Dialog content | 12px vertical              | `--idea-dialog-content-padding-block`; adapter or body-owning tab |
 
-- Exactly one layer owns each inset; avoid nested padding across surface, header,
-  content, and footer. Keep row/control padding and gaps separate. Menu hover and
-  selection backgrounds span the width. Suggestions, tooltips, input assists, and
+- One layer owns each inset. Keep control/row padding and gaps separate; hover
+  and selected menu backgrounds span the row. Suggestions, input assists, and
   compact floating toolbars retain their own density.
-- Only controls whose entire visible content is a single icon omit the native
-  `button` or library `Button` wrapper. Controls with text, icon + text, or
-  composite content keep their button component and normal button styling.
-  Use `vIconAction` for keyboard activation and disabled semantics on standalone
-  icon containers, with an accessible name. Single input prefix/suffix icons use
-  the control's icon slots directly; the input owns spacing. Stop action clicks
-  from bubbling into the input's focus handler.
-- `InputNumber`: use `theme="column"` and
-  `idea-input-number--persistent-controls`. Wrap in a labelled group, not a native
-  label that forwards events to its buttons. Compact number-format fields use
-  content-sized labels with an 8px control gap.
-- Ribbon/status interactive icons use `--idea-icon-button-hover-bg`; keep foreground
-  color stable on hover.
-
-- Keyboard focus uses the shared `--idea-keyboard-focus-bg` and
-  `--idea-keyboard-focus-shadow` tokens: menu/list rows use a tinted background;
-  compact triggers use a soft halo and their existing corner radius. Avoid dark
-  rectangular outlines. Keep keyboard focus visible and checked/selected indicators distinct.
-  Ordinary controls inherit the shared focus stylesheet; do not add feature-local
-  focus decorations. Canvas/SVG editing may retain target-specific focus feedback.
+- Use native/library buttons except for a single visible icon. Standalone icon
+  containers use `vIconAction`, an accessible name, keyboard activation, and
+  disabled semantics. Input prefix/suffix icons use slots; the input owns their
+  spacing. Stop action clicks from bubbling into the input focus handler.
+- `InputNumber` uses `theme="column"` and
+  `idea-input-number--persistent-controls`; place it in a labelled group. Use
+  no native `label` wrapper, which would forward focus to its buttons. Use
+  `--idea-icon-button-hover-bg` for ribbon/status icon hover; foreground stays
+  unchanged.
+- Ordinary controls inherit shared focus styling. Menu/list keyboard focus uses
+  `--idea-keyboard-focus-bg`; compact triggers use
+  `--idea-keyboard-focus-shadow` with their existing radius. Keep focus visible
+  and separate from selected/checked state. Do not add feature-local focus
+  overrides; canvas/SVG editing may keep target-specific feedback.
 
 ## Ribbon and menus
 
-- Action icons use two sizes, owned by the shared controls: compact ribbon actions
-  and menu icons use `--idea-action-icon-size` (15px); tall actions use
-  `--idea-ribbon-large-icon-size` (18px). `--idea-menu-icon-size` aliases the compact
-  size. Form-control indicators keep their separate `--idea-control-icon-size` token.
-  Lucide action icons use
-  `--idea-icon-stroke-width` (2). Do not set size/stroke props in feature action slots.
-  Composite icon containers inherit the slot size; border previews retain their
-  semantic line weights. Dropdown indicators and dialog launchers keep their
-  separate shared auxiliary sizes.
+- Action/menu icons use `--idea-action-icon-size` (15px); tall ribbon actions
+  use `--idea-ribbon-large-icon-size` (18px); Lucide stroke is
+  `--idea-icon-stroke-width` (2). Auxiliary/control icons keep their own shared
+  sizes; border previews keep semantic line weights. Feature slots do not set
+  action size or stroke.
+- Compose tab groups inside `RibbonToolbar`; it owns viewport, rail, overflow,
+  and focus visibility. Use its `ribbon.columns`, `compact`, `stack`,
+  `two-rows`, and `row` shells. Tall and stacked actions share 54px: two 26px
+  rows with a 2px gap, derived from ribbon tokens.
+- In `shared/ribbon`, use `RibbonButton` for actions, `RibbonMenuButton` for
+  triggers, and `RibbonSplitButton` for action plus popup. Controls own icon,
+  text, arrow, focus, and disabled state; groups own arrangement.
+- Use `fullWidth` to fill a component slot; never pass a parent scoped class
+  through a child root for positioning. Keep a grouped trigger and teleported
+  popup under one local root, and forward keyboard/ARIA attributes to the
+  interactive element.
+- Use `useMenu` with `MenuSurface` for normal menu opening, keyboard navigation,
+  dismissal, and focus restoration. Use `MenuItem` for commands and
+  `MenuRadioItem` for single choices. Consumers set placement, width, height
+  limits, and stacking; shared code owns rows, padding, indicators, radius, and
+  shadow. Text menus size to content; reserve fixed widths for inputs, searchable
+  lists, and compact preset grids.
 
-- All toolbar tabs compose their concrete feature groups inside `RibbonToolbar`.
-  It owns the viewport, rail, overflow scrolling, and focus visibility; do not
-  recreate those containers in feature toolbars. Use `ribbon.columns` or
-  `ribbon.compact` for group shells, `ribbon.stack`/`ribbon.two-rows` for action
-  columns, and `ribbon.row` for compact rows. Keep only feature-specific column
-  widths and horizontal arrangements local.
-- Tall actions and stacked compact actions share a 54px height (two 26px rows
-  with a 2px gap). Tall action icons and labels occupy those same two rows;
-  derive dimensions from the shared `--idea-ribbon-*` tokens rather than adding
-  local height or row-gap values.
+## Review
 
-- In `shared/ribbon`, use `RibbonButton` for actions/pressed states,
-  `RibbonMenuButton` for popup triggers, and `RibbonSplitButton` for action + popup.
-  Compact/tall are variants. Font selectors use TDesign Select and the adapter.
-- Controls own icons, text, arrows, focus, and disabled states; groups own spacing
-  and columns. Use `fullWidth` to fill a slot; do not forward parent scoped classes
-  through component roots for positioning.
-- Keep each tool concrete and explicitly composed in Vue. Grouped tools keep their
-  trigger and teleported popup under one local root; forward keyboard/ARIA attributes
-  to the interactive element.
-- List menus use `useMenu` + `MenuSurface` for opening, keyboard navigation,
-  dismissal, and focus restoration across ribbon, status bar, and Sheet. Form panels
-  and cascading submenus retain domain-specific focus/state rules.
-- First- and second-level text menus size to their content. Avoid fixed widths or
-  minimum widths that add empty space; reserve explicit widths for input controls,
-  searchable value lists, and compact preset grids.
-- Use `MenuItem` for commands and `MenuRadioItem` for single choices; features supply
-  checked state, labels, and actions. Menu padding, row height, indicators, radii,
-  and shadows stay shared; consumers set only width, height limits, stacking, and placement.
+Before committing, remove copied controls/CSS, undefined tokens, and unexplained
+differences from the reference. Run the scoped checks required by the repository;
+static checks do not establish visual consistency.

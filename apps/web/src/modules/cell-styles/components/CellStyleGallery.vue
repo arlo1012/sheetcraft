@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CellStyleDefinition } from "@idea10/core/cell-styles";
 import { nextTick } from "vue";
+import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   CELL_STYLE_CATEGORIES,
@@ -74,11 +75,10 @@ defineExpose({ focusFirstStyle });
 <template>
   <div class="cell-style-gallery" :style="{ '--cell-style-columns': columns }">
     <template v-for="category in CELL_STYLE_CATEGORIES" :key="category">
-      <section
+      <GallerySection
         v-if="styles.some((style) => style.category === category)"
-        class="cell-style-gallery__group"
+        :title="t(CELL_STYLE_CATEGORY_LABELS[category])"
       >
-        <h3>{{ t(CELL_STYLE_CATEGORY_LABELS[category]) }}</h3>
         <div
           class="cell-style-gallery__grid"
           role="group"
@@ -105,7 +105,7 @@ defineExpose({ focusFirstStyle });
             <CellStylePreview :style="style" :label="label(style)" />
           </button>
         </div>
-      </section>
+      </GallerySection>
     </template>
   </div>
 </template>
@@ -113,21 +113,6 @@ defineExpose({ focusFirstStyle });
 <style scoped lang="scss">
 .cell-style-gallery {
   display: grid;
-  padding: 0 var(--idea-tool-panel-padding);
-  gap: 7px;
-}
-.cell-style-gallery__group {
-  display: grid;
-  gap: 3px;
-}
-.cell-style-gallery h3 {
-  margin: 0;
-  padding: 2px 6px;
-  background: var(--idea-surface-secondary);
-  color: var(--idea-text-secondary);
-  font-size: var(--idea-font-size-body-small);
-  font-weight: var(--idea-font-weight-medium);
-  line-height: 18px;
 }
 .cell-style-gallery__grid {
   display: grid;

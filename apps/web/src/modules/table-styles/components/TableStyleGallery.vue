@@ -2,6 +2,7 @@
 import type { TableStyleDefinition } from "@idea10/core/table-styles";
 import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
 import { nextTick } from "vue";
+import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import TableStylePreview from "./TableStylePreview.vue";
 
@@ -112,40 +113,42 @@ function onTileKeydown(
     :style="{ '--table-style-columns': columns }"
   >
     <template v-for="category in categories" :key="category">
-      <h3 v-if="showCategories && styles.some((style) => style.category === category)">
-        {{ t(categoryLabel(category)) }}
-      </h3>
-      <div
+      <GallerySection
         v-if="styles.some((style) => style.category === category)"
-        class="table-style-gallery__grid"
-        :class="{ 'table-style-gallery__grid--compact': compact }"
-        role="grid"
+        :title="showCategories ? t(categoryLabel(category)) : undefined"
+        :inline="layout === 'ribbon'"
       >
-        <button
-          v-for="style in styles.filter((item) => item.category === category)"
-          :key="style.id"
-          :ref="setButtonRef(style)"
-          type="button"
-          class="table-style-gallery__tile"
-          :class="{ 'is-selected': style.id === selectedStyleId }"
-          :aria-label="displayName(style)"
-          :aria-pressed="style.id === selectedStyleId"
-          :title="displayName(style)"
-          :disabled="disabled"
-          :data-table-style-id="style.id"
-          role="gridcell"
-          @click="emit('select', style)"
-          @contextmenu.prevent="style.category === 'custom' && emit('edit', style)"
-          @keydown="onTileKeydown($event, style)"
+        <div
+          class="table-style-gallery__grid"
+          :class="{ 'table-style-gallery__grid--compact': compact }"
+          role="grid"
         >
-          <TableStylePreview
-            :kind="kind"
-            :style="style"
-            :selected="style.id === selectedStyleId"
-            :compact="compact"
-          />
-        </button>
-      </div>
+          <button
+            v-for="style in styles.filter((item) => item.category === category)"
+            :key="style.id"
+            :ref="setButtonRef(style)"
+            type="button"
+            class="table-style-gallery__tile"
+            :class="{ 'is-selected': style.id === selectedStyleId }"
+            :aria-label="displayName(style)"
+            :aria-pressed="style.id === selectedStyleId"
+            :title="displayName(style)"
+            :disabled="disabled"
+            :data-table-style-id="style.id"
+            role="gridcell"
+            @click="emit('select', style)"
+            @contextmenu.prevent="style.category === 'custom' && emit('edit', style)"
+            @keydown="onTileKeydown($event, style)"
+          >
+            <TableStylePreview
+              :kind="kind"
+              :style="style"
+              :selected="style.id === selectedStyleId"
+              :compact="compact"
+            />
+          </button>
+        </div>
+      </GallerySection>
     </template>
   </div>
 </template>
@@ -153,7 +156,6 @@ function onTileKeydown(
 <style scoped lang="scss">
 .table-style-gallery {
   display: grid;
-  gap: 6px;
 
   &.is-ribbon {
     display: flex;
@@ -162,16 +164,6 @@ function onTileKeydown(
     .table-style-gallery__grid {
       display: flex;
     }
-  }
-
-  h3 {
-    margin: 0;
-    padding: 3px 6px;
-    background: var(--idea-surface-secondary);
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    font-weight: var(--idea-font-weight-medium);
-    line-height: var(--idea-line-height-body-medium);
   }
 
   &__grid {

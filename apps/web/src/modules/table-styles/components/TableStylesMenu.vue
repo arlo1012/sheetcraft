@@ -241,7 +241,6 @@ function manage(): void {
     width: 400px;
     max-height: calc(100vh - 32px);
     overflow: hidden;
-    padding: 8px;
 
     > * {
       flex-shrink: 0;
@@ -267,10 +266,10 @@ function manage(): void {
   &__pivot {
     display: grid;
     gap: 6px;
-    padding: 2px 4px;
     color: var(--idea-text-primary);
 
     > span {
+      padding-inline: var(--idea-space-5);
       color: var(--idea-text-secondary);
       font-size: var(--idea-font-size-body-small);
       font-weight: var(--idea-font-weight-medium);
@@ -282,7 +281,7 @@ function manage(): void {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 2px 4px 8px;
+    padding: 2px var(--idea-space-5) 8px;
     color: var(--idea-text-primary);
 
     > div {
@@ -296,7 +295,7 @@ function manage(): void {
     align-items: center;
     justify-content: space-between;
     gap: var(--idea-space-3);
-    padding: 2px 4px 8px;
+    padding: 2px var(--idea-space-5) 8px;
     color: var(--idea-text-primary);
   }
 
