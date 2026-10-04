@@ -101,6 +101,7 @@ const { t } = useAppI18n();
 
   &__header {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: space-between;
     min-height: 42px;
@@ -143,6 +144,7 @@ const { t } = useAppI18n();
   &__items {
     display: grid;
     flex: 1 1 auto;
+    align-content: start;
     gap: 1px;
     min-height: 0;
     padding: 0;
@@ -154,6 +156,7 @@ const { t } = useAppI18n();
   &__item {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
+    align-content: start;
     gap: 6px;
     padding: 10px 10px 10px 14px;
     border-bottom: 1px solid var(--idea-border-subtle);
@@ -176,6 +179,7 @@ const { t } = useAppI18n();
 
   &__navigate {
     display: flex;
+    align-items: flex-start;
     gap: 8px;
     min-width: 0;
     padding: 0;
@@ -212,6 +216,9 @@ const { t } = useAppI18n();
 
   &__actions {
     display: flex;
+    grid-row: 1;
+    grid-column: 2;
+    align-self: start;
     gap: 2px;
   }
 }
