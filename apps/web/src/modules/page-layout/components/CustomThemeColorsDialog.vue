@@ -94,8 +94,7 @@ watch(
     :confirm-btn="t('pageTools.save')"
     :cancel-btn="t('pageTools.cancel')"
     width="min(680px, calc(100vw - 32px))"
-    placement="top"
-    top="16px"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
     @confirm="save"
@@ -112,7 +111,6 @@ watch(
           <ColorPaletteSelect
             :model-value="colorFor(field)"
             :label="label"
-            show-value
             :show-default="false"
             @select="setColor(field, $event)"
           />
