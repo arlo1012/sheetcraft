@@ -93,3 +93,25 @@ test("adds a custom mistake through the dialog and exposes it in dictionary mana
   expect(controller.panel.value).toBe("dictionary");
   expect(document.body.textContent).toContain("测试正词");
 });
+
+test("opens manual accepted-word entry without selecting results and returns to review", async () => {
+  const { controller } = fixture();
+  await click("通用校对");
+  const buttons = [
+    ...document.body.querySelectorAll<HTMLButtonElement>(".word-review__toolbar-actions button"),
+  ];
+  const add = buttons.find((button) => button.textContent?.trim() === "添加正词")!;
+  const bulk = buttons.find((button) => button.textContent?.trim() === "将所选加入正词")!;
+  expect(add.disabled).toBe(false);
+  expect(bulk.disabled).toBe(true);
+  add.click();
+  await nextTick();
+  const input = document.body.querySelector<HTMLInputElement>(".word-dictionary input")!;
+  input.value = "再接再励";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  await nextTick();
+  await click("保存");
+  expect(controller.panel.value).toBe("general");
+  expect(controller.dictionary.value.accepted).toContain("再接再励");
+  expect(controller.issues.value).toHaveLength(0);
+});

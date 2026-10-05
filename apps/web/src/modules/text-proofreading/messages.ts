@@ -4,6 +4,7 @@ export type WordProofMessageSchema = {
     general: string;
     batch: string;
     accepted: string;
+    acceptSelected: string;
     mistake: string;
     dictionary: string;
     settings: string;
@@ -53,6 +54,7 @@ export const wordProofZhCN: WordProofMessageSchema = {
     general: "通用校对",
     batch: "批量校对",
     accepted: "添加正词",
+    acceptSelected: "将所选加入正词",
     mistake: "添加错词",
     dictionary: "词库管理",
     settings: "设置",
@@ -103,6 +105,7 @@ export const wordProofEnUS: WordProofMessageSchema = {
     general: "General proofreading",
     batch: "Batch proofreading",
     accepted: "Add accepted word",
+    acceptSelected: "Accept selected words",
     mistake: "Add incorrect word",
     dictionary: "Dictionaries",
     settings: "Settings",

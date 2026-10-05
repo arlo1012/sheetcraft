@@ -42,7 +42,7 @@ const columns = computed<PrimaryTableCol[]>(() => [
   { colKey: "context", title: t("wordProof.context"), ellipsis: true },
   { colKey: "word", title: t("wordProof.word"), width: 110 },
   { colKey: "replacement", title: t("wordProof.replacement"), width: 150 },
-  { colKey: "actions", title: t("proofreading.action"), width: 120, align: "center" },
+  { colKey: "actions", title: t("proofreading.action"), width: 180, align: "center" },
 ]);
 const applicable = computed(() =>
   props.controller.issues.value
@@ -79,11 +79,14 @@ function scan() {
           <Option value="workbook" :label="t('wordProof.workbook')" />
         </Select>
         <div class="word-review__toolbar-actions">
+          <Button theme="default" @click="controller.open('accepted')">{{
+            t("wordProof.accepted")
+          }}</Button>
           <Button
             theme="default"
             :disabled="!controller.selected.value.length"
             @click="controller.acceptSelected() && (replacements = {})"
-            >{{ t("wordProof.accepted") }}</Button
+            >{{ t("wordProof.acceptSelected") }}</Button
           >
           <Button
             theme="default"
@@ -135,6 +138,9 @@ function scan() {
                 <Button size="small" variant="text" @click="controller.ignore([row.id])">{{
                   t("wordProof.ignore")
                 }}</Button>
+                <Button size="small" variant="text" @click="controller.add(row.word) && scan()">{{
+                  t("wordProof.accepted")
+                }}</Button>
               </div>
             </template>
           </PrimaryTable>
@@ -180,7 +186,6 @@ function scan() {
     margin-left: auto;
     display: flex;
     align-items: center;
-    gap: 8px;
   }
   &__scope {
     width: 180px;

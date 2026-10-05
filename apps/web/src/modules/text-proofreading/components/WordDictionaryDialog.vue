@@ -14,12 +14,17 @@ import type { useWordProofreading } from "../useWordProofreading";
 const props = defineProps<{ controller: ReturnType<typeof useWordProofreading> }>();
 const { t } = useAppI18n();
 const originalWord = ref<string>();
+const returnTo = ref<"general" | "batch">();
 const word = ref(""),
   replacement = ref(""),
   builtins = ref(true);
 watch(
   () => props.controller.panel.value,
-  () => {
+  (panel, previous) => {
+    returnTo.value =
+      panel === "accepted" && (previous === "general" || previous === "batch")
+        ? previous
+        : undefined;
     originalWord.value = undefined;
     word.value = "";
     replacement.value = "";
@@ -79,7 +84,12 @@ function saveWord() {
       originalWord.value,
     )
   )
-    props.controller.panel.value = "dictionary";
+    finishEditor(true);
+}
+function finishEditor(saved = false) {
+  const target = returnTo.value;
+  props.controller.panel.value = target ?? (saved ? "dictionary" : undefined);
+  if (saved && target) props.controller.scan();
 }
 function remove(row: Row) {
   props.controller.save({
@@ -104,7 +114,7 @@ function edit(row: Row) {
     :width="controller.panel.value === 'dictionary' ? '660px' : '520px'"
     :footer="false"
     :close-on-overlay-click="false"
-    @close="controller.panel.value = undefined"
+    @close="finishEditor()"
   >
     <div class="word-dictionary">
       <p v-if="controller.error.value" role="alert">{{ controller.error.value }}</p>
@@ -121,9 +131,7 @@ function edit(row: Row) {
           /></FormItem>
         </Form>
         <div class="word-dictionary__actions">
-          <Button variant="outline" @click="controller.panel.value = undefined">{{
-            t("wordProof.cancel")
-          }}</Button
+          <Button variant="outline" @click="finishEditor()">{{ t("wordProof.cancel") }}</Button
           ><Button @click="saveWord">{{ t("wordProof.save") }}</Button>
         </div>
       </template>
@@ -174,9 +182,7 @@ function edit(row: Row) {
         <p>{{ t("wordProof.localHint") }}</p>
         <Checkbox v-model="builtins">{{ t("wordProof.enableBuiltin") }}</Checkbox>
         <div class="word-dictionary__actions">
-          <Button variant="outline" @click="controller.panel.value = undefined">{{
-            t("wordProof.cancel")
-          }}</Button
+          <Button variant="outline" @click="finishEditor()">{{ t("wordProof.cancel") }}</Button
           ><Button
             @click="
               controller.save({ ...controller.dictionary.value, builtins }) &&
