@@ -3,7 +3,6 @@ import { computed, nextTick, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Button } from "tdesign-vue-next/es/button";
 import { Input } from "tdesign-vue-next/es/input";
-import { Textarea } from "tdesign-vue-next/es/textarea";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { BaseTable } from "tdesign-vue-next/es/table";
 import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
@@ -17,7 +16,6 @@ const { t } = useAppI18n();
 const originalWord = ref<string>();
 const word = ref(""),
   replacement = ref(""),
-  feedback = ref(""),
   builtins = ref(true);
 watch(
   () => props.controller.panel.value,
@@ -40,8 +38,6 @@ const title = computed(() => {
       return t("wordProof.mistake");
     case "settings":
       return t("wordProof.settings");
-    case "feedback":
-      return t("wordProof.feedback");
     default:
       return t("wordProof.dictionary");
   }
@@ -99,14 +95,6 @@ function edit(row: Row) {
     word.value = row.word;
     replacement.value = row.replacement;
   });
-}
-function download() {
-  const url = URL.createObjectURL(new Blob([feedback.value], { type: "text/plain;charset=utf-8" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "proofreading-feedback.txt";
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 </script>
 <template>
@@ -177,6 +165,7 @@ function download() {
         </div>
       </template>
       <template v-else-if="controller.panel.value === 'settings'">
+        <p>{{ t("wordProof.hint") }}</p>
         <p>{{ t("wordProof.localHint") }}</p>
         <Checkbox v-model="builtins">{{ t("wordProof.enableBuiltin") }}</Checkbox>
         <div class="word-dictionary__actions">
@@ -190,19 +179,6 @@ function download() {
             "
             >{{ t("wordProof.save") }}</Button
           >
-        </div>
-      </template>
-      <template v-else-if="controller.panel.value === 'feedback'">
-        <p>{{ t("wordProof.feedbackHint") }}</p>
-        <Textarea
-          v-model="feedback"
-          :placeholder="t('wordProof.feedbackPlaceholder')"
-          :autosize="{ minRows: 5, maxRows: 10 }"
-        />
-        <div class="word-dictionary__actions">
-          <Button :disabled="!feedback.trim()" @click="download">{{
-            t("wordProof.download")
-          }}</Button>
         </div>
       </template>
     </div>

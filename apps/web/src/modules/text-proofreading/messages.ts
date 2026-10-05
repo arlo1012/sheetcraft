@@ -6,7 +6,6 @@ export type WordProofMessageSchema = {
     accepted: string;
     mistake: string;
     dictionary: string;
-    feedback: string;
     settings: string;
     close: string;
     hint: string;
@@ -45,9 +44,6 @@ export type WordProofMessageSchema = {
     storageRead: string;
     storageWrite: string;
     stale: string;
-    feedbackHint: string;
-    download: string;
-    feedbackPlaceholder: string;
     noScan: string;
   };
 };
@@ -59,7 +55,6 @@ export const wordProofZhCN: WordProofMessageSchema = {
     accepted: "添加正词",
     mistake: "添加错词",
     dictionary: "词库管理",
-    feedback: "问题反馈",
     settings: "设置",
     close: "关闭",
     hint: "基于内置常见错词及自定义词库匹配，不进行语法或语义判断。仅检查可编辑文本，不检查公式结果。",
@@ -99,9 +94,6 @@ export const wordProofZhCN: WordProofMessageSchema = {
     storageRead: "本机词库无法读取，当前使用默认词库；保存前请检查词库内容。",
     storageWrite: "词库保存失败，请检查条目或浏览器存储空间。",
     stale: "工作簿已变化，请重新校对后再更正。",
-    feedbackHint: "可填写误报词语、建议词和复现说明并下载反馈文件；不会自动上传或发送。",
-    download: "下载反馈",
-    feedbackPlaceholder: "请描述校对问题…",
     noScan: "词库或范围已变化，请重新校对。",
   },
 };
@@ -113,7 +105,6 @@ export const wordProofEnUS: WordProofMessageSchema = {
     accepted: "Add accepted word",
     mistake: "Add incorrect word",
     dictionary: "Dictionaries",
-    feedback: "Feedback",
     settings: "Settings",
     close: "Close",
     hint: "Matches built-in phrase rules and your dictionary, without grammar or semantic analysis. Checks editable text, excluding formula results.",
@@ -155,10 +146,6 @@ export const wordProofEnUS: WordProofMessageSchema = {
       "Unable to read the saved dictionary; defaults are active. Review the dictionary before saving.",
     storageWrite: "Cannot save the dictionary. Check entries and browser storage.",
     stale: "The workbook changed. Check again before correcting.",
-    feedbackHint:
-      "Describe the false positive, suggestion, and reproduction steps, then download a report. Nothing is uploaded or sent automatically.",
-    download: "Download feedback",
-    feedbackPlaceholder: "Describe the proofreading issue…",
     noScan: "Dictionary or scope changed. Check again.",
   },
 };

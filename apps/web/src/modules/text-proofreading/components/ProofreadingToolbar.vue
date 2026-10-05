@@ -5,7 +5,6 @@ import {
   FilePlus2,
   FileWarning,
   BookOpen,
-  Headphones,
   Settings,
   SquareX,
 } from "lucide-vue-next";
@@ -67,14 +66,6 @@ const { t } = useAppI18n();
       /></RibbonButton>
     </section>
     <section class="word-toolbar__group" role="group" :aria-label="t('wordProof.settings')">
-      <RibbonButton
-        variant="tall"
-        :disabled="busy"
-        :label="t('wordProof.feedback')"
-        :text="t('wordProof.feedback')"
-        @activate="emit('open', 'feedback')"
-        ><Headphones
-      /></RibbonButton>
       <RibbonButton
         variant="tall"
         :disabled="busy"

@@ -45,34 +45,33 @@ function applySelected() {
   <Dialog
     :visible="controller.panel.value === 'general' || controller.panel.value === 'batch'"
     :header="t(controller.panel.value === 'batch' ? 'wordProof.batch' : 'wordProof.general')"
-    :width="controller.panel.value === 'batch' ? '900px' : '660px'"
-    :footer="false"
+    :width="controller.panel.value === 'batch' ? '900px' : '600px'"
     :close-on-overlay-click="false"
     @close="controller.panel.value = undefined"
   >
     <div class="word-review">
-      <p class="word-review__hint">{{ t("wordProof.hint") }}</p>
-      <div class="word-review__controls">
+      <div class="word-review__toolbar">
         <span>{{ t("wordProof.scope") }}</span>
         <Select
           v-model="controller.scope.value"
           :aria-label="t('wordProof.scope')"
           class="word-review__scope"
         >
-          <Option value="selection" :label="t('wordProof.selection')" /><Option
-            value="sheet"
-            :label="t('wordProof.sheet')"
-          /><Option value="workbook" :label="t('wordProof.workbook')" />
+          <Option value="selection" :label="t('wordProof.selection')" />
+          <Option value="sheet" :label="t('wordProof.sheet')" />
+          <Option value="workbook" :label="t('wordProof.workbook')" />
         </Select>
         <Button variant="outline" @click="controller.scan">{{ t("wordProof.scan") }}</Button>
+        <span v-if="controller.scanned.value" class="word-review__count">{{
+          t("wordProof.count", { count: controller.issues.value.length })
+        }}</span>
       </div>
       <p v-if="controller.error.value" role="alert">{{ controller.error.value }}</p>
-      <p v-if="controller.skipped.value">
+      <p v-if="controller.skipped.value" class="word-review__hint">
         {{ t("wordProof.skipped", { count: controller.skipped.value }) }}
       </p>
       <p v-if="controller.truncated.value" role="status">{{ t("wordProof.truncated") }}</p>
       <template v-if="controller.scanned.value">
-        <p>{{ t("wordProof.count", { count: controller.issues.value.length }) }}</p>
         <div v-if="controller.panel.value === 'batch'" class="word-review__table">
           <TableHeightWrapper v-slot="{ height }">
             <PrimaryTable
@@ -89,32 +88,34 @@ function applySelected() {
           </TableHeightWrapper>
         </div>
         <template v-else-if="current && currentCell">
-          <p>{{ currentCell.sheetName }}!{{ formatCellAddress(currentCell.address) }}</p>
-          <div class="word-review__context">
-            {{ currentCell.text.slice(Math.max(0, current.start - 80), current.start)
-            }}<mark>{{ current.word }}</mark
-            >{{ currentCell.text.slice(current.end, current.end + 100) }}
+          <div class="word-review__original">
+            <div class="word-review__metadata">
+              <span>{{ t("wordProof.context") }}</span>
+              <span>{{ currentCell.sheetName }}!{{ formatCellAddress(currentCell.address) }}</span>
+            </div>
+            <div class="word-review__context">
+              {{ currentCell.text.slice(Math.max(0, current.start - 80), current.start)
+              }}<mark>{{ current.word }}</mark
+              >{{ currentCell.text.slice(current.end, current.end + 100) }}
+            </div>
           </div>
-          <label>{{ t("wordProof.replacement") }}</label>
-          <Input v-model="replacement" :aria-label="t('wordProof.replacement')" />
-          <div class="word-review__controls">
-            <Button
-              :disabled="!replacement || replacement === current.word"
-              @click="controller.apply([{ ...current, replacement }])"
-              >{{ t("wordProof.replace") }}</Button
-            >
-            <Button variant="outline" @click="controller.ignore([current.id])">{{
-              t("wordProof.ignore")
-            }}</Button>
-            <Button variant="outline" @click="controller.add(current.word) && controller.scan()">{{
-              t("wordProof.accepted")
-            }}</Button>
+          <div class="word-review__replacement">
+            <span>{{ t("wordProof.replacement") }}</span>
+            <Input v-model="replacement" :aria-label="t('wordProof.replacement')" />
           </div>
         </template>
-        <p v-else role="status">{{ t("wordProof.empty") }}</p>
+        <p v-else class="word-review__empty" role="status">{{ t("wordProof.empty") }}</p>
       </template>
-      <p v-else role="status">{{ t("wordProof.noScan") }}</p>
+      <p v-else class="word-review__empty" role="status">{{ t("wordProof.noScan") }}</p>
+    </div>
+    <template #footer>
       <div class="word-review__footer">
+        <Button
+          class="word-review__close"
+          variant="outline"
+          @click="controller.panel.value = undefined"
+          >{{ t("wordProof.close") }}</Button
+        >
         <template v-if="controller.panel.value === 'batch'">
           <Button
             variant="outline"
@@ -126,44 +127,95 @@ function applySelected() {
             t("wordProof.applySelected")
           }}</Button>
         </template>
-        <Button variant="outline" @click="controller.panel.value = undefined">{{
-          t("wordProof.close")
-        }}</Button>
+        <template v-else-if="controller.scanned.value && current">
+          <Button variant="outline" @click="controller.add(current.word) && controller.scan()">{{
+            t("wordProof.accepted")
+          }}</Button>
+          <Button variant="outline" @click="controller.ignore([current.id])">{{
+            t("wordProof.ignore")
+          }}</Button>
+          <Button
+            :disabled="!replacement || replacement === current.word"
+            @click="controller.apply([{ ...current, replacement }])"
+            >{{ t("wordProof.replace") }}</Button
+          >
+        </template>
       </div>
-    </div>
+    </template>
   </Dialog>
 </template>
 <style scoped lang="scss">
 .word-review {
   display: grid;
-  gap: 12px;
+  gap: 16px;
   p {
     margin: 0;
+  }
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  &__scope {
+    width: 156px;
+  }
+  &__count {
+    margin-left: auto;
+    color: var(--td-text-color-secondary);
   }
   &__hint {
     color: var(--td-text-color-secondary);
   }
-  &__controls,
-  &__footer {
-    display: flex;
-    align-items: center;
+  &__original {
+    display: grid;
     gap: 8px;
   }
-  &__scope {
-    width: 180px;
+  &__metadata {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--td-text-color-secondary);
+    overflow-wrap: anywhere;
   }
   &__context {
+    min-height: 76px;
+    max-height: 180px;
+    overflow: auto;
     padding: 12px;
+    border-radius: var(--td-radius-default);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     background: var(--td-bg-color-secondarycontainer);
+    mark {
+      color: var(--td-warning-color);
+      background: var(--td-warning-color-light);
+      border-radius: 2px;
+    }
+  }
+  &__replacement {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
   }
   &__table {
     height: 320px;
     min-height: 0;
   }
+  &__empty {
+    padding: 24px 0;
+    text-align: center;
+    color: var(--td-text-color-secondary);
+  }
   &__footer {
-    justify-content: flex-end;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  &__close {
+    margin-right: auto;
   }
 }
 </style>

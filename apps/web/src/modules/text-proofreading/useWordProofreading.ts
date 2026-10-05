@@ -34,9 +34,7 @@ export function useWordProofreading(options: {
   } catch {
     error.value = t("wordProof.storageRead");
   }
-  const panel = ref<
-    "general" | "batch" | "accepted" | "mistake" | "dictionary" | "settings" | "feedback"
-  >();
+  const panel = ref<"general" | "batch" | "accepted" | "mistake" | "dictionary" | "settings">();
   const scope = ref<"selection" | "sheet" | "workbook">("sheet");
   const cells = shallowRef<ReviewTextCell[]>([]);
   const issues = shallowRef<WordIssue[]>([]);
