@@ -61,7 +61,6 @@ export type ReviewMessageSchema = {
     allowAutoFilter: string;
     allowPivotTables: string;
     allowEditObjects: string;
-    permissionHint: string;
     editRange: string;
     close: string;
     unlockRange: string;
@@ -116,6 +115,7 @@ export type ReviewMessageSchema = {
     noteText: string;
     save: string;
     cancel: string;
+    confirm: string;
     anonymous: string;
     emptyText: string;
     failed: string;

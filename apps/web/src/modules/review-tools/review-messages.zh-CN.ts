@@ -66,8 +66,6 @@ export const reviewZhCN = {
     allowAutoFilter: "使用自动筛选",
     allowPivotTables: "使用数据透视表",
     allowEditObjects: "编辑对象",
-    permissionHint:
-      "排序和删除行列要求目标单元格可编辑；自动筛选只能修改已有筛选条件。数据透视表权限可保存，当前尚无透视表操作。",
     editRange: "修改",
     close: "关闭",
     unlockRange: "解锁区域",
@@ -122,6 +120,7 @@ export const reviewZhCN = {
     author: "作者",
     noteText: "批注内容",
     save: "保存",
+    confirm: "确定",
     cancel: "取消",
     anonymous: "未署名",
     emptyText: "请输入批注内容。",

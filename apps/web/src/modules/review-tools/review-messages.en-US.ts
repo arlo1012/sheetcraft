@@ -67,8 +67,6 @@ export const reviewEnUS = {
     allowAutoFilter: "Use AutoFilter",
     allowPivotTables: "Use PivotTables",
     allowEditObjects: "Edit objects",
-    permissionHint:
-      "Sorting and deleting rows or columns require editable cells. AutoFilter can change existing criteria. PivotTable permission is retained; PivotTable operations are not available yet.",
     editRange: "Edit",
     close: "Close",
     unlockRange: "Unlock range",
@@ -127,6 +125,7 @@ export const reviewEnUS = {
     author: "Author",
     noteText: "Note",
     save: "Save",
+    confirm: "OK",
     cancel: "Cancel",
     anonymous: "Anonymous",
     emptyText: "Enter a note.",

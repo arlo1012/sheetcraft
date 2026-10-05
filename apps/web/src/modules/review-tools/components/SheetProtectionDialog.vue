@@ -13,7 +13,7 @@ const props = defineProps<{
   error: string;
 }>();
 const emit = defineEmits<{ close: []; save: [value: SheetProtection, password: string] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const password = ref(""),
   confirmation = ref(""),
   validationError = ref("");
@@ -64,14 +64,14 @@ function save(): void {
   <TDialog
     :visible="visible"
     :header="t(protected ? 'review.unprotectSheet' : 'review.protectSheet')"
-    :confirm-btn="t(protected ? 'review.unprotectSheet' : 'review.protectSheet')"
+    :confirm-btn="t('review.confirm')"
     :cancel-btn="t('review.cancel')"
     :close-on-overlay-click="false"
     width="460px"
     @confirm="save"
     @close="emit('close')"
   >
-    <TForm label-align="top">
+    <TForm label-align="right" :label-width="locale === 'zh-CN' ? 96 : 144">
       <TFormItem
         v-if="!protected || configuration.password"
         :label="t(protected ? 'review.password' : 'review.optionalPassword')"
@@ -121,7 +121,6 @@ function save(): void {
       <TCheckbox v-model="permissions.pivotTables">{{ t("review.allowPivotTables") }}</TCheckbox>
       <TCheckbox v-model="permissions.editObjects">{{ t("review.allowEditObjects") }}</TCheckbox>
     </div>
-    <p v-if="!protected" class="sheet-protection-options__hint">{{ t("review.permissionHint") }}</p>
     <p v-if="validationError || error" role="alert">{{ validationError || error }}</p>
   </TDialog>
 </template>
@@ -130,10 +129,5 @@ function save(): void {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: min(44vh, 360px);
-  overflow: auto;
-  &__hint {
-    color: var(--idea-text-secondary);
-  }
 }
 </style>
