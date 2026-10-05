@@ -2045,7 +2045,7 @@ const gridInert = computed(
           "
         />
       </template>
-      <template #review-tools>
+      <template #review-tools="{ openProofreading }">
         <ReviewToolbar
           :objects-read-only="!canUseSheetPermission(activeSheet, 'editObjects')"
           :busy="loading || fileBusy || xlsxBusy"
@@ -2059,6 +2059,7 @@ const gridInert = computed(
           :show-active-note="showActiveNote"
           :edit-session-id="cellEditSession.id"
           @encrypt-document="openDocumentEncryption"
+          @proofread="openProofreading"
           @spelling="textReview.open('spelling')"
           @convert-text="(mode, scope) => textReview.open(mode, scope)"
           @edit-note="reviewActions.edit()"

@@ -29,7 +29,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get("header").attributes("aria-label")).toBe("Workbook tools");
     expect(wrapper.get("nav").attributes("aria-label")).toBe("Ribbon categories");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("Home");
-    expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(7);
+    expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(6);
     expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-labelledby")).toBe(
       wrapper.get('[data-ribbon-category="home"]').attributes("id"),
     );
@@ -243,20 +243,8 @@ describe("SpreadsheetRibbon", () => {
     await wrapper.get('[data-ribbon-category="review"]').trigger("keydown", { key: "ArrowRight" });
     expect(wrapper.get('[data-ribbon-category="view"]').attributes("aria-selected")).toBe("true");
     await wrapper.get('[data-ribbon-category="view"]').trigger("keydown", { key: "ArrowRight" });
-    expect(wrapper.get('[data-ribbon-category="proofreading"]').attributes("aria-selected")).toBe(
-      "true",
-    );
-    await wrapper
-      .get('[data-ribbon-category="proofreading"]')
-      .trigger("keydown", { key: "ArrowRight" });
     expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
     await wrapper.get('[data-ribbon-category="home"]').trigger("keydown", { key: "End" });
-    expect(wrapper.get('[data-ribbon-category="proofreading"]').attributes("aria-selected")).toBe(
-      "true",
-    );
-    await wrapper
-      .get('[data-ribbon-category="proofreading"]')
-      .trigger("keydown", { key: "ArrowLeft" });
     expect(wrapper.get('[data-ribbon-category="view"]').attributes("aria-selected")).toBe("true");
     await wrapper.get('[data-ribbon-category="view"]').trigger("keydown", { key: "ArrowLeft" });
     expect(wrapper.get('[data-ribbon-category="review"]').attributes("aria-selected")).toBe("true");
@@ -285,12 +273,6 @@ describe("SpreadsheetRibbon", () => {
     await wrapper.get('[data-ribbon-category="review"]').trigger("keydown", { key: "ArrowRight" });
     expect(wrapper.get("[data-view-panel]").text()).toBe("视图设置");
     await wrapper.get('[data-ribbon-category="view"]').trigger("keydown", { key: "ArrowRight" });
-    expect(wrapper.get('[data-ribbon-category="proofreading"]').attributes("aria-selected")).toBe(
-      "true",
-    );
-    await wrapper
-      .get('[data-ribbon-category="proofreading"]')
-      .trigger("keydown", { key: "ArrowRight" });
     expect(wrapper.get("[data-table-panel]").text()).toBe("表格快捷设置");
     expect(wrapper.get('[role="tabpanel"]').attributes("aria-labelledby")).toBe(
       wrapper.get('[data-ribbon-category="table"]').attributes("id"),
@@ -298,12 +280,8 @@ describe("SpreadsheetRibbon", () => {
     await wrapper.setProps({ hasTable: false });
     expect(wrapper.find('[data-ribbon-category="table"]').exists()).toBe(false);
     expect(wrapper.find("[data-table-panel]").exists()).toBe(false);
-    expect(wrapper.get('[data-ribbon-category="proofreading"]').attributes("aria-selected")).toBe(
-      "true",
-    );
-    await wrapper
-      .get('[data-ribbon-category="proofreading"]')
-      .trigger("keydown", { key: "ArrowRight" });
+    expect(wrapper.get('[data-ribbon-category="view"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="view"]').trigger("keydown", { key: "ArrowRight" });
     expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
     wrapper.unmount();
   });

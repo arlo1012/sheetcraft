@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   SpellCheck,
+  FileSearch,
   ShieldCheck,
   LockKeyhole,
   SquarePen,
@@ -39,6 +40,7 @@ const props = withDefaults(
 );
 const emit = defineEmits<{
   spelling: [];
+  proofread: [];
   convertText: [mode: "to-simplified" | "to-traditional", scope: "sheet" | "workbook"];
   encryptDocument: [];
   editNote: [];
@@ -74,6 +76,15 @@ const protectionLabel = computed(() =>
       data-ribbon-group="review-proofreading"
       :aria-label="t('review.groupProofreading')"
     >
+      <RibbonButton
+        variant="tall"
+        :disabled="busy"
+        :label="t('wordProof.title')"
+        :text="t('wordProof.title')"
+        data-review-action="proofread"
+        @activate="emit('proofread')"
+        ><FileSearch
+      /></RibbonButton>
       <RibbonButton
         variant="tall"
         :disabled="busy"
