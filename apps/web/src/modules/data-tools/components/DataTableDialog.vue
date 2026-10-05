@@ -4,6 +4,7 @@ import { BaseTable } from "tdesign-vue-next/es/table";
 import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
 import { computed, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Button } from "tdesign-vue-next/es/button";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { RangeReferenceSelectionOptions } from "../../../shared/range-reference/useRangeReferencePicker";
@@ -123,11 +124,9 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
     :aria-label="t('dataTable.title')"
     :visible="visible && !suspended"
     :header="t('dataTable.title')"
-    width="min(560px, calc(100vw - 32px))"
+    width="min(760px, calc(100vw - 32px))"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
-    :confirm-btn="{ content: confirmLabel, disabled: busy || !canSolve }"
-    :cancel-btn="cancelLabel"
     :close-btn="!busy"
     @close="emit('close')"
     @confirm="confirm"
@@ -171,7 +170,6 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
       </div>
 
       <p class="data-table-dialog__hint">{{ instructions }}</p>
-      <p class="data-table-dialog__recalculation">{{ t("dataTable.recalculation") }}</p>
 
       <section v-if="result" class="data-table-dialog__preview" aria-live="polite">
         <div class="data-table-dialog__preview-heading">
@@ -201,6 +199,17 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
 
       <p v-if="error" class="data-table-dialog__error" role="alert">{{ error }}</p>
     </div>
+    <template #footer>
+      <div class="data-table-dialog__footer">
+        <p class="data-table-dialog__recalculation">{{ t("dataTable.recalculation") }}</p>
+        <div class="data-table-dialog__footer-actions">
+          <Button theme="default" @click="emit('close')">{{ cancelLabel }}</Button>
+          <Button theme="primary" :disabled="busy || !canSolve" @click="confirm">{{
+            confirmLabel
+          }}</Button>
+        </div>
+      </div>
+    </template>
   </Dialog>
 </template>
 
@@ -236,9 +245,21 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
     padding-top: var(--idea-space-1);
   }
 
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
   &__recalculation {
-    border-top: 1px solid var(--idea-border-subtle);
-    padding-top: var(--idea-space-2);
+    flex: 1;
+    text-align: left;
+  }
+  &__footer-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 0;
   }
 
   &__preview {
