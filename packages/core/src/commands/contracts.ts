@@ -1,3 +1,4 @@
+import type { SheetPivotTable, PivotTablesSnapshot } from "../pivot-tables.js";
 import type { CellSparkline } from "../sparklines.js";
 import type { SheetDrawing } from "../sheet-drawings.js";
 import type { ProtectionPassword } from "../protection-password.js";
@@ -158,6 +159,7 @@ export type DeleteCellsCommand = {
 
 /** Internal lossless inverse for a rectangular cell shift. */
 export type RestoreCellShiftCommand = {
+  pivotTables?: PivotTablesSnapshot;
   type: "restoreCellShift";
   sheetId: string;
   state: SheetSparseState;
@@ -512,6 +514,7 @@ export type UngroupSheetRangeCommand = {
 };
 
 export type AddSheetCommand = {
+  pivotTables?: PivotTablesSnapshot;
   type: "addSheet";
   sheet: SheetSnapshot;
   index: number;
@@ -672,6 +675,7 @@ export type MoveSheetAxisCommand = {
 };
 
 export type RestoreFullSheetStateCommand = {
+  pivotTables?: PivotTablesSnapshot;
   type: "restoreSheetState";
   sheetId: string;
   state: SheetSparseState;
@@ -728,6 +732,7 @@ export type ClearSheetConditionalFormatsCommand = {
 };
 
 export type SheetAxisSparseSlice = {
+  pivotTables?: PivotTablesSnapshot;
   cells: SheetSparseCell[];
   dimensions: SheetSparseDimension[];
   /** Hidden indexes removed by the structural operation. */
@@ -784,7 +789,22 @@ export type SetWorkbookThemeCommand = {
   tableStyles?: Array<{ sheetId: string; tableId: string; style: TableStyleDefinition | null }>;
 };
 
+export type SetPivotTableCommand = {
+  type: "setPivotTable";
+  sheetId: string;
+  table: SheetPivotTable;
+  overwrite: boolean;
+  chartId?: string;
+};
+export type RemovePivotTableCommand = {
+  type: "removePivotTable";
+  sheetId: string;
+  tableId: string;
+  clearOutput: boolean;
+};
 export type WorkbookCommand =
+  | SetPivotTableCommand
+  | RemovePivotTableCommand
   | SetSheetProtectionCommand
   | SetWorkbookStructureProtectionCommand
   | SetWorkbookDateSystemCommand
@@ -937,6 +957,10 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "cells.edit";
     case "clearCellRange":
       return "cells.clear";
+    case "setPivotTable":
+      return "table.update";
+    case "removePivotTable":
+      return "table.remove";
     case "createTable":
       return "table.create";
     case "updateTable":

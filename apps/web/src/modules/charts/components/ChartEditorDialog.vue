@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { Button } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input } from "tdesign-vue-next/es/input";
 import { Select } from "tdesign-vue-next/es/select";
@@ -25,7 +26,11 @@ const props = defineProps<{
   suspended: boolean;
   selectReference: (current: string) => Promise<string | undefined>;
 }>();
-const emit = defineEmits<{ confirm: [drawing: SheetChartDrawing, source: string]; close: [] }>();
+const emit = defineEmits<{
+  editPivot: [id: string];
+  confirm: [drawing: SheetChartDrawing, source: string];
+  close: [];
+}>();
 const { t } = useAppI18n();
 const draft = ref<SheetChartDrawing>({ ...props.drawing, chart: { ...props.drawing.chart } });
 const source = ref(
@@ -73,10 +78,17 @@ const options = computed(() => types.map((type) => ({ label: t(`chart.${type}`),
     @close="emit('close')"
   >
     <div class="chart-editor">
+      <p v-if="draft.chart.pivotTableId">
+        {{ t("pivot.cachedChart") }}
+        <Button size="small" @click="emit('editPivot', draft.chart.pivotTableId)">{{
+          t("pivot.edit")
+        }}</Button>
+      </p>
       <label
         >{{ t("chart.source")
         }}<RangeReferenceInput
           v-model="source"
+          :disabled="!!draft.chart.pivotTableId"
           :label="t('chart.source')"
           :select-reference="selectReference"
       /></label>

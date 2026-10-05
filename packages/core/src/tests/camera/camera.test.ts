@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 import type { SheetCameraDrawing } from "../../sheet-drawings.js";
-import { normalizeCameraRange, normalizeSheetDrawing } from "../../sheet-drawings.js";
+import {
+  normalizeCameraRange,
+  normalizeSheetDrawing,
+  mapDrawingSource,
+} from "../../sheet-drawings.js";
 import { createSetSheetDrawingsCommand } from "../../commands/drawings.js";
 import {
   createInsertSheetAxisCommand,
@@ -53,6 +57,15 @@ function fixture() {
   return { session, sheet, current };
 }
 describe("camera structural references", () => {
+  test("invalidates a mapped source that exceeds the camera range limit", () => {
+    const mapped = mapDrawingSource(drawing(), () => ({
+      start: { row: 0, column: 0 },
+      end: { row: 100, column: 99 },
+    })) as SheetCameraDrawing;
+    expect(mapped.camera.range).toBeNull();
+    expect(() => normalizeSheetDrawing(mapped)).not.toThrow();
+    expect(drawing().camera.range).not.toBeNull();
+  });
   test("round trips a standalone sheet containing both a camera and a sparkline", () => {
     const f = fixture();
     setCellSparkline(
@@ -196,7 +209,7 @@ describe("camera structural references", () => {
   test("round trips V28 cameras and rejects their payload in V27", () => {
     const f = fixture();
     const snapshot = serializeWorkbook(f.session.workbook);
-    expect(snapshot.version).toBe(30);
+    expect(snapshot.version).toBe(31);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 27 })).toThrow();
   });

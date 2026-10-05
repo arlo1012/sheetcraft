@@ -162,6 +162,10 @@
     "./form-controls": {
       "types": "./dist/form-controls.d.ts",
       "import": "./dist/form-controls.js"
+    },
+    "./pivot-tables": {
+      "types": "./dist/pivot-tables.d.ts",
+      "import": "./dist/pivot-tables.js"
     }
   },
   "scripts": {

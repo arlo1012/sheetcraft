@@ -76,15 +76,22 @@ export function mapDrawingSource(
   drawing: SheetDrawing,
   map: (range: CellRange) => CellRange | null,
 ): SheetDrawing {
+  const bounded = (range: CellRange | null, limit: number): CellRange | null => {
+    const next = range ? map(range) : null;
+    return next &&
+      (next.end.row - next.start.row + 1) * (next.end.column - next.start.column + 1) <= limit
+      ? next
+      : null;
+  };
   if (drawing.kind === "chart")
     return {
       ...drawing,
-      chart: { ...drawing.chart, range: drawing.chart.range ? map(drawing.chart.range) : null },
+      chart: { ...drawing.chart, range: bounded(drawing.chart.range, 10000) },
     };
   if (drawing.kind === "camera")
     return {
       ...drawing,
-      camera: { ...drawing.camera, range: drawing.camera.range ? map(drawing.camera.range) : null },
+      camera: { ...drawing.camera, range: bounded(drawing.camera.range, 10000) },
     };
   if (drawing.kind === "control") {
     const linked = drawing.control.linkedCell
@@ -95,7 +102,7 @@ export function mapDrawingSource(
       control: {
         ...drawing.control,
         linkedCell: linked?.start ?? null,
-        source: drawing.control.source ? map(drawing.control.source) : null,
+        source: bounded(drawing.control.source, 1000),
       },
     };
   }

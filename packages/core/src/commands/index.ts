@@ -63,3 +63,5 @@ export * from "./protection.js";
 export * from "./drawings.js";
 
 export * from "./sparklines.js";
+
+export * from "./pivot-tables.js";

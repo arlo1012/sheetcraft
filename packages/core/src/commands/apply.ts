@@ -1,3 +1,4 @@
+import { applySetPivotTableCommand, applyRemovePivotTableCommand } from "./pivot-tables.js";
 import { applySetCellSparklinesCommand } from "./sparklines.js";
 import { applySetSheetDrawingsCommand } from "./drawings.js";
 import {
@@ -197,6 +198,8 @@ function assertCommandDoesNotModifyProtectedSheet(
   switch (command.type) {
     case "setCellContents":
     case "clearCellRange":
+    case "setPivotTable":
+    case "removePivotTable":
     case "createTable":
     case "applyTableStyleToRange":
     case "updateTable":
@@ -303,6 +306,10 @@ export function applyWorkbookCommand(
         return applySetCellContentsCommand(workbook, command);
       case "clearCellRange":
         return applyClearCellRangeCommand(workbook, command);
+      case "setPivotTable":
+        return applySetPivotTableCommand(workbook, command);
+      case "removePivotTable":
+        return applyRemovePivotTableCommand(workbook, command);
       case "createTable":
         return applyCreateTableCommand(workbook, command);
       case "applyTableStyleToRange":

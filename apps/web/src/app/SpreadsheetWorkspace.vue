@@ -83,6 +83,8 @@ import PictureSelectionPane from "../modules/sheet-images/components/PictureSele
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
+import { usePivotActions } from "../modules/pivot-tables/usePivotActions";
+import PivotTableDialog from "../modules/pivot-tables/components/PivotTableDialog.vue";
 import { useFormControlActions } from "../modules/form-controls/useFormControlActions";
 import FormControlDialog from "../modules/form-controls/components/FormControlDialog.vue";
 import { useAttachmentActions } from "../modules/attachments/useAttachmentActions";
@@ -1098,6 +1100,42 @@ const imageActions = useSheetImageActions({
   },
   convertCellImageToFloating,
 });
+const pivotActions = usePivotActions({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getRange: () => activeSelectionRange.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => cellEditSession.finish(),
+  execute: executeCommand,
+  name: () => t("pivot.title"),
+  total: () => t("pivot.total"),
+  empty: () => t("pivot.empty"),
+  sumCaption: (field) => `${t("pivot.sum")} · ${field}`,
+  onError: () => {
+    void MessagePlugin.error(t("pivot.refreshFailed"));
+  },
+});
+const { editing: editingPivot, error: pivotError } = pivotActions;
+const activePivot = computed(() => {
+  void workbookRevision.value;
+  return pivotActions.selected();
+});
+const pivotRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingPivotRange, reference: pickedPivotReference } = pivotRangePicker;
+watch(editingPivot, (value) => {
+  if (!value) pivotRangePicker.cancel();
+});
+watch(
+  () => activeSheet.value.id,
+  () => {
+    if (!pickingPivotRange.value) pivotActions.close();
+  },
+);
+watch(workbookGeneration, pivotActions.close);
+function editLinkedPivot(id: string) {
+  chartActions.close();
+  pivotActions.open(false, id);
+}
 const controlActions = useFormControlActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1981,6 +2019,7 @@ const { active: pickingNameRange, reference: pickedNameReference } = nameRangePi
 const activeRangePicker = computed(() => {
   if (pickingProtectionRange.value) return protectionRangePicker;
   if (pickingTableRange.value) return tableRangePicker;
+  if (pickingPivotRange.value) return pivotRangePicker;
   if (pickingControlRange.value) return controlRangePicker;
   if (pickingCameraRange.value) return cameraRangePicker;
   if (pickingChartRange.value) return chartRangePicker;
@@ -2145,6 +2184,7 @@ const gridInert = computed(
     !!hyperlinkDraft.value ||
     (!!editingCamera.value && !pickingCameraRange.value) ||
     (!!editingControl.value && !pickingControlRange.value) ||
+    (!!editingPivot.value && !pickingPivotRange.value) ||
     !!viewingAttachment.value ||
     !!editingDrawing.value ||
     symbolVisible.value ||
@@ -2228,6 +2268,7 @@ const gridInert = computed(
         !!hyperlinkDraft ||
         (!!editingCamera && !pickingCameraRange) ||
         (!!editingControl && !pickingControlRange) ||
+        (!!editingPivot && !pickingPivotRange) ||
         !!viewingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
@@ -2325,6 +2366,15 @@ const gridInert = computed(
       </template>
       <template #insert-tools>
         <InsertToolbar
+          :pivot-disabled="loading || fileBusy || xlsxBusy"
+          :pivot-manage-disabled="
+            loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'pivotTables')
+          "
+          :has-pivot="!!activePivot"
+          @insert-pivot="pivotActions.open"
+          @edit-pivot="pivotActions.open(false)"
+          @refresh-pivot="pivotActions.refresh"
+          @remove-pivot="pivotActions.remove"
           @insert-control="controlActions.open()"
           @insert-attachment="attachmentActions.requestInsert"
           @insert-drawing="drawingActions.insert"
@@ -3201,6 +3251,7 @@ const gridInert = computed(
         !!hyperlinkDraft ||
         (!!editingCamera && !pickingCameraRange) ||
         (!!editingControl && !pickingControlRange) ||
+        (!!editingPivot && !pickingPivotRange) ||
         !!viewingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
@@ -3611,6 +3662,7 @@ const gridInert = computed(
         !!hyperlinkDraft ||
         (!!editingCamera && !pickingCameraRange) ||
         (!!editingControl && !pickingControlRange) ||
+        (!!editingPivot && !pickingPivotRange) ||
         !!viewingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
@@ -3714,6 +3766,7 @@ const gridInert = computed(
     :error="chartError"
     :suspended="pickingChartRange"
     :select-reference="chartRangePicker.selectReference"
+    @edit-pivot="editLinkedPivot"
     @confirm="chartActions.confirm"
     @close="chartActions.close"
   />
@@ -3735,6 +3788,26 @@ const gridInert = computed(
     :drawing="viewingAttachment"
     @download="attachmentActions.download(viewingAttachment)"
     @close="attachmentActions.close"
+  />
+  <PivotTableDialog
+    v-if="editingPivot"
+    :key="editingPivot.table.id"
+    :initial="editingPivot"
+    :workbook="session.workbook"
+    :revision="workbookRevision"
+    :disabled="loading || fileBusy || xlsxBusy"
+    :error="pivotError"
+    :suspended="pickingPivotRange"
+    :select-reference="pivotRangePicker.selectReference"
+    @confirm="pivotActions.confirm"
+    @close="pivotActions.close"
+  />
+  <RangeReferencePicker
+    v-if="pickingPivotRange"
+    :reference="pickedPivotReference"
+    :edit-session-id="cellEditSession.id"
+    @confirm="pivotRangePicker.confirm"
+    @cancel="pivotRangePicker.cancel"
   />
   <FormControlDialog
     v-if="editingControl"

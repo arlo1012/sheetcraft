@@ -1,3 +1,4 @@
+import { normalizePivotTables, type SheetPivotTable } from "./pivot-tables.js";
 import { cloneCellSparkline, normalizeCellSparkline, type CellSparkline } from "./sparklines.js";
 import { normalizeSheetDrawings, type SheetDrawing } from "./sheet-drawings.js";
 import type { ProtectionPassword } from "./protection-password.js";
@@ -205,6 +206,7 @@ export type SheetMetadata = {
   pageSetup?: SheetPageSetup;
   pageDecoration?: SheetPageDecoration;
   drawings?: SheetDrawing[];
+  pivotTables?: SheetPivotTable[];
   protection?: SheetProtection;
 };
 
@@ -372,6 +374,7 @@ export type Sheet = {
   pageSetup?: SheetPageSetup;
   pageDecoration?: SheetPageDecoration;
   drawings?: SheetDrawing[];
+  pivotTables?: SheetPivotTable[];
   protection?: SheetProtection;
   /** Transient editable-range authorization; never serialized or copied. */
   protectionAccess?: Array<{ name: string; verifier: string | undefined }>;
@@ -412,6 +415,7 @@ export type SheetSparseState = {
   pageSetup?: SheetPageSetup;
   pageDecoration?: SheetPageDecoration;
   drawings?: SheetDrawing[];
+  pivotTables?: SheetPivotTable[];
   protection?: SheetProtection;
   floatingImages: FloatingImage[];
 };
@@ -2670,6 +2674,7 @@ function normalizeSheetMetadata(
     | "pageSetup"
     | "pageDecoration"
     | "drawings"
+    | "pivotTables"
     | "protection"
   >,
 ): SheetMetadata {
@@ -2837,6 +2842,7 @@ function normalizeSheetMetadata(
     pageSetup,
     pageDecoration,
     drawings: normalizeSheetDrawings(state.drawings),
+    pivotTables: normalizePivotTables(state.pivotTables),
     protection,
   };
 }
@@ -2879,6 +2885,7 @@ export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean
   sheet.pageDecoration = cloneSheetPageDecoration(normalized.pageDecoration);
   sheet.protection = normalizeSheetProtection(normalized.protection);
   sheet.drawings = normalizeSheetDrawings(normalized.drawings);
+  sheet.pivotTables = normalizePivotTables(normalized.pivotTables);
   return true;
 }
 
@@ -3007,6 +3014,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     pageSetup: cloneSheetPageSetup(metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
     drawings: normalizeSheetDrawings(metadata.drawings),
+    pivotTables: normalizePivotTables(metadata.pivotTables),
     protection: normalizeSheetProtection(metadata.protection),
     floatingImages,
   };
@@ -3114,6 +3122,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
     pageSetup: cloneSheetPageSetup(sheet.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     pageDecoration: cloneSheetPageDecoration(sheet.pageDecoration),
     drawings: normalizeSheetDrawings(sheet.drawings),
+    pivotTables: normalizePivotTables(sheet.pivotTables),
     protection: normalizeSheetProtection(sheet.protection),
     floatingImages: sheet.floatingImages.map(cloneFloatingImage),
   });
@@ -3180,6 +3189,7 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
   sheet.pageSetup = cloneSheetPageSetup(nextState.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
   sheet.pageDecoration = cloneSheetPageDecoration(nextState.pageDecoration);
   sheet.drawings = normalizeSheetDrawings(nextState.drawings);
+  sheet.pivotTables = normalizePivotTables(nextState.pivotTables);
   sheet.protection = normalizeSheetProtection(nextState.protection);
   sheet.floatingImages = nextState.floatingImages.map(cloneFloatingImage);
   return true;

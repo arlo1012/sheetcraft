@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PivotInsertTools from "../../pivot-tables/components/PivotInsertTools.vue";
 import ChartInsertTools from "../../charts/components/ChartInsertTools.vue";
 import type { ChartType } from "@idea10/core/sheet-charts";
 import type { SheetGraphicDrawing } from "@idea10/core/sheet-drawings";
@@ -25,6 +26,9 @@ import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import ImageInsertMenu from "../../home-tools/components/ImageInsertMenu.vue";
 defineProps<{
   disabled: boolean;
+  pivotDisabled: boolean;
+  pivotManageDisabled: boolean;
+  hasPivot: boolean;
   imageDisabled: boolean;
   symbolDisabled: boolean;
   sparklineDisabled: boolean;
@@ -33,6 +37,10 @@ defineProps<{
   editSessionId?: string;
 }>();
 const emit = defineEmits<{
+  insertPivot: [chart: boolean];
+  refreshPivot: [];
+  editPivot: [];
+  removePivot: [];
   insertChart: [type: ChartType | "dashboard"];
   insertAttachment: [display: "icon" | "document"];
   insertCamera: [];
@@ -52,6 +60,15 @@ const { t } = useAppI18n();
 </script>
 <template>
   <RibbonToolbar :label="t('ribbon.insertTools')" :data-cell-edit-session="editSessionId">
+    <PivotInsertTools
+      :disabled="pivotDisabled"
+      :manage-disabled="pivotManageDisabled"
+      :has-pivot="hasPivot"
+      @insert="emit('insertPivot', $event)"
+      @refresh="emit('refreshPivot')"
+      @edit="emit('editPivot')"
+      @remove="emit('removePivot')"
+    />
     <section
       class="insert-toolbar__group"
       :aria-label="t('tables.tools')"

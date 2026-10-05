@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { SheetChartDrawing } from "../../sheet-drawings.js";
-import { normalizeSheetDrawing } from "../../sheet-drawings.js";
+import { normalizeSheetDrawing, mapDrawingSource } from "../../sheet-drawings.js";
 import { createSetSheetDrawingsCommand } from "../../commands/drawings.js";
 import {
   createInsertSheetAxisCommand,
@@ -55,6 +55,14 @@ function fixture() {
   return { session, sheet, current };
 }
 describe("chart structural references", () => {
+  test("invalidates a mapped source that exceeds the chart range limit", () => {
+    const mapped = mapDrawingSource(drawing(), () => ({
+      start: { row: 0, column: 0 },
+      end: { row: 100, column: 99 },
+    })) as SheetChartDrawing;
+    expect(mapped.chart.range).toBeNull();
+    expect(() => normalizeSheetDrawing(mapped)).not.toThrow();
+  });
   test("deep clones chart payloads and source ranges", () => {
     const source = drawing();
     const clone = normalizeSheetDrawing(source) as SheetChartDrawing;
@@ -122,7 +130,7 @@ describe("chart structural references", () => {
   test("round trips V26 charts and rejects their payload in V25", () => {
     const f = fixture();
     const snapshot = serializeWorkbook(f.session.workbook);
-    expect(snapshot.version).toBe(30);
+    expect(snapshot.version).toBe(31);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 25 })).toThrow();
   });

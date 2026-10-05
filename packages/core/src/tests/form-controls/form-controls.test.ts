@@ -5,7 +5,11 @@ import {
   resolveFormControlValue,
   type SheetFormControl,
 } from "../../form-controls.js";
-import { type SheetControlDrawing } from "../../sheet-drawings.js";
+import {
+  mapDrawingSource,
+  normalizeSheetDrawing,
+  type SheetControlDrawing,
+} from "../../sheet-drawings.js";
 import { getActiveSheet, createSheetEvaluator, setCellContent } from "../../workbook.js";
 import {
   createSetSheetDrawingsCommand,
@@ -69,6 +73,16 @@ function fixture() {
   return { session, sheet, current };
 }
 describe("form controls", () => {
+  test("invalidates a mapped item source beyond the control limit", () => {
+    const mapped = mapDrawingSource(drawing(), (range) =>
+      range.start.row === range.end.row
+        ? range
+        : { start: { row: 0, column: 2 }, end: { row: 1000, column: 2 } },
+    ) as SheetControlDrawing;
+    expect(mapped.control.source).toBeNull();
+    expect(mapped.control.linkedCell).toEqual(control().linkedCell);
+    expect(() => normalizeSheetDrawing(mapped)).not.toThrow();
+  });
   test.each([
     { type: "other" },
     { label: "a".repeat(1001) },
@@ -190,7 +204,7 @@ describe("form controls", () => {
   test("round trips V30 controls and rejects their payload in V29", () => {
     const f = fixture();
     const snapshot = serializeWorkbook(f.session.workbook);
-    expect(snapshot.version).toBe(30);
+    expect(snapshot.version).toBe(31);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 29 })).toThrow();
     const standalone = serializeSheet(f.sheet);

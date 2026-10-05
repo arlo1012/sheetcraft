@@ -1,3 +1,9 @@
+import {
+  capturePivotTables,
+  restorePivotTables,
+  transformPivotReferences,
+  normalizePivotTables,
+} from "../pivot-tables.js";
 import { getCellSparkline, setCellSparkline } from "../workbook.js";
 import { cloneCellSparkline } from "../sparklines.js";
 import { normalizeSheetDrawings, mapDrawingSource } from "../sheet-drawings.js";
@@ -182,6 +188,14 @@ function setAxisIndex(
 
 function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
   return {
+    ...(slice.pivotTables
+      ? {
+          pivotTables: slice.pivotTables.map((entry) => ({
+            sheetId: entry.sheetId,
+            tables: normalizePivotTables(entry.tables),
+          })),
+        }
+      : {}),
     cells: slice.cells.map((cell) => ({
       address: { ...cell.address },
       ...(cell.content === undefined ? {} : { content: cloneCellContent(cell.content) }),
@@ -283,6 +297,7 @@ function cloneSheetMetadata(metadata: SheetMetadata): SheetMetadata {
     pageSetup: cloneSheetPageSetup(metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
     drawings: normalizeSheetDrawings(metadata.drawings),
+    pivotTables: normalizePivotTables(metadata.pivotTables),
     protection: normalizeSheetProtection(metadata.protection),
   };
 }
@@ -646,6 +661,7 @@ function transformSheetMetadataForAxis(
     operation,
   );
   return {
+    pivotTables: normalizePivotTables(metadata.pivotTables),
     drawings: normalizeSheetDrawings(metadata.drawings).flatMap((drawing) => {
       const source = drawing.anchor[axis];
       const target = transformAxisIndex(source, index, count, maximum, operation);
@@ -1280,6 +1296,31 @@ function validateSheetAxisSlice(
     maximum,
     command.operation,
   );
+  if (command.slice.pivotTables)
+    expectedMetadata.pivotTables =
+      transformPivotReferences(
+        command.slice.pivotTables,
+        sheet.id,
+        (address) => {
+          const target = transformAxisIndex(
+            address[command.axis],
+            command.index,
+            command.count,
+            maximum,
+            command.operation,
+          );
+          return target === null ? null : { ...address, [command.axis]: target };
+        },
+        (range) =>
+          transformRangeForAxis(
+            range,
+            command.axis,
+            command.index,
+            command.count,
+            maximum,
+            command.operation,
+          ),
+      ).find((entry) => entry.sheetId === sheet.id)?.tables ?? [];
   if (
     JSON.stringify(getSheetMetadata({ ...sheet, ...expectedMetadata })) !==
     JSON.stringify(getSheetMetadata(sheet))
@@ -1346,13 +1387,15 @@ export function applyRestoreSheetStateCommand(
           },
         });
     }
-    if (!transformed && !metadataTransformed && !restored) return null;
+    const pivotsRestored = restorePivotTables(workbook, command.slice.pivotTables);
+    if (!transformed && !metadataTransformed && !restored && !pivotsRestored) return null;
     return command.operation === "insert"
       ? createInsertSheetAxisCommand(command.sheetId, command.axis, command.index, command.count)
       : createDeleteSheetAxisCommand(command.sheetId, command.axis, command.index, command.count);
   }
 
   const previousState = createSheetSparseState(sheet);
+  const pivotTables = command.pivotTables ? capturePivotTables(workbook) : undefined;
   const workbookFormulaSources = command.workbookFormulaSources
     ? [...workbook.sheets.values()].flatMap((sourceSheet) =>
         [...sourceSheet.cells.entries()].flatMap(([key, cell]) =>
@@ -1388,7 +1431,8 @@ export function applyRestoreSheetStateCommand(
     !changed &&
     !command.workbookFormulaSources &&
     !command.conditionalFormatFormulaSources &&
-    !command.definedNames
+    !command.definedNames &&
+    !command.pivotTables
   )
     return null;
   for (const formula of command.workbookFormulaSources ?? []) {
@@ -1413,8 +1457,10 @@ export function applyRestoreSheetStateCommand(
         },
       });
   }
+  restorePivotTables(workbook, command.pivotTables);
   return {
     type: "restoreSheetState",
+    ...(pivotTables ? { pivotTables } : {}),
     sheetId: command.sheetId,
     state: previousState,
     ...(workbookFormulaSources ? { workbookFormulaSources } : {}),
@@ -1463,6 +1509,23 @@ export function applySheetAxisCommand(
       end: { ...definition.reference.end },
     },
   }));
+  slice.pivotTables = capturePivotTables(workbook);
+  const nextPivots = transformPivotReferences(
+    slice.pivotTables,
+    sheet.id,
+    (address) => {
+      const target = transformAxisIndex(
+        address[command.axis],
+        command.index,
+        command.count,
+        maximum,
+        operation,
+      );
+      return target === null ? null : { ...address, [command.axis]: target };
+    },
+    (range) =>
+      transformRangeForAxis(range, command.axis, command.index, command.count, maximum, operation),
+  );
   const nextMetadata = transformSheetMetadataForAxis(
     getSheetMetadata(sheet),
     command.axis,
@@ -1519,6 +1582,7 @@ export function applySheetAxisCommand(
       reference: { ...reference, sheetId: command.sheetId },
     });
   }
+  const pivotsChanged = restorePivotTables(workbook, nextPivots);
   const externalChanged =
     (slice.workbookFormulaSources ?? []).some((formula) => {
       const current = workbook.sheets
@@ -1536,7 +1600,7 @@ export function applySheetAxisCommand(
       );
     }) ||
     JSON.stringify(slice.definedNames) !== JSON.stringify([...workbook.definedNames.values()]);
-  return changed || metadataChanged || externalChanged
+  return changed || metadataChanged || externalChanged || pivotsChanged
     ? createRestoreSheetAxisSliceCommand(
         command.sheetId,
         command.axis,
@@ -1612,6 +1676,7 @@ function transformSheetMetadataForAxisMove(
     toIndex,
   );
   return {
+    pivotTables: normalizePivotTables(metadata.pivotTables),
     drawings: normalizeSheetDrawings(metadata.drawings).map((drawing) => ({
       ...mapDrawingSource(
         { ...drawing, anchor: { ...drawing.anchor, [axis]: map(drawing.anchor[axis]) } },
@@ -1852,6 +1917,7 @@ export function applyMoveSheetAxisCommand(
   );
   assertFormulaRangesCanMove(sheet, command.axis, command.index, command.count, command.toIndex);
   const previousState = createSheetSparseState(sheet);
+  const pivotTables = capturePivotTables(workbook);
   const conditionalFormatFormulaSources = getConditionalFormatFormulaSources(
     workbook,
     command.sheetId,
@@ -1862,6 +1928,9 @@ export function applyMoveSheetAxisCommand(
     command.axis === "row"
       ? { row: mapIndex(address.row), column: address.column }
       : { row: address.row, column: mapIndex(address.column) };
+  const nextPivots = transformPivotReferences(pivotTables, sheet.id, mapAddress, (range) =>
+    transformRangeForAxisMove(range, command.axis, command.index, command.count, command.toIndex),
+  );
   const state: SheetSparseState = {
     cells: previousState.cells.map((cell) => {
       const content = cell.content;
@@ -1928,6 +1997,7 @@ export function applyMoveSheetAxisCommand(
     pageSetup: metadata.pageSetup,
     pageDecoration: metadata.pageDecoration,
     drawings: metadata.drawings,
+    pivotTables: metadata.pivotTables,
     protection: metadata.protection,
     floatingImages: previousState.floatingImages.map((image) => ({
       ...image,
@@ -1937,7 +2007,9 @@ export function applyMoveSheetAxisCommand(
           : { row: image.anchor.row, column: mapIndex(image.anchor.column) },
     })),
   };
-  if (!replaceSheetSparseState(sheet, state)) return null;
+  const stateChanged = replaceSheetSparseState(sheet, state);
+  const pivotsChanged = restorePivotTables(workbook, nextPivots);
+  if (!stateChanged && !pivotsChanged) return null;
   rewriteConditionalFormatQualifiedReferencesForSheet(workbook, command.sheetId, (address) =>
     command.axis === "row"
       ? { row: mapIndex(address.row), column: address.column }
@@ -1945,6 +2017,7 @@ export function applyMoveSheetAxisCommand(
   );
   return {
     ...createRestoreSheetStateCommand(command.sheetId, previousState),
+    pivotTables,
     ...(conditionalFormatFormulaSources.length ? { conditionalFormatFormulaSources } : {}),
   };
 }

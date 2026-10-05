@@ -99,6 +99,17 @@ export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookC
       reject(sheet.id);
     return true;
   }
+  if (command.type === "setPivotTable" || command.type === "removePivotTable") {
+    if (
+      !sheet.protection?.pivotTables ||
+      !(sheet.pivotTables ?? []).some(
+        (table) =>
+          table.id === (command.type === "setPivotTable" ? command.table.id : command.tableId),
+      )
+    )
+      reject(sheet.id);
+    return true;
+  }
   if (command.type === "setCellNotes") {
     if (!sheet.protection?.editObjects) reject(sheet.id);
     return true;

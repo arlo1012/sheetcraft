@@ -19,6 +19,7 @@ export type ChartType =
   | "river"
   | "wordCloud";
 export type SheetChart = {
+  pivotTableId?: string;
   type: ChartType;
   /** Null means structural edits deleted or split the source range. */
   range: CellRange | null;
@@ -48,6 +49,8 @@ const types = new Set([
 export function normalizeSheetChart(chart: SheetChart): SheetChart {
   if (
     !chart ||
+    (chart.pivotTableId !== undefined &&
+      (typeof chart.pivotTableId !== "string" || !chart.pivotTableId.trim())) ||
     !types.has(chart.type) ||
     typeof chart.title !== "string" ||
     chart.title.length > 1000 ||
@@ -74,6 +77,7 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
   )
     throw new RangeError("Chart source must contain at most 10,000 cells.");
   return {
+    ...(chart.pivotTableId ? { pivotTableId: chart.pivotTableId } : {}),
     type: chart.type,
     range: range ? { start: { ...range.start }, end: { ...range.end } } : null,
     title: chart.title,
@@ -97,6 +101,42 @@ export function getSheetChartData(
   chart: SheetChart,
   evaluator: SheetEvaluator,
 ): ChartData {
+  if (chart.pivotTableId) {
+    const pivot = sheet.pivotTables?.find((table) => table.id === chart.pivotTableId);
+    const range = pivot?.outputRange;
+    if (!pivot || !range) return { categories: [], series: [], records: [] };
+    const labelColumns = Math.max(1, pivot.rowFields.length);
+    const endRow = range.end.row - (pivot.rowTotals && pivot.rowFields.length ? 1 : 0);
+    const endColumn =
+      range.end.column -
+      (pivot.columnTotals && pivot.columnFields.length ? pivot.values.length : 0);
+    const categories: string[] = [];
+    const series: ChartSeries[] = [];
+    const records: ChartData["records"] = [];
+    for (let column = range.start.column + labelColumns; column <= endColumn; column++)
+      series.push({
+        name: String(evaluator.getComputedValue({ row: range.start.row, column }) ?? ""),
+        values: [],
+      });
+    for (let row = range.start.row + 1; row <= endRow; row++) {
+      const name = Array.from({ length: labelColumns }, (_, index) =>
+        String(evaluator.getComputedValue({ row, column: range.start.column + index }) ?? ""),
+      ).join(" / ");
+      categories.push(name);
+      const record: Array<string | number | null> = [name];
+      series.forEach((entry, index) => {
+        const value = evaluator.getComputedValue({
+          row,
+          column: range.start.column + labelColumns + index,
+        });
+        const number = typeof value === "number" && Number.isFinite(value) ? value : null;
+        entry.values.push(number);
+        record.push(number);
+      });
+      records.push(record);
+    }
+    return { categories, series, records };
+  }
   const { range } = normalizeSheetChart(chart);
   if (!range) return { categories: [], series: [], records: [] };
   const rows: number[] = [];

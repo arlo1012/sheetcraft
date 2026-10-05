@@ -1,3 +1,8 @@
+import {
+  capturePivotTables,
+  restorePivotTables,
+  transformPivotReferences,
+} from "../pivot-tables.js";
 import { mapDrawingSource } from "../sheet-drawings.js";
 import { collectFormulaRanges, transformFormulaReferences } from "../formula/references.js";
 import { conditionalFormatFormulaSources } from "../conditional-formatting.js";
@@ -456,12 +461,17 @@ export function applyCellShiftCommand(
     );
     return reference ? [{ ...definition, reference: { sheetId: sheet.id, ...reference } }] : [];
   });
+  const pivotTables = capturePivotTables(workbook);
+  const nextPivots = transformPivotReferences(pivotTables, sheet.id, map, (source) =>
+    transformFormulaRange(source, map, range, command.direction),
+  );
   const stateChanged = validateCommandPayload("range", command.range, () =>
     replaceSheetSparseState(sheet, nextState),
   );
   rewriteQualifiedReferencesForSheet(workbook, sheet.id, map);
   workbook.definedNames.clear();
   for (const definition of transformedNames) workbook.definedNames.set(definition.id, definition);
+  const pivotsChanged = restorePivotTables(workbook, nextPivots);
   const externalChanged =
     workbookFormulaSources.some((formula) => {
       const current = workbook.sheets
@@ -469,9 +479,10 @@ export function applyCellShiftCommand(
         ?.cells.get(createCellKey(formula.address))?.content;
       return current?.kind === "formula" && current.formula.source !== formula.source;
     }) || JSON.stringify(definedNames) !== JSON.stringify(transformedNames);
-  return stateChanged || externalChanged
+  return stateChanged || externalChanged || pivotsChanged
     ? {
         type: "restoreCellShift",
+        pivotTables,
         sheetId: sheet.id,
         state: previousState,
         direction: command.direction,
@@ -524,5 +535,6 @@ export function applyRestoreCellShiftCommand(
   workbook.definedNames.clear();
   for (const definition of command.definedNames)
     workbook.definedNames.set(definition.id, definition);
-  return changed || formulaChanged || namesChanged ? original : null;
+  const pivotsChanged = restorePivotTables(workbook, command.pivotTables);
+  return changed || formulaChanged || namesChanged || pivotsChanged ? original : null;
 }

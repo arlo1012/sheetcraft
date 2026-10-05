@@ -1,3 +1,4 @@
+import { pivotsZhCN } from "../../../modules/pivot-tables/pivot-messages.zh-CN";
 import { controlsZhCN } from "../../../modules/form-controls/control-messages.zh-CN";
 import { attachmentsZhCN } from "../../../modules/attachments/attachment-messages.zh-CN";
 import { cameraZhCN } from "../../../modules/camera/camera-messages.zh-CN";
@@ -21,6 +22,7 @@ import { tableStylesZhCN } from "../../../modules/table-styles/table-style-messa
 import { tablesZhCN } from "../../../modules/table-styles/table-messages.zh-CN";
 
 export const zhCN = {
+  ...pivotsZhCN,
   ...controlsZhCN,
   ...attachmentsZhCN,
   ...cameraZhCN,

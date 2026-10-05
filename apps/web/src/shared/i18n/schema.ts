@@ -1,3 +1,4 @@
+import type { pivotsEnUS } from "../../modules/pivot-tables/pivot-messages.en-US";
 import type { controlsEnUS } from "../../modules/form-controls/control-messages.en-US";
 import type { attachmentsEnUS } from "../../modules/attachments/attachment-messages.en-US";
 import type { cameraEnUS } from "../../modules/camera/camera-messages.en-US";
@@ -21,7 +22,8 @@ import type { TableMessageSchema } from "../../modules/table-styles/table-messag
 
 export type AppLocale = "zh-CN" | "en-US";
 
-type ToolMessageSchema = typeof controlsEnUS &
+type ToolMessageSchema = typeof pivotsEnUS &
+  typeof controlsEnUS &
   typeof attachmentsEnUS &
   typeof cameraEnUS &
   typeof sparklinesEnUS &

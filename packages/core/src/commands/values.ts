@@ -1,3 +1,8 @@
+import {
+  capturePivotTables,
+  restorePivotTables,
+  transformPivotReferences,
+} from "../pivot-tables.js";
 import { cloneCellSparkline, translateCellSparkline, type CellSparkline } from "../sparklines.js";
 import { getCellSparkline, setCellSparkline } from "../workbook.js";
 import { getCellMatrixSize } from "../clipboard.js";
@@ -836,6 +841,24 @@ export function applyMoveCellRangeCommand(
   )
     return null;
   const previous = createSheetSparseState(sheet);
+  const pivotTables = capturePivotTables(workbook);
+  const contains = (range: CellRange, address: CellAddress) =>
+    address.row >= range.start.row &&
+    address.row <= range.end.row &&
+    address.column >= range.start.column &&
+    address.column <= range.end.column;
+  const moveAddress = (address: CellAddress): CellAddress =>
+    contains(source, address)
+      ? {
+          row: address.row + destination.start.row - source.start.row,
+          column: address.column + destination.start.column - source.start.column,
+        }
+      : { ...address };
+  const nextPivots = transformPivotReferences(pivotTables, sheet.id, moveAddress, (range) => {
+    if (contains(source, range.start) && contains(source, range.end))
+      return { start: moveAddress(range.start), end: moveAddress(range.end) };
+    return doMergedCellRangesIntersect(range, source) ? null : range;
+  });
   assertConditionalFormatCrossSheetMoveSupported(workbook, sheet.id);
   const conditionalFormatFormulaSources = getConditionalFormatFormulaSources(workbook, sheet.id);
   const conditionalFormats = moveConditionalFormatRules(
@@ -933,8 +956,10 @@ export function applyMoveCellRangeCommand(
     sheet.id,
     createConditionalFormatMoveReferenceTransform(source, command.destination),
   );
+  const pivotsChanged = restorePivotTables(workbook, nextPivots);
   const current = createSheetSparseState(sheet);
   if (
+    !pivotsChanged &&
     JSON.stringify(current) === JSON.stringify(previous) &&
     JSON.stringify(getConditionalFormatFormulaSources(workbook, sheet.id)) ===
       JSON.stringify(conditionalFormatFormulaSources)
@@ -944,6 +969,7 @@ export function applyMoveCellRangeCommand(
     type: "restoreSheetState",
     sheetId: command.sheetId,
     state: previous,
+    pivotTables,
     ...(conditionalFormatFormulaSources.length ? { conditionalFormatFormulaSources } : {}),
   };
 }

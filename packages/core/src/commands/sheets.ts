@@ -1,3 +1,9 @@
+import {
+  capturePivotTables,
+  restorePivotTables,
+  transformPivotReferences,
+  normalizePivotTables,
+} from "../pivot-tables.js";
 import { WorkbookDomainError, toWorkbookErrorData, toWorkbookErrorDetail } from "../errors.js";
 import type { IdFactory } from "../runtime.js";
 import { deserializeSheet, serializeSheet } from "../serialization.js";
@@ -202,6 +208,10 @@ export function createDuplicateSheetCommand(
     if (source !== cell.content.formula.source)
       cell.content = { kind: "formula", formula: { source } };
   }
+  sheet.pivotTables = normalizePivotTables(sheet.pivotTables).map((table) => ({
+    ...table,
+    sourceSheetId: table.sourceSheetId === sourceSheetId ? sheetId : table.sourceSheetId,
+  }));
   sheet.id = sheetId;
   sheet.name = name;
   sheet.properties = {
@@ -339,6 +349,7 @@ export function applyAddSheetCommand(
     }
   }
   restoreConditionalFormatFormulaSources(workbook, command.conditionalFormatFormulaSources ?? []);
+  restorePivotTables(workbook, command.pivotTables);
   return {
     type: "deleteSheet",
     sheetId: sheet.id,
@@ -373,6 +384,7 @@ export function applyDeleteSheetCommand(
   if (nextActiveSheet.properties.hidden)
     throw invalidCommandPayload("activeSheetId", command.activeSheetId);
   const previousActiveSheetId = workbook.activeSheetId;
+  const pivotTables = capturePivotTables(workbook);
   const definedNames = [...workbook.definedNames.values()]
     .filter(
       (definition) =>
@@ -413,8 +425,18 @@ export function applyDeleteSheetCommand(
   for (const definition of definedNames) workbook.definedNames.delete(definition.id);
   const { sheet, index } = removeSheet(workbook, command.sheetId);
   setActiveSheet(workbook, command.activeSheetId);
+  restorePivotTables(
+    workbook,
+    transformPivotReferences(
+      pivotTables,
+      command.sheetId,
+      () => null,
+      () => null,
+    ),
+  );
   return {
     type: "addSheet",
+    pivotTables,
     sheet: serializeSheet(sheet),
     index,
     activeSheetId: previousActiveSheetId,

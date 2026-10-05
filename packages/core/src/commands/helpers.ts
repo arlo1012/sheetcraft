@@ -1,3 +1,4 @@
+import { normalizePivotTables } from "../pivot-tables.js";
 import { cloneCellSparkline } from "../sparklines.js";
 import { normalizeSheetDrawings } from "../sheet-drawings.js";
 import { normalizeSheetProtection } from "../protection.js";
@@ -210,6 +211,7 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
     pageSetup: cloneSheetPageSetup(state.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     pageDecoration: cloneSheetPageDecoration(state.pageDecoration),
     drawings: normalizeSheetDrawings(state.drawings),
+    pivotTables: normalizePivotTables(state.pivotTables),
     protection: normalizeSheetProtection(state.protection),
     floatingImages: state.floatingImages.map(cloneFloatingImage),
   };
