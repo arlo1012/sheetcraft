@@ -96,3 +96,18 @@ describe("dictionary TSV transfer", () => {
       expect(dictionary[field]).toEqual([{ word: "原词", replacement: "原替换" }]);
   });
 });
+
+test.each(["accepted", "sensitive", "terms", "mistakes", "people"] as const)(
+  "provides an importable template for %s",
+  async (category) => {
+    const { dictionaryTemplateEntries } =
+      await import("../../../modules/text-proofreading/dictionary-transfer");
+    const entries = dictionaryTemplateEntries(category);
+    expect(parseDictionaryText(serializeDictionaryText(entries, category), category)).toEqual(
+      entries,
+    );
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.word).not.toBe("");
+    expect(Boolean(entries[0]!.replacement)).toBe(category === "mistakes" || category === "people");
+  },
+);

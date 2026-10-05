@@ -33,6 +33,20 @@ export function serializeDictionaryText(
     rows.map((row) => (isSingleWordCategory(category) ? [row.word] : [row.word, row.replacement])),
   );
 }
+export function dictionaryTemplateEntries(category: DictionaryCategory): WordRule[] {
+  switch (category) {
+    case "accepted":
+      return [{ word: "示例专有名词", replacement: "" }];
+    case "sensitive":
+      return [{ word: "示例禁用词", replacement: "" }];
+    case "terms":
+      return [{ word: "示例专业术语", replacement: "" }];
+    case "mistakes":
+      return [{ word: "再接再励", replacement: "再接再厉" }];
+    case "people":
+      return [{ word: "张三", replacement: "经理" }];
+  }
+}
 export function downloadDictionaryText(
   rows: readonly WordRule[],
   category: DictionaryCategory,

@@ -91,19 +91,19 @@ function paste(event: ClipboardEvent, index: number, column: number) {
             </div>
           </template>
           <template #actions="{ row }">
-            <div class="dictionary-entry__actions">
+            <div class="dictionary-entry__actions" @dblclick.stop>
               <span
                 v-icon-action
                 :aria-label="t('wordProof.remove')"
                 :title="t('wordProof.remove')"
-                @click="remove(row.index)"
+                @click.stop="remove(row.index)"
                 ><Trash2 class="idea-action-icon" aria-hidden="true"
               /></span>
               <span
                 v-icon-action="model.length >= 5000"
                 :aria-label="t('wordProof.addRow')"
                 :title="t('wordProof.addRow')"
-                @click="insert(row.index)"
+                @click.stop="insert(row.index)"
                 ><Plus class="idea-action-icon" aria-hidden="true"
               /></span>
             </div>
@@ -125,7 +125,11 @@ function paste(event: ClipboardEvent, index: number, column: number) {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: var(--idea-space-2);
+    > span {
+      width: 24px;
+      height: 28px;
+    }
   }
   p {
     margin: 0;

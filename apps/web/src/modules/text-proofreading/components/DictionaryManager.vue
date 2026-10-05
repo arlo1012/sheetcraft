@@ -19,6 +19,7 @@ import {
 import {
   isSingleWordCategory,
   dictionaryEntries,
+  dictionaryTemplateEntries,
   downloadDictionaryText,
   parseDictionaryText,
 } from "../dictionary-transfer";
@@ -128,6 +129,13 @@ function exportEntries() {
   const exported = words.size ? entries.value.filter((row) => words.has(row.word)) : entries.value;
   downloadDictionaryText(exported, category.value, title.value);
 }
+function downloadTemplate() {
+  downloadDictionaryText(
+    dictionaryTemplateEntries(category.value),
+    category.value,
+    `${title.value}-${t("wordProof.importTemplate")}`,
+  );
+}
 async function importFile(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -205,6 +213,11 @@ async function importFile(event: Event) {
               ><template #icon><Upload :size="14" /></template>{{ t("wordProof.import") }}</Button
             ></Tooltip
           >
+          <Tooltip :content="t('wordProof.templateHint')">
+            <Button theme="default" variant="outline" @click="downloadTemplate">{{
+              t("wordProof.downloadTemplate")
+            }}</Button>
+          </Tooltip>
           <Button
             theme="default"
             variant="outline"
@@ -266,19 +279,21 @@ async function importFile(event: Event) {
               <span v-if="row.builtin" class="dictionary-manager__count">{{
                 t("wordProof.builtin")
               }}</span>
-              <div v-else class="dictionary-manager__row-actions">
+              <div v-else class="dictionary-manager__row-actions" @dblclick.stop>
                 <span
                   v-icon-action
                   :aria-label="t('wordProof.edit')"
                   :title="t('wordProof.edit')"
-                  @click="emit('edit', category, { word: row.word, replacement: row.replacement })"
+                  @click.stop="
+                    emit('edit', category, { word: row.word, replacement: row.replacement })
+                  "
                   ><Pencil class="idea-action-icon" aria-hidden="true"
                 /></span>
                 <span
                   v-icon-action
                   :aria-label="t('wordProof.remove')"
                   :title="t('wordProof.remove')"
-                  @click="emit('remove', category, [row.word])"
+                  @click.stop="emit('remove', category, [row.word])"
                   ><Trash2 class="idea-action-icon" aria-hidden="true"
                 /></span>
               </div>
@@ -346,7 +361,11 @@ async function importFile(event: Event) {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: var(--idea-space-2);
+    > span {
+      width: 24px;
+      height: 28px;
+    }
   }
   &__transfer {
     margin-left: auto;

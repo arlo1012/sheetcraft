@@ -15,6 +15,9 @@ export type WordProofMessageSchema = {
     termsRuleHint: string;
     peopleRuleHint: string;
     import: string;
+    importTemplate: string;
+    downloadTemplate: string;
+    templateHint: string;
     export: string;
     exportSelected: string;
     importHint: string;
@@ -108,6 +111,10 @@ export const wordProofZhCN: WordProofMessageSchema = {
     peopleRuleHint:
       "检查同一单元格中紧邻姓名的已登记职务，支持空格或冒号分隔。仅提示已知职务搭配错误，不推断未知职务、跨句或跨单元格关系。",
     import: "导入",
+    importTemplate: "导入模板",
+    downloadTemplate: "下载模板",
+    templateHint:
+      "下载当前分类的 TSV 模板。模板无表头，请将示例替换为自己的词条后导入；可用 Excel / WPS 编辑并保存为制表符分隔文本。",
     export: "导出",
     exportSelected: "导出所选",
     importHint:
@@ -208,6 +215,10 @@ export const wordProofEnUS: WordProofMessageSchema = {
     peopleRuleHint:
       "Checks registered titles immediately next to known names in the same cell, separated by spaces or colons. Unknown titles and relationships across sentences or cells are not inferred.",
     import: "Import",
+    importTemplate: "Import template",
+    downloadTemplate: "Template",
+    templateHint:
+      "Download a headerless TSV template for this category. Replace the examples with your entries; edit in Excel / WPS and save as tab-delimited text before importing.",
     export: "Export",
     exportSelected: "Export selected",
     importHint:
