@@ -56,7 +56,7 @@ const columns = computed<PrimaryTableCol[]>(() => [
   {
     colKey: "actions",
     title: t("proofreading.action"),
-    width: locale.value === "zh-CN" ? 240 : 336,
+    width: locale.value === "zh-CN" ? 216 : 312,
     fixed: "right",
     align: "center",
   },
