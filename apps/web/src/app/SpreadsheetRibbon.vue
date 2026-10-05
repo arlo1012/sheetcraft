@@ -99,6 +99,7 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 type Category =
   | "home"
+  | "insert"
   | "page"
   | "formulas"
   | "data"
@@ -110,6 +111,7 @@ const proofreadingOpen = ref(false);
 const activeCategory = ref<Category>("home");
 let previousCategory: Exclude<Category, "table"> = "home";
 const homeTab = ref<HTMLButtonElement>();
+const insertTab = ref<HTMLButtonElement>();
 const pageTab = ref<HTMLButtonElement>();
 const formulaTab = ref<HTMLButtonElement>();
 const dataTab = ref<HTMLButtonElement>();
@@ -132,8 +134,8 @@ watch(
 function onCategoryKeydown(event: KeyboardEvent): void {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
   event.preventDefault();
-  const categories: Category[] = ["home", "page", "formulas", "data", "review", "view"];
-  const tabs = [homeTab, pageTab, formulaTab, dataTab, reviewTab, viewTab];
+  const categories: Category[] = ["home", "insert", "page", "formulas", "data", "review", "view"];
+  const tabs = [homeTab, insertTab, pageTab, formulaTab, dataTab, reviewTab, viewTab];
   if (props.hasTable) {
     categories.push("table");
     tabs.push(tableTab);
@@ -172,6 +174,7 @@ defineSlots<{
   "data-tools"?: () => unknown;
   "table-tools"?: () => unknown;
   "page-tools"?: () => unknown;
+  "insert-tools"?: () => unknown;
   "review-tools"?: (props: { openProofreading: () => void }) => unknown;
   "view-tools"?: () => unknown;
   "proofreading-tools"?: (props: { close: () => void }) => unknown;
@@ -203,6 +206,21 @@ defineSlots<{
             @click="activeCategory = 'home'"
           >
             {{ t("ribbon.home") }}
+          </button>
+          <button
+            :id="`${tabId}-insert`"
+            ref="insertTab"
+            class="spreadsheet-ribbon__category"
+            :class="{ 'is-active': activeCategory === 'insert' }"
+            data-ribbon-category="insert"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'insert'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'insert' ? 0 : -1"
+            @click="activeCategory = 'insert'"
+          >
+            {{ t("ribbon.insert") }}
           </button>
           <button
             :id="`${tabId}-page`"
@@ -389,6 +407,7 @@ defineSlots<{
           <slot name="worksheet-tools" />
         </template>
       </HomeFormatToolbar>
+      <slot v-else-if="activeCategory === 'insert'" name="insert-tools" />
       <slot v-else-if="activeCategory === 'page'" name="page-tools" />
       <FormulaToolbar
         v-else-if="activeCategory === 'formulas'"

@@ -805,6 +805,7 @@ export const zhCN = {
     unavailableFeature: "{feature}，暂未开放",
   },
   ribbon: {
+    insert: "插入",
     rowColumnTools: "行和列",
     worksheetTools: "工作表",
     structureTools: "行列和工作表操作",

@@ -75,6 +75,7 @@ import { usePageThemeController } from "../modules/page-layout/usePageThemeContr
 import { workbookThemeKey } from "../shared/color/workbook-theme-context";
 import PageBackgroundMenu from "../modules/page-decorations/components/PageBackgroundMenu.vue";
 import type { SheetWatermark, WatermarkPreset } from "@idea10/core/page-decoration";
+import InsertToolbar from "../modules/insert-tools/components/InsertToolbar.vue";
 import PageWatermarkMenu from "../modules/page-decorations/components/PageWatermarkMenu.vue";
 import WatermarkDialog from "../modules/page-decorations/components/WatermarkDialog.vue";
 import {
@@ -2015,6 +2016,53 @@ const gridInert = computed(
       @undo="undo"
       @redo="redo"
     >
+      <template #insert-tools>
+        <InsertToolbar
+          :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
+          :image-disabled="
+            loading ||
+            fileBusy ||
+            xlsxBusy ||
+            imageBusy ||
+            !canUseSheetPermission(activeSheet, 'editObjects')
+          "
+          :hyperlink-disabled="
+            loading ||
+            fileBusy ||
+            xlsxBusy ||
+            !canUseSheetPermission(activeSheet, 'insertHyperlinks') ||
+            !canEditCell(activeSheet, activeAddress)
+          "
+          :has-table="!!activeTable"
+          :edit-session-id="cellEditSession.id"
+          @insert-image="imageActions.requestInsert"
+          @insert-hyperlink="hyperlinkActions.edit"
+          @insert-table="tableActions.requestCreate"
+          @manage-table="tableActions.openSettings"
+        >
+          <template #watermark>
+            <PageWatermarkMenu
+              :watermark="pageDecoration.watermark"
+              :presets="session.workbook.watermarkPresets"
+              :image-asset-urls="imageAssetUrls"
+              :disabled="
+                loading ||
+                fileBusy ||
+                xlsxBusy ||
+                decorationBusy ||
+                activeSheet.properties.protected
+              "
+              @apply="applyWatermark"
+              @custom="openWatermark"
+              @edit-document="openWatermark(undefined, pageDecoration.watermark)"
+              @apply-preset="applyWatermarkPreset"
+              @edit-preset="openWatermark"
+              @delete-preset="decorations.deletePreset"
+              @remove="decorations.removeWatermark"
+            />
+          </template>
+        </InsertToolbar>
+      </template>
       <template #table-tools>
         <TableToolsToolbar
           v-if="activeTable"

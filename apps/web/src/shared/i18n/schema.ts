@@ -791,6 +791,7 @@ export type MessageSchema = ToolMessageSchema & {
     unavailableFeature: string;
   };
   ribbon: {
+    insert: string;
     rowColumnTools: string;
     worksheetTools: string;
     structureTools: string;

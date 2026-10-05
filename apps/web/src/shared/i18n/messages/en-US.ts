@@ -831,6 +831,7 @@ export const enUS = {
     unavailableFeature: "{feature}, not available yet",
   },
   ribbon: {
+    insert: "Insert",
     rowColumnTools: "Rows and columns",
     worksheetTools: "Worksheet",
     structureTools: "Row, column, and worksheet operations",
