@@ -128,12 +128,16 @@ export function useTextReviewController(options: {
       }
     };
     timeout = setTimeout(failed, 60_000);
-    worker.postMessage({
-      cells: cells.value,
-      mode: mode.value,
-      language: language.value,
-      ignored: ignored.value,
-    });
+    try {
+      worker.postMessage({
+        cells: cells.value,
+        mode: mode.value,
+        language: language.value,
+        ignored: [...ignored.value],
+      });
+    } catch {
+      failed();
+    }
   }
   function apply(changes: NonNullable<TextReviewResult["conversions"]>) {
     if (busy.value || options.isBusy() || !changes.length) return false;

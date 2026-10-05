@@ -31,7 +31,9 @@ class ReviewWorker {
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: (() => void) | null = null;
   onmessageerror: (() => void) | null = null;
-  postMessage = vi.fn<(request: TextReviewRequest) => void>();
+  postMessage = vi.fn((request: TextReviewRequest) => {
+    structuredClone(request);
+  });
   terminate = vi.fn();
   constructor() {
     ReviewWorker.instances.push(this);
@@ -155,6 +157,23 @@ describe("text conversion controller", () => {
     wrapper!.unmount();
     wrapper = undefined;
     expect(worker.terminate).toHaveBeenCalledTimes(1);
+  });
+
+  test("clears busy state and reports synchronous worker send failures", async () => {
+    const f = fixture();
+    f.review.open("to-traditional");
+    const worker = ReviewWorker.instances[0]!;
+    worker.respond([]);
+    worker.postMessage.mockImplementationOnce(() => {
+      throw new Error("send failed");
+    });
+    expect(() => f.review.open("to-simplified")).not.toThrow();
+    expect(f.review.busy.value).toBe(false);
+    expect(worker.terminate).toHaveBeenCalledOnce();
+    await nextTick();
+    expect(messages.error).toHaveBeenCalledOnce();
+    f.review.open("to-traditional");
+    expect(ReviewWorker.instances).toHaveLength(2);
   });
 
   test("rejects a result captured before a workbook revision and reports the error", async () => {
