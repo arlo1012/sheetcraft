@@ -116,8 +116,8 @@ function selectIssues(keys: Array<string | number>): void {
       </div>
 
       <div v-if="error" class="data-proofreading-dialog__error" role="alert">{{ error }}</div>
-      <div v-else-if="!issues.length" class="data-proofreading-dialog__empty">
-        {{ hasScanned ? t("proofreading.noIssues") : t("proofreading.scanHint") }}
+      <div v-else-if="!hasScanned && !issues.length" class="data-proofreading-dialog__empty">
+        {{ t("proofreading.scanHint") }}
       </div>
 
       <TTable
@@ -198,6 +198,9 @@ function selectIssues(keys: Array<string | number>): void {
         <div class="data-proofreading-dialog__summary" aria-live="polite">
           <span v-if="issues.length">{{ t("proofreading.issues", { count: issues.length }) }}</span>
           <span>{{ t("proofreading.selected", { count: safeSelectedCount }) }}</span>
+          <span v-if="hasScanned && !issues.length && !error">{{
+            t("proofreading.noIssues")
+          }}</span>
         </div>
         <div class="data-proofreading-dialog__footer-actions">
           <TButton theme="default" :disabled="busy" @click="emit('close')">{{
