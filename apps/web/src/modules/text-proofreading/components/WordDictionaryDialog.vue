@@ -5,7 +5,6 @@ import { Button } from "tdesign-vue-next/es/button";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { useAppI18n } from "../../../shared/i18n";
 import DictionaryEntryTable from "./DictionaryEntryTable.vue";
 import DictionaryManager from "./DictionaryManager.vue";
@@ -192,10 +191,7 @@ function editEntry(target: DictionaryCategory, entry: WordRule) {
           :first-label="firstLabel"
           :second-label="secondLabel"
         />
-        <Form v-else label-align="top"
-          ><FormItem :label="t('wordProof.word')"
-            ><Input v-model="word" :maxlength="100" /></FormItem
-        ></Form>
+        <Input v-else v-model="word" :maxlength="100" :aria-label="t('wordProof.word')" />
       </template>
       <DictionaryManager
         v-else-if="controller.panel.value === 'dictionary'"
