@@ -1,5 +1,8 @@
+import { normalizeImageAppearance, type ImageAppearance } from "./image-appearance.js";
+export { normalizeImageAppearance, type ImageAppearance } from "./image-appearance.js";
 export type ImageCrop = { x: number; y: number; width: number; height: number };
 export type ImageTransform = {
+  appearance?: ImageAppearance;
   crop?: ImageCrop;
   rotation?: 0 | 90 | 180 | 270;
   /** Mirror the cropped source horizontally before applying rotation. */
@@ -60,8 +63,10 @@ export function normalizeImageTransform(
   if (transform.flipVertical !== undefined && typeof transform.flipVertical !== "boolean") {
     throw new TypeError("Image vertical flip must be a boolean.");
   }
-  return crop || rotation || transform.flipHorizontal || transform.flipVertical
+  const appearance = normalizeImageAppearance(transform.appearance);
+  return crop || rotation || transform.flipHorizontal || transform.flipVertical || appearance
     ? {
+        ...(appearance ? { appearance } : {}),
         ...(crop ? { crop } : {}),
         ...(rotation ? { rotation } : {}),
         ...(transform.flipHorizontal ? { flipHorizontal: true } : {}),
@@ -89,6 +94,7 @@ export function areImageTransformsEqual(
   const a = normalizeImageTransform(left);
   const b = normalizeImageTransform(right);
   return (
+    JSON.stringify(a?.appearance) === JSON.stringify(b?.appearance) &&
     a?.rotation === b?.rotation &&
     a?.flipHorizontal === b?.flipHorizontal &&
     a?.flipVertical === b?.flipVertical &&

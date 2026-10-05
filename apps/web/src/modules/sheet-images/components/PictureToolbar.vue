@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed } from "vue";
 import {
   Crop,
   RotateCcw,
@@ -19,8 +19,13 @@ import {
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
+import PictureAssetTools from "./PictureAssetTools.vue";
+import type { PictureFileFormat } from "../picture-asset-conversion";
+import PictureArrangeTools from "./PictureArrangeTools.vue";
+import type { PictureAlignment, PictureLayerAction } from "../usePictureTools";
+import PictureAppearanceTools from "./PictureAppearanceTools.vue";
 import ImageInsertMenu from "../../home-tools/components/ImageInsertMenu.vue";
-const props = defineProps<{ image: FloatingImage; disabled: boolean }>();
+const props = defineProps<{ image: FloatingImage; disabled: boolean; selectionCount: number }>();
 const emit = defineEmits<{
   update: [image: FloatingImage];
   insertImage: [mode: "cell" | "floating"];
@@ -29,16 +34,20 @@ const emit = defineEmits<{
   flip: [axis: "horizontal" | "vertical"];
   restore: [];
   replace: [];
+  group: [];
+  ungroup: [];
+  align: [action: PictureAlignment];
+  layer: [action: PictureLayerAction];
+  selectionPane: [];
+  compress: [];
+  batchSize: [];
+  export: [format: PictureFileFormat, all?: boolean];
+  preview: [];
+  print: [];
   convertToCell: [];
 }>();
 const { t } = useAppI18n();
-const locked = ref(true);
-watch(
-  () => props.image.id,
-  () => {
-    locked.value = true;
-  },
-);
+const locked = computed(() => props.image.lockAspectRatio ?? true);
 function resize(axis: "width" | "height", points: unknown): void {
   if (props.disabled || typeof points !== "number" || !Number.isFinite(points)) return;
   const pixels = (points * 4) / 3;
@@ -63,18 +72,21 @@ function resize(axis: "width" | "height", points: unknown): void {
         <RibbonButton
           :label="t('image.replace')"
           :text="t('image.replace')"
-          :disabled="disabled"
+          :disabled="disabled || selectionCount > 1"
           data-picture-tool="replace"
           @activate="emit('replace')"
           ><ImagePlus
         /></RibbonButton>
       </div>
-      <ImageInsertMenu :disabled="disabled" @insert-image="emit('insertImage', $event)" />
+      <ImageInsertMenu
+        :disabled="disabled || selectionCount > 1"
+        @insert-image="emit('insertImage', $event)"
+      />
       <RibbonButton
         variant="tall"
         :label="t('image.convertToCell')"
         :text="t('image.convertToCell')"
-        :disabled="disabled"
+        :disabled="disabled || selectionCount > 1"
         @activate="emit('convertToCell')"
         ><ImageDown
       /></RibbonButton>
@@ -84,7 +96,7 @@ function resize(axis: "width" | "height", points: unknown): void {
         variant="tall"
         :label="t('image.crop')"
         :text="t('image.crop')"
-        :disabled="disabled"
+        :disabled="disabled || selectionCount > 1"
         data-picture-tool="crop"
         @activate="emit('crop')"
         ><Crop
@@ -100,7 +112,7 @@ function resize(axis: "width" | "height", points: unknown): void {
             size="small"
             theme="column"
             class="idea-input-number--persistent-controls"
-            :disabled="disabled"
+            :disabled="disabled || selectionCount > 1"
             data-picture-size="width"
             @change="resize('width', $event)"
           />
@@ -115,20 +127,23 @@ function resize(axis: "width" | "height", points: unknown): void {
             size="small"
             theme="column"
             class="idea-input-number--persistent-controls"
-            :disabled="disabled"
+            :disabled="disabled || selectionCount > 1"
             data-picture-size="height"
             @change="resize('height', $event)"
           />
         </div>
       </div>
       <div class="picture-toolbar__stack">
-        <TCheckbox v-model="locked" :disabled="disabled">{{
-          t("image.lockAspectRatio")
-        }}</TCheckbox>
+        <TCheckbox
+          :model-value="locked"
+          :disabled="disabled || selectionCount > 1"
+          @update:model-value="emit('update', { ...image, lockAspectRatio: Boolean($event) })"
+          >{{ t("image.lockAspectRatio") }}</TCheckbox
+        >
         <RibbonButton
           :label="t('image.restoreOriginal')"
           :text="t('image.restoreOriginal')"
-          :disabled="disabled"
+          :disabled="disabled || selectionCount > 1"
           data-picture-tool="restore"
           @activate="emit('restore')"
           ><RotateCcw
@@ -140,7 +155,7 @@ function resize(axis: "width" | "height", points: unknown): void {
         <RibbonButton
           :label="t('image.rotateLeft')"
           :text="t('image.rotateLeft')"
-          :disabled="disabled"
+          :disabled="disabled || selectionCount > 1"
           data-picture-tool="rotate-left"
           @activate="emit('rotate', -1)"
           ><RotateCcw
@@ -148,7 +163,7 @@ function resize(axis: "width" | "height", points: unknown): void {
         <RibbonButton
           :label="t('image.rotateRight')"
           :text="t('image.rotateRight')"
-          :disabled="disabled"
+          :disabled="disabled || selectionCount > 1"
           data-picture-tool="rotate-right"
           @activate="emit('rotate', 1)"
           ><RotateCw
@@ -158,7 +173,7 @@ function resize(axis: "width" | "height", points: unknown): void {
         <RibbonButton
           :label="t('image.flipHorizontal')"
           :text="t('image.flipHorizontal')"
-          :disabled="disabled"
+          :disabled="disabled || selectionCount > 1"
           data-picture-tool="flip-horizontal"
           @activate="emit('flip', 'horizontal')"
           ><FlipHorizontal2
@@ -166,13 +181,37 @@ function resize(axis: "width" | "height", points: unknown): void {
         <RibbonButton
           :label="t('image.flipVertical')"
           :text="t('image.flipVertical')"
-          :disabled="disabled"
+          :disabled="disabled || selectionCount > 1"
           data-picture-tool="flip-vertical"
           @activate="emit('flip', 'vertical')"
           ><FlipVertical2
         /></RibbonButton>
       </div>
     </section>
+    <PictureArrangeTools
+      :disabled="disabled"
+      :count="selectionCount"
+      :grouped="!!image.groupId"
+      @group="emit('group')"
+      @ungroup="emit('ungroup')"
+      @align="emit('align', $event)"
+      @layer="emit('layer', $event)"
+      @selection-pane="emit('selectionPane')"
+    />
+    <PictureAppearanceTools
+      :image="image"
+      :disabled="disabled || selectionCount > 1"
+      @update="emit('update', $event)"
+    />
+    <PictureAssetTools
+      :disabled="disabled"
+      :busy="!!busy"
+      @compress="emit('compress')"
+      @batch-size="emit('batchSize')"
+      @export="(format, all) => emit('export', format, all)"
+      @preview="emit('preview')"
+      @print="emit('print')"
+    />
   </RibbonToolbar>
 </template>
 <style scoped lang="scss">

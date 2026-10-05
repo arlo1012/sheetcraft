@@ -2,6 +2,8 @@ import type { FloatingImage } from "@idea10/core/workbook";
 import {
   FLOATING_IMAGE_CLIPBOARD_TYPE,
   readFloatingImageClipboard,
+  readFloatingImageGroup,
+  serializeFloatingImageClipboard,
 } from "../sheet-images/imageClipboard";
 export const IDEA10_CLIPBOARD_TYPE = "application/x-idea10-cells";
 export const WEB_IDEA10_CLIPBOARD_TYPE = `web ${IDEA10_CLIPBOARD_TYPE}`;
@@ -12,6 +14,7 @@ export type GridClipboardTransfer = {
   localToken?: string;
   imageFile?: File;
   floatingImage?: FloatingImage;
+  floatingImages?: readonly FloatingImage[];
 };
 
 export type GridClipboardWriteResult = {
@@ -27,12 +30,14 @@ export type GridClipboardPort = {
     text: string;
     localToken: string;
     floatingImage?: FloatingImage;
+    floatingImages?: readonly FloatingImage[];
   }) => Promise<GridClipboardWriteResult>;
   /** Add an Async Clipboard custom format after a native copy/cut, without text-only fallback. */
   writeNativeRich?: (transfer: {
     text: string;
     localToken: string;
     floatingImage?: FloatingImage;
+    floatingImages?: readonly FloatingImage[];
   }) => Promise<void>;
   read: (options?: GridClipboardReadOptions) => Promise<GridClipboardTransfer>;
 };
@@ -78,6 +83,7 @@ function writeWithClipboardEvent(transfer: {
   text: string;
   localToken: string;
   floatingImage?: FloatingImage;
+  floatingImages?: readonly FloatingImage[];
 }): boolean {
   if (typeof document === "undefined" || typeof document.execCommand !== "function") {
     return false;
@@ -98,7 +104,7 @@ function writeWithClipboardEvent(transfer: {
     if (transfer.floatingImage)
       event.clipboardData.setData(
         FLOATING_IMAGE_CLIPBOARD_TYPE,
-        JSON.stringify(transfer.floatingImage),
+        serializeFloatingImageClipboard(transfer.floatingImage, transfer.floatingImages),
       );
     handled = true;
   };
@@ -142,6 +148,7 @@ function readWithClipboardEvent(): GridClipboardTransfer | undefined {
         ? Array.from(event.clipboardData.files).find((file) => file.type.startsWith("image/"))
         : undefined,
       floatingImage: readFloatingImageClipboard(event.clipboardData),
+      floatingImages: readFloatingImageGroup(event.clipboardData),
     };
   };
 
@@ -163,6 +170,7 @@ async function writeWithAsyncClipboard(transfer: {
   text: string;
   localToken: string;
   floatingImage?: FloatingImage;
+  floatingImages?: readonly FloatingImage[];
 }): Promise<void> {
   if (
     typeof navigator === "undefined" ||
@@ -177,9 +185,12 @@ async function writeWithAsyncClipboard(transfer: {
     [WEB_IDEA10_CLIPBOARD_TYPE]: new Blob([transfer.localToken], { type: IDEA10_CLIPBOARD_TYPE }),
     ...(transfer.floatingImage
       ? {
-          [WEB_FLOATING_IMAGE_CLIPBOARD_TYPE]: new Blob([JSON.stringify(transfer.floatingImage)], {
-            type: FLOATING_IMAGE_CLIPBOARD_TYPE,
-          }),
+          [WEB_FLOATING_IMAGE_CLIPBOARD_TYPE]: new Blob(
+            [serializeFloatingImageClipboard(transfer.floatingImage, transfer.floatingImages)],
+            {
+              type: FLOATING_IMAGE_CLIPBOARD_TYPE,
+            },
+          ),
         }
       : {}),
   });
@@ -224,7 +235,10 @@ async function readWithAsyncClipboard(): Promise<GridClipboardTransfer> {
               }
             : {}),
           ...(floatingText
-            ? { floatingImage: readFloatingImageClipboard({ getData: () => floatingText }) }
+            ? {
+                floatingImage: readFloatingImageClipboard({ getData: () => floatingText }),
+                floatingImages: readFloatingImageGroup({ getData: () => floatingText }),
+              }
             : {}),
         };
       }

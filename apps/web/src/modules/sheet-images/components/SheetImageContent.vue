@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, useId } from "vue";
+import { computed, ref, shallowRef, useId, watchEffect } from "vue";
 import type { ImageTransform } from "@idea10/core/workbook";
+import { createPictureCanvas } from "../../../shared/images/imageAppearance";
 import { getSheetImagePresentation } from "./sheetImagePresentation";
 
 const props = withDefaults(
@@ -16,6 +17,14 @@ defineOptions({ inheritAttrs: false });
 const emit = defineEmits<{ load: [size: { width: number; height: number }] }>();
 
 const clipPathId = `sheet-image-content-clip-${useId()}`;
+const processedSource = ref<string>();
+const sourceImage = shallowRef<HTMLImageElement>();
+watchEffect(() => {
+  processedSource.value =
+    sourceImage.value && props.transform?.appearance
+      ? createPictureCanvas(sourceImage.value, props.transform).toDataURL("image/png")
+      : undefined;
+});
 const naturalWidth = ref(1);
 const naturalHeight = ref(1);
 
@@ -26,6 +35,7 @@ const presentation = computed(() =>
 function onSourceLoad(event: Event): void {
   const image = event.currentTarget as HTMLImageElement;
   if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return;
+  sourceImage.value = image;
   naturalWidth.value = image.naturalWidth;
   naturalHeight.value = image.naturalHeight;
   emit("load", { width: image.naturalWidth, height: image.naturalHeight });
@@ -47,7 +57,14 @@ function onSourceLoad(event: Event): void {
         <rect :width="presentation.cropWidth" :height="presentation.cropHeight" />
       </clipPath>
     </defs>
-    <g :transform="presentation.rotationTransform">
+    <image
+      v-if="processedSource"
+      :href="processedSource"
+      :width="presentation.width"
+      :height="presentation.height"
+      preserveAspectRatio="none"
+    />
+    <g v-else :transform="presentation.rotationTransform">
       <g :transform="presentation.flipTransform">
         <g :clip-path="`url(#${clipPathId})`">
           <image

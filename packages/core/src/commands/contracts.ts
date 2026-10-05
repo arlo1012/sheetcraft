@@ -514,6 +514,12 @@ export type AddSheetCommand = {
   definedNames?: DefinedName[];
 };
 
+export type SetSheetFloatingImagesCommand = {
+  type: "setSheetFloatingImages";
+  sheetId: string;
+  images: FloatingImage[];
+};
+
 export type SetFloatingImageCommand = {
   type: "setFloatingImage";
   sheetId: string;
@@ -828,6 +834,7 @@ export type WorkbookCommand =
   | SetSheetOutlineLevelCommand
   | ClearSheetOutlineCommand
   | UngroupSheetRangeCommand
+  | SetSheetFloatingImagesCommand
   | SetFloatingImageCommand
   | DeleteFloatingImageCommand
   | ConvertFloatingImageToCellCommand
@@ -1005,6 +1012,7 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "clearSheetOutline":
     case "ungroupSheetRange":
       return "data.outline";
+    case "setSheetFloatingImages":
     case "setFloatingImage":
       return "images.floating.set";
     case "deleteFloatingImage":

@@ -14,6 +14,7 @@ import type {
   FloatingImageSize,
   RestoreFloatingImageToCellCommand,
   SetFloatingImageCommand,
+  SetSheetFloatingImagesCommand,
 } from "./contracts.js";
 import {
   assertCellAddress,
@@ -100,7 +101,19 @@ export function applySetFloatingImageCommand(
   const image = normalizeCommandFloatingImage(command.image);
   const index = sheet.floatingImages.findIndex((candidate) => candidate.id === image.id);
   const previous = index < 0 ? undefined : sheet.floatingImages[index];
-  if (previous && JSON.stringify(previous) === JSON.stringify(image)) return null;
+  if (
+    command.index !== undefined &&
+    (!Number.isInteger(command.index) ||
+      command.index < 0 ||
+      command.index >= sheet.floatingImages.length + (previous ? 0 : 1))
+  )
+    throw invalidCommandPayload("index", command.index);
+  if (
+    previous &&
+    JSON.stringify(previous) === JSON.stringify(image) &&
+    (command.index === undefined || command.index === index)
+  )
+    return null;
   if (index < 0) {
     if (
       command.index !== undefined &&
@@ -111,9 +124,12 @@ export function applySetFloatingImageCommand(
       throw invalidCommandPayload("index", command.index);
     }
     sheet.floatingImages.splice(command.index ?? sheet.floatingImages.length, 0, image);
+  } else if (command.index !== undefined && command.index !== index) {
+    sheet.floatingImages.splice(index, 1);
+    sheet.floatingImages.splice(command.index, 0, image);
   } else sheet.floatingImages[index] = image;
   return previous
-    ? createSetFloatingImageCommand(command.sheetId, previous)
+    ? createSetFloatingImageCommand(command.sheetId, previous, index)
     : createDeleteFloatingImageCommand(command.sheetId, image.id);
 }
 
@@ -213,4 +229,27 @@ export function applyRestoreFloatingImageToCellCommand(
   setCellContent(sheet, command.address, command.content);
   sheet.floatingImages.splice(command.index, 0, image);
   return createConvertFloatingImageToCellCommand(command.sheetId, image.id);
+}
+
+/** Replaces one sheet's picture collection atomically for grouping, arranging, and batch edits. */
+export function createSetSheetFloatingImagesCommand(
+  sheetId: string,
+  images: readonly FloatingImage[],
+): SetSheetFloatingImagesCommand {
+  if (!Array.isArray(images)) throw invalidCommandPayload("images", images);
+  const normalized = images.map(normalizeCommandFloatingImage);
+  if (new Set(normalized.map((image) => image.id)).size !== normalized.length)
+    throw invalidCommandPayload("images", images, "Duplicate picture IDs.");
+  return { type: "setSheetFloatingImages", sheetId, images: normalized };
+}
+export function applySetSheetFloatingImagesCommand(
+  workbook: Workbook,
+  command: SetSheetFloatingImagesCommand,
+): SetSheetFloatingImagesCommand | null {
+  const sheet = getSheetOrThrow(workbook, command.sheetId);
+  const next = createSetSheetFloatingImagesCommand(command.sheetId, command.images);
+  if (JSON.stringify(sheet.floatingImages) === JSON.stringify(next.images)) return null;
+  const inverse = createSetSheetFloatingImagesCommand(command.sheetId, sheet.floatingImages);
+  sheet.floatingImages = next.images;
+  return inverse;
 }

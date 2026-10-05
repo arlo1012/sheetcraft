@@ -12,6 +12,7 @@ import type { ImageInsertMode } from "./useSheetImageActions";
 
 type PendingFloatingImageClipboard = {
   image: FloatingImage;
+  images?: FloatingImage[];
   mode: "copy" | "cut";
   sheet: Sheet;
   sheetId: string;
@@ -30,6 +31,9 @@ function isSameSheet(pending: PendingFloatingImageClipboard, sheet: Sheet): bool
 export function useFloatingImageClipboard(options: {
   getSheet: () => Sheet;
   getRevision: () => number;
+  getSelectedImages?: () => FloatingImage[];
+  onPasteMany?: (images: readonly FloatingImage[], address: CellAddress) => void;
+  onMoveMany?: (images: FloatingImage[]) => void;
   clipboardPort: GridClipboardPort;
   onCopy: () => void;
   onFeedback: (key: MessageKey) => void;
@@ -63,7 +67,12 @@ export function useFloatingImageClipboard(options: {
   }
 
   function queueNativeRichWrite(
-    transfer: { text: string; localToken: string; floatingImage: FloatingImage },
+    transfer: {
+      text: string;
+      localToken: string;
+      floatingImage: FloatingImage;
+      floatingImages?: readonly FloatingImage[];
+    },
     capturedOperation: number,
   ): Promise<void> {
     nativeWriteQueue = nativeWriteQueue.then(async () => {
@@ -85,13 +94,20 @@ export function useFloatingImageClipboard(options: {
     const sheet = options.getSheet();
     const capturedOperation = ++operation;
     const capturedImage = cloneFloatingImage(image);
+    const selected = options.getSelectedImages?.();
+    const images =
+      selected && selected.length > 1 && selected.some((entry) => entry.id === image.id)
+        ? selected.map(cloneFloatingImage)
+        : undefined;
     const transfer = {
       text: capturedImage.altText,
       localToken: idFactory("floating-image"),
       floatingImage: capturedImage,
+      ...(images ? { floatingImages: images } : {}),
     };
     pending = {
       image: capturedImage,
+      ...(images ? { images } : {}),
       mode,
       sheet,
       sheetId: sheet.id,
@@ -105,7 +121,7 @@ export function useFloatingImageClipboard(options: {
       event.preventDefault();
       event.stopPropagation();
       if (event.clipboardData) {
-        writeFloatingImageClipboard(event.clipboardData, capturedImage);
+        writeFloatingImageClipboard(event.clipboardData, capturedImage, images);
         await queueNativeRichWrite(transfer, capturedOperation);
         return;
       }
@@ -120,7 +136,12 @@ export function useFloatingImageClipboard(options: {
     }
   }
 
-  function paste(image: FloatingImage, mode: ImageInsertMode, address: CellAddress): void {
+  function paste(
+    image: FloatingImage,
+    mode: ImageInsertMode,
+    address: CellAddress,
+    transferredImages?: readonly FloatingImage[],
+  ): void {
     const current = getPendingForCurrentSheet();
     if (current && !matchesImage(current.image, image)) clear();
     const pendingCut = getPendingForCurrentSheet();
@@ -137,6 +158,28 @@ export function useFloatingImageClipboard(options: {
         options.onFeedback("clipboard.documentChanged");
         return;
       }
+      if (pendingCut.images?.length && options.onMoveMany) {
+        if (
+          pendingCut.images.some(
+            (member) =>
+              !options.getSheet().floatingImages.some((entry) => matchesImage(member, entry)),
+          )
+        ) {
+          clear();
+          options.onFeedback("clipboard.documentChanged");
+          return;
+        }
+        options.onMoveMany(
+          pendingCut.images.map((member) => ({
+            ...cloneFloatingImage(member),
+            anchor: { ...address },
+            offsetX: member.offsetX + 12,
+            offsetY: member.offsetY + 12,
+          })),
+        );
+        clear();
+        return;
+      }
       options.onMove({
         ...cloneFloatingImage(currentImage),
         anchor: { ...address },
@@ -146,7 +189,12 @@ export function useFloatingImageClipboard(options: {
       clear();
       return;
     }
-    options.onPaste(cloneFloatingImage(image), mode, { ...address });
+    const images =
+      transferredImages ??
+      (current && matchesImage(current.image, image) ? current.images : undefined);
+    if (images && images.length > 1 && options.onPasteMany)
+      options.onPasteMany(images, { ...address });
+    else options.onPaste(cloneFloatingImage(image), mode, { ...address });
   }
 
   function pastePending(address: CellAddress): boolean {

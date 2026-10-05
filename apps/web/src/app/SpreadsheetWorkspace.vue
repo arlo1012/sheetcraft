@@ -75,6 +75,11 @@ import { usePageThemeController } from "../modules/page-layout/usePageThemeContr
 import { workbookThemeKey } from "../shared/color/workbook-theme-context";
 import PageBackgroundMenu from "../modules/page-decorations/components/PageBackgroundMenu.vue";
 import type { SheetWatermark, WatermarkPreset } from "@idea10/core/page-decoration";
+import { usePictureAssetTools } from "../modules/sheet-images/usePictureAssetTools";
+import PictureCompressDialog from "../modules/sheet-images/components/PictureCompressDialog.vue";
+import PictureBatchSizeDialog from "../modules/sheet-images/components/PictureBatchSizeDialog.vue";
+import { usePictureTools } from "../modules/sheet-images/usePictureTools";
+import PictureSelectionPane from "../modules/sheet-images/components/PictureSelectionPane.vue";
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
 import InsertToolbar from "../modules/insert-tools/components/InsertToolbar.vue";
 import PageWatermarkMenu from "../modules/page-decorations/components/PageWatermarkMenu.vue";
@@ -514,6 +519,7 @@ const pageRulerUnit = ref<PageLayoutRulerUnit>("cm");
 const pageSetupTab = ref<"page" | "margins" | "header-footer" | "sheet">("page");
 const headerFooterTarget = shallowRef<HeaderFooterEditTarget>();
 const selectedPictureId = ref<string | null>(null);
+const selectedPictureIds = ref<string[]>([]);
 const selectedPicture = computed(() =>
   activeSheet.value.floatingImages.find((image) => image.id === selectedPictureId.value),
 );
@@ -1050,15 +1056,59 @@ const {
 } = useImageAssetUrls(() => session.workbook, assetStore);
 const imageActions = useSheetImageActions({
   assetStore,
+  execute: (command) => {
+    const oldIds = new Set(activeSheet.value.floatingImages.map((image) => image.id));
+    const result = executeCommand(command);
+    if (command.type === "setSheetFloatingImages" && command.sheetId === activeSheet.value.id) {
+      const added = activeSheet.value.floatingImages
+        .filter((image) => !oldIds.has(image.id))
+        .map((image) => image.id);
+      if (added.length) void nextTick(() => sheetGridRef.value?.selectFloatingImages(added));
+    }
+    return result;
+  },
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
   getAddress: () => activeAddress.value,
   flushPendingEdits: () => cellEditSession.finish(),
   setCellImage,
-  setFloatingImage,
+  setFloatingImage: (image, sheetId) => {
+    setFloatingImage(image, sheetId);
+    if (activeSheet.value.id === sheetId)
+      void nextTick(() => sheetGridRef.value?.selectFloatingImage(image.id));
+  },
   convertCellImageToFloating,
 });
-const { busy: imageBusy } = imageActions;
+const pictureCompressVisible = ref(false);
+const pictureBatchSizeVisible = ref(false);
+watch(
+  () => activeSheet.value.id,
+  () => {
+    pictureCompressVisible.value = false;
+    pictureBatchSizeVisible.value = false;
+  },
+);
+watch(selectedPictureId, (id) => {
+  if (!id) pictureBatchSizeVisible.value = false;
+});
+const pictureAssetTools = usePictureAssetTools({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getSelectedIds: () => selectedPictureIds.value,
+  assetStore,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageActions.busy.value,
+  execute: executeCommand,
+  feedback: (key, error) => {
+    void (error ? MessagePlugin.error(t(key)) : MessagePlugin.success(t(key)));
+  },
+});
+const imageBusy = computed(() => imageActions.busy.value || pictureAssetTools.busy.value);
+const pictureTools = usePictureTools({
+  getSheet: () => activeSheet.value,
+  selectedIds: selectedPictureIds,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
+  execute: executeCommand,
+});
 
 const persistence = useWorkbookPersistence({
   store: props.workbookStore ?? createIndexedDbWorkbookStore(),
@@ -2032,6 +2082,8 @@ const gridInert = computed(
         <PictureToolbar
           v-if="selectedPicture"
           :image="selectedPicture"
+          :selection-count="selectedPictureIds.length"
+          :busy="loading || fileBusy || xlsxBusy || imageBusy"
           :disabled="
             loading ||
             fileBusy ||
@@ -2046,6 +2098,16 @@ const gridInert = computed(
           @flip="sheetGridRef?.flipImage($event)"
           @restore="sheetGridRef?.restoreImage()"
           @replace="imageActions.requestReplace(selectedPicture.id)"
+          @compress="pictureCompressVisible = true"
+          @batch-size="pictureBatchSizeVisible = true"
+          @export="pictureAssetTools.exportPictures"
+          @preview="sheetGridRef?.previewSelectedPicture()"
+          @print="pictureAssetTools.printPictures"
+          @group="pictureTools.group()"
+          @ungroup="pictureTools.group(true)"
+          @layer="pictureTools.layer"
+          @align="sheetGridRef?.arrangePictures(selectedPictureIds, $event)"
+          @selection-pane="pictureTools.paneVisible.value = !pictureTools.paneVisible.value"
           @convert-to-cell="convertFloatingImageToCell(selectedPicture.id)"
         />
       </template>
@@ -3022,108 +3084,134 @@ const gridInert = computed(
       :class="{ 'is-eye-comfort': eyeComfortEnabled }"
       :inert="gridInert"
     >
-      <SheetGrid
-        @unlock-range="protectionActions.requestRangeUnlock"
-        :note-draft="noteDraft"
-        :note-error="noteError"
-        :show-active-note="showActiveNote"
-        :show-all-notes="showAllNotes"
-        :hidden-note-keys="hiddenNoteKeys"
-        :note-preview-disabled="gridInert"
-        :theme="workbookTheme"
-        :show-page-breaks="showPageBreaks"
-        :view-mode="activeViewMode"
-        :page-setup="activePageSetup"
-        @page-setup-change="applyPageSetup"
-        :show-page-rulers="showPageRulers"
-        :show-page-margins="showPageMargins"
-        :show-page-white-space="showPageWhiteSpace"
-        @update:show-page-white-space="setPageWhiteSpace"
-        :page-ruler-unit="pageRulerUnit"
-        file-name="workbook.xlsx"
-        @open-header-footer="openHeaderFooter"
-        v-model:zoom="zoom"
-        :show-headers="showHeaders"
-        :show-grid-lines="showGridLines"
-        :show-axis-quick-tools="showAxisQuickTools"
-        :highlight-enabled="highlightEnabled"
-        :highlight-color="highlightColor"
-        :grid-id="gridId"
-        external-horizontal-scrollbar
-        :read-only="activeSheet.properties.protected"
-        :key="workbookGeneration"
-        :ref="setSheetGridRef"
-        :sheet="activeSheet"
-        :evaluator="activeSheetEvaluator"
-        :context-menu-state="contextMenuState"
-        :validation-info="activeValidationInfo"
-        :input-error="duplicateInputError"
-        @dismiss-input-error="retryValidationInput"
-        :error-cells="duplicateErrorCells"
-        :active-cell-error="activeCellErrorDescription"
-        :error-indicator-color="duplicateCheckSettings.indicatorColor"
-        @convert-cell-to-number="convertCellErrorValues('cell')"
-        @convert-selection-to-number="convertCellErrorValues('selection')"
-        @correct-sheet-errors="convertCellErrorValues('sheet')"
-        @ignore-selected-cell-errors="ignoreSelectedDuplicateErrors"
-        @ignore-all-cell-errors="ignoreAllDuplicateErrors"
-        @edit-error-in-formula-bar="editErrorInFormulaBar"
-        @error-check-options="openDuplicateErrorOptions"
-        @filter-column-request="dataTools.openColumnFilter($event)"
-        @table-expand-request="tableActions.expandTable"
-        @open-hyperlink="hyperlinkActions.open"
-        @edit-note="reviewActions.edit($event)"
-        @save-note="reviewActions.save"
-        @cancel-note="reviewActions.close(false)"
-        @update-note-box="reviewActions.updateBox"
-        @delete-note="reviewActions.remove($event)"
-        @validation-choose="chooseValidationValue"
-        @outline-toggle="toggleOutline"
-        @outline-level="showOutlineLevel"
-        @context-action="contextActions.request"
-        :date-system="session.workbook.dateSystem"
-        :reference-editor="activeRangePicker?.editor ?? formulaBarRef"
-        :edit-session="cellEditSession"
-        :image-asset-urls="imageAssetUrls"
-        :loading-image-asset-ids="loadingImageAssetIds"
-        :missing-image-asset-ids="missingImageAssetIds"
-        @selected-floating-image-change="selectedPictureId = $event"
-        @update-floating-image="setFloatingImage"
-        @delete-floating-image="deleteFloatingImage"
-        @convert-floating-image-to-cell="convertFloatingImageToCell"
-        @paste-image-file="imageActions.pasteImageFile"
-        @convert-cell-image-to-floating="imageActions.convertCellImageToFloating"
-        @paste-floating-image="imageActions.pasteFloatingImage"
-        :workbook-revision="workbookRevision"
-        :apply-paste="pasteCells"
-        :apply-axis-move="moveAxis"
-        :apply-fill="fillActions.apply"
-        @end-fill="fillActions.clear"
-        @fill-feedback="
-          MessagePlugin.warning(
-            t(
-              $event === 'duplicate'
-                ? 'dataTools.duplicates.duplicateRejected'
-                : `autoFill.${$event}`,
-            ),
-          )
+      <div class="spreadsheet-workspace__sheet">
+        <SheetGrid
+          @unlock-range="protectionActions.requestRangeUnlock"
+          :note-draft="noteDraft"
+          :note-error="noteError"
+          :show-active-note="showActiveNote"
+          :show-all-notes="showAllNotes"
+          :hidden-note-keys="hiddenNoteKeys"
+          :note-preview-disabled="gridInert"
+          :theme="workbookTheme"
+          :show-page-breaks="showPageBreaks"
+          :view-mode="activeViewMode"
+          :page-setup="activePageSetup"
+          @page-setup-change="applyPageSetup"
+          :show-page-rulers="showPageRulers"
+          :show-page-margins="showPageMargins"
+          :show-page-white-space="showPageWhiteSpace"
+          @update:show-page-white-space="setPageWhiteSpace"
+          :page-ruler-unit="pageRulerUnit"
+          file-name="workbook.xlsx"
+          @open-header-footer="openHeaderFooter"
+          v-model:zoom="zoom"
+          :show-headers="showHeaders"
+          :show-grid-lines="showGridLines"
+          :show-axis-quick-tools="showAxisQuickTools"
+          :highlight-enabled="highlightEnabled"
+          :highlight-color="highlightColor"
+          :grid-id="gridId"
+          external-horizontal-scrollbar
+          :read-only="activeSheet.properties.protected"
+          :key="workbookGeneration"
+          :ref="setSheetGridRef"
+          :sheet="activeSheet"
+          :evaluator="activeSheetEvaluator"
+          :context-menu-state="contextMenuState"
+          :validation-info="activeValidationInfo"
+          :input-error="duplicateInputError"
+          @dismiss-input-error="retryValidationInput"
+          :error-cells="duplicateErrorCells"
+          :active-cell-error="activeCellErrorDescription"
+          :error-indicator-color="duplicateCheckSettings.indicatorColor"
+          @convert-cell-to-number="convertCellErrorValues('cell')"
+          @convert-selection-to-number="convertCellErrorValues('selection')"
+          @correct-sheet-errors="convertCellErrorValues('sheet')"
+          @ignore-selected-cell-errors="ignoreSelectedDuplicateErrors"
+          @ignore-all-cell-errors="ignoreAllDuplicateErrors"
+          @edit-error-in-formula-bar="editErrorInFormulaBar"
+          @error-check-options="openDuplicateErrorOptions"
+          @filter-column-request="dataTools.openColumnFilter($event)"
+          @table-expand-request="tableActions.expandTable"
+          @open-hyperlink="hyperlinkActions.open"
+          @edit-note="reviewActions.edit($event)"
+          @save-note="reviewActions.save"
+          @cancel-note="reviewActions.close(false)"
+          @update-note-box="reviewActions.updateBox"
+          @delete-note="reviewActions.remove($event)"
+          @validation-choose="chooseValidationValue"
+          @outline-toggle="toggleOutline"
+          @outline-level="showOutlineLevel"
+          @context-action="contextActions.request"
+          :date-system="session.workbook.dateSystem"
+          :reference-editor="activeRangePicker?.editor ?? formulaBarRef"
+          :edit-session="cellEditSession"
+          :image-asset-urls="imageAssetUrls"
+          :loading-image-asset-ids="loadingImageAssetIds"
+          :missing-image-asset-ids="missingImageAssetIds"
+          @selected-floating-image-change="
+            (id, ids) => {
+              selectedPictureId = id;
+              selectedPictureIds = ids;
+            }
+          "
+          @update-floating-images="pictureTools.updateMany"
+          @delete-floating-images="pictureTools.remove"
+          @update-floating-image="setFloatingImage"
+          @delete-floating-image="deleteFloatingImage"
+          @convert-floating-image-to-cell="convertFloatingImageToCell"
+          @paste-image-file="imageActions.pasteImageFile"
+          @convert-cell-image-to-floating="imageActions.convertCellImageToFloating"
+          @paste-floating-image="imageActions.pasteFloatingImage"
+          @paste-floating-images="imageActions.pasteFloatingImages"
+          :workbook-revision="workbookRevision"
+          :apply-paste="pasteCells"
+          :apply-axis-move="moveAxis"
+          :apply-fill="fillActions.apply"
+          @end-fill="fillActions.clear"
+          @fill-feedback="
+            MessagePlugin.warning(
+              t(
+                $event === 'duplicate'
+                  ? 'dataTools.duplicates.duplicateRejected'
+                  : `autoFill.${$event}`,
+              ),
+            )
+          "
+          :view-state="activeSheetViewState"
+          :format-painter-active="formatPainterActive"
+          @clear-cells="clearCells"
+          @commit-cell="commitCell"
+          @delete-axis="deleteAxis"
+          @format-painter-target="applyFormatPainterTarget"
+          @insert-axis="insertAxis"
+          @freeze-change="setFreezePanes"
+          @resize-dimension="resizeDimension"
+          @cancel-format-painter="cancelFormatPainter"
+          @flash-fill="dataTools.flashFill"
+          @undo="undo"
+          @redo="redo"
+          @view-state-change="updateActiveSheetViewState"
+          @selection-dragging-change="setSelectionDragging"
+          @horizontal-scroll-change="updateHorizontalScrollState"
+        />
+      </div>
+      <PictureSelectionPane
+        v-if="pictureTools.paneVisible.value"
+        :images="activeSheet.floatingImages"
+        :selected-ids="selectedPictureIds"
+        :disabled="
+          loading ||
+          fileBusy ||
+          xlsxBusy ||
+          imageBusy ||
+          !canUseSheetPermission(activeSheet, 'editObjects')
         "
-        :view-state="activeSheetViewState"
-        :format-painter-active="formatPainterActive"
-        @clear-cells="clearCells"
-        @commit-cell="commitCell"
-        @delete-axis="deleteAxis"
-        @format-painter-target="applyFormatPainterTarget"
-        @insert-axis="insertAxis"
-        @freeze-change="setFreezePanes"
-        @resize-dimension="resizeDimension"
-        @cancel-format-painter="cancelFormatPainter"
-        @flash-fill="dataTools.flashFill"
-        @undo="undo"
-        @redo="redo"
-        @view-state-change="updateActiveSheetViewState"
-        @selection-dragging-change="setSelectionDragging"
-        @horizontal-scroll-change="updateHorizontalScrollState"
+        @select="sheetGridRef?.selectFloatingImages($event)"
+        @visibility="pictureTools.toggleVisibility"
+        @rename="pictureTools.rename"
+        @close="pictureTools.paneVisible.value = false"
       />
     </div>
     <DocumentPasswordDialog
@@ -3156,6 +3244,28 @@ const gridInert = computed(
       @close="textReview.close"
       @replace="textReview.replace"
       @ignore="textReview.ignore"
+    />
+    <PictureCompressDialog
+      v-if="pictureCompressVisible"
+      :busy="pictureAssetTools.busy.value"
+      @confirm="
+        async (settings) => {
+          if (await pictureAssetTools.compress(settings)) pictureCompressVisible = false;
+        }
+      "
+      @close="pictureCompressVisible = false"
+    />
+    <PictureBatchSizeDialog
+      v-if="pictureBatchSizeVisible && selectedPicture"
+      :width="selectedPicture.width"
+      :height="selectedPicture.height"
+      @confirm="
+        (value) => {
+          if (pictureTools.resizeMany(value)) pictureBatchSizeVisible = false;
+          else MessagePlugin.warning(t('picture.invalidSize'));
+        }
+      "
+      @close="pictureBatchSizeVisible = false"
     />
     <PagePrintPreview
       :theme="workbookTheme"
@@ -3344,7 +3454,14 @@ const gridInert = computed(
     display: none;
   }
 
+  &__sheet {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+  }
+
   &__grid {
+    display: flex;
     min-width: 0;
     min-height: 0;
 

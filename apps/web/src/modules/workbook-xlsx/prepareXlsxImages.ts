@@ -5,6 +5,7 @@ import {
   type ImageTransform,
 } from "@idea10/core/workbook";
 import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStore";
+import { paintImagePresentation } from "../../shared/images/imageAppearance";
 import { getImagePresentation } from "../../shared/images/imagePresentation";
 import type { XlsxWorkerImage } from "./xlsxWorkerProtocol";
 
@@ -162,38 +163,12 @@ async function rasterize(
   try {
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvas rendering is unavailable for XLSX image export.");
-    context.scale(output.width / presentation.width, output.height / presentation.height);
-    context.save();
-    if (normalized?.rotation === 90) {
-      context.translate(presentation.cropHeight, 0);
-      context.rotate(Math.PI / 2);
-    } else if (normalized?.rotation === 180) {
-      context.translate(presentation.cropWidth, presentation.cropHeight);
-      context.rotate(Math.PI);
-    } else if (normalized?.rotation === 270) {
-      context.translate(0, presentation.cropWidth);
-      context.rotate((Math.PI * 3) / 2);
-    }
-    if (normalized?.flipHorizontal) {
-      context.translate(presentation.cropWidth, 0);
-      context.scale(-1, 1);
-    }
-    if (normalized?.flipVertical) {
-      context.translate(0, presentation.cropHeight);
-      context.scale(1, -1);
-    }
-    context.drawImage(
+    paintImagePresentation(
+      context,
       image,
-      presentation.cropX,
-      presentation.cropY,
-      presentation.cropWidth,
-      presentation.cropHeight,
-      0,
-      0,
-      presentation.cropWidth,
-      presentation.cropHeight,
+      { x: 0, y: 0, width: output.width, height: output.height },
+      normalized,
     );
-    context.restore();
     const blob = await abortable(canvasBlob(canvas, signal), signal);
     return {
       bytes: await abortable(blob.arrayBuffer(), signal),

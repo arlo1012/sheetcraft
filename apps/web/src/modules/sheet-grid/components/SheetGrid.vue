@@ -114,7 +114,11 @@ import SheetImagePreview from "../../sheet-images/components/SheetImagePreview.v
 import SheetNotePreview from "./SheetNotePreview.vue";
 import { useFloatingImageClipboard } from "../../sheet-images/useFloatingImageClipboard";
 import { areGridClipboardTextsEqual, createBrowserGridClipboardPort } from "../gridClipboardPort";
-import { readFloatingImageClipboard } from "../../sheet-images/imageClipboard";
+import { getFloatingImageSheetRect } from "@idea10/sheet-engine/floating-image-layout";
+import {
+  readFloatingImageClipboard,
+  readFloatingImageGroup,
+} from "../../sheet-images/imageClipboard";
 import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetFreezeHandles from "./SheetFreezeHandles.vue";
@@ -286,7 +290,9 @@ const emit = defineEmits<{
   openHeaderFooter: [target: HeaderFooterEditTarget];
   "update:showPageWhiteSpace": [value: boolean];
   updateFloatingImage: [image: FloatingImage];
-  selectedFloatingImageChange: [id: string | null];
+  selectedFloatingImageChange: [id: string | null, ids: string[]];
+  updateFloatingImages: [images: FloatingImage[]];
+  deleteFloatingImages: [ids: string[]];
   deleteFloatingImage: [id: string];
   convertFloatingImageToCell: [id: string];
   convertCellImageToFloating: [address: CellAddress];
@@ -298,6 +304,7 @@ const emit = defineEmits<{
   imageFeedback: [key: MessageKey];
   pasteImageFile: [file: File, mode: ImageInsertMode, address?: CellAddress];
   pasteFloatingImage: [image: FloatingImage, mode: ImageInsertMode, address?: CellAddress];
+  pasteFloatingImages: [images: readonly FloatingImage[], address: CellAddress];
   commitCell: [payload: { address: CellAddress; input: string }];
   clearCells: [range: CellRange];
   clipboardFeedback: [feedback: GridClipboardFeedback];
@@ -463,7 +470,13 @@ const effectiveFreeze = computed(() =>
   props.viewMode === "normal" ? props.sheet.freezePanes : { rows: 0, columns: 0 },
 );
 const selectedImageId = ref<string | null>(null);
-watch(selectedImageId, (id) => emit("selectedFloatingImageChange", id));
+const selectedImageIds = ref<string[]>([]);
+watch(selectedImageId, (id) => {
+  if (!id) selectedImageIds.value = [];
+});
+watch([selectedImageId, selectedImageIds], ([id, ids]) =>
+  emit("selectedFloatingImageChange", id, [...ids]),
+);
 const selection = shallowRef<CellSelection>(createCellSelection({ row: 0, column: 0 }));
 const imagePreview = shallowRef<{
   assetId: string;
@@ -1564,7 +1577,8 @@ const {
     floatingClipboard.observeTransfer(transfer);
     const address = targetSelection.active;
     const mode = getCellContent(props.sheet, address)?.kind === "image" ? "cell" : "floating";
-    if (transfer.floatingImage) floatingClipboard.paste(transfer.floatingImage, mode, address);
+    if (transfer.floatingImage)
+      floatingClipboard.paste(transfer.floatingImage, mode, address, transfer.floatingImages);
     else if (transfer.imageFile) emit("pasteImageFile", transfer.imageFile, mode, address);
   },
   onReadUnavailable: (targetSelection) => floatingClipboard.pastePending(targetSelection.active),
@@ -1597,6 +1611,24 @@ const {
   },
 });
 const floatingClipboard = useFloatingImageClipboard({
+  getSelectedImages: () => {
+    const members = props.sheet.floatingImages
+      .filter((image) => selectedImageIds.value.includes(image.id))
+      .flatMap((image) => {
+        const rect = getFloatingImageSheetRect(image, layout.value);
+        return rect ? [{ image, rect }] : [];
+      });
+    const left = Math.min(...members.map((entry) => entry.rect.x));
+    const top = Math.min(...members.map((entry) => entry.rect.y));
+    return members.map(({ image, rect }) => ({
+      ...image,
+      anchor: { row: 0, column: 0 },
+      offsetX: rect.x - left,
+      offsetY: rect.y - top,
+    }));
+  },
+  onPasteMany: (images, address) => emit("pasteFloatingImages", images, address),
+  onMoveMany: (images) => emit("updateFloatingImages", images),
   getSheet: () => props.sheet,
   getRevision: () => props.workbookRevision ?? 0,
   clipboardPort: browserClipboard,
@@ -1677,19 +1709,37 @@ const {
   focusGrid: focusEditor,
 });
 
-function selectFloatingImage(id: string | null): void {
+function selectFloatingImage(id: string | null, additive = false): void {
   if (isComposing.value) return;
   if (isEditing.value) finishEdit(undefined, false);
   stopDragSelection();
   axisContextMenu.value = undefined;
   cellContextMenu.value = undefined;
-  selectedImageId.value = id;
+  const image = props.sheet.floatingImages.find((entry) => entry.id === id);
+  const group = image?.groupId
+    ? props.sheet.floatingImages
+        .filter((entry) => entry.groupId === image.groupId)
+        .map((entry) => entry.id)
+    : id
+      ? [id]
+      : [];
+  if (additive && id) {
+    selectedImageIds.value = selectedImageIds.value.includes(id)
+      ? selectedImageIds.value.filter((entry) => !group.includes(entry))
+      : [...new Set([...selectedImageIds.value, ...group])];
+    selectedImageId.value = selectedImageIds.value.at(-1) ?? null;
+  } else {
+    if (!id || !selectedImageIds.value.includes(id)) selectedImageIds.value = group;
+    selectedImageId.value = id;
+  }
   if (!id) focusEditor();
 }
 
 function deleteSelectedFloatingImage(id: string): void {
   if (objectsReadOnly.value) return;
-  emit("deleteFloatingImage", id);
+  if (selectedImageIds.value.includes(id) && selectedImageIds.value.length > 1)
+    emit("deleteFloatingImages", selectedImageIds.value);
+  else emit("deleteFloatingImage", id);
   selectedImageId.value = null;
   focusEditor();
 }
@@ -1776,7 +1826,13 @@ function onImagePaste(event: ClipboardEvent): void {
   // Commit any typed draft before the exclusive image content replaces this cell.
   if (isEditing.value) finishEdit(undefined, false);
   clearPendingClipboard();
-  if (image) floatingClipboard.paste(image, mode, activeCell.value);
+  if (image)
+    floatingClipboard.paste(
+      image,
+      mode,
+      activeCell.value,
+      readFloatingImageGroup(event.clipboardData),
+    );
   else if (file) emit("pasteImageFile", file, mode);
 }
 
@@ -1794,9 +1850,13 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
   const end = input?.selectionEnd ?? null;
   const text = event.clipboardData?.getData("text/plain") ?? "";
   let image: FloatingImage | undefined;
+  let images: readonly FloatingImage[] | undefined;
   try {
     const transfer = await browserClipboard.read({ preferAsync: true });
-    if (areGridClipboardTextsEqual(text, transfer.text)) image = transfer.floatingImage;
+    if (areGridClipboardTextsEqual(text, transfer.text)) {
+      image = transfer.floatingImage;
+      images = transfer.floatingImages;
+    }
   } catch {
     // Keep the captured native text when the browser denies the optional rich read.
   }
@@ -1819,6 +1879,7 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
       image,
       editing || getCellContent(sheet, address)?.kind === "image" ? "cell" : "floating",
       address,
+      images,
     );
   } else {
     floatingClipboard.clear();
@@ -1833,6 +1894,9 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
 watch(
   () => [props.sheet.id, ...props.sheet.floatingImages.map((image) => image.id)],
   (current, previous) => {
+    selectedImageIds.value = selectedImageIds.value.filter((id) =>
+      props.sheet.floatingImages.some((image) => image.id === id),
+    );
     if (
       current[0] !== previous[0] ||
       !props.sheet.floatingImages.some((image) => image.id === selectedImageId.value)
@@ -2947,6 +3011,20 @@ onBeforeUnmount(() => {
 });
 
 defineExpose({
+  previewSelectedPicture: () => {
+    const image = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
+    if (image) openImagePreview(image);
+  },
+  selectFloatingImages: (ids: string[]) => {
+    selectedImageIds.value = ids.filter((id) =>
+      props.sheet.floatingImages.some((image) => image.id === id),
+    );
+    selectedImageId.value = selectedImageIds.value.at(-1) ?? null;
+  },
+  arrangePictures: (
+    ids: string[],
+    action: Parameters<NonNullable<typeof imageLayerRef.value>["arrangeImages"]>[1],
+  ) => imageLayerRef.value?.arrangeImages(ids, action),
   cropImage: () => imageLayerRef.value?.startCrop(),
   rotateImage: (turns: -1 | 1 | 2) => imageLayerRef.value?.rotateImage(turns),
   flipImage: (axis: "horizontal" | "vertical") => imageLayerRef.value?.flipImage(axis),
@@ -3220,6 +3298,8 @@ defineExpose({
         :loading-asset-ids="loadingImageAssetIds"
         :missing-asset-ids="missingImageAssetIds"
         :selected-image-id="selectedImageId"
+        :selected-image-ids="selectedImageIds"
+        @update-many="emit('updateFloatingImages', $event)"
         :read-only="objectsReadOnly"
         @select="selectFloatingImage"
         @update="emit('updateFloatingImage', $event)"

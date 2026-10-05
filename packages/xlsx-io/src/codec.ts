@@ -1227,6 +1227,7 @@ export async function encodeWithExcelJs(
       );
     }
     for (const image of sheet.floatingImages) {
+      if (image.hidden) continue;
       const issueLocation = `${sheet.name}!${address(image.anchor.row, image.anchor.column)}`;
       imageExporter.addFloatingImage(output, sheet, image, issueLocation);
     }

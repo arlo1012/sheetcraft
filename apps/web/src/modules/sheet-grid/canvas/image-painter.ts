@@ -1,5 +1,6 @@
 import type { ImageTransform } from "@idea10/core/workbook";
 import type { Rect } from "@idea10/sheet-engine/geometry";
+import { paintImagePresentation } from "../../../shared/images/imageAppearance";
 import { getImagePresentation } from "../../../shared/images/imagePresentation";
 
 /** Decoded sources belong to the viewport, not to individual cell components. */
@@ -47,32 +48,15 @@ export function paintCellImage(
     Math.max(0, rect.width - 5) / geometry.width,
     Math.max(0, rect.height - 5) / geometry.height,
   );
-  context.save();
-  context.translate(
-    rect.x + (rect.width - 1 - geometry.width * scale) / 2,
-    rect.y + (rect.height - 1 - geometry.height * scale) / 2,
-  );
-  context.scale(scale, scale);
-  const rotation = transform?.rotation ?? 0;
-  if (rotation === 90) context.translate(geometry.cropHeight, 0);
-  else if (rotation === 180) context.translate(geometry.cropWidth, geometry.cropHeight);
-  else if (rotation === 270) context.translate(0, geometry.cropWidth);
-  context.rotate((rotation * Math.PI) / 180);
-  context.translate(
-    transform?.flipHorizontal ? geometry.cropWidth : 0,
-    transform?.flipVertical ? geometry.cropHeight : 0,
-  );
-  context.scale(transform?.flipHorizontal ? -1 : 1, transform?.flipVertical ? -1 : 1);
-  context.drawImage(
+  paintImagePresentation(
+    context,
     image,
-    geometry.cropX,
-    geometry.cropY,
-    geometry.cropWidth,
-    geometry.cropHeight,
-    0,
-    0,
-    geometry.cropWidth,
-    geometry.cropHeight,
+    {
+      x: rect.x + (rect.width - 1 - geometry.width * scale) / 2,
+      y: rect.y + (rect.height - 1 - geometry.height * scale) / 2,
+      width: geometry.width * scale,
+      height: geometry.height * scale,
+    },
+    transform,
   );
-  context.restore();
 }

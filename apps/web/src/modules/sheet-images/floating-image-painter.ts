@@ -6,7 +6,7 @@ import {
 } from "@idea10/sheet-engine/floating-image-layout";
 import type { Rect } from "@idea10/sheet-engine/geometry";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
-import { getImagePresentation } from "../../shared/images/imagePresentation";
+import { paintImagePresentation } from "../../shared/images/imageAppearance";
 import { hasVisibleDrawingThemeEffects, type DrawingThemeEffects } from "./drawing-theme-effects";
 
 export type FloatingImagePaintState = Readonly<{
@@ -34,31 +34,7 @@ function paintImageContent(
   rect: Rect,
   transform: ImageTransform | undefined,
 ): void {
-  const geometry = getImagePresentation(transform, image.naturalWidth, image.naturalHeight);
-  if (geometry.width <= 0 || geometry.height <= 0) return;
-  context.translate(rect.x, rect.y);
-  context.scale(rect.width / geometry.width, rect.height / geometry.height);
-  const rotation = transform?.rotation ?? 0;
-  if (rotation === 90) context.translate(geometry.cropHeight, 0);
-  else if (rotation === 180) context.translate(geometry.cropWidth, geometry.cropHeight);
-  else if (rotation === 270) context.translate(0, geometry.cropWidth);
-  context.rotate((rotation * Math.PI) / 180);
-  context.translate(
-    transform?.flipHorizontal ? geometry.cropWidth : 0,
-    transform?.flipVertical ? geometry.cropHeight : 0,
-  );
-  context.scale(transform?.flipHorizontal ? -1 : 1, transform?.flipVertical ? -1 : 1);
-  context.drawImage(
-    image,
-    geometry.cropX,
-    geometry.cropY,
-    geometry.cropWidth,
-    geometry.cropHeight,
-    0,
-    0,
-    geometry.cropWidth,
-    geometry.cropHeight,
-  );
+  paintImagePresentation(context, image, rect, transform);
 }
 
 function paintThemeOutline(
@@ -185,9 +161,11 @@ export function getFloatingImageViewportFragmentsForPaint(
   images: readonly FloatingImage[],
   layout: SheetViewportLayout,
 ): Array<FloatingImageViewportFragment & { image: FloatingImage }> {
-  return images.flatMap((image) =>
-    getFloatingImageViewportFragments(image, layout).map((fragment) => ({ ...fragment, image })),
-  );
+  return images
+    .filter((image) => !image.hidden)
+    .flatMap((image) =>
+      getFloatingImageViewportFragments(image, layout).map((fragment) => ({ ...fragment, image })),
+    );
 }
 
 /** Paints free-floating images into the surface canvas, clipping each frozen pane. */

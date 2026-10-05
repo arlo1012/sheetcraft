@@ -1,6 +1,7 @@
 import { readonly, ref } from "vue";
 import {
   MIN_FLOATING_IMAGE_SIZE,
+  MAX_SHEET_ROWS,
   getCellContent,
   type CellAddress,
   type FloatingImage,
@@ -8,6 +9,11 @@ import {
   type Sheet,
   type Workbook,
 } from "@idea10/core/workbook";
+import {
+  createSetSheetFloatingImagesCommand,
+  createBatchSetCellContentsCommand,
+  type WorkbookCommand,
+} from "@idea10/core/commands";
 import { getMergedCellAnchor, canUseSheetPermission, canEditCell } from "@idea10/core";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import type { MessageKey } from "../../shared/i18n";
@@ -19,6 +25,7 @@ type ImageTarget = { workbook: Workbook; sheetId: string; address: CellAddress }
 
 export function useSheetImageActions(options: {
   assetStore: ImageAssetStore;
+  execute?: (command: WorkbookCommand) => unknown;
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
   getAddress: () => CellAddress;
@@ -82,6 +89,7 @@ export function useSheetImageActions(options: {
     if (!target) return;
     pending = { mode, target };
     if (fileInput.value) {
+      fileInput.value.multiple = true;
       fileInput.value.value = "";
       fileInput.value.click();
     }
@@ -95,6 +103,7 @@ export function useSheetImageActions(options: {
     if (!target) return;
     pending = { mode: "floating", target, replaceId: imageId };
     if (fileInput.value) {
+      fileInput.value.multiple = false;
       fileInput.value.value = "";
       fileInput.value.click();
     }
@@ -165,13 +174,101 @@ export function useSheetImageActions(options: {
     }
   }
 
+  async function insertFiles(
+    files: readonly File[],
+    mode: ImageInsertMode,
+    target = captureTarget(options.getAddress(), mode),
+  ): Promise<void> {
+    if (files.length === 1) return insertFile(files[0]!, mode, target);
+    if (!files.length || !target || busy.value || !options.execute || !isCurrent(target, mode))
+      return;
+    if (files.length > 100) {
+      feedback.value = "picture.tooMany";
+      return;
+    }
+    busy.value = true;
+    feedback.value = undefined;
+    try {
+      const sheet = target.workbook.sheets.get(target.sheetId)!;
+      const addresses: CellAddress[] = [];
+      let row = target.address.row;
+      for (const _file of files) {
+        if (row >= MAX_SHEET_ROWS) throw new Error("Image placement exceeds sheet bounds.");
+        const address = { row, column: target.address.column };
+        addresses.push(address);
+        const merged = sheet.mergedCells.find(
+          (range) =>
+            row >= range.start.row &&
+            row <= range.end.row &&
+            address.column >= range.start.column &&
+            address.column <= range.end.column,
+        );
+        row = (merged?.end.row ?? row) + 1;
+      }
+      const valid = () =>
+        isCurrent(target, mode) &&
+        (mode !== "cell" || addresses.every((address) => canEditCell(sheet, address)));
+      if (!valid()) return;
+      const assets = [];
+      for (const file of files) {
+        assets.push(await prepareImageAsset(file));
+        if (!valid()) return;
+      }
+      for (const asset of assets) {
+        await options.assetStore.put(asset);
+        if (!valid()) return;
+      }
+      if (mode === "cell")
+        options.execute(
+          createBatchSetCellContentsCommand(
+            assets.map((asset, index) => ({
+              sheetId: target.sheetId,
+              address: addresses[index]!,
+              content: { kind: "image", image: { assetId: asset.id, altText: files[index]!.name } },
+            })),
+          ),
+        );
+      else
+        options.execute(
+          createSetSheetFloatingImagesCommand(target.sheetId, [
+            ...sheet.floatingImages,
+            ...assets.map((asset, index) => {
+              const scale = Math.max(
+                MIN_FLOATING_IMAGE_SIZE / Math.min(asset.width, asset.height),
+                Math.min(1, 400 / asset.width, 300 / asset.height),
+              );
+              return {
+                id: idFactory("image"),
+                assetId: asset.id,
+                altText: files[index]!.name,
+                anchor: { ...target.address },
+                offsetX: index * 24,
+                offsetY: index * 24,
+                width: asset.width * scale,
+                height: asset.height * scale,
+              };
+            }),
+          ]),
+        );
+      feedback.value = "image.inserted";
+    } catch {
+      feedback.value = "image.insertionFailed";
+    } finally {
+      busy.value = false;
+    }
+  }
+
   function onFileChange(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
+    const files = Array.from(input.files ?? []);
+    const file = files[0];
     const request = pending;
     pending = undefined;
     input.value = "";
-    if (file && request) void insertFile(file, request.mode, request.target, request.replaceId);
+    if (file && request) {
+      if (request.replaceId) void insertFile(file, request.mode, request.target, request.replaceId);
+      else void insertFiles(files, request.mode, request.target);
+    }
   }
 
   async function pasteFloatingImage(
@@ -198,10 +295,57 @@ export function useSheetImageActions(options: {
         });
       } else {
         options.setFloatingImage(
-          { ...image, id: idFactory("image"), anchor: target.address, offsetX: 12, offsetY: 12 },
+          {
+            ...image,
+            groupId: undefined,
+            id: idFactory("image"),
+            anchor: target.address,
+            offsetX: 12,
+            offsetY: 12,
+          },
           target.sheetId,
         );
       }
+      feedback.value = "image.inserted";
+    } catch {
+      feedback.value = "image.insertionFailed";
+    } finally {
+      busy.value = false;
+    }
+  }
+
+  async function pasteFloatingImages(
+    images: readonly FloatingImage[],
+    address: CellAddress,
+  ): Promise<void> {
+    const target = captureTarget(address);
+    if (!target || busy.value || !options.execute || images.length < 2 || images.length > 100)
+      return;
+    busy.value = true;
+    try {
+      for (const image of images)
+        if (!(await options.assetStore.get(image.assetId)))
+          throw new Error("Missing picture asset.");
+      if (!isCurrent(target)) return;
+      const groups = new Map<string, string>();
+      const next = images.map((image) => {
+        if (image.groupId && !groups.has(image.groupId))
+          groups.set(image.groupId, idFactory("picture-group"));
+        return {
+          ...image,
+          id: idFactory("image"),
+          groupId: image.groupId ? groups.get(image.groupId) : undefined,
+          anchor: { ...target.address },
+          offsetX: image.offsetX + 12,
+          offsetY: image.offsetY + 12,
+        };
+      });
+      options.execute(
+        createSetSheetFloatingImagesCommand(target.sheetId, [
+          ...target.workbook.sheets.get(target.sheetId)!.floatingImages,
+          ...next,
+        ]),
+      );
       feedback.value = "image.inserted";
     } catch {
       feedback.value = "image.insertionFailed";
@@ -262,10 +406,12 @@ export function useSheetImageActions(options: {
     requestInsert,
     requestReplace,
     insertFile,
+    insertFiles,
     pasteImageFile: (file: File, mode: ImageInsertMode, address?: CellAddress) =>
-      insertFile(file, mode, captureTarget(address)),
+      insertFile(file, mode, captureTarget(address, mode)),
     onFileChange,
     pasteFloatingImage,
+    pasteFloatingImages,
     convertCellImageToFloating,
   };
 }

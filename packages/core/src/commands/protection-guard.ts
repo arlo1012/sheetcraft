@@ -136,7 +136,11 @@ export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookC
       reject(sheet.id);
     return true;
   }
-  if (command.type === "setFloatingImage" || command.type === "deleteFloatingImage")
+  if (
+    command.type === "setFloatingImage" ||
+    command.type === "deleteFloatingImage" ||
+    command.type === "setSheetFloatingImages"
+  )
     return Boolean(sheet.protection?.editObjects);
   if (command.type === "applyCellStyle" && "unlocked" in command.patch) reject(sheet.id);
   if (

@@ -14,6 +14,8 @@ import {
 import { MAX_FLOATING_IMAGE_SIZE, type FloatingImage } from "@idea10/core/workbook";
 import {
   moveFloatingImageBy,
+  getFloatingImageSheetRect,
+  reanchorFloatingImageAtSheetRect,
   resizeFloatingImageBy,
   type FloatingImageResizeDirection,
   type FloatingImageViewportFragment,
@@ -59,6 +61,7 @@ const props = withDefaults(
     loadingAssetIds?: ReadonlySet<string>;
     missingAssetIds?: ReadonlySet<string>;
     selectedImageId?: string | null;
+    selectedImageIds?: readonly string[];
     readOnly?: boolean;
     scale?: number;
   }>(),
@@ -66,7 +69,8 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  select: [id: string | null];
+  select: [id: string | null, additive?: boolean];
+  updateMany: [images: FloatingImage[]];
   update: [image: FloatingImage];
   delete: [id: string];
   convertToCell: [id: string];
@@ -82,6 +86,7 @@ const { t } = useAppI18n();
 type ImageFragment = FloatingImageViewportFragment & { image: FloatingImage };
 type Gesture = {
   image: FloatingImage;
+  images: FloatingImage[];
   mode: "move" | FloatingImageResizeDirection;
   pointerId: number;
   focusTarget: HTMLElement;
@@ -96,6 +101,14 @@ type ContextMenuState = {
 
 const gesture = shallowRef<Gesture>();
 const previewImage = shallowRef<FloatingImage>();
+const previewImages = shallowRef<FloatingImage[]>([]);
+const selectedIds = computed(
+  () =>
+    new Set([
+      ...(props.selectedImageIds ?? []),
+      ...(props.selectedImageId ? [props.selectedImageId] : []),
+    ]),
+);
 const layerRef = ref<HTMLElement | null>(null);
 const contextMenu = shallowRef<ContextMenuState>();
 const paintRevision = ref(0);
@@ -155,7 +168,10 @@ function displayImages(): readonly FloatingImage[] {
 }
 
 function displayImage(image: FloatingImage): FloatingImage {
-  return previewImage.value?.id === image.id ? previewImage.value : image;
+  return (
+    previewImages.value.find((entry) => entry.id === image.id) ??
+    (previewImage.value?.id === image.id ? previewImage.value : image)
+  );
 }
 
 function cloneImage(image: FloatingImage): FloatingImage {
@@ -216,6 +232,17 @@ function startGesture(
     (event.currentTarget as HTMLElement);
   const target = layerRef.value;
   if (!target) return;
+  if (event.ctrlKey || event.metaKey) {
+    emit("select", image.id, true);
+    return;
+  }
+  const group = (
+    selectedIds.value.has(image.id)
+      ? props.images.filter((entry) => selectedIds.value.has(entry.id))
+      : image.groupId
+        ? props.images.filter((entry) => entry.groupId === image.groupId)
+        : [image]
+  ).filter((entry) => !entry.hidden);
   emit("select", image.id);
   focusSelectedImageProxy(focusTarget);
   if (props.readOnly) return;
@@ -223,6 +250,7 @@ function startGesture(
   previewImage.value = cloneImage(image);
   gesture.value = {
     image: cloneImage(image),
+    images: group.map(cloneImage),
     mode,
     pointerId: event.pointerId,
     focusTarget,
@@ -261,9 +289,17 @@ function moveGestureAt(activeGesture: Gesture, point: Point): void {
   const deltaX = point.x - activeGesture.startPoint.x;
   const deltaY = point.y - activeGesture.startPoint.y;
   if (activeGesture.mode === "move") {
-    previewImage.value =
-      moveFloatingImageBy(activeGesture.image, { x: deltaX, y: deltaY }, props.layout) ??
-      activeGesture.image;
+    const rects = activeGesture.images
+      .map((entry) => getFloatingImageSheetRect(entry, props.layout))
+      .filter((entry) => entry !== null);
+    const delta = {
+      x: Math.max(deltaX, -Math.min(...rects.map((rect) => rect.x))),
+      y: Math.max(deltaY, -Math.min(...rects.map((rect) => rect.y))),
+    };
+    previewImages.value = activeGesture.images.map(
+      (entry) => moveFloatingImageBy(entry, delta, props.layout) ?? entry,
+    );
+    previewImage.value = previewImages.value.find((entry) => entry.id === activeGesture.image.id);
     return;
   }
   previewImage.value =
@@ -272,7 +308,11 @@ function moveGestureAt(activeGesture: Gesture, point: Point): void {
       activeGesture.mode,
       { x: deltaX, y: deltaY },
       props.layout,
-      { minSize: MINIMUM_IMAGE_SIZE, maxSize: MAX_FLOATING_IMAGE_SIZE },
+      {
+        minSize: MINIMUM_IMAGE_SIZE,
+        maxSize: MAX_FLOATING_IMAGE_SIZE,
+        preserveAspectRatio: activeGesture.image.lockAspectRatio ?? true,
+      },
     ) ?? activeGesture.image;
 }
 
@@ -331,6 +371,8 @@ function startCropGesture(direction: ImageCropGesture, event: PointerEvent): voi
 function finishGesture(commit: boolean): void {
   const activeGesture = gesture.value;
   const preview = previewImage.value;
+  const previews = previewImages.value;
+  previewImages.value = [];
   gesture.value = undefined;
   previewImage.value = undefined;
   cancelPointerSession();
@@ -346,7 +388,8 @@ function finishGesture(commit: boolean): void {
       preview.width !== activeGesture.image.width ||
       preview.height !== activeGesture.image.height)
   )
-    emit("update", preview);
+    if (previews.length > 1) emit("updateMany", previews);
+    else emit("update", preview);
 }
 
 function onPointerUp(event: PointerEvent): void {
@@ -559,6 +602,7 @@ watch(
   [
     () => props.images,
     previewImage,
+    previewImages,
     crop,
     () => props.layout,
     () => props.assetUrls,
@@ -620,7 +664,72 @@ onBeforeUnmount(() => {
   closeContextMenu(false);
 });
 
+function arrangeImages(
+  ids: readonly string[],
+  action:
+    | "left"
+    | "center"
+    | "right"
+    | "top"
+    | "middle"
+    | "bottom"
+    | "horizontal"
+    | "vertical"
+    | "grid",
+): void {
+  if (props.readOnly) return;
+  const members = props.images
+    .filter((image) => ids.includes(image.id) && !image.hidden)
+    .flatMap((image) => {
+      const rect = getFloatingImageSheetRect(image, props.layout);
+      return rect ? [{ image, rect }] : [];
+    });
+  if (!members.length) return;
+  if (action === "grid") {
+    emit(
+      "updateMany",
+      members.map(({ image }) => ({ ...image, offsetX: 0, offsetY: 0 })),
+    );
+    return;
+  }
+  const left = Math.min(...members.map((entry) => entry.rect.x));
+  const right = Math.max(...members.map((entry) => entry.rect.x + entry.rect.width));
+  const top = Math.min(...members.map((entry) => entry.rect.y));
+  const bottom = Math.max(...members.map((entry) => entry.rect.y + entry.rect.height));
+  const ordered = [...members].sort((a, b) =>
+    action === "horizontal" ? a.rect.x - b.rect.x : a.rect.y - b.rect.y,
+  );
+  let cursor = action === "horizontal" ? left : top;
+  const gap =
+    members.length < 2
+      ? 0
+      : (action === "horizontal"
+          ? right - left - members.reduce((sum, entry) => sum + entry.rect.width, 0)
+          : bottom - top - members.reduce((sum, entry) => sum + entry.rect.height, 0)) /
+        (members.length - 1);
+  const next = ordered.map(({ image, rect }) => {
+    const target = { ...rect };
+    if (action === "left") target.x = left;
+    if (action === "center") target.x = (left + right - rect.width) / 2;
+    if (action === "right") target.x = right - rect.width;
+    if (action === "top") target.y = top;
+    if (action === "middle") target.y = (top + bottom - rect.height) / 2;
+    if (action === "bottom") target.y = bottom - rect.height;
+    if (action === "horizontal") {
+      target.x = cursor;
+      cursor += rect.width + gap;
+    }
+    if (action === "vertical") {
+      target.y = cursor;
+      cursor += rect.height + gap;
+    }
+    return reanchorFloatingImageAtSheetRect(image, target, props.layout) ?? image;
+  });
+  emit("updateMany", next);
+}
+
 defineExpose({
+  arrangeImages,
   startCrop,
   rotateImage,
   flipImage,
@@ -690,8 +799,17 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     ArrowDown: { x: 0, y: distance },
   }[event.key];
   if (!offset) return;
-  const next = moveFloatingImageBy(image, offset, props.layout);
-  if (next) emit("update", next);
+  const members = props.images.filter((entry) => selectedIds.value.has(entry.id));
+  const rects = members
+    .map((entry) => getFloatingImageSheetRect(entry, props.layout))
+    .filter((entry) => entry !== null);
+  const delta = {
+    x: Math.max(offset.x, -Math.min(...rects.map((rect) => rect.x))),
+    y: Math.max(offset.y, -Math.min(...rects.map((rect) => rect.y))),
+  };
+  const next = members.map((entry) => moveFloatingImageBy(entry, delta, props.layout) ?? entry);
+  if (next.length > 1) emit("updateMany", next);
+  else if (next[0]) emit("update", next[0]);
   event.preventDefault();
 }
 </script>
@@ -708,7 +826,7 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     @dblclick.prevent.stop="onLayerDoubleClick"
   >
     <div
-      v-for="fragment in fragments.filter((entry) => entry.image.id === selectedImageId)"
+      v-for="fragment in fragments.filter((entry) => selectedIds.has(entry.image.id))"
       :key="getFragmentKey(fragment)"
       class="sheet-floating-image-layer__selected"
       :class="{ 'is-selected': !crop }"
@@ -731,13 +849,13 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
         @start="startCropGesture"
       />
       <SheetFloatingImageSelection
-        v-if="fragment.image.id === selectedImageId && !crop && !readOnly"
+        v-if="fragment.image.id === selectedImageId && selectedIds.size <= 1 && !crop && !readOnly"
         :fragment="fragment"
         @resize="(direction, event) => startGesture(fragment.image, direction, event)"
       />
     </div>
     <SheetFloatingImageToolbar
-      v-if="toolbarAnchor && selectedImage && !gesture && !contextMenu"
+      v-if="toolbarAnchor && selectedImage && selectedIds.size <= 1 && !gesture && !contextMenu"
       :anchor="toolbarAnchor"
       :cropping="Boolean(crop)"
       :can-restore="canRestore"
@@ -777,7 +895,7 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     pointer-events: auto;
     touch-action: none;
     cursor: move;
-    outline: none;
+    outline: 1px solid var(--idea-action-primary);
 
     &:focus-visible {
       --image-selection-style: dashed;

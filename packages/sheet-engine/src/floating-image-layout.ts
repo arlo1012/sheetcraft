@@ -16,6 +16,7 @@ export type FloatingImagePlacement = {
 export type FloatingImageResizeDirection = "n" | "s" | "e" | "w" | "nw" | "ne" | "sw" | "se";
 
 export type FloatingImageResizeOptions = {
+  preserveAspectRatio?: boolean;
   minSize?: number;
   maxSize?: number;
 };
@@ -156,7 +157,7 @@ export function resizeFloatingImageBy<T extends FloatingImagePlacement>(
   const movesHorizontally = direction === "e" || direction === "w";
   const movesVertically = direction === "n" || direction === "s";
 
-  if (movesHorizontally) {
+  if (movesHorizontally && options?.preserveAspectRatio !== true) {
     if (delta.x === 0) return image;
     const width = Math.min(
       clamp(sheetRect.width + (direction === "w" ? -delta.x : delta.x), minSize, maxSize),
@@ -173,7 +174,7 @@ export function resizeFloatingImageBy<T extends FloatingImagePlacement>(
     );
   }
 
-  if (movesVertically) {
+  if (movesVertically && options?.preserveAspectRatio !== true) {
     if (delta.y === 0) return image;
     const height = Math.min(
       clamp(sheetRect.height + (direction === "n" ? -delta.y : delta.y), minSize, maxSize),
@@ -192,8 +193,32 @@ export function resizeFloatingImageBy<T extends FloatingImagePlacement>(
 
   if (delta.x === 0 && delta.y === 0) return image;
 
-  const horizontalScale = 1 + (movesLeft ? -delta.x : delta.x) / sheetRect.width;
-  const verticalScale = 1 + (movesTop ? -delta.y : delta.y) / sheetRect.height;
+  if (options?.preserveAspectRatio === false) {
+    const width = Math.min(
+      clamp(sheetRect.width + (movesLeft ? -delta.x : delta.x), minSize, maxSize),
+      movesLeft ? sheetRect.x + sheetRect.width : Infinity,
+    );
+    const height = Math.min(
+      clamp(sheetRect.height + (movesTop ? -delta.y : delta.y), minSize, maxSize),
+      movesTop ? sheetRect.y + sheetRect.height : Infinity,
+    );
+    return reanchorFloatingImageAtSheetRect(
+      image,
+      {
+        x: movesLeft ? sheetRect.x + sheetRect.width - width : sheetRect.x,
+        y: movesTop ? sheetRect.y + sheetRect.height - height : sheetRect.y,
+        width,
+        height,
+      },
+      layout,
+    );
+  }
+  const horizontalScale = movesVertically
+    ? 1
+    : 1 + (movesLeft ? -delta.x : delta.x) / sheetRect.width;
+  const verticalScale = movesHorizontally
+    ? 1
+    : 1 + (movesTop ? -delta.y : delta.y) / sheetRect.height;
   const requestedScale =
     Math.abs(horizontalScale - 1) >= Math.abs(verticalScale - 1) ? horizontalScale : verticalScale;
   const minimumScale = Math.max(minSize / sheetRect.width, minSize / sheetRect.height);

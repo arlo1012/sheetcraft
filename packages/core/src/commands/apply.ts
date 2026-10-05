@@ -87,6 +87,7 @@ import {
   applyDeleteFloatingImageCommand,
   applyRestoreFloatingImageToCellCommand,
   applySetFloatingImageCommand,
+  applySetSheetFloatingImagesCommand,
 } from "./images.js";
 import type { WorkbookCommand } from "./contracts.js";
 import {
@@ -245,6 +246,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "setSheetOutlineLevel":
     case "clearSheetOutline":
     case "ungroupSheetRange":
+    case "setSheetFloatingImages":
     case "setFloatingImage":
     case "deleteFloatingImage":
     case "convertFloatingImageToCell":
@@ -409,6 +411,8 @@ export function applyWorkbookCommand(
         return applyClearSheetOutlineCommand(workbook, command);
       case "ungroupSheetRange":
         return applyUngroupSheetRangeCommand(workbook, command);
+      case "setSheetFloatingImages":
+        return applySetSheetFloatingImagesCommand(workbook, command);
       case "setFloatingImage":
         return applySetFloatingImageCommand(workbook, command);
       case "deleteFloatingImage":

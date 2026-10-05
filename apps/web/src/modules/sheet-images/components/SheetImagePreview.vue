@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { createPictureCanvas } from "../../../shared/images/imageAppearance";
 import type { ImageTransform } from "@idea10/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import {
@@ -23,6 +24,7 @@ const viewerReady = ref(false);
 const presentationUrl = ref<string>();
 const hasTransform = computed(() =>
   Boolean(
+    props.transform?.appearance ||
     props.transform?.crop ||
     props.transform?.rotation ||
     props.transform?.flipHorizontal ||
@@ -55,6 +57,19 @@ async function onPresentationSourceLoad(event: Event): Promise<void> {
   if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return;
   const generation = presentationGeneration.value;
   try {
+    if (props.transform?.appearance) {
+      const canvas = createPictureCanvas(image, props.transform);
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(
+          (value) => (value ? resolve(value) : reject(new Error("Image rendering failed."))),
+          "image/png",
+        ),
+      );
+      if (generation !== presentationGeneration.value) return;
+      clearPresentationUrl();
+      presentationUrl.value = URL.createObjectURL(blob);
+      return;
+    }
     const source = await readImageSourceAsDataUrl(props.src);
     if (generation !== presentationGeneration.value) return;
     clearPresentationUrl();

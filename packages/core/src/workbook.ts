@@ -100,6 +100,8 @@ export {
   normalizeImageTransform,
   type ImageCrop,
   type ImageTransform,
+  type ImageAppearance,
+  normalizeImageAppearance,
 } from "./image-transform.js";
 
 export { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./sheet-limits.js";
@@ -293,6 +295,9 @@ export type FloatingImage = {
   width: number;
   height: number;
   transform?: ImageTransform;
+  hidden?: boolean;
+  groupId?: string;
+  lockAspectRatio?: boolean;
 };
 
 export type Cell = {
@@ -3195,6 +3200,12 @@ function normalizeFloatingImage(image: FloatingImage, ids?: Set<string>): Floati
       `Floating image dimensions must be between ${MIN_FLOATING_IMAGE_SIZE} and ${MAX_FLOATING_IMAGE_SIZE}.`,
     );
   }
+  if (image.hidden !== undefined && typeof image.hidden !== "boolean")
+    throw new TypeError("Invalid image visibility.");
+  if (image.lockAspectRatio !== undefined && typeof image.lockAspectRatio !== "boolean")
+    throw new TypeError("Invalid image aspect ratio lock.");
+  if (image.groupId !== undefined && (typeof image.groupId !== "string" || !image.groupId.trim()))
+    throw new TypeError("Invalid image group.");
   const transform = normalizeImageTransform(image.transform);
   return { ...cloneFloatingImage(image), ...(transform ? { transform } : {}) };
 }
@@ -3213,6 +3224,9 @@ function areFloatingImagesEqual(
     left.id === right.id &&
     left.assetId === right.assetId &&
     left.altText === right.altText &&
+    left.hidden === right.hidden &&
+    left.groupId === right.groupId &&
+    left.lockAspectRatio === right.lockAspectRatio &&
     left.anchor.row === right.anchor.row &&
     left.anchor.column === right.anchor.column &&
     left.offsetX === right.offsetX &&
