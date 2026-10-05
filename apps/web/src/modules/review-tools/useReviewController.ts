@@ -94,6 +94,7 @@ export function useReviewController(options: {
     draft.value = {
       address: cell,
       text: note?.text ?? "",
+      // TODO: Resolve the default author from the current user and follow identity changes; preserve existing note authors.
       author: note?.author ?? "Administrator",
       ...(note?.box ? { box: { ...note.box } } : {}),
     };
