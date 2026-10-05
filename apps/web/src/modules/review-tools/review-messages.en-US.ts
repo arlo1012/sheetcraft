@@ -108,6 +108,7 @@ export const reviewEnUS = {
       "These ranges remain editable while this sheet is protected. New ranges use the current selection.",
     rangeActions: "Actions",
     rangeName: "Name",
+    defaultRangeName: "Range{index}",
     rangeReference: "Cell range",
     addRange: "Add Range",
     removeRange: "Remove",

@@ -99,6 +99,7 @@ export type ReviewMessageSchema = {
     editableRangesHint: string;
     rangeActions: string;
     rangeName: string;
+    defaultRangeName: string;
     rangeReference: string;
     addRange: string;
     removeRange: string;

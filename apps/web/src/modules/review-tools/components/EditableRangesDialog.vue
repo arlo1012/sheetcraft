@@ -74,8 +74,11 @@ function selectRows(keys: Array<string | number>): void {
 function add(): void {
   if (props.readOnly) return;
   let index = 1;
-  while (rows.value.some((row) => row.entry.name.toLowerCase() === `range${index}`)) index++;
-  editor.value = { entry: { name: `Range${index}`, range: props.selection } };
+  let name = t("review.defaultRangeName", { index });
+  while (rows.value.some((row) => row.entry.name.toLowerCase() === name.toLowerCase())) {
+    name = t("review.defaultRangeName", { index: ++index });
+  }
+  editor.value = { entry: { name, range: props.selection } };
 }
 function edit(id = selectedId.value): void {
   const row = rows.value.find((row) => row.id === id);

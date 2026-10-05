@@ -104,6 +104,7 @@ export const reviewZhCN = {
     editableRangesHint: "设置当前工作表保护后仍可编辑的区域。新增区域默认使用当前选区。",
     rangeActions: "操作",
     rangeName: "名称",
+    defaultRangeName: "区域{index}",
     rangeReference: "单元格区域",
     addRange: "新增区域",
     removeRange: "删除",
