@@ -3058,8 +3058,7 @@ const gridInert = computed(
     <WordReviewDialog :controller="wordProofreading" />
     <WordDictionaryDialog :controller="wordProofreading" />
     <TextReviewDialog
-      v-if="textReview.mode.value"
-      :mode="textReview.mode.value"
+      v-if="textReview.mode.value === 'spelling'"
       v-model:scope="textReview.scope.value"
       v-model:language="textReview.language.value"
       :cells="textReview.cells.value"
@@ -3071,7 +3070,6 @@ const gridInert = computed(
       @close="textReview.close"
       @replace="textReview.replace"
       @ignore="textReview.ignore"
-      @convert="textReview.convert"
     />
     <PagePrintPreview
       :theme="workbookTheme"

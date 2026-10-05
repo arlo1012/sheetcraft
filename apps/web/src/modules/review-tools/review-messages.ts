@@ -11,7 +11,6 @@ export type ReviewMessageSchema = {
     toSimplified: string;
     toTraditional: string;
     spellingHint: string;
-    conversionHint: string;
     conversionScope: string;
     reviewScope: string;
     scopeSelection: string;
@@ -33,11 +32,6 @@ export type ReviewMessageSchema = {
     spellingComplete: string;
     reviewTruncated: string;
     checkNextBatch: string;
-    conversionCount: string;
-    beforeConversion: string;
-    afterConversion: string;
-    previewLimit: string;
-    applyConversion: string;
     textReviewFailed: string;
     encryptDocument: string;
 

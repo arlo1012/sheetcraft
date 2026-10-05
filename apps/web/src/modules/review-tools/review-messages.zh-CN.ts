@@ -15,8 +15,6 @@ export const reviewZhCN = {
     toSimplified: "繁转简",
     toTraditional: "简转繁",
     spellingHint: "检查文本单元格中的英语拼写。跳过公式、数字、网址及受保护的单元格。",
-    conversionHint:
-      "转换文本单元格中的简繁体中文。保留公式、数字、格式和批注；受保护的单元格不参与转换。",
     conversionScope: "转换范围",
     reviewScope: "检查范围",
     scopeSelection: "当前选区",
@@ -38,11 +36,6 @@ export const reviewZhCN = {
     spellingComplete: "检查完成，没有待处理的拼写问题。",
     reviewTruncated: "本次最多显示 2000 处拼写问题，处理后请重新检查。",
     checkNextBatch: "本批次已处理完，请重新检查其余文本。",
-    conversionCount: "将转换 {count} 个单元格。",
-    beforeConversion: "转换前",
-    afterConversion: "转换后",
-    previewLimit: "仅预览前 50 项，应用时转换全部列出的目标单元格。",
-    applyConversion: "应用转换",
     textReviewFailed: "检查未完成，请缩小范围后重试。",
     encryptDocument: "文档加密",
 

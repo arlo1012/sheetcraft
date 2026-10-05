@@ -16,8 +16,6 @@ export const reviewEnUS = {
     toTraditional: "Simplified to Traditional",
     spellingHint:
       "Check English spelling in text cells. Formulas, numbers, URLs and protected cells are skipped.",
-    conversionHint:
-      "Convert Chinese text in cells. Formulas, numbers, formatting and notes are preserved; protected cells are skipped.",
     conversionScope: "Conversion scope",
     reviewScope: "Scope",
     scopeSelection: "Selection",
@@ -39,11 +37,6 @@ export const reviewEnUS = {
     spellingComplete: "Check complete. No remaining spelling issues.",
     reviewTruncated: "Showing up to 2,000 spelling issues. Check again after resolving them.",
     checkNextBatch: "This batch is complete. Check again for remaining text.",
-    conversionCount: "{count} cells will be converted.",
-    beforeConversion: "Before",
-    afterConversion: "After",
-    previewLimit: "Preview shows the first 50 changes. Apply converts all matching cells.",
-    applyConversion: "Apply conversion",
     textReviewFailed: "Check could not finish. Try a smaller scope.",
     encryptDocument: "Encrypt document",
 

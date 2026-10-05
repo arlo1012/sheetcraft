@@ -190,9 +190,6 @@ export function useTextReviewController(options: {
         : result.value.issues.slice(1),
     };
   }
-  function convert() {
-    if (result.value && apply(result.value.conversions)) close();
-  }
   return {
     mode,
     scope,
@@ -208,6 +205,5 @@ export function useTextReviewController(options: {
     run,
     replace,
     ignore,
-    convert,
   };
 }
