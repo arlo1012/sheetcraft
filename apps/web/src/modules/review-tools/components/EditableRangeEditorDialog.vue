@@ -88,12 +88,15 @@ function save(): void {
       <TFormItem :label="t('review.rangeName')"
         ><TInput v-model="name" :maxlength="255"
       /></TFormItem>
-      <TFormItem :label="t('review.rangeReference')"
-        ><RangeReferenceInput
-          v-model="reference"
-          :select-reference="selectReference"
-          :label="t('review.rangeReference')"
-      /></TFormItem>
+      <TFormItem :label="t('review.rangeReference')">
+        <div class="editable-range-editor__reference">
+          <RangeReferenceInput
+            v-model="reference"
+            :select-reference="selectReference"
+            :label="t('review.rangeReference')"
+          />
+        </div>
+      </TFormItem>
       <TFormItem :label="t('review.optionalPassword')"
         ><TInput
           v-model="password"
@@ -117,3 +120,9 @@ function save(): void {
     <p v-if="error" role="alert">{{ error }}</p>
   </TDialog>
 </template>
+
+<style scoped lang="scss">
+.editable-range-editor__reference {
+  width: 100%;
+}
+</style>
