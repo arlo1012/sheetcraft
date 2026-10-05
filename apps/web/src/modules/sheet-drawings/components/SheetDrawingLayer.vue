@@ -112,6 +112,12 @@ function keydown(drawing: SheetDrawing, event: KeyboardEvent) {
     event.stopPropagation();
     return;
   }
+  if (drawing.kind === "attachment" && (event.key === "Enter" || event.key === "F2")) {
+    event.preventDefault();
+    event.stopPropagation();
+    emit("edit", drawing);
+    return;
+  }
   if (props.readOnly) return;
   if (event.key === "Delete" || event.key === "Backspace") {
     event.preventDefault();
@@ -181,7 +187,9 @@ watch(
       role="group"
       :aria-label="fragment.drawing.name"
       @pointerdown.prevent.stop="start(fragment.drawing, $event)"
-      @dblclick.prevent.stop="!readOnly && emit('edit', fragment.drawing)"
+      @dblclick.prevent.stop="
+        (!readOnly || fragment.drawing.kind === 'attachment') && emit('edit', fragment.drawing)
+      "
       @keydown="keydown(fragment.drawing, $event)"
     >
       <div class="sheet-drawing-layer__clip">

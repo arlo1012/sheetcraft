@@ -83,6 +83,8 @@ import PictureSelectionPane from "../modules/sheet-images/components/PictureSele
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
+import { useAttachmentActions } from "../modules/attachments/useAttachmentActions";
+import AttachmentDialog from "../modules/attachments/components/AttachmentDialog.vue";
 import { useCameraActions } from "../modules/camera/useCameraActions";
 import CameraEditorDialog from "../modules/camera/components/CameraEditorDialog.vue";
 import SparklineDialog from "../modules/sparklines/components/SparklineDialog.vue";
@@ -1094,6 +1096,20 @@ const imageActions = useSheetImageActions({
   },
   convertCellImageToFloating,
 });
+const attachmentActions = useAttachmentActions({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getAddress: () => activeAddress.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => cellEditSession.finish(),
+  execute: executeCommand,
+  onError: () => {
+    void MessagePlugin.error(t("attachment.failed"));
+  },
+});
+const { viewing: viewingAttachment, busy: attachmentBusy } = attachmentActions;
+watch(() => activeSheet.value.id, attachmentActions.close);
+watch(workbookGeneration, attachmentActions.close);
 const cameraActions = useCameraActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1151,6 +1167,7 @@ watch(workbookGeneration, () => {
 });
 function editSheetDrawing(drawing: SheetDrawing): void {
   if (drawing.kind === "chart") chartActions.edit(drawing);
+  else if (drawing.kind === "attachment") attachmentActions.viewing.value = drawing;
   else if (drawing.kind === "camera") cameraActions.open(drawing);
   else drawingActions.edit(drawing);
 }
@@ -2105,6 +2122,7 @@ const gridInert = computed(
     dataToolsModalOpen.value ||
     !!hyperlinkDraft.value ||
     (!!editingCamera.value && !pickingCameraRange.value) ||
+    !!viewingAttachment.value ||
     !!editingDrawing.value ||
     symbolVisible.value ||
     (!!editingChart.value && !pickingChartRange.value) ||
@@ -2186,6 +2204,7 @@ const gridInert = computed(
         !!conditionalFormattingSelection ||
         !!hyperlinkDraft ||
         (!!editingCamera && !pickingCameraRange) ||
+        !!viewingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
         (!!editingChart && !pickingChartRange) ||
@@ -2256,6 +2275,7 @@ const gridInert = computed(
             fileBusy ||
             xlsxBusy ||
             imageBusy ||
+            attachmentBusy ||
             captureBusy ||
             !canUseSheetPermission(activeSheet, 'editObjects')
           "
@@ -2281,6 +2301,7 @@ const gridInert = computed(
       </template>
       <template #insert-tools>
         <InsertToolbar
+          @insert-attachment="attachmentActions.requestInsert"
           @insert-drawing="drawingActions.insert"
           @insert-camera="cameraActions.open()"
           @insert-chart="chartActions.insert"
@@ -2300,6 +2321,7 @@ const gridInert = computed(
             fileBusy ||
             xlsxBusy ||
             imageBusy ||
+            attachmentBusy ||
             !canUseSheetPermission(activeSheet, 'editObjects')
           "
           :hyperlink-disabled="
@@ -3153,6 +3175,7 @@ const gridInert = computed(
         pickingReferenceRange ||
         !!hyperlinkDraft ||
         (!!editingCamera && !pickingCameraRange) ||
+        !!viewingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
         (!!editingChart && !pickingChartRange) ||
@@ -3556,6 +3579,7 @@ const gridInert = computed(
         !!cellFormatSelection ||
         !!hyperlinkDraft ||
         (!!editingCamera && !pickingCameraRange) ||
+        !!viewingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
         (!!editingChart && !pickingChartRange) ||
@@ -3667,6 +3691,18 @@ const gridInert = computed(
     :edit-session-id="cellEditSession.id"
     @confirm="chartRangePicker.confirm"
     @cancel="chartRangePicker.cancel"
+  />
+  <input
+    :ref="attachmentActions.fileInput"
+    type="file"
+    hidden
+    @change="attachmentActions.onFiles"
+  />
+  <AttachmentDialog
+    v-if="viewingAttachment"
+    :drawing="viewingAttachment"
+    @download="attachmentActions.download(viewingAttachment)"
+    @close="attachmentActions.close"
   />
   <CameraEditorDialog
     v-if="editingCamera"

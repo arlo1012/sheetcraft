@@ -1,3 +1,4 @@
+import { attachmentsEnUS } from "../../../modules/attachments/attachment-messages.en-US";
 import { cameraEnUS } from "../../../modules/camera/camera-messages.en-US";
 import { sparklinesEnUS } from "../../../modules/sparklines/sparkline-messages.en-US";
 import { chartsEnUS } from "../../../modules/charts/chart-messages.en-US";
@@ -19,6 +20,7 @@ import { tableStylesEnUS } from "../../../modules/table-styles/table-style-messa
 import { tablesEnUS } from "../../../modules/table-styles/table-messages.en-US";
 
 export const enUS = {
+  ...attachmentsEnUS,
   ...cameraEnUS,
   ...sparklinesEnUS,
   ...chartsEnUS,

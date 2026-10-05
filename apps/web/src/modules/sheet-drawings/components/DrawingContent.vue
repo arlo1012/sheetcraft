@@ -3,6 +3,9 @@ import { computed, defineAsyncComponent } from "vue";
 import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
 import type { WorkbookTheme } from "@idea10/core/workbook-theme";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
+const AttachmentContent = defineAsyncComponent(
+  () => import("../../attachments/components/AttachmentContent.vue"),
+);
 const CameraContent = defineAsyncComponent(
   () => import("../../camera/components/CameraContent.vue"),
 );
@@ -96,6 +99,7 @@ const textStyle = computed(() => ({
       :evaluator="evaluator"
       :revision="revision ?? 0"
     />
+    <AttachmentContent v-else-if="drawing.kind === 'attachment'" :drawing="drawing" />
     <CameraContent
       v-else-if="drawing.kind === 'camera' && sheet && evaluator"
       :drawing="drawing"

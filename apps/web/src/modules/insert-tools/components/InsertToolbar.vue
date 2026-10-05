@@ -4,6 +4,8 @@ import type { ChartType } from "@idea10/core/sheet-charts";
 import type { SheetGraphicDrawing } from "@idea10/core/sheet-drawings";
 import {
   Camera,
+  FileText,
+  Paperclip,
   Link2,
   Table2,
   Shapes,
@@ -31,6 +33,7 @@ defineProps<{
 }>();
 const emit = defineEmits<{
   insertChart: [type: ChartType | "dashboard"];
+  insertAttachment: [display: "icon" | "document"];
   insertCamera: [];
   insertSymbol: [];
   insertSparkline: [];
@@ -70,6 +73,15 @@ const { t } = useAppI18n();
       data-ribbon-group="insert-illustrations"
     >
       <ImageInsertMenu :disabled="imageDisabled" @insert-image="emit('insertImage', $event)" />
+      <RibbonButton
+        variant="tall"
+        :label="t('attachment.document')"
+        :text="t('attachment.document')"
+        :disabled="imageDisabled"
+        data-insert-tool="document"
+        @activate="emit('insertAttachment', 'document')"
+        ><FileText
+      /></RibbonButton>
       <slot name="watermark" />
       <RibbonButton
         variant="tall"
@@ -149,6 +161,15 @@ const { t } = useAppI18n();
         data-insert-tool="hyperlink"
         @activate="emit('insertHyperlink')"
         ><Link2
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :label="t('attachment.title')"
+        :text="t('attachment.title')"
+        :disabled="imageDisabled"
+        data-insert-tool="attachment"
+        @activate="emit('insertAttachment', 'icon')"
+        ><Paperclip
       /></RibbonButton>
       <RibbonButton
         variant="tall"

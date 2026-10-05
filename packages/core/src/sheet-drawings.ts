@@ -1,3 +1,8 @@
+import {
+  normalizeSheetAttachment,
+  MAX_SHEET_ATTACHMENT_BYTES,
+  type SheetAttachment,
+} from "./sheet-attachments.js";
 import { normalizeSheetChart, type SheetChart } from "./sheet-charts.js";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellAddress, type CellRange } from "./workbook.js";
 
@@ -37,7 +42,15 @@ export type SheetCameraDrawing = DrawingBase & {
   kind: "camera";
   camera: { range: CellRange | null; gridLines: boolean };
 };
-export type SheetDrawing = SheetGraphicDrawing | SheetChartDrawing | SheetCameraDrawing;
+export type SheetAttachmentDrawing = DrawingBase & {
+  kind: "attachment";
+  attachment: SheetAttachment;
+};
+export type SheetDrawing =
+  | SheetGraphicDrawing
+  | SheetChartDrawing
+  | SheetCameraDrawing
+  | SheetAttachmentDrawing;
 export function normalizeCameraRange(range: CellRange | null): CellRange | null {
   if (range === null) return null;
   if (
@@ -72,7 +85,16 @@ export function mapDrawingSource(
     };
   return drawing;
 }
-const kinds = new Set(["shape", "textBox", "wordArt", "icon", "equation", "chart", "camera"]);
+const kinds = new Set([
+  "shape",
+  "textBox",
+  "wordArt",
+  "icon",
+  "equation",
+  "chart",
+  "camera",
+  "attachment",
+]);
 const shapes = new Set([
   "rectangle",
   "roundedRectangle",
@@ -131,7 +153,12 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
               gridLines: value.camera.gridLines,
             },
           } as const)
-        : { kind: value.kind }),
+        : value.kind === "attachment"
+          ? ({
+              kind: "attachment",
+              attachment: normalizeSheetAttachment(value.attachment),
+            } as const)
+          : { kind: value.kind }),
     name: value.name,
     anchor: { ...value.anchor },
     offsetX: value.offsetX,
@@ -158,5 +185,12 @@ export function normalizeSheetDrawings(
   const result = values.map(normalizeSheetDrawing);
   if (new Set(result.map((value) => value.id)).size !== result.length)
     throw new RangeError("Duplicate drawing IDs.");
+  if (
+    result.reduce(
+      (total, drawing) => total + (drawing.kind === "attachment" ? drawing.attachment.size : 0),
+      0,
+    ) > MAX_SHEET_ATTACHMENT_BYTES
+  )
+    throw new RangeError("Embedded files exceed sheet limit.");
   return result;
 }

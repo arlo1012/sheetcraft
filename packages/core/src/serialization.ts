@@ -214,7 +214,8 @@ export type WorkbookSnapshotV25 = Omit<WorkbookSnapshotV24, "version"> & { versi
 export type WorkbookSnapshotV26 = Omit<WorkbookSnapshotV25, "version"> & { version: 26 };
 export type WorkbookSnapshotV27 = Omit<WorkbookSnapshotV26, "version"> & { version: 27 };
 export type WorkbookSnapshotV28 = Omit<WorkbookSnapshotV27, "version"> & { version: 28 };
-export type WorkbookSnapshot = WorkbookSnapshotV28;
+export type WorkbookSnapshotV29 = Omit<WorkbookSnapshotV28, "version"> & { version: 29 };
+export type WorkbookSnapshot = WorkbookSnapshotV29;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -258,7 +259,8 @@ type SnapshotVersion =
   | 25
   | 26
   | 27
-  | 28;
+  | 28
+  | 29;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -657,6 +659,12 @@ function parseSparseState(
     record.drawings.some((drawing) => asRecord(drawing, path).kind === "camera")
   )
     return fail(path, "Camera requires snapshot version 28.");
+  if (
+    version < 29 &&
+    Array.isArray(record.drawings) &&
+    record.drawings.some((drawing) => asRecord(drawing, path).kind === "attachment")
+  )
+    return fail(path, "Attachments require snapshot version 29.");
   if (version < 25 && Object.hasOwn(record, "drawings"))
     return fail(path, "Drawings require snapshot version 25.");
   if (
@@ -771,7 +779,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasValue && hasContent)
       return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
     version = Object.hasOwn(record, "drawings")
-      ? 28
+      ? 29
       : cells.some((cell) => Object.hasOwn(asRecord(cell, path), "sparkline"))
         ? 27
         : (Array.isArray(record.floatingImages) &&
@@ -907,7 +915,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 28,
+    version: 29,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -967,7 +975,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 25 &&
     record.version !== 26 &&
     record.version !== 27 &&
-    record.version !== 28
+    record.version !== 28 &&
+    record.version !== 29
   ) {
     throw new WorkbookDomainError(
       {

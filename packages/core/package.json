@@ -154,6 +154,10 @@
     "./sparklines": {
       "types": "./dist/sparklines.d.ts",
       "import": "./dist/sparklines.js"
+    },
+    "./sheet-attachments": {
+      "types": "./dist/sheet-attachments.d.ts",
+      "import": "./dist/sheet-attachments.js"
     }
   },
   "scripts": {

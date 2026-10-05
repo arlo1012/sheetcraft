@@ -1,3 +1,4 @@
+import type { attachmentsEnUS } from "../../modules/attachments/attachment-messages.en-US";
 import type { cameraEnUS } from "../../modules/camera/camera-messages.en-US";
 import type { sparklinesEnUS } from "../../modules/sparklines/sparkline-messages.en-US";
 import type { chartsEnUS } from "../../modules/charts/chart-messages.en-US";
@@ -19,7 +20,8 @@ import type { TableMessageSchema } from "../../modules/table-styles/table-messag
 
 export type AppLocale = "zh-CN" | "en-US";
 
-type ToolMessageSchema = typeof cameraEnUS &
+type ToolMessageSchema = typeof attachmentsEnUS &
+  typeof cameraEnUS &
   typeof sparklinesEnUS &
   typeof chartsEnUS &
   typeof drawingsEnUS &
