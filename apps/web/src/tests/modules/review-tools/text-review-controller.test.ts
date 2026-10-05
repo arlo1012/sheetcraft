@@ -112,6 +112,39 @@ describe("text conversion controller", () => {
     },
   );
 
+  test("converts the whole workbook on request and defaults back to the current sheet", () => {
+    const f = fixture();
+    f.review.open("to-traditional", "workbook");
+    const worker = ReviewWorker.instances[0]!;
+    const request = worker.postMessage.mock.calls[0]![0];
+    expect(new Set(request.cells.map((cell) => cell.sheetId))).toEqual(new Set(["sheet", "other"]));
+    const otherIndex = request.cells.findIndex((cell) => cell.sheetId === "other");
+    const mainIndex = request.cells.findIndex((cell) => cell.text === "汉语");
+    worker.respond([
+      { cell: mainIndex, text: "漢語" },
+      { cell: otherIndex, text: "其它" },
+    ]);
+    expect(f.execute).toHaveBeenCalledOnce();
+    expect(getCellContent(f.other, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "其它",
+    });
+    undoWorkbookCommand(f.session);
+    expect(getCellContent(f.sheet, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "汉语",
+    });
+    expect(getCellContent(f.other, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "其他",
+    });
+    f.review.open("to-simplified");
+    expect(ReviewWorker.instances).toHaveLength(1);
+    expect(
+      worker.postMessage.mock.lastCall![0].cells.every((cell) => cell.sheetId === "sheet"),
+    ).toBe(true);
+  });
+
   test("automatically applies all conversions as one undoable command and closes", () => {
     const f = fixture();
     f.review.open("to-traditional");

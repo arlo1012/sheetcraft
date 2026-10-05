@@ -2036,7 +2036,7 @@ const gridInert = computed(
           @proofread="dataTools.openDataProofreading"
           @encrypt-document="openDocumentEncryption"
           @spelling="textReview.open('spelling')"
-          @convert-text="textReview.open($event)"
+          @convert-text="(mode, scope) => textReview.open(mode, scope)"
           @edit-note="reviewActions.edit()"
           @delete-notes="reviewActions.remove()"
           @previous-note="reviewActions.step(-1)"

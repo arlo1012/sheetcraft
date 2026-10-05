@@ -17,6 +17,7 @@ export const reviewZhCN = {
     spellingHint: "检查文本单元格中的英语拼写。跳过公式、数字、网址及受保护的单元格。",
     conversionHint:
       "转换文本单元格中的简繁体中文。保留公式、数字、格式和批注；受保护的单元格不参与转换。",
+    conversionScope: "转换范围",
     reviewScope: "检查范围",
     scopeSelection: "当前选区",
     scopeSheet: "当前工作表",

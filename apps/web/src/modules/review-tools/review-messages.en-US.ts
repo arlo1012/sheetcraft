@@ -18,6 +18,7 @@ export const reviewEnUS = {
       "Check English spelling in text cells. Formulas, numbers, URLs and protected cells are skipped.",
     conversionHint:
       "Convert Chinese text in cells. Formulas, numbers, formatting and notes are preserved; protected cells are skipped.",
+    conversionScope: "Conversion scope",
     reviewScope: "Scope",
     scopeSelection: "Selection",
     scopeSheet: "Current sheet",

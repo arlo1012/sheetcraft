@@ -2,7 +2,6 @@
 import {
   ClipboardCheck,
   SpellCheck,
-  Languages,
   ShieldCheck,
   LockKeyhole,
   SquarePen,
@@ -18,6 +17,7 @@ import {
 import { computed } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
+import TextConversionMenu from "./TextConversionMenu.vue";
 import NoteResetMenu from "./NoteResetMenu.vue";
 import NoteVisibilityMenu from "./NoteVisibilityMenu.vue";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
@@ -41,7 +41,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   proofread: [];
   spelling: [];
-  convertText: [mode: "to-simplified" | "to-traditional"];
+  convertText: [mode: "to-simplified" | "to-traditional", scope: "sheet" | "workbook"];
   encryptDocument: [];
   editNote: [];
   deleteNotes: [];
@@ -210,20 +210,16 @@ const protectionLabel = computed(() =>
     </section>
     <section class="review-toolbar__group" role="group" :aria-label="t('review.toTraditional')">
       <div class="review-toolbar__stack">
-        <RibbonButton
+        <TextConversionMenu
+          mode="to-traditional"
           :disabled="busy"
-          :label="t('review.toTraditional')"
-          :text="t('review.toTraditional')"
-          @activate="emit('convertText', 'to-traditional')"
-          ><Languages
-        /></RibbonButton>
-        <RibbonButton
+          @convert="emit('convertText', 'to-traditional', $event)"
+        />
+        <TextConversionMenu
+          mode="to-simplified"
           :disabled="busy"
-          :label="t('review.toSimplified')"
-          :text="t('review.toSimplified')"
-          @activate="emit('convertText', 'to-simplified')"
-          ><Languages
-        /></RibbonButton>
+          @convert="emit('convertText', 'to-simplified', $event)"
+        />
       </div>
     </section>
   </RibbonToolbar>

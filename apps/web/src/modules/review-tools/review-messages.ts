@@ -12,6 +12,7 @@ export type ReviewMessageSchema = {
     toTraditional: string;
     spellingHint: string;
     conversionHint: string;
+    conversionScope: string;
     reviewScope: string;
     scopeSelection: string;
     scopeSheet: string;

@@ -66,14 +66,14 @@ export function useTextReviewController(options: {
     [scope, language],
     () => {
       if (mode.value) {
-        stop();
+        stop(busy.value);
         result.value = undefined;
         error.value = "";
       }
     },
     { flush: "sync" },
   );
-  function open(value: TextReviewMode) {
+  function open(value: TextReviewMode, conversionScope: "sheet" | "workbook" = "sheet") {
     if (busy.value || options.isBusy() || !options.finishEditing()) return;
     close();
     mode.value = value;
@@ -82,7 +82,9 @@ export function useTextReviewController(options: {
       value === "spelling" &&
       (range.start.row !== range.end.row || range.start.column !== range.end.column)
         ? "selection"
-        : "sheet";
+        : value === "spelling"
+          ? "sheet"
+          : conversionScope;
     run();
   }
   function run() {
@@ -94,7 +96,7 @@ export function useTextReviewController(options: {
       options.getWorkbook(),
       options.getSheet().id,
       options.getSelection(),
-      mode.value === "spelling" ? scope.value : "sheet",
+      scope.value,
     );
     cells.value = collected.cells;
     skipped.value = collected.skipped;

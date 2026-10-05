@@ -58,3 +58,20 @@ describe("review note menus", () => {
     expect(toolbar.get('[data-review-action="reset-note"]').attributes("disabled")).toBeDefined();
   });
 });
+
+test("conversion split buttons default to sheet and expose workbook conversion", async () => {
+  const toolbar = mountToolbar();
+  await toolbar.get('button[aria-label="Simplified to Traditional"]').trigger("click");
+  expect(toolbar.emitted("convertText")).toEqual([["to-traditional", "sheet"]]);
+  await toolbar
+    .get('button[aria-label="Traditional to Simplified · Conversion scope"]')
+    .trigger("click");
+  const items = [...document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+  expect(items.map((item) => item.textContent?.trim())).toEqual(["Current sheet", "Workbook"]);
+  items[1]!.click();
+  await nextTick();
+  expect(toolbar.emitted("convertText")?.at(-1)).toEqual(["to-simplified", "workbook"]);
+  expect(document.body.querySelector('[role="menu"]')).toBeNull();
+  await toolbar.get('button[aria-label="Traditional to Simplified"]').trigger("click");
+  expect(toolbar.emitted("convertText")?.at(-1)).toEqual(["to-simplified", "sheet"]);
+});
