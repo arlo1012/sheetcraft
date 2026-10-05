@@ -129,6 +129,15 @@ defineExpose({ rootElement, save, cancel, dismiss });
   font-size: calc(12px * var(--note-scale, 1));
   line-height: calc(16px * var(--note-scale, 1));
 
+  &__view,
+  &__text-input {
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
   &__view {
     display: flex;
     flex-direction: column;
