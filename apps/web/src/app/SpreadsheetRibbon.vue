@@ -97,7 +97,15 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-type Category = "home" | "page" | "formulas" | "data" | "review" | "view" | "table";
+type Category =
+  | "home"
+  | "page"
+  | "formulas"
+  | "data"
+  | "review"
+  | "view"
+  | "table"
+  | "proofreading";
 const proofreadingOpen = ref(false);
 const activeCategory = ref<Category>("home");
 let previousCategory: Exclude<Category, "table"> = "home";
@@ -108,10 +116,10 @@ const dataTab = ref<HTMLButtonElement>();
 const tableTab = ref<HTMLButtonElement>();
 const reviewTab = ref<HTMLButtonElement>();
 const viewTab = ref<HTMLButtonElement>();
+const proofreadingTab = ref<HTMLButtonElement>();
 const tabId = useId();
 
 watch(activeCategory, (category) => {
-  proofreadingOpen.value = false;
   if (category !== "table") previousCategory = category;
 });
 watch(
@@ -124,9 +132,16 @@ watch(
 function onCategoryKeydown(event: KeyboardEvent): void {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
   event.preventDefault();
-  const categories: Category[] = props.hasTable
-    ? ["home", "page", "formulas", "data", "review", "view", "table"]
-    : ["home", "page", "formulas", "data", "review", "view"];
+  const categories: Category[] = ["home", "page", "formulas", "data", "review", "view"];
+  const tabs = [homeTab, pageTab, formulaTab, dataTab, reviewTab, viewTab];
+  if (props.hasTable) {
+    categories.push("table");
+    tabs.push(tableTab);
+  }
+  if (proofreadingOpen.value) {
+    categories.push("proofreading");
+    tabs.push(proofreadingTab);
+  }
   const current = categories.indexOf(activeCategory.value);
   const index =
     event.key === "Home"
@@ -135,9 +150,19 @@ function onCategoryKeydown(event: KeyboardEvent): void {
         ? categories.length - 1
         : (current + (event.key === "ArrowRight" ? 1 : -1) + categories.length) % categories.length;
   activeCategory.value = categories[index]!;
-  void nextTick(() =>
-    [homeTab, pageTab, formulaTab, dataTab, reviewTab, viewTab, tableTab][index]?.value?.focus(),
-  );
+  void nextTick(() => tabs[index]?.value?.focus());
+}
+
+function openProofreading() {
+  proofreadingOpen.value = true;
+  activeCategory.value = "proofreading";
+  void nextTick(() => proofreadingTab.value?.focus());
+}
+function closeProofreading() {
+  proofreadingOpen.value = false;
+  previousCategory = "review";
+  activeCategory.value = "review";
+  void nextTick(() => reviewTab.value?.focus());
 }
 
 defineSlots<{
@@ -270,6 +295,22 @@ defineSlots<{
           >
             {{ t("tables.tools") }}
           </button>
+          <button
+            v-if="proofreadingOpen"
+            :id="`${tabId}-proofreading`"
+            ref="proofreadingTab"
+            class="spreadsheet-ribbon__category spreadsheet-ribbon__category--contextual"
+            :class="{ 'is-active': activeCategory === 'proofreading' }"
+            data-ribbon-category="proofreading"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'proofreading'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'proofreading' ? 0 : -1"
+            @click="activeCategory = 'proofreading'"
+          >
+            {{ t("wordProof.title") }}
+          </button>
         </div>
         <slot name="file-actions" />
       </nav>
@@ -366,22 +407,14 @@ defineSlots<{
       />
       <slot v-else-if="activeCategory === 'data'" name="data-tools" />
       <slot
-        v-else-if="activeCategory === 'review' && proofreadingOpen"
+        v-else-if="activeCategory === 'proofreading'"
         name="proofreading-tools"
-        :close="
-          () => {
-            proofreadingOpen = false;
-          }
-        "
+        :close="closeProofreading"
       />
       <slot
         v-else-if="activeCategory === 'review'"
         name="review-tools"
-        :open-proofreading="
-          () => {
-            proofreadingOpen = true;
-          }
-        "
+        :open-proofreading="openProofreading"
       />
       <slot v-else-if="activeCategory === 'view'" name="view-tools" />
       <slot v-else name="table-tools" />
