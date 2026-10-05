@@ -125,6 +125,7 @@ function selectIssues(keys: Array<string | number>): void {
         :aria-label="t('proofreading.title')"
         size="small"
         table-layout="fixed"
+        resizable
         vertical-align="middle"
         max-height="min(48vh, 440px)"
         hover
