@@ -1683,9 +1683,31 @@ watch(workbookGeneration, () => {
   recentFunctions.value = [];
 });
 
+const protectionRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingProtectionRange, reference: pickedProtectionReference } =
+  protectionRangePicker;
+async function selectProtectionReference(current: string): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const sheetId = activeSheet.value.id;
+  const selected = await protectionRangePicker.selectReference(current);
+  if (
+    selected === undefined ||
+    session.workbook !== workbook ||
+    protectionDialog.value !== "ranges"
+  )
+    return undefined;
+  const resolved = resolveRangeReference(workbook, selected, sheetId);
+  if (!resolved || resolved.sheetId !== sheetId) return undefined;
+  return `${formatCellAddress(resolved.range.start)}:${formatCellAddress(resolved.range.end)}`;
+}
+watch(protectionDialog, (dialog) => {
+  if (dialog !== "ranges") protectionRangePicker.cancel();
+});
+
 const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
 const activeRangePicker = computed(() => {
+  if (pickingProtectionRange.value) return protectionRangePicker;
   if (pickingTableRange.value) return tableRangePicker;
   if (pickingPageSetupRange.value) return pageSetupRangePicker;
   if (pickingFindFormat.value) return findFormatPicker;
@@ -1836,7 +1858,7 @@ const gridInert = computed(
     loading.value ||
     fileBusy.value ||
     xlsxBusy.value ||
-    !!protectionDialog.value ||
+    (!!protectionDialog.value && !pickingProtectionRange.value) ||
     !!textReview.mode.value ||
     encryptDocumentVisible.value ||
     xlsxActions.passwordRequired.value ||
@@ -3154,9 +3176,17 @@ const gridInert = computed(
       @close="protectionActions.close"
       @save="protectionActions.save"
     />
+    <RangeReferencePicker
+      v-if="pickingProtectionRange"
+      :reference="pickedProtectionReference"
+      @confirm="protectionRangePicker.confirm"
+      @cancel="protectionRangePicker.cancel"
+    />
     <EditableRangesDialog
       :visible="protectionDialog === 'ranges'"
       :configuration="protectionConfiguration"
+      :suspended="pickingProtectionRange"
+      :select-reference="selectProtectionReference"
       :selection="protectionSelection"
       :read-only="activeSheet.properties.protected"
       :error="protectionError"

@@ -18,6 +18,8 @@ import EditableRangeEditorDialog from "./EditableRangeEditorDialog.vue";
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{
   visible: boolean;
+  suspended?: boolean;
+  selectReference?: (current: string) => Promise<string | undefined>;
   configuration: SheetProtection;
   selection: CellRange;
   error: string;
@@ -200,6 +202,8 @@ function save(protect = false): void {
     v-if="editor"
     :visible="true"
     :draft="editor.entry"
+    :suspended="suspended"
+    :select-reference="selectReference"
     :editing="editor.id !== undefined"
     :names="rows.filter((row) => row.id !== editor?.id).map((row) => row.entry.name)"
     @close="editor = undefined"

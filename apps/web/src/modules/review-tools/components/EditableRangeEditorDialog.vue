@@ -11,6 +11,8 @@ import { useAppI18n } from "../../../shared/i18n";
 import { createBrowserProtectionPassword } from "../protection-password";
 const props = defineProps<{
   visible: boolean;
+  suspended?: boolean;
+  selectReference?: (current: string) => Promise<string | undefined>;
   draft: EditableRange;
   names: string[];
   editing: boolean;
@@ -73,7 +75,7 @@ function save(): void {
 </script>
 <template>
   <TDialog
-    :visible="visible"
+    :visible="visible && !suspended"
     :header="t(editing ? 'review.editRange' : 'review.addRange')"
     :confirm-btn="t('review.save')"
     :cancel-btn="t('review.cancel')"
@@ -89,7 +91,7 @@ function save(): void {
       <TFormItem :label="t('review.rangeReference')"
         ><RangeReferenceInput
           v-model="reference"
-          :show-picker="false"
+          :select-reference="selectReference"
           :label="t('review.rangeReference')"
       /></TFormItem>
       <TFormItem :label="t('review.optionalPassword')"
