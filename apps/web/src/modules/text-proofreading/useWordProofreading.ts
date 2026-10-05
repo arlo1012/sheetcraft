@@ -44,6 +44,7 @@ export function useWordProofreading(options: {
     truncated = ref(false),
     scanned = ref(false);
   let revision = 0;
+  let navigating = false;
   function invalidate() {
     cells.value = [];
     issues.value = [];
@@ -53,7 +54,8 @@ export function useWordProofreading(options: {
   watch(scope, invalidate, { flush: "sync" });
   watch(
     [options.getGeneration, () => options.getSheet().id],
-    () => {
+    ([generation], [previousGeneration]) => {
+      if (navigating && generation === previousGeneration) return;
       panel.value = undefined;
       invalidate();
     },
@@ -162,8 +164,14 @@ export function useWordProofreading(options: {
     const issue = issues.value.find((item) => item.id === id);
     const cell = issue && cells.value[issue.cell];
     if (!cell) return;
-    panel.value = undefined;
-    options.navigateToCell(cell.sheetId, cell.address);
+    const current = revision === options.getRevision();
+    navigating = true;
+    try {
+      options.navigateToCell(cell.sheetId, cell.address);
+      if (current) revision = options.getRevision();
+    } finally {
+      navigating = false;
+    }
   }
   function ignore(ids: readonly string[]) {
     issues.value = issues.value.filter((i) => !ids.includes(i.id));
