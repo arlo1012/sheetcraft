@@ -13,7 +13,10 @@ import {
   scanWords,
   wordChanges,
   type WordIssue,
+  type DictionaryCategory,
+  type WordRule,
 } from "./proofreading";
+import { parseDictionaryText } from "./dictionary-transfer";
 const storageKey = "idea10.word-proofreading.v1";
 export function useWordProofreading(options: {
   getWorkbook: () => Workbook;
@@ -35,7 +38,9 @@ export function useWordProofreading(options: {
   } catch {
     error.value = t("wordProof.storageRead");
   }
-  const panel = ref<"review" | "accepted" | "mistake" | "dictionary" | "settings">();
+  const panel = ref<
+    "review" | "accepted" | "mistake" | "sensitive" | "term" | "person" | "dictionary" | "settings"
+  >();
   const scope = ref<"selection" | "sheet" | "workbook">("sheet");
   const cells = shallowRef<ReviewTextCell[]>([]);
   const issues = shallowRef<WordIssue[]>([]);
@@ -97,28 +102,9 @@ export function useWordProofreading(options: {
       return false;
     }
   }
-  function add(word: string, replacement?: string, originalWord?: string) {
-    word = word.trim();
-    replacement = replacement?.trim();
-    if (
-      !word ||
-      word.length > 100 ||
-      replacement === "" ||
-      replacement === word ||
-      (replacement?.length ?? 0) > 100
-    ) {
-      error.value = t("wordProof.invalidWord");
-      return false;
-    }
-    const next = parseDictionary(dictionary.value);
-    next.accepted = next.accepted.filter((v) => v !== word && v !== originalWord);
-    next.mistakes = next.mistakes.filter((v) => v.word !== word && v.word !== originalWord);
-    if (replacement === undefined) next.accepted.push(word);
-    else next.mistakes.push({ word, replacement });
-    return save(next);
-  }
-  function addMistakes(
-    rows: readonly { word: string; replacement: string }[],
+  function addEntries(
+    category: DictionaryCategory,
+    rows: readonly WordRule[],
     originalWord?: string,
   ) {
     const entries = rows
@@ -126,47 +112,61 @@ export function useWordProofreading(options: {
       .filter((row) => row.word || row.replacement);
     if (
       !entries.length ||
-      entries.some(
-        (row) =>
-          !row.word ||
-          !row.replacement ||
-          row.word === row.replacement ||
-          row.word.length > 100 ||
-          row.replacement.length > 100,
-      )
+      entries.some((row) => !row.word || (category === "accepted" && row.replacement))
     ) {
       error.value = t("wordProof.invalidWord");
       return false;
     }
     const next = parseDictionary(dictionary.value);
     const replacements = new Map(entries.map((row) => [row.word, row]));
-    next.accepted = next.accepted.filter(
-      (word) => !replacements.has(word) && word !== originalWord,
-    );
-    next.mistakes = next.mistakes.filter(
-      (row) => !replacements.has(row.word) && row.word !== originalWord,
-    );
-    next.mistakes.push(...replacements.values());
-    return save(next);
-  }
-  function addAcceptedWords(input: string) {
-    const words = [
-      ...new Set(
-        input
-          .split(/\r\n|[\r\n]/)
-          .map((word) => word.trim())
-          .filter(Boolean),
-      ),
-    ];
-    if (!words.length || words.some((word) => word.length > 100)) {
+    if (category === "accepted") {
+      next.accepted = [
+        ...new Set([
+          ...next.accepted.filter((word) => word !== originalWord),
+          ...replacements.keys(),
+        ]),
+      ];
+      next.mistakes = next.mistakes.filter((row) => !replacements.has(row.word));
+    } else {
+      next[category] = [
+        ...next[category].filter((row) => !replacements.has(row.word) && row.word !== originalWord),
+        ...replacements.values(),
+      ];
+      if (category === "mistakes")
+        next.accepted = next.accepted.filter((word) => !replacements.has(word));
+    }
+    try {
+      parseDictionary(next);
+    } catch {
       error.value = t("wordProof.invalidWord");
       return false;
     }
-    const next = parseDictionary(dictionary.value);
-    next.accepted = [...new Set([...next.accepted, ...words])];
-    const accepted = new Set(words);
-    next.mistakes = next.mistakes.filter((rule) => !accepted.has(rule.word));
     return save(next);
+  }
+  function removeEntries(category: DictionaryCategory, words: readonly string[]) {
+    const next = parseDictionary(dictionary.value);
+    const removed = new Set(words);
+    if (category === "accepted") next.accepted = next.accepted.filter((word) => !removed.has(word));
+    else next[category] = next[category].filter((row) => !removed.has(row.word));
+    return save(next);
+  }
+  function add(word: string, replacement?: string, originalWord?: string) {
+    return addEntries(
+      replacement === undefined ? "accepted" : "mistakes",
+      [{ word, replacement: replacement ?? "" }],
+      originalWord,
+    );
+  }
+  function addMistakes(rows: readonly WordRule[], originalWord?: string) {
+    return addEntries("mistakes", rows, originalWord);
+  }
+  function addAcceptedWords(input: string) {
+    try {
+      return addEntries("accepted", parseDictionaryText(input, "accepted"));
+    } catch {
+      error.value = t("wordProof.invalidWord");
+      return false;
+    }
   }
   function acceptSelected() {
     const words = new Set(
@@ -181,6 +181,9 @@ export function useWordProofreading(options: {
     return true;
   }
   function apply(targets: readonly WordIssue[]) {
+    targets = targets.filter(
+      (issue) => issue.replacement.trim() && issue.replacement !== issue.word,
+    );
     if (!targets.length || options.isBusy()) return;
     if (revision !== options.getRevision()) {
       error.value = t("wordProof.stale");
@@ -244,6 +247,8 @@ export function useWordProofreading(options: {
     save,
     add,
     apply,
+    addEntries,
+    removeEntries,
     addMistakes,
     addAcceptedWords,
     acceptSelected,

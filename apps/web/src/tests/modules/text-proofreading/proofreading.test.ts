@@ -108,6 +108,65 @@ describe("Chinese phrase proofreading", () => {
 });
 
 describe("word dictionary deserialization", () => {
+  test("migrates version 1 to version 2 with empty new categories", () => {
+    expect(
+      parseDictionary({
+        version: 1,
+        builtins: true,
+        accepted: ["专名"],
+        mistakes: [{ word: "错误", replacement: "正确" }],
+      }),
+    ).toEqual({
+      ...emptyDictionary(),
+      accepted: ["专名"],
+      mistakes: [{ word: "错误", replacement: "正确" }],
+    });
+  });
+
+  test.each(["sensitive", "terms", "people"] as const)(
+    "validates and independently copies %s rules",
+    (category) => {
+      const source = { ...emptyDictionary(), [category]: [{ word: "词条", replacement: "标准" }] };
+      const parsed = parseDictionary(source);
+      parsed[category][0]!.replacement = "修改";
+      expect(source[category][0]?.replacement).toBe("标准");
+      for (const invalid of [
+        null,
+        "text",
+        [{ word: "", replacement: "标准" }],
+        [{ word: "词条", replacement: 42 }],
+        [{ word: "词条", replacement: " 标准" }],
+        [
+          { word: "词条", replacement: "标准" },
+          { word: "词条", replacement: "另一" },
+        ],
+      ]) {
+        expect(() => parseDictionary({ ...emptyDictionary(), [category]: invalid })).toThrow(
+          "invalid-dictionary",
+        );
+      }
+    },
+  );
+
+  test("allows an empty sensitive suggestion but requires terminology and person titles", () => {
+    expect(
+      parseDictionary({ ...emptyDictionary(), sensitive: [{ word: "禁词", replacement: "" }] })
+        .sensitive,
+    ).toEqual([{ word: "禁词", replacement: "" }]);
+    for (const category of ["terms", "people"] as const) {
+      expect(() =>
+        parseDictionary({ ...emptyDictionary(), [category]: [{ word: "词条", replacement: "" }] }),
+      ).toThrow();
+    }
+    expect(() =>
+      parseDictionary({ ...emptyDictionary(), terms: [{ word: "同词", replacement: "同词" }] }),
+    ).toThrow();
+    expect(
+      parseDictionary({ ...emptyDictionary(), people: [{ word: "同词", replacement: "同词" }] })
+        .people,
+    ).toHaveLength(1);
+  });
+
   test("deduplicates accepted words and returns independently owned data", () => {
     const source = {
       version: 1,
@@ -125,7 +184,7 @@ describe("word dictionary deserialization", () => {
 
   test.each([
     null,
-    { ...emptyDictionary(), version: 2 },
+    { ...emptyDictionary(), version: 999 },
     { ...emptyDictionary(), builtins: "yes" },
     { ...emptyDictionary(), accepted: "专名" },
     { ...emptyDictionary(), mistakes: null },
@@ -145,5 +204,126 @@ describe("word dictionary deserialization", () => {
     { ...emptyDictionary(), accepted: Array.from({ length: 5001 }, (_, index) => `词${index}`) },
   ])("rejects malformed or conflicting persisted dictionaries (%#)", (value) => {
     expect(() => parseDictionary(value)).toThrow("invalid-dictionary");
+  });
+});
+
+describe("five-category proofreading rules", () => {
+  test("reports sensitive and terminology rules with their kinds and optional sensitive deletion", () => {
+    const dictionary = parseDictionary({
+      ...emptyDictionary(),
+      sensitive: [{ word: "禁词", replacement: "" }],
+      terms: [{ word: "旧术语", replacement: "标准术语" }],
+    });
+    const cells = [{ text: "禁词与旧术语" }],
+      result = scanWords(cells, dictionary);
+    expect(result.issues.map((issue) => [issue.word, issue.replacement, issue.kind])).toEqual([
+      ["禁词", "", "sensitive"],
+      ["旧术语", "标准术语", "terms"],
+    ]);
+    expect(wordChanges(cells, result.issues)).toEqual([{ cell: 0, text: "与标准术语" }]);
+  });
+
+  test("uses sensitive, custom mistake, terminology and builtin priority for identical words", () => {
+    const base = emptyDictionary(),
+      word = "再接再励";
+    const terms = [{ word, replacement: "术语" }],
+      mistakes = [{ word, replacement: "自定义" }],
+      sensitive = [{ word, replacement: "敏感替代" }];
+    for (const [dictionary, replacement, kind] of [
+      [{ ...base, terms, mistakes, sensitive }, "敏感替代", "sensitive"],
+      [{ ...base, terms, mistakes }, "自定义", "mistakes"],
+      [{ ...base, terms }, "术语", "terms"],
+      [base, "再接再厉", "mistakes"],
+    ] as const) {
+      expect(scanWords([{ text: word }], dictionary).issues).toMatchObject([
+        { word, replacement, kind },
+      ]);
+    }
+  });
+
+  test("corrects registered mismatched titles before and after names, retaining separators", () => {
+    const dictionary = {
+      ...emptyDictionary(),
+      people: [
+        { word: "张三", replacement: "主任" },
+        { word: "李四", replacement: "经理" },
+      ],
+    };
+    const cells = [{ text: "经理：张三；张三\t经理；主任 李四；李四:主任" }];
+    const result = scanWords(cells, dictionary);
+    expect(result.issues.map((issue) => issue.kind)).toEqual([
+      "people",
+      "people",
+      "people",
+      "people",
+    ]);
+    expect(wordChanges(cells, result.issues)).toEqual([
+      { cell: 0, text: "主任：张三；张三\t主任；经理 李四；李四:经理" },
+    ]);
+  });
+
+  test("does not infer unknown titles, cross-sentence, newline or separate-cell pairs", () => {
+    const dictionary = {
+      ...emptyDictionary(),
+      people: [
+        { word: "张三", replacement: "主任" },
+        { word: "李四", replacement: "经理" },
+      ],
+    };
+    const texts = [
+      "张三董事",
+      "副经理张三",
+      "张三经理助理",
+      "经理。张三",
+      "张三，经理",
+      "张三\n经理",
+      "张三",
+      "经理",
+      "张三主任",
+      "主任张三",
+    ];
+    expect(
+      scanWords(
+        texts.map((text) => ({ text })),
+        dictionary,
+      ).issues,
+    ).toEqual([]);
+  });
+
+  test("chooses the longest registered title and longest containing name", () => {
+    const dictionary = {
+      ...emptyDictionary(),
+      people: [
+        { word: "张", replacement: "部长" },
+        { word: "张三", replacement: "主任" },
+        { word: "李四", replacement: "经理" },
+        { word: "王五", replacement: "总经理" },
+      ],
+    };
+    const cells = [{ text: "总经理张三；张三总经理" }];
+    const result = scanWords(cells, dictionary);
+    expect(result.issues.map((issue) => issue.word)).toEqual(["总经理张三", "张三总经理"]);
+    expect(wordChanges(cells, result.issues)).toEqual([{ cell: 0, text: "主任张三；张三主任" }]);
+  });
+
+  test("accepted phrases suppress all categories and overlapping outputs remain disjoint", () => {
+    const dictionary = {
+      ...emptyDictionary(),
+      accepted: ["禁词旧术语经理张三"],
+      sensitive: [{ word: "禁词", replacement: "" }],
+      terms: [{ word: "旧术语", replacement: "新术语" }],
+      people: [
+        { word: "张三", replacement: "主任" },
+        { word: "李四", replacement: "经理" },
+      ],
+    };
+    expect(scanWords([{ text: "禁词旧术语经理张三" }], dictionary).issues).toEqual([]);
+    const result = scanWords([{ text: "经理张三" }], {
+      ...dictionary,
+      accepted: [],
+      sensitive: [{ word: "张三", replacement: "某人" }],
+    });
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0]).toMatchObject({ word: "经理张三", kind: "people" });
   });
 });

@@ -1,34 +1,54 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Button } from "tdesign-vue-next/es/button";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import { BaseTable } from "tdesign-vue-next/es/table";
-import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
-import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n } from "../../../shared/i18n";
-import MistakeEntryTable from "./MistakeEntryTable.vue";
-import { builtinRules } from "../proofreading";
+import DictionaryEntryTable from "./DictionaryEntryTable.vue";
+import DictionaryManager from "./DictionaryManager.vue";
+import { serializeDictionaryText } from "../dictionary-transfer";
+import type { DictionaryCategory, WordRule } from "../proofreading";
 import type { useWordProofreading } from "../useWordProofreading";
 const props = defineProps<{ controller: ReturnType<typeof useWordProofreading> }>();
 const { t } = useAppI18n();
-const mistakeRows = ref([{ word: "", replacement: "" }]);
+const entryRows = ref<WordRule[]>([{ word: "", replacement: "" }]);
 const originalWord = ref<string>();
-const returnTo = ref<"review">();
-const word = ref(""),
-  builtins = ref(true);
+const returnTo = ref<"review" | "dictionary">();
+const category = ref<DictionaryCategory>("accepted");
+const word = ref("");
+const builtins = ref(true);
+const editingCategory = computed<DictionaryCategory>(() => {
+  switch (props.controller.panel.value) {
+    case "mistake":
+      return "mistakes";
+    case "sensitive":
+      return "sensitive";
+    case "term":
+      return "terms";
+    case "person":
+      return "people";
+    default:
+      return "accepted";
+  }
+});
 watch(
   () => props.controller.panel.value,
   (panel, previous) => {
-    returnTo.value = panel === "accepted" && previous === "review" ? previous : undefined;
+    returnTo.value =
+      panel !== "dictionary" &&
+      panel !== "review" &&
+      (previous === "review" || previous === "dictionary")
+        ? previous
+        : undefined;
     originalWord.value = undefined;
     word.value = "";
-    mistakeRows.value = [{ word: "", replacement: "" }];
+    entryRows.value = [{ word: "", replacement: "" }];
     builtins.value = props.controller.dictionary.value.builtins;
   },
+  { flush: "sync" },
 );
 const visible = computed(
   () => !!props.controller.panel.value && props.controller.panel.value !== "review",
@@ -36,77 +56,102 @@ const visible = computed(
 const title = computed(() => {
   switch (props.controller.panel.value) {
     case "accepted":
-      return t("wordProof.accepted");
+      return t(originalWord.value ? "wordProof.editAccepted" : "wordProof.accepted");
     case "mistake":
-      return t("wordProof.mistake");
+      return t(originalWord.value ? "wordProof.editMistake" : "wordProof.mistake");
+    case "sensitive":
+      return t(originalWord.value ? "wordProof.editSensitive" : "wordProof.addSensitive");
+    case "term":
+      return t(originalWord.value ? "wordProof.editTerm" : "wordProof.addTerm");
+    case "person":
+      return t(originalWord.value ? "wordProof.editPerson" : "wordProof.addPerson");
     case "settings":
       return t("wordProof.settings");
     default:
       return t("wordProof.dictionary");
   }
 });
-const rows = computed(() => [
-  ...props.controller.dictionary.value.accepted.map((word) => ({
-    id: `accepted:${word}`,
-    word,
-    replacement: "",
-    kind: t("wordProof.correctWord"),
-    builtin: false,
-  })),
-  ...props.controller.dictionary.value.mistakes.map((r) => ({
-    ...r,
-    id: `mistake:${r.word}`,
-    kind: t("wordProof.incorrectWord"),
-    builtin: false,
-  })),
-  ...builtinRules.map((r) => ({
-    ...r,
-    id: `builtin:${r.word}`,
-    kind: t("wordProof.incorrectWord"),
-    builtin: true,
-  })),
-]);
-type Row = (typeof rows.value)[number];
-const columns = computed<BaseTableCol[]>(() => [
-  { colKey: "word", title: t("wordProof.word"), width: 140 },
-  { colKey: "replacement", title: t("wordProof.replacement"), width: 140 },
-  { colKey: "kind", title: t("wordProof.kind"), width: 90 },
-  { colKey: "origin", title: t("wordProof.origin"), width: 80 },
-  { colKey: "actions", title: "", width: 130 },
-]);
+const isEditor = computed(
+  () =>
+    visible.value &&
+    props.controller.panel.value !== "dictionary" &&
+    props.controller.panel.value !== "settings",
+);
 const batchAccepted = computed(
   () => props.controller.panel.value === "accepted" && !originalWord.value,
 );
+const firstLabel = computed(() =>
+  t(
+    editingCategory.value === "people"
+      ? "wordProof.personName"
+      : editingCategory.value === "terms"
+        ? "wordProof.variant"
+        : editingCategory.value === "sensitive"
+          ? "wordProof.sensitive"
+          : "wordProof.incorrectWord",
+  ),
+);
+const secondLabel = computed(() =>
+  t(
+    editingCategory.value === "people"
+      ? "wordProof.jobTitle"
+      : editingCategory.value === "terms"
+        ? "wordProof.standardTerm"
+        : editingCategory.value === "sensitive"
+          ? "wordProof.optionalReplacement"
+          : "wordProof.replacement",
+  ),
+);
+const editorHint = computed(() =>
+  t(
+    batchAccepted.value
+      ? "wordProof.batchHint"
+      : editingCategory.value === "accepted"
+        ? "wordProof.wordHint"
+        : editingCategory.value === "sensitive"
+          ? "wordProof.sensitiveEntryHint"
+          : "wordProof.pairEntryHint",
+  ),
+);
+function openEntry(target: DictionaryCategory, entries?: WordRule[], original?: string) {
+  category.value = target;
+  props.controller.open(
+    target === "accepted"
+      ? "accepted"
+      : target === "mistakes"
+        ? "mistake"
+        : target === "sensitive"
+          ? "sensitive"
+          : target === "terms"
+            ? "term"
+            : "person",
+  );
+  originalWord.value = original;
+  if (entries) {
+    word.value = original ? entries[0]!.word : serializeDictionaryText(entries, "accepted");
+    entryRows.value = entries.map((row) => ({ ...row }));
+  }
+}
 function saveWord() {
-  if (props.controller.panel.value === "mistake") {
-    if (props.controller.addMistakes(mistakeRows.value, originalWord.value)) finishEditor(true);
-    return;
+  const target = editingCategory.value;
+  const saved =
+    target === "accepted"
+      ? batchAccepted.value
+        ? props.controller.addAcceptedWords(word.value)
+        : props.controller.add(word.value, undefined, originalWord.value)
+      : props.controller.addEntries(target, entryRows.value, originalWord.value);
+  if (saved) {
+    category.value = target;
+    finishEditor(true);
   }
-  if (batchAccepted.value) {
-    if (props.controller.addAcceptedWords(word.value)) finishEditor(true);
-    return;
-  }
-  if (props.controller.add(word.value, undefined, originalWord.value)) finishEditor(true);
 }
 function finishEditor(saved = false) {
   const target = returnTo.value;
   props.controller.panel.value = target ?? (saved ? "dictionary" : undefined);
-  if (saved && target) props.controller.scan();
+  if (saved && target === "review") props.controller.scan();
 }
-function remove(row: Row) {
-  props.controller.save({
-    ...props.controller.dictionary.value,
-    accepted: props.controller.dictionary.value.accepted.filter((w) => w !== row.word),
-    mistakes: props.controller.dictionary.value.mistakes.filter((r) => r.word !== row.word),
-  });
-}
-function edit(row: Row) {
-  props.controller.panel.value = row.replacement ? "mistake" : "accepted";
-  void nextTick(() => {
-    originalWord.value = row.word;
-    word.value = row.word;
-    mistakeRows.value = [{ word: row.word, replacement: row.replacement }];
-  });
+function editEntry(target: DictionaryCategory, entry: WordRule) {
+  openEntry(target, [entry], entry.word);
 }
 </script>
 <template>
@@ -114,9 +159,11 @@ function edit(row: Row) {
     :visible="visible"
     :header="title"
     :width="
-      controller.panel.value === 'dictionary' || controller.panel.value === 'mistake'
-        ? '660px'
-        : '520px'
+      controller.panel.value === 'dictionary'
+        ? '820px'
+        : isEditor && editingCategory !== 'accepted'
+          ? '660px'
+          : '520px'
     "
     :footer="controller.panel.value !== 'dictionary'"
     :close-on-overlay-click="false"
@@ -124,9 +171,7 @@ function edit(row: Row) {
   >
     <div class="word-dictionary">
       <p v-if="controller.error.value" role="alert">{{ controller.error.value }}</p>
-      <template
-        v-if="controller.panel.value === 'accepted' || controller.panel.value === 'mistake'"
-      >
+      <template v-if="isEditor">
         <Textarea
           v-if="batchAccepted"
           v-model="word"
@@ -134,55 +179,25 @@ function edit(row: Row) {
           :autosize="{ minRows: 5, maxRows: 10 }"
           :placeholder="t('wordProof.batchPlaceholder')"
         />
-        <MistakeEntryTable v-else-if="controller.panel.value === 'mistake'" v-model="mistakeRows" />
-        <Form v-else label-align="top">
-          <FormItem :label="t('wordProof.word')">
-            <Input v-model="word" :maxlength="100" />
-          </FormItem>
-        </Form>
+        <DictionaryEntryTable
+          v-else-if="editingCategory !== 'accepted'"
+          v-model="entryRows"
+          :first-label="firstLabel"
+          :second-label="secondLabel"
+        />
+        <Form v-else label-align="top"
+          ><FormItem :label="t('wordProof.word')"
+            ><Input v-model="word" :maxlength="100" /></FormItem
+        ></Form>
       </template>
-      <template v-else-if="controller.panel.value === 'dictionary'">
-        <p>{{ t("wordProof.localHint") }}</p>
-        <div class="word-dictionary__actions">
-          <Button variant="outline" @click="controller.open('accepted')">{{
-            t("wordProof.accepted")
-          }}</Button
-          ><Button variant="outline" @click="controller.open('mistake')">{{
-            t("wordProof.mistake")
-          }}</Button>
-        </div>
-        <div class="word-dictionary__table">
-          <TableHeightWrapper v-slot="{ height }"
-            ><BaseTable
-              class="idea-table--mini idea-table--row-dividers"
-              size="small"
-              vertical-align="middle"
-              :bordered="false"
-              hover
-              row-key="id"
-              :data="rows"
-              :columns="columns"
-              :height="height"
-              table-layout="fixed"
-              resizable
-            >
-              <template #origin="{ row }">{{
-                t(row.builtin ? "wordProof.builtin" : "wordProof.custom")
-              }}</template>
-              <template #actions="{ row }"
-                ><template v-if="!row.builtin"
-                  ><Button size="small" variant="text" @click="edit(row as Row)">{{
-                    t("wordProof.edit")
-                  }}</Button
-                  ><Button size="small" variant="text" @click="remove(row as Row)">{{
-                    t("wordProof.remove")
-                  }}</Button></template
-                ></template
-              >
-            </BaseTable></TableHeightWrapper
-          >
-        </div>
-      </template>
+      <DictionaryManager
+        v-else-if="controller.panel.value === 'dictionary'"
+        v-model="category"
+        :dictionary="controller.dictionary.value"
+        @add="openEntry"
+        @edit="editEntry"
+        @remove="controller.removeEntries"
+      />
       <template v-else-if="controller.panel.value === 'settings'">
         <p>{{ t("wordProof.hint") }}</p>
         <p>{{ t("wordProof.localHint") }}</p>
@@ -191,9 +206,7 @@ function edit(row: Row) {
     </div>
     <template #footer>
       <div class="word-dictionary__footer">
-        <span v-if="controller.panel.value !== 'settings'" class="word-dictionary__hint">{{
-          t(batchAccepted ? "wordProof.batchHint" : "wordProof.wordHint")
-        }}</span>
+        <span v-if="isEditor" class="word-dictionary__hint">{{ editorHint }}</span>
         <div class="word-dictionary__footer-actions">
           <Button theme="default" @click="finishEditor()">{{ t("wordProof.cancel") }}</Button>
           <Button
@@ -217,12 +230,7 @@ function edit(row: Row) {
   gap: 12px;
   p {
     margin: 0;
-    color: var(--td-text-color-secondary);
-  }
-  &__actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
+    color: var(--idea-text-secondary);
   }
   &__footer {
     display: flex;
@@ -238,10 +246,6 @@ function edit(row: Row) {
     display: flex;
     flex-shrink: 0;
     margin-left: auto;
-  }
-  &__table {
-    height: min(320px, calc(100dvh - 280px));
-    min-height: 0;
   }
 }
 </style>

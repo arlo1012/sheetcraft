@@ -6,13 +6,14 @@ import { Button } from "tdesign-vue-next/es/button";
 import { parseTsvToCellTexts } from "@idea10/core/clipboard";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n } from "../../../shared/i18n";
+const props = defineProps<{ firstLabel: string; secondLabel: string }>();
 const model = defineModel<{ word: string; replacement: string }[]>({ required: true });
 const { t } = useAppI18n();
 const error = ref("");
 const rows = computed(() => model.value.map((row, index) => ({ ...row, index })));
 const columns = computed(() => [
-  { colKey: "word", title: t("wordProof.incorrectWord") },
-  { colKey: "replacement", title: t("wordProof.replacement") },
+  { colKey: "word", title: props.firstLabel },
+  { colKey: "replacement", title: props.secondLabel },
   { colKey: "actions", title: "", width: 60 },
 ]);
 function update(index: number, key: "word" | "replacement", value: string) {
@@ -28,6 +29,10 @@ function paste(event: ClipboardEvent, index: number, column: number) {
   if (!text || !/[\t\r\n]/.test(text)) return;
   event.preventDefault();
   event.stopPropagation();
+  if (text.length > 2_000_000) {
+    error.value = t("wordProof.pasteInvalid");
+    return;
+  }
   const values = parseTsvToCellTexts(text);
   if (values.some((row) => row.length > 2 - column) || index + values.length > 5000) {
     error.value = t("wordProof.pasteInvalid");
@@ -46,9 +51,9 @@ function paste(event: ClipboardEvent, index: number, column: number) {
 }
 </script>
 <template>
-  <div class="mistake-entry">
+  <div class="dictionary-entry">
     <p v-if="error" role="alert">{{ error }}</p>
-    <div class="mistake-entry__table">
+    <div class="dictionary-entry__table">
       <TableHeightWrapper v-slot="{ height }">
         <BaseTable
           class="idea-table--mini idea-table--row-dividers"
@@ -64,7 +69,7 @@ function paste(event: ClipboardEvent, index: number, column: number) {
             <div @paste.capture="paste($event, row.index, 0)">
               <Input
                 :value="row.word"
-                :aria-label="`${t('wordProof.incorrectWord')} ${row.index + 1}`"
+                :aria-label="`${firstLabel} ${row.index + 1}`"
                 @change="update(row.index, 'word', String($event))"
               />
             </div>
@@ -73,7 +78,7 @@ function paste(event: ClipboardEvent, index: number, column: number) {
             <div @paste.capture="paste($event, row.index, 1)">
               <Input
                 :value="row.replacement"
-                :aria-label="`${t('wordProof.replacement')} ${row.index + 1}`"
+                :aria-label="`${secondLabel} ${row.index + 1}`"
                 @change="update(row.index, 'replacement', String($event))"
               />
             </div>
@@ -95,7 +100,7 @@ function paste(event: ClipboardEvent, index: number, column: number) {
   </div>
 </template>
 <style scoped lang="scss">
-.mistake-entry {
+.dictionary-entry {
   display: grid;
   gap: 8px;
   &__table {

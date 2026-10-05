@@ -33,6 +33,15 @@ const rows = computed(() =>
       ...i,
       location: `${cell.sheetName}!${formatCellAddress(cell.address)}`,
       context: cell.text,
+      kindLabel: t(
+        i.kind === "sensitive"
+          ? "wordProof.sensitive"
+          : i.kind === "terms"
+            ? "wordProof.terms"
+            : i.kind === "people"
+              ? "wordProof.people"
+              : "wordProof.incorrectWord",
+      ),
     };
   }),
 );
@@ -40,6 +49,7 @@ const columns = computed<PrimaryTableCol[]>(() => [
   { colKey: "row-select", type: "multiple", width: 42 },
   { colKey: "location", title: t("wordProof.location"), width: 130 },
   { colKey: "context", title: t("wordProof.context"), ellipsis: true },
+  { colKey: "kindLabel", title: t("wordProof.issueKind"), width: 100 },
   { colKey: "word", title: t("wordProof.word"), width: 110 },
   { colKey: "replacement", title: t("wordProof.replacement"), width: 150 },
   { colKey: "actions", title: t("proofreading.action"), width: 180, align: "center" },

@@ -1,5 +1,5 @@
-import { mount } from "@vue/test-utils";
-import { afterEach, beforeEach, expect, test } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { defineComponent, h, nextTick, ref } from "vue";
 import {
   createWorkbook,
@@ -74,7 +74,7 @@ test("opens general proofreading from its ribbon and corrects the current text",
     kind: "literal",
     value: "再接再厉",
   });
-  expect(document.body.textContent).toContain("未发现匹配的错词");
+  expect(document.body.textContent).toContain("未发现词库匹配问题");
 });
 test("adds a custom mistake through the dialog and exposes it in dictionary management", async () => {
   const { controller } = fixture();
@@ -133,4 +133,77 @@ test("pastes multiple spreadsheet rows into mistake entry and saves them", async
     { word: "错词一", replacement: "正词一" },
     { word: "错词二", replacement: "正词二" },
   ]);
+});
+
+async function fillEntry(first: string, second: string) {
+  const inputs = [...document.body.querySelectorAll<HTMLInputElement>(".dictionary-entry input")];
+  inputs[0]!.value = first;
+  inputs[0]!.dispatchEvent(new Event("input", { bubbles: true }));
+  inputs[1]!.value = second;
+  inputs[1]!.dispatchEvent(new Event("input", { bubbles: true }));
+  await nextTick();
+}
+test("manages all categories and applies the new dictionary rules to review", async () => {
+  const { controller, sheet } = fixture();
+  await click("词库管理");
+  await click("敏感词");
+  await click("添加");
+  await fillEntry("需核查", "");
+  await click("保存");
+  expect(controller.dictionary.value.sensitive).toEqual([{ word: "需核查", replacement: "" }]);
+  await click("术语");
+  await click("添加");
+  await fillEntry("旧名称", "标准名称");
+  await click("保存");
+  await click("姓名职务");
+  await click("添加");
+  await fillEntry("张三", "经理");
+  await click("保存");
+  expect(controller.dictionary.value.people).toEqual([{ word: "张三", replacement: "经理" }]);
+  setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "需核查旧名称" });
+  controller.open("review");
+  await nextTick();
+  expect(controller.issues.value.map((issue) => issue.kind)).toEqual(["sensitive", "terms"]);
+});
+test("searches and deletes only selected entries in the active category", async () => {
+  const { controller } = fixture();
+  controller.addAcceptedWords("正词甲\n正词乙");
+  controller.addEntries("sensitive", [{ word: "正词甲", replacement: "" }]);
+  await click("词库管理");
+  const search = document.body.querySelector<HTMLInputElement>(
+    ".dictionary-manager__search input",
+  )!;
+  search.value = "正词甲";
+  search.dispatchEvent(new Event("input", { bubbles: true }));
+  await nextTick();
+  expect(document.body.querySelectorAll(".dictionary-manager tbody tr")).toHaveLength(1);
+  const checkbox = document.body.querySelector<HTMLInputElement>(
+    ".dictionary-manager tbody input[type=checkbox]",
+  )!;
+  checkbox.click();
+  await nextTick();
+  await click("删除");
+  expect(controller.dictionary.value.accepted).toEqual(["正词乙"]);
+  expect(controller.dictionary.value.sensitive).toHaveLength(1);
+});
+test("stages a dictionary import and leaves saved data untouched on cancel", async () => {
+  const { controller } = fixture();
+  await click("词库管理");
+  await click("错词");
+  const input = document.body.querySelector<HTMLInputElement>(
+    ".dictionary-manager input[type=file]",
+  )!;
+  const file = new File(["错词\t正词"], "words.tsv", { type: "text/tab-separated-values" });
+  Object.defineProperty(file, "text", { value: vi.fn().mockResolvedValue("错词\t正词") });
+  Object.defineProperty(input, "files", { configurable: true, value: [file] });
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  await flushPromises();
+  expect(controller.panel.value).toBe("mistake");
+  expect(controller.dictionary.value.mistakes).toEqual([]);
+  expect(document.body.querySelector<HTMLInputElement>(".dictionary-entry input")!.value).toBe(
+    "错词",
+  );
+  await click("取消");
+  expect(controller.panel.value).toBe("dictionary");
+  expect(controller.dictionary.value.mistakes).toEqual([]);
 });
