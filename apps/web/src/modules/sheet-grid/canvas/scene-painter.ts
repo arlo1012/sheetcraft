@@ -1,3 +1,4 @@
+import { paintSparkline } from "../../sparklines/sparkline-painter";
 import type { CellAddress } from "@idea10/core/workbook";
 import type { Rect } from "@idea10/sheet-engine/geometry";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
@@ -65,6 +66,14 @@ export function paintSheetScene(
       paintConditionalFormatVisual(context, cell.rect, cell.content.conditionalFormatVisual);
     if (options.showGridLines)
       paintGridLines(context, paneScene.cells, palette.gridLine, options.screenScale);
+    for (const cell of paneScene.cells)
+      if (cell.content.sparkline)
+        paintSparkline(
+          context,
+          cell.contentRect,
+          cell.content.sparkline.definition,
+          cell.content.sparkline.values,
+        );
     const drawnSpans = new Set<string>();
     for (const cell of paneScene.cells) {
       const { content, contentRect, span } = cell;

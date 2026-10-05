@@ -1,3 +1,4 @@
+import { applySetCellSparklinesCommand } from "./sparklines.js";
 import { applySetSheetDrawingsCommand } from "./drawings.js";
 import {
   applySetSheetProtectionCommand,
@@ -331,6 +332,8 @@ export function applyWorkbookCommand(
         return applyCellStyleCommand(workbook, command);
       case "setCellHyperlink":
         return applySetCellHyperlinkCommand(workbook, command);
+      case "setCellSparklines":
+        return applySetCellSparklinesCommand(workbook, command);
       case "setCellNotes":
         return applySetCellNotesCommand(workbook, command);
       case "markCellHyperlinkVisited":

@@ -1,3 +1,4 @@
+import { cloneCellSparkline, normalizeCellSparkline, type CellSparkline } from "./sparklines.js";
 import { normalizeSheetDrawings, type SheetDrawing } from "./sheet-drawings.js";
 import type { ProtectionPassword } from "./protection-password.js";
 import { normalizeSheetProtection, type SheetProtection } from "./protection.js";
@@ -309,6 +310,7 @@ export type Cell = {
   namedStyle?: CellNamedStyleBinding;
   hyperlink?: CellHyperlink;
   note?: CellNote;
+  sparkline?: CellSparkline;
 };
 
 export type CellNamedStyleBinding = {
@@ -383,6 +385,7 @@ export type SheetSparseCell = {
   namedStyle?: CellNamedStyleBinding;
   hyperlink?: CellHyperlink;
   note?: CellNote;
+  sparkline?: CellSparkline;
 };
 
 export type SheetSparseDimension = {
@@ -1826,12 +1829,13 @@ export function setCellContent(
   const cell = sheet.cells.get(key);
   if (areCellContentsEqual(cell?.content, normalizedContent)) return false;
   if (!normalizedContent) {
-    if (cell?.style || cell?.namedStyle || cell?.hyperlink || cell?.note)
+    if (cell?.style || cell?.namedStyle || cell?.hyperlink || cell?.note || cell?.sparkline)
       sheet.cells.set(key, {
         ...(cell.style ? { style: cell.style } : {}),
         ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
         ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
         ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
+        ...(cell.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
       });
     else sheet.cells.delete(key);
   } else {
@@ -1841,6 +1845,7 @@ export function setCellContent(
       ...(cell?.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(cell?.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
       ...(cell?.note ? { note: cloneCellNote(cell.note) } : {}),
+      ...(cell?.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
     });
   }
   return true;
@@ -1864,12 +1869,14 @@ export function setCellStyle(
       ...(normalizedStyle ? { style: normalizedStyle } : {}),
       ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
       ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
+      ...(cell.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
     });
-  } else if (normalizedStyle || cell?.hyperlink || cell?.note) {
+  } else if (normalizedStyle || cell?.hyperlink || cell?.note || cell?.sparkline) {
     sheet.cells.set(key, {
       ...(normalizedStyle ? { style: normalizedStyle } : {}),
       ...(cell?.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
       ...(cell?.note ? { note: cloneCellNote(cell.note) } : {}),
+      ...(cell?.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
     });
   } else {
     sheet.cells.delete(key);
@@ -1897,7 +1904,8 @@ export function setCellNamedStyle(
     normalizedStyle ||
     normalizedBinding ||
     cell?.hyperlink ||
-    cell?.note
+    cell?.note ||
+    cell?.sparkline
   ) {
     sheet.cells.set(key, {
       ...(cell?.content !== undefined ? { content: cell.content } : {}),
@@ -1905,6 +1913,7 @@ export function setCellNamedStyle(
       ...(normalizedBinding ? { namedStyle: normalizedBinding } : {}),
       ...(cell?.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
       ...(cell?.note ? { note: cloneCellNote(cell.note) } : {}),
+      ...(cell?.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
     });
   } else sheet.cells.delete(key);
   return true;
@@ -1919,13 +1928,21 @@ export function setCellHyperlink(
   const key = createCellKey(address);
   const cell = sheet.cells.get(key);
   if (JSON.stringify(cell?.hyperlink) === JSON.stringify(normalized)) return false;
-  if (cell?.content !== undefined || cell?.style || cell?.namedStyle || normalized || cell?.note) {
+  if (
+    cell?.content !== undefined ||
+    cell?.style ||
+    cell?.namedStyle ||
+    normalized ||
+    cell?.note ||
+    cell?.sparkline
+  ) {
     sheet.cells.set(key, {
       ...(cell?.content !== undefined ? { content: cell.content } : {}),
       ...(cell?.style ? { style: cloneCellStyle(cell.style) } : {}),
       ...(cell?.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(normalized ? { hyperlink: normalized } : {}),
       ...(cell?.note ? { note: cloneCellNote(cell.note) } : {}),
+      ...(cell?.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
     });
   } else sheet.cells.delete(key);
   return true;
@@ -1946,6 +1963,7 @@ export function setCellNote(
     cell?.style ||
     cell?.namedStyle ||
     cell?.hyperlink ||
+    cell?.sparkline ||
     normalized
   ) {
     sheet.cells.set(key, {
@@ -1954,8 +1972,29 @@ export function setCellNote(
       ...(cell?.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(cell?.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
       ...(normalized ? { note: normalized } : {}),
+      ...(cell?.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
     });
   } else sheet.cells.delete(key);
+  return true;
+}
+
+export function getCellSparkline(sheet: Sheet, address: CellAddress): CellSparkline | undefined {
+  return getCell(sheet, address)?.sparkline;
+}
+export function setCellSparkline(
+  sheet: Sheet,
+  address: CellAddress,
+  value: CellSparkline | null | undefined,
+): boolean {
+  if (!isCellAddressInBounds(address)) throw new RangeError("Cell address is outside the sheet.");
+  const normalized = normalizeCellSparkline(value);
+  const key = createCellKey(address);
+  const cell = sheet.cells.get(key);
+  if (JSON.stringify(cell?.sparkline) === JSON.stringify(normalized)) return false;
+  const { sparkline: _previous, ...rest } = cell ?? {};
+  if (normalized) sheet.cells.set(key, { ...rest, sparkline: normalized });
+  else if (Object.keys(rest).length) sheet.cells.set(key, rest);
+  else sheet.cells.delete(key);
   return true;
 }
 
@@ -2866,7 +2905,8 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     const namedStyle = cloneCellNamedStyleBinding(cell.namedStyle);
     const hyperlink = cloneCellHyperlink(cell.hyperlink);
     const note = cloneCellNote(cell.note);
-    if (content === undefined && !style && !namedStyle && !hyperlink && !note) {
+    const sparkline = cloneCellSparkline(cell.sparkline);
+    if (content === undefined && !style && !namedStyle && !hyperlink && !note && !sparkline) {
       throw new Error(
         "Sparse state cells must contain content, style, named style, hyperlink, or note.",
       );
@@ -2884,6 +2924,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
       ...(namedStyle ? { namedStyle } : {}),
       ...(hyperlink ? { hyperlink } : {}),
       ...(note ? { note } : {}),
+      ...(sparkline ? { sparkline } : {}),
     };
   });
 
@@ -2998,7 +3039,8 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
         areCellStylesEqual(cell.style, right.cells[index]?.style) &&
         JSON.stringify(cell.namedStyle) === JSON.stringify(right.cells[index]?.namedStyle) &&
         JSON.stringify(cell.hyperlink) === JSON.stringify(right.cells[index]?.hyperlink) &&
-        JSON.stringify(cell.note) === JSON.stringify(right.cells[index]?.note),
+        JSON.stringify(cell.note) === JSON.stringify(right.cells[index]?.note) &&
+        JSON.stringify(cell.sparkline) === JSON.stringify(right.cells[index]?.sparkline),
     ) &&
     left.rowHeights.every(
       (dimension, index) =>
@@ -3032,6 +3074,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
         ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
         ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
         ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
+        ...(cell.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
       };
     }),
     rowHeights: [...sheet.rowHeights].map(([index, size]) => ({ index, size })),
@@ -3095,6 +3138,7 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
       ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
       ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
+      ...(cell.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
     });
   }
   for (const dimension of nextState.rowHeights) {

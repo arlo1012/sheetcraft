@@ -1,3 +1,5 @@
+import { getCellSparkline, setCellSparkline } from "../workbook.js";
+import { cloneCellSparkline } from "../sparklines.js";
 import { normalizeSheetDrawings } from "../sheet-drawings.js";
 import { normalizeSheetProtection } from "../protection.js";
 import {
@@ -66,6 +68,7 @@ import type {
   SheetAxisSparseSlice,
 } from "./contracts.js";
 import {
+  assertCellAddress,
   cloneSparseState,
   getSheetOrThrow,
   invalidCommandPayload,
@@ -186,6 +189,7 @@ function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
       ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
       ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
+      ...(cell.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
     })),
     dimensions: slice.dimensions.map((dimension) => ({ ...dimension })),
     ...(slice.hiddenIndexes ? { hiddenIndexes: [...slice.hiddenIndexes] } : {}),
@@ -193,6 +197,14 @@ function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
       image: cloneFloatingImage(image),
       index,
     })),
+    ...(slice.sparklineSources
+      ? {
+          sparklineSources: slice.sparklineSources.map((entry) => ({
+            address: { ...entry.address },
+            sparkline: cloneCellSparkline(entry.sparkline)!,
+          })),
+        }
+      : {}),
     ...(slice.formulaSources
       ? {
           formulaSources: slice.formulaSources.map((formula) => ({
@@ -916,7 +928,23 @@ function transformSheetAxis(
       changed = true;
     }
   }
-  for (const [key, cell] of sheet.cells) {
+  for (const [key, originalCell] of sheet.cells) {
+    let cell = originalCell;
+    if (cell.sparkline?.source) {
+      const source = transformRangeForAxis(
+        cell.sparkline.source,
+        axis,
+        index,
+        count,
+        maximum,
+        operation,
+      );
+      if (JSON.stringify(source) !== JSON.stringify(cell.sparkline.source)) {
+        cell = { ...cell, sparkline: { ...cell.sparkline, source } };
+        sheet.cells.set(key, cell);
+        changed = true;
+      }
+    }
     if (cell.content?.kind !== "formula") continue;
     const source = transformFormulaForAxis(cell.content.formula.source, {
       axis,
@@ -972,6 +1000,7 @@ function captureSheetAxisSlice(
             ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
             ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
             ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
+            ...(cell.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
           },
         ]
       : [];
@@ -1012,6 +1041,11 @@ function captureSheetAxisSlice(
     hiddenIndexes: capturedHiddenIndexes,
     floatingImages,
     formulaSources,
+    sparklineSources: [...sheet.cells].flatMap(([key, cell]) =>
+      cell.sparkline
+        ? [{ address: parseCellKey(key), sparkline: cloneCellSparkline(cell.sparkline)! }]
+        : [],
+    ),
     metadata: getSheetMetadata(sheet),
   };
 }
@@ -1030,7 +1064,8 @@ function restoreSheetAxisSlice(
       JSON.stringify(current?.style) === JSON.stringify(cell.style) &&
       JSON.stringify(current?.namedStyle) === JSON.stringify(cell.namedStyle) &&
       JSON.stringify(current?.hyperlink) === JSON.stringify(cell.hyperlink) &&
-      JSON.stringify(current?.note) === JSON.stringify(cell.note)
+      JSON.stringify(current?.note) === JSON.stringify(cell.note) &&
+      JSON.stringify(current?.sparkline) === JSON.stringify(cell.sparkline)
     ) {
       continue;
     }
@@ -1040,6 +1075,7 @@ function restoreSheetAxisSlice(
       ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
       ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
+      ...(cell.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
     });
     changed = true;
   }
@@ -1066,6 +1102,8 @@ function restoreSheetAxisSlice(
     );
     changed = true;
   }
+  for (const entry of slice.sparklineSources ?? [])
+    if (setCellSparkline(sheet, entry.address, entry.sparkline)) changed = true;
   for (const formula of slice.formulaSources ?? []) {
     const key = createCellKey(formula.address);
     const current = sheet.cells.get(key);
@@ -1220,6 +1258,34 @@ function validateSheetAxisSlice(
         "Formula source restore is not associated with this structural inverse.",
       );
     }
+  }
+  for (const entry of command.slice.sparklineSources ?? []) {
+    assertCellAddress(entry.address);
+    const sparkline = cloneCellSparkline(entry.sparkline)!;
+    const index = transformAxisIndex(
+      getAxisIndex(entry.address, command.axis),
+      command.index,
+      command.count,
+      maximum,
+      command.operation,
+    );
+    if (index === null) continue;
+    const current = getCellSparkline(sheet, setAxisIndex(entry.address, command.axis, index));
+    const expected = {
+      ...sparkline,
+      source: sparkline.source
+        ? transformRangeForAxis(
+            sparkline.source,
+            command.axis,
+            command.index,
+            command.count,
+            maximum,
+            command.operation,
+          )
+        : null,
+    };
+    if (JSON.stringify(current) !== JSON.stringify(expected))
+      throw invalidCommandPayload("slice.sparklineSources", entry);
   }
   const expectedMetadata = transformSheetMetadataForAxis(
     command.slice.metadata,
@@ -1823,6 +1889,22 @@ export function applyMoveSheetAxisCommand(
       return {
         ...cell,
         address: mapAddress(cell.address),
+        ...(cell.sparkline
+          ? {
+              sparkline: {
+                ...cell.sparkline,
+                source: cell.sparkline.source
+                  ? transformRangeForAxisMove(
+                      cell.sparkline.source,
+                      command.axis,
+                      command.index,
+                      command.count,
+                      command.toIndex,
+                    )
+                  : null,
+              },
+            }
+          : {}),
         ...(content?.kind === "formula"
           ? {
               content: {

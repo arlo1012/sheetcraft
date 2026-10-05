@@ -1,3 +1,4 @@
+import type { CellSparkline } from "../sparklines.js";
 import type { SheetDrawing } from "../sheet-drawings.js";
 import type { ProtectionPassword } from "../protection-password.js";
 import type { SheetProtection } from "../protection.js";
@@ -60,6 +61,7 @@ export type CellContentChange = {
   namedStyle?: CellNamedStyleBinding | null;
   hyperlink?: CellHyperlink | null;
   note?: CellNote | null;
+  sparkline?: CellSparkline | null;
 };
 
 export type SetCellContentsCommand = {
@@ -196,6 +198,12 @@ export type SetCellHyperlinkCommand = {
     namedStyle: CellNamedStyleBinding | null;
     hyperlink: CellHyperlink | null;
   };
+};
+
+export type SetCellSparklinesCommand = {
+  type: "setCellSparklines";
+  sheetId: string;
+  changes: Array<{ address: CellAddress; sparkline: CellSparkline | null }>;
 };
 
 export type SetCellNotesCommand = {
@@ -728,6 +736,7 @@ export type SheetAxisSparseSlice = {
   floatingImages: Array<{ image: FloatingImage; index: number }>;
   /** Exact raw formula sources before the structural change, for lossless undo. */
   formulaSources?: Array<{ address: CellAddress; source: string }>;
+  sparklineSources?: Array<{ address: CellAddress; sparkline: CellSparkline }>;
   workbookFormulaSources?: FormulaSourceRestore[];
   conditionalFormatFormulaSources?: ConditionalFormatFormulaSourceRestore[];
   definedNames?: DefinedName[];
@@ -800,6 +809,7 @@ export type WorkbookCommand =
   | BatchDeleteSheetAxesCommand
   | ApplyCellStyleCommand
   | SetCellHyperlinkCommand
+  | SetCellSparklinesCommand
   | SetCellNotesCommand
   | MarkCellHyperlinkVisitedCommand
   | ApplyCellBordersCommand
@@ -957,6 +967,7 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "adjustCellNumberFormatDecimals":
     case "adjustCellIndent":
       return "format.cells";
+    case "setCellSparklines":
     case "setCellNotes":
       return "review.note";
     case "applyCellBorders":

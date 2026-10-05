@@ -1,3 +1,4 @@
+import { getSparklineValues, type CellSparkline } from "@idea10/core/sparklines";
 import type { Cell, CellAddress, CellRange } from "@idea10/core/workbook";
 import type { ExcelDateSystem, FormulaValue } from "@idea10/core/formula";
 import type { CellStyle } from "@idea10/core/style";
@@ -15,6 +16,7 @@ import { getConditionalFormatIconSlot } from "../../../shared/conditional-format
 export const SHEET_PANE_IDS = ["topLeft", "top", "left", "body"] as const;
 
 export type CanvasCellContent = {
+  sparkline?: { definition: CellSparkline; values: Array<number | null> };
   text: string;
   style: Readonly<CellStyle> | undefined;
   textLayout?: CellTextLayout;
@@ -101,6 +103,7 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
     const sourceAddress = span?.kind === "fill" ? span.source : (spill?.root ?? address);
     const source = options.display.sheet.cells.get(`${sourceAddress.row}:${sourceAddress.column}`);
     const formulaEvaluator =
+      source?.sparkline ||
       source?.content?.kind === "formula" ||
       spill ||
       options.display.sheet.duplicateRules?.length ||
@@ -151,6 +154,18 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
       style,
       ...(conditionalFormatVisual ? { conditionalFormatVisual } : {}),
       ...(image ? { image } : {}),
+      ...(displayCell?.sparkline
+        ? {
+            sparkline: {
+              definition: displayCell.sparkline,
+              values: getSparklineValues(
+                options.display.sheet,
+                displayCell.sparkline,
+                options.display.evaluator,
+              ),
+            },
+          }
+        : {}),
       ...(presentation.text && !hideValue
         ? {
             textLayout: (() => {

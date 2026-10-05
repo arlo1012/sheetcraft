@@ -12,6 +12,8 @@ import {
   Sigma,
   Omega,
   ScanLine,
+  Activity,
+  Eraser,
 } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
@@ -21,6 +23,7 @@ defineProps<{
   disabled: boolean;
   imageDisabled: boolean;
   symbolDisabled: boolean;
+  sparklineDisabled: boolean;
   hyperlinkDisabled: boolean;
   hasTable: boolean;
   editSessionId?: string;
@@ -28,6 +31,8 @@ defineProps<{
 const emit = defineEmits<{
   insertChart: [type: ChartType | "dashboard"];
   insertSymbol: [];
+  insertSparkline: [];
+  clearSparklines: [];
   captureScreen: [];
   insertDrawing: [kind: SheetGraphicDrawing["kind"]];
   insertImage: [mode: "cell" | "floating"];
@@ -111,6 +116,23 @@ const { t } = useAppI18n();
       /></RibbonButton>
     </section>
     <ChartInsertTools :disabled="imageDisabled" @insert="emit('insertChart', $event)" />
+    <section class="insert-toolbar__group" role="group" :aria-label="t('sparkline.title')">
+      <RibbonButton
+        variant="tall"
+        :label="t('sparkline.title')"
+        :text="t('sparkline.title')"
+        :disabled="sparklineDisabled"
+        @activate="emit('insertSparkline')"
+        ><Activity /></RibbonButton
+      ><RibbonButton
+        :label="t('sparkline.remove')"
+        :text="t('sparkline.remove')"
+        :disabled="sparklineDisabled"
+        @activate="emit('clearSparklines')"
+        ><Eraser
+      /></RibbonButton>
+    </section>
+
     <section
       class="insert-toolbar__group"
       :aria-label="t('hyperlinks.insert')"

@@ -1,3 +1,4 @@
+import { sparklinesZhCN } from "../../../modules/sparklines/sparkline-messages.zh-CN";
 import { chartsZhCN } from "../../../modules/charts/chart-messages.zh-CN";
 import { drawingsZhCN } from "../../../modules/sheet-drawings/drawing-messages.zh-CN";
 import { wordProofZhCN } from "../../../modules/text-proofreading/messages";
@@ -17,6 +18,7 @@ import { tableStylesZhCN } from "../../../modules/table-styles/table-style-messa
 import { tablesZhCN } from "../../../modules/table-styles/table-messages.zh-CN";
 
 export const zhCN = {
+  ...sparklinesZhCN,
   ...chartsZhCN,
   ...drawingsZhCN,
   ...wordProofZhCN,

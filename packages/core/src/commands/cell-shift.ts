@@ -389,7 +389,23 @@ export function applyCellShiftCommand(
         : cell.content === undefined
           ? undefined
           : cloneCellContent(cell.content);
-    return [{ ...cell, address, ...(content === undefined ? {} : { content }) }];
+    return [
+      {
+        ...cell,
+        address,
+        ...(content === undefined ? {} : { content }),
+        ...(cell.sparkline
+          ? {
+              sparkline: {
+                ...cell.sparkline,
+                source: cell.sparkline.source
+                  ? transformFormulaRange(cell.sparkline.source, map, range, command.direction)
+                  : null,
+              },
+            }
+          : {}),
+      },
+    ];
   });
   nextState.drawings = (previousState.drawings ?? []).flatMap((drawing) => {
     const anchor = map(drawing.anchor);

@@ -61,3 +61,5 @@ export { createFlashFillCommand, type FlashFillOptions } from "./flash-fill.js";
 export * from "./protection.js";
 
 export * from "./drawings.js";
+
+export * from "./sparklines.js";

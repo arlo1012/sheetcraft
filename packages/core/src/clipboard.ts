@@ -1,3 +1,5 @@
+import { cloneCellSparkline, type CellSparkline } from "./sparklines.js";
+import { getCellSparkline } from "./workbook.js";
 import {
   formatComputedValueForDisplay,
   formatCellValueForDisplay,
@@ -26,6 +28,7 @@ import {
 
 export type CellValueMatrix = CellValue[][];
 export type CellContentMatrix = (CellContent | null)[][];
+export type CellSparklineMatrix = (CellSparkline | null)[][];
 export type CellNoteMatrix = (import("./workbook.js").CellNote | null)[][];
 export type CellComputedValueMatrix = FormulaValue[][];
 
@@ -94,6 +97,18 @@ export function getCellRangeNotes(sheet: Sheet, range: CellRange): CellNoteMatri
     notes.push(rowNotes);
   }
   return notes;
+}
+
+export function getCellRangeSparklines(sheet: Sheet, range: CellRange): CellSparklineMatrix {
+  const normalized = normalizeRange(range);
+  const result: CellSparklineMatrix = [];
+  for (let row = normalized.start.row; row <= normalized.end.row; row++) {
+    const values: Array<CellSparkline | null> = [];
+    for (let column = normalized.start.column; column <= normalized.end.column; column++)
+      values.push(cloneCellSparkline(getCellSparkline(sheet, { row, column })) ?? null);
+    result.push(values);
+  }
+  return result;
 }
 
 export function getCellRangeComputedValues(

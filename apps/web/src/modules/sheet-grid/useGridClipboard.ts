@@ -3,12 +3,14 @@ import {
   getCellMatrixSize,
   getCellRangeContents,
   getCellRangeNotes,
+  getCellRangeSparklines,
   parseTsvToCellTexts,
   parseTsvToCellValues,
   serializeCellValuesToTsv,
   tileCellMatrix,
   type CellContentMatrix,
   type CellNoteMatrix,
+  type CellSparklineMatrix,
   type CellValueMatrix,
   type PastePlan,
 } from "@idea10/core/clipboard";
@@ -87,6 +89,7 @@ export type GridPastePayload =
       namedStyles?: CellNamedStyleMatrix;
       hyperlinks?: CellHyperlinkMatrix;
       notes?: CellNoteMatrix;
+      sparklines?: CellSparklineMatrix;
       conditionalFormats?: SheetConditionalFormatRule[];
       /** Original external TSV fields for Text-number-format targets. */
       rawTextValues?: string[][];
@@ -136,6 +139,7 @@ type PendingClipboard = {
   namedStyles: CellNamedStyleMatrix;
   hyperlinks: CellHyperlinkMatrix;
   notes: CellNoteMatrix;
+  sparklines: CellSparklineMatrix;
   conditionalFormats: SheetConditionalFormatRule[];
   sourceRows?: number[];
   revision: number;
@@ -296,6 +300,7 @@ export function useGridClipboard(options: {
     const namedStyles: CellNamedStyleMatrix = [];
     const hyperlinks: CellHyperlinkMatrix = [];
     const notes: CellNoteMatrix = [];
+    const sparklines: CellSparklineMatrix = [];
     const evaluator = options.getEvaluator?.() ?? createSheetEvaluator(sheet);
     for (const row of rows) {
       const rowRange = {
@@ -315,6 +320,7 @@ export function useGridClipboard(options: {
       namedStyles.push(getCellRangeNamedStyles(sheet, rowRange)[0]!);
       hyperlinks.push(getCellRangeHyperlinks(sheet, rowRange)[0]!);
       notes.push(getCellRangeNotes(sheet, rowRange)[0]!);
+      sparklines.push(getCellRangeSparklines(sheet, rowRange)[0]!);
     }
     const text = serializeCellValuesToTsv(values);
     const token = createToken();
@@ -330,6 +336,7 @@ export function useGridClipboard(options: {
       namedStyles,
       hyperlinks,
       notes,
+      sparklines,
       conditionalFormats: (sheet.conditionalFormats ?? []).map(cloneConditionalFormatRule),
       sourceRows: compressed ? rows : undefined,
       revision: getRevision(),
@@ -635,6 +642,10 @@ export function useGridClipboard(options: {
       axis && isMatchingLocalClipboard && pending
         ? extendAxisMatrix(pending.notes, axis, targetRange, null)
         : pending?.notes;
+    const plannedSparklines =
+      axis && isMatchingLocalClipboard && pending
+        ? extendAxisMatrix(pending.sparklines, axis, targetRange, null)
+        : pending?.sparklines;
     const plannedSourceRange =
       axis && isMatchingLocalClipboard && pending
         ? extendAxisRange(pending.range, axis, targetRange)
@@ -735,6 +746,13 @@ export function useGridClipboard(options: {
             isMatchingLocalClipboard && pending
               ? tileCellMatrix(
                   plannedHyperlinks ?? pending.hyperlinks,
+                  getCellMatrixSize(plan.values),
+                )
+              : undefined,
+          sparklines:
+            isMatchingLocalClipboard && pending
+              ? tileCellMatrix(
+                  plannedSparklines ?? pending.sparklines,
                   getCellMatrixSize(plan.values),
                 )
               : undefined,

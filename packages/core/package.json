@@ -150,6 +150,10 @@
     "./sheet-charts": {
       "types": "./dist/sheet-charts.d.ts",
       "import": "./dist/sheet-charts.js"
+    },
+    "./sparklines": {
+      "types": "./dist/sparklines.d.ts",
+      "import": "./dist/sparklines.js"
     }
   },
   "scripts": {

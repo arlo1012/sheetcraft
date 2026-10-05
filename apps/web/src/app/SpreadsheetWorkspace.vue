@@ -82,6 +82,8 @@ import { usePictureTools } from "../modules/sheet-images/usePictureTools";
 import PictureSelectionPane from "../modules/sheet-images/components/PictureSelectionPane.vue";
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
+import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
+import SparklineDialog from "../modules/sparklines/components/SparklineDialog.vue";
 import { useChartActions } from "../modules/charts/useChartActions";
 import { defineAsyncComponent } from "vue";
 const ChartEditorDialog = defineAsyncComponent(
@@ -1090,6 +1092,22 @@ const imageActions = useSheetImageActions({
   },
   convertCellImageToFloating,
 });
+const sparklineActions = useSparklineActions({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getRange: () => activeSelectionRange.value,
+  flush: () => cellEditSession.finish(),
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  execute: executeCommand,
+});
+const { draft: sparklineDraft, error: sparklineError } = sparklineActions;
+const sparklineRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingSparklineRange, reference: pickedSparklineReference } = sparklineRangePicker;
+watch(sparklineDraft, (value) => {
+  if (!value) sparklineRangePicker.cancel();
+});
+watch(() => activeSheet.value.id, sparklineActions.close);
+watch(workbookGeneration, sparklineActions.close);
 const chartActions = useChartActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1906,6 +1924,7 @@ const activeRangePicker = computed(() => {
   if (pickingProtectionRange.value) return protectionRangePicker;
   if (pickingTableRange.value) return tableRangePicker;
   if (pickingChartRange.value) return chartRangePicker;
+  if (pickingSparklineRange.value) return sparklineRangePicker;
   if (pickingPageSetupRange.value) return pageSetupRangePicker;
   if (pickingFindFormat.value) return findFormatPicker;
   if (pickingSimulationRange.value) return simulationRangePicker;
@@ -2067,6 +2086,7 @@ const gridInert = computed(
     !!editingDrawing.value ||
     symbolVisible.value ||
     (!!editingChart.value && !pickingChartRange.value) ||
+    (!!sparklineDraft.value && !pickingSparklineRange.value) ||
     cellStylesModalOpen.value ||
     (tableModalOpen.value && !pickingTableRange.value) ||
     formulaEditorVisible.value ||
@@ -2146,6 +2166,7 @@ const gridInert = computed(
         !!editingDrawing ||
         symbolVisible ||
         (!!editingChart && !pickingChartRange) ||
+        (!!sparklineDraft && !pickingSparklineRange) ||
         cellStylesModalOpen ||
         tableModalOpen ||
         !!findFormatDraft ||
@@ -2239,6 +2260,11 @@ const gridInert = computed(
       </template>
       <template #insert-tools>
         <InsertToolbar
+          :sparkline-disabled="
+            loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'formatCells')
+          "
+          @insert-sparkline="sparklineActions.open"
+          @clear-sparklines="sparklineActions.remove"
           :symbol-disabled="
             loading || fileBusy || xlsxBusy || !canEditCell(activeSheet, activeAddress)
           "
@@ -3105,6 +3131,7 @@ const gridInert = computed(
         !!editingDrawing ||
         symbolVisible ||
         (!!editingChart && !pickingChartRange) ||
+        (!!sparklineDraft && !pickingSparklineRange) ||
         cellStylesModalOpen ||
         tableModalOpen ||
         dataToolsModalOpen ||
@@ -3478,7 +3505,7 @@ const gridInert = computed(
       @close="contextActions.closePanels()"
     />
     <WorkbookStatusBar
-      :sheet-tabs-disabled="pickingTableRange || pickingChartRange"
+      :sheet-tabs-disabled="pickingTableRange || pickingChartRange || pickingSparklineRange"
       :view-mode="activeViewMode"
       @update:view-mode="setViewMode"
       :edit-session-id="
@@ -3504,6 +3531,7 @@ const gridInert = computed(
         !!editingDrawing ||
         symbolVisible ||
         (!!editingChart && !pickingChartRange) ||
+        (!!sparklineDraft && !pickingSparklineRange) ||
         cellStylesModalOpen ||
         (tableModalOpen && !pickingTableRange)
       "
@@ -3611,6 +3639,25 @@ const gridInert = computed(
     :edit-session-id="cellEditSession.id"
     @confirm="chartRangePicker.confirm"
     @cancel="chartRangePicker.cancel"
+  />
+  <SparklineDialog
+    v-if="sparklineDraft"
+    :initial="sparklineDraft"
+    :disabled="
+      loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'formatCells')
+    "
+    :error="sparklineError"
+    :suspended="pickingSparklineRange"
+    :select-reference="sparklineRangePicker.selectReference"
+    @confirm="sparklineActions.confirm"
+    @close="sparklineActions.close"
+  />
+  <RangeReferencePicker
+    v-if="pickingSparklineRange"
+    :reference="pickedSparklineReference"
+    :edit-session-id="cellEditSession.id"
+    @confirm="sparklineRangePicker.confirm"
+    @cancel="sparklineRangePicker.cancel"
   />
 </template>
 

@@ -1,7 +1,7 @@
 import { getSheetFilters } from "./filter.js";
 import { WorkbookDomainError } from "../errors.js";
 import { MAX_SHEET_ROWS, MAX_SHEET_COLUMNS } from "../sheet-limits.js";
-import { canEditRange } from "../protection.js";
+import { canEditCell, canEditRange } from "../protection.js";
 import { expandSelectionToMergedCellRanges } from "../merged-cells.js";
 import { areCellStylesEqual } from "../style.js";
 import type { Workbook } from "../workbook.js";
@@ -60,6 +60,12 @@ export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookC
       )
         reject(sheet.id);
       if (
+        change.sparkline !== undefined &&
+        !sheet.protection?.formatCells &&
+        JSON.stringify(change.sparkline ?? undefined) !== JSON.stringify(cell?.sparkline)
+      )
+        reject(sheet.id);
+      if (
         change.note !== undefined &&
         !sheet.protection?.editObjects &&
         JSON.stringify(change.note ?? undefined) !== JSON.stringify(cell?.note)
@@ -85,6 +91,14 @@ export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookC
     sheet.protection?.password
   )
     reject(sheet.id);
+  if (command.type === "setCellSparklines") {
+    if (
+      !sheet.protection?.formatCells ||
+      command.changes.some((change) => !canEditCell(sheet, change.address))
+    )
+      reject(sheet.id);
+    return true;
+  }
   if (command.type === "setCellNotes") {
     if (!sheet.protection?.editObjects) reject(sheet.id);
     return true;

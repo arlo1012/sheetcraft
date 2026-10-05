@@ -1,3 +1,5 @@
+import { cloneCellSparkline, translateCellSparkline, type CellSparkline } from "./sparklines.js";
+import { getCellSparkline } from "./workbook.js";
 import { translateCellContentForCopy } from "./clipboard.js";
 import { createSheetFilterHiddenRowIntervals } from "./commands/filter.js";
 import { createBatchSetCellContentsCommand } from "./commands/values.js";
@@ -60,6 +62,7 @@ type CapturedCell = Readonly<{
   namedStyle: import("./workbook.js").CellNamedStyleBinding | undefined;
   hyperlink: import("./workbook.js").CellHyperlink | undefined;
   note: import("./workbook.js").CellNote | undefined;
+  sparkline: CellSparkline | undefined;
 }>;
 export type CellFillPlan = Readonly<{
   sheetId: string;
@@ -218,6 +221,7 @@ export function captureCellFill(
       namedStyle: cloneCellNamedStyleBinding(getCellNamedStyle(sheet, address)),
       hyperlink: cloneCellHyperlink(getCellHyperlink(sheet, address)),
       note: cloneCellNote(getCellNote(sheet, address)),
+      sparkline: cloneCellSparkline(getCellSparkline(sheet, address)),
     };
   };
   const source = addresses(sourceRange).map(capture),
@@ -533,6 +537,13 @@ export function createCellFillCommand(
             ? (original.namedStyle ?? null)
             : (source.namedStyle ?? null),
         hyperlink: mode === "copy" ? (source.hyperlink ?? null) : (original.hyperlink ?? null),
+        sparkline:
+          mode === "copy"
+            ? (translateCellSparkline(source.sparkline, {
+                row: target.address.row - source.address.row,
+                column: target.address.column - source.address.column,
+              }) ?? null)
+            : (original.sparkline ?? null),
         note: mode === "copy" ? (source.note ?? null) : (original.note ?? null),
       };
     }),

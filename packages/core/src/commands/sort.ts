@@ -1,3 +1,5 @@
+import { getCellSparkline, setCellSparkline } from "../workbook.js";
+import { cloneCellSparkline, translateCellSparkline, type CellSparkline } from "../sparklines.js";
 import { translateFormulaForCopy } from "../formula/references.js";
 import { isFormulaError, type CellContent, type FormulaValue } from "../formula/types.js";
 import {
@@ -579,6 +581,7 @@ export function applySortSheetRangeCommand(
         ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
         ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
         ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
+        ...(cell.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
       },
     ];
   });
@@ -591,6 +594,7 @@ export function applySortSheetRangeCommand(
       namedStyle?: import("../workbook.js").CellNamedStyleBinding;
       hyperlink?: import("../workbook.js").CellHyperlink;
       note?: import("../workbook.js").CellNote;
+      sparkline?: CellSparkline;
     }
   >();
   const affected = new Map<string, CellAddress>();
@@ -610,6 +614,14 @@ export function applySortSheetRangeCommand(
       ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
       ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
+      ...(cell.sparkline
+        ? {
+            sparkline: translateCellSparkline(cell.sparkline, {
+              row: address.row - cell.address.row,
+              column: 0,
+            }),
+          }
+        : {}),
     });
     affected.set(getCellBorderTargetKey(cell.address), cell.address);
     affected.set(key, address);
@@ -627,6 +639,7 @@ export function applySortSheetRangeCommand(
       namedStyle: cloneCellNamedStyleBinding(getCellNamedStyle(sheet, address)) ?? null,
       hyperlink: cloneCellHyperlink(getCellHyperlink(sheet, address)) ?? null,
       note: cloneCellNote(getCellNote(sheet, address)) ?? null,
+      sparkline: cloneCellSparkline(getCellSparkline(sheet, address)) ?? null,
     });
   };
   for (const [key, address] of affected) {
@@ -636,6 +649,7 @@ export function applySortSheetRangeCommand(
     setCellNamedStyle(sheet, address, next?.style ?? null, next?.namedStyle ?? null);
     setCellHyperlink(sheet, address, next?.hyperlink ?? null);
     setCellNote(sheet, address, next?.note ?? null);
+    setCellSparkline(sheet, address, next?.sparkline ?? null);
   }
 
   const mergeResolver = new MergedCellRangeResolver(sheet.mergedCells);

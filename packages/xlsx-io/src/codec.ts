@@ -1,3 +1,4 @@
+import { readXlsxSparklines } from "./sparklines.js";
 import { readXlsxProtection } from "./protection.js";
 import ExcelJSImport from "exceljs/dist/exceljs.min.js";
 import { unzipSync } from "fflate/browser";
@@ -635,6 +636,12 @@ export async function decodeWithExcelJs(
   const source = new ExcelJS.Workbook();
   await source.xlsx.load(withoutTableAutoFiltersForExcelJs(withExcelJsCompatibleCellNotes(bytes)));
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
+  const rawSparklines = readXlsxSparklines(
+    archive,
+    source.worksheets.map((sheet) => sheet.name),
+    (index, reference) =>
+      add(report, "feature-omitted", `worksheet${index + 1}.sparkline:${reference}`),
+  );
   const pageSetups = readXlsxPageSetups(bytes, source.worksheets, report);
   const dateSystem = source.properties.date1904 ? "1904" : "1900";
   const calculation = readWorkbookCalculationSettings(bytes);
@@ -652,6 +659,7 @@ export async function decodeWithExcelJs(
       hyperlink?: import("@idea10/core/workbook").CellHyperlink;
       namedStyle?: import("@idea10/core/workbook").CellNamedStyleBinding;
       note?: import("@idea10/core/workbook").CellNote;
+      sparkline?: import("@idea10/core/sparklines").CellSparkline;
     }> = [];
     const rowHeights: Array<{ index: number; size: number }> = [];
     const columnWidths: Array<{ index: number; size: number }> = [];
@@ -773,6 +781,24 @@ export async function decodeWithExcelJs(
         );
       }
       cells.push({ address: cellAddress, note });
+    }
+    const cellsByKey = new Map(
+      cells.map((cell) => [`${cell.address.row}:${cell.address.column}`, cell]),
+    );
+    for (const [reference, sparkline] of rawSparklines[sheetIndex] ?? []) {
+      const address = parseAddress(reference);
+      if (!address) continue;
+      const existing = cellsByKey.get(`${address.row}:${address.column}`);
+      if (existing) existing.sparkline = sparkline;
+      else {
+        importedCells++;
+        if (importedCells > MAX_SPARSE_CELLS)
+          throw new XlsxCompatibilityError(
+            "The workbook exceeds the XLSX cell limit.",
+            report.build(),
+          );
+        cells.push({ address, sparkline });
+      }
     }
     for (const column of sourceSheet.columns ?? []) {
       const index = column.number;

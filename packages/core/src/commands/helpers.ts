@@ -1,3 +1,4 @@
+import { cloneCellSparkline } from "../sparklines.js";
 import { normalizeSheetDrawings } from "../sheet-drawings.js";
 import { normalizeSheetProtection } from "../protection.js";
 import { WorkbookDomainError, toWorkbookErrorDetail } from "../errors.js";
@@ -121,6 +122,7 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
       ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
       ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
       ...(cell.note ? { note: cloneCellNote(cell.note) } : {}),
+      ...(cell.sparkline ? { sparkline: cloneCellSparkline(cell.sparkline) } : {}),
     })),
     rowHeights: state.rowHeights.map((dimension) => ({ ...dimension })),
     columnWidths: state.columnWidths.map((dimension) => ({ ...dimension })),

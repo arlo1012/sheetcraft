@@ -1,3 +1,4 @@
+import { writeXlsxSparklines } from "./sparklines.js";
 import type { ProtectionPassword } from "@idea10/core";
 import { writeXlsxProtection } from "./protection.js";
 import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from "fflate/browser";
@@ -94,6 +95,7 @@ export function finalizeXlsxExport(
   );
   writeXlsxHyperlinks(entries, sheets);
   writeXlsxCellNotes(entries, sheets);
+  writeXlsxSparklines(entries, sheets);
   writeXlsxProtection(entries, sheets, structureProtected, structurePassword);
   writeXlsxCellNoteVmlBoxes(entries, sheets);
   const projectedCellStyles = cellStyles?.map((definition) => ({

@@ -1,3 +1,4 @@
+import { translateCellSparkline } from "@idea10/core/sparklines";
 import {
   createBatchSetCellContentsCommand,
   createMoveCellRangeCommand,
@@ -292,17 +293,37 @@ function createCellPasteCommand(
     if (payload.namedStyles) assertMatrixShape(payload.namedStyles, plan);
     if (payload.hyperlinks) assertMatrixShape(payload.hyperlinks, plan);
     if (payload.notes) assertMatrixShape(payload.notes, plan);
+    if (payload.sparklines) assertMatrixShape(payload.sparklines, plan);
+    const sourceSize = payload.contents ? getCellMatrixSize(payload.contents) : undefined;
+    const sparklines = payload.sparklines?.map((row, rowIndex) =>
+      row.map((sparkline, columnIndex) => {
+        if (!payload.sourceRange || !sourceSize) return sparkline;
+        const sourceRow =
+          payload.sourceRows?.[rowIndex % sourceSize.rowCount] ??
+          payload.sourceRange.start.row + (rowIndex % sourceSize.rowCount);
+        const sourceColumn =
+          payload.sourceRange.start.column + (columnIndex % sourceSize.columnCount);
+        const target = targetAddress(payload.plan, plan.rows, rowIndex, columnIndex);
+        return (
+          translateCellSparkline(sparkline, {
+            row: target.row - sourceRow,
+            column: target.column - sourceColumn,
+          }) ?? null
+        );
+      }),
+    );
     if (!payload.plan.preserveHiddenRows) {
       return createPasteCellContentsCommand(
         sheet.id,
         payload.plan.anchor,
         contents,
-        payload.styles || payload.namedStyles || payload.hyperlinks || payload.notes
+        payload.styles || payload.namedStyles || payload.hyperlinks || payload.notes || sparklines
           ? {
               ...(payload.styles ? { styles: payload.styles } : {}),
               ...(payload.namedStyles ? { namedStyles: payload.namedStyles } : {}),
               ...(payload.hyperlinks ? { hyperlinks: payload.hyperlinks } : {}),
               ...(payload.notes ? { notes: payload.notes } : {}),
+              ...(sparklines ? { sparklines } : {}),
             }
           : undefined,
       );
@@ -321,6 +342,7 @@ function createCellPasteCommand(
             ? { hyperlink: payload.hyperlinks[rowIndex]?.[columnIndex] ?? null }
             : {}),
           ...(payload.notes ? { note: payload.notes[rowIndex]?.[columnIndex] ?? null } : {}),
+          ...(sparklines ? { sparkline: sparklines[rowIndex]?.[columnIndex] ?? null } : {}),
         })),
       ),
     );

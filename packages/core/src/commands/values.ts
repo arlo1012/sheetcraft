@@ -1,3 +1,5 @@
+import { cloneCellSparkline, translateCellSparkline, type CellSparkline } from "../sparklines.js";
+import { getCellSparkline, setCellSparkline } from "../workbook.js";
 import { getCellMatrixSize } from "../clipboard.js";
 import {
   cloneConditionalFormatRule,
@@ -137,6 +139,7 @@ export function createBatchSetCellContentsCommand(
       ...("hyperlink" in change
         ? { hyperlink: cloneCellHyperlink(change.hyperlink ?? undefined) ?? null }
         : {}),
+      ...("sparkline" in change ? { sparkline: cloneCellSparkline(change.sparkline) ?? null } : {}),
       ...("note" in change ? { note: cloneCellNote(change.note ?? undefined) ?? null } : {}),
     })),
     ...(options?.reconcileBorders ? { reconcileBorders: true } : {}),
@@ -183,6 +186,7 @@ export function createPasteCellContentsCommand(
     namedStyles?: readonly (readonly (import("../workbook.js").CellNamedStyleBinding | null)[])[];
     hyperlinks?: readonly (readonly (import("../workbook.js").CellHyperlink | null)[])[];
     notes?: readonly (readonly (import("../workbook.js").CellNote | null)[])[];
+    sparklines?: readonly (readonly (CellSparkline | null)[])[];
   },
 ): SetCellContentsCommand {
   const size = validateCommandPayload("contents", contents, () => getCellMatrixSize(contents));
@@ -207,6 +211,7 @@ export function createPasteCellContentsCommand(
     ["namedStyles", options?.namedStyles],
     ["hyperlinks", options?.hyperlinks],
     ["notes", options?.notes],
+    ["sparklines", options?.sparklines],
   ] as const) {
     if (
       matrix &&
@@ -228,6 +233,7 @@ export function createPasteCellContentsCommand(
     namedStyle?: import("../workbook.js").CellNamedStyleBinding | null,
     hyperlink?: import("../workbook.js").CellHyperlink | null,
     note?: import("../workbook.js").CellNote | null,
+    sparkline?: CellSparkline | null,
   ) => {
     changes.set(`${address.row}:${address.column}`, {
       sheetId,
@@ -238,6 +244,7 @@ export function createPasteCellContentsCommand(
         ? {}
         : { namedStyle: cloneCellNamedStyleBinding(namedStyle) ?? null }),
       ...(hyperlink === undefined ? {} : { hyperlink: cloneCellHyperlink(hyperlink) ?? null }),
+      ...(sparkline === undefined ? {} : { sparkline: cloneCellSparkline(sparkline) ?? null }),
       ...(note === undefined ? {} : { note: cloneCellNote(note) ?? null }),
     });
   };
@@ -262,6 +269,7 @@ export function createPasteCellContentsCommand(
         options?.namedStyles ? (options.namedStyles[row]?.[column] ?? null) : undefined,
         options?.hyperlinks ? (options.hyperlinks[row]?.[column] ?? null) : undefined,
         options?.notes ? (options.notes[row]?.[column] ?? null) : undefined,
+        options?.sparklines ? (options.sparklines[row]?.[column] ?? null) : undefined,
       );
     }
   }
@@ -462,6 +470,14 @@ export function applySetCellContentsCommand(
               ) ?? null,
           }
         : {}),
+      ...(Object.hasOwn(change, "sparkline")
+        ? {
+            sparkline:
+              validateCommandPayload("sparkline", change.sparkline, () =>
+                cloneCellSparkline(change.sparkline),
+              ) ?? null,
+          }
+        : {}),
       ...(Object.hasOwn(change, "note")
         ? {
             note:
@@ -504,6 +520,7 @@ export function applySetCellContentsCommand(
       namedStyle: import("../workbook.js").CellNamedStyleBinding | undefined;
       hyperlink: import("../workbook.js").CellHyperlink | undefined;
       note: import("../workbook.js").CellNote | undefined;
+      sparkline: CellSparkline | undefined;
     }
   >();
   const getChangeKey = (sheetId: string, address: CellAddress) =>
@@ -524,6 +541,7 @@ export function applySetCellContentsCommand(
       namedStyle: cloneCellNamedStyleBinding(getCellNamedStyle(sheet, change.address)),
       hyperlink: cloneCellHyperlink(getCellHyperlink(sheet, change.address)),
       note: cloneCellNote(getCellNote(sheet, change.address)),
+      sparkline: cloneCellSparkline(getCellSparkline(sheet, change.address)),
     });
   }
 
@@ -537,6 +555,7 @@ export function applySetCellContentsCommand(
       namedStyle: import("../workbook.js").CellNamedStyleBinding | undefined;
       hyperlink: import("../workbook.js").CellHyperlink | undefined;
       note: import("../workbook.js").CellNote | undefined;
+      sparkline: CellSparkline | undefined;
     },
   ) => {
     const key = getChangeKey(sheetId, address);
@@ -562,6 +581,9 @@ export function applySetCellContentsCommand(
         : {}),
       ...(originalChange && "hyperlink" in originalChange
         ? { hyperlink: previous.hyperlink ?? null }
+        : {}),
+      ...(originalChange && "sparkline" in originalChange
+        ? { sparkline: previous.sparkline ?? null }
         : {}),
       ...(originalChange && "note" in originalChange ? { note: previous.note ?? null } : {}),
     };
@@ -591,7 +613,16 @@ export function applySetCellContentsCommand(
       "note" in change
         ? setCellNote(sheet, change.address, (change as CellContentChange).note)
         : false;
-    if (valueChanged || styleChanged || namedStyleChanged || hyperlinkChanged || noteChanged) {
+    const sparklineChanged =
+      "sparkline" in change ? setCellSparkline(sheet, change.address, change.sparkline) : false;
+    if (
+      valueChanged ||
+      styleChanged ||
+      namedStyleChanged ||
+      hyperlinkChanged ||
+      noteChanged ||
+      sparklineChanged
+    ) {
       recordReverseChange(change.sheetId, change.address, "style" in change);
     }
   }
@@ -634,6 +665,7 @@ export function applySetCellContentsCommand(
             namedStyle: cloneCellNamedStyleBinding(getCellNamedStyle(sheet, address)),
             hyperlink: cloneCellHyperlink(getCellHyperlink(sheet, address)),
             note: cloneCellNote(getCellNote(sheet, address)),
+            sparkline: cloneCellSparkline(getCellSparkline(sheet, address)),
           });
         }
       }
@@ -825,6 +857,7 @@ export function applyMoveCellRangeCommand(
             namedStyle: cloneCellNamedStyleBinding(cell.namedStyle),
             hyperlink: cloneCellHyperlink(cell.hyperlink),
             note: cloneCellNote(cell.note),
+            sparkline: cloneCellSparkline(cell.sparkline),
           },
         ]
       : [];
@@ -846,6 +879,7 @@ export function applyMoveCellRangeCommand(
     setCellNamedStyle(sheet, address, null, null);
     setCellHyperlink(sheet, address, null);
     setCellNote(sheet, address, null);
+    setCellSparkline(sheet, address, null);
   }
   for (const cell of captured) {
     const address = {
@@ -856,6 +890,14 @@ export function applyMoveCellRangeCommand(
     setCellNamedStyle(sheet, address, cell.style ?? null, cell.namedStyle ?? null);
     setCellHyperlink(sheet, address, cell.hyperlink ?? null);
     setCellNote(sheet, address, cell.note ?? null);
+    setCellSparkline(
+      sheet,
+      address,
+      translateCellSparkline(cell.sparkline, {
+        row: address.row - cell.address.row,
+        column: address.column - cell.address.column,
+      }),
+    );
     affected.set(`${address.row}:${address.column}`, address);
   }
   for (const [key, cell] of sheet.cells)
