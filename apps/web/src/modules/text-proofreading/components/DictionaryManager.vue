@@ -198,11 +198,15 @@ async function importFile(event: Event) {
     </nav>
     <section class="dictionary-manager__content" :aria-label="title">
       <div class="dictionary-manager__header">
-        <strong>{{ title }}</strong>
-        <Tooltip :content="hint"
-          ><span class="dictionary-manager__info" tabindex="0" :aria-label="hint"
-            ><Info class="idea-action-icon" aria-hidden="true" /></span
-        ></Tooltip>
+        <div class="dictionary-manager__heading">
+          <strong>{{ title }}</strong>
+          <span class="dictionary-manager__info">
+            <Tooltip :content="hint"
+              ><span tabindex="0" :aria-label="hint"
+                ><Info class="idea-action-icon" aria-hidden="true" /></span
+            ></Tooltip>
+          </span>
+        </div>
         <div class="dictionary-manager__transfer">
           <Tooltip :content="t('wordProof.templateHint')">
             <Button theme="default" variant="text" @click="downloadTemplate">{{
@@ -354,7 +358,17 @@ async function importFile(event: Event) {
     margin-bottom: 4px;
     border-bottom: 1px solid var(--td-component-border);
   }
+  &__heading {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 28px;
+    strong {
+      line-height: 20px;
+    }
+  }
   &__info {
+    line-height: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
