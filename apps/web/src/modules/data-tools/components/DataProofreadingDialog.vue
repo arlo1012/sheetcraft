@@ -110,9 +110,6 @@ function selectIssues(keys: Array<string | number>): void {
           @update:model-value="updateRange"
           @enter="!busy && emit('scan', draft)"
         />
-        <TButton :loading="busy" :disabled="busy" @click="emit('scan', draft)">
-          {{ hasScanned ? t("proofreading.rescan") : t("proofreading.scan") }}
-        </TButton>
       </div>
 
       <div v-if="error" class="data-proofreading-dialog__error" role="alert">{{ error }}</div>
@@ -209,6 +206,9 @@ function selectIssues(keys: Array<string | number>): void {
             @click="emit('applySelected')"
           >
             {{ t("proofreading.applySelected") }}
+          </TButton>
+          <TButton :loading="busy" :disabled="busy" @click="emit('scan', draft)">
+            {{ hasScanned ? t("proofreading.rescan") : t("proofreading.scan") }}
           </TButton>
         </div>
       </div>
