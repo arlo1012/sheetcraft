@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from "lucide-vue-next";
+import { ArrowDown, ArrowUp, Copy, Trash2 } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -352,7 +352,6 @@ function apply(): void {
             :disabled="!columns.length || rows.length >= maxLevels"
             @click="addLevel"
           >
-            <template #icon><Plus class="idea-control-icon" aria-hidden="true" /></template>
             {{ t("dataTools.sort.addLevel") }}
           </TButton>
           <TButton variant="outline" data-sort-action="options" @click="openOptions">{{

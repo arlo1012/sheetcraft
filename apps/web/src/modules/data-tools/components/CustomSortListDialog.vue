@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Check, Plus, Trash2 } from "lucide-vue-next";
+import { Check, Trash2 } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
@@ -184,7 +184,6 @@ function apply(): void {
               data-sort-list-add
               @click="addList"
             >
-              <template #icon><Plus :size="15" aria-hidden="true" /></template>
               {{ t("dataTools.customSort.add") }}
             </TButton>
             <TButton

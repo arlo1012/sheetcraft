@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from "vue";
-import { Plus, Pencil, Trash2, LockKeyholeOpen } from "lucide-vue-next";
+import { Pencil, Trash2, LockKeyholeOpen } from "lucide-vue-next";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Button as TButton } from "tdesign-vue-next/es/button";
@@ -140,7 +140,6 @@ function save(protect = false): void {
         </p>
         <div class="editable-ranges__actions">
           <TButton variant="outline" :disabled="readOnly" data-range-action="add" @click="add">
-            <template #icon><Plus class="idea-control-icon" aria-hidden="true" /></template>
             {{ t("review.addRange") }}
           </TButton>
           <TButton v-if="!readOnly" variant="outline" @click="save(true)">{{

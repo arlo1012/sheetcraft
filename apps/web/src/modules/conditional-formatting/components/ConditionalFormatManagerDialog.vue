@@ -4,7 +4,6 @@ import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { computed, ref, watch } from "vue";
-import { Plus } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   cloneConditionalFormatRule,
@@ -334,7 +333,6 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
           :disabled="readonly"
           @click="addRule"
         >
-          <template #icon><Plus class="idea-control-icon" aria-hidden="true" /></template>
           {{ t("conditionalFormatting.newRuleAction") }}
         </TButton>
       </div>

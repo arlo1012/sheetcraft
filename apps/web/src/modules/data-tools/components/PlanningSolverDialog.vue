@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Plus, Trash2 } from "lucide-vue-next";
+import { Trash2 } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
@@ -197,7 +197,7 @@ const methodHint = computed(() =>
             :disabled="busy"
             @click="draft.variables.push(blankVariable())"
           >
-            <Plus class="simulation-dialog__action-icon" />{{ tr("simulation.addVariable") }}
+            {{ tr("simulation.addVariable") }}
           </TButton>
         </div>
         <div v-for="(item, index) in draft.variables" :key="item.id" class="simulation-dialog__row">
@@ -248,7 +248,7 @@ const methodHint = computed(() =>
             :disabled="busy"
             @click="draft.constraints.push(blankConstraint())"
           >
-            <Plus class="simulation-dialog__action-icon" />{{ tr("simulation.addConstraint") }}
+            {{ tr("simulation.addConstraint") }}
           </TButton>
         </div>
         <div
