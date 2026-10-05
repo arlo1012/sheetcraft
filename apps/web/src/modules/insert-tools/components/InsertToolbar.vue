@@ -4,6 +4,7 @@ import type { ChartType } from "@idea10/core/sheet-charts";
 import type { SheetGraphicDrawing } from "@idea10/core/sheet-drawings";
 import {
   Camera,
+  PanelsTopLeft,
   FileText,
   Paperclip,
   Link2,
@@ -35,6 +36,7 @@ const emit = defineEmits<{
   insertChart: [type: ChartType | "dashboard"];
   insertAttachment: [display: "icon" | "document"];
   insertCamera: [];
+  insertControl: [];
   insertSymbol: [];
   insertSparkline: [];
   clearSparklines: [];
@@ -170,6 +172,15 @@ const { t } = useAppI18n();
         data-insert-tool="attachment"
         @activate="emit('insertAttachment', 'icon')"
         ><Paperclip
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :label="t('control.title')"
+        :text="t('control.title')"
+        :disabled="imageDisabled"
+        data-insert-tool="control"
+        @activate="emit('insertControl')"
+        ><PanelsTopLeft
       /></RibbonButton>
       <RibbonButton
         variant="tall"

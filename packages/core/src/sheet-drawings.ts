@@ -1,3 +1,4 @@
+import { normalizeFormControl, type SheetFormControl } from "./form-controls.js";
 import {
   normalizeSheetAttachment,
   MAX_SHEET_ATTACHMENT_BYTES,
@@ -46,11 +47,13 @@ export type SheetAttachmentDrawing = DrawingBase & {
   kind: "attachment";
   attachment: SheetAttachment;
 };
+export type SheetControlDrawing = DrawingBase & { kind: "control"; control: SheetFormControl };
 export type SheetDrawing =
   | SheetGraphicDrawing
   | SheetChartDrawing
   | SheetCameraDrawing
-  | SheetAttachmentDrawing;
+  | SheetAttachmentDrawing
+  | SheetControlDrawing;
 export function normalizeCameraRange(range: CellRange | null): CellRange | null {
   if (range === null) return null;
   if (
@@ -83,6 +86,19 @@ export function mapDrawingSource(
       ...drawing,
       camera: { ...drawing.camera, range: drawing.camera.range ? map(drawing.camera.range) : null },
     };
+  if (drawing.kind === "control") {
+    const linked = drawing.control.linkedCell
+      ? map({ start: drawing.control.linkedCell, end: drawing.control.linkedCell })
+      : null;
+    return {
+      ...drawing,
+      control: {
+        ...drawing.control,
+        linkedCell: linked?.start ?? null,
+        source: drawing.control.source ? map(drawing.control.source) : null,
+      },
+    };
+  }
   return drawing;
 }
 const kinds = new Set([
@@ -94,6 +110,7 @@ const kinds = new Set([
   "chart",
   "camera",
   "attachment",
+  "control",
 ]);
 const shapes = new Set([
   "rectangle",
@@ -158,7 +175,9 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
               kind: "attachment",
               attachment: normalizeSheetAttachment(value.attachment),
             } as const)
-          : { kind: value.kind }),
+          : value.kind === "control"
+            ? ({ kind: "control", control: normalizeFormControl(value.control) } as const)
+            : { kind: value.kind }),
     name: value.name,
     anchor: { ...value.anchor },
     offsetX: value.offsetX,

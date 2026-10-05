@@ -158,6 +158,10 @@
     "./sheet-attachments": {
       "types": "./dist/sheet-attachments.d.ts",
       "import": "./dist/sheet-attachments.js"
+    },
+    "./form-controls": {
+      "types": "./dist/form-controls.d.ts",
+      "import": "./dist/form-controls.js"
     }
   },
   "scripts": {

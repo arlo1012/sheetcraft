@@ -289,6 +289,7 @@ const emit = defineEmits<{
   updateDrawing: [drawing: SheetDrawing];
   deleteDrawing: [id: string];
   editDrawing: [drawing: SheetDrawing];
+  changeControl: [id: string, value: unknown];
   unlockRange: [range: CellRange];
   contextAction: [request: SheetContextRequest];
   pageSetupChange: [setup: SheetPageSetup];
@@ -3296,6 +3297,7 @@ defineExpose({
       }"
     >
       <SheetDrawingLayer
+        @control-change="(id, value) => emit('changeControl', id, value)"
         :key="sheet.id"
         :drawings="sheet.drawings ?? []"
         :theme="theme"

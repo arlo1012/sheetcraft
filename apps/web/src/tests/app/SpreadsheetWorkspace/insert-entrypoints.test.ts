@@ -42,6 +42,7 @@ describe("workspace insert entry points", () => {
       dialog: ".chart-editor",
     },
     { tool: "camera", selector: '[data-insert-tool="camera"]', dialog: ".camera-editor" },
+    { tool: "control", selector: '[data-insert-tool="control"]', dialog: ".form-control-editor" },
   ])("opens the $tool editor from the actual Insert ribbon", async ({ selector, dialog }) => {
     const wrapper = await fixture();
     expect(document.querySelector(dialog)).toBeNull();

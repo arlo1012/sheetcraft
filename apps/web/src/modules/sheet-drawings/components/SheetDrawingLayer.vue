@@ -43,6 +43,7 @@ const emit = defineEmits<{
   delete: [id: string];
   edit: [drawing: SheetDrawing];
   select: [];
+  controlChange: [id: string, value: unknown];
 }>();
 const selectedId = ref<string | null>(null);
 const preview = shallowRef<SheetDrawing>();
@@ -195,6 +196,7 @@ watch(
       <div class="sheet-drawing-layer__clip">
         <div class="sheet-drawing-layer__content" :style="contentStyle(fragment)">
           <DrawingContent
+            @control-change="emit('controlChange', fragment.drawing.id, $event)"
             :drawing="fragment.drawing"
             :sheet="sheet"
             :evaluator="evaluator"

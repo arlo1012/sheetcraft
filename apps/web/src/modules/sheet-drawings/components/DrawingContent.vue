@@ -3,6 +3,9 @@ import { computed, defineAsyncComponent } from "vue";
 import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
 import type { WorkbookTheme } from "@idea10/core/workbook-theme";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
+const FormControlContent = defineAsyncComponent(
+  () => import("../../form-controls/components/FormControlContent.vue"),
+);
 const AttachmentContent = defineAsyncComponent(
   () => import("../../attachments/components/AttachmentContent.vue"),
 );
@@ -21,6 +24,7 @@ const props = defineProps<{
   locale?: string;
   dateSystem?: "1900" | "1904";
 }>();
+const emit = defineEmits<{ controlChange: [value: unknown] }>();
 const textStyle = computed(() => ({
   color: props.drawing.color,
   fontSize: `${props.drawing.fontSize}px`,
@@ -98,6 +102,14 @@ const textStyle = computed(() => ({
       :sheet="sheet"
       :evaluator="evaluator"
       :revision="revision ?? 0"
+    />
+    <FormControlContent
+      v-else-if="drawing.kind === 'control' && sheet && evaluator"
+      :drawing="drawing"
+      :sheet="sheet"
+      :evaluator="evaluator"
+      :revision="revision ?? 0"
+      @change="emit('controlChange', $event)"
     />
     <AttachmentContent v-else-if="drawing.kind === 'attachment'" :drawing="drawing" />
     <CameraContent

@@ -1,3 +1,4 @@
+import { controlsZhCN } from "../../../modules/form-controls/control-messages.zh-CN";
 import { attachmentsZhCN } from "../../../modules/attachments/attachment-messages.zh-CN";
 import { cameraZhCN } from "../../../modules/camera/camera-messages.zh-CN";
 import { sparklinesZhCN } from "../../../modules/sparklines/sparkline-messages.zh-CN";
@@ -20,6 +21,7 @@ import { tableStylesZhCN } from "../../../modules/table-styles/table-style-messa
 import { tablesZhCN } from "../../../modules/table-styles/table-messages.zh-CN";
 
 export const zhCN = {
+  ...controlsZhCN,
   ...attachmentsZhCN,
   ...cameraZhCN,
   ...sparklinesZhCN,

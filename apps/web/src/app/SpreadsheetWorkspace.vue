@@ -83,6 +83,8 @@ import PictureSelectionPane from "../modules/sheet-images/components/PictureSele
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
+import { useFormControlActions } from "../modules/form-controls/useFormControlActions";
+import FormControlDialog from "../modules/form-controls/components/FormControlDialog.vue";
 import { useAttachmentActions } from "../modules/attachments/useAttachmentActions";
 import AttachmentDialog from "../modules/attachments/components/AttachmentDialog.vue";
 import { useCameraActions } from "../modules/camera/useCameraActions";
@@ -1096,6 +1098,24 @@ const imageActions = useSheetImageActions({
   },
   convertCellImageToFloating,
 });
+const controlActions = useFormControlActions({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getAddress: () => activeAddress.value,
+  getEvaluator: () => activeSheetEvaluator.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => cellEditSession.finish(),
+  execute: executeCommand,
+  name: (type) => t(`control.${type}`),
+});
+const { editing: editingControl, error: controlError } = controlActions;
+const controlRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingControlRange, reference: pickedControlReference } = controlRangePicker;
+watch(editingControl, (value) => {
+  if (!value) controlRangePicker.cancel();
+});
+watch(() => activeSheet.value.id, controlActions.close);
+watch(workbookGeneration, controlActions.close);
 const attachmentActions = useAttachmentActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1167,6 +1187,7 @@ watch(workbookGeneration, () => {
 });
 function editSheetDrawing(drawing: SheetDrawing): void {
   if (drawing.kind === "chart") chartActions.edit(drawing);
+  else if (drawing.kind === "control") controlActions.open(drawing);
   else if (drawing.kind === "attachment") attachmentActions.viewing.value = drawing;
   else if (drawing.kind === "camera") cameraActions.open(drawing);
   else drawingActions.edit(drawing);
@@ -1960,6 +1981,7 @@ const { active: pickingNameRange, reference: pickedNameReference } = nameRangePi
 const activeRangePicker = computed(() => {
   if (pickingProtectionRange.value) return protectionRangePicker;
   if (pickingTableRange.value) return tableRangePicker;
+  if (pickingControlRange.value) return controlRangePicker;
   if (pickingCameraRange.value) return cameraRangePicker;
   if (pickingChartRange.value) return chartRangePicker;
   if (pickingSparklineRange.value) return sparklineRangePicker;
@@ -2122,6 +2144,7 @@ const gridInert = computed(
     dataToolsModalOpen.value ||
     !!hyperlinkDraft.value ||
     (!!editingCamera.value && !pickingCameraRange.value) ||
+    (!!editingControl.value && !pickingControlRange.value) ||
     !!viewingAttachment.value ||
     !!editingDrawing.value ||
     symbolVisible.value ||
@@ -2204,6 +2227,7 @@ const gridInert = computed(
         !!conditionalFormattingSelection ||
         !!hyperlinkDraft ||
         (!!editingCamera && !pickingCameraRange) ||
+        (!!editingControl && !pickingControlRange) ||
         !!viewingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
@@ -2301,6 +2325,7 @@ const gridInert = computed(
       </template>
       <template #insert-tools>
         <InsertToolbar
+          @insert-control="controlActions.open()"
           @insert-attachment="attachmentActions.requestInsert"
           @insert-drawing="drawingActions.insert"
           @insert-camera="cameraActions.open()"
@@ -3175,6 +3200,7 @@ const gridInert = computed(
         pickingReferenceRange ||
         !!hyperlinkDraft ||
         (!!editingCamera && !pickingCameraRange) ||
+        (!!editingControl && !pickingControlRange) ||
         !!viewingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
@@ -3368,6 +3394,7 @@ const gridInert = computed(
           @update-drawing="drawingActions.update"
           @delete-drawing="drawingActions.remove"
           @edit-drawing="editSheetDrawing"
+          @change-control="controlActions.change"
           @update-floating-images="pictureTools.updateMany"
           @delete-floating-images="pictureTools.remove"
           @update-floating-image="setFloatingImage"
@@ -3554,7 +3581,11 @@ const gridInert = computed(
     />
     <WorkbookStatusBar
       :sheet-tabs-disabled="
-        pickingTableRange || pickingChartRange || pickingSparklineRange || pickingCameraRange
+        pickingTableRange ||
+        pickingChartRange ||
+        pickingSparklineRange ||
+        pickingCameraRange ||
+        pickingControlRange
       "
       :view-mode="activeViewMode"
       @update:view-mode="setViewMode"
@@ -3579,6 +3610,7 @@ const gridInert = computed(
         !!cellFormatSelection ||
         !!hyperlinkDraft ||
         (!!editingCamera && !pickingCameraRange) ||
+        (!!editingControl && !pickingControlRange) ||
         !!viewingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
@@ -3703,6 +3735,27 @@ const gridInert = computed(
     :drawing="viewingAttachment"
     @download="attachmentActions.download(viewingAttachment)"
     @close="attachmentActions.close"
+  />
+  <FormControlDialog
+    v-if="editingControl"
+    :key="editingControl.id"
+    :drawing="editingControl"
+    :sheet-name="activeSheet.name"
+    :disabled="
+      loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
+    "
+    :error="controlError"
+    :suspended="pickingControlRange"
+    :select-reference="controlRangePicker.selectReference"
+    @confirm="controlActions.confirm"
+    @close="controlActions.close"
+  />
+  <RangeReferencePicker
+    v-if="pickingControlRange"
+    :reference="pickedControlReference"
+    :edit-session-id="cellEditSession.id"
+    @confirm="controlRangePicker.confirm"
+    @cancel="controlRangePicker.cancel"
   />
   <CameraEditorDialog
     v-if="editingCamera"
