@@ -1583,6 +1583,33 @@ export type MessageSchema = ToolMessageSchema & {
     colorValue: string;
   };
   picture: {
+    viewSettings: string;
+    doubleClickPreview: string;
+    doubleClickSelect: string;
+
+    annotate: string;
+    apply: string;
+    pen: string;
+    arrow: string;
+    rectangle: string;
+    ellipse: string;
+    text: string;
+    annotationColor: string;
+    strokeWidth: string;
+    fontSize: string;
+    undoAnnotation: string;
+    clearAnnotations: string;
+    annotationHint: string;
+    design: string;
+    filters: string;
+    designPlain: string;
+    designShadow: string;
+    designReflection: string;
+    filterWarm: string;
+    filterCool: string;
+    filterVivid: string;
+    filterFade: string;
+
     tooMany: string;
     files: string;
     compress: string;

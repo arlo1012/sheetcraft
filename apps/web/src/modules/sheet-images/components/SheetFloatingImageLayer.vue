@@ -11,6 +11,11 @@ import {
   watch,
   type CSSProperties,
 } from "vue";
+import {
+  rotateFloatingImages,
+  flipFloatingImages,
+  resizeFloatingImagesBy,
+} from "@idea10/sheet-engine/floating-image-group";
 import { MAX_FLOATING_IMAGE_SIZE, type FloatingImage } from "@idea10/core/workbook";
 import {
   moveFloatingImageBy,
@@ -63,9 +68,10 @@ const props = withDefaults(
     selectedImageId?: string | null;
     selectedImageIds?: readonly string[];
     readOnly?: boolean;
+    previewOnDoubleClick?: boolean;
     scale?: number;
   }>(),
-  { readOnly: false, scale: 1 },
+  { readOnly: false, scale: 1, previewOnDoubleClick: true },
 );
 
 const emit = defineEmits<{
@@ -162,6 +168,20 @@ let lastGestureMode: Gesture["mode"] = "move";
 const fragments = computed<ImageFragment[]>(() =>
   getFloatingImageViewportFragmentsForPaint(displayImages(), props.layout),
 );
+const groupFragments = computed<ImageFragment[]>(() => {
+  const images = displayImages().filter(
+    (image) => selectedIds.value.has(image.id) && !image.hidden,
+  );
+  if (images.length < 2) return [];
+  const rects = images.map((image) => getFloatingImageSheetRect(image, props.layout));
+  if (rects.some((rect) => !rect)) return [];
+  const x = Math.min(...rects.map((rect) => rect!.x));
+  const y = Math.min(...rects.map((rect) => rect!.y));
+  const width = Math.max(...rects.map((rect) => rect!.x + rect!.width)) - x;
+  const height = Math.max(...rects.map((rect) => rect!.y + rect!.height)) - y;
+  const proxy = reanchorFloatingImageAtSheetRect(images[0]!, { x, y, width, height }, props.layout);
+  return proxy ? getFloatingImageViewportFragmentsForPaint([proxy], props.layout) : [];
+});
 
 function displayImages(): readonly FloatingImage[] {
   return props.images.map(displayImage);
@@ -302,6 +322,17 @@ function moveGestureAt(activeGesture: Gesture, point: Point): void {
     previewImage.value = previewImages.value.find((entry) => entry.id === activeGesture.image.id);
     return;
   }
+  if (activeGesture.images.length > 1) {
+    previewImages.value =
+      resizeFloatingImagesBy(
+        activeGesture.images,
+        activeGesture.mode,
+        { x: deltaX, y: deltaY },
+        props.layout,
+      ) ?? activeGesture.images;
+    previewImage.value = previewImages.value.find((entry) => entry.id === activeGesture.image.id);
+    return;
+  }
   previewImage.value =
     resizeFloatingImageBy(
       activeGesture.image,
@@ -333,11 +364,23 @@ function applyCrop(): void {
 }
 
 function rotateImage(turns: -1 | 1 | 2): void {
-  if (!props.readOnly) rotateImageEdit(turns);
+  if (props.readOnly) return;
+  const images = props.images.filter((image) => selectedIds.value.has(image.id) && !image.hidden);
+  if (images.length < 2) rotateImageEdit(turns);
+  else {
+    const next = rotateFloatingImages(images, turns, props.layout);
+    if (next) emit("updateMany", next);
+  }
 }
 
 function flipImage(axis: "horizontal" | "vertical"): void {
-  if (!props.readOnly) flipImageEdit(axis);
+  if (props.readOnly) return;
+  const images = props.images.filter((image) => selectedIds.value.has(image.id) && !image.hidden);
+  if (images.length < 2) flipImageEdit(axis);
+  else {
+    const next = flipFloatingImages(images, axis, props.layout);
+    if (next) emit("updateMany", next);
+  }
 }
 
 function restoreImage(): void {
@@ -487,7 +530,7 @@ function onImageDoubleClick(image: FloatingImage, event: MouseEvent): void {
     applyCrop();
     return;
   }
-  emit("preview", image, event.currentTarget as HTMLElement);
+  if (props.previewOnDoubleClick) emit("preview", image, event.currentTarget as HTMLElement);
 }
 
 function onLayerDoubleClick(event: MouseEvent): void {
@@ -496,7 +539,8 @@ function onLayerDoubleClick(event: MouseEvent): void {
     crop.value ||
     event.target !== event.currentTarget ||
     gesture.value ||
-    lastGestureMode !== "move"
+    lastGestureMode !== "move" ||
+    !props.previewOnDoubleClick
   )
     return;
   const image = props.images.find((entry) => entry.id === props.selectedImageId);
@@ -571,7 +615,7 @@ function handleSurfaceDoubleClick(event: MouseEvent, point: Point): boolean {
   if (isSelectedOverlayTarget(event.target) || crop.value) return false;
   const image = hitTestFloatingImage(point);
   if (!image) return false;
-  emit("preview", image, layerRef.value ?? undefined);
+  if (props.previewOnDoubleClick) emit("preview", image, layerRef.value ?? undefined);
   return true;
 }
 
@@ -854,6 +898,20 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
         @resize="(direction, event) => startGesture(fragment.image, direction, event)"
       />
     </div>
+    <template v-if="!crop && !readOnly && selectedImage">
+      <div
+        v-for="fragment in groupFragments"
+        :key="`group-${fragment.paneId}`"
+        class="sheet-floating-image-layer__selected"
+        :style="getFragmentStyle(fragment)"
+        data-floating-image-group
+      >
+        <SheetFloatingImageSelection
+          :fragment="fragment"
+          @resize="(direction, event) => startGesture(selectedImage!, direction, event)"
+        />
+      </div>
+    </template>
     <SheetFloatingImageToolbar
       v-if="toolbarAnchor && selectedImage && selectedIds.size <= 1 && !gesture && !contextMenu"
       :anchor="toolbarAnchor"
@@ -896,6 +954,11 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     touch-action: none;
     cursor: move;
     outline: 1px solid var(--idea-action-primary);
+
+    &[data-floating-image-group] {
+      pointer-events: none;
+      outline: none;
+    }
 
     &:focus-visible {
       --image-selection-style: dashed;

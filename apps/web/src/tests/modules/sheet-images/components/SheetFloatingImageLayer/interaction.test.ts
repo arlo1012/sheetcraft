@@ -64,6 +64,21 @@ function floatingImageMenu(): HTMLElement | null {
 }
 
 describe("SheetFloatingImageLayer", () => {
+  test("view settings can disable double-click preview without disabling selection", async () => {
+    const wrapper = mountLayer();
+    await wrapper.setProps({ previewOnDoubleClick: false });
+    const fragment = wrapper.get('[data-floating-image-id="image-1"]');
+    await fragment.trigger("pointerdown", { button: 0, pointerId: 4, clientX: 10, clientY: 10 });
+    await fragment.trigger("pointerup", { pointerId: 4 });
+    await fragment.trigger("dblclick", { button: 0 });
+    await wrapper.get("[data-floating-image-layer]").trigger("dblclick", { button: 0 });
+    expect(wrapper.emitted("select")).toBeDefined();
+    expect(wrapper.emitted("preview")).toBeUndefined();
+    await wrapper.setProps({ previewOnDoubleClick: true });
+    await fragment.trigger("dblclick", { button: 0 });
+    expect(wrapper.emitted("preview")).toHaveLength(1);
+    wrapper.unmount();
+  });
   test("keeps image pixels out of the DOM and routes an unselected image through the surface hit test", () => {
     const wrapper = mountLayer({ selectedImageId: null });
     expect(wrapper.findAll("img, svg, .sheet-floating-image-layer__placeholder")).toHaveLength(0);

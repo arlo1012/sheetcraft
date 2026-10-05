@@ -24,6 +24,7 @@ const viewerReady = ref(false);
 const presentationUrl = ref<string>();
 const hasTransform = computed(() =>
   Boolean(
+    props.transform?.annotations?.length ||
     props.transform?.appearance ||
     props.transform?.crop ||
     props.transform?.rotation ||
@@ -57,7 +58,7 @@ async function onPresentationSourceLoad(event: Event): Promise<void> {
   if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return;
   const generation = presentationGeneration.value;
   try {
-    if (props.transform?.appearance) {
+    if (props.transform?.appearance || props.transform?.annotations?.length) {
       const canvas = createPictureCanvas(image, props.transform);
       const blob = await new Promise<Blob>((resolve, reject) =>
         canvas.toBlob(

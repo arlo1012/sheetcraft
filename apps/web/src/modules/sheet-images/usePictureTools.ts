@@ -1,7 +1,12 @@
 import { ref, type Ref } from "vue";
 import { createSetSheetFloatingImagesCommand, type WorkbookCommand } from "@idea10/core/commands";
 import { canUseSheetPermission } from "@idea10/core";
-import type { FloatingImage, Sheet } from "@idea10/core/workbook";
+import {
+  normalizeImageTransform,
+  type ImageAppearance,
+  type FloatingImage,
+  type Sheet,
+} from "@idea10/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 export type PictureLayerAction = "front" | "forward" | "backward" | "back";
 export type PictureAlignment =
@@ -112,11 +117,35 @@ export function usePictureTools(options: {
     updateMany(images);
     return true;
   }
+  function applyAppearance(patch: Partial<ImageAppearance> | undefined): void {
+    updateMany(
+      options
+        .getSheet()
+        .floatingImages.filter((image) => options.selectedIds.value.includes(image.id))
+        .map((image) => ({
+          ...image,
+          transform: normalizeImageTransform({
+            ...image.transform,
+            appearance: patch ? { ...image.transform?.appearance, ...patch } : undefined,
+          }),
+        })),
+    );
+  }
   function toggleVisibility(image: FloatingImage): void {
     updateMany([{ ...image, hidden: !image.hidden }]);
   }
   function rename(image: FloatingImage, name: string): void {
     updateMany([{ ...image, altText: name }]);
   }
-  return { paneVisible, updateMany, remove, group, layer, toggleVisibility, rename, resizeMany };
+  return {
+    applyAppearance,
+    paneVisible,
+    updateMany,
+    remove,
+    group,
+    layer,
+    toggleVisibility,
+    rename,
+    resizeMany,
+  };
 }

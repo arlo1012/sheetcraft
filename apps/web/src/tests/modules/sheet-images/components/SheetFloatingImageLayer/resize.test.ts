@@ -55,6 +55,28 @@ function fixture(options?: {
 }
 
 describe("floating image resize controls", () => {
+  test("resizes a selected group with one atomic update and preserved member spacing", async () => {
+    const { wrapper, image, layout } = fixture();
+    const second = { ...image, id: "second", anchor: { row: 3, column: 3 }, width: 60, height: 30 };
+    await wrapper.setProps({ images: [image, second], selectedImageIds: [image.id, second.id] });
+    expect(wrapper.findAll("[data-image-resize]")).toHaveLength(8);
+    const handle = wrapper.get('[data-floating-image-group] [data-image-resize="e"]');
+    const layer = wrapper.get("[data-floating-image-layer]");
+    await handle.trigger("pointerdown", { button: 0, pointerId: 14, clientX: 320, clientY: 80 });
+    await layer.trigger("pointermove", { pointerId: 14, clientX: 430, clientY: 80 });
+    expect(wrapper.emitted("updateMany")).toBeUndefined();
+    await layer.trigger("pointerup", { pointerId: 14 });
+    expect(wrapper.emitted("update")).toBeUndefined();
+    const updates = wrapper.emitted("updateMany")!;
+    expect(updates).toHaveLength(1);
+    const [first, last] = updates[0]![0] as FloatingImage[];
+    expect(first!.width).toBe(180);
+    expect(last!.width).toBe(90);
+    expect(
+      getFloatingImageSheetRect(last!, layout)!.x - getFloatingImageSheetRect(first!, layout)!.x,
+    ).toBe(240);
+  });
+
   test("preserves the image aspect ratio during a locked edge resize", async () => {
     const { wrapper, layout } = fixture({ image: { lockAspectRatio: true } });
     const layer = wrapper.get("[data-floating-image-layer]");

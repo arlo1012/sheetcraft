@@ -70,6 +70,10 @@
     "./visibility": {
       "types": "./dist/visibility.d.ts",
       "import": "./dist/visibility.js"
+    },
+    "./floating-image-group": {
+      "types": "./dist/floating-image-group.d.ts",
+      "import": "./dist/floating-image-group.js"
     }
   },
   "scripts": {

@@ -221,6 +221,7 @@ const props = withDefaults(
     referenceEditor?: FormulaReferenceEditor | null;
     editSession?: CellEditSession;
     imageAssetUrls?: ReadonlyMap<string, string>;
+    imagePreviewOnDoubleClick?: boolean;
     loadingImageAssetIds?: ReadonlySet<string>;
     missingImageAssetIds?: ReadonlySet<string>;
     readOnly?: boolean;
@@ -3316,6 +3317,7 @@ defineExpose({
         @edit="emit('editDrawing', $event)"
       />
       <SheetFloatingImageLayer
+        :preview-on-double-click="imagePreviewOnDoubleClick ?? true"
         ref="imageLayerRef"
         @paint-state-change="imagePaintState = $event"
         :scale="scale"

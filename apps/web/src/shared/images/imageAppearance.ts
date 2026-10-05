@@ -1,3 +1,4 @@
+import { paintImageAnnotations } from "./imageAnnotations";
 import type { ImageAppearance, ImageTransform } from "@idea10/core/workbook";
 import { getImagePresentation } from "./imagePresentation";
 
@@ -99,6 +100,13 @@ export function paintImagePresentation(
       geometry.cropWidth,
       geometry.cropHeight,
     );
+    if (transform?.annotations?.length) {
+      context.beginPath();
+      context.rect(0, 0, geometry.cropWidth, geometry.cropHeight);
+      context.clip();
+      context.translate(-geometry.cropX, -geometry.cropY);
+      paintImageAnnotations(context, transform.annotations, sourceWidth, sourceHeight);
+    }
     context.restore();
   };
   context.save();

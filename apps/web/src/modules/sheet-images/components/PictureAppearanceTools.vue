@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId } from "vue";
-import { Palette, Square, Sun, Blend, RotateCcw, Pipette } from "lucide-vue-next";
+import {
+  Palette,
+  Square,
+  Sun,
+  Blend,
+  RotateCcw,
+  Pipette,
+  Frame,
+  SlidersHorizontal,
+} from "lucide-vue-next";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import {
@@ -17,10 +26,22 @@ import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 const props = defineProps<{ image: FloatingImage; disabled: boolean }>();
-const emit = defineEmits<{ update: [image: FloatingImage] }>();
+const emit = defineEmits<{
+  update: [image: FloatingImage];
+  change: [patch: Partial<ImageAppearance> | undefined];
+}>();
 const { t } = useAppI18n();
-type Mode = "color" | "effects" | "border" | "transparency" | "transparentColor";
+type Mode =
+  | "design"
+  | "filters"
+  | "color"
+  | "effects"
+  | "border"
+  | "transparency"
+  | "transparentColor";
 const mode = ref<Mode>("color");
+const designButton = ref<InstanceType<typeof RibbonMenuButton>>();
+const filtersButton = ref<InstanceType<typeof RibbonMenuButton>>();
 const colorButton = ref<InstanceType<typeof RibbonMenuButton>>();
 const effectButton = ref<InstanceType<typeof RibbonMenuButton>>();
 const borderButton = ref<InstanceType<typeof RibbonMenuButton>>();
@@ -28,6 +49,10 @@ const transparencyButton = ref<InstanceType<typeof RibbonMenuButton>>();
 const transparentColorButton = ref<InstanceType<typeof RibbonMenuButton>>();
 const triggerRef = computed(() => {
   switch (mode.value) {
+    case "design":
+      return designButton.value?.rootElement ?? null;
+    case "filters":
+      return filtersButton.value?.rootElement ?? null;
     case "color":
       return colorButton.value?.rootElement ?? null;
     case "effects":
@@ -70,6 +95,7 @@ function change(patch: Partial<ImageAppearance>): void {
     appearance: { ...appearance.value, ...patch },
   });
   emit("update", { ...props.image, transform });
+  emit("change", patch);
 }
 function number(key: "brightness" | "contrast" | "saturation" | "opacity", value: unknown): void {
   if (typeof value !== "number" || !Number.isFinite(value)) return;
@@ -81,6 +107,7 @@ function preset(patch: Partial<ImageAppearance>): void {
 }
 function reset(): void {
   if (props.disabled) return;
+  emit("change", undefined);
   emit("update", {
     ...props.image,
     transform: normalizeImageTransform({ ...props.image.transform, appearance: undefined }),
@@ -152,11 +179,35 @@ function reset(): void {
       <RibbonButton
         :label="t('picture.resetStyle')"
         :text="t('picture.resetStyle')"
-        :disabled="disabled || !image.transform?.appearance"
+        :disabled="disabled"
         @activate="reset"
         ><RotateCcw
       /></RibbonButton>
     </div>
+    <RibbonMenuButton
+      ref="designButton"
+      variant="tall"
+      :label="t('picture.design')"
+      :text="t('picture.design')"
+      :disabled="disabled"
+      :expanded="open && mode === 'design'"
+      :menu-id="menuId"
+      @activate="toggle('design')"
+      @keydown="keydown('design', $event)"
+      ><Frame
+    /></RibbonMenuButton>
+    <RibbonMenuButton
+      ref="filtersButton"
+      variant="tall"
+      :label="t('picture.filters')"
+      :text="t('picture.filters')"
+      :disabled="disabled"
+      :expanded="open && mode === 'filters'"
+      :menu-id="menuId"
+      @activate="toggle('filters')"
+      @keydown="keydown('filters', $event)"
+      ><SlidersHorizontal
+    /></RibbonMenuButton>
     <Teleport to="body">
       <MenuSurface
         v-if="open"
@@ -279,7 +330,7 @@ function reset(): void {
               />
             </div>
           </GallerySection>
-          <GallerySection v-else :title="t('picture.effects')">
+          <GallerySection v-else-if="mode === 'effects'" :title="t('picture.effects')">
             <TCheckbox
               :model-value="!!appearance.reflection"
               @update:model-value="change({ reflection: Boolean($event) })"
@@ -288,6 +339,106 @@ function reset(): void {
           </GallerySection>
         </template>
         <template #items>
+          <template v-if="mode === 'design'">
+            <MenuItem
+              @select="
+                preset({
+                  border: { color: '#FFFFFF', width: 6 },
+                  shadow: 'soft',
+                  reflection: undefined,
+                })
+              "
+              >{{ t("picture.designPlain") }}</MenuItem
+            >
+            <MenuItem
+              @select="preset({ border: undefined, shadow: 'soft', reflection: undefined })"
+              >{{ t("picture.designShadow") }}</MenuItem
+            >
+            <MenuItem
+              @select="
+                preset({
+                  border: { color: '#D9E2F3', width: 2 },
+                  shadow: undefined,
+                  reflection: true,
+                })
+              "
+              >{{ t("picture.designReflection") }}</MenuItem
+            >
+          </template>
+          <template v-if="mode === 'filters'">
+            <MenuItem
+              @select="
+                preset({
+                  grayscale: undefined,
+                  sepia: undefined,
+                  saturation: undefined,
+                  brightness: undefined,
+                  contrast: undefined,
+                })
+              "
+              >{{ t("picture.originalColor") }}</MenuItem
+            >
+            <MenuItem
+              @select="
+                preset({
+                  grayscale: 1,
+                  sepia: undefined,
+                  saturation: 1,
+                  brightness: 1,
+                  contrast: 1.1,
+                })
+              "
+              >{{ t("picture.grayscale") }}</MenuItem
+            >
+            <MenuItem
+              @select="
+                preset({
+                  grayscale: undefined,
+                  sepia: 0.4,
+                  saturation: 1.15,
+                  brightness: 1.05,
+                  contrast: 1,
+                })
+              "
+              >{{ t("picture.filterWarm") }}</MenuItem
+            >
+            <MenuItem
+              @select="
+                preset({
+                  grayscale: 0.15,
+                  sepia: undefined,
+                  saturation: 0.75,
+                  brightness: 1.1,
+                  contrast: 0.9,
+                })
+              "
+              >{{ t("picture.filterCool") }}</MenuItem
+            >
+            <MenuItem
+              @select="
+                preset({
+                  grayscale: undefined,
+                  sepia: undefined,
+                  saturation: 1.5,
+                  brightness: 1.05,
+                  contrast: 1.2,
+                })
+              "
+              >{{ t("picture.filterVivid") }}</MenuItem
+            >
+            <MenuItem
+              @select="
+                preset({
+                  grayscale: 0.25,
+                  sepia: 0.1,
+                  saturation: 0.7,
+                  brightness: 1.15,
+                  contrast: 0.8,
+                })
+              "
+              >{{ t("picture.filterFade") }}</MenuItem
+            >
+          </template>
           <template v-if="mode === 'color'">
             <MenuItem
               @select="

@@ -17,7 +17,7 @@ describe("pivot snapshot protocol", () => {
       createSetPivotTableCommand(f.destination.id, f.table, { chartId: "chart" }),
     );
     const snapshot = serializeWorkbook(f.workbook);
-    expect(snapshot.version).toBe(31);
+    expect(snapshot.version).toBe(32);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     const standalone = serializeSheet(f.destination);
     expect(serializeSheet(deserializeSheet(standalone))).toEqual(standalone);
@@ -31,6 +31,6 @@ describe("pivot snapshot protocol", () => {
       version: 30,
       sheets: snapshot.sheets.map(({ pivotTables: _pivots, ...sheet }) => sheet),
     };
-    expect(serializeWorkbook(deserializeWorkbook(previous)).version).toBe(31);
+    expect(serializeWorkbook(deserializeWorkbook(previous)).version).toBe(32);
   });
 });

@@ -194,7 +194,10 @@ export function restoreFloatingImage(
   const width = fitted.width;
   const height = fitted.height;
   return reanchorFloatingImageAtSheetRect(
-    withTransform(image, undefined),
+    withTransform(image, {
+      appearance: image.transform?.appearance,
+      annotations: image.transform?.annotations,
+    }),
     {
       x: rect.x + (rect.width - width) / 2,
       y: rect.y + (rect.height - height) / 2,

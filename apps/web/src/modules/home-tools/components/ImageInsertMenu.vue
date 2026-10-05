@@ -9,7 +9,9 @@ import { useMenu } from "../../../shared/menu/useMenu";
 
 defineOptions({ inheritAttrs: false });
 
-const props = defineProps<{ disabled: boolean }>();
+const props = withDefaults(defineProps<{ disabled: boolean; compact?: boolean; text?: string }>(), {
+  compact: false,
+});
 const emit = defineEmits<{ insertImage: [mode: "cell" | "floating"] }>();
 const { t } = useAppI18n();
 const triggerComponentRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
@@ -33,12 +35,12 @@ function insertImage(mode: "cell" | "floating"): void {
     <RibbonMenuButton
       ref="triggerComponentRef"
       :label="t('image.insertMenu')"
-      :text="t('ribbon.image')"
+      :text="text ?? t('ribbon.image')"
       :disabled="disabled"
-      variant="tall"
+      :variant="compact ? 'compact' : 'tall'"
       data-ribbon-action="image"
-      data-ribbon-layout="tall"
-      data-ribbon-span="2"
+      :data-ribbon-layout="compact ? 'compact' : 'tall'"
+      :data-ribbon-span="compact ? '1' : '2'"
       popup-role="menu"
       :expanded="open"
       :menu-id="menuId"

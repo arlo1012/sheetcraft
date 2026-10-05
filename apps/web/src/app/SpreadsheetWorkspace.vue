@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { FloatingImage, Workbook } from "@idea10/core/workbook";
 import { useWordProofreading } from "../modules/text-proofreading/useWordProofreading";
 import ProofreadingToolbar from "../modules/text-proofreading/components/ProofreadingToolbar.vue";
 import WordReviewDialog from "../modules/text-proofreading/components/WordReviewDialog.vue";
@@ -80,6 +81,7 @@ import PictureCompressDialog from "../modules/sheet-images/components/PictureCom
 import PictureBatchSizeDialog from "../modules/sheet-images/components/PictureBatchSizeDialog.vue";
 import { usePictureTools } from "../modules/sheet-images/usePictureTools";
 import PictureSelectionPane from "../modules/sheet-images/components/PictureSelectionPane.vue";
+import PictureAnnotationDialog from "../modules/sheet-images/components/PictureAnnotationDialog.vue";
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
@@ -539,6 +541,7 @@ const showPageWhiteSpace = ref(true);
 const pageRulerUnit = ref<PageLayoutRulerUnit>("cm");
 const pageSetupTab = ref<"page" | "margins" | "header-footer" | "sheet">("page");
 const headerFooterTarget = shallowRef<HeaderFooterEditTarget>();
+const picturePreviewOnDoubleClick = ref(true);
 const selectedPictureId = ref<string | null>(null);
 const selectedPictureIds = ref<string[]>([]);
 const selectedPicture = computed(() =>
@@ -1309,11 +1312,33 @@ const drawingActions = useDrawingActions({
 });
 const { editing: editingDrawing } = drawingActions;
 watch(() => activeSheet.value.id, drawingActions.close);
+const pictureAnnotation = shallowRef<{
+  image: FloatingImage;
+  sheetId: string;
+  workbook: Workbook;
+}>();
+function openPictureAnnotation(): void {
+  const image = selectedPicture.value;
+  if (!image || !imageAssetUrls.value.get(image.assetId)) return;
+  pictureAnnotation.value = { image, sheetId: activeSheet.value.id, workbook: session.workbook };
+}
+function applyPictureAnnotation(image: FloatingImage): void {
+  const draft = pictureAnnotation.value;
+  if (
+    draft &&
+    draft.workbook === session.workbook &&
+    draft.sheetId === activeSheet.value.id &&
+    activeSheet.value.floatingImages.find((current) => current.id === image.id) === draft.image
+  )
+    setFloatingImage(image);
+  pictureAnnotation.value = undefined;
+}
 const pictureCompressVisible = ref(false);
 const pictureBatchSizeVisible = ref(false);
 watch(
   () => activeSheet.value.id,
   () => {
+    pictureAnnotation.value = undefined;
     pictureCompressVisible.value = false;
     pictureBatchSizeVisible.value = false;
   },
@@ -2185,6 +2210,7 @@ const gridInert = computed(
     (!!editingCamera.value && !pickingCameraRange.value) ||
     (!!editingControl.value && !pickingControlRange.value) ||
     (!!editingPivot.value && !pickingPivotRange.value) ||
+    !!pictureAnnotation.value ||
     !!viewingAttachment.value ||
     !!editingDrawing.value ||
     symbolVisible.value ||
@@ -2269,6 +2295,7 @@ const gridInert = computed(
         (!!editingCamera && !pickingCameraRange) ||
         (!!editingControl && !pickingControlRange) ||
         (!!editingPivot && !pickingPivotRange) ||
+        !!pictureAnnotation ||
         !!viewingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
@@ -2334,6 +2361,8 @@ const gridInert = computed(
           v-if="selectedPicture"
           :image="selectedPicture"
           :selection-count="selectedPictureIds.length"
+          :preview-on-double-click="picturePreviewOnDoubleClick"
+          @view-settings="picturePreviewOnDoubleClick = $event"
           :busy="loading || fileBusy || xlsxBusy || imageBusy"
           :disabled="
             loading ||
@@ -2345,12 +2374,14 @@ const gridInert = computed(
             !canUseSheetPermission(activeSheet, 'editObjects')
           "
           @update="setFloatingImage"
+          @appearance="pictureTools.applyAppearance"
           @insert-image="imageActions.requestInsert"
           @crop="sheetGridRef?.cropImage()"
           @rotate="sheetGridRef?.rotateImage($event)"
           @flip="sheetGridRef?.flipImage($event)"
           @restore="sheetGridRef?.restoreImage()"
           @replace="imageActions.requestReplace(selectedPicture.id)"
+          @annotate="openPictureAnnotation"
           @compress="pictureCompressVisible = true"
           @batch-size="pictureBatchSizeVisible = true"
           @export="pictureAssetTools.exportPictures"
@@ -3252,6 +3283,7 @@ const gridInert = computed(
         (!!editingCamera && !pickingCameraRange) ||
         (!!editingControl && !pickingControlRange) ||
         (!!editingPivot && !pickingPivotRange) ||
+        !!pictureAnnotation ||
         !!viewingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
@@ -3434,6 +3466,7 @@ const gridInert = computed(
           :reference-editor="activeRangePicker?.editor ?? formulaBarRef"
           :edit-session="cellEditSession"
           :image-asset-urls="imageAssetUrls"
+          :image-preview-on-double-click="picturePreviewOnDoubleClick"
           :loading-image-asset-ids="loadingImageAssetIds"
           :missing-image-asset-ids="missingImageAssetIds"
           @selected-floating-image-change="
@@ -3534,6 +3567,13 @@ const gridInert = computed(
       @close="textReview.close"
       @replace="textReview.replace"
       @ignore="textReview.ignore"
+    />
+    <PictureAnnotationDialog
+      v-if="pictureAnnotation"
+      :image="pictureAnnotation.image"
+      :source="imageAssetUrls.get(pictureAnnotation.image.assetId) ?? ''"
+      @confirm="applyPictureAnnotation"
+      @close="pictureAnnotation = undefined"
     />
     <PictureCompressDialog
       v-if="pictureCompressVisible"
@@ -3663,6 +3703,7 @@ const gridInert = computed(
         (!!editingCamera && !pickingCameraRange) ||
         (!!editingControl && !pickingControlRange) ||
         (!!editingPivot && !pickingPivotRange) ||
+        !!pictureAnnotation ||
         !!viewingAttachment ||
         !!editingDrawing ||
         symbolVisible ||

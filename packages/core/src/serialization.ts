@@ -218,7 +218,8 @@ export type WorkbookSnapshotV28 = Omit<WorkbookSnapshotV27, "version"> & { versi
 export type WorkbookSnapshotV29 = Omit<WorkbookSnapshotV28, "version"> & { version: 29 };
 export type WorkbookSnapshotV30 = Omit<WorkbookSnapshotV29, "version"> & { version: 30 };
 export type WorkbookSnapshotV31 = Omit<WorkbookSnapshotV30, "version"> & { version: 31 };
-export type WorkbookSnapshot = WorkbookSnapshotV31;
+export type WorkbookSnapshotV32 = Omit<WorkbookSnapshotV31, "version"> & { version: 32 };
+export type WorkbookSnapshot = WorkbookSnapshotV32;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -266,7 +267,8 @@ type SnapshotVersion =
   | 28
   | 29
   | 30
-  | 31;
+  | 31
+  | 32;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -371,6 +373,8 @@ function parseCellContent(value: unknown, path: string, version: SnapshotVersion
       return fail(`${path}.image.altText`, "Expected a string.");
     if (version < 24 && (image.transform as ImageTransform | undefined)?.appearance !== undefined)
       return fail(path, "Picture styling requires snapshot version 24.");
+    if (version < 32 && (image.transform as ImageTransform | undefined)?.annotations !== undefined)
+      return fail(path, "Picture annotations require snapshot version 32.");
     let transform: ImageTransform | undefined;
     if (version >= 5 && Object.hasOwn(image, "transform")) {
       try {
@@ -606,6 +610,8 @@ function parseFloatingImage(value: unknown, path: string, version: SnapshotVersi
       (record.transform as ImageTransform | undefined)?.appearance !== undefined)
   )
     return fail(path, "Picture styling requires snapshot version 24.");
+  if (version < 32 && (record.transform as ImageTransform | undefined)?.annotations !== undefined)
+    return fail(path, "Picture annotations require snapshot version 32.");
   let transform: ImageTransform | undefined;
   if (version >= 5 && Object.hasOwn(record, "transform")) {
     try {
@@ -805,69 +811,83 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     );
     if (hasValue && hasContent)
       return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
-    version = Object.hasOwn(record, "pivotTables")
-      ? 31
-      : Object.hasOwn(record, "drawings")
+    const hasAnnotations =
+      (Array.isArray(record.floatingImages) &&
+        record.floatingImages.some(
+          (item) =>
+            (asRecord(item, path).transform as ImageTransform | undefined)?.annotations !==
+            undefined,
+        )) ||
+      cells.some(
+        (cell) =>
+          (asRecord(cell, path).content as { image?: { transform?: ImageTransform } } | undefined)
+            ?.image?.transform?.annotations !== undefined,
+      );
+    version = hasAnnotations
+      ? 32
+      : Object.hasOwn(record, "pivotTables")
         ? 31
-        : cells.some((cell) => Object.hasOwn(asRecord(cell, path), "sparkline"))
-          ? 27
-          : (Array.isArray(record.floatingImages) &&
-                record.floatingImages.some((image) => {
-                  const item = asRecord(image, `${path}.floatingImages`);
-                  return (
-                    "hidden" in item ||
-                    "groupId" in item ||
-                    "lockAspectRatio" in item ||
-                    Boolean((item.transform as ImageTransform | undefined)?.appearance)
-                  );
-                })) ||
-              cells.some((cell) =>
-                Boolean(
-                  (
-                    asRecord(cell, path).content as
-                      | { image?: { transform?: ImageTransform } }
-                      | undefined
-                  )?.image?.transform?.appearance,
-                ),
-              )
-            ? 24
-            : Object.hasOwn(record, "protection") ||
+        : Object.hasOwn(record, "drawings")
+          ? 31
+          : cells.some((cell) => Object.hasOwn(asRecord(cell, path), "sparkline"))
+            ? 27
+            : (Array.isArray(record.floatingImages) &&
+                  record.floatingImages.some((image) => {
+                    const item = asRecord(image, `${path}.floatingImages`);
+                    return (
+                      "hidden" in item ||
+                      "groupId" in item ||
+                      "lockAspectRatio" in item ||
+                      Boolean((item.transform as ImageTransform | undefined)?.appearance)
+                    );
+                  })) ||
                 cells.some((cell) =>
-                  Boolean((cell as { style?: { unlocked?: boolean } }).style?.unlocked),
+                  Boolean(
+                    (
+                      asRecord(cell, path).content as
+                        | { image?: { transform?: ImageTransform } }
+                        | undefined
+                    )?.image?.transform?.appearance,
+                  ),
                 )
-              ? 23
-              : hasValue
-                ? 1
-                : cells.some((cell) => {
-                      const item = asRecord(cell, `${path}.cells`);
-                      return (
-                        Object.hasOwn(item, "note") &&
-                        typeof item.note === "object" &&
-                        item.note !== null &&
-                        Object.hasOwn(item.note, "box")
-                      );
-                    })
-                  ? 21
-                  : cells.some((cell) => Object.hasOwn(asRecord(cell, `${path}.cells`), "note"))
-                    ? 20
-                    : cells.some((cell) => {
-                          const item = asRecord(cell, `${path}.cells`);
-                          return (
-                            Object.hasOwn(item, "namedStyle") || Object.hasOwn(item, "hyperlink")
-                          );
-                        })
-                      ? 15
-                      : Object.hasOwn(record, "pageDecoration")
-                        ? 17
-                        : Object.hasOwn(record, "tables") || Object.hasOwn(record, "pageSetup")
-                          ? 13
-                          : Object.hasOwn(record, "conditionalFormats")
-                            ? 12
-                            : Object.hasOwn(record, "properties")
-                              ? 7
-                              : Object.hasOwn(record, "floatingImages")
-                                ? 6
-                                : 3;
+              ? 24
+              : Object.hasOwn(record, "protection") ||
+                  cells.some((cell) =>
+                    Boolean((cell as { style?: { unlocked?: boolean } }).style?.unlocked),
+                  )
+                ? 23
+                : hasValue
+                  ? 1
+                  : cells.some((cell) => {
+                        const item = asRecord(cell, `${path}.cells`);
+                        return (
+                          Object.hasOwn(item, "note") &&
+                          typeof item.note === "object" &&
+                          item.note !== null &&
+                          Object.hasOwn(item.note, "box")
+                        );
+                      })
+                    ? 21
+                    : cells.some((cell) => Object.hasOwn(asRecord(cell, `${path}.cells`), "note"))
+                      ? 20
+                      : cells.some((cell) => {
+                            const item = asRecord(cell, `${path}.cells`);
+                            return (
+                              Object.hasOwn(item, "namedStyle") || Object.hasOwn(item, "hyperlink")
+                            );
+                          })
+                        ? 15
+                        : Object.hasOwn(record, "pageDecoration")
+                          ? 17
+                          : Object.hasOwn(record, "tables") || Object.hasOwn(record, "pageSetup")
+                            ? 13
+                            : Object.hasOwn(record, "conditionalFormats")
+                              ? 12
+                              : Object.hasOwn(record, "properties")
+                                ? 7
+                                : Object.hasOwn(record, "floatingImages")
+                                  ? 6
+                                  : 3;
   }
   if (version < 23 && record.protection !== undefined) {
     const protection = asRecord(record.protection, `${path}.protection`);
@@ -945,7 +965,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 31,
+    version: 32,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1008,7 +1028,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 28 &&
     record.version !== 29 &&
     record.version !== 30 &&
-    record.version !== 31
+    record.version !== 31 &&
+    record.version !== 32
   ) {
     throw new WorkbookDomainError(
       {

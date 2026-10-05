@@ -104,6 +104,9 @@ export {
   type ImageCrop,
   type ImageTransform,
   type ImageAppearance,
+  type ImageAnnotation,
+  type ImageAnnotationPoint,
+  normalizeImageAnnotations,
   normalizeImageAppearance,
 } from "./image-transform.js";
 

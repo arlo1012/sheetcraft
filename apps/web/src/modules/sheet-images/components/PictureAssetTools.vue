@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
-import { Minimize2, Images, Download, ScanEye, Printer } from "lucide-vue-next";
+import { Minimize2, Images, Download, Printer } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
@@ -33,14 +33,6 @@ function exportImage(format: PictureFileFormat, all = false): void {
 </script>
 <template>
   <section class="picture-asset-tools" role="group" :aria-label="t('picture.files')">
-    <RibbonButton
-      variant="tall"
-      :label="t('image.preview')"
-      :text="t('image.preview')"
-      :disabled="busy"
-      @activate="emit('preview')"
-      ><ScanEye
-    /></RibbonButton>
     <RibbonButton
       variant="tall"
       :label="t('picture.compress')"

@@ -1,24 +1,19 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import {
-  Crop,
-  RotateCcw,
-  RotateCw,
-  FlipHorizontal2,
-  FlipVertical2,
-  ImageDown,
-  ImagePlus,
-} from "lucide-vue-next";
+import { Crop, RotateCcw, ImageDown, ImagePlus, PencilLine } from "lucide-vue-next";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import {
   MIN_FLOATING_IMAGE_SIZE,
   MAX_FLOATING_IMAGE_SIZE,
   type FloatingImage,
+  type ImageAppearance,
 } from "@idea10/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
+import PictureViewMenu from "./PictureViewMenu.vue";
+import PictureRotationMenu from "./PictureRotationMenu.vue";
 import PictureAssetTools from "./PictureAssetTools.vue";
 import type { PictureFileFormat } from "../picture-asset-conversion";
 import PictureArrangeTools from "./PictureArrangeTools.vue";
@@ -30,9 +25,11 @@ const props = defineProps<{
   disabled: boolean;
   busy?: boolean;
   selectionCount: number;
+  previewOnDoubleClick: boolean;
 }>();
 const emit = defineEmits<{
   update: [image: FloatingImage];
+  appearance: [patch: Partial<ImageAppearance> | undefined];
   insertImage: [mode: "cell" | "floating"];
   crop: [];
   rotate: [turns: -1 | 1 | 2];
@@ -45,9 +42,11 @@ const emit = defineEmits<{
   layer: [action: PictureLayerAction];
   selectionPane: [];
   compress: [];
+  annotate: [];
   batchSize: [];
   export: [format: PictureFileFormat, all?: boolean];
   preview: [];
+  viewSettings: [value: boolean];
   print: [];
   convertToCell: [];
 }>();
@@ -74,6 +73,12 @@ function resize(axis: "width" | "height", points: unknown): void {
   <RibbonToolbar :label="t('image.tools')">
     <section class="picture-toolbar__group" role="group" :aria-label="t('image.insertMenu')">
       <div class="picture-toolbar__stack">
+        <ImageInsertMenu
+          compact
+          :text="t('image.insertMenu')"
+          :disabled="disabled"
+          @insert-image="emit('insertImage', $event)"
+        />
         <RibbonButton
           :label="t('image.replace')"
           :text="t('image.replace')"
@@ -83,10 +88,7 @@ function resize(axis: "width" | "height", points: unknown): void {
           ><ImagePlus
         /></RibbonButton>
       </div>
-      <ImageInsertMenu
-        :disabled="disabled || selectionCount > 1"
-        @insert-image="emit('insertImage', $event)"
-      />
+
       <RibbonButton
         variant="tall"
         :label="t('image.convertToCell')"
@@ -96,6 +98,12 @@ function resize(axis: "width" | "height", points: unknown): void {
         ><ImageDown
       /></RibbonButton>
     </section>
+    <PictureViewMenu
+      :disabled="!!busy"
+      :preview-on-double-click="previewOnDoubleClick"
+      @preview="emit('preview')"
+      @change="emit('viewSettings', $event)"
+    />
     <section class="picture-toolbar__group" role="group" :aria-label="t('image.crop')">
       <RibbonButton
         variant="tall"
@@ -155,44 +163,11 @@ function resize(axis: "width" | "height", points: unknown): void {
         /></RibbonButton>
       </div>
     </section>
-    <section class="picture-toolbar__group" role="group" :aria-label="t('image.rotate')">
-      <div class="picture-toolbar__stack">
-        <RibbonButton
-          :label="t('image.rotateLeft')"
-          :text="t('image.rotateLeft')"
-          :disabled="disabled || selectionCount > 1"
-          data-picture-tool="rotate-left"
-          @activate="emit('rotate', -1)"
-          ><RotateCcw
-        /></RibbonButton>
-        <RibbonButton
-          :label="t('image.rotateRight')"
-          :text="t('image.rotateRight')"
-          :disabled="disabled || selectionCount > 1"
-          data-picture-tool="rotate-right"
-          @activate="emit('rotate', 1)"
-          ><RotateCw
-        /></RibbonButton>
-      </div>
-      <div class="picture-toolbar__stack">
-        <RibbonButton
-          :label="t('image.flipHorizontal')"
-          :text="t('image.flipHorizontal')"
-          :disabled="disabled || selectionCount > 1"
-          data-picture-tool="flip-horizontal"
-          @activate="emit('flip', 'horizontal')"
-          ><FlipHorizontal2
-        /></RibbonButton>
-        <RibbonButton
-          :label="t('image.flipVertical')"
-          :text="t('image.flipVertical')"
-          :disabled="disabled || selectionCount > 1"
-          data-picture-tool="flip-vertical"
-          @activate="emit('flip', 'vertical')"
-          ><FlipVertical2
-        /></RibbonButton>
-      </div>
-    </section>
+    <PictureRotationMenu
+      :disabled="disabled"
+      @rotate="emit('rotate', $event)"
+      @flip="emit('flip', $event)"
+    />
     <PictureArrangeTools
       :disabled="disabled"
       :count="selectionCount"
@@ -205,9 +180,18 @@ function resize(axis: "width" | "height", points: unknown): void {
     />
     <PictureAppearanceTools
       :image="image"
-      :disabled="disabled || selectionCount > 1"
-      @update="emit('update', $event)"
+      :disabled="disabled"
+      @change="emit('appearance', $event)"
     />
+    <RibbonButton
+      variant="tall"
+      :label="t('picture.annotate')"
+      :text="t('picture.annotate')"
+      :disabled="disabled || selectionCount > 1"
+      data-picture-tool="annotate"
+      @activate="emit('annotate')"
+      ><PencilLine
+    /></RibbonButton>
     <PictureAssetTools
       :disabled="disabled"
       :busy="!!busy"

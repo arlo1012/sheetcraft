@@ -204,7 +204,7 @@ describe("form controls", () => {
   test("round trips V30 controls and rejects their payload in V29", () => {
     const f = fixture();
     const snapshot = serializeWorkbook(f.session.workbook);
-    expect(snapshot.version).toBe(31);
+    expect(snapshot.version).toBe(32);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 29 })).toThrow();
     const standalone = serializeSheet(f.sheet);

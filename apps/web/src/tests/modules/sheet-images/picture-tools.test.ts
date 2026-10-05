@@ -47,6 +47,56 @@ function fixture(images = ["a", "b", "c", "d", "e"].map((id) => picture(id))) {
 }
 
 describe("picture tools", () => {
+  test("patches selected picture appearances while preserving each picture's geometry and annotations", () => {
+    const a: FloatingImage = {
+      ...picture("b"),
+      transform: {
+        crop: { x: 0.1, y: 0.2, width: 0.5, height: 0.5 },
+        rotation: 90,
+        appearance: { opacity: 0.5 },
+        annotations: [{ kind: "pen", points: [{ x: 0.2, y: 0.3 }], color: "#FF0000", width: 0.01 }],
+      },
+    };
+    const b: FloatingImage = {
+      ...picture("d"),
+      width: 200,
+      offsetX: 15,
+      transform: {
+        flipHorizontal: true,
+        appearance: { brightness: 0.7 },
+        annotations: [
+          {
+            kind: "text",
+            points: [{ x: 0.4, y: 0.6 }],
+            color: "#0000FF",
+            width: 0.02,
+            text: "Review",
+            fontSize: 0.1,
+          },
+        ],
+      },
+    };
+    const untouched = picture("other");
+    const f = fixture([a, b, untouched]);
+    f.tools.applyAppearance({ shadow: "soft" });
+    expect(f.execute).toHaveBeenCalledTimes(1);
+    expect(f.sheet.floatingImages).toEqual([
+      { ...a, transform: { ...a.transform, appearance: { opacity: 0.5, shadow: "soft" } } },
+      { ...b, transform: { ...b.transform, appearance: { brightness: 0.7, shadow: "soft" } } },
+      untouched,
+    ]);
+    f.tools.applyAppearance(undefined);
+    expect(f.sheet.floatingImages).toEqual([
+      {
+        ...a,
+        transform: { crop: a.transform!.crop, rotation: 90, annotations: a.transform!.annotations },
+      },
+      { ...b, transform: { flipHorizontal: true, annotations: b.transform!.annotations } },
+      untouched,
+    ]);
+    expect(a.transform!.appearance).toEqual({ opacity: 0.5 });
+    expect(b.transform!.appearance).toEqual({ brightness: 0.7 });
+  });
   test.each<[PictureLayerAction, string[]]>([
     ["front", ["a", "c", "e", "b", "d"]],
     ["back", ["b", "d", "a", "c", "e"]],

@@ -1,7 +1,14 @@
+import { normalizeImageAnnotations, type ImageAnnotation } from "./image-annotations.js";
+export {
+  normalizeImageAnnotations,
+  type ImageAnnotation,
+  type ImageAnnotationPoint,
+} from "./image-annotations.js";
 import { normalizeImageAppearance, type ImageAppearance } from "./image-appearance.js";
 export { normalizeImageAppearance, type ImageAppearance } from "./image-appearance.js";
 export type ImageCrop = { x: number; y: number; width: number; height: number };
 export type ImageTransform = {
+  annotations?: ImageAnnotation[];
   appearance?: ImageAppearance;
   crop?: ImageCrop;
   rotation?: 0 | 90 | 180 | 270;
@@ -63,9 +70,16 @@ export function normalizeImageTransform(
   if (transform.flipVertical !== undefined && typeof transform.flipVertical !== "boolean") {
     throw new TypeError("Image vertical flip must be a boolean.");
   }
+  const annotations = normalizeImageAnnotations(transform.annotations);
   const appearance = normalizeImageAppearance(transform.appearance);
-  return crop || rotation || transform.flipHorizontal || transform.flipVertical || appearance
+  return crop ||
+    rotation ||
+    transform.flipHorizontal ||
+    transform.flipVertical ||
+    appearance ||
+    annotations
     ? {
+        ...(annotations ? { annotations } : {}),
         ...(appearance ? { appearance } : {}),
         ...(crop ? { crop } : {}),
         ...(rotation ? { rotation } : {}),
@@ -94,6 +108,7 @@ export function areImageTransformsEqual(
   const a = normalizeImageTransform(left);
   const b = normalizeImageTransform(right);
   return (
+    JSON.stringify(a?.annotations) === JSON.stringify(b?.annotations) &&
     JSON.stringify(a?.appearance) === JSON.stringify(b?.appearance) &&
     a?.rotation === b?.rotation &&
     a?.flipHorizontal === b?.flipHorizontal &&
