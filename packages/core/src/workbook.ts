@@ -1,3 +1,4 @@
+import type { ProtectionPassword } from "./protection-password.js";
 import { normalizeSheetProtection, type SheetProtection } from "./protection.js";
 import { evaluateFormulaRuntime, evaluateFormulaRuntimeAst } from "./formula/evaluate.js";
 import { calculateIterativeComponents } from "./formula/iterative-calculation.js";
@@ -362,6 +363,8 @@ export type Sheet = {
   pageSetup?: SheetPageSetup;
   pageDecoration?: SheetPageDecoration;
   protection?: SheetProtection;
+  /** Transient editable-range authorization; never serialized or copied. */
+  protectionAccess?: Array<{ name: string; verifier: string | undefined }>;
   floatingImages: FloatingImage[];
 };
 
@@ -403,6 +406,7 @@ export type SheetSparseState = {
 
 export type Workbook = {
   structureProtected?: boolean;
+  structurePassword?: ProtectionPassword;
   id: string;
   /** Interpretation of date serials; cell numbers are not converted when this changes. */
   dateSystem: ExcelDateSystem;

@@ -1,7 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
 import { createWorkbook, getActiveSheet, setCellStyle, getCellStyle } from "@idea10/core/workbook";
-import { canEditCell } from "@idea10/core";
+import {
+  canEditCell,
+  createProtectionPassword,
+  verifyProtectionPassword,
+  unlockEditableRange,
+} from "@idea10/core";
 import { encodeXlsx, decodeXlsx } from "../index.js";
 
 describe("XLSX protection", () => {
@@ -41,6 +46,47 @@ describe("XLSX protection", () => {
     expect(canEditCell(restored, { row: 0, column: 1 })).toBe(false);
     expect(canEditCell(restored, { row: 3, column: 3 })).toBe(true);
   });
+  test("roundtrips passwords and all protection permissions without storing plaintext", async () => {
+    const workbook = createWorkbook({ id: "passwords", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    const password = createProtectionPassword("秘密pass", new Uint8Array(16).fill(9), 3);
+    workbook.structureProtected = true;
+    workbook.structurePassword = password;
+    sheet.properties.protected = true;
+    sheet.protection = {
+      password,
+      editableRanges: [
+        {
+          name: "Secret",
+          range: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+          password,
+        },
+      ],
+      sort: true,
+      autoFilter: true,
+      pivotTables: true,
+      editObjects: true,
+      insertRows: true,
+      insertColumns: true,
+      deleteRows: true,
+      deleteColumns: true,
+      insertHyperlinks: true,
+      selectLockedCells: false,
+      selectUnlockedCells: false,
+    };
+    const encoded = await encodeXlsx(workbook),
+      files = unzipSync(encoded.bytes);
+    expect(strFromU8(files["xl/workbook.xml"]!)).toContain('workbookAlgorithmName="SHA-512"');
+    expect(strFromU8(files["xl/worksheets/sheet1.xml"]!)).not.toContain("秘密pass");
+    const restored = (await decodeXlsx(encoded.bytes)).workbook,
+      restoredSheet = getActiveSheet(restored);
+    expect(restoredSheet.protection).toEqual(sheet.protection);
+    expect(verifyProtectionPassword("秘密pass", restored.structurePassword)).toBe(true);
+    expect(canEditCell(restoredSheet, { row: 0, column: 0 })).toBe(false);
+    expect(unlockEditableRange(restoredSheet, "Secret", "wrong")).toBe(false);
+    expect(unlockEditableRange(restoredSheet, "Secret", "秘密pass")).toBe(true);
+    expect(canEditCell(restoredSheet, { row: 0, column: 0 })).toBe(true);
+  });
   test("preserves configured edit ranges on an unprotected sheet", async () => {
     const workbook = createWorkbook({ id: "unprotected", sheetId: "sheet" });
     const sheet = getActiveSheet(workbook);
@@ -63,7 +109,10 @@ describe("XLSX protection", () => {
       ),
     );
     const loaded = await decodeXlsx(zipSync(files));
-    expect(getActiveSheet(loaded.workbook).protection?.editableRanges).toEqual([]);
-    expect(loaded.report.issues.some((issue) => issue.code === "feature-omitted")).toBe(true);
+    expect(getActiveSheet(loaded.workbook).protection?.editableRanges[0]?.password).toEqual({
+      kind: "legacy",
+      hash: "1234",
+    });
+    expect(canEditCell(getActiveSheet(loaded.workbook), { row: 0, column: 0 })).toBe(false);
   });
 });

@@ -43,6 +43,7 @@ const props = defineProps<{
   showOutline: boolean;
   readOnly: boolean;
   contentReadOnly?: boolean;
+  filterReadOnly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -243,7 +244,7 @@ watch(
     <span
       v-for="button in filterButtons"
       :key="`${button.tableId ?? 'sheet'}:${button.column}`"
-      v-icon-action="readOnly"
+      v-icon-action="filterReadOnly ?? readOnly"
       class="sheet-data-controls__filter"
       :style="button.style"
       :class="{ 'is-active': button.active }"

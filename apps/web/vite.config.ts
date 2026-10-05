@@ -1,8 +1,10 @@
+import { dictionaryAliases } from "./dictionary-assets.ts";
 import vue from "@vitejs/plugin-vue";
 import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [vue()],
+  resolve: { alias: dictionaryAliases },
   optimizeDeps: {
     // These workspace packages publish from dist. Keep them out of the dependency
     // optimizer so Vite observes their rebuilt output during development.

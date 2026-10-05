@@ -5,7 +5,7 @@ import { ChartNoAxesColumn, Link2, Table2 } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import ImageInsertMenu from "./ImageInsertMenu.vue";
 
-defineProps<{ disabled: boolean }>();
+defineProps<{ disabled: boolean; hyperlinkDisabled?: boolean; imageDisabled?: boolean }>();
 const emit = defineEmits<{ insertImage: [mode: "cell" | "floating"]; insertHyperlink: [] }>();
 const { t } = useAppI18n();
 </script>
@@ -21,12 +21,15 @@ const { t } = useAppI18n();
       variant="tall"
       :label="t('hyperlinks.insert')"
       :text="t('hyperlinks.insert')"
-      :disabled="disabled"
+      :disabled="hyperlinkDisabled ?? disabled"
       data-ribbon-action="insert-hyperlink"
       @activate="emit('insertHyperlink')"
       ><Link2 aria-hidden="true"
     /></RibbonButton>
-    <ImageInsertMenu :disabled="disabled" @insert-image="emit('insertImage', $event)" />
+    <ImageInsertMenu
+      :disabled="imageDisabled ?? disabled"
+      @insert-image="emit('insertImage', $event)"
+    />
     <div class="home-insert-group__stack" data-ribbon-stack="chart-pivot">
       <RibbonMenuButton
         :label="t('app.unavailableFeature', { feature: t('ribbon.chart') })"

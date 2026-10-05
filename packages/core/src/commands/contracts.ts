@@ -1,3 +1,4 @@
+import type { ProtectionPassword } from "../protection-password.js";
 import type { SheetProtection } from "../protection.js";
 import type { SheetSnapshot } from "../serialization.js";
 import type { ExcelDateSystem } from "../formula/date-system.js";
@@ -41,10 +42,13 @@ export type SetSheetProtectionCommand = {
   sheetId: string;
   protected: boolean;
   protection?: SheetProtection;
+  currentPassword?: string;
 };
 export type SetWorkbookStructureProtectionCommand = {
   type: "setWorkbookStructureProtection";
   protected: boolean;
+  password?: ProtectionPassword;
+  currentPassword?: string;
 };
 
 export type CellContentChange = {

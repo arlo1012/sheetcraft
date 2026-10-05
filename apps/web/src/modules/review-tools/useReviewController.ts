@@ -1,3 +1,4 @@
+import { canUseSheetPermission } from "@idea10/core";
 import { computed, nextTick, ref, shallowRef, watch } from "vue";
 import {
   createClearCellNotesCommand,
@@ -97,7 +98,11 @@ export function useReviewController(options: {
   );
 
   function edit(address = options.getAddress()): void {
-    if (options.isBusy() || options.getSheet().properties.protected || !options.finishEditing())
+    if (
+      options.isBusy() ||
+      !canUseSheetPermission(options.getSheet(), "editObjects") ||
+      !options.finishEditing()
+    )
       return;
     const cell = { ...anchor(address) };
     const note = getCellNote(options.getSheet(), cell);
@@ -114,7 +119,11 @@ export function useReviewController(options: {
   function save(value: { text: string; author: string; restoreFocus?: boolean }): void {
     if (!target || !draft.value || options.isBusy()) return;
     const sheet = options.getWorkbook().sheets.get(target.sheetId);
-    if (!sheet || sheet.properties.protected || options.getRevision() !== target.revision) {
+    if (
+      !sheet ||
+      !canUseSheetPermission(sheet, "editObjects") ||
+      options.getRevision() !== target.revision
+    ) {
       error.value = t("review.staleTarget");
       return;
     }
@@ -145,7 +154,7 @@ export function useReviewController(options: {
     }
   }
   function updateBox(value: { address: CellAddress; box: NonNullable<CellNote["box"]> }): void {
-    if (options.isBusy() || options.getSheet().properties.protected) return;
+    if (options.isBusy() || !canUseSheetPermission(options.getSheet(), "editObjects")) return;
     const cell = anchor(value.address);
     if (draft.value && target?.address.row === cell.row && target.address.column === cell.column) {
       draft.value = { ...draft.value, box: { ...value.box } };
@@ -162,7 +171,11 @@ export function useReviewController(options: {
     );
   }
   function resetBox(mode: "position" | "size" | "all"): void {
-    if (options.isBusy() || options.getSheet().properties.protected || !options.finishEditing())
+    if (
+      options.isBusy() ||
+      !canUseSheetPermission(options.getSheet(), "editObjects") ||
+      !options.finishEditing()
+    )
       return;
     const address = draft.value?.address ?? anchor(options.getAddress());
     const note = getCellNote(options.getSheet(), address);
@@ -186,7 +199,11 @@ export function useReviewController(options: {
     showActiveNote.value = visible;
   }
   function remove(address?: CellAddress): void {
-    if (options.isBusy() || options.getSheet().properties.protected || !options.finishEditing())
+    if (
+      options.isBusy() ||
+      !canUseSheetPermission(options.getSheet(), "editObjects") ||
+      !options.finishEditing()
+    )
       return;
     const sheetId = options.getSheet().id;
     const command = address

@@ -150,6 +150,8 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
+    "@noble/hashes": "2.0.1",
+    "@scure/base": "2.0.0",
     "javascript-lp-solver": "1.0.3",
     "numfmt": "3.2.6"
   },

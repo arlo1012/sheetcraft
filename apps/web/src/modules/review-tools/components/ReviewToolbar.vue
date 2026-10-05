@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import {
   ClipboardCheck,
+  SpellCheck,
+  Languages,
+  ShieldCheck,
   LockKeyhole,
   SquarePen,
   BookLock,
@@ -26,16 +29,20 @@ const props = withDefaults(
     lockedState?: boolean | "mixed";
     structureProtected?: boolean;
     readOnly: boolean;
+    objectsReadOnly?: boolean;
     hasNote: boolean;
     hasNotes: boolean;
     hasSelectedNotes?: boolean;
     showActiveNote: boolean;
     editSessionId?: string;
   }>(),
-  { hasSelectedNotes: undefined, editSessionId: undefined },
+  { hasSelectedNotes: undefined, editSessionId: undefined, objectsReadOnly: undefined },
 );
 const emit = defineEmits<{
   proofread: [];
+  spelling: [];
+  convertText: [mode: "to-simplified" | "to-traditional"];
+  encryptDocument: [];
   editNote: [];
   deleteNotes: [];
   previousNote: [];
@@ -72,6 +79,15 @@ const protectionLabel = computed(() =>
       <RibbonButton
         variant="tall"
         :disabled="busy"
+        :label="t('review.spelling')"
+        :text="t('review.spelling')"
+        data-review-action="spelling"
+        @activate="emit('spelling')"
+        ><SpellCheck
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :disabled="busy"
         :label="t('review.proofread')"
         :text="t('review.proofread')"
         data-review-action="proofread"
@@ -87,7 +103,7 @@ const protectionLabel = computed(() =>
     >
       <RibbonButton
         variant="tall"
-        :disabled="busy || readOnly"
+        :disabled="busy || (objectsReadOnly ?? readOnly)"
         :label="noteActionLabel"
         :text="noteActionLabel"
         data-review-action="edit-note"
@@ -96,7 +112,7 @@ const protectionLabel = computed(() =>
       /></RibbonButton>
       <RibbonButton
         variant="tall"
-        :disabled="busy || readOnly || !canDeleteNotes"
+        :disabled="busy || (objectsReadOnly ?? readOnly) || !canDeleteNotes"
         :label="t('review.deleteNotes')"
         :text="t('review.deleteNotes')"
         data-review-action="delete-notes"
@@ -123,7 +139,7 @@ const protectionLabel = computed(() =>
       </div>
       <div class="review-toolbar__stack">
         <NoteResetMenu
-          :disabled="busy || readOnly || !hasNote"
+          :disabled="busy || (objectsReadOnly ?? readOnly) || !hasNote"
           @reset="emit('resetNoteBox', $event)"
         />
         <NoteVisibilityMenu
@@ -153,7 +169,7 @@ const protectionLabel = computed(() =>
           ><LockKeyhole
         /></RibbonButton>
         <RibbonButton
-          :disabled="busy || readOnly"
+          :disabled="busy"
           :label="t('review.editableRanges')"
           :text="t('review.editableRanges')"
           data-review-action="editable-ranges"
@@ -182,6 +198,33 @@ const protectionLabel = computed(() =>
         @activate="emit('toggleWorkbookProtection')"
         ><BookLock
       /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :disabled="busy"
+        :label="t('review.encryptDocument')"
+        :text="t('review.encryptDocument')"
+        data-review-action="encrypt-document"
+        @activate="emit('encryptDocument')"
+        ><ShieldCheck
+      /></RibbonButton>
+    </section>
+    <section class="review-toolbar__group" role="group" :aria-label="t('review.toTraditional')">
+      <div class="review-toolbar__stack">
+        <RibbonButton
+          :disabled="busy"
+          :label="t('review.toTraditional')"
+          :text="t('review.toTraditional')"
+          @activate="emit('convertText', 'to-traditional')"
+          ><Languages
+        /></RibbonButton>
+        <RibbonButton
+          :disabled="busy"
+          :label="t('review.toSimplified')"
+          :text="t('review.toSimplified')"
+          @activate="emit('convertText', 'to-simplified')"
+          ><Languages
+        /></RibbonButton>
+      </div>
     </section>
   </RibbonToolbar>
 </template>

@@ -749,6 +749,9 @@ export const enUS = {
       imported: "XLSX imported. Undo history starts from this file.",
       exported: "XLSX download started. The current document and original file are unchanged.",
       failed: "XLSX processing failed. Please try again; your document was not replaced.",
+      unsupportedEncryption:
+        "This encryption method is not supported. Password-based Office Agile AES encryption is supported.",
+      invalidEncryptedFile: "The encrypted file is damaged or failed its integrity check.",
       timeout: "XLSX processing timed out and was stopped. The current document was not replaced.",
       finishEditing: "Finish your current text composition before importing or exporting XLSX.",
       stale:

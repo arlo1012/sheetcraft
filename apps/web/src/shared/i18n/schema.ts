@@ -721,6 +721,8 @@ export type MessageSchema = ToolMessageSchema & {
       exported: string;
       failed: string;
       timeout: string;
+      unsupportedEncryption: string;
+      invalidEncryptedFile: string;
       finishEditing: string;
       stale: string;
       blocked: string;

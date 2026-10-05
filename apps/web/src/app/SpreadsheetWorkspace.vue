@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { canEditCell } from "@idea10/core";
+import DocumentPasswordDialog from "../modules/workbook-xlsx/components/DocumentPasswordDialog.vue";
+import { useTextReviewController } from "../modules/review-tools/useTextReviewController";
+import TextReviewDialog from "../modules/review-tools/components/TextReviewDialog.vue";
+import { canEditCell, canUseSheetPermission } from "@idea10/core";
 import { useProtectionController } from "../modules/review-tools/useProtectionController";
+import UnlockRangeDialog from "../modules/review-tools/components/UnlockRangeDialog.vue";
 import SheetProtectionDialog from "../modules/review-tools/components/SheetProtectionDialog.vue";
 import EditableRangesDialog from "../modules/review-tools/components/EditableRangesDialog.vue";
 import WorkbookProtectionDialog from "../modules/review-tools/components/WorkbookProtectionDialog.vue";
@@ -381,6 +385,16 @@ const {
   hasNote,
   hasSelectedNotes,
 } = reviewActions;
+const textReview = useTextReviewController({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getSelection: () => activeSelectionRange.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  finishEditing: () => cellEditSession.finish(),
+  execute: executeCommand,
+});
 const cellStyleActions = useCellStylesController({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1029,7 +1043,10 @@ const fileActions = useWorkbookFileActions({
   getWorkbook: () => session.workbook,
   flushPendingEdits: () => cellEditSession.finish(),
   hasPendingEdits: cellEditSession.hasPendingEdit,
-  isBlocked: () => xlsxActions.busy.value || xlsxActions.confirmation.value !== undefined,
+  isBlocked: () =>
+    xlsxActions.busy.value ||
+    xlsxActions.passwordRequired.value ||
+    xlsxActions.confirmation.value !== undefined,
 });
 const { busy: fileBusy, confirmation, feedback } = fileActions;
 const xlsxActions = useWorkbookXlsxActions({
@@ -1042,6 +1059,19 @@ const xlsxActions = useWorkbookXlsxActions({
   isBlocked: () => fileBusy.value || confirmation.value !== undefined || imageBusy.value,
 });
 const { busy: xlsxBusy, confirmation: xlsxConfirmation, feedback: xlsxFeedback } = xlsxActions;
+
+const encryptDocumentVisible = ref(false);
+function openDocumentEncryption(): void {
+  if (loading.value || fileBusy.value || xlsxBusy.value || !cellEditSession.finish()) return;
+  encryptDocumentVisible.value = true;
+}
+async function exportEncryptedDocument(password: string): Promise<void> {
+  await xlsxActions.exportXlsx(password);
+  if (xlsxFeedback.value?.key === "xlsx.feedback.exported") encryptDocumentVisible.value = false;
+}
+watch(workbookGeneration, () => {
+  encryptDocumentVisible.value = false;
+});
 
 const formulaTools = useFormulaToolsController({
   getWorkbook: () => session.workbook,
@@ -1684,8 +1714,11 @@ function changeSheetProperties(payload: {
   patch: Partial<SheetProperties>;
 }): void {
   if (!cellEditSession.finish()) return;
-  if (payload.patch.protected === true && payload.sheetId === activeSheet.value.id) {
-    protectionActions.open("sheet");
+  if (payload.patch.protected !== undefined) {
+    if (payload.sheetId !== activeSheet.value.id) {
+      selectSheet(payload.sheetId);
+      void nextTick(() => protectionActions.open("sheet"));
+    } else protectionActions.open("sheet");
     return;
   }
   updateSheetProperties(payload);
@@ -1804,6 +1837,9 @@ const gridInert = computed(
     fileBusy.value ||
     xlsxBusy.value ||
     !!protectionDialog.value ||
+    !!textReview.mode.value ||
+    encryptDocumentVisible.value ||
+    xlsxActions.passwordRequired.value ||
     !!cellFormatSelection.value ||
     !!findFormatDraft.value ||
     dataToolsModalOpen.value ||
@@ -1841,6 +1877,16 @@ const gridInert = computed(
       @change="imageActions.onFileChange"
     />
     <SpreadsheetRibbon
+      :hyperlink-disabled="
+        loading ||
+        fileBusy ||
+        xlsxBusy ||
+        !canUseSheetPermission(activeSheet, 'insertHyperlinks') ||
+        !canEditCell(activeSheet, activeAddress)
+      "
+      :image-disabled="
+        loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
+      "
       :theme="session.workbook.theme"
       :state="activeSelectionStyle"
       :disabled="!isFormattingSupported || protectedFormatting"
@@ -1954,6 +2000,7 @@ const gridInert = computed(
       </template>
       <template #review-tools>
         <ReviewToolbar
+          :objects-read-only="!canUseSheetPermission(activeSheet, 'editObjects')"
           :busy="loading || fileBusy || xlsxBusy"
           :read-only="activeSheet.properties.protected"
           :can-lock-cells="canLockCells"
@@ -1965,6 +2012,9 @@ const gridInert = computed(
           :show-active-note="showActiveNote"
           :edit-session-id="cellEditSession.id"
           @proofread="dataTools.openDataProofreading"
+          @encrypt-document="openDocumentEncryption"
+          @spelling="textReview.open('spelling')"
+          @convert-text="textReview.open($event)"
           @edit-note="reviewActions.edit()"
           @delete-notes="reviewActions.remove()"
           @previous-note="reviewActions.step(-1)"
@@ -2102,6 +2152,12 @@ const gridInert = computed(
       </template>
       <template #data-tools>
         <DataToolbar
+          :sort-disabled="
+            loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'sort')
+          "
+          :filter-criteria-disabled="
+            loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'autoFilter')
+          "
           :disabled="dataToolsDisabled"
           :comparison-disabled="loading || fileBusy || xlsxBusy || imageBusy"
           :capabilities="dataToolCapabilities"
@@ -2152,7 +2208,18 @@ const gridInert = computed(
           :sheet="activeSheet"
           :range="activeSelectionRange"
           :edit-session-id="cellEditSession.id"
-          :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
+          :disabled="
+            loading ||
+            fileBusy ||
+            xlsxBusy ||
+            (activeSheet.properties.protected &&
+              !activeSheet.protection?.formatRows &&
+              !activeSheet.protection?.formatColumns &&
+              !activeSheet.protection?.insertRows &&
+              !activeSheet.protection?.insertColumns &&
+              !activeSheet.protection?.deleteRows &&
+              !activeSheet.protection?.deleteColumns)
+          "
           @resize="axisTools.resize"
           @auto-fit="axisTools.autoFit"
           @standard-width="axisTools.standardWidth"
@@ -2824,6 +2891,7 @@ const gridInert = computed(
       :inert="gridInert"
     >
       <SheetGrid
+        @unlock-range="protectionActions.requestRangeUnlock"
         :note-draft="noteDraft"
         :note-error="noteError"
         :show-active-note="showActiveNote"
@@ -2925,6 +2993,37 @@ const gridInert = computed(
         @horizontal-scroll-change="updateHorizontalScrollState"
       />
     </div>
+    <DocumentPasswordDialog
+      v-if="encryptDocumentVisible"
+      mode="encrypt"
+      :busy="xlsxBusy"
+      @submit="exportEncryptedDocument"
+      @close="encryptDocumentVisible = false"
+    />
+    <DocumentPasswordDialog
+      v-if="xlsxActions.passwordRequired.value"
+      mode="decrypt"
+      :busy="xlsxBusy"
+      :incorrect="xlsxActions.passwordError.value"
+      @submit="xlsxActions.submitPassword"
+      @close="xlsxActions.cancel"
+    />
+    <TextReviewDialog
+      v-if="textReview.mode.value"
+      :mode="textReview.mode.value"
+      v-model:scope="textReview.scope.value"
+      v-model:language="textReview.language.value"
+      :cells="textReview.cells.value"
+      :result="textReview.result.value"
+      :busy="textReview.busy.value"
+      :error="textReview.error.value"
+      :skipped="textReview.skipped.value"
+      @run="textReview.run"
+      @close="textReview.close"
+      @replace="textReview.replace"
+      @ignore="textReview.ignore"
+      @convert="textReview.convert"
+    />
     <PagePrintPreview
       :theme="workbookTheme"
       v-if="printPreviewVisible"
@@ -3059,16 +3158,27 @@ const gridInert = computed(
       :visible="protectionDialog === 'ranges'"
       :configuration="protectionConfiguration"
       :selection="protectionSelection"
+      :read-only="activeSheet.properties.protected"
       :error="protectionError"
       @close="protectionActions.close"
       @save="protectionActions.save"
+      @protect="protectionActions.protectWithRanges"
+      @unlock="protectionActions.requestRangeUnlock"
     />
     <WorkbookProtectionDialog
       :visible="protectionDialog === 'workbook'"
       :protected="structureProtected"
+      :has-password="Boolean(session.workbook.structurePassword)"
       :error="protectionError"
       @close="protectionActions.close"
-      @save="protectionActions.save()"
+      @save="protectionActions.save(undefined, $event)"
+    />
+    <UnlockRangeDialog
+      :visible="protectionDialog === 'unlock'"
+      :range-name="protectionActions.unlockRangeName.value"
+      :error="protectionError"
+      @close="protectionActions.close"
+      @unlock="protectionActions.unlock"
     />
   </section>
 </template>

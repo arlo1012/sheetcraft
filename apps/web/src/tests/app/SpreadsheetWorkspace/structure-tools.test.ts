@@ -78,6 +78,8 @@ describe("ribbon structure tools", () => {
       workspace.get('[data-ribbon-action="worksheet-operations"]').attributes("disabled"),
     ).toBeUndefined();
     await worksheetAction("protect");
+    workspace.getComponent(SheetProtectionDialog).getComponent(TDialog).vm.$emit("confirm");
+    await flushPromises();
     expect(workspace.getComponent(SheetGrid).props("readOnly")).toBe(false);
   });
 });

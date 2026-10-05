@@ -32,3 +32,5 @@ export * from "./pivot-table-styles.js";
 export * from "./tables.js";
 
 export * from "./protection.js";
+
+export * from "./protection-password.js";

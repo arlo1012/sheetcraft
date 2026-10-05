@@ -28,24 +28,29 @@ import SheetDimensionInput from "./SheetDimensionInput.vue";
 import ContextClipboardActions from "./ContextClipboardActions.vue";
 import SheetContextFormatToolbar from "./SheetContextFormatToolbar.vue";
 
-const props = defineProps<{
-  axis: SheetDimensionAxis;
-  selectionCount: number;
-  maxBeforeCount: number;
-  maxAfterCount: number;
-  currentSize?: number;
-  minimumSize: number;
-  maximumSize: number;
-  anchor: FloatingReference;
-  readOnly?: boolean;
-  dimensionReadOnly?: boolean;
-  pasteSpecialDisabled?: boolean;
-  pasteFormatsDisabled?: boolean;
-  cutDisabledReason?: string;
-  state?: SheetContextMenuState;
-  sheet?: Sheet;
-  range?: CellRange;
-}>();
+const props = withDefaults(
+  defineProps<{
+    axis: SheetDimensionAxis;
+    selectionCount: number;
+    maxBeforeCount: number;
+    maxAfterCount: number;
+    currentSize?: number;
+    minimumSize: number;
+    maximumSize: number;
+    anchor: FloatingReference;
+    readOnly?: boolean;
+    dimensionReadOnly?: boolean;
+    insertReadOnly?: boolean;
+    deleteReadOnly?: boolean;
+    pasteSpecialDisabled?: boolean;
+    pasteFormatsDisabled?: boolean;
+    cutDisabledReason?: string;
+    state?: SheetContextMenuState;
+    sheet?: Sheet;
+    range?: CellRange;
+  }>(),
+  { dimensionReadOnly: undefined, insertReadOnly: undefined, deleteReadOnly: undefined },
+);
 const emit = defineEmits<{
   insert: [payload: { direction: "before" | "after"; count: number }];
   resize: [size: number];
@@ -97,6 +102,8 @@ function dispatch(action: SheetContextAction): void {
     isOpen.value &&
     (!props.readOnly ||
       action.type === "columnStatistics" ||
+      (action.type === "insert" && !(props.insertReadOnly ?? props.readOnly)) ||
+      (action.type === "delete" && !(props.deleteReadOnly ?? props.readOnly)) ||
       (!(props.dimensionReadOnly ?? props.readOnly) &&
         (action.type === "resize" || action.type === "autoFit" || action.type === "visibility")))
   )
@@ -114,7 +121,7 @@ function onKeydown(event: KeyboardEvent): void {
   if (key === "v" && !props.readOnly) emit("paste");
 }
 function requestInsert(direction: "before" | "after", count: number): void {
-  if (props.readOnly) return;
+  if (props.insertReadOnly ?? props.readOnly) return;
   if (!props.state) emit("insert", { direction, count });
   dispatch({ type: "insert", axis: props.axis, direction, count });
 }
@@ -131,7 +138,7 @@ function requestResize(size: number): void {
   dispatch({ type: "resize", axis: props.axis, size });
 }
 function requestDelete(): void {
-  if (props.readOnly) return;
+  if (props.deleteReadOnly ?? props.readOnly) return;
   if (!props.state) emit("delete");
   dispatch({ type: "delete", axis: props.axis });
 }
@@ -204,7 +211,11 @@ function requestClear(mode: "contents" | "formats" | "all"): void {
               :size="16" /></template
         ></AxisInsertMenuItem>
         <MenuSeparator />
-        <MenuItem data-axis-action="delete" danger :disabled="readOnly" @select="requestDelete"
+        <MenuItem
+          data-axis-action="delete"
+          danger
+          :disabled="deleteReadOnly ?? readOnly"
+          @select="requestDelete"
           ><template #icon><Trash2 :size="16" /></template>{{ t("contextMenu.delete") }}</MenuItem
         >
         <MenuItem

@@ -1,3 +1,4 @@
+import { normalizeProtectionPassword, type ProtectionPassword } from "./protection-password.js";
 import { normalizeSheetProtection, type SheetProtection } from "./protection.js";
 import { WorkbookDomainError } from "./errors.js";
 import {
@@ -201,7 +202,11 @@ export type WorkbookSnapshotV22 = Omit<WorkbookSnapshotV21, "version"> & {
   version: 22;
   structureProtected?: boolean;
 };
-export type WorkbookSnapshot = WorkbookSnapshotV22;
+export type WorkbookSnapshotV23 = Omit<WorkbookSnapshotV22, "version"> & {
+  version: 23;
+  structurePassword?: ProtectionPassword;
+};
+export type WorkbookSnapshot = WorkbookSnapshotV23;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -238,7 +243,8 @@ type SnapshotVersion =
   | 19
   | 20
   | 21
-  | 22;
+  | 22
+  | 23;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -708,7 +714,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     version =
       Object.hasOwn(record, "protection") ||
       cells.some((cell) => Boolean((cell as { style?: { unlocked?: boolean } }).style?.unlocked))
-        ? 22
+        ? 23
         : hasValue
           ? 1
           : cells.some((cell) => {
@@ -739,6 +745,34 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
                         : Object.hasOwn(record, "floatingImages")
                           ? 6
                           : 3;
+  }
+  if (version < 23 && record.protection !== undefined) {
+    const protection = asRecord(record.protection, `${path}.protection`);
+    const newer = [
+      "password",
+      "selectLockedCells",
+      "selectUnlockedCells",
+      "insertColumns",
+      "insertRows",
+      "insertHyperlinks",
+      "deleteColumns",
+      "deleteRows",
+      "sort",
+      "autoFilter",
+      "pivotTables",
+      "editObjects",
+    ];
+    if (
+      newer.some((key) => protection[key] !== undefined) ||
+      (Array.isArray(protection.editableRanges) &&
+        protection.editableRanges.some(
+          (entry) => asRecord(entry, `${path}.protection.editableRanges`).password !== undefined,
+        ))
+    )
+      return fail(
+        `${path}.protection`,
+        "Extended protection settings require snapshot version 23.",
+      );
   }
   if (version < 22 && record.protection !== undefined)
     return fail(
@@ -786,8 +820,11 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 22,
+    version: 23,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
+    ...(workbook.structurePassword
+      ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
+      : {}),
     calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
     theme: cloneWorkbookTheme(workbook.theme),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
@@ -837,7 +874,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 19 &&
     record.version !== 20 &&
     record.version !== 21 &&
-    record.version !== 22
+    record.version !== 22 &&
+    record.version !== 23
   ) {
     throw new WorkbookDomainError(
       {
@@ -864,6 +902,11 @@ export function deserializeWorkbook(value: unknown): Workbook {
   }
 
   const version = record.version;
+  if (version < 23 && record.structurePassword !== undefined)
+    return fail("$.structurePassword", "Protection passwords require snapshot version 23.");
+  const structurePassword = normalizeProtectionPassword(
+    record.structurePassword as ProtectionPassword | undefined,
+  );
   if (
     record.structureProtected !== undefined &&
     (version < 22 || typeof record.structureProtected !== "boolean")
@@ -982,6 +1025,7 @@ export function deserializeWorkbook(value: unknown): Workbook {
   return {
     id,
     ...(version >= 22 && record.structureProtected ? { structureProtected: true } : {}),
+    ...(structurePassword ? { structurePassword } : {}),
     dateSystem,
     calculation,
     theme,

@@ -1,3 +1,4 @@
+import type { ProtectionPassword } from "@idea10/core";
 import { writeXlsxProtection } from "./protection.js";
 import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from "fflate/browser";
 import { addNativeCellImages, type NativeCellImage } from "./native-cell-images.js";
@@ -51,6 +52,7 @@ export function finalizeXlsxExport(
   report?: CompatibilityReportBuilder,
   sheetBackgrounds: readonly (string | undefined)[] = [],
   structureProtected = false,
+  structurePassword?: ProtectionPassword,
 ): Uint8Array {
   const entries = unzipSync(bytes);
   const styles = entries["xl/styles.xml"];
@@ -92,7 +94,7 @@ export function finalizeXlsxExport(
   );
   writeXlsxHyperlinks(entries, sheets);
   writeXlsxCellNotes(entries, sheets);
-  writeXlsxProtection(entries, sheets, structureProtected);
+  writeXlsxProtection(entries, sheets, structureProtected, structurePassword);
   writeXlsxCellNoteVmlBoxes(entries, sheets);
   const projectedCellStyles = cellStyles?.map((definition) => ({
     ...definition,

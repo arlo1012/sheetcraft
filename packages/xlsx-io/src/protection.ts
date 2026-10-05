@@ -1,5 +1,10 @@
 import { strFromU8, strToU8, type Unzipped } from "fflate/browser";
-import { normalizeSheetProtection, type SheetProtection } from "@idea10/core";
+import {
+  normalizeSheetProtection,
+  normalizeProtectionPassword,
+  type ProtectionPassword,
+  type SheetProtection,
+} from "@idea10/core";
 import type { Sheet } from "@idea10/core/workbook";
 import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
 import { readXlsxWorksheetPartTargets } from "./raw-cell-values.js";
@@ -31,30 +36,89 @@ function escape(value: string): string {
 const truthy = (value: string | undefined) => value === "1" || value === "true";
 const falsy = (value: string | undefined) => value === "0" || value === "false";
 
+function readPassword(
+  xml: string,
+  report: CompatibilityReportBuilder,
+  location: string,
+  workbook = false,
+): ProtectionPassword | undefined {
+  const legacy = attr(xml, workbook ? "workbookPassword" : "password");
+  const algorithmName = attr(xml, workbook ? "workbookAlgorithmName" : "algorithmName");
+  if (!legacy && !algorithmName && !/hashValue|saltValue/i.test(xml)) return undefined;
+  try {
+    return normalizeProtectionPassword(
+      algorithmName
+        ? {
+            kind: "hash",
+            algorithmName: algorithmName as Extract<
+              ProtectionPassword,
+              { kind: "hash" }
+            >["algorithmName"],
+            saltValue: attr(xml, workbook ? "workbookSaltValue" : "saltValue") ?? "",
+            hashValue: attr(xml, workbook ? "workbookHashValue" : "hashValue") ?? "",
+            spinCount: Number(attr(xml, workbook ? "workbookSpinCount" : "spinCount")),
+          }
+        : { kind: "legacy", hash: legacy ?? "" },
+    );
+  } catch {
+    report.add("feature-omitted", "block", location);
+    return undefined;
+  }
+}
+function writePassword(password: ProtectionPassword | undefined, workbook = false): string {
+  if (!password) return "";
+  if (password.kind === "legacy")
+    return ` ${workbook ? "workbookPassword" : "password"}="${escape(password.hash)}"`;
+  const prefix = workbook ? "workbook" : "";
+  const name = (key: string) => (prefix ? prefix + key[0]!.toUpperCase() + key.slice(1) : key);
+  return ` ${name("algorithmName")}="${password.algorithmName}" ${name("hashValue")}="${password.hashValue}" ${name("saltValue")}="${password.saltValue}" ${name("spinCount")}="${password.spinCount}"`;
+}
+
 export function readXlsxProtection(entries: Unzipped, report: CompatibilityReportBuilder) {
   const workbookXml = entries["xl/workbook.xml"] ? strFromU8(entries["xl/workbook.xml"]!) : "";
   const workbookProtection =
     /<(?:\w+:)?workbookProtection\b([^>]*)\/?\s*>/i.exec(workbookXml)?.[1] ?? "";
-  if (/password|hashValue|saltValue|algorithmName/i.test(workbookProtection))
-    report.add("feature-omitted", "warning", "workbook.protection.password");
+  const structurePassword = readPassword(
+    workbookProtection,
+    report,
+    "workbook.protection.password",
+    true,
+  );
   const sheets = readXlsxWorksheetPartTargets(entries).map((part) => {
     const xml = entries[part] ? strFromU8(entries[part]!) : "";
     const protectionTag = /<(?:\w+:)?sheetProtection\b([^>]*)\/?\s*>/i.exec(xml)?.[1];
     const protection: SheetProtection = { editableRanges: [] };
     if (protectionTag) {
-      for (const key of ["formatCells", "formatRows", "formatColumns"] as const) {
+      for (const key of [
+        "formatCells",
+        "formatRows",
+        "formatColumns",
+        "insertColumns",
+        "insertRows",
+        "insertHyperlinks",
+        "deleteColumns",
+        "deleteRows",
+        "sort",
+        "autoFilter",
+        "pivotTables",
+      ] as const) {
         if (falsy(attr(protectionTag, key))) protection[key] = true;
       }
-      if (/password|hashValue|saltValue|algorithmName/i.test(protectionTag))
-        report.add("feature-omitted", "warning", `${part}.protection.password`);
+      if (falsy(attr(protectionTag, "objects"))) protection.editObjects = true;
+      if (truthy(attr(protectionTag, "selectLockedCells"))) protection.selectLockedCells = false;
+      if (truthy(attr(protectionTag, "selectUnlockedCells")))
+        protection.selectUnlockedCells = false;
+      const password = readPassword(protectionTag, report, `${part}.protection.password`);
+      if (password) protection.password = password;
     }
     for (const match of xml.matchAll(/<(?:\w+:)?protectedRange\b([^>]*)\/?\s*>/gi)) {
       const attrs = match[1]!;
       // Password- or identity-restricted ranges must not become unrestricted edit exceptions.
-      if (/password|hashValue|saltValue|securityDescriptor/i.test(attrs)) {
+      if (/securityDescriptor/i.test(attrs)) {
         report.add("feature-omitted", "warning", `${part}.protectedRange`);
         continue;
       }
+      const password = readPassword(attrs, report, `${part}.protectedRange.password`);
       const references = (attr(attrs, "sqref") ?? "").split(/\s+/).filter(Boolean);
       const name = attr(attrs, "name") ?? "Range";
       for (const [index, reference] of references.entries()) {
@@ -68,6 +132,7 @@ export function readXlsxProtection(entries: Unzipped, report: CompatibilityRepor
         protection.editableRanges.push({
           name: references.length > 1 ? `${name}_${index + 1}` : name,
           range: { start, end },
+          ...(password ? { password } : {}),
         });
       }
     }
@@ -76,24 +141,43 @@ export function readXlsxProtection(entries: Unzipped, report: CompatibilityRepor
       protection: normalizeSheetProtection(protection),
     };
   });
-  return { structureProtected: truthy(attr(workbookProtection, "lockStructure")), sheets };
+  return {
+    structureProtected: truthy(attr(workbookProtection, "lockStructure")),
+    structurePassword,
+    sheets,
+  };
 }
 
 export function writeXlsxProtection(
   entries: Unzipped,
   sheets: readonly Sheet[],
   structureProtected: boolean,
+  structurePassword?: ProtectionPassword,
 ): void {
   for (const [index, part] of readXlsxWorksheetPartTargets(entries).entries()) {
     const sheet = sheets[index];
     if (!sheet || !entries[part]) continue;
     let xml = strFromU8(entries[part]!);
     const settings = sheet.protection;
+    const allowed = [
+      "formatCells",
+      "formatRows",
+      "formatColumns",
+      "insertColumns",
+      "insertRows",
+      "insertHyperlinks",
+      "deleteColumns",
+      "deleteRows",
+      "sort",
+      "autoFilter",
+      "pivotTables",
+    ] as const;
+    const permissions = allowed.map((key) => (settings?.[key] ? ` ${key}="0"` : "")).join("");
     const tag = sheet.properties.protected
-      ? `<sheetProtection sheet="1" objects="1" scenarios="1"${settings?.formatCells ? ' formatCells="0"' : ""}${settings?.formatRows ? ' formatRows="0"' : ""}${settings?.formatColumns ? ' formatColumns="0"' : ""}/>`
+      ? `<sheetProtection sheet="1" objects="${settings?.editObjects ? 0 : 1}" scenarios="1"${permissions}${settings?.selectLockedCells === false ? ' selectLockedCells="1"' : ""}${settings?.selectUnlockedCells === false ? ' selectUnlockedCells="1"' : ""}${writePassword(settings?.password)}/>`
       : "";
     const ranges = settings?.editableRanges.length
-      ? `<protectedRanges>${settings.editableRanges.map((entry) => `<protectedRange name="${escape(entry.name)}" sqref="${formatCellAddress(entry.range.start)}:${formatCellAddress(entry.range.end)}"/>`).join("")}</protectedRanges>`
+      ? `<protectedRanges>${settings.editableRanges.map((entry) => `<protectedRange name="${escape(entry.name)}"${writePassword(entry.password)} sqref="${formatCellAddress(entry.range.start)}:${formatCellAddress(entry.range.end)}"/>`).join("")}</protectedRanges>`
       : "";
     xml = xml
       .replace(/<sheetProtection\b[^>]*\/>/g, "")
@@ -108,6 +192,9 @@ export function writeXlsxProtection(
   if (!entries[part]) return;
   let xml = strFromU8(entries[part]!).replace(/<workbookProtection\b[^>]*\/>/g, "");
   if (structureProtected)
-    xml = xml.replace(/(<bookViews\b|<sheets\b)/, '<workbookProtection lockStructure="1"/>$1');
+    xml = xml.replace(
+      /(<bookViews\b|<sheets\b)/,
+      `<workbookProtection lockStructure="1"${writePassword(structurePassword, true)}/>$1`,
+    );
   entries[part] = strToU8(xml);
 }

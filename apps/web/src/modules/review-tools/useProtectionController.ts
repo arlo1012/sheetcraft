@@ -6,8 +6,15 @@ import {
   type WorkbookCommand,
 } from "@idea10/core/commands";
 import { isCellStyleRangeSupported } from "@idea10/core/style-state";
-import { normalizeSheetProtection, type SheetProtection } from "@idea10/core";
+import {
+  normalizeSheetProtection,
+  unlockEditableRange,
+  getProtectedEditableRanges,
+  type SheetProtection,
+} from "@idea10/core";
 import type { CellRange, Sheet, Workbook } from "@idea10/core/workbook";
+import { WorkbookDomainError } from "@idea10/core/errors";
+import { createBrowserProtectionPassword } from "./protection-password";
 import { useAppI18n } from "../../shared/i18n";
 
 export function useProtectionController(options: {
@@ -21,10 +28,11 @@ export function useProtectionController(options: {
   execute: (command: WorkbookCommand) => boolean;
 }) {
   const { t } = useAppI18n();
-  const dialog = ref<"sheet" | "ranges" | "workbook">();
+  const dialog = ref<"sheet" | "ranges" | "workbook" | "unlock">();
   const configuration = shallowRef<SheetProtection>({ editableRanges: [] });
   const selection = shallowRef<CellRange>(options.getRange());
   const error = ref("");
+  const unlockRangeName = ref("");
   let target: { sheetId: string; revision: number } | undefined;
   const canLockCells = computed(
     () =>
@@ -75,7 +83,6 @@ export function useProtectionController(options: {
   }
   function open(kind: "sheet" | "ranges" | "workbook"): void {
     if (options.isBusy() || !options.finishEditing()) return;
-    if (kind === "ranges" && options.getSheet().properties.protected) return;
     target = { sheetId: options.getSheet().id, revision: options.getRevision() };
     configuration.value = normalizeSheetProtection(options.getSheet().protection) ?? {
       editableRanges: [],
@@ -87,22 +94,75 @@ export function useProtectionController(options: {
     error.value = "";
     dialog.value = kind;
   }
-  function save(value?: SheetProtection): void {
+  function save(value?: SheetProtection, password = ""): void {
     if (!target || options.isBusy()) return;
     if (target.sheetId !== options.getSheet().id || target.revision !== options.getRevision()) {
       error.value = t("review.staleTarget");
       return;
     }
     const sheet = options.getSheet();
-    const command =
-      dialog.value === "workbook"
-        ? createSetWorkbookStructureProtectionCommand(!structureProtected.value)
-        : createSetSheetProtectionCommand(
-            sheet.id,
-            dialog.value === "sheet" ? !sheet.properties.protected : sheet.properties.protected,
-            value ?? configuration.value,
-          );
-    if (options.execute(command)) close();
+    try {
+      const protecting = !sheet.properties.protected;
+      const nextConfiguration = value ?? configuration.value;
+      const command =
+        dialog.value === "workbook"
+          ? createSetWorkbookStructureProtectionCommand(
+              !structureProtected.value,
+              structureProtected.value ? undefined : createBrowserProtectionPassword(password),
+              password,
+            )
+          : createSetSheetProtectionCommand(
+              sheet.id,
+              dialog.value === "sheet" ? protecting : sheet.properties.protected,
+              dialog.value === "sheet"
+                ? {
+                    ...nextConfiguration,
+                    password: protecting ? createBrowserProtectionPassword(password) : undefined,
+                  }
+                : nextConfiguration,
+              password,
+            );
+      options.execute(command);
+      close();
+    } catch (cause) {
+      error.value = t(
+        cause instanceof WorkbookDomainError && cause.data.code === "incorrect_protection_password"
+          ? "review.incorrectPassword"
+          : "review.failed",
+      );
+    }
+  }
+  function protectWithRanges(value: SheetProtection): void {
+    save(value);
+    if (!dialog.value) open("sheet");
+  }
+  function requestRangeUnlock(range: CellRange | string): void {
+    if (options.isBusy()) return;
+    const sheet = options.getSheet();
+    const entry =
+      typeof range === "string"
+        ? sheet.protection?.editableRanges.find((item) => item.name === range)
+        : getProtectedEditableRanges(sheet, range)[0];
+    if (!entry?.password) return;
+    target = { sheetId: sheet.id, revision: options.getRevision() };
+    unlockRangeName.value = entry.name;
+    error.value = "";
+    dialog.value = "unlock";
+  }
+  function unlock(password: string): void {
+    if (
+      !target ||
+      target.sheetId !== options.getSheet().id ||
+      target.revision !== options.getRevision()
+    ) {
+      error.value = t("review.staleTarget");
+      return;
+    }
+    if (!unlockEditableRange(options.getSheet(), unlockRangeName.value, password)) {
+      error.value = t("review.incorrectPassword");
+      return;
+    }
+    close();
   }
   watch([options.getGeneration, () => options.getSheet().id], close);
   return {
@@ -117,5 +177,9 @@ export function useProtectionController(options: {
     open,
     close,
     save,
+    protectWithRanges,
+    requestRangeUnlock,
+    unlockRangeName,
+    unlock,
   };
 }

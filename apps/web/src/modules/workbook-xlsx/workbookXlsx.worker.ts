@@ -18,7 +18,11 @@ async function handleRequest(request: XlsxWorkerRequest): Promise<void> {
     // The codec stays behind this worker-only dynamic import so ExcelJS never enters the app bundle.
     const codec = await import("@idea10/xlsx-io");
     if (request.type === "decode") {
-      const result = await codec.decodeXlsx(new Uint8Array(request.bytes));
+      const input = new Uint8Array(request.bytes);
+      const plaintext = codec.isOfficeEncryptedFile(input)
+        ? codec.decryptOfficeFile(input, request.password ?? "")
+        : input;
+      const result = await codec.decodeXlsx(plaintext);
       respond({
         id: request.id,
         ok: true,
@@ -34,7 +38,9 @@ async function handleRequest(request: XlsxWorkerRequest): Promise<void> {
         bytes: new Uint8Array(image.bytes),
       })),
     });
-    const bytes = new Uint8Array(result.bytes).buffer;
+    const bytes = new Uint8Array(
+      request.password ? codec.encryptOfficeFile(result.bytes, request.password) : result.bytes,
+    ).buffer;
     respond(
       {
         id: request.id,
@@ -46,11 +52,16 @@ async function handleRequest(request: XlsxWorkerRequest): Promise<void> {
       [bytes],
     );
   } catch (cause) {
-    const error = cause as { message?: unknown; report?: unknown };
+    const error = cause as {
+      message?: unknown;
+      report?: unknown;
+      code?: import("./xlsxWorkerProtocol").XlsxWorkerError["code"];
+    };
     respond({
       id: request.id,
       ok: false,
       error: {
+        ...(error.code ? { code: error.code } : {}),
         message: typeof error.message === "string" ? error.message : "XLSX conversion failed.",
         ...(error.report && typeof error.report === "object"
           ? { report: error.report as XlsxCompatibilityReport }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { canUseSheetPermission, type SheetProtectionPermission } from "@idea10/core";
 import {
   PanelTopDashed,
   PanelBottomDashed,
@@ -112,8 +113,11 @@ const {
     ) ?? null,
   offset: 4,
 });
-const rowSizeEnabled = computed(() => !props.disabled && rowCount.value > 0);
-const columnSizeEnabled = computed(() => !props.disabled && columnCount.value > 0);
+function blocked(permission: SheetProtectionPermission): boolean {
+  return props.disabled || !canUseSheetPermission(props.sheet, permission);
+}
+const rowSizeEnabled = computed(() => !blocked("formatRows") && rowCount.value > 0);
+const columnSizeEnabled = computed(() => !blocked("formatColumns") && columnCount.value > 0);
 function maximumInsertCount(axis: SheetDimensionAxis, direction: "before" | "after"): number {
   const maximum = axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
   const address = direction === "before" ? props.range.start : props.range.end;
@@ -155,7 +159,7 @@ function requestInsert(
   direction: "before" | "after",
   count: number,
 ): void {
-  if (props.disabled || !Number.isInteger(count)) return;
+  if (blocked(axis === "row" ? "insertRows" : "insertColumns") || !Number.isInteger(count)) return;
   const start = axis === "row" ? props.range.start.row : props.range.start.column;
   const end = axis === "row" ? props.range.end.row : props.range.end.column;
   const maximum = axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
@@ -166,7 +170,7 @@ function requestInsert(
 }
 
 function requestDelete(axis: SheetDimensionAxis): void {
-  if (props.disabled) return;
+  if (blocked(axis === "row" ? "deleteRows" : "deleteColumns")) return;
   const index = axis === "row" ? props.range.start.row : props.range.start.column;
   const count = axis === "row" ? rowCount.value : columnCount.value;
   if (count < 1) return;
@@ -181,7 +185,7 @@ function closeCellDialog(restoreFocus = true): void {
 }
 
 function openCellDialog(operation: "insert" | "delete"): void {
-  if (props.disabled) return;
+  if (props.disabled || props.sheet.properties.protected) return;
   cellTarget.value = {
     operation,
     range: { start: { ...props.range.start }, end: { ...props.range.end } },
@@ -198,7 +202,7 @@ function confirmCellOperation(
 }
 
 function requestDeleteEmptyRows(): void {
-  if (props.disabled) return;
+  if (props.disabled || props.sheet.properties.protected) return;
   emit("deleteEmptyRows", props.range);
   dismiss();
 }
@@ -232,7 +236,7 @@ function confirmSize(): void {
 }
 
 function openStandardWidthDialog(): void {
-  if (props.disabled) return;
+  if (blocked("formatColumns")) return;
   standardWidthDraft.value = getDefaultColumnWidth(props.sheet);
   isStandardWidthDialogOpen.value = true;
   activeSubmenu.value = null;
@@ -240,7 +244,7 @@ function openStandardWidthDialog(): void {
 }
 
 function confirmStandardWidth(): void {
-  if (props.disabled || typeof standardWidthDraft.value !== "number") return;
+  if (blocked("formatColumns") || typeof standardWidthDraft.value !== "number") return;
   const size = Math.round(standardWidthDraft.value);
   if (!Number.isFinite(size) || size < MIN_COLUMN_WIDTH || size > MAX_COLUMN_WIDTH) return;
   if (size !== getDefaultColumnWidth(props.sheet)) emit("standardWidth", { size });
@@ -248,13 +252,13 @@ function confirmStandardWidth(): void {
 }
 
 function requestAutoFit(axis: SheetDimensionAxis): void {
-  if (props.disabled) return;
+  if (blocked(axis === "row" ? "formatRows" : "formatColumns")) return;
   emit("autoFit", { axis, range: props.range });
   dismiss();
 }
 
 function requestVisibility(axis: SheetDimensionAxis, hidden: boolean): void {
-  if (props.disabled) return;
+  if (blocked(axis === "row" ? "formatRows" : "formatColumns")) return;
   const index = axis === "row" ? props.range.start.row : props.range.start.column;
   const count = axis === "row" ? rowCount.value : columnCount.value;
   emit("visibility", { axis, index, count, hidden });
@@ -339,7 +343,7 @@ watch(
         </MenuItem>
         <MenuItem
           data-row-column-action="auto-fit-row-height"
-          :disabled="disabled"
+          :disabled="blocked('formatRows')"
           @select="requestAutoFit('row')"
         >
           <template #icon><Maximize2 :size="15" /></template>
@@ -356,7 +360,7 @@ watch(
         </MenuItem>
         <MenuItem
           data-row-column-action="auto-fit-column-width"
-          :disabled="disabled"
+          :disabled="blocked('formatColumns')"
           @select="requestAutoFit('column')"
         >
           <template #icon><Maximize2 :size="15" /></template>
@@ -364,7 +368,7 @@ watch(
         </MenuItem>
         <MenuItem
           data-row-column-action="standard-column-width"
-          :disabled="disabled"
+          :disabled="blocked('formatColumns')"
           @select="openStandardWidthDialog"
         >
           <template #icon><Scaling :size="15" /></template>
@@ -428,7 +432,7 @@ watch(
         <template v-if="activeSubmenu === 'insert'">
           <MenuItem
             data-row-column-action="insert-cells"
-            :disabled="disabled"
+            :disabled="disabled || sheet.properties.protected"
             @select="openCellDialog('insert')"
           >
             <template #icon
@@ -442,7 +446,7 @@ watch(
             :label="t('axisMenu.insertRowsAboveAction')"
             :initial-count="rowCount"
             :maximum="maximumInsertCount('row', 'before')"
-            :disabled="disabled"
+            :disabled="blocked('insertRows')"
             @insert="requestInsert('row', 'before', $event)"
             ><PanelTopDashed class="row-column-operations-menu__insert-icon" :size="15"
           /></AxisInsertMenuItem>
@@ -451,7 +455,7 @@ watch(
             :label="t('axisMenu.insertRowsBelowAction')"
             :initial-count="rowCount"
             :maximum="maximumInsertCount('row', 'after')"
-            :disabled="disabled"
+            :disabled="blocked('insertRows')"
             @insert="requestInsert('row', 'after', $event)"
             ><PanelBottomDashed class="row-column-operations-menu__insert-icon" :size="15"
           /></AxisInsertMenuItem>
@@ -460,7 +464,7 @@ watch(
             :label="t('axisMenu.insertColumnsBeforeAction')"
             :initial-count="columnCount"
             :maximum="maximumInsertCount('column', 'before')"
-            :disabled="disabled"
+            :disabled="blocked('insertColumns')"
             @insert="requestInsert('column', 'before', $event)"
             ><PanelLeftDashed class="row-column-operations-menu__insert-icon" :size="15"
           /></AxisInsertMenuItem>
@@ -469,7 +473,7 @@ watch(
             :label="t('axisMenu.insertColumnsAfterAction')"
             :initial-count="columnCount"
             :maximum="maximumInsertCount('column', 'after')"
-            :disabled="disabled"
+            :disabled="blocked('insertColumns')"
             @insert="requestInsert('column', 'after', $event)"
             ><PanelRightDashed class="row-column-operations-menu__insert-icon" :size="15"
           /></AxisInsertMenuItem>
@@ -477,7 +481,7 @@ watch(
         <template v-else-if="activeSubmenu === 'delete'">
           <MenuItem
             data-row-column-action="delete-cells"
-            :disabled="disabled"
+            :disabled="disabled || sheet.properties.protected"
             @select="openCellDialog('delete')"
           >
             <template #icon
@@ -488,7 +492,7 @@ watch(
           <MenuSeparator />
           <MenuItem
             data-row-column-action="delete-rows"
-            :disabled="disabled"
+            :disabled="blocked('deleteRows')"
             @select="requestDelete('row')"
           >
             <template #icon><Rows3 :size="15" /></template>
@@ -496,7 +500,7 @@ watch(
           </MenuItem>
           <MenuItem
             data-row-column-action="delete-columns"
-            :disabled="disabled"
+            :disabled="blocked('deleteColumns')"
             @select="requestDelete('column')"
           >
             <template #icon><Columns3 :size="15" /></template>
@@ -505,7 +509,7 @@ watch(
           <MenuSeparator />
           <MenuItem
             data-row-column-action="delete-empty-rows"
-            :disabled="disabled"
+            :disabled="disabled || sheet.properties.protected"
             @select="requestDeleteEmptyRows"
           >
             <template #icon
@@ -517,28 +521,28 @@ watch(
         <template v-else>
           <MenuItem
             data-row-column-action="hide-rows"
-            :disabled="disabled"
+            :disabled="blocked('formatRows')"
             @select="requestVisibility('row', true)"
           >
             {{ t("axisMenu.hideRows") }}
           </MenuItem>
           <MenuItem
             data-row-column-action="unhide-rows"
-            :disabled="disabled"
+            :disabled="blocked('formatRows')"
             @select="requestVisibility('row', false)"
           >
             {{ t("axisMenu.unhideRows") }}
           </MenuItem>
           <MenuItem
             data-row-column-action="hide-columns"
-            :disabled="disabled"
+            :disabled="blocked('formatColumns')"
             @select="requestVisibility('column', true)"
           >
             {{ t("axisMenu.hideColumns") }}
           </MenuItem>
           <MenuItem
             data-row-column-action="unhide-columns"
-            :disabled="disabled"
+            :disabled="blocked('formatColumns')"
             @select="requestVisibility('column', false)"
           >
             {{ t("axisMenu.unhideColumns") }}

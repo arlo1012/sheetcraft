@@ -25,11 +25,12 @@ export type XlsxWorkerImage = {
 };
 
 export type XlsxWorkerRequest =
-  | { id: string; type: "decode"; bytes: ArrayBuffer }
+  | { id: string; type: "decode"; bytes: ArrayBuffer; password?: string }
   | {
       id: string;
       type: "encode";
       snapshot: WorkbookSnapshot;
+      password?: string;
       images?: readonly XlsxWorkerImage[];
     };
 
@@ -51,6 +52,11 @@ export type XlsxWorkerResponse =
   | { id: string; ok: false; error: XlsxWorkerError };
 
 export type XlsxWorkerError = {
+  code?:
+    | "password-required"
+    | "incorrect-password"
+    | "unsupported-encryption"
+    | "invalid-encrypted-file";
   message: string;
   report?: XlsxCompatibilityReport;
 };

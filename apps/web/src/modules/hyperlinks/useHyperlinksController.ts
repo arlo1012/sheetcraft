@@ -1,3 +1,4 @@
+import { canUseSheetPermission } from "@idea10/core";
 import { nextTick, ref, shallowRef, watch } from "vue";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { formatCellContentForInput } from "@idea10/core/input";
@@ -47,7 +48,11 @@ export function useHyperlinksController(options: {
   watch(options.getGeneration, close);
 
   function edit(): void {
-    if (options.isBusy() || options.getSheet().properties.protected || !options.finishEditing())
+    if (
+      options.isBusy() ||
+      !canUseSheetPermission(options.getSheet(), "insertHyperlinks") ||
+      !options.finishEditing()
+    )
       return;
     const sheet = options.getSheet();
     const address = { ...options.getAddress() };
@@ -86,7 +91,7 @@ export function useHyperlinksController(options: {
   function save(value: HyperlinkInput): void {
     if (!target || !draft.value || options.isBusy()) return;
     const sheet = options.getWorkbook().sheets.get(target.sheetId);
-    if (!sheet || sheet.properties.protected) return;
+    if (!sheet || !canUseSheetPermission(sheet, "insertHyperlinks")) return;
     const address = value.target.trim();
     if (!validTarget(address, target.sheetId)) {
       error.value = t("hyperlinks.invalidTarget");
@@ -121,7 +126,7 @@ export function useHyperlinksController(options: {
   function remove(): void {
     if (!target || options.isBusy()) return;
     const sheet = options.getWorkbook().sheets.get(target.sheetId);
-    if (!sheet || sheet.properties.protected) return;
+    if (!sheet || !canUseSheetPermission(sheet, "insertHyperlinks")) return;
     try {
       options.execute(createSetCellHyperlinkCommand(target.sheetId, target.address, null));
       close();

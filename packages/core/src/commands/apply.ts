@@ -268,15 +268,18 @@ function assertCommandDoesNotModifyProtectedSheet(
 export function applyWorkbookCommand(
   workbook: Workbook,
   command: WorkbookCommand,
+  options: { fromHistory?: boolean } = {},
 ): WorkbookCommand | null {
   try {
-    assertWorkbookStructureProtection(workbook, command);
-    assertCommandDoesNotModifyProtectedSheet(workbook, command);
+    if (!options.fromHistory) {
+      assertWorkbookStructureProtection(workbook, command);
+      assertCommandDoesNotModifyProtectedSheet(workbook, command);
+    }
     switch (command.type) {
       case "setSheetProtection":
-        return applySetSheetProtectionCommand(workbook, command);
+        return applySetSheetProtectionCommand(workbook, command, options.fromHistory);
       case "setWorkbookStructureProtection":
-        return applySetWorkbookStructureProtectionCommand(workbook, command);
+        return applySetWorkbookStructureProtectionCommand(workbook, command, options.fromHistory);
       case "setWorkbookDateSystem":
         return applySetWorkbookDateSystemCommand(workbook, command);
       case "setWorkbookCalculation":

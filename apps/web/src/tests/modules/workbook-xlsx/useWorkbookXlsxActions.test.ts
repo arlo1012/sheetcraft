@@ -365,3 +365,84 @@ describe("useWorkbookXlsxActions", () => {
     expect(worker?.terminate).toHaveBeenCalledOnce();
   });
 });
+
+describe("encrypted XLSX actions", () => {
+  test("retries passwords without replacing the document until confirmation", async () => {
+    const requests: XlsxWorkerRequest[] = [];
+    const fixture = mountActions(
+      createWorkerFactory((request, worker) => {
+        requests.push(request);
+        if (request.type !== "decode") throw new Error("unexpected request");
+        if (request.password !== "correct")
+          response(worker, {
+            id: request.id,
+            ok: false,
+            error: {
+              message: "password",
+              code: request.password ? "incorrect-password" : "password-required",
+            },
+          });
+        else
+          response(worker, {
+            id: request.id,
+            ok: true,
+            type: "decode",
+            snapshot: serializeWorkbook(createTestWorkbook()),
+            report: emptyReport(),
+          });
+      }),
+    );
+    await fixture.actions.importXlsx(file());
+    expect(fixture.actions.passwordRequired.value).toBe(true);
+    await fixture.actions.submitPassword("wrong");
+    expect(fixture.actions.passwordError.value).toBe(true);
+    expect(fixture.replaceDocument).not.toHaveBeenCalled();
+    await fixture.actions.submitPassword("correct");
+    expect(fixture.actions.passwordRequired.value).toBe(false);
+    expect(fixture.actions.confirmation.value).toBe("import");
+    expect(requests).toHaveLength(3);
+    await fixture.actions.confirm();
+    expect(fixture.replaceDocument).toHaveBeenCalledOnce();
+    fixture.scope.stop();
+  });
+  test("rejects a password retry after document edits and releases it on cancellation", async () => {
+    const fixture = mountActions(
+      createWorkerFactory((request, worker) =>
+        response(worker, {
+          id: request.id,
+          ok: false,
+          error: { message: "password", code: "password-required" },
+        }),
+      ),
+    );
+    await fixture.actions.importXlsx(file());
+    fixture.setRevision(2);
+    await fixture.actions.submitPassword("correct");
+    expect(fixture.actions.passwordRequired.value).toBe(false);
+    expect(fixture.actions.feedback.value?.key).toBe("xlsx.feedback.stale");
+    await fixture.actions.importXlsx(file());
+    fixture.actions.cancel();
+    expect(fixture.actions.passwordRequired.value).toBe(false);
+    fixture.scope.stop();
+  });
+  test("passes an export password only to the worker and names the encrypted download", async () => {
+    const fixture = mountActions(
+      createWorkerFactory((request, worker) => {
+        expect(request.type).toBe("encode");
+        expect(request.password).toBe("private");
+        if (request.type === "encode")
+          expect(JSON.stringify(request.snapshot)).not.toContain("private");
+        response(worker, {
+          id: request.id,
+          ok: true,
+          type: "encode",
+          bytes: new Uint8Array([1]).buffer,
+          report: emptyReport(),
+        });
+      }),
+    );
+    await fixture.actions.exportXlsx("private");
+    expect(fixture.download).toHaveBeenCalledWith(new Uint8Array([1]), "workbook-encrypted.xlsx");
+    fixture.scope.stop();
+  });
+});

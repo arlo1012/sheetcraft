@@ -729,6 +729,9 @@ export const zhCN = {
       imported: "已导入 XLSX，撤销历史从此文件重新开始。",
       exported: "已开始下载 XLSX 文件，当前文档和原文件均未被修改。",
       failed: "XLSX 操作失败，请重试。当前文档未被替换。",
+      unsupportedEncryption:
+        "暂不支持此文件的加密方式。目前支持使用密码的 Office Agile AES 加密 XLSX。",
+      invalidEncryptedFile: "加密文件已损坏或完整性校验失败，无法打开。",
       timeout: "XLSX 处理超时，已停止处理，当前文档未被替换。",
       finishEditing: "请先完成当前输入法组词，再导入或导出 XLSX。",
       stale: "读取文件期间文档发生了变化，本次导入已取消，请重新选择文件。",

@@ -46,3 +46,11 @@ export async function encodeXlsx(
 ): Promise<XlsxEncodeResult> {
   return encodeWithExcelJs(workbook, options);
 }
+
+export {
+  encryptOfficeFile,
+  decryptOfficeFile,
+  isOfficeEncryptedFile,
+  OfficeEncryptionError,
+  type OfficeEncryptionCode,
+} from "./encryption.js";

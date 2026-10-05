@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { canEditCell, canEditRange } from "@idea10/core";
+import { canEditCell, canEditRange, canSelectCell, canUseSheetPermission } from "@idea10/core";
 import {
   computed,
   nextTick,
@@ -280,6 +280,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
+  unlockRange: [range: CellRange];
   contextAction: [request: SheetContextRequest];
   pageSetupChange: [setup: SheetPageSetup];
   openHeaderFooter: [target: HeaderFooterEditTarget];
@@ -743,6 +744,16 @@ const selectedRange = computed(() =>
     columnCount: renderExtent.value.columnCount,
   }),
 );
+const objectsReadOnly = computed(
+  () =>
+    props.readOnly &&
+    (!props.sheet.properties.protected || !canUseSheetPermission(props.sheet, "editObjects")),
+);
+const filterReadOnly = computed(
+  () =>
+    props.readOnly &&
+    (!props.sheet.properties.protected || !canUseSheetPermission(props.sheet, "autoFilter")),
+);
 const cellReadOnly = computed(() => {
   void props.workbookRevision;
   return (
@@ -757,6 +768,20 @@ const selectionReadOnly = computed(() => {
     (!props.sheet.properties.protected || !canEditRange(props.sheet, selectedRange.value))
   );
 });
+function axisOperationReadOnly(axis: SheetDimensionAxis, operation: "insert" | "delete"): boolean {
+  const permission =
+    operation === "insert"
+      ? axis === "row"
+        ? "insertRows"
+        : "insertColumns"
+      : axis === "row"
+        ? "deleteRows"
+        : "deleteColumns";
+  return (
+    props.readOnly &&
+    (!props.sheet.properties.protected || !canUseSheetPermission(props.sheet, permission))
+  );
+}
 function dimensionReadOnly(axis: SheetDimensionAxis): boolean {
   return (
     props.readOnly &&
@@ -1661,7 +1686,7 @@ function selectFloatingImage(id: string | null): void {
 }
 
 function deleteSelectedFloatingImage(id: string): void {
-  if (props.readOnly) return;
+  if (objectsReadOnly.value) return;
   emit("deleteFloatingImage", id);
   selectedImageId.value = null;
   focusEditor();
@@ -1695,7 +1720,7 @@ function onImageCut(event: ClipboardEvent): void {
     floatingClipboard.clear();
     return;
   }
-  if (props.readOnly) {
+  if (objectsReadOnly.value) {
     event.preventDefault();
     return;
   }
@@ -1709,7 +1734,7 @@ function requestFloatingImageCopy(id: string, mode: "copy" | "cut"): void {
 }
 
 async function requestFloatingImagePaste(id: string): Promise<void> {
-  if (props.readOnly) return;
+  if (objectsReadOnly.value) return;
   const image = props.sheet.floatingImages.find((entry) => entry.id === id);
   if (!image) return;
   setActiveCell(image.anchor);
@@ -1733,7 +1758,7 @@ function onImagePaste(event: ClipboardEvent): void {
     else floatingClipboard.clear();
     return;
   }
-  if (props.readOnly) {
+  if (objectsReadOnly.value) {
     event.preventDefault();
     event.stopPropagation();
     return;
@@ -1754,7 +1779,7 @@ function onImagePaste(event: ClipboardEvent): void {
 }
 
 async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> {
-  if (props.readOnly) return;
+  if (objectsReadOnly.value) return;
   event.preventDefault();
   event.stopPropagation();
   const sheet = props.sheet;
@@ -1774,7 +1799,7 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
     // Keep the captured native text when the browser denies the optional rich read.
   }
   if (
-    props.readOnly ||
+    objectsReadOnly.value ||
     props.sheet !== sheet ||
     props.workbookRevision !== revision ||
     !areCellAddressesEqual(activeCell.value, address) ||
@@ -1849,6 +1874,11 @@ function setSelection(
   visibleAddress: CellAddress = nextSelection.active,
   restoreFocus = true,
 ): void {
+  if (
+    !canSelectCell(props.sheet, nextSelection.active) ||
+    !canSelectCell(props.sheet, nextSelection.focus)
+  )
+    return;
   selectedImageId.value = null;
   axisContextMenu.value = undefined;
   cellContextMenu.value = undefined;
@@ -2220,7 +2250,7 @@ function getAxisMaximum(axis: SheetDimensionAxis): number {
 }
 
 function requestAxisInsert(payload: { direction: "before" | "after"; count: number }): void {
-  if (props.readOnly) return;
+  if (!axisContextMenu.value || axisOperationReadOnly(axisContextMenu.value.axis, "insert")) return;
   const menu = axisContextMenu.value;
   if (!menu) {
     return;
@@ -2238,7 +2268,7 @@ function requestAxisInsertion(
   direction: "before" | "after",
   count = selectionCount,
 ): boolean {
-  if (props.readOnly) return false;
+  if (axisOperationReadOnly(axis, "insert")) return false;
   const insertIndex = direction === "before" ? index : index + selectionCount;
   if (count > getAxisMaximum(axis) - insertIndex) return false;
   clearPendingClipboard();
@@ -2247,7 +2277,7 @@ function requestAxisInsertion(
 }
 
 function requestAxisDelete(): void {
-  if (props.readOnly) return;
+  if (!axisContextMenu.value || axisOperationReadOnly(axisContextMenu.value.axis, "delete")) return;
   const menu = axisContextMenu.value;
   if (!menu) {
     return;
@@ -2391,7 +2421,16 @@ function requestContextAction(action: SheetContextAction): void {
   const allowedAxisFormatting =
     (action.type === "resize" || action.type === "autoFit" || action.type === "visibility") &&
     !dimensionReadOnly(action.axis);
-  if (props.readOnly && action.type !== "columnStatistics" && !allowedAxisFormatting) return;
+  const allowedAxisOperation =
+    (action.type === "insert" || action.type === "delete") &&
+    !axisOperationReadOnly(action.axis, action.type);
+  if (
+    props.readOnly &&
+    action.type !== "columnStatistics" &&
+    !allowedAxisFormatting &&
+    !allowedAxisOperation
+  )
+    return;
   const range = getSelectionRange(selection.value);
   const keepOpen =
     action.type === "applyStyle" ||
@@ -2431,7 +2470,7 @@ function requestCellImageAction(action: "preview" | "float"): void {
 }
 
 function requestCellNote(action: "edit" | "delete"): void {
-  if (props.readOnly) return;
+  if (objectsReadOnly.value) return;
   const address = cellContextMenu.value?.noteAddress;
   cellContextMenu.value = undefined;
   if (!address) return;
@@ -2471,8 +2510,10 @@ function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
     openImagePreview(content.image);
     return;
   }
-  if (props.readOnly && (!props.sheet.properties.protected || !canEditCell(props.sheet, address)))
+  if (props.readOnly && (!props.sheet.properties.protected || !canEditCell(props.sheet, address))) {
+    emit("unlockRange", { start: address, end: address });
     return;
+  }
   if (isComposing.value) {
     return;
   }
@@ -2650,6 +2691,13 @@ function onEditorKeydown(event: KeyboardEvent): void {
   }
 
   if (cellReadOnly.value) {
+    if (
+      event.key === "F2" ||
+      event.key === "Delete" ||
+      event.key === "Backspace" ||
+      (event.key.length === 1 && !event.ctrlKey && !event.metaKey)
+    )
+      emit("unlockRange", selectedRange.value);
     if (
       event.key === "Delete" ||
       event.key === "Backspace" ||
@@ -3115,6 +3163,7 @@ defineExpose({
       :show-outline="showHeaders"
       :read-only="readOnly"
       :content-read-only="cellReadOnly"
+      :filter-read-only="filterReadOnly"
       @filter-column-request="emit('filterColumnRequest', $event)"
       @validation-choose="emit('validationChoose', $event)"
       @outline-toggle="emit('outlineToggle', $event)"
@@ -3165,7 +3214,7 @@ defineExpose({
         :loading-asset-ids="loadingImageAssetIds"
         :missing-asset-ids="missingImageAssetIds"
         :selected-image-id="selectedImageId"
-        :read-only="readOnly"
+        :read-only="objectsReadOnly"
         @select="selectFloatingImage"
         @update="emit('updateFloatingImage', $event)"
         @delete="deleteSelectedFloatingImage"
@@ -3210,6 +3259,8 @@ defineExpose({
       :anchor="axisContextMenu.anchor"
       :read-only="readOnly"
       :dimension-read-only="dimensionReadOnly(axisContextMenu.axis)"
+      :insert-read-only="axisOperationReadOnly(axisContextMenu.axis, 'insert')"
+      :delete-read-only="axisOperationReadOnly(axisContextMenu.axis, 'delete')"
       @insert="requestAxisInsert"
       @resize="requestAxisResize"
       @delete="requestAxisDelete"
@@ -3267,7 +3318,7 @@ defineExpose({
       :note="preview.note"
       :draft="preview.draft"
       :error="preview.draft ? noteError : undefined"
-      :read-only="readOnly"
+      :read-only="objectsReadOnly"
       @enter="cancelNotePreviewLeave"
       @leave="scheduleNotePreviewLeave"
       @edit="emit('editNote', $event)"

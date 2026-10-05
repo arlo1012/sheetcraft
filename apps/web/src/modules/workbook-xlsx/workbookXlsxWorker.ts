@@ -18,6 +18,7 @@ export class XlsxWorkerFailure extends Error {
   constructor(
     message: string,
     readonly report?: XlsxCompatibilityReport,
+    readonly code?: import("./xlsxWorkerProtocol").XlsxWorkerError["code"],
   ) {
     super(message);
     this.name = "XlsxWorkerFailure";
@@ -100,7 +101,9 @@ export function runXlsxWorker(
           settle(new XlsxWorkerFailure("XLSX worker returned an invalid message."));
           return;
         }
-        settle(new XlsxWorkerFailure(response.error.message, response.error.report));
+        settle(
+          new XlsxWorkerFailure(response.error.message, response.error.report, response.error.code),
+        );
         return;
       }
       if (response.type !== request.type) {

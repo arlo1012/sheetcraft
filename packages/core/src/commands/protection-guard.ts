@@ -1,4 +1,6 @@
+import { getSheetFilters } from "./filter.js";
 import { WorkbookDomainError } from "../errors.js";
+import { MAX_SHEET_ROWS, MAX_SHEET_COLUMNS } from "../sheet-limits.js";
 import { canEditRange } from "../protection.js";
 import { expandSelectionToMergedCellRanges } from "../merged-cells.js";
 import { areCellStylesEqual } from "../style.js";
@@ -52,7 +54,14 @@ export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookC
           reject(sheet.id);
       }
       if (
+        change.hyperlink !== undefined &&
+        !sheet.protection?.insertHyperlinks &&
+        JSON.stringify(change.hyperlink ?? undefined) !== JSON.stringify(cell?.hyperlink)
+      )
+        reject(sheet.id);
+      if (
         change.note !== undefined &&
+        !sheet.protection?.editObjects &&
         JSON.stringify(change.note ?? undefined) !== JSON.stringify(cell?.note)
       )
         reject(sheet.id);
@@ -70,7 +79,65 @@ export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookC
       reject(sheet.id);
     return true;
   }
-  if (command.type === "setCellNotes") reject(sheet.id);
+  if (
+    command.type === "setSheetProperties" &&
+    command.properties.protected === false &&
+    sheet.protection?.password
+  )
+    reject(sheet.id);
+  if (command.type === "setCellNotes") {
+    if (!sheet.protection?.editObjects) reject(sheet.id);
+    return true;
+  }
+  if (command.type === "sortSheetRange") {
+    const range = { start: { ...command.range.start }, end: { ...command.range.end } };
+    if (command.hasHeader) range.start.row++;
+    if (!sheet.protection?.sort || !canEditRange(sheet, range)) reject(sheet.id);
+    return true;
+  }
+  if (command.type === "setSheetFilter") {
+    const existing = getSheetFilters(sheet).find(
+      (filter) => JSON.stringify(filter.range) === JSON.stringify(command.filter?.range),
+    );
+    if (
+      !sheet.protection?.autoFilter ||
+      !existing ||
+      !command.filter ||
+      JSON.stringify(existing.advanced) !== JSON.stringify(command.filter.advanced)
+    )
+      reject(sheet.id);
+    return true;
+  }
+  if (command.type === "insertSheetAxis")
+    return Boolean(
+      command.axis === "row" ? sheet.protection?.insertRows : sheet.protection?.insertColumns,
+    );
+  if (command.type === "deleteSheetAxis") {
+    const allowed =
+      command.axis === "row" ? sheet.protection?.deleteRows : sheet.protection?.deleteColumns;
+    const range =
+      command.axis === "row"
+        ? {
+            start: { row: command.index, column: 0 },
+            end: { row: command.index + command.count - 1, column: MAX_SHEET_COLUMNS - 1 },
+          }
+        : {
+            start: { row: 0, column: command.index },
+            end: { row: MAX_SHEET_ROWS - 1, column: command.index + command.count - 1 },
+          };
+    if (!allowed || !canEditRange(sheet, range)) reject(sheet.id);
+    return true;
+  }
+  if (command.type === "setCellHyperlink") {
+    if (
+      !sheet.protection?.insertHyperlinks ||
+      !canEditRange(sheet, { start: command.address, end: command.address })
+    )
+      reject(sheet.id);
+    return true;
+  }
+  if (command.type === "setFloatingImage" || command.type === "deleteFloatingImage")
+    return Boolean(sheet.protection?.editObjects);
   if (command.type === "applyCellStyle" && "unlocked" in command.patch) reject(sheet.id);
   if (
     command.type === "applyCellFormat" &&

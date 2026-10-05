@@ -911,6 +911,7 @@ export async function decodeWithExcelJs(
     workbook: {
       id: workbookId(),
       structureProtected: protection.structureProtected,
+      ...(protection.structurePassword ? { structurePassword: protection.structurePassword } : {}),
       dateSystem,
       calculation,
       theme,
@@ -1261,6 +1262,7 @@ export async function encodeWithExcelJs(
       report,
       sheetBackgrounds,
       Boolean(workbook.structureProtected),
+      workbook.structurePassword,
     ),
     report: report.build(),
   };

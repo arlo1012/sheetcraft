@@ -19,7 +19,12 @@
   },
   "dependencies": {
     "@idea10/core": "workspace:*",
+    "@noble/ciphers": "2.1.1",
+    "@noble/hashes": "2.0.1",
+    "@scure/base": "2.0.0",
+    "cfb": "1.2.2",
     "exceljs": "4.4.0",
+    "fast-xml-parser": "5.3.8",
     "fflate": "0.8.3"
   },
   "devDependencies": {

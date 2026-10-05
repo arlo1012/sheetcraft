@@ -26,6 +26,8 @@ const props = withDefaults(
     theme?: WorkbookTheme;
     state: SelectionCellStyleState;
     disabled: boolean;
+    hyperlinkDisabled?: boolean;
+    imageDisabled?: boolean;
     conditionalFormattingDisabled?: boolean;
     readOnly?: boolean;
     formatPainterActive?: boolean;
@@ -283,6 +285,8 @@ defineSlots<{
         :theme-accent-color="theme?.accentColors[0]"
         :state="state"
         :disabled="disabled"
+        :hyperlink-disabled="hyperlinkDisabled"
+        :image-disabled="imageDisabled"
         :conditional-formatting-disabled="conditionalFormattingDisabled"
         :read-only="readOnly"
         :format-painter-active="formatPainterActive"

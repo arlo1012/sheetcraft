@@ -6,6 +6,7 @@ export type WorkbookErrorCode =
   | "last_visible_sheet"
   | "sheet_protected"
   | "workbook_protected"
+  | "incorrect_protection_password"
   | "sheet_name_conflict"
   | "sheet_not_found"
   | "unsupported_snapshot_version"

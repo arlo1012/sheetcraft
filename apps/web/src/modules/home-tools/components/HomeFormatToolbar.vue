@@ -33,6 +33,8 @@ const props = withDefaults(
   defineProps<{
     state: SelectionCellStyleState;
     disabled: boolean;
+    hyperlinkDisabled?: boolean;
+    imageDisabled?: boolean;
     conditionalFormattingDisabled?: boolean;
     readOnly?: boolean;
     editSessionId?: string;
@@ -213,6 +215,8 @@ function onKeydown(event: KeyboardEvent): void {
     />
     <HomeInsertGroup
       :disabled="disabled"
+      :hyperlink-disabled="hyperlinkDisabled"
+      :image-disabled="imageDisabled"
       @insert-image="emit('insertImage', $event)"
       @insert-hyperlink="emit('insertHyperlink')"
     />

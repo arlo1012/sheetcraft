@@ -13,6 +13,7 @@ import {
   createWorkbookXlsxWorker,
   runXlsxWorker,
   XlsxWorkerAbortError,
+  XlsxWorkerFailure,
   XlsxWorkerTimeoutError,
   type XlsxWorkerFactory,
 } from "./workbookXlsxWorker";
@@ -24,7 +25,9 @@ export type XlsxFeedbackKey =
   | "xlsx.feedback.finishEditing"
   | "xlsx.feedback.imported"
   | "xlsx.feedback.stale"
-  | "xlsx.feedback.timeout";
+  | "xlsx.feedback.timeout"
+  | "xlsx.feedback.unsupportedEncryption"
+  | "xlsx.feedback.invalidEncryptedFile";
 
 export type XlsxFeedback = { key: XlsxFeedbackKey; error: boolean };
 export type XlsxConfirmation = "import";
@@ -68,6 +71,9 @@ export function useWorkbookXlsxActions(options: {
   timeoutMs?: number;
 }) {
   const busy = ref(false);
+  const passwordRequired = ref(false);
+  const passwordError = ref(false);
+  let encryptedImport: { bytes: ArrayBuffer; workbook: Workbook; revision: number } | undefined;
   const confirmation = ref<XlsxConfirmation>();
   const feedback = ref<XlsxFeedback>();
   const pendingImport = shallowRef<PendingImport>();
@@ -83,13 +89,17 @@ export function useWorkbookXlsxActions(options: {
       options.isBlocked?.() ||
       options.persistence.loading.value ||
       busy.value ||
-      confirmation.value,
+      confirmation.value ||
+      passwordRequired.value,
     );
   }
 
   function clearPending(): void {
     confirmation.value = undefined;
     pendingImport.value = undefined;
+    passwordRequired.value = false;
+    passwordError.value = false;
+    encryptedImport = undefined;
   }
 
   function canApplyImport(pending: PendingImport): boolean {
@@ -114,13 +124,22 @@ export function useWorkbookXlsxActions(options: {
     if (error instanceof XlsxWorkerAbortError || disposed) return;
     feedback.value = {
       key:
-        error instanceof XlsxWorkerTimeoutError ? "xlsx.feedback.timeout" : "xlsx.feedback.failed",
+        error instanceof XlsxWorkerTimeoutError
+          ? "xlsx.feedback.timeout"
+          : error instanceof XlsxWorkerFailure && error.code === "unsupported-encryption"
+            ? "xlsx.feedback.unsupportedEncryption"
+            : error instanceof XlsxWorkerFailure && error.code === "invalid-encrypted-file"
+              ? "xlsx.feedback.invalidEncryptedFile"
+              : "xlsx.feedback.failed",
       error: true,
     };
   }
 
-  async function importXlsx(file: Pick<File, "arrayBuffer" | "size">): Promise<void> {
-    if (!prepare()) return;
+  async function importXlsx(
+    file: Pick<File, "arrayBuffer" | "size">,
+    password?: string,
+  ): Promise<void> {
+    if (password === undefined && !prepare()) return;
     const workbookAtStart = options.getWorkbook();
     const revisionAtStart = options.getRevision();
     const requestId = `xlsx-import-${++requestNumber}`;
@@ -134,12 +153,16 @@ export function useWorkbookXlsxActions(options: {
       }
       const bytes = await file.arrayBuffer();
       if (abortController.signal.aborted) throw new XlsxWorkerAbortError();
+      encryptedImport = { bytes, workbook: workbookAtStart, revision: revisionAtStart };
       const response = await runXlsxWorker(
         workerFactory,
-        { id: requestId, type: "decode", bytes },
+        { id: requestId, type: "decode", bytes: bytes.slice(0), ...(password ? { password } : {}) },
         { timeoutMs, signal: abortController.signal },
       );
       if (disposed || response.type !== "decode") return;
+      encryptedImport = undefined;
+      passwordRequired.value = false;
+      passwordError.value = false;
       if (hasBlockingIssue(response.report)) {
         feedback.value = { key: "xlsx.feedback.blocked", error: true };
         return;
@@ -156,14 +179,43 @@ export function useWorkbookXlsxActions(options: {
       pendingImport.value = pending;
       confirmation.value = "import";
     } catch (error) {
-      setFailure(error);
+      if (
+        error instanceof XlsxWorkerFailure &&
+        (error.code === "password-required" || error.code === "incorrect-password")
+      ) {
+        passwordRequired.value = true;
+        passwordError.value = error.code === "incorrect-password";
+      } else {
+        encryptedImport = undefined;
+        passwordRequired.value = false;
+        setFailure(error);
+      }
     } finally {
       abortController = undefined;
       busy.value = false;
     }
   }
 
-  async function exportXlsx(): Promise<void> {
+  async function submitPassword(password: string): Promise<void> {
+    const pending = encryptedImport;
+    if (!pending || busy.value || !password) return;
+    if (
+      options.getWorkbook() !== pending.workbook ||
+      options.getRevision() !== pending.revision ||
+      options.hasPendingEdits() ||
+      options.isBlocked?.()
+    ) {
+      clearPending();
+      feedback.value = { key: "xlsx.feedback.stale", error: true };
+      return;
+    }
+    await importXlsx(
+      { size: pending.bytes.byteLength, arrayBuffer: async () => pending.bytes },
+      password,
+    );
+  }
+
+  async function exportXlsx(password?: string): Promise<void> {
     if (!prepare()) return;
     const snapshot: WorkbookSnapshot = serializeWorkbook(options.getWorkbook());
     const requestId = `xlsx-export-${++requestNumber}`;
@@ -182,7 +234,7 @@ export function useWorkbookXlsxActions(options: {
       if (controller.signal.aborted) throw new XlsxWorkerAbortError();
       const response = await runXlsxWorker(
         workerFactory,
-        { id: requestId, type: "encode", snapshot, images },
+        { id: requestId, type: "encode", snapshot, images, ...(password ? { password } : {}) },
         { timeoutMs: Math.max(1, timeoutMs - (Date.now() - startedAt)), signal: controller.signal },
       );
       clearTimeout(timeout);
@@ -192,7 +244,7 @@ export function useWorkbookXlsxActions(options: {
         return;
       }
       const bytes = new Uint8Array(response.bytes);
-      await download(bytes, "workbook.xlsx");
+      await download(bytes, password ? "workbook-encrypted.xlsx" : "workbook.xlsx");
       if (!disposed) feedback.value = { key: "xlsx.feedback.exported", error: false };
     } catch (error) {
       if (timedOut) setFailure(new XlsxWorkerTimeoutError());
@@ -243,6 +295,9 @@ export function useWorkbookXlsxActions(options: {
 
   return {
     busy: readonly(busy),
+    passwordRequired: readonly(passwordRequired),
+    passwordError: readonly(passwordError),
+    submitPassword,
     confirmation: readonly(confirmation),
     feedback: readonly(feedback),
     importXlsx,

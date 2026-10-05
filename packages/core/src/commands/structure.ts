@@ -729,7 +729,7 @@ function transformSheetMetadataForAxis(
               maximum,
               operation,
             );
-            return range ? [{ name: entry.name, range }] : [];
+            return range ? [{ ...entry, range }] : [];
           }),
         }
       : undefined,
@@ -1651,7 +1651,7 @@ function transformSheetMetadataForAxisMove(
                 axis,
                 "Moving this band would split an editable range.",
               );
-            return { name: entry.name, range };
+            return { ...entry, range };
           }),
         }
       : undefined,

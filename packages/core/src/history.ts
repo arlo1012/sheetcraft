@@ -159,13 +159,13 @@ export function executeReplaceableWorkbookCommand(
   if (token && newest?.replacementToken === token.id) {
     // First restore the captured pre-fill state. A failed replacement must put the
     // workbook back exactly where it was, with the original history entry intact.
-    const redo = applyWorkbookCommand(session.workbook, newest.command);
+    const redo = applyWorkbookCommand(session.workbook, newest.command, { fromHistory: true });
     if (!redo) return { changed: false, accepted: false };
     let inverse: WorkbookCommand | null;
     try {
       inverse = applyWorkbookCommand(session.workbook, command);
     } catch (error) {
-      applyWorkbookCommand(session.workbook, redo);
+      applyWorkbookCommand(session.workbook, redo, { fromHistory: true });
       throw error;
     }
     if (!inverse) {
@@ -223,7 +223,7 @@ function transferHistoryEntry(
 ): boolean {
   const entry = source[source.length - 1];
   if (!entry) return false;
-  const inverse = applyWorkbookCommand(session.workbook, entry.command);
+  const inverse = applyWorkbookCommand(session.workbook, entry.command, { fromHistory: true });
   if (!inverse) return false;
   source.pop();
   pushEntry(target, { command: inverse, operation: entry.operation }, session.history.maxEntries);

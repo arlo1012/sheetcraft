@@ -29,6 +29,8 @@ import type { DuplicateToolMode } from "../duplicate-tools-types";
 const props = withDefaults(
   defineProps<{
     disabled?: boolean;
+    sortDisabled?: boolean;
+    filterCriteriaDisabled?: boolean;
     comparisonDisabled?: boolean;
     fillDisabled?: boolean;
     canFillRows?: boolean;
@@ -99,7 +101,7 @@ const { t } = useAppI18n();
       :aria-label="t('dataTools.groups.sortFilter')"
     >
       <DataSortTool
-        :disabled="disabled || !capabilities.sort"
+        :disabled="(sortDisabled ?? disabled) || !capabilities.sort"
         @sort="emit('sort', $event)"
         @custom="emit('openSort')"
       /><DataFilterTool
@@ -110,14 +112,16 @@ const { t } = useAppI18n();
       />
       <div class="data-toolbar__stack">
         <RibbonButton
-          :disabled="disabled || !filterActive || !capabilities.clearFilter"
+          :disabled="
+            (filterCriteriaDisabled ?? disabled) || !filterActive || !capabilities.clearFilter
+          "
           :label="t('dataTools.filter.showAll')"
           :text="t('dataTools.filter.showAll')"
           data-data-action="clear-filter"
           @activate="emit('clearFilter')"
           ><Filter /></RibbonButton
         ><RibbonButton
-          :disabled="disabled || !filterActive"
+          :disabled="(filterCriteriaDisabled ?? disabled) || !filterActive"
           :label="t('dataTools.filter.reapply')"
           :text="t('dataTools.filter.reapply')"
           data-data-action="reapply-filter"

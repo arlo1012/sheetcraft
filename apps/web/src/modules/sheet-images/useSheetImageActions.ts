@@ -8,7 +8,7 @@ import {
   type Sheet,
   type Workbook,
 } from "@idea10/core/workbook";
-import { getMergedCellAnchor } from "@idea10/core";
+import { getMergedCellAnchor, canUseSheetPermission, canEditCell } from "@idea10/core";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import type { MessageKey } from "../../shared/i18n";
 import type { ImageAssetStore } from "../image-assets/imageAssetStore";
@@ -44,8 +44,16 @@ export function useSheetImageActions(options: {
   const fileInput = ref<HTMLInputElement | null>(null);
   let pending: { mode: ImageInsertMode; target: ImageTarget } | undefined;
 
-  function captureTarget(address = options.getAddress()): ImageTarget | undefined {
-    if (options.getSheet().properties.protected) return;
+  function captureTarget(
+    address = options.getAddress(),
+    mode: ImageInsertMode = "floating",
+  ): ImageTarget | undefined {
+    if (
+      mode === "floating"
+        ? !canUseSheetPermission(options.getSheet(), "editObjects")
+        : !canEditCell(options.getSheet(), address)
+    )
+      return;
     if (!options.flushPendingEdits()) return;
     const sheet = options.getSheet();
     return {
@@ -57,14 +65,20 @@ export function useSheetImageActions(options: {
     };
   }
 
-  function isCurrent(target: ImageTarget): boolean {
+  function isCurrent(target: ImageTarget, mode: ImageInsertMode = "floating"): boolean {
     const sheet = target.workbook.sheets.get(target.sheetId);
-    return options.getWorkbook() === target.workbook && !!sheet && !sheet.properties.protected;
+    return (
+      options.getWorkbook() === target.workbook &&
+      !!sheet &&
+      (mode === "floating"
+        ? canUseSheetPermission(sheet, "editObjects")
+        : canEditCell(sheet, target.address))
+    );
   }
 
   function requestInsert(mode: ImageInsertMode): void {
     if (busy.value) return;
-    const target = captureTarget();
+    const target = captureTarget(options.getAddress(), mode);
     if (!target) return;
     pending = { mode, target };
     if (fileInput.value) {
@@ -76,16 +90,16 @@ export function useSheetImageActions(options: {
   async function insertFile(
     file: File,
     mode: ImageInsertMode = "floating",
-    target = captureTarget(),
+    target = captureTarget(options.getAddress(), mode),
   ): Promise<void> {
-    if (!target || !isCurrent(target) || busy.value) return;
+    if (!target || !isCurrent(target, mode) || busy.value) return;
     busy.value = true;
     feedback.value = undefined;
     try {
       const asset = await prepareImageAsset(file);
-      if (!isCurrent(target)) return;
+      if (!isCurrent(target, mode)) return;
       await options.assetStore.put(asset);
-      if (!isCurrent(target)) return;
+      if (!isCurrent(target, mode)) return;
       const altText = file.name || "";
       if (mode === "cell") {
         options.setCellImage({
@@ -145,7 +159,7 @@ export function useSheetImageActions(options: {
     mode: ImageInsertMode = "floating",
     address = options.getAddress(),
   ): Promise<void> {
-    const target = captureTarget(address);
+    const target = captureTarget(address, mode);
     if (!target || busy.value) return;
     busy.value = true;
     try {
@@ -153,7 +167,7 @@ export function useSheetImageActions(options: {
         feedback.value = "image.assetUnavailable";
         return;
       }
-      if (!isCurrent(target)) return;
+      if (!isCurrent(target, mode)) return;
       if (mode === "cell") {
         options.setCellImage({
           sheetId: target.sheetId,
@@ -177,6 +191,7 @@ export function useSheetImageActions(options: {
   }
 
   async function convertCellImageToFloating(address: CellAddress): Promise<void> {
+    if (options.getSheet().properties.protected) return;
     const target = captureTarget(address);
     if (!target || busy.value) return;
     const sheet = options.getSheet();

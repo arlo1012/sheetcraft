@@ -1,3 +1,4 @@
+import { canUseSheetPermission } from "@idea10/core";
 import { computed, ref } from "vue";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import {
@@ -85,7 +86,7 @@ import {
   type OutlineSelection,
 } from "./outline-selection";
 
-type Target = DataToolRangeSnapshot;
+type Target = DataToolRangeSnapshot & { permission?: "sort" | "autoFilter" };
 type Options = {
   getWorkbook: () => Workbook;
   getSelection: () => OutlineSelection & { address: CellAddress };
@@ -227,17 +228,23 @@ export function useDataToolsController(options: Options) {
   function error(message = t("dataTools.common.operationFailed")): void {
     void MessagePlugin.warning(message);
   }
-  function capture(dataRegion = true): Target | undefined {
+  function capture(dataRegion = true, permission?: "sort" | "autoFilter"): Target | undefined {
     if (options.isBusy() || !options.flush()) return undefined;
     const sheet = activeSheet.value;
-    if (sheet.properties.protected) return undefined;
+    if (sheet.properties.protected && (!permission || !canUseSheetPermission(sheet, permission)))
+      return undefined;
     const selection = options.getSelection();
     const range = dataRegion
       ? sheet.filter && intersects(sheet.filter.range, selection.range)
         ? sheet.filter.range
         : resolveDataRange(sheet, selection.range)
       : selection.range;
-    return { sheetId: sheet.id, generation: options.getGeneration(), range: cloneRange(range) };
+    return {
+      sheetId: sheet.id,
+      generation: options.getGeneration(),
+      range: cloneRange(range),
+      permission,
+    };
   }
   function valid(target: Target | undefined): target is Target {
     return Boolean(
@@ -245,7 +252,8 @@ export function useDataToolsController(options: Options) {
       !options.isBusy() &&
       options.getGeneration() === target.generation &&
       activeSheet.value.id === target.sheetId &&
-      !activeSheet.value.properties.protected,
+      (!activeSheet.value.properties.protected ||
+        (target.permission && canUseSheetPermission(activeSheet.value, target.permission))),
     );
   }
   function execute(target: Target | undefined, command: () => WorkbookCommand): boolean {
@@ -379,6 +387,7 @@ export function useDataToolsController(options: Options) {
       preferredKind,
       hasCriteria: Boolean(existing),
       canSort:
+        canUseSheetPermission(activeSheet.value, "sort") &&
         filter.range.end.row - filter.range.start.row > 1 &&
         !activeSheet.value.mergedCells.some((merge) => intersects(merge, filter.range)),
       includesMergedCells: activeSheet.value.mergedCells.some(
@@ -565,7 +574,7 @@ export function useDataToolsController(options: Options) {
     );
   }
   function clearFilter(): void {
-    const target = capture();
+    const target = capture(true, "autoFilter");
     if (target && activeSheet.value.filter)
       execute(target, () =>
         createSetSheetFilterCriteriaCommand(target.sheetId, activeSheet.value.filter!.range, [], {
@@ -574,7 +583,7 @@ export function useDataToolsController(options: Options) {
       );
   }
   function reapplyFilter(): void {
-    const target = capture();
+    const target = capture(true, "autoFilter");
     const filter = activeSheet.value.filter;
     if (!target || !filter) return;
     execute(target, () =>
@@ -592,7 +601,7 @@ export function useDataToolsController(options: Options) {
     options.recalculate?.();
   }
   function sort(direction: "ascending" | "descending"): void {
-    const target = capture();
+    const target = capture(true, "sort");
     if (!target) return;
     const hasHeader = inferHeader(target);
     const column = options.getSelection().address.column;
@@ -633,7 +642,7 @@ export function useDataToolsController(options: Options) {
     return hasTypedBody ? true : undefined;
   }
   function openSort(): void {
-    const target = capture();
+    const target = capture(true, "sort");
     if (target) {
       sortTarget.value = target;
       const restored = sortSettingsFor(target);
@@ -993,11 +1002,17 @@ export function useDataToolsController(options: Options) {
         },
     anchor?: DataToolFilterAnchor,
   ): void {
-    if (options.isBusy() || !options.flush() || activeSheet.value.properties.protected) return;
+    if (
+      options.isBusy() ||
+      !options.flush() ||
+      !canUseSheetPermission(activeSheet.value, "autoFilter")
+    )
+      return;
     const column = typeof request === "number" ? request : request.column;
     const range = typeof request === "number" ? activeSheet.value.filter?.range : request.range;
     if (!range) return;
-    const target = {
+    const target: Target = {
+      permission: "autoFilter",
       sheetId: activeSheet.value.id,
       generation: options.getGeneration(),
       range: cloneRange(range),
@@ -1017,7 +1032,11 @@ export function useDataToolsController(options: Options) {
       return;
     }
     if (!filterState.value?.canSort) return;
-    sortTarget.value = { ...panel.target, range: cloneRange(panel.target.range) };
+    sortTarget.value = {
+      ...panel.target,
+      permission: "sort",
+      range: cloneRange(panel.target.range),
+    };
     sortInitial.value = {
       hasHeader: true,
       headerLocked: true,
@@ -1031,7 +1050,7 @@ export function useDataToolsController(options: Options) {
     const panel = filterPanel.value;
     if (
       panel &&
-      execute(panel.target, () =>
+      execute({ ...panel.target, permission: "sort" }, () =>
         createMultiKeySortSheetRangeCommand(
           panel.target.sheetId,
           panel.target.range,
@@ -1046,7 +1065,7 @@ export function useDataToolsController(options: Options) {
     const panel = filterPanel.value;
     if (!panel || !filterState.value?.canSort) return;
     if (
-      execute(panel.target, () =>
+      execute({ ...panel.target, permission: "sort" }, () =>
         createMultiKeySortSheetRangeCommand(
           panel.target.sheetId,
           panel.target.range,
