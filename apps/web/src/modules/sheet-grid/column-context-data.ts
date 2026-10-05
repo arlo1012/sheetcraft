@@ -18,6 +18,9 @@ export type ColumnStatistics = Readonly<{
   average: number | null;
   minimum: number | null;
   maximum: number | null;
+  distinctCount: number;
+  uniqueCount: number;
+  distributionTruncated: boolean;
   distribution: readonly ColumnValueDistribution[];
 }>;
 
@@ -70,6 +73,7 @@ function asDistributionValue(value: FormulaValue): string | null {
 
 function createEmptyStatistic() {
   return {
+    selectedCellCount: 0,
     nonEmptyCount: 0,
     numericCount: 0,
     dateCount: 0,
@@ -78,26 +82,6 @@ function createEmptyStatistic() {
     minimum: null as number | null,
     maximum: null as number | null,
   };
-}
-
-function isInIntervals(row: number, intervals: readonly { start: number; end: number }[]): boolean {
-  return intervals.some((interval) => row >= interval.start && row <= interval.end);
-}
-
-function getVisibleRowCount(sheet: Sheet, range: CellRange, evaluator: SheetEvaluator): number {
-  const intervals = createSheetHiddenRowIntervals(sheet, evaluator);
-  let hiddenCount = 0;
-  for (const interval of intervals) {
-    const start = Math.max(range.start.row, interval.start);
-    const end = Math.min(range.end.row, interval.end);
-    if (start <= end) hiddenCount += end - start + 1;
-  }
-  for (const row of sheet.hiddenRows ?? []) {
-    if (row >= range.start.row && row <= range.end.row && !isInIntervals(row, intervals)) {
-      hiddenCount += 1;
-    }
-  }
-  return Math.max(0, range.end.row - range.start.row + 1 - hiddenCount);
 }
 
 /**
@@ -142,11 +126,12 @@ export function getColumnStatistics(
           : cell.content.kind === "error"
             ? cell.content.error
             : null;
+    if (value === null || value === "") continue;
+    statistic.selectedCellCount += 1;
     if (isFormulaError(value)) {
       statistic.errorCount += 1;
       continue;
     }
-    if (value === null) continue;
 
     statistic.nonEmptyCount += 1;
     const displayValue = asDistributionValue(value);
@@ -165,7 +150,6 @@ export function getColumnStatistics(
     }
   }
 
-  const selectedRowCount = getVisibleRowCount(sheet, normalized, evaluator);
   const selectedColumnCount = normalized.end.column - normalized.start.column + 1;
   if (selectedColumnCount <= MAX_EMPTY_COLUMNS_TO_REPORT) {
     for (let column = normalized.start.column; column <= normalized.end.column; column += 1) {
@@ -179,14 +163,21 @@ export function getColumnStatistics(
     .map(([column, statistic]) => {
       const distribution = [...valuesByColumn.get(column)!.entries()]
         .map(([value, count]) => ({ value, count }))
-        .sort((left, right) => right.count - left.count || left.value.localeCompare(right.value))
+        .sort(
+          (left, right) =>
+            right.count - left.count ||
+            left.value.localeCompare(right.value, undefined, { numeric: true }),
+        )
         .slice(0, MAX_DISTRIBUTION_VALUES);
       return {
         column,
-        selectedCellCount: selectedRowCount,
         ...statistic,
         sum: Object.is(statistic.sum, -0) ? 0 : statistic.sum,
         average: statistic.numericCount === 0 ? null : statistic.sum / statistic.numericCount,
+        distinctCount: valuesByColumn.get(column)!.size,
+        uniqueCount: [...valuesByColumn.get(column)!.values()].filter((count) => count === 1)
+          .length,
+        distributionTruncated: valuesByColumn.get(column)!.size > MAX_DISTRIBUTION_VALUES,
         distribution,
       };
     });
@@ -232,7 +223,7 @@ export function getColumnChoices(
       (left, right) =>
         Math.abs(left.nearestRow - address.row) - Math.abs(right.nearestRow - address.row) ||
         right.count - left.count ||
-        left.value.localeCompare(right.value),
+        left.value.localeCompare(right.value, undefined, { numeric: true }),
     )
     .slice(0, MAX_COLUMN_CHOICES);
 }
