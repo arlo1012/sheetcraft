@@ -1,0 +1,229 @@
+<script setup lang="ts">
+import { computed, nextTick, ref, watch } from "vue";
+import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Button } from "tdesign-vue-next/es/button";
+import { Input } from "tdesign-vue-next/es/input";
+import { Textarea } from "tdesign-vue-next/es/textarea";
+import { Checkbox } from "tdesign-vue-next/es/checkbox";
+import { BaseTable } from "tdesign-vue-next/es/table";
+import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
+import { useAppI18n } from "../../../shared/i18n";
+import { builtinRules } from "../proofreading";
+import type { useWordProofreading } from "../useWordProofreading";
+const props = defineProps<{ controller: ReturnType<typeof useWordProofreading> }>();
+const { t } = useAppI18n();
+const originalWord = ref<string>();
+const word = ref(""),
+  replacement = ref(""),
+  feedback = ref(""),
+  builtins = ref(true);
+watch(
+  () => props.controller.panel.value,
+  () => {
+    originalWord.value = undefined;
+    word.value = "";
+    replacement.value = "";
+    builtins.value = props.controller.dictionary.value.builtins;
+  },
+);
+const visible = computed(
+  () =>
+    !!props.controller.panel.value && !["general", "batch"].includes(props.controller.panel.value),
+);
+const title = computed(() => {
+  switch (props.controller.panel.value) {
+    case "accepted":
+      return t("wordProof.accepted");
+    case "mistake":
+      return t("wordProof.mistake");
+    case "settings":
+      return t("wordProof.settings");
+    case "feedback":
+      return t("wordProof.feedback");
+    default:
+      return t("wordProof.dictionary");
+  }
+});
+const rows = computed(() => [
+  ...props.controller.dictionary.value.accepted.map((word) => ({
+    id: `accepted:${word}`,
+    word,
+    replacement: "",
+    kind: t("wordProof.correctWord"),
+    builtin: false,
+  })),
+  ...props.controller.dictionary.value.mistakes.map((r) => ({
+    ...r,
+    id: `mistake:${r.word}`,
+    kind: t("wordProof.incorrectWord"),
+    builtin: false,
+  })),
+  ...builtinRules.map((r) => ({
+    ...r,
+    id: `builtin:${r.word}`,
+    kind: t("wordProof.incorrectWord"),
+    builtin: true,
+  })),
+]);
+type Row = (typeof rows.value)[number];
+const columns = computed<BaseTableCol[]>(() => [
+  { colKey: "word", title: t("wordProof.word"), width: 140 },
+  { colKey: "replacement", title: t("wordProof.replacement"), width: 140 },
+  { colKey: "kind", title: t("wordProof.kind"), width: 90 },
+  { colKey: "origin", title: t("wordProof.origin"), width: 80 },
+  { colKey: "actions", title: "", width: 130 },
+]);
+function saveWord() {
+  if (
+    props.controller.add(
+      word.value,
+      props.controller.panel.value === "mistake" ? replacement.value : undefined,
+      originalWord.value,
+    )
+  )
+    props.controller.panel.value = "dictionary";
+}
+function remove(row: Row) {
+  props.controller.save({
+    ...props.controller.dictionary.value,
+    accepted: props.controller.dictionary.value.accepted.filter((w) => w !== row.word),
+    mistakes: props.controller.dictionary.value.mistakes.filter((r) => r.word !== row.word),
+  });
+}
+function edit(row: Row) {
+  props.controller.panel.value = row.replacement ? "mistake" : "accepted";
+  void nextTick(() => {
+    originalWord.value = row.word;
+    word.value = row.word;
+    replacement.value = row.replacement;
+  });
+}
+function download() {
+  const url = URL.createObjectURL(new Blob([feedback.value], { type: "text/plain;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "proofreading-feedback.txt";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+</script>
+<template>
+  <Dialog
+    :visible="visible"
+    :header="title"
+    :width="controller.panel.value === 'dictionary' ? '660px' : '520px'"
+    :footer="false"
+    :close-on-overlay-click="false"
+    @close="controller.panel.value = undefined"
+  >
+    <div class="word-dictionary">
+      <p v-if="controller.error.value" role="alert">{{ controller.error.value }}</p>
+      <template
+        v-if="controller.panel.value === 'accepted' || controller.panel.value === 'mistake'"
+      >
+        <p>{{ t("wordProof.wordHint") }}</p>
+        <Form label-align="top">
+          <FormItem :label="t('wordProof.word')"
+            ><Input v-model="word" :maxlength="100"
+          /></FormItem>
+          <FormItem v-if="controller.panel.value === 'mistake'" :label="t('wordProof.replacement')"
+            ><Input v-model="replacement" :maxlength="100"
+          /></FormItem>
+        </Form>
+        <div class="word-dictionary__actions">
+          <Button variant="outline" @click="controller.panel.value = undefined">{{
+            t("wordProof.cancel")
+          }}</Button
+          ><Button @click="saveWord">{{ t("wordProof.save") }}</Button>
+        </div>
+      </template>
+      <template v-else-if="controller.panel.value === 'dictionary'">
+        <p>{{ t("wordProof.localHint") }}</p>
+        <div class="word-dictionary__actions">
+          <Button variant="outline" @click="controller.open('accepted')">{{
+            t("wordProof.accepted")
+          }}</Button
+          ><Button variant="outline" @click="controller.open('mistake')">{{
+            t("wordProof.mistake")
+          }}</Button>
+        </div>
+        <div class="word-dictionary__table">
+          <TableHeightWrapper v-slot="{ height }"
+            ><BaseTable
+              row-key="id"
+              :data="rows"
+              :columns="columns"
+              :height="height"
+              table-layout="fixed"
+              resizable
+            >
+              <template #origin="{ row }">{{
+                t(row.builtin ? "wordProof.builtin" : "wordProof.custom")
+              }}</template>
+              <template #actions="{ row }"
+                ><template v-if="!row.builtin"
+                  ><Button size="small" variant="text" @click="edit(row as Row)">{{
+                    t("wordProof.edit")
+                  }}</Button
+                  ><Button size="small" variant="text" @click="remove(row as Row)">{{
+                    t("wordProof.remove")
+                  }}</Button></template
+                ></template
+              >
+            </BaseTable></TableHeightWrapper
+          >
+        </div>
+      </template>
+      <template v-else-if="controller.panel.value === 'settings'">
+        <p>{{ t("wordProof.localHint") }}</p>
+        <Checkbox v-model="builtins">{{ t("wordProof.enableBuiltin") }}</Checkbox>
+        <div class="word-dictionary__actions">
+          <Button variant="outline" @click="controller.panel.value = undefined">{{
+            t("wordProof.cancel")
+          }}</Button
+          ><Button
+            @click="
+              controller.save({ ...controller.dictionary.value, builtins }) &&
+              (controller.panel.value = undefined)
+            "
+            >{{ t("wordProof.save") }}</Button
+          >
+        </div>
+      </template>
+      <template v-else-if="controller.panel.value === 'feedback'">
+        <p>{{ t("wordProof.feedbackHint") }}</p>
+        <Textarea
+          v-model="feedback"
+          :placeholder="t('wordProof.feedbackPlaceholder')"
+          :autosize="{ minRows: 5, maxRows: 10 }"
+        />
+        <div class="word-dictionary__actions">
+          <Button :disabled="!feedback.trim()" @click="download">{{
+            t("wordProof.download")
+          }}</Button>
+        </div>
+      </template>
+    </div>
+  </Dialog>
+</template>
+<style scoped lang="scss">
+.word-dictionary {
+  display: grid;
+  gap: 12px;
+  p {
+    margin: 0;
+    color: var(--td-text-color-secondary);
+  }
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  &__table {
+    height: 320px;
+    min-height: 0;
+  }
+}
+</style>

@@ -2,7 +2,7 @@ import type { ProofreadingMessageSchema } from "./proofreading-messages";
 
 export const proofreadingZhCN = {
   proofreading: {
-    title: "数据校对",
+    title: "数据规范检查",
     range: "校对区域",
     rangePlaceholder: "默认校对当前工作表，可指定区域",
     pickRange: "选择区域",

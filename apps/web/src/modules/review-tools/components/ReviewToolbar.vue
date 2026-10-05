@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-  ClipboardCheck,
   SpellCheck,
   ShieldCheck,
   LockKeyhole,
@@ -39,7 +38,6 @@ const props = withDefaults(
   { hasSelectedNotes: undefined, editSessionId: undefined, objectsReadOnly: undefined },
 );
 const emit = defineEmits<{
-  proofread: [];
   spelling: [];
   convertText: [mode: "to-simplified" | "to-traditional", scope: "sheet" | "workbook"];
   encryptDocument: [];
@@ -84,15 +82,6 @@ const protectionLabel = computed(() =>
         data-review-action="spelling"
         @activate="emit('spelling')"
         ><SpellCheck
-      /></RibbonButton>
-      <RibbonButton
-        variant="tall"
-        :disabled="busy"
-        :label="t('review.proofread')"
-        :text="t('review.proofread')"
-        data-review-action="proofread"
-        @activate="emit('proofread')"
-        ><ClipboardCheck
       /></RibbonButton>
     </section>
     <section

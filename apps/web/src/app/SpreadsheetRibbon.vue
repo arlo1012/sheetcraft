@@ -97,7 +97,15 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-type Category = "home" | "page" | "formulas" | "data" | "review" | "view" | "table";
+type Category =
+  | "home"
+  | "page"
+  | "formulas"
+  | "data"
+  | "review"
+  | "view"
+  | "table"
+  | "proofreading";
 const activeCategory = ref<Category>("home");
 let previousCategory: Exclude<Category, "table"> = "home";
 const homeTab = ref<HTMLButtonElement>();
@@ -107,6 +115,7 @@ const dataTab = ref<HTMLButtonElement>();
 const tableTab = ref<HTMLButtonElement>();
 const reviewTab = ref<HTMLButtonElement>();
 const viewTab = ref<HTMLButtonElement>();
+const proofreadingTab = ref<HTMLButtonElement>();
 const tabId = useId();
 
 watch(activeCategory, (category) => {
@@ -123,8 +132,8 @@ function onCategoryKeydown(event: KeyboardEvent): void {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
   event.preventDefault();
   const categories: Category[] = props.hasTable
-    ? ["home", "page", "formulas", "data", "review", "view", "table"]
-    : ["home", "page", "formulas", "data", "review", "view"];
+    ? ["home", "page", "formulas", "data", "review", "view", "proofreading", "table"]
+    : ["home", "page", "formulas", "data", "review", "view", "proofreading"];
   const current = categories.indexOf(activeCategory.value);
   const index =
     event.key === "Home"
@@ -134,7 +143,9 @@ function onCategoryKeydown(event: KeyboardEvent): void {
         : (current + (event.key === "ArrowRight" ? 1 : -1) + categories.length) % categories.length;
   activeCategory.value = categories[index]!;
   void nextTick(() =>
-    [homeTab, pageTab, formulaTab, dataTab, reviewTab, viewTab, tableTab][index]?.value?.focus(),
+    [homeTab, pageTab, formulaTab, dataTab, reviewTab, viewTab, proofreadingTab, tableTab][
+      index
+    ]?.value?.focus(),
   );
 }
 
@@ -147,6 +158,7 @@ defineSlots<{
   "page-tools"?: () => unknown;
   "review-tools"?: () => unknown;
   "view-tools"?: () => unknown;
+  "proofreading-tools"?: (props: { close: () => void }) => unknown;
 }>();
 </script>
 
@@ -250,6 +262,21 @@ defineSlots<{
             @click="activeCategory = 'view'"
           >
             {{ t("ribbon.view") }}
+          </button>
+          <button
+            :id="`${tabId}-proofreading`"
+            ref="proofreadingTab"
+            class="spreadsheet-ribbon__category"
+            :class="{ 'is-active': activeCategory === 'proofreading' }"
+            data-ribbon-category="proofreading"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'proofreading'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'proofreading' ? 0 : -1"
+            @click="activeCategory = 'proofreading'"
+          >
+            {{ t("wordProof.title") }}
           </button>
           <button
             v-if="hasTable"
@@ -363,6 +390,15 @@ defineSlots<{
       />
       <slot v-else-if="activeCategory === 'data'" name="data-tools" />
       <slot v-else-if="activeCategory === 'review'" name="review-tools" />
+      <slot
+        v-else-if="activeCategory === 'proofreading'"
+        name="proofreading-tools"
+        :close="
+          () => {
+            activeCategory = 'home';
+          }
+        "
+      />
       <slot v-else-if="activeCategory === 'view'" name="view-tools" />
       <slot v-else name="table-tools" />
     </section>

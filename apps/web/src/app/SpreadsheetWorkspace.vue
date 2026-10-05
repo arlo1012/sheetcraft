@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useWordProofreading } from "../modules/text-proofreading/useWordProofreading";
+import ProofreadingToolbar from "../modules/text-proofreading/components/ProofreadingToolbar.vue";
+import WordReviewDialog from "../modules/text-proofreading/components/WordReviewDialog.vue";
+import WordDictionaryDialog from "../modules/text-proofreading/components/WordDictionaryDialog.vue";
 import DocumentPasswordDialog from "../modules/workbook-xlsx/components/DocumentPasswordDialog.vue";
 import { useTextReviewController } from "../modules/review-tools/useTextReviewController";
 import TextReviewDialog from "../modules/review-tools/components/TextReviewDialog.vue";
@@ -386,6 +390,16 @@ const {
   hasSelectedNotes,
 } = reviewActions;
 const textReview = useTextReviewController({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getSelection: () => activeSelectionRange.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  finishEditing: () => cellEditSession.finish(),
+  execute: executeCommand,
+});
+const wordProofreading = useWordProofreading({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
   getSelection: () => activeSelectionRange.value,
@@ -1860,6 +1874,7 @@ const gridInert = computed(
     xlsxBusy.value ||
     (!!protectionDialog.value && !pickingProtectionRange.value) ||
     !!textReview.mode.value ||
+    !!wordProofreading.panel.value ||
     encryptDocumentVisible.value ||
     xlsxActions.passwordRequired.value ||
     !!cellFormatSelection.value ||
@@ -2020,6 +2035,16 @@ const gridInert = computed(
           @settings="tableActions.openSettings"
         />
       </template>
+      <template #proofreading-tools="{ close }">
+        <ProofreadingToolbar
+          :busy="loading || fileBusy || xlsxBusy"
+          @open="wordProofreading.open"
+          @close="
+            wordProofreading.panel.value = undefined;
+            close();
+          "
+        />
+      </template>
       <template #review-tools>
         <ReviewToolbar
           :objects-read-only="!canUseSheetPermission(activeSheet, 'editObjects')"
@@ -2033,7 +2058,6 @@ const gridInert = computed(
           :has-notes="reviewNotes.length > 0"
           :show-active-note="showActiveNote"
           :edit-session-id="cellEditSession.id"
-          @proofread="dataTools.openDataProofreading"
           @encrypt-document="openDocumentEncryption"
           @spelling="textReview.open('spelling')"
           @convert-text="(mode, scope) => textReview.open(mode, scope)"
@@ -3030,6 +3054,8 @@ const gridInert = computed(
       @submit="xlsxActions.submitPassword"
       @close="xlsxActions.cancel"
     />
+    <WordReviewDialog :controller="wordProofreading" />
+    <WordDictionaryDialog :controller="wordProofreading" />
     <TextReviewDialog
       v-if="textReview.mode.value"
       :mode="textReview.mode.value"

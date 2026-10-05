@@ -54,7 +54,7 @@ const dialog = () => new DOMWrapper(document.body).get('[role="dialog"]');
 describe("DataProofreadingDialog", () => {
   test("does not present an empty scan as success before proofreading begins", async () => {
     const wrapper = mountDialog();
-    expect(dialog().text()).toContain("Proofread the current worksheet");
+    expect(dialog().text()).not.toContain("Proofread the current worksheet");
     expect(dialog().text()).not.toContain("No items need proofreading");
 
     await wrapper.setProps({ hasScanned: true });

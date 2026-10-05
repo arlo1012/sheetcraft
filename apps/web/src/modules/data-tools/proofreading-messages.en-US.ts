@@ -2,7 +2,7 @@ import type { ProofreadingMessageSchema } from "./proofreading-messages";
 
 export const proofreadingEnUS = {
   proofreading: {
-    title: "Data Proofreading",
+    title: "Data consistency check",
     range: "Range",
     rangePlaceholder: "Current worksheet by default; range optional",
     pickRange: "Pick range",
