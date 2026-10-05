@@ -35,7 +35,7 @@ export function useWordProofreading(options: {
   } catch {
     error.value = t("wordProof.storageRead");
   }
-  const panel = ref<"general" | "batch" | "accepted" | "mistake" | "dictionary" | "settings">();
+  const panel = ref<"review" | "accepted" | "mistake" | "dictionary" | "settings">();
   const scope = ref<"selection" | "sheet" | "workbook">("sheet");
   const cells = shallowRef<ReviewTextCell[]>([]);
   const issues = shallowRef<WordIssue[]>([]);
@@ -82,7 +82,7 @@ export function useWordProofreading(options: {
   function open(value: NonNullable<typeof panel.value>) {
     if (options.isBusy() || !options.finishEditing()) return;
     panel.value = value;
-    if (value === "general" || value === "batch") scan();
+    if (value === "review") scan();
   }
   function save(value: unknown) {
     try {

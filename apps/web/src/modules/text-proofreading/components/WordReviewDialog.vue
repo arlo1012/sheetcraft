@@ -60,8 +60,8 @@ function scan() {
 </script>
 <template>
   <Dialog
-    :visible="controller.panel.value === 'general' || controller.panel.value === 'batch'"
-    :header="t(controller.panel.value === 'batch' ? 'wordProof.batch' : 'wordProof.general')"
+    :visible="controller.panel.value === 'review'"
+    :header="t('wordProof.review')"
     width="960px"
     :close-on-overlay-click="false"
     @close="controller.panel.value = undefined"

@@ -15,17 +15,14 @@ import type { useWordProofreading } from "../useWordProofreading";
 const props = defineProps<{ controller: ReturnType<typeof useWordProofreading> }>();
 const { t } = useAppI18n();
 const originalWord = ref<string>();
-const returnTo = ref<"general" | "batch">();
+const returnTo = ref<"review">();
 const word = ref(""),
   replacement = ref(""),
   builtins = ref(true);
 watch(
   () => props.controller.panel.value,
   (panel, previous) => {
-    returnTo.value =
-      panel === "accepted" && (previous === "general" || previous === "batch")
-        ? previous
-        : undefined;
+    returnTo.value = panel === "accepted" && previous === "review" ? previous : undefined;
     originalWord.value = undefined;
     word.value = "";
     replacement.value = "";
@@ -33,8 +30,7 @@ watch(
   },
 );
 const visible = computed(
-  () =>
-    !!props.controller.panel.value && !["general", "batch"].includes(props.controller.panel.value),
+  () => !!props.controller.panel.value && props.controller.panel.value !== "review",
 );
 const title = computed(() => {
   switch (props.controller.panel.value) {

@@ -77,7 +77,7 @@ describe("Chinese proofreading controller", () => {
   });
   test("applies different suggestions across cells as one undoable command", () => {
     const f = fixture();
-    f.review.open("batch");
+    f.review.open("review");
     expect(f.review.issues.value).toHaveLength(3);
     f.review.apply(f.review.issues.value);
     expect(f.execute).toHaveBeenCalledOnce();
@@ -92,7 +92,7 @@ describe("Chinese proofreading controller", () => {
   test("accepts selected words together, deduplicates them, and leaves unselected issues", () => {
     const f = fixture();
     setCellContent(f.sheet, a1, { kind: "literal", value: "再接再励再接再励" });
-    f.review.open("general");
+    f.review.open("review");
     f.review.selected.value = f.review.issues.value
       .filter((issue) => issue.word === "再接再励")
       .map((issue) => issue.id);
@@ -103,7 +103,7 @@ describe("Chinese proofreading controller", () => {
   });
   test("does not partially accept words when dictionary persistence fails", () => {
     const f = fixture();
-    f.review.open("general");
+    f.review.open("review");
     f.review.selected.value = f.review.issues.value.map((issue) => issue.id);
     const write = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
       throw new Error("full");
@@ -119,7 +119,7 @@ describe("Chinese proofreading controller", () => {
 
   test("refuses stale results without invoking workbook commands", () => {
     const f = fixture();
-    f.review.open("batch");
+    f.review.open("review");
     f.revision.value++;
     f.review.apply(f.review.issues.value);
     expect(f.execute).not.toHaveBeenCalled();
@@ -132,7 +132,7 @@ describe("Chinese proofreading controller", () => {
     expect(first.review.add("再接再励")).toBe(true);
     const reloaded = fixture();
     expect(reloaded.review.dictionary.value.accepted).toEqual(["再接再励"]);
-    reloaded.review.open("batch");
+    reloaded.review.open("review");
     expect(reloaded.review.issues.value.map((issue) => issue.word)).toEqual([
       "按步就班",
       "迫不急待",
@@ -154,7 +154,7 @@ describe("Chinese proofreading controller", () => {
     const f = fixture();
     setCellContent(f.sheet, a1, { kind: "literal", value: "错词再接再励" });
     expect(f.review.add("错词", "这是正确词")).toBe(true);
-    f.review.open("general");
+    f.review.open("review");
     const ignored = f.review.issues.value.find((issue) => issue.word === "再接再励")!;
     f.review.ignore([ignored.id]);
     expect(f.review.issues.value.some((issue) => issue.word === "再接再励")).toBe(false);
@@ -170,7 +170,7 @@ describe("Chinese proofreading controller", () => {
       createApplyCellStyleCommand(f.sheet.id, { start: a2, end: a2 }, { unlocked: true }),
     );
     executeWorkbookCommand(f.session, createSetSheetProtectionCommand(f.sheet.id, true));
-    f.review.open("batch");
+    f.review.open("review");
     expect(f.review.skipped.value).toBe(1);
     expect(f.review.issues.value.map((issue) => issue.word)).toEqual(["迫不急待"]);
     f.review.apply(f.review.issues.value);

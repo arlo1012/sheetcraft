@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   ClipboardCheck,
-  Files,
   FilePlus2,
   FileWarning,
   BookOpen,
@@ -25,18 +24,10 @@ const { t } = useAppI18n();
       <RibbonButton
         variant="tall"
         :disabled="busy"
-        :label="t('wordProof.general')"
-        :text="t('wordProof.general')"
-        @activate="emit('open', 'general')"
+        :label="t('wordProof.review')"
+        :text="t('wordProof.review')"
+        @activate="emit('open', 'review')"
         ><ClipboardCheck
-      /></RibbonButton>
-      <RibbonButton
-        variant="tall"
-        :disabled="busy"
-        :label="t('wordProof.batch')"
-        :text="t('wordProof.batch')"
-        @activate="emit('open', 'batch')"
-        ><Files
       /></RibbonButton>
     </section>
     <section class="word-toolbar__group" role="group" :aria-label="t('wordProof.dictionary')">

@@ -67,7 +67,7 @@ async function click(text: string) {
 }
 test("opens general proofreading from its ribbon and corrects the current text", async () => {
   const { sheet } = fixture();
-  await click("通用校对");
+  await click("文字校对");
   expect(document.body.textContent).toContain("再接再励");
   await click("更正");
   expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
@@ -96,7 +96,7 @@ test("adds a custom mistake through the dialog and exposes it in dictionary mana
 
 test("opens manual accepted-word entry without selecting results and returns to review", async () => {
   const { controller } = fixture();
-  await click("通用校对");
+  await click("文字校对");
   const buttons = [
     ...document.body.querySelectorAll<HTMLButtonElement>(".word-review__toolbar-actions button"),
   ];
@@ -111,7 +111,7 @@ test("opens manual accepted-word entry without selecting results and returns to 
   input.dispatchEvent(new Event("input", { bubbles: true }));
   await nextTick();
   await click("保存");
-  expect(controller.panel.value).toBe("general");
+  expect(controller.panel.value).toBe("review");
   expect(controller.dictionary.value.accepted).toContain("再接再励");
   expect(controller.issues.value).toHaveLength(0);
 });

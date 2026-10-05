@@ -1,8 +1,7 @@
 export type WordProofMessageSchema = {
   wordProof: {
     title: string;
-    general: string;
-    batch: string;
+    review: string;
     accepted: string;
     acceptWord: string;
     acceptSelected: string;
@@ -54,8 +53,7 @@ export type WordProofMessageSchema = {
 export const wordProofZhCN: WordProofMessageSchema = {
   wordProof: {
     title: "校对",
-    general: "通用校对",
-    batch: "批量校对",
+    review: "文字校对",
     accepted: "添加正词",
     acceptWord: "加入正词",
     acceptSelected: "将所选加入正词",
@@ -108,8 +106,7 @@ export const wordProofZhCN: WordProofMessageSchema = {
 export const wordProofEnUS: WordProofMessageSchema = {
   wordProof: {
     title: "Proofreading",
-    general: "General proofreading",
-    batch: "Batch proofreading",
+    review: "Text proofreading",
     accepted: "Add accepted word",
     acceptWord: "Accept word",
     acceptSelected: "Accept selected words",
