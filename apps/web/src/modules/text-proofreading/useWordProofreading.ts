@@ -170,7 +170,9 @@ export function useWordProofreading(options: {
   }
   function acceptSelected() {
     const words = new Set(
-      issues.value.filter((issue) => selected.value.includes(issue.id)).map((issue) => issue.word),
+      issues.value
+        .filter((issue) => selected.value.includes(issue.id) && issue.kind !== "sensitive")
+        .map((issue) => issue.word),
     );
     if (!words.size) return false;
     const next = parseDictionary(dictionary.value);

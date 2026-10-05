@@ -9,7 +9,11 @@ import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { useAppI18n } from "../../../shared/i18n";
 import DictionaryEntryTable from "./DictionaryEntryTable.vue";
 import DictionaryManager from "./DictionaryManager.vue";
-import { serializeDictionaryText } from "../dictionary-transfer";
+import {
+  isSingleWordCategory,
+  parseDictionaryText,
+  serializeDictionaryText,
+} from "../dictionary-transfer";
 import type { DictionaryCategory, WordRule } from "../proofreading";
 import type { useWordProofreading } from "../useWordProofreading";
 const props = defineProps<{ controller: ReturnType<typeof useWordProofreading> }>();
@@ -78,7 +82,7 @@ const isEditor = computed(
     props.controller.panel.value !== "settings",
 );
 const batchAccepted = computed(
-  () => props.controller.panel.value === "accepted" && !originalWord.value,
+  () => isSingleWordCategory(editingCategory.value) && !originalWord.value,
 );
 const firstLabel = computed(() =>
   t(
@@ -106,11 +110,9 @@ const editorHint = computed(() =>
   t(
     batchAccepted.value
       ? "wordProof.batchHint"
-      : editingCategory.value === "accepted"
+      : isSingleWordCategory(editingCategory.value)
         ? "wordProof.wordHint"
-        : editingCategory.value === "sensitive"
-          ? "wordProof.sensitiveEntryHint"
-          : "wordProof.pairEntryHint",
+        : "wordProof.pairEntryHint",
   ),
 );
 function openEntry(target: DictionaryCategory, entries?: WordRule[], original?: string) {
@@ -134,13 +136,18 @@ function openEntry(target: DictionaryCategory, entries?: WordRule[], original?: 
 }
 function saveWord() {
   const target = editingCategory.value;
-  const saved =
-    target === "accepted"
-      ? batchAccepted.value
-        ? props.controller.addAcceptedWords(word.value)
-        : props.controller.add(word.value, undefined, originalWord.value)
-      : props.controller.addEntries(target, entryRows.value, originalWord.value);
-  if (saved) {
+  let entries = entryRows.value;
+  if (isSingleWordCategory(target)) {
+    try {
+      entries = originalWord.value
+        ? [{ word: word.value, replacement: "" }]
+        : parseDictionaryText(word.value, target);
+    } catch {
+      props.controller.error.value = t("wordProof.invalidWord");
+      return;
+    }
+  }
+  if (props.controller.addEntries(target, entries, originalWord.value)) {
     category.value = target;
     finishEditor(true);
   }
@@ -161,7 +168,7 @@ function editEntry(target: DictionaryCategory, entry: WordRule) {
     :width="
       controller.panel.value === 'dictionary'
         ? '820px'
-        : isEditor && editingCategory !== 'accepted'
+        : isEditor && !isSingleWordCategory(editingCategory)
           ? '660px'
           : '520px'
     "
@@ -177,10 +184,10 @@ function editEntry(target: DictionaryCategory, entry: WordRule) {
           v-model="word"
           :aria-label="t('wordProof.word')"
           :autosize="{ minRows: 5, maxRows: 10 }"
-          :placeholder="t('wordProof.batchPlaceholder')"
+          :placeholder="t('wordProof.singleWordPlaceholder')"
         />
         <DictionaryEntryTable
-          v-else-if="editingCategory !== 'accepted'"
+          v-else-if="!isSingleWordCategory(editingCategory)"
           v-model="entryRows"
           :first-label="firstLabel"
           :second-label="secondLabel"

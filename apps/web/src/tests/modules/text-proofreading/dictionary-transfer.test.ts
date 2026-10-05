@@ -13,8 +13,14 @@ const categories: DictionaryCategory[] = ["accepted", "mistakes", "sensitive", "
 describe("dictionary TSV transfer", () => {
   test.each(categories)("roundtrips %s entries without adding a header", (category) => {
     const rows = [
-      { word: "词条一", replacement: category === "accepted" ? "" : "替换一" },
-      { word: "词条二", replacement: category === "accepted" ? "" : "替换二" },
+      {
+        word: "词条一",
+        replacement: ["accepted", "sensitive", "terms"].includes(category) ? "" : "替换一",
+      },
+      {
+        word: "词条二",
+        replacement: ["accepted", "sensitive", "terms"].includes(category) ? "" : "替换二",
+      },
     ];
     const text = serializeDictionaryText(rows, category);
     expect(text.startsWith("词条一")).toBe(true);
@@ -27,9 +33,9 @@ describe("dictionary TSV transfer", () => {
       { word: "旧\t术语", replacement: '新"术语\n续行' },
       { word: "普通", replacement: "标准" },
     ];
-    const text = serializeDictionaryText(rows, "terms");
+    const text = serializeDictionaryText(rows, "mistakes");
     expect(text).toBe('"旧\t术语"\t"新""术语\n续行"\r\n普通\t标准');
-    expect(parseDictionaryText(text, "terms")).toEqual(rows);
+    expect(parseDictionaryText(text, "mistakes")).toEqual(rows);
   });
 
   test("treats the first row as data rather than an inferred header", () => {
@@ -54,7 +60,9 @@ describe("dictionary TSV transfer", () => {
   });
 
   test.each(categories)("rejects extra columns and empty %s files", (category) => {
-    const excess = category === "accepted" ? "词\t多列" : "词\t替换\t多列";
+    const excess = ["accepted", "sensitive", "terms"].includes(category)
+      ? "词\t多列"
+      : "词\t替换\t多列";
     expect(() => parseDictionaryText(excess, category)).toThrow("invalid-import");
     for (const empty of ["", "\uFEFF", " \n\t\n "]) {
       expect(() => parseDictionaryText(empty, category)).toThrow("invalid-import");

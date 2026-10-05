@@ -108,7 +108,7 @@ describe("Chinese phrase proofreading", () => {
 });
 
 describe("word dictionary deserialization", () => {
-  test("migrates version 1 to version 2 with empty new categories", () => {
+  test("migrates version 1 to version 3 with empty new categories", () => {
     expect(
       parseDictionary({
         version: 1,
@@ -126,10 +126,11 @@ describe("word dictionary deserialization", () => {
   test.each(["sensitive", "terms", "people"] as const)(
     "validates and independently copies %s rules",
     (category) => {
-      const source = { ...emptyDictionary(), [category]: [{ word: "词条", replacement: "标准" }] };
+      const replacement = category === "people" ? "标准" : "";
+      const source = { ...emptyDictionary(), [category]: [{ word: "词条", replacement }] };
       const parsed = parseDictionary(source);
       parsed[category][0]!.replacement = "修改";
-      expect(source[category][0]?.replacement).toBe("标准");
+      expect(source[category][0]?.replacement).toBe(replacement);
       for (const invalid of [
         null,
         "text",
@@ -148,23 +149,49 @@ describe("word dictionary deserialization", () => {
     },
   );
 
-  test("allows an empty sensitive suggestion but requires terminology and person titles", () => {
-    expect(
-      parseDictionary({ ...emptyDictionary(), sensitive: [{ word: "禁词", replacement: "" }] })
-        .sensitive,
-    ).toEqual([{ word: "禁词", replacement: "" }]);
-    for (const category of ["terms", "people"] as const) {
+  test("requires single-word categories to have empty replacements and people to have titles", () => {
+    for (const category of ["sensitive", "terms"] as const) {
+      expect(
+        parseDictionary({ ...emptyDictionary(), [category]: [{ word: "词条", replacement: "" }] })[
+          category
+        ],
+      ).toEqual([{ word: "词条", replacement: "" }]);
       expect(() =>
-        parseDictionary({ ...emptyDictionary(), [category]: [{ word: "词条", replacement: "" }] }),
-      ).toThrow();
+        parseDictionary({
+          ...emptyDictionary(),
+          [category]: [{ word: "词条", replacement: "替换" }],
+        }),
+      ).toThrow("invalid-dictionary");
+      expect(() =>
+        parseDictionary({
+          ...emptyDictionary(),
+          [category]: [
+            { word: "词条", replacement: "" },
+            { word: "词条", replacement: "" },
+          ],
+        }),
+      ).toThrow("invalid-dictionary");
     }
     expect(() =>
-      parseDictionary({ ...emptyDictionary(), terms: [{ word: "同词", replacement: "同词" }] }),
+      parseDictionary({ ...emptyDictionary(), people: [{ word: "人名", replacement: "" }] }),
     ).toThrow();
-    expect(
-      parseDictionary({ ...emptyDictionary(), people: [{ word: "同词", replacement: "同词" }] })
-        .people,
-    ).toHaveLength(1);
+  });
+
+  test("migrates version 2 sensitive words and deduplicates canonical terms", () => {
+    const source = {
+      ...emptyDictionary(),
+      version: 2,
+      sensitive: [{ word: "禁词", replacement: "旧替换" }],
+      terms: [
+        { word: "旧一", replacement: "标准词" },
+        { word: "旧二", replacement: "标准词" },
+      ],
+    };
+    const migrated = parseDictionary(source);
+    expect(migrated.version).toBe(3);
+    expect(migrated.sensitive).toEqual([{ word: "禁词", replacement: "" }]);
+    expect(migrated.terms).toEqual([{ word: "标准词", replacement: "" }]);
+    expect(source.sensitive[0]?.replacement).toBe("旧替换");
   });
 
   test("deduplicates accepted words and returns independently owned data", () => {
@@ -208,37 +235,45 @@ describe("word dictionary deserialization", () => {
 });
 
 describe("five-category proofreading rules", () => {
-  test("reports sensitive and terminology rules with their kinds and optional sensitive deletion", () => {
+  test("terms protect standard phrases while sensitive words remain forbidden", () => {
     const dictionary = parseDictionary({
       ...emptyDictionary(),
+      terms: [{ word: "再接再励", replacement: "" }],
       sensitive: [{ word: "禁词", replacement: "" }],
-      terms: [{ word: "旧术语", replacement: "标准术语" }],
     });
-    const cells = [{ text: "禁词与旧术语" }],
-      result = scanWords(cells, dictionary);
+    const cells = [{ text: "禁词与再接再励" }];
+    const result = scanWords(cells, dictionary);
     expect(result.issues.map((issue) => [issue.word, issue.replacement, issue.kind])).toEqual([
       ["禁词", "", "sensitive"],
-      ["旧术语", "标准术语", "terms"],
     ]);
-    expect(wordChanges(cells, result.issues)).toEqual([{ cell: 0, text: "与标准术语" }]);
+    expect(wordChanges(cells, result.issues)).toEqual([{ cell: 0, text: "与再接再励" }]);
   });
 
-  test("uses sensitive, custom mistake, terminology and builtin priority for identical words", () => {
-    const base = emptyDictionary(),
-      word = "再接再励";
-    const terms = [{ word, replacement: "术语" }],
-      mistakes = [{ word, replacement: "自定义" }],
-      sensitive = [{ word, replacement: "敏感替代" }];
-    for (const [dictionary, replacement, kind] of [
-      [{ ...base, terms, mistakes, sensitive }, "敏感替代", "sensitive"],
-      [{ ...base, terms, mistakes }, "自定义", "mistakes"],
-      [{ ...base, terms }, "术语", "terms"],
-      [base, "再接再厉", "mistakes"],
-    ] as const) {
-      expect(scanWords([{ text: word }], dictionary).issues).toMatchObject([
-        { word, replacement, kind },
-      ]);
-    }
+  test("positive dictionaries never allow sensitive words even inside a longer ordinary mistake", () => {
+    const dictionary = {
+      ...emptyDictionary(),
+      accepted: ["长禁词句"],
+      terms: [{ word: "长禁词句", replacement: "" }],
+      sensitive: [{ word: "禁词", replacement: "" }],
+      mistakes: [{ word: "长禁词句", replacement: "普通建议" }],
+    };
+    expect(scanWords([{ text: "长禁词句" }], dictionary).issues).toMatchObject([
+      { word: "禁词", replacement: "", kind: "sensitive", start: 1, end: 3 },
+    ]);
+    expect(
+      scanWords([{ text: "长禁词句" }], { ...dictionary, accepted: [], terms: [] }).issues,
+    ).toMatchObject([{ word: "禁词", kind: "sensitive" }]);
+  });
+
+  test("terms suppress custom mistakes and custom mistakes otherwise override builtins", () => {
+    const word = "再接再励",
+      dictionary = { ...emptyDictionary(), mistakes: [{ word, replacement: "自定义" }] };
+    expect(scanWords([{ text: word }], dictionary).issues).toMatchObject([
+      { replacement: "自定义", kind: "mistakes" },
+    ]);
+    expect(
+      scanWords([{ text: word }], { ...dictionary, terms: [{ word, replacement: "" }] }).issues,
+    ).toEqual([]);
   });
 
   test("corrects registered mismatched titles before and after names, retaining separators", () => {
@@ -306,24 +341,26 @@ describe("five-category proofreading rules", () => {
     expect(wordChanges(cells, result.issues)).toEqual([{ cell: 0, text: "主任张三；张三主任" }]);
   });
 
-  test("accepted phrases suppress all categories and overlapping outputs remain disjoint", () => {
+  test("accepted phrases suppress ordinary checks but not sensitive checks", () => {
     const dictionary = {
       ...emptyDictionary(),
       accepted: ["禁词旧术语经理张三"],
       sensitive: [{ word: "禁词", replacement: "" }],
-      terms: [{ word: "旧术语", replacement: "新术语" }],
+      terms: [{ word: "旧术语", replacement: "" }],
       people: [
         { word: "张三", replacement: "主任" },
         { word: "李四", replacement: "经理" },
       ],
     };
-    expect(scanWords([{ text: "禁词旧术语经理张三" }], dictionary).issues).toEqual([]);
+    expect(scanWords([{ text: "禁词旧术语经理张三" }], dictionary).issues).toMatchObject([
+      { word: "禁词", kind: "sensitive" },
+    ]);
     const result = scanWords([{ text: "经理张三" }], {
       ...dictionary,
       accepted: [],
-      sensitive: [{ word: "张三", replacement: "某人" }],
+      sensitive: [{ word: "张三", replacement: "" }],
     });
     expect(result.issues).toHaveLength(1);
-    expect(result.issues[0]).toMatchObject({ word: "经理张三", kind: "people" });
+    expect(result.issues[0]).toMatchObject({ word: "张三", kind: "sensitive" });
   });
 });

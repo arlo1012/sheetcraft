@@ -1,7 +1,7 @@
 export type WordRule = { word: string; replacement: string };
 export type DictionaryCategory = "accepted" | "mistakes" | "sensitive" | "terms" | "people";
 export type WordDictionary = {
-  version: 2;
+  version: 3;
   accepted: string[];
   mistakes: WordRule[];
   sensitive: WordRule[];
@@ -33,7 +33,7 @@ export const builtinRules: readonly WordRule[] = [
 ];
 export function emptyDictionary(): WordDictionary {
   return {
-    version: 2,
+    version: 3,
     accepted: [],
     mistakes: [],
     sensitive: [],
@@ -45,7 +45,8 @@ export function emptyDictionary(): WordDictionary {
 export function parseDictionary(value: unknown): WordDictionary {
   if (!value || typeof value !== "object") throw new Error("invalid-dictionary");
   const source = value as Record<string, unknown>;
-  if (source.version !== 1 && source.version !== 2) throw new Error("invalid-dictionary");
+  if (source.version !== 1 && source.version !== 2 && source.version !== 3)
+    throw new Error("invalid-dictionary");
   const v = (source.version === 1
     ? { ...source, sensitive: [], terms: [], people: [] }
     : source) as unknown as WordDictionary;
@@ -62,6 +63,9 @@ export function parseDictionary(value: unknown): WordDictionary {
     throw new Error("invalid-dictionary");
   const valid = (s: unknown): s is string =>
     typeof s === "string" && s.trim() === s && s.length > 0 && s.length <= 100;
+  const validWords = (rules: WordRule[]) =>
+    rules.every((r) => r && valid(r.word) && r.replacement === "") &&
+    new Set(rules.map((r) => r.word)).size === rules.length;
   const validRules = (rules: WordRule[], optional = false, allowSame = false) =>
     rules.every(
       (r) =>
@@ -73,8 +77,8 @@ export function parseDictionary(value: unknown): WordDictionary {
   if (
     !v.accepted.every(valid) ||
     !validRules(v.mistakes) ||
-    !validRules(v.sensitive, true) ||
-    !validRules(v.terms) ||
+    !(source.version === 3 ? validWords(v.sensitive) : validRules(v.sensitive, true)) ||
+    !(source.version === 3 ? validWords(v.terms) : validRules(v.terms)) ||
     !validRules(v.people, false, true) ||
     v.mistakes.some((r) => v.accepted.includes(r.word))
   )
@@ -82,12 +86,14 @@ export function parseDictionary(value: unknown): WordDictionary {
   const copy = (rules: WordRule[]) =>
     rules.map((r) => ({ word: r.word, replacement: r.replacement }));
   return {
-    version: 2,
+    version: 3,
     builtins: v.builtins,
     accepted: [...new Set(v.accepted)],
     mistakes: copy(v.mistakes),
-    sensitive: copy(v.sensitive),
-    terms: copy(v.terms),
+    sensitive: v.sensitive.map((r) => ({ word: r.word, replacement: "" })),
+    terms: [...new Set(v.terms.map((r) => (source.version === 3 ? r.word : r.replacement)))].map(
+      (word) => ({ word, replacement: "" }),
+    ),
     people: copy(v.people),
   };
 }
@@ -160,14 +166,13 @@ export function scanWords(
   const rules = new Map<string, WordRule & { kind: WordIssue["kind"] }>(
     (dictionary.builtins ? builtinRules : []).map((r) => [r.word, { ...r, kind: "mistakes" }]),
   );
-  for (const rule of dictionary.terms) rules.set(rule.word, { ...rule, kind: "terms" });
   for (const rule of dictionary.mistakes) rules.set(rule.word, { ...rule, kind: "mistakes" });
   for (const rule of dictionary.sensitive) rules.set(rule.word, { ...rule, kind: "sensitive" });
   const ordered = [...rules.values()].sort((a, b) => b.word.length - a.word.length);
   const issues: WordIssue[] = [];
   for (const [cell, { text }] of cells.entries()) {
     const accepted: [number, number][] = [];
-    for (const word of dictionary.accepted) {
+    for (const word of [...dictionary.accepted, ...dictionary.terms.map((r) => r.word)]) {
       let start = text.indexOf(word);
       while (start >= 0) {
         accepted.push([start, start + word.length]);
@@ -181,18 +186,25 @@ export function scanWords(
       let start = text.indexOf(rule.word);
       while (start >= 0) {
         const end = start + rule.word.length;
-        if (!accepted.some(([a, b]) => a <= start && b >= end))
+        if (rule.kind === "sensitive" || !accepted.some(([a, b]) => a <= start && b >= end))
           candidates.push({ id: `${cell}:${start}:${end}`, cell, start, end, ...rule });
         start = text.indexOf(rule.word, start + 1);
       }
     }
-    candidates.sort((a, b) => a.start - b.start || b.end - a.end);
-    let end = -1;
+    candidates.sort(
+      (a, b) =>
+        Number(b.kind === "sensitive") - Number(a.kind === "sensitive") ||
+        a.start - b.start ||
+        b.end - a.end,
+    );
+    const selected: WordIssue[] = [];
     for (const issue of candidates) {
-      if (issue.start < end) continue;
+      if (selected.some((other) => issue.start < other.end && issue.end > other.start)) continue;
+      selected.push(issue);
+    }
+    for (const issue of selected.sort((a, b) => a.start - b.start)) {
       if (issues.length === limit) return { issues, truncated: true };
       issues.push(issue);
-      end = issue.end;
     }
   }
   return { issues, truncated: false };

@@ -1,6 +1,10 @@
 import { parseTsvToCellTexts, serializeCellValuesToTsv } from "@idea10/core/clipboard";
 import type { DictionaryCategory, WordDictionary, WordRule } from "./proofreading";
 
+export function isSingleWordCategory(category: DictionaryCategory) {
+  return category === "accepted" || category === "sensitive" || category === "terms";
+}
+
 export function dictionaryEntries(
   dictionary: WordDictionary,
   category: DictionaryCategory,
@@ -12,7 +16,7 @@ export function dictionaryEntries(
 export function parseDictionaryText(text: string, category: DictionaryCategory): WordRule[] {
   if (text.length > 2_000_000) throw new Error("invalid-import");
   const matrix = parseTsvToCellTexts(text.replace(/^\uFEFF/, ""));
-  const maxColumns = category === "accepted" ? 1 : 2;
+  const maxColumns = isSingleWordCategory(category) ? 1 : 2;
   if (matrix.length > 5000 || matrix.some((row) => row.length > maxColumns))
     throw new Error("invalid-import");
   const rows = matrix
@@ -26,7 +30,7 @@ export function serializeDictionaryText(
   category: DictionaryCategory,
 ): string {
   return serializeCellValuesToTsv(
-    rows.map((row) => (category === "accepted" ? [row.word] : [row.word, row.replacement])),
+    rows.map((row) => (isSingleWordCategory(category) ? [row.word] : [row.word, row.replacement])),
   );
 }
 export function downloadDictionaryText(

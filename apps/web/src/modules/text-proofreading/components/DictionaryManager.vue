@@ -6,7 +6,8 @@ import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { Tooltip } from "tdesign-vue-next/es/tooltip";
 import { PrimaryTable } from "tdesign-vue-next/es/table";
 import type { PrimaryTableCol } from "tdesign-vue-next/es/table/type";
-import { Search, Plus, Trash2, Info, Upload, Download } from "lucide-vue-next";
+import { Search, Plus, Trash2, Pencil, Info, Upload, Download } from "lucide-vue-next";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import {
@@ -16,6 +17,7 @@ import {
   type WordRule,
 } from "../proofreading";
 import {
+  isSingleWordCategory,
   dictionaryEntries,
   downloadDictionaryText,
   parseDictionaryText,
@@ -69,8 +71,10 @@ const firstLabel = computed(() =>
     category.value === "people"
       ? "wordProof.personName"
       : category.value === "terms"
-        ? "wordProof.variant"
-        : "wordProof.word",
+        ? "wordProof.terms"
+        : category.value === "sensitive"
+          ? "wordProof.sensitive"
+          : "wordProof.word",
   ),
 );
 const secondLabel = computed(() =>
@@ -97,10 +101,10 @@ const rows = computed(() => {
 const columns = computed<PrimaryTableCol[]>(() => [
   { colKey: "select", type: "multiple", width: 40, disabled: ({ row }) => row.builtin },
   { colKey: "word", title: firstLabel.value, ellipsis: true },
-  ...(category.value === "accepted"
+  ...(isSingleWordCategory(category.value)
     ? []
     : [{ colKey: "replacement", title: secondLabel.value, ellipsis: true }]),
-  { colKey: "actions", title: "", width: 90 },
+  { colKey: "actions", title: t("proofreading.action"), width: 72, align: "center" },
 ]);
 const selectedWords = computed(() =>
   rows.value
@@ -148,56 +152,64 @@ async function importFile(event: Event) {
 <template>
   <div class="dictionary-manager">
     <nav class="dictionary-manager__nav" :aria-label="t('wordProof.dictionary')">
-      <Button
-        :variant="category === 'accepted' ? 'outline' : 'text'"
-        :theme="category === 'accepted' ? 'primary' : 'default'"
+      <button
+        type="button"
         :aria-current="category === 'accepted' ? 'page' : undefined"
         @click="category = 'accepted'"
-        >{{ t("wordProof.correctWord") }}</Button
       >
-      <Button
-        :variant="category === 'mistakes' ? 'outline' : 'text'"
-        :theme="category === 'mistakes' ? 'primary' : 'default'"
+        {{ t("wordProof.correctWord") }}
+      </button>
+      <button
+        type="button"
         :aria-current="category === 'mistakes' ? 'page' : undefined"
         @click="category = 'mistakes'"
-        >{{ t("wordProof.incorrectWord") }}</Button
       >
-      <Button
-        :variant="category === 'sensitive' ? 'outline' : 'text'"
-        :theme="category === 'sensitive' ? 'primary' : 'default'"
+        {{ t("wordProof.incorrectWord") }}
+      </button>
+      <button
+        type="button"
         :aria-current="category === 'sensitive' ? 'page' : undefined"
         @click="category = 'sensitive'"
-        >{{ t("wordProof.sensitive") }}</Button
       >
-      <Button
-        :variant="category === 'terms' ? 'outline' : 'text'"
-        :theme="category === 'terms' ? 'primary' : 'default'"
+        {{ t("wordProof.sensitive") }}
+      </button>
+      <button
+        type="button"
         :aria-current="category === 'terms' ? 'page' : undefined"
         @click="category = 'terms'"
-        >{{ t("wordProof.terms") }}</Button
       >
-      <Button
-        :variant="category === 'people' ? 'outline' : 'text'"
-        :theme="category === 'people' ? 'primary' : 'default'"
+        {{ t("wordProof.terms") }}
+      </button>
+      <button
+        type="button"
         :aria-current="category === 'people' ? 'page' : undefined"
         @click="category = 'people'"
-        >{{ t("wordProof.people") }}</Button
       >
+        {{ t("wordProof.people") }}
+      </button>
     </nav>
     <section class="dictionary-manager__content" :aria-label="title">
       <div class="dictionary-manager__header">
         <strong>{{ title }}</strong>
         <Tooltip :content="hint"
-          ><Button size="small" variant="text" theme="default" :aria-label="hint"
-            ><Info :size="14" /></Button
+          ><span class="dictionary-manager__info" tabindex="0" :aria-label="hint"
+            ><Info class="idea-action-icon" aria-hidden="true" /></span
         ></Tooltip>
         <div class="dictionary-manager__transfer">
           <Tooltip :content="t('wordProof.importHint')"
-            ><Button theme="default" :loading="reading" @click="fileInput?.click()"
+            ><Button
+              theme="default"
+              variant="outline"
+              :loading="reading"
+              @click="fileInput?.click()"
               ><template #icon><Upload :size="14" /></template>{{ t("wordProof.import") }}</Button
             ></Tooltip
           >
-          <Button theme="default" :disabled="!entries.length" @click="exportEntries"
+          <Button
+            theme="default"
+            variant="outline"
+            :disabled="!entries.length"
+            @click="exportEntries"
             ><template #icon><Download :size="14" /></template
             >{{ t(selectedWords.length ? "wordProof.exportSelected" : "wordProof.export") }}</Button
           >
@@ -222,11 +234,11 @@ async function importFile(event: Event) {
           class="dictionary-manager__search"
           ><template #prefix-icon><Search :size="14" /></template
         ></Input>
-        <Button variant="text" theme="primary" @click="emit('add', category)"
+        <Button variant="outline" theme="default" @click="emit('add', category)"
           ><template #icon><Plus :size="14" /></template>{{ t("wordProof.addEntry") }}</Button
         >
         <Button
-          variant="text"
+          variant="outline"
           theme="default"
           :disabled="!selectedWords.length"
           @click="emit('remove', category, selectedWords)"
@@ -250,18 +262,27 @@ async function importFile(event: Event) {
             hover
             @select-change="selected = $event.map(String)"
           >
-            <template #actions="{ row }"
-              ><span v-if="row.builtin" class="dictionary-manager__count">{{
+            <template #actions="{ row }">
+              <span v-if="row.builtin" class="dictionary-manager__count">{{
                 t("wordProof.builtin")
-              }}</span
-              ><Button
-                v-else
-                variant="text"
-                size="small"
-                @click="emit('edit', category, { word: row.word, replacement: row.replacement })"
-                >{{ t("wordProof.edit") }}</Button
-              ></template
-            >
+              }}</span>
+              <div v-else class="dictionary-manager__row-actions">
+                <span
+                  v-icon-action
+                  :aria-label="t('wordProof.edit')"
+                  :title="t('wordProof.edit')"
+                  @click="emit('edit', category, { word: row.word, replacement: row.replacement })"
+                  ><Pencil class="idea-action-icon" aria-hidden="true"
+                /></span>
+                <span
+                  v-icon-action
+                  :aria-label="t('wordProof.remove')"
+                  :title="t('wordProof.remove')"
+                  @click="emit('remove', category, [row.word])"
+                  ><Trash2 class="idea-action-icon" aria-hidden="true"
+                /></span>
+              </div>
+            </template>
           </PrimaryTable>
         </TableHeightWrapper>
       </div>
@@ -275,6 +296,7 @@ async function importFile(event: Event) {
   </div>
 </template>
 <style scoped lang="scss">
+@use "../../../shared/option-list/option-list";
 .dictionary-manager {
   display: flex;
   min-height: 430px;
@@ -289,7 +311,11 @@ async function importFile(event: Event) {
     border-right: 1px solid var(--td-component-border);
     padding-right: 16px;
     button {
-      justify-content: flex-start;
+      @include option-list.item;
+      min-height: 28px;
+      &[aria-current="page"]:not(:focus-visible) {
+        background: var(--idea-surface-active);
+      }
     }
   }
   &__content {
@@ -297,7 +323,7 @@ async function importFile(event: Event) {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 4px;
   }
   &__header,
   &__toolbar,
@@ -307,10 +333,20 @@ async function importFile(event: Event) {
     align-items: center;
   }
   &__header {
-    min-height: 32px;
+    min-height: 28px;
     gap: 4px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--td-component-border);
+    padding-bottom: 0;
+  }
+  &__info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  &__row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
   }
   &__transfer {
     margin-left: auto;

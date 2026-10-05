@@ -82,6 +82,7 @@ export type WordProofMessageSchema = {
     pasteInvalid: string;
     batchHint: string;
     batchPlaceholder: string;
+    singleWordPlaceholder: string;
     invalidWord: string;
     storageRead: string;
     storageWrite: string;
@@ -100,19 +101,19 @@ export const wordProofZhCN: WordProofMessageSchema = {
     variant: "待规范写法",
     standardTerm: "标准术语",
     optionalReplacement: "建议改为（选填）",
-    acceptedRuleHint: "正词覆盖范围内不再提示问题，用于减少专名误报。",
+    acceptedRuleHint: "正词覆盖范围内不再提示普通问题，用于减少专名误报；不能放行敏感词。",
     mistakesRuleHint: "命中登记的错词后，提示替换为对应建议词。自定义条目优先于内置规则。",
-    sensitiveRuleHint: "命中敏感词即提示核查；建议词可留空。加入正词后不再提示。",
-    termsRuleHint: "将登记的待规范写法替换为标准术语；仅匹配已登记写法，不推断其他拼写。",
+    sensitiveRuleHint: "敏感词为禁止出现的词语；命中即报出，不受正词或术语放行。",
+    termsRuleHint: "术语作为标准用词保护，避免其被普通错词规则误报；不能放行敏感词。",
     peopleRuleHint:
       "检查同一单元格中紧邻姓名的已登记职务，支持空格或冒号分隔。仅提示已知职务搭配错误，不推断未知职务、跨句或跨单元格关系。",
     import: "导入",
     export: "导出",
     exportSelected: "导出所选",
     importHint:
-      "导入 UTF-8 TXT / TSV，无表头。正词一列，其余两列，以制表符分隔；导入后可编辑再保存。",
+      "导入 UTF-8 TXT / TSV，无表头。正词、敏感词、术语一列；错词、姓名职务两列，以制表符分隔；导入后可编辑再保存。",
     importError:
-      "无法导入。请使用 UTF-8 TXT / TSV 无表头文件，正词一列、其他最多两列，最多 5000 行、2 MB。",
+      "无法导入。请使用 UTF-8 TXT / TSV 无表头文件，正词、敏感词、术语一列，错词、姓名职务两列，最多 5000 行、2 MB。",
     entryCount: "已选 {selected} / {count} 项",
     search: "搜索词条",
     addEntry: "添加",
@@ -171,13 +172,14 @@ export const wordProofZhCN: WordProofMessageSchema = {
     origin: "来源",
     enableBuiltin: "启用内置常见错词规则",
     localHint:
-      "词库与设置保存在当前浏览器，不随工作簿导出。正词会放行其覆盖范围；自定义错词优先于同名内置规则。",
-    batchHint: "每行一个正词，每词最多 100 字；自动忽略空行和重复词。",
+      "词库与设置保存在当前浏览器，不随工作簿导出。正词和术语会放行普通问题，敏感词始终报出；自定义错词优先于同名内置规则。",
+    batchHint: "每行一个词，每词最多 100 字；自动忽略空行和重复词。",
+    singleWordPlaceholder: "输入或粘贴多个词语，每行一个",
     batchPlaceholder: "输入或粘贴多个正词，每行一个",
     addRow: "添加一行",
     pasteInvalid: "请从错词列粘贴最多两列数据，最多 5000 行；建议列仅支持单列粘贴。",
-    wordHint: "词语和建议词最多 100 个字符；同名词条保存时会替换原条目。",
-    invalidWord: "请检查必填内容、100 字限制和词库总量（最多 5000 项）；错词或术语的两列不能相同。",
+    wordHint: "每个词最多 100 个字符；同名词条保存时会替换原条目。",
+    invalidWord: "请检查必填内容、100 字限制和词库总量（最多 5000 项）；错词与建议词不能相同。",
     storageRead: "本机词库无法读取，当前使用默认词库；保存前请检查词库内容。",
     storageWrite: "词库保存失败，请检查条目或浏览器存储空间。",
     stale: "工作簿已变化，请重新校对后再更正。",
@@ -200,18 +202,18 @@ export const wordProofEnUS: WordProofMessageSchema = {
     mistakesRuleHint:
       "Matches registered mistakes and suggests their replacements. Custom entries override built-in rules.",
     sensitiveRuleHint:
-      "Flags registered sensitive words for review. Replacements are optional. Accepted phrases suppress these matches.",
+      "Flags forbidden words whenever they appear, including inside accepted words or terminology.",
     termsRuleHint:
-      "Normalizes registered variants to standard terms. Unlisted spellings are not inferred.",
+      "Protects registered standard terms from ordinary mistake rules. Does not suppress forbidden words.",
     peopleRuleHint:
       "Checks registered titles immediately next to known names in the same cell, separated by spaces or colons. Unknown titles and relationships across sentences or cells are not inferred.",
     import: "Import",
     export: "Export",
     exportSelected: "Export selected",
     importHint:
-      "Import UTF-8 TXT / TSV without headers. One column for accepted words; two tab-separated columns for other categories. Review before saving.",
+      "Import UTF-8 TXT / TSV without headers. One column for accepted, sensitive and terminology entries; two tab-separated columns for mistakes and names/titles. Review before saving.",
     importError:
-      "Cannot import. Use headerless UTF-8 TXT / TSV: one column for accepted words, up to two for others; maximum 5,000 rows and 2 MB.",
+      "Cannot import. Use headerless UTF-8 TXT / TSV: one column for accepted, sensitive and terminology entries; two for mistakes and names/titles; maximum 5,000 rows and 2 MB.",
     entryCount: "{selected} / {count} selected",
     search: "Search entries",
     addEntry: "Add",
@@ -271,17 +273,18 @@ export const wordProofEnUS: WordProofMessageSchema = {
     origin: "Source",
     enableBuiltin: "Enable built-in phrase rules",
     localHint:
-      "Dictionaries and settings stay in this browser and are not exported with the workbook. Accepted phrases suppress matches inside them; custom rules override built-in rules.",
+      "Dictionaries and settings stay in this browser and are not exported with the workbook. Accepted phrases and terminology suppress ordinary matches, but never forbidden words; custom rules override built-in rules.",
     batchHint:
       "One word per line, up to 100 characters each. Blank lines and duplicates are ignored.",
+    singleWordPlaceholder: "Enter or paste words, one per line",
     batchPlaceholder: "Enter or paste accepted words, one per line",
     addRow: "Add row",
     pasteInvalid:
       "Paste up to two columns from the incorrect-word column, or one from the replacement column; maximum 5,000 rows.",
     wordHint:
-      "Words and replacements allow up to 100 characters. Saving replaces an existing entry for the same word.",
+      "Words allow up to 100 characters. Saving replaces an existing entry for the same word.",
     invalidWord:
-      "Check required fields, the 100-character field limit, and the 5,000-entry dictionary limit. Mistake and terminology columns must differ.",
+      "Check required fields, the 100-character field limit, and the 5,000-entry dictionary limit. Mistake and replacement columns must differ.",
     storageRead:
       "Unable to read the saved dictionary; defaults are active. Review the dictionary before saving.",
     storageWrite: "Cannot save the dictionary. Check entries and browser storage.",

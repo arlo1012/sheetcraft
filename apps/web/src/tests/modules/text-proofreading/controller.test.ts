@@ -69,17 +69,21 @@ describe("Chinese proofreading controller", () => {
   test("does not delete sensitive matches without a replacement and persists all categories", () => {
     const f = fixture();
     f.review.addEntries("sensitive", [{ word: "再接再励", replacement: "" }]);
-    f.review.addEntries("terms", [{ word: "旧称", replacement: "新称" }]);
+    f.review.addEntries("terms", [{ word: "标准术语", replacement: "" }]);
     f.review.addEntries("people", [{ word: "张三", replacement: "主任" }]);
     const reloaded = fixture();
     expect(reloaded.review.dictionary.value.sensitive).toEqual([
       { word: "再接再励", replacement: "" },
     ]);
-    expect(reloaded.review.dictionary.value.terms).toEqual([{ word: "旧称", replacement: "新称" }]);
+    expect(reloaded.review.dictionary.value.terms).toEqual([{ word: "标准术语", replacement: "" }]);
     expect(reloaded.review.dictionary.value.people).toEqual([
       { word: "张三", replacement: "主任" },
     ]);
     f.review.open("review");
+    f.review.selected.value = f.review.issues.value
+      .filter((issue) => issue.kind === "sensitive")
+      .map((issue) => issue.id);
+    expect(f.review.acceptSelected()).toBe(false);
     f.review.apply(f.review.issues.value.filter((issue) => issue.kind === "sensitive"));
     expect(f.execute).not.toHaveBeenCalled();
     expect(getCellContent(f.sheet, a1)).toEqual({ kind: "literal", value: "再接再励和按步就班" });

@@ -148,22 +148,28 @@ test("manages all categories and applies the new dictionary rules to review", as
   await click("词库管理");
   await click("敏感词");
   await click("添加");
-  await fillEntry("需核查", "");
+  const sensitive = document.body.querySelector<HTMLTextAreaElement>(".word-dictionary textarea")!;
+  sensitive.value = "需核查";
+  sensitive.dispatchEvent(new Event("input", { bubbles: true }));
+  await nextTick();
   await click("保存");
   expect(controller.dictionary.value.sensitive).toEqual([{ word: "需核查", replacement: "" }]);
   await click("术语");
   await click("添加");
-  await fillEntry("旧名称", "标准名称");
+  const term = document.body.querySelector<HTMLTextAreaElement>(".word-dictionary textarea")!;
+  term.value = "品牌再接再励";
+  term.dispatchEvent(new Event("input", { bubbles: true }));
+  await nextTick();
   await click("保存");
   await click("姓名职务");
   await click("添加");
   await fillEntry("张三", "经理");
   await click("保存");
   expect(controller.dictionary.value.people).toEqual([{ word: "张三", replacement: "经理" }]);
-  setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "需核查旧名称" });
+  setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "需核查品牌再接再励" });
   controller.open("review");
   await nextTick();
-  expect(controller.issues.value.map((issue) => issue.kind)).toEqual(["sensitive", "terms"]);
+  expect(controller.issues.value.map((issue) => issue.kind)).toEqual(["sensitive"]);
 });
 test("searches and deletes only selected entries in the active category", async () => {
   const { controller } = fixture();
@@ -206,4 +212,31 @@ test("stages a dictionary import and leaves saved data untouched on cancel", asy
   await click("取消");
   expect(controller.panel.value).toBe("dictionary");
   expect(controller.dictionary.value.mistakes).toEqual([]);
+});
+
+test("uses icon actions to edit and remove a single dictionary row", async () => {
+  const { controller } = fixture();
+  controller.addEntries("sensitive", [
+    { word: "禁用甲", replacement: "" },
+    { word: "禁用乙", replacement: "" },
+  ]);
+  await click("词库管理");
+  await click("敏感词");
+  const edit = document.body.querySelector<HTMLElement>(
+    '.dictionary-manager__row-actions [aria-label="编辑"]',
+  )!;
+  edit.click();
+  await nextTick();
+  const input = document.body.querySelector<HTMLInputElement>(".word-dictionary input")!;
+  expect(input.value).toBe("禁用甲");
+  input.value = "禁用丙";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  await nextTick();
+  await click("保存");
+  const remove = document.body.querySelector<HTMLElement>(
+    '.dictionary-manager__row-actions [aria-label="删除"]',
+  )!;
+  remove.click();
+  await nextTick();
+  expect(controller.dictionary.value.sensitive).toEqual([{ word: "禁用丙", replacement: "" }]);
 });

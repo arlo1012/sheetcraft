@@ -94,7 +94,12 @@ function scan() {
           }}</Button>
           <Button
             theme="default"
-            :disabled="!controller.selected.value.length"
+            :disabled="
+              !controller.issues.value.some(
+                (issue) =>
+                  controller.selected.value.includes(issue.id) && issue.kind !== 'sensitive',
+              )
+            "
             @click="controller.acceptSelected() && (replacements = {})"
             >{{ t("wordProof.acceptSelected") }}</Button
           >
@@ -158,9 +163,13 @@ function scan() {
                 <Button size="small" variant="text" @click="controller.ignore([row.id])">{{
                   t("wordProof.ignore")
                 }}</Button>
-                <Button size="small" variant="text" @click="controller.add(row.word) && scan()">{{
-                  t("wordProof.acceptWord")
-                }}</Button>
+                <Button
+                  size="small"
+                  variant="text"
+                  :disabled="row.kind === 'sensitive'"
+                  @click="controller.add(row.word) && scan()"
+                  >{{ t("wordProof.acceptWord") }}</Button
+                >
               </div>
             </template>
           </PrimaryTable>
