@@ -5,13 +5,13 @@ import { Input } from "tdesign-vue-next/es/input";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import type { SheetDrawing, DrawingShape } from "@idea10/core/sheet-drawings";
+import type { SheetGraphicDrawing, DrawingShape } from "@idea10/core/sheet-drawings";
 import { useAppI18n } from "../../../shared/i18n";
 import DrawingContent from "./DrawingContent.vue";
-const props = defineProps<{ drawing: SheetDrawing; disabled: boolean }>();
-const emit = defineEmits<{ confirm: [drawing: SheetDrawing]; close: [] }>();
+const props = defineProps<{ drawing: SheetGraphicDrawing; disabled: boolean }>();
+const emit = defineEmits<{ confirm: [drawing: SheetGraphicDrawing]; close: [] }>();
 const { t } = useAppI18n();
-const draft = ref<SheetDrawing>({ ...props.drawing, anchor: { ...props.drawing.anchor } });
+const draft = ref<SheetGraphicDrawing>({ ...props.drawing, anchor: { ...props.drawing.anchor } });
 const shapes: DrawingShape[] = [
   "rectangle",
   "roundedRectangle",

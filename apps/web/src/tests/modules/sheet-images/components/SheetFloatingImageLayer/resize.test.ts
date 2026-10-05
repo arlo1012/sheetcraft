@@ -69,7 +69,7 @@ describe("floating image resize controls", () => {
     const updates = wrapper.emitted("update")!;
     expect(updates).toHaveLength(1);
     const image = updates[0]![0] as FloatingImage;
-    const rect = getFloatingImageSheetRect(image, layout);
+    const rect = getFloatingImageSheetRect(image, layout)!;
     expect(rect.width).toBe(160);
     expect(rect.height).toBe(80);
     expect(rect.width / rect.height).toBe(2);

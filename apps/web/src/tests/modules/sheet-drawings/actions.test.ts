@@ -56,7 +56,8 @@ describe("drawing actions", () => {
     f.actions.insert("textBox");
     f.actions.confirm(f.actions.editing.value!);
     const [first, second] = f.getSheet().drawings!;
-    f.actions.edit(first!);
+    if (!first || first.kind === "chart") throw new Error("Expected a graphic drawing.");
+    f.actions.edit(first);
     f.actions.confirm({ ...first!, text: "Changed", width: 300 });
     expect(f.getSheet().drawings).toEqual([{ ...first!, text: "Changed", width: 300 }, second]);
     f.actions.update({ ...first!, id: "missing" });

@@ -393,7 +393,24 @@ export function applyCellShiftCommand(
   });
   nextState.drawings = (previousState.drawings ?? []).flatMap((drawing) => {
     const anchor = map(drawing.anchor);
-    return anchor ? [{ ...drawing, anchor }] : [];
+    return anchor
+      ? [
+          {
+            ...drawing,
+            anchor,
+            ...(drawing.kind === "chart"
+              ? {
+                  chart: {
+                    ...drawing.chart,
+                    range: drawing.chart.range
+                      ? transformFormulaRange(drawing.chart.range, map, range, command.direction)
+                      : null,
+                  },
+                }
+              : {}),
+          },
+        ]
+      : [];
   });
   nextState.floatingImages = previousState.floatingImages.flatMap((image) => {
     const anchor = map(image.anchor);

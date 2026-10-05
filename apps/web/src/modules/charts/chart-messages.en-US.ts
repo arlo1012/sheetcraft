@@ -1,0 +1,36 @@
+export const chartsEnUS = {
+  "chart.tools": "Charts",
+  "chart.edit": "Insert or edit chart",
+  "chart.source": "Data range",
+  "chart.type": "Chart type",
+  "chart.title": "Title",
+  "chart.headerRow": "First row contains series names",
+  "chart.headerColumn": "First column contains categories",
+  "chart.seriesByRows": "Series in rows",
+  "chart.legend": "Legend",
+  "chart.labels": "Data labels",
+  "chart.stacked": "Stacked",
+  "chart.showHidden": "Include hidden data",
+  "chart.sourceHint":
+    "Use up to 10,000 cells from this sheet. Charts update when the source values change.",
+  "chart.sankeyHint":
+    "The first three columns contain source, target and value. Links must not form a cycle.",
+  "chart.scatterHint":
+    "The first numeric series supplies X values and the following series supply Y values. Do not treat numeric X values as categories.",
+  "chart.invalidSource":
+    "Select a valid source range on this sheet containing the numeric columns required by the chart.",
+  "chart.column": "Column",
+  "chart.bar": "Bar",
+  "chart.line": "Line",
+  "chart.area": "Area",
+  "chart.pie": "Pie",
+  "chart.doughnut": "Doughnut",
+  "chart.scatter": "Scatter",
+  "chart.radar": "Radar",
+  "chart.treemap": "Treemap",
+  "chart.sankey": "Sankey",
+  "chart.river": "River",
+  "chart.wordCloud": "Word cloud",
+  "chart.dashboard": "Dashboard",
+  "chart.more": "Dynamic charts",
+};

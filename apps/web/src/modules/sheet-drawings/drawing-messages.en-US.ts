@@ -1,4 +1,13 @@
 export const drawingsEnUS = {
+  "drawing.symbol": "Symbol",
+  "drawing.insert": "Insert",
+  "drawing.customSymbol": "Custom characters",
+  "drawing.screenshot": "Screenshot",
+  "drawing.captureFailed":
+    "Could not capture the screen. Check the browser screen-sharing permission.",
+  "drawing.captureUnsupported":
+    "This browser does not support screen capture. You can paste a screenshot into the sheet.",
+
   "drawing.shape": "Shapes",
   "drawing.textBox": "Text box",
   "drawing.wordArt": "WordArt",

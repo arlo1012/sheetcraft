@@ -1,4 +1,11 @@
 export const drawingsZhCN = {
+  "drawing.symbol": "符号",
+  "drawing.insert": "插入",
+  "drawing.customSymbol": "自定义字符",
+  "drawing.screenshot": "截图",
+  "drawing.captureFailed": "无法截取屏幕。请检查浏览器屏幕共享权限。",
+  "drawing.captureUnsupported": "当前浏览器不支持屏幕截图，可将截图粘贴到工作表。",
+
   "drawing.shape": "形状",
   "drawing.textBox": "文本框",
   "drawing.wordArt": "艺术字",

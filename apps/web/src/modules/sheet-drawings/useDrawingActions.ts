@@ -2,7 +2,11 @@ import { ref, shallowRef } from "vue";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { canUseSheetPermission } from "@idea10/core";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@idea10/core/commands";
-import type { SheetDrawing } from "@idea10/core/sheet-drawings";
+import type {
+  SheetDrawing,
+  SheetGraphicDrawing,
+  SheetGraphicKind,
+} from "@idea10/core/sheet-drawings";
 import type { Sheet, CellAddress } from "@idea10/core/workbook";
 export function useDrawingActions(options: {
   getSheet: () => Sheet;
@@ -10,15 +14,15 @@ export function useDrawingActions(options: {
   flush: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
   isBusy: () => boolean;
-  name: (kind: SheetDrawing["kind"]) => string;
+  name: (kind: SheetGraphicKind) => string;
 }) {
   const idFactory = createBrowserIdFactory();
-  const editing = shallowRef<SheetDrawing>();
+  const editing = shallowRef<SheetGraphicDrawing>();
   const editingSheetId = ref("");
   let existing = false;
   const allowed = () =>
     !options.isBusy() && canUseSheetPermission(options.getSheet(), "editObjects");
-  function insert(kind: SheetDrawing["kind"]) {
+  function insert(kind: SheetGraphicKind) {
     if (!allowed() || !options.flush()) return;
     existing = false;
     editingSheetId.value = options.getSheet().id;
@@ -48,7 +52,7 @@ export function useDrawingActions(options: {
       rotation: 0,
     };
   }
-  function edit(drawing: SheetDrawing) {
+  function edit(drawing: SheetGraphicDrawing) {
     if (!allowed() || !options.flush()) return;
     existing = true;
     editingSheetId.value = options.getSheet().id;

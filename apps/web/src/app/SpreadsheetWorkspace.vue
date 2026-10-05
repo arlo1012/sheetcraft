@@ -81,6 +81,15 @@ import PictureBatchSizeDialog from "../modules/sheet-images/components/PictureBa
 import { usePictureTools } from "../modules/sheet-images/usePictureTools";
 import PictureSelectionPane from "../modules/sheet-images/components/PictureSelectionPane.vue";
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
+import type { SheetDrawing } from "@idea10/core/sheet-drawings";
+import { useChartActions } from "../modules/charts/useChartActions";
+import { defineAsyncComponent } from "vue";
+const ChartEditorDialog = defineAsyncComponent(
+  () => import("../modules/charts/components/ChartEditorDialog.vue"),
+);
+import SymbolDialog from "../modules/insert-tools/components/SymbolDialog.vue";
+import { captureScreen } from "../modules/insert-tools/captureScreen";
+import { insertTextAtSelection } from "../shared/forms/text-selection";
 import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
 import DrawingEditorDialog from "../modules/sheet-drawings/components/DrawingEditorDialog.vue";
 import InsertToolbar from "../modules/insert-tools/components/InsertToolbar.vue";
@@ -1081,6 +1090,101 @@ const imageActions = useSheetImageActions({
   },
   convertCellImageToFloating,
 });
+const chartActions = useChartActions({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getRange: () => activeSelectionRange.value,
+  getEvaluator: () => activeSheetEvaluator.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => cellEditSession.finish(),
+  execute: executeCommand,
+  name: () => t("chart.tools"),
+});
+const { editing: editingChart, error: chartError } = chartActions;
+const chartRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingChartRange, reference: pickedChartReference } = chartRangePicker;
+watch(editingChart, (value) => {
+  if (!value) chartRangePicker.cancel();
+});
+watch(() => activeSheet.value.id, chartActions.close);
+watch(workbookGeneration, () => {
+  chartActions.close();
+  drawingActions.close();
+  symbolVisible.value = false;
+});
+function editSheetDrawing(drawing: SheetDrawing): void {
+  if (drawing.kind === "chart") chartActions.edit(drawing);
+  else drawingActions.edit(drawing);
+}
+const symbolVisible = ref(false);
+const captureBusy = ref(false);
+function insertSymbol(symbol: string): void {
+  if (
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    !canEditCell(activeSheet.value, activeAddress.value)
+  )
+    return;
+  if (
+    !cellEditSession.begin(
+      { sheetId: activeSheet.value.id, address: activeAddress.value, input: activeCellInput.value },
+      { surface: "grid", mode: "append" },
+    )
+  )
+    return;
+  const state = cellEditSession.state;
+  const result = insertTextAtSelection(
+    state.draft,
+    state.selection.start,
+    state.selection.end,
+    symbol,
+  );
+  cellEditSession.setDraft(result.value);
+  cellEditSession.setSelection(result.caret, result.caret);
+  symbolVisible.value = false;
+  void nextTick(focusCellEditor);
+}
+watch(
+  () => activeSheet.value.id,
+  () => {
+    symbolVisible.value = false;
+  },
+);
+async function insertScreenCapture(): Promise<void> {
+  if (
+    captureBusy.value ||
+    imageBusy.value ||
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    !canUseSheetPermission(activeSheet.value, "editObjects") ||
+    !cellEditSession.finish()
+  )
+    return;
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    void MessagePlugin.warning(t("drawing.captureUnsupported"));
+    return;
+  }
+  const workbook = session.workbook;
+  const sheetId = activeSheet.value.id;
+  const address = { ...activeAddress.value };
+  captureBusy.value = true;
+  try {
+    const file = await captureScreen();
+    if (
+      file &&
+      session.workbook === workbook &&
+      activeSheet.value.id === sheetId &&
+      canUseSheetPermission(activeSheet.value, "editObjects")
+    )
+      await imageActions.pasteImageFile(file, "floating", address);
+  } catch {
+    void MessagePlugin.error(t("drawing.captureFailed"));
+  } finally {
+    captureBusy.value = false;
+  }
+}
 const drawingActions = useDrawingActions({
   getSheet: () => activeSheet.value,
   getAddress: () => activeAddress.value,
@@ -1801,6 +1905,7 @@ const { active: pickingNameRange, reference: pickedNameReference } = nameRangePi
 const activeRangePicker = computed(() => {
   if (pickingProtectionRange.value) return protectionRangePicker;
   if (pickingTableRange.value) return tableRangePicker;
+  if (pickingChartRange.value) return chartRangePicker;
   if (pickingPageSetupRange.value) return pageSetupRangePicker;
   if (pickingFindFormat.value) return findFormatPicker;
   if (pickingSimulationRange.value) return simulationRangePicker;
@@ -1959,6 +2064,9 @@ const gridInert = computed(
     !!findFormatDraft.value ||
     dataToolsModalOpen.value ||
     !!hyperlinkDraft.value ||
+    !!editingDrawing.value ||
+    symbolVisible.value ||
+    (!!editingChart.value && !pickingChartRange.value) ||
     cellStylesModalOpen.value ||
     (tableModalOpen.value && !pickingTableRange.value) ||
     formulaEditorVisible.value ||
@@ -2035,6 +2143,9 @@ const gridInert = computed(
         !!cellFormatSelection ||
         !!conditionalFormattingSelection ||
         !!hyperlinkDraft ||
+        !!editingDrawing ||
+        symbolVisible ||
+        (!!editingChart && !pickingChartRange) ||
         cellStylesModalOpen ||
         tableModalOpen ||
         !!findFormatDraft ||
@@ -2101,10 +2212,12 @@ const gridInert = computed(
             fileBusy ||
             xlsxBusy ||
             imageBusy ||
+            captureBusy ||
             !canUseSheetPermission(activeSheet, 'editObjects')
           "
           @update="setFloatingImage"
           @insert-drawing="drawingActions.insert"
+          @insert-chart="chartActions.insert"
           @insert-image="imageActions.requestInsert"
           @crop="sheetGridRef?.cropImage()"
           @rotate="sheetGridRef?.rotateImage($event)"
@@ -2126,6 +2239,11 @@ const gridInert = computed(
       </template>
       <template #insert-tools>
         <InsertToolbar
+          :symbol-disabled="
+            loading || fileBusy || xlsxBusy || !canEditCell(activeSheet, activeAddress)
+          "
+          @insert-symbol="symbolVisible = true"
+          @capture-screen="insertScreenCapture"
           :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
           :image-disabled="
             loading ||
@@ -2984,6 +3102,9 @@ const gridInert = computed(
         !!findFormatDraft ||
         pickingReferenceRange ||
         !!hyperlinkDraft ||
+        !!editingDrawing ||
+        symbolVisible ||
+        (!!editingChart && !pickingChartRange) ||
         cellStylesModalOpen ||
         tableModalOpen ||
         dataToolsModalOpen ||
@@ -3171,7 +3292,7 @@ const gridInert = computed(
           "
           @update-drawing="drawingActions.update"
           @delete-drawing="drawingActions.remove"
-          @edit-drawing="drawingActions.edit"
+          @edit-drawing="editSheetDrawing"
           @update-floating-images="pictureTools.updateMany"
           @delete-floating-images="pictureTools.remove"
           @update-floating-image="setFloatingImage"
@@ -3357,7 +3478,7 @@ const gridInert = computed(
       @close="contextActions.closePanels()"
     />
     <WorkbookStatusBar
-      :sheet-tabs-disabled="pickingTableRange"
+      :sheet-tabs-disabled="pickingTableRange || pickingChartRange"
       :view-mode="activeViewMode"
       @update:view-mode="setViewMode"
       :edit-session-id="
@@ -3380,6 +3501,9 @@ const gridInert = computed(
         xlsxBusy ||
         !!cellFormatSelection ||
         !!hyperlinkDraft ||
+        !!editingDrawing ||
+        symbolVisible ||
+        (!!editingChart && !pickingChartRange) ||
         cellStylesModalOpen ||
         (tableModalOpen && !pickingTableRange)
       "
@@ -3457,6 +3581,36 @@ const gridInert = computed(
     "
     @confirm="drawingActions.confirm"
     @close="drawingActions.close"
+  />
+  <SymbolDialog
+    v-if="symbolVisible"
+    :disabled="loading || fileBusy || xlsxBusy || !canEditCell(activeSheet, activeAddress)"
+    @insert="insertSymbol"
+    @close="symbolVisible = false"
+  />
+  <ChartEditorDialog
+    v-if="editingChart"
+    :key="editingChart.id"
+    :drawing="editingChart"
+    :workbook="session.workbook"
+    :sheet="activeSheet"
+    :evaluator="activeSheetEvaluator"
+    :revision="workbookRevision"
+    :disabled="
+      loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
+    "
+    :error="chartError"
+    :suspended="pickingChartRange"
+    :select-reference="chartRangePicker.selectReference"
+    @confirm="chartActions.confirm"
+    @close="chartActions.close"
+  />
+  <RangeReferencePicker
+    v-if="pickingChartRange"
+    :reference="pickedChartReference"
+    :edit-session-id="cellEditSession.id"
+    @confirm="chartRangePicker.confirm"
+    @cancel="chartRangePicker.cancel"
   />
 </template>
 

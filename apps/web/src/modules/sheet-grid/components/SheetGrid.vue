@@ -3298,6 +3298,9 @@ defineExpose({
       <SheetDrawingLayer
         :key="sheet.id"
         :drawings="sheet.drawings ?? []"
+        :sheet="sheet"
+        :evaluator="sheetEvaluator"
+        :revision="workbookRevision"
         :layout="layout"
         :scale="scale"
         :read-only="objectsReadOnly"

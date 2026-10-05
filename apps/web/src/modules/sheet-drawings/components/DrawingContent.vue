@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from "vue";
+import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
+const ChartContent = defineAsyncComponent(() => import("../../charts/components/ChartContent.vue"));
 const EquationContent = defineAsyncComponent(() => import("./EquationContent.vue"));
-const props = defineProps<{ drawing: SheetDrawing }>();
+const props = defineProps<{
+  drawing: SheetDrawing;
+  sheet?: Sheet;
+  evaluator?: SheetEvaluator;
+  revision?: number;
+}>();
 const textStyle = computed(() => ({
   color: props.drawing.color,
   fontSize: `${props.drawing.fontSize}px`,
@@ -74,7 +81,18 @@ const textStyle = computed(() => ({
         />
       </g>
     </svg>
-    <EquationContent v-if="drawing.kind === 'equation'" :source="drawing.text" :style="textStyle" />
+    <ChartContent
+      v-if="drawing.kind === 'chart' && sheet && evaluator"
+      :drawing="drawing"
+      :sheet="sheet"
+      :evaluator="evaluator"
+      :revision="revision ?? 0"
+    />
+    <EquationContent
+      v-else-if="drawing.kind === 'equation'"
+      :source="drawing.text"
+      :style="textStyle"
+    />
     <div
       v-else
       class="drawing-content__text"

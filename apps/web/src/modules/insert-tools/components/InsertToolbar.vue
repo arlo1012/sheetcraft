@@ -1,6 +1,18 @@
 <script setup lang="ts">
-import type { SheetDrawing } from "@idea10/core/sheet-drawings";
-import { Link2, Table2, Shapes, Type, Sparkles, Star, Sigma } from "lucide-vue-next";
+import ChartInsertTools from "../../charts/components/ChartInsertTools.vue";
+import type { ChartType } from "@idea10/core/sheet-charts";
+import type { SheetGraphicDrawing } from "@idea10/core/sheet-drawings";
+import {
+  Link2,
+  Table2,
+  Shapes,
+  Type,
+  Sparkles,
+  Star,
+  Sigma,
+  Omega,
+  ScanLine,
+} from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
@@ -8,12 +20,16 @@ import ImageInsertMenu from "../../home-tools/components/ImageInsertMenu.vue";
 defineProps<{
   disabled: boolean;
   imageDisabled: boolean;
+  symbolDisabled: boolean;
   hyperlinkDisabled: boolean;
   hasTable: boolean;
   editSessionId?: string;
 }>();
 const emit = defineEmits<{
-  insertDrawing: [kind: SheetDrawing["kind"]];
+  insertChart: [type: ChartType | "dashboard"];
+  insertSymbol: [];
+  captureScreen: [];
+  insertDrawing: [kind: SheetGraphicDrawing["kind"]];
   insertImage: [mode: "cell" | "floating"];
   insertHyperlink: [];
   insertTable: [];
@@ -48,6 +64,15 @@ const { t } = useAppI18n();
     >
       <ImageInsertMenu :disabled="imageDisabled" @insert-image="emit('insertImage', $event)" />
       <slot name="watermark" />
+      <RibbonButton
+        variant="tall"
+        :label="t('drawing.screenshot')"
+        :text="t('drawing.screenshot')"
+        :disabled="imageDisabled"
+        data-insert-tool="screenshot"
+        @activate="emit('captureScreen')"
+        ><ScanLine
+      /></RibbonButton>
       <RibbonButton
         variant="tall"
         :label="t('drawing.shape')"
@@ -85,6 +110,7 @@ const { t } = useAppI18n();
         ><Type
       /></RibbonButton>
     </section>
+    <ChartInsertTools :disabled="imageDisabled" @insert="emit('insertChart', $event)" />
     <section
       class="insert-toolbar__group"
       :aria-label="t('hyperlinks.insert')"
@@ -108,6 +134,15 @@ const { t } = useAppI18n();
         data-insert-tool="equation"
         @activate="emit('insertDrawing', 'equation')"
         ><Sigma
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :label="t('drawing.symbol')"
+        :text="t('drawing.symbol')"
+        :disabled="symbolDisabled"
+        data-insert-tool="symbol"
+        @activate="emit('insertSymbol')"
+        ><Omega
       /></RibbonButton>
     </section>
   </RibbonToolbar>

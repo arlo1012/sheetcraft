@@ -8,6 +8,7 @@ import {
   watch,
   type CSSProperties,
 } from "vue";
+import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import {
   getFloatingImageViewportFragments,
@@ -25,6 +26,9 @@ import SheetObjectSelection from "../../../shared/sheet-objects/SheetObjectSelec
 import DrawingContent from "./DrawingContent.vue";
 const props = defineProps<{
   drawings: readonly SheetDrawing[];
+  sheet?: Sheet;
+  evaluator?: SheetEvaluator;
+  revision?: number;
   layout: SheetViewportLayout;
   scale: number;
   readOnly: boolean;
@@ -177,7 +181,12 @@ watch(
     >
       <div class="sheet-drawing-layer__clip">
         <div class="sheet-drawing-layer__content" :style="contentStyle(fragment)">
-          <DrawingContent :drawing="fragment.drawing" />
+          <DrawingContent
+            :drawing="fragment.drawing"
+            :sheet="sheet"
+            :evaluator="evaluator"
+            :revision="revision"
+          />
         </div>
       </div>
       <SheetObjectSelection

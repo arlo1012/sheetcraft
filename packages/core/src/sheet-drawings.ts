@@ -1,3 +1,4 @@
+import { normalizeSheetChart, type SheetChart } from "./sheet-charts.js";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellAddress } from "./workbook.js";
 
 export type DrawingShape =
@@ -10,9 +11,9 @@ export type DrawingShape =
   | "line"
   | "star"
   | "heart";
-export type SheetDrawing = {
+export type SheetGraphicKind = "shape" | "textBox" | "wordArt" | "icon" | "equation";
+type DrawingBase = {
   id: string;
-  kind: "shape" | "textBox" | "wordArt" | "icon" | "equation";
   name: string;
   anchor: CellAddress;
   offsetX: number;
@@ -30,7 +31,10 @@ export type SheetDrawing = {
   italic: boolean;
   rotation: number;
 };
-const kinds = new Set(["shape", "textBox", "wordArt", "icon", "equation"]);
+export type SheetGraphicDrawing = DrawingBase & { kind: SheetGraphicKind };
+export type SheetChartDrawing = DrawingBase & { kind: "chart"; chart: SheetChart };
+export type SheetDrawing = SheetGraphicDrawing | SheetChartDrawing;
+const kinds = new Set(["shape", "textBox", "wordArt", "icon", "equation", "chart"]);
 const shapes = new Set([
   "rectangle",
   "roundedRectangle",
@@ -77,7 +81,9 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   }
   return {
     id: value.id,
-    kind: value.kind,
+    ...(value.kind === "chart"
+      ? ({ kind: "chart", chart: normalizeSheetChart(value.chart) } as const)
+      : { kind: value.kind }),
     name: value.name,
     anchor: { ...value.anchor },
     offsetX: value.offsetX,

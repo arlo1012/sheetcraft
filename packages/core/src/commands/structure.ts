@@ -637,7 +637,31 @@ function transformSheetMetadataForAxis(
     drawings: normalizeSheetDrawings(metadata.drawings).flatMap((drawing) => {
       const source = drawing.anchor[axis];
       const target = transformAxisIndex(source, index, count, maximum, operation);
-      return target === null ? [] : [{ ...drawing, anchor: { ...drawing.anchor, [axis]: target } }];
+      return target === null
+        ? []
+        : [
+            {
+              ...drawing,
+              anchor: { ...drawing.anchor, [axis]: target },
+              ...(drawing.kind === "chart"
+                ? {
+                    chart: {
+                      ...drawing.chart,
+                      range: drawing.chart.range
+                        ? transformRangeForAxis(
+                            drawing.chart.range,
+                            axis,
+                            index,
+                            count,
+                            maximum,
+                            operation,
+                          )
+                        : null,
+                    },
+                  }
+                : {}),
+            },
+          ];
     }),
     freezePanes:
       axis === "row"
@@ -1540,6 +1564,14 @@ function transformSheetMetadataForAxisMove(
     drawings: normalizeSheetDrawings(metadata.drawings).map((drawing) => ({
       ...drawing,
       anchor: { ...drawing.anchor, [axis]: map(drawing.anchor[axis]) },
+      ...(drawing.kind === "chart"
+        ? {
+            chart: {
+              ...drawing.chart,
+              range: drawing.chart.range ? moveRange(drawing.chart.range) : null,
+            },
+          }
+        : {}),
     })),
     freezePanes: { ...metadata.freezePanes },
     filter,
