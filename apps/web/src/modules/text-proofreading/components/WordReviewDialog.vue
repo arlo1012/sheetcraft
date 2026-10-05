@@ -149,7 +149,7 @@ function scan() {
                   t("wordProof.ignore")
                 }}</Button>
                 <Button size="small" variant="text" @click="controller.add(row.word) && scan()">{{
-                  t("wordProof.accepted")
+                  t("wordProof.acceptWord")
                 }}</Button>
               </div>
             </template>
