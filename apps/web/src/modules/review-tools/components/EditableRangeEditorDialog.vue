@@ -81,6 +81,7 @@ function save(): void {
     :cancel-btn="t('review.cancel')"
     :close-on-overlay-click="false"
     width="470px"
+    placement="center"
     @confirm="save"
     @close="emit('close')"
   >
