@@ -5,6 +5,7 @@ import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
 import { Statistic as TStatistic } from "tdesign-vue-next/es/statistic";
 import { Tabs, TabPanel } from "tdesign-vue-next/es/tabs";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Button } from "tdesign-vue-next/es/button";
 import { computed, ref } from "vue";
 import { Select, Option } from "tdesign-vue-next/es/select";
 import { columnIndexToLabel } from "@idea10/core/coordinates";
@@ -67,7 +68,6 @@ function columnLabel(column: number): string {
     :visible="true"
     :header="t('contextMenu.columnStatistics')"
     :confirm-btn="null"
-    :cancel-btn="t('wordProof.close')"
     :close-on-overlay-click="false"
     :destroy-on-close="true"
     width="min(660px, calc(100vw - 32px))"
@@ -190,8 +190,7 @@ function columnLabel(column: number): string {
             ><strong>—</strong>
           </div>
         </div>
-        <div class="column-statistics__notes">
-          <p>{{ t("contextMenu.statisticsScope") }}</p>
+        <div v-if="statistic.dateCount || statistic.errorCount" class="column-statistics__notes">
           <span v-if="statistic.dateCount"
             >{{ t("contextMenu.dateCount") }}：{{ formatNumber(statistic.dateCount) }}</span
           >
@@ -201,6 +200,12 @@ function columnLabel(column: number): string {
         </div>
       </template>
     </div>
+    <template #footer>
+      <div class="column-statistics__footer">
+        <p>{{ t("contextMenu.statisticsScope") }}</p>
+        <Button theme="default" @click="emit('close')">{{ t("wordProof.close") }}</Button>
+      </div>
+    </template>
   </Dialog>
 </template>
 
@@ -210,6 +215,21 @@ function columnLabel(column: number): string {
   gap: 12px;
   p {
     margin: 0;
+  }
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    p {
+      flex: 1;
+      margin: 0;
+      text-align: left;
+      color: var(--idea-text-secondary);
+    }
+    > :last-child {
+      flex-shrink: 0;
+    }
   }
   &__selector {
     width: 120px;
