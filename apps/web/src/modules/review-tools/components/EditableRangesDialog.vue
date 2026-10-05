@@ -139,12 +139,12 @@ function save(protect = false): void {
           {{ t(readOnly ? "review.unlockRangesHint" : "review.editableRangesHint") }}
         </p>
         <div class="editable-ranges__actions">
-          <TButton variant="outline" :disabled="readOnly" data-range-action="add" @click="add">
-            {{ t("review.addRange") }}
-          </TButton>
           <TButton v-if="!readOnly" variant="outline" @click="save(true)">{{
             t("review.protectSheet")
           }}</TButton>
+          <TButton variant="outline" :disabled="readOnly" data-range-action="add" @click="add">
+            {{ t("review.addRange") }}
+          </TButton>
         </div>
       </div>
       <TableHeightWrapper v-slot="{ height }">
