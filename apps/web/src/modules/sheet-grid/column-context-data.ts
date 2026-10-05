@@ -1,4 +1,5 @@
 import { isFormulaError, type FormulaValue } from "@idea10/core/formula";
+import { MAX_SHEET_ROWS } from "@idea10/core/workbook";
 import type { CellAddress, CellRange, Sheet, SheetEvaluator } from "@idea10/core/workbook";
 import { createSheetHiddenRowIntervals, isInHiddenAxisIntervals } from "./data-visibility";
 
@@ -9,6 +10,10 @@ export type ColumnValueDistribution = Readonly<{
 
 export type ColumnStatistics = Readonly<{
   column: number;
+  totalRowCount: number;
+  emptyCount: number;
+  median: number | null;
+  leastDistribution: readonly ColumnValueDistribution[];
   selectedCellCount: number;
   nonEmptyCount: number;
   numericCount: number;
@@ -30,7 +35,7 @@ export type ColumnChoice = Readonly<{
   nearestRow: number;
 }>;
 
-const MAX_DISTRIBUTION_VALUES = 24;
+const MAX_DISTRIBUTION_VALUES = 5;
 const MAX_COLUMN_CHOICES = 200;
 const MAX_EMPTY_COLUMNS_TO_REPORT = 50;
 
@@ -84,10 +89,8 @@ function createEmptyStatistic() {
   };
 }
 
-/**
- * Summarizes sparse, visible content in each selected column. Manually hidden
- * rows and rows hidden by the active sheet filter are omitted; hidden columns
- * do not affect statistics for an explicitly selected column.
+/** Summarizes selected content, including hidden and filter-hidden rows.
+ * Whole columns use their populated bounds rather than the grid capacity.
  */
 export function getColumnStatistics(
   sheet: Sheet,
@@ -95,7 +98,8 @@ export function getColumnStatistics(
   evaluator: SheetEvaluator,
 ): ColumnStatistics[] {
   const normalized = normalizeRange(range);
-  const hiddenIntervals = createSheetHiddenRowIntervals(sheet, evaluator);
+  const bounds = new Map<number, { first: number; last: number }>();
+  const numbers = new Map<number, number[]>();
   const valuesByColumn = new Map<number, Map<string, number>>();
   const statistics = new Map<number, ReturnType<typeof createEmptyStatistic>>();
 
@@ -107,8 +111,7 @@ export function getColumnStatistics(
       address.row < normalized.start.row ||
       address.row > normalized.end.row ||
       address.column < normalized.start.column ||
-      address.column > normalized.end.column ||
-      !isVisibleRow(sheet, address, hiddenIntervals)
+      address.column > normalized.end.column
     ) {
       continue;
     }
@@ -127,6 +130,11 @@ export function getColumnStatistics(
             ? cell.content.error
             : null;
     if (value === null || value === "") continue;
+    const bound = bounds.get(address.column);
+    bounds.set(address.column, {
+      first: Math.min(bound?.first ?? address.row, address.row),
+      last: Math.max(bound?.last ?? address.row, address.row),
+    });
     statistic.selectedCellCount += 1;
     if (isFormulaError(value)) {
       statistic.errorCount += 1;
@@ -143,6 +151,9 @@ export function getColumnStatistics(
       const isDate =
         cell.style?.numberFormat?.kind === "date" || cell.style?.numberFormat?.kind === "time";
       if (isDate) statistic.dateCount += 1;
+      const numericValues = numbers.get(address.column) ?? [];
+      numericValues.push(value);
+      numbers.set(address.column, numericValues);
       statistic.numericCount += 1;
       statistic.sum += value;
       statistic.minimum = statistic.minimum === null ? value : Math.min(statistic.minimum, value);
@@ -161,16 +172,40 @@ export function getColumnStatistics(
   return [...statistics.entries()]
     .sort(([left], [right]) => left - right)
     .map(([column, statistic]) => {
-      const distribution = [...valuesByColumn.get(column)!.entries()]
+      const allValues = [...valuesByColumn.get(column)!.entries()]
         .map(([value, count]) => ({ value, count }))
         .sort(
           (left, right) =>
             right.count - left.count ||
             left.value.localeCompare(right.value, undefined, { numeric: true }),
+        );
+      const distribution = allValues.slice(0, MAX_DISTRIBUTION_VALUES);
+      const leastDistribution = [...allValues]
+        .sort(
+          (a, b) =>
+            a.count - b.count || a.value.localeCompare(b.value, undefined, { numeric: true }),
         )
         .slice(0, MAX_DISTRIBUTION_VALUES);
+      const numericValues = (numbers.get(column) ?? []).sort((a, b) => a - b);
+      const middle = Math.floor(numericValues.length / 2);
+      const median = !numericValues.length
+        ? null
+        : numericValues.length % 2
+          ? numericValues[middle]!
+          : numericValues[middle - 1]! / 2 + numericValues[middle]! / 2;
+      const bound = bounds.get(column);
+      const wholeColumn = normalized.start.row === 0 && normalized.end.row === MAX_SHEET_ROWS - 1;
+      const totalRowCount = wholeColumn
+        ? bound
+          ? bound.last - bound.first + 1
+          : 0
+        : normalized.end.row - normalized.start.row + 1;
       return {
         column,
+        totalRowCount,
+        emptyCount: totalRowCount - statistic.selectedCellCount,
+        median,
+        leastDistribution,
         ...statistic,
         sum: Object.is(statistic.sum, -0) ? 0 : statistic.sum,
         average: statistic.numericCount === 0 ? null : statistic.sum / statistic.numericCount,

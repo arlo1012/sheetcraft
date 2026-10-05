@@ -1672,6 +1672,11 @@ export type MessageSchema = ToolMessageSchema & {
     hide: string;
     unhide: string;
     columnStatistics: string;
+    statisticsTotalRows: string;
+    statisticsEmptyCells: string;
+    statisticsMedian: string;
+    statisticsMost: string;
+    statisticsLeast: string;
     statisticsCount: string;
     statisticsDistinct: string;
     statisticsUnique: string;

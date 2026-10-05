@@ -28,7 +28,7 @@ describe("column context data", () => {
     ).toHaveLength(1);
   });
 
-  test("summarizes sparse visible cells, retaining date numbers but excluding errors", () => {
+  test("includes hidden cells, retaining date numbers but excluding numeric errors", () => {
     const sheet = createSheet("Sheet1", "sheet-1");
     setCellValue(sheet, { row: 0, column: 0 }, 12);
     setCellValue(sheet, { row: 1, column: 0 }, 24);
@@ -56,20 +56,20 @@ describe("column context data", () => {
     ).toEqual([
       expect.objectContaining({
         column: 0,
-        selectedCellCount: 5,
-        nonEmptyCount: 4,
-        numericCount: 3,
+        selectedCellCount: 6,
+        nonEmptyCount: 5,
+        numericCount: 4,
         dateCount: 1,
         errorCount: 1,
-        sum: 45_036,
-        average: 15_012,
+        sum: 45_060,
+        average: 11_265,
         minimum: 12,
         maximum: 45_000,
       }),
     ]);
   });
 
-  test("omits rows hidden by active filter criteria without walking empty rows", () => {
+  test("includes rows hidden by active filter criteria without walking empty rows", () => {
     const sheet = createSheet("Sheet1", "sheet-1");
     setCellValue(sheet, { row: 0, column: 0 }, "Header");
     setCellValue(sheet, { row: 1, column: 0 }, 10);
@@ -86,12 +86,13 @@ describe("column context data", () => {
         createSheetEvaluator(sheet),
       )[0],
     ).toMatchObject({
-      selectedCellCount: 2,
-      nonEmptyCount: 2,
-      numericCount: 1,
-      sum: 10,
+      selectedCellCount: 3,
+      nonEmptyCount: 3,
+      numericCount: 2,
+      sum: 30,
       distribution: [
         { value: "10", count: 1 },
+        { value: "20", count: 1 },
         { value: "Header", count: 1 },
       ],
     });
@@ -119,19 +120,7 @@ describe("column context data", () => {
       distinctCount: 11,
       uniqueCount: 11,
     });
-    expect(result.distribution.map((item) => item.value)).toEqual([
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "45",
-      "title1",
-    ]);
+    expect(result.distribution.map((item) => item.value)).toEqual(["1", "2", "3", "4", "5"]);
   });
 
   test("empty columns have zero count and no numeric extrema", () => {
@@ -153,7 +142,7 @@ describe("column context data", () => {
     });
   });
 
-  test("does not include gaps, hidden contents or cells outside the selected range", () => {
+  test("includes hidden content but excludes gaps and cells outside the selected range", () => {
     const sheet = createSheet("Sheet1", "sheet-1");
     setCellValue(sheet, { row: 0, column: 0 }, 100);
     setCellValue(sheet, { row: 2, column: 0 }, 0);
@@ -167,7 +156,7 @@ describe("column context data", () => {
         { start: { row: 1, column: 0 }, end: { row: 8, column: 0 } },
         createSheetEvaluator(sheet),
       )[0],
-    ).toMatchObject({ selectedCellCount: 2, nonEmptyCount: 2, numericCount: 1, sum: 0 });
+    ).toMatchObject({ selectedCellCount: 3, nonEmptyCount: 3, numericCount: 2, sum: 10 });
   });
 
   test("computes distinct and singleton counts before limiting the distribution", () => {
@@ -185,8 +174,58 @@ describe("column context data", () => {
       uniqueCount: 29,
       distributionTruncated: true,
     });
-    expect(result.distribution).toHaveLength(24);
+    expect(result.distribution).toHaveLength(5);
     expect(result.distribution[0]).toEqual({ value: "5", count: 2 });
+  });
+
+  test("matches the 27-row reference and computes least frequent values independently", () => {
+    const sheet = createSheet("Sheet1", "sheet-1");
+    setCellValue(sheet, { row: 0, column: 0 }, "Header");
+    const numbers = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 3, 4, 5, 6, 7];
+    numbers.forEach((value, index) =>
+      setCellValue(sheet, { row: index === 14 ? 26 : index + 1, column: 0 }, value),
+    );
+    sheet.hiddenRows?.add(2);
+    const result = getColumnStatistics(
+      sheet,
+      { start: { row: 0, column: 0 }, end: { row: MAX_SHEET_ROWS - 1, column: 0 } },
+      createSheetEvaluator(sheet),
+    )[0]!;
+    expect(result).toMatchObject({
+      totalRowCount: 27,
+      emptyCount: 11,
+      distinctCount: 11,
+      numericCount: 15,
+      sum: 90,
+      average: 6,
+      median: 6,
+      minimum: 2,
+      maximum: 11,
+    });
+    expect(result.distribution).toEqual(
+      [3, 4, 5, 6, 7].map((value) => ({ value: String(value), count: 2 })),
+    );
+    expect(result.leastDistribution.every((item) => item.count === 1)).toBe(true);
+    expect(result.distribution[0]!.count / result.nonEmptyCount).toBe(0.125);
+  });
+  test("computes even medians and retains explicitly selected blank rows", () => {
+    const sheet = createSheet("Sheet1", "sheet-1");
+    setCellValue(sheet, { row: 3, column: 0 }, 2);
+    setCellValue(sheet, { row: 5, column: 0 }, 10);
+    expect(
+      getColumnStatistics(
+        sheet,
+        { start: { row: 1, column: 0 }, end: { row: 8, column: 0 } },
+        createSheetEvaluator(sheet),
+      )[0],
+    ).toMatchObject({ totalRowCount: 8, emptyCount: 6, median: 6 });
+    expect(
+      getColumnStatistics(
+        sheet,
+        { start: { row: 0, column: 0 }, end: { row: MAX_SHEET_ROWS - 1, column: 0 } },
+        createSheetEvaluator(sheet),
+      )[0],
+    ).toMatchObject({ totalRowCount: 3, emptyCount: 1, median: 6 });
   });
 
   test("returns nearby distinct literal text choices only", () => {

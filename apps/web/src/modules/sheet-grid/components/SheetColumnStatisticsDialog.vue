@@ -2,6 +2,8 @@
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { BaseTable } from "tdesign-vue-next/es/table";
 import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
+import { Statistic as TStatistic } from "tdesign-vue-next/es/statistic";
+import { Tabs, TabPanel } from "tdesign-vue-next/es/tabs";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { computed, ref } from "vue";
 import { Select, Option } from "tdesign-vue-next/es/select";
@@ -28,6 +30,19 @@ const statistic = computed(
     displayedStatistics.value.find((item) => item.column === selectedColumn.value) ??
     displayedStatistics.value[0],
 );
+const frequency = ref<"most" | "least">("most");
+const distribution = computed(() =>
+  statistic.value
+    ? [
+        ...(frequency.value === "most"
+          ? statistic.value.distribution
+          : statistic.value.leastDistribution),
+      ]
+    : [],
+);
+function decimalPlaces(value: number | null) {
+  return value !== null && !Number.isInteger(value) ? 3 : 0;
+}
 const numberFormatter = computed(() => new Intl.NumberFormat(props.locale));
 
 const distributionColumns = computed<BaseTableCol[]>(() => [
@@ -61,11 +76,13 @@ function columnLabel(column: number): string {
     @close="emit('close')"
   >
     <div class="column-statistics">
-      <div class="column-statistics__toolbar">
-        <span>{{ t("contextMenu.column") }}</span>
+      <p v-if="hasMoreColumns" class="column-statistics__hint">
+        {{ t("contextMenu.statisticsColumnLimit", { count: MAX_RENDERED_COLUMNS }) }}
+      </p>
+      <template v-if="statistic">
         <Select
           v-if="displayedStatistics.length > 1"
-          :value="statistic?.column"
+          :value="statistic.column"
           :aria-label="t('contextMenu.column')"
           class="column-statistics__selector"
           @change="selectedColumn = Number($event)"
@@ -74,62 +91,19 @@ function columnLabel(column: number): string {
             v-for="item in displayedStatistics"
             :key="item.column"
             :value="item.column"
-            :label="columnLabel(item.column)"
+            :label="`${t('contextMenu.column')} ${columnLabel(item.column)}`"
           />
         </Select>
-        <strong v-else-if="statistic">{{ columnLabel(statistic.column) }}</strong>
-        <span class="column-statistics__hint">{{ t("contextMenu.visibleRowsOnly") }}</span>
-      </div>
-      <p v-if="hasMoreColumns" class="column-statistics__hint">
-        {{ t("contextMenu.statisticsColumnLimit", { count: MAX_RENDERED_COLUMNS }) }}
-      </p>
-      <template v-if="statistic">
-        <dl class="column-statistics__metrics">
-          <div>
-            <dt>{{ t("contextMenu.statisticsCount") }}</dt>
-            <dd>{{ formatNumber(statistic.selectedCellCount) }}</dd>
-          </div>
-          <div>
-            <dt>{{ t("contextMenu.numericCount") }}</dt>
-            <dd>{{ formatNumber(statistic.numericCount) }}</dd>
-          </div>
-          <div>
-            <dt>{{ t("contextMenu.statisticsDistinct") }}</dt>
-            <dd>{{ formatNumber(statistic.distinctCount) }}</dd>
-          </div>
-          <div>
-            <dt>{{ t("contextMenu.statisticsUnique") }}</dt>
-            <dd>{{ formatNumber(statistic.uniqueCount) }}</dd>
-          </div>
-          <div>
-            <dt>{{ t("contextMenu.sum") }}</dt>
-            <dd>{{ formatNumber(statistic.sum) }}</dd>
-          </div>
-          <div>
-            <dt>{{ t("contextMenu.average") }}</dt>
-            <dd>{{ formatNumber(statistic.average) }}</dd>
-          </div>
-          <div>
-            <dt>{{ t("contextMenu.minimum") }}</dt>
-            <dd>{{ formatNumber(statistic.minimum) }}</dd>
-          </div>
-          <div>
-            <dt>{{ t("contextMenu.maximum") }}</dt>
-            <dd>{{ formatNumber(statistic.maximum) }}</dd>
-          </div>
-        </dl>
-        <div class="column-statistics__distribution-heading">
-          <strong>{{ t("contextMenu.valueDistribution") }}</strong>
-          <span v-if="statistic.distributionTruncated" class="column-statistics__hint">{{
-            t("contextMenu.statisticsLimit")
-          }}</span>
-        </div>
+        <Tabs v-model="frequency">
+          <TabPanel value="most" :label="t('contextMenu.statisticsMost')" />
+          <TabPanel value="least" :label="t('contextMenu.statisticsLeast')" />
+        </Tabs>
         <div class="column-statistics__table">
           <TableHeightWrapper v-slot="{ height }">
             <BaseTable
               class="idea-table--mini idea-table--row-dividers"
               row-key="value"
-              :data="[...statistic.distribution]"
+              :data="distribution"
               :columns="distributionColumns"
               :height="height"
               size="small"
@@ -140,16 +114,81 @@ function columnLabel(column: number): string {
               resizable
             >
               <template #count="{ row }">{{ formatNumber(row.count) }}</template>
-              <template #share="{ row }">
-                <div class="column-statistics__share">
-                  <span class="column-statistics__bar"
-                    ><span :style="{ width: `${(row.count / statistic.nonEmptyCount) * 100}%` }"
-                  /></span>
-                  <span>{{ ((row.count / statistic.nonEmptyCount) * 100).toFixed(1) }}%</span>
-                </div>
-              </template>
+              <template #share="{ row }"
+                >{{ ((row.count / statistic.nonEmptyCount) * 100).toFixed(2) }}%</template
+              >
             </BaseTable>
           </TableHeightWrapper>
+        </div>
+        <div class="column-statistics__metrics">
+          <TStatistic
+            :title="t('contextMenu.statisticsTotalRows')"
+            :value="statistic.totalRowCount"
+            :decimal-places="decimalPlaces(statistic.totalRowCount)"
+            separator=","
+          />
+          <TStatistic
+            :title="t('contextMenu.statisticsEmptyCells')"
+            :value="statistic.emptyCount"
+            :decimal-places="decimalPlaces(statistic.emptyCount)"
+            separator=","
+          />
+          <TStatistic
+            :title="t('contextMenu.statisticsDistinct')"
+            :value="statistic.distinctCount"
+            :decimal-places="decimalPlaces(statistic.distinctCount)"
+            separator=","
+          />
+          <TStatistic
+            :title="t('contextMenu.sum')"
+            :value="statistic.sum"
+            :decimal-places="decimalPlaces(statistic.sum)"
+            separator=","
+          />
+          <TStatistic
+            v-if="statistic.average !== null"
+            :title="t('contextMenu.average')"
+            :value="statistic.average"
+            :decimal-places="decimalPlaces(statistic.average)"
+            separator=","
+          />
+          <div v-else class="column-statistics__unavailable">
+            <span>{{ t("contextMenu.average") }}</span
+            ><strong>—</strong>
+          </div>
+          <TStatistic
+            v-if="statistic.median !== null"
+            :title="t('contextMenu.statisticsMedian')"
+            :value="statistic.median"
+            :decimal-places="decimalPlaces(statistic.median)"
+            separator=","
+          />
+          <div v-else class="column-statistics__unavailable">
+            <span>{{ t("contextMenu.statisticsMedian") }}</span
+            ><strong>—</strong>
+          </div>
+          <TStatistic
+            v-if="statistic.minimum !== null"
+            :title="t('contextMenu.minimum')"
+            :value="statistic.minimum"
+            :decimal-places="decimalPlaces(statistic.minimum)"
+            separator=","
+          />
+          <div v-else class="column-statistics__unavailable">
+            <span>{{ t("contextMenu.minimum") }}</span
+            ><strong>—</strong>
+          </div>
+          <TStatistic
+            v-if="statistic.maximum !== null"
+            :title="t('contextMenu.maximum')"
+            :value="statistic.maximum"
+            :decimal-places="decimalPlaces(statistic.maximum)"
+            separator=","
+          />
+          <div v-else class="column-statistics__unavailable">
+            <span>{{ t("contextMenu.maximum") }}</span
+            ><strong>—</strong>
+          </div>
         </div>
         <div class="column-statistics__notes">
           <p>{{ t("contextMenu.statisticsScope") }}</p>
@@ -172,17 +211,8 @@ function columnLabel(column: number): string {
   p {
     margin: 0;
   }
-  &__toolbar,
-  &__distribution-heading {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
   &__selector {
     width: 120px;
-  }
-  &__toolbar > :last-child {
-    margin-left: auto;
   }
   &__hint,
   &__notes {
@@ -191,31 +221,22 @@ function columnLabel(column: number): string {
   &__metrics {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px 16px;
-    margin: 0;
-    padding: 12px;
-    background: var(--idea-surface-subtle);
-    border-radius: var(--idea-radius-small);
-    div {
-      min-width: 0;
-    }
-    dt {
-      color: var(--idea-text-secondary);
-    }
-    dd {
-      margin: 4px 0 0;
-      font-size: 16px;
-      line-height: 24px;
-      font-weight: 500;
-      font-variant-numeric: tabular-nums;
-      overflow-wrap: anywhere;
-    }
+    gap: 16px;
+    padding-top: 4px;
   }
-  &__distribution-heading {
-    justify-content: space-between;
+  &__unavailable {
+    display: grid;
+    gap: 8px;
+    color: var(--idea-text-secondary);
+    strong {
+      font-size: 24px;
+      line-height: 32px;
+      font-weight: 500;
+      color: var(--idea-text-primary);
+    }
   }
   &__table {
-    height: min(260px, calc(100dvh - 360px));
+    height: 186px;
     min-height: 0;
   }
   &__notes {
@@ -224,24 +245,6 @@ function columnLabel(column: number): string {
     gap: 4px 12px;
     p {
       width: 100%;
-    }
-  }
-  &__share {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-variant-numeric: tabular-nums;
-  }
-  &__bar {
-    flex: 1;
-    height: 6px;
-    background: var(--td-bg-color-secondarycontainer);
-    border-radius: 3px;
-    overflow: hidden;
-    span {
-      display: block;
-      height: 100%;
-      background: var(--td-brand-color);
     }
   }
 }
