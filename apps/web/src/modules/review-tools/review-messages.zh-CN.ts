@@ -102,6 +102,7 @@ export const reviewZhCN = {
     allowFormatRows: "允许设置行格式",
     allowFormatColumns: "允许设置列格式",
     editableRangesHint: "设置当前工作表保护后仍可编辑的区域。新增区域默认使用当前选区。",
+    rangeActions: "操作",
     rangeName: "名称",
     rangeReference: "单元格区域",
     addRange: "新增区域",

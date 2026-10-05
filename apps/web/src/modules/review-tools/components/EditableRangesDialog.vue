@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from "vue";
+import { Plus, Pencil, Trash2, LockKeyholeOpen } from "lucide-vue-next";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import {
   BaseTable as TTable,
   type BaseTableCol,
   type TableRowData,
+  type TableRowAttributes,
 } from "tdesign-vue-next/es/table";
 import { normalizeSheetProtection, type SheetProtection, type EditableRange } from "@idea10/core";
 import type { CellRange } from "@idea10/core/workbook";
@@ -44,12 +47,12 @@ watch(
   },
   { immediate: true },
 );
-const selected = computed(() => rows.value.find((row) => row.id === selectedId.value));
 const tableRows = computed(() =>
   rows.value.map((row) => ({
     id: row.id,
     name: row.entry.name,
     reference: `${formatCellAddress(row.entry.range.start)}:${formatCellAddress(row.entry.range.end)}`,
+    hasPassword: Boolean(row.entry.password),
     password: t(row.entry.password ? "review.passwordSet" : "review.noPassword"),
   })),
 );
@@ -57,22 +60,39 @@ const columns = computed<BaseTableCol[]>(() => [
   { colKey: "name", title: t("review.rangeName"), width: 160, ellipsis: true },
   { colKey: "reference", title: t("review.rangeReference"), ellipsis: true },
   { colKey: "password", title: t("review.password"), width: 110 },
+  { colKey: "actions", title: t("review.rangeActions"), width: 96, align: "center" },
 ]);
+const rowAttributes: TableRowAttributes<TableRowData> = ({ row }) => ({
+  "data-editable-range-row": String(row.id),
+  "aria-selected": String(selectedId.value === row.id),
+});
+function selectRows(keys: Array<string | number>): void {
+  if (typeof keys[0] === "number") selectedId.value = keys[0];
+}
 function add(): void {
   if (props.readOnly) return;
   let index = 1;
   while (rows.value.some((row) => row.entry.name.toLowerCase() === `range${index}`)) index++;
   editor.value = { entry: { name: `Range${index}`, range: props.selection } };
 }
-function edit(): void {
-  if (!props.readOnly && selected.value) editor.value = { ...selected.value };
+function edit(id = selectedId.value): void {
+  const row = rows.value.find((row) => row.id === id);
+  if (!props.readOnly && row) {
+    selectedId.value = row.id;
+    editor.value = { ...row };
+  }
 }
 function editRow({ row }: { row: TableRowData }): void {
   selectedId.value = Number(row.id);
   edit();
 }
-function remove(): void {
-  if (!props.readOnly) rows.value = rows.value.filter((row) => row.id !== selectedId.value);
+function remove(id: number): void {
+  if (props.readOnly) return;
+  const index = rows.value.findIndex((row) => row.id === id);
+  if (index < 0) return;
+  rows.value.splice(index, 1);
+  if (selectedId.value === id)
+    selectedId.value = rows.value[Math.min(index, rows.value.length - 1)]?.id;
 }
 function saveEntry(entry: EditableRange): void {
   const id = editor.value?.id ?? nextId++;
@@ -97,69 +117,84 @@ function save(protect = false): void {
 </script>
 <template>
   <TDialog
-    :visible="visible"
+    :visible="visible && !editor"
     :header="t('review.editableRanges')"
-    :confirm-btn="t(readOnly ? 'review.close' : 'review.save')"
+    :confirm-btn="t(readOnly ? 'review.close' : 'review.confirm')"
     :cancel-btn="readOnly ? null : t('review.cancel')"
     :close-on-overlay-click="false"
-    width="680px"
+    width="min(680px, calc(100vw - 32px))"
+    placement="center"
+    :confirm-on-enter="false"
     @confirm="save()"
     @close="emit('close')"
   >
+    <p>{{ t(readOnly ? "review.unlockRangesHint" : "review.editableRangesHint") }}</p>
     <div class="editable-ranges">
-      <p>{{ t(readOnly ? "review.unlockRangesHint" : "review.editableRangesHint") }}</p>
       <div class="editable-ranges__toolbar">
-        <TButton variant="outline" :disabled="readOnly" data-range-action="add" @click="add">{{
-          t("review.addRange")
+        <TButton variant="outline" :disabled="readOnly" data-range-action="add" @click="add">
+          <template #icon><Plus class="idea-control-icon" aria-hidden="true" /></template>
+          {{ t("review.addRange") }}
+        </TButton>
+        <TButton v-if="!readOnly" variant="outline" @click="save(true)">{{
+          t("review.protectSheet")
         }}</TButton>
-        <TButton
-          variant="outline"
-          :disabled="readOnly || !selected"
-          data-range-action="edit"
-          @click="edit"
-          >{{ t("review.editRange") }}</TButton
-        >
-        <TButton
-          variant="outline"
-          :disabled="readOnly || !selected"
-          data-range-action="delete"
-          @click="remove"
-          >{{ t("review.removeRange") }}</TButton
-        >
-        <TButton
-          v-if="readOnly"
-          variant="outline"
-          :disabled="!selected?.entry.password"
-          @click="selected && emit('unlock', selected.entry.name)"
-          >{{ t("review.unlockRange") }}</TButton
-        >
-        <TButton v-else variant="text" @click="save(true)">{{ t("review.protectSheet") }}</TButton>
       </div>
       <TableHeightWrapper v-slot="{ height }">
         <TTable
-          class="idea-table--mini"
+          class="idea-table--mini idea-table--row-dividers"
           row-key="id"
           :data="tableRows"
           :columns="columns"
+          :row-attributes="rowAttributes"
           :active-row-keys="selectedId === undefined ? [] : [selectedId]"
           active-row-type="single"
           :disable-space-inactive-row="true"
           size="small"
           table-layout="fixed"
+          vertical-align="middle"
           :height="height"
           :bordered="false"
-          resizable
           hover
           :empty="t('review.noEditableRanges')"
           :aria-label="t('review.editableRanges')"
-          @active-change="
-            (keys) => (selectedId = keys[0] === undefined ? undefined : Number(keys[0]))
-          "
+          @active-change="selectRows"
           @row-dblclick="editRow"
-        />
+        >
+          <template #actions="{ row }">
+            <div class="editable-ranges__row-actions" @dblclick.stop>
+              <span
+                v-if="readOnly"
+                v-icon-action="!row.hasPassword"
+                data-range-action="unlock"
+                :aria-label="t('review.unlockRange')"
+                :title="t('review.unlockRange')"
+                @click.stop="emit('unlock', row.name)"
+                ><LockKeyholeOpen class="idea-action-icon" aria-hidden="true"
+              /></span>
+              <template v-else>
+                <span
+                  v-icon-action
+                  data-range-action="edit"
+                  :aria-label="t('review.editRange')"
+                  :title="t('review.editRange')"
+                  @click.stop="edit(row.id)"
+                  ><Pencil class="idea-action-icon" aria-hidden="true"
+                /></span>
+                <span
+                  v-icon-action
+                  data-range-action="delete"
+                  :aria-label="t('review.removeRange')"
+                  :title="t('review.removeRange')"
+                  @click.stop="remove(row.id)"
+                  ><Trash2 class="idea-action-icon" aria-hidden="true"
+                /></span>
+              </template>
+            </div>
+          </template>
+        </TTable>
       </TableHeightWrapper>
-      <p v-if="error" role="alert">{{ error }}</p>
     </div>
+    <p v-if="error" role="alert">{{ error }}</p>
   </TDialog>
   <EditableRangeEditorDialog
     v-if="editor"
@@ -174,17 +209,30 @@ function save(protect = false): void {
 <style scoped lang="scss">
 .editable-ranges {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 12px;
-  height: min(52vh, 420px);
-  min-height: 240px;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--idea-space-4);
+  height: min(300px, calc(100dvh - 240px));
+  min-height: 0;
+  min-width: 0;
+  color: var(--idea-text-primary);
+
   &__toolbar {
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
   }
-  p {
-    margin: 0;
+  &__row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--idea-space-2);
+
+    > span {
+      width: 24px;
+      height: 28px;
+    }
   }
 }
 </style>

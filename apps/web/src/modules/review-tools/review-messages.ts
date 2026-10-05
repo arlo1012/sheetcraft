@@ -97,6 +97,7 @@ export type ReviewMessageSchema = {
     allowFormatRows: string;
     allowFormatColumns: string;
     editableRangesHint: string;
+    rangeActions: string;
     rangeName: string;
     rangeReference: string;
     addRange: string;

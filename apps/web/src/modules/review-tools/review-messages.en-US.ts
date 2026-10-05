@@ -106,6 +106,7 @@ export const reviewEnUS = {
     allowFormatColumns: "Allow formatting columns",
     editableRangesHint:
       "These ranges remain editable while this sheet is protected. New ranges use the current selection.",
+    rangeActions: "Actions",
     rangeName: "Name",
     rangeReference: "Cell range",
     addRange: "Add Range",
