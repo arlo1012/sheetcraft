@@ -350,7 +350,8 @@ async function importFile(event: Event) {
   &__header {
     min-height: 28px;
     gap: 4px;
-    padding-bottom: 0;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
     border-bottom: 1px solid var(--td-component-border);
   }
   &__info {
@@ -373,7 +374,7 @@ async function importFile(event: Event) {
     gap: 8px;
   }
   &__toolbar {
-    gap: 4px;
+    gap: 8px;
   }
   &__search {
     width: 160px;
