@@ -10,14 +10,15 @@ import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import MistakeEntryTable from "./MistakeEntryTable.vue";
 import { builtinRules } from "../proofreading";
 import type { useWordProofreading } from "../useWordProofreading";
 const props = defineProps<{ controller: ReturnType<typeof useWordProofreading> }>();
 const { t } = useAppI18n();
+const mistakeRows = ref([{ word: "", replacement: "" }]);
 const originalWord = ref<string>();
 const returnTo = ref<"review">();
 const word = ref(""),
-  replacement = ref(""),
   builtins = ref(true);
 watch(
   () => props.controller.panel.value,
@@ -25,7 +26,7 @@ watch(
     returnTo.value = panel === "accepted" && previous === "review" ? previous : undefined;
     originalWord.value = undefined;
     word.value = "";
-    replacement.value = "";
+    mistakeRows.value = [{ word: "", replacement: "" }];
     builtins.value = props.controller.dictionary.value.builtins;
   },
 );
@@ -77,18 +78,15 @@ const batchAccepted = computed(
   () => props.controller.panel.value === "accepted" && !originalWord.value,
 );
 function saveWord() {
+  if (props.controller.panel.value === "mistake") {
+    if (props.controller.addMistakes(mistakeRows.value, originalWord.value)) finishEditor(true);
+    return;
+  }
   if (batchAccepted.value) {
     if (props.controller.addAcceptedWords(word.value)) finishEditor(true);
     return;
   }
-  if (
-    props.controller.add(
-      word.value,
-      props.controller.panel.value === "mistake" ? replacement.value : undefined,
-      originalWord.value,
-    )
-  )
-    finishEditor(true);
+  if (props.controller.add(word.value, undefined, originalWord.value)) finishEditor(true);
 }
 function finishEditor(saved = false) {
   const target = returnTo.value;
@@ -107,7 +105,7 @@ function edit(row: Row) {
   void nextTick(() => {
     originalWord.value = row.word;
     word.value = row.word;
-    replacement.value = row.replacement;
+    mistakeRows.value = [{ word: row.word, replacement: row.replacement }];
   });
 }
 </script>
@@ -115,7 +113,11 @@ function edit(row: Row) {
   <Dialog
     :visible="visible"
     :header="title"
-    :width="controller.panel.value === 'dictionary' ? '660px' : '520px'"
+    :width="
+      controller.panel.value === 'dictionary' || controller.panel.value === 'mistake'
+        ? '660px'
+        : '520px'
+    "
     :footer="controller.panel.value !== 'dictionary'"
     :close-on-overlay-click="false"
     @close="finishEditor()"
@@ -132,13 +134,11 @@ function edit(row: Row) {
           :autosize="{ minRows: 5, maxRows: 10 }"
           :placeholder="t('wordProof.batchPlaceholder')"
         />
+        <MistakeEntryTable v-else-if="controller.panel.value === 'mistake'" v-model="mistakeRows" />
         <Form v-else label-align="top">
           <FormItem :label="t('wordProof.word')">
             <Input v-model="word" :maxlength="100" />
           </FormItem>
-          <FormItem v-if="controller.panel.value === 'mistake'" :label="t('wordProof.replacement')"
-            ><Input v-model="replacement" :maxlength="100"
-          /></FormItem>
         </Form>
       </template>
       <template v-else-if="controller.panel.value === 'dictionary'">

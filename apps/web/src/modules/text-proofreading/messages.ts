@@ -41,6 +41,9 @@ export type WordProofMessageSchema = {
     enableBuiltin: string;
     localHint: string;
     wordHint: string;
+    addRow: string;
+    pasteInvalid: string;
+    mistakeBatchHint: string;
     batchHint: string;
     batchPlaceholder: string;
     invalidWord: string;
@@ -95,6 +98,9 @@ export const wordProofZhCN: WordProofMessageSchema = {
       "词库与设置保存在当前浏览器，不随工作簿导出。正词会放行其覆盖范围；自定义错词优先于同名内置规则。",
     batchHint: "每行一个正词，每词最多 100 字；自动忽略空行和重复词。",
     batchPlaceholder: "输入或粘贴多个正词，每行一个",
+    addRow: "添加一行",
+    pasteInvalid: "请从错词列粘贴最多两列数据，最多 5000 行；建议列仅支持单列粘贴。",
+    mistakeBatchHint: "支持粘贴两列数据（错词、建议词）；每词最多 100 字，同名词取最后一行。",
     wordHint: "词语和建议词最多 100 个字符；同名词条保存时会替换原条目。",
     invalidWord: "请输入有效且不同的词语与建议词（最多 100 个字符）。",
     storageRead: "本机词库无法读取，当前使用默认词库；保存前请检查词库内容。",
@@ -149,6 +155,11 @@ export const wordProofEnUS: WordProofMessageSchema = {
     batchHint:
       "One word per line, up to 100 characters each. Blank lines and duplicates are ignored.",
     batchPlaceholder: "Enter or paste accepted words, one per line",
+    addRow: "Add row",
+    pasteInvalid:
+      "Paste up to two columns from the incorrect-word column, or one from the replacement column; maximum 5,000 rows.",
+    mistakeBatchHint:
+      "Paste two columns: incorrect word and replacement. Up to 100 characters each; the last duplicate wins.",
     wordHint:
       "Words and replacements allow up to 100 characters. Saving replaces an existing entry for the same word.",
     invalidWord: "Enter valid, different words and replacements (up to 100 characters).",

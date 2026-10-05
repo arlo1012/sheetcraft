@@ -115,3 +115,22 @@ test("opens manual accepted-word entry without selecting results and returns to 
   expect(controller.dictionary.value.accepted).toContain("再接再励");
   expect(controller.issues.value).toHaveLength(0);
 });
+
+test("pastes multiple spreadsheet rows into mistake entry and saves them", async () => {
+  const { controller } = fixture();
+  await click("添加错词");
+  const input = document.body.querySelector<HTMLInputElement>(".word-dictionary input")!;
+  const paste = new Event("paste", { bubbles: true, cancelable: true });
+  Object.defineProperty(paste, "clipboardData", {
+    value: { getData: () => "错词一\t正词一\r\n错词二\t正词二\r\n" },
+  });
+  input.dispatchEvent(paste);
+  await nextTick();
+  expect(paste.defaultPrevented).toBe(true);
+  expect(document.body.querySelectorAll(".word-dictionary input")).toHaveLength(4);
+  await click("保存");
+  expect(controller.dictionary.value.mistakes).toEqual([
+    { word: "错词一", replacement: "正词一" },
+    { word: "错词二", replacement: "正词二" },
+  ]);
+});
