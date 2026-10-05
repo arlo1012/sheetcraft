@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
+
 import { computed } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -114,79 +116,82 @@ function selectIssues(keys: Array<string | number>): void {
 
       <div v-if="error" class="data-proofreading-dialog__error" role="alert">{{ error }}</div>
 
-      <TTable
-        v-if="hasScanned && issues.length"
-        class="idea-table--mini"
-        row-key="id"
-        :data="rows"
-        :columns="columns"
-        :selected-row-keys="[...selectedIds]"
-        :bordered="false"
-        :aria-label="t('proofreading.title')"
-        size="small"
-        table-layout="fixed"
-        resizable
-        vertical-align="middle"
-        max-height="min(48vh, 440px)"
-        hover
-        @select-change="selectIssues"
-      >
-        <template #type="{ row }">
-          {{ issueTypeLabel(row.type) }}
-        </template>
-        <template #reason="{ row }">
-          {{ t(`proofreading.reasons.${row.reason}`) }}
-        </template>
-        <template #address="{ row }">
-          <TButton
-            variant="text"
+      <div v-if="hasScanned && issues.length" class="data-proofreading-dialog__table">
+        <TableHeightWrapper v-slot="{ height }">
+          <TTable
+            class="idea-table--mini"
+            row-key="id"
+            :data="rows"
+            :columns="columns"
+            :selected-row-keys="[...selectedIds]"
+            :bordered="false"
+            :aria-label="t('proofreading.title')"
             size="small"
-            :disabled="busy"
-            @click="emit('selectIssue', row.id)"
+            table-layout="fixed"
+            resizable
+            vertical-align="middle"
+            :height="height"
+            hover
+            @select-change="selectIssues"
           >
-            {{ row.address }}
-          </TButton>
-        </template>
-        <template #proposedValue="{ row }">
-          {{ row.proposedValue ?? t("proofreading.unsafe") }}
-        </template>
-        <template #actions="{ row }">
-          <div class="data-proofreading-dialog__actions">
-            <TButton
-              size="small"
-              variant="text"
-              :disabled="busy || !row.safe"
-              @click="emit('applyIssue', row.id)"
-            >
-              {{ t("proofreading.apply") }}
-            </TButton>
-            <TButton
-              size="small"
-              variant="text"
-              :disabled="busy"
-              @click="emit('ignoreIssue', row.id)"
-            >
-              {{ t("proofreading.ignore") }}
-            </TButton>
-            <TButton
-              size="small"
-              variant="text"
-              :disabled="busy || !row.safe"
-              @click="emit('applyType', row.type)"
-            >
-              {{ t("proofreading.applyType") }}
-            </TButton>
-            <TButton
-              size="small"
-              variant="text"
-              :disabled="busy"
-              @click="emit('ignoreType', row.type)"
-            >
-              {{ t("proofreading.ignoreType") }}
-            </TButton>
-          </div>
-        </template>
-      </TTable>
+            <template #type="{ row }">
+              {{ issueTypeLabel(row.type) }}
+            </template>
+            <template #reason="{ row }">
+              {{ t(`proofreading.reasons.${row.reason}`) }}
+            </template>
+            <template #address="{ row }">
+              <TButton
+                variant="text"
+                size="small"
+                :disabled="busy"
+                @click="emit('selectIssue', row.id)"
+              >
+                {{ row.address }}
+              </TButton>
+            </template>
+            <template #proposedValue="{ row }">
+              {{ row.proposedValue ?? t("proofreading.unsafe") }}
+            </template>
+            <template #actions="{ row }">
+              <div class="data-proofreading-dialog__actions">
+                <TButton
+                  size="small"
+                  variant="text"
+                  :disabled="busy || !row.safe"
+                  @click="emit('applyIssue', row.id)"
+                >
+                  {{ t("proofreading.apply") }}
+                </TButton>
+                <TButton
+                  size="small"
+                  variant="text"
+                  :disabled="busy"
+                  @click="emit('ignoreIssue', row.id)"
+                >
+                  {{ t("proofreading.ignore") }}
+                </TButton>
+                <TButton
+                  size="small"
+                  variant="text"
+                  :disabled="busy || !row.safe"
+                  @click="emit('applyType', row.type)"
+                >
+                  {{ t("proofreading.applyType") }}
+                </TButton>
+                <TButton
+                  size="small"
+                  variant="text"
+                  :disabled="busy"
+                  @click="emit('ignoreType', row.type)"
+                >
+                  {{ t("proofreading.ignoreType") }}
+                </TButton>
+              </div>
+            </template>
+          </TTable>
+        </TableHeightWrapper>
+      </div>
     </div>
     <template #footer>
       <div class="data-proofreading-dialog__footer">
@@ -221,6 +226,11 @@ function selectIssues(keys: Array<string | number>): void {
 .data-proofreading-dialog {
   display: grid;
   gap: 12px;
+
+  &__table {
+    height: min(48vh, 440px);
+    min-height: 0;
+  }
 
   &__toolbar,
   &__footer,

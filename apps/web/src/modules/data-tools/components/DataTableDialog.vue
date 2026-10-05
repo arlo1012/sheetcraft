@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
+import { BaseTable } from "tdesign-vue-next/es/table";
+import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
 import { computed, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
@@ -44,6 +47,20 @@ const instructions = computed(() => {
   return t("dataTable.instructions");
 });
 const visibleRows = computed(() => props.result?.values.slice(0, 8) ?? []);
+const previewRows = computed(() =>
+  visibleRows.value.map((values, id) => ({
+    id,
+    ...Object.fromEntries(
+      values.slice(0, 8).map((value, index) => [`c${index}`, displayValue(value)]),
+    ),
+  })),
+);
+const previewColumns = computed<BaseTableCol[]>(() =>
+  Array.from(
+    { length: Math.max(0, ...visibleRows.value.map((row) => Math.min(8, row.length))) },
+    (_, index) => ({ colKey: `c${index}`, ellipsis: true }),
+  ),
+);
 const hasHiddenPreviewValues = computed(() =>
   Boolean(
     props.result &&
@@ -164,15 +181,19 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
           }}</span>
         </div>
         <div class="data-table-dialog__table-wrap">
-          <table>
-            <tbody>
-              <tr v-for="(row, rowIndex) in visibleRows" :key="rowIndex">
-                <td v-for="(value, columnIndex) in row.slice(0, 8)" :key="columnIndex">
-                  {{ displayValue(value) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <TableHeightWrapper v-slot="{ height }">
+            <BaseTable
+              class="idea-table--mini"
+              row-key="id"
+              :data="previewRows"
+              :columns="previewColumns"
+              :height="height"
+              :show-header="false"
+              size="small"
+              table-layout="fixed"
+              bordered
+            />
+          </TableHeightWrapper>
         </div>
         <p v-if="hasHiddenPreviewValues">{{ t("dataTable.previewLimited") }}</p>
         <p>{{ t("dataTable.previewHelp") }}</p>
@@ -245,34 +266,8 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
   }
 
   &__table-wrap {
-    overflow: auto;
-    border: 1px solid var(--idea-border-subtle);
-    max-height: 208px;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-  }
-
-  td {
-    min-width: 72px;
-    padding: var(--idea-space-1) var(--idea-space-2);
-    overflow: hidden;
-    border-right: 1px solid var(--idea-border-subtle);
-    border-bottom: 1px solid var(--idea-border-subtle);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
-  }
-
-  tr:last-child td {
-    border-bottom: 0;
-  }
-
-  td:last-child {
-    border-right: 0;
+    height: min(208px, calc(100dvh - 360px));
+    min-height: 0;
   }
 
   &__error {

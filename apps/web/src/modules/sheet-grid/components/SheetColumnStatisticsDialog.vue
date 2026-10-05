@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
+import { BaseTable } from "tdesign-vue-next/es/table";
+import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { computed } from "vue";
 import { columnIndexToLabel } from "@idea10/core/coordinates";
@@ -20,6 +23,10 @@ const displayedStatistics = computed(() => statistics.value.slice(0, MAX_RENDERE
 const hasMoreColumns = computed(() => statistics.value.length > MAX_RENDERED_COLUMNS);
 const numberFormatter = computed(() => new Intl.NumberFormat(props.locale));
 
+const distributionColumns = computed<BaseTableCol[]>(() => [
+  { colKey: "value", title: t("contextMenu.value"), ellipsis: true },
+  { colKey: "count", title: t("contextMenu.occurrences"), width: 120 },
+]);
 function formatNumber(value: number | null): string {
   return value === null ? "—" : numberFormatter.value.format(value);
 }
@@ -99,20 +106,26 @@ function columnLabel(column: number): string {
         class="sheet-column-statistics-dialog__distribution"
       >
         <h4>{{ t("contextMenu.valueDistribution") }}</h4>
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">{{ t("contextMenu.value") }}</th>
-              <th scope="col">{{ t("contextMenu.occurrences") }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="entry in statistic.distribution" :key="entry.value">
-              <td :title="entry.value">{{ entry.value }}</td>
-              <td>{{ formatNumber(entry.count) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div
+          class="sheet-column-statistics-dialog__table"
+          :style="{ height: `${Math.min(220, 34 + statistic.distribution.length * 30)}px` }"
+        >
+          <TableHeightWrapper v-slot="{ height }">
+            <BaseTable
+              class="idea-table--mini idea-table--row-dividers"
+              row-key="value"
+              :data="[...statistic.distribution]"
+              :columns="distributionColumns"
+              :height="height"
+              size="small"
+              table-layout="fixed"
+              :bordered="false"
+              hover
+            >
+              <template #count="{ row }">{{ formatNumber(row.count) }}</template>
+            </BaseTable>
+          </TableHeightWrapper>
+        </div>
       </div>
     </section>
   </Dialog>
@@ -167,27 +180,10 @@ function columnLabel(column: number): string {
 
   &__distribution {
     margin-top: var(--idea-space-3);
-
-    table {
-      width: 100%;
-      margin-top: var(--idea-space-2);
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-
-    th,
-    td {
-      padding: 6px var(--idea-space-2);
-      text-align: left;
-      border-bottom: 1px solid var(--idea-border-control);
-    }
-
-    td:first-child {
-      max-width: 420px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
+  }
+  &__table {
+    margin-top: var(--idea-space-2);
+    min-height: 0;
   }
 }
 </style>

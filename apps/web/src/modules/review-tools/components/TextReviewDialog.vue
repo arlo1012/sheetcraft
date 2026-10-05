@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
+import { BaseTable } from "tdesign-vue-next/es/table";
+import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
 import { computed, ref, watch } from "vue";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Select as TSelect, Option as TOption } from "tdesign-vue-next/es/select";
@@ -49,6 +52,19 @@ const title = computed(() =>
         : "review.toTraditional",
   ),
 );
+const conversionRows = computed(() =>
+  (props.result?.conversions ?? []).slice(0, 50).map((change) => ({
+    id: change.cell,
+    address: location(props.cells[change.cell]!),
+    before: props.cells[change.cell]!.text,
+    after: change.text,
+  })),
+);
+const conversionColumns = computed<BaseTableCol[]>(() => [
+  { colKey: "address", title: t("review.address"), width: 130, ellipsis: true },
+  { colKey: "before", title: t("review.beforeConversion"), ellipsis: true },
+  { colKey: "after", title: t("review.afterConversion"), ellipsis: true },
+]);
 function location(cell: ReviewTextCell) {
   return `${cell.sheetName}!${formatCellAddress(cell.address)}`;
 }
@@ -148,22 +164,19 @@ function location(cell: ReviewTextCell) {
         <template v-else>
           <p>{{ t("review.conversionCount", { count: result.conversions.length }) }}</p>
           <div v-if="result.conversions.length" class="text-review__preview">
-            <table>
-              <thead>
-                <tr>
-                  <th>{{ t("review.address") }}</th>
-                  <th>{{ t("review.beforeConversion") }}</th>
-                  <th>{{ t("review.afterConversion") }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="change in result.conversions.slice(0, 50)" :key="change.cell">
-                  <td>{{ location(cells[change.cell]!) }}</td>
-                  <td>{{ cells[change.cell]!.text }}</td>
-                  <td>{{ change.text }}</td>
-                </tr>
-              </tbody>
-            </table>
+            <TableHeightWrapper v-slot="{ height }">
+              <BaseTable
+                class="idea-table--mini idea-table--row-dividers"
+                row-key="id"
+                :data="conversionRows"
+                :columns="conversionColumns"
+                :height="height"
+                size="small"
+                table-layout="fixed"
+                :bordered="false"
+                hover
+              />
+            </TableHeightWrapper>
           </div>
           <p v-if="result.conversions.length > 50">{{ t("review.previewLimit") }}</p>
           <TButton :disabled="!result.conversions.length" @click="emit('convert')">{{
@@ -200,26 +213,8 @@ function location(cell: ReviewTextCell) {
     gap: 8px;
   }
   &__preview {
-    max-height: 280px;
-    overflow: auto;
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      table-layout: fixed;
-    }
-    th,
-    td {
-      padding: 8px;
-      text-align: left;
-      border-bottom: 1px solid var(--td-component-border);
-      overflow-wrap: anywhere;
-      white-space: pre-wrap;
-    }
-    th {
-      position: sticky;
-      top: 0;
-      background: var(--td-bg-color-container);
-    }
+    height: min(280px, calc(100dvh - 320px));
+    min-height: 0;
   }
   &__footer {
     display: flex;

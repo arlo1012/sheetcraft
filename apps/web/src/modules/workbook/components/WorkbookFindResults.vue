@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
+
 import { computed, ref } from "vue";
 import { BaseTable as TTable } from "tdesign-vue-next/es/table";
 import type {
@@ -77,27 +79,29 @@ function onTableKeydown(event: KeyboardEvent): void {
         }}
       </p>
     </div>
-    <div class="workbook-find-results__table narrow-scrollbar">
-      <TTable
-        class="idea-table--mini workbook-find-results__data"
-        row-key="id"
-        :data="rows"
-        :columns="columns"
-        :row-attributes="rowAttributes"
-        :active-row-keys="selectedId ? [selectedId] : []"
-        active-row-type="single"
-        :disable-space-inactive-row="true"
-        :bordered="false"
-        :aria-label="t('navigation.findResults')"
-        size="small"
-        table-layout="fixed"
-        height="180"
-        hover
-        resizable
-        :empty="t('navigation.findNoMatches')"
-        @row-click="selectRow"
-        @keydown="onTableKeydown"
-      />
+    <div class="workbook-find-results__table">
+      <TableHeightWrapper v-slot="{ height }">
+        <TTable
+          class="idea-table--mini"
+          row-key="id"
+          :data="rows"
+          :columns="columns"
+          :row-attributes="rowAttributes"
+          :active-row-keys="selectedId ? [selectedId] : []"
+          active-row-type="single"
+          :disable-space-inactive-row="true"
+          :bordered="false"
+          :aria-label="t('navigation.findResults')"
+          size="small"
+          table-layout="fixed"
+          :height="height"
+          hover
+          resizable
+          :empty="t('navigation.findNoMatches')"
+          @row-click="selectRow"
+          @keydown="onTableKeydown"
+        />
+      </TableHeightWrapper>
     </div>
   </section>
 </template>
@@ -131,11 +135,8 @@ function onTableKeydown(event: KeyboardEvent): void {
 
   &__table {
     max-width: 100%;
-    overflow-x: auto;
-  }
-
-  &__data {
-    min-width: 536px;
+    height: 180px;
+    min-height: 0;
   }
 }
 </style>

@@ -33,6 +33,17 @@
 | Searchable menus          | `shared/menu/MenuSearch.vue`, `WorkbookSheetNavigator`           |
 | Inputs and dialog actions | TDesign controls and `CellFormatDialog`; cancel precedes confirm |
 
+## Data tables
+
+- Use TDesign `BaseTable` or `PrimaryTable` directly with `idea-table--mini` and
+  `size="small"`; keep library overrides in the shared TDesign adapter.
+- For a bounded or scrollable table, give its feature-owned outer container a
+  definite height and `min-height: 0`. Place `TableHeightWrapper` inside it and
+  pass the slot's `height` to the table. Let the table own scrolling; avoid a
+  second scrolling shell or independent height measurement.
+- Use table props and slots for headerless matrix previews and cell rendering,
+  rather than recreating table styling with native HTML tables.
+
 ## Typography
 
 Use CSS pixels at 100% scale; size and line height are a pair.

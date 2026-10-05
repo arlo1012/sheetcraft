@@ -140,6 +140,11 @@ function edit(row: Row) {
         <div class="word-dictionary__table">
           <TableHeightWrapper v-slot="{ height }"
             ><BaseTable
+              class="idea-table--mini idea-table--row-dividers"
+              size="small"
+              vertical-align="middle"
+              :bordered="false"
+              hover
               row-key="id"
               :data="rows"
               :columns="columns"
@@ -198,7 +203,7 @@ function edit(row: Row) {
     gap: 8px;
   }
   &__table {
-    height: 320px;
+    height: min(320px, calc(100dvh - 280px));
     min-height: 0;
   }
 }
