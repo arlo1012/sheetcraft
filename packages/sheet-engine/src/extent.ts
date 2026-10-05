@@ -1,3 +1,4 @@
+import { getPivotTableRange } from "@idea10/core/pivot-tables";
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
@@ -54,6 +55,7 @@ export function getSheetContentExtent(sheet: Sheet): GridExtent {
   }
   if (sheet.filter) include(sheet.filter.range.end);
   for (const table of sheet.tables ?? []) include(table.range.end);
+  for (const table of sheet.pivotTables ?? []) include(getPivotTableRange(table).end);
   if (sheet.floatingImages.length > 0) {
     const geometry = createSheetGeometry({
       rowHeights: sheet.rowHeights,

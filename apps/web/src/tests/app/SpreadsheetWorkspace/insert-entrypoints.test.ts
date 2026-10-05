@@ -12,6 +12,7 @@ import { serializeWorkbook } from "@idea10/core/serialization";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
+import { triggerCanvasCell } from "../canvas-interaction";
 import { createAppI18n } from "../../../shared/i18n";
 
 const mounted: Array<{ unmount(): void }> = [];
@@ -63,8 +64,8 @@ describe("workspace insert entry points", () => {
     },
     { tool: "camera", selector: '[data-insert-tool="camera"]', dialog: ".camera-editor" },
     { tool: "control", selector: '[data-insert-tool="control"]', dialog: ".form-control-editor" },
-    { tool: "pivot table", selector: '[data-insert-tool="pivot-table"]', dialog: ".pivot-editor" },
-    { tool: "pivot chart", selector: '[data-insert-tool="pivot-chart"]', dialog: ".pivot-editor" },
+    { tool: "pivot table", selector: '[data-insert-tool="pivot-table"]', dialog: ".pivot-create" },
+    { tool: "pivot chart", selector: '[data-insert-tool="pivot-chart"]', dialog: ".pivot-create" },
   ])("opens the $tool editor from the actual Insert ribbon", async ({ selector, dialog }) => {
     const wrapper = await fixture();
     expect(document.querySelector(dialog)).toBeNull();
@@ -74,12 +75,12 @@ describe("workspace insert entry points", () => {
       timeout: 10000,
     });
   });
-  test("confirms a real pivot dialog and creates a new sheet with calculated output", async () => {
+  test("creates an empty report, configures it through the field pane, and leaves its contextual tools", async () => {
     const wrapper = await fixture(true);
     const sourceId = (wrapper.getComponent(SheetGrid).props("sheet") as Sheet).id;
     await wrapper.get('[data-insert-tool="pivot-table"]').trigger("click");
-    await vi.waitFor(() => expect(document.querySelector(".pivot-editor__preview")).not.toBeNull());
-    const dialog = document.querySelector(".pivot-editor")!.closest(".t-dialog")!;
+    await vi.waitFor(() => expect(document.querySelector(".pivot-create")).not.toBeNull());
+    const dialog = document.querySelector(".pivot-create")!.closest(".t-dialog")!;
     const confirm = dialog.querySelector<HTMLButtonElement>(
       ".t-dialog__footer .t-button--theme-primary",
     )!;
@@ -91,8 +92,24 @@ describe("workspace insert entry points", () => {
     );
     const output = wrapper.getComponent(SheetGrid).props("sheet") as Sheet;
     expect(output.pivotTables).toHaveLength(1);
+    expect(output.pivotTables![0]!.outputRange).toBeNull();
+    expect(output.cells.size).toBe(0);
+    expect(wrapper.find("[data-pivot-placeholder]").exists()).toBe(true);
+    expect(wrapper.find(".pivot-fields-pane").exists()).toBe(true);
+    expect(wrapper.find('[data-ribbon-category="pivot-analysis"]').exists()).toBe(true);
+    expect(wrapper.find('[data-ribbon-category="pivot-design"]').exists()).toBe(true);
+    await wrapper.get('[data-pivot-source-field="0"] input[type="checkbox"]').setValue(true);
+    await wrapper.get('[data-pivot-source-field="1"] input[type="checkbox"]').setValue(true);
+    await flushPromises();
+    expect(wrapper.find("[data-pivot-placeholder]").exists()).toBe(false);
+
     expect(getCellValue(output, { row: 1, column: 1 })).toBe(30);
     expect(getCellValue(output, { row: 2, column: 1 })).toBe(40);
     expect(getCellValue(output, { row: 3, column: 1 })).toBe(70);
+    await triggerCanvasCell(wrapper, { row: 5, column: 4 }, "mousedown", { button: 0 });
+    await flushPromises();
+    expect(wrapper.find(".pivot-fields-pane").exists()).toBe(false);
+    expect(wrapper.find('[data-ribbon-category="pivot-analysis"]').exists()).toBe(false);
+    expect(wrapper.find('[data-ribbon-category="pivot-design"]').exists()).toBe(false);
   });
 });

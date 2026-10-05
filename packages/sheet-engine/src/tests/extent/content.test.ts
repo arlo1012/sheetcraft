@@ -2,11 +2,14 @@ import { describe, expect, test } from "vitest";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
+  MAX_SHEET_COLUMNS,
+  MAX_SHEET_ROWS,
   createSheet,
   setCellStyle,
   setColumnWidth,
   setRowHeight,
 } from "@idea10/core/workbook";
+import type { SheetPivotTable } from "@idea10/core/pivot-tables";
 import { getSheetContentExtent } from "../../extent.js";
 
 function createTestSheet() {
@@ -79,6 +82,44 @@ describe("sheet content extent", () => {
     expect(getSheetContentExtent(sheet)).toEqual({ rowCount: 14, columnCount: 15 });
 
     sheet.floatingImages = [];
+    expect(getSheetContentExtent(sheet)).toEqual({ rowCount: 1, columnCount: 1 });
+  });
+
+  test.each([
+    {
+      anchor: { row: 500, column: 80 },
+      extent: { rowCount: 514, columnCount: 83 },
+    },
+    {
+      anchor: { row: MAX_SHEET_ROWS - 5, column: MAX_SHEET_COLUMNS - 2 },
+      extent: { rowCount: MAX_SHEET_ROWS, columnCount: MAX_SHEET_COLUMNS },
+    },
+  ])("keeps an empty pivot placeholder reachable at $anchor", ({ anchor, extent }) => {
+    const sheet = createTestSheet();
+    const table: SheetPivotTable = {
+      id: "pivot-1",
+      name: "Pivot1",
+      sourceSheetId: "source",
+      source: { start: { row: 0, column: 0 }, end: { row: 3, column: 2 } },
+      anchor,
+      outputRange: null,
+      rowFields: [],
+      columnFields: [],
+      values: [],
+      filters: [],
+      rowTotals: true,
+      columnTotals: true,
+      includeHidden: false,
+      sort: "source",
+      totalLabel: "Grand Total",
+      emptyLabel: "(blank)",
+    };
+    sheet.pivotTables = [table];
+
+    expect(sheet.cells.size).toBe(0);
+    expect(getSheetContentExtent(sheet)).toEqual(extent);
+
+    sheet.pivotTables = [];
     expect(getSheetContentExtent(sheet)).toEqual({ rowCount: 1, columnCount: 1 });
   });
 });

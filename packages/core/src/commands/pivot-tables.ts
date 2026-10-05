@@ -1,6 +1,8 @@
 import { isFormulaError, type CellContent, type FormulaValue } from "../formula/types.js";
 import {
   buildPivotResult,
+  getPivotTableRange,
+  getPivotPresentation,
   normalizePivotTable,
   normalizePivotTables,
   addressInRange,
@@ -64,13 +66,15 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
   if (sheet.properties.protected && (!existing || !sheet.protection?.pivotTables))
     throw invalidCommandPayload("protected", sheet.id);
   const result = buildPivotResult(workbook, table);
-  const range = {
-    start: { ...table.anchor },
-    end: {
-      row: table.anchor.row + result.matrix.length - 1,
-      column: table.anchor.column + result.matrix[0]!.length - 1,
-    },
-  };
+  const range = result.matrix.length
+    ? {
+        start: { ...table.anchor },
+        end: {
+          row: table.anchor.row + result.matrix.length - 1,
+          column: table.anchor.column + result.matrix[0]!.length - 1,
+        },
+      }
+    : getPivotTableRange({ ...table, outputRange: null });
   if (range.end.row >= MAX_SHEET_ROWS || range.end.column >= MAX_SHEET_COLUMNS)
     throw invalidCommandPayload("destination", range);
   if (table.sourceSheetId === sheet.id && table.source && rangesIntersect(range, table.source))
@@ -80,8 +84,7 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
   if (
     sheet.tables?.some((item) => rangesIntersect(item.range, range)) ||
     sheet.pivotTables?.some(
-      (item) =>
-        item.id !== table.id && item.outputRange && rangesIntersect(item.outputRange, range),
+      (item) => item.id !== table.id && rangesIntersect(getPivotTableRange(item), range),
     )
   )
     throw invalidCommandPayload("tableOverlap", range);
@@ -103,22 +106,33 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
         if (rest.note || rest.hyperlink || rest.sparkline) cells.set(key, rest);
         else cells.delete(key);
       }
+  // Reserve the empty report's area as well; failed configuration never partially clears cells.
+  if (!result.matrix.length && !command.overwrite)
+    for (const cell of previousState.cells)
+      if (
+        addressInRange(cell.address, range) &&
+        !(existing?.outputRange && addressInRange(cell.address, existing.outputRange)) &&
+        (cell.content || cell.note || cell.hyperlink || cell.sparkline)
+      )
+        throw invalidCommandPayload("overwrite", cell.address);
+  const presentation = getPivotPresentation(table);
   const customStyle = (workbook.pivotTableStyles ?? []).find(
     (style) => style.id === (table.styleId ?? workbook.defaultPivotTableStyleId),
   );
-  const style = customStyle ?? createThemedTableStyles()[0]!;
+  const styles = createThemedTableStyles();
+  const style = customStyle ?? styles.find((style) => style.id === table.styleId) ?? styles[0]!;
   const styledTable: SheetTable = {
     id: table.id,
     name: table.name,
     range,
     columns: [],
     style,
-    headerRow: true,
+    headerRow: presentation.columnHeaders,
     totalRow: result.totalRow !== null,
-    firstColumn: true,
+    firstColumn: presentation.rowHeaders,
     lastColumn: result.totalColumnStart !== null,
-    bandedRows: true,
-    bandedColumns: false,
+    bandedRows: presentation.bandedRows,
+    bandedColumns: presentation.bandedColumns,
     filterButton: false,
     filter: null,
   };
@@ -136,19 +150,38 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
       const original = originals.get(key);
       const cell: SheetSparseCell = {
         ...(cells.get(key) ?? { address }),
-        style: mergeCellStyle(original?.style, resolveTableCellStyle(styledTable, address) ?? {}),
+        style: mergeCellStyle(
+          existing?.outputRange && addressInRange(address, existing.outputRange)
+            ? undefined
+            : original?.style,
+          resolveTableCellStyle(styledTable, address) ?? {},
+        ),
       };
+      if (columnIndex === 0 && result.rowIndents[rowIndex])
+        cell.style = mergeCellStyle(cell.style, { indent: result.rowIndents[rowIndex] });
+      if (result.subtotalRows.includes(rowIndex))
+        cell.style = mergeCellStyle(cell.style, { bold: true });
       delete cell.namedStyle;
       const content = literal(value);
       if (content) cell.content = content;
       else delete cell.content;
-      cells.set(key, cell);
+      if (cell.content || cell.style || cell.note || cell.hyperlink || cell.sparkline)
+        cells.set(key, cell);
+      else cells.delete(key);
     }),
   );
-  const nextTable = { ...table, outputRange: range };
+  const nextTable: SheetPivotTable = {
+    ...table,
+    outputRange: result.matrix.length ? range : null,
+    resultLayout: {
+      labelColumns: result.rowLabelColumns,
+      dataRows: result.dataRows,
+      rowLabels: result.rowLabels,
+    },
+  };
   const drawings = (previousState.drawings ?? []).map((drawing) =>
     drawing.kind === "chart" && drawing.chart.pivotTableId === table.id
-      ? { ...drawing, chart: { ...drawing.chart, range } }
+      ? { ...drawing, chart: { ...drawing.chart, range: nextTable.outputRange } }
       : drawing,
   );
   if (
@@ -182,7 +215,7 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
       chart: {
         pivotTableId: table.id,
         type: "column",
-        range,
+        range: nextTable.outputRange,
         title: table.name,
         headerRow: true,
         headerColumn: true,

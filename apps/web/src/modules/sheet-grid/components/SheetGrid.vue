@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PivotEmptyReports from "../../pivot-tables/components/PivotEmptyReports.vue";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer.vue";
 import { canEditCell, canEditRange, canSelectCell, canUseSheetPermission } from "@idea10/core";
@@ -290,6 +291,7 @@ const emit = defineEmits<{
   updateDrawing: [drawing: SheetDrawing];
   deleteDrawing: [id: string];
   editDrawing: [drawing: SheetDrawing];
+  configurePivot: [id: string];
   changeControl: [id: string, value: unknown];
   unlockRange: [range: CellRange];
   contextAction: [request: SheetContextRequest];
@@ -3213,6 +3215,21 @@ defineExpose({
       :state="pageView"
       :frame="renderFrame"
       @toggle="emit('update:showPageWhiteSpace', !showPageWhiteSpace)"
+    />
+    <PivotEmptyReports
+      :tables="sheet.pivotTables ?? []"
+      :layout="layout"
+      :body="renderFrame.body"
+      :active-address="activeCell"
+      @select="
+        (id) => {
+          const table = sheet.pivotTables?.find((table) => table.id === id);
+          if (table) {
+            navigateToCell(table.anchor);
+            emit('configurePivot', id);
+          }
+        }
+      "
     />
     <SheetCellNotice
       v-if="inputError"

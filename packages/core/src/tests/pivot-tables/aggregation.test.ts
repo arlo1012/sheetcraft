@@ -4,6 +4,20 @@ import { setCellContent } from "../../workbook.js";
 import { fixture, records } from "./fixture.js";
 
 describe("pivot aggregation", () => {
+  test("distinguishes all-selected filters from an explicitly empty filter selection", () => {
+    const f = fixture();
+    const all = { ...f.table, filters: [{ field: 0, values: [], all: true }] };
+    expect(buildPivotResult(f.workbook, all).sourceRows).toBe(4);
+    expect(
+      buildPivotResult(f.workbook, { ...all, filters: [{ field: 0, values: [], all: false }] })
+        .sourceRows,
+    ).toBe(0);
+    setCellContent(f.source, { row: 4, column: 0 }, { kind: "literal", value: "New Region" });
+    expect(buildPivotResult(f.workbook, all).matrix.some((row) => row[0] === "New Region")).toBe(
+      true,
+    );
+    expect(normalizePivotTable(all).filters[0]!.all).toBe(true);
+  });
   test.each([
     { values: [Number.MAX_VALUE, Number.MAX_VALUE], expected: Number.MAX_VALUE },
     { values: [Number.MAX_VALUE, -Number.MAX_VALUE], expected: 0 },

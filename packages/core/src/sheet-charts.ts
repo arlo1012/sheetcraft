@@ -105,7 +105,7 @@ export function getSheetChartData(
     const pivot = sheet.pivotTables?.find((table) => table.id === chart.pivotTableId);
     const range = pivot?.outputRange;
     if (!pivot || !range) return { categories: [], series: [], records: [] };
-    const labelColumns = Math.max(1, pivot.rowFields.length);
+    const labelColumns = pivot.resultLayout?.labelColumns ?? Math.max(1, pivot.rowFields.length);
     const endRow = range.end.row - (pivot.rowTotals && pivot.rowFields.length ? 1 : 0);
     const endColumn =
       range.end.column -
@@ -118,10 +118,17 @@ export function getSheetChartData(
         name: String(evaluator.getComputedValue({ row: range.start.row, column }) ?? ""),
         values: [],
       });
-    for (let row = range.start.row + 1; row <= endRow; row++) {
-      const name = Array.from({ length: labelColumns }, (_, index) =>
-        String(evaluator.getComputedValue({ row, column: range.start.column + index }) ?? ""),
-      ).join(" / ");
+    const dataRows =
+      pivot.resultLayout?.dataRows ??
+      Array.from({ length: Math.max(0, endRow - range.start.row) }, (_, index) => index + 1);
+    for (const [rowIndex, offset] of dataRows.entries()) {
+      const row = range.start.row + offset;
+      if (row > range.end.row) continue;
+      const name =
+        pivot.resultLayout?.rowLabels[rowIndex] ??
+        Array.from({ length: labelColumns }, (_, index) =>
+          String(evaluator.getComputedValue({ row, column: range.start.column + index }) ?? ""),
+        ).join(" / ");
       categories.push(name);
       const record: Array<string | number | null> = [name];
       series.forEach((entry, index) => {

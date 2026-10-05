@@ -4,12 +4,11 @@ import { createSheet, insertSheet } from "@idea10/core/workbook";
 import PivotTableDialog from "../../../modules/pivot-tables/components/PivotTableDialog.vue";
 import { createAppI18n } from "../../../shared/i18n";
 import { fixture } from "./fixture";
-
 const mounted: Array<{ unmount(): void }> = [];
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
 });
-function dialogFixture() {
+function dialogFixture(disabled = false) {
   const f = fixture();
   f.actions.open();
   const initial = f.actions.editing.value!;
@@ -21,7 +20,7 @@ function dialogFixture() {
       initial: { ...initial, referenceSheetId: output.id },
       workbook: f.workbook,
       revision: 0,
-      disabled: false,
+      disabled,
       error: false,
       suspended: false,
       selectReference: async () => undefined,
@@ -31,47 +30,42 @@ function dialogFixture() {
   mounted.push(wrapper);
   return { wrapper, initial };
 }
-describe("pivot editor dialog", () => {
-  test("resolves explicit cross-sheet sources for a real sample preview", async () => {
-    const { initial } = dialogFixture();
-    await flushPromises();
-    const preview = document.querySelector(".pivot-editor__preview")!;
-    expect(preview.textContent).toContain("East");
-    expect(preview.textContent).toContain("30");
-    expect(preview.textContent).toContain("Grand Total");
-    expect(preview.textContent).toContain("70");
-    expect(initial.table.values).toHaveLength(1);
-  });
-  test("adds value fields and changes aggregation through real controls", async () => {
+function confirmButton() {
+  return document
+    .querySelector<HTMLButtonElement>(".pivot-create")!
+    .closest(".t-dialog")!
+    .querySelector<HTMLButtonElement>(".t-dialog__footer .t-button--theme-primary")!;
+}
+describe("pivot creation dialog", () => {
+  test("accepts an explicit cross-sheet source and confirms an empty configuration", async () => {
     const { wrapper, initial } = dialogFixture();
     await flushPromises();
-    const editor = new DOMWrapper(document.querySelector(".pivot-editor")!);
-    const add = editor.findAll("button").find((button) => button.text() === "Add value field")!;
-    await add.trigger("click");
-    expect(editor.findAll(".pivot-editor__value")).toHaveLength(2);
-    const firstValue = editor.findAll(".pivot-editor__value")[0]!;
-    const selects = firstValue.findAll(".t-input__inner");
-    await selects[1]!.trigger("keydown", { code: "ArrowDown" });
-    await expect
-      .poll(() =>
-        [...document.querySelectorAll<HTMLElement>(".t-select-option")].map((item) =>
-          item.textContent?.trim(),
-        ),
-      )
-      .toContain("Count");
-    const option = [...document.querySelectorAll<HTMLElement>(".t-select-option")].find(
-      (item) => item.textContent?.trim() === "Count",
-    )!;
-    await new DOMWrapper(option).trigger("click");
+    expect(confirmButton().disabled).toBe(false);
+    expect(document.querySelector(".pivot-editor__preview")).toBeNull();
+    confirmButton().click();
     await flushPromises();
-    const dialog = editor.element.closest(".t-dialog")!;
-    await new DOMWrapper(
-      dialog.querySelector(".t-dialog__footer .t-button--theme-primary")!,
-    ).trigger("click");
     expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({
-      table: { values: [{ aggregate: "count" }, { aggregate: "sum" }] },
+      source: initial.source,
+      newSheet: true,
+      table: { values: [], rowFields: [], columnFields: [] },
     });
-    expect(initial.table.values).toHaveLength(1);
-    expect(initial.table.values[0]!.aggregate).toBe("sum");
+  });
+  test("switches to an existing worksheet using the real destination radio", async () => {
+    const { wrapper } = dialogFixture();
+    await flushPromises();
+    const editor = new DOMWrapper(document.querySelector(".pivot-create")!);
+    await new DOMWrapper(
+      editor.get('input[type="radio"][value="existing"]').element.closest("label")!,
+    ).trigger("click");
+    await flushPromises();
+    expect(editor.findAll(".t-input__inner")).toHaveLength(2);
+    confirmButton().click();
+    await flushPromises();
+    expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({ newSheet: false, mode: "create" });
+  });
+  test("disables confirmation when the caller disables editing", async () => {
+    dialogFixture(true);
+    await flushPromises();
+    expect(confirmButton().disabled).toBe(true);
   });
 });

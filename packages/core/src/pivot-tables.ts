@@ -10,7 +10,18 @@ import {
 } from "./workbook.js";
 export type PivotAggregate = "sum" | "count" | "average" | "min" | "max";
 export type PivotValueField = { field: number; aggregate: PivotAggregate; caption: string };
-export type PivotFilter = { field: number; values: CellValue[] };
+export type PivotFilter = { field: number; values: CellValue[]; all?: boolean };
+export type PivotPresentation = {
+  layout: "compact" | "outline" | "tabular";
+  subtotals: "off" | "top" | "bottom";
+  repeatLabels: boolean;
+  blankRows: boolean;
+  rowHeaders: boolean;
+  columnHeaders: boolean;
+  bandedRows: boolean;
+  bandedColumns: boolean;
+};
+export type PivotResultLayout = { labelColumns: number; dataRows: number[]; rowLabels: string[] };
 export type SheetPivotTable = {
   id: string;
   name: string;
@@ -29,6 +40,8 @@ export type SheetPivotTable = {
   totalLabel: string;
   emptyLabel: string;
   styleId?: string;
+  presentation?: PivotPresentation;
+  resultLayout?: PivotResultLayout;
 };
 export const MAX_PIVOT_SOURCE_CELLS = 100000;
 export const MAX_PIVOT_OUTPUT_CELLS = 10000;
@@ -69,7 +82,6 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
     !Array.isArray(table.rowFields) ||
     !Array.isArray(table.columnFields) ||
     !Array.isArray(table.values) ||
-    !table.values.length ||
     table.values.length > 16 ||
     !Array.isArray(table.filters) ||
     table.filters.length > 128 ||
@@ -82,6 +94,41 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
     (table.styleId !== undefined && !text(table.styleId))
   )
     throw new RangeError("Invalid pivot table.");
+  const presentation = table.presentation;
+  if (
+    presentation &&
+    (!["compact", "outline", "tabular"].includes(presentation.layout) ||
+      !["off", "top", "bottom"].includes(presentation.subtotals) ||
+      [
+        presentation.repeatLabels,
+        presentation.blankRows,
+        presentation.rowHeaders,
+        presentation.columnHeaders,
+        presentation.bandedRows,
+        presentation.bandedColumns,
+      ].some((value) => typeof value !== "boolean"))
+  )
+    throw new RangeError("Invalid pivot presentation.");
+  const resultLayout = table.resultLayout;
+  if (
+    resultLayout &&
+    (!Number.isInteger(resultLayout.labelColumns) ||
+      resultLayout.labelColumns < 1 ||
+      resultLayout.labelColumns > 32 ||
+      !Array.isArray(resultLayout.dataRows) ||
+      !Array.isArray(resultLayout.rowLabels) ||
+      resultLayout.dataRows.length !== resultLayout.rowLabels.length ||
+      resultLayout.dataRows.length > MAX_PIVOT_OUTPUT_CELLS ||
+      resultLayout.dataRows.some(
+        (row, index) =>
+          !Number.isInteger(row) ||
+          row < 1 ||
+          row >= MAX_PIVOT_OUTPUT_CELLS ||
+          (index > 0 && row <= resultLayout.dataRows[index - 1]!),
+      ) ||
+      resultLayout.rowLabels.some((label) => typeof label !== "string" || label.length > 1048576))
+  )
+    throw new RangeError("Invalid pivot result layout.");
   const source = cloneRange(table.source);
   const width = source ? source.end.column - source.start.column + 1 : MAX_SHEET_COLUMNS;
   const field = (index: number) => Number.isInteger(index) && index >= 0 && index < width;
@@ -102,6 +149,7 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
       (filter) =>
         !filter ||
         !field(filter.field) ||
+        (filter.all !== undefined && typeof filter.all !== "boolean") ||
         !Array.isArray(filter.values) ||
         filter.values.length > 10000 ||
         filter.values.some(
@@ -121,7 +169,11 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
     rowFields: [...table.rowFields],
     columnFields: [...table.columnFields],
     values: table.values.map((value) => ({ ...value })),
-    filters: table.filters.map((filter) => ({ field: filter.field, values: [...filter.values] })),
+    filters: table.filters.map((filter) => ({
+      field: filter.field,
+      values: [...filter.values],
+      ...(filter.all !== undefined ? { all: filter.all } : {}),
+    })),
     rowTotals: table.rowTotals,
     columnTotals: table.columnTotals,
     includeHidden: table.includeHidden,
@@ -129,6 +181,16 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
     totalLabel: table.totalLabel,
     emptyLabel: table.emptyLabel,
     ...(table.styleId ? { styleId: table.styleId } : {}),
+    ...(presentation ? { presentation: { ...presentation } } : {}),
+    ...(resultLayout
+      ? {
+          resultLayout: {
+            labelColumns: resultLayout.labelColumns,
+            dataRows: [...resultLayout.dataRows],
+            rowLabels: [...resultLayout.rowLabels],
+          },
+        }
+      : {}),
   };
 }
 export function normalizePivotTables(
@@ -175,6 +237,32 @@ export const addressInRange = (address: CellAddress, range: CellRange) =>
   address.row <= range.end.row &&
   address.column >= range.start.column &&
   address.column <= range.end.column;
+/** Empty reports reserve a visible sheet area without writing placeholder cell values. */
+export function getPivotTableRange(table: SheetPivotTable): CellRange {
+  return (
+    table.outputRange ?? {
+      start: { ...table.anchor },
+      end: {
+        row: Math.min(MAX_SHEET_ROWS - 1, table.anchor.row + 13),
+        column: Math.min(MAX_SHEET_COLUMNS - 1, table.anchor.column + 2),
+      },
+    }
+  );
+}
+export function getPivotPresentation(table: SheetPivotTable): PivotPresentation {
+  return (
+    table.presentation ?? {
+      layout: "tabular",
+      subtotals: "off",
+      repeatLabels: true,
+      blankRows: false,
+      rowHeaders: true,
+      columnHeaders: true,
+      bandedRows: true,
+      bandedColumns: false,
+    }
+  );
+}
 export type PivotResult = {
   matrix: FormulaValue[][];
   headerRows: number;
@@ -183,6 +271,10 @@ export type PivotResult = {
   totalColumnStart: number | null;
   sourceRows: number;
   headers: string[];
+  dataRows: number[];
+  rowLabels: string[];
+  rowIndents: number[];
+  subtotalRows: number[];
 };
 type Accumulator = {
   sum: number;
@@ -207,16 +299,33 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
     table.sourceSheetId,
     table.source,
   );
+  if (!table.rowFields.length && !table.columnFields.length && !table.values.length)
+    return {
+      matrix: [],
+      headerRows: 0,
+      rowLabelColumns: 1,
+      totalRow: null,
+      totalColumnStart: null,
+      sourceRows: 0,
+      headers,
+      dataRows: [],
+      rowLabels: [],
+      rowIndents: [],
+      subtotalRows: [],
+    };
+  const presentation = getPivotPresentation(table);
   const rows = new Map<string, FormulaValue[]>();
   const columns = new Map<string, FormulaValue[]>();
   if (!table.rowFields.length) rows.set(groupKey([]), []);
   if (!table.columnFields.length) columns.set(groupKey([]), []);
   const aggregates = new Map<string, Accumulator>();
   let sourceRows = 0;
-  const filterKeys = table.filters.map((filter) => ({
-    field: filter.field,
-    values: new Set(filter.values.map((value) => JSON.stringify(valueKey(value)))),
-  }));
+  const filterKeys = table.filters
+    .filter((filter) => !filter.all)
+    .map((filter) => ({
+      field: filter.field,
+      values: new Set(filter.values.map((value) => JSON.stringify(valueKey(value)))),
+    }));
   const add = (row: string, column: string, field: number, value: FormulaValue) => {
     const key = JSON.stringify([row, column, field]);
     let aggregate = aggregates.get(key);
@@ -261,7 +370,13 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       MAX_PIVOT_OUTPUT_CELLS
     )
       throw new RangeError("Pivot output exceeds 10,000 cells.");
-    const rowKeys = [rowKey, ...(table.rowTotals && table.rowFields.length ? ["@total"] : [])];
+    const rowKeys = [
+      rowKey,
+      ...(table.rowTotals && table.rowFields.length ? ["@total"] : []),
+      ...rowValues
+        .slice(0, -1)
+        .map((_, index) => `@group:${groupKey(rowValues.slice(0, index + 1))}`),
+    ];
     const columnKeys = [
       columnKey,
       ...(table.columnTotals && table.columnFields.length ? ["@total"] : []),
@@ -290,25 +405,25 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
   };
   const rowEntries = sorted(rows);
   const columnEntries = sorted(columns);
-  const rowLabelColumns = Math.max(1, table.rowFields.length);
-  const totalRow = table.rowTotals && table.rowFields.length ? rowEntries.length + 1 : null;
-  if (totalRow !== null) rowEntries.push(["@total", [table.totalLabel]]);
+  const rowLabelColumns =
+    presentation.layout === "compact" ? 1 : Math.max(1, table.rowFields.length);
   const totalColumnStart =
-    table.columnTotals && table.columnFields.length
+    table.values.length && table.columnTotals && table.columnFields.length
       ? rowLabelColumns + columnEntries.length * table.values.length
       : null;
   if (totalColumnStart !== null) columnEntries.push(["@total", [table.totalLabel]]);
-  const width = rowLabelColumns + columnEntries.length * table.values.length;
-  if ((rowEntries.length + 1) * width > MAX_PIVOT_OUTPUT_CELLS)
-    throw new RangeError("Pivot output exceeds 10,000 cells.");
   const label = (value: FormulaValue) =>
     value === null || value === "" ? table.emptyLabel : isFormulaError(value) ? value.code : value;
   const heading: FormulaValue[] = table.rowFields.length
-    ? table.rowFields.map((index) => headers[index]!)
+    ? presentation.layout === "compact"
+      ? [headers[table.rowFields[0]!]!]
+      : table.rowFields.map((index) => headers[index]!)
     : [table.name];
   for (const [, values] of columnEntries)
-    for (const value of table.values)
-      heading.push([...values.map(label), value.caption].join(" / "));
+    if (table.values.length)
+      for (const value of table.values)
+        heading.push([...values.map(label), value.caption].join(" / "));
+    else if (table.columnFields.length) heading.push(values.map(label).join(" / "));
   const aggregateValue = (row: string, column: string, index: number): FormulaValue => {
     const acc = aggregates.get(JSON.stringify([row, column, index]));
     const type = table.values[index]!.aggregate;
@@ -319,18 +434,99 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       type === "sum" ? acc.sum : type === "average" ? acc.mean : type === "min" ? acc.min : acc.max;
     return Number.isFinite(number) ? number : createFormulaError("NUM");
   };
-  const matrix = [
-    heading,
-    ...rowEntries.map(([key, values]) => {
-      const result: FormulaValue[] = Array.from({ length: rowLabelColumns }, (_, index) =>
-        index < values.length ? (key === "@total" ? table.totalLabel : label(values[index]!)) : "",
-      );
-      if (!table.rowFields.length) result[0] = table.totalLabel;
-      for (const [column] of columnEntries)
-        table.values.forEach((_, index) => result.push(aggregateValue(key, column, index)));
-      return result;
-    }),
-  ];
+  const matrix: FormulaValue[][] = [heading];
+  const dataRows: number[] = [],
+    rowLabels: string[] = [],
+    rowIndents: number[] = [0],
+    subtotalRows: number[] = [];
+  const append = (
+    key: string,
+    values: FormulaValue[],
+    depth: number,
+    kind: "leaf" | "group" | "subtotal" | "total",
+    previous?: FormulaValue[],
+  ) => {
+    const cells: FormulaValue[] = Array.from({ length: rowLabelColumns }, () => "");
+    if (presentation.layout === "compact")
+      cells[0] =
+        kind === "total"
+          ? table.totalLabel
+          : values.length
+            ? label(values.at(-1)!)
+            : table.totalLabel;
+    else
+      values.forEach((value, index) => {
+        if (
+          index < rowLabelColumns &&
+          (presentation.repeatLabels ||
+            kind !== "leaf" ||
+            !previous ||
+            groupKey(values.slice(0, index + 1)) !== groupKey(previous.slice(0, index + 1)))
+        )
+          cells[index] = label(value);
+      });
+    if (!table.rowFields.length || kind === "total") cells[0] = table.totalLabel;
+    if (kind === "subtotal")
+      cells[presentation.layout === "compact" ? 0 : depth] =
+        `${String(label(values.at(-1)!))} ${table.totalLabel}`;
+    for (const [column] of columnEntries)
+      if (table.values.length)
+        table.values.forEach((_, index) =>
+          cells.push(kind === "group" ? null : aggregateValue(key, column, index)),
+        );
+      else if (table.columnFields.length) cells.push(null);
+    const index = matrix.length;
+    matrix.push(cells);
+    rowIndents.push(presentation.layout === "compact" ? Math.min(depth, 15) : 0);
+    if (kind === "leaf") {
+      dataRows.push(index);
+      rowLabels.push(values.length ? values.map(label).join(" / ") : table.totalLabel);
+    }
+    if (kind === "subtotal") subtotalRows.push(index);
+  };
+  let previous: FormulaValue[] | undefined;
+  const render = (entries: Array<[string, FormulaValue[]]>, depth: number) => {
+    if (depth >= table.rowFields.length - 1) {
+      for (const [key, values] of entries) {
+        append(key, values, Math.max(0, depth), "leaf", previous);
+        previous = values;
+      }
+      return;
+    }
+    const groups = new Map<string, Array<[string, FormulaValue[]]>>();
+    for (const entry of entries) {
+      const key = groupKey(entry[1].slice(0, depth + 1));
+      const group = groups.get(key) ?? [];
+      group.push(entry);
+      groups.set(key, group);
+    }
+    for (const [key, group] of groups) {
+      const values = group[0]![1].slice(0, depth + 1);
+      const subtotal = presentation.subtotals !== "off" && !!table.values.length;
+      if (presentation.layout !== "tabular")
+        append(
+          `@group:${key}`,
+          values,
+          depth,
+          subtotal && presentation.subtotals === "top" ? "subtotal" : "group",
+        );
+      else if (subtotal && presentation.subtotals === "top")
+        append(`@group:${key}`, values, depth, "subtotal");
+      render(group, depth + 1);
+      if (subtotal && presentation.subtotals === "bottom")
+        append(`@group:${key}`, values, depth, "subtotal");
+      if (presentation.blankRows) {
+        matrix.push(Array.from({ length: heading.length }, () => null));
+        rowIndents.push(0);
+      }
+    }
+  };
+  render(rowEntries, 0);
+  const totalRow =
+    table.values.length && table.rowTotals && table.rowFields.length ? matrix.length : null;
+  if (totalRow !== null) append("@total", [table.totalLabel], 0, "total");
+  if (matrix.length * heading.length > MAX_PIVOT_OUTPUT_CELLS)
+    throw new RangeError("Pivot output exceeds 10,000 cells.");
   return {
     matrix,
     headerRows: 1,
@@ -339,8 +535,13 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
     totalColumnStart,
     sourceRows,
     headers,
+    dataRows,
+    rowLabels,
+    rowIndents,
+    subtotalRows,
   };
 }
+
 export type PivotTablesSnapshot = Array<{ sheetId: string; tables: SheetPivotTable[] }>;
 export function capturePivotTables(workbook: Workbook): PivotTablesSnapshot {
   return [...workbook.sheets.values()].map((sheet) => ({
@@ -379,6 +580,23 @@ export function transformPivotReferences(
       if (entry.sheetId === sheetId) {
         const anchor = mapAddress(table.anchor);
         if (!anchor) return [];
+        if (table.resultLayout) {
+          const layout = table.resultLayout;
+          const rows = layout.dataRows.flatMap((offset, index) => {
+            const address = mapAddress({
+              row: table.anchor.row + offset,
+              column: table.anchor.column,
+            });
+            return address
+              ? [{ offset: address.row - anchor.row, label: layout.rowLabels[index]! }]
+              : [];
+          });
+          table.resultLayout = {
+            ...layout,
+            dataRows: rows.map((row) => row.offset),
+            rowLabels: rows.map((row) => row.label),
+          };
+        }
         table.anchor = anchor;
         table.outputRange = table.outputRange ? mapRange(table.outputRange) : null;
       }

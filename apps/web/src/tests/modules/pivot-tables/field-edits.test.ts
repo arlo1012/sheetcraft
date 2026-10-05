@@ -1,0 +1,101 @@
+import { describe, expect, test } from "vitest";
+import { placePivotField, removePivotField } from "../../../modules/pivot-tables/pivot-field-edits";
+import { fixture } from "./fixture";
+const caption = (aggregate: string, field: string) => `${aggregate} ${field}`;
+const numeric = { field: 2, label: "Amount", numeric: true };
+describe("pivot field placement", () => {
+  test("allows repeated measures with independent settings", () => {
+    const f = fixture();
+    f.actions.open();
+    const original = f.actions.editing.value!.table;
+    const first = placePivotField(original, { field: 2 }, "values", 0, numeric, caption);
+    const second = placePivotField(first, { field: 2 }, "values", 1, numeric, caption);
+    second.values[1]!.aggregate = "average";
+    expect(second.values.map((item) => item.aggregate)).toEqual(["sum", "average"]);
+    expect(first.values).toHaveLength(1);
+    expect(original.values).toEqual([]);
+  });
+  test("moves dimensions across areas without duplicate field identities", () => {
+    const f = fixture();
+    f.actions.open();
+    const original = { ...f.actions.editing.value!.table, rowFields: [0, 1] };
+    const next = placePivotField(
+      original,
+      { field: 0, area: "rows", index: 0 },
+      "filters",
+      0,
+      { field: 0, label: "Region", numeric: false },
+      caption,
+    );
+    expect(next.rowFields).toEqual([1]);
+    expect(next.filters).toEqual([{ field: 0, values: [], all: true }]);
+    const moved = placePivotField(
+      next,
+      { field: 0, area: "filters", index: 0 },
+      "columns",
+      0,
+      { field: 0, label: "Region", numeric: false },
+      caption,
+    );
+    expect(moved.filters).toEqual([]);
+    expect(moved.columnFields).toEqual([0]);
+    expect(original.rowFields).toEqual([0, 1]);
+  });
+  test("reorders measures with their aggregation and captions intact", () => {
+    const f = fixture();
+    f.actions.open();
+    const original = {
+      ...f.actions.editing.value!.table,
+      values: [
+        { field: 2, aggregate: "sum" as const, caption: "Total" },
+        { field: 2, aggregate: "average" as const, caption: "Average" },
+      ],
+    };
+    const next = placePivotField(
+      original,
+      { field: 2, area: "values", index: 1 },
+      "values",
+      0,
+      numeric,
+      caption,
+    );
+    expect(next.values.map((item) => item.caption)).toEqual(["Average", "Total"]);
+    const removed = removePivotField(next, "values", 0);
+    expect(removed.values.map((item) => item.caption)).toEqual(["Total"]);
+    expect(next.values).toHaveLength(2);
+  });
+  test("assigns Count to text measures and preserves selected filter values when reordered", () => {
+    const f = fixture();
+    f.actions.open();
+    const table = f.actions.editing.value!.table;
+    expect(
+      placePivotField(
+        table,
+        { field: 0 },
+        "values",
+        0,
+        { field: 0, label: "Region", numeric: false },
+        caption,
+      ).values[0]!.aggregate,
+    ).toBe("count");
+    const filtered = {
+      ...table,
+      filters: [
+        { field: 0, values: ["East"], all: false },
+        { field: 1, values: [], all: true },
+      ],
+    };
+    const next = placePivotField(
+      filtered,
+      { field: 0, area: "filters", index: 0 },
+      "filters",
+      2,
+      { field: 0, label: "Region", numeric: false },
+      caption,
+    );
+    expect(next.filters).toEqual([
+      { field: 1, values: [], all: true },
+      { field: 0, values: ["East"], all: false },
+    ]);
+  });
+});

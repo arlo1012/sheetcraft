@@ -45,6 +45,7 @@ const props = withDefaults(
     selectedTableStyleColor?: string;
     hasTable?: boolean;
     hasImage?: boolean;
+    pivotId?: string;
   }>(),
   { conditionalFormattingDisabled: undefined },
 );
@@ -102,6 +103,8 @@ type Category =
   | "home"
   | "insert"
   | "image"
+  | "pivot-analysis"
+  | "pivot-design"
   | "page"
   | "formulas"
   | "data"
@@ -111,9 +114,12 @@ type Category =
   | "proofreading";
 const proofreadingOpen = ref(false);
 const activeCategory = ref<Category>("home");
-let previousCategory: Exclude<Category, "table" | "image"> = "home";
+let previousCategory: Exclude<Category, "table" | "image" | "pivot-analysis" | "pivot-design"> =
+  "home";
 const homeTab = ref<HTMLButtonElement>();
 const insertTab = ref<HTMLButtonElement>();
+const pivotAnalysisTab = ref<HTMLButtonElement>();
+const pivotDesignTab = ref<HTMLButtonElement>();
 const imageTab = ref<HTMLButtonElement>();
 const pageTab = ref<HTMLButtonElement>();
 const formulaTab = ref<HTMLButtonElement>();
@@ -125,7 +131,13 @@ const proofreadingTab = ref<HTMLButtonElement>();
 const tabId = useId();
 
 watch(activeCategory, (category) => {
-  if (category !== "table" && category !== "image") previousCategory = category;
+  if (
+    category !== "table" &&
+    category !== "image" &&
+    category !== "pivot-analysis" &&
+    category !== "pivot-design"
+  )
+    previousCategory = category;
 });
 watch(
   () => props.hasTable,
@@ -142,6 +154,17 @@ watch(
   },
 );
 
+watch(
+  () => props.pivotId,
+  (id) => {
+    if (id && !props.hasImage) activeCategory.value = "pivot-analysis";
+    else if (
+      !id &&
+      (activeCategory.value === "pivot-analysis" || activeCategory.value === "pivot-design")
+    )
+      activeCategory.value = previousCategory;
+  },
+);
 function onCategoryKeydown(event: KeyboardEvent): void {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
   event.preventDefault();
@@ -151,10 +174,15 @@ function onCategoryKeydown(event: KeyboardEvent): void {
     categories.push("table");
     tabs.push(tableTab);
   }
+  if (props.pivotId) {
+    categories.push("pivot-analysis", "pivot-design");
+    tabs.push(pivotAnalysisTab, pivotDesignTab);
+  }
   if (props.hasImage) {
     categories.push("image");
     tabs.push(imageTab);
   }
+
   if (proofreadingOpen.value) {
     categories.push("proofreading");
     tabs.push(proofreadingTab);
@@ -191,6 +219,8 @@ defineSlots<{
   "page-tools"?: () => unknown;
   "insert-tools"?: () => unknown;
   "image-tools"?: () => unknown;
+  "pivot-analysis-tools"?: () => unknown;
+  "pivot-design-tools"?: () => unknown;
   "review-tools"?: (props: { openProofreading: () => void }) => unknown;
   "view-tools"?: () => unknown;
   "proofreading-tools"?: (props: { close: () => void }) => unknown;
@@ -312,6 +342,38 @@ defineSlots<{
             @click="activeCategory = 'view'"
           >
             {{ t("ribbon.view") }}
+          </button>
+          <button
+            v-if="pivotId"
+            :id="`${tabId}-pivot-analysis`"
+            ref="pivotAnalysisTab"
+            class="spreadsheet-ribbon__category spreadsheet-ribbon__category--contextual"
+            :class="{ 'is-active': activeCategory === 'pivot-analysis' }"
+            data-ribbon-category="pivot-analysis"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'pivot-analysis'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'pivot-analysis' ? 0 : -1"
+            @click="activeCategory = 'pivot-analysis'"
+          >
+            {{ t("pivot.analysis") }}
+          </button>
+          <button
+            v-if="pivotId"
+            :id="`${tabId}-pivot-design`"
+            ref="pivotDesignTab"
+            class="spreadsheet-ribbon__category spreadsheet-ribbon__category--contextual"
+            :class="{ 'is-active': activeCategory === 'pivot-design' }"
+            data-ribbon-category="pivot-design"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'pivot-design'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'pivot-design' ? 0 : -1"
+            @click="activeCategory = 'pivot-design'"
+          >
+            {{ t("pivot.design") }}
           </button>
           <button
             v-if="hasImage"
@@ -440,6 +502,8 @@ defineSlots<{
         </template>
       </HomeFormatToolbar>
       <slot v-else-if="activeCategory === 'image'" name="image-tools" />
+      <slot v-else-if="activeCategory === 'pivot-analysis'" name="pivot-analysis-tools" />
+      <slot v-else-if="activeCategory === 'pivot-design'" name="pivot-design-tools" />
       <slot v-else-if="activeCategory === 'insert'" name="insert-tools" />
       <slot v-else-if="activeCategory === 'page'" name="page-tools" />
       <FormulaToolbar

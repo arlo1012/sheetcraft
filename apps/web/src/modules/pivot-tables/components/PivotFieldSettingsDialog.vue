@@ -1,0 +1,113 @@
+<script setup lang="ts">
+import { computed, ref } from "vue";
+import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Input } from "tdesign-vue-next/es/input";
+import { Select } from "tdesign-vue-next/es/select";
+import { Checkbox } from "tdesign-vue-next/es/checkbox";
+import {
+  normalizePivotTable,
+  type PivotAggregate,
+  type SheetPivotTable,
+} from "@idea10/core/pivot-tables";
+import type { CellValue } from "@idea10/core/workbook";
+import type { PivotArea } from "../pivot-field-edits";
+import { useAppI18n } from "../../../shared/i18n";
+const props = defineProps<{
+  table: SheetPivotTable;
+  area: PivotArea;
+  index: number;
+  name: string;
+  choices: Array<{ label: string; value: string }>;
+  disabled: boolean;
+}>();
+const emit = defineEmits<{ confirm: [table: SheetPivotTable]; close: [] }>();
+const { t } = useAppI18n();
+const draft = ref(normalizePivotTable(props.table));
+const value = computed(() => draft.value.values[props.index]);
+const filter = computed(() => draft.value.filters[props.index]);
+const aggregates: PivotAggregate[] = ["sum", "count", "average", "min", "max"];
+function setValues(values: unknown): void {
+  if (filter.value && Array.isArray(values))
+    filter.value.values = values
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => JSON.parse(value) as CellValue);
+}
+</script>
+<template>
+  <Dialog
+    :visible="true"
+    :header="t('pivot.fieldSettings')"
+    width="400px"
+    :close-on-overlay-click="false"
+    :confirm-btn="{
+      content: t('picture.confirm'),
+      disabled: disabled || (area === 'values' && !value?.caption.trim()),
+    }"
+    :cancel-btn="t('picture.cancel')"
+    @confirm="emit('confirm', draft)"
+    @close="emit('close')"
+  >
+    <div class="pivot-field-settings">
+      <strong>{{ name }}</strong>
+      <template v-if="area === 'values' && value">
+        <label
+          >{{ t("pivot.caption")
+          }}<Input v-model="value.caption" :maxlength="200" :disabled="disabled"
+        /></label>
+        <label
+          >{{ t("pivot.aggregate")
+          }}<Select
+            v-model="value.aggregate"
+            :options="aggregates.map((value) => ({ value, label: t(`pivot.${value}`) }))"
+            :disabled="disabled"
+        /></label>
+      </template>
+      <template v-else-if="area === 'filters' && filter">
+        <Checkbox
+          :checked="!!filter.all"
+          :disabled="disabled"
+          @change="filter.all = Boolean($event)"
+          >{{ t("pivot.allItems") }}</Checkbox
+        >
+        <Select
+          :value="filter.values.map((value) => JSON.stringify(value))"
+          multiple
+          filterable
+          :options="choices"
+          :disabled="disabled || filter.all"
+          :aria-label="t('pivot.filterItems')"
+          @change="setValues"
+        />
+        <p>{{ t("pivot.filterHint") }}</p>
+      </template>
+      <template v-else>
+        <label
+          >{{ t("pivot.sort")
+          }}<Select
+            v-model="draft.sort"
+            :disabled="disabled"
+            :options="[
+              { value: 'source', label: t('pivot.sourceOrder') },
+              { value: 'ascending', label: t('pivot.ascending') },
+              { value: 'descending', label: t('pivot.descending') },
+            ]"
+        /></label>
+        <p>{{ t("pivot.sortHint") }}</p>
+      </template>
+    </div>
+  </Dialog>
+</template>
+<style scoped lang="scss">
+.pivot-field-settings {
+  display: grid;
+  gap: 14px;
+  label {
+    display: grid;
+    gap: 6px;
+  }
+  p {
+    margin: 0;
+    color: var(--idea-text-secondary);
+  }
+}
+</style>

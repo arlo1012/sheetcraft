@@ -86,6 +86,13 @@ import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vu
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
 import { usePivotActions } from "../modules/pivot-tables/usePivotActions";
+import { getPivotSource } from "@idea10/core/pivot-tables";
+import { createThemedTableStyles } from "@idea10/core/table-styles";
+import type { PivotArea } from "../modules/pivot-tables/pivot-field-edits";
+import PivotFieldsPane from "../modules/pivot-tables/components/PivotFieldsPane.vue";
+import PivotAnalysisToolbar from "../modules/pivot-tables/components/PivotAnalysisToolbar.vue";
+import PivotDesignToolbar from "../modules/pivot-tables/components/PivotDesignToolbar.vue";
+import TableStyleGallery from "../modules/table-styles/components/TableStyleGallery.vue";
 import PivotTableDialog from "../modules/pivot-tables/components/PivotTableDialog.vue";
 import { useFormControlActions } from "../modules/form-controls/useFormControlActions";
 import FormControlDialog from "../modules/form-controls/components/FormControlDialog.vue";
@@ -1114,6 +1121,13 @@ const pivotActions = usePivotActions({
   total: () => t("pivot.total"),
   empty: () => t("pivot.empty"),
   sumCaption: (field) => `${t("pivot.sum")} · ${field}`,
+  activate: (sheetId, table) => {
+    selectSheet(sheetId);
+    void nextTick(() => {
+      sheetGridRef.value?.navigateToCell(table.anchor);
+      pivotFieldsVisible.value = true;
+    });
+  },
   onError: () => {
     void MessagePlugin.error(t("pivot.refreshFailed"));
   },
@@ -1123,6 +1137,62 @@ const activePivot = computed(() => {
   void workbookRevision.value;
   return pivotActions.selected();
 });
+const pivotFieldsVisible = ref(false);
+const pivotFieldSettingsOpen = ref(false);
+const pivotFieldsPaneRef = shallowRef<InstanceType<typeof PivotFieldsPane>>();
+const pivotStyles = computed(() => [...createThemedTableStyles(), ...customPivotTableStyles.value]);
+const pivotDisabled = computed(
+  () =>
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    !canUseSheetPermission(activeSheet.value, "pivotTables"),
+);
+const pivotActiveField = computed<{ area: PivotArea; index: number; name: string } | undefined>(
+  () => {
+    const table = activePivot.value;
+    if (!table) return undefined;
+    let headers: string[] = [];
+    try {
+      headers = getPivotSource(session.workbook, table.sourceSheetId, table.source).headers;
+    } catch {
+      return undefined;
+    }
+    const offset = activeAddress.value.column - table.anchor.column;
+    const labels = table.resultLayout?.labelColumns ?? Math.max(1, table.rowFields.length);
+    if (table.values.length && offset >= labels) {
+      const index = (offset - labels) % table.values.length;
+      return { area: "values", index, name: table.values[index]!.caption };
+    }
+    if (table.rowFields.length) {
+      const index = Math.max(0, Math.min(offset, table.rowFields.length - 1));
+      return { area: "rows", index, name: headers[table.rowFields[index]!] ?? "" };
+    }
+    if (table.values.length) return { area: "values", index: 0, name: table.values[0]!.caption };
+    if (table.columnFields.length)
+      return { area: "columns", index: 0, name: headers[table.columnFields[0]!] ?? "" };
+    if (table.filters.length)
+      return { area: "filters", index: 0, name: headers[table.filters[0]!.field] ?? "" };
+    return undefined;
+  },
+);
+watch(
+  () => activePivot.value?.id,
+  (id) => {
+    pivotFieldsVisible.value = !!id;
+  },
+);
+function openPivotFields(id?: string): void {
+  const table = pivotActions.selected(id);
+  if (!table) return;
+  sheetGridRef.value?.navigateToCell(table.anchor);
+  pivotFieldsVisible.value = true;
+}
+function openPivotFieldSettings(): void {
+  const field = pivotActiveField.value;
+  pivotFieldsVisible.value = true;
+  void nextTick(() => pivotFieldsPaneRef.value?.openFieldSettings(field));
+}
 const pivotRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingPivotRange, reference: pickedPivotReference } = pivotRangePicker;
 watch(editingPivot, (value) => {
@@ -1137,7 +1207,7 @@ watch(
 watch(workbookGeneration, pivotActions.close);
 function editLinkedPivot(id: string) {
   chartActions.close();
-  pivotActions.open(false, id);
+  openPivotFields(id);
 }
 const controlActions = useFormControlActions({
   getWorkbook: () => session.workbook,
@@ -2210,6 +2280,7 @@ const gridInert = computed(
     (!!editingCamera.value && !pickingCameraRange.value) ||
     (!!editingControl.value && !pickingControlRange.value) ||
     (!!editingPivot.value && !pickingPivotRange.value) ||
+    pivotFieldSettingsOpen.value ||
     !!pictureAnnotation.value ||
     !!viewingAttachment.value ||
     !!editingDrawing.value ||
@@ -2250,6 +2321,7 @@ const gridInert = computed(
     />
     <SpreadsheetRibbon
       :has-image="!!selectedPicture"
+      :pivot-id="activePivot?.id"
       :hyperlink-disabled="
         loading ||
         fileBusy ||
@@ -2295,6 +2367,7 @@ const gridInert = computed(
         (!!editingCamera && !pickingCameraRange) ||
         (!!editingControl && !pickingControlRange) ||
         (!!editingPivot && !pickingPivotRange) ||
+        pivotFieldSettingsOpen ||
         !!pictureAnnotation ||
         !!viewingAttachment ||
         !!editingDrawing ||
@@ -2356,6 +2429,46 @@ const gridInert = computed(
       @undo="undo"
       @redo="redo"
     >
+      <template #pivot-analysis-tools>
+        <PivotAnalysisToolbar
+          v-if="activePivot"
+          :table="activePivot"
+          :disabled="pivotDisabled"
+          :fields-visible="pivotFieldsVisible"
+          :active-field="pivotActiveField?.name ?? ''"
+          @rename="pivotActions.update({ ...activePivot, name: $event })"
+          @settings="openPivotFieldSettings"
+          @refresh="pivotActions.refresh"
+          @source="pivotActions.source"
+          @clear="pivotActions.clear"
+          @move="pivotActions.move"
+          @remove="pivotActions.remove(true)"
+          @convert="pivotActions.remove(false)"
+          @chart="pivotActions.chart"
+          @fields="pivotFieldsVisible = !pivotFieldsVisible"
+        />
+      </template>
+      <template #pivot-design-tools>
+        <PivotDesignToolbar
+          v-if="activePivot"
+          :table="activePivot"
+          :disabled="pivotDisabled"
+          @update="pivotActions.update($event)"
+        >
+          <template #styles
+            ><TableStyleGallery
+              kind="pivot"
+              :styles="pivotStyles"
+              :selected-style-id="activePivot.styleId ?? pivotStyles[0]?.id"
+              compact
+              layout="ribbon"
+              :disabled="pivotDisabled"
+              @select="pivotActions.update({ ...activePivot, styleId: $event.id })"
+              @edit="tableActions.openPivotStyle($event)"
+              @delete="tableActions.deletePivotStyle"
+          /></template>
+        </PivotDesignToolbar>
+      </template>
       <template #image-tools>
         <PictureToolbar
           v-if="selectedPicture"
@@ -2403,7 +2516,7 @@ const gridInert = computed(
           "
           :has-pivot="!!activePivot"
           @insert-pivot="pivotActions.open"
-          @edit-pivot="pivotActions.open(false)"
+          @edit-pivot="openPivotFields()"
           @refresh-pivot="pivotActions.refresh"
           @remove-pivot="pivotActions.remove"
           @insert-control="controlActions.open()"
@@ -3283,6 +3396,7 @@ const gridInert = computed(
         (!!editingCamera && !pickingCameraRange) ||
         (!!editingControl && !pickingControlRange) ||
         (!!editingPivot && !pickingPivotRange) ||
+        pivotFieldSettingsOpen ||
         !!pictureAnnotation ||
         !!viewingAttachment ||
         !!editingDrawing ||
@@ -3478,6 +3592,7 @@ const gridInert = computed(
           @update-drawing="drawingActions.update"
           @delete-drawing="drawingActions.remove"
           @edit-drawing="editSheetDrawing"
+          @configure-pivot="openPivotFields"
           @change-control="controlActions.change"
           @update-floating-images="pictureTools.updateMany"
           @delete-floating-images="pictureTools.remove"
@@ -3520,6 +3635,17 @@ const gridInert = computed(
           @horizontal-scroll-change="updateHorizontalScrollState"
         />
       </div>
+      <PivotFieldsPane
+        v-if="activePivot && pivotFieldsVisible"
+        ref="pivotFieldsPaneRef"
+        :table="activePivot"
+        :workbook="session.workbook"
+        :revision="workbookRevision"
+        :disabled="pivotDisabled"
+        @update="pivotActions.update($event)"
+        @close="pivotFieldsVisible = false"
+        @settings-open="pivotFieldSettingsOpen = $event"
+      />
       <PictureSelectionPane
         v-if="pictureTools.paneVisible.value"
         :images="activeSheet.floatingImages"
@@ -3703,6 +3829,7 @@ const gridInert = computed(
         (!!editingCamera && !pickingCameraRange) ||
         (!!editingControl && !pickingControlRange) ||
         (!!editingPivot && !pickingPivotRange) ||
+        pivotFieldSettingsOpen ||
         !!pictureAnnotation ||
         !!viewingAttachment ||
         !!editingDrawing ||

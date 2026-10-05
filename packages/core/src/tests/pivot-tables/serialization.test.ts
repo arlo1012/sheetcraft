@@ -10,14 +10,14 @@ import {
 import { fixture } from "./fixture.js";
 
 describe("pivot snapshot protocol", () => {
-  test("round trips V31 definitions, output cells, and pivot chart binding", () => {
+  test("round trips current definitions, output cells, and pivot chart binding", () => {
     const f = fixture();
     executeWorkbookCommand(
       f.session,
       createSetPivotTableCommand(f.destination.id, f.table, { chartId: "chart" }),
     );
     const snapshot = serializeWorkbook(f.workbook);
-    expect(snapshot.version).toBe(32);
+    expect(snapshot.version).toBe(33);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     const standalone = serializeSheet(f.destination);
     expect(serializeSheet(deserializeSheet(standalone))).toEqual(standalone);
@@ -31,6 +31,95 @@ describe("pivot snapshot protocol", () => {
       version: 30,
       sheets: snapshot.sheets.map(({ pivotTables: _pivots, ...sheet }) => sheet),
     };
-    expect(serializeWorkbook(deserializeWorkbook(previous)).version).toBe(32);
+    expect(serializeWorkbook(deserializeWorkbook(previous)).version).toBe(33);
+  });
+  test("round trips V33 empty objects and presentation options", () => {
+    const f = fixture();
+    const table = {
+      ...f.table,
+      rowFields: [],
+      columnFields: [],
+      values: [],
+      presentation: {
+        layout: "compact" as const,
+        subtotals: "bottom" as const,
+        repeatLabels: false,
+        blankRows: true,
+        rowHeaders: false,
+        columnHeaders: true,
+        bandedRows: false,
+        bandedColumns: true,
+      },
+    };
+    executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, table));
+    const snapshot = serializeWorkbook(f.workbook);
+    expect(snapshot.version).toBe(33);
+    expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
+    const standalone = serializeSheet(f.destination);
+    expect(serializeSheet(deserializeSheet(standalone))).toEqual(standalone);
+  });
+  test.each(["presentation", "resultLayout", "emptyValues", "filterAll"] as const)(
+    "rejects V33 %s payloads in a V32 snapshot",
+    (feature) => {
+      const f = fixture();
+      executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, f.table));
+      const snapshot = serializeWorkbook(f.workbook);
+      const historical = {
+        ...snapshot,
+        version: 32,
+        sheets: snapshot.sheets.map((sheet) => ({
+          ...sheet,
+          pivotTables: sheet.pivotTables?.map(
+            ({ resultLayout, presentation: _presentation, ...table }) => ({
+              ...table,
+              ...(feature === "resultLayout" ? { resultLayout } : {}),
+              ...(feature === "emptyValues" ? { values: [] } : {}),
+              ...(feature === "filterAll"
+                ? { filters: [{ field: 0, values: [], all: true }] }
+                : {}),
+              ...(feature === "presentation"
+                ? {
+                    presentation: {
+                      layout: "compact",
+                      subtotals: "off",
+                      repeatLabels: false,
+                      blankRows: false,
+                      rowHeaders: true,
+                      columnHeaders: true,
+                      bandedRows: true,
+                      bandedColumns: false,
+                    },
+                  }
+                : {}),
+            }),
+          ),
+        })),
+      };
+      expect(() => deserializeWorkbook(historical)).toThrow();
+    },
+  );
+  test("accepts V32 legacy nonempty pivots with their old tabular layout", () => {
+    const f = fixture();
+    executeWorkbookCommand(
+      f.session,
+      createSetPivotTableCommand(f.destination.id, f.table, { chartId: "chart" }),
+    );
+    const snapshot = serializeWorkbook(f.workbook);
+    const historical = {
+      ...snapshot,
+      version: 32,
+      sheets: snapshot.sheets.map((sheet) => ({
+        ...sheet,
+        pivotTables: sheet.pivotTables?.map(
+          ({ resultLayout: _layout, presentation: _presentation, ...table }) => table,
+        ),
+      })),
+    };
+    const restored = deserializeWorkbook(historical);
+    const pivot = restored.sheets.get(f.destination.id)!.pivotTables![0]!;
+    expect(pivot.values).toEqual(f.table.values);
+    expect(pivot.presentation).toBeUndefined();
+    expect(pivot.resultLayout).toBeUndefined();
+    expect(serializeWorkbook(restored).version).toBe(33);
   });
 });

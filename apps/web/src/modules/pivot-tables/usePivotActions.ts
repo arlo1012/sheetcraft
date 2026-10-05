@@ -8,6 +8,7 @@ import {
 import {
   getPivotSource,
   addressInRange,
+  getPivotTableRange,
   normalizePivotTable,
   type SheetPivotTable,
 } from "@idea10/core/pivot-tables";
@@ -29,6 +30,7 @@ export type PivotDraft = {
   chart: boolean;
   referenceSheetId: string;
   existing: boolean;
+  mode: "create" | "source" | "move";
 };
 export function usePivotActions(options: {
   getWorkbook: () => Workbook;
@@ -41,6 +43,7 @@ export function usePivotActions(options: {
   total: () => string;
   empty: () => string;
   sumCaption: (field: string) => string;
+  activate?: (sheetId: string, table: SheetPivotTable) => void;
   onError: () => void;
 }) {
   const editing = shallowRef<PivotDraft>();
@@ -51,45 +54,52 @@ export function usePivotActions(options: {
     const sheet = options.getSheet(),
       address = options.getRange().start;
     return sheet.pivotTables?.find((table) =>
-      id
-        ? table.id === id
-        : table.outputRange
-          ? addressInRange(address, table.outputRange)
-          : table.anchor.row === address.row && table.anchor.column === address.column,
+      id ? table.id === id : addressInRange(address, getPivotTableRange(table)),
     );
   }
-  function open(chart = false, id?: string) {
+  function open(chart = false, id?: string, mode: PivotDraft["mode"] = "create") {
     if (options.isBusy() || !options.flush()) return;
     const workbook = options.getWorkbook(),
       sheet = options.getSheet(),
-      existing = selected(id);
+      existing = mode === "create" ? undefined : selected(id);
     if (existing && !canUseSheetPermission(sheet, "pivotTables")) return;
     target = { workbook, sheetId: sheet.id, existing: !!existing };
     let sourceRange = resolveDataRange(sheet, options.getRange()) ?? options.getRange();
-    let headers: string[] = [];
-    try {
-      headers = getPivotSource(workbook, sheet.id, sourceRange).headers;
-    } catch {
-      /* Editor accepts a corrected range. */
-    }
-    const field = Math.max(0, headers.length - 1);
+    const names = new Set(
+      [...workbook.sheets.values()].flatMap((sheet) =>
+        (sheet.pivotTables ?? []).map((table) => table.name),
+      ),
+    );
+    let number = 1;
+    while (names.has(`${options.name()}${number}`)) number++;
+
     const table: SheetPivotTable = existing
       ? normalizePivotTable(existing)
       : {
           id: idFactory("pivot"),
-          name: options.name(),
+          name: `${options.name()}${number}`,
           sourceSheetId: sheet.id,
           source: sourceRange,
           anchor: { row: 0, column: 0 },
           outputRange: null,
-          rowFields: field > 0 ? [0] : [],
+          rowFields: [],
           columnFields: [],
-          values: [{ field, aggregate: "sum", caption: options.sumCaption(headers[field] ?? "") }],
+          values: [],
           filters: [],
           rowTotals: true,
           columnTotals: true,
           includeHidden: true,
           sort: "ascending",
+          presentation: {
+            layout: "compact",
+            subtotals: "bottom",
+            repeatLabels: false,
+            blankRows: false,
+            rowHeaders: true,
+            columnHeaders: true,
+            bandedRows: false,
+            bandedColumns: false,
+          },
           totalLabel: options.total(),
           emptyLabel: options.empty(),
           ...(workbook.defaultPivotTableStyleId
@@ -108,6 +118,7 @@ export function usePivotActions(options: {
       chart,
       referenceSheetId: sheet.id,
       existing: !!existing,
+      mode,
     };
     error.value = false;
   }
@@ -146,8 +157,36 @@ export function usePivotActions(options: {
       return;
     }
     try {
+      // Source changes retain fields by header identity; missing fields are removed, never rebound by index.
+      let fields = draft.table;
+      if (draft.existing && draft.mode === "source") {
+        let before: string[] | undefined;
+        try {
+          before = getPivotSource(
+            target.workbook,
+            draft.table.sourceSheetId,
+            draft.table.source,
+          ).headers;
+        } catch {
+          /* A deleted source can be repaired with a new range. */
+        }
+        const after = getPivotSource(target.workbook, source.sheetId, source.range).headers;
+        const remap = (index: number) =>
+          before ? after.indexOf(before[index] ?? "") : index < after.length ? index : -1;
+        fields = {
+          ...draft.table,
+          rowFields: draft.table.rowFields.map(remap).filter((index) => index >= 0),
+          columnFields: draft.table.columnFields.map(remap).filter((index) => index >= 0),
+          values: draft.table.values.flatMap((value) =>
+            remap(value.field) < 0 ? [] : [{ ...value, field: remap(value.field) }],
+          ),
+          filters: draft.table.filters.flatMap((filter) =>
+            remap(filter.field) < 0 ? [] : [{ ...filter, field: remap(filter.field) }],
+          ),
+        };
+      }
       const table = normalizePivotTable({
-        ...draft.table,
+        ...fields,
         sourceSheetId: source.sheetId,
         source: source.range,
         anchor: draft.newSheet ? { row: 0, column: 0 } : destination!.range.start,
@@ -176,31 +215,85 @@ export function usePivotActions(options: {
         return;
       }
       options.execute(command);
+      const sheetId = command.type === "addSheet" ? command.sheet.id : destination!.sheetId;
+      const created = target.workbook.sheets
+        .get(sheetId)
+        ?.pivotTables?.find((item) => item.id === table.id);
+      if (created) options.activate?.(sheetId, created);
       close();
     } catch {
       error.value = true;
     }
   }
-  function refresh() {
-    if (options.isBusy() || !options.flush()) return;
-    const table = selected();
-    if (!table || !canUseSheetPermission(options.getSheet(), "pivotTables")) return;
+  function update(table: SheetPivotTable, chart = false): boolean {
+    if (options.isBusy() || !options.flush()) return false;
+    const sheet = options.getSheet();
+    if (
+      !sheet.pivotTables?.some((item) => item.id === table.id) ||
+      !canUseSheetPermission(sheet, "pivotTables")
+    )
+      return false;
     try {
-      options.execute(createSetPivotTableCommand(options.getSheet().id, table));
+      options.execute(
+        createSetPivotTableCommand(
+          sheet.id,
+          table,
+          chart ? { chartId: idFactory("pivot-chart") } : {},
+        ),
+      );
+      const current = sheet.pivotTables?.find((item) => item.id === table.id);
+      if (current && !addressInRange(options.getRange().start, getPivotTableRange(current)))
+        options.activate?.(sheet.id, current);
+      return true;
     } catch {
       options.onError();
+      return false;
     }
   }
-  function remove() {
+  function refresh() {
+    const table = selected();
+    if (table) update(table);
+  }
+  function clear() {
+    const table = selected();
+    if (table) update({ ...table, rowFields: [], columnFields: [], values: [], filters: [] });
+  }
+  function remove(clearOutput = false) {
     if (options.isBusy() || !options.flush()) return;
     const table = selected();
     if (table && canUseSheetPermission(options.getSheet(), "pivotTables"))
-      options.execute(createRemovePivotTableCommand(options.getSheet().id, table.id));
+      options.execute(createRemovePivotTableCommand(options.getSheet().id, table.id, clearOutput));
+  }
+  function source() {
+    const table = selected();
+    if (table) open(false, table.id, "source");
+  }
+  function move() {
+    const table = selected();
+    if (table) open(false, table.id, "move");
+  }
+  function chart() {
+    const table = selected();
+    if (table) update(table, true);
   }
   function close() {
     editing.value = undefined;
     target = undefined;
     error.value = false;
   }
-  return { editing, error, open, confirm, refresh, remove, selected, close };
+  return {
+    editing,
+    error,
+    open,
+    confirm,
+    refresh,
+    remove,
+    selected,
+    close,
+    update,
+    clear,
+    source,
+    move,
+    chart,
+  };
 }

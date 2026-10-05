@@ -102,7 +102,7 @@ describe("workbook snapshots", () => {
     const snapshot = serializeWorkbook(workbook);
     const restored = deserializeWorkbook(snapshot);
 
-    expect(snapshot.version).toBe(32);
+    expect(snapshot.version).toBe(33);
     expect(restored.sheets.get(sheet.id)?.tables).toEqual(sheet.tables);
     expect(restored.sheets.get(sheet.id)?.pageSetup?.orientation).toBe("landscape");
     expect(restored.cellStyles).toEqual(workbook.cellStyles);
@@ -491,7 +491,7 @@ describe("workbook snapshots", () => {
       { kind: "formula", formula: { source: "=SUM(" } },
     );
     const snapshot = serializeWorkbook(migrated);
-    expect(snapshot.version).toBe(32);
+    expect(snapshot.version).toBe(33);
     expect(snapshot.dateSystem).toBe("1900");
     expect(snapshot.sheets[0]?.cells).toContainEqual({
       address: { row: 0, column: 1 },
