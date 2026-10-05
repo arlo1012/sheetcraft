@@ -129,15 +129,17 @@ function edit(row: Row) {
       <template
         v-if="controller.panel.value === 'accepted' || controller.panel.value === 'mistake'"
       >
-        <Form label-align="top">
+        <Textarea
+          v-if="batchAccepted"
+          v-model="word"
+          :aria-label="t('wordProof.word')"
+          :autosize="{ minRows: 5, maxRows: 10 }"
+          :placeholder="t('wordProof.batchPlaceholder')"
+        />
+        <Form v-else label-align="top">
           <FormItem :label="t('wordProof.word')">
-            <Textarea
-              v-if="batchAccepted"
-              v-model="word"
-              :autosize="{ minRows: 5, maxRows: 10 }"
-              :placeholder="t('wordProof.batchPlaceholder')" />
-            <Input v-else v-model="word" :maxlength="100"
-          /></FormItem>
+            <Input v-model="word" :maxlength="100" />
+          </FormItem>
           <FormItem v-if="controller.panel.value === 'mistake'" :label="t('wordProof.replacement')"
             ><Input v-model="replacement" :maxlength="100"
           /></FormItem>
