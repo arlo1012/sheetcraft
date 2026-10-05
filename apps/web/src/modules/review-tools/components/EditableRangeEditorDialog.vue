@@ -18,7 +18,7 @@ const props = defineProps<{
   editing: boolean;
 }>();
 const emit = defineEmits<{ close: []; save: [range: EditableRange] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const name = ref(""),
   reference = ref(""),
   password = ref(""),
@@ -84,7 +84,7 @@ function save(): void {
     @confirm="save"
     @close="emit('close')"
   >
-    <TForm label-align="top">
+    <TForm label-align="right" :label-width="locale === 'zh-CN' ? 96 : 144">
       <TFormItem :label="t('review.rangeName')"
         ><TInput v-model="name" :maxlength="255"
       /></TFormItem>
