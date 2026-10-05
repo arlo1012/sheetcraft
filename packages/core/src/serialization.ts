@@ -1,3 +1,4 @@
+import { normalizeSheetDrawings, type SheetDrawing } from "./sheet-drawings.js";
 import { normalizeProtectionPassword, type ProtectionPassword } from "./protection-password.js";
 import { normalizeSheetProtection, type SheetProtection } from "./protection.js";
 import { WorkbookDomainError } from "./errors.js";
@@ -207,7 +208,8 @@ export type WorkbookSnapshotV23 = Omit<WorkbookSnapshotV22, "version"> & {
   structurePassword?: ProtectionPassword;
 };
 export type WorkbookSnapshotV24 = Omit<WorkbookSnapshotV23, "version"> & { version: 24 };
-export type WorkbookSnapshot = WorkbookSnapshotV24;
+export type WorkbookSnapshotV25 = Omit<WorkbookSnapshotV24, "version"> & { version: 25 };
+export type WorkbookSnapshot = WorkbookSnapshotV25;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -220,6 +222,7 @@ export type SheetSnapshot = SheetSnapshotV7 & {
   tables?: SheetTable[];
   pageSetup?: SheetPageSetup;
   pageDecoration?: SheetPageDecoration;
+  drawings?: SheetDrawing[];
   protection?: SheetProtection;
 };
 type SnapshotVersion =
@@ -246,7 +249,8 @@ type SnapshotVersion =
   | 21
   | 22
   | 23
-  | 24;
+  | 24
+  | 25;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -627,6 +631,8 @@ function parseSparseState(
   path: string,
   version: SnapshotVersion,
 ): SheetSparseState {
+  if (version < 25 && Object.hasOwn(record, "drawings"))
+    return fail(path, "Drawings require snapshot version 25.");
   return {
     cells: asArray(record.cells, `${path}.cells`).map((cell, index) =>
       parseCell(cell, `${path}.cells[${index}]`, version),
@@ -709,6 +715,8 @@ function parseSparseState(
       version >= 17 && Object.hasOwn(record, "pageDecoration")
         ? normalizeSheetPageDecoration(record.pageDecoration)
         : undefined,
+    drawings:
+      version >= 25 ? normalizeSheetDrawings(record.drawings as SheetDrawing[] | undefined) : [],
     floatingImages:
       version >= 4
         ? asArray(record.floatingImages, `${path}.floatingImages`).map((image, index) =>
@@ -720,6 +728,8 @@ function parseSparseState(
 
 function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sheet {
   const record = asRecord(value, path);
+  if (version !== undefined && version < 25 && Object.hasOwn(record, "drawings"))
+    return fail(path, "Drawings require snapshot version 25.");
   if (version === undefined) {
     const cells = asArray(record.cells, `${path}.cells`);
     const hasValue = cells.some((cell) => Object.hasOwn(asRecord(cell, `${path}.cells`), "value"));
@@ -728,23 +738,27 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     );
     if (hasValue && hasContent)
       return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
-    version =
-      (Array.isArray(record.floatingImages) &&
-        record.floatingImages.some((image) => {
-          const item = asRecord(image, `${path}.floatingImages`);
-          return (
-            "hidden" in item ||
-            "groupId" in item ||
-            "lockAspectRatio" in item ||
-            Boolean((item.transform as ImageTransform | undefined)?.appearance)
-          );
-        })) ||
-      cells.some((cell) =>
-        Boolean(
-          (asRecord(cell, path).content as { image?: { transform?: ImageTransform } } | undefined)
-            ?.image?.transform?.appearance,
-        ),
-      )
+    version = Object.hasOwn(record, "drawings")
+      ? 25
+      : (Array.isArray(record.floatingImages) &&
+            record.floatingImages.some((image) => {
+              const item = asRecord(image, `${path}.floatingImages`);
+              return (
+                "hidden" in item ||
+                "groupId" in item ||
+                "lockAspectRatio" in item ||
+                Boolean((item.transform as ImageTransform | undefined)?.appearance)
+              );
+            })) ||
+          cells.some((cell) =>
+            Boolean(
+              (
+                asRecord(cell, path).content as
+                  | { image?: { transform?: ImageTransform } }
+                  | undefined
+              )?.image?.transform?.appearance,
+            ),
+          )
         ? 24
         : Object.hasOwn(record, "protection") ||
             cells.some((cell) =>
@@ -838,8 +852,9 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
 }
 
 export function serializeSheet(sheet: Sheet): SheetSnapshot {
-  const state = createSheetSparseState(sheet);
+  const { drawings, ...state } = createSheetSparseState(sheet);
   return {
+    ...(drawings?.length ? { drawings } : {}),
     id: sheet.id,
     name: sheet.name,
     properties: { ...sheet.properties },
@@ -856,7 +871,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 24,
+    version: 25,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -912,7 +927,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 21 &&
     record.version !== 22 &&
     record.version !== 23 &&
-    record.version !== 24
+    record.version !== 24 &&
+    record.version !== 25
   ) {
     throw new WorkbookDomainError(
       {

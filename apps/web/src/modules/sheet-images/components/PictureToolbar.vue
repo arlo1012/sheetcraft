@@ -25,7 +25,12 @@ import PictureArrangeTools from "./PictureArrangeTools.vue";
 import type { PictureAlignment, PictureLayerAction } from "../usePictureTools";
 import PictureAppearanceTools from "./PictureAppearanceTools.vue";
 import ImageInsertMenu from "../../home-tools/components/ImageInsertMenu.vue";
-const props = defineProps<{ image: FloatingImage; disabled: boolean; selectionCount: number }>();
+const props = defineProps<{
+  image: FloatingImage;
+  disabled: boolean;
+  busy?: boolean;
+  selectionCount: number;
+}>();
 const emit = defineEmits<{
   update: [image: FloatingImage];
   insertImage: [mode: "cell" | "floating"];

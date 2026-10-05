@@ -1,3 +1,4 @@
+import { normalizeSheetDrawings } from "../sheet-drawings.js";
 import { normalizeSheetProtection } from "../protection.js";
 import {
   MAX_SHEET_COLUMNS,
@@ -269,6 +270,7 @@ function cloneSheetMetadata(metadata: SheetMetadata): SheetMetadata {
     tables: (metadata.tables ?? []).map(cloneSheetTable),
     pageSetup: cloneSheetPageSetup(metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
+    drawings: normalizeSheetDrawings(metadata.drawings),
     protection: normalizeSheetProtection(metadata.protection),
   };
 }
@@ -632,6 +634,11 @@ function transformSheetMetadataForAxis(
     operation,
   );
   return {
+    drawings: normalizeSheetDrawings(metadata.drawings).flatMap((drawing) => {
+      const source = drawing.anchor[axis];
+      const target = transformAxisIndex(source, index, count, maximum, operation);
+      return target === null ? [] : [{ ...drawing, anchor: { ...drawing.anchor, [axis]: target } }];
+    }),
     freezePanes:
       axis === "row"
         ? { rows: nextFreezeValue, columns: metadata.freezePanes.columns }
@@ -1198,7 +1205,10 @@ function validateSheetAxisSlice(
     maximum,
     command.operation,
   );
-  if (JSON.stringify(expectedMetadata) !== JSON.stringify(getSheetMetadata(sheet))) {
+  if (
+    JSON.stringify(getSheetMetadata({ ...sheet, ...expectedMetadata })) !==
+    JSON.stringify(getSheetMetadata(sheet))
+  ) {
     throw invalidCommandPayload(
       "slice.metadata",
       command.slice.metadata,
@@ -1527,6 +1537,10 @@ function transformSheetMetadataForAxisMove(
     toIndex,
   );
   return {
+    drawings: normalizeSheetDrawings(metadata.drawings).map((drawing) => ({
+      ...drawing,
+      anchor: { ...drawing.anchor, [axis]: map(drawing.anchor[axis]) },
+    })),
     freezePanes: { ...metadata.freezePanes },
     filter,
     mergedCells,
@@ -1820,6 +1834,7 @@ export function applyMoveSheetAxisCommand(
     tables: metadata.tables,
     pageSetup: metadata.pageSetup,
     pageDecoration: metadata.pageDecoration,
+    drawings: metadata.drawings,
     protection: metadata.protection,
     floatingImages: previousState.floatingImages.map((image) => ({
       ...image,

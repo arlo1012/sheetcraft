@@ -1,3 +1,4 @@
+import type { drawingsEnUS } from "../../modules/sheet-drawings/drawing-messages.en-US";
 import type { WordProofMessageSchema } from "../../modules/text-proofreading/messages";
 import type { ReviewMessageSchema } from "../../modules/review-tools/review-messages";
 import type { PageDecorationMessageSchema } from "../../modules/page-decorations/page-decoration-messages";
@@ -15,7 +16,8 @@ import type { TableMessageSchema } from "../../modules/table-styles/table-messag
 
 export type AppLocale = "zh-CN" | "en-US";
 
-type ToolMessageSchema = WordProofMessageSchema &
+type ToolMessageSchema = typeof drawingsEnUS &
+  WordProofMessageSchema &
   ReviewMessageSchema &
   PageDecorationMessageSchema &
   PagePrintMessageSchema &

@@ -6,7 +6,6 @@ export * from "./contracts.js";
 export * from "./dimensions.js";
 export * from "./formatting.js";
 export * from "./images.js";
-export * from "./images.js";
 export * from "./filter.js";
 export * from "./advanced-filter.js";
 export * from "./metadata.js";
@@ -60,3 +59,5 @@ export {
 export { createFlashFillCommand, type FlashFillOptions } from "./flash-fill.js";
 
 export * from "./protection.js";
+
+export * from "./drawings.js";

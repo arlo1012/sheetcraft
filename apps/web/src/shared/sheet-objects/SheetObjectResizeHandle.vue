@@ -4,7 +4,7 @@ import type {
   FloatingImageResizeDirection,
   FloatingImageViewportFragment,
 } from "@idea10/sheet-engine/floating-image-layout";
-import { useAppI18n, type MessageKey } from "../../../shared/i18n";
+import { useAppI18n, type MessageKey } from "../i18n";
 
 const props = defineProps<{
   fragment: FloatingImageViewportFragment;

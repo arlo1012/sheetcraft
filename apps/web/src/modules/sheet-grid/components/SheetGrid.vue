@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { SheetDrawing } from "@idea10/core/sheet-drawings";
+import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer.vue";
 import { canEditCell, canEditRange, canSelectCell, canUseSheetPermission } from "@idea10/core";
 import {
   computed,
@@ -284,6 +286,9 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
+  updateDrawing: [drawing: SheetDrawing];
+  deleteDrawing: [id: string];
+  editDrawing: [drawing: SheetDrawing];
   unlockRange: [range: CellRange];
   contextAction: [request: SheetContextRequest];
   pageSetupChange: [setup: SheetPageSetup];
@@ -2164,7 +2169,10 @@ function onDimensionResizeStart(
 
 function onGridKeydown(event: KeyboardEvent): void {
   if (event.target instanceof Element && event.target.closest("[data-page-header-footer]")) return;
-  if (event.target instanceof Element && event.target.closest("[data-floating-image-id]")) {
+  if (
+    event.target instanceof Element &&
+    event.target.closest("[data-floating-image-id], [data-sheet-drawing-id]")
+  ) {
     handleHistoryShortcut(event);
     return;
   }
@@ -3287,6 +3295,17 @@ defineExpose({
         height: `${viewportSize.height}px`,
       }"
     >
+      <SheetDrawingLayer
+        :key="sheet.id"
+        :drawings="sheet.drawings ?? []"
+        :layout="layout"
+        :scale="scale"
+        :read-only="objectsReadOnly"
+        @select="selectFloatingImage(null)"
+        @update="emit('updateDrawing', $event)"
+        @delete="emit('deleteDrawing', $event)"
+        @edit="emit('editDrawing', $event)"
+      />
       <SheetFloatingImageLayer
         ref="imageLayerRef"
         @paint-state-change="imagePaintState = $event"

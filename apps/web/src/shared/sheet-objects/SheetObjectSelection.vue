@@ -4,7 +4,7 @@ import type {
   FloatingImageResizeDirection,
   FloatingImageViewportFragment,
 } from "@idea10/sheet-engine/floating-image-layout";
-import SheetFloatingImageResizeHandle from "./SheetFloatingImageResizeHandle.vue";
+import SheetObjectResizeHandle from "./SheetObjectResizeHandle.vue";
 
 const props = defineProps<{ fragment: FloatingImageViewportFragment }>();
 const emit = defineEmits<{
@@ -31,14 +31,14 @@ function onResize(direction: FloatingImageResizeDirection, event: PointerEvent):
     <div class="sheet-floating-image-selection__clip">
       <div class="sheet-floating-image-selection__outline" :style="outlineStyle" />
     </div>
-    <SheetFloatingImageResizeHandle :fragment="fragment" direction="n" @resize="onResize" />
-    <SheetFloatingImageResizeHandle :fragment="fragment" direction="s" @resize="onResize" />
-    <SheetFloatingImageResizeHandle :fragment="fragment" direction="w" @resize="onResize" />
-    <SheetFloatingImageResizeHandle :fragment="fragment" direction="e" @resize="onResize" />
-    <SheetFloatingImageResizeHandle :fragment="fragment" direction="nw" @resize="onResize" />
-    <SheetFloatingImageResizeHandle :fragment="fragment" direction="ne" @resize="onResize" />
-    <SheetFloatingImageResizeHandle :fragment="fragment" direction="sw" @resize="onResize" />
-    <SheetFloatingImageResizeHandle :fragment="fragment" direction="se" @resize="onResize" />
+    <SheetObjectResizeHandle :fragment="fragment" direction="n" @resize="onResize" />
+    <SheetObjectResizeHandle :fragment="fragment" direction="s" @resize="onResize" />
+    <SheetObjectResizeHandle :fragment="fragment" direction="w" @resize="onResize" />
+    <SheetObjectResizeHandle :fragment="fragment" direction="e" @resize="onResize" />
+    <SheetObjectResizeHandle :fragment="fragment" direction="nw" @resize="onResize" />
+    <SheetObjectResizeHandle :fragment="fragment" direction="ne" @resize="onResize" />
+    <SheetObjectResizeHandle :fragment="fragment" direction="sw" @resize="onResize" />
+    <SheetObjectResizeHandle :fragment="fragment" direction="se" @resize="onResize" />
   </div>
 </template>
 

@@ -1,3 +1,4 @@
+import { applySetSheetDrawingsCommand } from "./drawings.js";
 import {
   applySetSheetProtectionCommand,
   applySetWorkbookStructureProtectionCommand,
@@ -246,6 +247,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "setSheetOutlineLevel":
     case "clearSheetOutline":
     case "ungroupSheetRange":
+    case "setSheetDrawings":
     case "setSheetFloatingImages":
     case "setFloatingImage":
     case "deleteFloatingImage":
@@ -411,6 +413,8 @@ export function applyWorkbookCommand(
         return applyClearSheetOutlineCommand(workbook, command);
       case "ungroupSheetRange":
         return applyUngroupSheetRangeCommand(workbook, command);
+      case "setSheetDrawings":
+        return applySetSheetDrawingsCommand(workbook, command);
       case "setSheetFloatingImages":
         return applySetSheetFloatingImagesCommand(workbook, command);
       case "setFloatingImage":

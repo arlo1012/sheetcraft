@@ -1,3 +1,4 @@
+import type { SheetDrawing } from "../sheet-drawings.js";
 import type { ProtectionPassword } from "../protection-password.js";
 import type { SheetProtection } from "../protection.js";
 import type { SheetSnapshot } from "../serialization.js";
@@ -514,6 +515,12 @@ export type AddSheetCommand = {
   definedNames?: DefinedName[];
 };
 
+export type SetSheetDrawingsCommand = {
+  type: "setSheetDrawings";
+  sheetId: string;
+  drawings: SheetDrawing[];
+};
+
 export type SetSheetFloatingImagesCommand = {
   type: "setSheetFloatingImages";
   sheetId: string;
@@ -834,6 +841,7 @@ export type WorkbookCommand =
   | SetSheetOutlineLevelCommand
   | ClearSheetOutlineCommand
   | UngroupSheetRangeCommand
+  | SetSheetDrawingsCommand
   | SetSheetFloatingImagesCommand
   | SetFloatingImageCommand
   | DeleteFloatingImageCommand
@@ -1012,6 +1020,7 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "clearSheetOutline":
     case "ungroupSheetRange":
       return "data.outline";
+    case "setSheetDrawings":
     case "setSheetFloatingImages":
     case "setFloatingImage":
       return "images.floating.set";

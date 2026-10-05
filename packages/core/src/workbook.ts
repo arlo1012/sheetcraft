@@ -1,3 +1,4 @@
+import { normalizeSheetDrawings, type SheetDrawing } from "./sheet-drawings.js";
 import type { ProtectionPassword } from "./protection-password.js";
 import { normalizeSheetProtection, type SheetProtection } from "./protection.js";
 import { evaluateFormulaRuntime, evaluateFormulaRuntimeAst } from "./formula/evaluate.js";
@@ -202,6 +203,7 @@ export type SheetMetadata = {
   tables?: SheetTable[];
   pageSetup?: SheetPageSetup;
   pageDecoration?: SheetPageDecoration;
+  drawings?: SheetDrawing[];
   protection?: SheetProtection;
 };
 
@@ -367,6 +369,7 @@ export type Sheet = {
   tables?: SheetTable[];
   pageSetup?: SheetPageSetup;
   pageDecoration?: SheetPageDecoration;
+  drawings?: SheetDrawing[];
   protection?: SheetProtection;
   /** Transient editable-range authorization; never serialized or copied. */
   protectionAccess?: Array<{ name: string; verifier: string | undefined }>;
@@ -405,6 +408,7 @@ export type SheetSparseState = {
   tables?: SheetTable[];
   pageSetup?: SheetPageSetup;
   pageDecoration?: SheetPageDecoration;
+  drawings?: SheetDrawing[];
   protection?: SheetProtection;
   floatingImages: FloatingImage[];
 };
@@ -2626,6 +2630,7 @@ function normalizeSheetMetadata(
     | "tables"
     | "pageSetup"
     | "pageDecoration"
+    | "drawings"
     | "protection"
   >,
 ): SheetMetadata {
@@ -2792,6 +2797,7 @@ function normalizeSheetMetadata(
     tables,
     pageSetup,
     pageDecoration,
+    drawings: normalizeSheetDrawings(state.drawings),
     protection,
   };
 }
@@ -2833,6 +2839,7 @@ export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean
   sheet.pageSetup = cloneSheetPageSetup(normalized.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
   sheet.pageDecoration = cloneSheetPageDecoration(normalized.pageDecoration);
   sheet.protection = normalizeSheetProtection(normalized.protection);
+  sheet.drawings = normalizeSheetDrawings(normalized.drawings);
   return true;
 }
 
@@ -2958,6 +2965,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     tables: metadata.tables ?? [],
     pageSetup: cloneSheetPageSetup(metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
+    drawings: normalizeSheetDrawings(metadata.drawings),
     protection: normalizeSheetProtection(metadata.protection),
     floatingImages,
   };
@@ -3062,6 +3070,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
     tables: (sheet.tables ?? []).map(cloneSheetTable),
     pageSetup: cloneSheetPageSetup(sheet.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     pageDecoration: cloneSheetPageDecoration(sheet.pageDecoration),
+    drawings: normalizeSheetDrawings(sheet.drawings),
     protection: normalizeSheetProtection(sheet.protection),
     floatingImages: sheet.floatingImages.map(cloneFloatingImage),
   });
@@ -3126,6 +3135,7 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
   sheet.tables = (nextState.tables ?? []).map(cloneSheetTable);
   sheet.pageSetup = cloneSheetPageSetup(nextState.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
   sheet.pageDecoration = cloneSheetPageDecoration(nextState.pageDecoration);
+  sheet.drawings = normalizeSheetDrawings(nextState.drawings);
   sheet.protection = normalizeSheetProtection(nextState.protection);
   sheet.floatingImages = nextState.floatingImages.map(cloneFloatingImage);
   return true;

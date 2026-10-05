@@ -363,7 +363,8 @@ export function applyCellShiftCommand(
   if (command.type === "insertCells") {
     const overflow =
       previousState.cells.some((cell) => !map(cell.address)) ||
-      sheet.floatingImages.some((image) => !map(image.anchor));
+      sheet.floatingImages.some((image) => !map(image.anchor)) ||
+      (sheet.drawings ?? []).some((drawing) => !map(drawing.anchor));
     if (overflow)
       throw invalidCommandPayload(
         "range",
@@ -389,6 +390,10 @@ export function applyCellShiftCommand(
           ? undefined
           : cloneCellContent(cell.content);
     return [{ ...cell, address, ...(content === undefined ? {} : { content }) }];
+  });
+  nextState.drawings = (previousState.drawings ?? []).flatMap((drawing) => {
+    const anchor = map(drawing.anchor);
+    return anchor ? [{ ...drawing, anchor }] : [];
   });
   nextState.floatingImages = previousState.floatingImages.flatMap((image) => {
     const anchor = map(image.anchor);

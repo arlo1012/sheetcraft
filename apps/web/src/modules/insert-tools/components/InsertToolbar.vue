@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Link2, Table2 } from "lucide-vue-next";
+import type { SheetDrawing } from "@idea10/core/sheet-drawings";
+import { Link2, Table2, Shapes, Type, Sparkles, Star, Sigma } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
@@ -12,6 +13,7 @@ defineProps<{
   editSessionId?: string;
 }>();
 const emit = defineEmits<{
+  insertDrawing: [kind: SheetDrawing["kind"]];
   insertImage: [mode: "cell" | "floating"];
   insertHyperlink: [];
   insertTable: [];
@@ -46,6 +48,42 @@ const { t } = useAppI18n();
     >
       <ImageInsertMenu :disabled="imageDisabled" @insert-image="emit('insertImage', $event)" />
       <slot name="watermark" />
+      <RibbonButton
+        variant="tall"
+        :label="t('drawing.shape')"
+        :text="t('drawing.shape')"
+        :disabled="imageDisabled"
+        data-insert-tool="shape"
+        @activate="emit('insertDrawing', 'shape')"
+        ><Shapes
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :label="t('drawing.icon')"
+        :text="t('drawing.icon')"
+        :disabled="imageDisabled"
+        data-insert-tool="icon"
+        @activate="emit('insertDrawing', 'icon')"
+        ><Star
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :label="t('drawing.wordArt')"
+        :text="t('drawing.wordArt')"
+        :disabled="imageDisabled"
+        data-insert-tool="wordArt"
+        @activate="emit('insertDrawing', 'wordArt')"
+        ><Sparkles
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :label="t('drawing.textBox')"
+        :text="t('drawing.textBox')"
+        :disabled="imageDisabled"
+        data-insert-tool="text-box"
+        @activate="emit('insertDrawing', 'textBox')"
+        ><Type
+      /></RibbonButton>
     </section>
     <section
       class="insert-toolbar__group"
@@ -61,6 +99,15 @@ const { t } = useAppI18n();
         data-insert-tool="hyperlink"
         @activate="emit('insertHyperlink')"
         ><Link2
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :label="t('drawing.equation')"
+        :text="t('drawing.equation')"
+        :disabled="imageDisabled"
+        data-insert-tool="equation"
+        @activate="emit('insertDrawing', 'equation')"
+        ><Sigma
       /></RibbonButton>
     </section>
   </RibbonToolbar>

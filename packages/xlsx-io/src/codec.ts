@@ -1078,6 +1078,7 @@ export async function encodeWithExcelJs(
   for (const [sheetIndex, sheet] of [...workbook.sheets.values()].entries()) {
     pageSetups.push(sheet.pageSetup);
     // Tiled watermarks have no native worksheet field; do not silently claim XLSX fidelity.
+    if (sheet.drawings?.length) add(report, "feature-omitted", `${sheet.name}.drawings`);
     if (sheet.pageDecoration?.watermark) add(report, "feature-omitted", `${sheet.name}.watermark`);
     sheetBackgrounds.push(
       sheet.pageDecoration?.backgroundAssetId

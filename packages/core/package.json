@@ -142,6 +142,10 @@
     "./pivot-table-styles": {
       "types": "./dist/pivot-table-styles.d.ts",
       "import": "./dist/pivot-table-styles.js"
+    },
+    "./sheet-drawings": {
+      "types": "./dist/sheet-drawings.d.ts",
+      "import": "./dist/sheet-drawings.js"
     }
   },
   "scripts": {

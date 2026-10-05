@@ -4,7 +4,7 @@ import type { ImageCrop } from "@idea10/core/workbook";
 import type { FloatingImageViewportFragment } from "@idea10/sheet-engine/floating-image-layout";
 import type { ImageCropGesture } from "@idea10/sheet-engine/image-crop-selection";
 import { useAppI18n } from "../../../shared/i18n";
-import SheetFloatingImageResizeHandle from "./SheetFloatingImageResizeHandle.vue";
+import SheetFloatingImageResizeHandle from "../../../shared/sheet-objects/SheetObjectResizeHandle.vue";
 
 const props = defineProps<{ fragment: FloatingImageViewportFragment; selection: ImageCrop }>();
 const emit = defineEmits<{ start: [direction: ImageCropGesture, event: PointerEvent] }>();

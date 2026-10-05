@@ -30,7 +30,7 @@ import type { FloatingReference } from "../../../shared/floating/useFloatingPane
 import { useAppI18n } from "../../../shared/i18n";
 import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import SheetFloatingImageContextMenu from "./SheetFloatingImageContextMenu.vue";
-import SheetFloatingImageSelection from "./SheetFloatingImageSelection.vue";
+import SheetFloatingImageSelection from "../../../shared/sheet-objects/SheetObjectSelection.vue";
 import type { DrawingThemeEffects } from "../drawing-theme-effects";
 
 import { useFloatingImageEditing } from "../useFloatingImageEditing";

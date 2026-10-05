@@ -81,6 +81,8 @@ import PictureBatchSizeDialog from "../modules/sheet-images/components/PictureBa
 import { usePictureTools } from "../modules/sheet-images/usePictureTools";
 import PictureSelectionPane from "../modules/sheet-images/components/PictureSelectionPane.vue";
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
+import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
+import DrawingEditorDialog from "../modules/sheet-drawings/components/DrawingEditorDialog.vue";
 import InsertToolbar from "../modules/insert-tools/components/InsertToolbar.vue";
 import PageWatermarkMenu from "../modules/page-decorations/components/PageWatermarkMenu.vue";
 import WatermarkDialog from "../modules/page-decorations/components/WatermarkDialog.vue";
@@ -1079,6 +1081,16 @@ const imageActions = useSheetImageActions({
   },
   convertCellImageToFloating,
 });
+const drawingActions = useDrawingActions({
+  getSheet: () => activeSheet.value,
+  getAddress: () => activeAddress.value,
+  flush: () => cellEditSession.finish(),
+  execute: executeCommand,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  name: (kind) => t(`drawing.${kind}`),
+});
+const { editing: editingDrawing } = drawingActions;
+watch(() => activeSheet.value.id, drawingActions.close);
 const pictureCompressVisible = ref(false);
 const pictureBatchSizeVisible = ref(false);
 watch(
@@ -2092,6 +2104,7 @@ const gridInert = computed(
             !canUseSheetPermission(activeSheet, 'editObjects')
           "
           @update="setFloatingImage"
+          @insert-drawing="drawingActions.insert"
           @insert-image="imageActions.requestInsert"
           @crop="sheetGridRef?.cropImage()"
           @rotate="sheetGridRef?.rotateImage($event)"
@@ -3156,6 +3169,9 @@ const gridInert = computed(
               selectedPictureIds = ids;
             }
           "
+          @update-drawing="drawingActions.update"
+          @delete-drawing="drawingActions.remove"
+          @edit-drawing="drawingActions.edit"
           @update-floating-images="pictureTools.updateMany"
           @delete-floating-images="pictureTools.remove"
           @update-floating-image="setFloatingImage"
@@ -3432,6 +3448,16 @@ const gridInert = computed(
       @unlock="protectionActions.unlock"
     />
   </section>
+  <DrawingEditorDialog
+    v-if="editingDrawing"
+    :key="editingDrawing.id"
+    :drawing="editingDrawing"
+    :disabled="
+      loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
+    "
+    @confirm="drawingActions.confirm"
+    @close="drawingActions.close"
+  />
 </template>
 
 <style scoped lang="scss">

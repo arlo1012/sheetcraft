@@ -1,3 +1,4 @@
+import { drawingsZhCN } from "../../../modules/sheet-drawings/drawing-messages.zh-CN";
 import { wordProofZhCN } from "../../../modules/text-proofreading/messages";
 import { reviewZhCN } from "../../../modules/review-tools/review-messages.zh-CN";
 import { pageDecorationZhCN } from "../../../modules/page-decorations/page-decoration-messages.zh-CN";
@@ -15,6 +16,7 @@ import { tableStylesZhCN } from "../../../modules/table-styles/table-style-messa
 import { tablesZhCN } from "../../../modules/table-styles/table-messages.zh-CN";
 
 export const zhCN = {
+  ...drawingsZhCN,
   ...wordProofZhCN,
   ...reviewZhCN,
   ...pageDecorationZhCN,
