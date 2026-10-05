@@ -349,6 +349,8 @@ const {
   error: noteError,
   notes: reviewNotes,
   showActiveNote,
+  showAllNotes,
+  hiddenNoteKeys,
   hasNote,
   hasSelectedNotes,
 } = reviewActions;
@@ -1927,6 +1929,9 @@ const gridInert = computed(
           @previous-note="reviewActions.step(-1)"
           @next-note="reviewActions.step(1)"
           @toggle-note="reviewActions.toggleNote"
+          @show-all-notes="reviewActions.setAllNotesVisible(true)"
+          @hide-all-notes="reviewActions.setAllNotesVisible(false)"
+          @reset-note-box="reviewActions.resetBox"
           @toggle-protection="
             changeSheetProperties({
               sheetId: activeSheet.id,
@@ -2783,6 +2788,8 @@ const gridInert = computed(
         :note-draft="noteDraft"
         :note-error="noteError"
         :show-active-note="showActiveNote"
+        :show-all-notes="showAllNotes"
+        :hidden-note-keys="hiddenNoteKeys"
         :note-preview-disabled="gridInert"
         :theme="workbookTheme"
         :show-page-breaks="showPageBreaks"

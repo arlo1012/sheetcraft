@@ -3,7 +3,6 @@ import {
   ClipboardCheck,
   FileLock2,
   FileKey2,
-  MessageSquareText,
   MessageSquarePlus,
   Pencil,
   Trash2,
@@ -13,6 +12,8 @@ import {
 import { computed } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
+import NoteResetMenu from "./NoteResetMenu.vue";
+import NoteVisibilityMenu from "./NoteVisibilityMenu.vue";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 
 const props = withDefaults(
@@ -34,14 +35,14 @@ const emit = defineEmits<{
   previousNote: [];
   nextNote: [];
   toggleNote: [];
+  showAllNotes: [];
+  hideAllNotes: [];
+  resetNoteBox: [mode: "position" | "size" | "all"];
   toggleProtection: [];
 }>();
 const { t } = useAppI18n();
 const canDeleteNotes = computed(() => props.hasSelectedNotes ?? props.hasNote);
 const noteActionLabel = computed(() => t(props.hasNote ? "review.editNote" : "review.newNote"));
-const notesVisibilityLabel = computed(() =>
-  t(props.hasNote && props.showActiveNote ? "review.hideNotes" : "review.showNotes"),
-);
 const protectionLabel = computed(() =>
   t(props.readOnly ? "review.unprotectSheet" : "review.protectSheet"),
 );
@@ -111,16 +112,20 @@ const protectionLabel = computed(() =>
           ><ChevronDown
         /></RibbonButton>
       </div>
-      <RibbonButton
-        variant="tall"
-        :disabled="busy || !hasNote"
-        :pressed="hasNote && showActiveNote"
-        :label="notesVisibilityLabel"
-        :text="notesVisibilityLabel"
-        data-review-action="toggle-note"
-        @activate="emit('toggleNote')"
-        ><MessageSquareText
-      /></RibbonButton>
+      <div class="review-toolbar__stack">
+        <NoteResetMenu
+          :disabled="busy || readOnly || !hasNote"
+          @reset="emit('resetNoteBox', $event)"
+        />
+        <NoteVisibilityMenu
+          :disabled="busy || !hasNotes"
+          :has-note="hasNote"
+          :show-active-note="showActiveNote"
+          @toggle="emit('toggleNote')"
+          @show-all="emit('showAllNotes')"
+          @hide-all="emit('hideAllNotes')"
+        />
+      </div>
     </section>
     <section
       class="review-toolbar__group"

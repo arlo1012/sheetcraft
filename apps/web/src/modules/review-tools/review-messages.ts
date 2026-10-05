@@ -12,6 +12,13 @@ export type ReviewMessageSchema = {
     nextNote: string;
     showNotes: string;
     hideNotes: string;
+    resetNote: string;
+    resetNotePosition: string;
+    resetNoteSize: string;
+    resetNoteBox: string;
+    noteVisibility: string;
+    showAllNotes: string;
+    hideAllNotes: string;
     protectSheet: string;
     unprotectSheet: string;
     protectionHint: string;

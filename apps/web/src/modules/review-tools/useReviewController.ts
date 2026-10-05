@@ -14,6 +14,7 @@ import {
   type Sheet,
   type Workbook,
 } from "@idea10/core/workbook";
+import { DEFAULT_NOTE_BOX } from "../../shared/cell-notes/note-box";
 import { useAppI18n } from "../../shared/i18n";
 
 type NoteDraft = { address: CellAddress; text: string; author: string; box?: CellNote["box"] };
@@ -35,6 +36,9 @@ export function useReviewController(options: {
 }) {
   const { t } = useAppI18n();
   const showActiveNote = ref(true);
+  const showAllNotes = ref(false);
+  const hiddenNoteKeys = ref<string[]>([]);
+  const allNotesHidden = ref(false);
   const draft = shallowRef<NoteDraft>();
   const error = ref("");
   let target: NoteTarget | undefined;
@@ -72,7 +76,12 @@ export function useReviewController(options: {
     error.value = "";
     if (wasOpen && restoreFocus) void nextTick(options.focus);
   }
-  watch([options.getGeneration, () => options.getSheet().id], () => close(false));
+  watch([options.getGeneration, () => options.getSheet().id], () => {
+    close(false);
+    showAllNotes.value = false;
+    allNotesHidden.value = false;
+    hiddenNoteKeys.value = [];
+  });
   watch(
     [
       options.getGeneration,
@@ -81,7 +90,9 @@ export function useReviewController(options: {
       () => options.getAddress().column,
     ],
     () => {
-      showActiveNote.value = true;
+      const address = anchor(options.getAddress());
+      showActiveNote.value =
+        !allNotesHidden.value && !hiddenNoteKeys.value.includes(`${address.row}:${address.column}`);
     },
   );
 
@@ -150,6 +161,30 @@ export function useReviewController(options: {
       }),
     );
   }
+  function resetBox(mode: "position" | "size" | "all"): void {
+    if (options.isBusy() || options.getSheet().properties.protected || !options.finishEditing())
+      return;
+    const address = draft.value?.address ?? anchor(options.getAddress());
+    const note = getCellNote(options.getSheet(), address);
+    if (!note && !draft.value) return;
+    const box = { ...(draft.value?.box ?? note?.box ?? DEFAULT_NOTE_BOX) };
+    if (mode !== "size") {
+      box.offsetX = DEFAULT_NOTE_BOX.offsetX;
+      box.offsetY = DEFAULT_NOTE_BOX.offsetY;
+    }
+    if (mode !== "position") {
+      box.width = DEFAULT_NOTE_BOX.width;
+      box.height = DEFAULT_NOTE_BOX.height;
+    }
+    updateBox({ address, box });
+  }
+  function setAllNotesVisible(visible: boolean): void {
+    if (options.isBusy() || !options.finishEditing()) return;
+    allNotesHidden.value = !visible;
+    hiddenNoteKeys.value = [];
+    showAllNotes.value = visible;
+    showActiveNote.value = visible;
+  }
   function remove(address?: CellAddress): void {
     if (options.isBusy() || options.getSheet().properties.protected || !options.finishEditing())
       return;
@@ -162,6 +197,9 @@ export function useReviewController(options: {
   }
   function navigate(address: CellAddress): void {
     if (options.isBusy() || !options.finishEditing()) return;
+    allNotesHidden.value = false;
+    const key = `${address.row}:${address.column}`;
+    hiddenNoteKeys.value = hiddenNoteKeys.value.filter((value) => value !== key);
     options.navigate(address);
     showActiveNote.value = true;
   }
@@ -177,13 +215,25 @@ export function useReviewController(options: {
   }
   function toggleNote(): void {
     if (options.isBusy() || !options.finishEditing()) return;
+    allNotesHidden.value = false;
     showActiveNote.value = !showActiveNote.value;
+    if (showAllNotes.value) {
+      const address = anchor(options.getAddress());
+      const key = `${address.row}:${address.column}`;
+      hiddenNoteKeys.value = showActiveNote.value
+        ? hiddenNoteKeys.value.filter((value) => value !== key)
+        : [...hiddenNoteKeys.value, key];
+    }
   }
   return {
     notes,
     draft,
     error,
     showActiveNote,
+    showAllNotes,
+    hiddenNoteKeys,
+    setAllNotesVisible,
+    resetBox,
     hasNote,
     hasSelectedNotes,
     edit,

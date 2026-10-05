@@ -5,6 +5,7 @@ import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
+  redoWorkbookCommand,
 } from "@idea10/core/history";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { createSetCellNoteCommand } from "@idea10/core/commands";
@@ -129,6 +130,92 @@ describe("review controller", () => {
     f.review.updateBox({ address: f.address.value, box: { ...box, width: 300 } });
     f.review.close(false);
     expect(getCellNote(f.sheet, f.address.value)?.box).toEqual(box);
+  });
+  test("resets position and size independently with undo/redo and preserves author/text", () => {
+    const f = fixture();
+    const box = { offsetX: 70, offsetY: 30, width: 240, height: 140 };
+    f.execute(
+      createSetCellNoteCommand(f.workbook, f.sheet.id, f.address.value, {
+        text: "Keep",
+        author: "Ada",
+        box,
+      }),
+    );
+    f.execute.mockClear();
+    f.review.resetBox("position");
+    expect(getCellNote(f.sheet, f.address.value)).toEqual({
+      text: "Keep",
+      author: "Ada",
+      box: { ...box, offsetX: 15, offsetY: -10 },
+    });
+    expect(f.execute).toHaveBeenCalledTimes(1);
+    undoWorkbookCommand(f.session);
+    f.revision.value++;
+    expect(getCellNote(f.sheet, f.address.value)?.box).toEqual(box);
+    redoWorkbookCommand(f.session);
+    f.revision.value++;
+    expect(getCellNote(f.sheet, f.address.value)?.box?.width).toBe(240);
+    f.review.resetBox("size");
+    expect(getCellNote(f.sheet, f.address.value)?.box).toEqual({
+      offsetX: 15,
+      offsetY: -10,
+      width: 128,
+      height: 80,
+    });
+    f.review.updateBox({ address: f.address.value, box });
+    f.review.resetBox("all");
+    expect(getCellNote(f.sheet, f.address.value)?.box).toEqual({
+      offsetX: 15,
+      offsetY: -10,
+      width: 128,
+      height: 80,
+    });
+  });
+  test("reset respects protection and keeps draft geometry in its save transaction", () => {
+    const f = fixture();
+    f.add(0, 0, "Keep");
+    const box = { offsetX: 70, offsetY: 30, width: 240, height: 140 };
+    f.review.updateBox({ address: f.address.value, box });
+    f.sheet.properties.protected = true;
+    f.review.resetBox("all");
+    expect(getCellNote(f.sheet, f.address.value)?.box).toEqual(box);
+    f.sheet.properties.protected = false;
+    f.review.edit();
+    f.execute.mockClear();
+    f.review.resetBox("size");
+    expect(f.execute).not.toHaveBeenCalled();
+    f.review.save({ text: "Updated", author: "Ada" });
+    expect(getCellNote(f.sheet, f.address.value)?.box).toEqual({ ...box, width: 128, height: 80 });
+    undoWorkbookCommand(f.session);
+    expect(getCellNote(f.sheet, f.address.value)).toEqual({ text: "Keep", box });
+  });
+  test("all-note visibility is view state and allows hiding a single note", async () => {
+    const f = fixture();
+    f.add(0, 0, "First");
+    f.add(1, 1, "Second");
+    f.execute.mockClear();
+    f.review.setAllNotesVisible(true);
+    f.review.toggleNote();
+    expect(f.review.showAllNotes.value).toBe(true);
+    expect(f.review.hiddenNoteKeys.value).toEqual(["0:0"]);
+    f.address.value = { row: 1, column: 1 };
+    await nextTick();
+    expect(f.review.showActiveNote.value).toBe(true);
+    f.address.value = { row: 0, column: 0 };
+    await nextTick();
+    expect(f.review.showActiveNote.value).toBe(false);
+    f.review.setAllNotesVisible(false);
+    f.address.value = { row: 1, column: 1 };
+    await nextTick();
+    expect(f.review.showActiveNote.value).toBe(false);
+    expect(f.execute).not.toHaveBeenCalled();
+    f.review.step(1);
+    await nextTick();
+    expect(f.review.showActiveNote.value).toBe(true);
+    f.generation.value++;
+    await nextTick();
+    expect(f.review.showAllNotes.value).toBe(false);
+    expect(f.review.showActiveNote.value).toBe(true);
   });
   test("navigates notes in row-major order and wraps without workbook commands", () => {
     const f = fixture();
