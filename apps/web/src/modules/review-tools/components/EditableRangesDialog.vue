@@ -133,16 +133,20 @@ function save(protect = false): void {
     @confirm="save()"
     @close="emit('close')"
   >
-    <p>{{ t(readOnly ? "review.unlockRangesHint" : "review.editableRangesHint") }}</p>
     <div class="editable-ranges">
       <div class="editable-ranges__toolbar">
-        <TButton variant="outline" :disabled="readOnly" data-range-action="add" @click="add">
-          <template #icon><Plus class="idea-control-icon" aria-hidden="true" /></template>
-          {{ t("review.addRange") }}
-        </TButton>
-        <TButton v-if="!readOnly" variant="outline" @click="save(true)">{{
-          t("review.protectSheet")
-        }}</TButton>
+        <p class="editable-ranges__hint">
+          {{ t(readOnly ? "review.unlockRangesHint" : "review.editableRangesHint") }}
+        </p>
+        <div class="editable-ranges__actions">
+          <TButton variant="outline" :disabled="readOnly" data-range-action="add" @click="add">
+            <template #icon><Plus class="idea-control-icon" aria-hidden="true" /></template>
+            {{ t("review.addRange") }}
+          </TButton>
+          <TButton v-if="!readOnly" variant="outline" @click="save(true)">{{
+            t("review.protectSheet")
+          }}</TButton>
+        </div>
       </div>
       <TableHeightWrapper v-slot="{ height }">
         <TTable
@@ -226,9 +230,18 @@ function save(protect = false): void {
   &__toolbar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
     gap: 12px;
+  }
+  &__hint {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+  }
+  &__actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--idea-space-4);
   }
   &__row-actions {
     display: flex;
