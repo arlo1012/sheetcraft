@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { createWorkbook, getActiveSheet, setCellContent } from "@idea10/core/workbook";
+import {
+  createWorkbook,
+  getActiveSheet,
+  setCellContent,
+  type FloatingImage,
+} from "@idea10/core/workbook";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { useSheetImageActions } from "../../../../modules/sheet-images/useSheetImageActions";
 import { prepareImageAsset } from "../../../../modules/image-assets/prepareImageAsset";
@@ -11,6 +16,19 @@ vi.mock("../../../../modules/image-assets/prepareImageAsset", async (original) =
 }));
 const file = new File(["PNG"], "diagram.png", { type: "image/png" });
 const asset = { id: "asset", mimeType: "image/png", width: 800, height: 400, blob: file };
+function existingImage(): FloatingImage {
+  return {
+    id: "existing-image",
+    assetId: "original-asset",
+    altText: "Original",
+    anchor: { row: 5, column: 6 },
+    offsetX: 17,
+    offsetY: 23,
+    width: 180,
+    height: 95,
+    transform: { crop: { x: 0.1, y: 0.2, width: 0.6, height: 0.7 }, rotation: 90 },
+  };
+}
 function fixture() {
   let workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
   const store = createMemoryImageAssetStore();
@@ -39,8 +57,112 @@ function fixture() {
     },
   };
 }
-beforeEach(() => vi.mocked(prepareImageAsset).mockReset());
+beforeEach(() => {
+  vi.mocked(prepareImageAsset).mockReset();
+});
 describe("sheet image insertion", () => {
+  test("replaces an image asset while retaining its identity, geometry, and edits", async () => {
+    vi.mocked(prepareImageAsset).mockResolvedValue(asset);
+    const f = fixture();
+    const image = existingImage();
+    const sheet = getActiveSheet(f.getWorkbook());
+    sheet.floatingImages.push(image);
+    f.setFloatingImage.mockImplementation(async (replacement) =>
+      expect(await f.store.get(replacement.assetId)).toEqual(asset),
+    );
+    await f.actions.insertFile(file, "floating", undefined, image.id);
+    expect(f.setFloatingImage).toHaveBeenCalledExactlyOnceWith(
+      { ...image, assetId: asset.id, altText: file.name },
+      sheet.id,
+    );
+    expect(f.setCellImage).not.toHaveBeenCalled();
+  });
+
+  test("does not recreate a replacement target deleted during image decoding", async () => {
+    let resolve!: (value: typeof asset) => void;
+    vi.mocked(prepareImageAsset).mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    const f = fixture();
+    const image = existingImage();
+    const sheet = getActiveSheet(f.getWorkbook());
+    sheet.floatingImages.push(image);
+    const replacing = f.actions.insertFile(file, "floating", undefined, image.id);
+    sheet.floatingImages = [];
+    resolve(asset);
+    await replacing;
+    expect(f.setFloatingImage).not.toHaveBeenCalled();
+    expect(sheet.floatingImages).toEqual([]);
+    expect(f.actions.busy.value).toBe(false);
+  });
+
+  test.each(["decoding", "storage"] as const)(
+    "keeps the original image when replacement %s fails",
+    async (failure) => {
+      const f = fixture();
+      const image = existingImage();
+      const sheet = getActiveSheet(f.getWorkbook());
+      sheet.floatingImages.push(image);
+      if (failure === "decoding")
+        vi.mocked(prepareImageAsset).mockRejectedValue(new Error("decode"));
+      else {
+        vi.mocked(prepareImageAsset).mockResolvedValue(asset);
+        vi.spyOn(f.store, "put").mockRejectedValue(new Error("quota"));
+      }
+      await f.actions.insertFile(file, "floating", undefined, image.id);
+      expect(f.setFloatingImage).not.toHaveBeenCalled();
+      expect(sheet.floatingImages).toEqual([image]);
+      expect(image.assetId).toBe("original-asset");
+      expect(f.actions.feedback.value).toBe("image.insertionFailed");
+      expect(f.actions.busy.value).toBe(false);
+    },
+  );
+
+  test.each(["protection", "workbook"] as const)(
+    "cancels replacement when %s changes during decoding",
+    async (change) => {
+      let resolve!: (value: typeof asset) => void;
+      vi.mocked(prepareImageAsset).mockReturnValue(
+        new Promise((done) => {
+          resolve = done;
+        }),
+      );
+      const f = fixture();
+      const image = existingImage();
+      const sheet = getActiveSheet(f.getWorkbook());
+      sheet.floatingImages.push(image);
+      const replacing = f.actions.insertFile(file, "floating", undefined, image.id);
+      if (change === "protection") sheet.properties.protected = true;
+      else f.replace();
+      resolve(asset);
+      await replacing;
+      expect(f.setFloatingImage).not.toHaveBeenCalled();
+      expect(await f.store.get(asset.id)).toBeUndefined();
+      expect(sheet.floatingImages).toEqual([image]);
+      expect(f.actions.busy.value).toBe(false);
+    },
+  );
+
+  test("opens the replacement picker only for an editable existing image", () => {
+    const f = fixture();
+    const image = existingImage();
+    const sheet = getActiveSheet(f.getWorkbook());
+    sheet.floatingImages.push(image);
+    const input = document.createElement("input");
+    input.type = "file";
+    const click = vi.spyOn(input, "click").mockImplementation(() => {});
+    f.actions.fileInput.value = input;
+    f.actions.requestReplace("missing-image");
+    expect(click).not.toHaveBeenCalled();
+    f.actions.requestReplace(image.id);
+    expect(click).toHaveBeenCalledTimes(1);
+    sheet.properties.protected = true;
+    f.actions.requestReplace(image.id);
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+
   test("does not finish an image insertion after its target becomes protected", async () => {
     let resolve!: (value: typeof asset) => void;
     vi.mocked(prepareImageAsset).mockReturnValue(

@@ -44,6 +44,7 @@ const props = withDefaults(
     selectedTableStyleId?: string;
     selectedTableStyleColor?: string;
     hasTable?: boolean;
+    hasImage?: boolean;
   }>(),
   { conditionalFormattingDisabled: undefined },
 );
@@ -100,6 +101,7 @@ const { t } = useAppI18n();
 type Category =
   | "home"
   | "insert"
+  | "image"
   | "page"
   | "formulas"
   | "data"
@@ -109,9 +111,10 @@ type Category =
   | "proofreading";
 const proofreadingOpen = ref(false);
 const activeCategory = ref<Category>("home");
-let previousCategory: Exclude<Category, "table"> = "home";
+let previousCategory: Exclude<Category, "table" | "image"> = "home";
 const homeTab = ref<HTMLButtonElement>();
 const insertTab = ref<HTMLButtonElement>();
+const imageTab = ref<HTMLButtonElement>();
 const pageTab = ref<HTMLButtonElement>();
 const formulaTab = ref<HTMLButtonElement>();
 const dataTab = ref<HTMLButtonElement>();
@@ -122,12 +125,20 @@ const proofreadingTab = ref<HTMLButtonElement>();
 const tabId = useId();
 
 watch(activeCategory, (category) => {
-  if (category !== "table") previousCategory = category;
+  if (category !== "table" && category !== "image") previousCategory = category;
 });
 watch(
   () => props.hasTable,
   (hasTable) => {
     if (!hasTable && activeCategory.value === "table") activeCategory.value = previousCategory;
+  },
+);
+
+watch(
+  () => props.hasImage,
+  (hasImage) => {
+    if (hasImage) activeCategory.value = "image";
+    else if (activeCategory.value === "image") activeCategory.value = previousCategory;
   },
 );
 
@@ -139,6 +150,10 @@ function onCategoryKeydown(event: KeyboardEvent): void {
   if (props.hasTable) {
     categories.push("table");
     tabs.push(tableTab);
+  }
+  if (props.hasImage) {
+    categories.push("image");
+    tabs.push(imageTab);
   }
   if (proofreadingOpen.value) {
     categories.push("proofreading");
@@ -175,6 +190,7 @@ defineSlots<{
   "table-tools"?: () => unknown;
   "page-tools"?: () => unknown;
   "insert-tools"?: () => unknown;
+  "image-tools"?: () => unknown;
   "review-tools"?: (props: { openProofreading: () => void }) => unknown;
   "view-tools"?: () => unknown;
   "proofreading-tools"?: (props: { close: () => void }) => unknown;
@@ -298,6 +314,22 @@ defineSlots<{
             {{ t("ribbon.view") }}
           </button>
           <button
+            v-if="hasImage"
+            :id="`${tabId}-image`"
+            ref="imageTab"
+            class="spreadsheet-ribbon__category spreadsheet-ribbon__category--contextual"
+            :class="{ 'is-active': activeCategory === 'image' }"
+            data-ribbon-category="image"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'image'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'image' ? 0 : -1"
+            @click="activeCategory = 'image'"
+          >
+            {{ t("image.tools") }}
+          </button>
+          <button
             v-if="hasTable"
             :id="`${tabId}-table`"
             ref="tableTab"
@@ -407,6 +439,7 @@ defineSlots<{
           <slot name="worksheet-tools" />
         </template>
       </HomeFormatToolbar>
+      <slot v-else-if="activeCategory === 'image'" name="image-tools" />
       <slot v-else-if="activeCategory === 'insert'" name="insert-tools" />
       <slot v-else-if="activeCategory === 'page'" name="page-tools" />
       <FormulaToolbar

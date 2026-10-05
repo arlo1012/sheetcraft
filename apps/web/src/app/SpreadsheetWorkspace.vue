@@ -75,6 +75,7 @@ import { usePageThemeController } from "../modules/page-layout/usePageThemeContr
 import { workbookThemeKey } from "../shared/color/workbook-theme-context";
 import PageBackgroundMenu from "../modules/page-decorations/components/PageBackgroundMenu.vue";
 import type { SheetWatermark, WatermarkPreset } from "@idea10/core/page-decoration";
+import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
 import InsertToolbar from "../modules/insert-tools/components/InsertToolbar.vue";
 import PageWatermarkMenu from "../modules/page-decorations/components/PageWatermarkMenu.vue";
 import WatermarkDialog from "../modules/page-decorations/components/WatermarkDialog.vue";
@@ -512,6 +513,16 @@ const showPageWhiteSpace = ref(true);
 const pageRulerUnit = ref<PageLayoutRulerUnit>("cm");
 const pageSetupTab = ref<"page" | "margins" | "header-footer" | "sheet">("page");
 const headerFooterTarget = shallowRef<HeaderFooterEditTarget>();
+const selectedPictureId = ref<string | null>(null);
+const selectedPicture = computed(() =>
+  activeSheet.value.floatingImages.find((image) => image.id === selectedPictureId.value),
+);
+watch(
+  () => activeSheet.value.id,
+  () => {
+    selectedPictureId.value = null;
+  },
+);
 const sheetGridRef = shallowRef<InstanceType<typeof SheetGrid> | null>(null);
 function setSheetGridRef(value: Element | ComponentPublicInstance | null): void {
   sheetGridRef.value = value as InstanceType<typeof SheetGrid> | null;
@@ -1919,6 +1930,7 @@ const gridInert = computed(
       @change="imageActions.onFileChange"
     />
     <SpreadsheetRibbon
+      :has-image="!!selectedPicture"
       :hyperlink-disabled="
         loading ||
         fileBusy ||
@@ -2016,6 +2028,27 @@ const gridInert = computed(
       @undo="undo"
       @redo="redo"
     >
+      <template #image-tools>
+        <PictureToolbar
+          v-if="selectedPicture"
+          :image="selectedPicture"
+          :disabled="
+            loading ||
+            fileBusy ||
+            xlsxBusy ||
+            imageBusy ||
+            !canUseSheetPermission(activeSheet, 'editObjects')
+          "
+          @update="setFloatingImage"
+          @insert-image="imageActions.requestInsert"
+          @crop="sheetGridRef?.cropImage()"
+          @rotate="sheetGridRef?.rotateImage($event)"
+          @flip="sheetGridRef?.flipImage($event)"
+          @restore="sheetGridRef?.restoreImage()"
+          @replace="imageActions.requestReplace(selectedPicture.id)"
+          @convert-to-cell="convertFloatingImageToCell(selectedPicture.id)"
+        />
+      </template>
       <template #insert-tools>
         <InsertToolbar
           :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
@@ -3054,6 +3087,7 @@ const gridInert = computed(
         :image-asset-urls="imageAssetUrls"
         :loading-image-asset-ids="loadingImageAssetIds"
         :missing-image-asset-ids="missingImageAssetIds"
+        @selected-floating-image-change="selectedPictureId = $event"
         @update-floating-image="setFloatingImage"
         @delete-floating-image="deleteFloatingImage"
         @convert-floating-image-to-cell="convertFloatingImageToCell"

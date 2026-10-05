@@ -805,7 +805,6 @@ export const zhCN = {
     unavailableFeature: "{feature}，暂未开放",
   },
   ribbon: {
-    insert: "插入",
     rowColumnTools: "行和列",
     worksheetTools: "工作表",
     structureTools: "行列和工作表操作",
@@ -1585,6 +1584,11 @@ export const zhCN = {
     colorValue: "颜色 {value}",
   },
   image: {
+    replace: "更改图片",
+    tools: "图片工具",
+    widthPoints: "宽度（磅）",
+    heightPoints: "高度（磅）",
+    lockAspectRatio: "锁定纵横比",
     insertMenu: "插入图片",
     insertInCell: "单元格内图片",
     insertFloating: "浮动图片",

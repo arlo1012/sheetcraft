@@ -791,7 +791,6 @@ export type MessageSchema = ToolMessageSchema & {
     unavailableFeature: string;
   };
   ribbon: {
-    insert: string;
     rowColumnTools: string;
     worksheetTools: string;
     structureTools: string;
@@ -1570,6 +1569,11 @@ export type MessageSchema = ToolMessageSchema & {
     colorValue: string;
   };
   image: {
+    replace: string;
+    tools: string;
+    widthPoints: string;
+    heightPoints: string;
+    lockAspectRatio: string;
     insertMenu: string;
     insertInCell: string;
     insertFloating: string;

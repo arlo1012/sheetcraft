@@ -42,7 +42,7 @@ export function useSheetImageActions(options: {
   const feedback = ref<MessageKey>();
   const idFactory = createBrowserIdFactory();
   const fileInput = ref<HTMLInputElement | null>(null);
-  let pending: { mode: ImageInsertMode; target: ImageTarget } | undefined;
+  let pending: { mode: ImageInsertMode; target: ImageTarget; replaceId?: string } | undefined;
 
   function captureTarget(
     address = options.getAddress(),
@@ -87,10 +87,24 @@ export function useSheetImageActions(options: {
     }
   }
 
+  function requestReplace(imageId: string): void {
+    if (busy.value) return;
+    const image = options.getSheet().floatingImages.find((entry) => entry.id === imageId);
+    if (!image) return;
+    const target = captureTarget(image.anchor);
+    if (!target) return;
+    pending = { mode: "floating", target, replaceId: imageId };
+    if (fileInput.value) {
+      fileInput.value.value = "";
+      fileInput.value.click();
+    }
+  }
+
   async function insertFile(
     file: File,
     mode: ImageInsertMode = "floating",
     target = captureTarget(options.getAddress(), mode),
+    replaceId?: string,
   ): Promise<void> {
     if (!target || !isCurrent(target, mode) || busy.value) return;
     busy.value = true;
@@ -101,7 +115,13 @@ export function useSheetImageActions(options: {
       await options.assetStore.put(asset);
       if (!isCurrent(target, mode)) return;
       const altText = file.name || "";
-      if (mode === "cell") {
+      if (replaceId) {
+        const current = target.workbook.sheets
+          .get(target.sheetId)
+          ?.floatingImages.find((entry) => entry.id === replaceId);
+        if (!current) return;
+        options.setFloatingImage({ ...current, assetId: asset.id, altText }, target.sheetId);
+      } else if (mode === "cell") {
         options.setCellImage({
           sheetId: target.sheetId,
           address: target.address,
@@ -151,7 +171,7 @@ export function useSheetImageActions(options: {
     const request = pending;
     pending = undefined;
     input.value = "";
-    if (file && request) void insertFile(file, request.mode, request.target);
+    if (file && request) void insertFile(file, request.mode, request.target, request.replaceId);
   }
 
   async function pasteFloatingImage(
@@ -240,6 +260,7 @@ export function useSheetImageActions(options: {
     },
     fileInput,
     requestInsert,
+    requestReplace,
     insertFile,
     pasteImageFile: (file: File, mode: ImageInsertMode, address?: CellAddress) =>
       insertFile(file, mode, captureTarget(address)),

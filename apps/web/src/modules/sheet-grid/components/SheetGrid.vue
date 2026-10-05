@@ -286,6 +286,7 @@ const emit = defineEmits<{
   openHeaderFooter: [target: HeaderFooterEditTarget];
   "update:showPageWhiteSpace": [value: boolean];
   updateFloatingImage: [image: FloatingImage];
+  selectedFloatingImageChange: [id: string | null];
   deleteFloatingImage: [id: string];
   convertFloatingImageToCell: [id: string];
   convertCellImageToFloating: [address: CellAddress];
@@ -462,6 +463,7 @@ const effectiveFreeze = computed(() =>
   props.viewMode === "normal" ? props.sheet.freezePanes : { rows: 0, columns: 0 },
 );
 const selectedImageId = ref<string | null>(null);
+watch(selectedImageId, (id) => emit("selectedFloatingImageChange", id));
 const selection = shallowRef<CellSelection>(createCellSelection({ row: 0, column: 0 }));
 const imagePreview = shallowRef<{
   assetId: string;
@@ -2945,6 +2947,10 @@ onBeforeUnmount(() => {
 });
 
 defineExpose({
+  cropImage: () => imageLayerRef.value?.startCrop(),
+  rotateImage: (turns: -1 | 1 | 2) => imageLayerRef.value?.rotateImage(turns),
+  flipImage: (axis: "horizontal" | "vertical") => imageLayerRef.value?.flipImage(axis),
+  restoreImage: () => imageLayerRef.value?.restoreImage(),
   fillSelection,
   clearClipboard,
   flushPendingEdit,

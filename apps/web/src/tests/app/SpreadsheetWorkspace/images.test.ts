@@ -283,7 +283,9 @@ describe("workspace cell image entry points", () => {
     async function menu(row: number, column: number, action: string) {
       await triggerCanvasCell(wrapper, { row, column }, "contextmenu");
       await flushPromises();
-      document.querySelector<HTMLButtonElement>(`[data-cell-action="${action}"]`)!.click();
+      document
+        .querySelector<HTMLButtonElement>(`[data-context-clipboard-action="${action}"]`)!
+        .click();
       await flushPromises();
     }
     await menu(0, 0, "copy");

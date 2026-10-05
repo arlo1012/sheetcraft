@@ -29,7 +29,13 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get("header").attributes("aria-label")).toBe("Workbook tools");
     expect(wrapper.get("nav").attributes("aria-label")).toBe("Ribbon categories");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("Home");
-    expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(6);
+    expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(7);
+    expect(
+      wrapper
+        .findAll(".spreadsheet-ribbon__category")
+        .slice(0, 2)
+        .map((tab) => tab.attributes("data-ribbon-category")),
+    ).toEqual(["home", "insert"]);
     expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-labelledby")).toBe(
       wrapper.get('[data-ribbon-category="home"]').attributes("id"),
     );
@@ -210,6 +216,7 @@ describe("SpreadsheetRibbon", () => {
 
     expect(wrapper.get("header").attributes("aria-label")).toBe("工作簿工具");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("开始");
+    expect(wrapper.get('[data-ribbon-category="insert"]').text()).toBe("插入");
     expect(wrapper.get('[data-ribbon-category="data"]').text()).toBe("数据");
     expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-labelledby")).toBe(
       wrapper.get('[data-ribbon-category="home"]').attributes("id"),
@@ -252,6 +259,46 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-category="data"]').attributes("aria-selected")).toBe("true");
     await wrapper.get('[data-ribbon-category="data"]').trigger("keydown", { key: "Home" });
     expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="home"]').trigger("keydown", { key: "ArrowRight" });
+    expect(wrapper.get('[data-ribbon-category="insert"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="insert"]').trigger("keydown", { key: "ArrowRight" });
+    expect(wrapper.get('[data-ribbon-category="page"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="page"]').trigger("keydown", { key: "ArrowLeft" });
+    expect(wrapper.get('[data-ribbon-category="insert"]').attributes("aria-selected")).toBe("true");
+  });
+
+  test("opens contextual Image tools on selection and restores the previous category", async () => {
+    const wrapper = mount(SpreadsheetRibbon, {
+      props: { state: createDefaultSelectionCellStyleState(), disabled: false },
+      global: { plugins: [createAppI18n("zh-CN")] },
+      slots: {
+        "image-tools": "<div data-image-panel>图片设置</div>",
+        "insert-tools": "<div data-insert-panel>插入工具</div>",
+      },
+    });
+    expect(wrapper.find('[data-ribbon-category="image"]').exists()).toBe(false);
+    await wrapper.get('[data-ribbon-category="insert"]').trigger("click");
+    expect(wrapper.get("[data-insert-panel]").text()).toBe("插入工具");
+    await wrapper.setProps({ hasImage: true });
+    expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(8);
+    expect(wrapper.get('[data-ribbon-category="image"]').attributes("aria-selected")).toBe("true");
+    expect(wrapper.get("[data-image-panel]").text()).toBe("图片设置");
+    expect(wrapper.get('[role="tabpanel"]').attributes("aria-labelledby")).toBe(
+      wrapper.get('[data-ribbon-category="image"]').attributes("id"),
+    );
+    await wrapper.get('[data-ribbon-category="image"]').trigger("keydown", { key: "Home" });
+    expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="home"]').trigger("keydown", { key: "End" });
+    expect(wrapper.get('[data-ribbon-category="image"]').attributes("aria-selected")).toBe("true");
+    await wrapper.setProps({ hasImage: false });
+    expect(wrapper.find('[data-ribbon-category="image"]').exists()).toBe(false);
+    expect(wrapper.find("[data-image-panel]").exists()).toBe(false);
+    expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="insert"]').trigger("click");
+    await wrapper.setProps({ hasImage: true });
+    await wrapper.setProps({ hasImage: false });
+    expect(wrapper.get('[data-ribbon-category="insert"]').attributes("aria-selected")).toBe("true");
+    wrapper.unmount();
   });
 
   test("shows contextual Table tools and restores the previous category on leaving a table", async () => {

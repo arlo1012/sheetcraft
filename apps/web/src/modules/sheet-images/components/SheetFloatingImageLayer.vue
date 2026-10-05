@@ -621,6 +621,10 @@ onBeforeUnmount(() => {
 });
 
 defineExpose({
+  startCrop,
+  rotateImage,
+  flipImage,
+  restoreImage,
   getPaintState,
   cacheImageSize,
   handleSurfacePointerDown,

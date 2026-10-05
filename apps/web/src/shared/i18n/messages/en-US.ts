@@ -831,7 +831,6 @@ export const enUS = {
     unavailableFeature: "{feature}, not available yet",
   },
   ribbon: {
-    insert: "Insert",
     rowColumnTools: "Rows and columns",
     worksheetTools: "Worksheet",
     structureTools: "Row, column, and worksheet operations",
@@ -1620,6 +1619,11 @@ export const enUS = {
     colorValue: "Color {value}",
   },
   image: {
+    replace: "Change picture",
+    tools: "Picture tools",
+    widthPoints: "Width (pt)",
+    heightPoints: "Height (pt)",
+    lockAspectRatio: "Lock aspect ratio",
     insertMenu: "Insert image",
     insertInCell: "Image in cell",
     insertFloating: "Floating image",
