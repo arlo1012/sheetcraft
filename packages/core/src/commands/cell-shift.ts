@@ -1,3 +1,4 @@
+import { mapDrawingSource } from "../sheet-drawings.js";
 import { collectFormulaRanges, transformFormulaReferences } from "../formula/references.js";
 import { conditionalFormatFormulaSources } from "../conditional-formatting.js";
 import { rewriteQualifiedReferencesForSheet } from "../formula/workbook-references.js";
@@ -198,6 +199,12 @@ function transformFormulaRange(
   if (!intersects(range, getCellShiftMovement(selected, direction)))
     return { start: { ...range.start }, end: { ...range.end } };
   if (direction !== "left" && direction !== "up") {
+    const horizontal = direction === "right";
+    const selectedStart = horizontal ? selected.start.row : selected.start.column;
+    const selectedEnd = horizontal ? selected.end.row : selected.end.column;
+    const rangeStart = horizontal ? range.start.row : range.start.column;
+    const rangeEnd = horizontal ? range.end.row : range.end.column;
+    if (rangeStart < selectedStart || rangeEnd > selectedEnd) return null;
     const start = map(range.start),
       end = map(range.end);
     return start && end ? { start, end } : null;
@@ -412,18 +419,9 @@ export function applyCellShiftCommand(
     return anchor
       ? [
           {
-            ...drawing,
-            anchor,
-            ...(drawing.kind === "chart"
-              ? {
-                  chart: {
-                    ...drawing.chart,
-                    range: drawing.chart.range
-                      ? transformFormulaRange(drawing.chart.range, map, range, command.direction)
-                      : null,
-                  },
-                }
-              : {}),
+            ...mapDrawingSource({ ...drawing, anchor }, (source) =>
+              transformFormulaRange(source, map, range, command.direction),
+            ),
           },
         ]
       : [];

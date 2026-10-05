@@ -12,11 +12,12 @@ import {
   insertSheet,
 } from "@idea10/core/workbook";
 import { useSparklineActions } from "../../../modules/sparklines/useSparklineActions";
+import { createSequentialIdFactory } from "@idea10/core/runtime";
 
 function fixture() {
   let workbook = createWorkbook({ id: "sparklines", sheetId: "first" });
   let sheet = getActiveSheet(workbook);
-  const session = createWorkbookSession({ workbook });
+  const session = createWorkbookSession({ workbook, idFactory: createSequentialIdFactory() });
   let busy = false;
   const flush = vi.fn(() => true);
   const execute = vi.fn((command) => executeWorkbookCommand(session, command));

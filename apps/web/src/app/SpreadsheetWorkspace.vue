@@ -83,6 +83,8 @@ import PictureSelectionPane from "../modules/sheet-images/components/PictureSele
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
+import { useCameraActions } from "../modules/camera/useCameraActions";
+import CameraEditorDialog from "../modules/camera/components/CameraEditorDialog.vue";
 import SparklineDialog from "../modules/sparklines/components/SparklineDialog.vue";
 import { useChartActions } from "../modules/charts/useChartActions";
 import { defineAsyncComponent } from "vue";
@@ -1092,6 +1094,23 @@ const imageActions = useSheetImageActions({
   },
   convertCellImageToFloating,
 });
+const cameraActions = useCameraActions({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getRange: () => activeSelectionRange.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => cellEditSession.finish(),
+  execute: executeCommand,
+  name: () => t("camera.title"),
+});
+const { editing: editingCamera, error: cameraError } = cameraActions;
+const cameraRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingCameraRange, reference: pickedCameraReference } = cameraRangePicker;
+watch(editingCamera, (value) => {
+  if (!value) cameraRangePicker.cancel();
+});
+watch(() => activeSheet.value.id, cameraActions.close);
+watch(workbookGeneration, cameraActions.close);
 const sparklineActions = useSparklineActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1132,6 +1151,7 @@ watch(workbookGeneration, () => {
 });
 function editSheetDrawing(drawing: SheetDrawing): void {
   if (drawing.kind === "chart") chartActions.edit(drawing);
+  else if (drawing.kind === "camera") cameraActions.open(drawing);
   else drawingActions.edit(drawing);
 }
 const symbolVisible = ref(false);
@@ -1923,6 +1943,7 @@ const { active: pickingNameRange, reference: pickedNameReference } = nameRangePi
 const activeRangePicker = computed(() => {
   if (pickingProtectionRange.value) return protectionRangePicker;
   if (pickingTableRange.value) return tableRangePicker;
+  if (pickingCameraRange.value) return cameraRangePicker;
   if (pickingChartRange.value) return chartRangePicker;
   if (pickingSparklineRange.value) return sparklineRangePicker;
   if (pickingPageSetupRange.value) return pageSetupRangePicker;
@@ -2083,6 +2104,7 @@ const gridInert = computed(
     !!findFormatDraft.value ||
     dataToolsModalOpen.value ||
     !!hyperlinkDraft.value ||
+    (!!editingCamera.value && !pickingCameraRange.value) ||
     !!editingDrawing.value ||
     symbolVisible.value ||
     (!!editingChart.value && !pickingChartRange.value) ||
@@ -2163,6 +2185,7 @@ const gridInert = computed(
         !!cellFormatSelection ||
         !!conditionalFormattingSelection ||
         !!hyperlinkDraft ||
+        (!!editingCamera && !pickingCameraRange) ||
         !!editingDrawing ||
         symbolVisible ||
         (!!editingChart && !pickingChartRange) ||
@@ -2237,8 +2260,6 @@ const gridInert = computed(
             !canUseSheetPermission(activeSheet, 'editObjects')
           "
           @update="setFloatingImage"
-          @insert-drawing="drawingActions.insert"
-          @insert-chart="chartActions.insert"
           @insert-image="imageActions.requestInsert"
           @crop="sheetGridRef?.cropImage()"
           @rotate="sheetGridRef?.rotateImage($event)"
@@ -2260,6 +2281,9 @@ const gridInert = computed(
       </template>
       <template #insert-tools>
         <InsertToolbar
+          @insert-drawing="drawingActions.insert"
+          @insert-camera="cameraActions.open()"
+          @insert-chart="chartActions.insert"
           :sparkline-disabled="
             loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'formatCells')
           "
@@ -3128,6 +3152,7 @@ const gridInert = computed(
         !!findFormatDraft ||
         pickingReferenceRange ||
         !!hyperlinkDraft ||
+        (!!editingCamera && !pickingCameraRange) ||
         !!editingDrawing ||
         symbolVisible ||
         (!!editingChart && !pickingChartRange) ||
@@ -3505,7 +3530,9 @@ const gridInert = computed(
       @close="contextActions.closePanels()"
     />
     <WorkbookStatusBar
-      :sheet-tabs-disabled="pickingTableRange || pickingChartRange || pickingSparklineRange"
+      :sheet-tabs-disabled="
+        pickingTableRange || pickingChartRange || pickingSparklineRange || pickingCameraRange
+      "
       :view-mode="activeViewMode"
       @update:view-mode="setViewMode"
       :edit-session-id="
@@ -3528,6 +3555,7 @@ const gridInert = computed(
         xlsxBusy ||
         !!cellFormatSelection ||
         !!hyperlinkDraft ||
+        (!!editingCamera && !pickingCameraRange) ||
         !!editingDrawing ||
         symbolVisible ||
         (!!editingChart && !pickingChartRange) ||
@@ -3639,6 +3667,27 @@ const gridInert = computed(
     :edit-session-id="cellEditSession.id"
     @confirm="chartRangePicker.confirm"
     @cancel="chartRangePicker.cancel"
+  />
+  <CameraEditorDialog
+    v-if="editingCamera"
+    :key="editingCamera.id"
+    :drawing="editingCamera"
+    :sheet-name="activeSheet.name"
+    :disabled="
+      loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
+    "
+    :error="cameraError"
+    :suspended="pickingCameraRange"
+    :select-reference="cameraRangePicker.selectReference"
+    @confirm="cameraActions.confirm"
+    @close="cameraActions.close"
+  />
+  <RangeReferencePicker
+    v-if="pickingCameraRange"
+    :reference="pickedCameraReference"
+    :edit-session-id="cellEditSession.id"
+    @confirm="cameraRangePicker.confirm"
+    @cancel="cameraRangePicker.cancel"
   />
   <SparklineDialog
     v-if="sparklineDraft"

@@ -200,7 +200,7 @@ describe("picture styling", () => {
       { kind: "image", image: { assetId: "cell-asset", altText: "", transform: image.transform } },
     );
     const snapshot = serializeWorkbook(workbook);
-    expect(snapshot.version).toBe(27);
+    expect(snapshot.version).toBe(28);
     expect(getActiveSheet(deserializeWorkbook(snapshot)).floatingImages).toEqual([image]);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
   });

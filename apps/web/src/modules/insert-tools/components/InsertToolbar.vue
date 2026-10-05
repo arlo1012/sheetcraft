@@ -3,6 +3,7 @@ import ChartInsertTools from "../../charts/components/ChartInsertTools.vue";
 import type { ChartType } from "@idea10/core/sheet-charts";
 import type { SheetGraphicDrawing } from "@idea10/core/sheet-drawings";
 import {
+  Camera,
   Link2,
   Table2,
   Shapes,
@@ -30,6 +31,7 @@ defineProps<{
 }>();
 const emit = defineEmits<{
   insertChart: [type: ChartType | "dashboard"];
+  insertCamera: [];
   insertSymbol: [];
   insertSparkline: [];
   clearSparklines: [];
@@ -147,6 +149,15 @@ const { t } = useAppI18n();
         data-insert-tool="hyperlink"
         @activate="emit('insertHyperlink')"
         ><Link2
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :label="t('camera.title')"
+        :text="t('camera.title')"
+        :disabled="imageDisabled"
+        data-insert-tool="camera"
+        @activate="emit('insertCamera')"
+        ><Camera
       /></RibbonButton>
       <RibbonButton
         variant="tall"

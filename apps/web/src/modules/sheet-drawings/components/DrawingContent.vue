@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from "vue";
 import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
+import type { WorkbookTheme } from "@idea10/core/workbook-theme";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
+const CameraContent = defineAsyncComponent(
+  () => import("../../camera/components/CameraContent.vue"),
+);
 const ChartContent = defineAsyncComponent(() => import("../../charts/components/ChartContent.vue"));
 const EquationContent = defineAsyncComponent(() => import("./EquationContent.vue"));
 const props = defineProps<{
@@ -9,6 +13,10 @@ const props = defineProps<{
   sheet?: Sheet;
   evaluator?: SheetEvaluator;
   revision?: number;
+  theme?: WorkbookTheme;
+  imageAssetUrls?: ReadonlyMap<string, string>;
+  locale?: string;
+  dateSystem?: "1900" | "1904";
 }>();
 const textStyle = computed(() => ({
   color: props.drawing.color,
@@ -87,6 +95,17 @@ const textStyle = computed(() => ({
       :sheet="sheet"
       :evaluator="evaluator"
       :revision="revision ?? 0"
+    />
+    <CameraContent
+      v-else-if="drawing.kind === 'camera' && sheet && evaluator"
+      :drawing="drawing"
+      :sheet="sheet"
+      :evaluator="evaluator"
+      :revision="revision ?? 0"
+      :theme="theme"
+      :image-asset-urls="imageAssetUrls"
+      :locale="locale"
+      :date-system="dateSystem"
     />
     <EquationContent
       v-else-if="drawing.kind === 'equation'"

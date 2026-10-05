@@ -1,6 +1,6 @@
 import { getCellSparkline, setCellSparkline } from "../workbook.js";
 import { cloneCellSparkline } from "../sparklines.js";
-import { normalizeSheetDrawings } from "../sheet-drawings.js";
+import { normalizeSheetDrawings, mapDrawingSource } from "../sheet-drawings.js";
 import { normalizeSheetProtection } from "../protection.js";
 import {
   MAX_SHEET_COLUMNS,
@@ -653,25 +653,10 @@ function transformSheetMetadataForAxis(
         ? []
         : [
             {
-              ...drawing,
-              anchor: { ...drawing.anchor, [axis]: target },
-              ...(drawing.kind === "chart"
-                ? {
-                    chart: {
-                      ...drawing.chart,
-                      range: drawing.chart.range
-                        ? transformRangeForAxis(
-                            drawing.chart.range,
-                            axis,
-                            index,
-                            count,
-                            maximum,
-                            operation,
-                          )
-                        : null,
-                    },
-                  }
-                : {}),
+              ...mapDrawingSource(
+                { ...drawing, anchor: { ...drawing.anchor, [axis]: target } },
+                (range) => transformRangeForAxis(range, axis, index, count, maximum, operation),
+              ),
             },
           ];
     }),
@@ -1628,16 +1613,10 @@ function transformSheetMetadataForAxisMove(
   );
   return {
     drawings: normalizeSheetDrawings(metadata.drawings).map((drawing) => ({
-      ...drawing,
-      anchor: { ...drawing.anchor, [axis]: map(drawing.anchor[axis]) },
-      ...(drawing.kind === "chart"
-        ? {
-            chart: {
-              ...drawing.chart,
-              range: drawing.chart.range ? moveRange(drawing.chart.range) : null,
-            },
-          }
-        : {}),
+      ...mapDrawingSource(
+        { ...drawing, anchor: { ...drawing.anchor, [axis]: map(drawing.anchor[axis]) } },
+        moveRange,
+      ),
     })),
     freezePanes: { ...metadata.freezePanes },
     filter,

@@ -1,5 +1,5 @@
 import { normalizeSheetChart, type SheetChart } from "./sheet-charts.js";
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellAddress } from "./workbook.js";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellAddress, type CellRange } from "./workbook.js";
 
 export type DrawingShape =
   | "rectangle"
@@ -33,8 +33,46 @@ type DrawingBase = {
 };
 export type SheetGraphicDrawing = DrawingBase & { kind: SheetGraphicKind };
 export type SheetChartDrawing = DrawingBase & { kind: "chart"; chart: SheetChart };
-export type SheetDrawing = SheetGraphicDrawing | SheetChartDrawing;
-const kinds = new Set(["shape", "textBox", "wordArt", "icon", "equation", "chart"]);
+export type SheetCameraDrawing = DrawingBase & {
+  kind: "camera";
+  camera: { range: CellRange | null; gridLines: boolean };
+};
+export type SheetDrawing = SheetGraphicDrawing | SheetChartDrawing | SheetCameraDrawing;
+export function normalizeCameraRange(range: CellRange | null): CellRange | null {
+  if (range === null) return null;
+  if (
+    !range ||
+    !range.start ||
+    !range.end ||
+    [range.start.row, range.start.column, range.end.row, range.end.column].some(
+      (n) => !Number.isInteger(n) || n < 0,
+    ) ||
+    range.end.row >= MAX_SHEET_ROWS ||
+    range.end.column >= MAX_SHEET_COLUMNS ||
+    range.start.row > range.end.row ||
+    range.start.column > range.end.column ||
+    (range.end.row - range.start.row + 1) * (range.end.column - range.start.column + 1) > 10000
+  )
+    throw new RangeError("Camera source must contain at most 10,000 cells.");
+  return { start: { ...range.start }, end: { ...range.end } };
+}
+export function mapDrawingSource(
+  drawing: SheetDrawing,
+  map: (range: CellRange) => CellRange | null,
+): SheetDrawing {
+  if (drawing.kind === "chart")
+    return {
+      ...drawing,
+      chart: { ...drawing.chart, range: drawing.chart.range ? map(drawing.chart.range) : null },
+    };
+  if (drawing.kind === "camera")
+    return {
+      ...drawing,
+      camera: { ...drawing.camera, range: drawing.camera.range ? map(drawing.camera.range) : null },
+    };
+  return drawing;
+}
+const kinds = new Set(["shape", "textBox", "wordArt", "icon", "equation", "chart", "camera"]);
 const shapes = new Set([
   "rectangle",
   "roundedRectangle",
@@ -79,11 +117,21 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   ) {
     throw new RangeError("Invalid sheet drawing.");
   }
+  if (value.kind === "camera" && (!value.camera || typeof value.camera.gridLines !== "boolean"))
+    throw new RangeError("Invalid camera.");
   return {
     id: value.id,
     ...(value.kind === "chart"
       ? ({ kind: "chart", chart: normalizeSheetChart(value.chart) } as const)
-      : { kind: value.kind }),
+      : value.kind === "camera"
+        ? ({
+            kind: "camera",
+            camera: {
+              range: normalizeCameraRange(value.camera.range),
+              gridLines: value.camera.gridLines,
+            },
+          } as const)
+        : { kind: value.kind }),
     name: value.name,
     anchor: { ...value.anchor },
     offsetX: value.offsetX,

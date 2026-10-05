@@ -9,6 +9,7 @@ import {
   type CSSProperties,
 } from "vue";
 import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
+import type { WorkbookTheme } from "@idea10/core/workbook-theme";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import {
   getFloatingImageViewportFragments,
@@ -29,6 +30,10 @@ const props = defineProps<{
   sheet?: Sheet;
   evaluator?: SheetEvaluator;
   revision?: number;
+  theme?: WorkbookTheme;
+  imageAssetUrls?: ReadonlyMap<string, string>;
+  locale?: string;
+  dateSystem?: "1900" | "1904";
   layout: SheetViewportLayout;
   scale: number;
   readOnly: boolean;
@@ -186,6 +191,10 @@ watch(
             :sheet="sheet"
             :evaluator="evaluator"
             :revision="revision"
+            :theme="theme"
+            :image-asset-urls="imageAssetUrls"
+            :locale="locale"
+            :date-system="dateSystem"
           />
         </div>
       </div>

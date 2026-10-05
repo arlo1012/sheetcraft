@@ -3298,6 +3298,10 @@ defineExpose({
       <SheetDrawingLayer
         :key="sheet.id"
         :drawings="sheet.drawings ?? []"
+        :theme="theme"
+        :image-asset-urls="imageAssetUrls"
+        :locale="locale"
+        :date-system="dateSystem"
         :sheet="sheet"
         :evaluator="sheetEvaluator"
         :revision="workbookRevision"

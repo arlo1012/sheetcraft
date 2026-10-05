@@ -213,7 +213,8 @@ export type WorkbookSnapshotV24 = Omit<WorkbookSnapshotV23, "version"> & { versi
 export type WorkbookSnapshotV25 = Omit<WorkbookSnapshotV24, "version"> & { version: 25 };
 export type WorkbookSnapshotV26 = Omit<WorkbookSnapshotV25, "version"> & { version: 26 };
 export type WorkbookSnapshotV27 = Omit<WorkbookSnapshotV26, "version"> & { version: 27 };
-export type WorkbookSnapshot = WorkbookSnapshotV27;
+export type WorkbookSnapshotV28 = Omit<WorkbookSnapshotV27, "version"> & { version: 28 };
+export type WorkbookSnapshot = WorkbookSnapshotV28;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -256,7 +257,8 @@ type SnapshotVersion =
   | 24
   | 25
   | 26
-  | 27;
+  | 27
+  | 28;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -649,6 +651,12 @@ function parseSparseState(
   path: string,
   version: SnapshotVersion,
 ): SheetSparseState {
+  if (
+    version < 28 &&
+    Array.isArray(record.drawings) &&
+    record.drawings.some((drawing) => asRecord(drawing, path).kind === "camera")
+  )
+    return fail(path, "Camera requires snapshot version 28.");
   if (version < 25 && Object.hasOwn(record, "drawings"))
     return fail(path, "Drawings require snapshot version 25.");
   if (
@@ -762,10 +770,10 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     );
     if (hasValue && hasContent)
       return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
-    version = cells.some((cell) => Object.hasOwn(asRecord(cell, path), "sparkline"))
-      ? 27
-      : Object.hasOwn(record, "drawings")
-        ? 26
+    version = Object.hasOwn(record, "drawings")
+      ? 28
+      : cells.some((cell) => Object.hasOwn(asRecord(cell, path), "sparkline"))
+        ? 27
         : (Array.isArray(record.floatingImages) &&
               record.floatingImages.some((image) => {
                 const item = asRecord(image, `${path}.floatingImages`);
@@ -899,7 +907,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 27,
+    version: 28,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -958,7 +966,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 24 &&
     record.version !== 25 &&
     record.version !== 26 &&
-    record.version !== 27
+    record.version !== 27 &&
+    record.version !== 28
   ) {
     throw new WorkbookDomainError(
       {
