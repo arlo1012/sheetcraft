@@ -42,6 +42,8 @@ export type WordProofMessageSchema = {
     enableBuiltin: string;
     localHint: string;
     wordHint: string;
+    batchHint: string;
+    batchPlaceholder: string;
     invalidWord: string;
     storageRead: string;
     storageWrite: string;
@@ -93,6 +95,8 @@ export const wordProofZhCN: WordProofMessageSchema = {
     enableBuiltin: "启用内置常见错词规则",
     localHint:
       "词库与设置保存在当前浏览器，不随工作簿导出。正词会放行其覆盖范围；自定义错词优先于同名内置规则。",
+    batchHint: "每行一个正词，每词最多 100 字；自动忽略空行和重复词。",
+    batchPlaceholder: "输入或粘贴多个正词，每行一个",
     wordHint: "词语和建议词最多 100 个字符；同名词条保存时会替换原条目。",
     invalidWord: "请输入有效且不同的词语与建议词（最多 100 个字符）。",
     storageRead: "本机词库无法读取，当前使用默认词库；保存前请检查词库内容。",
@@ -145,6 +149,9 @@ export const wordProofEnUS: WordProofMessageSchema = {
     enableBuiltin: "Enable built-in phrase rules",
     localHint:
       "Dictionaries and settings stay in this browser and are not exported with the workbook. Accepted phrases suppress matches inside them; custom rules override built-in rules.",
+    batchHint:
+      "One word per line, up to 100 characters each. Blank lines and duplicates are ignored.",
+    batchPlaceholder: "Enter or paste accepted words, one per line",
     wordHint:
       "Words and replacements allow up to 100 characters. Saving replaces an existing entry for the same word.",
     invalidWord: "Enter valid, different words and replacements (up to 100 characters).",

@@ -106,7 +106,7 @@ test("opens manual accepted-word entry without selecting results and returns to 
   expect(bulk.disabled).toBe(true);
   add.click();
   await nextTick();
-  const input = document.body.querySelector<HTMLInputElement>(".word-dictionary input")!;
+  const input = document.body.querySelector<HTMLTextAreaElement>(".word-dictionary textarea")!;
   input.value = "再接再励";
   input.dispatchEvent(new Event("input", { bubbles: true }));
   await nextTick();

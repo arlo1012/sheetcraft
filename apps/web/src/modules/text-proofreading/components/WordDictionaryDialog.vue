@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Button } from "tdesign-vue-next/es/button";
+import { Textarea } from "tdesign-vue-next/es/textarea";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { BaseTable } from "tdesign-vue-next/es/table";
@@ -76,7 +77,14 @@ const columns = computed<BaseTableCol[]>(() => [
   { colKey: "origin", title: t("wordProof.origin"), width: 80 },
   { colKey: "actions", title: "", width: 130 },
 ]);
+const batchAccepted = computed(
+  () => props.controller.panel.value === "accepted" && !originalWord.value,
+);
 function saveWord() {
+  if (batchAccepted.value) {
+    if (props.controller.addAcceptedWords(word.value)) finishEditor(true);
+    return;
+  }
   if (
     props.controller.add(
       word.value,
@@ -112,7 +120,7 @@ function edit(row: Row) {
     :visible="visible"
     :header="title"
     :width="controller.panel.value === 'dictionary' ? '660px' : '520px'"
-    :footer="false"
+    :footer="controller.panel.value !== 'dictionary'"
     :close-on-overlay-click="false"
     @close="finishEditor()"
   >
@@ -121,19 +129,19 @@ function edit(row: Row) {
       <template
         v-if="controller.panel.value === 'accepted' || controller.panel.value === 'mistake'"
       >
-        <p>{{ t("wordProof.wordHint") }}</p>
         <Form label-align="top">
-          <FormItem :label="t('wordProof.word')"
-            ><Input v-model="word" :maxlength="100"
+          <FormItem :label="t('wordProof.word')">
+            <Textarea
+              v-if="batchAccepted"
+              v-model="word"
+              :autosize="{ minRows: 5, maxRows: 10 }"
+              :placeholder="t('wordProof.batchPlaceholder')" />
+            <Input v-else v-model="word" :maxlength="100"
           /></FormItem>
           <FormItem v-if="controller.panel.value === 'mistake'" :label="t('wordProof.replacement')"
             ><Input v-model="replacement" :maxlength="100"
           /></FormItem>
         </Form>
-        <div class="word-dictionary__actions">
-          <Button variant="outline" @click="finishEditor()">{{ t("wordProof.cancel") }}</Button
-          ><Button @click="saveWord">{{ t("wordProof.save") }}</Button>
-        </div>
       </template>
       <template v-else-if="controller.panel.value === 'dictionary'">
         <p>{{ t("wordProof.localHint") }}</p>
@@ -181,18 +189,28 @@ function edit(row: Row) {
         <p>{{ t("wordProof.hint") }}</p>
         <p>{{ t("wordProof.localHint") }}</p>
         <Checkbox v-model="builtins">{{ t("wordProof.enableBuiltin") }}</Checkbox>
-        <div class="word-dictionary__actions">
-          <Button variant="outline" @click="finishEditor()">{{ t("wordProof.cancel") }}</Button
-          ><Button
+      </template>
+    </div>
+    <template #footer>
+      <div class="word-dictionary__footer">
+        <span v-if="controller.panel.value !== 'settings'" class="word-dictionary__hint">{{
+          t(batchAccepted ? "wordProof.batchHint" : "wordProof.wordHint")
+        }}</span>
+        <div class="word-dictionary__footer-actions">
+          <Button theme="default" @click="finishEditor()">{{ t("wordProof.cancel") }}</Button>
+          <Button
+            theme="primary"
             @click="
-              controller.save({ ...controller.dictionary.value, builtins }) &&
-              (controller.panel.value = undefined)
+              controller.panel.value === 'settings'
+                ? controller.save({ ...controller.dictionary.value, builtins }) &&
+                  (controller.panel.value = undefined)
+                : saveWord()
             "
             >{{ t("wordProof.save") }}</Button
           >
         </div>
-      </template>
-    </div>
+      </div>
+    </template>
   </Dialog>
 </template>
 <style scoped lang="scss">
@@ -207,6 +225,21 @@ function edit(row: Row) {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
+  }
+  &__footer {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    text-align: left;
+  }
+  &__hint {
+    color: var(--idea-text-secondary);
+    flex: 1;
+  }
+  &__footer-actions {
+    display: flex;
+    flex-shrink: 0;
+    margin-left: auto;
   }
   &__table {
     height: min(320px, calc(100dvh - 280px));

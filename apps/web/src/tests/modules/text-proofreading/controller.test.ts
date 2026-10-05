@@ -66,6 +66,15 @@ afterEach(() => {
 });
 
 describe("Chinese proofreading controller", () => {
+  test("adds newline-separated accepted words atomically and removes conflicting mistakes", () => {
+    const f = fixture();
+    f.review.add("测试", "建议");
+    expect(f.review.addAcceptedWords(" 测试 \r\n正词\n\n测试\r另一个")).toBe(true);
+    expect(f.review.dictionary.value.accepted).toEqual(["测试", "正词", "另一个"]);
+    expect(f.review.dictionary.value.mistakes).toEqual([]);
+    expect(f.review.addAcceptedWords("有效\n" + "词".repeat(101))).toBe(false);
+    expect(f.review.dictionary.value.accepted).toEqual(["测试", "正词", "另一个"]);
+  });
   test("applies different suggestions across cells as one undoable command", () => {
     const f = fixture();
     f.review.open("batch");

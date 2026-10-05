@@ -117,6 +117,25 @@ export function useWordProofreading(options: {
     else next.mistakes.push({ word, replacement });
     return save(next);
   }
+  function addAcceptedWords(input: string) {
+    const words = [
+      ...new Set(
+        input
+          .split(/\r\n|[\r\n]/)
+          .map((word) => word.trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (!words.length || words.some((word) => word.length > 100)) {
+      error.value = t("wordProof.invalidWord");
+      return false;
+    }
+    const next = parseDictionary(dictionary.value);
+    next.accepted = [...new Set([...next.accepted, ...words])];
+    const accepted = new Set(words);
+    next.mistakes = next.mistakes.filter((rule) => !accepted.has(rule.word));
+    return save(next);
+  }
   function acceptSelected() {
     const words = new Set(
       issues.value.filter((issue) => selected.value.includes(issue.id)).map((issue) => issue.word),
@@ -193,6 +212,7 @@ export function useWordProofreading(options: {
     save,
     add,
     apply,
+    addAcceptedWords,
     acceptSelected,
     selectIssue,
     ignore,
