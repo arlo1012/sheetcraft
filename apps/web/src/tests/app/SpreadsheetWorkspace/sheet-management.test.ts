@@ -11,6 +11,10 @@ import {
   insertSheet,
   setCellValue,
 } from "@idea10/core/workbook";
+import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
+import EditableRangesDialog from "../../../modules/review-tools/components/EditableRangesDialog.vue";
+import WorkbookProtectionDialog from "../../../modules/review-tools/components/WorkbookProtectionDialog.vue";
+import SheetProtectionDialog from "../../../modules/review-tools/components/SheetProtectionDialog.vue";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
@@ -100,6 +104,9 @@ describe("sheet management workspace integration", () => {
     const { wrapper } = await fixture();
     const sheet = wrapper.findComponent(SheetGrid).props("sheet");
     await action(wrapper, "Overview", "protect");
+    expect(sheet.properties.protected).toBe(false);
+    await wrapper.getComponent(SheetProtectionDialog).getComponent(TDialog).vm.$emit("confirm");
+    await flushPromises();
     expect(sheet.properties.protected).toBe(true);
     expect(wrapper.findComponent(SheetGrid).props("readOnly")).toBe(true);
     const formula = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
@@ -116,8 +123,51 @@ describe("sheet management workspace integration", () => {
     await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
     expect(wrapper.findComponent(SheetGrid).props("sheet").id).toBe(sheet.id);
     await wrapper.get('[data-ribbon-action="protect"]').trigger("click");
+    wrapper.getComponent(SheetProtectionDialog).getComponent(TDialog).vm.$emit("confirm");
+    await flushPromises();
     expect(sheet.properties.protected).toBe(false);
     expect(wrapper.get<HTMLTextAreaElement>("[data-formula-input]").element.readOnly).toBe(false);
+  });
+
+  test("review protection preserves unlocked cells and edit ranges and restricts workbook structure", async () => {
+    const { wrapper } = await fixture();
+    const sheet = wrapper.getComponent(SheetGrid).props("sheet");
+    await wrapper.get('[data-ribbon-category="review"]').trigger("click");
+    await wrapper.get('[data-review-action="lock-cells"]').trigger("click");
+    expect(sheet.cells.get("0:0")?.style?.unlocked).toBe(true);
+    await wrapper.get('[data-review-action="editable-ranges"]').trigger("click");
+    wrapper.getComponent(EditableRangesDialog).vm.$emit("save", {
+      editableRanges: [
+        { name: "Input", range: { start: { row: 0, column: 1 }, end: { row: 0, column: 1 } } },
+      ],
+      formatRows: true,
+    });
+    await flushPromises();
+    await wrapper.get('[data-review-action="toggle-protection"]').trigger("click");
+    wrapper.getComponent(SheetProtectionDialog).getComponent(TDialog).vm.$emit("confirm");
+    await flushPromises();
+    expect(sheet.protection?.editableRanges[0]?.name).toBe("Input");
+    expect(sheet.protection?.formatRows).toBe(true);
+    const formula = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
+    expect(formula.element.readOnly).toBe(false);
+    await formula.trigger("focus");
+    await formula.setValue("56");
+    await formula.trigger("keydown", { key: "Enter" });
+    expect(getCellValue(sheet, { row: 0, column: 0 })).toBe(56);
+    await wrapper.get('[data-review-action="protect-workbook"]').trigger("click");
+    expect(wrapper.getComponent(WorkbookProtectionDialog).props("visible")).toBe(true);
+    wrapper.getComponent(WorkbookProtectionDialog).getComponent(TDialog).vm.$emit("confirm");
+    await flushPromises();
+    expect(wrapper.getComponent(WorkbookProtectionDialog).props("error")).toBe("");
+    expect(wrapper.getComponent(WorkbookProtectionDialog).props("protected")).toBe(true);
+    expect(wrapper.get('[aria-label="Add sheet"]').attributes("aria-disabled")).toBe("true");
+    await wrapper.get('[role="tab"][title="Details (double-click to rename)"]').trigger("click");
+    expect(wrapper.getComponent(SheetGrid).props("sheet").id).toBe("details");
+    await wrapper.get('[data-review-action="protect-workbook"]').trigger("click");
+    expect(wrapper.getComponent(WorkbookProtectionDialog).props("visible")).toBe(true);
+    wrapper.getComponent(WorkbookProtectionDialog).getComponent(TDialog).vm.$emit("confirm");
+    await flushPromises();
+    expect(wrapper.get('[aria-label="Add sheet"]').attributes("aria-disabled")).toBe("false");
   });
 
   test("commits a shared formula draft before protection and restoring a hidden sheet", async () => {
@@ -129,6 +179,8 @@ describe("sheet management workspace integration", () => {
     await formula.setValue("21");
     await action(wrapper, "Overview", "protect");
     expect(getCellValue(overview, { row: 0, column: 0 })).toBe(21);
+    wrapper.getComponent(SheetProtectionDialog).getComponent(TDialog).vm.$emit("confirm");
+    await flushPromises();
     expect(overview.properties.protected).toBe(true);
 
     await action(wrapper, "Overview", "hide");

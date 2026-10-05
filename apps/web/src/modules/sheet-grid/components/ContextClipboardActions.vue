@@ -6,6 +6,7 @@ import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 const props = withDefaults(
   defineProps<{
     readOnly?: boolean;
+    contentReadOnly?: boolean;
     cutDisabledReason?: string;
     pasteSpecialDisabled?: boolean;
     pasteFormatsDisabled?: boolean;
@@ -55,7 +56,7 @@ const { t } = useAppI18n();
     </RibbonButton>
     <RibbonButton
       :label="t('cellMenu.paste')"
-      :disabled="readOnly"
+      :disabled="contentReadOnly ?? readOnly"
       data-context-clipboard-action="paste"
       @activate="emit('paste')"
     >
@@ -63,7 +64,7 @@ const { t } = useAppI18n();
     </RibbonButton>
     <RibbonButton
       :label="t('cellMenu.pasteValues')"
-      :disabled="readOnly || pasteSpecialDisabled"
+      :disabled="(contentReadOnly ?? readOnly) || pasteSpecialDisabled"
       data-context-clipboard-action="paste-values"
       @activate="emit('pasteValues')"
     >

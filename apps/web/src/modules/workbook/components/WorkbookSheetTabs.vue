@@ -32,6 +32,7 @@ const { t } = useAppI18n();
 const props = defineProps<{
   sheets: readonly Sheet[];
   activeSheetId: string;
+  structureProtected?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -48,6 +49,7 @@ const emit = defineEmits<{
 const visibleSheets = computed(() => getVisibleSheets(props.sheets));
 
 function moveTarget(sheet: Sheet, direction: -1 | 1): Sheet | undefined {
+  if (props.structureProtected) return;
   const group = visibleSheets.value.filter(
     (entry) => entry.properties.pinned === sheet.properties.pinned,
   );
@@ -94,6 +96,7 @@ function setTabButton(sheetId: string, element: Element | ComponentPublicInstanc
 }
 
 function startRename(sheet: Sheet): void {
+  if (props.structureProtected) return;
   closeMenu();
   renamingSheetId.value = sheet.id;
   renameValue.value = sheet.name;
@@ -133,6 +136,7 @@ function renameFromMenu(sheet: Sheet): void {
 }
 
 function duplicateFromMenu(sheet: Sheet): void {
+  if (props.structureProtected) return;
   closeMenu();
   emit("duplicate", sheet.id);
   void nextTick(() => tabButtons.get(props.activeSheetId)?.focus());
@@ -148,7 +152,7 @@ function moveFromMenu(sheet: Sheet, direction: -1 | 1): void {
 }
 
 function deleteFromMenu(sheet: Sheet): void {
-  if (visibleSheets.value.length <= 1) {
+  if (props.structureProtected || visibleSheets.value.length <= 1) {
     return;
   }
   closeMenu();
@@ -299,7 +303,7 @@ function suppressTabClick(): void {
 }
 
 function onTabDragStart(sheetId: string, event: DragEvent): void {
-  if (renamingSheetId.value === sheetId) {
+  if (props.structureProtected || renamingSheetId.value === sheetId) {
     event.preventDefault();
     return;
   }
@@ -400,7 +404,8 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
         :sheets="sheets"
         :active-sheet-id="activeSheetId"
         @select="selectSheet"
-        @restore="emit('restore', $event)"
+        :structure-protected="structureProtected"
+        @restore="!structureProtected && emit('restore', $event)"
         @open="closeMenu()"
       />
       <span
@@ -490,7 +495,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
             aria-keyshortcuts="Shift+F10 Alt+Shift+ArrowLeft Alt+Shift+ArrowRight"
             :tabindex="sheet.id === props.activeSheetId ? 0 : -1"
             :title="t('sheetTabs.renameHint', { name: sheet.name })"
-            :draggable="renamingSheetId !== sheet.id"
+            :draggable="!structureProtected && renamingSheetId !== sheet.id"
             @click="onTabClick(sheet.id)"
             @dblclick="startRename(sheet)"
             @dragstart="onTabDragStart(sheet.id, $event)"
@@ -515,13 +520,13 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
       </div>
     </div>
     <span
-      v-icon-action
+      v-icon-action="structureProtected"
       class="workbook-sheet-tabs__add"
       :aria-label="t('sheetTabs.add')"
       :title="t('sheetTabs.add')"
       @click="
         closeMenu();
-        emit('add');
+        if (!structureProtected) emit('add');
       "
     >
       <Plus :size="16" aria-hidden="true" />
@@ -531,11 +536,12 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
       :sheet="menuSheet"
       :anchor="menuAnchor"
       :sheet-count="visibleSheets.length"
+      :structure-protected="structureProtected"
       :sheet-index="visibleSheets.indexOf(menuSheet)"
       :can-move-left="!!moveTarget(menuSheet, -1)"
       :can-move-right="!!moveTarget(menuSheet, 1)"
-      :can-hide="visibleSheets.length > 1"
-      :can-delete="visibleSheets.length > 1"
+      :can-hide="!structureProtected && visibleSheets.length > 1"
+      :can-delete="!structureProtected && visibleSheets.length > 1"
       :is-open="true"
       @duplicate="duplicateFromMenu(menuSheet)"
       @rename="renameFromMenu(menuSheet)"

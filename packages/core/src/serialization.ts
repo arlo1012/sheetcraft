@@ -1,3 +1,4 @@
+import { normalizeSheetProtection, type SheetProtection } from "./protection.js";
 import { WorkbookDomainError } from "./errors.js";
 import {
   DEFAULT_WORKBOOK_CALCULATION_SETTINGS,
@@ -196,7 +197,11 @@ export type WorkbookSnapshotV19 = Omit<WorkbookSnapshotV18, "version"> & { versi
 export type WorkbookSnapshotV20 = Omit<WorkbookSnapshotV19, "version"> & { version: 20 };
 export type WorkbookSnapshotV21 = Omit<WorkbookSnapshotV20, "version"> & { version: 21 };
 /** Current write format. Earlier versions remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV21;
+export type WorkbookSnapshotV22 = Omit<WorkbookSnapshotV21, "version"> & {
+  version: 22;
+  structureProtected?: boolean;
+};
+export type WorkbookSnapshot = WorkbookSnapshotV22;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -209,6 +214,7 @@ export type SheetSnapshot = SheetSnapshotV7 & {
   tables?: SheetTable[];
   pageSetup?: SheetPageSetup;
   pageDecoration?: SheetPageDecoration;
+  protection?: SheetProtection;
 };
 type SnapshotVersion =
   | 1
@@ -231,7 +237,8 @@ type SnapshotVersion =
   | 18
   | 19
   | 20
-  | 21;
+  | 21
+  | 22;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -362,6 +369,12 @@ function parseCell(value: unknown, path: string, version: SnapshotVersion): Cell
   const hasContent = Object.hasOwn(record, "content");
   const hasValue = Object.hasOwn(record, "value");
   const hasStyle = Object.hasOwn(record, "style");
+  if (
+    version < 22 &&
+    hasStyle &&
+    Object.hasOwn(asRecord(record.style, `${path}.style`), "unlocked")
+  )
+    return fail(`${path}.style.unlocked`, "Cell protection requires snapshot version 22 or newer.");
   if ((version !== 1 && hasValue) || (version === 1 && hasContent)) {
     return fail(
       path,
@@ -665,6 +678,10 @@ function parseSparseState(
       version >= 13 && Object.hasOwn(record, "pageSetup")
         ? (record.pageSetup as SheetPageSetup)
         : undefined,
+    protection:
+      version >= 22
+        ? normalizeSheetProtection(record.protection as SheetProtection | undefined)
+        : undefined,
     pageDecoration:
       version >= 17 && Object.hasOwn(record, "pageDecoration")
         ? normalizeSheetPageDecoration(record.pageDecoration)
@@ -688,37 +705,46 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     );
     if (hasValue && hasContent)
       return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
-    version = hasValue
-      ? 1
-      : cells.some((cell) => {
-            const item = asRecord(cell, `${path}.cells`);
-            return (
-              Object.hasOwn(item, "note") &&
-              typeof item.note === "object" &&
-              item.note !== null &&
-              Object.hasOwn(item.note, "box")
-            );
-          })
-        ? 21
-        : cells.some((cell) => Object.hasOwn(asRecord(cell, `${path}.cells`), "note"))
-          ? 20
+    version =
+      Object.hasOwn(record, "protection") ||
+      cells.some((cell) => Boolean((cell as { style?: { unlocked?: boolean } }).style?.unlocked))
+        ? 22
+        : hasValue
+          ? 1
           : cells.some((cell) => {
                 const item = asRecord(cell, `${path}.cells`);
-                return Object.hasOwn(item, "namedStyle") || Object.hasOwn(item, "hyperlink");
+                return (
+                  Object.hasOwn(item, "note") &&
+                  typeof item.note === "object" &&
+                  item.note !== null &&
+                  Object.hasOwn(item.note, "box")
+                );
               })
-            ? 15
-            : Object.hasOwn(record, "pageDecoration")
-              ? 17
-              : Object.hasOwn(record, "tables") || Object.hasOwn(record, "pageSetup")
-                ? 13
-                : Object.hasOwn(record, "conditionalFormats")
-                  ? 12
-                  : Object.hasOwn(record, "properties")
-                    ? 7
-                    : Object.hasOwn(record, "floatingImages")
-                      ? 6
-                      : 3;
+            ? 21
+            : cells.some((cell) => Object.hasOwn(asRecord(cell, `${path}.cells`), "note"))
+              ? 20
+              : cells.some((cell) => {
+                    const item = asRecord(cell, `${path}.cells`);
+                    return Object.hasOwn(item, "namedStyle") || Object.hasOwn(item, "hyperlink");
+                  })
+                ? 15
+                : Object.hasOwn(record, "pageDecoration")
+                  ? 17
+                  : Object.hasOwn(record, "tables") || Object.hasOwn(record, "pageSetup")
+                    ? 13
+                    : Object.hasOwn(record, "conditionalFormats")
+                      ? 12
+                      : Object.hasOwn(record, "properties")
+                        ? 7
+                        : Object.hasOwn(record, "floatingImages")
+                          ? 6
+                          : 3;
   }
+  if (version < 22 && record.protection !== undefined)
+    return fail(
+      `${path}.protection`,
+      "Sheet protection configuration requires snapshot version 22 or newer.",
+    );
   const id = asIdentifier(record.id, `${path}.id`);
   let name: string;
   try {
@@ -760,7 +786,8 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 21,
+    version: 22,
+    ...(workbook.structureProtected ? { structureProtected: true } : {}),
     calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
     theme: cloneWorkbookTheme(workbook.theme),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
@@ -809,7 +836,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 18 &&
     record.version !== 19 &&
     record.version !== 20 &&
-    record.version !== 21
+    record.version !== 21 &&
+    record.version !== 22
   ) {
     throw new WorkbookDomainError(
       {
@@ -836,6 +864,11 @@ export function deserializeWorkbook(value: unknown): Workbook {
   }
 
   const version = record.version;
+  if (
+    record.structureProtected !== undefined &&
+    (version < 22 || typeof record.structureProtected !== "boolean")
+  )
+    return fail("$.structureProtected", "Expected a boolean in snapshot version 22 or newer.");
   let dateSystem: ExcelDateSystem = "1900";
   if (version >= 3) {
     try {
@@ -948,6 +981,7 @@ export function deserializeWorkbook(value: unknown): Workbook {
       : [];
   return {
     id,
+    ...(version >= 22 && record.structureProtected ? { structureProtected: true } : {}),
     dateSystem,
     calculation,
     theme,

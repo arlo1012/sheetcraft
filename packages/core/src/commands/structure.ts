@@ -1,3 +1,4 @@
+import { normalizeSheetProtection } from "../protection.js";
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
@@ -268,6 +269,7 @@ function cloneSheetMetadata(metadata: SheetMetadata): SheetMetadata {
     tables: (metadata.tables ?? []).map(cloneSheetTable),
     pageSetup: cloneSheetPageSetup(metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
+    protection: normalizeSheetProtection(metadata.protection),
   };
 }
 
@@ -715,6 +717,22 @@ function transformSheetMetadataForAxis(
     }),
     pageSetup,
     pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
+    protection: metadata.protection
+      ? {
+          ...normalizeSheetProtection(metadata.protection)!,
+          editableRanges: metadata.protection.editableRanges.flatMap((entry) => {
+            const range = transformRangeForAxis(
+              entry.range,
+              axis,
+              index,
+              count,
+              maximum,
+              operation,
+            );
+            return range ? [{ name: entry.name, range }] : [];
+          }),
+        }
+      : undefined,
   };
 }
 
@@ -1622,6 +1640,21 @@ function transformSheetMetadataForAxisMove(
     }),
     pageSetup,
     pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
+    protection: metadata.protection
+      ? {
+          ...normalizeSheetProtection(metadata.protection)!,
+          editableRanges: metadata.protection.editableRanges.map((entry) => {
+            const range = moveRange(entry.range);
+            if (!range)
+              throw invalidCommandPayload(
+                "axis",
+                axis,
+                "Moving this band would split an editable range.",
+              );
+            return { name: entry.name, range };
+          }),
+        }
+      : undefined,
   };
 }
 
@@ -1787,6 +1820,7 @@ export function applyMoveSheetAxisCommand(
     tables: metadata.tables,
     pageSetup: metadata.pageSetup,
     pageDecoration: metadata.pageDecoration,
+    protection: metadata.protection,
     floatingImages: previousState.floatingImages.map((image) => ({
       ...image,
       anchor:

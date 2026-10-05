@@ -58,3 +58,5 @@ export {
 } from "./fill-numbers.js";
 
 export { createFlashFillCommand, type FlashFillOptions } from "./flash-fill.js";
+
+export * from "./protection.js";

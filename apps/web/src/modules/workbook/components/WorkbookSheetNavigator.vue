@@ -15,6 +15,7 @@ import { getVisibleSheets } from "../sheet-navigation";
 const props = defineProps<{
   sheets: readonly Sheet[];
   activeSheetId: string;
+  structureProtected?: boolean;
 }>();
 const emit = defineEmits<{ select: [sheetId: string]; restore: [sheetId: string]; open: [] }>();
 const { t } = useAppI18n();
@@ -60,6 +61,7 @@ function selectSheet(sheetId: string): void {
 }
 
 function restoreSheet(sheetId: string): void {
+  if (props.structureProtected) return;
   dismiss("programmatic", true);
   emit("restore", sheetId);
 }
@@ -151,6 +153,7 @@ watch(open, (isOpen) => {
           v-for="sheet in hiddenSheets"
           :key="sheet.id"
           class="workbook-sheet-navigator__item"
+          :disabled="structureProtected"
           :aria-label="t('sheetTabs.restoreSheet', { name: sheet.name })"
           :title="sheet.name"
           :data-workbook-hidden-sheet-id="sheet.id"

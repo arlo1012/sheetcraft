@@ -59,6 +59,7 @@ const props = withDefaults(
     hasImage?: boolean;
     hasNote?: boolean;
     readOnly?: boolean;
+    contentReadOnly?: boolean;
     state?: SheetContextMenuState;
     sheet?: Sheet;
     range?: CellRange;
@@ -141,8 +142,11 @@ function dispatch(action: SheetContextAction): void {
   if (isOpen.value && !props.readOnly) emit("action", action);
 }
 function requestClear(mode: "contents" | "formats" | "all"): void {
+  if (mode === "contents") {
+    if (!(props.contentReadOnly ?? props.readOnly)) emit("clear");
+    return;
+  }
   if (props.readOnly) return;
-  if (mode === "contents" && !props.state) emit("clear");
   dispatch({ type: "clear", mode });
 }
 function submenuName(target: EventTarget | null): Exclude<Submenu, null> | undefined {
@@ -153,6 +157,7 @@ function submenuName(target: EventTarget | null): Exclude<Submenu, null> | undef
     : undefined;
 }
 function canOpenSubmenu(name: Exclude<Submenu, null>): boolean {
+  if (name === "clear") return !(props.contentReadOnly ?? props.readOnly);
   return !props.readOnly && (name !== "sort" || Boolean(props.state?.data.sortEnabled));
 }
 function openSubmenu(name: Exclude<Submenu, null>): void {
@@ -165,7 +170,7 @@ function onMenuKeydown(event: KeyboardEvent): void {
       event.preventDefault();
       if (key === "x" && !props.readOnly && !props.cutDisabledReason) emit("cut");
       if (key === "c") emit("copy");
-      if (key === "v" && !props.readOnly) emit("paste");
+      if (key === "v" && !(props.contentReadOnly ?? props.readOnly)) emit("paste");
       return;
     }
   }
@@ -203,6 +208,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
       >
         <li role="none">
           <ContextClipboardActions
+            :content-read-only="contentReadOnly"
             :read-only="readOnly"
             :cut-disabled-reason="cutDisabledReason"
             :paste-special-disabled="pasteSpecialDisabled"
@@ -243,7 +249,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
           aria-haspopup="menu"
           :aria-expanded="activeSubmenu === 'clear'"
           :aria-controls="activeSubmenu === 'clear' ? submenuId : undefined"
-          :disabled="readOnly"
+          :disabled="contentReadOnly ?? readOnly"
           @mouseenter="onMenuMouseover"
           @select="openSubmenu('clear')"
           ><template #icon><Eraser :size="16" /></template>{{ t("contextMenu.clear")
@@ -416,7 +422,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
       <template v-else-if="activeSubmenu === 'clear'"
         ><MenuItem
           data-cell-action="clear-contents"
-          :disabled="readOnly"
+          :disabled="contentReadOnly ?? readOnly"
           @select="requestClear('contents')"
           ><template #icon><Delete :size="16" /></template
           >{{ t("contextMenu.clearContents") }}</MenuItem

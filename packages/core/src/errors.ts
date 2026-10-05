@@ -5,6 +5,7 @@ export type WorkbookErrorCode =
   | "last_sheet_removal"
   | "last_visible_sheet"
   | "sheet_protected"
+  | "workbook_protected"
   | "sheet_name_conflict"
   | "sheet_not_found"
   | "unsupported_snapshot_version"

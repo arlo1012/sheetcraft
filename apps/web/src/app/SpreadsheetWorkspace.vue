@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { canEditCell } from "@idea10/core";
+import { useProtectionController } from "../modules/review-tools/useProtectionController";
+import SheetProtectionDialog from "../modules/review-tools/components/SheetProtectionDialog.vue";
+import EditableRangesDialog from "../modules/review-tools/components/EditableRangesDialog.vue";
+import WorkbookProtectionDialog from "../modules/review-tools/components/WorkbookProtectionDialog.vue";
 import ReviewToolbar from "../modules/review-tools/components/ReviewToolbar.vue";
 import { useReviewController } from "../modules/review-tools/useReviewController";
 import { formatCellAddress } from "@idea10/core/coordinates";
@@ -331,6 +336,28 @@ const hyperlinkActions = useHyperlinksController({
   focus: focusCellEditor,
 });
 const { draft: hyperlinkDraft, error: hyperlinkError } = hyperlinkActions;
+const protectionActions = useProtectionController({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getRange: () => activeSelectionRange.value,
+  getRevision: () => workbookRevision.value,
+  getGeneration: () => workbookGeneration.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  finishEditing: () => cellEditSession.finish(),
+  execute: executeCommand,
+});
+const {
+  dialog: protectionDialog,
+  configuration: protectionConfiguration,
+  selection: protectionSelection,
+  error: protectionError,
+  canLockCells,
+  lockedState,
+  structureProtected,
+} = protectionActions;
+const protectedFormatting = computed(
+  () => activeSheet.value.properties.protected && !activeSheet.value.protection?.formatCells,
+);
 const reviewActions = useReviewController({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -665,7 +692,7 @@ const cellOperationActions = createCellOperationActions({
 });
 const contextMenuState = computed<SheetContextMenuState>(() => ({
   format: activeSelectionStyle.value,
-  formattingDisabled: !isFormattingSupported.value || activeSheet.value.properties.protected,
+  formattingDisabled: !isFormattingSupported.value || protectedFormatting.value,
   data: dataToolState.value,
   merge: mergeState.value,
 }));
@@ -1583,7 +1610,13 @@ const {
   recentFunctions,
   calculationSettings,
 } = formulaTools;
-const formulaReadOnly = computed(() => editTargetSheet.value.properties.protected);
+const formulaReadOnly = computed(() => {
+  void workbookRevision.value;
+  return !canEditCell(
+    editTargetSheet.value,
+    cellEditSession.state.owner?.address ?? activeAddress.value,
+  );
+});
 const formulaInsertVisible = ref(false);
 
 function closeFormulaInsert(): void {
@@ -1651,6 +1684,10 @@ function changeSheetProperties(payload: {
   patch: Partial<SheetProperties>;
 }): void {
   if (!cellEditSession.finish()) return;
+  if (payload.patch.protected === true && payload.sheetId === activeSheet.value.id) {
+    protectionActions.open("sheet");
+    return;
+  }
   updateSheetProperties(payload);
 }
 
@@ -1766,6 +1803,7 @@ const gridInert = computed(
     loading.value ||
     fileBusy.value ||
     xlsxBusy.value ||
+    !!protectionDialog.value ||
     !!cellFormatSelection.value ||
     !!findFormatDraft.value ||
     dataToolsModalOpen.value ||
@@ -1805,7 +1843,7 @@ const gridInert = computed(
     <SpreadsheetRibbon
       :theme="session.workbook.theme"
       :state="activeSelectionStyle"
-      :disabled="!isFormattingSupported || activeSheet.properties.protected"
+      :disabled="!isFormattingSupported || protectedFormatting"
       :conditional-formatting-disabled="activeSheet.properties.protected"
       :read-only="activeSheet.properties.protected"
       @toggle-protection="
@@ -1918,6 +1956,9 @@ const gridInert = computed(
         <ReviewToolbar
           :busy="loading || fileBusy || xlsxBusy"
           :read-only="activeSheet.properties.protected"
+          :can-lock-cells="canLockCells"
+          :locked-state="lockedState"
+          :structure-protected="structureProtected"
           :has-note="hasNote"
           :has-selected-notes="hasSelectedNotes"
           :has-notes="reviewNotes.length > 0"
@@ -1932,12 +1973,10 @@ const gridInert = computed(
           @show-all-notes="reviewActions.setAllNotesVisible(true)"
           @hide-all-notes="reviewActions.setAllNotesVisible(false)"
           @reset-note-box="reviewActions.resetBox"
-          @toggle-protection="
-            changeSheetProperties({
-              sheetId: activeSheet.id,
-              patch: { protected: !activeSheet.properties.protected },
-            })
-          "
+          @toggle-protection="protectionActions.open('sheet')"
+          @toggle-cells-lock="protectionActions.toggleCells"
+          @editable-ranges="protectionActions.open('ranges')"
+          @toggle-workbook-protection="protectionActions.open('workbook')"
         />
       </template>
       <template #page-tools>
@@ -2128,7 +2167,7 @@ const gridInert = computed(
         <WorksheetOperationsMenu
           :sheets="sheets"
           :active-sheet-id="activeSheet.id"
-          :disabled="loading || fileBusy || xlsxBusy"
+          :disabled="loading || fileBusy || xlsxBusy || structureProtected"
           @add="cellEditSession.finish() && addSheet()"
           @duplicate="cellEditSession.finish() && duplicateSheet($event)"
           @rename="cellEditSession.finish() && renameSheet($event)"
@@ -2987,6 +3026,7 @@ const gridInert = computed(
         (tableModalOpen && !pickingTableRange)
       "
       :sheets="sheets"
+      :structure-protected="structureProtected"
       :active-sheet-id="session.workbook.activeSheetId"
       :selection-summary="activeSelectionSummary"
       @select="onSelectSheet"
@@ -3007,6 +3047,29 @@ const gridInert = computed(
         />
       </template>
     </WorkbookStatusBar>
+    <SheetProtectionDialog
+      :visible="protectionDialog === 'sheet'"
+      :protected="activeSheet.properties.protected"
+      :configuration="protectionConfiguration"
+      :error="protectionError"
+      @close="protectionActions.close"
+      @save="protectionActions.save"
+    />
+    <EditableRangesDialog
+      :visible="protectionDialog === 'ranges'"
+      :configuration="protectionConfiguration"
+      :selection="protectionSelection"
+      :error="protectionError"
+      @close="protectionActions.close"
+      @save="protectionActions.save"
+    />
+    <WorkbookProtectionDialog
+      :visible="protectionDialog === 'workbook'"
+      :protected="structureProtected"
+      :error="protectionError"
+      @close="protectionActions.close"
+      @save="protectionActions.save()"
+    />
   </section>
 </template>
 

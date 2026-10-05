@@ -1,3 +1,4 @@
+import { readXlsxProtection } from "./protection.js";
 import ExcelJSImport from "exceljs/dist/exceljs.min.js";
 import { unzipSync } from "fflate/browser";
 import { readExcelBorder, writeExcelBorder } from "./border.js";
@@ -452,6 +453,8 @@ function readStyle(
     alignment?.vertical === "distributed"
   )
     result.verticalAlign = alignment.vertical;
+  if ((style.protection as { locked?: boolean } | undefined)?.locked === false)
+    result.unlocked = true;
   if (alignment?.wrapText === true) result.wrapText = true;
   if (
     typeof alignment?.indent === "number" &&
@@ -628,6 +631,7 @@ export async function decodeWithExcelJs(
     add(report, "feature-omitted", `worksheet${sheetIndex + 1}.note:${reference}`),
   );
   const rawNoteBoxes = readXlsxCellNoteVmlBoxes(archive);
+  const protection = readXlsxProtection(archive, report);
   const source = new ExcelJS.Workbook();
   await source.xlsx.load(withoutTableAutoFiltersForExcelJs(withExcelJsCompatibleCellNotes(bytes)));
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
@@ -886,9 +890,11 @@ export async function decodeWithExcelJs(
       })),
       conditionalFormats,
       tables,
+      protection: protection.sheets[sheetIndex]?.protection,
       ...(pageSetups[sheetIndex] ? { pageSetup: pageSetups[sheetIndex] } : {}),
       floatingImages: [],
     });
+    sheet.properties.protected = protection.sheets[sheetIndex]?.protected ?? false;
     return sheet;
   });
   const activeTab = source.views?.[0]?.activeTab;
@@ -904,6 +910,7 @@ export async function decodeWithExcelJs(
   return {
     workbook: {
       id: workbookId(),
+      structureProtected: protection.structureProtected,
       dateSystem,
       calculation,
       theme,
@@ -1037,6 +1044,7 @@ function writeStyle(
     }
     if (Object.keys(border).length) next.border = border;
   }
+  if (style.unlocked) next.protection = { locked: false };
   cell.style = next;
   if (style.numberFormat) cell.numFmt = toExcelNumberFormat(style.numberFormat);
   // XLSX number-format codes cannot distinguish WPS's compact Chinese upper
@@ -1252,6 +1260,7 @@ export async function encodeWithExcelJs(
       workbook.theme,
       report,
       sheetBackgrounds,
+      Boolean(workbook.structureProtected),
     ),
     report: report.build(),
   };

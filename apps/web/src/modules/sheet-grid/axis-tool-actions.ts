@@ -68,7 +68,7 @@ export function createAxisToolActions(options: {
   onError: () => void;
 }) {
   function run(create: (sheet: Sheet) => WorkbookCommand | undefined): void {
-    if (options.getSheet().properties.protected || !options.flushPendingEdits()) return;
+    if (!options.flushPendingEdits()) return;
     try {
       const command = create(options.getSheet());
       if (command) options.execute(command);

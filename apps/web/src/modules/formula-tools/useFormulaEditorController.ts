@@ -1,3 +1,4 @@
+import { canEditCell } from "@idea10/core";
 import { computed, nextTick, ref, watch } from "vue";
 import { formatCellAddress } from "@idea10/core/coordinates";
 import { formatCellContentForInput } from "@idea10/core/input";
@@ -55,7 +56,7 @@ export function useFormulaEditorController(options: {
       options.isBusy() ||
       session.state.composing ||
       !sheet.value ||
-      sheet.value.properties.protected,
+      !canEditCell(sheet.value, target.value.address),
   );
 
   watch(

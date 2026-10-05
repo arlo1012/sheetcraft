@@ -43,7 +43,7 @@ export function createCellFillActions(options: {
     const workbook = options.getWorkbook();
     const sheetId = options.getSheetId();
     const sheet = workbook.sheets.get(sheetId);
-    if (!sheet || sheet.properties.protected) {
+    if (!sheet) {
       clear();
       return { ok: false, reason: "readOnly" };
     }

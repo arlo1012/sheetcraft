@@ -328,6 +328,7 @@ export function applyCellShiftCommand(
       "Cell shifts inside an active filter are not supported.",
     );
   if (
+    (sheet.protection?.editableRanges ?? []).some((entry) => intersects(entry.range, movement)) ||
     (sheet.dataValidations ?? []).some((rule) => intersects(rule.range, movement)) ||
     (sheet.subtotalMetadata ?? []).some((entry) => intersects(entry.range, movement)) ||
     (sheet.duplicateRules ?? []).some((rule) => intersects(rule.range, movement)) ||

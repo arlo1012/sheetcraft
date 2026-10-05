@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import {
   ClipboardCheck,
+  LockKeyhole,
+  SquarePen,
+  BookLock,
   FileLock2,
   FileKey2,
   MessageSquarePlus,
@@ -19,6 +22,9 @@ import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 const props = withDefaults(
   defineProps<{
     busy: boolean;
+    canLockCells?: boolean;
+    lockedState?: boolean | "mixed";
+    structureProtected?: boolean;
     readOnly: boolean;
     hasNote: boolean;
     hasNotes: boolean;
@@ -39,6 +45,9 @@ const emit = defineEmits<{
   hideAllNotes: [];
   resetNoteBox: [mode: "position" | "size" | "all"];
   toggleProtection: [];
+  toggleCellsLock: [];
+  editableRanges: [];
+  toggleWorkbookProtection: [];
 }>();
 const { t } = useAppI18n();
 const canDeleteNotes = computed(() => props.hasSelectedNotes ?? props.hasNote);
@@ -133,6 +142,25 @@ const protectionLabel = computed(() =>
       data-ribbon-group="review-protection"
       :aria-label="t('review.groupProtection')"
     >
+      <div class="review-toolbar__stack">
+        <RibbonButton
+          :disabled="!canLockCells"
+          :pressed="lockedState"
+          :label="t(lockedState === true ? 'review.unlockCells' : 'review.lockCells')"
+          :text="t('review.lockCells')"
+          data-review-action="lock-cells"
+          @activate="emit('toggleCellsLock')"
+          ><LockKeyhole
+        /></RibbonButton>
+        <RibbonButton
+          :disabled="busy || readOnly"
+          :label="t('review.editableRanges')"
+          :text="t('review.editableRanges')"
+          data-review-action="editable-ranges"
+          @activate="emit('editableRanges')"
+          ><SquarePen
+        /></RibbonButton>
+      </div>
       <RibbonButton
         variant="tall"
         :disabled="busy"
@@ -143,6 +171,16 @@ const protectionLabel = computed(() =>
         data-review-action="toggle-protection"
         @activate="emit('toggleProtection')"
         ><FileKey2 v-if="readOnly" /><FileLock2 v-else
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :disabled="busy"
+        :pressed="structureProtected"
+        :label="t(structureProtected ? 'review.unprotectWorkbook' : 'review.protectWorkbook')"
+        :text="t(structureProtected ? 'review.unprotectWorkbook' : 'review.protectWorkbook')"
+        data-review-action="protect-workbook"
+        @activate="emit('toggleWorkbookProtection')"
+        ><BookLock
       /></RibbonButton>
     </section>
   </RibbonToolbar>

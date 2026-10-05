@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { canEditCell, canEditRange } from "@idea10/core";
 import {
   computed,
   nextTick,
@@ -742,6 +743,29 @@ const selectedRange = computed(() =>
     columnCount: renderExtent.value.columnCount,
   }),
 );
+const cellReadOnly = computed(() => {
+  void props.workbookRevision;
+  return (
+    props.readOnly &&
+    (!props.sheet.properties.protected || !canEditCell(props.sheet, activeCell.value))
+  );
+});
+const selectionReadOnly = computed(() => {
+  void props.workbookRevision;
+  return (
+    props.readOnly &&
+    (!props.sheet.properties.protected || !canEditRange(props.sheet, selectedRange.value))
+  );
+});
+function dimensionReadOnly(axis: SheetDimensionAxis): boolean {
+  return (
+    props.readOnly &&
+    (!props.sheet.properties.protected ||
+      !(axis === "row"
+        ? props.sheet.protection?.formatRows
+        : props.sheet.protection?.formatColumns))
+  );
+}
 const quickToolsAvailable = computed(
   () =>
     props.viewMode === "normal" &&
@@ -1576,7 +1600,7 @@ const {
   getRange: () => selectedRange.value,
   getCanFill: () =>
     Boolean(props.applyFill) &&
-    !props.readOnly &&
+    !selectionReadOnly.value &&
     !isEditing.value &&
     !isComposing.value &&
     !props.formatPainterActive &&
@@ -1695,10 +1719,6 @@ async function requestFloatingImagePaste(id: string): Promise<void> {
 
 function onImagePaste(event: ClipboardEvent): void {
   if (event.target instanceof Element && event.target.closest("[data-page-header-footer]")) return;
-  if (props.readOnly) {
-    event.preventDefault();
-    return;
-  }
   if (isComposing.value || !event.clipboardData) return;
   const image = readFloatingImageClipboard(event.clipboardData);
   const file =
@@ -1711,6 +1731,11 @@ function onImagePaste(event: ClipboardEvent): void {
     if (floatingClipboard.hasPending() && navigator.clipboard)
       void pasteDeferredFloatingImage(event);
     else floatingClipboard.clear();
+    return;
+  }
+  if (props.readOnly) {
+    event.preventDefault();
+    event.stopPropagation();
     return;
   }
   floatingClipboard.observeTransfer({ floatingImage: image });
@@ -2025,7 +2050,7 @@ function onDimensionResizeRequest(
   axis: SheetDimensionAxis,
   payload: { index: number; size: number },
 ): void {
-  if (props.readOnly) return;
+  if (dimensionReadOnly(axis)) return;
   requestDimensionResize(axis, payload);
 }
 
@@ -2033,7 +2058,7 @@ function onDimensionResizeStart(
   axis: SheetDimensionAxis,
   payload: { index: number; event: PointerEvent },
 ): void {
-  if (props.readOnly) return;
+  if (dimensionReadOnly(axis)) return;
   const startSize =
     axis === "row"
       ? geometry.value.getRowHeight(payload.index)
@@ -2234,7 +2259,7 @@ function requestAxisDelete(): void {
 }
 
 function requestAxisResize(size: number): void {
-  if (props.readOnly) return;
+  if (!axisContextMenu.value || dimensionReadOnly(axisContextMenu.value.axis)) return;
   const menu = axisContextMenu.value;
   if (!menu || menu.count !== 1) {
     return;
@@ -2321,7 +2346,12 @@ function openActiveCellContextMenu(): void {
 async function requestCellClipboard(
   action: "cut" | "copy" | "paste" | "paste-values" | "paste-formats",
 ): Promise<void> {
-  if (props.readOnly && action !== "copy") return;
+  if (
+    props.readOnly &&
+    action !== "copy" &&
+    (selectionReadOnly.value || action === "cut" || action === "paste-formats")
+  )
+    return;
   if (!cellContextMenu.value) {
     return;
   }
@@ -2358,7 +2388,10 @@ async function requestAxisClipboard(
 
 function requestContextAction(action: SheetContextAction): void {
   if (!axisContextMenu.value && !cellContextMenu.value) return;
-  if (props.readOnly && action.type !== "columnStatistics") return;
+  const allowedAxisFormatting =
+    (action.type === "resize" || action.type === "autoFit" || action.type === "visibility") &&
+    !dimensionReadOnly(action.axis);
+  if (props.readOnly && action.type !== "columnStatistics" && !allowedAxisFormatting) return;
   const range = getSelectionRange(selection.value);
   const keepOpen =
     action.type === "applyStyle" ||
@@ -2408,7 +2441,7 @@ function requestCellNote(action: "edit" | "delete"): void {
 }
 
 function requestCellClear(): void {
-  if (props.readOnly) return;
+  if (selectionReadOnly.value) return;
   if (!cellContextMenu.value) {
     return;
   }
@@ -2438,7 +2471,8 @@ function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
     openImagePreview(content.image);
     return;
   }
-  if (props.readOnly) return;
+  if (props.readOnly && (!props.sheet.properties.protected || !canEditCell(props.sheet, address)))
+    return;
   if (isComposing.value) {
     return;
   }
@@ -2615,7 +2649,7 @@ function onEditorKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  if (props.readOnly) {
+  if (cellReadOnly.value) {
     if (
       event.key === "Delete" ||
       event.key === "Backspace" ||
@@ -2655,7 +2689,7 @@ function onEditorKeydown(event: KeyboardEvent): void {
   }
 
   if (
-    !props.readOnly &&
+    !selectionReadOnly.value &&
     (event.ctrlKey || event.metaKey) &&
     !event.altKey &&
     !event.shiftKey &&
@@ -2675,7 +2709,7 @@ function onEditorKeydown(event: KeyboardEvent): void {
   }
 
   if (
-    !props.readOnly &&
+    !selectionReadOnly.value &&
     (event.ctrlKey || event.metaKey) &&
     !event.altKey &&
     !event.shiftKey &&
@@ -2708,7 +2742,7 @@ function onEditorKeydown(event: KeyboardEvent): void {
   if (event.key === "Delete" || event.key === "Backspace") {
     event.preventDefault();
     clearPendingClipboard();
-    emit("clearCells", getSelectionRange(selection.value));
+    if (!selectionReadOnly.value) emit("clearCells", getSelectionRange(selection.value));
     return;
   }
 
@@ -2895,7 +2929,7 @@ defineExpose({
     }"
     role="grid"
     :aria-label="t('grid.worksheet', { name: sheet.name })"
-    :aria-readonly="readOnly"
+    :aria-readonly="cellReadOnly"
     :data-sheet-view="viewMode"
     :data-page-count="pagination?.pageCount"
     :aria-rowcount="renderExtent.rowCount"
@@ -3080,6 +3114,7 @@ defineExpose({
       :outline-control-offset="quickToolsGutter"
       :show-outline="showHeaders"
       :read-only="readOnly"
+      :content-read-only="cellReadOnly"
       @filter-column-request="emit('filterColumnRequest', $event)"
       @validation-choose="emit('validationChoose', $event)"
       @outline-toggle="emit('outlineToggle', $event)"
@@ -3174,6 +3209,7 @@ defineExpose({
       :maximum-size="axisContextMenu.axis === 'row' ? MAX_ROW_HEIGHT : MAX_COLUMN_WIDTH"
       :anchor="axisContextMenu.anchor"
       :read-only="readOnly"
+      :dimension-read-only="dimensionReadOnly(axisContextMenu.axis)"
       @insert="requestAxisInsert"
       @resize="requestAxisResize"
       @delete="requestAxisDelete"
@@ -3196,6 +3232,7 @@ defineExpose({
         )
       "
       :read-only="readOnly"
+      :content-read-only="selectionReadOnly"
       :paste-special-disabled="clipboardMode === 'cut'"
       :paste-formats-disabled="!canPasteFormats"
       :cut-disabled-reason="

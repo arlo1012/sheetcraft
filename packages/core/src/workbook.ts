@@ -1,3 +1,4 @@
+import { normalizeSheetProtection, type SheetProtection } from "./protection.js";
 import { evaluateFormulaRuntime, evaluateFormulaRuntimeAst } from "./formula/evaluate.js";
 import { calculateIterativeComponents } from "./formula/iterative-calculation.js";
 import { isSheetRowFiltered } from "./filter-values.js";
@@ -198,6 +199,7 @@ export type SheetMetadata = {
   tables?: SheetTable[];
   pageSetup?: SheetPageSetup;
   pageDecoration?: SheetPageDecoration;
+  protection?: SheetProtection;
 };
 
 export type SheetTableColumn = { id: string; name: string };
@@ -359,6 +361,7 @@ export type Sheet = {
   tables?: SheetTable[];
   pageSetup?: SheetPageSetup;
   pageDecoration?: SheetPageDecoration;
+  protection?: SheetProtection;
   floatingImages: FloatingImage[];
 };
 
@@ -394,10 +397,12 @@ export type SheetSparseState = {
   tables?: SheetTable[];
   pageSetup?: SheetPageSetup;
   pageDecoration?: SheetPageDecoration;
+  protection?: SheetProtection;
   floatingImages: FloatingImage[];
 };
 
 export type Workbook = {
+  structureProtected?: boolean;
   id: string;
   /** Interpretation of date serials; cell numbers are not converted when this changes. */
   dateSystem: ExcelDateSystem;
@@ -2612,6 +2617,7 @@ function normalizeSheetMetadata(
     | "tables"
     | "pageSetup"
     | "pageDecoration"
+    | "protection"
   >,
 ): SheetMetadata {
   const freezePanes = normalizeFreezePanes(state.freezePanes);
@@ -2728,6 +2734,7 @@ function normalizeSheetMetadata(
   }
   const pageSetup = normalizeSheetPageSetup(state.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
   const pageDecoration = normalizeSheetPageDecoration(state.pageDecoration);
+  const protection = normalizeSheetProtection(state.protection);
   if (new Set(dataValidations.map((rule) => rule.id)).size !== dataValidations.length)
     throw new Error("Duplicate data validation ID.");
   const outlineGroups = normalizeOutlineGroups(state.outlineGroups ?? []);
@@ -2776,6 +2783,7 @@ function normalizeSheetMetadata(
     tables,
     pageSetup,
     pageDecoration,
+    protection,
   };
 }
 
@@ -2815,6 +2823,7 @@ export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean
   sheet.tables = (normalized.tables ?? []).map(cloneSheetTable);
   sheet.pageSetup = cloneSheetPageSetup(normalized.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
   sheet.pageDecoration = cloneSheetPageDecoration(normalized.pageDecoration);
+  sheet.protection = normalizeSheetProtection(normalized.protection);
   return true;
 }
 
@@ -2940,6 +2949,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     tables: metadata.tables ?? [],
     pageSetup: cloneSheetPageSetup(metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
+    protection: normalizeSheetProtection(metadata.protection),
     floatingImages,
   };
 }
@@ -3043,6 +3053,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
     tables: (sheet.tables ?? []).map(cloneSheetTable),
     pageSetup: cloneSheetPageSetup(sheet.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     pageDecoration: cloneSheetPageDecoration(sheet.pageDecoration),
+    protection: normalizeSheetProtection(sheet.protection),
     floatingImages: sheet.floatingImages.map(cloneFloatingImage),
   });
 }
@@ -3106,6 +3117,7 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
   sheet.tables = (nextState.tables ?? []).map(cloneSheetTable);
   sheet.pageSetup = cloneSheetPageSetup(nextState.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
   sheet.pageDecoration = cloneSheetPageDecoration(nextState.pageDecoration);
+  sheet.protection = normalizeSheetProtection(nextState.protection);
   sheet.floatingImages = nextState.floatingImages.map(cloneFloatingImage);
   return true;
 }

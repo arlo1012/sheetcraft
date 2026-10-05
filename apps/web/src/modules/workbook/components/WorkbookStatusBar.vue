@@ -14,6 +14,7 @@ const props = withDefaults(
   defineProps<{
     sheets: readonly Sheet[];
     sheetTabsDisabled?: boolean;
+    structureProtected?: boolean;
     activeSheetId: string;
     editSessionId?: string;
     selectionSummary: SelectionSummary;
@@ -111,6 +112,7 @@ function formatNumber(value: number): string {
       >
         <WorkbookSheetTabs
           :sheets="sheets"
+          :structure-protected="structureProtected"
           :active-sheet-id="activeSheetId"
           @select="emit('select', $event)"
           @add="emit('add')"

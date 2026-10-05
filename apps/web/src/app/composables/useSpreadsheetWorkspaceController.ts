@@ -1,3 +1,4 @@
+import { canEditCell, canEditRange } from "@idea10/core";
 import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
 import {
   computed,
@@ -488,7 +489,16 @@ export function useSpreadsheetWorkspaceController(
       );
       changed = executeWorkbookCommand(session, command, operation);
     } catch (error) {
-      if (error instanceof WorkbookDomainError && error.data.code === "sheet_protected") {
+      if (
+        error instanceof WorkbookDomainError &&
+        (error.data.code === "sheet_protected" || error.data.code === "workbook_protected")
+      ) {
+        showWorkspaceStatus({
+          key:
+            error.data.code === "workbook_protected"
+              ? "review.workbookProtected"
+              : "review.cellsProtected",
+        });
         return false;
       }
       throw error;
@@ -653,7 +663,7 @@ export function useSpreadsheetWorkspaceController(
   }): boolean {
     const sheetId = payload.sheetId ?? activeSheet.value.id;
     const sheet = session.workbook.sheets.get(sheetId);
-    if (!sheet) return false;
+    if (!sheet || !canEditCell(sheet, payload.address)) return false;
     const accepted = validationInput.commit(
       {
         sheetId,
@@ -736,7 +746,12 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function pasteCells(payload: GridPastePayload): GridPasteResult {
-    if (activeSheet.value.properties.protected) return { ok: false, reason: "pasteRejected" };
+    if (
+      !canEditRange(activeSheet.value, payload.plan.range) ||
+      (activeSheet.value.properties.protected &&
+        (payload.kind === "formats" || (payload.kind === "all" && payload.moveSource)))
+    )
+      return { ok: false, reason: "pasteRejected" };
     try {
       execute(
         createGridPasteCommand(activeSheet.value, payload, activeSheetEvaluator.value),
@@ -1020,7 +1035,11 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function captureCellFormatSelection(): CellFormatSelection | undefined {
-    if (!isFormattingSupported.value || activeSheet.value.properties.protected) return;
+    if (
+      !isFormattingSupported.value ||
+      (activeSheet.value.properties.protected && !activeSheet.value.protection?.formatCells)
+    )
+      return;
     const sheet = activeSheet.value;
     const range = activeSelectionRange.value;
     const value = activeSheetEvaluator.value.getComputedValue(activeAddress.value);
@@ -1031,7 +1050,10 @@ export function useSpreadsheetWorkspaceController(
       state: getSelectionCellStyleState(sheet, range),
       borderState: getSelectionBorderState(sheet, range),
       borderCapabilities: getCellFormatBorderCapabilities(range, sheet.mergedCells),
-      mergeState: getCellFormatMergeState(sheet, range),
+      mergeState: {
+        ...getCellFormatMergeState(sheet, range),
+        ...(sheet.properties.protected ? { canMerge: false, canUnmerge: false } : {}),
+      },
       sampleValue:
         typeof value === "object" && value !== null ? formatComputedValueForDisplay(value) : value,
       dateSystem: session.workbook.dateSystem,
@@ -1101,7 +1123,11 @@ export function useSpreadsheetWorkspaceController(
 
   function applyCellFormat(change: CellFormatChange, target: CellFormatSelection): boolean {
     const sheet = session.workbook.sheets.get(target.sheetId);
-    if (target.generation !== workbookGeneration.value || !sheet || sheet.properties.protected) {
+    if (
+      target.generation !== workbookGeneration.value ||
+      !sheet ||
+      (sheet.properties.protected && !sheet.protection?.formatCells)
+    ) {
       return false;
     }
     if (!isCellStyleRangeSupported(target.range)) {
@@ -1505,7 +1531,7 @@ export function useSpreadsheetWorkspaceController(
       });
       for (const change of changesWithFormat) {
         const sheet = session.workbook.sheets.get(change.sheetId);
-        if (!sheet || sheet.properties.protected) return false;
+        if (!sheet || !canEditCell(sheet, change.address)) return false;
         const rule = getCellDataValidation(sheet, change.address);
         if (
           rule &&

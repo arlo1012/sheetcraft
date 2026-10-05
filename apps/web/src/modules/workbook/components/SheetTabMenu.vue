@@ -31,6 +31,7 @@ const props = defineProps<{
   canMoveRight?: boolean;
   canHide?: boolean;
   canDelete?: boolean;
+  structureProtected?: boolean;
 }>();
 const emit = defineEmits<{
   duplicate: [];
@@ -118,11 +119,17 @@ watch(
       :label="t('sheetTabs.menu', { name: sheet.name })"
       :style="menuStyle"
     >
-      <MenuItem data-sheet-tab-action="duplicate" @select="closeAfter(() => emit('duplicate'))"
+      <MenuItem
+        data-sheet-tab-action="duplicate"
+        :disabled="structureProtected"
+        @select="closeAfter(() => emit('duplicate'))"
         ><template #icon><Copy :size="15" /></template
         >{{ t("sheetTabs.duplicateAction") }}</MenuItem
       >
-      <MenuItem data-sheet-tab-action="rename" @select="closeAfter(() => emit('rename'))"
+      <MenuItem
+        data-sheet-tab-action="rename"
+        :disabled="structureProtected"
+        @select="closeAfter(() => emit('rename'))"
         ><template #icon><Pencil :size="15" /></template>{{ t("sheetTabs.renameAction") }}</MenuItem
       >
       <MenuItem

@@ -254,7 +254,9 @@ export function captureCellFill(
         isDateStyle(c.style),
     ),
   );
-  const availableModes: CellFillMode[] = ["copy", "fillFormatsOnly", "fillWithoutFormatting"];
+  const availableModes: CellFillMode[] = sheet.properties.protected
+    ? ["copy", "fillWithoutFormatting"]
+    : ["copy", "fillFormatsOnly", "fillWithoutFormatting"];
   if (canSeries) availableModes.push("series");
   if (date) availableModes.push("dateDay", "dateWeekday", "dateMonth", "dateYear");
   const sourceLength = sourceEnd - sourceStart + 1;
@@ -499,6 +501,12 @@ export function createCellFillCommand(
   captureCellFill(workbook, plan.sheetId, plan.sourceRange, plan.resultRange);
   if (!plan.availableModes.includes(mode))
     throw new CellFillError("modeUnavailable", `Fill mode ${mode} is unavailable for this source.`);
+  const protectedSheet = workbook.sheets.get(plan.sheetId)?.properties.protected;
+  if (protectedSheet && mode === "fillFormatsOnly")
+    throw new CellFillError(
+      "modeUnavailable",
+      "Format-only fill is unavailable on a protected sheet.",
+    );
   const previous = new Map(plan.target.map((c) => [key(c.address), c]));
   return createBatchSetCellContentsCommand(
     plan.target.map((target) => {
@@ -513,6 +521,8 @@ export function createCellFillCommand(
                 ? translateCellContentForCopy(source.content, source.address, target.address)
                 : null,
         original = previous.get(key(target.address))!;
+      if (protectedSheet)
+        return { sheetId: plan.sheetId, address: target.address, content: generated };
       return {
         sheetId: plan.sheetId,
         address: target.address,
@@ -526,6 +536,6 @@ export function createCellFillCommand(
         note: mode === "copy" ? (source.note ?? null) : (original.note ?? null),
       };
     }),
-    { reconcileBorders: true },
+    { reconcileBorders: !protectedSheet },
   );
 }

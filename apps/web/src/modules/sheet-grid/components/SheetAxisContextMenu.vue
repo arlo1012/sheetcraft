@@ -38,6 +38,7 @@ const props = defineProps<{
   maximumSize: number;
   anchor: FloatingReference;
   readOnly?: boolean;
+  dimensionReadOnly?: boolean;
   pasteSpecialDisabled?: boolean;
   pasteFormatsDisabled?: boolean;
   cutDisabledReason?: string;
@@ -92,7 +93,13 @@ function close(restoreFocus: boolean): void {
   emit("close", restoreFocus);
 }
 function dispatch(action: SheetContextAction): void {
-  if (isOpen.value && (!props.readOnly || action.type === "columnStatistics"))
+  if (
+    isOpen.value &&
+    (!props.readOnly ||
+      action.type === "columnStatistics" ||
+      (!(props.dimensionReadOnly ?? props.readOnly) &&
+        (action.type === "resize" || action.type === "autoFit" || action.type === "visibility")))
+  )
     emit("action", action);
 }
 function onKeydown(event: KeyboardEvent): void {
@@ -113,7 +120,7 @@ function requestInsert(direction: "before" | "after", count: number): void {
 }
 function requestResize(size: number): void {
   if (
-    props.readOnly ||
+    (props.dimensionReadOnly ?? props.readOnly) ||
     !Number.isInteger(size) ||
     size < props.minimumSize ||
     size > props.maximumSize ||
@@ -202,13 +209,13 @@ function requestClear(mode: "contents" | "formats" | "all"): void {
         >
         <MenuItem
           data-axis-action="hide"
-          :disabled="readOnly"
+          :disabled="dimensionReadOnly ?? readOnly"
           @select="dispatch({ type: 'visibility', axis, hidden: true })"
           ><template #icon><EyeOff :size="16" /></template>{{ t("contextMenu.hide") }}</MenuItem
         >
         <MenuItem
           data-axis-action="unhide"
-          :disabled="readOnly"
+          :disabled="dimensionReadOnly ?? readOnly"
           @select="dispatch({ type: 'visibility', axis, hidden: false })"
           ><template #icon><Eye :size="16" /></template>{{ t("contextMenu.unhide") }}</MenuItem
         >
@@ -220,14 +227,14 @@ function requestClear(mode: "contents" | "formats" | "all"): void {
             :axis="axis"
             :minimum="minimumSize"
             :maximum="maximumSize"
-            :disabled="readOnly"
+            :disabled="dimensionReadOnly ?? readOnly"
             compact
             @commit="requestResize"
           />
         </li>
         <MenuItem
           data-axis-action="auto-fit"
-          :disabled="readOnly"
+          :disabled="dimensionReadOnly ?? readOnly"
           @select="dispatch({ type: 'autoFit', axis })"
           ><template #icon><Settings2 :size="16" /></template>{{ autoFitLabel }}</MenuItem
         >

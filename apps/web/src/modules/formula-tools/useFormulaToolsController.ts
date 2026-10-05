@@ -1,3 +1,4 @@
+import { canEditCell } from "@idea10/core";
 import { computed, nextTick, ref } from "vue";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import {
@@ -52,7 +53,13 @@ export function useFormulaToolsController(options: {
     return workbook.sheets.get(session.state.owner?.sheetId ?? workbook.activeSheetId)!;
   });
   const disabled = computed(
-    () => options.isBusy() || session.state.composing || editTargetSheet.value.properties.protected,
+    () =>
+      options.isBusy() ||
+      session.state.composing ||
+      !canEditCell(
+        editTargetSheet.value,
+        session.state.owner?.address ?? options.getSelection().address,
+      ),
   );
   const namedRanges = computed(() => {
     const workbook = options.getWorkbook();

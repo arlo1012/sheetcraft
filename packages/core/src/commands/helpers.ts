@@ -1,3 +1,4 @@
+import { normalizeSheetProtection } from "../protection.js";
 import { WorkbookDomainError, toWorkbookErrorDetail } from "../errors.js";
 import { cloneCellStyle, type CellStyle } from "../style.js";
 import { cloneConditionalFormatRule } from "../conditional-formatting.js";
@@ -205,6 +206,7 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
     ...(state.tables ? { tables: state.tables.map(cloneSheetTable) } : {}),
     pageSetup: cloneSheetPageSetup(state.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     pageDecoration: cloneSheetPageDecoration(state.pageDecoration),
+    protection: normalizeSheetProtection(state.protection),
     floatingImages: state.floatingImages.map(cloneFloatingImage),
   };
 }

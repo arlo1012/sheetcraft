@@ -1,6 +1,8 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import { getCellValue } from "@idea10/core/workbook";
+import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
+import SheetProtectionDialog from "../../../modules/review-tools/components/SheetProtectionDialog.vue";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
@@ -61,6 +63,13 @@ describe("ribbon structure tools", () => {
     await workspace.get('[data-ribbon-action="undo"]').trigger("click");
     expect(workspace.getComponent(SheetGrid).props("sheet").id).toBe(sheetId);
     await worksheetAction("protect");
+    expect(workspace.getComponent(SheetGrid).props("readOnly")).toBe(false);
+    workspace.getComponent(SheetProtectionDialog).getComponent(TDialog).vm.$emit("close");
+    await flushPromises();
+    expect(workspace.getComponent(SheetGrid).props("readOnly")).toBe(false);
+    await worksheetAction("protect");
+    workspace.getComponent(SheetProtectionDialog).getComponent(TDialog).vm.$emit("confirm");
+    await flushPromises();
     expect(workspace.getComponent(SheetGrid).props("readOnly")).toBe(true);
     expect(
       workspace.get('[data-ribbon-action="row-column-operations"]').attributes("disabled"),

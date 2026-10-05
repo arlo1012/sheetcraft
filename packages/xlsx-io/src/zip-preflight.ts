@@ -135,20 +135,11 @@ function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBu
     report.add("macro-content", "block", name);
 
   const workbookPart = name.toLowerCase() === "xl/workbook.xml";
-  const worksheetPart = /^xl\/worksheets\/[^/]+\.xml$/i.test(name);
-  if (
-    workbookPart &&
-    ["workbookProtection", "fileSharing"].some((feature) => hasXmlElement(xml, feature))
-  )
+  if (workbookPart && ["fileSharing"].some((feature) => hasXmlElement(xml, feature)))
     report.add("feature-omitted", "warning", name);
   if (
     workbookPart &&
     xmlAttributeValues(xml, "state").some((value) => /^(hidden|veryhidden)$/i.test(value.trim()))
-  )
-    report.add("feature-omitted", "warning", name);
-  if (
-    worksheetPart &&
-    ["sheetProtection", "protectedRanges"].some((feature) => hasXmlElement(xml, feature))
   )
     report.add("feature-omitted", "warning", name);
 }

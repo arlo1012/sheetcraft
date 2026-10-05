@@ -1,3 +1,11 @@
+import {
+  applySetSheetProtectionCommand,
+  applySetWorkbookStructureProtectionCommand,
+} from "./protection.js";
+import {
+  assertWorkbookStructureProtection,
+  allowProtectedCellCommand,
+} from "./protection-guard.js";
 import { applyBatchDeleteSheetAxesCommand } from "./batch.js";
 import {
   WorkbookDomainError,
@@ -119,6 +127,7 @@ function assertCommandDoesNotModifyProtectedSheet(
   workbook: Workbook,
   command: WorkbookCommand,
 ): void {
+  if (allowProtectedCellCommand(workbook, command)) return;
   if (command.type === "setWorkbookTheme" && !command.cellStates && !command.tableStyles) {
     const affected = [...workbook.sheets.values()].find(
       (sheet) =>
@@ -261,8 +270,13 @@ export function applyWorkbookCommand(
   command: WorkbookCommand,
 ): WorkbookCommand | null {
   try {
+    assertWorkbookStructureProtection(workbook, command);
     assertCommandDoesNotModifyProtectedSheet(workbook, command);
     switch (command.type) {
+      case "setSheetProtection":
+        return applySetSheetProtectionCommand(workbook, command);
+      case "setWorkbookStructureProtection":
+        return applySetWorkbookStructureProtectionCommand(workbook, command);
       case "setWorkbookDateSystem":
         return applySetWorkbookDateSystemCommand(workbook, command);
       case "setWorkbookCalculation":

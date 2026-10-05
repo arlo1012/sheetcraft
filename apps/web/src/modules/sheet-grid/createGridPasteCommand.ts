@@ -401,6 +401,17 @@ export function createGridPasteCommand(
   evaluator?: SheetEvaluator,
 ): WorkbookCommand {
   const command = createCellPasteCommand(sheet, payload, evaluator);
+  if (sheet.properties.protected && command.type === "setCellContents") {
+    // Content paste on a protected form retains destination formatting and lock state.
+    return {
+      type: "setCellContents",
+      changes: command.changes.map(({ sheetId, address, content }) => ({
+        sheetId,
+        address,
+        content,
+      })),
+    };
+  }
   if (
     payload.kind === "values" ||
     command.type !== "setCellContents" ||

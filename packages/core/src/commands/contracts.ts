@@ -1,3 +1,4 @@
+import type { SheetProtection } from "../protection.js";
 import type { SheetSnapshot } from "../serialization.js";
 import type { ExcelDateSystem } from "../formula/date-system.js";
 import type { WorkbookCalculationSettings } from "../calculation.js";
@@ -34,6 +35,17 @@ import type { ConditionalFormatIconSet } from "../conditional-formatting.js";
 import type { SheetPageSetup } from "../page-setup.js";
 import type { SheetPageDecoration, SheetWatermark, WatermarkPreset } from "../page-decoration.js";
 import type { WorkbookTheme } from "../workbook-theme.js";
+
+export type SetSheetProtectionCommand = {
+  type: "setSheetProtection";
+  sheetId: string;
+  protected: boolean;
+  protection?: SheetProtection;
+};
+export type SetWorkbookStructureProtectionCommand = {
+  type: "setWorkbookStructureProtection";
+  protected: boolean;
+};
 
 export type CellContentChange = {
   sheetId: string;
@@ -747,6 +759,8 @@ export type SetWorkbookThemeCommand = {
 };
 
 export type WorkbookCommand =
+  | SetSheetProtectionCommand
+  | SetWorkbookStructureProtectionCommand
   | SetWorkbookDateSystemCommand
   | SetWorkbookCalculationCommand
   | SetWorkbookThemeCommand
@@ -879,6 +893,9 @@ export type WorkbookOperation =
 
 export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperation {
   switch (command.type) {
+    case "setWorkbookStructureProtection":
+    case "setSheetProtection":
+      return "sheets.properties";
     case "setWorkbookDateSystem":
       return "workbook.dateSystem";
     case "setWorkbookCalculation":

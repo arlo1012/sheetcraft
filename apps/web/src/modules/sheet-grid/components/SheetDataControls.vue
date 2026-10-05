@@ -42,6 +42,7 @@ const props = defineProps<{
   outlineControlOffset?: number;
   showOutline: boolean;
   readOnly: boolean;
+  contentReadOnly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -152,7 +153,9 @@ const {
 } = useMenu({
   triggerRef: validationTriggerRef,
   menuSurfaceRef: validationMenuRef,
-  disabled: computed(() => props.readOnly || !validationButtonStyle.value),
+  disabled: computed(
+    () => (props.contentReadOnly ?? props.readOnly) || !validationButtonStyle.value,
+  ),
   placement: "bottom-end",
   offset: 4,
   pointerFocus: "menu",
@@ -222,7 +225,7 @@ function requestColumnFilter(
 }
 
 function chooseValidation(value: string | number | boolean): void {
-  if (props.readOnly) return;
+  if (props.contentReadOnly ?? props.readOnly) return;
   dismissValidation("programmatic", true);
   emit("validationChoose", { address: { ...props.activeCell }, value });
 }
@@ -255,7 +258,7 @@ watch(
     <template v-if="validationButtonStyle && validationInfo">
       <span
         ref="validationTriggerRef"
-        v-icon-action="readOnly"
+        v-icon-action="contentReadOnly ?? readOnly"
         class="sheet-data-controls__validation"
         :style="validationButtonStyle"
         :aria-label="t('dataTools.validation.openList')"
@@ -293,7 +296,7 @@ watch(
             v-for="(value, index) in validationOptions"
             :key="`${typeof value}:${String(value)}:${index}`"
             class="sheet-data-controls__validation-item"
-            :disabled="readOnly"
+            :disabled="contentReadOnly ?? readOnly"
             :title="String(value)"
             @select="chooseValidation(value)"
           >

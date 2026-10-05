@@ -1,3 +1,4 @@
+import { canEditCell } from "@idea10/core";
 import { shallowRef, watch } from "vue";
 import { createSetCellContentCommand, type WorkbookCommand } from "@idea10/core/commands";
 import { isCellInRange } from "@idea10/sheet-engine/selection";
@@ -138,7 +139,7 @@ export function useDataValidationInput(options: {
   function commit(candidate: Candidate, commitOptions: DataValidationCommitOptions = {}): boolean {
     const workbook = options.getWorkbook();
     const sheet = workbook.sheets.get(candidate.sheetId);
-    if (!sheet || sheet.properties.protected) return false;
+    if (!sheet || !canEditCell(sheet, candidate.address)) return false;
     const confirmedDuplicate =
       commitOptions.confirmPendingWarning &&
       pending?.source === "duplicate" &&
@@ -198,7 +199,7 @@ export function useDataValidationInput(options: {
       request.workbook !== workbook ||
       request.generation !== options.getGeneration() ||
       !sheet ||
-      sheet.properties.protected ||
+      !canEditCell(sheet, request.candidate.address) ||
       !rule ||
       request.ruleSignature !== JSON.stringify(rule)
     ) {

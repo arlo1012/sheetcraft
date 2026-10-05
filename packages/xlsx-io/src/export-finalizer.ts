@@ -1,3 +1,4 @@
+import { writeXlsxProtection } from "./protection.js";
 import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from "fflate/browser";
 import { addNativeCellImages, type NativeCellImage } from "./native-cell-images.js";
 import { writeDefinedNames } from "./defined-names.js";
@@ -49,6 +50,7 @@ export function finalizeXlsxExport(
   theme?: WorkbookTheme,
   report?: CompatibilityReportBuilder,
   sheetBackgrounds: readonly (string | undefined)[] = [],
+  structureProtected = false,
 ): Uint8Array {
   const entries = unzipSync(bytes);
   const styles = entries["xl/styles.xml"];
@@ -90,6 +92,7 @@ export function finalizeXlsxExport(
   );
   writeXlsxHyperlinks(entries, sheets);
   writeXlsxCellNotes(entries, sheets);
+  writeXlsxProtection(entries, sheets, structureProtected);
   writeXlsxCellNoteVmlBoxes(entries, sheets);
   const projectedCellStyles = cellStyles?.map((definition) => ({
     ...definition,

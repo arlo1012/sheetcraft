@@ -144,7 +144,7 @@ describe("XLSX ZIP preflight", () => {
       expect.arrayContaining([
         expect.objectContaining({
           code: "feature-omitted",
-          locations: expect.arrayContaining(["xl/workbook.xml", "xl/worksheets/sheet1.xml"]),
+          locations: expect.arrayContaining(["xl/workbook.xml"]),
         }),
       ]),
     );

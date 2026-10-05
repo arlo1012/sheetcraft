@@ -67,6 +67,32 @@ function filteredPlan(rows: number[], rowCount = rows.length) {
 }
 
 describe("createGridPasteCommand", () => {
+  test("protected input paste preserves destination locks, style and notes through undo", () => {
+    const sheet = getActiveSheet(createWorkbook({ idFactory: createSequentialIdFactory() }));
+    const destination = { row: 0, column: 0 };
+    setCellValue(sheet, destination, "before");
+    setCellStyle(sheet, destination, { unlocked: true, italic: true });
+    setCellNote(sheet, destination, { text: "keep" });
+    sheet.properties.protected = true;
+    const session = execute(sheet, {
+      kind: "all",
+      plan: {
+        anchor: destination,
+        range: { start: destination, end: destination },
+        values: [["after"]],
+      },
+      contents: [[{ kind: "literal", value: "after" }]],
+      styles: [[{ bold: true }]],
+      notes: [[{ text: "replace" }]],
+    });
+    expect(getCellStyle(sheet, destination)).toEqual({ unlocked: true, italic: true });
+    expect(getCellNote(sheet, destination)?.text).toBe("keep");
+    expect(getCellContent(sheet, destination)).toEqual({ kind: "literal", value: "after" });
+    undoWorkbookCommand(session);
+    expect(getCellContent(sheet, destination)).toEqual({ kind: "literal", value: "before" });
+    expect(getCellStyle(sheet, destination)?.unlocked).toBe(true);
+  });
+
   test("copies named style and hyperlink metadata with ordinary cell content", () => {
     const sheet = getActiveSheet(createWorkbook({ idFactory: createSequentialIdFactory() }));
     const source = { row: 0, column: 0 };

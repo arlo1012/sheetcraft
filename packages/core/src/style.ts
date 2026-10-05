@@ -166,6 +166,8 @@ export type CellBorderFormatPatch = {
 };
 
 export type CellStyle = {
+  /** Cells are locked by default; this flag allows editing when sheet protection is enabled. */
+  unlocked?: true;
   fontFamily?: string;
   /** Live major/minor binding; fontFamily stores its resolved display cache. */
   fontTheme?: ThemeFontRole;
@@ -205,6 +207,7 @@ export type CellStylePatch = {
 };
 
 export const CELL_STYLE_KEYS = [
+  "unlocked",
   "fontFamily",
   "fontTheme",
   "fontSize",
@@ -759,6 +762,7 @@ function normalizeStyleValue<Key extends keyof CellStyle>(
     key === "bold" ||
     key === "italic" ||
     key === "strikethrough" ||
+    key === "unlocked" ||
     key === "shrinkToFit" ||
     key === "wrapText"
   ) {

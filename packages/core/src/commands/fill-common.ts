@@ -1,3 +1,4 @@
+import { canEditRange } from "../protection.js";
 import { createSheetFilterHiddenRowIntervals } from "./filter.js";
 import { doMergedCellRangesIntersect } from "../merged-cells.js";
 import {
@@ -63,7 +64,7 @@ export function prepareFillTarget(workbook: Workbook, sheetId: string, input: Ce
     throw new DataFillError("tooLarge", `A fill can change at most ${MAX_FILL_CELLS} cells.`);
 
   const sheet = getSheetOrThrow(workbook, sheetId);
-  if (sheet.properties.protected)
+  if (!canEditRange(sheet, range))
     throw new DataFillError("protected", "Cannot fill cells on a protected sheet.");
   if (sheet.mergedCells.some((merged) => doMergedCellRangesIntersect(merged, range)))
     throw new DataFillError("mergedCells", "Cannot fill across merged cells.");
