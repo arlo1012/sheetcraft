@@ -11,7 +11,7 @@ const props = defineProps<{
   error: string;
 }>();
 const emit = defineEmits<{ close: []; save: [password: string] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const password = ref(""),
   confirmation = ref(""),
   validationError = ref("");
@@ -35,15 +35,14 @@ function save(): void {
   <TDialog
     :visible="visible"
     :header="t(protected ? 'review.unprotectWorkbook' : 'review.protectWorkbook')"
-    :confirm-btn="t(protected ? 'review.unprotectWorkbook' : 'review.protectWorkbook')"
+    :confirm-btn="t('review.confirm')"
     :cancel-btn="t('review.cancel')"
     :close-on-overlay-click="false"
     width="420px"
     @confirm="save"
     @close="emit('close')"
   >
-    <p>{{ t(protected ? "review.unprotectWorkbookHint" : "review.workbookProtectionHint") }}</p>
-    <TForm label-align="top">
+    <TForm label-align="right" :label-width="locale === 'zh-CN' ? 96 : 144">
       <TFormItem
         v-if="!protected || hasPassword"
         :label="t(protected ? 'review.password' : 'review.optionalPassword')"
