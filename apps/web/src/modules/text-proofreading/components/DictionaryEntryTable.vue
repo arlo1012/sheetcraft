@@ -2,7 +2,8 @@
 import { computed, ref } from "vue";
 import { BaseTable } from "tdesign-vue-next/es/table";
 import { Input } from "tdesign-vue-next/es/input";
-import { Button } from "tdesign-vue-next/es/button";
+import { Plus, Trash2 } from "lucide-vue-next";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import { parseTsvToCellTexts } from "@idea10/core/clipboard";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -19,6 +20,12 @@ const columns = computed(() => [
 function update(index: number, key: "word" | "replacement", value: string) {
   const row = model.value[index];
   if (row) row[key] = value;
+}
+function insert(index: number) {
+  if (model.value.length >= 5000) return;
+  const next = [...model.value];
+  next.splice(index + 1, 0, { word: "", replacement: "" });
+  model.value = next;
 }
 function remove(index: number) {
   const next = model.value.filter((_, i) => i !== index);
@@ -83,20 +90,27 @@ function paste(event: ClipboardEvent, index: number, column: number) {
               />
             </div>
           </template>
-          <template #actions="{ row }"
-            ><Button size="small" variant="text" @click="remove(row.index)">{{
-              t("wordProof.remove")
-            }}</Button></template
-          >
+          <template #actions="{ row }">
+            <div class="dictionary-entry__actions">
+              <span
+                v-icon-action
+                :aria-label="t('wordProof.remove')"
+                :title="t('wordProof.remove')"
+                @click="remove(row.index)"
+                ><Trash2 class="idea-action-icon" aria-hidden="true"
+              /></span>
+              <span
+                v-icon-action="model.length >= 5000"
+                :aria-label="t('wordProof.addRow')"
+                :title="t('wordProof.addRow')"
+                @click="insert(row.index)"
+                ><Plus class="idea-action-icon" aria-hidden="true"
+              /></span>
+            </div>
+          </template>
         </BaseTable>
       </TableHeightWrapper>
     </div>
-    <Button
-      theme="default"
-      :disabled="model.length >= 5000"
-      @click="model = [...model, { word: '', replacement: '' }]"
-      >{{ t("wordProof.addRow") }}</Button
-    >
   </div>
 </template>
 <style scoped lang="scss">
@@ -107,8 +121,11 @@ function paste(event: ClipboardEvent, index: number, column: number) {
     height: 240px;
     min-height: 0;
   }
-  > button {
-    justify-self: start;
+  &__actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
   }
   p {
     margin: 0;
