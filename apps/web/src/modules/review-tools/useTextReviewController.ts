@@ -1,3 +1,4 @@
+import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
 import type { CellRange, Sheet, Workbook } from "@idea10/core/workbook";
 import type { WorkbookCommand } from "@idea10/core/commands";
@@ -37,22 +38,30 @@ export function useTextReviewController(options: {
   let revision = 0;
   let worker: Worker | undefined;
   let timeout: ReturnType<typeof setTimeout> | undefined;
-  function stop() {
+  function stop(dispose = true) {
     clearTimeout(timeout);
-    worker?.terminate();
-    worker = undefined;
+    if (dispose) {
+      worker?.terminate();
+      worker = undefined;
+    }
     busy.value = false;
   }
   function close() {
-    stop();
+    stop(busy.value);
     mode.value = undefined;
     cells.value = [];
     result.value = undefined;
     error.value = "";
     ignored.value = [];
   }
-  watch([options.getGeneration, () => options.getSheet().id], close);
-  onScopeDispose(close);
+  watch([options.getGeneration, () => options.getSheet().id], close, { flush: "sync" });
+  onScopeDispose(() => {
+    close();
+    stop();
+  });
+  watch(error, (message) => {
+    if (message && mode.value !== "spelling") void MessagePlugin.error(message);
+  });
   watch(
     [scope, language],
     () => {
@@ -65,32 +74,37 @@ export function useTextReviewController(options: {
     { flush: "sync" },
   );
   function open(value: TextReviewMode) {
-    if (options.isBusy() || !options.finishEditing()) return;
+    if (busy.value || options.isBusy() || !options.finishEditing()) return;
     close();
     mode.value = value;
     const range = options.getSelection();
     scope.value =
-      range.start.row !== range.end.row || range.start.column !== range.end.column
+      value === "spelling" &&
+      (range.start.row !== range.end.row || range.start.column !== range.end.column)
         ? "selection"
         : "sheet";
     run();
   }
   function run() {
     if (!mode.value || options.isBusy()) return;
-    stop();
+    stop(busy.value);
     error.value = "";
     result.value = undefined;
     const collected = collectReviewText(
       options.getWorkbook(),
       options.getSheet().id,
       options.getSelection(),
-      scope.value,
+      mode.value === "spelling" ? scope.value : "sheet",
     );
     cells.value = collected.cells;
     skipped.value = collected.skipped;
     revision = options.getRevision();
+    if (!cells.value.length && mode.value !== "spelling") {
+      close();
+      return;
+    }
     busy.value = true;
-    worker = new Worker(new URL("./textReview.worker.ts", import.meta.url), { type: "module" });
+    worker ??= new Worker(new URL("./textReview.worker.ts", import.meta.url), { type: "module" });
     const failed = () => {
       stop();
       error.value = t("review.textReviewFailed");
@@ -102,12 +116,16 @@ export function useTextReviewController(options: {
         failed();
         return;
       }
-      stop();
+      stop(false);
       if (revision !== options.getRevision()) {
         error.value = t("review.staleTarget");
         return;
       }
       result.value = event.data.result;
+      if (mode.value !== "spelling") {
+        if (!result.value.conversions.length || apply(result.value.conversions)) close();
+        else if (!error.value) error.value = t("review.textReviewFailed");
+      }
     };
     timeout = setTimeout(failed, 60_000);
     worker.postMessage({

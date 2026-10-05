@@ -55,7 +55,7 @@ function location(cell: ReviewTextCell) {
 </script>
 <template>
   <TDialog
-    :visible="Boolean(mode)"
+    :visible="mode === 'spelling'"
     :header="title"
     width="660px"
     :footer="false"
