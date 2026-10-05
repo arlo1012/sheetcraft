@@ -114,6 +114,18 @@ export function useWordProofreading(options: {
     else next.mistakes.push({ word, replacement });
     return save(next);
   }
+  function acceptSelected() {
+    const words = new Set(
+      issues.value.filter((issue) => selected.value.includes(issue.id)).map((issue) => issue.word),
+    );
+    if (!words.size) return false;
+    const next = parseDictionary(dictionary.value);
+    next.accepted = [...new Set([...next.accepted, ...words])];
+    next.mistakes = next.mistakes.filter((rule) => !words.has(rule.word));
+    if (!save(next)) return false;
+    scan();
+    return true;
+  }
   function apply(targets: readonly WordIssue[]) {
     if (!targets.length || options.isBusy()) return;
     if (revision !== options.getRevision()) {
@@ -164,6 +176,7 @@ export function useWordProofreading(options: {
     save,
     add,
     apply,
+    acceptSelected,
     ignore,
   };
 }

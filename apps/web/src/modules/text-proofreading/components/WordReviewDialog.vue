@@ -26,10 +26,6 @@ function correct(id: string) {
   if (issue && replacement && replacement !== issue.word)
     props.controller.apply([{ ...issue, replacement }]);
 }
-function accept(id: string) {
-  const issue = props.controller.issues.value.find((issue) => issue.id === id);
-  if (issue && props.controller.add(issue.word)) scan();
-}
 const rows = computed(() =>
   props.controller.issues.value.map((i) => {
     const cell = props.controller.cells.value[i.cell]!;
@@ -41,14 +37,12 @@ const rows = computed(() =>
   }),
 );
 const columns = computed<PrimaryTableCol[]>(() => [
-  ...(props.controller.panel.value === "batch"
-    ? [{ colKey: "row-select", type: "multiple" as const, width: 42 }]
-    : []),
+  { colKey: "row-select", type: "multiple", width: 42 },
   { colKey: "location", title: t("wordProof.location"), width: 130 },
   { colKey: "context", title: t("wordProof.context"), ellipsis: true },
   { colKey: "word", title: t("wordProof.word"), width: 110 },
   { colKey: "replacement", title: t("wordProof.replacement"), width: 150 },
-  { colKey: "actions", title: t("proofreading.action"), width: 180 },
+  { colKey: "actions", title: t("proofreading.action"), width: 120, align: "center" },
 ]);
 const applicable = computed(() =>
   props.controller.issues.value
@@ -84,6 +78,20 @@ function scan() {
           <Option value="sheet" :label="t('wordProof.sheet')" />
           <Option value="workbook" :label="t('wordProof.workbook')" />
         </Select>
+        <div class="word-review__toolbar-actions">
+          <Button
+            theme="default"
+            :disabled="!controller.selected.value.length"
+            @click="controller.acceptSelected() && (replacements = {})"
+            >{{ t("wordProof.accepted") }}</Button
+          >
+          <Button
+            theme="default"
+            :disabled="!controller.selected.value.length"
+            @click="controller.ignore(controller.selected.value)"
+            >{{ t("wordProof.ignoreSelected") }}</Button
+          >
+        </div>
       </div>
       <p v-if="controller.error.value" role="alert">{{ controller.error.value }}</p>
       <p v-if="controller.skipped.value" class="word-review__hint">
@@ -127,9 +135,6 @@ function scan() {
                 <Button size="small" variant="text" @click="controller.ignore([row.id])">{{
                   t("wordProof.ignore")
                 }}</Button>
-                <Button size="small" variant="text" @click="accept(row.id)">{{
-                  t("wordProof.accepted")
-                }}</Button>
               </div>
             </template>
           </PrimaryTable>
@@ -142,21 +147,15 @@ function scan() {
           <span v-if="controller.scanned.value">{{
             t("wordProof.count", { count: controller.issues.value.length })
           }}</span>
-          <span v-if="controller.panel.value === 'batch'">{{
-            t("proofreading.selected", { count: controller.selected.value.length })
-          }}</span>
+          <span>{{ t("proofreading.selected", { count: controller.selected.value.length }) }}</span>
         </div>
         <div class="word-review__footer-actions">
           <Button theme="default" @click="controller.panel.value = undefined">{{
             t("wordProof.close")
           }}</Button>
-          <Button
-            v-if="controller.panel.value === 'batch'"
-            theme="primary"
-            :disabled="!applicable.length"
-            @click="applySelected"
-            >{{ t("wordProof.applySelected") }}</Button
-          >
+          <Button theme="primary" :disabled="!applicable.length" @click="applySelected">{{
+            t("wordProof.applySelected")
+          }}</Button>
           <Button @click="scan">{{ t("wordProof.scan") }}</Button>
         </div>
       </div>
@@ -173,6 +172,12 @@ function scan() {
   &__toolbar,
   &__footer,
   &__summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  &__toolbar-actions {
+    margin-left: auto;
     display: flex;
     align-items: center;
     gap: 8px;

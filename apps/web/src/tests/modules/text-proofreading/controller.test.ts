@@ -80,6 +80,34 @@ describe("Chinese proofreading controller", () => {
     expect(getCellContent(f.sheet, a2)).toEqual({ kind: "literal", value: "迫不急待" });
   });
 
+  test("accepts selected words together, deduplicates them, and leaves unselected issues", () => {
+    const f = fixture();
+    setCellContent(f.sheet, a1, { kind: "literal", value: "再接再励再接再励" });
+    f.review.open("general");
+    f.review.selected.value = f.review.issues.value
+      .filter((issue) => issue.word === "再接再励")
+      .map((issue) => issue.id);
+    expect(f.review.acceptSelected()).toBe(true);
+    expect(f.review.dictionary.value.accepted).toEqual(["再接再励"]);
+    expect(f.review.issues.value.map((issue) => issue.word)).toEqual(["迫不急待"]);
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+  test("does not partially accept words when dictionary persistence fails", () => {
+    const f = fixture();
+    f.review.open("general");
+    f.review.selected.value = f.review.issues.value.map((issue) => issue.id);
+    const write = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("full");
+    });
+    try {
+      expect(f.review.acceptSelected()).toBe(false);
+      expect(f.review.dictionary.value.accepted).toEqual([]);
+      expect(f.review.issues.value).toHaveLength(3);
+    } finally {
+      write.mockRestore();
+    }
+  });
+
   test("refuses stale results without invoking workbook commands", () => {
     const f = fixture();
     f.review.open("batch");
