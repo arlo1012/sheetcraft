@@ -204,6 +204,11 @@ async function importFile(event: Event) {
             ><Info class="idea-action-icon" aria-hidden="true" /></span
         ></Tooltip>
         <div class="dictionary-manager__transfer">
+          <Tooltip :content="t('wordProof.templateHint')">
+            <Button theme="default" variant="text" @click="downloadTemplate">{{
+              t("wordProof.downloadTemplate")
+            }}</Button>
+          </Tooltip>
           <Tooltip :content="t('wordProof.importHint')"
             ><Button
               theme="default"
@@ -213,11 +218,6 @@ async function importFile(event: Event) {
               ><template #icon><Upload :size="14" /></template>{{ t("wordProof.import") }}</Button
             ></Tooltip
           >
-          <Tooltip :content="t('wordProof.templateHint')">
-            <Button theme="default" variant="outline" @click="downloadTemplate">{{
-              t("wordProof.downloadTemplate")
-            }}</Button>
-          </Tooltip>
           <Button
             theme="default"
             variant="outline"
@@ -351,6 +351,7 @@ async function importFile(event: Event) {
     min-height: 28px;
     gap: 4px;
     padding-bottom: 0;
+    border-bottom: 1px solid var(--td-component-border);
   }
   &__info {
     display: inline-flex;
