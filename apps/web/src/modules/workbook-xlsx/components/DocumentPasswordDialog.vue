@@ -6,7 +6,7 @@ import { Input as TInput } from "tdesign-vue-next/es/input";
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{ mode: "encrypt" | "decrypt"; busy: boolean; incorrect?: boolean }>();
 const emit = defineEmits<{ close: []; submit: [password: string] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const password = ref(""),
   confirmation = ref(""),
   error = ref("");
@@ -28,7 +28,7 @@ function submit() {
     visible
     :header="t(mode === 'encrypt' ? 'review.encryptDocument' : 'review.openEncryptedDocument')"
     :confirm-btn="{
-      content: t(mode === 'encrypt' ? 'review.encryptAndDownload' : 'review.openDocument'),
+      content: t('review.confirm'),
       loading: busy,
     }"
     :cancel-btn="{ content: t('review.cancel'), disabled: busy }"
@@ -39,8 +39,11 @@ function submit() {
     @confirm="submit"
     @close="!busy && emit('close')"
   >
-    <p>{{ t(mode === "encrypt" ? "review.encryptionHint" : "review.decryptionHint") }}</p>
-    <TForm label-align="top" @submit.prevent="submit">
+    <TForm
+      label-align="right"
+      :label-width="locale === 'zh-CN' ? 96 : 144"
+      @submit.prevent="submit"
+    >
       <TFormItem :label="t('review.password')"
         ><TInput
           v-model="password"
