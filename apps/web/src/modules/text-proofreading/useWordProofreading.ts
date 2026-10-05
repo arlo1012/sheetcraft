@@ -1,5 +1,5 @@
 import { ref, shallowRef, watch } from "vue";
-import type { Workbook, Sheet, CellRange } from "@idea10/core/workbook";
+import type { Workbook, Sheet, CellRange, CellAddress } from "@idea10/core/workbook";
 import type { WorkbookCommand } from "@idea10/core/commands";
 import { useAppI18n } from "../../shared/i18n";
 import {
@@ -24,6 +24,7 @@ export function useWordProofreading(options: {
   isBusy: () => boolean;
   finishEditing: () => boolean;
   execute: (command: WorkbookCommand) => boolean;
+  navigateToCell?: (sheetId: string, address: CellAddress) => void;
 }) {
   const { t } = useAppI18n();
   const dictionary = ref(emptyDictionary());
@@ -156,6 +157,14 @@ export function useWordProofreading(options: {
       error.value = t("wordProof.stale");
     }
   }
+  function selectIssue(id: string) {
+    if (options.isBusy() || !options.navigateToCell) return;
+    const issue = issues.value.find((item) => item.id === id);
+    const cell = issue && cells.value[issue.cell];
+    if (!cell) return;
+    panel.value = undefined;
+    options.navigateToCell(cell.sheetId, cell.address);
+  }
   function ignore(ids: readonly string[]) {
     issues.value = issues.value.filter((i) => !ids.includes(i.id));
     selected.value = selected.value.filter((id) => !ids.includes(id));
@@ -177,6 +186,7 @@ export function useWordProofreading(options: {
     add,
     apply,
     acceptSelected,
+    selectIssue,
     ignore,
   };
 }

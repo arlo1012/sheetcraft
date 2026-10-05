@@ -408,6 +408,10 @@ const wordProofreading = useWordProofreading({
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   finishEditing: () => cellEditSession.finish(),
   execute: executeCommand,
+  navigateToCell: (sheetId, address) => {
+    if (activeSheet.value.id !== sheetId) selectSheet(sheetId);
+    void nextTick(() => navigateToAddress(formatCellAddress(address)));
+  },
 });
 const cellStyleActions = useCellStylesController({
   getWorkbook: () => session.workbook,

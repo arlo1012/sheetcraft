@@ -119,6 +119,16 @@ function scan() {
             :empty="t(controller.scanned.value ? 'wordProof.empty' : 'wordProof.noScan')"
             @select-change="controller.selected.value = $event.map(String)"
           >
+            <template #location="{ row }">
+              <Button
+                size="small"
+                variant="text"
+                theme="primary"
+                @click="controller.selectIssue(row.id)"
+              >
+                {{ row.location }}
+              </Button>
+            </template>
             <template #replacement="{ row }">
               <Input
                 :value="replacementFor(row.id)"
