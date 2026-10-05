@@ -35,12 +35,12 @@ export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[])
       if (!cell.sparkline) return [];
       const spark = normalizeCellSparkline(cell.sparkline)!;
       const [row, column] = key.split(":").map(Number);
-      const location = getCellAddressLabel({ row: row!, column: column! });
+      const cellLabel = getCellAddressLabel({ row: row!, column: column! });
       const formula = spark.source
         ? `'${sheet.name.replaceAll("'", "''")}'!${getCellAddressLabel(spark.source.start)}:${getCellAddressLabel(spark.source.end)}`
         : "#REF!";
       return [
-        `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="1" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"><x14:colorSeries rgb="FF${spark.color.slice(1).toUpperCase()}"/><x14:colorNegative rgb="FF${spark.negativeColor.slice(1).toUpperCase()}"/><x14:colorAxis rgb="FFA3A3A3"/><x14:colorMarkers rgb="FF${spark.color.slice(1).toUpperCase()}"/><x14:sparklines><x14:sparkline><xm:f>${escape(formula)}</xm:f><xm:sqref>${location}</xm:sqref></x14:sparkline></x14:sparklines></x14:sparklineGroup>`,
+        `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="1" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"><x14:colorSeries rgb="FF${spark.color.slice(1).toUpperCase()}"/><x14:colorNegative rgb="FF${spark.negativeColor.slice(1).toUpperCase()}"/><x14:colorAxis rgb="FFA3A3A3"/><x14:colorMarkers rgb="FF${spark.color.slice(1).toUpperCase()}"/><x14:sparklines><x14:sparkline><xm:f>${escape(formula)}</xm:f><xm:sqref>${cellLabel}</xm:sqref></x14:sparkline></x14:sparklines></x14:sparklineGroup>`,
       ];
     });
     if (!groups.length) return;

@@ -77,14 +77,24 @@ const shapes: DrawingShape[] = [
         <label>{{ t("drawing.stroke") }}<input v-model="draft.stroke" type="color" /></label>
         <label
           >{{ t("drawing.strokeWidth")
-          }}<InputNumber v-model="draft.strokeWidth" :min="0" :max="32" size="small"
+          }}<InputNumber
+            class="drawing-editor__number"
+            v-model="draft.strokeWidth"
+            :min="0"
+            :max="32"
+            size="small"
         /></label>
       </div>
       <div class="drawing-editor__row">
         <label>{{ t("drawing.color") }}<input v-model="draft.color" type="color" /></label>
         <label
           >{{ t("drawing.fontSize")
-          }}<InputNumber v-model="draft.fontSize" :min="1" :max="512" size="small"
+          }}<InputNumber
+            class="drawing-editor__number"
+            v-model="draft.fontSize"
+            :min="1"
+            :max="512"
+            size="small"
         /></label>
         <Checkbox v-model="draft.bold">{{ t("drawing.bold") }}</Checkbox
         ><Checkbox v-model="draft.italic">{{ t("drawing.italic") }}</Checkbox>
@@ -92,15 +102,30 @@ const shapes: DrawingShape[] = [
       <div class="drawing-editor__row">
         <label
           >{{ t("drawing.width")
-          }}<InputNumber v-model="draft.width" :min="16" :max="16384" size="small"
+          }}<InputNumber
+            class="drawing-editor__number"
+            v-model="draft.width"
+            :min="16"
+            :max="16384"
+            size="small"
         /></label>
         <label
           >{{ t("drawing.height")
-          }}<InputNumber v-model="draft.height" :min="16" :max="16384" size="small"
+          }}<InputNumber
+            class="drawing-editor__number"
+            v-model="draft.height"
+            :min="16"
+            :max="16384"
+            size="small"
         /></label>
         <label
           >{{ t("drawing.rotation")
-          }}<InputNumber v-model="draft.rotation" :min="-360" :max="360" size="small"
+          }}<InputNumber
+            class="drawing-editor__number"
+            v-model="draft.rotation"
+            :min="-360"
+            :max="360"
+            size="small"
         /></label>
       </div>
       <div class="drawing-editor__preview" :aria-label="t('drawing.preview')">
@@ -130,7 +155,7 @@ const shapes: DrawingShape[] = [
     gap: 12px;
     align-items: center;
     flex-wrap: wrap;
-    :deep(.t-input-number) {
+    .drawing-editor__number {
       width: 90px;
     }
     input[type="color"] {

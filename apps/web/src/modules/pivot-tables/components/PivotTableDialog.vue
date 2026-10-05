@@ -309,7 +309,7 @@ function display(value: unknown) {
       width: 100%;
     }
     td {
-      border: 1px solid var(--td-component-border);
+      border: 1px solid var(--idea-border-control);
       padding: 5px 8px;
       white-space: nowrap;
     }
@@ -323,7 +323,7 @@ function display(value: unknown) {
     color: var(--text-secondary);
   }
   [role="alert"] {
-    color: var(--td-error-color);
+    color: var(--idea-status-error);
   }
 }
 </style>

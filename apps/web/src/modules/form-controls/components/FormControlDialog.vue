@@ -157,7 +157,7 @@ function confirm() {
     color: var(--text-secondary);
   }
   [role="alert"] {
-    color: var(--td-error-color);
+    color: var(--idea-status-error);
   }
 }
 </style>
