@@ -116,9 +116,6 @@ function selectIssues(keys: Array<string | number>): void {
       </div>
 
       <div v-if="error" class="data-proofreading-dialog__error" role="alert">{{ error }}</div>
-      <div v-else-if="!hasScanned && !issues.length" class="data-proofreading-dialog__empty">
-        {{ t("proofreading.scanHint") }}
-      </div>
 
       <TTable
         v-if="hasScanned && issues.length"
@@ -226,8 +223,7 @@ function selectIssues(keys: Array<string | number>): void {
 
   &__toolbar,
   &__footer,
-  &__summary,
-  &__actions {
+  &__summary {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -239,8 +235,7 @@ function selectIssues(keys: Array<string | number>): void {
   &__error {
     color: var(--idea-status-error);
   }
-  &__summary,
-  &__empty {
+  &__summary {
     color: var(--idea-text-secondary);
   }
   &__summary {
@@ -248,9 +243,10 @@ function selectIssues(keys: Array<string | number>): void {
     gap: 12px;
   }
   &__actions {
+    display: flex;
+    align-items: center;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 4px;
   }
   &__footer {
     justify-content: space-between;
