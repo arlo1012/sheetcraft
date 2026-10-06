@@ -176,14 +176,8 @@ const title = computed(() =>
         :disabled="disabled"
         >{{ t("pivot.overwrite") }}</Checkbox
       >
-      <p v-if="error || !validSource" role="alert">
-        {{
-          t(
-            error && errorReason && errorReason !== "invalid"
-              ? `pivot.error.${errorReason}`
-              : "pivot.invalid",
-          )
-        }}
+      <p v-if="error && errorReason && errorReason !== 'invalid'" role="alert">
+        {{ t(`pivot.error.${errorReason}`) }}
       </p>
     </div>
   </Dialog>
