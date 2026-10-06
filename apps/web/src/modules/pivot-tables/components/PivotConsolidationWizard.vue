@@ -73,15 +73,6 @@ function finish(): void {
         </RadioGroup>
       </template>
       <template v-else>
-        <div
-          v-if="draft.consolidationPageMode === 'custom'"
-          class="pivot-consolidation-wizard__count"
-        >
-          <strong>{{ t("pivot.pageFieldsCount") }}</strong>
-          <RadioGroup v-model="draft.consolidationPageCount" :disabled="disabled">
-            <Radio v-for="count in [0, 1, 2, 3, 4]" :key="count" :value="count">{{ count }}</Radio>
-          </RadioGroup>
-        </div>
         <PivotConsolidationRanges
           v-model="draft.sources"
           v-model:page-items="draft.consolidationPageItems"
@@ -91,7 +82,21 @@ function finish(): void {
           :page-count="draft.consolidationPageMode === 'custom' ? draft.consolidationPageCount : 0"
           :disabled="disabled"
           :select-reference="selectReference"
-        />
+        >
+          <template #page-count>
+            <div
+              v-if="draft.consolidationPageMode === 'custom'"
+              class="pivot-consolidation-wizard__count"
+            >
+              <strong>{{ t("pivot.pageFieldsCount") }}</strong>
+              <RadioGroup v-model="draft.consolidationPageCount" :disabled="disabled">
+                <Radio v-for="count in [0, 1, 2, 3, 4]" :key="count" :value="count">{{
+                  count
+                }}</Radio>
+              </RadioGroup>
+            </div>
+          </template>
+        </PivotConsolidationRanges>
       </template>
     </div>
     <template #footer>
@@ -137,6 +142,7 @@ function finish(): void {
   }
   &__footer {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: 8px;
   }

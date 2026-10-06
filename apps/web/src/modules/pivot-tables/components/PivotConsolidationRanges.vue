@@ -22,6 +22,7 @@ const props = defineProps<{
 }>();
 const sources = defineModel<string[]>({ required: true });
 const pageItems = defineModel<string[][]>("pageItems", { required: true });
+defineSlots<{ "page-count"?: () => unknown }>();
 const { t } = useAppI18n();
 const reference = ref(props.initialReference);
 const selected = ref<string | undefined>(sources.value.length ? "0" : undefined);
@@ -79,17 +80,16 @@ function select(value: string): void {
 </script>
 <template>
   <div class="pivot-consolidation-ranges">
-    <p>{{ t("pivot.wizardRangesHint") }}</p>
-    <strong>{{ t("pivot.sourceRange") }}</strong>
-    <RangeReferenceInput
-      v-model="reference"
-      :label="t('pivot.sourceRange')"
-      :disabled="disabled"
-      :select-reference="selectReference"
-      @enter="add"
-    />
-    <div class="pivot-consolidation-ranges__heading">
-      <strong>{{ t("pivot.allRanges") }}</strong>
+    <section class="pivot-consolidation-ranges__source">
+      <p>{{ t("pivot.wizardRangesHint") }}</p>
+      <strong>{{ t("pivot.sourceRange") }}</strong>
+      <RangeReferenceInput
+        v-model="reference"
+        :label="t('pivot.sourceRange')"
+        :disabled="disabled"
+        :select-reference="selectReference"
+        @enter="add"
+      />
       <div class="pivot-consolidation-ranges__actions">
         <Button size="small" variant="outline" :disabled="disabled || !canAdd" @click="add">{{
           t("pivot.addRange")
@@ -105,70 +105,88 @@ function select(value: string): void {
           t("pivot.browse")
         }}</Button>
       </div>
-    </div>
-    <div class="pivot-consolidation-ranges__list">
-      <OptionList
-        :model-value="selected"
-        :options="options"
-        :label="t('pivot.consolidationRanges')"
-        :inert="disabled || undefined"
-        overflow="ellipsis"
-        @select="select"
-        @keydown.delete.stop.prevent="remove"
-      >
-        <template #empty
-          ><p>{{ t("pivot.noRanges") }}</p></template
+    </section>
+    <section class="pivot-consolidation-ranges__areas">
+      <strong>{{ t("pivot.allRanges") }}</strong>
+      <div class="pivot-consolidation-ranges__list">
+        <OptionList
+          :model-value="selected"
+          :options="options"
+          :label="t('pivot.consolidationRanges')"
+          :inert="disabled || undefined"
+          overflow="ellipsis"
+          @select="select"
+          @keydown.delete.stop.prevent="remove"
         >
-      </OptionList>
-    </div>
+          <template #empty
+            ><p>{{ t("pivot.noRanges") }}</p></template
+          >
+        </OptionList>
+      </div>
+    </section>
+    <slot name="page-count" />
     <section v-if="pageCount" class="pivot-consolidation-ranges__page-items">
       <p>{{ t("pivot.pageItemsHint") }}</p>
-      <label v-for="field in pageCount" :key="field"
-        >{{ t("pivot.pageField", { index: field }) }}
-        <Input
-          v-if="selectedItems"
-          v-model="selectedItems[field - 1]"
-          :disabled="disabled"
-          :maxlength="200"
-          :aria-label="t('pivot.pageField', { index: field })"
-        />
-        <Input v-else :disabled="true" />
-      </label>
+      <div class="pivot-consolidation-ranges__page-grid">
+        <label v-for="field in pageCount" :key="field"
+          >{{ t("pivot.pageField", { index: field }) }}
+          <Input
+            v-if="selectedItems"
+            v-model="selectedItems[field - 1]"
+            :disabled="disabled"
+            :maxlength="200"
+            :aria-label="t('pivot.pageField', { index: field })"
+          />
+          <Input v-else :disabled="true" />
+        </label>
+      </div>
     </section>
   </div>
 </template>
 <style scoped lang="scss">
 .pivot-consolidation-ranges {
   display: grid;
-  gap: 8px;
+  gap: 16px;
+  min-width: 0;
   p {
     margin: 0;
     color: var(--idea-text-secondary);
   }
-  &__heading,
-  &__actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  &__heading {
-    justify-content: space-between;
-  }
+  &__source,
+  &__areas,
   &__page-items {
     display: grid;
     gap: 8px;
+    min-width: 0;
+  }
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  &__page-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 16px;
     label {
       display: grid;
-      grid-template-columns: 48px minmax(0, 1fr);
+      grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
       gap: 8px;
     }
   }
   &__list {
     display: grid;
-    height: 112px;
+    height: 128px;
+    min-height: 0;
     p {
       padding: 8px;
+    }
+  }
+  @media (max-width: 420px) {
+    &__page-grid {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 }
