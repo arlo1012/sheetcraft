@@ -211,6 +211,17 @@ export function createDuplicateSheetCommand(
   sheet.pivotTables = normalizePivotTables(sheet.pivotTables).map((table) => ({
     ...table,
     sourceSheetId: table.sourceSheetId === sourceSheetId ? sheetId : table.sourceSheetId,
+    ...(table.consolidation
+      ? {
+          consolidation: {
+            ...table.consolidation,
+            ranges: table.consolidation.ranges.map((area) => ({
+              ...area,
+              sheetId: area.sheetId === sourceSheetId ? sheetId : area.sheetId,
+            })),
+          },
+        }
+      : {}),
   }));
   sheet.id = sheetId;
   sheet.name = name;

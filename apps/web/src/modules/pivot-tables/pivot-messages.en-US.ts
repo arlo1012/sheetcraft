@@ -14,6 +14,18 @@ export const pivotsEnUS = {
   "pivot.createTitle": "Create PivotTable",
   "pivot.chooseSource": "Choose the data to analyze",
   "pivot.cellRange": "Select a cell range",
+  "pivot.consolidationRanges": "Use multiple consolidation ranges",
+  "pivot.anotherPivot": "Use another PivotTable",
+  "pivot.consolidationHint":
+    "The first row and column supply labels. Values with matching labels are summarized together. Exclude subtotals and grand totals.",
+  "pivot.sourceRange": "Source range",
+  "pivot.selectedRanges": "{count} ranges selected",
+  "pivot.addRange": "Add range",
+  "pivot.noRanges": "Add the ranges to consolidate.",
+  "pivot.noReports": "There are no other PivotTables in this workbook.",
+  "pivot.reuseHint":
+    "Reuse the selected report’s original data source with an independent field layout.",
+  "pivot.sourceArea": "Area",
   "pivot.chooseDestination": "Choose where to place the PivotTable",
   "pivot.existingSheet": "Existing worksheet",
   "pivot.changeSource": "Change data source",

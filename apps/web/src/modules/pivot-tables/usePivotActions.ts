@@ -6,7 +6,8 @@ import {
   type WorkbookCommand,
 } from "@idea10/core/commands";
 import {
-  getPivotSource,
+  getPivotTableSource,
+  type PivotConsolidation,
   addressInRange,
   getPivotTableRange,
   normalizePivotTable,
@@ -21,9 +22,14 @@ import {
   formatRangeReference,
   resolveRangeReference,
 } from "../../shared/range-reference/formatRangeReference";
+import { resolvePivotDraftSource } from "./pivot-draft-source";
 export type PivotDraft = {
   table: SheetPivotTable;
   source: string;
+  sourceKind: "range" | "consolidation" | "pivot";
+  sources: string[];
+  consolidationLabels: PivotConsolidation["labels"];
+  sourcePivot?: { sheetId: string; tableId: string };
   destination: string;
   newSheet: boolean;
   newSheetName: string;
@@ -44,6 +50,7 @@ export function usePivotActions(options: {
   total: () => string;
   empty: () => string;
   sumCaption: (field: string) => string;
+  consolidationLabels?: () => PivotConsolidation["labels"];
   activate?: (sheetId: string, table: SheetPivotTable) => void;
   onError: () => void;
 }) {
@@ -122,6 +129,18 @@ export function usePivotActions(options: {
     editing.value = {
       table,
       source: formatRangeReference(sourceSheet?.name ?? sheet.name, sourceRange),
+      sourceKind: table.consolidation ? "consolidation" : "range",
+      sources:
+        table.consolidation?.ranges.map((area) =>
+          area.range
+            ? formatRangeReference(
+                workbook.sheets.get(area.sheetId)?.name ?? area.sheetId,
+                area.range,
+              )
+            : "",
+        ) ?? [],
+      consolidationLabels: table.consolidation?.labels ??
+        options.consolidationLabels?.() ?? ["Row", "Column", "Value", "Area"],
       destination: formatRangeReference(sheet.name, { start: table.anchor, end: table.anchor }),
       newSheet: !existing,
       newSheetName: getNextSheetName(workbook),
@@ -143,14 +162,12 @@ export function usePivotActions(options: {
     )
       return;
     errorReason.value = "invalid";
-    const source = resolveRangeReference(target.workbook, draft.source, draft.referenceSheetId);
     const destination = resolveRangeReference(
       target.workbook,
       draft.destination,
       draft.referenceSheetId,
     );
     if (
-      !source ||
       (!draft.newSheet &&
         (!destination ||
           destination.range.start.row !== destination.range.end.row ||
@@ -170,20 +187,42 @@ export function usePivotActions(options: {
       return;
     }
     try {
+      const source = resolvePivotDraftSource(target.workbook, draft);
+      const after = getPivotTableSource(
+        target.workbook,
+        normalizePivotTable({
+          ...draft.table,
+          ...source,
+          rowFields: [],
+          columnFields: [],
+          values: [],
+          filters: [],
+        }),
+      ).headers;
       // Source changes retain fields by header identity; missing fields are removed, never rebound by index.
       let fields = draft.table;
+      if (!draft.existing && source.consolidation) {
+        fields = {
+          ...draft.table,
+          rowFields: [0],
+          columnFields: [1],
+          values: [
+            {
+              field: 2,
+              aggregate: "sum",
+              caption: options.sumCaption(source.consolidation.labels[2]),
+            },
+          ],
+          filters: [{ field: 3, values: [], all: true }],
+        };
+      }
       if (draft.existing && draft.mode === "source") {
         let before: string[] | undefined;
         try {
-          before = getPivotSource(
-            target.workbook,
-            draft.table.sourceSheetId,
-            draft.table.source,
-          ).headers;
+          before = getPivotTableSource(target.workbook, draft.table).headers;
         } catch {
           /* A deleted source can be repaired with a new range. */
         }
-        const after = getPivotSource(target.workbook, source.sheetId, source.range).headers;
         const remap = (index: number) =>
           before ? after.indexOf(before[index] ?? "") : index < after.length ? index : -1;
         fields = {
@@ -200,8 +239,7 @@ export function usePivotActions(options: {
       }
       const table = normalizePivotTable({
         ...fields,
-        sourceSheetId: source.sheetId,
-        source: source.range,
+        ...source,
         anchor: draft.newSheet ? { row: 0, column: 0 } : destination!.range.start,
       });
       const chartId = draft.chart ? idFactory("pivot-chart") : undefined;

@@ -22,11 +22,18 @@ export type PivotPresentation = {
   bandedColumns: boolean;
 };
 export type PivotResultLayout = { labelColumns: number; dataRows: number[]; rowLabels: string[] };
+export type PivotSourceRange = { sheetId: string; range: CellRange | null; label: string };
+export type PivotConsolidation = {
+  ranges: PivotSourceRange[];
+  /** Row, column, value and source-area field captions. */
+  labels: [string, string, string, string];
+};
 export type SheetPivotTable = {
   id: string;
   name: string;
   sourceSheetId: string;
   source: CellRange | null;
+  consolidation?: PivotConsolidation;
   anchor: CellAddress;
   outputRange: CellRange | null;
   rowFields: number[];
@@ -129,8 +136,31 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
       resultLayout.rowLabels.some((label) => typeof label !== "string" || label.length > 1048576))
   )
     throw new RangeError("Invalid pivot result layout.");
-  const source = cloneRange(table.source);
-  const width = source ? source.end.column - source.start.column + 1 : MAX_SHEET_COLUMNS;
+  const consolidation = table.consolidation;
+  if (
+    consolidation !== undefined &&
+    (!consolidation ||
+      !Array.isArray(consolidation.ranges) ||
+      !consolidation.ranges.length ||
+      consolidation.ranges.length > 128 ||
+      !Array.isArray(consolidation.labels) ||
+      consolidation.labels.length !== 4 ||
+      consolidation.labels.some((label) => !text(label)) ||
+      new Set(consolidation.labels).size !== 4 ||
+      consolidation.ranges.some((area) => !area || !text(area.sheetId) || !text(area.label)))
+  )
+    throw new RangeError("Invalid pivot consolidation.");
+  const ranges = consolidation?.ranges.map((area) => ({
+    sheetId: area.sheetId,
+    range: cloneRange(area.range),
+    label: area.label,
+  }));
+  const source = ranges ? ranges[0]!.range : cloneRange(table.source);
+  const width = consolidation
+    ? 4
+    : source
+      ? source.end.column - source.start.column + 1
+      : MAX_SHEET_COLUMNS;
   const field = (index: number) => Number.isInteger(index) && index >= 0 && index < width;
   if (
     table.rowFields.length > 32 ||
@@ -162,8 +192,16 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
   return {
     id: table.id,
     name: table.name,
-    sourceSheetId: table.sourceSheetId,
+    sourceSheetId: ranges ? ranges[0]!.sheetId : table.sourceSheetId,
     source,
+    ...(consolidation && ranges
+      ? {
+          consolidation: {
+            ranges,
+            labels: [...consolidation.labels] as PivotConsolidation["labels"],
+          },
+        }
+      : {}),
     anchor: { ...table.anchor },
     outputRange: cloneRange(table.outputRange),
     rowFields: [...table.rowFields],
@@ -226,6 +264,94 @@ export function getPivotSource(workbook: Workbook, sourceSheetId: string, range:
   if (new Set(headers.map((header) => header.toLowerCase())).size !== headers.length)
     throw new RangeError("Pivot column headers must be unique.");
   return { sheet, range: source, evaluator, headers };
+}
+/** Every physical source area, also used to protect source cells from report output. */
+export function getPivotSourceRanges(table: SheetPivotTable): PivotSourceRange[] {
+  return (
+    table.consolidation?.ranges ?? [
+      { sheetId: table.sourceSheetId, range: table.source, label: table.name },
+    ]
+  );
+}
+/** Uniform record stream for ordinary lists and labeled consolidation matrices. */
+export function getPivotTableSource(workbook: Workbook, table: SheetPivotTable) {
+  if (!table.consolidation) {
+    const info = getPivotSource(workbook, table.sourceSheetId, table.source);
+    return {
+      headers: info.headers,
+      *records(): Generator<FormulaValue[]> {
+        for (let row = info.range.start.row + 1; row <= info.range.end.row; row++) {
+          if (!table.includeHidden && info.sheet.hiddenRows?.has(row)) continue;
+          yield info.headers.map((_, field) =>
+            info.evaluator.getComputedValue({ row, column: info.range.start.column + field }),
+          );
+        }
+      },
+    };
+  }
+  let cells = 0;
+  const areas = table.consolidation.ranges.map((area, index, ranges) => {
+    const range = cloneRange(area.range);
+    const sheet = workbook.sheets.get(area.sheetId);
+    if (
+      !range ||
+      !sheet ||
+      range.end.row <= range.start.row ||
+      range.end.column <= range.start.column
+    )
+      throw new RangeError("Consolidation needs row labels, column labels and values.");
+    cells += (range.end.row - range.start.row + 1) * (range.end.column - range.start.column + 1);
+    if (cells > MAX_PIVOT_SOURCE_CELLS) throw new RangeError("Pivot source exceeds 100,000 cells.");
+    if (sheet.mergedCells.some((merge) => rangesIntersect(merge, range)))
+      throw new RangeError("Pivot source contains merged cells.");
+    if (
+      ranges
+        .slice(0, index)
+        .some(
+          (previous) =>
+            previous.sheetId === area.sheetId &&
+            previous.range &&
+            rangesIntersect(previous.range, range),
+        )
+    )
+      throw new RangeError("Consolidation areas must not overlap.");
+    const evaluator = createWorkbookEvaluator(workbook, sheet.id);
+    const columns: FormulaValue[] = [];
+    for (let column = range.start.column + 1; column <= range.end.column; column++) {
+      const label = evaluator.getComputedValue({ row: range.start.row, column });
+      if (label === null || isFormulaError(label) || !String(label).trim())
+        throw new RangeError("Consolidation column labels must not be blank.");
+      columns.push(label);
+    }
+    // Validate all labels before offering or mutating a report, including hidden rows.
+    for (let row = range.start.row + 1; row <= range.end.row; row++) {
+      const label = evaluator.getComputedValue({ row, column: range.start.column });
+      if (label === null || isFormulaError(label) || !String(label).trim()) {
+        const blank = columns.every((_, index) => {
+          const value = evaluator.getComputedValue({ row, column: range.start.column + index + 1 });
+          return value === null || value === "";
+        });
+        if (!blank) throw new RangeError("Consolidation row labels must not be blank.");
+      }
+    }
+    return { sheet, range, evaluator, columns, label: area.label };
+  });
+  return {
+    headers: [...table.consolidation.labels],
+    *records(): Generator<FormulaValue[]> {
+      for (const { sheet, range, evaluator, columns, label } of areas)
+        for (let row = range.start.row + 1; row <= range.end.row; row++) {
+          if (!table.includeHidden && sheet.hiddenRows?.has(row)) continue;
+          const rowLabel = evaluator.getComputedValue({ row, column: range.start.column });
+          if (rowLabel === null || isFormulaError(rowLabel) || !String(rowLabel).trim()) continue;
+          for (let field = 0; field < columns.length; field++) {
+            const column = range.start.column + field + 1;
+            if (!table.includeHidden && sheet.hiddenColumns?.has(column)) continue;
+            yield [rowLabel, columns[field]!, evaluator.getComputedValue({ row, column }), label];
+          }
+        }
+    },
+  };
 }
 export const rangesIntersect = (a: CellRange, b: CellRange) =>
   a.start.row <= b.end.row &&
@@ -294,11 +420,8 @@ const valueKey = (value: FormulaValue) =>
 const groupKey = (values: FormulaValue[]) => JSON.stringify(values.map(valueKey));
 export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): PivotResult {
   const table = normalizePivotTable(input);
-  const { sheet, range, evaluator, headers } = getPivotSource(
-    workbook,
-    table.sourceSheetId,
-    table.source,
-  );
+  const source = getPivotTableSource(workbook, table);
+  const { headers } = source;
   if (!table.rowFields.length && !table.columnFields.length && !table.values.length)
     return {
       matrix: [],
@@ -343,11 +466,7 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       aggregate.max = Math.max(aggregate.max, value);
     }
   };
-  for (let row = range.start.row + 1; row <= range.end.row; row++) {
-    if (!table.includeHidden && sheet.hiddenRows?.has(row)) continue;
-    const record = headers.map((_, index) =>
-      evaluator.getComputedValue({ row, column: range.start.column + index }),
-    );
+  for (const record of source.records()) {
     if (record.every((value) => value === null || value === "")) continue;
     if (
       filterKeys.some(
@@ -600,7 +719,24 @@ export function transformPivotReferences(
         table.anchor = anchor;
         table.outputRange = table.outputRange ? mapRange(table.outputRange) : null;
       }
-      if (table.sourceSheetId === sheetId && table.source) {
+      if (table.consolidation) {
+        table.consolidation.ranges = table.consolidation.ranges.map((area) => {
+          if (area.sheetId !== sheetId || !area.range) return area;
+          const range = mapRange(area.range);
+          // A deleted header row/label column cannot silently change the meaning of a matrix.
+          const header = mapAddress(area.range.start);
+          return {
+            ...area,
+            range:
+              range &&
+              header &&
+              header.row === range.start.row &&
+              header.column === range.start.column
+                ? range
+                : null,
+          };
+        });
+      } else if (table.sourceSheetId === sheetId && table.source) {
         const previous = table.source;
         const next = mapRange(previous);
         const header = mapAddress(previous.start);

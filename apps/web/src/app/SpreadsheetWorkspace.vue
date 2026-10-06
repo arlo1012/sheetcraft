@@ -1121,6 +1121,12 @@ const pivotActions = usePivotActions({
   total: () => t("pivot.total"),
   empty: () => t("pivot.empty"),
   sumCaption: (field) => `${t("pivot.sum")} · ${field}`,
+  consolidationLabels: () => [
+    t("pivot.rows"),
+    t("pivot.columns"),
+    t("pivot.values"),
+    t("pivot.sourceArea"),
+  ],
   activate: (sheetId, table) => {
     selectSheet(sheetId);
     void nextTick(() => {

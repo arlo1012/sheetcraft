@@ -2,6 +2,7 @@ import { isFormulaError, type CellContent, type FormulaValue } from "../formula/
 import {
   buildPivotResult,
   getPivotTableRange,
+  getPivotSourceRanges,
   getPivotPresentation,
   normalizePivotTable,
   normalizePivotTables,
@@ -77,7 +78,11 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
     : getPivotTableRange({ ...table, outputRange: null });
   if (range.end.row >= MAX_SHEET_ROWS || range.end.column >= MAX_SHEET_COLUMNS)
     throw invalidCommandPayload("destination", range);
-  if (table.sourceSheetId === sheet.id && table.source && rangesIntersect(range, table.source))
+  if (
+    getPivotSourceRanges(table).some(
+      (area) => area.sheetId === sheet.id && area.range && rangesIntersect(range, area.range),
+    )
+  )
     throw invalidCommandPayload("sourceOverlap", range);
   if (sheet.mergedCells.some((merge) => rangesIntersect(merge, range)))
     throw invalidCommandPayload("merged", range);

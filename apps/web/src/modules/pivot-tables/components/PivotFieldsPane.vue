@@ -5,7 +5,7 @@ import { Button } from "tdesign-vue-next/es/button";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import {
-  getPivotSource,
+  getPivotTableSource,
   normalizePivotTable,
   type PivotAggregate,
   type SheetPivotTable,
@@ -41,30 +41,26 @@ const settings = ref<{ area: PivotArea; index: number }>();
 const source = computed(() => {
   void props.revision;
   try {
-    return getPivotSource(props.workbook, props.table.sourceSheetId, props.table.source);
+    return getPivotTableSource(props.workbook, props.table);
   } catch {
     return undefined;
   }
 });
-const choices = computed<PivotFieldChoice[]>(
-  () =>
-    source.value?.headers.map((label, field) => {
-      const info = source.value!;
-      let numeric = false;
-      for (let row = info.range.start.row + 1; row <= info.range.end.row; row++) {
-        const value = info.evaluator.getComputedValue({
-          row,
-          column: info.range.start.column + field,
-        });
-        if (typeof value === "number") numeric = true;
-        else if (value !== null && value !== "" && !isFormulaError(value)) {
-          numeric = false;
-          break;
-        }
-      }
-      return { field, label, numeric };
-    }) ?? [],
-);
+const choices = computed<PivotFieldChoice[]>(() => {
+  const info = source.value;
+  if (!info) return [];
+  const types = info.headers.map(() => ({ number: false, other: false }));
+  for (const record of info.records())
+    record.forEach((value, field) => {
+      if (typeof value === "number") types[field]!.number = true;
+      else if (value !== null && value !== "" && !isFormulaError(value)) types[field]!.other = true;
+    });
+  return info.headers.map((label, field) => ({
+    field,
+    label,
+    numeric: types[field]!.number && !types[field]!.other,
+  }));
+});
 const filtered = computed(() =>
   choices.value.filter((choice) =>
     choice.label.toLocaleLowerCase().includes(search.value.toLocaleLowerCase()),
@@ -152,8 +148,8 @@ const settingChoices = computed(() => {
     field = settingField.value;
   if (!info || field === undefined || settings.value?.area !== "filters") return [];
   const values = new Map<string, string>();
-  for (let row = info.range.start.row + 1; row <= info.range.end.row; row++) {
-    const value = info.evaluator.getComputedValue({ row, column: info.range.start.column + field });
+  for (const record of info.records()) {
+    const value = record[field] ?? null;
     if (!isFormulaError(value))
       values.set(
         JSON.stringify(value),
