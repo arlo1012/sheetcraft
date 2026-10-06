@@ -144,7 +144,7 @@ const title = computed(() =>
           <div class="pivot-create__source">
             <Radio value="pivot">{{ t("pivot.anotherPivot") }}</Radio>
             <template v-if="draft.sourceKind === 'pivot'">
-              <div class="pivot-create__reports">
+              <div v-if="pivotOptions.length" class="pivot-create__reports">
                 <OptionList
                   :model-value="selectedPivot"
                   :options="pivotOptions"
@@ -152,12 +152,9 @@ const title = computed(() =>
                   :inert="disabled || undefined"
                   overflow="ellipsis"
                   @select="selectPivot"
-                >
-                  <template #empty
-                    ><p>{{ t("pivot.noReports") }}</p></template
-                  >
-                </OptionList>
+                />
               </div>
+              <p v-else>{{ t("pivot.noReports") }}</p>
               <p>{{ t("pivot.reuseHint") }}</p>
             </template>
           </div>
@@ -210,11 +207,11 @@ const title = computed(() =>
 <style scoped lang="scss">
 .pivot-create {
   display: grid;
-  gap: 24px;
+  gap: 16px;
   &__sources,
   &__source {
     display: grid;
-    gap: 10px;
+    gap: 8px;
   }
   &__sources {
     width: 100%;
@@ -230,14 +227,12 @@ const title = computed(() =>
   }
   &__reports {
     display: grid;
-    height: 112px;
-    p {
-      padding: 8px;
-    }
+    max-height: 112px;
+    min-height: 0;
   }
   &__section {
     display: grid;
-    gap: 12px;
+    gap: 10px;
   }
   &__locations {
     display: flex;

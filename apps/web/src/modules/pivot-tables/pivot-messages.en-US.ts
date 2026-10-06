@@ -25,7 +25,7 @@ export const pivotsEnUS = {
   "pivot.pageField": "Page{index}",
   "pivot.pageItemPrefix": "Item",
   "pivot.pageItemsHint":
-    "Select a range and enter its item name for each page field. Shared names group multiple ranges.",
+    "Enter an item name for each page field. Shared names group multiple ranges.",
   "pivot.wizardRangesHint": "Type or select the worksheet ranges to consolidate",
   "pivot.allRanges": "All ranges",
   "pivot.previousStep": "Previous",

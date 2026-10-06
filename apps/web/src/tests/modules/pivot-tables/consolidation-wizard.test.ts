@@ -72,6 +72,50 @@ function isDisabled(index: number) {
 const sources = ["'Source Data'!A1:C3", "Second!A1:C3"];
 
 describe("WPS consolidation wizard", () => {
+  test("allows page labels before adding an area and retains them across wizard steps", async () => {
+    const { wrapper } = setup();
+    await flushPromises();
+    await radio("custom");
+    await next();
+    await radio("4");
+    const inputs = () => wizard().findAll(".pivot-consolidation-ranges__page-items input");
+    const labels = ["East", "2026", "Store", "Owner"];
+    expect(inputs()).toHaveLength(4);
+    for (const [index, label] of labels.entries()) {
+      expect((inputs()[index]!.element as HTMLInputElement).disabled).toBe(false);
+      await inputs()[index]!.setValue(label);
+    }
+    expect(isDisabled(3)).toBe(true);
+    await buttons()[1]!.trigger("click");
+    await next();
+    expect(inputs().map((input) => (input.element as HTMLInputElement).value)).toEqual(labels);
+    await wizard().findAll(".pivot-consolidation-ranges__actions button")[0]!.trigger("click");
+    await flushPromises();
+    expect(wizard().findAll('[role="option"]')).toHaveLength(1);
+    expect(isDisabled(3)).toBe(false);
+    await buttons()[3]!.trigger("click");
+    expect((wrapper.emitted("confirm")![0]![0] as PivotDraft).consolidationPageItems).toEqual([
+      labels,
+    ]);
+  });
+  test("keeps page fields editable after removing the last area", async () => {
+    const labels = ["East", "2026", "Store", "Owner"];
+    setup({
+      sources: [sources[0]!],
+      consolidationPageItems: [labels],
+      consolidationPageMode: "custom",
+      consolidationPageCount: 4,
+    });
+    await flushPromises();
+    await next();
+    await wizard().findAll(".pivot-consolidation-ranges__actions button")[1]!.trigger("click");
+    await flushPromises();
+    expect(wizard().findAll('[role="option"]')).toHaveLength(0);
+    const inputs = wizard().findAll(".pivot-consolidation-ranges__page-items input");
+    expect(inputs.map((input) => (input.element as HTMLInputElement).value)).toEqual(labels);
+    expect(inputs.every((input) => !(input.element as HTMLInputElement).disabled)).toBe(true);
+    expect(isDisabled(3)).toBe(true);
+  });
   test("walks both steps and cannot finish before selecting any range", async () => {
     setup();
     await flushPromises();

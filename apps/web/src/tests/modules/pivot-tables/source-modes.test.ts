@@ -219,6 +219,7 @@ describe("PivotTable source modes", () => {
     mountDialog();
     await flushPromises();
     await mode("pivot");
+    expect(editor().find(".pivot-create__reports").exists()).toBe(false);
     expect(editor().findAll('.pivot-create__reports [role="option"]')).toHaveLength(0);
     expect(confirmButton().disabled).toBe(true);
     confirmButton().click();

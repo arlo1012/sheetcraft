@@ -26,6 +26,7 @@ draft.value.consolidationPageItems = draft.value.sources.map((_, index) =>
   Array.from({ length: 4 }, (_, field) => draft.value.consolidationPageItems[index]?.[field] ?? ""),
 );
 const step = ref(1);
+const pendingPageItems = ref(["", "", "", ""]);
 const canFinish = computed(() => {
   void props.revision;
   try {
@@ -76,6 +77,7 @@ function finish(): void {
         <PivotConsolidationRanges
           v-model="draft.sources"
           v-model:page-items="draft.consolidationPageItems"
+          v-model:pending-page-items="pendingPageItems"
           :workbook="workbook"
           :reference-sheet-id="draft.referenceSheetId"
           :initial-reference="draft.source"

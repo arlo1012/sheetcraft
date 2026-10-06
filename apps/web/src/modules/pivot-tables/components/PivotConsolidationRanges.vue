@@ -22,12 +22,13 @@ const props = defineProps<{
 }>();
 const sources = defineModel<string[]>({ required: true });
 const pageItems = defineModel<string[][]>("pageItems", { required: true });
+const pendingPageItems = defineModel<string[]>("pendingPageItems", { required: true });
 defineSlots<{ "page-count"?: () => unknown }>();
 const { t } = useAppI18n();
 const reference = ref(props.initialReference);
 const selected = ref<string | undefined>(sources.value.length ? "0" : undefined);
 const selectedItems = computed(() =>
-  selected.value === undefined ? undefined : pageItems.value[Number(selected.value)],
+  selected.value === undefined ? pendingPageItems.value : pageItems.value[Number(selected.value)],
 );
 async function browse(): Promise<void> {
   if (props.disabled) return;
@@ -61,13 +62,17 @@ function add(): void {
     formatRangeReference(props.workbook.sheets.get(next.sheetId)!.name, next.range),
   ];
   sources.value = nextSources;
-  pageItems.value = [...pageItems.value, ["", "", "", ""]];
+  pageItems.value = [
+    ...pageItems.value,
+    selected.value === undefined ? [...pendingPageItems.value] : ["", "", "", ""],
+  ];
   selected.value = String(nextSources.length - 1);
 }
 function remove(): void {
   if (props.disabled || selected.value === undefined) return;
   const index = Number(selected.value);
   const nextSources = sources.value.filter((_, at) => at !== index);
+  if (!nextSources.length) pendingPageItems.value = [...(selectedItems.value ?? ["", "", "", ""])];
   sources.value = nextSources;
   pageItems.value = pageItems.value.filter((_, at) => at !== index);
   selected.value = nextSources.length ? String(Math.min(index, nextSources.length - 1)) : undefined;

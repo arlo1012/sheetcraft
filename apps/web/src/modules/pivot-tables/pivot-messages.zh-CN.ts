@@ -19,7 +19,7 @@ export const pivotsZhCN = {
   "pivot.pageFieldsCount": "需要多少个页字段？",
   "pivot.pageField": "页{index}",
   "pivot.pageItemPrefix": "项",
-  "pivot.pageItemsHint": "选择一个区域，为它指定各页字段的项目名称。相同名称可汇总多个区域。",
+  "pivot.pageItemsHint": "为每个页字段设置项目名称，相同名称可汇总多个区域。",
   "pivot.wizardRangesHint": "请键入或选定包含汇总数据的工作表数据区域",
   "pivot.allRanges": "所有区域",
   "pivot.previousStep": "上一步",
