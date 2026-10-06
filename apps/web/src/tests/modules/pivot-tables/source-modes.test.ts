@@ -50,6 +50,20 @@ async function mode(value: string) {
   ).trigger("click");
   await flushPromises();
 }
+function wizard() {
+  return new DOMWrapper(document.querySelector(".pivot-consolidation-wizard")!);
+}
+function wizardButtons() {
+  return new DOMWrapper(wizard().element.closest(".t-dialog")!).findAll(
+    ".pivot-consolidation-wizard__footer button",
+  );
+}
+async function openRangesWizard() {
+  await editor().get(".pivot-create__range-summary button").trigger("click");
+  await flushPromises();
+  await wizardButtons()[2]!.trigger("click");
+  await flushPromises();
+}
 function configuredReport() {
   const f = fixture();
   f.actions.open();
@@ -131,7 +145,8 @@ describe("PivotTable source modes", () => {
     selectReference.mockResolvedValueOnce("'Source Data'!A1:C4");
     await flushPromises();
     await mode("consolidation");
-    const ranges = editor().get(".pivot-consolidation-ranges");
+    await openRangesWizard();
+    const ranges = wizard().get(".pivot-consolidation-ranges");
     await ranges.get("[data-select-formula-reference]").trigger("click");
     await flushPromises();
     const buttons = ranges.findAll(".pivot-consolidation-ranges__actions button");
@@ -139,6 +154,16 @@ describe("PivotTable source modes", () => {
     await flushPromises();
     expect(ranges.findAll('[role="option"]')).toHaveLength(1);
     expect((buttons[0]!.element as HTMLButtonElement).disabled).toBe(true);
+    expect((wizardButtons()[3]!.element as HTMLButtonElement).disabled).toBe(false);
+    await buttons[1]!.trigger("click");
+    await flushPromises();
+    expect(ranges.findAll('[role="option"]')).toHaveLength(0);
+    expect((buttons[1]!.element as HTMLButtonElement).disabled).toBe(true);
+    expect((wizardButtons()[3]!.element as HTMLButtonElement).disabled).toBe(true);
+    await buttons[0]!.trigger("click");
+    await flushPromises();
+    await wizardButtons()[3]!.trigger("click");
+    await flushPromises();
     expect(confirmButton().disabled).toBe(false);
     confirmButton().click();
     await flushPromises();
@@ -146,11 +171,6 @@ describe("PivotTable source modes", () => {
       sourceKind: "consolidation",
       sources: ["='Source Data'!$A$1:$C$4"],
     });
-    await buttons[1]!.trigger("click");
-    await flushPromises();
-    expect(ranges.findAll('[role="option"]')).toHaveLength(0);
-    expect((buttons[1]!.element as HTMLButtonElement).disabled).toBe(true);
-    expect(confirmButton().disabled).toBe(true);
   });
   test("canceling an asynchronous range picker preserves the entered consolidation reference", async () => {
     let resolve!: (value: string | undefined) => void;
@@ -163,7 +183,8 @@ describe("PivotTable source modes", () => {
     mountDialog(fixture(), {}, selectReference);
     await flushPromises();
     await mode("consolidation");
-    const ranges = editor().get(".pivot-consolidation-ranges");
+    await openRangesWizard();
+    const ranges = wizard().get(".pivot-consolidation-ranges");
     await ranges.get("input").setValue("'Source Data'!A1:C4");
     await ranges.get("[data-select-formula-reference]").trigger("click");
     expect(selectReference).toHaveBeenCalledWith("'Source Data'!A1:C4");
@@ -171,6 +192,9 @@ describe("PivotTable source modes", () => {
     await flushPromises();
     expect((ranges.get("input").element as HTMLInputElement).value).toBe("'Source Data'!A1:C4");
     await ranges.get(".pivot-consolidation-ranges__actions button").trigger("click");
+    await flushPromises();
+    expect((wizardButtons()[3]!.element as HTMLButtonElement).disabled).toBe(false);
+    await wizardButtons()[3]!.trigger("click");
     await flushPromises();
     expect(confirmButton().disabled).toBe(false);
   });
@@ -249,7 +273,7 @@ describe("PivotTable source modes", () => {
       "Row",
       "Column",
       "Value",
-      "Area",
+      "Page1",
     ]);
     expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(40);
     expect(getCellValue(f.sheet, { row: 2, column: 1 })).toBe(40);
@@ -288,7 +312,7 @@ describe("PivotTable source modes", () => {
     expect(getCellValue(f.sheet, { row: 1, column: 0 })).toBe("East");
     expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(10);
   });
-  test("the fields pane offers combined headers and both worksheets as area filter choices", async () => {
+  test("the fields pane offers combined headers and page items from both worksheet ranges as filter choices", async () => {
     const { f } = matrixFixture();
     f.actions.update({
       ...f.sheet.pivotTables![0]!,
@@ -309,7 +333,7 @@ describe("PivotTable source modes", () => {
       "Row",
       "Column",
       "Value",
-      "Area",
+      "Page1",
     ]);
     await wrapper.get('[data-pivot-area="filters"] .pivot-area__label').trigger("click");
     await flushPromises();
@@ -322,7 +346,7 @@ describe("PivotTable source modes", () => {
           item.textContent?.trim(),
         ),
       )
-      .toEqual(expect.arrayContaining(["='Source Data'!$A$1:$C$3", "=Second!$A$1:$C$2"]));
+      .toEqual(expect.arrayContaining(["Item1", "Item2"]));
   });
   test("confirms a narrower range while retaining matching fields and dropping removed fields", async () => {
     const f = configuredReport();
@@ -365,5 +389,63 @@ describe("PivotTable source modes", () => {
       rowFields: [0],
       values: [],
     });
+  });
+  test("migrates a legacy area-label selection when confirming its source", () => {
+    const { f } = matrixFixture();
+    const current = f.sheet.pivotTables![0]!;
+    const legacy = {
+      ...current,
+      reportLayout: undefined,
+      consolidation: {
+        labels: ["Row", "Column", "Value", "Area"],
+        ranges: current.consolidation!.ranges.map(({ pageItems: _pageItems, ...area }) => area),
+      },
+      filters: [{ field: 3, all: false, values: [current.consolidation!.ranges[1]!.label] }],
+    };
+    f.sheet.pivotTables = [legacy];
+    f.actions.source();
+    f.actions.confirm(f.actions.editing.value!);
+    expect(f.actions.error.value).toBe(false);
+    const updated = f.sheet.pivotTables![0]!;
+    expect(updated.consolidation!.pageFields).toEqual({ mode: "single", count: 1 });
+    expect(updated.consolidation!.ranges.map((range) => range.pageItems)).toEqual([
+      ["Item1"],
+      ["Item2"],
+    ]);
+    expect(updated.filters).toEqual([{ field: 3, all: false, values: ["Item2"] }]);
+  });
+  test("changing page field count adds new filters and removes them when switching to zero", () => {
+    const { f } = matrixFixture();
+    f.actions.update({
+      ...f.sheet.pivotTables![0]!,
+      filters: [{ field: 3, all: true, values: [] }],
+    });
+    f.actions.source();
+    f.actions.confirm({
+      ...f.actions.editing.value!,
+      consolidationPageMode: "custom",
+      consolidationPageCount: 4,
+      consolidationPageItems: [
+        ["A", "2026", "Site", "Owner"],
+        ["B", "2026", "Site", "Owner"],
+      ],
+    });
+    expect(f.actions.error.value).toBe(false);
+    expect(f.sheet.pivotTables![0]!.filters).toEqual(
+      [3, 4, 5, 6].map((field) => ({ field, all: true, values: [] })),
+    );
+    f.actions.source();
+    f.actions.confirm({
+      ...f.actions.editing.value!,
+      consolidationPageMode: "custom",
+      consolidationPageCount: 0,
+    });
+    expect(f.actions.error.value).toBe(false);
+    expect(f.sheet.pivotTables![0]!.filters).toEqual([]);
+    expect(getPivotTableSource(f.workbook, f.sheet.pivotTables![0]!).headers).toEqual([
+      "Row",
+      "Column",
+      "Value",
+    ]);
   });
 });

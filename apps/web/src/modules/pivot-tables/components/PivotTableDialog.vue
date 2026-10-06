@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
+import { Button } from "tdesign-vue-next/es/button";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { getPivotTableSource, normalizePivotTable } from "@idea10/core/pivot-tables";
 import type { Workbook } from "@idea10/core/workbook";
@@ -9,7 +10,7 @@ import type { PivotDraft } from "../usePivotActions";
 import { useAppI18n } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import OptionList from "../../../shared/option-list/OptionList.vue";
-import PivotConsolidationRanges from "./PivotConsolidationRanges.vue";
+import PivotConsolidationWizard from "./PivotConsolidationWizard.vue";
 import { resolvePivotDraftSource } from "../pivot-draft-source";
 const props = defineProps<{
   initial: PivotDraft;
@@ -32,6 +33,14 @@ const props = defineProps<{
 const emit = defineEmits<{ confirm: [draft: PivotDraft]; close: [] }>();
 const { t } = useAppI18n();
 const draft = ref<PivotDraft>(JSON.parse(JSON.stringify(props.initial)) as PivotDraft);
+const wizardOpen = ref(false);
+function confirmRanges(value: PivotDraft): void {
+  draft.value.sources = value.sources;
+  draft.value.consolidationPageMode = value.consolidationPageMode;
+  draft.value.consolidationPageCount = value.consolidationPageCount;
+  draft.value.consolidationPageItems = value.consolidationPageItems;
+  wizardOpen.value = false;
+}
 const validSource = computed(() => {
   void props.revision;
   try {
@@ -91,7 +100,7 @@ const title = computed(() =>
 </script>
 <template>
   <Dialog
-    :visible="!suspended"
+    :visible="!suspended && !wizardOpen"
     :header="title"
     width="min(480px, calc(100vw - 32px))"
     :close-on-overlay-click="false"
@@ -117,15 +126,20 @@ const title = computed(() =>
           </div>
           <div class="pivot-create__source">
             <Radio value="consolidation">{{ t("pivot.consolidationRanges") }}</Radio>
-            <PivotConsolidationRanges
-              v-if="draft.sourceKind === 'consolidation'"
-              v-model="draft.sources"
-              :workbook="workbook"
-              :reference-sheet-id="draft.referenceSheetId"
-              :initial-reference="draft.source"
-              :disabled="disabled"
-              :select-reference="selectReference"
-            />
+            <div v-if="draft.sourceKind === 'consolidation'" class="pivot-create__range-summary">
+              <Button
+                size="small"
+                variant="outline"
+                :disabled="disabled"
+                @click="wizardOpen = true"
+                >{{ t("pivot.selectRanges") }}</Button
+              >
+              <span>{{
+                draft.sources.length
+                  ? t("pivot.selectedRanges", { count: draft.sources.length })
+                  : t("pivot.noRangesSelected")
+              }}</span>
+            </div>
           </div>
           <div class="pivot-create__source">
             <Radio value="pivot">{{ t("pivot.anotherPivot") }}</Radio>
@@ -181,6 +195,17 @@ const title = computed(() =>
       </p>
     </div>
   </Dialog>
+  <PivotConsolidationWizard
+    v-if="wizardOpen"
+    :initial="draft"
+    :workbook="workbook"
+    :revision="revision"
+    :disabled="disabled"
+    :suspended="suspended"
+    :select-reference="selectReference"
+    @confirm="confirmRanges"
+    @close="wizardOpen = false"
+  />
 </template>
 <style scoped lang="scss">
 .pivot-create {
@@ -196,6 +221,12 @@ const title = computed(() =>
   }
   &__source > :not(:first-child) {
     margin-left: 20px;
+  }
+  &__range-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--idea-text-secondary);
   }
   &__reports {
     display: grid;

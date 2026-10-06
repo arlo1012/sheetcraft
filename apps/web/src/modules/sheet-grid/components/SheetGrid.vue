@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PivotReportFilters from "../../pivot-tables/components/PivotReportFilters.vue";
+import type { SheetPivotTable } from "@idea10/core/pivot-tables";
 import PivotEmptyReports from "../../pivot-tables/components/PivotEmptyReports.vue";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer.vue";
@@ -68,6 +70,7 @@ import {
   type ImageTransform,
   type CellRange,
   type Sheet,
+  type Workbook,
   type SheetEvaluator,
   type SheetDimensionAxis,
 } from "@idea10/core/workbook";
@@ -204,6 +207,7 @@ const props = withDefaults(
   defineProps<{
     contextMenuState?: SheetContextMenuState;
     sheet: Sheet;
+    workbook?: Workbook;
     /** Workbook-level effects for drawable sheet objects. */
     theme?: WorkbookTheme;
     evaluator?: SheetEvaluator;
@@ -292,6 +296,8 @@ const emit = defineEmits<{
   deleteDrawing: [id: string];
   editDrawing: [drawing: SheetDrawing];
   configurePivot: [id: string];
+  updatePivot: [table: SheetPivotTable];
+  configurePivotFilter: [id: string, index: number];
   changeControl: [id: string, value: unknown];
   unlockRange: [range: CellRange];
   contextAction: [request: SheetContextRequest];
@@ -3215,6 +3221,25 @@ defineExpose({
       :state="pageView"
       :frame="renderFrame"
       @toggle="emit('update:showPageWhiteSpace', !showPageWhiteSpace)"
+    />
+    <PivotReportFilters
+      v-if="workbook"
+      :tables="sheet.pivotTables ?? []"
+      :workbook="workbook"
+      :revision="workbookRevision ?? 0"
+      :layout="layout"
+      :body="renderFrame.body"
+      :disabled="
+        readOnly && (!sheet.properties.protected || !canUseSheetPermission(sheet, 'pivotTables'))
+      "
+      @update="emit('updatePivot', $event)"
+      @settings="
+        (id, index) => {
+          const table = sheet.pivotTables?.find((table) => table.id === id);
+          if (table) navigateToCell(table.anchor);
+          emit('configurePivotFilter', id, index);
+        }
+      "
     />
     <PivotEmptyReports
       :tables="sheet.pivotTables ?? []"

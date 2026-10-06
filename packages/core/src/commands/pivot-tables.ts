@@ -142,7 +142,7 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
   const styledTable: SheetTable = {
     id: table.id,
     name: table.name,
-    range,
+    range: { ...range, start: { ...range.start, row: range.start.row + result.headerStart } },
     columns: [],
     style,
     headerRow: presentation.columnHeaders,
@@ -172,7 +172,16 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
           existing?.outputRange && addressInRange(address, existing.outputRange)
             ? undefined
             : original?.style,
-          resolveTableCellStyle(styledTable, address) ?? {},
+          rowIndex < result.headerStart
+            ? columnIndex === 0 && rowIndex < table.filters.length
+              ? { bold: true }
+              : {}
+            : (resolveTableCellStyle(
+                styledTable,
+                rowIndex < result.headerRows
+                  ? { ...address, row: styledTable.range.start.row }
+                  : address,
+              ) ?? {}),
         ),
       };
       if (columnIndex === 0 && result.rowIndents[rowIndex])
@@ -195,6 +204,9 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
       labelColumns: result.rowLabelColumns,
       dataRows: result.dataRows,
       rowLabels: result.rowLabels,
+      ...(table.reportLayout
+        ? { headerRows: result.headerRows, seriesLabels: result.seriesLabels }
+        : {}),
     },
   };
   const drawings = (previousState.drawings ?? []).map((drawing) =>

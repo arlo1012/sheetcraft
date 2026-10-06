@@ -115,7 +115,14 @@ export function getSheetChartData(
     const records: ChartData["records"] = [];
     for (let column = range.start.column + labelColumns; column <= endColumn; column++)
       series.push({
-        name: String(evaluator.getComputedValue({ row: range.start.row, column }) ?? ""),
+        name:
+          pivot.resultLayout?.seriesLabels?.[column - range.start.column - labelColumns] ??
+          String(
+            evaluator.getComputedValue({
+              row: range.start.row + (pivot.resultLayout?.headerRows ?? 1) - 1,
+              column,
+            }) ?? "",
+          ),
         values: [],
       });
     const dataRows =

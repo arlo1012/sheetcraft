@@ -209,7 +209,7 @@ describe("camera structural references", () => {
   test("round trips V28 cameras and rejects their payload in V27", () => {
     const f = fixture();
     const snapshot = serializeWorkbook(f.session.workbook);
-    expect(snapshot.version).toBe(34);
+    expect(snapshot.version).toBe(35);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 27 })).toThrow();
   });

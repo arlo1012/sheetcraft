@@ -46,7 +46,8 @@ export function resolvePivotDraftSource(
   }
   if (draft.sourceKind === "consolidation") {
     if (!draft.sources.length) throw new RangeError("Select consolidation ranges.");
-    const ranges = draft.sources.map((reference) => {
+    const count = draft.consolidationPageMode === "single" ? 1 : draft.consolidationPageCount;
+    const ranges = draft.sources.map((reference, index) => {
       const area = resolveRangeReference(workbook, reference, draft.referenceSheetId);
       if (!area) throw new RangeError("Invalid consolidation range.");
       const previous = draft.table.consolidation?.ranges.find(
@@ -57,12 +58,20 @@ export function resolvePivotDraftSource(
       const label =
         previous?.label ??
         formatRangeReference(workbook.sheets.get(area.sheetId)!.name, area.range);
-      return { sheetId: area.sheetId, range: area.range, label };
+      const pageItems =
+        draft.consolidationPageMode === "single"
+          ? [`${draft.consolidationItemPrefix}${index + 1}`]
+          : (draft.consolidationPageItems[index] ?? []).slice(0, count);
+      return { sheetId: area.sheetId, range: area.range, label, pageItems };
     });
     return {
       sourceSheetId: ranges[0]!.sheetId,
       source: ranges[0]!.range,
-      consolidation: { ranges, labels: [...draft.consolidationLabels] },
+      consolidation: {
+        ranges,
+        labels: draft.consolidationLabels.slice(0, 3 + count),
+        pageFields: { mode: draft.consolidationPageMode, count },
+      },
     };
   }
   const area = resolveRangeReference(workbook, draft.source, draft.referenceSheetId);

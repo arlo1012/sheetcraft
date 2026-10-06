@@ -8,6 +8,8 @@ import {
 import {
   getPivotTableSource,
   type PivotConsolidation,
+  type PivotReportLayout,
+  type PivotAggregate,
   addressInRange,
   getPivotTableRange,
   normalizePivotTable,
@@ -29,6 +31,10 @@ export type PivotDraft = {
   sourceKind: "range" | "consolidation" | "pivot";
   sources: string[];
   consolidationLabels: PivotConsolidation["labels"];
+  consolidationPageMode: "single" | "custom";
+  consolidationPageCount: number;
+  consolidationPageItems: string[][];
+  consolidationItemPrefix: string;
   sourcePivot?: { sheetId: string; tableId: string };
   destination: string;
   newSheet: boolean;
@@ -51,6 +57,9 @@ export function usePivotActions(options: {
   empty: () => string;
   sumCaption: (field: string) => string;
   consolidationLabels?: () => PivotConsolidation["labels"];
+  pageItemPrefix?: () => string;
+  valueCaption?: (aggregate: PivotAggregate, field: string) => string;
+  reportLayout?: () => PivotReportLayout;
   activate?: (sheetId: string, table: SheetPivotTable) => void;
   onError: () => void;
 }) {
@@ -139,8 +148,17 @@ export function usePivotActions(options: {
               )
             : "",
         ) ?? [],
-      consolidationLabels: table.consolidation?.labels ??
-        options.consolidationLabels?.() ?? ["Row", "Column", "Value", "Area"],
+      consolidationLabels: table.consolidation?.pageFields
+        ? [
+            ...table.consolidation.labels,
+            ...defaultConsolidationLabels().slice(table.consolidation.labels.length),
+          ]
+        : defaultConsolidationLabels(),
+      consolidationPageMode: table.consolidation?.pageFields?.mode ?? "single",
+      consolidationPageCount: table.consolidation?.pageFields?.count ?? 1,
+      consolidationPageItems:
+        table.consolidation?.ranges.map((area) => [...(area.pageItems ?? [])]) ?? [],
+      consolidationItemPrefix: options.pageItemPrefix?.() ?? "Item",
       destination: formatRangeReference(sheet.name, { start: table.anchor, end: table.anchor }),
       newSheet: !existing,
       newSheetName: getNextSheetName(workbook),
@@ -187,7 +205,11 @@ export function usePivotActions(options: {
       return;
     }
     try {
-      const source = resolvePivotDraftSource(target.workbook, draft);
+      let source = resolvePivotDraftSource(target.workbook, draft);
+      if (source.consolidation && !source.consolidation.pageFields) {
+        const upgraded = upgradeLegacyConsolidation({ ...draft.table, ...source });
+        source = { ...source, consolidation: upgraded.consolidation };
+      }
       const after = getPivotTableSource(
         target.workbook,
         normalizePivotTable({
@@ -200,20 +222,38 @@ export function usePivotActions(options: {
         }),
       ).headers;
       // Source changes retain fields by header identity; missing fields are removed, never rebound by index.
-      let fields = draft.table;
+      let fields = upgradeLegacyConsolidation(draft.table);
       if (!draft.existing && source.consolidation) {
+        const records = getPivotTableSource(target.workbook, {
+          ...draft.table,
+          ...source,
+        }).records();
+        let numeric = true,
+          hasNumber = false;
+        for (const record of records) {
+          if (typeof record[2] !== "number") numeric = false;
+          else hasNumber = true;
+        }
+        const aggregate = numeric && hasNumber ? "sum" : "count";
         fields = {
           ...draft.table,
+          reportLayout: defaultReportLayout(),
           rowFields: [0],
           columnFields: [1],
           values: [
             {
               field: 2,
-              aggregate: "sum",
-              caption: options.sumCaption(source.consolidation.labels[2]),
+              aggregate,
+              caption:
+                options.valueCaption?.(aggregate, source.consolidation.labels[2]!) ??
+                (aggregate === "sum"
+                  ? options.sumCaption(source.consolidation.labels[2]!)
+                  : `Count of ${source.consolidation.labels[2]}`),
             },
           ],
-          filters: [{ field: 3, values: [], all: true }],
+          filters: source.consolidation.labels
+            .slice(3)
+            .map((_, index) => ({ field: index + 3, values: [], all: true })),
         };
       }
       if (draft.existing && draft.mode === "source") {
@@ -223,22 +263,66 @@ export function usePivotActions(options: {
         } catch {
           /* A deleted source can be repaired with a new range. */
         }
+        const previous = fields;
+        const oldConsolidation = previous.consolidation;
+        const nextConsolidation = source.consolidation;
         const remap = (index: number) =>
-          before ? after.indexOf(before[index] ?? "") : index < after.length ? index : -1;
+          oldConsolidation && nextConsolidation
+            ? index < after.length
+              ? index
+              : -1
+            : before
+              ? after.indexOf(before[index] ?? "")
+              : index < after.length
+                ? index
+                : -1;
         fields = {
-          ...draft.table,
-          rowFields: draft.table.rowFields.map(remap).filter((index) => index >= 0),
-          columnFields: draft.table.columnFields.map(remap).filter((index) => index >= 0),
-          values: draft.table.values.flatMap((value) =>
+          ...previous,
+          rowFields: previous.rowFields.map(remap).filter((index) => index >= 0),
+          columnFields: previous.columnFields.map(remap).filter((index) => index >= 0),
+          values: previous.values.flatMap((value) =>
             remap(value.field) < 0 ? [] : [{ ...value, field: remap(value.field) }],
           ),
-          filters: draft.table.filters.flatMap((filter) =>
-            remap(filter.field) < 0 ? [] : [{ ...filter, field: remap(filter.field) }],
-          ),
+          filters: previous.filters.flatMap((filter) => {
+            const field = remap(filter.field);
+            if (field < 0) return [];
+            if (!oldConsolidation || !nextConsolidation || field < 3 || filter.all)
+              return [{ ...filter, field }];
+            const axis = field - 3;
+            // Keep the selected source areas when page items are renamed or automatic items renumber.
+            const values = filter.values.flatMap((value) => {
+              const areas = oldConsolidation.ranges.filter(
+                (area) => area.pageItems?.[axis] === value,
+              );
+              if (!areas.length) return [value];
+              return areas.flatMap((area) =>
+                nextConsolidation.ranges
+                  .filter(
+                    (next) =>
+                      next.sheetId === area.sheetId &&
+                      JSON.stringify(next.range) === JSON.stringify(area.range),
+                  )
+                  .flatMap((next) =>
+                    next.pageItems?.[axis] === undefined ? [] : [next.pageItems[axis]!],
+                  ),
+              );
+            });
+            return [{ ...filter, field, values: [...new Set(values)] }];
+          }),
         };
+        if (oldConsolidation && nextConsolidation)
+          for (
+            let field = oldConsolidation.labels.length;
+            field < nextConsolidation.labels.length;
+            field++
+          )
+            fields.filters.push({ field, values: [], all: true });
       }
       const table = normalizePivotTable({
         ...fields,
+        ...(source.consolidation && !fields.reportLayout
+          ? { reportLayout: defaultReportLayout() }
+          : {}),
         ...source,
         anchor: draft.newSheet ? { row: 0, column: 0 } : destination!.range.start,
       });
@@ -288,6 +372,66 @@ export function usePivotActions(options: {
         errorReason.value = field;
     }
   }
+  function defaultConsolidationLabels(): string[] {
+    return (
+      options.consolidationLabels?.() ?? [
+        "Row",
+        "Column",
+        "Value",
+        "Page1",
+        "Page2",
+        "Page3",
+        "Page4",
+      ]
+    );
+  }
+  function upgradeLegacyConsolidation(table: SheetPivotTable): SheetPivotTable {
+    if (table.consolidation && !table.consolidation.pageFields) {
+      const legacy = table.consolidation;
+      const items = legacy.ranges.map(
+        (_, index) => `${options.pageItemPrefix?.() ?? "Item"}${index + 1}`,
+      );
+      const labels = [...legacy.labels.slice(0, 3), options.consolidationLabels?.()[3] ?? "Page1"];
+      table = {
+        ...table,
+        consolidation: {
+          ...legacy,
+          labels,
+          pageFields: { mode: "single", count: 1 },
+          ranges: legacy.ranges.map((area, index) => ({ ...area, pageItems: [items[index]!] })),
+        },
+        filters: table.filters.map((filter) =>
+          filter.field === 3
+            ? {
+                ...filter,
+                values: filter.values.map(
+                  (value) =>
+                    items[legacy.ranges.findIndex((area) => area.label === value)] ?? value,
+                ),
+              }
+            : filter,
+        ),
+        values: table.values.map((value) =>
+          value.field === 2 &&
+          value.caption === options.sumCaption(legacy.labels[2]!) &&
+          options.valueCaption
+            ? { ...value, caption: options.valueCaption(value.aggregate, labels[2]!) }
+            : value,
+        ),
+      };
+    }
+    return table;
+  }
+  function defaultReportLayout(): PivotReportLayout {
+    return (
+      options.reportLayout?.() ?? {
+        rowLabel: "Row",
+        columnLabel: "Column",
+        allLabel: "(All)",
+        multipleLabel: "(Multiple Items)",
+      }
+    );
+  }
   function update(table: SheetPivotTable, chart = false): boolean {
     if (options.isBusy() || !options.flush()) return false;
     const sheet = options.getSheet();
@@ -297,6 +441,9 @@ export function usePivotActions(options: {
     )
       return false;
     try {
+      table = upgradeLegacyConsolidation(table);
+      if (table.consolidation && !table.reportLayout)
+        table = { ...table, reportLayout: defaultReportLayout() };
       options.execute(
         createSetPivotTableCommand(
           sheet.id,

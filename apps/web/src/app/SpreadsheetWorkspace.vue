@@ -86,7 +86,7 @@ import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vu
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
 import { usePivotActions } from "../modules/pivot-tables/usePivotActions";
-import { getPivotSource } from "@idea10/core/pivot-tables";
+import { getPivotTableSource } from "@idea10/core/pivot-tables";
 import { createThemedTableStyles } from "@idea10/core/table-styles";
 import type { PivotArea } from "../modules/pivot-tables/pivot-field-edits";
 import PivotFieldsPane from "../modules/pivot-tables/components/PivotFieldsPane.vue";
@@ -1125,8 +1125,20 @@ const pivotActions = usePivotActions({
     t("pivot.rows"),
     t("pivot.columns"),
     t("pivot.values"),
-    t("pivot.sourceArea"),
+    t("pivot.pageField", { index: 1 }),
+    t("pivot.pageField", { index: 2 }),
+    t("pivot.pageField", { index: 3 }),
+    t("pivot.pageField", { index: 4 }),
   ],
+  pageItemPrefix: () => t("pivot.pageItemPrefix"),
+  valueCaption: (aggregate, field) =>
+    t(aggregate === "sum" ? "pivot.sumOf" : "pivot.countOf", { field }),
+  reportLayout: () => ({
+    rowLabel: t("pivot.rows"),
+    columnLabel: t("pivot.columns"),
+    allLabel: t("pivot.reportAll"),
+    multipleLabel: t("pivot.reportMultiple"),
+  }),
   activate: (sheetId, table) => {
     selectSheet(sheetId);
     void nextTick(() => {
@@ -1160,7 +1172,7 @@ const pivotActiveField = computed<{ area: PivotArea; index: number; name: string
     if (!table) return undefined;
     let headers: string[] = [];
     try {
-      headers = getPivotSource(session.workbook, table.sourceSheetId, table.source).headers;
+      headers = getPivotTableSource(session.workbook, table).headers;
     } catch {
       return undefined;
     }
@@ -3555,6 +3567,7 @@ const gridInert = computed(
           :key="workbookGeneration"
           :ref="setSheetGridRef"
           :sheet="activeSheet"
+          :workbook="session.workbook"
           :evaluator="activeSheetEvaluator"
           :context-menu-state="contextMenuState"
           :validation-info="activeValidationInfo"
@@ -3599,6 +3612,15 @@ const gridInert = computed(
           @delete-drawing="drawingActions.remove"
           @edit-drawing="editSheetDrawing"
           @configure-pivot="openPivotFields"
+          @update-pivot="pivotActions.update"
+          @configure-pivot-filter="
+            (id, index) => {
+              openPivotFields(id);
+              void nextTick(() =>
+                pivotFieldsPaneRef?.openFieldSettings({ area: 'filters', index }),
+              );
+            }
+          "
           @change-control="controlActions.change"
           @update-floating-images="pictureTools.updateMany"
           @delete-floating-images="pictureTools.remove"
