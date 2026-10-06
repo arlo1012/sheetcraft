@@ -15,6 +15,15 @@ const props = defineProps<{
   revision: number;
   disabled: boolean;
   error: boolean;
+  errorReason?:
+    | "invalid"
+    | "overwrite"
+    | "sourceOverlap"
+    | "merged"
+    | "spill"
+    | "tableOverlap"
+    | "protected"
+    | "destination";
   suspended: boolean;
   selectReference: (current: string) => Promise<string | undefined>;
 }>();
@@ -87,11 +96,21 @@ const title = computed(() =>
           :select-reference="selectReference"
           :disabled="disabled"
         />
-        <Checkbox v-if="error && !draft.newSheet" v-model="draft.overwrite">{{
-          t("pivot.overwrite")
-        }}</Checkbox>
+        <Checkbox
+          v-if="error && (!errorReason || errorReason === 'overwrite') && !draft.newSheet"
+          v-model="draft.overwrite"
+          >{{ t("pivot.overwrite") }}</Checkbox
+        >
       </section>
-      <p v-if="error || !validSource" role="alert">{{ t("pivot.invalid") }}</p>
+      <p v-if="error || !validSource" role="alert">
+        {{
+          t(
+            error && errorReason && errorReason !== "invalid"
+              ? `pivot.error.${errorReason}`
+              : "pivot.invalid",
+          )
+        }}
+      </p>
     </div>
   </Dialog>
 </template>

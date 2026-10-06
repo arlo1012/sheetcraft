@@ -115,6 +115,19 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
         (cell.content || cell.note || cell.hyperlink || cell.sparkline)
       )
         throw invalidCommandPayload("overwrite", cell.address);
+  if (!result.matrix.length && command.overwrite)
+    for (const [key, cell] of cells)
+      if (addressInRange(cell.address, range)) {
+        const {
+          content: _content,
+          note: _note,
+          hyperlink: _hyperlink,
+          sparkline: _sparkline,
+          ...rest
+        } = cell;
+        if (rest.style || rest.namedStyle) cells.set(key, rest);
+        else cells.delete(key);
+      }
   const presentation = getPivotPresentation(table);
   const customStyle = (workbook.pivotTableStyles ?? []).find(
     (style) => style.id === (table.styleId ?? workbook.defaultPivotTableStyleId),

@@ -1,4 +1,16 @@
 export const pivotsEnUS = {
+  "pivot.error.overwrite":
+    "The destination contains content. Allow overwrite and retry, or choose an empty location.",
+  "pivot.error.sourceOverlap": "The destination overlaps the source data. Choose another location.",
+  "pivot.error.merged":
+    "The destination contains merged cells. Unmerge them or choose another location.",
+  "pivot.error.spill": "The destination overlaps a spilled formula range. Choose another location.",
+  "pivot.error.tableOverlap":
+    "The destination overlaps an existing table or PivotTable. Remove that table or choose another location.",
+  "pivot.error.protected":
+    "The workbook or destination sheet is protected. This PivotTable cannot be created or changed here.",
+  "pivot.error.destination":
+    "The report extends beyond the worksheet boundary. Choose another location.",
   "pivot.createTitle": "Create PivotTable",
   "pivot.chooseSource": "Choose the data to analyze",
   "pivot.cellRange": "Select a cell range",

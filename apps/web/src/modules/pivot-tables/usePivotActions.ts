@@ -12,6 +12,7 @@ import {
   normalizePivotTable,
   type SheetPivotTable,
 } from "@idea10/core/pivot-tables";
+import { WorkbookDomainError } from "@idea10/core/errors";
 import { canUseSheetPermission } from "@idea10/core";
 import { resolveDataRange } from "@idea10/core/data-range";
 import { type Workbook, type Sheet, type CellRange, getNextSheetName } from "@idea10/core/workbook";
@@ -48,6 +49,16 @@ export function usePivotActions(options: {
 }) {
   const editing = shallowRef<PivotDraft>();
   const error = ref(false);
+  const errorReason = ref<
+    | "invalid"
+    | "overwrite"
+    | "sourceOverlap"
+    | "merged"
+    | "spill"
+    | "tableOverlap"
+    | "protected"
+    | "destination"
+  >("invalid");
   const idFactory = createBrowserIdFactory();
   let target: { workbook: Workbook; sheetId: string; existing: boolean } | undefined;
   function selected(id?: string) {
@@ -121,6 +132,7 @@ export function usePivotActions(options: {
       mode,
     };
     error.value = false;
+    errorReason.value = "invalid";
   }
   function confirm(draft: PivotDraft) {
     if (
@@ -130,6 +142,7 @@ export function usePivotActions(options: {
       editing.value?.table.id !== draft.table.id
     )
       return;
+    errorReason.value = "invalid";
     const source = resolveRangeReference(target.workbook, draft.source, draft.referenceSheetId);
     const destination = resolveRangeReference(
       target.workbook,
@@ -212,6 +225,7 @@ export function usePivotActions(options: {
           (!target.existing || !canUseSheetPermission(destinationSheet, "pivotTables")))
       ) {
         error.value = true;
+        errorReason.value = "protected";
         return;
       }
       options.execute(command);
@@ -221,8 +235,19 @@ export function usePivotActions(options: {
         ?.pivotTables?.find((item) => item.id === table.id);
       if (created) options.activate?.(sheetId, created);
       close();
-    } catch {
+    } catch (cause) {
       error.value = true;
+      const field = cause instanceof WorkbookDomainError ? cause.data.details?.field : undefined;
+      if (
+        field === "overwrite" ||
+        field === "sourceOverlap" ||
+        field === "merged" ||
+        field === "spill" ||
+        field === "tableOverlap" ||
+        field === "protected" ||
+        field === "destination"
+      )
+        errorReason.value = field;
     }
   }
   function update(table: SheetPivotTable, chart = false): boolean {
@@ -280,10 +305,12 @@ export function usePivotActions(options: {
     editing.value = undefined;
     target = undefined;
     error.value = false;
+    errorReason.value = "invalid";
   }
   return {
     editing,
     error,
+    errorReason,
     open,
     confirm,
     refresh,

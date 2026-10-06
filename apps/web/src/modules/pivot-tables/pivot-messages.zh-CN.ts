@@ -1,4 +1,11 @@
 export const pivotsZhCN = {
+  "pivot.error.overwrite": "目标区域已有内容。勾选允许覆盖后重试，或选择空白位置。",
+  "pivot.error.sourceOverlap": "放置区域与数据源重叠，不能覆盖源数据。请选择其他位置。",
+  "pivot.error.merged": "放置区域包含合并单元格。请先取消合并，或选择其他位置。",
+  "pivot.error.spill": "放置区域与公式溢出区域重叠。请选择其他位置。",
+  "pivot.error.tableOverlap": "放置区域与已有表格或数据透视表重叠。请移除原表格，或选择其他位置。",
+  "pivot.error.protected": "工作簿或目标工作表已受保护，无法在此创建或修改透视表。",
+  "pivot.error.destination": "放置区域超出工作表边界，请选择其他位置。",
   "pivot.createTitle": "创建数据透视表",
   "pivot.chooseSource": "请选择要分析的数据",
   "pivot.cellRange": "选择单元格区域",

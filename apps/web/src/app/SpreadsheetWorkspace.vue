@@ -1132,7 +1132,7 @@ const pivotActions = usePivotActions({
     void MessagePlugin.error(t("pivot.refreshFailed"));
   },
 });
-const { editing: editingPivot, error: pivotError } = pivotActions;
+const { editing: editingPivot, error: pivotError, errorReason: pivotErrorReason } = pivotActions;
 const activePivot = computed(() => {
   void workbookRevision.value;
   return pivotActions.selected();
@@ -3965,6 +3965,7 @@ const gridInert = computed(
     :revision="workbookRevision"
     :disabled="loading || fileBusy || xlsxBusy"
     :error="pivotError"
+    :error-reason="pivotErrorReason"
     :suspended="pickingPivotRange"
     :select-reference="pivotRangePicker.selectReference"
     @confirm="pivotActions.confirm"
