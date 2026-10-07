@@ -78,9 +78,11 @@ function adjustFontSize(direction: 1 | -1): void {
         ><AArrowDown
       /></RibbonButton>
     </div>
-    <div class="home-cell-format-group__row" data-ribbon-row="2">
+    <div
+      class="home-cell-format-group__row home-cell-format-group__row--appearance"
+      data-ribbon-row="2"
+    >
       <TextFormatControls
-        class="home-cell-format-group__text-tools"
         :state="state"
         :disabled="disabled"
         @apply-style="emit('applyStyle', $event)"
@@ -130,8 +132,9 @@ function adjustFontSize(direction: 1 | -1): void {
     gap: var(--cell-format-gap);
   }
 
-  &__text-tools {
-    flex: 0 0 108px;
+  &__row--appearance {
+    display: grid;
+    grid-template-columns: 108px repeat(3, 40px);
   }
 }
 </style>
