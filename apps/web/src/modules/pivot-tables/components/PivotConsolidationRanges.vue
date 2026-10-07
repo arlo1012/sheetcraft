@@ -73,7 +73,7 @@ async function browse(index: number): Promise<void> {
 const rows = computed(() => sources.value.map((reference, index) => ({ index, reference })));
 const columns = computed<BaseTableCol[]>(() => [
   { colKey: "reference", title: t("pivot.sourceArea"), ellipsis: true },
-  { colKey: "actions", title: t("pivot.rangeActions"), width: 124, align: "center" },
+  { colKey: "actions", title: t("pivot.rangeActions"), width: 80, align: "center" },
 ]);
 const rowAttributes: TableRowAttributes<TableRowData> = ({ row }) => ({
   "data-pivot-range-row": String(row.index),
