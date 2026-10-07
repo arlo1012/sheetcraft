@@ -146,7 +146,7 @@ function toggleMenu(): void {
     justify-items: stretch;
     align-self: stretch;
     width: max-content;
-    min-width: var(--ribbon-tall-action-min-width, 58px);
+    min-width: var(--ribbon-tall-action-min-width, 48px);
     height: var(--idea-ribbon-content-height, 54px);
     padding: 0;
 
@@ -157,7 +157,7 @@ function toggleMenu(): void {
       position: absolute;
       inset: 1px;
       border-radius: var(--idea-radius-default);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--idea-text-primary) 24%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--idea-text-primary) 14%, transparent);
       content: "";
       pointer-events: none;
     }
@@ -169,7 +169,7 @@ function toggleMenu(): void {
     .ribbon-split-button__main {
       --ribbon-feedback-inset: 1px 1px calc(-1 * var(--ribbon-row-gap, 2px));
       justify-content: center;
-      padding: 0 2px;
+      padding: 0 6px;
 
       &::before {
         border-radius: var(--idea-radius-default) var(--idea-radius-default) 0 0;
@@ -178,7 +178,7 @@ function toggleMenu(): void {
 
     .ribbon-split-button__menu {
       gap: 2px;
-      padding: 0 2px;
+      padding: 0 6px;
       border-radius: 0 0 var(--idea-radius-default) var(--idea-radius-default);
 
       &::before {

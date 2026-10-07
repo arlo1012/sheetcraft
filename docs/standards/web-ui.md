@@ -99,8 +99,9 @@ Use CSS pixels at 100% scale; size and line height are a pair.
   action size or stroke.
 - Compose tab groups inside `RibbonToolbar`; it owns viewport, rail, overflow,
   and focus visibility. Use its `ribbon.columns`, `compact`, `stack`,
-  `two-rows`, and `row` shells. Tall and stacked actions share 54px: two 26px
-  rows with a 2px gap, derived from ribbon tokens.
+  `two-rows`, and `row` shells. Tall and stacked actions share 54px. Stacked
+  actions use two 26px rows with a 2px gap; tall actions reserve 22px for the
+  caption and give the remaining height to the icon, with the same gap.
 - In `shared/ribbon`, use `RibbonButton` for actions, `RibbonMenuButton` for
   triggers, and `RibbonSplitButton` for action plus popup. Controls own icon,
   text, arrow, focus, and disabled state; groups own arrangement.

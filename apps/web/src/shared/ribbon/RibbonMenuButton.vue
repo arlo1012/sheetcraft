@@ -91,10 +91,10 @@ function activate(): void {
     align-self: stretch;
     justify-content: center;
     width: max-content;
-    min-width: var(--ribbon-tall-action-min-width, 58px);
+    min-width: var(--ribbon-tall-action-min-width, 48px);
     height: var(--idea-ribbon-content-height, 54px);
     @include ribbon.tall-content;
-    padding: 0 2px;
+    padding: 0 6px;
 
     &.is-full-width {
       width: 100%;
