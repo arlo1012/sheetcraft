@@ -210,7 +210,7 @@ function select(keys: Array<string | number>): void {
 <style scoped lang="scss">
 .pivot-consolidation-ranges {
   display: grid;
-  gap: 16px;
+  gap: 8px;
   min-width: 0;
   p {
     margin: 0;
