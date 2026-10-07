@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { Input as TInput } from "tdesign-vue-next/es/input";
+import { SelectInput as TSelectInput } from "tdesign-vue-next/es/select-input";
+import type { PopupProps } from "tdesign-vue-next/es/popup";
 import { computed, nextTick, ref, useId, watch, watchPostEffect } from "vue";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import RibbonDropdownArrow from "../../../shared/ribbon/RibbonDropdownArrow.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
-import { useMenu } from "../../../shared/menu/useMenu";
 
 const props = defineProps<{
   modelValue?: string | number;
@@ -35,14 +35,61 @@ watch(
 const triggerRef = ref<HTMLElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = useId();
-const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
-  triggerRef,
-  menuSurfaceRef,
-  disabled: computed(() => props.disabled),
-  defaultFocus: "selected",
-  pointerFocus: "menu",
-  placement: "bottom-end",
+const open = ref(false);
+const focusMenuOnMount = ref(false);
+watchPostEffect(() => {
+  if (open.value && focusMenuOnMount.value && menuSurfaceRef.value?.rootElement) {
+    menuSurfaceRef.value.focusFirstItem();
+    focusMenuOnMount.value = false;
+  }
 });
+const popupProps = computed<PopupProps>(() => ({
+  attach: props.popupAttach,
+  placement: "bottom-left",
+  trigger: "click",
+  overlayInnerClassName: "idea-font-options-popup",
+  overlayStyle: { zIndex: "var(--idea-layer-menu)" },
+}));
+let selectOnClick = false;
+function focus(_value: unknown, { e }: { e: FocusEvent }): void {
+  const input = e.target;
+  if (input instanceof HTMLInputElement) {
+    input.select();
+    selectOnClick = true;
+  }
+}
+function clickInput(event: MouseEvent): void {
+  if (selectOnClick && event.target instanceof HTMLInputElement) {
+    event.target.select();
+    selectOnClick = false;
+  }
+}
+function dismiss(): void {
+  open.value = false;
+  void nextTick(() => triggerRef.value?.focus());
+}
+function toggleMenu(): void {
+  if (!props.disabled) open.value = !open.value;
+}
+function onTriggerKeydown(event: KeyboardEvent): void {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  event.preventDefault();
+  if (props.disabled) return;
+  open.value = true;
+  focusMenuOnMount.value = true;
+}
+function onMenuKeydown(event: KeyboardEvent): void {
+  if (event.key !== "Escape") return;
+  event.preventDefault();
+  event.stopPropagation();
+  dismiss();
+}
+watch(
+  () => props.disabled,
+  (disabled) => {
+    if (disabled) open.value = false;
+  },
+);
 async function commit(): Promise<void> {
   if (props.disabled || open.value || draft.value === displayValue.value) return;
   emit("change", draft.value);
@@ -50,6 +97,7 @@ async function commit(): Promise<void> {
   draft.value = displayValue.value;
 }
 function select(value: string | number): void {
+  draft.value = displayValue.value;
   emit("change", value);
   dismiss();
 }
@@ -66,17 +114,27 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
 </script>
 
 <template>
-  <div ref="control" class="font-format-field">
-    <TInput
+  <div ref="control" class="font-format-field" @click="clickInput">
+    <TSelectInput
       class="idea-ribbon-font-input"
-      v-model="draft"
+      :value="draft"
+      v-model:input-value="draft"
+      allow-input
       borderless
       size="small"
+      :popup-visible="open"
+      :popup-props="popupProps"
+      :input-props="{ onKeydown: keydown, borderless: true }"
       :aria-label="label"
       :disabled="disabled"
+      @popup-visible-change="
+        (visible, context) => {
+          if (!visible && context.trigger !== 'trigger-element-hover') open = false;
+        }
+      "
+      @focus="focus"
       @blur="commit"
-      @keydown="keydown"
-      @enter="keydown"
+      @enter="(_value, context) => keydown(draft, context)"
     >
       <template #suffixIcon>
         <span
@@ -93,26 +151,27 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
           ><RibbonDropdownArrow :expanded="open"
         /></span>
       </template>
-    </TInput>
-    <Teleport :to="popupAttach?.() ?? 'body'">
-      <MenuSurface
-        v-if="open"
-        :id="menuId"
-        ref="menuSurfaceRef"
-        class="font-format-field__menu"
-        :style="{ ...floatingStyles, minWidth: `${control?.offsetWidth ?? 64}px` }"
-        :label="label"
-      >
-        <MenuRadioItem
-          v-for="option in options"
-          :key="option.value"
-          :checked="option.value === modelValue"
-          indicator="none"
-          @select="select(option.value)"
-          >{{ option.label }}</MenuRadioItem
+      <template #panel>
+        <MenuSurface
+          v-if="open"
+          :id="menuId"
+          ref="menuSurfaceRef"
+          class="font-format-field__menu"
+          :style="{ minWidth: `${control?.offsetWidth ?? 48}px` }"
+          @keydown="onMenuKeydown"
+          :label="label"
         >
-      </MenuSurface>
-    </Teleport>
+          <MenuRadioItem
+            v-for="option in options"
+            :key="option.value"
+            :checked="option.value === modelValue"
+            indicator="none"
+            @select="select(option.value)"
+            >{{ option.label }}</MenuRadioItem
+          >
+        </MenuSurface>
+      </template>
+    </TSelectInput>
   </div>
 </template>
 
@@ -138,7 +197,7 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
 
   &__menu {
     z-index: var(--idea-layer-menu);
-    min-width: 64px;
+    min-width: 48px;
     max-height: min(360px, calc(100vh - 32px));
   }
 }

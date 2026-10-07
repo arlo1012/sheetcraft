@@ -223,6 +223,7 @@ describe("HomeFormatToolbar", () => {
     await input.setValue(kind === "family" ? "Arial" : "99");
     expect(document.body.querySelector(".font-format-field__menu")).toBeNull();
     await field.get('[aria-haspopup="menu"]').trigger("click");
+    await new Promise((resolve) => setTimeout(resolve, 30));
     const menu = new DOMWrapper(document.body.querySelector(".font-format-field__menu")!);
     expect(menu.exists()).toBe(true);
     const target = menu
@@ -233,6 +234,20 @@ describe("HomeFormatToolbar", () => {
       kind === "family" ? { fontFamily: "Arial" } : { fontSize: 18 },
     ]);
     expect(document.body.querySelector(".font-format-field__menu")).toBeNull();
+  });
+
+  test("selects the current size on focus without opening the panel", async () => {
+    const wrapper = mountToolbar();
+    const input = wrapper.get<HTMLInputElement>(".font-format-controls__size input");
+    input.element.focus();
+    await input.trigger("click");
+    expect(input.element.selectionStart).toBe(0);
+    expect(input.element.selectionEnd).toBe(input.element.value.length);
+    expect(document.body.querySelector(".font-format-field__menu")).toBeNull();
+    input.element.setSelectionRange(1, 1);
+    await input.trigger("click");
+    expect(input.element.selectionStart).toBe(1);
+    expect(input.element.selectionEnd).toBe(1);
   });
 
   test("commits size on blur and cancels a draft with Escape", async () => {

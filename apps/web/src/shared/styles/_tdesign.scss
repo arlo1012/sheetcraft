@@ -600,3 +600,11 @@
     margin-left: 0;
   }
 }
+
+// MenuSurface owns the chrome within SelectInput's native popup.
+.idea-font-options-popup.t-popup__content {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}

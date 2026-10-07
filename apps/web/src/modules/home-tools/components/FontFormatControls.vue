@@ -188,7 +188,7 @@ function setFontSize(value: string | number): void {
     }
 
     &--size {
-      width: var(--cell-format-font-size-width, 64px);
+      width: var(--cell-format-font-size-width, 48px);
     }
   }
 

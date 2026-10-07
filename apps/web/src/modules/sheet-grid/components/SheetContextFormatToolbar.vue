@@ -245,7 +245,7 @@ function getPopupAttach(): HTMLElement {
   @include panel.toolbar-surface(var(--idea-layer-context-menu), 0, none);
 
   --cell-format-font-width: 130px;
-  --cell-format-font-size-width: 64px;
+  --cell-format-font-size-width: 48px;
   --cell-format-gap: 0px;
   --ribbon-button-width: 26px;
   --ribbon-control-height: 26px;
