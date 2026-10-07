@@ -213,18 +213,15 @@
   padding-left: 12px;
 }
 
-// Ordinary secondary actions retain a visible outline on dialogs and popovers.
+// Secondary actions use background feedback without a visible border.
 .t-button--theme-default:is(.t-button--variant-base, .t-button--variant-outline) {
-  border-color: var(--idea-border-control);
-
-  &:hover:not(.t-is-disabled, .t-is-loading),
-  &:focus-visible:not(.t-is-disabled, .t-is-loading) {
-    border-color: var(--idea-action-primary-hover);
-  }
-
+  &,
+  &:hover,
+  &:active,
+  &:focus-visible,
   &.t-is-disabled,
   &.t-is-loading {
-    border-color: var(--idea-border-subtle);
+    border-color: transparent;
   }
 }
 
