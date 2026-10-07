@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { EyeOff, Layers, Pin } from "lucide-vue-next";
+import { Ellipsis, EyeOff, Layers, Pin } from "lucide-vue-next";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { vIconAction } from "../../../shared/focus/icon-action";
@@ -16,6 +16,7 @@ const props = defineProps<{
   sheets: readonly Sheet[];
   activeSheetId: string;
   structureProtected?: boolean;
+  variant?: "all" | "overflow";
 }>();
 const emit = defineEmits<{ select: [sheetId: string]; restore: [sheetId: string]; open: [] }>();
 const { t } = useAppI18n();
@@ -92,6 +93,7 @@ watch(open, (isOpen) => {
     v-icon-action
     ref="triggerRef"
     class="workbook-sheet-navigator__trigger"
+    :class="{ 'workbook-sheet-navigator__trigger--overflow': variant === 'overflow' }"
     :aria-label="t('sheetTabs.allSheets')"
     :title="t('sheetTabs.allSheets')"
     aria-haspopup="menu"
@@ -101,7 +103,8 @@ watch(open, (isOpen) => {
     @click="toggleMenu"
     @keydown="onTriggerKeydown"
   >
-    <Layers :size="16" aria-hidden="true" />
+    <Ellipsis v-if="variant === 'overflow'" :size="16" aria-hidden="true" />
+    <Layers v-else :size="16" aria-hidden="true" />
   </span>
 
   <Teleport to="body">
@@ -193,6 +196,12 @@ watch(open, (isOpen) => {
     border-radius: 0;
     color: var(--idea-text-secondary);
     cursor: pointer;
+
+    &--overflow {
+      flex-basis: 26px;
+      width: 26px;
+      border-right: 0;
+    }
 
     &:hover,
     &[aria-expanded="true"] {

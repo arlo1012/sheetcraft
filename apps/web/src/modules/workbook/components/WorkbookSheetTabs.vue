@@ -74,6 +74,7 @@ const tabButtons = new Map<string, HTMLButtonElement>();
 const tabList = ref<HTMLDivElement>();
 const navigation = ref<HTMLDivElement>();
 const addButton = ref<HTMLElement>();
+const overflowButton = ref<HTMLElement>();
 const hasOverflow = ref(false);
 const canScrollLeft = ref(false);
 const canScrollRight = ref(false);
@@ -182,7 +183,10 @@ function updateScrollState(): void {
       ),
     );
   }
-  hasOverflow.value = list.scrollWidth > list.clientWidth + 1;
+  // Exclude the overflow entry's own space so it disappears once all tabs fit.
+  const contentWidth = list.firstElementChild?.scrollWidth ?? list.scrollWidth;
+  const availableWidth = list.clientWidth + (overflowButton.value?.offsetWidth ?? 0);
+  hasOverflow.value = contentWidth > availableWidth + 1;
   canScrollLeft.value = list.scrollLeft > 1;
   canScrollRight.value = list.scrollLeft + list.clientWidth < list.scrollWidth - 1;
 }
@@ -537,6 +541,17 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
         </div>
       </div>
     </div>
+    <div v-if="hasOverflow" ref="overflowButton" class="workbook-sheet-tabs__overflow">
+      <WorkbookSheetNavigator
+        variant="overflow"
+        :sheets="sheets"
+        :active-sheet-id="activeSheetId"
+        :structure-protected="structureProtected"
+        @select="selectSheet"
+        @restore="!structureProtected && emit('restore', $event)"
+        @open="closeMenu()"
+      />
+    </div>
     <span
       ref="addButton"
       v-icon-action="structureProtected"
@@ -764,6 +779,12 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     width: 26px;
     height: 26px;
     border-radius: 0;
+  }
+
+  &__overflow {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: stretch;
   }
 
   &__scroll {
