@@ -153,6 +153,8 @@ function toggleMenu(): void {
 
   &:not(.is-tall) &__menu {
     --ribbon-feedback-inset: 1px 1px 1px 0;
+    box-sizing: border-box;
+    padding-right: 1px;
 
     &::before {
       border-radius: 0 var(--idea-radius-default) var(--idea-radius-default) 0;
