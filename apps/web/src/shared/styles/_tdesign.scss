@@ -602,6 +602,10 @@
     box-shadow: none;
   }
 
+  .t-input.t-is-focused {
+    box-shadow: var(--idea-keyboard-focus-shadow);
+  }
+
   .t-input__suffix {
     margin-left: 3px;
   }

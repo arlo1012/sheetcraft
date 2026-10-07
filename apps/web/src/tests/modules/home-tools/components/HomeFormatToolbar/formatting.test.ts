@@ -214,6 +214,28 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper).at(-1)).toEqual({ fontSize: 20 });
   });
 
+  test("applies typed font names and sizes on Enter, rejecting invalid sizes", async () => {
+    const wrapper = mountToolbar();
+    const family = wrapper.get(".font-format-controls__family input");
+    const size = wrapper.get(".font-format-controls__size input");
+    expect(family.attributes("readonly")).toBeUndefined();
+    expect(size.attributes("readonly")).toBeUndefined();
+    await family.setValue("Custom Font");
+    await family.trigger("keydown", { key: "Enter", code: "Enter" });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(emittedPatches(wrapper)).toEqual([{ fontFamily: "Custom Font" }]);
+    await size.setValue("23");
+    await size.trigger("keydown", { key: "Enter", code: "Enter" });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(emittedPatches(wrapper).at(-1)).toEqual({ fontSize: 23 });
+    for (const invalid of ["90", "0", "12.5", "abc"]) {
+      await size.setValue(invalid);
+      await size.trigger("keydown", { key: "Enter", code: "Enter" });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(emittedPatches(wrapper)).toHaveLength(2);
+  });
+
   test("opens palette colors from the menu action and applies them immediately", async () => {
     const wrapper = mountToolbar();
     const textColor = wrapper.get('[data-cell-color-control="text"]');

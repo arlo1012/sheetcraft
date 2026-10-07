@@ -44,6 +44,8 @@ const emit = defineEmits<{
 
 const { t } = useAppI18n();
 const workbookTheme = useWorkbookTheme();
+const fontFamilyInput = ref("");
+const fontSizeInput = ref("");
 const fontFamilyPopupVisible = ref(false);
 const fontSizePopupVisible = ref(false);
 const fontFamilyOptions = computed(() => [
@@ -59,7 +61,12 @@ const fontFamilyOptions = computed(() => [
         },
       ]
     : []),
-  ...CELL_FONT_FAMILY_PRESETS.map((family) => ({
+  ...[
+    ...new Set([
+      ...CELL_FONT_FAMILY_PRESETS,
+      ...(props.state.fontFamily.value ? [props.state.fontFamily.value] : []),
+    ]),
+  ].map((family) => ({
     label: family === DEFAULT_CELL_FONT_FAMILY ? t("format.defaultFont") : family,
     value: family,
   })),
@@ -99,9 +106,16 @@ const resolvedFontSizePopupProps = computed(() => ({
 }));
 
 function setFontFamily(value: SelectValue): void {
-  if (typeof value !== "string" || !value) {
+  if (props.disabled || typeof value !== "string" || !value.trim()) {
     return;
   }
+  const input = value.trim();
+  const option = fontFamilyOptions.value.find(
+    (option) => option.label.toLowerCase() === input.toLowerCase(),
+  );
+  value = option?.value ?? input;
+  fontFamilyInput.value = "";
+  fontFamilyPopupVisible.value = false;
   if ((value === "theme:major" || value === "theme:minor") && workbookTheme?.value) {
     const role = value === "theme:major" ? "major" : "minor";
     emit("applyStyle", {
@@ -116,6 +130,10 @@ function setFontFamily(value: SelectValue): void {
 }
 
 function setFontSize(value: SelectValue): void {
+  if (props.disabled) return;
+  if (typeof value === "string" && value.trim()) value = Number(value);
+  fontSizeInput.value = "";
+  fontSizePopupVisible.value = false;
   if (
     typeof value !== "number" ||
     !Number.isInteger(value) ||
@@ -152,13 +170,17 @@ function setFontSize(value: SelectValue): void {
       <TSelect
         class="font-format-controls__family idea-ribbon-select"
         borderless
+        filterable
+        creatable
+        v-model:input-value="fontFamilyInput"
+        v-model:popup-visible="fontFamilyPopupVisible"
         :model-value="fontFamilyValue"
         :options="fontFamilyOptions"
         :popup-props="resolvedFontFamilyPopupProps"
         :placeholder="state.fontFamily.mixed ? '' : undefined"
         :disabled="disabled"
         @change="setFontFamily"
-        @popup-visible-change="fontFamilyPopupVisible = $event"
+        @create="setFontFamily"
       >
         <template #suffixIcon>
           <RibbonDropdownArrow :expanded="fontFamilyPopupVisible" />
@@ -174,6 +196,10 @@ function setFontSize(value: SelectValue): void {
       <TSelect
         class="font-format-controls__size idea-ribbon-select idea-ribbon-select--compact"
         borderless
+        filterable
+        creatable
+        v-model:input-value="fontSizeInput"
+        v-model:popup-visible="fontSizePopupVisible"
         :model-value="fontSizeValue"
         :options="fontSizeOptions"
         :input-props="{ align: 'center' }"
@@ -181,7 +207,7 @@ function setFontSize(value: SelectValue): void {
         :placeholder="state.fontSize.mixed ? '' : undefined"
         :disabled="disabled"
         @change="setFontSize"
-        @popup-visible-change="fontSizePopupVisible = $event"
+        @create="setFontSize"
       >
         <template #suffixIcon><RibbonDropdownArrow :expanded="fontSizePopupVisible" /></template>
       </TSelect>
@@ -203,7 +229,7 @@ function setFontSize(value: SelectValue): void {
     min-width: 0;
     height: var(--ribbon-control-height, 26px);
     overflow: hidden;
-    border-radius: 2px;
+    border-radius: var(--idea-radius-small);
 
     &--family {
       width: var(--cell-format-font-width, 126px);
@@ -215,7 +241,7 @@ function setFontSize(value: SelectValue): void {
   }
 
   &:not(.is-disabled) &__field:is(:hover, :focus-within) {
-    background: var(--idea-surface-hover);
+    background: var(--idea-icon-button-hover-bg);
   }
 
   &.is-disabled &__field {
