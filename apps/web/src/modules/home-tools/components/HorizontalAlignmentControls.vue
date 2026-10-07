@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { TextAlignCenter, TextAlignEnd, TextAlignJustify, TextAlignStart } from "lucide-vue-next";
-import CellDistributedAlignmentIcon from "./CellDistributedAlignmentIcon.vue";
+import CellHorizontalAlignmentIcon from "./CellHorizontalAlignmentIcon.vue";
 import { computed } from "vue";
 import type { CellStylePatch, HorizontalCellAlignment } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
@@ -52,7 +51,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="left"
       @activate="align('left')"
     >
-      <TextAlignStart aria-hidden="true" />
+      <CellHorizontalAlignmentIcon alignment="left" />
     </RibbonButton>
     <RibbonButton
       class="horizontal-alignment-controls__button"
@@ -62,7 +61,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="center"
       @activate="align('center')"
     >
-      <TextAlignCenter aria-hidden="true" />
+      <CellHorizontalAlignmentIcon alignment="center" />
     </RibbonButton>
     <RibbonButton
       class="horizontal-alignment-controls__button"
@@ -72,7 +71,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="right"
       @activate="align('right')"
     >
-      <TextAlignEnd aria-hidden="true" />
+      <CellHorizontalAlignmentIcon alignment="right" />
     </RibbonButton>
     <RibbonButton
       class="horizontal-alignment-controls__button"
@@ -82,7 +81,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="justify"
       @activate="align('justify')"
     >
-      <TextAlignJustify aria-hidden="true" />
+      <CellHorizontalAlignmentIcon alignment="justify" />
     </RibbonButton>
     <RibbonButton
       class="horizontal-alignment-controls__button"
@@ -92,7 +91,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="distributed"
       @activate="align('distributed')"
     >
-      <CellDistributedAlignmentIcon />
+      <CellHorizontalAlignmentIcon alignment="distributed" />
     </RibbonButton>
   </div>
 </template>
