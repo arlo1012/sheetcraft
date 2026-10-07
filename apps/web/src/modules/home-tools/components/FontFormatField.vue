@@ -40,6 +40,8 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   menuSurfaceRef,
   disabled: computed(() => props.disabled),
   defaultFocus: "selected",
+  pointerFocus: "menu",
+  placement: "bottom-end",
 });
 async function commit(): Promise<void> {
   if (props.disabled || open.value || draft.value === displayValue.value) return;
@@ -66,6 +68,7 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
 <template>
   <div ref="control" class="font-format-field">
     <TInput
+      class="idea-ribbon-font-input"
       v-model="draft"
       borderless
       size="small"
@@ -97,14 +100,14 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
         :id="menuId"
         ref="menuSurfaceRef"
         class="font-format-field__menu"
-        :style="floatingStyles"
+        :style="{ ...floatingStyles, minWidth: `${control?.offsetWidth ?? 64}px` }"
         :label="label"
       >
         <MenuRadioItem
           v-for="option in options"
           :key="option.value"
           :checked="option.value === modelValue"
-          indicator="check"
+          indicator="none"
           @select="select(option.value)"
           >{{ option.label }}</MenuRadioItem
         >
@@ -124,6 +127,7 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
     justify-content: center;
     width: 16px;
     height: 20px;
+    background: transparent;
     cursor: pointer;
     border-radius: var(--idea-radius-small);
 

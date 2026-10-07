@@ -580,3 +580,23 @@
     margin-left: 2px;
   }
 }
+
+// Ribbon font editing stays visually plain even while the input has focus.
+.idea-ribbon-font-input .t-input {
+  &,
+  &:hover,
+  &:focus,
+  &.t-is-focused,
+  &.t-input--focused,
+  &.t-is-disabled {
+    height: var(--ribbon-control-height, 26px);
+    padding-right: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .t-input__suffix {
+    margin-left: 0;
+  }
+}

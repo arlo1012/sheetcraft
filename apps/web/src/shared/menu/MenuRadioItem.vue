@@ -4,7 +4,7 @@ import { Radio as TRadio } from "tdesign-vue-next/es/radio";
 import MenuItem from "./MenuItem.vue";
 
 defineOptions({ inheritAttrs: false });
-defineProps<{ checked: boolean; disabled?: boolean; indicator?: "radio" | "check" }>();
+defineProps<{ checked: boolean; disabled?: boolean; indicator?: "radio" | "check" | "none" }>();
 const emit = defineEmits<{ select: [event: MouseEvent | KeyboardEvent] }>();
 defineSlots<{ default(): unknown; shortcut?(): unknown }>();
 </script>
@@ -13,11 +13,12 @@ defineSlots<{ default(): unknown; shortcut?(): unknown }>();
   <MenuItem
     v-bind="$attrs"
     role="menuitemradio"
+    :class="{ 'idea-menu-radio-text-selected': indicator === 'none' && checked }"
     :aria-checked="checked"
     :disabled="disabled"
     @select="emit('select', $event)"
   >
-    <template #icon>
+    <template v-if="indicator !== 'none'" #icon>
       <!-- The menu row owns focus and activation; the radio supplies its visual state. -->
       <Check v-if="indicator === 'check' && checked" />
       <span v-else-if="indicator !== 'check'" class="idea-menu-radio" inert>
@@ -30,6 +31,10 @@ defineSlots<{ default(): unknown; shortcut?(): unknown }>();
 </template>
 
 <style scoped lang="scss">
+.idea-menu-radio-text-selected {
+  color: var(--idea-action-primary);
+}
+
 .idea-menu-radio {
   display: flex;
   align-items: center;
