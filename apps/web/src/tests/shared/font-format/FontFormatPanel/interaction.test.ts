@@ -99,7 +99,7 @@ describe("FontFormatPanel", () => {
     }
   });
 
-  test("links typed size and size list, clamps on blur, and restores an empty draft", async () => {
+  test("links custom sizes and size list, and restores an empty draft", async () => {
     const { wrapper, panel, patch } = mountPanel();
     try {
       const input = panel.get("[data-cell-format-font-size]").getComponent(TInput);
@@ -116,11 +116,11 @@ describe("FontFormatPanel", () => {
       input.vm.$emit("change", "999");
       input.vm.$emit("blur");
       await wrapper.vm.$nextTick();
-      expect(patch().fontSize).toBe(72);
+      expect(patch().fontSize).toBe(999);
       input.vm.$emit("change", "");
       input.vm.$emit("blur");
       await wrapper.vm.$nextTick();
-      expect(input.props("modelValue")).toBe("72");
+      expect(input.props("modelValue")).toBe("999");
       await panel
         .get('[data-cell-format-font-size-list] [data-option-list-value="18"]')
         .trigger("click");

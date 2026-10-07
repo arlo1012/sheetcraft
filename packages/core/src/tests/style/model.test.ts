@@ -110,7 +110,12 @@ describe("cell style model", () => {
     ).toEqual({
       borderDiagonalDown: { style: "medium", color: "#abcdef" },
     });
-    expect(() => normalizeCellStyle({ fontSize: 7 })).toThrow(RangeError);
+    for (const fontSize of [1, 7, 23, 90, 999]) {
+      expect(normalizeCellStyle({ fontSize })).toEqual({ fontSize });
+    }
+    for (const fontSize of [0, -1, 12.5, NaN, Infinity]) {
+      expect(() => normalizeCellStyle({ fontSize })).toThrow(RangeError);
+    }
     expect(() => normalizeCellStyle({ fillColor: "red" })).toThrow(TypeError);
     expect(() =>
       normalizeCellStyle({ borderLeft: { style: "wide" as never, color: "#112233" } }),

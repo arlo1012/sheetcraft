@@ -175,7 +175,7 @@ export function readXlsxDxfStyle(xml: string | undefined): {
     const size = childElements(font, "sz")[0];
     if (size) {
       const value = Number(attribute(size.attributes, "val"));
-      if (Number.isInteger(value) && value >= 8 && value <= 72) style.fontSize = value;
+      if (Number.isInteger(value) && value > 0) style.fontSize = value;
       else unsupported = true;
     }
     const underline = childElements(font, "u")[0];

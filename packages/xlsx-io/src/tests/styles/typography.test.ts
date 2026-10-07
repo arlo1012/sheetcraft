@@ -66,20 +66,21 @@ describe("XLSX typography", () => {
   test("preserves every supported font-size number in XML and after reimport", async () => {
     const workbook = createWorkbook({ id: "font-sizes", sheetId: "sheet" });
     const sheet = getActiveSheet(workbook);
-    for (let size = 8; size <= 72; size += 1) {
-      const address = { row: size - 8, column: 0 };
+    const sizes = [1, 7, 23, 72, 90, 999];
+    for (const [row, size] of sizes.entries()) {
+      const address = { row, column: 0 };
       setCellContent(sheet, address, { kind: "literal", value: size });
       setCellStyle(sheet, address, { fontSize: size, bold: true });
     }
     const before = serializeWorkbook(workbook);
     const result = await encodeXlsx(workbook);
     const restored = getActiveSheet((await decodeXlsx(result.bytes)).workbook);
-    for (let size = 8; size <= 72; size += 1) {
-      const { font } = cellFormat(result.bytes, `A${size - 7}`);
+    for (const [row, size] of sizes.entries()) {
+      const { font } = cellFormat(result.bytes, `A${row + 1}`);
       expect(font).toContain(`<sz val="${size}"/>`);
       expect(font).toContain('<name val="Calibri"/>');
       expect(font).not.toContain("<scheme");
-      expect(getCellStyle(restored, { row: size - 8, column: 0 })).toMatchObject({
+      expect(getCellStyle(restored, { row, column: 0 })).toMatchObject({
         fontSize: size,
         bold: true,
       });

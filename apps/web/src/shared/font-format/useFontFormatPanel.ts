@@ -210,11 +210,11 @@ export function useFontFormatPanel(props: Props, update: (patch: FontFormatPatch
       return;
     }
     const parsed = Number(sizeInput.value);
-    if (!sizeInput.value.trim() || !Number.isFinite(parsed)) {
+    if (!sizeInput.value.trim() || !Number.isInteger(parsed) || parsed <= 0) {
       sizeInput.value = size.value === undefined ? "" : String(size.value);
       return;
     }
-    const normalized = Math.min(maxSize.value, Math.max(minSize.value, Math.round(parsed)));
+    const normalized = Math.min(maxSize.value, Math.max(minSize.value, parsed));
     sizeInput.value = String(normalized);
     setSize(sizeInput.value);
   }

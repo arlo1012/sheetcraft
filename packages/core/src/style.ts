@@ -21,8 +21,9 @@ export {
   type CellFillPatternStyle,
 } from "./cell-fill.js";
 
-export const MIN_CELL_FONT_SIZE = 8;
-export const MAX_CELL_FONT_SIZE = 72;
+// Presets are suggestions; document styles accept any positive integer size.
+export const MIN_CELL_FONT_SIZE = 1;
+export const MAX_CELL_FONT_SIZE = Number.MAX_VALUE;
 export const DEFAULT_CELL_FONT_SIZE = 13;
 export const DEFAULT_CELL_FONT_FAMILY = "Inter";
 export const DEFAULT_CELL_TEXT_COLOR = "#20242c";
@@ -488,9 +489,7 @@ function normalizeFontSize(value: unknown): number {
     value < MIN_CELL_FONT_SIZE ||
     value > MAX_CELL_FONT_SIZE
   ) {
-    throw new RangeError(
-      `Cell font size must be an integer between ${MIN_CELL_FONT_SIZE} and ${MAX_CELL_FONT_SIZE}.`,
-    );
+    throw new RangeError("Cell font size must be a positive integer.");
   }
   return value;
 }

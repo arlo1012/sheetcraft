@@ -207,7 +207,7 @@ describe("HomeFormatToolbar", () => {
       { verticalAlign: null },
     ]);
 
-    fontSize.vm.$emit("change", 90);
+    fontSize.vm.$emit("change", 0);
     expect(emittedPatches(wrapper)).toHaveLength(4);
 
     fontSize.vm.$emit("change", 20);
@@ -228,12 +228,18 @@ describe("HomeFormatToolbar", () => {
     await size.trigger("keydown", { key: "Enter", code: "Enter" });
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(emittedPatches(wrapper).at(-1)).toEqual({ fontSize: 23 });
-    for (const invalid of ["90", "0", "12.5", "abc"]) {
+    for (const valid of ["1", "7", "90", "999"]) {
+      await size.setValue(valid);
+      await size.trigger("keydown", { key: "Enter", code: "Enter" });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(emittedPatches(wrapper).at(-1)).toEqual({ fontSize: Number(valid) });
+    }
+    for (const invalid of ["0", "-1", "12.5", "Infinity", "abc"]) {
       await size.setValue(invalid);
       await size.trigger("keydown", { key: "Enter", code: "Enter" });
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
-    expect(emittedPatches(wrapper)).toHaveLength(2);
+    expect(emittedPatches(wrapper)).toHaveLength(6);
   });
 
   test("opens palette colors from the menu action and applies them immediately", async () => {
