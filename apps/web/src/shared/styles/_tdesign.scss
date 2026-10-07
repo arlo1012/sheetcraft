@@ -213,6 +213,21 @@
   padding-left: 12px;
 }
 
+// Ordinary secondary actions retain a visible outline on dialogs and popovers.
+.t-button--theme-default:is(.t-button--variant-base, .t-button--variant-outline) {
+  border-color: var(--idea-border-control);
+
+  &:hover:not(.t-is-disabled, .t-is-loading),
+  &:focus-visible:not(.t-is-disabled, .t-is-loading) {
+    border-color: var(--idea-action-primary-hover);
+  }
+
+  &.t-is-disabled,
+  &.t-is-loading {
+    border-color: var(--idea-border-subtle);
+  }
+}
+
 .t-select-option {
   --td-comp-size-s: 24px;
 }
