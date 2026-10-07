@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Columns3, Rows3, Snowflake, Table2 } from "lucide-vue-next";
+import { columnIndexToLabel } from "@idea10/core/coordinates";
+import SheetFreezeIcon from "./SheetFreezeIcon.vue";
 import { computed, ref, useId } from "vue";
 import { useAppI18n } from "../i18n";
 import MenuItem from "../menu/MenuItem.vue";
@@ -19,7 +20,7 @@ const props = withDefaults(
   { variant: "compact" },
 );
 const emit = defineEmits<{
-  freeze: [mode: "panes" | "top-row" | "first-column"];
+  freeze: [mode: "panes" | "rows" | "columns" | "top-row" | "first-column"];
   unfreeze: [];
 }>();
 const { t } = useAppI18n();
@@ -29,12 +30,35 @@ const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `sheet-freeze-menu-${useId().replaceAll(":", "")}`;
 const hasFrozenPanes = computed(() => props.freeze.rows > 0 || props.freeze.columns > 0);
 const canFreezePanes = computed(() => props.activeCell.row > 0 || props.activeCell.column > 0);
+const rowLabel = computed(() =>
+  props.activeCell.row > 0
+    ? t("ribbon.freezeThroughRow", { row: props.activeCell.row })
+    : t("ribbon.freezeRowsAbove"),
+);
+const columnLabel = computed(() =>
+  props.activeCell.column > 0
+    ? t("ribbon.freezeThroughColumn", { column: columnIndexToLabel(props.activeCell.column - 1) })
+    : t("ribbon.freezeColumnsBefore"),
+);
+const panesLabel = computed(() =>
+  props.activeCell.row > 0 && props.activeCell.column > 0
+    ? t("ribbon.freezeThroughCell", {
+        row: props.activeCell.row,
+        column: columnIndexToLabel(props.activeCell.column - 1),
+      })
+    : props.activeCell.row > 0
+      ? rowLabel.value
+      : props.activeCell.column > 0
+        ? columnLabel.value
+        : t("ribbon.freezePanes"),
+);
+
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef,
   disabled: computed(() => props.disabled),
 });
-function select(mode: "panes" | "top-row" | "first-column"): void {
+function select(mode: "panes" | "rows" | "columns" | "top-row" | "first-column"): void {
   emit("freeze", mode);
   dismiss("programmatic", true);
 }
@@ -57,7 +81,7 @@ function unfreeze(): void {
       :menu-id="menuId"
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
-      ><Snowflake aria-hidden="true"
+      ><SheetFreezeIcon
     /></RibbonMenuButton>
     <Teleport to="body"
       ><MenuSurface
@@ -69,13 +93,29 @@ function unfreeze(): void {
         :label="t('ribbon.freeze')"
       >
         <MenuItem data-freeze-action="panes" :disabled="!canFreezePanes" @select="select('panes')"
-          ><template #icon><Table2 :size="15" /></template>{{ t("ribbon.freezePanes") }}</MenuItem
+          ><template #icon><SheetFreezeIcon /></template>{{ panesLabel }}</MenuItem
         >
+        <MenuItem
+          data-freeze-action="rows"
+          :disabled="activeCell.row === 0"
+          @select="select('rows')"
+        >
+          <template #icon><SheetFreezeIcon area="rows" /></template>{{ rowLabel }}
+        </MenuItem>
+        <MenuItem
+          data-freeze-action="columns"
+          :disabled="activeCell.column === 0"
+          @select="select('columns')"
+        >
+          <template #icon><SheetFreezeIcon area="columns" /></template>{{ columnLabel }}
+        </MenuItem>
+        <MenuSeparator />
         <MenuItem data-freeze-action="top-row" @select="select('top-row')"
-          ><template #icon><Rows3 :size="15" /></template>{{ t("ribbon.freezeTopRow") }}</MenuItem
+          ><template #icon><SheetFreezeIcon area="rows" /></template
+          >{{ t("ribbon.freezeTopRow") }}</MenuItem
         >
         <MenuItem data-freeze-action="first-column" @select="select('first-column')"
-          ><template #icon><Columns3 :size="15" /></template
+          ><template #icon><SheetFreezeIcon area="columns" /></template
           >{{ t("ribbon.freezeFirstColumn") }}</MenuItem
         >
         <MenuSeparator /><MenuItem

@@ -898,15 +898,15 @@ export function useSpreadsheetWorkspaceController(
     );
   }
 
-  function freeze(mode: "panes" | "top-row" | "first-column"): void {
+  function freeze(mode: "panes" | "rows" | "columns" | "top-row" | "first-column"): void {
     const freezePanes =
       mode === "top-row"
         ? { rows: 1, columns: 0 }
         : mode === "first-column"
           ? { rows: 0, columns: 1 }
           : {
-              rows: activeAddress.value.row,
-              columns: activeAddress.value.column,
+              rows: mode === "columns" ? 0 : activeAddress.value.row,
+              columns: mode === "rows" ? 0 : activeAddress.value.column,
             };
     executeFeature(
       () => createSetSheetFreezePanesCommand(activeSheet.value.id, freezePanes),

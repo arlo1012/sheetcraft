@@ -860,6 +860,11 @@ export type MessageSchema = ToolMessageSchema & {
     clearFilter: string;
     freeze: string;
     freezePanes: string;
+    freezeThroughCell: string;
+    freezeThroughRow: string;
+    freezeThroughColumn: string;
+    freezeRowsAbove: string;
+    freezeColumnsBefore: string;
     freezeTopRow: string;
     freezeFirstColumn: string;
     unfreeze: string;

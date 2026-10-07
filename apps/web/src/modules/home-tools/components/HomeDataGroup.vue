@@ -16,7 +16,7 @@ const emit = defineEmits<{
   sort: [direction: "ascending" | "descending"];
   applyFilter: [includedKeys: FilterValueKey[]];
   clearFilter: [];
-  freeze: [mode: "panes" | "top-row" | "first-column"];
+  freeze: [mode: "panes" | "rows" | "columns" | "top-row" | "first-column"];
   unfreeze: [];
   toggleProtection: [];
   openDataTools: [];

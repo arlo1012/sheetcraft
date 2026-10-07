@@ -203,6 +203,15 @@ describe("spreadsheet workspace data tools", () => {
     expect(sheet.freezePanes).toEqual({ rows: 2, columns: 3 });
     controller.unfreeze();
     expect(sheet.freezePanes).toEqual({ rows: 0, columns: 0 });
+    controller.freeze("rows");
+    expect(sheet.freezePanes).toEqual({ rows: 2, columns: 0 });
+    controller.freeze("columns");
+    expect(sheet.freezePanes).toEqual({ rows: 0, columns: 3 });
+    expect(controller.undo()).toBe(true);
+    expect(sheet.freezePanes).toEqual({ rows: 2, columns: 0 });
+    expect(controller.redo()).toBe(true);
+    expect(sheet.freezePanes).toEqual({ rows: 0, columns: 3 });
+
     controller.freeze("top-row");
     expect(sheet.freezePanes).toEqual({ rows: 1, columns: 0 });
     controller.freeze("first-column");

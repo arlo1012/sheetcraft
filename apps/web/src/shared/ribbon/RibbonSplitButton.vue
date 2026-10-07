@@ -136,7 +136,7 @@ function toggleMenu(): void {
   &.is-tall {
     --ribbon-icon-size: var(--idea-ribbon-large-icon-size);
     display: grid;
-    grid-template-rows: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr) 20px;
     gap: var(--ribbon-row-gap, 2px);
     align-self: stretch;
     width: max-content;

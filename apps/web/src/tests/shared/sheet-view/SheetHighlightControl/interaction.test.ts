@@ -67,4 +67,35 @@ describe("SheetHighlightControl", () => {
     await trigger.trigger("click");
     expect(document.body.querySelector('[data-color-swatch][aria-checked="true"]')).toBeNull();
   });
+
+  test("separates the tall ribbon toggle from its color menu and restores menu focus", async () => {
+    const wrapper = mount(SheetHighlightControl, {
+      attachTo: document.body,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { highlightEnabled: true, highlightColor: "#ace2c5", variant: "ribbon" },
+    });
+    wrappers.push(wrapper);
+    const main = wrapper.get("[data-ribbon-split-main]");
+    const menu = wrapper.get("[data-ribbon-split-menu]");
+    expect(main.attributes()).toMatchObject({
+      role: "button",
+      "aria-label": "Highlight row and column",
+      "aria-pressed": "true",
+    });
+    expect(menu.attributes()).toMatchObject({
+      role: "button",
+      "aria-label": "Highlight color",
+      "aria-haspopup": "dialog",
+    });
+    expect(menu.text()).toBe("Highlight row and column");
+    await main.trigger("keydown", { key: "Enter" });
+    expect(wrapper.emitted("update:highlightEnabled")).toEqual([[false]]);
+    expect(document.body.querySelector(".sheet-highlight-control__color-panel")).toBeNull();
+    await menu.trigger("keydown", { key: " " });
+    expect(menu.attributes("aria-expanded")).toBe("true");
+    const panel = new DOMWrapper(document.body).get(".sheet-highlight-control__color-panel");
+    await panel.trigger("keydown", { key: "Escape" });
+    expect(document.body.querySelector(".sheet-highlight-control__color-panel")).toBeNull();
+    expect(document.activeElement).toBe(menu.element);
+  });
 });

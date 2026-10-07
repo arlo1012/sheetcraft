@@ -55,7 +55,7 @@ const emit = defineEmits<{
   "update:pageRulerUnit": [value: "mm" | "cm" | "in"];
   toggleFullscreen: [];
   fitSelection: [];
-  freeze: [mode: "panes" | "top-row" | "first-column"];
+  freeze: [mode: "panes" | "rows" | "columns" | "top-row" | "first-column"];
   unfreeze: [];
 }>();
 const { t } = useAppI18n();

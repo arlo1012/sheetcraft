@@ -36,6 +36,9 @@ describe("SheetFreezeMenu", () => {
     expect(freezeTrigger.attributes("aria-pressed")).toBe("false");
     await freezeTrigger.trigger("click");
     expect(menu().get('[data-freeze-action="panes"]').attributes("aria-disabled")).toBe("false");
+    expect(menu().get('[data-freeze-action="panes"]').text()).toBe(
+      "Freeze through row 2, column C",
+    );
     await menu().get('[data-freeze-action="panes"]').trigger("click");
     expect(freeze.emitted("freeze")).toEqual([["panes"]]);
 
@@ -45,4 +48,39 @@ describe("SheetFreezeMenu", () => {
     await menu().get('[data-freeze-action="unfreeze"]').trigger("click");
     expect(freeze.emitted("unfreeze")).toEqual([[]]);
   });
+
+  test.each([
+    ["rows", "Freeze through row 2"],
+    ["columns", "Freeze through column C"],
+  ] as const)("emits %s with the active-cell boundary in its label", async (mode, label) => {
+    const wrapper = mountMenu({
+      disabled: false,
+      activeCell: { row: 2, column: 3 },
+      freeze: { rows: 0, columns: 0 },
+    });
+    await wrapper.get('[data-ribbon-action="freeze"]').trigger("click");
+    const action = menu().get(`[data-freeze-action="${mode}"]`);
+    expect(action.text()).toBe(label);
+    expect(action.attributes("aria-disabled")).toBe("false");
+    await action.trigger("click");
+    expect(wrapper.emitted("freeze")).toEqual([[mode]]);
+  });
+
+  test.each([
+    [{ row: 0, column: 0 }, ["panes", "rows", "columns"]],
+    [{ row: 0, column: 3 }, ["rows"]],
+    [{ row: 2, column: 0 }, ["columns"]],
+  ] as const)(
+    "disables boundary actions that would freeze nothing at %j",
+    async (activeCell, modes) => {
+      const wrapper = mountMenu({ disabled: false, activeCell, freeze: { rows: 0, columns: 0 } });
+      await wrapper.get('[data-ribbon-action="freeze"]').trigger("click");
+      for (const mode of modes) {
+        const action = menu().get(`[data-freeze-action="${mode}"]`);
+        expect(action.attributes("aria-disabled")).toBe("true");
+        await action.trigger("click");
+      }
+      expect(wrapper.emitted("freeze")).toBeUndefined();
+    },
+  );
 });

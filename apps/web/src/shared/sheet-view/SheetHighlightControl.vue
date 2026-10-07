@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown, Icon as LucideIcon, Palette } from "lucide-vue-next";
+import { ChevronDown, Icon as LucideIcon } from "lucide-vue-next";
 import type { IconNode } from "lucide-vue-next";
 import { computed, nextTick, ref, useId } from "vue";
 import ColorPalette from "../color/ColorPalette.vue";
@@ -9,7 +9,7 @@ import { useDismissibleFloatingPanel } from "../floating/useDismissibleFloatingP
 import FloatingPanelSurface from "../floating/FloatingPanelSurface.vue";
 import { vIconAction } from "../focus/icon-action";
 import { useAppI18n } from "../i18n";
-import RibbonButton from "../ribbon/RibbonButton.vue";
+import RibbonSplitButton from "../ribbon/RibbonSplitButton.vue";
 
 const HIGHLIGHT_ICON_NODE: IconNode = [
   ["rect", { x: "9", y: "3", width: "6", height: "18", rx: "1" }],
@@ -48,7 +48,11 @@ const emit = defineEmits<{
   "update:highlightColor": [value: string];
 }>();
 const { t } = useAppI18n();
-const colorTriggerRef = ref<HTMLElement | null>(null);
+const statusColorTriggerRef = ref<HTMLElement | null>(null);
+const ribbonRef = ref<InstanceType<typeof RibbonSplitButton> | null>(null);
+const colorTriggerRef = computed(() =>
+  props.variant === "ribbon" ? (ribbonRef.value?.menuElement ?? null) : statusColorTriggerRef.value,
+);
 const colorPanelSurfaceRef = ref<InstanceType<typeof FloatingPanelSurface> | null>(null);
 const colorPanelRef = computed(() => colorPanelSurfaceRef.value?.rootElement ?? null);
 const colorPickerOpen = ref(false);
@@ -111,15 +115,22 @@ function selectHighlightColor(value: string | null): void {
     :class="[`is-${variant}`, { 'is-active': highlightEnabled }]"
     :style="highlightStyles"
   >
-    <RibbonButton
+    <RibbonSplitButton
+      ref="ribbonRef"
       v-if="variant === 'ribbon'"
       variant="tall"
       :label="t('statusBar.highlightRowColumn')"
       :text="t('viewTools.highlight')"
       :pressed="highlightEnabled"
+      :menu-label="t('statusBar.highlightColor')"
+      :expanded="colorPickerOpen"
+      :menu-id="colorPanelId"
+      popup-role="dialog"
+      @toggle-menu="toggleColorPicker"
+      @menu-keydown="onColorTriggerKeydown"
       @activate="toggleHighlight"
       ><LucideIcon name="HighlightRowColumn" :iconNode="HIGHLIGHT_ICON_NODE" aria-hidden="true"
-    /></RibbonButton>
+    /></RibbonSplitButton>
     <span
       v-icon-action
       v-else
@@ -140,24 +151,19 @@ function selectHighlightColor(value: string | null): void {
     </span>
     <span
       v-icon-action
-      ref="colorTriggerRef"
+      v-if="variant === 'status'"
+      ref="statusColorTriggerRef"
       class="sheet-highlight-control__color-trigger"
-      :class="{ 'is-ribbon': variant === 'ribbon' }"
       :aria-label="t('statusBar.highlightColor')"
       :aria-controls="colorPickerOpen ? colorPanelId : undefined"
       :aria-expanded="colorPickerOpen"
       aria-haspopup="dialog"
       :title="t('statusBar.highlightColor')"
-      :data-view-control="variant === 'status' ? 'highlight-color' : undefined"
-      :data-view-tool="variant === 'ribbon' ? 'highlight-color' : undefined"
+      data-view-control="highlight-color"
       @click="toggleColorPicker"
       @keydown="onColorTriggerKeydown"
     >
-      <Palette v-if="variant === 'ribbon'" :size="16" aria-hidden="true" /><ChevronDown
-        v-else
-        :size="12"
-        aria-hidden="true"
-      />
+      <ChevronDown :size="12" aria-hidden="true" />
     </span>
   </div>
   <Teleport to="body"
@@ -212,14 +218,6 @@ function selectHighlightColor(value: string | null): void {
     background: transparent;
     color: inherit;
     cursor: pointer;
-  }
-  &__color-trigger.is-ribbon {
-    align-self: stretch;
-    width: 22px;
-    height: auto;
-    color: var(--highlight-foreground);
-    background: var(--highlight-background);
-    border-radius: var(--idea-radius-small);
   }
 }
 </style>
