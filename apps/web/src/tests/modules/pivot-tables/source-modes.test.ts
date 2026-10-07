@@ -61,8 +61,6 @@ function wizardButtons() {
 async function openRangesWizard() {
   await editor().get(".pivot-create__range-summary button").trigger("click");
   await flushPromises();
-  await wizardButtons()[2]!.trigger("click");
-  await flushPromises();
 }
 function configuredReport() {
   const f = fixture();
@@ -140,6 +138,83 @@ describe("PivotTable source modes", () => {
     await flushPromises();
     expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({ sourceKind: "range" });
   });
+  test.each(["single", "custom"] as const)(
+    "selects %s page fields in the parent and opens its range step directly",
+    async (pageMode) => {
+      const f = fixture();
+      const second = createSheet("Second", "second");
+      second.cells = new Map(f.source.cells);
+      insertSheet(f.workbook, second);
+      const { wrapper } = mountDialog(f, {
+        sources: ["'Source Data'!A1:C4"],
+        consolidationPageCount: 1,
+        consolidationPageItems: [["Original"]],
+      });
+      await flushPromises();
+      expect(editor().find('input[value="single"]').exists()).toBe(false);
+      await mode("consolidation");
+      expect(editor().get('input[value="single"]').exists()).toBe(true);
+      expect(editor().get('input[value="custom"]').exists()).toBe(true);
+      await mode(pageMode);
+      await openRangesWizard();
+      expect(wizard().attributes("data-pivot-wizard-step")).toBe("2");
+      expect(wizard().find(".pivot-consolidation-wizard__count").exists()).toBe(
+        pageMode === "custom",
+      );
+      expect(wizard().findAll(".pivot-consolidation-ranges__page-items input")).toHaveLength(
+        pageMode === "custom" ? 1 : 0,
+      );
+      if (pageMode === "custom") {
+        await wizard().get(".pivot-consolidation-ranges__page-items input").setValue("Edited");
+      }
+      await wizard().get(".pivot-consolidation-ranges input").setValue("Second!A1:C4");
+      await wizard().findAll(".pivot-consolidation-ranges__actions button")[0]!.trigger("click");
+      await flushPromises();
+      if (pageMode === "custom") {
+        await wizard().get(".pivot-consolidation-ranges__page-items input").setValue("Added");
+      }
+      await wizardButtons()[1]!.trigger("click");
+      await flushPromises();
+      expect(document.querySelector(".pivot-consolidation-wizard")).toBeNull();
+      expect((editor().get(`input[value="${pageMode}"]`).element as HTMLInputElement).checked).toBe(
+        true,
+      );
+      expect(wrapper.emitted("confirm")).toBeUndefined();
+      await openRangesWizard();
+      expect(wizard().findAll('[role="option"]')).toHaveLength(2);
+      if (pageMode === "custom") {
+        await wizard().findAll('[role="option"]')[0]!.trigger("click");
+        expect(
+          (
+            wizard().get(".pivot-consolidation-ranges__page-items input")
+              .element as HTMLInputElement
+          ).value,
+        ).toBe("Edited");
+      }
+      await wizardButtons()[2]!.trigger("click");
+      await flushPromises();
+      confirmButton().click();
+      await flushPromises();
+      expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({
+        sourceKind: "consolidation",
+        consolidationPageMode: pageMode,
+        sources: ["'Source Data'!A1:C4", "=Second!$A$1:$C$4"],
+      });
+    },
+  );
+  test("disables parent page-field choices while editing is disabled", async () => {
+    const { wrapper } = mountDialog(fixture(), { sourceKind: "consolidation" });
+    await flushPromises();
+    await wrapper.setProps({ disabled: true });
+    for (const pageMode of ["single", "custom"]) {
+      expect(
+        (editor().get(`input[value="${pageMode}"]`).element as HTMLInputElement).disabled,
+      ).toBe(true);
+    }
+    expect(
+      (editor().get(".pivot-create__range-summary button").element as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
   test("adds a selected worksheet range, rejects duplicates, and removes the selection", async () => {
     const { wrapper, selectReference } = mountDialog();
     selectReference.mockResolvedValueOnce("'Source Data'!A1:C4");
@@ -154,15 +229,15 @@ describe("PivotTable source modes", () => {
     await flushPromises();
     expect(ranges.findAll('[role="option"]')).toHaveLength(1);
     expect((buttons[0]!.element as HTMLButtonElement).disabled).toBe(true);
-    expect((wizardButtons()[3]!.element as HTMLButtonElement).disabled).toBe(false);
+    expect((wizardButtons()[2]!.element as HTMLButtonElement).disabled).toBe(false);
     await buttons[1]!.trigger("click");
     await flushPromises();
     expect(ranges.findAll('[role="option"]')).toHaveLength(0);
     expect((buttons[1]!.element as HTMLButtonElement).disabled).toBe(true);
-    expect((wizardButtons()[3]!.element as HTMLButtonElement).disabled).toBe(true);
+    expect((wizardButtons()[2]!.element as HTMLButtonElement).disabled).toBe(true);
     await buttons[0]!.trigger("click");
     await flushPromises();
-    await wizardButtons()[3]!.trigger("click");
+    await wizardButtons()[2]!.trigger("click");
     await flushPromises();
     expect(confirmButton().disabled).toBe(false);
     confirmButton().click();
@@ -193,8 +268,8 @@ describe("PivotTable source modes", () => {
     expect((ranges.get("input").element as HTMLInputElement).value).toBe("'Source Data'!A1:C4");
     await ranges.get(".pivot-consolidation-ranges__actions button").trigger("click");
     await flushPromises();
-    expect((wizardButtons()[3]!.element as HTMLButtonElement).disabled).toBe(false);
-    await wizardButtons()[3]!.trigger("click");
+    expect((wizardButtons()[2]!.element as HTMLButtonElement).disabled).toBe(false);
+    await wizardButtons()[2]!.trigger("click");
     await flushPromises();
     expect(confirmButton().disabled).toBe(false);
   });

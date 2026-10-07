@@ -62,21 +62,15 @@ async function radio(value: string) {
   ).trigger("click");
   await flushPromises();
 }
-async function next() {
-  await buttons()[2]!.trigger("click");
-  await flushPromises();
-}
 function isDisabled(index: number) {
   return (buttons()[index]!.element as HTMLButtonElement).disabled;
 }
 const sources = ["'Source Data'!A1:C3", "Second!A1:C3"];
 
 describe("WPS consolidation wizard", () => {
-  test("allows page labels before adding an area and retains them across wizard steps", async () => {
-    const { wrapper } = setup();
+  test("allows inherited custom page labels before adding an area", async () => {
+    const { wrapper } = setup({ consolidationPageMode: "custom" });
     await flushPromises();
-    await radio("custom");
-    await next();
     await radio("4");
     const inputs = () => wizard().findAll(".pivot-consolidation-ranges__page-items input");
     const labels = ["East", "2026", "Store", "Owner"];
@@ -85,15 +79,13 @@ describe("WPS consolidation wizard", () => {
       expect((inputs()[index]!.element as HTMLInputElement).disabled).toBe(false);
       await inputs()[index]!.setValue(label);
     }
-    expect(isDisabled(3)).toBe(true);
-    await buttons()[1]!.trigger("click");
-    await next();
+    expect(isDisabled(2)).toBe(true);
     expect(inputs().map((input) => (input.element as HTMLInputElement).value)).toEqual(labels);
     await wizard().findAll(".pivot-consolidation-ranges__actions button")[0]!.trigger("click");
     await flushPromises();
     expect(wizard().findAll('[role="option"]')).toHaveLength(1);
-    expect(isDisabled(3)).toBe(false);
-    await buttons()[3]!.trigger("click");
+    expect(isDisabled(2)).toBe(false);
+    await buttons()[2]!.trigger("click");
     expect((wrapper.emitted("confirm")![0]![0] as PivotDraft).consolidationPageItems).toEqual([
       labels,
     ]);
@@ -107,38 +99,33 @@ describe("WPS consolidation wizard", () => {
       consolidationPageCount: 4,
     });
     await flushPromises();
-    await next();
     await wizard().findAll(".pivot-consolidation-ranges__actions button")[1]!.trigger("click");
     await flushPromises();
     expect(wizard().findAll('[role="option"]')).toHaveLength(0);
     const inputs = wizard().findAll(".pivot-consolidation-ranges__page-items input");
     expect(inputs.map((input) => (input.element as HTMLInputElement).value)).toEqual(labels);
     expect(inputs.every((input) => !(input.element as HTMLInputElement).disabled)).toBe(true);
-    expect(isDisabled(3)).toBe(true);
-  });
-  test("walks both steps and cannot finish before selecting any range", async () => {
-    setup();
-    await flushPromises();
-    expect(wizard().attributes("data-pivot-wizard-step")).toBe("1");
-    expect(isDisabled(1)).toBe(true);
-    expect(isDisabled(3)).toBe(true);
-    await next();
-    expect(wizard().attributes("data-pivot-wizard-step")).toBe("2");
     expect(isDisabled(2)).toBe(true);
-    expect(isDisabled(3)).toBe(true);
+  });
+  test("opens at range selection and returns its draft to the parent without creating a report", async () => {
+    const { wrapper } = setup();
+    await flushPromises();
+    expect(wizard().attributes("data-pivot-wizard-step")).toBe("2");
+    expect(isDisabled(1)).toBe(false);
+    expect(isDisabled(2)).toBe(true);
+    expect(wizard().find(".pivot-consolidation-ranges").exists()).toBe(true);
     await buttons()[1]!.trigger("click");
     await flushPromises();
-    expect(wizard().attributes("data-pivot-wizard-step")).toBe("1");
+    expect(wrapper.emitted("back")?.[0]?.[0]).toMatchObject({ sourceKind: "consolidation" });
+    expect(wrapper.emitted("confirm")).toBeUndefined();
   });
   test("supports zero page fields and creates a numeric Sum report without filters", async () => {
-    const { f, wrapper } = setup({ sources });
+    const { f, wrapper } = setup({ sources, consolidationPageMode: "custom" });
     await flushPromises();
-    await radio("custom");
-    await next();
     await radio("0");
     expect(wizard().find(".pivot-consolidation-ranges__page-items").exists()).toBe(false);
-    expect(isDisabled(3)).toBe(false);
-    await buttons()[3]!.trigger("click");
+    expect(isDisabled(2)).toBe(false);
+    await buttons()[2]!.trigger("click");
     const draft = wrapper.emitted("confirm")![0]![0] as PivotDraft;
     expect(draft).toMatchObject({ consolidationPageMode: "custom", consolidationPageCount: 0 });
     f.actions.confirm(draft);
@@ -151,30 +138,26 @@ describe("WPS consolidation wizard", () => {
     expect(table.reportLayout).toBeDefined();
   });
   test("requires four assignments per area and groups different areas under matching page items", async () => {
-    const { f, wrapper } = setup({ sources });
+    const { f, wrapper } = setup({ sources, consolidationPageMode: "custom" });
     await flushPromises();
-    await radio("custom");
-    await next();
     await radio("4");
     const inputs = () => wizard().findAll(".pivot-consolidation-ranges__page-items input");
     expect(inputs()).toHaveLength(4);
-    expect(isDisabled(3)).toBe(true);
+    expect(isDisabled(2)).toBe(true);
     for (const [index, value] of ["Group", "2026", "Site", "Owner"].entries())
       await inputs()[index]!.setValue(value);
-    expect(isDisabled(3)).toBe(true);
+    expect(isDisabled(2)).toBe(true);
     await wizard().findAll('[role="option"]')[1]!.trigger("click");
     for (const [index, value] of ["Group", "2026", "Site", "Owner"].entries())
       await inputs()[index]!.setValue(value);
-    expect(isDisabled(3)).toBe(false);
-    await buttons()[1]!.trigger("click");
-    await next();
+    expect(isDisabled(2)).toBe(false);
     expect(inputs().map((input) => (input.element as HTMLInputElement).value)).toEqual([
       "Group",
       "2026",
       "Site",
       "Owner",
     ]);
-    await buttons()[3]!.trigger("click");
+    await buttons()[2]!.trigger("click");
     const draft = wrapper.emitted("confirm")![0]![0] as PivotDraft;
     expect(draft.consolidationPageItems).toEqual([
       ["Group", "2026", "Site", "Owner"],
@@ -230,7 +213,6 @@ describe("WPS consolidation wizard", () => {
     const parent = () => new DOMWrapper(document.querySelector(".pivot-create")!);
     await parent().get(".pivot-create__range-summary button").trigger("click");
     await flushPromises();
-    await next();
     await wizard().get(".pivot-consolidation-ranges__page-items input").setValue("Edited");
     await wizard().findAll(".pivot-consolidation-ranges__actions button")[1]!.trigger("click");
     await buttons()[0]!.trigger("click");

@@ -125,19 +125,30 @@ const title = computed(() =>
           </div>
           <div class="pivot-create__source">
             <Radio value="consolidation">{{ t("pivot.consolidationRanges") }}</Radio>
-            <div v-if="draft.sourceKind === 'consolidation'" class="pivot-create__range-summary">
-              <Button
-                size="small"
-                variant="outline"
+            <div v-if="draft.sourceKind === 'consolidation'" class="pivot-create__consolidation">
+              <RadioGroup
+                v-model="draft.consolidationPageMode"
                 :disabled="disabled"
-                @click="wizardOpen = true"
-                >{{ t("pivot.selectRanges") }}</Button
+                :aria-label="t('pivot.pageFieldsPrompt')"
+                class="pivot-create__page-modes"
               >
-              <span>{{
-                draft.sources.length
-                  ? t("pivot.selectedRanges", { count: draft.sources.length })
-                  : t("pivot.noRangesSelected")
-              }}</span>
+                <Radio value="single">{{ t("pivot.singlePageField") }}</Radio>
+                <Radio value="custom">{{ t("pivot.customPageFields") }}</Radio>
+              </RadioGroup>
+              <div class="pivot-create__range-summary">
+                <Button
+                  size="small"
+                  variant="outline"
+                  :disabled="disabled"
+                  @click="wizardOpen = true"
+                  >{{ t("pivot.selectRanges") }}</Button
+                >
+                <span>{{
+                  draft.sources.length
+                    ? t("pivot.selectedRanges", { count: draft.sources.length })
+                    : t("pivot.noRangesSelected")
+                }}</span>
+              </div>
             </div>
           </div>
           <div class="pivot-create__source">
@@ -199,6 +210,7 @@ const title = computed(() =>
     :disabled="disabled"
     :suspended="suspended"
     :select-reference="selectReference"
+    @back="confirmRanges"
     @confirm="confirmRanges"
     @close="wizardOpen = false"
   />
@@ -208,7 +220,8 @@ const title = computed(() =>
   display: grid;
   gap: 16px;
   &__sources,
-  &__source {
+  &__source,
+  &__consolidation {
     display: grid;
     gap: 8px;
   }
@@ -233,7 +246,8 @@ const title = computed(() =>
     display: grid;
     gap: 10px;
   }
-  &__locations {
+  &__locations,
+  &__page-modes {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
