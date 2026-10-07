@@ -18,6 +18,7 @@ const props = defineProps<{
   selectReference: (current: string) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{ confirm: [draft: PivotDraft]; close: [] }>();
+defineSlots<{ feedback?: () => unknown }>();
 const { t } = useAppI18n();
 const draft = ref<PivotDraft>(JSON.parse(JSON.stringify(props.initial)) as PivotDraft);
 draft.value.sourceKind = "consolidation";
@@ -55,7 +56,7 @@ function finish(): void {
     :header="t('pivot.selectRangesTitle')"
     width="min(500px, calc(100vw - 32px))"
     :close-on-overlay-click="false"
-    :confirm-btn="{ content: t('picture.confirm'), disabled: disabled || !canFinish }"
+    :confirm-btn="{ content: t('pivot.finish'), disabled: disabled || !canFinish }"
     :cancel-btn="t('picture.cancel')"
     :confirm-on-enter="false"
     @confirm="finish"
@@ -87,6 +88,7 @@ function finish(): void {
           </div>
         </template>
       </PivotConsolidationRanges>
+      <slot name="feedback" />
     </div>
   </Dialog>
 </template>

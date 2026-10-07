@@ -159,7 +159,9 @@ export function usePivotActions(options: {
       consolidationPageItems:
         table.consolidation?.ranges.map((area) => [...(area.pageItems ?? [])]) ?? [],
       consolidationItemPrefix: options.pageItemPrefix?.() ?? "Item",
-      destination: formatRangeReference(sheet.name, { start: table.anchor, end: table.anchor }),
+      destination: existing
+        ? formatRangeReference(sheet.name, { start: table.anchor, end: table.anchor })
+        : "",
       newSheet: !existing,
       newSheetName: getNextSheetName(workbook),
       overwrite: false,

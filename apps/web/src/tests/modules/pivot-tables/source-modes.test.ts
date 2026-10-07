@@ -137,7 +137,7 @@ describe("PivotTable source modes", () => {
     expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({ sourceKind: "range" });
   });
   test.each(["single", "custom"] as const)(
-    "selects %s page fields in the parent and retains confirmed ranges when reopened",
+    "selects %s page fields in the parent and finishes directly from range selection",
     async (pageMode) => {
       const f = fixture();
       const second = createSheet("Second", "second");
@@ -172,26 +172,8 @@ describe("PivotTable source modes", () => {
       }
       await wizardButtons()[1]!.trigger("click");
       await flushPromises();
-      expect(document.querySelector(".pivot-consolidation-wizard")).toBeNull();
-      expect((editor().get(`input[value="${pageMode}"]`).element as HTMLInputElement).checked).toBe(
-        true,
-      );
-      expect(wrapper.emitted("confirm")).toBeUndefined();
-      await openRangesWizard();
-      expect(wizard().findAll("tr[data-pivot-range-row]")).toHaveLength(2);
-      if (pageMode === "custom") {
-        await wizard().findAll("tr[data-pivot-range-row]")[0]!.trigger("click");
-        expect(
-          (
-            wizard().get(".pivot-consolidation-ranges__page-items input")
-              .element as HTMLInputElement
-          ).value,
-        ).toBe("Edited");
-      }
-      await wizardButtons()[1]!.trigger("click");
-      await flushPromises();
-      confirmButton().click();
-      await flushPromises();
+      expect(wrapper.emitted("confirm")).toHaveLength(1);
+      expect(editor().isVisible()).toBe(false);
       expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({
         sourceKind: "consolidation",
         consolidationPageMode: pageMode,
@@ -199,6 +181,74 @@ describe("PivotTable source modes", () => {
       });
     },
   );
+  test.each([true, false])(
+    "Finish creates a report once with newSheet=%s without reopening the parent",
+    async (newSheet) => {
+      const f = fixture();
+      const { wrapper } = mountDialog(f, {
+        sourceKind: "consolidation",
+        sources: ["'Source Data'!A1:C4"],
+        destination: "F8",
+        newSheet,
+        overwrite: true,
+        chart: true,
+      });
+      await wrapper.setProps({ onConfirm: (draft: PivotDraft) => f.actions.confirm(draft) });
+      await flushPromises();
+      await openRangesWizard();
+      const calls = f.execute.mock.calls.length;
+      await wizardButtons()[1]!.trigger("click");
+      await flushPromises();
+      expect(wrapper.emitted("confirm")).toHaveLength(1);
+      expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({
+        newSheet,
+        destination: "F8",
+        overwrite: true,
+        chart: true,
+      });
+      expect(f.actions.error.value).toBe(false);
+      expect(f.execute.mock.calls.length).toBe(calls + 1);
+      expect(f.sheet.pivotTables).toHaveLength(1);
+      expect(editor().isVisible()).toBe(false);
+    },
+  );
+  test("keeps overwrite feedback in range selection for a Finish retry", async () => {
+    const f = fixture();
+    setCellContent(f.source, { row: 7, column: 5 }, { kind: "literal", value: "Occupied" });
+    const { wrapper } = mountDialog(f, {
+      sourceKind: "consolidation",
+      sources: ["'Source Data'!A1:C4"],
+      destination: "F8",
+      newSheet: false,
+    });
+    await wrapper.setProps({
+      onConfirm: (draft: PivotDraft) => {
+        f.actions.confirm(draft);
+        void wrapper.setProps({
+          error: f.actions.error.value,
+          errorReason: f.actions.errorReason.value,
+        });
+      },
+    });
+    await flushPromises();
+    await openRangesWizard();
+    await wizardButtons()[1]!.trigger("click");
+    await flushPromises();
+    expect(f.actions.errorReason.value).toBe("overwrite");
+    expect(wizard().isVisible()).toBe(true);
+    expect(editor().isVisible()).toBe(false);
+    expect(wizard().get('[role="alert"]').text()).toContain("destination contains content");
+    await wizard().get('input[type="checkbox"]').setValue(true);
+    await wizardButtons()[1]!.trigger("click");
+    await flushPromises();
+    expect(f.actions.error.value).toBe(false);
+    expect(f.sheet.pivotTables).toHaveLength(1);
+    expect(wrapper.emitted("confirm")?.at(-1)?.[0]).toMatchObject({
+      overwrite: true,
+      destination: "F8",
+    });
+    expect(editor().isVisible()).toBe(false);
+  });
   test("disables parent page-field choices while editing is disabled", async () => {
     const { wrapper } = mountDialog(fixture(), { sourceKind: "consolidation" });
     await flushPromises();
@@ -236,9 +286,8 @@ describe("PivotTable source modes", () => {
     await flushPromises();
     await wizardButtons()[1]!.trigger("click");
     await flushPromises();
-    expect(confirmButton().disabled).toBe(false);
-    confirmButton().click();
-    await flushPromises();
+    expect(editor().isVisible()).toBe(false);
+    expect(wrapper.emitted("confirm")).toHaveLength(1);
     expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({
       sourceKind: "consolidation",
       sources: ["='Source Data'!$A$1:$C$4"],
@@ -252,7 +301,7 @@ describe("PivotTable source modes", () => {
           resolve = done;
         }),
     );
-    mountDialog(fixture(), {}, selectReference);
+    const { wrapper } = mountDialog(fixture(), {}, selectReference);
     await flushPromises();
     await mode("consolidation");
     await openRangesWizard();
@@ -268,7 +317,8 @@ describe("PivotTable source modes", () => {
     expect((wizardButtons()[1]!.element as HTMLButtonElement).disabled).toBe(false);
     await wizardButtons()[1]!.trigger("click");
     await flushPromises();
-    expect(confirmButton().disabled).toBe(false);
+    expect(wrapper.emitted("confirm")).toHaveLength(1);
+    expect(editor().isVisible()).toBe(false);
   });
   test("requires an existing report selection and emits its stable identifiers", async () => {
     const f = configuredReport();

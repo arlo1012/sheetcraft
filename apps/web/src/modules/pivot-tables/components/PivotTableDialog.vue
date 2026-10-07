@@ -3,7 +3,6 @@ import { computed, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import { Button } from "tdesign-vue-next/es/button";
-import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { getPivotTableSource, normalizePivotTable } from "@idea10/core/pivot-tables";
 import type { Workbook } from "@idea10/core/workbook";
 import type { PivotDraft } from "../usePivotActions";
@@ -11,6 +10,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import OptionList from "../../../shared/option-list/OptionList.vue";
 import PivotConsolidationWizard from "./PivotConsolidationWizard.vue";
+import PivotCreateFeedback from "./PivotCreateFeedback.vue";
 import { resolvePivotDraftSource } from "../pivot-draft-source";
 const props = defineProps<{
   initial: PivotDraft;
@@ -34,12 +34,21 @@ const emit = defineEmits<{ confirm: [draft: PivotDraft]; close: [] }>();
 const { t } = useAppI18n();
 const draft = ref<PivotDraft>(JSON.parse(JSON.stringify(props.initial)) as PivotDraft);
 const wizardOpen = ref(false);
-function confirmRanges(value: PivotDraft): void {
+function completeRanges(value: PivotDraft): void {
+  if (props.disabled) return;
   draft.value.sources = value.sources;
   draft.value.consolidationPageMode = value.consolidationPageMode;
   draft.value.consolidationPageCount = value.consolidationPageCount;
   draft.value.consolidationPageItems = value.consolidationPageItems;
-  wizardOpen.value = false;
+  emit("confirm", draft.value);
+}
+function selectExistingDestination(): void {
+  if (!props.disabled) draft.value.newSheet = false;
+}
+async function selectDestinationReference(current: string): Promise<string | undefined> {
+  if (props.disabled) return undefined;
+  selectExistingDestination();
+  return props.selectReference(current);
 }
 const validSource = computed(() => {
   void props.revision;
@@ -183,23 +192,27 @@ const title = computed(() =>
           <Radio value="existing">{{ t("pivot.existingSheet") }}</Radio>
         </RadioGroup>
         <p v-else>{{ t("pivot.moveHint") }}</p>
-        <RangeReferenceInput
-          v-if="!draft.newSheet"
-          v-model="draft.destination"
-          :label="t('pivot.destination')"
-          :select-reference="selectReference"
-          :disabled="disabled"
-        />
+        <div
+          class="pivot-create__destination"
+          @pointerdown.capture="selectExistingDestination"
+          @focusin="selectExistingDestination"
+        >
+          <RangeReferenceInput
+            v-model="draft.destination"
+            :label="t('pivot.destination')"
+            :select-reference="selectDestinationReference"
+            :disabled="disabled"
+            @update:model-value="selectExistingDestination"
+          />
+        </div>
       </section>
-      <Checkbox
-        v-if="error && (!errorReason || errorReason === 'overwrite') && !draft.newSheet"
+      <PivotCreateFeedback
         v-model="draft.overwrite"
+        :error="error"
+        :error-reason="errorReason"
+        :new-sheet="draft.newSheet"
         :disabled="disabled"
-        >{{ t("pivot.overwrite") }}</Checkbox
-      >
-      <p v-if="error && errorReason && errorReason !== 'invalid'" role="alert">
-        {{ t(`pivot.error.${errorReason}`) }}
-      </p>
+      />
     </div>
   </Dialog>
   <PivotConsolidationWizard
@@ -210,9 +223,19 @@ const title = computed(() =>
     :disabled="disabled"
     :suspended="suspended"
     :select-reference="selectReference"
-    @confirm="confirmRanges"
+    @confirm="completeRanges"
     @close="wizardOpen = false"
-  />
+  >
+    <template #feedback>
+      <PivotCreateFeedback
+        v-model="draft.overwrite"
+        :error="error"
+        :error-reason="errorReason"
+        :new-sheet="draft.newSheet"
+        :disabled="disabled"
+      />
+    </template>
+  </PivotConsolidationWizard>
 </template>
 <style scoped lang="scss">
 .pivot-create {
@@ -245,6 +268,9 @@ const title = computed(() =>
     display: grid;
     gap: 10px;
   }
+  &__destination {
+    margin-left: 20px;
+  }
   &__locations,
   &__page-modes {
     display: flex;
@@ -260,9 +286,6 @@ const title = computed(() =>
   p {
     margin: 0;
     color: var(--idea-text-secondary);
-  }
-  [role="alert"] {
-    color: var(--idea-status-error);
   }
 }
 </style>
