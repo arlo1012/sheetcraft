@@ -30,6 +30,7 @@ import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismiss
 import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
@@ -83,16 +84,6 @@ const calculationMenuOpen = ref(false);
 const sumMenuId = `formula-sum-${Math.random().toString(36).slice(2)}`;
 const nameMenuId = `formula-name-create-${Math.random().toString(36).slice(2)}`;
 const calculationMenuId = `formula-calculation-${Math.random().toString(36).slice(2)}`;
-const aggregates: ReadonlyArray<{
-  name: "SUM" | "AVERAGE" | "COUNT" | "MAX" | "MIN";
-  label: string;
-}> = [
-  { name: "SUM", label: "SUM" },
-  { name: "AVERAGE", label: "AVERAGE" },
-  { name: "COUNT", label: "COUNT" },
-  { name: "MAX", label: "MAX" },
-  { name: "MIN", label: "MIN" },
-];
 const namePositions = ref<Record<DefinedNameLabelPosition, boolean>>({
   top: true,
   left: false,
@@ -136,6 +127,14 @@ function toggleSumMenu(): void {
 function chooseAggregate(name: "SUM" | "AVERAGE" | "COUNT" | "MAX" | "MIN"): void {
   sumMenuOpen.value = false;
   emit("aggregate", name);
+}
+function insertConditionalSum(): void {
+  sumMenuOpen.value = false;
+  emit("insertFunction", "SUMIF");
+}
+function openFunctionBrowser(): void {
+  sumMenuOpen.value = false;
+  browserOpen.value = true;
 }
 function openSumMenuFromKeyboard(event: KeyboardEvent): void {
   if (event.key === "ArrowDown") {
@@ -209,12 +208,20 @@ function insertFunction(name: string): void {
       role="group"
       :aria-label="t('formulaTools.autoSum')"
     >
+      <RibbonButton
+        variant="tall"
+        :label="t('formulaTools.insertFunction')"
+        :text="t('formulaTools.insertCaption')"
+        :disabled="disabled"
+        @activate="browserOpen = true"
+        ><FunctionSquare
+      /></RibbonButton>
       <RibbonSplitButton
         ref="sumSplitRef"
         variant="tall"
         :label="t('formulaTools.autoSum')"
         :menu-label="t('formulaTools.autoSumMenu')"
-        :text="t('formulaTools.autoSum')"
+        :text="t('formulaTools.sumCaption')"
         :disabled="disabled"
         :menu-disabled="disabled"
         :expanded="sumMenuOpen"
@@ -235,15 +242,38 @@ function insertFunction(name: string): void {
           :style="floatingStyles"
           :data-cell-edit-session="editSessionId"
         >
-          <MenuSurface ref="sumMenuRef" :label="t('formulaTools.autoSumMenu')"
-            ><MenuItem
-              v-for="aggregate in aggregates"
-              :key="aggregate.name"
-              :data-formula-aggregate="aggregate.name"
-              @select="chooseAggregate(aggregate.name)"
-              >{{ aggregate.label }}</MenuItem
-            ></MenuSurface
-          >
+          <MenuSurface ref="sumMenuRef" :label="t('formulaTools.autoSumMenu')">
+            <MenuItem data-formula-aggregate="SUM" @select="chooseAggregate('SUM')">
+              <template #icon><Sigma /></template>
+              {{ t("formulaTools.sum") }}
+            </MenuItem>
+            <MenuItem data-formula-aggregate="AVERAGE" @select="chooseAggregate('AVERAGE')">
+              <template #icon><span class="formula-toolbar__aggregate-mark">Avg</span></template>
+              {{ t("formulaTools.average") }}
+            </MenuItem>
+            <MenuItem data-formula-aggregate="COUNT" @select="chooseAggregate('COUNT')">
+              <template #icon><span class="formula-toolbar__aggregate-mark">Cnt</span></template>
+              {{ t("formulaTools.count") }}
+            </MenuItem>
+            <MenuItem data-formula-aggregate="MAX" @select="chooseAggregate('MAX')">
+              <template #icon><span class="formula-toolbar__aggregate-mark">Max</span></template>
+              {{ t("formulaTools.maximum") }}
+            </MenuItem>
+            <MenuItem data-formula-aggregate="MIN" @select="chooseAggregate('MIN')">
+              <template #icon><span class="formula-toolbar__aggregate-mark">Min</span></template>
+              {{ t("formulaTools.minimum") }}
+            </MenuItem>
+            <MenuSeparator />
+            <MenuItem data-formula-function="SUMIF" @select="insertConditionalSum">
+              <template #icon><FunctionSquare /></template>
+              {{ t("formulaTools.conditionalSum") }}
+            </MenuItem>
+            <MenuSeparator />
+            <MenuItem @select="openFunctionBrowser">
+              <template #icon><Calculator /></template>
+              {{ t("formulaTools.otherFunctions") }}
+            </MenuItem>
+          </MenuSurface>
         </div></Teleport
       >
     </section>
@@ -253,106 +283,94 @@ function insertFunction(name: string): void {
       role="group"
       :aria-label="t('formulaTools.categories')"
     >
-      <div class="formula-toolbar__category-column">
-        <FormulaCategoryMenu
-          category="Financial"
-          :disabled="disabled"
-          :edit-session-id="editSessionId"
-          @insert-function="emit('insertFunction', $event)"
-        >
-          <template #icon><Banknote /></template>
-        </FormulaCategoryMenu>
-        <FormulaCategoryMenu
-          category="Logical"
-          :disabled="disabled"
-          :edit-session-id="editSessionId"
-          @insert-function="emit('insertFunction', $event)"
-        >
-          <template #icon><GitBranch /></template>
-        </FormulaCategoryMenu>
-      </div>
-      <div class="formula-toolbar__category-column">
-        <FormulaCategoryMenu
-          category="Text"
-          :disabled="disabled"
-          :edit-session-id="editSessionId"
-          @insert-function="emit('insertFunction', $event)"
-        >
-          <template #icon><CaseSensitive /></template>
-        </FormulaCategoryMenu>
-        <FormulaCategoryMenu
-          category="Date"
-          :disabled="disabled"
-          :edit-session-id="editSessionId"
-          @insert-function="emit('insertFunction', $event)"
-        >
-          <template #icon><CalendarDays /></template>
-        </FormulaCategoryMenu>
-      </div>
-      <div class="formula-toolbar__category-column">
-        <FormulaCategoryMenu
-          category="Statistical"
-          :disabled="disabled"
-          :edit-session-id="editSessionId"
-          @insert-function="emit('insertFunction', $event)"
-        >
-          <template #icon><ChartColumn /></template>
-        </FormulaCategoryMenu>
-        <FormulaCategoryMenu
-          category="Engineering"
-          :disabled="disabled"
-          :edit-session-id="editSessionId"
-          @insert-function="emit('insertFunction', $event)"
-        >
-          <template #icon><Wrench /></template>
-        </FormulaCategoryMenu>
-      </div>
-      <div class="formula-toolbar__category-column">
-        <FormulaCategoryMenu
-          category="Information"
-          :disabled="disabled"
-          :edit-session-id="editSessionId"
-          @insert-function="emit('insertFunction', $event)"
-        >
-          <template #icon><Info /></template>
-        </FormulaCategoryMenu>
-        <FormulaCategoryMenu
-          category="Database"
-          :disabled="disabled"
-          :edit-session-id="editSessionId"
-          @insert-function="emit('insertFunction', $event)"
-        >
-          <template #icon><Database /></template>
-        </FormulaCategoryMenu>
-      </div>
-      <div class="formula-toolbar__category-column">
-        <FormulaCategoryMenu
-          category="Lookup"
-          :disabled="disabled"
-          :edit-session-id="editSessionId"
-          @insert-function="emit('insertFunction', $event)"
-        >
-          <template #icon><Search /></template>
-        </FormulaCategoryMenu>
-        <FormulaCategoryMenu
-          category="Math"
-          :disabled="disabled"
-          :edit-session-id="editSessionId"
-          @insert-function="emit('insertFunction', $event)"
-        >
-          <template #icon><Radical /></template>
-        </FormulaCategoryMenu>
-      </div>
-      <div class="formula-toolbar__category-column">
-        <FormulaCategoryMenu
-          category="Compatibility"
-          :disabled="disabled"
-          :edit-session-id="editSessionId"
-          @insert-function="emit('insertFunction', $event)"
-        >
-          <template #icon><RotateCcw /></template>
-        </FormulaCategoryMenu>
-      </div>
+      <FormulaCategoryMenu
+        category="Financial"
+        :disabled="disabled"
+        :edit-session-id="editSessionId"
+        @insert-function="emit('insertFunction', $event)"
+      >
+        <template #icon><Banknote /></template>
+      </FormulaCategoryMenu>
+      <FormulaCategoryMenu
+        category="Logical"
+        :disabled="disabled"
+        :edit-session-id="editSessionId"
+        @insert-function="emit('insertFunction', $event)"
+      >
+        <template #icon><GitBranch /></template>
+      </FormulaCategoryMenu>
+      <FormulaCategoryMenu
+        category="Text"
+        :disabled="disabled"
+        :edit-session-id="editSessionId"
+        @insert-function="emit('insertFunction', $event)"
+      >
+        <template #icon><CaseSensitive /></template>
+      </FormulaCategoryMenu>
+      <FormulaCategoryMenu
+        category="Date"
+        :disabled="disabled"
+        :edit-session-id="editSessionId"
+        @insert-function="emit('insertFunction', $event)"
+      >
+        <template #icon><CalendarDays /></template>
+      </FormulaCategoryMenu>
+      <FormulaCategoryMenu
+        category="Statistical"
+        :disabled="disabled"
+        :edit-session-id="editSessionId"
+        @insert-function="emit('insertFunction', $event)"
+      >
+        <template #icon><ChartColumn /></template>
+      </FormulaCategoryMenu>
+      <FormulaCategoryMenu
+        category="Engineering"
+        :disabled="disabled"
+        :edit-session-id="editSessionId"
+        @insert-function="emit('insertFunction', $event)"
+      >
+        <template #icon><Wrench /></template>
+      </FormulaCategoryMenu>
+      <FormulaCategoryMenu
+        category="Information"
+        :disabled="disabled"
+        :edit-session-id="editSessionId"
+        @insert-function="emit('insertFunction', $event)"
+      >
+        <template #icon><Info /></template>
+      </FormulaCategoryMenu>
+      <FormulaCategoryMenu
+        category="Database"
+        :disabled="disabled"
+        :edit-session-id="editSessionId"
+        @insert-function="emit('insertFunction', $event)"
+      >
+        <template #icon><Database /></template>
+      </FormulaCategoryMenu>
+      <FormulaCategoryMenu
+        category="Lookup"
+        :disabled="disabled"
+        :edit-session-id="editSessionId"
+        @insert-function="emit('insertFunction', $event)"
+      >
+        <template #icon><Search /></template>
+      </FormulaCategoryMenu>
+      <FormulaCategoryMenu
+        category="Math"
+        :disabled="disabled"
+        :edit-session-id="editSessionId"
+        @insert-function="emit('insertFunction', $event)"
+      >
+        <template #icon><Radical /></template>
+      </FormulaCategoryMenu>
+      <FormulaCategoryMenu
+        category="Compatibility"
+        :disabled="disabled"
+        :edit-session-id="editSessionId"
+        @insert-function="emit('insertFunction', $event)"
+      >
+        <template #icon><RotateCcw /></template>
+      </FormulaCategoryMenu>
     </section>
     <section
       class="formula-toolbar__group"
@@ -501,14 +519,6 @@ function insertFunction(name: string): void {
               @change="updateNumericCalculationSetting('maxChange', $event)"
             /></div></FloatingPanelSurface
       ></Teleport>
-      <RibbonButton
-        variant="tall"
-        :label="t('formulaTools.insertFunction')"
-        :text="t('formulaTools.insertFunction')"
-        :disabled="disabled"
-        @activate="browserOpen = true"
-        ><FunctionSquare
-      /></RibbonButton>
     </section>
     <template #overlays>
       <FormulaFunctionBrowser
@@ -528,9 +538,10 @@ function insertFunction(name: string): void {
   &__group {
     @include ribbon.columns;
   }
-  &__category-column {
-    @include ribbon.two-rows;
-    min-width: 86px;
+  &__aggregate-mark {
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
   }
   &__sum-menu {
     z-index: var(--idea-layer-menu);

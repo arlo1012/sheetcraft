@@ -108,13 +108,12 @@ watch(open, (isOpen) => {
   <div v-if="functions.length" class="formula-category-menu">
     <RibbonMenuButton
       ref="triggerRef"
-      class="formula-category-menu__trigger"
+      variant="tall"
       :label="label"
       :text="label"
       :disabled="disabled"
       :expanded="open"
       :menu-id="panelId"
-      full-width
       @activate="toggle"
       @keydown="onTriggerKeydown"
     >
@@ -171,14 +170,6 @@ watch(open, (isOpen) => {
 <style scoped lang="scss">
 .formula-category-menu {
   display: contents;
-
-  &__trigger {
-    --ribbon-labeled-action-justify: flex-start;
-    --ribbon-labeled-action-padding: 4px;
-
-    padding: 0 4px;
-    text-align: left;
-  }
 
   &__panel {
     max-width: calc(100vw - 24px);

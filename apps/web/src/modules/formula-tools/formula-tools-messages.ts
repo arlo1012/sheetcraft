@@ -3,6 +3,15 @@ export type FormulaToolsMessageSchema = {
     toolbar: string;
     insertFunction: string;
     moreFunctions: string;
+    insertCaption: string;
+    sumCaption: string;
+    sum: string;
+    average: string;
+    count: string;
+    maximum: string;
+    minimum: string;
+    conditionalSum: string;
+    otherFunctions: string;
     autoSum: string;
     autoSumMenu: string;
     nameManager: string;
