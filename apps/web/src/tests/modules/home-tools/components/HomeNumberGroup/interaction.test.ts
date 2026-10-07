@@ -32,6 +32,24 @@ afterEach(() => {
 });
 
 describe("HomeNumberGroup", () => {
+  test("offers currency and accounting from the split menu", async () => {
+    const wrapper = mountNumberGroup("zh-CN");
+    expect(wrapper.get('[data-ribbon-action="percent-format"]').attributes("aria-label")).toBe(
+      "百分比",
+    );
+    await wrapper
+      .get('[data-ribbon-action="currency-format"] [data-ribbon-split-menu]')
+      .trigger("click");
+    const menu = new DOMWrapper(document.body);
+    expect(menu.get('[data-currency-format="currency"]').text()).toBe("货币格式");
+    expect(menu.get('[data-currency-format="accounting"]').text()).toBe("会计专用");
+    await menu.get('[data-currency-format="accounting"]').trigger("click");
+    expect(wrapper.emitted("applyStyle")).toEqual([
+      [{ numberFormat: { kind: "accounting", currency: "CNY", fractionDigits: 2 } }],
+    ]);
+    expect(document.body.querySelector('[data-currency-format="accounting"]')).toBeNull();
+  });
+
   test("applies thousands grouping and preserves existing number precision", async () => {
     const general = mountNumberGroup();
     await general.get('[data-ribbon-action="thousands-separator"]').trigger("click");
@@ -103,9 +121,15 @@ describe("HomeNumberGroup", () => {
     expect(english.get("[data-number-format-trigger]").attributes("aria-label")).toBe(
       "Number format, mixed",
     );
-    await english.get('[data-ribbon-action="currency-format"]').trigger("click");
-    await chinese.get('[data-ribbon-action="currency-format"]').trigger("click");
-    await existingCurrency.get('[data-ribbon-action="currency-format"]').trigger("click");
+    await english
+      .get('[data-ribbon-action="currency-format"] [data-ribbon-split-main]')
+      .trigger("click");
+    await chinese
+      .get('[data-ribbon-action="currency-format"] [data-ribbon-split-main]')
+      .trigger("click");
+    await existingCurrency
+      .get('[data-ribbon-action="currency-format"] [data-ribbon-split-main]')
+      .trigger("click");
 
     expect(english.emitted("applyStyle")).toEqual([
       [{ numberFormat: { kind: "currency", currency: "USD", fractionDigits: 2 } }],

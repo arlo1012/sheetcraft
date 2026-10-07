@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { DollarSign, Percent } from "lucide-vue-next";
+import { Percent } from "lucide-vue-next";
 import ThousandsSeparatorIcon from "./ThousandsSeparatorIcon.vue";
+import CurrencyFormatControl from "./CurrencyFormatControl.vue";
 import DecimalPlacesIcon from "./DecimalPlacesIcon.vue";
 import { computed } from "vue";
 import type { CellValueConversionMode } from "@idea10/core/commands";
@@ -74,6 +75,11 @@ function selectFormat(choice: NumberFormatPresetChoice): void {
       <NumberConversionMenu :disabled="isConversionDisabled" @convert="emit('convert', $event)" />
     </div>
     <div class="home-number-group__row" data-ribbon-row="2">
+      <CurrencyFormatControl
+        :state="state.numberFormat"
+        :disabled="disabled"
+        @select="selectFormat"
+      />
       <RibbonButton
         :label="t('ribbon.percentFormat')"
         :disabled="disabled"
@@ -81,14 +87,6 @@ function selectFormat(choice: NumberFormatPresetChoice): void {
         @activate="selectFormat('percent')"
       >
         <Percent aria-hidden="true" />
-      </RibbonButton>
-      <RibbonButton
-        :label="t('ribbon.currencyFormat')"
-        :disabled="disabled"
-        data-ribbon-action="currency-format"
-        @activate="selectFormat('currency')"
-      >
-        <DollarSign aria-hidden="true" />
       </RibbonButton>
       <RibbonButton
         :label="t('ribbon.thousandsSeparator')"

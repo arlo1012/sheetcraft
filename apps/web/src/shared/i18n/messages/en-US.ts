@@ -888,7 +888,7 @@ export const enUS = {
     increaseIndent: "Increase indent",
     numberFormat: "Number format",
     generalFormat: "General",
-    percentFormat: "Percent format",
+    percentFormat: "Percent",
     tableStyles: "Table styles",
     conditionalFormatting: "Conditional formatting",
     filter: "Filter",

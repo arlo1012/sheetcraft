@@ -862,7 +862,7 @@ export const zhCN = {
     increaseIndent: "增加缩进",
     numberFormat: "数字格式",
     generalFormat: "常规",
-    percentFormat: "百分比格式",
+    percentFormat: "百分比",
     tableStyles: "表格样式",
     conditionalFormatting: "条件格式",
     filter: "筛选",
