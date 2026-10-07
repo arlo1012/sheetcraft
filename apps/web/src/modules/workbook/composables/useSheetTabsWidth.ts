@@ -12,7 +12,7 @@ type ResizeGesture = {
   preferredWidth: number | undefined;
 };
 
-export function useSheetTabsWidth(container: Ref<HTMLElement | null>) {
+export function useSheetTabsWidth(container: Ref<HTMLElement | null>, contentWidth: Ref<number>) {
   const containerWidth = ref(typeof window === "undefined" ? 1280 : window.innerWidth);
   const preferredWidth = ref<number>();
   const resizing = ref(false);
@@ -20,10 +20,7 @@ export function useSheetTabsWidth(container: Ref<HTMLElement | null>) {
     Math.max(0, Math.floor(containerWidth.value - SEPARATOR_WIDTH - MINIMUM_SCROLLBAR_WIDTH)),
   );
   const minimum = computed(() => Math.min(MINIMUM_TABS_WIDTH, maximum.value));
-  const defaultWidth = computed(() =>
-    containerWidth.value <= 480 ? 170 : Math.min(480, Math.max(200, containerWidth.value * 0.25)),
-  );
-  const width = computed(() => clamp(preferredWidth.value ?? defaultWidth.value));
+  const width = computed(() => clamp(preferredWidth.value ?? contentWidth.value));
   let gesture: ResizeGesture | undefined;
   let observer: ResizeObserver | undefined;
 

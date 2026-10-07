@@ -36,6 +36,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  contentWidth: [width: number];
   select: [sheetId: string];
   add: [];
   duplicate: [sheetId: string];
@@ -71,6 +72,8 @@ const renameValue = ref("");
 const renameInput = ref<HTMLInputElement>();
 const tabButtons = new Map<string, HTMLButtonElement>();
 const tabList = ref<HTMLDivElement>();
+const navigation = ref<HTMLDivElement>();
+const addButton = ref<HTMLElement>();
 const hasOverflow = ref(false);
 const canScrollLeft = ref(false);
 const canScrollRight = ref(false);
@@ -167,6 +170,18 @@ function selectSheet(sheetId: string): void {
 function updateScrollState(): void {
   const list = tabList.value;
   if (!list) return;
+  if (navigation.value && addButton.value) {
+    const navigationMargin = Number.parseFloat(getComputedStyle(navigation.value).marginRight) || 0;
+    emit(
+      "contentWidth",
+      Math.ceil(
+        navigation.value.getBoundingClientRect().width +
+          navigationMargin +
+          list.scrollWidth +
+          addButton.value.getBoundingClientRect().width,
+      ),
+    );
+  }
   hasOverflow.value = list.scrollWidth > list.clientWidth + 1;
   canScrollLeft.value = list.scrollLeft > 1;
   canScrollRight.value = list.scrollLeft + list.clientWidth < list.scrollWidth - 1;
@@ -238,6 +253,9 @@ onMounted(() => {
   if (typeof ResizeObserver !== "undefined" && tabList.value) {
     resizeObserver = new ResizeObserver(revealActiveSheet);
     resizeObserver.observe(tabList.value);
+    if (tabList.value.firstElementChild) {
+      resizeObserver.observe(tabList.value.firstElementChild);
+    }
   }
   revealActiveSheet();
 });
@@ -399,7 +417,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
 <template>
   <div class="workbook-sheet-tabs">
-    <div class="workbook-sheet-tabs__navigation">
+    <div ref="navigation" class="workbook-sheet-tabs__navigation">
       <WorkbookSheetNavigator
         :sheets="sheets"
         :active-sheet-id="activeSheetId"
@@ -520,6 +538,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
       </div>
     </div>
     <span
+      ref="addButton"
       v-icon-action="structureProtected"
       class="workbook-sheet-tabs__add"
       :aria-label="t('sheetTabs.add')"

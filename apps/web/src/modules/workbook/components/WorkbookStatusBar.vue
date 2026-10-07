@@ -67,6 +67,7 @@ const emit = defineEmits<{
 const { locale, t } = useAppI18n();
 const settings = useStatusBarSettings();
 const topRowRef = ref<HTMLDivElement | null>(null);
+const sheetsContentWidth = ref(0);
 const sheetsRegionId = `workbook-sheet-tabs-${useId().replaceAll(":", "")}`;
 const {
   width: sheetsWidth,
@@ -78,7 +79,7 @@ const {
   onPointerUp,
   onPointerCancel,
   onKeydown,
-} = useSheetTabsWidth(topRowRef);
+} = useSheetTabsWidth(topRowRef, sheetsContentWidth);
 const shouldShowSummary = computed(
   () =>
     props.selectionSummary.selectedCellCount > 1 &&
@@ -114,6 +115,7 @@ function formatNumber(value: number): string {
           :sheets="sheets"
           :structure-protected="structureProtected"
           :active-sheet-id="activeSheetId"
+          @content-width="sheetsContentWidth = $event"
           @select="emit('select', $event)"
           @add="emit('add')"
           @duplicate="emit('duplicate', $event)"
