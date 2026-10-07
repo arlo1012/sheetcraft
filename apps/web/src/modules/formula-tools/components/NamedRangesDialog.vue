@@ -465,15 +465,6 @@ watch(
     height: 26px;
     border-radius: var(--idea-radius-small);
     cursor: pointer;
-
-    &:hover:not([aria-disabled="true"]) {
-      background: var(--idea-icon-button-hover-bg);
-    }
-
-    &[aria-disabled="true"] {
-      color: var(--idea-text-disabled);
-      cursor: not-allowed;
-    }
   }
 
   &__reference-controls {
