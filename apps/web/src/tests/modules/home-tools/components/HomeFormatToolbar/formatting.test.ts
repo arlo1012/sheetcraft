@@ -1,5 +1,5 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
-import { Select as TSelect } from "tdesign-vue-next/es/select";
+import FontFormatField from "../../../../../modules/home-tools/components/FontFormatField.vue";
 import { afterEach, describe, expect, test } from "vitest";
 import HomeFormatToolbar from "../../../../../modules/home-tools/components/HomeFormatToolbar.vue";
 import { createClearCellStylePatch } from "@idea10/core/style";
@@ -190,7 +190,7 @@ describe("HomeFormatToolbar", () => {
 
   test("emits validated font and alignment patches", async () => {
     const wrapper = mountToolbar();
-    const fontSelectors = wrapper.findAllComponents(TSelect);
+    const fontSelectors = wrapper.findAllComponents(FontFormatField);
     expect(fontSelectors).toHaveLength(2);
     const fontFamily = fontSelectors[0]!;
     const fontSize = fontSelectors[1]!;
@@ -212,6 +212,39 @@ describe("HomeFormatToolbar", () => {
 
     fontSize.vm.$emit("change", 20);
     expect(emittedPatches(wrapper).at(-1)).toEqual({ fontSize: 20 });
+  });
+
+  test.each(["family", "size"])("opens the %s list only from its arrow", async (kind) => {
+    const wrapper = mountToolbar();
+    const field = wrapper.get(`.font-format-controls__${kind}`);
+    const input = field.get("input");
+    await input.trigger("focus");
+    await input.trigger("click");
+    await input.setValue(kind === "family" ? "Arial" : "99");
+    expect(document.body.querySelector(".font-format-field__menu")).toBeNull();
+    await field.get('[aria-haspopup="menu"]').trigger("click");
+    const menu = new DOMWrapper(document.body.querySelector(".font-format-field__menu")!);
+    expect(menu.exists()).toBe(true);
+    const target = menu
+      .findAll('[role="menuitemradio"]')
+      .find((item) => item.text() === (kind === "family" ? "Arial" : "18"))!;
+    await target.trigger("click");
+    expect(emittedPatches(wrapper)).toEqual([
+      kind === "family" ? { fontFamily: "Arial" } : { fontSize: 18 },
+    ]);
+    expect(document.body.querySelector(".font-format-field__menu")).toBeNull();
+  });
+
+  test("commits size on blur and cancels a draft with Escape", async () => {
+    const wrapper = mountToolbar();
+    const input = wrapper.get(".font-format-controls__size input");
+    await input.setValue("99");
+    await input.trigger("blur");
+    expect(emittedPatches(wrapper)).toEqual([{ fontSize: 99 }]);
+    await input.setValue("123");
+    await input.trigger("keydown", { key: "Escape", code: "Escape" });
+    await input.trigger("blur");
+    expect(emittedPatches(wrapper)).toHaveLength(1);
   });
 
   test("applies typed font names and sizes on Enter, rejecting invalid sizes", async () => {

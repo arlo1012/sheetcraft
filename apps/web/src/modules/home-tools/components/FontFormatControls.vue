@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { Select as TSelect } from "tdesign-vue-next/es/select";
-import type { SelectValue } from "tdesign-vue-next/es/select/type";
-import { computed, ref } from "vue";
+import { computed } from "vue";
+import FontFormatField from "./FontFormatField.vue";
 import { resolveThemeFontFamily } from "@idea10/core/workbook-theme";
 import { useWorkbookTheme } from "../../../shared/color/workbook-theme-context";
 import {
@@ -13,26 +12,16 @@ import {
 } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
-import RibbonDropdownArrow from "../../../shared/ribbon/RibbonDropdownArrow.vue";
 import {
   CELL_FONT_FAMILY_PRESETS,
   CELL_FONT_SIZE_PRESETS,
 } from "../../../shared/cell-text/font-catalog";
 
-const fontFamilyPopupProps = {
-  overlayStyle: { minWidth: "168px" },
-  overlayInnerStyle: { minWidth: "168px" },
-};
-const fontSizePopupProps = {
-  overlayStyle: { minWidth: "64px" },
-  overlayInnerStyle: { minWidth: "64px" },
-};
-
 const props = defineProps<{
   state: SelectionCellStyleState;
   disabled: boolean;
   /**
-   * Lets an embedded toolbar keep its Select popup in the same dismissal
+   * Lets an embedded toolbar keep its font menu in the same dismissal
    * boundary. Omitted in the ribbon, so its current body attachment remains.
    */
   popupAttach?: () => HTMLElement;
@@ -44,10 +33,6 @@ const emit = defineEmits<{
 
 const { t } = useAppI18n();
 const workbookTheme = useWorkbookTheme();
-const fontFamilyInput = ref("");
-const fontSizeInput = ref("");
-const fontFamilyPopupVisible = ref(false);
-const fontSizePopupVisible = ref(false);
 const fontFamilyOptions = computed(() => [
   ...(workbookTheme?.value
     ? [
@@ -96,16 +81,7 @@ const fontSizeOptions = computed(() => {
       value,
     }));
 });
-const resolvedFontFamilyPopupProps = computed(() => ({
-  ...fontFamilyPopupProps,
-  ...(props.popupAttach ? { attach: props.popupAttach } : {}),
-}));
-const resolvedFontSizePopupProps = computed(() => ({
-  ...fontSizePopupProps,
-  ...(props.popupAttach ? { attach: props.popupAttach } : {}),
-}));
-
-function setFontFamily(value: SelectValue): void {
+function setFontFamily(value: string | number): void {
   if (props.disabled || typeof value !== "string" || !value.trim()) {
     return;
   }
@@ -114,8 +90,6 @@ function setFontFamily(value: SelectValue): void {
     (option) => option.label.toLowerCase() === input.toLowerCase(),
   );
   value = option?.value ?? input;
-  fontFamilyInput.value = "";
-  fontFamilyPopupVisible.value = false;
   if ((value === "theme:major" || value === "theme:minor") && workbookTheme?.value) {
     const role = value === "theme:major" ? "major" : "minor";
     emit("applyStyle", {
@@ -129,11 +103,9 @@ function setFontFamily(value: SelectValue): void {
   });
 }
 
-function setFontSize(value: SelectValue): void {
+function setFontSize(value: string | number): void {
   if (props.disabled) return;
   if (typeof value === "string" && value.trim()) value = Number(value);
-  fontSizeInput.value = "";
-  fontSizePopupVisible.value = false;
   if (
     typeof value !== "number" ||
     !Number.isInteger(value) ||
@@ -161,54 +133,38 @@ function setFontSize(value: SelectValue): void {
     :aria-label="t('format.font')"
     :aria-disabled="disabled"
   >
-    <label
+    <div
       class="font-format-controls__field font-format-controls__field--family"
       data-font-format-segment="family"
       :title="t('format.fontFamily')"
     >
       <span class="ui-visually-hidden">{{ t("format.fontFamily") }}</span>
-      <TSelect
-        class="font-format-controls__family idea-ribbon-select"
-        borderless
-        filterable
-        creatable
-        v-model:input-value="fontFamilyInput"
-        v-model:popup-visible="fontFamilyPopupVisible"
+      <FontFormatField
+        class="font-format-controls__family"
         :model-value="fontFamilyValue"
         :options="fontFamilyOptions"
-        :popup-props="resolvedFontFamilyPopupProps"
-        :placeholder="state.fontFamily.mixed ? '' : undefined"
+        :label="t('format.fontFamily')"
+        :popup-attach="popupAttach"
         :disabled="disabled"
         @change="setFontFamily"
-        @create="setFontFamily"
-      >
-        <template #suffixIcon>
-          <RibbonDropdownArrow :expanded="fontFamilyPopupVisible" />
-        </template>
-      </TSelect>
-    </label>
-    <label
+      />
+    </div>
+    <div
       class="font-format-controls__field font-format-controls__field--size"
       data-font-format-segment="size"
       :title="t('format.fontSize')"
     >
       <span class="ui-visually-hidden">{{ t("format.fontSize") }}</span>
-      <TSelect
+      <FontFormatField
         class="font-format-controls__size"
-        size="small"
-        filterable
-        creatable
-        v-model:input-value="fontSizeInput"
-        v-model:popup-visible="fontSizePopupVisible"
         :model-value="fontSizeValue"
         :options="fontSizeOptions"
-        :popup-props="resolvedFontSizePopupProps"
-        :placeholder="state.fontSize.mixed ? '' : undefined"
+        :label="t('format.fontSize')"
+        :popup-attach="popupAttach"
         :disabled="disabled"
         @change="setFontSize"
-        @create="setFontSize"
       />
-    </label>
+    </div>
   </div>
 </template>
 
@@ -228,22 +184,12 @@ function setFontSize(value: SelectValue): void {
     align-items: center;
 
     &--family {
-      overflow: hidden;
-      border-radius: var(--idea-radius-small);
       width: var(--cell-format-font-width, 126px);
     }
 
     &--size {
       width: var(--cell-format-font-size-width, 64px);
     }
-  }
-
-  &:not(.is-disabled) &__field--family:is(:hover, :focus-within) {
-    background: var(--idea-icon-button-hover-bg);
-  }
-
-  &.is-disabled &__field--family {
-    background: var(--idea-surface-disabled);
   }
 
   &__family,

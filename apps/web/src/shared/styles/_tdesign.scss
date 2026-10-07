@@ -580,38 +580,3 @@
     margin-left: 2px;
   }
 }
-
-// The ribbon requires a compact select density that TDesign does not expose as
-// a public prop. Scope this internal override to the explicit product variant.
-.idea-ribbon-select {
-  .t-input {
-    height: var(--cell-format-control-height, 26px);
-    padding-right: 6px;
-    padding-left: 6px;
-    background: transparent;
-    border: 0;
-    border-radius: var(--idea-radius-small);
-    box-shadow: none;
-  }
-
-  .t-input:hover,
-  .t-input.t-is-focused,
-  .t-input.t-is-disabled {
-    background: transparent;
-    border: 0;
-    box-shadow: none;
-  }
-
-  .t-input.t-is-focused {
-    box-shadow: var(--idea-keyboard-focus-shadow);
-  }
-
-  .t-input__suffix {
-    margin-left: 3px;
-  }
-
-  .t-fake-arrow {
-    width: 12px;
-    height: 12px;
-  }
-}
