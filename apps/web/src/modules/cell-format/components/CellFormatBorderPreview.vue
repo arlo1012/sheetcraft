@@ -243,10 +243,6 @@ const { t } = useAppI18n();
       background: var(--idea-surface-panel);
       color: var(--idea-text-primary);
       cursor: pointer;
-
-      &:hover:not([aria-disabled="true"]) {
-        background: var(--idea-icon-button-hover-bg);
-      }
       &[aria-pressed="true"] {
         border-color: var(--idea-action-primary);
         background: var(--idea-surface-selected);

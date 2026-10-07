@@ -168,11 +168,6 @@ function selectNumberFormat(numberFormat: StatusBarNumberFormat): void {
     background: transparent;
     color: var(--idea-text-secondary);
     cursor: pointer;
-
-    &:hover,
-    &[aria-expanded="true"] {
-      background: var(--idea-icon-button-hover-bg);
-    }
   }
 
   &__menu {

@@ -182,11 +182,6 @@ const overlay = computed(() => {
     border: 0;
     border-radius: var(--idea-radius-small);
     cursor: pointer;
-
-    &:hover {
-      color: var(--idea-text-primary);
-      background: var(--idea-icon-button-hover-bg);
-    }
   }
 }
 </style>

@@ -257,10 +257,6 @@ watch(
       content: "";
     }
 
-    &:hover:not(:disabled):not([aria-disabled="true"]) {
-      background: var(--idea-surface-hover);
-    }
-
     &:disabled,
     &[aria-disabled="true"] {
       color: var(--idea-text-secondary);

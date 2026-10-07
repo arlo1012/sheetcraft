@@ -187,11 +187,12 @@ const { t } = useAppI18n();
     font-size: var(--idea-font-size-body-medium);
     line-height: var(--idea-line-height-body-medium);
 
-    &:hover,
-    &:focus-visible,
     &[aria-checked="true"] {
-      background: var(--idea-surface-hover);
-      outline: none;
+      --idea-icon-feedback-background: color-mix(
+        in srgb,
+        var(--idea-text-primary) 12%,
+        transparent
+      );
     }
   }
 }

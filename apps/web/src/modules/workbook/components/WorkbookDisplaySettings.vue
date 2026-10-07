@@ -106,11 +106,6 @@ const { open, floatingStyles, toggleMenu, onTriggerKeydown } = useMenu({
     background: transparent;
     color: var(--idea-text-secondary);
     cursor: pointer;
-
-    &:hover,
-    &[aria-expanded="true"] {
-      background: var(--idea-icon-button-hover-bg);
-    }
   }
 
   &__icon {

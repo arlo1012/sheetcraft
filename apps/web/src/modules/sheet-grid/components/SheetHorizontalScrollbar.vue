@@ -185,10 +185,6 @@ function onWheel(event: WheelEvent): void {
     background: transparent;
     cursor: pointer;
 
-    &:hover:not([aria-disabled="true"]) {
-      background: var(--idea-icon-button-hover-bg);
-    }
-
     &[aria-disabled="true"] {
       color: var(--idea-text-disabled);
       cursor: default;

@@ -202,11 +202,6 @@ watch(open, (isOpen) => {
       width: 26px;
       border-right: 0;
     }
-
-    &:hover,
-    &[aria-expanded="true"] {
-      background: var(--idea-icon-button-hover-bg);
-    }
   }
 
   &__menu {

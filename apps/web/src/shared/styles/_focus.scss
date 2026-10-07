@@ -1,3 +1,5 @@
+@use "../focus/icon-feedback";
+
 // Shared keyboard focus for ordinary controls; canvas/SVG editing owns its feedback.
 :where(button, [role="button"], [role="tab"]):not(svg, svg *):focus-visible:not(:disabled):not(
     [aria-disabled="true"]
@@ -21,12 +23,9 @@
   user-select: none;
 }
 
-:where(
-  .idea-icon-action:hover,
-  .idea-icon-action[aria-pressed="true"],
-  .idea-icon-action[aria-expanded="true"]
-):not([aria-disabled="true"]) {
-  background: var(--idea-icon-button-hover-bg);
+// SVG-only actions keep their foreground feedback; containers own the surface.
+:where(.idea-icon-action:not(svg)) {
+  @include icon-feedback.feedback;
 }
 
 :where(.idea-icon-action[aria-disabled="true"]) {

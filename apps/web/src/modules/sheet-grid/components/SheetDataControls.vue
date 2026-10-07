@@ -503,11 +503,6 @@ watch(
     cursor: pointer;
     pointer-events: auto;
 
-    &:hover {
-      color: var(--idea-action-primary);
-      background: var(--idea-action-hover);
-      outline: none;
-    }
     &.is-active {
       color: var(--idea-action-primary);
       background: var(--idea-action-subtle, var(--idea-action-hover));
@@ -528,14 +523,14 @@ watch(
       position: absolute;
       inset: 2px;
       border: 1px solid var(--idea-border-control);
+      border-radius: 0;
       background: var(--idea-surface-panel);
     }
     svg {
       position: relative;
     }
     &:hover:not([aria-disabled="true"])::before {
-      border-color: var(--idea-action-primary);
-      background: var(--idea-action-hover);
+      background: color-mix(in srgb, var(--idea-text-primary) 8%, var(--idea-surface-panel));
     }
   }
 
@@ -545,14 +540,6 @@ watch(
     height: 2px;
     background: var(--idea-text-primary);
     transform: translate(-50%, -50%);
-  }
-
-  &__validation {
-    &:hover:not([aria-disabled="true"]),
-    &[aria-expanded="true"] {
-      color: var(--idea-text-secondary);
-      background: var(--idea-icon-button-hover-bg);
-    }
   }
 
   &__validation-menu {

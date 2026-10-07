@@ -181,6 +181,10 @@
   :is(.idea-icon-action, .idea-table-action-icon, .idea-input-action-icon, .idea-table-drag-icon) {
     background: transparent;
 
+    &::before {
+      content: none;
+    }
+
     &:hover:not([aria-disabled="true"], :disabled) {
       color: var(--idea-action-primary);
     }

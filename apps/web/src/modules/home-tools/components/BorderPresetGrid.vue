@@ -181,11 +181,6 @@ function selectPreset(preset: CellBorderPreset): void {
     border-radius: 2px;
     color: var(--idea-text-primary);
     cursor: pointer;
-
-    &:hover {
-      background: var(--idea-surface-hover);
-      outline: none;
-    }
   }
 }
 </style>

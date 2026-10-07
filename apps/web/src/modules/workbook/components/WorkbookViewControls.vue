@@ -224,11 +224,6 @@ function onNativeSliderInput(event: Event): void {
     color: inherit;
     cursor: pointer;
 
-    &:hover:not([aria-disabled="true"]),
-    &[aria-expanded="true"] {
-      background: var(--idea-icon-button-hover-bg);
-    }
-
     &:focus-visible {
       z-index: 1;
     }

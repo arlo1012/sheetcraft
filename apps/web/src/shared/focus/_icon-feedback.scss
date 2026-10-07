@@ -1,0 +1,47 @@
+// Keep the interaction box stable; only the inset surface carries feedback.
+@mixin feedback($prefix: "idea-icon") {
+  --#{$prefix}-feedback-background: transparent;
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  user-select: none;
+
+  &::before {
+    position: absolute;
+    z-index: -1;
+    inset: var(--#{$prefix}-feedback-inset, 1px);
+    border-radius: var(--idea-radius-default);
+    background: var(--#{$prefix}-feedback-background, transparent);
+    content: "";
+    pointer-events: none;
+  }
+
+  &:hover:not([aria-disabled="true"]),
+  &[aria-expanded="true"]:not([aria-disabled="true"]) {
+    --#{$prefix}-feedback-background: color-mix(in srgb, var(--idea-text-primary) 8%, transparent);
+  }
+
+  &[aria-pressed="true"]:not([aria-disabled="true"]) {
+    --#{$prefix}-feedback-background: color-mix(in srgb, var(--idea-text-primary) 12%, transparent);
+  }
+
+  &[aria-pressed="mixed"]:not([aria-disabled="true"]) {
+    --#{$prefix}-feedback-background: color-mix(in srgb, var(--idea-text-primary) 7%, transparent);
+
+    &::before {
+      outline: 1px dotted var(--idea-text-muted);
+      outline-offset: -2px;
+    }
+  }
+
+  &[aria-pressed="true"]:hover:not([aria-disabled="true"]),
+  &:active:not([aria-disabled="true"]) {
+    --#{$prefix}-feedback-background: color-mix(in srgb, var(--idea-text-primary) 18%, transparent);
+  }
+
+  &[aria-disabled="true"] {
+    --#{$prefix}-feedback-background: transparent;
+    color: var(--idea-text-disabled);
+    cursor: default;
+  }
+}

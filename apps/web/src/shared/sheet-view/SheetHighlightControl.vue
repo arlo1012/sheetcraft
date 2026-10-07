@@ -197,7 +197,6 @@ function selectHighlightColor(value: string | null): void {
   height: 100%;
   &.is-status {
     border-radius: var(--idea-radius-small);
-    &:hover,
     &.is-active {
       background: var(--highlight-background);
       color: var(--highlight-foreground);
