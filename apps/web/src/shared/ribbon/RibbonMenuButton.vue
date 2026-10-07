@@ -110,6 +110,10 @@ function activate(): void {
     text-align: left;
   }
 
+  &:not(.is-tall) &__text {
+    line-height: normal;
+  }
+
   &__arrow {
     flex: 0 0 auto;
   }
