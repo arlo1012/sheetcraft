@@ -155,8 +155,13 @@ function toggleMenu(): void {
     }
 
     .ribbon-split-button__main {
+      --ribbon-feedback-inset: 1px 1px calc(-1 * var(--ribbon-row-gap, 2px));
       justify-content: center;
       padding: 0 2px;
+
+      &::before {
+        border-radius: var(--idea-radius-default) var(--idea-radius-default) 0 0;
+      }
     }
 
     .ribbon-split-button__menu {

@@ -93,7 +93,7 @@ Use CSS pixels at 100% scale; size and line height are a pair.
 ## Ribbon and menus
 
 - Action/menu icons use `--idea-action-icon-size` (15px); tall ribbon actions
-  use `--idea-ribbon-large-icon-size` (18px); Lucide stroke is
+  use `--idea-ribbon-large-icon-size` (22px); Lucide stroke is
   `--idea-icon-stroke-width` (2). Auxiliary/control icons keep their own shared
   sizes; border previews keep semantic line weights. Feature slots do not set
   action size or stroke.
