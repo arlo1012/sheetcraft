@@ -60,6 +60,13 @@ function activate(): void {
 
   padding: 0;
 
+  &:not(.has-text):not(.is-tall) {
+    width: calc(var(--ribbon-button-width, 27px) - 3px);
+    height: calc(var(--ribbon-control-height, 26px) - 2px);
+    margin: 1px 1.5px;
+    border-radius: 4px;
+  }
+
   &.has-text:not(.is-tall) {
     justify-content: var(--ribbon-labeled-action-justify, flex-start);
     width: var(--ribbon-labeled-action-width, auto);

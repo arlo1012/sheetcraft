@@ -8,11 +8,11 @@
 @mixin feedback {
   &:hover:not([aria-disabled="true"]),
   &[aria-expanded="true"]:not([aria-disabled="true"]) {
-    background: var(--idea-icon-button-hover-bg);
+    background: color-mix(in srgb, var(--idea-text-primary) 8%, transparent);
   }
 
   &[aria-pressed="true"]:not([aria-disabled="true"]) {
-    background: color-mix(in srgb, var(--idea-text-primary) 14%, transparent);
+    background: color-mix(in srgb, var(--idea-text-primary) 12%, transparent);
   }
 
   &[aria-pressed="mixed"]:not([aria-disabled="true"]) {
@@ -23,7 +23,7 @@
 
   &[aria-pressed="true"]:hover:not([aria-disabled="true"]),
   &:active:not([aria-disabled="true"]) {
-    background: color-mix(in srgb, var(--idea-text-primary) 20%, transparent);
+    background: color-mix(in srgb, var(--idea-text-primary) 18%, transparent);
   }
 
   &[aria-disabled="true"] {
