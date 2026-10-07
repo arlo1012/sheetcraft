@@ -29,9 +29,6 @@ const triggerRef = computed(() => buttonRef.value?.rootElement ?? null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `number-format-menu-${useId().replaceAll(":", "")}`;
 const currentFormatLabel = computed(() => currentLabel());
-const currentIconChoice = computed(
-  () => NUMBER_FORMAT_PRESET_CHOICES.find((choice) => isSelected(choice)) ?? "general",
-);
 const triggerLabel = computed(() =>
   props.state.mixed
     ? t("format.numberFormatMixed")
@@ -98,9 +95,7 @@ function openCellFormat(): void {
       data-number-format-trigger
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
-    >
-      <NumberFormatIcon :choice="currentIconChoice" />
-    </RibbonMenuButton>
+    />
     <Teleport to="body">
       <MenuSurface
         v-if="open"
