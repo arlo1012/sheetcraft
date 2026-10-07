@@ -150,6 +150,12 @@ function toggleMenu(): void {
     height: var(--idea-ribbon-content-height, 54px);
     padding: 0;
 
+    > [aria-pressed="true"]:not([aria-disabled="true"])::before,
+    > [aria-expanded="true"]:not([aria-disabled="true"])::before,
+    > [role="button"]:active:not([aria-disabled="true"])::before {
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--idea-text-primary) 24%, transparent);
+    }
+
     &.is-full-width {
       width: 100%;
     }

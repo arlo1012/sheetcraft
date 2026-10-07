@@ -31,12 +31,6 @@
     --ribbon-feedback-background: color-mix(in srgb, var(--idea-text-primary) 12%, transparent);
   }
 
-  &[aria-pressed="true"]:not([aria-disabled="true"])::before,
-  &[aria-expanded="true"]:not([aria-disabled="true"])::before,
-  &:active:not([aria-disabled="true"])::before {
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--idea-text-primary) 24%, transparent);
-  }
-
   &[aria-pressed="mixed"]:not([aria-disabled="true"]) {
     --ribbon-feedback-background: color-mix(in srgb, var(--idea-text-primary) 7%, transparent);
 
