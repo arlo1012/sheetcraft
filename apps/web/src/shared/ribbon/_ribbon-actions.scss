@@ -5,29 +5,48 @@
   }
 }
 
+// Keep the interaction box stable; only the inset surface carries feedback.
 @mixin feedback {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  user-select: none;
+
+  &::before {
+    position: absolute;
+    z-index: -1;
+    inset: var(--ribbon-feedback-inset, 1px);
+    border-radius: var(--idea-radius-default);
+    background: var(--ribbon-feedback-background, transparent);
+    content: "";
+    pointer-events: none;
+  }
+
   &:hover:not([aria-disabled="true"]),
   &[aria-expanded="true"]:not([aria-disabled="true"]) {
-    background: color-mix(in srgb, var(--idea-text-primary) 8%, transparent);
+    --ribbon-feedback-background: color-mix(in srgb, var(--idea-text-primary) 8%, transparent);
   }
 
   &[aria-pressed="true"]:not([aria-disabled="true"]) {
-    background: color-mix(in srgb, var(--idea-text-primary) 12%, transparent);
+    --ribbon-feedback-background: color-mix(in srgb, var(--idea-text-primary) 12%, transparent);
   }
 
   &[aria-pressed="mixed"]:not([aria-disabled="true"]) {
-    background: color-mix(in srgb, var(--idea-text-primary) 7%, transparent);
-    outline: 1px dotted var(--idea-text-muted);
-    outline-offset: -3px;
+    --ribbon-feedback-background: color-mix(in srgb, var(--idea-text-primary) 7%, transparent);
+
+    &::before {
+      outline: 1px dotted var(--idea-text-muted);
+      outline-offset: -2px;
+    }
   }
 
   &[aria-pressed="true"]:hover:not([aria-disabled="true"]),
   &:active:not([aria-disabled="true"]) {
-    background: color-mix(in srgb, var(--idea-text-primary) 18%, transparent);
+    --ribbon-feedback-background: color-mix(in srgb, var(--idea-text-primary) 18%, transparent);
   }
 
   &[aria-disabled="true"] {
-    background: transparent;
+    --ribbon-feedback-background: transparent;
     color: var(--idea-text-disabled);
     cursor: default;
   }
@@ -43,7 +62,7 @@
   margin: 0;
   background: transparent;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--idea-radius-default);
   color: var(--idea-text-primary);
   cursor: pointer;
   font: inherit;

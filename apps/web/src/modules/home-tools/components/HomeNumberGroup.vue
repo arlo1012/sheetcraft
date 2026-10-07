@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { DollarSign, MoveLeft, MoveRight, Percent } from "lucide-vue-next";
+import { DollarSign, Percent } from "lucide-vue-next";
+import DecimalPlacesIcon from "./DecimalPlacesIcon.vue";
 import { computed } from "vue";
 import type { CellValueConversionMode } from "@idea10/core/commands";
 import type { CellStylePatch } from "@idea10/core/style";
@@ -83,7 +84,7 @@ function selectFormat(choice: NumberFormatPresetChoice): void {
         data-ribbon-action="decrease-decimal"
         @activate="emit('adjustDecimals', -1)"
       >
-        <MoveLeft aria-hidden="true" />
+        <DecimalPlacesIcon :increase="false" />
       </RibbonButton>
       <RibbonButton
         :label="t('ribbon.increaseDecimal')"
@@ -91,7 +92,7 @@ function selectFormat(choice: NumberFormatPresetChoice): void {
         data-ribbon-action="increase-decimal"
         @activate="emit('adjustDecimals', 1)"
       >
-        <MoveRight aria-hidden="true" />
+        <DecimalPlacesIcon increase />
       </RibbonButton>
     </div>
     <RibbonDialogLauncher

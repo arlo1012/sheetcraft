@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowDownToLine, ArrowUpToLine, FoldVertical } from "lucide-vue-next";
+import CellVerticalAlignmentIcon from "./CellVerticalAlignmentIcon.vue";
 import type { CellStylePatch, VerticalCellAlignment } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
@@ -37,7 +37,7 @@ function align(alignment: "top" | "middle" | "bottom"): void {
       data-vertical-alignment-action="top"
       @activate="align('top')"
     >
-      <ArrowUpToLine aria-hidden="true" />
+      <CellVerticalAlignmentIcon alignment="top" />
     </RibbonButton>
     <RibbonButton
       class="vertical-alignment-controls__button"
@@ -47,7 +47,7 @@ function align(alignment: "top" | "middle" | "bottom"): void {
       data-vertical-alignment-action="middle"
       @activate="align('middle')"
     >
-      <FoldVertical aria-hidden="true" />
+      <CellVerticalAlignmentIcon alignment="middle" />
     </RibbonButton>
     <RibbonButton
       class="vertical-alignment-controls__button"
@@ -57,7 +57,7 @@ function align(alignment: "top" | "middle" | "bottom"): void {
       data-vertical-alignment-action="bottom"
       @activate="align('bottom')"
     >
-      <ArrowDownToLine aria-hidden="true" />
+      <CellVerticalAlignmentIcon alignment="bottom" />
     </RibbonButton>
   </div>
 </template>

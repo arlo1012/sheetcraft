@@ -94,8 +94,6 @@ const { t } = useAppI18n();
 
   &__stack {
     @include ribbon.stack;
-
-    min-width: 94px;
   }
 }
 </style>

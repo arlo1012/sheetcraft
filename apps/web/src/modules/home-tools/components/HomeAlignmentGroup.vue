@@ -103,11 +103,14 @@ function toggleWrapText(state: ToggleStyleState): void {
 .home-alignment-group {
   @include ribbon.compact;
   @include ribbon.dialog-launcher-anchor;
+  grid-template-columns: max-content max-content;
+  column-gap: 4px;
 
   &__row {
     @include ribbon.row;
     display: grid;
-    grid-template-columns: calc(5 * var(--ribbon-button-width, 27px)) minmax(72px, 1fr);
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
     gap: 4px;
   }
 

@@ -61,10 +61,7 @@ function activate(): void {
   padding: 0;
 
   &:not(.has-text):not(.is-tall) {
-    width: calc(var(--ribbon-button-width, 27px) - 3px);
-    height: calc(var(--ribbon-control-height, 26px) - 2px);
-    margin: 1px 1.5px;
-    border-radius: 4px;
+    --ribbon-feedback-inset: 1px 1.5px;
   }
 
   &.has-text:not(.is-tall) {

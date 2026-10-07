@@ -68,7 +68,13 @@ describe("CustomHeaderFooterDialog", () => {
       (textarea.element as HTMLTextAreaElement).focus();
       await wrapper.vm.$nextTick();
       const toolbar = wrapper.findComponent({ name: "PageHeaderFooterToolbar" });
-      await toolbar.get('[data-header-footer-action="font"]').trigger("click");
+      const fontAction = toolbar.get('[data-header-footer-action="font"]');
+      expect(fontAction.attributes()).toMatchObject({
+        role: "button",
+        "aria-disabled": "false",
+        tabindex: "0",
+      });
+      await fontAction.trigger("keydown", { key: "Enter" });
       let font = toolbar.getComponent(HeaderFooterFontDialog);
       expect(font.props("visible")).toBe(true);
       expect(font.findComponent(FontFormatPanel).exists()).toBe(true);
@@ -141,10 +147,11 @@ describe("CustomHeaderFooterDialog", () => {
       const textarea = wrapper.get('[data-page-setup="footer-right"] textarea');
       expect(document.activeElement).toBe(textarea.element);
       (textarea.element as HTMLTextAreaElement).setSelectionRange(1, 5);
-      wrapper.findComponent({ name: "PageHeaderFooterToolbar" }).vm.$emit("action", {
-        type: "insertField",
-        field: "pageNumber",
-      });
+      await wrapper.vm.$nextTick();
+      await wrapper
+        .findComponent({ name: "PageHeaderFooterToolbar" })
+        .get('[role="button"][aria-label="Page"]')
+        .trigger("keydown", { key: " " });
       await wrapper.vm.$nextTick();
       wrapper.findComponent({ name: "TDialog" }).vm.$emit("confirm");
       await wrapper.vm.$nextTick();

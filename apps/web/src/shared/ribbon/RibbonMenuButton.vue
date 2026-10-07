@@ -58,8 +58,10 @@ function activate(): void {
     @click="activate"
   >
     <span class="ribbon-menu-button__icon" aria-hidden="true"><slot /></span>
-    <span v-if="text" class="ribbon-menu-button__text" aria-hidden="true">{{ text }}</span>
-    <RibbonDropdownArrow class="ribbon-menu-button__arrow" :expanded="expanded" />
+    <span class="ribbon-menu-button__caption" aria-hidden="true">
+      <span v-if="text" class="ribbon-menu-button__text">{{ text }}</span>
+      <RibbonDropdownArrow class="ribbon-menu-button__arrow" :expanded="expanded" />
+    </span>
   </span>
 </template>
 
@@ -91,11 +93,7 @@ function activate(): void {
     width: max-content;
     min-width: var(--ribbon-tall-action-min-width, 58px);
     height: var(--idea-ribbon-content-height, 54px);
-    display: grid;
-    grid-template-columns: auto auto;
-    grid-template-rows: repeat(2, minmax(0, 1fr));
-    justify-items: center;
-    gap: var(--ribbon-row-gap, 2px) 2px;
+    @include ribbon.tall-content;
     padding: 0 2px;
 
     &.is-full-width {
@@ -116,8 +114,16 @@ function activate(): void {
     flex: 0 0 auto;
   }
 
-  &.is-tall &__icon {
-    grid-column: 1 / -1;
+  &__caption {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &.is-full-width:not(.is-tall) &__caption {
+    flex: 1 1 auto;
   }
 
   &.is-tall &__text {
@@ -129,11 +135,6 @@ function activate(): void {
 
   &.is-full-width:not(.is-tall) &__text {
     flex: 1 1 auto;
-  }
-
-  &.is-tall &__arrow {
-    grid-column: 2;
-    grid-row: 2;
   }
 }
 </style>

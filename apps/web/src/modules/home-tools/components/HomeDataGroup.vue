@@ -103,8 +103,6 @@ const emit = defineEmits<{
 
   &__stack {
     @include ribbon.stack;
-
-    min-width: 60px;
   }
 }
 </style>

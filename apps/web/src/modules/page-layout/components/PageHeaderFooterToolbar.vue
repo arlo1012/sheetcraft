@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Button as TButton } from "tdesign-vue-next/es/button";
+import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import { Calendar, Clock, File, Files, Hash, Sheet } from "lucide-vue-next";
 import type { HeaderFooterEditorAction, HeaderFooterEditContext } from "../header-footer-editor";
 import type { HeaderFooterFormat } from "../header-footer-text";
@@ -42,70 +42,49 @@ watch(
     :aria-label="t('pageLayout.headerFooterTools')"
     data-page-header-footer-toolbar
   >
-    <TButton
-      shape="square"
-      variant="text"
-      :title="t('pageLayout.headerFooterFont')"
-      :aria-label="t('pageLayout.headerFooterFont')"
+    <RibbonButton
+      :label="t('pageLayout.headerFooterFont')"
       :disabled="inactive"
       data-header-footer-action="font"
-      @click="fontVisible = true"
-      ><span class="page-header-footer-toolbar__font" aria-hidden="true">A</span></TButton
+      @activate="fontVisible = true"
+      ><span class="page-header-footer-toolbar__font" aria-hidden="true">A</span></RibbonButton
     >
-    <TButton
-      shape="square"
-      variant="text"
-      :title="t('pageLayout.headerFooterPageNumber')"
-      :aria-label="t('pageLayout.headerFooterPageNumber')"
+    <RibbonButton
+      :label="t('pageLayout.headerFooterPageNumber')"
       :disabled="inactive"
-      @click="emit('action', { type: 'insertField', field: 'pageNumber' })"
-      ><template #icon><Hash class="page-header-footer-toolbar__icon" /></template
-    ></TButton>
-    <TButton
-      shape="square"
-      variant="text"
-      :title="t('pageLayout.headerFooterPageCount')"
-      :aria-label="t('pageLayout.headerFooterPageCount')"
+      @activate="emit('action', { type: 'insertField', field: 'pageNumber' })"
+      ><Hash
+    /></RibbonButton>
+    <RibbonButton
+      :label="t('pageLayout.headerFooterPageCount')"
       :disabled="inactive"
-      @click="emit('action', { type: 'insertField', field: 'pageCount' })"
-      ><template #icon><Files class="page-header-footer-toolbar__icon" /></template
-    ></TButton>
-    <TButton
-      shape="square"
-      variant="text"
-      :title="t('pageLayout.headerFooterDate')"
-      :aria-label="t('pageLayout.headerFooterDate')"
+      @activate="emit('action', { type: 'insertField', field: 'pageCount' })"
+      ><Files
+    /></RibbonButton>
+    <RibbonButton
+      :label="t('pageLayout.headerFooterDate')"
       :disabled="inactive"
-      @click="emit('action', { type: 'insertField', field: 'date' })"
-      ><template #icon><Calendar class="page-header-footer-toolbar__icon" /></template
-    ></TButton>
-    <TButton
-      shape="square"
-      variant="text"
-      :title="t('pageLayout.headerFooterTime')"
-      :aria-label="t('pageLayout.headerFooterTime')"
+      @activate="emit('action', { type: 'insertField', field: 'date' })"
+      ><Calendar
+    /></RibbonButton>
+    <RibbonButton
+      :label="t('pageLayout.headerFooterTime')"
       :disabled="inactive"
-      @click="emit('action', { type: 'insertField', field: 'time' })"
-      ><template #icon><Clock class="page-header-footer-toolbar__icon" /></template
-    ></TButton>
-    <TButton
-      shape="square"
-      variant="text"
-      :title="t('pageLayout.headerFooterFileName')"
-      :aria-label="t('pageLayout.headerFooterFileName')"
+      @activate="emit('action', { type: 'insertField', field: 'time' })"
+      ><Clock
+    /></RibbonButton>
+    <RibbonButton
+      :label="t('pageLayout.headerFooterFileName')"
       :disabled="inactive"
-      @click="emit('action', { type: 'insertField', field: 'fileName' })"
-      ><template #icon><File class="page-header-footer-toolbar__icon" /></template
-    ></TButton>
-    <TButton
-      shape="square"
-      variant="text"
-      :title="t('pageLayout.headerFooterSheetName')"
-      :aria-label="t('pageLayout.headerFooterSheetName')"
+      @activate="emit('action', { type: 'insertField', field: 'fileName' })"
+      ><File
+    /></RibbonButton>
+    <RibbonButton
+      :label="t('pageLayout.headerFooterSheetName')"
       :disabled="inactive"
-      @click="emit('action', { type: 'insertField', field: 'sheetName' })"
-      ><template #icon><Sheet class="page-header-footer-toolbar__icon" /></template
-    ></TButton>
+      @activate="emit('action', { type: 'insertField', field: 'sheetName' })"
+      ><Sheet
+    /></RibbonButton>
   </div>
   <HeaderFooterFontDialog
     v-if="context"
@@ -121,12 +100,6 @@ watch(
   display: flex;
   align-items: center;
   gap: var(--idea-space-2);
-
-  &__icon {
-    width: var(--idea-action-icon-size);
-    height: var(--idea-action-icon-size);
-    stroke-width: var(--idea-icon-stroke-width);
-  }
 
   &__font {
     font-family: var(--idea-font-sans);
