@@ -923,7 +923,7 @@ export const enUS = {
     verticalAlignment: "Vertical alignment",
     textOrientation: "Text orientation",
     strikethrough: "Strikethrough",
-    currencyFormat: "Currency format",
+    currencyFormat: "Currency",
     thousandsSeparator: "Thousands separator",
     accountingFormat: "Accounting",
     shortDateFormat: "Short date",

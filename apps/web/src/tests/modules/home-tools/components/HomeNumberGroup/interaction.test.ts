@@ -41,7 +41,7 @@ describe("HomeNumberGroup", () => {
       .get('[data-ribbon-action="currency-format"] [data-ribbon-split-menu]')
       .trigger("click");
     const menu = new DOMWrapper(document.body);
-    expect(menu.get('[data-currency-format="currency"]').text()).toBe("货币格式");
+    expect(menu.get('[data-currency-format="currency"]').text()).toBe("货币");
     expect(menu.get('[data-currency-format="accounting"]').text()).toBe("会计专用");
     await menu.get('[data-currency-format="accounting"]').trigger("click");
     expect(wrapper.emitted("applyStyle")).toEqual([
@@ -58,13 +58,15 @@ describe("HomeNumberGroup", () => {
     await new DOMWrapper(document.body).get('[data-currency-format="accounting"]').trigger("click");
     await wrapper.setProps({ state: createDefaultSelectionCellStyleState() });
     expect(main.attributes("aria-label")).toBe("Accounting");
+    expect(main.find(".lucide-calculator").exists()).toBe(true);
     await main.trigger("click");
     expect(wrapper.emitted("applyStyle")?.at(-1)).toEqual([
       { numberFormat: { kind: "accounting", currency: "USD", fractionDigits: 2 } },
     ]);
     await arrow.trigger("click");
     await new DOMWrapper(document.body).get('[data-currency-format="currency"]').trigger("click");
-    expect(main.attributes("aria-label")).toBe("Currency format");
+    expect(main.attributes("aria-label")).toBe("Currency");
+    expect(main.find(".lucide-coins").exists()).toBe(true);
     await main.trigger("click");
     expect(wrapper.emitted("applyStyle")?.at(-1)).toEqual([
       { numberFormat: { kind: "currency", currency: "USD", fractionDigits: 2 } },

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DollarSign } from "lucide-vue-next";
+import { Coins, Calculator } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
@@ -46,8 +46,10 @@ function select(choice: "currency" | "accounting"): void {
       @activate="select(lastChoice)"
       @toggle-menu="toggleMenu"
       @menu-keydown="onTriggerKeydown"
-      ><DollarSign
-    /></RibbonSplitButton>
+    >
+      <Coins v-if="lastChoice === 'currency'" />
+      <Calculator v-else />
+    </RibbonSplitButton>
     <Teleport to="body">
       <MenuSurface
         v-if="open"
@@ -61,14 +63,18 @@ function select(choice: "currency" | "accounting"): void {
           :checked="!state.mixed && state.value?.kind === 'currency'"
           data-currency-format="currency"
           @select="select('currency')"
-          >{{ t("ribbon.currencyFormat") }}</MenuRadioItem
         >
+          <template #icon><Coins /></template>
+          {{ t("ribbon.currencyFormat") }}
+        </MenuRadioItem>
         <MenuRadioItem
           :checked="!state.mixed && state.value?.kind === 'accounting'"
           data-currency-format="accounting"
           @select="select('accounting')"
-          >{{ t("ribbon.accountingFormat") }}</MenuRadioItem
         >
+          <template #icon><Calculator /></template>
+          {{ t("ribbon.accountingFormat") }}
+        </MenuRadioItem>
       </MenuSurface>
     </Teleport>
   </div>

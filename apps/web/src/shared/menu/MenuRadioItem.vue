@@ -6,7 +6,7 @@ import MenuItem from "./MenuItem.vue";
 defineOptions({ inheritAttrs: false });
 defineProps<{ checked: boolean; disabled?: boolean; indicator?: "radio" | "check" | "none" }>();
 const emit = defineEmits<{ select: [event: MouseEvent | KeyboardEvent] }>();
-defineSlots<{ default(): unknown; shortcut?(): unknown }>();
+defineSlots<{ default(): unknown; shortcut?(): unknown; icon?(): unknown }>();
 </script>
 
 <template>
@@ -18,12 +18,19 @@ defineSlots<{ default(): unknown; shortcut?(): unknown }>();
     :disabled="disabled"
     @select="emit('select', $event)"
   >
-    <template v-if="indicator !== 'none'" #icon>
-      <!-- The menu row owns focus and activation; the radio supplies its visual state. -->
-      <Check v-if="indicator === 'check' && checked" />
-      <span v-else-if="indicator !== 'check'" class="idea-menu-radio" inert>
-        <TRadio class="idea-menu-radio__control" :checked="checked" :disabled="disabled" readonly />
-      </span>
+    <template v-if="$slots.icon || indicator !== 'none'" #icon>
+      <slot name="icon">
+        <!-- The menu row owns focus and activation; the radio supplies its visual state. -->
+        <Check v-if="indicator === 'check' && checked" />
+        <span v-else-if="indicator !== 'check'" class="idea-menu-radio" inert>
+          <TRadio
+            class="idea-menu-radio__control"
+            :checked="checked"
+            :disabled="disabled"
+            readonly
+          />
+        </span>
+      </slot>
     </template>
     <slot />
     <template v-if="$slots.shortcut" #shortcut><slot name="shortcut" /></template>
