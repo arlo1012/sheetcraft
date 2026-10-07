@@ -13,6 +13,7 @@ const props = defineProps<{
   label: string;
   disabled: boolean;
   popupAttach?: () => HTMLElement;
+  matchPanelWidth?: boolean;
 }>();
 const emit = defineEmits<{ change: [value: string | number] }>();
 const displayValue = computed(
@@ -48,6 +49,11 @@ const popupProps = computed<PopupProps>(() => ({
   placement: "bottom-left",
   trigger: "click",
   overlayInnerClassName: "idea-font-options-popup",
+  ...(props.matchPanelWidth
+    ? {
+        overlayInnerStyle: (trigger: HTMLElement) => ({ width: `${trigger.offsetWidth}px` }),
+      }
+    : {}),
   overlayStyle: { zIndex: "var(--idea-layer-menu)" },
 }));
 let selectOnClick = false;
@@ -161,7 +167,16 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
           :id="menuId"
           ref="menuSurfaceRef"
           class="font-format-field__menu"
-          :style="{ minWidth: `${control?.offsetWidth ?? 48}px` }"
+          :style="
+            matchPanelWidth
+              ? {
+                  width: '100%',
+                  minWidth: '0',
+                  boxSizing: 'border-box',
+                  '--idea-menu-item-padding-inline': '6px',
+                }
+              : { minWidth: `${control?.offsetWidth ?? 48}px` }
+          "
           @keydown="onMenuKeydown"
           :label="label"
         >

@@ -157,6 +157,7 @@ function setFontSize(value: string | number): void {
       <span class="ui-visually-hidden">{{ t("format.fontSize") }}</span>
       <FontFormatField
         class="font-format-controls__size"
+        match-panel-width
         :model-value="fontSizeValue"
         :options="fontSizeOptions"
         :label="t('format.fontSize')"
