@@ -20,6 +20,7 @@ export const formulaToolsEnUS = {
     otherFunctions: "Other functions (F)...",
     autoSum: "AutoSum",
     autoSumMenu: "Choose aggregate",
+    actions: "Actions",
     nameManager: "Name manager",
     createNamesFromSelection: "Create names from selection",
     quickCreateNames: "Quick create",

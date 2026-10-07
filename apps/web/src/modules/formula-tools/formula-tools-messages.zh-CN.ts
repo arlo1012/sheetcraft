@@ -20,6 +20,7 @@ export const formulaToolsZhCN = {
     otherFunctions: "其他函数(F)...",
     autoSum: "自动求和",
     autoSumMenu: "选择汇总函数",
+    actions: "操作",
     nameManager: "名称管理器",
     createNamesFromSelection: "从选区创建名称",
     quickCreateNames: "快速创建",

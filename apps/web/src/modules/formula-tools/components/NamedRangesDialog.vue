@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Check, X } from "lucide-vue-next";
+import { Check, Pencil, Trash2, X } from "lucide-vue-next";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -133,7 +133,8 @@ const columns = computed<BaseTableCol[]>(() => [
   { colKey: "value", title: t("formulaTools.value"), width: 140, ellipsis: true },
   { colKey: "reference", title: t("formulaTools.reference"), ellipsis: true },
   { colKey: "scopeLabel", title: t("formulaTools.scope"), width: 110, ellipsis: true },
-  { colKey: "comment", title: t("formulaTools.comment"), width: 180, ellipsis: true },
+  { colKey: "comment", title: t("formulaTools.comment"), width: 140, ellipsis: true },
+  { colKey: "actions", title: t("formulaTools.actions"), width: 88, align: "center" },
 ]);
 const rowAttributes: TableRowAttributes<TableRowData> = ({ row, rowIndex }) => ({
   "data-named-range": String(row.id),
@@ -176,10 +177,9 @@ function saveEditor(draft: NamedRangeDraft): void {
     selectedId.value = id;
   });
 }
-function remove(): void {
-  if (!selectedId.value) return;
-  emit("delete", selectedId.value);
-  selectedId.value = undefined;
+function remove(id: string): void {
+  emit("delete", id);
+  if (selectedId.value === id) selectedId.value = undefined;
 }
 function resetReference(): void {
   referenceDraft.value = selectedRange.value?.reference ?? "";
@@ -226,20 +226,6 @@ watch(
           <TButton variant="outline" data-name-action="new" @click="createRange">{{
             t("formulaTools.newName")
           }}</TButton>
-          <TButton
-            variant="outline"
-            data-name-action="edit"
-            :disabled="!selectedRange"
-            @click="editRange()"
-            >{{ t("formulaTools.editName") }}</TButton
-          >
-          <TButton
-            variant="outline"
-            data-name-action="delete"
-            :disabled="!selectedRange"
-            @click="remove"
-            >{{ t("formulaTools.deleteName") }}</TButton
-          >
         </div>
         <div class="named-ranges-dialog__filters">
           <TInput
@@ -269,7 +255,7 @@ watch(
       </div>
       <TableHeightWrapper v-slot="{ height }">
         <TTable
-          class="idea-table--mini"
+          class="idea-table--mini idea-table--row-dividers"
           row-key="id"
           :data="filteredRanges"
           :columns="columns"
@@ -279,6 +265,7 @@ watch(
           :disable-space-inactive-row="true"
           size="small"
           table-layout="fixed"
+          vertical-align="middle"
           :height="height"
           :bordered="false"
           resizable
@@ -293,7 +280,28 @@ watch(
           :aria-label="t('formulaTools.namedRanges')"
           @active-change="selectRows"
           @row-dblclick="editRow"
-        />
+        >
+          <template #actions="{ row }">
+            <div class="named-ranges-dialog__row-actions" @dblclick.stop>
+              <span
+                v-icon-action
+                data-name-action="edit"
+                :aria-label="t('formulaTools.editName')"
+                :title="t('formulaTools.editName')"
+                @click.stop="editRange(row)"
+                ><Pencil class="idea-action-icon" aria-hidden="true"
+              /></span>
+              <span
+                v-icon-action
+                data-name-action="delete"
+                :aria-label="t('formulaTools.deleteName')"
+                :title="t('formulaTools.deleteName')"
+                @click.stop="remove(row.id)"
+                ><Trash2 class="idea-action-icon" aria-hidden="true"
+              /></span>
+            </div>
+          </template>
+        </TTable>
       </TableHeightWrapper>
       <div
         class="named-ranges-dialog__reference"
@@ -356,7 +364,7 @@ watch(
     grid-template-rows: auto minmax(0, 1fr) auto;
     height: min(340px, calc(100dvh - 180px));
     min-height: 0;
-    gap: 12px;
+    gap: var(--idea-space-4);
     color: var(--idea-text-primary);
   }
   &__toolbar {
@@ -368,6 +376,17 @@ watch(
   &__actions {
     display: flex;
     gap: 8px;
+  }
+  &__row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--idea-space-2);
+
+    > span {
+      width: 24px;
+      height: 28px;
+    }
   }
   &__filters {
     display: flex;
