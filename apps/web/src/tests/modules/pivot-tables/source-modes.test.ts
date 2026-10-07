@@ -54,9 +54,7 @@ function wizard() {
   return new DOMWrapper(document.querySelector(".pivot-consolidation-wizard")!);
 }
 function wizardButtons() {
-  return new DOMWrapper(wizard().element.closest(".t-dialog")!).findAll(
-    ".pivot-consolidation-wizard__footer button",
-  );
+  return new DOMWrapper(wizard().element.closest(".t-dialog")!).findAll(".t-dialog__footer button");
 }
 async function openRangesWizard() {
   await editor().get(".pivot-create__range-summary button").trigger("click");
@@ -139,7 +137,7 @@ describe("PivotTable source modes", () => {
     expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({ sourceKind: "range" });
   });
   test.each(["single", "custom"] as const)(
-    "selects %s page fields in the parent and opens its range step directly",
+    "selects %s page fields in the parent and retains confirmed ranges when reopened",
     async (pageMode) => {
       const f = fixture();
       const second = createSheet("Second", "second");
@@ -157,7 +155,6 @@ describe("PivotTable source modes", () => {
       expect(editor().get('input[value="custom"]').exists()).toBe(true);
       await mode(pageMode);
       await openRangesWizard();
-      expect(wizard().attributes("data-pivot-wizard-step")).toBe("2");
       expect(wizard().find(".pivot-consolidation-wizard__count").exists()).toBe(
         pageMode === "custom",
       );
@@ -168,7 +165,7 @@ describe("PivotTable source modes", () => {
         await wizard().get(".pivot-consolidation-ranges__page-items input").setValue("Edited");
       }
       await wizard().get(".pivot-consolidation-ranges input").setValue("Second!A1:C4");
-      await wizard().findAll(".pivot-consolidation-ranges__actions button")[0]!.trigger("click");
+      await wizard().get('[data-pivot-range-action="add"]').trigger("click");
       await flushPromises();
       if (pageMode === "custom") {
         await wizard().get(".pivot-consolidation-ranges__page-items input").setValue("Added");
@@ -181,9 +178,9 @@ describe("PivotTable source modes", () => {
       );
       expect(wrapper.emitted("confirm")).toBeUndefined();
       await openRangesWizard();
-      expect(wizard().findAll('[role="option"]')).toHaveLength(2);
+      expect(wizard().findAll("tr[data-pivot-range-row]")).toHaveLength(2);
       if (pageMode === "custom") {
-        await wizard().findAll('[role="option"]')[0]!.trigger("click");
+        await wizard().findAll("tr[data-pivot-range-row]")[0]!.trigger("click");
         expect(
           (
             wizard().get(".pivot-consolidation-ranges__page-items input")
@@ -191,7 +188,7 @@ describe("PivotTable source modes", () => {
           ).value,
         ).toBe("Edited");
       }
-      await wizardButtons()[2]!.trigger("click");
+      await wizardButtons()[1]!.trigger("click");
       await flushPromises();
       confirmButton().click();
       await flushPromises();
@@ -224,20 +221,20 @@ describe("PivotTable source modes", () => {
     const ranges = wizard().get(".pivot-consolidation-ranges");
     await ranges.get("[data-select-formula-reference]").trigger("click");
     await flushPromises();
-    const buttons = ranges.findAll(".pivot-consolidation-ranges__actions button");
-    await buttons[0]!.trigger("click");
+    const add = ranges.get('[data-pivot-range-action="add"]');
+    await add.trigger("click");
     await flushPromises();
-    expect(ranges.findAll('[role="option"]')).toHaveLength(1);
-    expect((buttons[0]!.element as HTMLButtonElement).disabled).toBe(true);
-    expect((wizardButtons()[2]!.element as HTMLButtonElement).disabled).toBe(false);
-    await buttons[1]!.trigger("click");
+    expect(ranges.findAll("tr[data-pivot-range-row]")).toHaveLength(1);
+    expect((add.element as HTMLButtonElement).disabled).toBe(true);
+    expect((wizardButtons()[1]!.element as HTMLButtonElement).disabled).toBe(false);
+    await ranges.get('[data-pivot-range-action="remove"]').trigger("click");
     await flushPromises();
-    expect(ranges.findAll('[role="option"]')).toHaveLength(0);
-    expect((buttons[1]!.element as HTMLButtonElement).disabled).toBe(true);
-    expect((wizardButtons()[2]!.element as HTMLButtonElement).disabled).toBe(true);
-    await buttons[0]!.trigger("click");
+    expect(ranges.findAll("tr[data-pivot-range-row]")).toHaveLength(0);
+    expect(ranges.find('[data-pivot-range-action="remove"]').exists()).toBe(false);
+    expect((wizardButtons()[1]!.element as HTMLButtonElement).disabled).toBe(true);
+    await add.trigger("click");
     await flushPromises();
-    await wizardButtons()[2]!.trigger("click");
+    await wizardButtons()[1]!.trigger("click");
     await flushPromises();
     expect(confirmButton().disabled).toBe(false);
     confirmButton().click();
@@ -266,10 +263,10 @@ describe("PivotTable source modes", () => {
     resolve(undefined);
     await flushPromises();
     expect((ranges.get("input").element as HTMLInputElement).value).toBe("'Source Data'!A1:C4");
-    await ranges.get(".pivot-consolidation-ranges__actions button").trigger("click");
+    await ranges.get('[data-pivot-range-action="add"]').trigger("click");
     await flushPromises();
-    expect((wizardButtons()[2]!.element as HTMLButtonElement).disabled).toBe(false);
-    await wizardButtons()[2]!.trigger("click");
+    expect((wizardButtons()[1]!.element as HTMLButtonElement).disabled).toBe(false);
+    await wizardButtons()[1]!.trigger("click");
     await flushPromises();
     expect(confirmButton().disabled).toBe(false);
   });

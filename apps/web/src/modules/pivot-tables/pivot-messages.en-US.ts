@@ -33,6 +33,10 @@ export const pivotsEnUS = {
   "pivot.finish": "Finish",
   "pivot.browse": "Browse…",
   "pivot.selectRanges": "Select ranges…",
+  "pivot.selectRangesTitle": "Select ranges",
+  "pivot.rangeActions": "Actions",
+  "pivot.invalidConsolidationRange":
+    "Select at least two rows and two columns without overlapping another range.",
   "pivot.noRangesSelected": "No ranges selected",
   "pivot.pageFilter": "Filter {field}",
   "pivot.reportAll": "(All)",

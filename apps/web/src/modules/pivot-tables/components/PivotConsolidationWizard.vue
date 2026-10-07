@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { Button } from "tdesign-vue-next/es/button";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import { getPivotTableSource, normalizePivotTable } from "@idea10/core/pivot-tables";
 import type { Workbook } from "@idea10/core/workbook";
@@ -18,7 +17,7 @@ const props = defineProps<{
   suspended: boolean;
   selectReference: (current: string) => Promise<string | undefined>;
 }>();
-const emit = defineEmits<{ confirm: [draft: PivotDraft]; back: [draft: PivotDraft]; close: [] }>();
+const emit = defineEmits<{ confirm: [draft: PivotDraft]; close: [] }>();
 const { t } = useAppI18n();
 const draft = ref<PivotDraft>(JSON.parse(JSON.stringify(props.initial)) as PivotDraft);
 draft.value.sourceKind = "consolidation";
@@ -53,13 +52,16 @@ function finish(): void {
 <template>
   <Dialog
     :visible="!suspended"
-    :header="t('pivot.wizardTitle', { step: 2 })"
+    :header="t('pivot.selectRangesTitle')"
     width="min(500px, calc(100vw - 32px))"
     :close-on-overlay-click="false"
+    :confirm-btn="{ content: t('picture.confirm'), disabled: disabled || !canFinish }"
+    :cancel-btn="t('picture.cancel')"
     :confirm-on-enter="false"
+    @confirm="finish"
     @close="emit('close')"
   >
-    <div class="pivot-consolidation-wizard" data-pivot-wizard-step="2">
+    <div class="pivot-consolidation-wizard">
       <PivotConsolidationRanges
         v-model="draft.sources"
         v-model:page-items="draft.consolidationPageItems"
@@ -86,17 +88,6 @@ function finish(): void {
         </template>
       </PivotConsolidationRanges>
     </div>
-    <template #footer>
-      <div class="pivot-consolidation-wizard__footer">
-        <Button variant="outline" @click="emit('close')">{{ t("picture.cancel") }}</Button>
-        <Button variant="outline" :disabled="disabled" @click="emit('back', draft)">
-          {{ t("pivot.previousStep") }}
-        </Button>
-        <Button theme="primary" :disabled="disabled || !canFinish" @click="finish">{{
-          t("pivot.finish")
-        }}</Button>
-      </div>
-    </template>
   </Dialog>
 </template>
 <style scoped lang="scss">
@@ -105,12 +96,6 @@ function finish(): void {
   gap: 16px;
   &__count {
     display: grid;
-    gap: 8px;
-  }
-  &__footer {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
     gap: 8px;
   }
 }

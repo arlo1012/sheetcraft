@@ -210,7 +210,6 @@ const title = computed(() =>
     :disabled="disabled"
     :suspended="suspended"
     :select-reference="selectReference"
-    @back="confirmRanges"
     @confirm="confirmRanges"
     @close="wizardOpen = false"
   />

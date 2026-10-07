@@ -2,10 +2,17 @@
 import { computed, ref } from "vue";
 import { Input } from "tdesign-vue-next/es/input";
 import { Button } from "tdesign-vue-next/es/button";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
+import {
+  BaseTable,
+  type BaseTableCol,
+  type TableRowAttributes,
+  type TableRowData,
+} from "tdesign-vue-next/es/table";
 import { rangesIntersect } from "@idea10/core/pivot-tables";
 import type { Workbook } from "@idea10/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
-import OptionList from "../../../shared/option-list/OptionList.vue";
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import {
   formatRangeReference,
@@ -24,39 +31,58 @@ const sources = defineModel<string[]>({ required: true });
 const pageItems = defineModel<string[][]>("pageItems", { required: true });
 const pendingPageItems = defineModel<string[]>("pendingPageItems", { required: true });
 defineSlots<{ "page-count"?: () => unknown }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const reference = ref(props.initialReference);
-const selected = ref<string | undefined>(sources.value.length ? "0" : undefined);
+const selected = ref<number | undefined>(sources.value.length ? 0 : undefined);
+const browseError = ref(false);
 const selectedItems = computed(() =>
-  selected.value === undefined ? pendingPageItems.value : pageItems.value[Number(selected.value)],
+  selected.value === undefined ? pendingPageItems.value : pageItems.value[selected.value],
 );
-async function browse(): Promise<void> {
-  if (props.disabled) return;
-  const picked = await props.selectReference(reference.value);
-  if (picked !== undefined) reference.value = picked;
-}
-const options = computed(() =>
-  sources.value.map((label, index) => ({ value: String(index), label })),
-);
-const area = computed(() =>
-  resolveRangeReference(props.workbook, reference.value, props.referenceSheetId),
-);
-const canAdd = computed(() => {
-  const next = area.value;
-  return (
-    !!next &&
-    sources.value.length < 128 &&
-    next.range.end.row > next.range.start.row &&
-    next.range.end.column > next.range.start.column &&
-    !sources.value.some((source) => {
+function validArea(value: string, replacing?: number) {
+  const next = resolveRangeReference(props.workbook, value, props.referenceSheetId);
+  if (
+    !next ||
+    next.range.end.row <= next.range.start.row ||
+    next.range.end.column <= next.range.start.column ||
+    sources.value.some((source, index) => {
+      if (index === replacing) return false;
       const existing = resolveRangeReference(props.workbook, source, props.referenceSheetId);
       return existing?.sheetId === next.sheetId && rangesIntersect(existing.range, next.range);
     })
+  )
+    return undefined;
+  return next;
+}
+async function browse(index: number): Promise<void> {
+  const current = sources.value[index];
+  if (props.disabled || current === undefined) return;
+  const picked = await props.selectReference(current);
+  if (picked === undefined || props.disabled || sources.value[index] !== current) return;
+  const next = validArea(picked, index);
+  browseError.value = !next;
+  if (!next) return;
+  sources.value = sources.value.map((source, at) =>
+    at === index
+      ? formatRangeReference(props.workbook.sheets.get(next.sheetId)!.name, next.range)
+      : source,
   );
+  select([index]);
+}
+const rows = computed(() => sources.value.map((reference, index) => ({ index, reference })));
+const columns = computed<BaseTableCol[]>(() => [
+  { colKey: "reference", title: t("pivot.sourceArea"), ellipsis: true },
+  { colKey: "actions", title: t("pivot.rangeActions"), width: 124, align: "right" },
+]);
+const rowAttributes: TableRowAttributes<TableRowData> = ({ row }) => ({
+  "data-pivot-range-row": String(row.index),
+  "aria-selected": String(selected.value === row.index),
 });
+const area = computed(() => validArea(reference.value));
+const canAdd = computed(() => !!area.value && sources.value.length < 128);
 function add(): void {
-  if (props.disabled || !canAdd.value || !area.value) return;
   const next = area.value;
+  if (props.disabled || !canAdd.value || !next) return;
+  browseError.value = false;
   const nextSources = [
     ...sources.value,
     formatRangeReference(props.workbook.sheets.get(next.sheetId)!.name, next.range),
@@ -66,68 +92,99 @@ function add(): void {
     ...pageItems.value,
     selected.value === undefined ? [...pendingPageItems.value] : ["", "", "", ""],
   ];
-  selected.value = String(nextSources.length - 1);
+  selected.value = nextSources.length - 1;
 }
-function remove(): void {
-  if (props.disabled || selected.value === undefined) return;
-  const index = Number(selected.value);
+function remove(index = selected.value): void {
+  if (props.disabled || index === undefined || sources.value[index] === undefined) return;
+  browseError.value = false;
   const nextSources = sources.value.filter((_, at) => at !== index);
-  if (!nextSources.length) pendingPageItems.value = [...(selectedItems.value ?? ["", "", "", ""])];
+  if (!nextSources.length)
+    pendingPageItems.value = [...(pageItems.value[index] ?? ["", "", "", ""])];
   sources.value = nextSources;
   pageItems.value = pageItems.value.filter((_, at) => at !== index);
-  selected.value = nextSources.length ? String(Math.min(index, nextSources.length - 1)) : undefined;
+  if (!nextSources.length) selected.value = undefined;
+  else if (selected.value === index) selected.value = Math.min(index, nextSources.length - 1);
+  else if (selected.value !== undefined && selected.value > index) selected.value--;
 }
-function select(value: string): void {
-  if (props.disabled) return;
-  selected.value = value;
-  reference.value = sources.value[Number(value)] ?? "";
+function select(keys: Array<string | number>): void {
+  if (props.disabled || typeof keys[0] !== "number") return;
+  selected.value = keys[0];
+  reference.value = sources.value[keys[0]] ?? "";
 }
 </script>
 <template>
   <div class="pivot-consolidation-ranges">
-    <section class="pivot-consolidation-ranges__source">
-      <p>{{ t("pivot.wizardRangesHint") }}</p>
-      <strong>{{ t("pivot.sourceRange") }}</strong>
-      <RangeReferenceInput
-        v-model="reference"
-        :label="t('pivot.sourceRange')"
-        :disabled="disabled"
-        :select-reference="selectReference"
-        @enter="add"
-      />
-      <div class="pivot-consolidation-ranges__actions">
-        <Button size="small" variant="outline" :disabled="disabled || !canAdd" @click="add">{{
-          t("pivot.addRange")
-        }}</Button>
-        <Button
-          size="small"
-          variant="outline"
-          :disabled="disabled || selected === undefined"
-          @click="remove"
-          >{{ t("pivot.remove") }}</Button
-        >
-        <Button size="small" variant="outline" :disabled="disabled" @click="browse">{{
-          t("pivot.browse")
-        }}</Button>
-      </div>
-    </section>
-    <section class="pivot-consolidation-ranges__areas">
-      <strong>{{ t("pivot.allRanges") }}</strong>
-      <div class="pivot-consolidation-ranges__list">
-        <OptionList
-          :model-value="selected"
-          :options="options"
-          :label="t('pivot.consolidationRanges')"
-          :inert="disabled || undefined"
-          overflow="ellipsis"
-          @select="select"
-          @keydown.delete.stop.prevent="remove"
-        >
-          <template #empty
-            ><p>{{ t("pivot.noRanges") }}</p></template
+    <Form
+      label-align="right"
+      :label-width="locale === 'zh-CN' ? 72 : 104"
+      :prevent-submit-default="true"
+    >
+      <FormItem :label="t('pivot.addRange')">
+        <div class="pivot-consolidation-ranges__add">
+          <RangeReferenceInput
+            v-model="reference"
+            :label="t('pivot.addRange')"
+            :disabled="disabled"
+            :select-reference="selectReference"
+            @enter="add"
+          />
+          <Button
+            size="small"
+            variant="outline"
+            data-pivot-range-action="add"
+            :disabled="disabled || !canAdd"
+            @click="add"
+            >{{ t("pivot.addRange") }}</Button
           >
-        </OptionList>
+        </div>
+      </FormItem>
+    </Form>
+    <section class="pivot-consolidation-ranges__areas">
+      <div class="pivot-consolidation-ranges__list" @keydown.delete.stop.prevent="remove()">
+        <TableHeightWrapper v-slot="{ height }">
+          <BaseTable
+            class="idea-table--mini idea-table--row-dividers"
+            row-key="index"
+            :data="rows"
+            :columns="columns"
+            :row-attributes="rowAttributes"
+            :active-row-keys="selected === undefined ? [] : [selected]"
+            active-row-type="single"
+            :disable-space-inactive-row="true"
+            :height="height"
+            :bordered="false"
+            size="small"
+            table-layout="fixed"
+            vertical-align="middle"
+            hover
+            :empty="t('pivot.noRanges')"
+            :aria-label="t('pivot.allRanges')"
+            @active-change="select"
+          >
+            <template #actions="{ row }">
+              <div class="pivot-consolidation-ranges__row-actions">
+                <Button
+                  size="small"
+                  variant="text"
+                  data-pivot-range-action="remove"
+                  :disabled="disabled"
+                  @click.stop="remove(row.index)"
+                  >{{ t("pivot.remove") }}</Button
+                >
+                <Button
+                  size="small"
+                  variant="text"
+                  data-pivot-range-action="browse"
+                  :disabled="disabled"
+                  @click.stop="browse(row.index)"
+                  >{{ t("pivot.browse") }}</Button
+                >
+              </div>
+            </template>
+          </BaseTable>
+        </TableHeightWrapper>
       </div>
+      <p v-if="browseError" role="alert">{{ t("pivot.invalidConsolidationRange") }}</p>
     </section>
     <slot name="page-count" />
     <section v-if="pageCount" class="pivot-consolidation-ranges__page-items">
@@ -157,18 +214,23 @@ function select(value: string): void {
     margin: 0;
     color: var(--idea-text-secondary);
   }
-  &__source,
+  &__add {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
   &__areas,
   &__page-items {
     display: grid;
     gap: 8px;
     min-width: 0;
   }
-  &__actions {
+  &__row-actions {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    justify-content: flex-end;
   }
   &__page-grid {
     display: grid;
@@ -182,12 +244,11 @@ function select(value: string): void {
     }
   }
   &__list {
-    display: grid;
-    height: 128px;
+    height: 160px;
     min-height: 0;
-    p {
-      padding: 8px;
-    }
+  }
+  [role="alert"] {
+    color: var(--idea-status-error);
   }
   @media (max-width: 420px) {
     &__page-grid {
