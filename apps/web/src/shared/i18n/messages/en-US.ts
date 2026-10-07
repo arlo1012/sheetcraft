@@ -924,6 +924,7 @@ export const enUS = {
     textOrientation: "Text orientation",
     strikethrough: "Strikethrough",
     currencyFormat: "Currency format",
+    thousandsSeparator: "Thousands separator",
     accountingFormat: "Accounting",
     shortDateFormat: "Short date",
     longDateFormat: "Long date",

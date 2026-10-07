@@ -32,6 +32,35 @@ afterEach(() => {
 });
 
 describe("HomeNumberGroup", () => {
+  test("applies thousands grouping and preserves existing number precision", async () => {
+    const general = mountNumberGroup();
+    await general.get('[data-ribbon-action="thousands-separator"]').trigger("click");
+    expect(general.emitted("applyStyle")).toEqual([
+      [{ numberFormat: { kind: "number", fractionDigits: 2, useGrouping: true } }],
+    ]);
+    const number = mountNumberGroup("en-US", false, {
+      kind: "number",
+      fractionDigits: 0,
+      negativeStyle: "parentheses",
+    });
+    await number.get('[data-ribbon-action="thousands-separator"]').trigger("click");
+    expect(number.emitted("applyStyle")).toEqual([
+      [
+        {
+          numberFormat: {
+            kind: "number",
+            fractionDigits: 0,
+            negativeStyle: "parentheses",
+            useGrouping: true,
+          },
+        },
+      ],
+    ]);
+    await number.setProps({ disabled: true });
+    await number.get('[data-ribbon-action="thousands-separator"]').trigger("click");
+    expect(number.emitted("applyStyle")).toHaveLength(1);
+  });
+
   test("applies each format from the accessible format menu", async () => {
     const wrapper = mountNumberGroup();
 
@@ -101,25 +130,25 @@ describe("HomeNumberGroup", () => {
     expect(wrapper.emitted("adjustDecimals")).toEqual([[-1], [1]]);
 
     await wrapper.setProps({ disabled: true });
-    expect(wrapper.get("[data-number-format-trigger]").attributes("disabled")).toBeDefined();
-    expect(
-      wrapper.get('[data-ribbon-action="percent-format"]').attributes("disabled"),
-    ).toBeDefined();
+    expect(wrapper.get("[data-number-format-trigger]").attributes("aria-disabled")).toBe("true");
+    expect(wrapper.get('[data-ribbon-action="percent-format"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
   });
 
   test("keeps format choices available for dates while disabling decimal adjustments", async () => {
     const wrapper = mountNumberGroup("en-US", false, { kind: "date", code: "yyyy-mm-dd" });
 
-    expect(wrapper.get("[data-number-format-trigger]").attributes("disabled")).toBeUndefined();
-    expect(
-      wrapper.get('[data-ribbon-action="percent-format"]').attributes("disabled"),
-    ).toBeUndefined();
-    expect(
-      wrapper.get('[data-ribbon-action="decrease-decimal"]').attributes("disabled"),
-    ).toBeDefined();
-    expect(
-      wrapper.get('[data-ribbon-action="increase-decimal"]').attributes("disabled"),
-    ).toBeDefined();
+    expect(wrapper.get("[data-number-format-trigger]").attributes("aria-disabled")).toBe("false");
+    expect(wrapper.get('[data-ribbon-action="percent-format"]').attributes("aria-disabled")).toBe(
+      "false",
+    );
+    expect(wrapper.get('[data-ribbon-action="decrease-decimal"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
+    expect(wrapper.get('[data-ribbon-action="increase-decimal"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
 
     await wrapper.get("[data-number-format-trigger]").trigger("click");
     expect(
@@ -133,9 +162,9 @@ describe("HomeNumberGroup", () => {
     expect(wrapper.emitted("openCellFormat")).toEqual([[]]);
 
     await wrapper.setProps({ disabled: true, conversionDisabled: false });
-    expect(wrapper.get("[data-number-format-trigger]").attributes("disabled")).toBeDefined();
+    expect(wrapper.get("[data-number-format-trigger]").attributes("aria-disabled")).toBe("true");
     const trigger = wrapper.get<HTMLElement>('[data-ribbon-action="convert-number"]');
-    expect(trigger.attributes("disabled")).toBeUndefined();
+    expect(trigger.attributes("aria-disabled")).toBe("false");
     await trigger.trigger("keydown", { key: "ArrowUp" });
     const last = new DOMWrapper(document.body).get<HTMLElement>(
       '[data-number-conversion="number-to-text"]',
@@ -148,6 +177,6 @@ describe("HomeNumberGroup", () => {
     await trigger.trigger("click");
     await wrapper.setProps({ conversionDisabled: true });
     expect(document.body.querySelector("[data-number-conversion]")).toBeNull();
-    expect(trigger.attributes("disabled")).toBeDefined();
+    expect(trigger.attributes("aria-disabled")).toBe("true");
   });
 });

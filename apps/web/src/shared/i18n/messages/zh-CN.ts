@@ -898,6 +898,7 @@ export const zhCN = {
     textOrientation: "文字方向",
     strikethrough: "删除线",
     currencyFormat: "货币格式",
+    thousandsSeparator: "千分位显示",
     accountingFormat: "会计专用",
     shortDateFormat: "短日期",
     longDateFormat: "长日期",

@@ -884,6 +884,7 @@ export type MessageSchema = ToolMessageSchema & {
     textOrientation: string;
     strikethrough: string;
     currencyFormat: string;
+    thousandsSeparator: string;
     accountingFormat: string;
     shortDateFormat: string;
     longDateFormat: string;
