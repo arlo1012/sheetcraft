@@ -140,20 +140,15 @@
   }
 }
 
-// Direct SVG actions keep the feedback surface close to the glyph.
+// Direct SVG actions retain a compact pointer target without button chrome.
 .idea-table-action-icon {
   box-sizing: content-box;
   width: var(--idea-action-icon-size);
   height: var(--idea-action-icon-size);
   padding: 3px;
-  border-radius: var(--idea-radius-small);
   color: var(--idea-text-secondary);
   stroke-width: var(--idea-icon-stroke-width);
   cursor: pointer;
-
-  &:hover:not([aria-disabled="true"]) {
-    background: var(--idea-icon-button-hover-bg);
-  }
 
   &:focus-visible:not([aria-disabled="true"]) {
     outline: none;
@@ -177,5 +172,17 @@
 
   &:active {
     cursor: grabbing;
+  }
+}
+
+// All table icon actions share foreground-only hover feedback, including
+// existing directive containers and reference pickers inside editable cells.
+.t-table {
+  :is(.idea-icon-action, .idea-table-action-icon, .idea-input-action-icon, .idea-table-drag-icon) {
+    background: transparent;
+
+    &:hover:not([aria-disabled="true"], :disabled) {
+      color: var(--idea-action-primary);
+    }
   }
 }
