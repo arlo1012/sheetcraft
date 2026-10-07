@@ -103,10 +103,10 @@
   white-space: nowrap;
 }
 
-// Large actions keep the stacked controls' total height with a compact caption row.
+// Share row centers with stacked tools so every second-row label has the same baseline.
 @mixin tall-content {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 22px;
+  grid-template-rows: repeat(2, var(--ribbon-control-height, 26px));
   align-items: center;
   justify-items: center;
   gap: var(--ribbon-row-gap, 2px);
