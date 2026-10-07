@@ -112,7 +112,6 @@ const title = computed(() =>
   >
     <div class="pivot-create">
       <section v-if="initial.mode !== 'move'" class="pivot-create__section">
-        <h3>{{ t("pivot.chooseSource") }}</h3>
         <RadioGroup v-model="draft.sourceKind" class="pivot-create__sources" :disabled="disabled">
           <div class="pivot-create__source">
             <Radio value="range">{{ t("pivot.cellRange") }}</Radio>
