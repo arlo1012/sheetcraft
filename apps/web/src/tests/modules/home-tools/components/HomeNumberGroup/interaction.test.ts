@@ -109,6 +109,12 @@ describe("HomeNumberGroup", () => {
     const menu = new DOMWrapper(document.body).get('ul[aria-label="Number format"]');
     expect(menu.findAll("[data-number-format-option]")).toHaveLength(11);
     expect(menu.findAll('[role="menuitemradio"]')).toHaveLength(11);
+    expect(menu.find('[role="radio"], input[type="radio"], .t-radio').exists()).toBe(false);
+    for (const option of menu.findAll("[data-number-format-option]")) {
+      expect(option.find("svg").exists()).toBe(true);
+    }
+    expect(menu.get('[data-number-format-option="currency"] .lucide-coins')).toBeTruthy();
+    expect(menu.get('[data-number-format-option="accounting"] .lucide-calculator')).toBeTruthy();
     expect(menu.get('[data-number-format-option="general"]').attributes("aria-checked")).toBe(
       "true",
     );

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Hash } from "lucide-vue-next";
+import NumberFormatIcon from "./NumberFormatIcon.vue";
 import { computed, ref, useId } from "vue";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
@@ -29,6 +29,9 @@ const triggerRef = computed(() => buttonRef.value?.rootElement ?? null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `number-format-menu-${useId().replaceAll(":", "")}`;
 const currentFormatLabel = computed(() => currentLabel());
+const currentIconChoice = computed(
+  () => NUMBER_FORMAT_PRESET_CHOICES.find((choice) => isSelected(choice)) ?? "general",
+);
 const triggerLabel = computed(() =>
   props.state.mixed
     ? t("format.numberFormatMixed")
@@ -96,7 +99,7 @@ function openCellFormat(): void {
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
     >
-      <Hash aria-hidden="true" />
+      <NumberFormatIcon :choice="currentIconChoice" />
     </RibbonMenuButton>
     <Teleport to="body">
       <MenuSurface
@@ -112,8 +115,10 @@ function openCellFormat(): void {
           :key="choice"
           :data-number-format-option="choice"
           :checked="isSelected(choice)"
+          indicator="none"
           @select="select(choice)"
         >
+          <template #icon><NumberFormatIcon :choice="choice" /></template>
           {{ formatLabel(choice) }}
         </MenuRadioItem>
         <MenuSeparator />
