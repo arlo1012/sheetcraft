@@ -125,11 +125,10 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
       :value="draft"
       v-model:input-value="draft"
       allow-input
-      borderless
       size="small"
       :popup-visible="open"
       :popup-props="popupProps"
-      :input-props="{ onKeydown: keydown, borderless: true }"
+      :input-props="{ onKeydown: keydown }"
       :aria-label="label"
       :disabled="disabled"
       @popup-visible-change="

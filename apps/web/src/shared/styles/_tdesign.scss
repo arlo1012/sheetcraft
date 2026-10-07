@@ -582,7 +582,7 @@
 }
 
 // Ribbon font fields share split-action feedback, without input chrome.
-.idea-ribbon-font-input .t-input {
+.idea-ribbon-font-input.t-select-input .t-input {
   &,
   &:hover,
   &:focus,
@@ -603,7 +603,7 @@
     border-radius: var(--idea-radius-default) 0 0 var(--idea-radius-default);
 
     &:hover:not(:disabled) {
-      background: var(--idea-icon-button-hover-bg);
+      background: color-mix(in srgb, var(--idea-text-primary) 8%, transparent);
     }
   }
 
