@@ -210,7 +210,7 @@ function toggleMenu(): void {
   &__main {
     flex: 1 1 auto;
     justify-content: var(--ribbon-labeled-action-justify, flex-start);
-    gap: 2px;
+    gap: var(--idea-space-2);
     padding: 0 3px;
   }
 

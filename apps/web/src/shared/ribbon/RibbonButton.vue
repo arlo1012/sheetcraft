@@ -68,7 +68,7 @@ function activate(): void {
     justify-content: var(--ribbon-labeled-action-justify, flex-start);
     width: var(--ribbon-labeled-action-width, auto);
     min-width: 27px;
-    gap: 2px;
+    gap: var(--idea-space-2);
     padding: 0 var(--ribbon-labeled-action-padding, 4px);
   }
 
