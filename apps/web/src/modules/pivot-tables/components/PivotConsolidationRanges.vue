@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { Eye, Trash2 } from "lucide-vue-next";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import { Input } from "tdesign-vue-next/es/input";
 import { Button } from "tdesign-vue-next/es/button";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
@@ -163,22 +165,22 @@ function select(keys: Array<string | number>): void {
           >
             <template #actions="{ row }">
               <div class="pivot-consolidation-ranges__row-actions">
-                <Button
-                  size="small"
-                  variant="text"
+                <span
+                  v-icon-action="disabled"
                   data-pivot-range-action="remove"
-                  :disabled="disabled"
+                  :aria-label="t('pivot.remove')"
+                  :title="t('pivot.remove')"
                   @click.stop="remove(row.index)"
-                  >{{ t("pivot.remove") }}</Button
-                >
-                <Button
-                  size="small"
-                  variant="text"
+                  ><Trash2 class="idea-action-icon" aria-hidden="true"
+                /></span>
+                <span
+                  v-icon-action="disabled"
                   data-pivot-range-action="browse"
-                  :disabled="disabled"
+                  :aria-label="t('pivot.browse')"
+                  :title="t('pivot.browse')"
                   @click.stop="browse(row.index)"
-                  >{{ t("pivot.browse") }}</Button
-                >
+                  ><Eye class="idea-action-icon" aria-hidden="true"
+                /></span>
               </div>
             </template>
           </BaseTable>
@@ -231,6 +233,7 @@ function select(keys: Array<string | number>): void {
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
   }
   &__page-grid {
     display: grid;
