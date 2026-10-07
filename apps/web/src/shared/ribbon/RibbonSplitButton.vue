@@ -125,7 +125,7 @@ function toggleMenu(): void {
     position: absolute;
     inset: 1px;
     border-radius: var(--idea-radius-default);
-    box-shadow: inset 0 0 0 1px var(--idea-border-subtle);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--idea-text-primary) 14%, transparent);
     content: "";
     pointer-events: none;
   }
@@ -137,6 +137,26 @@ function toggleMenu(): void {
 
   &.is-full-width {
     width: 100%;
+  }
+
+  &:not(.is-tall) &__main {
+    --ribbon-feedback-inset: 1px 0 1px 1px;
+
+    &::before {
+      border-radius: var(--idea-radius-default) 0 0 var(--idea-radius-default);
+    }
+  }
+
+  &.has-text:not(.is-tall) &__main {
+    padding: 0 var(--ribbon-labeled-action-padding, 4px);
+  }
+
+  &:not(.is-tall) &__menu {
+    --ribbon-feedback-inset: 1px 1px 1px 0;
+
+    &::before {
+      border-radius: 0 var(--idea-radius-default) var(--idea-radius-default) 0;
+    }
   }
 
   &.is-tall {
