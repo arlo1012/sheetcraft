@@ -242,6 +242,7 @@ watch(
     v-if="visible"
     :visible="visible && !suspended"
     :header="t('formulaTools.namedRanges')"
+    :footer="false"
     width="min(920px, calc(100vw - 32px))"
     placement="center"
     :close-on-overlay-click="false"
@@ -395,11 +396,6 @@ watch(
         </TFormItem>
       </TForm>
     </div>
-    <template #footer>
-      <TButton variant="outline" data-name-action="close" @click="emit('close')">{{
-        t("formulaTools.close")
-      }}</TButton>
-    </template>
   </Dialog>
   <NamedRangeEditorDialog
     v-if="visible && editorDraft"

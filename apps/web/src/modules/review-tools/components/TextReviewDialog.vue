@@ -130,9 +130,6 @@ function location(cell: ReviewTextCell) {
           {{ t(result.truncated ? "review.checkNextBatch" : "review.spellingComplete") }}
         </p>
       </template>
-      <div class="text-review__footer">
-        <TButton variant="outline" @click="emit('close')">{{ t("review.close") }}</TButton>
-      </div>
     </div>
   </TDialog>
 </template>
@@ -157,10 +154,6 @@ function location(cell: ReviewTextCell) {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-  }
-  &__footer {
-    display: flex;
-    justify-content: flex-end;
   }
 }
 </style>

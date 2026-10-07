@@ -124,8 +124,9 @@ function save(protect = false): void {
   <TDialog
     :visible="visible && !editor"
     :header="t('review.editableRanges')"
-    :confirm-btn="t(readOnly ? 'review.close' : 'review.confirm')"
-    :cancel-btn="readOnly ? null : t('review.cancel')"
+    :footer="!readOnly"
+    :confirm-btn="t('review.confirm')"
+    :cancel-btn="t('review.cancel')"
     :close-on-overlay-click="false"
     width="min(680px, calc(100vw - 32px))"
     placement="center"
