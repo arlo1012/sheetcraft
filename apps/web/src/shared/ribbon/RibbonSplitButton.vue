@@ -111,6 +111,7 @@ function toggleMenu(): void {
 
 .ribbon-split-button {
   --ribbon-icon-size: var(--idea-action-icon-size);
+  position: relative;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: stretch;
@@ -119,9 +120,14 @@ function toggleMenu(): void {
   padding: 0;
   border-radius: var(--idea-radius-default);
 
-  &:has(> [aria-disabled="false"]:hover),
-  &:has(> [aria-expanded="true"][aria-disabled="false"]) {
+  &:has(> [aria-disabled="false"]:hover)::after,
+  &:has(> [aria-expanded="true"][aria-disabled="false"])::after {
+    position: absolute;
+    inset: 1px;
+    border-radius: var(--idea-radius-default);
     box-shadow: inset 0 0 0 1px var(--idea-border-subtle);
+    content: "";
+    pointer-events: none;
   }
 
   &.has-text {
@@ -135,9 +141,9 @@ function toggleMenu(): void {
 
   &.is-tall {
     --ribbon-icon-size: var(--idea-ribbon-large-icon-size);
-    display: grid;
-    grid-template-rows: repeat(2, minmax(0, 1fr));
-    gap: var(--ribbon-row-gap, 2px);
+    @include ribbon.tall-content;
+    align-items: stretch;
+    justify-items: stretch;
     align-self: stretch;
     width: max-content;
     min-width: var(--ribbon-tall-action-min-width, 58px);
@@ -154,10 +160,8 @@ function toggleMenu(): void {
     }
 
     .ribbon-split-button__menu {
-      align-self: end;
-      height: calc(100% - 3px);
       gap: 2px;
-      padding: 0 2px 3px;
+      padding: 0 2px;
       border-radius: 0 0 2px 2px;
     }
   }
