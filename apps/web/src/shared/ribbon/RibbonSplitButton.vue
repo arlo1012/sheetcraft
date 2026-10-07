@@ -148,6 +148,7 @@ function toggleMenu(): void {
   }
 
   &.has-text:not(.is-tall) &__main {
+    justify-content: var(--ribbon-labeled-action-justify, flex-start);
     padding: 0 var(--ribbon-labeled-action-padding, 4px);
   }
 
@@ -231,7 +232,6 @@ function toggleMenu(): void {
 
   &__main {
     flex: 1 1 auto;
-    justify-content: var(--ribbon-labeled-action-justify, flex-start);
     gap: var(--idea-space-2);
     padding: 0 3px;
   }
