@@ -139,3 +139,43 @@
     padding: 0;
   }
 }
+
+// Direct SVG actions keep the feedback surface close to the glyph.
+.idea-table-action-icon {
+  box-sizing: content-box;
+  width: var(--idea-action-icon-size);
+  height: var(--idea-action-icon-size);
+  padding: 3px;
+  border-radius: var(--idea-radius-small);
+  color: var(--idea-text-secondary);
+  stroke-width: var(--idea-icon-stroke-width);
+  cursor: pointer;
+
+  &:hover:not([aria-disabled="true"]) {
+    background: var(--idea-icon-button-hover-bg);
+  }
+
+  &:focus-visible:not([aria-disabled="true"]) {
+    outline: none;
+    box-shadow: var(--idea-keyboard-focus-shadow);
+  }
+
+  &[aria-disabled="true"] {
+    color: var(--idea-text-disabled);
+    cursor: not-allowed;
+  }
+}
+
+.idea-table-drag-icon {
+  display: block;
+  width: var(--idea-action-icon-size);
+  height: var(--idea-action-icon-size);
+  margin-inline: auto;
+  color: var(--idea-text-secondary);
+  stroke-width: var(--idea-icon-stroke-width);
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+}

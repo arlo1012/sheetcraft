@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { ArrowDown, ArrowUp, Check, Pencil, Trash2, X } from "lucide-vue-next";
+import { GripVertical, ArrowDown, ArrowUp, Check, Pencil, Trash2, X } from "lucide-vue-next";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -316,40 +316,43 @@ watch(
           @drag-sort="reorderRows"
           @row-dblclick="editRow"
         >
+          <template #drag>
+            <GripVertical class="idea-table-drag-icon" aria-hidden="true" />
+          </template>
           <template #actions="{ row, rowIndex }">
             <div class="named-ranges-dialog__row-actions" @dblclick.stop>
-              <span
+              <Pencil
                 v-icon-action
                 data-name-action="edit"
                 :aria-label="t('formulaTools.editName')"
                 :title="t('formulaTools.editName')"
                 @click.stop="editRange(row)"
-                ><Pencil class="idea-action-icon" aria-hidden="true"
-              /></span>
-              <span
+                class="idea-table-action-icon"
+              />
+              <Trash2
                 v-icon-action
                 data-name-action="delete"
                 :aria-label="t('formulaTools.deleteName')"
                 :title="t('formulaTools.deleteName')"
                 @click.stop="remove(row.id)"
-                ><Trash2 class="idea-action-icon" aria-hidden="true"
-              /></span>
-              <span
+                class="idea-table-action-icon"
+              />
+              <ArrowUp
                 v-icon-action="rowIndex === 0"
                 data-name-action="up"
                 :aria-label="t('formulaTools.moveNameUp')"
                 :title="t('formulaTools.moveNameUp')"
                 @click.stop="moveName(rowIndex, -1)"
-                ><ArrowUp class="idea-action-icon" aria-hidden="true"
-              /></span>
-              <span
+                class="idea-table-action-icon"
+              />
+              <ArrowDown
                 v-icon-action="rowIndex === filteredRanges.length - 1"
                 data-name-action="down"
                 :aria-label="t('formulaTools.moveNameDown')"
                 :title="t('formulaTools.moveNameDown')"
                 @click.stop="moveName(rowIndex, 1)"
-                ><ArrowDown class="idea-action-icon" aria-hidden="true"
-              /></span>
+                class="idea-table-action-icon"
+              />
             </div>
           </template>
         </TTable>
@@ -433,11 +436,6 @@ watch(
     align-items: center;
     justify-content: center;
     gap: var(--idea-space-2);
-
-    > span {
-      width: 24px;
-      height: 28px;
-    }
   }
   &__filters {
     display: flex;

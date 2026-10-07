@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { ArrowDown, ArrowUp, Copy, Trash2 } from "lucide-vue-next";
+import { GripVertical, ArrowDown, ArrowUp, Copy, Trash2 } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -517,40 +517,43 @@ function apply(): void {
               />
             </div>
           </template>
+          <template #drag>
+            <GripVertical class="idea-table-drag-icon" aria-hidden="true" />
+          </template>
           <template #actions="{ rowIndex }">
             <div class="sort-dialog__row-actions" @dblclick.stop>
-              <span
+              <Copy
                 v-icon-action="rows.length >= maxLevels"
                 data-sort-action="copy"
                 :aria-label="t('dataTools.sort.copyLevel')"
                 :title="t('dataTools.sort.copyLevel')"
                 @click.stop="copyLevel(rowIndex)"
-                ><Copy class="idea-action-icon" aria-hidden="true"
-              /></span>
-              <span
+                class="idea-table-action-icon"
+              />
+              <Trash2
                 v-icon-action="rows.length <= 1"
                 data-sort-action="delete"
                 :aria-label="t('dataTools.sort.deleteLevel')"
                 :title="t('dataTools.sort.deleteLevel')"
                 @click.stop="removeLevel(rowIndex)"
-                ><Trash2 class="idea-action-icon" aria-hidden="true"
-              /></span>
-              <span
+                class="idea-table-action-icon"
+              />
+              <ArrowUp
                 v-icon-action="rowIndex === 0"
                 data-sort-action="up"
                 :aria-label="t('dataTools.sort.moveUp')"
                 :title="t('dataTools.sort.moveUp')"
                 @click.stop="moveLevel(rowIndex, -1)"
-                ><ArrowUp class="idea-action-icon" aria-hidden="true"
-              /></span>
-              <span
+                class="idea-table-action-icon"
+              />
+              <ArrowDown
                 v-icon-action="rowIndex === rows.length - 1"
                 data-sort-action="down"
                 :aria-label="t('dataTools.sort.moveDown')"
                 :title="t('dataTools.sort.moveDown')"
                 @click.stop="moveLevel(rowIndex, 1)"
-                ><ArrowDown class="idea-action-icon" aria-hidden="true"
-              /></span>
+                class="idea-table-action-icon"
+              />
             </div>
           </template>
         </TTable>
@@ -652,11 +655,6 @@ function apply(): void {
     align-items: center;
     justify-content: center;
     gap: var(--idea-space-2);
-
-    > span {
-      width: 24px;
-      height: 28px;
-    }
   }
   &__column {
     display: grid;

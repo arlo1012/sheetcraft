@@ -1,10 +1,12 @@
 import type { ObjectDirective } from "vue";
 
+type IconActionElement = HTMLElement | SVGElement;
+
 type IconActionState = { disabled: boolean; tabIndex: string; cleanup: () => void };
-const states = new WeakMap<HTMLElement, IconActionState>();
+const states = new WeakMap<IconActionElement, IconActionState>();
 
 /** Keyboard and disabled semantics for directly interactive icon containers. */
-export const vIconAction: ObjectDirective<HTMLElement, boolean | undefined> = {
+export const vIconAction: ObjectDirective<IconActionElement, boolean | undefined> = {
   mounted(element, { value }) {
     const state: IconActionState = {
       disabled: Boolean(value),
@@ -24,7 +26,10 @@ export const vIconAction: ObjectDirective<HTMLElement, boolean | undefined> = {
       if (state.disabled || event.defaultPrevented) return;
       event.preventDefault();
       event.stopPropagation();
-      if (!event.repeat) element.click();
+      if (!event.repeat) {
+        if (element instanceof HTMLElement) element.click();
+        else element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      }
     };
     element.addEventListener("click", guardDisabled, true);
     element.addEventListener("pointerdown", guardDisabled, true);
@@ -52,7 +57,7 @@ export const vIconAction: ObjectDirective<HTMLElement, boolean | undefined> = {
   },
 };
 
-function sync(element: HTMLElement, state: IconActionState): void {
+function sync(element: IconActionElement, state: IconActionState): void {
   element.classList.add("idea-icon-action");
   element.setAttribute("tabindex", state.disabled ? "-1" : state.tabIndex);
   element.setAttribute("aria-disabled", String(state.disabled));

@@ -3,7 +3,7 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, test, vi } from "vitest";
 import { vIconAction } from "../../../shared/focus/icon-action";
 
-function fixture(disabled = false, handled = false) {
+function fixture(disabled = false, handled = false, directSvg = false) {
   const activate = vi.fn();
   const customKey = vi.fn((event: KeyboardEvent) => {
     if (handled && event.key === "Enter") {
@@ -15,8 +15,9 @@ function fixture(disabled = false, handled = false) {
     directives: { iconAction: vIconAction },
     props: { disabled: Boolean },
     setup: () => ({ activate, customKey }),
-    template:
-      '<span v-icon-action="disabled" :class="{ muted: disabled }" aria-label="Remove" @click="activate" @keydown="customKey"><svg /></span>',
+    template: directSvg
+      ? '<svg v-icon-action="disabled" aria-label="Remove" @click="activate" @keydown="customKey"><path /></svg>'
+      : '<span v-icon-action="disabled" :class="{ muted: disabled }" aria-label="Remove" @click="activate" @keydown="customKey"><svg /></span>',
   });
   return { wrapper: mount(component, { props: { disabled } }), activate, customKey };
 }
@@ -56,4 +57,18 @@ describe("interactive icon containers", () => {
     expect(activate).toHaveBeenCalledTimes(1);
     wrapper.unmount();
   });
+});
+
+test("direct SVG icons activate with keyboard and respect disabled state", async () => {
+  const { wrapper, activate } = fixture(false, false, true);
+  await wrapper.trigger("keydown", { key: "Enter" });
+  await wrapper.trigger("keydown", { key: " " });
+  await wrapper.trigger("keydown", { key: "Enter", repeat: true });
+  expect(activate).toHaveBeenCalledTimes(2);
+  await wrapper.setProps({ disabled: true });
+  await wrapper.trigger("keydown", { key: "Enter" });
+  await wrapper.trigger("click");
+  expect(activate).toHaveBeenCalledTimes(2);
+  expect(wrapper.attributes("tabindex")).toBe("-1");
+  wrapper.unmount();
 });

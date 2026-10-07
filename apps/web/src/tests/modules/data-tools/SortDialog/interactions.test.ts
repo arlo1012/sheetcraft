@@ -509,6 +509,9 @@ test("dragging sort levels changes the confirmed priority and cancels without ap
   const table = wrapper.getComponent(PrimaryTable);
   const rows = [...(table.props("data") ?? [])];
   expect(table.props("dragSort")).toBe("row-handler");
+  expect(table.findAll("svg.idea-table-drag-icon")).toHaveLength(
+    (table.props("data") ?? []).length,
+  );
   table.vm.$emit("drag-sort", {
     currentIndex: 0,
     targetIndex: 1,

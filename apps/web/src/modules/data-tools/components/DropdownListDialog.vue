@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { ChevronDown, ChevronUp, Pencil, PlusCircle, Trash2 } from "lucide-vue-next";
+import { GripVertical, ChevronDown, ChevronUp, Pencil, PlusCircle, Trash2 } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -332,6 +332,9 @@ async function selectRange(current: string): Promise<string | undefined> {
             @row-dblclick="editItem"
             @drag-sort="reorderItems"
           >
+            <template #drag>
+              <GripVertical class="idea-table-drag-icon" aria-hidden="true" />
+            </template>
             <template #text="{ row, rowIndex }">
               <div class="dropdown-list-dialog__item">
                 <TInput

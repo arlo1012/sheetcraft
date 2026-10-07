@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
 import { computed } from "vue";
-import { ArrowDown, ArrowUp, Pencil, Trash2 } from "lucide-vue-next";
+import { GripVertical, ArrowDown, ArrowUp, Pencil, Trash2 } from "lucide-vue-next";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { PrimaryTable as TTable } from "tdesign-vue-next/es/table";
 import type {
@@ -170,13 +170,16 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
           />
         </div>
       </template>
+      <template #drag>
+        <GripVertical class="idea-table-drag-icon" aria-hidden="true" />
+      </template>
       <template #actions="{ row, rowIndex }">
         <div
           class="conditional-format-rules-table__cell conditional-format-rules-table__actions"
           @dblclick.stop
         >
           <Pencil
-            class="conditional-format-rules-table__action"
+            class="idea-table-action-icon"
             data-cf-action="edit"
             role="button"
             :tabindex="readonly ? -1 : 0"
@@ -188,7 +191,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
             @keydown.space.prevent.stop="editAction(row.id)"
           />
           <Trash2
-            class="conditional-format-rules-table__action"
+            class="idea-table-action-icon"
             data-cf-action="delete"
             role="button"
             :tabindex="readonly ? -1 : 0"
@@ -201,7 +204,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
           />
           <ArrowUp
             v-if="reorderable && !readonly"
-            class="conditional-format-rules-table__action"
+            class="idea-table-action-icon"
             data-cf-action="up"
             role="button"
             :tabindex="canMove(rowIndex, -1) ? 0 : -1"
@@ -214,7 +217,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
           />
           <ArrowDown
             v-if="reorderable && !readonly"
-            class="conditional-format-rules-table__action"
+            class="idea-table-action-icon"
             data-cf-action="down"
             role="button"
             :tabindex="canMove(rowIndex, 1) ? 0 : -1"
@@ -258,25 +261,6 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
   &__actions {
     justify-content: center;
     gap: 4px;
-  }
-  &__action {
-    box-sizing: content-box;
-    width: var(--idea-action-icon-size);
-    height: var(--idea-action-icon-size);
-    padding: 3px;
-    color: var(--idea-text-secondary);
-    cursor: pointer;
-    stroke-width: var(--idea-icon-stroke-width);
-
-    &:hover {
-      color: var(--idea-action-primary);
-    }
-
-    &[aria-disabled="true"] {
-      cursor: default;
-      opacity: 0.45;
-      pointer-events: none;
-    }
   }
   &__error {
     margin: 0;
