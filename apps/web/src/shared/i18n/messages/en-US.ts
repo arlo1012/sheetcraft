@@ -1409,6 +1409,8 @@ export const enUS = {
     defaultFont: "Default font",
     fontFamily: "Font family",
     fontSize: "Font size",
+    increaseFontSize: "Increase font size",
+    decreaseFontSize: "Decrease font size",
     emphasis: "Text emphasis",
     typographyTools: "Text formatting",
     appearanceTools: "Cell appearance",

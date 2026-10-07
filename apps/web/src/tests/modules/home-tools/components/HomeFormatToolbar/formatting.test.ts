@@ -437,7 +437,7 @@ describe("HomeFormatToolbar", () => {
     const cellFirstRow = cellGroup.get(':scope > [data-ribbon-row="1"]');
     const cellSecondRow = cellGroup.get(':scope > [data-ribbon-row="2"]');
     expect(cellFirstRow.get("[data-font-format-control]")).toBeTruthy();
-    expect(cellFirstRow.get("[data-cell-border-control]")).toBeTruthy();
+    expect(cellSecondRow.get("[data-cell-border-control]")).toBeTruthy();
     expect(cellSecondRow.get(".text-format-controls")).toBeTruthy();
     expect(cellSecondRow.get('[data-cell-color-control="text"]')).toBeTruthy();
     expect(cellSecondRow.get('[data-cell-color-control="fill"]')).toBeTruthy();
@@ -625,7 +625,9 @@ describe("HomeFormatToolbar", () => {
     await panel.trigger("keydown", { key: "Tab" });
 
     expect(document.body.querySelector("[data-cell-border-panel]")).toBeNull();
-    expect(document.activeElement).toBe(wrapper.get('[aria-label="Bold"]').element);
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-cell-color-control="fill"] [data-ribbon-split-main]').element,
+    );
   });
 
   test("forwards history shortcuts from the teleported border menus", async () => {

@@ -52,7 +52,9 @@ describe("HomeCellFormatGroup layout", () => {
     const firstRow = wrapper.get('[data-ribbon-row="1"]');
     const secondRow = wrapper.get('[data-ribbon-row="2"]');
     expect(firstRow.get("[data-font-format-control]")).toBeTruthy();
-    expect(firstRow.get("[data-cell-border-control]")).toBeTruthy();
+    expect(firstRow.get('[data-font-size-step="increase"]')).toBeTruthy();
+    expect(firstRow.get('[data-font-size-step="decrease"]')).toBeTruthy();
+    expect(secondRow.get("[data-cell-border-control]")).toBeTruthy();
     expect(secondRow.get(".text-format-controls")).toBeTruthy();
     expect(secondRow.get('[data-cell-color-control="text"]')).toBeTruthy();
     expect(secondRow.get('[data-cell-color-control="fill"]')).toBeTruthy();
@@ -92,6 +94,36 @@ describe("HomeCellFormatGroup layout", () => {
     expect(wrapper.get('[data-cell-color-icon="fill"]').attributes("style")).toContain(
       "--cell-color-indicator: #ffff00",
     );
+  });
+
+  test.each([
+    [13, "increase", 14],
+    [14, "increase", 16],
+    [16, "decrease", 14],
+    [70, "increase", 72],
+    [72, "increase", 74],
+    [90, "decrease", 88],
+    [7, "decrease", 6],
+  ] as const)("adjusts size %s with %s to %s", async (current, direction, expected) => {
+    const wrapper = mountGroup();
+    await wrapper.setProps({
+      state: { ...createStyleState(), fontSize: { value: current, mixed: false } },
+    });
+    await wrapper.get(`[data-font-size-step="${direction}"]`).trigger("click");
+    expect(wrapper.emitted("applyStyle")).toEqual([[{ fontSize: expected }]]);
+    wrapper.unmount();
+  });
+
+  test("disables decreasing at the minimum size", async () => {
+    const wrapper = mountGroup();
+    await wrapper.setProps({
+      state: { ...createStyleState(), fontSize: { value: 1, mixed: false } },
+    });
+    const decrease = wrapper.get('[data-font-size-step="decrease"]');
+    expect(decrease.attributes("aria-disabled")).toBe("true");
+    await decrease.trigger("click");
+    expect(wrapper.emitted("applyStyle")).toBeUndefined();
+    wrapper.unmount();
   });
 
   test.each([

@@ -1362,6 +1362,8 @@ export type MessageSchema = ToolMessageSchema & {
     defaultFont: string;
     fontFamily: string;
     fontSize: string;
+    increaseFontSize: string;
+    decreaseFontSize: string;
     emphasis: string;
     typographyTools: string;
     appearanceTools: string;

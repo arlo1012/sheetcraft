@@ -1377,6 +1377,8 @@ export const zhCN = {
     defaultFont: "默认字体",
     fontFamily: "字体",
     fontSize: "字号",
+    increaseFontSize: "增大字号",
+    decreaseFontSize: "减小字号",
     emphasis: "文本样式",
     typographyTools: "文字格式",
     appearanceTools: "单元格外观",
