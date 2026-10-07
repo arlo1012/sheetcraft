@@ -131,7 +131,7 @@ function openCellFormat(): void {
 .number-format-menu {
   @include ribbon.tool;
 
-  min-width: 62px;
+  min-width: 72px;
 
   &__surface {
     z-index: var(--idea-layer-menu);
