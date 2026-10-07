@@ -158,6 +158,7 @@ const { t } = useAppI18n();
         @activate="emit('insertSparkline')"
         ><Activity /></RibbonButton
       ><RibbonButton
+        variant="tall"
         :label="t('sparkline.remove')"
         :text="t('sparkline.remove')"
         :disabled="sparklineDisabled"

@@ -109,10 +109,9 @@ function insert(type: ChartType) {
 .chart-insert-tools {
   @include ribbon.columns;
   &__columns {
-    display: grid;
+    @include ribbon.two-rows;
     grid-template-columns: repeat(2, auto);
-    grid-template-rows: repeat(2, 1fr);
-    gap: 2px 4px;
+    column-gap: 4px;
   }
 }
 </style>

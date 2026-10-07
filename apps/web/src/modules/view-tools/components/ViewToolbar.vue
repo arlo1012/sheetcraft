@@ -264,10 +264,9 @@ const pageRulerUnitOptions = computed(() => [
     @include ribbon.columns;
   }
   &__checks {
-    display: grid;
+    @include ribbon.two-rows;
     grid-template-columns: repeat(2, max-content);
-    gap: var(--idea-space-1) var(--idea-space-3);
-    align-content: center;
+    column-gap: var(--idea-space-3);
     min-width: 150px;
     padding: 0 var(--idea-space-2);
     font-size: var(--idea-font-size-body-small);

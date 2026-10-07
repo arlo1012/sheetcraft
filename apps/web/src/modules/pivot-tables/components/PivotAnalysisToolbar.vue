@@ -154,10 +154,13 @@ function rename(value: string): void {
     max-width: 180px;
   }
   &__field {
+    box-sizing: border-box;
+    height: var(--ribbon-control-height, 26px);
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
     padding: 2px 6px;
     border: 1px solid var(--idea-border-control);
     border-radius: 3px;
-    min-height: 24px;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
