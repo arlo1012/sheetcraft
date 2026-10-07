@@ -3250,6 +3250,7 @@ const gridInert = computed(
       @close="formulaTools.closeNames"
       @save="formulaTools.saveName"
       @delete="formulaTools.deleteName"
+      @reorder="formulaTools.reorderNames"
     />
     <RangeReferencePicker
       v-if="pickingNameRange"

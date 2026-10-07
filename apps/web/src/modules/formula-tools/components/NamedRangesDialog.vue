@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Check, Pencil, Trash2, X } from "lucide-vue-next";
+import { ArrowDown, ArrowUp, Check, Pencil, Trash2, X } from "lucide-vue-next";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
-import { BaseTable as TTable } from "tdesign-vue-next/es/table";
+import { PrimaryTable as TTable } from "tdesign-vue-next/es/table";
 import type {
-  BaseTableCol,
+  PrimaryTableCol,
+  DragSortContext,
   RowEventContext,
   TableRowAttributes,
   TableRowData,
@@ -49,6 +50,7 @@ const emit = defineEmits<{
   close: [];
   save: [row: NamedRangeDraft, onSaved?: (id: string) => void];
   delete: [id: string];
+  reorder: [ids: string[]];
 }>();
 const { t } = useAppI18n();
 const contentRef = ref<HTMLElement | null>(null);
@@ -128,13 +130,14 @@ function clearFilters(): void {
   nameFilters.value = [];
   searchQuery.value = "";
 }
-const columns = computed<BaseTableCol[]>(() => [
+const columns = computed<PrimaryTableCol[]>(() => [
+  { colKey: "drag", width: 32 },
   { colKey: "name", title: t("formulaTools.name"), width: 140, ellipsis: true },
   { colKey: "value", title: t("formulaTools.value"), width: 140, ellipsis: true },
   { colKey: "reference", title: t("formulaTools.reference"), ellipsis: true },
   { colKey: "scopeLabel", title: t("formulaTools.scope"), width: 110, ellipsis: true },
   { colKey: "comment", title: t("formulaTools.comment"), width: 140, ellipsis: true },
-  { colKey: "actions", title: t("formulaTools.actions"), width: 88, align: "center" },
+  { colKey: "actions", title: t("formulaTools.actions"), width: 144, align: "center" },
 ]);
 const rowAttributes: TableRowAttributes<TableRowData> = ({ row, rowIndex }) => ({
   "data-named-range": String(row.id),
@@ -145,6 +148,36 @@ const referenceChanged = computed(() =>
   Boolean(selectedRange.value && referenceDraft.value !== selectedRange.value.reference),
 );
 
+function reorderNames(orderedIds: string[], selected: string): void {
+  const visibleIds = new Set(filteredRanges.value.map((range) => range.id));
+  if (
+    orderedIds.length !== visibleIds.size ||
+    new Set(orderedIds).size !== visibleIds.size ||
+    orderedIds.some((id) => !visibleIds.has(id))
+  )
+    return;
+  let nextVisible = 0;
+  const ids = props.ranges.map((range) =>
+    visibleIds.has(range.id) ? orderedIds[nextVisible++]! : range.id,
+  );
+  selectedId.value = selected;
+  emit("reorder", ids);
+}
+function reorderRows({ newData, current }: DragSortContext<TableRowData>): void {
+  reorderNames(
+    newData.map((row) => String(row.id)),
+    String(current.id),
+  );
+}
+function moveName(index: number, offset: -1 | 1): void {
+  const ids = filteredRanges.value.map((range) => range.id);
+  const target = index + offset;
+  if (index < 0 || target < 0 || target >= ids.length) return;
+  const [id] = ids.splice(index, 1);
+  if (!id) return;
+  ids.splice(target, 0, id);
+  reorderNames(ids, id);
+}
 function selectRows(keys: Array<string | number>): void {
   selectedId.value = typeof keys[0] === "string" ? keys[0] : undefined;
 }
@@ -257,6 +290,7 @@ watch(
         <TTable
           class="idea-table--mini idea-table--row-dividers"
           row-key="id"
+          drag-sort="row-handler"
           :data="filteredRanges"
           :columns="columns"
           :row-attributes="rowAttributes"
@@ -279,9 +313,10 @@ watch(
           "
           :aria-label="t('formulaTools.namedRanges')"
           @active-change="selectRows"
+          @drag-sort="reorderRows"
           @row-dblclick="editRow"
         >
-          <template #actions="{ row }">
+          <template #actions="{ row, rowIndex }">
             <div class="named-ranges-dialog__row-actions" @dblclick.stop>
               <span
                 v-icon-action
@@ -298,6 +333,22 @@ watch(
                 :title="t('formulaTools.deleteName')"
                 @click.stop="remove(row.id)"
                 ><Trash2 class="idea-action-icon" aria-hidden="true"
+              /></span>
+              <span
+                v-icon-action="rowIndex === 0"
+                data-name-action="up"
+                :aria-label="t('formulaTools.moveNameUp')"
+                :title="t('formulaTools.moveNameUp')"
+                @click.stop="moveName(rowIndex, -1)"
+                ><ArrowUp class="idea-action-icon" aria-hidden="true"
+              /></span>
+              <span
+                v-icon-action="rowIndex === filteredRanges.length - 1"
+                data-name-action="down"
+                :aria-label="t('formulaTools.moveNameDown')"
+                :title="t('formulaTools.moveNameDown')"
+                @click.stop="moveName(rowIndex, 1)"
+                ><ArrowDown class="idea-action-icon" aria-hidden="true"
               /></span>
             </div>
           </template>

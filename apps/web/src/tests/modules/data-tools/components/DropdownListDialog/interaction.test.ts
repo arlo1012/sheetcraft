@@ -1,5 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, expect, test } from "vitest";
+import { PrimaryTable } from "tdesign-vue-next/es/table";
 import { RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import DropdownListDialog from "../../../../../modules/data-tools/components/DropdownListDialog.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
@@ -85,4 +86,80 @@ test("preserves an in-progress range draft while the picker suspends the dialog"
     source: "Sheet1!A1:A3",
     clear: false,
   });
+});
+
+async function dragOption(dialog: ReturnType<typeof mount>, from: number, to: number) {
+  const table = dialog.getComponent(PrimaryTable);
+  const data = table.props("data") ?? [];
+  const newData = [...data];
+  const [row] = newData.splice(from, 1);
+  if (row) newData.splice(to, 0, row);
+  table.vm.$emit("drag-sort", {
+    currentIndex: from,
+    targetIndex: to,
+    current: data[from],
+    target: data[to],
+    data,
+    newData,
+    sort: "row",
+  });
+  await dialog.vm.$nextTick();
+}
+
+test("drags a manual option to its final position and applies the order", async () => {
+  const dialog = mountDialog({ initial: { ...initial(), items: ["Open", "Closed", "Pending"] } });
+  expect(dialog.getComponent(PrimaryTable).props("dragSort")).toBe("row-handler");
+  await dragOption(dialog, 0, 2);
+  expect(dialog.findAll('[role="option"]').map((row) => row.text())).toEqual([
+    "Closed",
+    "Pending",
+    "Open",
+  ]);
+  expect(dialog.findAll('[role="option"]')[2]!.attributes("aria-selected")).toBe("true");
+  await dialog.get("[data-dropdown-confirm]").trigger("click");
+  expect(dialog.emitted("apply")?.[0]?.[0]).toMatchObject({ items: ["Closed", "Pending", "Open"] });
+});
+
+test("dragging duplicate option text preserves each position and cancel leaves the source untouched", async () => {
+  const source = { ...initial(), items: ["Open", "Closed", "Open"] };
+  const dialog = mountDialog({ initial: source });
+  await dragOption(dialog, 2, 1);
+  expect(dialog.findAll('[role="option"]').map((row) => row.text())).toEqual([
+    "Open",
+    "Open",
+    "Closed",
+  ]);
+  await dialog.get("[data-dropdown-cancel]").trigger("click");
+  expect(dialog.emitted("apply")).toBeUndefined();
+  expect(source.items).toEqual(["Open", "Closed", "Open"]);
+});
+
+test("ignores same-position drags and disables drag while editing or using a range", async () => {
+  const dialog = mountDialog();
+  await dragOption(dialog, 0, 0);
+  await dialog.findAll('[role="option"]')[0]!.trigger("dblclick");
+  const filter = dialog.getComponent(PrimaryTable).props("dragSortOptions")?.filter;
+  expect(typeof filter).toBe("function");
+  expect((filter as () => boolean)()).toBe(true);
+  await dialog.get('[aria-label="Edit option"] input').setValue("Still editing");
+  await dragOption(dialog, 0, 1);
+  await dialog.get("[data-dropdown-confirm]").trigger("click");
+  expect(dialog.emitted("apply")?.[0]?.[0]).toMatchObject({ items: ["Still editing", "Closed"] });
+  dialog.findAllComponents(TRadioGroup)[1]!.vm.$emit("update:modelValue", "range");
+  await dialog.vm.$nextTick();
+  expect(dialog.getComponent(PrimaryTable).props("dragSort")).toBeUndefined();
+  await dragOption(dialog, 0, 1);
+  expect(dialog.findAll('[role="option"]').map((row) => row.text())).toEqual([
+    "Still editing",
+    "Closed",
+  ]);
+});
+
+test("double-clicking another row edits that option after a reorder", async () => {
+  const dialog = mountDialog();
+  await dragOption(dialog, 0, 1);
+  await dialog.findAll('[role="option"]')[0]!.trigger("dblclick");
+  await dialog.get('[aria-label="Edit option"] input').setValue("Resolved");
+  await dialog.get("[data-dropdown-confirm]").trigger("click");
+  expect(dialog.emitted("apply")?.[0]?.[0]).toMatchObject({ items: ["Resolved", "Open"] });
 });

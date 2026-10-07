@@ -266,6 +266,20 @@ function move(id: string, offset: -1 | 1): void {
   currentDraft.value.dirty = true;
 }
 
+function reorder(ids: string[]): void {
+  if (scope.value === "selection" || readonly.value) return;
+  const rules = new Map(draftRules.value.map((rule) => [rule.id, rule]));
+  if (
+    ids.length !== rules.size ||
+    new Set(ids).size !== ids.length ||
+    ids.some((id) => !rules.has(id))
+  )
+    return;
+  if (draftRules.value.every((rule, index) => rule.id === ids[index])) return;
+  draftRules.value = ids.map((id) => rules.get(id)!);
+  currentDraft.value.dirty = true;
+}
+
 function save(): void {
   const changes: ConditionalFormatSheetChange[] = [];
   for (const [sheetId, draft] of sheetDrafts.value) {
@@ -346,6 +360,7 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
         @edit="editRow"
         @remove="removeRule"
         @move="move"
+        @reorder="reorder"
         @update-range="updateRange"
         @update-stop="updateStop"
       />

@@ -6,6 +6,7 @@ import {
   createDeleteDefinedNameCommand,
   createSetWorkbookCalculationCommand,
   createUpsertDefinedNameCommand,
+  createReorderDefinedNamesCommand,
   type DefinedNameLabelPosition,
   type DefinedNameDraft,
   type WorkbookCommand,
@@ -199,6 +200,11 @@ export function useFormulaToolsController(options: {
     }
   }
 
+  function reorderNames(ids: string[]): void {
+    if (disabled.value) return;
+    options.execute(createReorderDefinedNamesCommand(options.getWorkbook(), ids));
+  }
+
   function createNamesFromSelection(positions: readonly DefinedNameLabelPosition[]): void {
     try {
       const workbook = options.getWorkbook();
@@ -249,6 +255,7 @@ export function useFormulaToolsController(options: {
     captureNameSelection,
     saveName,
     deleteName,
+    reorderNames,
     createNamesFromSelection,
     updateCalculationSettings,
     recalculate,

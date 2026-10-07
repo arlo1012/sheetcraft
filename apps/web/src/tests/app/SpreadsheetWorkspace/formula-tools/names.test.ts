@@ -1,5 +1,7 @@
 import { flushPromises } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
+import { PrimaryTable } from "tdesign-vue-next/es/table";
+import SheetGrid from "../../../../modules/sheet-grid/components/SheetGrid.vue";
 import { deserializeWorkbook } from "@idea10/core/serialization";
 import SpreadsheetRibbon from "../../../../app/SpreadsheetRibbon.vue";
 import NamedRangesDialog from "../../../../modules/formula-tools/components/NamedRangesDialog.vue";
@@ -56,6 +58,50 @@ describe("SpreadsheetWorkspace defined names", () => {
     await input.trigger("keydown", { key: "s", ctrlKey: true });
     await flushPromises();
     expect(deserializeWorkbook(memory.record().snapshot).definedNames.size).toBe(0);
+  });
+
+  test("persists dragged name order through workspace history and storage", async () => {
+    const memory = createFormulaToolsStore();
+    const wrapper = await mountFormulaToolsWorkspace(memory.store);
+    wrapper.findComponent(SpreadsheetRibbon).vm.$emit("openNames");
+    await flushPromises();
+    const manager = wrapper.getComponent(NamedRangesDialog);
+    for (const name of ["Revenue", "Costs", "Profit"]) {
+      manager.vm.$emit("save", { name, reference: "=Summary!$B$1" });
+      await flushPromises();
+    }
+    const table = manager.getComponent(PrimaryTable);
+    const data = table.props("data") ?? [];
+    table.vm.$emit("drag-sort", {
+      currentIndex: 0,
+      targetIndex: 2,
+      current: data[0],
+      target: data[2],
+      data,
+      newData: [data[1], data[2], data[0]],
+      sort: "row",
+    });
+    await flushPromises();
+    const names = () => manager.props("ranges").map((row) => row.name);
+    expect(names()).toEqual(["Costs", "Profit", "Revenue"]);
+    manager.vm.$emit("close");
+    await flushPromises();
+    wrapper.findComponent(SheetGrid).vm.$emit("undo");
+    await flushPromises();
+    expect(names()).toEqual(["Revenue", "Costs", "Profit"]);
+    wrapper.findComponent(SheetGrid).vm.$emit("redo");
+    await flushPromises();
+    expect(names()).toEqual(["Costs", "Profit", "Revenue"]);
+    await wrapper
+      .findComponent(WorkbookFormulaBar)
+      .get("[data-formula-input]")
+      .trigger("keydown", { key: "s", ctrlKey: true });
+    await flushPromises();
+    expect(
+      [...deserializeWorkbook(memory.record().snapshot).definedNames.values()].map(
+        (name) => name.name,
+      ),
+    ).toEqual(["Costs", "Profit", "Revenue"]);
   });
 
   test("returns to the manager after saving and retains the editor when saving fails", async () => {

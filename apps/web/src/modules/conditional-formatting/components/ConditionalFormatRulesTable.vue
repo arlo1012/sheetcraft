@@ -3,9 +3,10 @@ import type { SheetConditionalFormatRule } from "@idea10/core/conditional-format
 import { computed } from "vue";
 import { ArrowDown, ArrowUp, Pencil, Trash2 } from "lucide-vue-next";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
-import { BaseTable as TTable } from "tdesign-vue-next/es/table";
+import { PrimaryTable as TTable } from "tdesign-vue-next/es/table";
 import type {
-  BaseTableCol,
+  PrimaryTableCol,
+  DragSortContext,
   RowEventContext,
   TableRowAttributes,
   TableRowData,
@@ -34,11 +35,13 @@ const emit = defineEmits<{
   edit: [id: string];
   remove: [id: string];
   move: [id: string, offset: -1 | 1];
+  reorder: [ids: string[]];
   updateRange: [id: string, value: string];
   updateStop: [id: string, value: boolean];
 }>();
 const { t } = useAppI18n();
-const columns = computed<BaseTableCol[]>(() => [
+const columns = computed<PrimaryTableCol[]>(() => [
+  ...(props.reorderable && !props.readonly ? [{ colKey: "drag", width: 32 }] : []),
   { colKey: "description", title: t("conditionalFormatting.rulePriority"), ellipsis: true },
   { colKey: "format", title: t("conditionalFormatting.format"), width: 128 },
   { colKey: "range", title: t("conditionalFormatting.appliesTo"), width: 220 },
@@ -50,6 +53,14 @@ const rowAttributes: TableRowAttributes<TableRowData> = ({ row, rowIndex }) => (
   "aria-selected": String(props.selectedId === row.id),
   tabindex: props.selectedId === row.id || (!props.selectedId && rowIndex === 0) ? "0" : "-1",
 });
+function reorderRows({ newData, current }: DragSortContext<TableRowData>): void {
+  if (!props.reorderable || props.readonly) return;
+  emit(
+    "reorder",
+    newData.map((row) => String(row.id)),
+  );
+  emit("select", String(current.id));
+}
 function selectRows(keys: Array<string | number>): void {
   emit("select", typeof keys[0] === "string" ? keys[0] : undefined);
 }
@@ -84,6 +95,8 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
 <template>
   <TableHeightWrapper v-slot="{ height }">
     <TTable
+      :key="`${Boolean(reorderable)}:${Boolean(readonly)}`"
+      :drag-sort="reorderable && !readonly ? 'row-handler' : undefined"
       class="idea-table--mini"
       row-key="id"
       :data="rows"
@@ -102,6 +115,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
       :empty="t('conditionalFormatting.noRules')"
       :aria-label="t('conditionalFormatting.manageRules')"
       @active-change="selectRows"
+      @drag-sort="reorderRows"
       @row-dblclick="editRow"
     >
       <template #description="{ row }">

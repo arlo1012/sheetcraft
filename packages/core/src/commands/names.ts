@@ -6,6 +6,7 @@ import { setCellContent, type DefinedName, type Workbook } from "../workbook.js"
 import type {
   DeleteDefinedNameCommand,
   FormulaSourceRestore,
+  ReorderDefinedNamesCommand,
   UpsertDefinedNameCommand,
 } from "./contracts.js";
 import { invalidCommandPayload } from "./helpers.js";
@@ -96,6 +97,36 @@ export function createDeleteDefinedNameCommand(
   return { type: "deleteDefinedName", id };
 }
 
+function assertDefinedNameOrder(workbook: Workbook, ids: readonly string[]): void {
+  if (
+    !Array.isArray(ids) ||
+    ids.length !== workbook.definedNames.size ||
+    new Set(ids).size !== ids.length ||
+    ids.some((id) => !workbook.definedNames.has(id))
+  ) {
+    throw invalidCommandPayload("ids", ids);
+  }
+}
+
+export function createReorderDefinedNamesCommand(
+  workbook: Workbook,
+  ids: readonly string[],
+): ReorderDefinedNamesCommand {
+  assertDefinedNameOrder(workbook, ids);
+  return { type: "reorderDefinedNames", ids: [...ids] };
+}
+
+export function applyReorderDefinedNamesCommand(
+  workbook: Workbook,
+  command: ReorderDefinedNamesCommand,
+): ReorderDefinedNamesCommand | null {
+  assertDefinedNameOrder(workbook, command.ids);
+  const previous = [...workbook.definedNames.keys()];
+  if (previous.every((id, index) => id === command.ids[index])) return null;
+  workbook.definedNames = new Map(command.ids.map((id) => [id, workbook.definedNames.get(id)!]));
+  return { type: "reorderDefinedNames", ids: previous };
+}
+
 export function applyUpsertDefinedNameCommand(
   workbook: Workbook,
   command: UpsertDefinedNameCommand,
@@ -118,6 +149,15 @@ export function applyUpsertDefinedNameCommand(
   );
   if (duplicate) throw invalidCommandPayload("definition.name", definition.name);
   const previous = workbook.definedNames.get(definition.id);
+  const previousPosition = [...workbook.definedNames.keys()].indexOf(definition.id);
+  if (
+    command.position !== undefined &&
+    (!Number.isInteger(command.position) ||
+      command.position < 0 ||
+      command.position > workbook.definedNames.size - (previous ? 1 : 0))
+  ) {
+    throw invalidCommandPayload("position", command.position);
+  }
   if (previous && previous.scopeSheetId !== definition.scopeSheetId) {
     throw invalidCommandPayload("definition.scopeSheetId", definition.scopeSheetId);
   }
@@ -138,6 +178,11 @@ export function applyUpsertDefinedNameCommand(
     ? captureFormulaSources(workbook, command.formulaSources)
     : [];
   workbook.definedNames.set(definition.id, cloneDefinedName(definition));
+  if (command.position !== undefined) {
+    const entries = [...workbook.definedNames].filter(([id]) => id !== definition.id);
+    entries.splice(command.position, 0, [definition.id, workbook.definedNames.get(definition.id)!]);
+    workbook.definedNames = new Map(entries);
+  }
   if (command.formulaSources) {
     restoreFormulaSources(workbook, command.formulaSources);
   } else if (previous) {
@@ -148,6 +193,7 @@ export function applyUpsertDefinedNameCommand(
       type: "upsertDefinedName",
       definition: cloneDefinedName(previous),
       formulaSources: inverseFormulaSources,
+      ...(command.position !== undefined ? { position: previousPosition } : {}),
     };
   }
   return { type: "deleteDefinedName", id: definition.id };
@@ -289,8 +335,9 @@ export function applyDeleteDefinedNameCommand(
 ): UpsertDefinedNameCommand | null {
   const previous = workbook.definedNames.get(command.id);
   if (!previous) return null;
+  const position = [...workbook.definedNames.keys()].indexOf(command.id);
   workbook.definedNames.delete(command.id);
-  return { type: "upsertDefinedName", definition: cloneDefinedName(previous) };
+  return { type: "upsertDefinedName", definition: cloneDefinedName(previous), position };
 }
 
 function cloneDefinedName(definition: DefinedName): DefinedName {

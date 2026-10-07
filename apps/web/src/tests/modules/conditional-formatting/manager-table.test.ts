@@ -1,5 +1,6 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, expect, test } from "vitest";
+import { PrimaryTable } from "tdesign-vue-next/es/table";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select } from "tdesign-vue-next/es/select";
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
@@ -279,4 +280,72 @@ test("makes protected sheets read-only", async () => {
   expect(wrapper.find('[data-cf-action="down"]').exists()).toBe(false);
   expect(wrapper.get('[data-cf-range="text-rule"] input').attributes("disabled")).toBeDefined();
   expect(wrapper.get('[data-cf-stop="text-rule"] input').attributes("disabled")).toBeDefined();
+});
+
+function dragFirstRuleLast(wrapper: ReturnType<typeof mount>) {
+  const table = wrapper.getComponent(PrimaryTable);
+  const rows = [...(table.props("data") ?? [])];
+  table.vm.$emit("drag-sort", {
+    currentIndex: 0,
+    targetIndex: rows.length - 1,
+    current: rows[0],
+    target: rows.at(-1),
+    data: rows,
+    newData: [...rows.slice(1), rows[0]],
+    sort: "row",
+  });
+  return table;
+}
+
+test("dragging sheet rules saves the changed priority only on confirmation", async () => {
+  const rules = [textRule, secondRule];
+  const wrapper = mountManager(rules);
+  wrapper.getComponent(Select).vm.$emit("update:modelValue", "sheet");
+  await wrapper.vm.$nextTick();
+  const table = dragFirstRuleLast(wrapper);
+  expect(table.props("dragSort")).toBe("row-handler");
+  await wrapper.vm.$nextTick();
+  expect(wrapper.emitted("save")).toBeUndefined();
+  expect(rules.map((rule) => rule.id)).toEqual(["text-rule", "second-rule"]);
+  saveManager(wrapper);
+  expect(
+    (wrapper.emitted("save")?.[0]?.[0] as SheetConditionalFormatRule[]).map((rule) => rule.id),
+  ).toEqual(["second-rule", "text-rule"]);
+});
+
+test("cancelling dragged priorities restores the sheet rules on reopening", async () => {
+  const wrapper = mountManager([textRule, secondRule]);
+  wrapper.getComponent(Select).vm.$emit("update:modelValue", "sheet");
+  await wrapper.vm.$nextTick();
+  dragFirstRuleLast(wrapper);
+  await wrapper.vm.$nextTick();
+  wrapper.getComponent(Dialog).vm.$emit("close");
+  expect(wrapper.emitted("save")).toBeUndefined();
+  await wrapper.setProps({ visible: false });
+  await wrapper.setProps({ visible: true });
+  saveManager(wrapper);
+  expect(
+    (wrapper.emitted("save")?.[0]?.[0] as SheetConditionalFormatRule[]).map((rule) => rule.id),
+  ).toEqual(["text-rule", "second-rule"]);
+});
+
+test("filtered selection and protected sheets reject dragged priorities", async () => {
+  const visibleSecond = { ...textRule, id: "visible-second" };
+  const wrapper = mountManager([textRule, secondRule, visibleSecond]);
+  expect(dragFirstRuleLast(wrapper).props("dragSort")).toBeUndefined();
+  await wrapper.vm.$nextTick();
+  saveManager(wrapper);
+  expect(
+    (wrapper.emitted("save")?.[0]?.[0] as SheetConditionalFormatRule[]).map((rule) => rule.id),
+  ).toEqual(["text-rule", "second-rule", "visible-second"]);
+  const locked = mountManager([], undefined, {
+    sheets: [{ ...summarySheet, id: "locked", protected: true, rules: [textRule, visibleSecond] }],
+    sheetId: "locked",
+  });
+  locked.getComponent(Select).vm.$emit("update:modelValue", "sheet:locked");
+  await locked.vm.$nextTick();
+  expect(dragFirstRuleLast(locked).props("dragSort")).toBeUndefined();
+  await locked.vm.$nextTick();
+  saveManager(locked);
+  expect(locked.emitted("saveSheets")).toEqual([[[]]]);
 });

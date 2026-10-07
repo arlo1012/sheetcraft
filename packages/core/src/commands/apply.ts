@@ -104,7 +104,11 @@ import {
   applySetCellHyperlinkCommand,
 } from "./hyperlinks.js";
 import { applySetCellNotesCommand } from "./notes.js";
-import { applyDeleteDefinedNameCommand, applyUpsertDefinedNameCommand } from "./names.js";
+import {
+  applyDeleteDefinedNameCommand,
+  applyUpsertDefinedNameCommand,
+  applyReorderDefinedNamesCommand,
+} from "./names.js";
 import { applySetDefinedNamesCommand } from "./names-from-selection.js";
 import {
   applyCreateTableCommand,
@@ -296,6 +300,8 @@ export function applyWorkbookCommand(
         return applySetWorkbookThemeCommand(workbook, command);
       case "setWorkbookCellStyles":
         return applySetWorkbookCellStylesCommand(workbook, command);
+      case "reorderDefinedNames":
+        return applyReorderDefinedNamesCommand(workbook, command);
       case "setDefinedNames":
         return applySetDefinedNamesCommand(workbook, command);
       case "upsertDefinedName":

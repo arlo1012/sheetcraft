@@ -6,9 +6,10 @@ import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { Select as TSelect, Option as TOption } from "tdesign-vue-next/es/select";
-import { BaseTable as TTable } from "tdesign-vue-next/es/table";
+import { PrimaryTable as TTable } from "tdesign-vue-next/es/table";
 import type {
-  BaseTableCol,
+  PrimaryTableCol,
+  DragSortContext,
   TableRowAttributes,
   TableRowData,
 } from "tdesign-vue-next/es/table/type";
@@ -223,7 +224,8 @@ const canApply = computed(
           : true,
     ),
 );
-const tableColumns = computed<BaseTableCol[]>(() => [
+const tableColumns = computed<PrimaryTableCol[]>(() => [
+  { colKey: "drag", width: 32 },
   { colKey: "column", title: t("dataTools.sort.column"), width: 300 },
   { colKey: "basis", title: t("dataTools.sort.sortOn"), width: 150 },
   { colKey: "direction", title: t("dataTools.sort.order") },
@@ -298,6 +300,20 @@ function moveLevel(index: number, offset: -1 | 1): void {
     selectedId.value = row.id;
   }
 }
+function reorderLevels({ currentIndex, targetIndex }: DragSortContext<TableRowData>): void {
+  if (
+    currentIndex === targetIndex ||
+    currentIndex < 0 ||
+    targetIndex < 0 ||
+    currentIndex >= rows.value.length ||
+    targetIndex >= rows.value.length
+  )
+    return;
+  const [row] = rows.value.splice(currentIndex, 1);
+  if (!row) return;
+  rows.value.splice(targetIndex, 0, row);
+  selectedId.value = row.id;
+}
 function openOptions(): void {
   optionCaseSensitive.value = caseSensitive.value;
   optionSortMethod.value = sortMethod.value;
@@ -366,6 +382,7 @@ function apply(): void {
         <TTable
           class="idea-table--mini idea-table--row-dividers"
           row-key="id"
+          drag-sort="row-handler"
           :data="rows"
           :columns="tableColumns"
           :row-attributes="rowAttributes"
@@ -380,6 +397,7 @@ function apply(): void {
           hover
           :aria-label="t('dataTools.sort.title')"
           @active-change="selectRows"
+          @drag-sort="reorderLevels"
         >
           <template #column="{ row, rowIndex }">
             <div class="sort-dialog__column">

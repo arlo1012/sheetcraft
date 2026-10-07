@@ -14,6 +14,8 @@ export type FormulaToolsMessageSchema = {
     otherFunctions: string;
     autoSum: string;
     autoSumMenu: string;
+    moveNameUp: string;
+    moveNameDown: string;
     actions: string;
     nameManager: string;
     createNamesFromSelection: string;

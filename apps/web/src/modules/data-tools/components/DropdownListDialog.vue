@@ -6,6 +6,15 @@ import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput, type InputValue } from "tdesign-vue-next/es/input";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
+import { PrimaryTable as TTable } from "tdesign-vue-next/es/table";
+import type {
+  DragSortContext,
+  PrimaryTableCol,
+  RowEventContext,
+  TableRowAttributes,
+  TableRowData,
+} from "tdesign-vue-next/es/table/type";
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { vIconAction } from "../../../shared/focus/icon-action";
@@ -45,6 +54,43 @@ const draft = ref<DropdownListDraft>(createDraft(props.initial));
 const selectedIndex = ref(-1);
 const editingIndex = ref<number>();
 const editingValue = ref("");
+const canDrag = computed(() => draft.value.mode === "manual" && editingIndex.value === undefined);
+const itemRows = computed(() => draft.value.items.map((text, id) => ({ id, text })));
+const itemColumns = computed<PrimaryTableCol[]>(() => [
+  ...(draft.value.mode === "manual" ? [{ colKey: "drag", width: 32 }] : []),
+  { colKey: "text" },
+]);
+const itemDragOptions = {
+  filter: () => !canDrag.value,
+  preventOnFilter: false,
+};
+const itemAttributes: TableRowAttributes<TableRowData> = ({ rowIndex }) => ({
+  role: "option",
+  "aria-selected": String(selectedIndex.value === rowIndex),
+});
+function reorderItems({ currentIndex, targetIndex }: DragSortContext<TableRowData>): void {
+  if (
+    !canDrag.value ||
+    currentIndex === targetIndex ||
+    currentIndex < 0 ||
+    targetIndex < 0 ||
+    currentIndex >= draft.value.items.length ||
+    targetIndex >= draft.value.items.length
+  )
+    return;
+  const [item] = draft.value.items.splice(currentIndex, 1);
+  draft.value.items.splice(targetIndex, 0, item!);
+  selectedIndex.value = targetIndex;
+  markChanged();
+}
+function selectItem(keys: Array<string | number>): void {
+  if (draft.value.mode === "manual" && typeof keys[0] === "number") selectedIndex.value = keys[0];
+}
+function editItem({ index, e }: RowEventContext<TableRowData>): void {
+  if (draft.value.mode !== "manual" || (e.target instanceof Element && e.target.closest("input")))
+    return;
+  beginEdit(index);
+}
 const itemInput = ref<{ focus(): void }>();
 const canConfirm = computed(() => {
   if (draft.value.clear) return true;
@@ -152,7 +198,7 @@ function moveSelected(offset: number): void {
   markChanged();
 }
 function onListKeydown(event: KeyboardEvent): void {
-  if (editingIndex.value !== undefined) return;
+  if (draft.value.mode !== "manual" || editingIndex.value !== undefined) return;
   if (event.key === "ArrowDown") {
     event.preventDefault();
     selectedIndex.value = Math.min(selectedIndex.value + 1, draft.value.items.length - 1);
@@ -262,27 +308,46 @@ async function selectRange(current: string): Promise<string | undefined> {
         :aria-label="t('dataTools.dropdown.manual')"
         @keydown="onListKeydown"
       >
-        <div
-          v-for="(item, index) in draft.items"
-          :key="`${index}:${item}`"
-          class="dropdown-list-dialog__item"
-          :class="{ 'is-editing': editingIndex === index }"
-          role="option"
-          :aria-selected="selectedIndex === index"
-          @click="selectedIndex = index"
-          @dblclick="beginEdit(index)"
-        >
-          <TInput
-            v-if="editingIndex === index"
-            :ref="setItemInput"
-            v-model="editingValue"
-            :aria-label="t('dataTools.dropdown.edit')"
-            @focus="onEditorFocus"
-            @keydown="onEditorKeydown"
-            @blur="commitEdit"
-          />
-          <span v-else>{{ item }}</span>
-        </div>
+        <TableHeightWrapper v-slot="{ height }">
+          <TTable
+            :key="draft.mode"
+            class="idea-table--mini"
+            row-key="id"
+            :data="itemRows"
+            :columns="itemColumns"
+            :row-attributes="itemAttributes"
+            :drag-sort="draft.mode === 'manual' ? 'row-handler' : undefined"
+            :drag-sort-options="itemDragOptions"
+            :active-row-keys="selectedIndex >= 0 ? [selectedIndex] : []"
+            active-row-type="single"
+            :disable-space-inactive-row="true"
+            :show-header="false"
+            :height="height"
+            :bordered="false"
+            size="small"
+            table-layout="fixed"
+            empty=""
+            hover
+            @active-change="selectItem"
+            @row-dblclick="editItem"
+            @drag-sort="reorderItems"
+          >
+            <template #text="{ row, rowIndex }">
+              <div class="dropdown-list-dialog__item">
+                <TInput
+                  v-if="editingIndex === rowIndex"
+                  :ref="setItemInput"
+                  v-model="editingValue"
+                  :aria-label="t('dataTools.dropdown.edit')"
+                  @focus="onEditorFocus"
+                  @keydown="onEditorKeydown"
+                  @blur="commitEdit"
+                />
+                <span v-else>{{ row.text }}</span>
+              </div>
+            </template>
+          </TTable>
+        </TableHeightWrapper>
       </div>
       <TRadioGroup
         :model-value="draft.mode"
@@ -326,8 +391,6 @@ async function selectRange(current: string): Promise<string | undefined> {
 </template>
 
 <style scoped lang="scss">
-@use "../../../shared/option-list/option-list";
-
 .dropdown-list-dialog {
   display: grid;
   gap: var(--idea-space-2);
@@ -354,29 +417,20 @@ async function selectRange(current: string): Promise<string | undefined> {
   }
 }
 .dropdown-list-dialog__list {
-  @include option-list.surface;
   height: 190px;
+  min-height: 0;
+  min-width: 0;
   outline: none;
 }
 .dropdown-list-dialog__list--disabled {
-  color: var(--idea-text-disabled);
-  background: var(--td-bg-color-container-disabled);
+  opacity: 0.55;
 }
 .dropdown-list-dialog__item {
-  @include option-list.item;
+  display: flex;
+  align-items: center;
   min-height: 28px;
-  padding: 4px 8px;
+  min-width: 0;
   white-space: normal;
-
-  &[aria-selected="true"] {
-    font-weight: var(--idea-font-weight-medium);
-  }
-
-  &.is-editing,
-  &.is-editing:hover {
-    padding: 0;
-    background: transparent;
-  }
 }
 .dropdown-list-dialog__error {
   margin: 0;

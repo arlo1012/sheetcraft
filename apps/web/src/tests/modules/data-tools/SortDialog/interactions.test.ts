@@ -1,3 +1,4 @@
+import { PrimaryTable } from "tdesign-vue-next/es/table";
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import CustomSortListDialog from "../../../../modules/data-tools/components/CustomSortListDialog.vue";
@@ -500,4 +501,46 @@ describe("SortDialog", () => {
     dialogs[0]!.vm.$emit("close");
     expect(wrapper.emitted("close")).toHaveLength(1);
   });
+});
+
+test("dragging sort levels changes the confirmed priority and cancels without applying", async () => {
+  const { wrapper, action, confirm } = fixture();
+  await action("add");
+  const table = wrapper.getComponent(PrimaryTable);
+  const rows = [...(table.props("data") ?? [])];
+  expect(table.props("dragSort")).toBe("row-handler");
+  table.vm.$emit("drag-sort", {
+    currentIndex: 0,
+    targetIndex: 1,
+    current: rows[0],
+    target: rows[1],
+    data: rows,
+    newData: [rows[1], rows[0]],
+    sort: "row",
+  });
+  await wrapper.vm.$nextTick();
+  expect((table.props("data") ?? []).map((row) => row.id)).toEqual([rows[1]!.id, rows[0]!.id]);
+  confirm();
+  expect(wrapper.emitted("apply")?.[0]?.[0]).toMatchObject({
+    levels: [{ column: 1 }, { column: 0 }],
+  });
+  await wrapper.setProps({ visible: false });
+  await wrapper.setProps({ visible: true });
+  await action("add");
+  const reopenedRows = [...(table.props("data") ?? [])];
+  table.vm.$emit("drag-sort", {
+    currentIndex: 0,
+    targetIndex: 1,
+    current: reopenedRows[0],
+    target: reopenedRows[1],
+    data: reopenedRows,
+    newData: [...reopenedRows].reverse(),
+    sort: "row",
+  });
+  await wrapper.vm.$nextTick();
+  wrapper.findAllComponents({ name: "TDialog" })[0]!.vm.$emit("close");
+  expect(wrapper.emitted("apply")).toHaveLength(1);
+  await wrapper.setProps({ visible: false });
+  await wrapper.setProps({ visible: true });
+  expect(table.props("data")).toHaveLength(1);
 });

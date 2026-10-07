@@ -623,8 +623,16 @@ export type ConditionalFormatFormulaSourceRestore = {
 export type UpsertDefinedNameCommand = {
   type: "upsertDefinedName";
   definition: DefinedName;
+  /** Original zero-based position when restoring a deleted name. */
+  position?: number;
   /** Exact raw formula sources restored by a defined-name rename inverse. */
   formulaSources?: FormulaSourceRestore[];
+};
+
+export type ReorderDefinedNamesCommand = {
+  type: "reorderDefinedNames";
+  /** Complete permutation of the workbook's defined-name IDs. */
+  ids: string[];
 };
 
 export type DeleteDefinedNameCommand = {
@@ -882,6 +890,7 @@ export type WorkbookCommand =
   | DeleteSheetCommand
   | SetSheetPropertiesCommand
   | RenameSheetCommand
+  | ReorderDefinedNamesCommand
   | UpsertDefinedNameCommand
   | DeleteDefinedNameCommand
   | MoveSheetCommand
@@ -1077,6 +1086,7 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "sheets.rename";
     case "moveSheet":
       return "sheets.move";
+    case "reorderDefinedNames":
     case "upsertDefinedName":
     case "deleteDefinedName":
     case "setDefinedNames":
