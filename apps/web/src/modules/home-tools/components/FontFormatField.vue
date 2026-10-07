@@ -114,7 +114,12 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
 </script>
 
 <template>
-  <div ref="control" class="font-format-field" @click="clickInput">
+  <div
+    ref="control"
+    class="font-format-field"
+    :class="{ 'is-disabled': disabled, 'is-open': open }"
+    @click="clickInput"
+  >
     <TSelectInput
       class="idea-ribbon-font-input"
       :value="draft"
@@ -176,19 +181,36 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/ribbon/ribbon-actions" as ribbon;
+
 .font-format-field {
+  position: relative;
   width: 100%;
   min-width: 0;
+
+  &:not(.is-disabled):is(:hover, .is-open)::after {
+    position: absolute;
+    inset: 1px;
+    border-radius: var(--idea-radius-default);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--idea-text-primary) 14%, transparent);
+    content: "";
+    pointer-events: none;
+  }
 
   &__arrow {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 16px;
-    height: 20px;
+    width: 12px;
+    height: var(--ribbon-control-height, 26px);
     background: transparent;
     cursor: pointer;
-    border-radius: var(--idea-radius-small);
+    @include ribbon.feedback;
+    --ribbon-feedback-inset: 1px 1px 1px 0;
+
+    &::before {
+      border-radius: 0 var(--idea-radius-default) var(--idea-radius-default) 0;
+    }
 
     &[aria-disabled="true"] {
       cursor: not-allowed;

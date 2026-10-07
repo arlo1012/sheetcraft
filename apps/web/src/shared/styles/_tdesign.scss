@@ -581,7 +581,7 @@
   }
 }
 
-// Ribbon font editing stays visually plain even while the input has focus.
+// Ribbon font fields share split-action feedback, without input chrome.
 .idea-ribbon-font-input .t-input {
   &,
   &:hover,
@@ -590,10 +590,21 @@
   &.t-input--focused,
   &.t-is-disabled {
     height: var(--ribbon-control-height, 26px);
-    padding-right: 0;
+    padding: 0;
     border: 0;
     background: transparent;
     box-shadow: none;
+  }
+
+  .t-input__inner {
+    min-width: 0;
+    height: calc(var(--ribbon-control-height, 26px) - 2px);
+    padding-left: 6px;
+    border-radius: var(--idea-radius-default) 0 0 var(--idea-radius-default);
+
+    &:hover:not(:disabled) {
+      background: var(--idea-icon-button-hover-bg);
+    }
   }
 
   .t-input__suffix {
