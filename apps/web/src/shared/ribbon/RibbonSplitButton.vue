@@ -150,10 +150,16 @@ function toggleMenu(): void {
     height: var(--idea-ribbon-content-height, 54px);
     padding: 0;
 
-    > [aria-pressed="true"]:not([aria-disabled="true"])::before,
-    > [aria-expanded="true"]:not([aria-disabled="true"])::before,
-    > [role="button"]:active:not([aria-disabled="true"])::before {
+    &:has(> [aria-pressed="true"][aria-disabled="false"])::after,
+    &:has(> [aria-expanded="true"][aria-disabled="false"])::after,
+    &:has(> [aria-disabled="false"]:hover)::after,
+    &:has(> [aria-disabled="false"]:active)::after {
+      position: absolute;
+      inset: 1px;
+      border-radius: var(--idea-radius-default);
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--idea-text-primary) 24%, transparent);
+      content: "";
+      pointer-events: none;
     }
 
     &.is-full-width {
@@ -173,10 +179,10 @@ function toggleMenu(): void {
     .ribbon-split-button__menu {
       gap: 2px;
       padding: 0 2px;
-      border-radius: 0;
+      border-radius: 0 0 var(--idea-radius-default) var(--idea-radius-default);
 
       &::before {
-        border-radius: 0;
+        border-radius: 0 0 var(--idea-radius-default) var(--idea-radius-default);
       }
     }
   }
