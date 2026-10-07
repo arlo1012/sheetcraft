@@ -194,23 +194,20 @@ function setFontSize(value: SelectValue): void {
     >
       <span class="ui-visually-hidden">{{ t("format.fontSize") }}</span>
       <TSelect
-        class="font-format-controls__size idea-ribbon-select idea-ribbon-select--compact"
-        borderless
+        class="font-format-controls__size"
+        size="small"
         filterable
         creatable
         v-model:input-value="fontSizeInput"
         v-model:popup-visible="fontSizePopupVisible"
         :model-value="fontSizeValue"
         :options="fontSizeOptions"
-        :input-props="{ align: 'center' }"
         :popup-props="resolvedFontSizePopupProps"
         :placeholder="state.fontSize.mixed ? '' : undefined"
         :disabled="disabled"
         @change="setFontSize"
         @create="setFontSize"
-      >
-        <template #suffixIcon><RibbonDropdownArrow :expanded="fontSizePopupVisible" /></template>
-      </TSelect>
+      />
     </label>
   </div>
 </template>
@@ -228,23 +225,24 @@ function setFontSize(value: SelectValue): void {
     flex: 0 0 auto;
     min-width: 0;
     height: var(--ribbon-control-height, 26px);
-    overflow: hidden;
-    border-radius: var(--idea-radius-small);
+    align-items: center;
 
     &--family {
+      overflow: hidden;
+      border-radius: var(--idea-radius-small);
       width: var(--cell-format-font-width, 126px);
     }
 
     &--size {
-      width: var(--cell-format-font-size-width, 40px);
+      width: var(--cell-format-font-size-width, 64px);
     }
   }
 
-  &:not(.is-disabled) &__field:is(:hover, :focus-within) {
+  &:not(.is-disabled) &__field--family:is(:hover, :focus-within) {
     background: var(--idea-icon-button-hover-bg);
   }
 
-  &.is-disabled &__field {
+  &.is-disabled &__field--family {
     background: var(--idea-surface-disabled);
   }
 

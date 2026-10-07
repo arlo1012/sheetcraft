@@ -84,7 +84,7 @@ const { t } = useAppI18n();
   @include ribbon.dialog-launcher-anchor;
 
   --cell-format-font-width: 126px;
-  --cell-format-font-size-width: 48px;
+  --cell-format-font-size-width: 64px;
   --cell-format-gap: 4px;
 
   &__row {

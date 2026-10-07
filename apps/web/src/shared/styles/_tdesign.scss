@@ -614,20 +614,4 @@
     width: 12px;
     height: 12px;
   }
-
-  &.idea-ribbon-select--compact {
-    .t-input {
-      padding-right: 3px;
-      padding-left: 4px;
-    }
-
-    .t-input__suffix {
-      margin-left: 1px;
-    }
-
-    .t-fake-arrow {
-      width: 10px;
-      height: 10px;
-    }
-  }
 }
