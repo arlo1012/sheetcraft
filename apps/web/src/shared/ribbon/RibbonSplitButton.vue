@@ -154,10 +154,10 @@ function toggleMenu(): void {
     }
 
     .ribbon-split-button__menu {
-      align-self: center;
-      height: 20px;
+      align-self: end;
+      height: calc(100% - 3px);
       gap: 2px;
-      padding: 0 2px;
+      padding: 0 2px 3px;
       border-radius: 0 0 2px 2px;
     }
   }
