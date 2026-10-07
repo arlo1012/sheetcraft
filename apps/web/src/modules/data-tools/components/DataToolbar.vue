@@ -2,20 +2,20 @@
 import {
   SquarePlus,
   SquareMinus,
-  Rows3,
+  Sigma,
   Columns3,
-  TableProperties,
+  Search,
   Combine,
-  Database,
-  Filter,
-  ShieldCheck,
-  ListFilter,
+  RefreshCw,
+  FunnelX,
+  ListChecks,
   ClipboardCheck,
 } from "lucide-vue-next";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { DataToolCapabilities } from "../data-tools-types";
+import DropdownListIcon from "./DropdownListIcon.vue";
 import DataSimulationTool from "./DataSimulationTool.vue";
 import DataOutlineTools from "./DataOutlineTools.vue";
 import DataFilterTool from "./DataFilterTool.vue";
@@ -119,14 +119,14 @@ const { t } = useAppI18n();
           :text="t('dataTools.filter.showAll')"
           data-data-action="clear-filter"
           @activate="emit('clearFilter')"
-          ><Filter /></RibbonButton
+          ><FunnelX /></RibbonButton
         ><RibbonButton
           :disabled="(filterCriteriaDisabled ?? disabled) || !filterActive"
           :label="t('dataTools.filter.reapply')"
           :text="t('dataTools.filter.reapply')"
           data-data-action="reapply-filter"
           @activate="emit('reapplyFilter')"
-          ><Database
+          ><RefreshCw
         /></RibbonButton>
       </div>
     </section>
@@ -160,7 +160,7 @@ const { t } = useAppI18n();
         :text="t('dataTools.lookupFill.title')"
         data-data-action="lookup-fill"
         @activate="emit('openLookupFill')"
-        ><TableProperties
+        ><Search
       /></RibbonButton>
       <DataComparisonTool
         :disabled="comparisonDisabled ?? disabled"
@@ -186,7 +186,7 @@ const { t } = useAppI18n();
         :text="t('dataTools.dropdownList')"
         data-data-action="dropdown-list"
         @activate="emit('openDropdownList')"
-        ><ListFilter
+        ><DropdownListIcon
       /></RibbonButton>
       <RibbonButton
         variant="tall"
@@ -195,7 +195,7 @@ const { t } = useAppI18n();
         :text="t('dataTools.validation.title')"
         data-data-action="validation"
         @activate="emit('openValidation')"
-        ><ShieldCheck
+        ><ListChecks
       /></RibbonButton>
       <RibbonButton
         variant="tall"
@@ -242,7 +242,7 @@ const { t } = useAppI18n();
         :text="t('dataTools.outline.subtotal')"
         data-data-action="subtotal"
         @activate="emit('openSubtotal')"
-        ><Rows3 /></RibbonButton
+        ><Sigma /></RibbonButton
       ><DataOutlineTools
         :disabled="disabled"
         :ungroup-rows="capabilities.ungroupRows"

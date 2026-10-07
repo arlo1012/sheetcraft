@@ -11,7 +11,6 @@ import {
   BarChart3,
   Palette,
   Shapes,
-  TableProperties,
   ArrowDown,
   ArrowUp,
   Percent,
@@ -22,6 +21,7 @@ import {
   TextCursorInput,
 } from "lucide-vue-next";
 import type { ConditionalFormatPresetKind } from "../conditional-format-presets";
+import ConditionalFormattingToolIcon from "./ConditionalFormattingToolIcon.vue";
 import ConditionalFormatPresetGallery from "./ConditionalFormatPresetGallery.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -139,7 +139,7 @@ function onMenuKeydown(event: KeyboardEvent): void {
       variant="tall"
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
-      ><TableProperties aria-hidden="true"
+      ><ConditionalFormattingToolIcon
     /></RibbonMenuButton>
     <Teleport to="body">
       <MenuSurface

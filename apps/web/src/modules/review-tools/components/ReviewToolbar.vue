@@ -2,7 +2,7 @@
 import {
   SpellCheck,
   FileSearch,
-  ShieldCheck,
+  KeyRound,
   LockKeyhole,
   SquarePen,
   BookLock,
@@ -205,7 +205,7 @@ const protectionLabel = computed(() =>
         :text="t('review.encryptDocument')"
         data-review-action="encrypt-document"
         @activate="emit('encryptDocument')"
-        ><ShieldCheck
+        ><KeyRound
       /></RibbonButton>
     </section>
     <section class="review-toolbar__group" role="group" :aria-label="t('review.toTraditional')">

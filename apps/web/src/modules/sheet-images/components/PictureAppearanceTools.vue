@@ -3,7 +3,7 @@ import { computed, nextTick, ref, useId } from "vue";
 import {
   Palette,
   Square,
-  Sun,
+  Sparkles,
   Blend,
   RotateCcw,
   Pipette,
@@ -150,7 +150,7 @@ function reset(): void {
       :menu-id="menuId"
       @activate="toggle('effects')"
       @keydown="keydown('effects', $event)"
-      ><Sun
+      ><Sparkles
     /></RibbonMenuButton>
     <RibbonMenuButton
       ref="borderButton"

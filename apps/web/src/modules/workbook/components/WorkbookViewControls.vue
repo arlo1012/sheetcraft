@@ -1,14 +1,6 @@
 <script setup lang="ts">
-import {
-  Eye,
-  FileText,
-  Maximize2,
-  Minimize2,
-  Minus,
-  PanelsTopLeft,
-  Plus,
-  Table2,
-} from "lucide-vue-next";
+import { Eye, FileText, Maximize2, Minimize2, Minus, Plus, Table2 } from "lucide-vue-next";
+import SheetPageBreakIcon from "../../../shared/sheet-view/SheetPageBreakIcon.vue";
 import SheetHighlightControl from "../../../shared/sheet-view/SheetHighlightControl.vue";
 import SheetZoomMenu from "../../../shared/sheet-view/SheetZoomMenu.vue";
 import WorkbookDisplaySettings from "./WorkbookDisplaySettings.vue";
@@ -126,7 +118,7 @@ function onNativeSliderInput(event: Event): void {
         data-view-control="page-break-preview"
         @click="emit('update:viewMode', 'page-break-preview')"
       >
-        <PanelsTopLeft :size="15" aria-hidden="true" />
+        <SheetPageBreakIcon />
       </span>
       <span
         v-icon-action

@@ -1,11 +1,6 @@
 <script setup lang="ts">
-import {
-  AlignHorizontalSpaceBetween,
-  TextAlignCenter,
-  TextAlignEnd,
-  TextAlignJustify,
-  TextAlignStart,
-} from "lucide-vue-next";
+import { TextAlignCenter, TextAlignEnd, TextAlignJustify, TextAlignStart } from "lucide-vue-next";
+import CellDistributedAlignmentIcon from "./CellDistributedAlignmentIcon.vue";
 import { computed } from "vue";
 import type { CellStylePatch, HorizontalCellAlignment } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
@@ -97,7 +92,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="distributed"
       @activate="align('distributed')"
     >
-      <AlignHorizontalSpaceBetween aria-hidden="true" />
+      <CellDistributedAlignmentIcon />
     </RibbonButton>
   </div>
 </template>

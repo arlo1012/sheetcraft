@@ -7,7 +7,7 @@ defineProps<{ increase: boolean }>();
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    stroke-width="1.5"
+    style="stroke-width: var(--idea-icon-stroke-width)"
     stroke-linecap="round"
     stroke-linejoin="round"
     aria-hidden="true"

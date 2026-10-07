@@ -12,11 +12,11 @@ import {
   Table2,
   Shapes,
   Type,
-  Sparkles,
+  ALargeSmall,
   Star,
   Sigma,
   Omega,
-  ScanLine,
+  Scan,
   Activity,
   Eraser,
 } from "lucide-vue-next";
@@ -109,7 +109,7 @@ const { t } = useAppI18n();
         :disabled="imageDisabled"
         data-insert-tool="screenshot"
         @activate="emit('captureScreen')"
-        ><ScanLine
+        ><Scan
       /></RibbonButton>
       <RibbonButton
         variant="tall"
@@ -136,7 +136,7 @@ const { t } = useAppI18n();
         :disabled="imageDisabled"
         data-insert-tool="wordArt"
         @activate="emit('insertDrawing', 'wordArt')"
-        ><Sparkles
+        ><ALargeSmall
       /></RibbonButton>
       <RibbonButton
         variant="tall"

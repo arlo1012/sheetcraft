@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, ListFilter } from "lucide-vue-next";
+import { Check, Funnel } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -93,7 +93,7 @@ function clearFilter(): void {
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
     >
-      <ListFilter aria-hidden="true" />
+      <Funnel aria-hidden="true" />
     </RibbonMenuButton>
 
     <Teleport to="body">

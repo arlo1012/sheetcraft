@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { Eye, Maximize2, Minimize2, PanelsTopLeft, TableProperties } from "lucide-vue-next";
+import { Eye, Maximize2, Minimize2, FileText, Table2, Search, View } from "lucide-vue-next";
 import { computed } from "vue";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
+import SheetPageBreakIcon from "../../../shared/sheet-view/SheetPageBreakIcon.vue";
 import SheetFreezeMenu from "../../../shared/sheet-view/SheetFreezeMenu.vue";
 import SheetHighlightControl from "../../../shared/sheet-view/SheetHighlightControl.vue";
 import SheetZoomMenu from "../../../shared/sheet-view/SheetZoomMenu.vue";
@@ -113,7 +114,7 @@ const pageRulerUnitOptions = computed(() => [
         :pressed="viewMode === 'normal'"
         data-view-tool="normal-view"
         @activate="emit('update:viewMode', 'normal')"
-        ><TableProperties aria-hidden="true"
+        ><Table2 aria-hidden="true"
       /></RibbonButton>
       <RibbonButton
         variant="tall"
@@ -122,7 +123,7 @@ const pageRulerUnitOptions = computed(() => [
         :pressed="viewMode === 'page-break-preview'"
         data-view-tool="page-break-preview"
         @activate="emit('update:viewMode', 'page-break-preview')"
-        ><PanelsTopLeft aria-hidden="true"
+        ><SheetPageBreakIcon
       /></RibbonButton>
       <RibbonButton
         variant="tall"
@@ -131,7 +132,7 @@ const pageRulerUnitOptions = computed(() => [
         :pressed="viewMode === 'page-layout'"
         data-view-tool="page-layout-view"
         @activate="emit('update:viewMode', 'page-layout')"
-        ><PanelsTopLeft aria-hidden="true"
+        ><FileText aria-hidden="true"
       /></RibbonButton>
       <!-- TODO: custom views need persisted view-state snapshots, not a local visual toggle. -->
       <RibbonButton
@@ -141,7 +142,7 @@ const pageRulerUnitOptions = computed(() => [
         disabled
         :title="t('viewTools.unavailable')"
         data-view-tool="custom-views"
-        ><Eye aria-hidden="true"
+        ><View aria-hidden="true"
       /></RibbonButton>
     </section>
 
@@ -230,7 +231,7 @@ const pageRulerUnitOptions = computed(() => [
         text="100%"
         data-view-tool="zoom-100"
         @activate="emit('update:zoom', 100)"
-        ><TableProperties aria-hidden="true"
+        ><Search aria-hidden="true"
       /></RibbonButton>
       <SheetZoomMenu
         variant="ribbon"

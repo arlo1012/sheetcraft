@@ -6,7 +6,7 @@ defineProps<{ area?: "panes" | "rows" | "columns" }>();
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    stroke-width="1.5"
+    style="stroke-width: var(--idea-icon-stroke-width)"
     aria-hidden="true"
     focusable="false"
   >

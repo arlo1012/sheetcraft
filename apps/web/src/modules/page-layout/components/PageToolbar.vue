@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Printer, PanelsTopLeft, Rows3, PanelsTopBottom } from "lucide-vue-next";
+import SheetPageBreakIcon from "../../../shared/sheet-view/SheetPageBreakIcon.vue";
+import { Printer, Rows3, PanelsTopBottom } from "lucide-vue-next";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { DEFAULT_SHEET_PAGE_PRINT_OPTIONS, type SheetPageSetup } from "@idea10/core/page-setup";
 import type { CellAddress } from "@idea10/core/workbook";
@@ -158,7 +159,7 @@ function setPrintOption(key: "gridLines" | "headings", value: boolean): void {
             viewMode === 'page-break-preview' ? 'normal' : 'page-break-preview',
           )
         "
-        ><PanelsTopLeft
+        ><SheetPageBreakIcon
       /></RibbonButton>
       <div class="page-toolbar__stack">
         <TCheckbox
