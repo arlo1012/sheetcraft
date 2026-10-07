@@ -1,6 +1,5 @@
 @mixin shell {
   flex: 0 0 auto;
-  min-width: max-content;
   padding: 1px 3px;
   border-right: 1px solid var(--idea-border-subtle);
 
@@ -21,9 +20,9 @@
 }
 
 @mixin stack {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  display: grid;
+  grid-auto-rows: var(--ribbon-control-height, 26px);
+  align-content: center;
   gap: var(--ribbon-row-gap, 2px);
   min-height: var(--idea-ribbon-content-height, 54px);
 }
@@ -36,7 +35,6 @@
 @mixin row {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
   gap: 2px;
   min-width: 0;
   min-height: var(--ribbon-control-height, 26px);

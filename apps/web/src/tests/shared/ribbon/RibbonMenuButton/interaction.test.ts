@@ -15,6 +15,9 @@ describe("RibbonMenuButton", () => {
     });
 
     expect(wrapper.attributes()).toMatchObject({
+      role: "button",
+      tabindex: "0",
+      "aria-disabled": "false",
       "aria-haspopup": "menu",
       "aria-expanded": "false",
     });
@@ -32,10 +35,22 @@ describe("RibbonMenuButton", () => {
     expect(wrapper.emitted("activate")).toHaveLength(1);
   });
 
-  test("retains its arrow while disabled", () => {
+  test.each(["Enter", " "])("opens with %j and ignores held-key repeats", async (key) => {
+    const wrapper = mount(RibbonMenuButton, { props: { label: "Sort" } });
+
+    await wrapper.trigger("keydown", { key });
+    await wrapper.trigger("keydown", { key, repeat: true });
+    expect(wrapper.emitted("activate")).toHaveLength(1);
+  });
+
+  test("retains its arrow and suppresses activation while disabled", async () => {
     const wrapper = mount(RibbonMenuButton, { props: { label: "Filter", disabled: true } });
 
-    expect((wrapper.element as HTMLButtonElement).disabled).toBe(true);
+    expect(wrapper.attributes()).toMatchObject({ "aria-disabled": "true", tabindex: "-1" });
     expect(wrapper.find(".ribbon-menu-button__arrow").exists()).toBe(true);
+    await wrapper.trigger("click");
+    await wrapper.trigger("keydown", { key: "Enter" });
+    await wrapper.trigger("keydown", { key: " " });
+    expect(wrapper.emitted("activate")).toBeUndefined();
   });
 });

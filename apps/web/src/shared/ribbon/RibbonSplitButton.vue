@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { vIconAction } from "../focus/icon-action";
 import RibbonDropdownArrow from "./RibbonDropdownArrow.vue";
 
 const props = withDefaults(
@@ -35,8 +36,8 @@ const emit = defineEmits<{
   menuKeydown: [event: KeyboardEvent];
 }>();
 const rootElement = ref<HTMLDivElement | null>(null);
-const mainElement = ref<HTMLButtonElement | null>(null);
-const menuElement = ref<HTMLButtonElement | null>(null);
+const mainElement = ref<HTMLElement | null>(null);
+const menuElement = ref<HTMLElement | null>(null);
 defineExpose({ rootElement, mainElement, menuElement });
 
 function activate(): void {
@@ -61,12 +62,11 @@ function toggleMenu(): void {
       'is-full-width': fullWidth,
     }"
   >
-    <button
+    <span
       ref="mainElement"
       class="ribbon-split-button__main ribbon-split-action__main"
-      type="button"
       data-ribbon-split-main
-      :disabled="disabled"
+      v-icon-action="disabled"
       :aria-label="label"
       :aria-pressed="pressed"
       :title="label"
@@ -76,18 +76,17 @@ function toggleMenu(): void {
         ><slot
       /></span>
       <span
-        v-if="text"
+        v-if="text && variant !== 'tall'"
         class="ribbon-split-button__text ribbon-split-action__text"
         aria-hidden="true"
         >{{ text }}</span
       >
-    </button>
-    <button
+    </span>
+    <span
       ref="menuElement"
       class="ribbon-split-button__menu ribbon-split-action__menu"
-      type="button"
       data-ribbon-split-menu
-      :disabled="menuDisabled"
+      v-icon-action="menuDisabled"
       :aria-label="menuLabel"
       :title="menuLabel"
       :aria-haspopup="popupRole"
@@ -96,8 +95,14 @@ function toggleMenu(): void {
       @click="toggleMenu"
       @keydown="emit('menuKeydown', $event)"
     >
+      <span
+        v-if="text && variant === 'tall'"
+        class="ribbon-split-button__text"
+        aria-hidden="true"
+        >{{ text }}</span
+      >
       <RibbonDropdownArrow :expanded="expanded" />
-    </button>
+    </span>
   </div>
 </template>
 
@@ -111,34 +116,17 @@ function toggleMenu(): void {
   align-items: stretch;
   width: var(--ribbon-split-button-width, 40px);
   height: var(--ribbon-control-height, 26px);
-  padding: 1px;
+  padding: 0;
   border-radius: var(--idea-radius-default);
 
-  &:hover:not(.is-disabled),
-  &.is-expanded {
-    background: color-mix(in srgb, var(--idea-icon-button-hover-bg) 50%, transparent);
-
-    .ribbon-split-button__menu {
-      background: var(--idea-icon-button-hover-bg);
-    }
-  }
-
-  &:has(> button:focus-visible) {
-    background: color-mix(in srgb, var(--idea-action-primary-subtle) 50%, transparent);
-
-    .ribbon-split-button__menu {
-      background: var(--idea-action-primary-subtle);
-    }
+  &:has(> [aria-disabled="false"]:hover),
+  &:has(> [aria-expanded="true"][aria-disabled="false"]) {
+    box-shadow: inset 0 0 0 1px var(--idea-border-subtle);
   }
 
   &.has-text {
     width: var(--ribbon-labeled-action-width, max-content);
     min-width: 40px;
-  }
-
-  &.is-pressed {
-    background: var(--idea-action-primary-subtle);
-    color: var(--idea-action-primary);
   }
 
   &.is-full-width {
@@ -147,6 +135,9 @@ function toggleMenu(): void {
 
   &.is-tall {
     --ribbon-icon-size: var(--idea-ribbon-large-icon-size);
+    display: grid;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: var(--ribbon-row-gap, 2px);
     align-self: stretch;
     width: max-content;
     min-width: var(--ribbon-tall-action-min-width, 58px);
@@ -158,14 +149,14 @@ function toggleMenu(): void {
     }
 
     .ribbon-split-button__main {
-      @include ribbon.tall-content;
       justify-content: center;
       padding: 0 2px;
     }
 
     .ribbon-split-button__menu {
-      align-items: flex-end;
-      padding-bottom: 5px;
+      gap: 2px;
+      padding: 0 2px;
+      border-radius: 0 0 2px 2px;
     }
   }
 
@@ -177,20 +168,16 @@ function toggleMenu(): void {
     min-width: 0;
     margin: 0;
     padding: 0;
-    appearance: none;
     background: transparent;
-    border: 1px solid transparent;
+    border: 0;
+    border-radius: 2px;
     color: var(--idea-text-primary);
     cursor: pointer;
     font: inherit;
     outline: none;
 
     @include ribbon.focus-ring;
-
-    &:disabled {
-      color: var(--idea-text-secondary);
-      cursor: default;
-    }
+    @include ribbon.feedback;
   }
 
   &__main {
@@ -202,7 +189,7 @@ function toggleMenu(): void {
 
   &__menu {
     flex: 0 0 12px;
-    border-radius: 0 var(--idea-radius-default) var(--idea-radius-default) 0;
+    border-radius: 0 2px 2px 0;
   }
 
   &__icon {

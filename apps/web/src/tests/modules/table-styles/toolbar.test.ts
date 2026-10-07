@@ -47,8 +47,11 @@ test("synchronizes the table name, selected style and protected controls", async
   expect((input.element as HTMLInputElement).value).toBe("Sales");
   expect(wrapper.get('[data-table-option="filterButton"] input').attributes("disabled")).toBe("");
   await wrapper.setProps({ disabled: true });
-  for (const control of wrapper.findAll("button, input"))
-    expect(control.attributes("disabled")).toBe("");
+  for (const control of wrapper.findAll('button, input, [role="button"]')) {
+    if (control.element.matches('span[role="button"]'))
+      expect(control.attributes("aria-disabled")).toBe("true");
+    else expect(control.attributes("disabled")).toBe("");
+  }
   await wrapper.get("[data-table-style-id]").trigger("click");
   expect(wrapper.emitted("applyStyle")).toBeUndefined();
   wrapper.unmount();

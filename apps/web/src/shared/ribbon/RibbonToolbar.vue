@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { vIconAction } from "../focus/icon-action";
 import { useAppI18n } from "../i18n";
 
 defineProps<{
@@ -166,30 +167,26 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
         data-ribbon-overflow-cue="right"
         aria-hidden="true"
       />
-      <button
-        type="button"
+      <span
+        v-icon-action="!canScrollLeft"
         class="ribbon-toolbar__scroll-button ribbon-toolbar__scroll-button--left"
         data-ribbon-scroll="left"
         :aria-label="t('ribbon.scrollLeft')"
         :title="t('ribbon.scrollLeft')"
-        :aria-disabled="!canScrollLeft"
-        :tabindex="canScrollLeft ? 0 : -1"
         @click="scrollByPage(-1)"
       >
         <ChevronLeft :size="16" :stroke-width="2" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
+      </span>
+      <span
+        v-icon-action="!canScrollRight"
         class="ribbon-toolbar__scroll-button ribbon-toolbar__scroll-button--right"
         data-ribbon-scroll="right"
         :aria-label="t('ribbon.scrollRight')"
         :title="t('ribbon.scrollRight')"
-        :aria-disabled="!canScrollRight"
-        :tabindex="canScrollRight ? 0 : -1"
         @click="scrollByPage(1)"
       >
         <ChevronRight :size="16" :stroke-width="2" aria-hidden="true" />
-      </button>
+      </span>
     </template>
     <div
       ref="viewportRef"
@@ -219,7 +216,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
 
   &__viewport {
     width: 100%;
-    height: var(--idea-ribbon-toolbar-height, 68px);
+    height: 100%;
     padding: 5px 8px;
     overflow-x: auto;
     overflow-y: hidden;
@@ -240,7 +237,6 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
     display: flex;
     align-items: stretch;
     width: max-content;
-    min-width: max-content;
     height: var(--idea-ribbon-group-height, 56px);
   }
 

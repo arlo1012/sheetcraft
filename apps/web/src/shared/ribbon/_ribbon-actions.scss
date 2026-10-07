@@ -5,6 +5,34 @@
   }
 }
 
+@mixin feedback {
+  &:hover:not([aria-disabled="true"]),
+  &[aria-expanded="true"]:not([aria-disabled="true"]) {
+    background: var(--idea-icon-button-hover-bg);
+  }
+
+  &[aria-pressed="true"]:not([aria-disabled="true"]) {
+    background: color-mix(in srgb, var(--idea-text-primary) 14%, transparent);
+  }
+
+  &[aria-pressed="mixed"]:not([aria-disabled="true"]) {
+    background: color-mix(in srgb, var(--idea-text-primary) 7%, transparent);
+    outline: 1px dotted var(--idea-text-muted);
+    outline-offset: -3px;
+  }
+
+  &[aria-pressed="true"]:hover:not([aria-disabled="true"]),
+  &:active:not([aria-disabled="true"]) {
+    background: color-mix(in srgb, var(--idea-text-primary) 20%, transparent);
+  }
+
+  &[aria-disabled="true"] {
+    background: transparent;
+    color: var(--idea-text-disabled);
+    cursor: default;
+  }
+}
+
 @mixin action-button($width) {
   display: inline-flex;
   flex: 0 0 auto;
@@ -13,31 +41,17 @@
   width: $width;
   height: var(--ribbon-control-height, 26px);
   margin: 0;
-  appearance: none;
   background: transparent;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: 2px;
   color: var(--idea-text-primary);
   cursor: pointer;
   font: inherit;
   outline: none;
+  user-select: none;
 
   @include focus-ring;
-
-  &:hover:not(:disabled),
-  &.is-expanded {
-    background: var(--idea-icon-button-hover-bg);
-  }
-
-  &.is-pressed {
-    background: var(--idea-action-primary-subtle);
-    color: var(--idea-action-primary);
-  }
-
-  &:disabled {
-    cursor: default;
-    color: var(--idea-text-secondary);
-  }
+  @include feedback;
 }
 
 @mixin icon-slot {

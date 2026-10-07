@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { vIconAction } from "../focus/icon-action";
 import { ArrowDownRight } from "lucide-vue-next";
 
 const props = withDefaults(
@@ -11,7 +12,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{ activate: [] }>();
-const rootElement = ref<HTMLButtonElement | null>(null);
+const rootElement = ref<HTMLElement | null>(null);
 defineExpose({ rootElement });
 
 function activate(): void {
@@ -20,17 +21,16 @@ function activate(): void {
 </script>
 
 <template>
-  <button
+  <span
     ref="rootElement"
     class="ribbon-dialog-launcher"
-    type="button"
-    :disabled="disabled"
+    v-icon-action="disabled"
     :aria-label="label"
     :title="label"
     @click="activate"
   >
     <ArrowDownRight :size="12" :stroke-width="1.8" aria-hidden="true" />
-  </button>
+  </span>
 </template>
 
 <style scoped lang="scss">
@@ -57,11 +57,11 @@ function activate(): void {
     pointer-events: none;
   }
 
-  &:hover:not(:disabled) {
+  &:hover:not([aria-disabled="true"]) {
     background: var(--idea-icon-button-hover-bg);
   }
 
-  &:disabled {
+  &[aria-disabled="true"] {
     cursor: default;
     color: var(--idea-text-secondary);
   }

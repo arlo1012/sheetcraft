@@ -79,11 +79,13 @@ describe("HomeFormatToolbar", () => {
   test("keeps history and unprotect available while protecting all data tools", async () => {
     const wrapper = mountToolbar(createStyleState(), true);
     await wrapper.setProps({ readOnly: true });
-    expect(wrapper.get('[data-ribbon-action="convert-number"]').attributes("disabled")).toBe("");
-    expect(wrapper.get('[data-ribbon-action="auto-sum"]').attributes("disabled")).toBe("");
+    expect(wrapper.get('[data-ribbon-action="convert-number"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
+    expect(wrapper.get('[data-ribbon-action="auto-sum"]').attributes("aria-disabled")).toBe("true");
     const protection = wrapper.get('[data-ribbon-action="protect"]');
     expect(protection.attributes("aria-label")).toBe("Unprotect");
-    expect(protection.attributes("disabled")).toBeUndefined();
+    expect(protection.attributes("aria-disabled")).toBe("false");
     await protection.trigger("click");
     await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
     expect(wrapper.emitted("toggleProtection")).toEqual([[]]);
@@ -108,7 +110,7 @@ describe("HomeFormatToolbar", () => {
     const wrapper = mountToolbar(createStyleState({ strikethrough: "mixed" }));
     const action = wrapper.get('[aria-label="Strikethrough"]');
     expect(action.attributes("aria-pressed")).toBe("mixed");
-    expect(action.attributes("disabled")).toBeUndefined();
+    expect(action.attributes("aria-disabled")).toBe("false");
     await action.trigger("click");
     expect(emittedPatches(wrapper)).toEqual([{ strikethrough: true }]);
     await wrapper.setProps({ state: createStyleState({ strikethrough: "on" }) });
@@ -116,16 +118,16 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper).at(-1)).toEqual({ strikethrough: null });
   });
 
-  test("uses native buttons for emphasis and alignment", async () => {
+  test("uses accessible tool actions for emphasis and alignment", async () => {
     const wrapper = mountToolbar();
     const bold = wrapper.get('[aria-label="Bold"]');
     const center = wrapper.get('[aria-label="Align center"]');
 
-    expect(bold.element).toBeInstanceOf(HTMLButtonElement);
-    expect(center.element).toBeInstanceOf(HTMLButtonElement);
+    expect(bold.element).toBeInstanceOf(HTMLSpanElement);
+    expect(center.element).toBeInstanceOf(HTMLSpanElement);
     for (const action of [bold, center]) {
-      expect(action.attributes()).toMatchObject({ type: "button" });
-      expect((action.element as HTMLButtonElement).disabled).toBe(false);
+      expect(action.attributes()).toMatchObject({ role: "button" });
+      expect(action.attributes("aria-disabled")).toBe("false");
     }
 
     await bold.trigger("click");
@@ -138,7 +140,7 @@ describe("HomeFormatToolbar", () => {
     const formatPainter = wrapper.get('[data-ribbon-action="format-painter"]');
 
     expect(formatPainter.attributes()).toMatchObject({
-      type: "button",
+      role: "button",
       "aria-label": "Format painter",
       "aria-pressed": "false",
     });
@@ -152,17 +154,17 @@ describe("HomeFormatToolbar", () => {
     expect(wrapper.emitted("activateFormatPainter")).toEqual([[], []]);
   });
 
-  test("toggles wrapping from native button activation", async () => {
+  test("toggles wrapping from tool activation", async () => {
     const wrapper = mountToolbar(createStyleState({ wrapText: "mixed" }));
     const wrapText = wrapper.get('[data-ribbon-action="wrap-text"]');
 
     expect(wrapText.attributes()).toMatchObject({
-      type: "button",
+      role: "button",
       "aria-label": "Wrap text",
       "aria-pressed": "mixed",
     });
-    expect(wrapText.element).toBeInstanceOf(HTMLButtonElement);
-    expect((wrapText.element as HTMLButtonElement).disabled).toBe(false);
+    expect(wrapText.element).toBeInstanceOf(HTMLSpanElement);
+    expect(wrapText.attributes("aria-disabled")).toBe("false");
     await wrapText.trigger("click");
     expect(emittedPatches(wrapper)).toEqual([{ wrapText: true }]);
 
@@ -171,16 +173,16 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper).at(-1)).toEqual({ wrapText: null });
   });
 
-  test("emits a complete clear-formatting patch from native button activation", async () => {
+  test("emits a complete clear-formatting patch from tool activation", async () => {
     const wrapper = mountToolbar();
     const clearFormatting = wrapper.get('[data-ribbon-action="clear-formatting"]');
 
     expect(clearFormatting.attributes()).toMatchObject({
-      type: "button",
+      role: "button",
       "aria-label": "Clear formatting",
     });
-    expect(clearFormatting.element).toBeInstanceOf(HTMLButtonElement);
-    expect((clearFormatting.element as HTMLButtonElement).disabled).toBe(false);
+    expect(clearFormatting.element).toBeInstanceOf(HTMLSpanElement);
+    expect(clearFormatting.attributes("aria-disabled")).toBe("false");
     await clearFormatting.trigger("click");
 
     expect(emittedPatches(wrapper)).toEqual([createClearCellStylePatch()]);
@@ -281,16 +283,18 @@ describe("HomeFormatToolbar", () => {
       true,
     );
 
+    await wrapper.setProps({ hyperlinkDisabled: true, imageDisabled: true });
+
     expect(wrapper.get(".font-format-controls__family input").element).toHaveProperty("value", "");
     expect(wrapper.get(".font-format-controls__size input").element).toHaveProperty("value", "");
     expect(
       wrapper.get('[data-cell-color-control="text"] [data-ribbon-split-main]').element,
-    ).toBeInstanceOf(HTMLButtonElement);
+    ).toBeInstanceOf(HTMLSpanElement);
     const toolbar = wrapper.get(".home-format-toolbar");
     expect(toolbar.attributes("role")).toBe("group");
     expect(toolbar.attributes("aria-disabled")).toBeUndefined();
     for (const control of wrapper.findAll(
-      '[data-ribbon-group]:not([data-ribbon-group="history"]) button, input',
+      '[data-ribbon-group]:not([data-ribbon-group="history"]) .ribbon-icon-action, [data-ribbon-group]:not([data-ribbon-group="history"]) .ribbon-split-action > [role="button"], input',
     )) {
       if (
         ["auto-sum", "protect", "convert-number", "open-data-tools"].includes(
@@ -298,22 +302,24 @@ describe("HomeFormatToolbar", () => {
         )
       )
         continue;
-      expect((control.element as HTMLButtonElement | HTMLInputElement).disabled).toBe(true);
+      if (control.element.matches("input"))
+        expect((control.element as HTMLInputElement).disabled).toBe(true);
+      else expect(control.attributes("aria-disabled")).toBe("true");
     }
     for (const control of wrapper.findAll(
       '[aria-label="Bold"], [aria-label="Italic"], [aria-label="Underline"], [aria-label="Clear formatting"], [aria-label="Wrap text"], [aria-label="Align left"], [aria-label="Align center"], [aria-label="Align right"]',
     )) {
-      expect(control.element).toBeInstanceOf(HTMLButtonElement);
+      expect(control.element).toBeInstanceOf(HTMLSpanElement);
       expect(control.attributes()).toMatchObject({
-        type: "button",
-        disabled: "",
+        role: "button",
+        "aria-disabled": "true",
       });
       await control.trigger("click");
     }
     await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
     await wrapper.get('[data-ribbon-action="redo"]').trigger("click");
     const autoSum = wrapper.get('[data-ribbon-action="auto-sum"]');
-    expect((autoSum.element as HTMLButtonElement).disabled).toBe(false);
+    expect(autoSum.attributes("aria-disabled")).toBe("false");
     await autoSum.trigger("click");
     expect(emittedPatches(wrapper)).toEqual([]);
     expect(wrapper.emitted("undo")).toHaveLength(1);
@@ -394,8 +400,10 @@ describe("HomeFormatToolbar", () => {
         }),
       ).toEqual(actionNames);
       for (const action of actions) {
-        const button = action.element.matches("button") ? action : action.get("button");
-        expect(button.classes()).toContain("is-tall");
+        const tool = action.element.matches('[role="button"]')
+          ? action
+          : action.get('[role="button"]');
+        expect(tool.classes()).toContain("is-tall");
         expect(action.attributes("data-ribbon-span")).toBe("2");
       }
     }
@@ -465,10 +473,10 @@ describe("HomeFormatToolbar", () => {
       "print",
     ]);
     for (const placeholder of placeholders) {
-      expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
+      expect(placeholder.element).toBeInstanceOf(HTMLSpanElement);
       expect(placeholder.attributes()).toMatchObject({
-        type: "button",
-        disabled: "",
+        role: "button",
+        "aria-disabled": "true",
       });
     }
   });
@@ -485,10 +493,10 @@ describe("HomeFormatToolbar", () => {
 
     expect(
       wrapper.get('[data-cell-color-control="text"] [data-ribbon-split-main]').element,
-    ).toBeInstanceOf(HTMLButtonElement);
+    ).toBeInstanceOf(HTMLSpanElement);
     expect(
       wrapper.get('[data-cell-color-control="fill"] [data-ribbon-split-main]').element,
-    ).toBeInstanceOf(HTMLButtonElement);
+    ).toBeInstanceOf(HTMLSpanElement);
     expect(wrapper.get('[data-cell-color-icon="text"]').attributes("style")).toContain(
       "--cell-color-indicator: #ff0000",
     );
@@ -498,11 +506,13 @@ describe("HomeFormatToolbar", () => {
     expect(wrapper.get('[aria-label="Horizontal alignment, mixed"]').attributes("role")).toBe(
       "group",
     );
-    expect(wrapper.get('[aria-label="Vertical alignment"]').findAll("button")).toHaveLength(3);
+    expect(
+      wrapper.get('[aria-label="Vertical alignment"]').findAll('[role="button"]'),
+    ).toHaveLength(3);
     expect(
       wrapper
         .get('[aria-label="Vertical alignment"]')
-        .findAll("button")
+        .findAll('[role="button"]')
         .map((button) => button.attributes("aria-pressed")),
     ).toEqual(["false", "false", "false"]);
   });
@@ -577,7 +587,7 @@ describe("HomeFormatToolbar", () => {
     expect(document.activeElement).toBe(getTeleportedDialog().element);
 
     const outsideControl = wrapper.get('[data-cell-color-control="fill"] [data-ribbon-split-main]');
-    (outsideControl.element as HTMLButtonElement).focus();
+    (outsideControl.element as HTMLElement).focus();
     await wrapper.vm.$nextTick();
 
     expect(document.body.querySelector('[role="dialog"]')).toBeNull();

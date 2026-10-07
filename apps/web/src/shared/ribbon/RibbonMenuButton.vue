@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { vIconAction } from "../focus/icon-action";
 import RibbonDropdownArrow from "./RibbonDropdownArrow.vue";
 
 const props = withDefaults(
@@ -27,7 +28,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{ activate: [] }>();
-const rootElement = ref<HTMLButtonElement | null>(null);
+const rootElement = ref<HTMLElement | null>(null);
 defineExpose({ rootElement });
 
 function activate(): void {
@@ -36,7 +37,7 @@ function activate(): void {
 </script>
 
 <template>
-  <button
+  <span
     ref="rootElement"
     class="ribbon-menu-button ribbon-icon-action"
     :class="{
@@ -47,8 +48,7 @@ function activate(): void {
       'is-tall': variant === 'tall',
       'is-full-width': fullWidth,
     }"
-    type="button"
-    :disabled="disabled"
+    v-icon-action="disabled"
     :aria-label="label"
     :aria-pressed="pressed"
     :aria-haspopup="popupRole"
@@ -60,7 +60,7 @@ function activate(): void {
     <span class="ribbon-menu-button__icon" aria-hidden="true"><slot /></span>
     <span v-if="text" class="ribbon-menu-button__text" aria-hidden="true">{{ text }}</span>
     <RibbonDropdownArrow class="ribbon-menu-button__arrow" :expanded="expanded" />
-  </button>
+  </span>
 </template>
 
 <style scoped lang="scss">
@@ -72,7 +72,7 @@ function activate(): void {
 
   padding: 0 2px;
 
-  &.has-text {
+  &.has-text:not(.is-tall) {
     justify-content: var(--ribbon-labeled-action-justify, flex-start);
     width: var(--ribbon-labeled-action-width, auto);
     min-width: 40px;
@@ -86,19 +86,17 @@ function activate(): void {
 
   &.is-tall {
     --ribbon-icon-size: var(--idea-ribbon-large-icon-size);
-    position: relative;
     align-self: stretch;
     justify-content: center;
     width: max-content;
     min-width: var(--ribbon-tall-action-min-width, 58px);
     height: var(--idea-ribbon-content-height, 54px);
-    @include ribbon.tall-content;
+    display: grid;
+    grid-template-columns: auto auto;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    justify-items: center;
+    gap: var(--ribbon-row-gap, 2px) 2px;
     padding: 0 2px;
-
-    &.has-text {
-      width: max-content;
-      min-width: var(--ribbon-tall-action-min-width, 58px);
-    }
 
     &.is-full-width {
       width: 100%;
@@ -118,6 +116,10 @@ function activate(): void {
     flex: 0 0 auto;
   }
 
+  &.is-tall &__icon {
+    grid-column: 1 / -1;
+  }
+
   &.is-tall &__text {
     max-width: 100%;
     overflow: visible;
@@ -130,9 +132,8 @@ function activate(): void {
   }
 
   &.is-tall &__arrow {
-    position: absolute;
-    top: 7px;
-    right: 2px;
+    grid-column: 2;
+    grid-row: 2;
   }
 }
 </style>

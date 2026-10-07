@@ -156,8 +156,8 @@ describe("RibbonToolbar overflow navigation", () => {
     });
     await measureOverflow();
 
-    const left = wrapper.get<HTMLButtonElement>('[data-ribbon-scroll="left"]');
-    const right = wrapper.get<HTMLButtonElement>('[data-ribbon-scroll="right"]');
+    const left = wrapper.get<HTMLElement>('[data-ribbon-scroll="left"]');
+    const right = wrapper.get<HTMLElement>('[data-ribbon-scroll="right"]');
     expect(left.attributes()).toMatchObject({ "aria-disabled": "true", tabindex: "-1" });
     expect(right.attributes()).toMatchObject({ "aria-disabled": "false", tabindex: "0" });
 
@@ -180,7 +180,7 @@ describe("RibbonToolbar overflow navigation", () => {
       scrollWidth: 864,
     });
     await measureOverflow();
-    wrapper.get<HTMLButtonElement>('[data-ribbon-scroll="right"]').element.focus();
+    wrapper.get<HTMLElement>('[data-ribbon-scroll="right"]').element.focus();
     const fittedGeometry = setHorizontalGeometry(wrapper, {
       toolbarWidth: 1000,
       railWidth: 800,

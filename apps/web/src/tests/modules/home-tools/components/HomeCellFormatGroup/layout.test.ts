@@ -60,7 +60,7 @@ describe("HomeCellFormatGroup layout", () => {
     expect(
       wrapper
         .get(".text-format-controls")
-        .findAll("button")
+        .findAll('[role="button"]')
         .map((action) => action.attributes("aria-label")),
     ).toEqual(["Bold", "Italic", "Underline", "Strikethrough"]);
     expect(

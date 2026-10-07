@@ -74,9 +74,10 @@ Use CSS pixels at 100% scale; size and line height are a pair.
 - One layer owns each inset. Keep control/row padding and gaps separate; hover
   and selected menu backgrounds span the row. Suggestions, input assists, and
   compact floating toolbars retain their own density.
-- Use native/library buttons except for a single visible icon. Standalone icon
-  containers use `vIconAction`, an accessible name, keyboard activation, and
-  disabled semantics. Input prefix/suffix icons use slots; the input owns their
+- Ribbon tools and standalone icon actions use lightweight containers with
+  `vIconAction` for button roles, keyboard activation, focus, and disabled semantics;
+  provide an accessible name. Other controls use native/library buttons.
+  Input prefix/suffix icons use slots; the input owns their
   spacing. Stop action clicks from bubbling into the input focus handler.
 - `InputNumber` uses `theme="column"` and
   `idea-input-number--persistent-controls`; place it in a labelled group. Use
@@ -103,6 +104,9 @@ Use CSS pixels at 100% scale; size and line height are a pair.
 - In `shared/ribbon`, use `RibbonButton` for actions, `RibbonMenuButton` for
   triggers, and `RibbonSplitButton` for action plus popup. Controls own icon,
   text, arrow, focus, and disabled state; groups own arrangement.
+  Tool feedback uses neutral backgrounds without recoloring icons. Split tools
+  highlight each action independently: compact tools split left/right, tall tools
+  split the icon action above the text/menu action. Containers own row sizing.
 - Use `fullWidth` to fill a component slot; never pass a parent scoped class
   through a child root for positioning. Keep a grouped trigger and teleported
   popup under one local root, and forward keyboard/ARIA attributes to the

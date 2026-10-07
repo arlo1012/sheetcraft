@@ -50,7 +50,7 @@ function mountToolbar() {
 describe("FormulaToolbar", () => {
   test("emits the primary aggregate and a category function without committing the edit session", async () => {
     const wrapper = mountToolbar();
-    await wrapper.get('button[aria-label="AutoSum"]').trigger("click");
+    await wrapper.get('[role="button"][aria-label="AutoSum"]').trigger("click");
     expect(wrapper.emitted("aggregate")).toEqual([["SUM"]]);
     await wrapper.get(".formula-category-menu__trigger").trigger("click");
     await vi.waitFor(() =>

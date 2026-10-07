@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { vIconAction } from "../focus/icon-action";
 
 const props = withDefaults(
   defineProps<{
@@ -20,7 +21,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{ activate: [] }>();
-const rootElement = ref<HTMLButtonElement | null>(null);
+const rootElement = ref<HTMLElement | null>(null);
 defineExpose({ rootElement });
 
 function activate(): void {
@@ -29,7 +30,7 @@ function activate(): void {
 </script>
 
 <template>
-  <button
+  <span
     ref="rootElement"
     class="ribbon-button ribbon-icon-action"
     :class="{
@@ -39,8 +40,7 @@ function activate(): void {
       'is-tall': variant === 'tall',
       'is-full-width': fullWidth,
     }"
-    type="button"
-    :disabled="disabled"
+    v-icon-action="disabled"
     :aria-label="label"
     :aria-pressed="pressed"
     :title="label"
@@ -48,7 +48,7 @@ function activate(): void {
   >
     <span class="ribbon-button__icon" aria-hidden="true"><slot /></span>
     <span v-if="text" class="ribbon-button__text" aria-hidden="true">{{ text }}</span>
-  </button>
+  </span>
 </template>
 
 <style scoped lang="scss">
@@ -60,7 +60,7 @@ function activate(): void {
 
   padding: 0;
 
-  &.has-text {
+  &.has-text:not(.is-tall) {
     justify-content: var(--ribbon-labeled-action-justify, flex-start);
     width: var(--ribbon-labeled-action-width, auto);
     min-width: 27px;
@@ -74,7 +74,6 @@ function activate(): void {
 
   &.is-tall {
     --ribbon-icon-size: var(--idea-ribbon-large-icon-size);
-    position: relative;
     align-self: stretch;
     justify-content: center;
     width: max-content;
@@ -82,13 +81,6 @@ function activate(): void {
     height: var(--idea-ribbon-content-height, 54px);
     @include ribbon.tall-content;
     padding: 0 2px;
-
-    &.has-text {
-      width: max-content;
-      min-width: var(--ribbon-tall-action-min-width, 58px);
-      gap: var(--ribbon-row-gap, 2px);
-      padding: 0 2px;
-    }
 
     &.is-full-width {
       width: 100%;
