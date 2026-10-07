@@ -173,7 +173,11 @@ function toggleMenu(): void {
     .ribbon-split-button__menu {
       gap: 2px;
       padding: 0 2px;
-      border-radius: 0 0 2px 2px;
+      border-radius: 0;
+
+      &::before {
+        border-radius: 0;
+      }
     }
   }
 
