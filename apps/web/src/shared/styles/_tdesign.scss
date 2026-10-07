@@ -270,6 +270,15 @@
 }
 
 // Action options keep the same label alignment as selectable options.
+// Match labeled ribbon tools while keeping dialog and menu checkboxes unchanged.
+.ribbon-toolbar__rail .t-checkbox {
+  padding-left: var(--ribbon-labeled-action-padding, 4px);
+
+  .t-checkbox__label {
+    margin-left: var(--idea-space-2);
+  }
+}
+
 .idea-select-option--action .t-checkbox__input {
   visibility: hidden;
 }
