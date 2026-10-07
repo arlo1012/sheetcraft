@@ -136,7 +136,7 @@ function toggleMenu(): void {
   &.is-tall {
     --ribbon-icon-size: var(--idea-ribbon-large-icon-size);
     display: grid;
-    grid-template-rows: minmax(0, 1fr) 20px;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
     gap: var(--ribbon-row-gap, 2px);
     align-self: stretch;
     width: max-content;
@@ -154,6 +154,8 @@ function toggleMenu(): void {
     }
 
     .ribbon-split-button__menu {
+      align-self: center;
+      height: 20px;
       gap: 2px;
       padding: 0 2px;
       border-radius: 0 0 2px 2px;
