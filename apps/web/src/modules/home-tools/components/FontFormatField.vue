@@ -215,7 +215,9 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    box-sizing: border-box;
     width: 12px;
+    padding-right: 1px;
     height: var(--ribbon-control-height, 26px);
     background: transparent;
     cursor: pointer;
