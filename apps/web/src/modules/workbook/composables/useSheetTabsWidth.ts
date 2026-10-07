@@ -2,7 +2,7 @@ import { computed, onBeforeUnmount, onMounted, ref, type Ref } from "vue";
 
 const MINIMUM_TABS_WIDTH = 200;
 const MINIMUM_SCROLLBAR_WIDTH = 100;
-const MINIMUM_SCROLLBAR_RATIO = 0.3;
+const MINIMUM_REGION_RATIO = 0.2;
 const SEPARATOR_WIDTH = 8;
 
 type ResizeGesture = {
@@ -23,11 +23,16 @@ export function useSheetTabsWidth(container: Ref<HTMLElement | null>, contentWid
       Math.floor(
         containerWidth.value -
           SEPARATOR_WIDTH -
-          Math.max(MINIMUM_SCROLLBAR_WIDTH, containerWidth.value * MINIMUM_SCROLLBAR_RATIO),
+          Math.max(MINIMUM_SCROLLBAR_WIDTH, containerWidth.value * MINIMUM_REGION_RATIO),
       ),
     ),
   );
-  const minimum = computed(() => Math.min(MINIMUM_TABS_WIDTH, maximum.value));
+  const minimum = computed(() =>
+    Math.min(
+      Math.max(MINIMUM_TABS_WIDTH, Math.ceil(containerWidth.value * MINIMUM_REGION_RATIO)),
+      maximum.value,
+    ),
+  );
   const width = computed(() => clamp(preferredWidth.value ?? contentWidth.value));
   let gesture: ResizeGesture | undefined;
   let observer: ResizeObserver | undefined;
