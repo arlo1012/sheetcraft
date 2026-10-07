@@ -594,12 +594,15 @@
     border: 0;
     background: transparent;
     box-shadow: none;
+    transition: none;
   }
 
   .t-input__inner {
     min-width: 0;
     height: calc(var(--ribbon-control-height, 26px) - 2px);
-    padding-left: 6px;
+    margin-left: 1px;
+    padding-left: 5px;
+    transition: none;
     border-radius: var(--idea-radius-default) 0 0 var(--idea-radius-default);
 
     &:hover:not(:disabled) {
