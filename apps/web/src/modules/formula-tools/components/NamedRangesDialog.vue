@@ -4,6 +4,7 @@ import { GripVertical, ArrowDown, ArrowUp, Check, Pencil, Trash2, X } from "luci
 import { vIconAction } from "../../../shared/focus/icon-action";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
@@ -52,7 +53,7 @@ const emit = defineEmits<{
   delete: [id: string];
   reorder: [ids: string[]];
 }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const contentRef = ref<HTMLElement | null>(null);
 const filterPopupProps = {
   attach: () => contentRef.value ?? document.body,
@@ -255,11 +256,6 @@ watch(
       :data-cell-edit-session="editSessionId"
     >
       <div class="named-ranges-dialog__toolbar">
-        <div class="named-ranges-dialog__actions">
-          <TButton variant="outline" data-name-action="new" @click="createRange">{{
-            t("formulaTools.newName")
-          }}</TButton>
-        </div>
         <div class="named-ranges-dialog__filters">
           <TInput
             v-model="searchQuery"
@@ -284,6 +280,11 @@ watch(
             data-name-filter
             @change="changeFilters"
           />
+        </div>
+        <div class="named-ranges-dialog__actions">
+          <TButton variant="outline" data-name-action="new" @click="createRange">{{
+            t("formulaTools.newName")
+          }}</TButton>
         </div>
       </div>
       <TableHeightWrapper v-slot="{ height }">
@@ -357,40 +358,42 @@ watch(
           </template>
         </TTable>
       </TableHeightWrapper>
-      <div
-        class="named-ranges-dialog__reference"
-        role="group"
-        :aria-label="t('formulaTools.reference')"
+      <TForm
+        class="idea-form-grid"
+        layout="vertical"
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 64 : 80"
       >
-        <span>{{ t("formulaTools.reference") }}</span>
-        <div class="named-ranges-dialog__reference-controls">
-          <span
-            v-icon-action="!referenceChanged"
-            class="named-ranges-dialog__reference-action"
-            :aria-label="t('formulaTools.resetReference')"
-            :title="t('formulaTools.resetReference')"
-            data-name-reference-reset
-            @click="resetReference"
-            ><X :size="15"
-          /></span>
-          <span
-            v-icon-action="!referenceChanged || !referenceDraft.trim()"
-            class="named-ranges-dialog__reference-action"
-            :aria-label="t('formulaTools.saveReference')"
-            :title="t('formulaTools.saveReference')"
-            data-name-reference-save
-            @click="saveReference"
-            ><Check :size="15"
-          /></span>
-          <RangeReferenceInput
-            v-model="referenceDraft"
-            :disabled="!selectedRange"
-            :select-reference="selectReference"
-            data-name-reference
-            @enter="saveReference"
-          />
-        </div>
-      </div>
+        <TFormItem :label="t('formulaTools.reference')">
+          <div class="named-ranges-dialog__reference-controls">
+            <RangeReferenceInput
+              v-model="referenceDraft"
+              :disabled="!selectedRange"
+              :select-reference="selectReference"
+              data-name-reference
+              @enter="saveReference"
+            />
+            <span
+              v-icon-action="!referenceChanged"
+              class="named-ranges-dialog__reference-action"
+              :aria-label="t('formulaTools.resetReference')"
+              :title="t('formulaTools.resetReference')"
+              data-name-reference-reset
+              @click="resetReference"
+              ><X :size="15"
+            /></span>
+            <span
+              v-icon-action="!referenceChanged || !referenceDraft.trim()"
+              class="named-ranges-dialog__reference-action"
+              :aria-label="t('formulaTools.saveReference')"
+              :title="t('formulaTools.saveReference')"
+              data-name-reference-save
+              @click="saveReference"
+              ><Check :size="15"
+            /></span>
+          </div>
+        </TFormItem>
+      </TForm>
     </div>
     <template #footer>
       <TButton variant="outline" data-name-action="close" @click="emit('close')">{{
@@ -429,6 +432,8 @@ watch(
   }
   &__actions {
     display: flex;
+    flex-shrink: 0;
+    margin-left: auto;
     gap: 8px;
   }
   &__row-actions {
@@ -439,7 +444,7 @@ watch(
   }
   &__filters {
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-start;
     gap: 8px;
     min-width: 0;
   }
@@ -450,12 +455,6 @@ watch(
   &__filter {
     width: 260px;
     flex-shrink: 0;
-  }
-  &__reference {
-    display: grid;
-    gap: 4px;
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
   }
   &__reference-action {
     display: inline-flex;
@@ -469,7 +468,9 @@ watch(
 
   &__reference-controls {
     display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    width: 100%;
+    min-width: 0;
     align-items: center;
     gap: 6px;
   }
