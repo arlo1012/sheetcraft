@@ -11,6 +11,10 @@ import { useMenu } from "../../../shared/menu/useMenu";
 const props = defineProps<{ state: SelectionCellStyleState["numberFormat"]; disabled: boolean }>();
 const emit = defineEmits<{ select: [choice: "currency" | "accounting"] }>();
 const { t } = useAppI18n();
+const lastChoice = ref<"currency" | "accounting">("currency");
+const actionLabel = computed(() =>
+  t(lastChoice.value === "currency" ? "ribbon.currencyFormat" : "ribbon.accountingFormat"),
+);
 const buttonRef = ref<InstanceType<typeof RibbonSplitButton> | null>(null);
 const triggerRef = computed(() => buttonRef.value?.menuElement ?? null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
@@ -22,6 +26,7 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
 });
 function select(choice: "currency" | "accounting"): void {
   if (props.disabled) return;
+  lastChoice.value = choice;
   emit("select", choice);
   dismiss();
 }
@@ -31,14 +36,14 @@ function select(choice: "currency" | "accounting"): void {
   <div class="currency-format-control">
     <RibbonSplitButton
       ref="buttonRef"
-      :label="t('ribbon.currencyFormat')"
+      :label="actionLabel"
       :menu-label="`${t('ribbon.currencyFormat')} / ${t('ribbon.accountingFormat')}`"
       :disabled="disabled"
       :menu-disabled="disabled"
       :expanded="open"
       :menu-id="menuId"
       data-ribbon-action="currency-format"
-      @activate="select('currency')"
+      @activate="select(lastChoice)"
       @toggle-menu="toggleMenu"
       @menu-keydown="onTriggerKeydown"
       ><DollarSign

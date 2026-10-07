@@ -50,6 +50,27 @@ describe("HomeNumberGroup", () => {
     expect(document.body.querySelector('[data-currency-format="accounting"]')).toBeNull();
   });
 
+  test("repeats the last currency choice after changing the selection", async () => {
+    const wrapper = mountNumberGroup();
+    const arrow = wrapper.get('[data-ribbon-action="currency-format"] [data-ribbon-split-menu]');
+    const main = wrapper.get('[data-ribbon-action="currency-format"] [data-ribbon-split-main]');
+    await arrow.trigger("click");
+    await new DOMWrapper(document.body).get('[data-currency-format="accounting"]').trigger("click");
+    await wrapper.setProps({ state: createDefaultSelectionCellStyleState() });
+    expect(main.attributes("aria-label")).toBe("Accounting");
+    await main.trigger("click");
+    expect(wrapper.emitted("applyStyle")?.at(-1)).toEqual([
+      { numberFormat: { kind: "accounting", currency: "USD", fractionDigits: 2 } },
+    ]);
+    await arrow.trigger("click");
+    await new DOMWrapper(document.body).get('[data-currency-format="currency"]').trigger("click");
+    expect(main.attributes("aria-label")).toBe("Currency format");
+    await main.trigger("click");
+    expect(wrapper.emitted("applyStyle")?.at(-1)).toEqual([
+      { numberFormat: { kind: "currency", currency: "USD", fractionDigits: 2 } },
+    ]);
+  });
+
   test("applies thousands grouping and preserves existing number precision", async () => {
     const general = mountNumberGroup();
     await general.get('[data-ribbon-action="thousands-separator"]').trigger("click");
