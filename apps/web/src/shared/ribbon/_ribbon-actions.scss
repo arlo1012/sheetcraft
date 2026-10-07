@@ -98,13 +98,15 @@
 @mixin action-text {
   overflow: hidden;
   font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
+  line-height: var(--ribbon-action-text-line-height, normal);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 // Share row centers with stacked tools so every second-row label has the same baseline.
 @mixin tall-content {
+  --ribbon-action-text-line-height: var(--idea-line-height-body-medium);
+
   display: grid;
   grid-template-rows: repeat(2, var(--ribbon-control-height, 26px));
   align-items: center;
