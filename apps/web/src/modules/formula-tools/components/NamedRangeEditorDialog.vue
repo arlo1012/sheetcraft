@@ -133,11 +133,13 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
           />
         </TFormItem>
         <TFormItem :label="t('formulaTools.reference')">
-          <RangeReferenceInput
-            v-model="draft.reference"
-            :select-reference="selectReference"
-            data-formula-reference
-          />
+          <div class="named-range-editor-dialog__reference">
+            <RangeReferenceInput
+              v-model="draft.reference"
+              :select-reference="selectReference"
+              data-formula-reference
+            />
+          </div>
         </TFormItem>
         <TFormItem :label="t('formulaTools.comment')">
           <TTextarea
@@ -155,6 +157,11 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
 <style scoped lang="scss">
 .named-range-editor-dialog {
   &__content {
+    min-width: 0;
+  }
+
+  &__reference {
+    width: 100%;
     min-width: 0;
   }
 }
