@@ -25,7 +25,7 @@ export const pivotsZhCN = {
   "pivot.previousStep": "上一步",
   "pivot.nextStep": "下一步",
   "pivot.finish": "完成",
-  "pivot.browse": "浏览…",
+  "pivot.browse": "浏览",
   "pivot.selectRanges": "选择区域…",
   "pivot.selectRangesTitle": "选择区域",
   "pivot.rangeActions": "操作",

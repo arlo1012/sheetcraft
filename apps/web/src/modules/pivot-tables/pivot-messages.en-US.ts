@@ -31,7 +31,7 @@ export const pivotsEnUS = {
   "pivot.previousStep": "Previous",
   "pivot.nextStep": "Next",
   "pivot.finish": "Finish",
-  "pivot.browse": "Browse…",
+  "pivot.browse": "Browse",
   "pivot.selectRanges": "Select ranges…",
   "pivot.selectRangesTitle": "Select ranges",
   "pivot.rangeActions": "Actions",
