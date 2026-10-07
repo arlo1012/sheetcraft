@@ -90,6 +90,27 @@ Use CSS pixels at 100% scale; size and line height are a pair.
   and separate from selected/checked state. Do not add feature-local focus
   overrides; canvas/SVG editing may keep target-specific feedback.
 
+## Dialog and popover actions
+
+- Use `NewCellStyleDialog` (the Style dialog) as the reference for footer actions.
+  Prefer TDesign Dialog's built-in `confirmBtn` and `cancelBtn` APIs. Custom
+  dialog footers and popover action rows must use the same button modes:
+  secondary actions such as Cancel use `theme="default"` and `variant="base"`
+  (gray background at rest); primary actions use `theme="primary"` and
+  `variant="base"`. Place Cancel before the primary action.
+- Secondary footer actions have no visible border, including hover and pressed
+  states. Keep background feedback and visible keyboard focus. Removing an
+  `outline` button's border does not make it equivalent to the gray `base`
+  variant; use the correct public button mode. Shared TDesign adaptation owns
+  border styling; do not recreate it in feature CSS.
+- If the only footer action dismisses the dialog (Close, Cancel, or equivalent),
+  omit the entire footer with `:footer="false"` and retain an accessible header
+  close control. Apply this to conditional read-only/result states too. Move any
+  useful footer explanation into the body. Keep footers that contain meaningful
+  actions such as Save, Apply, or workflow navigation.
+- Apply these rules to new and modified UI. Existing exceptions are migrated
+  incrementally when their UI is being updated.
+
 ## Ribbon and menus
 
 - Action/menu icons use `--idea-action-icon-size` (15px); tall ribbon actions

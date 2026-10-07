@@ -423,7 +423,7 @@ function insertFunction(name: string): void {
             t("formulaTools.nameFromRightColumn")
           }}</TCheckbox>
           <div class="formula-toolbar__name-menu-actions">
-            <TButton variant="outline" theme="default" @click="nameMenuOpen = false">{{
+            <TButton variant="base" theme="default" @click="nameMenuOpen = false">{{
               t("formulaTools.cancel")
             }}</TButton>
             <TButton
