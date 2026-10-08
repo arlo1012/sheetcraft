@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { ListOrdered } from "lucide-vue-next";
-import { Button } from "tdesign-vue-next/es/button";
 import { Select } from "tdesign-vue-next/es/select";
 import { getSheetFilterValue, getSheetFilterValueKey } from "@idea10/core/commands";
 import { isFormulaError } from "@idea10/core/formula";
@@ -209,12 +207,7 @@ function apply(): void {
         :aria-label="t(area === 'rows' ? 'pivot.rows' : 'pivot.columns')"
         :disabled="disabled"
       />
-      <FilterSortBar v-if="area !== 'filters'" :disabled="disabled" @sort="sort">
-        <Button variant="text" size="small" :disabled="disabled" @click="sort('source')">
-          <template #icon><ListOrdered class="idea-action-icon" /></template>
-          {{ t("pivot.sourceOrder") }}
-        </Button>
-      </FilterSortBar>
+      <FilterSortBar v-if="area !== 'filters'" :disabled="disabled" @sort="sort" />
       <PivotFieldFilterConditions
         v-if="area !== 'filters'"
         ref="conditions"
