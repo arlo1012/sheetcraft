@@ -104,13 +104,10 @@ describe("pivot field filter panel", () => {
     await confirm();
     expect(updated(wrapper).filters[0]).toEqual({ field: 0, all: false, values: [] });
   });
-  test("clear filters restores all page members", async () => {
+  test("select all restores all page members", async () => {
     const { wrapper } = setup();
     await panel().get('.filter-value-list__tools input[type="checkbox"]').setValue(false);
-    await panel()
-      .findAll("button")
-      .find((button) => button.text() === "Clear filters")!
-      .trigger("click");
+    await panel().get('.filter-value-list__tools input[type="checkbox"]').setValue(true);
     await confirm();
     expect(updated(wrapper).filters[0]).toEqual({ field: 0, all: true, values: [] });
   });

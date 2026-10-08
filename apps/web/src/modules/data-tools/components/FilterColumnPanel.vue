@@ -30,6 +30,7 @@ import type {
   DataToolFilterValueOption,
   FilterColorSort,
 } from "../data-tools-types";
+import FilterPanelActions from "../../../shared/filter/components/FilterPanelActions.vue";
 import FilterValueList from "../../../shared/filter/components/FilterValueList.vue";
 import FilterColorOptions from "./FilterColorOptions.vue";
 import FilterColorSortMenu from "./FilterColorSortMenu.vue";
@@ -392,7 +393,7 @@ onBeforeUnmount(() => {
             })
           }}
         </p>
-        <footer>
+        <FilterPanelActions :disabled="!canApply" @cancel="emit('close')" @apply="apply">
           <span
             v-if="tab === 'values' && !pendingValueCriteria"
             class="filter-column-panel__summary"
@@ -412,13 +413,7 @@ onBeforeUnmount(() => {
                   )
             }}
           </span>
-          <TButton theme="default" variant="base" size="small" @click="emit('close')">{{
-            t("dataTools.filter.cancel")
-          }}</TButton>
-          <TButton theme="primary" size="small" :disabled="!canApply" @click="apply">{{
-            t("dataTools.filter.apply")
-          }}</TButton>
-        </footer>
+        </FilterPanelActions>
       </div>
     </FloatingPanelSurface>
   </Teleport>
@@ -503,12 +498,6 @@ onBeforeUnmount(() => {
     display: grid;
     gap: var(--idea-space-4);
     background: var(--idea-surface-panel);
-  }
-  footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--idea-space-4);
   }
 }
 </style>

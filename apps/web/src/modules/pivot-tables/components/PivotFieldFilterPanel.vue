@@ -21,6 +21,7 @@ import type {
 import { useAppI18n } from "../../../shared/i18n";
 import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import FilterPanelActions from "../../../shared/filter/components/FilterPanelActions.vue";
 import FilterValueList from "../../../shared/filter/components/FilterValueList.vue";
 import FilterConditionMenu from "../../../shared/filter/components/FilterConditionMenu.vue";
 import FilterConditionDialog from "../../../shared/filter/components/FilterConditionDialog.vue";
@@ -164,12 +165,6 @@ function acceptCondition(condition: SheetFilterCondition): void {
   else valueCondition.value = condition as PivotValueCondition;
   editor.value = undefined;
 }
-function clear(): void {
-  query.value = "";
-  selection.value = choices.value.map((entry) => entry.key);
-  labelCondition.value = undefined;
-  valueCondition.value = undefined;
-}
 function apply(): void {
   if (props.disabled) return;
   const selected = new Set(selection.value.map(getSheetFilterValueKey));
@@ -218,7 +213,6 @@ function apply(): void {
       :style="floatingStyles"
       padding="tool"
     >
-      <strong>{{ fieldLabel }}</strong>
       <Select
         v-if="dimensions.length > 1"
         v-model="field"
@@ -296,9 +290,6 @@ function apply(): void {
           }}
         </p>
       </template>
-      <Button variant="text" size="small" :disabled="disabled" @click="clear">{{
-        t("pivot.clearFilters")
-      }}</Button>
       <FilterValueList
         ref="list"
         v-model="selection"
@@ -309,14 +300,12 @@ function apply(): void {
         :disabled="disabled"
         compact
       />
-      <div class="pivot-field-filter-panel__footer">
-        <Button theme="primary" size="small" :disabled="disabled" @click="apply">{{
-          t("dataTools.common.confirm")
-        }}</Button>
-        <Button theme="default" variant="outline" size="small" @click="close">{{
-          t("dataTools.common.cancel")
-        }}</Button>
-      </div>
+      <FilterPanelActions
+        class="pivot-field-filter-panel__footer"
+        :disabled="disabled"
+        @apply="apply"
+        @cancel="close"
+      />
     </FloatingPanelSurface>
     <FilterConditionDialog
       :visible="!!editor && editor.action !== 'rank'"
@@ -347,8 +336,7 @@ function apply(): void {
   gap: var(--idea-space-3);
   width: min(320px, calc(100vw - 32px));
   &__sort,
-  &__conditions,
-  &__footer {
+  &__conditions {
     display: flex;
     align-items: center;
     gap: var(--idea-space-2);
@@ -361,9 +349,6 @@ function apply(): void {
   &__active {
     margin: 0;
     color: var(--idea-text-secondary);
-  }
-  &__footer {
-    justify-content: flex-end;
   }
 }
 </style>
