@@ -131,8 +131,8 @@ function select(keys: Array<string | number>): void {
             @enter="add"
           />
           <Button
-            size="small"
-            variant="outline"
+            size="medium"
+            variant="text"
             data-pivot-range-action="add"
             :disabled="disabled || !canAdd"
             @click="add"
