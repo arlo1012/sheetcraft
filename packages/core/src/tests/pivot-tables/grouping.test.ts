@@ -472,7 +472,7 @@ describe("pivot field grouping", () => {
     const f = numeric();
     executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, f.table));
     const snapshot = serializeWorkbook(f.workbook);
-    expect(snapshot.version).toBe(41);
+    expect(snapshot.version).toBe(42);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 39 })).toThrow();
   });

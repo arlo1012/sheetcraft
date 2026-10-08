@@ -6,7 +6,7 @@ import {
   type Sheet,
   type SheetEvaluator,
 } from "./workbook.js";
-import type { CellNumberFormat } from "./style.js";
+import { normalizeCellNumberFormat, type CellNumberFormat } from "./style.js";
 
 export type ChartType =
   | "column"
@@ -23,6 +23,8 @@ export type ChartType =
   | "wordCloud";
 export type SheetChart = {
   pivotTableId?: string;
+  /** Values retained when a PivotTable is removed; no worksheet data dependency. */
+  dataCache?: ChartData;
   type: ChartType;
   /** Null means structural edits deleted or split the source range. */
   range: CellRange | null;
@@ -52,6 +54,7 @@ const types = new Set([
 export function normalizeSheetChart(chart: SheetChart): SheetChart {
   if (
     !chart ||
+    (chart.pivotTableId !== undefined && chart.dataCache !== undefined) ||
     (chart.pivotTableId !== undefined &&
       (typeof chart.pivotTableId !== "string" || !chart.pivotTableId.trim())) ||
     !types.has(chart.type) ||
@@ -81,6 +84,9 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
     throw new RangeError("Chart source must contain at most 10,000 cells.");
   return {
     ...(chart.pivotTableId ? { pivotTableId: chart.pivotTableId } : {}),
+    ...(chart.dataCache !== undefined
+      ? { dataCache: normalizeChartDataCache(chart.dataCache) }
+      : {}),
     type: chart.type,
     range: range ? { start: { ...range.start }, end: { ...range.end } } : null,
     title: chart.title,
@@ -103,11 +109,54 @@ export type ChartData = {
   series: ChartSeries[];
   records: Array<Array<string | number | null>>;
 };
+/** Validate and clone persisted static chart values at the document boundary. */
+export function normalizeChartDataCache(data: ChartData): ChartData {
+  const text = (value: unknown): value is string =>
+    typeof value === "string" && value.length <= 32767;
+  const number = (value: unknown): value is number | null =>
+    value === null || (typeof value === "number" && Number.isFinite(value));
+  if (
+    !data ||
+    !Array.isArray(data.categories) ||
+    !data.categories.every(text) ||
+    !Array.isArray(data.series) ||
+    !Array.isArray(data.records) ||
+    data.categories.length > 10000 ||
+    data.series.length > 10000 ||
+    data.records.length > 10000 ||
+    data.categories.length * Math.max(1, data.series.length) > 10000 ||
+    data.series.some(
+      (entry) =>
+        !entry ||
+        !text(entry.name) ||
+        !Array.isArray(entry.values) ||
+        entry.values.length !== data.categories.length ||
+        !entry.values.every(number),
+    ) ||
+    data.records.some(
+      (row) => !Array.isArray(row) || row.some((value) => !text(value) && !number(value)),
+    ) ||
+    data.records.reduce((count, row) => count + row.length, 0) > 10000
+  )
+    throw new RangeError("Invalid cached chart data.");
+  return {
+    categories: [...data.categories],
+    series: data.series.map((entry) => ({
+      name: entry.name,
+      values: [...entry.values],
+      ...(entry.numberFormat !== undefined
+        ? { numberFormat: normalizeCellNumberFormat(entry.numberFormat) }
+        : {}),
+    })),
+    records: data.records.map((row) => [...row]),
+  };
+}
 export function getSheetChartData(
   sheet: Sheet,
   chart: SheetChart,
   evaluator: SheetEvaluator,
 ): ChartData {
+  if (chart.dataCache !== undefined) return normalizeChartDataCache(chart.dataCache);
   if (chart.pivotTableId) {
     const pivot = sheet.pivotTables?.find((table) => table.id === chart.pivotTableId);
     const range = pivot?.outputRange;

@@ -43,6 +43,7 @@ import type {
   RestoreFullSheetStateCommand,
 } from "./contracts.js";
 import type { SheetChartDrawing } from "../sheet-drawings.js";
+import { getSheetChartData } from "../sheet-charts.js";
 function literal(value: FormulaValue): CellContent | undefined {
   return value === null
     ? undefined
@@ -361,10 +362,14 @@ export function applyRemovePivotTableCommand(
         else temporary.cells.delete(key);
       }
     }
+  const evaluator = createWorkbookEvaluator(workbook, sheet.id);
   temporary.drawings = (temporary.drawings ?? []).map((drawing) => {
     if (drawing.kind !== "chart" || drawing.chart.pivotTableId !== table.id) return drawing;
     const { pivotTableId: _pivotId, ...chart } = drawing.chart;
-    return { ...drawing, chart };
+    return {
+      ...drawing,
+      chart: { ...chart, dataCache: getSheetChartData(sheet, drawing.chart, evaluator) },
+    };
   });
   replaceSheetSparseState(sheet, createSheetSparseState(temporary));
   return createRestoreSheetStateCommand(sheet.id, before);

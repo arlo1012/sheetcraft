@@ -11,6 +11,9 @@ export const chartsEnUS = {
   "chart.labels": "Data labels",
   "chart.stacked": "Stacked",
   "chart.showHidden": "Include hidden data",
+  "chart.cachedSourceHint":
+    "This chart retains its previous data. Use worksheet data to rebuild it from the selected range.",
+  "chart.linkSource": "Use worksheet data",
   "chart.pivotSourceHint":
     "The linked PivotTable controls the source and row/column layout. Use Edit PivotTable to change them.",
   "chart.sourceHint":
