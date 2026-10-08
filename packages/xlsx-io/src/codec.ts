@@ -1,3 +1,4 @@
+import { readXlsxPivotTables } from "./pivot-tables.js";
 import { readXlsxSparklines } from "./sparklines.js";
 import { readXlsxProtection } from "./protection.js";
 import ExcelJSImport from "exceljs/dist/exceljs.min.js";
@@ -933,33 +934,32 @@ export async function decodeWithExcelJs(
       : 0;
   if (activeTab !== undefined && activeSheetIndex === 0 && activeTab !== 0)
     add(report, "feature-omitted", "workbook.activeTab");
-  return {
-    workbook: {
-      id: workbookId(),
-      structureProtected: protection.structureProtected,
-      ...(protection.structurePassword ? { structurePassword: protection.structurePassword } : {}),
-      dateSystem,
-      calculation,
-      theme,
-      activeSheetId: sheets[activeSheetIndex]?.id ?? sheets[0]?.id ?? "",
-      sheets: new Map(sheets.map((sheet) => [sheet.id, sheet])),
-      definedNames: readDefinedNames(bytes, sheets, report),
-      tableStyles: rawTables.tableStyles,
-      pivotTableStyles: rawTables.pivotTableStyles,
-      ...(cellStyles.length ? { cellStyles } : {}),
-      ...(xlsxTableStyleId(rawTables.defaultTableStyleName)
-        ? {
-            defaultTableStyleId: xlsxTableStyleId(rawTables.defaultTableStyleName),
-          }
-        : {}),
-      ...(xlsxPivotTableStyleId(rawTables.defaultPivotTableStyleName)
-        ? {
-            defaultPivotTableStyleId: xlsxPivotTableStyleId(rawTables.defaultPivotTableStyleName),
-          }
-        : {}),
-    },
-    report: report.build(),
+  const workbook: Workbook = {
+    id: workbookId(),
+    structureProtected: protection.structureProtected,
+    ...(protection.structurePassword ? { structurePassword: protection.structurePassword } : {}),
+    dateSystem,
+    calculation,
+    theme,
+    activeSheetId: sheets[activeSheetIndex]?.id ?? sheets[0]?.id ?? "",
+    sheets: new Map(sheets.map((sheet) => [sheet.id, sheet])),
+    definedNames: readDefinedNames(bytes, sheets, report),
+    tableStyles: rawTables.tableStyles,
+    pivotTableStyles: rawTables.pivotTableStyles,
+    ...(cellStyles.length ? { cellStyles } : {}),
+    ...(xlsxTableStyleId(rawTables.defaultTableStyleName)
+      ? {
+          defaultTableStyleId: xlsxTableStyleId(rawTables.defaultTableStyleName),
+        }
+      : {}),
+    ...(xlsxPivotTableStyleId(rawTables.defaultPivotTableStyleName)
+      ? {
+          defaultPivotTableStyleId: xlsxPivotTableStyleId(rawTables.defaultPivotTableStyleName),
+        }
+      : {}),
   };
+  readXlsxPivotTables(bytes, workbook, report);
+  return { workbook, report: report.build() };
 }
 
 function writeStyle(
@@ -1104,7 +1104,6 @@ export async function encodeWithExcelJs(
   for (const [sheetIndex, sheet] of [...workbook.sheets.values()].entries()) {
     pageSetups.push(sheet.pageSetup);
     // Tiled watermarks have no native worksheet field; do not silently claim XLSX fidelity.
-    if (sheet.pivotTables?.length) add(report, "feature-omitted", `${sheet.name}.pivotTables`);
     if (sheet.drawings?.length) add(report, "feature-omitted", `${sheet.name}.drawings`);
     if (sheet.pageDecoration?.watermark) add(report, "feature-omitted", `${sheet.name}.watermark`);
     sheetBackgrounds.push(
@@ -1292,6 +1291,7 @@ export async function encodeWithExcelJs(
       sheetBackgrounds,
       Boolean(workbook.structureProtected),
       workbook.structurePassword,
+      workbook,
     ),
     report: report.build(),
   };

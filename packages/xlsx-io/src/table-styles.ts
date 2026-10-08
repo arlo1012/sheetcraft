@@ -402,7 +402,7 @@ function writeTableStyles(
   defaultStyleId?: string,
   pivotStyles: readonly PivotTableStyleDefinition[] = [],
   defaultPivotStyleId?: string,
-): void {
+): Map<string, string> {
   const source = strFromU8(entries["xl/styles.xml"]!);
   const custom = styles.filter((style) => Object.keys(style.elements).length);
   const customPivots = pivotStyles.filter((style) => Object.keys(style.elements).length);
@@ -493,6 +493,7 @@ function writeTableStyles(
   entries["xl/styles.xml"] = strToU8(
     withDxfs.replace(/<tableStyles\b[^>]*(?:\/>|>[\s\S]*?<\/tableStyles>)/i, tableStylesContainer),
   );
+  return pivotStyleNames;
 }
 
 function nextRelationshipId(xml: string): number {
@@ -519,7 +520,7 @@ export function writeXlsxTableMetadata(
   defaultStyleId?: string,
   pivotStyles: readonly PivotTableStyleDefinition[] = [],
   defaultPivotStyleId?: string,
-): void {
+): Map<string, string> {
   if (
     !sheets.some((sheet) => sheet.tables?.length) &&
     !styles.length &&
@@ -527,11 +528,11 @@ export function writeXlsxTableMetadata(
     !defaultStyleId &&
     !defaultPivotStyleId
   )
-    return;
+    return new Map();
   const stylesById = new Map(styles.map((style) => [style.id, style]));
   for (const table of sheets.flatMap((sheet) => sheet.tables ?? []))
     if (!stylesById.has(table.style.id)) stylesById.set(table.style.id, table.style);
-  writeTableStyles(
+  const pivotStyleNames = writeTableStyles(
     entries,
     [...stylesById.values()],
     defaultStyleId,
@@ -577,4 +578,5 @@ export function writeXlsxTableMetadata(
       ),
     );
   }
+  return pivotStyleNames;
 }

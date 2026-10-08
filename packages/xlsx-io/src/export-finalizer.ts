@@ -1,3 +1,5 @@
+import type { SheetPivotTable } from "@idea10/core/pivot-tables";
+import { writeXlsxPivotTables } from "./pivot-tables.js";
 import { writeXlsxSparklines } from "./sparklines.js";
 import type { ProtectionPassword } from "@idea10/core";
 import { writeXlsxProtection } from "./protection.js";
@@ -18,10 +20,13 @@ import { writeXlsxHyperlinks } from "./hyperlinks.js";
 import { writeXlsxCellNoteVmlBoxes, writeXlsxCellNotes } from "./cell-notes.js";
 import { writeXlsxPageSetups } from "./page-setup.js";
 import type { CompatibilityReportBuilder } from "./report.js";
-import type { Sheet, WorkbookCalculationSettings } from "@idea10/core/workbook";
+import type { Sheet, Workbook, WorkbookCalculationSettings } from "@idea10/core/workbook";
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
 import type { TableStyleDefinition } from "@idea10/core/table-styles";
-import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
+import {
+  resolvePivotTableStyle,
+  type PivotTableStyleDefinition,
+} from "@idea10/core/pivot-table-styles";
 import type { CellStyleDefinition } from "@idea10/core/cell-styles";
 import type { SheetPageSetup } from "@idea10/core/page-setup";
 import { resolveThemeFont, type WorkbookTheme } from "@idea10/core/workbook-theme";
@@ -54,6 +59,7 @@ export function finalizeXlsxExport(
   sheetBackgrounds: readonly (string | undefined)[] = [],
   structureProtected = false,
   structurePassword?: ProtectionPassword,
+  workbook?: Workbook,
 ): Uint8Array {
   const entries = unzipSync(bytes);
   const styles = entries["xl/styles.xml"];
@@ -81,12 +87,39 @@ export function finalizeXlsxExport(
   writeXlsxDataMetadata(entries, dataMetadata);
   writeXlsxPageSetups(entries, pageSetups, report);
   writeXlsxConditionalFormats(entries, conditionalFormats, report);
-  writeXlsxTableMetadata(
+  const nativePivotStyles = [...pivotTableStyles];
+  const tableStyleIds = new Map<SheetPivotTable, string>();
+  if (workbook)
+    for (const sheet of workbook.sheets.values())
+      for (const table of sheet.pivotTables ?? []) {
+        if (
+          table.styleId?.startsWith("xlsx-pivot-table-style-") &&
+          !nativePivotStyles.some((style) => style.id === table.styleId)
+        ) {
+          tableStyleIds.set(table, table.styleId);
+          continue;
+        }
+        const resolved = resolvePivotTableStyle(workbook, table);
+        let style = nativePivotStyles.find(
+          (style) => JSON.stringify(style.elements) === JSON.stringify(resolved.elements),
+        );
+        if (!style) {
+          style = {
+            ...resolved,
+            id: `xlsx-report-pivot-${nativePivotStyles.length}`,
+            name: `Idea10 Pivot ${nativePivotStyles.length + 1}`,
+            category: "custom",
+          };
+          nativePivotStyles.push(style);
+        }
+        tableStyleIds.set(table, style.id);
+      }
+  const pivotStyleNames = writeXlsxTableMetadata(
     entries,
     sheets,
     tableStyles,
     defaultTableStyleId,
-    pivotTableStyles,
+    nativePivotStyles,
     defaultPivotTableStyleId,
   );
   writeXlsxFilterColorFormats(
@@ -140,6 +173,21 @@ export function finalizeXlsxExport(
   }
   if (calculation) writeWorkbookCalculationSettings(entries, calculation);
   if (theme) writeXlsxWorkbookTheme(entries, theme);
+  if (workbook)
+    writeXlsxPivotTables(
+      entries,
+      workbook,
+      report,
+      new Map(
+        [...tableStyleIds].map(([table, id]) => [
+          table,
+          pivotStyleNames.get(id) ??
+            (id.startsWith("xlsx-pivot-table-style-")
+              ? id.slice("xlsx-pivot-table-style-".length)
+              : (nativePivotStyles.find((style) => style.id === id)?.name ?? "PivotStyleLight16")),
+        ]),
+      ),
+    );
   const files: Zippable = {};
   for (const [name, content] of Object.entries(entries)) {
     if (name.endsWith("/")) continue;
