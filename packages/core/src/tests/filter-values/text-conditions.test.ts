@@ -131,7 +131,7 @@ describe("text filter comparison conditions", () => {
         ],
       };
       const snapshot = serializeWorkbook(session.workbook);
-      expect(snapshot.version).toBe(39);
+      expect(snapshot.version).toBe(40);
       expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
       expect(() => deserializeWorkbook({ ...snapshot, version: 36 })).toThrow();
     },
@@ -151,7 +151,7 @@ describe("text filter comparison conditions", () => {
       ],
     };
     const snapshot = serializeWorkbook(session.workbook);
-    expect(serializeWorkbook(deserializeWorkbook({ ...snapshot, version: 36 })).version).toBe(39);
+    expect(serializeWorkbook(deserializeWorkbook({ ...snapshot, version: 36 })).version).toBe(40);
   });
   test("gates text comparisons inside table filters and infers standalone sheet format", () => {
     const session = createTestWorkbookSession();

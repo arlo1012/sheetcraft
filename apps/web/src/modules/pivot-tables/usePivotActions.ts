@@ -230,6 +230,7 @@ export function usePivotActions(options: {
           ...draft.table,
           ...source,
           dataCache: undefined,
+          groups: undefined,
           rowFields: [],
           columnFields: [],
           values: [],
@@ -329,6 +330,9 @@ export function usePivotActions(options: {
         };
         fields.sortFields = previous.sortFields?.flatMap((rule) =>
           remap(rule.field) < 0 ? [] : [{ ...rule, field: remap(rule.field) }],
+        );
+        fields.groups = previous.groups?.flatMap((group) =>
+          remap(group.field) < 0 ? [] : [{ ...group, field: remap(group.field) }],
         );
         fields.axisFilters = previous.axisFilters?.flatMap((filter) =>
           remap(filter.field) < 0 ? [] : [{ ...filter, field: remap(filter.field) }],
@@ -545,6 +549,7 @@ export function usePivotActions(options: {
         filters: [],
         axisFilters: undefined,
         sortFields: undefined,
+        groups: undefined,
       });
   }
   function remove(clearOutput = false) {

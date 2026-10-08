@@ -10,6 +10,8 @@ import {
   ChartColumnIncreasing,
   PanelRight,
   Table2,
+  ListTree,
+  ListX,
 } from "lucide-vue-next";
 import type { SheetPivotTable } from "@idea10/core/pivot-tables";
 import { useAppI18n } from "../../../shared/i18n";
@@ -20,6 +22,8 @@ const props = defineProps<{
   disabled: boolean;
   fieldsVisible: boolean;
   activeField: string;
+  groupEnabled?: boolean;
+  ungroupEnabled?: boolean;
 }>();
 const emit = defineEmits<{
   rename: [name: string];
@@ -32,6 +36,8 @@ const emit = defineEmits<{
   chart: [];
   fields: [];
   convert: [];
+  group: [];
+  ungroup: [];
 }>();
 const { t } = useAppI18n();
 function rename(value: string): void {
@@ -68,6 +74,24 @@ function rename(value: string): void {
         :disabled="disabled || !activeField"
         @activate="emit('settings')"
         ><Settings2
+      /></RibbonButton>
+    </section>
+    <section class="pivot-analysis__group">
+      <RibbonButton
+        variant="tall"
+        :label="t('pivot.group')"
+        :text="t('pivot.group')"
+        :disabled="disabled || !groupEnabled"
+        @activate="emit('group')"
+        ><ListTree
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :label="t('pivot.ungroup')"
+        :text="t('pivot.ungroup')"
+        :disabled="disabled || !ungroupEnabled"
+        @activate="emit('ungroup')"
+        ><ListX
       /></RibbonButton>
     </section>
     <section class="pivot-analysis__group">

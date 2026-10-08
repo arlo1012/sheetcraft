@@ -1,4 +1,25 @@
 export const pivotsEnUS = {
+  "pivot.groupAutomatic": "Automatic",
+  "pivot.group": "Group",
+  "pivot.ungroup": "Ungroup",
+  "pivot.groupTitle": "Group: {field}",
+  "pivot.groupNumbers": "Numbers",
+  "pivot.groupDates": "Dates",
+  "pivot.groupStart": "Starting at",
+  "pivot.groupEnd": "Ending at",
+  "pivot.groupUnit": "By",
+  "pivot.groupInterval": "Interval",
+  "pivot.groupYears": "Years",
+  "pivot.groupQuarters": "Quarters",
+  "pivot.groupMonths": "Months",
+  "pivot.groupDays": "Days",
+  "pivot.groupHours": "Hours",
+  "pivot.groupMinutes": "Minutes",
+  "pivot.groupSeconds": "Seconds",
+  "pivot.groupInvalid": "Enter valid bounds and a positive interval, with at most 10,000 groups.",
+  "pivot.groupFailed":
+    "Cannot group this field. Use numbers or dates without blanks, text, or errors.",
+
   "pivot.showDetails": "Show Details",
   "pivot.detailsNeedRefresh": "Refresh this pivot table before showing details.",
   "pivot.detailsFailed":

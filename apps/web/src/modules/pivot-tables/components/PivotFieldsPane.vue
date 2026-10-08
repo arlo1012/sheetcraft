@@ -5,7 +5,7 @@ import { vIconAction } from "../../../shared/focus/icon-action";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import {
-  getPivotTableSource,
+  getRawPivotTableSource,
   normalizePivotTable,
   type PivotAggregate,
   type SheetPivotTable,
@@ -41,7 +41,7 @@ const settings = ref<{ area: PivotArea; index: number }>();
 const source = computed(() => {
   void props.revision;
   try {
-    return getPivotTableSource(props.workbook, props.table);
+    return getRawPivotTableSource(props.workbook, props.table);
   } catch {
     return undefined;
   }

@@ -85,6 +85,8 @@ import PictureAnnotationDialog from "../modules/sheet-images/components/PictureA
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
+import PivotGroupingDialog from "../modules/pivot-tables/components/PivotGroupingDialog.vue";
+import { usePivotGrouping } from "../modules/pivot-tables/usePivotGrouping";
 import { usePivotActions } from "../modules/pivot-tables/usePivotActions";
 import { getPivotTableSource } from "@idea10/core/pivot-tables";
 import { createThemedTableStyles } from "@idea10/core/table-styles";
@@ -1195,6 +1197,27 @@ const pivotActiveField = computed<{ area: PivotArea; index: number; name: string
     return getPivotActiveField(table, headers, activeAddress.value);
   },
 );
+const pivotGroupField = computed(() => {
+  const table = activePivot.value,
+    field = pivotActiveField.value;
+  if (!table || !field || (field.area !== "rows" && field.area !== "columns")) return undefined;
+  return (field.area === "rows" ? table.rowFields : table.columnFields)[field.index];
+});
+const pivotGrouping = usePivotGrouping({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  selected: pivotActions.selected,
+  getField: () => pivotGroupField.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => cellEditSession.finish(),
+  execute: executeCommand,
+  onError: () => {
+    void MessagePlugin.error(t("pivot.groupFailed"));
+  },
+});
+const { draft: pivotGroupingDraft } = pivotGrouping;
+watch(workbookGeneration, pivotGrouping.close);
+watch(() => activeSheet.value.id, pivotGrouping.close);
 watch(
   () => activePivot.value?.id,
   (id) => {
@@ -2455,6 +2478,10 @@ const gridInert = computed(
           :disabled="pivotDisabled"
           :fields-visible="pivotFieldsVisible"
           :active-field="pivotActiveField?.name ?? ''"
+          :group-enabled="pivotGroupField !== undefined"
+          :ungroup-enabled="activePivot.groups?.some((group) => group.field === pivotGroupField)"
+          @group="pivotGrouping.open()"
+          @ungroup="pivotGrouping.ungroup()"
           @rename="pivotActions.update({ ...activePivot, name: $event })"
           @settings="openPivotFieldSettings"
           @refresh="pivotActions.refresh"
@@ -3615,6 +3642,8 @@ const gridInert = computed(
           @configure-pivot="openPivotFields"
           @update-pivot="pivotActions.update"
           @show-pivot-details="(id, address) => pivotActions.showDetails(id, address)"
+          @group-pivot-field="pivotGrouping.open"
+          @ungroup-pivot-field="pivotGrouping.ungroup"
           @configure-pivot-filter="
             (id, index) => {
               openPivotFields(id);
@@ -3988,6 +4017,14 @@ const gridInert = computed(
     :drawing="viewingAttachment"
     @download="attachmentActions.download(viewingAttachment)"
     @close="attachmentActions.close"
+  />
+  <PivotGroupingDialog
+    v-if="pivotGroupingDraft"
+    :draft="pivotGroupingDraft"
+    :date-system="session.workbook.dateSystem"
+    :disabled="pivotDisabled"
+    @apply="pivotGrouping.apply"
+    @close="pivotGrouping.close"
   />
   <PivotTableDialog
     v-if="editingPivot"

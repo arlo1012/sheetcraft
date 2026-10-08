@@ -138,6 +138,8 @@ function matches(value: FormulaValue, rule: PivotLabelCondition): boolean {
 export function filterPivotRecords(
   table: SheetPivotTable,
   records: FormulaValue[][],
+  getValue: (record: FormulaValue[], field: number) => FormulaValue = (record, field) =>
+    record[field] ?? null,
 ): FormulaValue[][] {
   const filters = table.axisFilters ?? [];
   const memberFilters = filters.map((filter) => ({
@@ -161,7 +163,7 @@ export function filterPivotRecords(
     for (const record of labelFiltered) {
       const member = key(record[filter.field] ?? null);
       const acc = members.get(member) ?? createPivotAccumulator();
-      addPivotValue(acc, record[field.field] ?? null);
+      addPivotValue(acc, getValue(record, field.field));
       members.set(member, acc);
     }
     const values = [...members].map(([member, acc]) => ({

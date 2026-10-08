@@ -10,6 +10,7 @@ import {
   addressInRange,
   rangesIntersect,
   type SheetPivotTable,
+  type PivotFieldGroup,
 } from "../pivot-tables.js";
 import {
   createCellKey,
@@ -206,6 +207,7 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
     ...table,
     outputRange: result.matrix.length ? range : null,
     dataCache: result.dataCache,
+    groups: result.groups,
     resultLayout: {
       labelColumns: result.rowLabelColumns,
       dataRows: result.dataRows,
@@ -394,4 +396,45 @@ export function createPivotDetailsSheetCommand(
     }),
   );
   return { ...command, sheet: serializeSheet(sheet) };
+}
+
+/** Grouping changes only axis membership; source cells and measure values remain intact. */
+export function createGroupPivotFieldCommand(
+  sheetId: string,
+  table: SheetPivotTable,
+  group: PivotFieldGroup,
+): SetPivotTableCommand {
+  if (
+    ![
+      ...table.rowFields,
+      ...table.columnFields,
+      ...table.filters.map((filter) => filter.field),
+    ].includes(group.field)
+  )
+    throw new RangeError("Select a pivot dimension field to group.");
+  const next = {
+    ...table,
+    groups: [...(table.groups ?? []).filter((item) => item.field !== group.field), group],
+    axisFilters: table.axisFilters?.filter((filter) => filter.field !== group.field),
+    filters: table.filters.map((filter) =>
+      filter.field === group.field ? { ...filter, all: true, values: [] } : filter,
+    ),
+  };
+  return createSetPivotTableCommand(sheetId, next);
+}
+export function createUngroupPivotFieldCommand(
+  sheetId: string,
+  table: SheetPivotTable,
+  field: number,
+): SetPivotTableCommand {
+  if (!table.groups?.some((group) => group.field === field))
+    throw new RangeError("This pivot field is not grouped.");
+  return createSetPivotTableCommand(sheetId, {
+    ...table,
+    groups: table.groups.filter((group) => group.field !== field),
+    axisFilters: table.axisFilters?.filter((filter) => filter.field !== field),
+    filters: table.filters.map((filter) =>
+      filter.field === field ? { ...filter, all: true, values: [] } : filter,
+    ),
+  });
 }

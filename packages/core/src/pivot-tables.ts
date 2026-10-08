@@ -1,3 +1,16 @@
+import {
+  normalizePivotGroups,
+  refreshPivotGroupBounds,
+  groupPivotRecords,
+  getPivotGroupLabels,
+  type PivotFieldGroup,
+} from "./pivot-groups.js";
+export {
+  getPivotGroupLabels,
+  getPivotGroupedValue,
+  type PivotFieldGroup,
+  type PivotDateGroupUnit,
+} from "./pivot-groups.js";
 import { isFormulaError, type FormulaValue } from "./formula/types.js";
 import {
   MAX_SHEET_ROWS,
@@ -71,6 +84,7 @@ export type PivotConsolidation = {
 export type PivotDataCache = { headers: string[]; records: FormulaValue[][] };
 export type SheetPivotTable = {
   dataCache?: PivotDataCache;
+  groups?: PivotFieldGroup[];
   id: string;
   name: string;
   sourceSheetId: string;
@@ -315,6 +329,7 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
       : MAX_SHEET_COLUMNS;
   if (dataCache && (source || consolidation) && dataCache.headers.length !== width)
     throw new RangeError("Invalid pivot cache field count.");
+  const groups = normalizePivotGroups(table.groups, width);
   const field = (index: number) => Number.isInteger(index) && index >= 0 && index < width;
   if (
     table.rowFields.length > 32 ||
@@ -354,6 +369,7 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
           },
         }
       : {}),
+    ...(groups?.length ? { groups } : {}),
     id: table.id,
     name: table.name,
     sourceSheetId: ranges ? ranges[0]!.sheetId : table.sourceSheetId,
@@ -450,7 +466,7 @@ export function getPivotSourceRanges(table: SheetPivotTable): PivotSourceRange[]
   );
 }
 /** Uniform record stream for ordinary lists and labeled consolidation matrices. */
-export function getPivotTableSource(workbook: Workbook, table: SheetPivotTable) {
+export function getRawPivotTableSource(workbook: Workbook, table: SheetPivotTable) {
   if (!table.consolidation) {
     const info = getPivotSource(workbook, table.sourceSheetId, table.source);
     return {
@@ -534,6 +550,16 @@ export function getPivotTableSource(workbook: Workbook, table: SheetPivotTable) 
     },
   };
 }
+/** Field menus use the same group members as the displayed report. */
+export function getPivotTableSource(workbook: Workbook, table: SheetPivotTable) {
+  const source = getRawPivotTableSource(workbook, table);
+  if (!table.groups?.length) return source;
+  return {
+    headers: source.headers,
+    records: () =>
+      groupPivotRecords([...source.records()], table.groups, workbook.dateSystem).values(),
+  };
+}
 export const rangesIntersect = (a: CellRange, b: CellRange) =>
   a.start.row <= b.end.row &&
   a.end.row >= b.start.row &&
@@ -573,6 +599,7 @@ export function getPivotPresentation(table: SheetPivotTable): PivotPresentation 
 export type PivotResult = {
   matrix: FormulaValue[][];
   dataCache: PivotDataCache;
+  groups?: PivotFieldGroup[];
   rowMembers: Array<FormulaValue[] | null>;
   columnMembers: FormulaValue[][];
   filteredRecords: FormulaValue[][];
@@ -606,7 +633,7 @@ export function buildPivotResult(
   const source =
     options?.useCache && table.dataCache
       ? { headers: table.dataCache.headers, records: () => table.dataCache!.records.values() }
-      : getPivotTableSource(workbook, table);
+      : getRawPivotTableSource(workbook, table);
   const { headers } = source;
   const dataCache = {
     headers: [...headers],
@@ -620,6 +647,7 @@ export function buildPivotResult(
     return {
       matrix: [],
       dataCache,
+      ...(table.groups?.length ? { groups: table.groups } : {}),
       rowMembers: [],
       columnMembers: [],
       filteredRecords: [],
@@ -660,7 +688,15 @@ export function buildPivotResult(
     addPivotValue(aggregate, value);
   };
   const records: FormulaValue[][] = [];
-  for (const record of dataCache.records) {
+  if (!options?.useCache)
+    table.groups = refreshPivotGroupBounds(table.groups, dataCache.records, workbook.dateSystem);
+  const groupedRecords = groupPivotRecords(dataCache.records, table.groups, workbook.dateSystem);
+  const originals = new Map(
+    groupedRecords.map((record, index) => [record, dataCache.records[index]!]),
+  );
+  const rawValue = (record: FormulaValue[], field: number) =>
+    originals.get(record)?.[field] ?? null;
+  for (const record of groupedRecords) {
     if (record.every((value) => value === null || value === "")) continue;
     if (
       filterKeys.some(
@@ -670,7 +706,7 @@ export function buildPivotResult(
       continue;
     records.push(record);
   }
-  const filteredRecords = filterPivotRecords(table, records);
+  const filteredRecords = filterPivotRecords(table, records, rawValue);
   for (const record of filteredRecords) {
     sourceRows++;
     const rowValues = table.rowFields.map((index) => record[index] ?? null);
@@ -700,7 +736,7 @@ export function buildPivotResult(
     ];
     for (const r of rowKeys)
       for (const c of columnKeys)
-        table.values.forEach((value, index) => add(r, c, index, record[value.field] ?? null));
+        table.values.forEach((value, index) => add(r, c, index, rawValue(record, value.field)));
   }
   if (!columns.size) columns.set(groupKey([]), []);
   const sorted = (groups: Map<string, FormulaValue[]>, axis: "rows" | "columns") => {
@@ -719,15 +755,25 @@ export function buildPivotResult(
         for (const record of filteredRecords) {
           const prefix = groupKey(fields.slice(0, level + 1).map((index) => record[index] ?? null));
           const acc = measures.get(prefix) ?? createPivotAccumulator();
-          addPivotValue(acc, record[table.values[rule.measure]!.field] ?? null);
+          addPivotValue(acc, rawValue(record, table.values[rule.measure]!.field));
           measures.set(prefix, acc);
         }
       }
-      return { rule, order, positions, measures };
+      const group =
+        rule?.measure === undefined
+          ? table.groups?.find((group) => group.field === field)
+          : undefined;
+      return {
+        rule,
+        order,
+        positions,
+        measures,
+        groupLabels: group ? getPivotGroupLabels(group, workbook.dateSystem) : undefined,
+      };
     });
     return entries.sort((a, b) => {
       for (let level = 0; level < fields.length; level++) {
-        const { rule, order, positions, measures } = levels[level]!;
+        const { rule, order, positions, measures, groupLabels } = levels[level]!;
         const leftKey = groupKey(a[1].slice(0, level + 1));
         const rightKey = groupKey(b[1].slice(0, level + 1));
         if (leftKey === rightKey) continue;
@@ -740,8 +786,9 @@ export function buildPivotResult(
           rule?.measure !== undefined
             ? getPivotAggregateValue(measures.get(rightKey), table.values[rule.measure]!.aggregate)
             : b[1][level];
-        const comparison =
-          typeof left === "number" && typeof right === "number"
+        const comparison = groupLabels
+          ? groupLabels.indexOf(String(left)) - groupLabels.indexOf(String(right))
+          : typeof left === "number" && typeof right === "number"
             ? left - right
             : String(left ?? "").localeCompare(String(right ?? ""), "en");
         if (comparison) return order === "descending" ? -comparison : comparison;
@@ -942,9 +989,10 @@ export function buildPivotResult(
   return {
     matrix,
     dataCache,
+    ...(table.groups?.length ? { groups: table.groups } : {}),
     rowMembers,
     columnMembers: columnEntries.map(([key, values]) => (key === "@total" ? [] : values)),
-    filteredRecords,
+    filteredRecords: filteredRecords.map((record) => originals.get(record)!),
     headerRows,
     headerStart,
     seriesLabels,
@@ -1008,13 +1056,18 @@ export function getPivotDetails(
     values.every(
       (value, index) => groupKey([record[fields[index]!] ?? null]) === groupKey([value]),
     );
+  const memberRecords = groupPivotRecords(
+    result.filteredRecords,
+    table.groups,
+    workbook.dateSystem,
+  );
   return {
     headers: [...result.headers],
     records: result.filteredRecords
       .filter(
-        (record) =>
-          matches(record, table.rowFields, members) &&
-          matches(record, table.columnFields, columnMembers),
+        (_, index) =>
+          matches(memberRecords[index]!, table.rowFields, members) &&
+          matches(memberRecords[index]!, table.columnFields, columnMembers),
       )
       .map((record) => record.map((value) => (isFormulaError(value) ? { ...value } : value))),
   };
@@ -1123,10 +1176,14 @@ export function transformPivotReferences(
           fields.some(
             (index) => field(index) < 0 || field(index) > next.end.column - next.start.column,
           )
-        )
+        ) {
           table.source = null;
-        else {
+          table.groups = table.groups?.filter((group) => field(group.field) >= 0);
+        } else {
           table.source = next;
+          table.groups = table.groups?.flatMap((group) =>
+            field(group.field) < 0 ? [] : [{ ...group, field: field(group.field) }],
+          );
           table.sortFields = table.sortFields?.map((rule) => ({
             ...rule,
             field: field(rule.field),

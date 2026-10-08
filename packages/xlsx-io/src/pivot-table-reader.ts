@@ -1,3 +1,4 @@
+import { cacheGroupFingerprint, readNativePivotGroups } from "./pivot-native-groups.js";
 import type { FormulaValue } from "@idea10/core/formula";
 import { createWorkbookEvaluator, type Workbook } from "@idea10/core/workbook";
 import {
@@ -100,6 +101,7 @@ function nativeSource(
 }
 function restoreMetadata(
   root: XmlNode,
+  cacheRoot: XmlNode,
   workbook: Workbook,
   native: SheetPivotTable,
 ): SheetPivotTable {
@@ -109,6 +111,7 @@ function restoreMetadata(
     const data = JSON.parse(ext.metadata) as {
       version?: unknown;
       nativeFingerprint?: string;
+      cacheGroupFingerprint?: string;
       table?: SheetPivotTable;
       bindings?: Record<string, string>;
     };
@@ -116,7 +119,10 @@ function restoreMetadata(
       data.version !== 1 ||
       !data.table ||
       !data.bindings ||
-      data.nativeFingerprint !== pivotFingerprint(root)
+      data.nativeFingerprint !== pivotFingerprint(root) ||
+      (data.cacheGroupFingerprint !== undefined
+        ? data.cacheGroupFingerprint !== cacheGroupFingerprint(cacheRoot)
+        : !!native.groups?.length)
     )
       return native;
     const remap = (id: string) => {
@@ -180,9 +186,12 @@ export function readPivotTable(
   if (flag(root, "dataOnRows") || "calculatedItems" in cacheRoot || "cacheHierarchies" in cacheRoot)
     throw new Error("Unsupported pivot layout or calculated cache.");
   const cacheFields = nodes(child(cacheRoot, "cacheFields").cacheField);
-  if (cacheFields.some((field) => "fieldGroup" in field || attr(field, "formula")))
+  if (
+    cacheFields.some((field) => attr(field, "databaseField", "1") === "0" || attr(field, "formula"))
+  )
     throw new Error("Unsupported grouped/calculated pivot.");
   const cache = readPivotSharedItems(cacheBytes, workbook.dateSystem);
+  const groups = readNativePivotGroups(cacheRoot, workbook.dateSystem);
   const fields = nodes(child(root, "pivotFields").pivotField);
   const source = nativeSource(workbook, cacheRoot, cache.headers);
   const location = parseRange(attr(child(root, "location"), "ref"));
@@ -197,6 +206,7 @@ export function readPivotTable(
   ): { values: FormulaValue[]; hidden: boolean; itemValues: FormulaValue[] } => {
     if (!Number.isInteger(field) || field < 0 || field >= cache.headers.length)
       throw new Error("Invalid pivot field.");
+    const members = groups.find((group) => group.field === field)?.labels ?? cache.shared[field]!;
     const items = nodes(child(fields[field] ?? {}, "items").item).filter((item) =>
       ["", "data"].includes(attr(item, "t")),
     );
@@ -205,9 +215,8 @@ export function readPivotTable(
     let hidden = false;
     for (const item of items) {
       const index = Number(attr(item, "x", "-1"));
-      if (index < 0 || index >= cache.shared[field]!.length)
-        throw new Error("Invalid pivot member.");
-      const value = cache.shared[field]![index]!;
+      if (index < 0 || index >= members.length) throw new Error("Invalid pivot member.");
+      const value = members[index]!;
       itemValues.push(value);
       if (flag(item, "h")) hidden = true;
       else values.push(value);
@@ -249,6 +258,7 @@ export function readPivotTable(
   const rowField = fields[rowFields[0] ?? -1] ?? {};
   const table: SheetPivotTable = {
     id,
+    ...(groups.length ? { groups } : {}),
     ...(recordsBytes
       ? {
           dataCache: {
@@ -345,7 +355,7 @@ export function readPivotTable(
     (normalized.source ? normalized.source.end.column - normalized.source.start.column + 1 : 0);
   if (width !== cache.headers.length) throw new Error("Pivot source fields changed.");
   if (!normalized.dataCache) getPivotTableSource(workbook, normalized);
-  const restored = restoreMetadata(root, workbook, normalized);
+  const restored = restoreMetadata(root, cacheRoot, workbook, normalized);
   if (restored.dataCache && !restored.resultLayout) {
     // Offer drill-through only when our rebuilt layout agrees with the imported displayed cells.
     // External clients may retain manual ordering/layouts that this model cannot reproduce.

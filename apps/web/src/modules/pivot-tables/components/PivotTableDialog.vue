@@ -59,6 +59,7 @@ const validSource = computed(() => {
         ...draft.value.table,
         ...resolvePivotDraftSource(props.workbook, draft.value),
         dataCache: undefined,
+        groups: undefined,
         rowFields: [],
         columnFields: [],
         values: [],

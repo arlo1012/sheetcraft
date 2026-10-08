@@ -1,3 +1,4 @@
+import { nativePivotGroupXml, nativePivotDateTime } from "./pivot-native-groups.js";
 import { createPivotNumberFormatReader } from "./pivot-number-formats.js";
 import type { SheetPivotTable } from "@idea10/core/pivot-tables";
 import { strFromU8, strToU8, unzipSync } from "fflate/browser";
@@ -34,6 +35,17 @@ export function writeXlsxPivotTables(
       if (!table.includeHidden)
         report?.add("filter-omitted", "warning", `${table.name}.includeHidden`);
       const cache = createPivotCache(workbook, table);
+      try {
+        for (const group of table.groups ?? []) {
+          nativePivotGroupXml(group, workbook.dateSystem);
+          if (group.kind === "date")
+            for (const value of cache.shared[group.field]!)
+              if (typeof value === "number") nativePivotDateTime(value, workbook.dateSystem);
+        }
+      } catch {
+        report?.add("feature-omitted", "warning", `${table.name}.groups`);
+        continue;
+      }
       cache.numberFormats = readNumberFormats(table, cache.headers.length);
       index++;
       const cachePart = `xl/pivotCache/pivotCacheDefinition${index}.xml`;

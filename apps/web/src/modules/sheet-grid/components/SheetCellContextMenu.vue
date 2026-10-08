@@ -58,6 +58,8 @@ const props = withDefaults(
     cutDisabledReason?: string;
     hasImage?: boolean;
     showPivotDetails?: boolean;
+    groupPivotField?: boolean;
+    ungroupPivotField?: boolean;
     hasNote?: boolean;
     readOnly?: boolean;
     contentReadOnly?: boolean;
@@ -75,6 +77,8 @@ const emit = defineEmits<{
   pasteFormats: [];
   convertImageToFloating: [];
   showPivotDetails: [];
+  groupPivotField: [];
+  ungroupPivotField: [];
   previewImage: [];
   editNote: [];
   deleteNote: [];
@@ -215,7 +219,19 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
         >
           <template #icon><Rows3 :size="16" /></template>{{ t("pivot.showDetails") }}
         </MenuItem>
-        <MenuSeparator v-if="showPivotDetails" />
+        <MenuItem
+          v-if="groupPivotField"
+          data-cell-action="pivot-group"
+          @select="emit('groupPivotField')"
+          ><template #icon><Rows3 :size="16" /></template>{{ t("pivot.group") }}</MenuItem
+        >
+        <MenuItem
+          v-if="ungroupPivotField"
+          data-cell-action="pivot-ungroup"
+          @select="emit('ungroupPivotField')"
+          ><template #icon><ListMinus :size="16" /></template>{{ t("pivot.ungroup") }}</MenuItem
+        >
+        <MenuSeparator v-if="showPivotDetails || groupPivotField || ungroupPivotField" />
         <li role="none">
           <ContextClipboardActions
             :content-read-only="contentReadOnly"

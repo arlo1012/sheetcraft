@@ -1,7 +1,9 @@
+import { nativeGroupFingerprint } from "./pivot-native-groups.js";
 import { strToU8 } from "fflate/browser";
 import type { Workbook } from "@idea10/core/workbook";
 import {
   buildPivotResult,
+  getPivotGroupLabels,
   getPivotPresentation,
   getPivotTableRange,
   type SheetPivotTable,
@@ -53,8 +55,12 @@ export function pivotTableXml(
       const allowed = selected === undefined ? undefined : new Set(selected.map(pivotValueKey));
       const sort = table.sortFields?.find((rule) => rule.field === field);
       const order = sort?.order ?? table.sort;
+      const group = table.groups?.find((group) => group.field === field);
+      const members = group
+        ? getPivotGroupLabels(group, workbook.dateSystem)
+        : cache.shared[field]!;
       const items = axis
-        ? `<items count="${cache.shared[field]!.length}">${cache.shared[field]!.map((value, index) => `<item x="${index}"${allowed && !allowed.has(pivotValueKey(value)) ? ' h="1"' : ""}/>`).join("")}</items>`
+        ? `<items count="${members.length}">${members.map((value, index) => `<item x="${index}"${allowed && !allowed.has(pivotValueKey(value)) ? ' h="1"' : ""}/>`).join("")}</items>`
         : "";
       const sortScope =
         sort?.measure === undefined
@@ -72,9 +78,13 @@ export function pivotTableXml(
       const member =
         filter.all || filter.values.length !== 1
           ? undefined
-          : cache.shared[filter.field]!.findIndex(
-              (value) => pivotValueKey(value) === pivotValueKey(filter.values[0]!),
-            );
+          : (table.groups?.some((group) => group.field === filter.field)
+              ? getPivotGroupLabels(
+                  table.groups.find((group) => group.field === filter.field)!,
+                  workbook.dateSystem,
+                )
+              : cache.shared[filter.field]!
+            ).findIndex((value) => pivotValueKey(value) === pivotValueKey(filter.values[0]!));
       return `<pageField fld="${filter.field}" hier="-1"${member === undefined || member < 0 ? "" : ` item="${member}"`}/>`;
     })
     .join("");
@@ -105,6 +115,11 @@ export function pivotTableXml(
     version: 1,
     table: { ...table, dataCache: undefined },
     bindings,
+    cacheGroupFingerprint: nativeGroupFingerprint(
+      table.groups,
+      cache.headers.length,
+      workbook.dateSystem,
+    ),
     nativeFingerprint: pivotFingerprint(child(parseXml(strToU8(native)), "pivotTableDefinition")),
   };
   return strToU8(

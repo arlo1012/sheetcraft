@@ -290,7 +290,7 @@ describe("pivot cached record details", () => {
   test("persists cached details in V39 and rejects a cache smuggled into a V38 snapshot", () => {
     const f = installed();
     const snapshot = serializeWorkbook(f.workbook);
-    expect(snapshot.version).toBe(39);
+    expect(snapshot.version).toBe(40);
     const restored = deserializeWorkbook(snapshot);
     expect(serializeWorkbook(restored)).toEqual(snapshot);
     const table = restored.sheets.get(f.destination.id)!.pivotTables![0]!;

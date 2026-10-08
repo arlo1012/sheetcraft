@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getPivotActiveField } from "../../pivot-tables/pivot-active-field";
 import PivotReportFilters from "../../pivot-tables/components/PivotReportFilters.vue";
 import { isPivotValueCell, type SheetPivotTable } from "@idea10/core/pivot-tables";
 import PivotEmptyReports from "../../pivot-tables/components/PivotEmptyReports.vue";
@@ -299,6 +300,8 @@ const emit = defineEmits<{
   updatePivot: [table: SheetPivotTable];
   configurePivotFilter: [id: string, index: number];
   showPivotDetails: [id: string, address: CellAddress];
+  groupPivotField: [id: string];
+  ungroupPivotField: [id: string];
   changeControl: [id: string, value: unknown];
   unlockRange: [range: CellRange];
   contextAction: [request: SheetContextRequest];
@@ -2580,6 +2583,25 @@ const contextPivotDetails = computed(() =>
     isPivotValueCell(table, cellContextMenu.value?.noteAddress ?? activeCell.value),
   ),
 );
+const contextPivotGroup = computed(() => {
+  const address = cellContextMenu.value?.noteAddress ?? activeCell.value;
+  for (const table of props.sheet.pivotTables ?? []) {
+    const active = getPivotActiveField(table, [], address);
+    if (active?.area === "rows" || active?.area === "columns") {
+      const field = (active.area === "rows" ? table.rowFields : table.columnFields)[active.index]!;
+      return { table, field };
+    }
+  }
+  return undefined;
+});
+function requestPivotGroup(ungroup = false): void {
+  const table = contextPivotGroup.value?.table;
+  if (table) {
+    if (ungroup) emit("ungroupPivotField", table.id);
+    else emit("groupPivotField", table.id);
+  }
+  closeCellContextMenu(false);
+}
 function requestPivotDetails(): void {
   const table = contextPivotDetails.value;
   const address = cellContextMenu.value?.noteAddress;
@@ -3452,6 +3474,16 @@ defineExpose({
       :sheet="sheet"
       :range="selectedRange"
       @action="requestContextAction"
+      :group-pivot-field="Boolean(contextPivotGroup)"
+      :ungroup-pivot-field="
+        Boolean(
+          contextPivotGroup?.table.groups?.some(
+            (group) => group.field === contextPivotGroup?.field,
+          ),
+        )
+      "
+      @group-pivot-field="requestPivotGroup(false)"
+      @ungroup-pivot-field="requestPivotGroup(true)"
       :show-pivot-details="Boolean(contextPivotDetails)"
       @show-pivot-details="requestPivotDetails"
       :has-image="Boolean(cellContextMenu.imageAddress)"
