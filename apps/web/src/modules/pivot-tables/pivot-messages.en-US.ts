@@ -49,6 +49,7 @@ export const pivotsEnUS = {
   "pivot.sourceRange": "Source range",
   "pivot.selectedRanges": "{count} ranges selected",
   "pivot.addRange": "Add range",
+  "pivot.confirmAddRange": "Confirm add",
   "pivot.noRanges": "Add the ranges to consolidate.",
   "pivot.noReports": "There are no other PivotTables in this workbook.",
   "pivot.reuseHint":

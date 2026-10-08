@@ -136,7 +136,7 @@ function select(keys: Array<string | number>): void {
             data-pivot-range-action="add"
             :disabled="disabled || !canAdd"
             @click="add"
-            >{{ t("pivot.addRange") }}</Button
+            >{{ t("pivot.confirmAddRange") }}</Button
           >
         </div>
       </FormItem>

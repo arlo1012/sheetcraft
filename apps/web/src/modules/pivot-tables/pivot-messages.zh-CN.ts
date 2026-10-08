@@ -42,6 +42,7 @@ export const pivotsZhCN = {
   "pivot.sourceRange": "引用区域",
   "pivot.selectedRanges": "已选择 {count} 个区域",
   "pivot.addRange": "添加区域",
+  "pivot.confirmAddRange": "确认添加",
   "pivot.noRanges": "请添加需要合并计算的区域。",
   "pivot.noReports": "当前工作簿没有可用的其他数据透视表。",
   "pivot.reuseHint": "复用所选透视表的原始数据源，字段布局可独立设置。",
