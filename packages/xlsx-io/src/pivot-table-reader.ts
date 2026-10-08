@@ -289,7 +289,8 @@ export function readPivotTable(
     includeHidden: true,
     sort: "source",
     totalLabel: attr(root, "grandTotalCaption", "Grand Total"),
-    emptyLabel: attr(root, "missingCaption", "(blank)"),
+    // missingCaption is a data-cell replacement, not the name of a blank axis member.
+    emptyLabel: "(blank)",
     styleId: xlsxPivotTableStyleId(attr(style, "name")),
     reportLayout: {
       rowLabel: attr(root, "rowHeaderCaption", "Row Labels"),
