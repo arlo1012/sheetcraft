@@ -4,7 +4,7 @@ import {
   readFilterPanelSettings,
   writeFilterPanelSettings,
   type FilterPanelSettings,
-} from "../../../../modules/data-tools/filter-panel-settings";
+} from "../../../../shared/filter/filter-panel-settings";
 
 const defaults: FilterPanelSettings = {
   showItemCount: true,

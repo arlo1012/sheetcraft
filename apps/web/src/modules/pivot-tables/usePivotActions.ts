@@ -24,6 +24,8 @@ import {
   formatRangeReference,
   resolveRangeReference,
 } from "../../shared/range-reference/formatRangeReference";
+import { reconcilePivotAxisFilters } from "./pivot-field-edits";
+import { getPivotReportColors } from "./pivot-report-colors";
 import { resolvePivotDraftSource } from "./pivot-draft-source";
 export type PivotDraft = {
   table: SheetPivotTable;
@@ -222,6 +224,7 @@ export function usePivotActions(options: {
           columnFields: [],
           values: [],
           filters: [],
+          axisFilters: undefined,
         }),
       ).headers;
       // Source changes retain fields by header identity; missing fields are removed, never rebound by index.
@@ -313,6 +316,13 @@ export function usePivotActions(options: {
             return [{ ...filter, field, values: [...new Set(values)] }];
           }),
         };
+        fields.axisFilters = previous.axisFilters?.flatMap((filter) =>
+          remap(filter.field) < 0 ? [] : [{ ...filter, field: remap(filter.field) }],
+        );
+        reconcilePivotAxisFilters(
+          fields,
+          previous.values.flatMap((value, index) => (remap(value.field) < 0 ? [] : [index])),
+        );
         if (oldConsolidation && nextConsolidation)
           for (
             let field = oldConsolidation.labels.length;
@@ -323,7 +333,10 @@ export function usePivotActions(options: {
       }
       const table = normalizePivotTable({
         ...fields,
-        ...(!fields.reportLayout ? { reportLayout: defaultReportLayout() } : {}),
+        reportLayout: {
+          ...(fields.reportLayout ?? defaultReportLayout()),
+          ...getPivotReportColors(),
+        },
         ...source,
         anchor: draft.newSheet ? { row: 0, column: 0 } : destination!.range.start,
       });
@@ -424,14 +437,15 @@ export function usePivotActions(options: {
     return table;
   }
   function defaultReportLayout(): PivotReportLayout {
-    return (
-      options.reportLayout?.() ?? {
+    return {
+      ...(options.reportLayout?.() ?? {
         rowLabel: "Row",
         columnLabel: "Column",
         allLabel: "(All)",
         multipleLabel: "(Multiple Items)",
-      }
-    );
+      }),
+      ...getPivotReportColors(),
+    };
   }
   function update(table: SheetPivotTable, chart = false): boolean {
     if (options.isBusy() || !options.flush()) return false;
@@ -456,6 +470,7 @@ export function usePivotActions(options: {
           }),
         };
       }
+      table = { ...table, reportLayout: { ...table.reportLayout!, ...getPivotReportColors() } };
       options.execute(
         createSetPivotTableCommand(
           sheet.id,
@@ -478,7 +493,15 @@ export function usePivotActions(options: {
   }
   function clear() {
     const table = selected();
-    if (table) update({ ...table, rowFields: [], columnFields: [], values: [], filters: [] });
+    if (table)
+      update({
+        ...table,
+        rowFields: [],
+        columnFields: [],
+        values: [],
+        filters: [],
+        axisFilters: undefined,
+      });
   }
   function remove(clearOutput = false) {
     if (options.isBusy() || !options.flush()) return;

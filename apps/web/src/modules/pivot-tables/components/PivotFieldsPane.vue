@@ -110,11 +110,13 @@ function toggle(field: number, checked: boolean): void {
     const choice = choices.value.find((entry) => entry.field === field);
     if (choice) add(choice.numeric ? "values" : "rows", field);
   } else {
-    const next = normalizePivotTable(props.table);
-    next.rowFields = next.rowFields.filter((item) => item !== field);
-    next.columnFields = next.columnFields.filter((item) => item !== field);
-    next.values = next.values.filter((item) => item.field !== field);
-    next.filters = next.filters.filter((item) => item.field !== field);
+    let next = normalizePivotTable(props.table);
+    for (const area of ["rows", "columns", "values", "filters"] as const) {
+      for (let index = pivotAreaFields(next, area).length - 1; index >= 0; index--) {
+        if (pivotAreaFields(next, area)[index] === field)
+          next = removePivotField(next, area, index);
+      }
+    }
     emit("update", next);
   }
 }

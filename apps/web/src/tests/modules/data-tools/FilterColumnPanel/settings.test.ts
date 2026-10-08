@@ -6,7 +6,7 @@ import FilterColumnPanel from "../../../../modules/data-tools/components/FilterC
 import {
   readFilterPanelSettings,
   type FilterPanelSettings,
-} from "../../../../modules/data-tools/filter-panel-settings";
+} from "../../../../shared/filter/filter-panel-settings";
 
 const values = [
   { key: { kind: "string" as const, value: "Alpha" }, label: "Alpha", count: 2 },

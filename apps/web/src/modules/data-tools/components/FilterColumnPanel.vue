@@ -11,25 +11,31 @@ import { vIconAction } from "../../../shared/focus/icon-action";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
-import { createFilterConditionDraft, type FilterConditionOperator } from "../filter-conditions";
-import type { FilterConditionAction } from "../filter-condition-actions";
+import {
+  createFilterConditionDraft,
+  type FilterConditionOperator,
+} from "../../../shared/filter/filter-conditions";
+import type { FilterConditionAction } from "../../../shared/filter/filter-condition-actions";
 import {
   getMatchingFilterValues,
   DEFAULT_FILTER_SEARCH_OPTIONS,
   type FilterSearchOptions,
-} from "../filter-value-options";
-import { readFilterPanelSettings, type FilterPanelSettings } from "../filter-panel-settings";
+} from "../../../shared/filter/filter-value-options";
+import {
+  readFilterPanelSettings,
+  type FilterPanelSettings,
+} from "../../../shared/filter/filter-panel-settings";
 import type {
   DataToolFilterCriteria,
   DataToolFilterValueOption,
   FilterColorSort,
 } from "../data-tools-types";
-import FilterValueList from "./FilterValueList.vue";
+import FilterValueList from "../../../shared/filter/components/FilterValueList.vue";
 import FilterColorOptions from "./FilterColorOptions.vue";
 import FilterColorSortMenu from "./FilterColorSortMenu.vue";
-import FilterConditionMenu from "./FilterConditionMenu.vue";
-import FilterConditionDialog from "./FilterConditionDialog.vue";
-import FilterRankDialog from "./FilterRankDialog.vue";
+import FilterConditionMenu from "../../../shared/filter/components/FilterConditionMenu.vue";
+import FilterConditionDialog from "../../../shared/filter/components/FilterConditionDialog.vue";
+import FilterRankDialog from "../../../shared/filter/components/FilterRankDialog.vue";
 
 type ColorCondition = Extract<SheetFilterCondition, { kind: "color" | "color-set" }>;
 

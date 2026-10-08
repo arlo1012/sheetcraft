@@ -17,7 +17,7 @@ describe("pivot snapshot protocol", () => {
       createSetPivotTableCommand(f.destination.id, f.table, { chartId: "chart" }),
     );
     const snapshot = serializeWorkbook(f.workbook);
-    expect(snapshot.version).toBe(35);
+    expect(snapshot.version).toBe(36);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     const standalone = serializeSheet(f.destination);
     expect(serializeSheet(deserializeSheet(standalone))).toEqual(standalone);
@@ -31,7 +31,7 @@ describe("pivot snapshot protocol", () => {
       version: 30,
       sheets: snapshot.sheets.map(({ pivotTables: _pivots, ...sheet }) => sheet),
     };
-    expect(serializeWorkbook(deserializeWorkbook(previous)).version).toBe(35);
+    expect(serializeWorkbook(deserializeWorkbook(previous)).version).toBe(36);
   });
   test("round trips V33 empty objects and presentation options", () => {
     const f = fixture();
@@ -53,7 +53,7 @@ describe("pivot snapshot protocol", () => {
     };
     executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, table));
     const snapshot = serializeWorkbook(f.workbook);
-    expect(snapshot.version).toBe(35);
+    expect(snapshot.version).toBe(36);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     const standalone = serializeSheet(f.destination);
     expect(serializeSheet(deserializeSheet(standalone))).toEqual(standalone);
@@ -120,6 +120,6 @@ describe("pivot snapshot protocol", () => {
     expect(pivot.values).toEqual(f.table.values);
     expect(pivot.presentation).toBeUndefined();
     expect(pivot.resultLayout).toBeUndefined();
-    expect(serializeWorkbook(restored).version).toBe(35);
+    expect(serializeWorkbook(restored).version).toBe(36);
   });
 });

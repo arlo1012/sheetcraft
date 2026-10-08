@@ -20,7 +20,7 @@ import {
   type FilterConditionOperator,
 } from "../filter-conditions";
 import type { FilterConditionAction } from "../filter-condition-actions";
-import type { DataToolFilterValueOption } from "../data-tools-types";
+import type { FilterValueOption } from "../filter-types";
 
 const props = defineProps<{
   visible: boolean;
@@ -28,9 +28,11 @@ const props = defineProps<{
   kind: FilterValueKind;
   initial?: SheetFilterCondition;
   action?: FilterConditionAction;
-  values: readonly DataToolFilterValueOption[];
+  values: readonly FilterValueOption[];
   dateSystem: ExcelDateSystem;
   disabled?: boolean;
+  caption?: string;
+  strictKind?: boolean;
 }>();
 const emit = defineEmits<{ close: []; apply: [condition: SheetFilterCondition] }>();
 const { t } = useAppI18n();
@@ -57,12 +59,14 @@ const operatorOptions = computed(() => {
   const operators =
     props.kind === "text"
       ? TEXT_FILTER_OPERATORS
-      : [
-          ...NUMBER_FILTER_OPERATORS,
-          ...TEXT_FILTER_OPERATORS.filter(
-            (operator) => operator !== "equals" && operator !== "notEquals",
-          ),
-        ];
+      : props.strictKind
+        ? NUMBER_FILTER_OPERATORS
+        : [
+            ...NUMBER_FILTER_OPERATORS,
+            ...TEXT_FILTER_OPERATORS.filter(
+              (operator) => operator !== "equals" && operator !== "notEquals",
+            ),
+          ];
   return operators.map((operator) => ({ value: operator, label: t(labels[operator]) }));
 });
 const valueOptions = computed(() =>
@@ -127,7 +131,7 @@ function apply(): void {
   >
     <div ref="contentRef" class="filter-condition-dialog">
       <p class="filter-condition-dialog__caption">
-        {{ t("dataTools.filter.showRows", { column: columnLabel }) }}
+        {{ caption ?? t("dataTools.filter.showRows", { column: columnLabel }) }}
       </p>
       <div class="filter-condition-dialog__row">
         <TSelect

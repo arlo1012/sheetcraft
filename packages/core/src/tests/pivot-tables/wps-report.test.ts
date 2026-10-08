@@ -297,7 +297,7 @@ describe("WPS pivot report layout", () => {
     const f = report(4);
     executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, f.table));
     const snapshot = serializeWorkbook(f.workbook);
-    expect(snapshot.version).toBe(35);
+    expect(snapshot.version).toBe(36);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     const standalone = serializeSheet(f.destination);
     expect(serializeSheet(deserializeSheet(standalone))).toEqual(standalone);

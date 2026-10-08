@@ -81,19 +81,18 @@ async function open(wrapper: ReturnType<typeof setup>["wrapper"], index: number)
   await flushPromises();
 }
 function menu() {
-  return new DOMWrapper(document.querySelector('[role="menu"]')!);
+  return new DOMWrapper(document.querySelector(".pivot-field-filter-panel")!);
 }
 
 describe("report page filter overlay", () => {
-  test("selecting a page item emits its filter and preserves the other page filters", async () => {
+  test("applying all page members preserves the other page filters", async () => {
     const { wrapper, table } = setup();
     expect(wrapper.findAll("[data-pivot-report-filter]")).toHaveLength(2);
     await open(wrapper, 0);
-    const options = menu().findAll('[role="menuitemradio"]');
-    expect(options.map((option) => option.text())).toContain("Group");
-    await options.find((option) => option.text() === "Group")!.trigger("click");
+    expect(menu().text()).toContain("Group");
+    await menu().get(".pivot-field-filter-panel__footer .t-button--theme-primary").trigger("click");
     const updated = wrapper.emitted("update")![0]![0] as SheetPivotTable;
-    expect(updated.filters[0]).toEqual({ field: 3, all: false, values: ["Group"] });
+    expect(updated.filters[0]).toEqual({ field: 3, all: true, values: [] });
     expect(updated.filters[1]).toEqual(table.filters[1]);
     expect(updated.consolidation).toEqual(table.consolidation);
     expect(table.filters[0]).toEqual({ field: 3, all: true, values: [] });
@@ -106,16 +105,17 @@ describe("report page filter overlay", () => {
     };
     await wrapper.setProps({ tables: [selected] });
     await open(wrapper, 0);
-    await menu().findAll('[role="menuitemradio"]')[0]!.trigger("click");
+    await menu().get(".filter-value-list__tools input[type=checkbox]").setValue(true);
+    await menu().get(".pivot-field-filter-panel__footer .t-button--theme-primary").trigger("click");
     const updated = wrapper.emitted("update")![0]![0] as SheetPivotTable;
     expect(updated.filters).toEqual([{ field: 3, all: true, values: [] }, table.filters[1]]);
   });
-  test("advanced settings emits the selected report id and filter index", async () => {
-    const { wrapper, table } = setup();
+  test("cancel closes a page panel without changing the report", async () => {
+    const { wrapper } = setup();
     await open(wrapper, 1);
-    await menu().get('[role="menuitem"]').trigger("click");
-    expect(wrapper.emitted("settings")).toEqual([[table.id, 1]]);
+    await menu().get(".pivot-field-filter-panel__footer .t-button--theme-default").trigger("click");
     expect(wrapper.emitted("update")).toBeUndefined();
+    expect(document.querySelector(".pivot-field-filter-panel")).toBeNull();
   });
   test("disabled editing leaves both report filter buttons disabled", () => {
     const { wrapper } = setup(true);
@@ -149,7 +149,7 @@ describe("report page filter overlay", () => {
       const { wrapper, table } = setup(false, true);
       await wrapper.get(`[data-pivot-report-dimension="${area}"]`).trigger("click");
       await flushPromises();
-      await menu().findAll('[role="menuitemradio"]')[1]!.trigger("click");
+      await menu().findAll(".pivot-field-filter-panel__sort button")[1]!.trigger("click");
       const updated = wrapper.emitted("update")![0]![0] as SheetPivotTable;
       expect(updated.sort).toBe("descending");
       expect(updated.rowFields).toEqual(table.rowFields);

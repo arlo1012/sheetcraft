@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import FilterRankDialog from "../../../../modules/data-tools/components/FilterRankDialog.vue";
+import FilterRankDialog from "../../../../shared/filter/components/FilterRankDialog.vue";
 import { createAppI18n } from "../../../../shared/i18n";
 
 let wrapper: ReturnType<typeof mount> | undefined;

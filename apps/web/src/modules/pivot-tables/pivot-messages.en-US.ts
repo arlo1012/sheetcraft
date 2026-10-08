@@ -1,4 +1,8 @@
 export const pivotsEnUS = {
+  "pivot.labelFilters": "Label filters",
+  "pivot.valueFilters": "Value filters",
+  "pivot.filterMeasure": "Aggregate measure",
+  "pivot.clearFilters": "Clear filters",
   "pivot.error.overwrite":
     "The destination contains content. Allow overwrite and retry, or choose an empty location.",
   "pivot.error.sourceOverlap": "The destination overlaps the source data. Choose another location.",

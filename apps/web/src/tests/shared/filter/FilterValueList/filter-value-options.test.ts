@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getMatchingFilterValues } from "../../../../modules/data-tools/filter-value-options";
+import { getMatchingFilterValues } from "../../../../shared/filter/filter-value-options";
 
 const values = [
   { key: { kind: "string" as const, value: "north america" }, label: "North America", count: 4 },

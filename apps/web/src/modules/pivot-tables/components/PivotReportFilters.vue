@@ -1,23 +1,18 @@
 <script setup lang="ts">
 import { computed, ref, watch, type CSSProperties } from "vue";
-import { ChevronDown } from "lucide-vue-next";
+import { ChevronDown, Filter } from "lucide-vue-next";
 import {
   getPivotTableSource,
   getPivotPresentation,
-  normalizePivotTable,
   type SheetPivotTable,
 } from "@idea10/core/pivot-tables";
-import { isFormulaError } from "@idea10/core/formula";
-import type { Workbook, CellValue } from "@idea10/core/workbook";
+import type { Workbook } from "@idea10/core/workbook";
 import { getFloatingImageViewportFragments } from "@idea10/sheet-engine/floating-image-layout";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import type { Rect } from "@idea10/sheet-engine/geometry";
 import { useAppI18n } from "../../../shared/i18n";
-import { useMenu } from "../../../shared/menu/useMenu";
-import MenuSurface from "../../../shared/menu/MenuSurface.vue";
-import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
-import MenuItem from "../../../shared/menu/MenuItem.vue";
 import { vIconAction } from "../../../shared/focus/icon-action";
+import PivotFieldFilterPanel from "./PivotFieldFilterPanel.vue";
 
 type ReportControl = { id: string; area: "filters" | "rows" | "columns"; index: number };
 
@@ -35,36 +30,9 @@ const emit = defineEmits<{
 }>();
 const { t } = useAppI18n();
 const triggerRef = ref<HTMLElement | null>(null);
-const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const selected = ref<ReportControl>();
-const { open, floatingStyles, openMenu, onTriggerKeydown, dismiss } = useMenu({
-  triggerRef,
-  menuSurfaceRef,
-  disabled: computed(() => props.disabled),
-  defaultFocus: "selected",
-});
+const open = ref(false);
 const current = computed(() => props.tables.find((table) => table.id === selected.value?.id));
-const filter = computed(() =>
-  selected.value?.area === "filters" ? current.value?.filters[selected.value.index] : undefined,
-);
-const choices = computed(() => {
-  void props.revision;
-  if (!current.value || !filter.value) return [];
-  const values = new Map<string, CellValue>();
-  try {
-    for (const record of getPivotTableSource(props.workbook, current.value).records()) {
-      const value = record[filter.value.field] ?? null;
-      if (!isFormulaError(value)) values.set(JSON.stringify(value), value);
-    }
-  } catch {
-    return [];
-  }
-  return [...values].map(([key, value]) => ({
-    key,
-    value,
-    label: value === null || value === "" ? t("pivot.empty") : String(value),
-  }));
-});
 const fragments = computed(() => {
   void props.revision;
   return props.tables
@@ -129,6 +97,15 @@ const fragments = computed(() => {
       });
     });
 });
+function filtered(table: SheetPivotTable, area: ReportControl["area"], index: number): boolean {
+  return area === "filters"
+    ? !table.filters[index]?.all
+    : !!table.axisFilters?.some(
+        (filter) =>
+          filter.axis === area &&
+          (filter.values !== undefined || filter.labelCondition || filter.valueCondition),
+      );
+}
 function style(rect: Rect): CSSProperties {
   return {
     left: `${props.body.x + rect.x}px`,
@@ -141,41 +118,20 @@ function menu(event: MouseEvent, id: string, area: ReportControl["area"], index:
   if (props.disabled) return;
   selected.value = { id, area, index };
   triggerRef.value = event.currentTarget as HTMLElement;
-  openMenu();
+  open.value = true;
 }
 function key(event: KeyboardEvent, id: string, area: ReportControl["area"], index: number): void {
   if (props.disabled || (event.key !== "ArrowDown" && event.key !== "ArrowUp")) return;
   selected.value = { id, area, index };
   triggerRef.value = event.currentTarget as HTMLElement;
-  onTriggerKeydown(event);
-}
-function apply(value?: CellValue): void {
-  if (!current.value || !selected.value || props.disabled) return;
-  const table = normalizePivotTable(current.value);
-  table.filters[selected.value.index] = {
-    ...table.filters[selected.value.index]!,
-    all: value === undefined,
-    values: value === undefined ? [] : [value],
-  };
-  dismiss();
-  emit("update", table);
-}
-function settings(): void {
-  if (selected.value) {
-    dismiss();
-    emit("settings", selected.value.id, selected.value.index);
-  }
-}
-function sort(order: SheetPivotTable["sort"]): void {
-  if (!current.value || props.disabled) return;
-  const table = normalizePivotTable(current.value);
-  table.sort = order;
-  dismiss();
-  emit("update", table);
+  event.preventDefault();
+  open.value = true;
 }
 watch(
-  () => props.revision,
-  () => dismiss("programmatic", false),
+  () => [props.revision, props.disabled],
+  () => {
+    open.value = false;
+  },
 );
 </script>
 <template>
@@ -190,7 +146,7 @@ watch(
       :data-pivot-report-dimension="fragment.area === 'filters' ? undefined : fragment.area"
       :aria-label="fragment.label"
       :title="fragment.label"
-      aria-haspopup="menu"
+      aria-haspopup="dialog"
       :aria-expanded="
         open &&
         selected?.id === fragment.table.id &&
@@ -201,48 +157,26 @@ watch(
       @keydown.stop="key($event, fragment.table.id, fragment.area, fragment.index)"
       @click.stop="menu($event, fragment.table.id, fragment.area, fragment.index)"
     >
-      <ChevronDown :size="12" aria-hidden="true" />
+      <Filter
+        v-if="filtered(fragment.table, fragment.area, fragment.index)"
+        :size="12"
+        aria-hidden="true"
+      />
+      <ChevronDown v-else :size="12" aria-hidden="true" />
     </span>
   </div>
-  <Teleport to="body">
-    <MenuSurface
-      v-if="open"
-      ref="menuSurfaceRef"
-      :style="floatingStyles"
-      :label="t(selected?.area === 'filters' ? 'pivot.filters' : 'pivot.sort')"
-    >
-      <template #items>
-        <template v-if="selected?.area !== 'filters'">
-          <MenuRadioItem :checked="current?.sort === 'ascending'" @select="sort('ascending')">{{
-            t("pivot.ascending")
-          }}</MenuRadioItem>
-          <MenuRadioItem :checked="current?.sort === 'descending'" @select="sort('descending')">{{
-            t("pivot.descending")
-          }}</MenuRadioItem>
-          <MenuRadioItem :checked="current?.sort === 'source'" @select="sort('source')">{{
-            t("pivot.sourceOrder")
-          }}</MenuRadioItem>
-        </template>
-        <template v-else>
-          <MenuRadioItem :checked="!!filter?.all" @select="apply()">{{
-            t("pivot.reportAll")
-          }}</MenuRadioItem>
-          <MenuRadioItem
-            v-for="choice in choices"
-            :key="choice.key"
-            :checked="
-              !filter?.all &&
-              filter?.values.length === 1 &&
-              JSON.stringify(filter.values[0]) === choice.key
-            "
-            @select="apply(choice.value)"
-            >{{ choice.label }}</MenuRadioItem
-          >
-          <MenuItem @select="settings">{{ t("pivot.filterItems") }}…</MenuItem>
-        </template>
-      </template>
-    </MenuSurface>
-  </Teleport>
+  <PivotFieldFilterPanel
+    v-if="open && current && selected && triggerRef"
+    :key="`${selected.id}-${selected.area}-${selected.index}`"
+    :table="current"
+    :workbook="workbook"
+    :area="selected.area"
+    :index="selected.index"
+    :trigger="triggerRef"
+    :disabled="disabled"
+    @update="emit('update', $event)"
+    @close="open = false"
+  />
 </template>
 <style scoped lang="scss">
 .pivot-report-filters {

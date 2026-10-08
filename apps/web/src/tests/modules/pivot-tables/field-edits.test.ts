@@ -1,9 +1,83 @@
 import { describe, expect, test } from "vitest";
 import { placePivotField, removePivotField } from "../../../modules/pivot-tables/pivot-field-edits";
 import { fixture } from "./fixture";
+import type { SheetPivotTable } from "@idea10/core/pivot-tables";
 const caption = (aggregate: string, field: string) => `${aggregate} ${field}`;
 const numeric = { field: 2, label: "Amount", numeric: true };
+function filteredTable(): SheetPivotTable {
+  const f = fixture();
+  f.actions.open();
+  return {
+    ...f.actions.editing.value!.table,
+    rowFields: [0, 1],
+    values: [
+      { field: 2, aggregate: "sum", caption: "Total" },
+      { field: 2, aggregate: "average", caption: "Average" },
+    ],
+    axisFilters: [
+      {
+        axis: "rows",
+        field: 0,
+        values: ["East"],
+        labelCondition: { kind: "text", operator: "beginsWith", value: "E" },
+        valueCondition: {
+          measure: 1,
+          condition: { kind: "number", operator: "greaterThan", value: 15 },
+        },
+      },
+    ],
+  };
+}
 describe("pivot field placement", () => {
+  test("measure reorder and deletion keep value rules bound to the same measure", () => {
+    const original = filteredTable();
+    const reordered = placePivotField(
+      original,
+      { field: 2, area: "values", index: 1 },
+      "values",
+      0,
+      numeric,
+      caption,
+    );
+    expect(reordered.axisFilters![0]!.valueCondition!.measure).toBe(0);
+    expect(reordered.values[0]!.caption).toBe("Average");
+    const deletedOther = removePivotField(original, "values", 0);
+    expect(deletedOther.axisFilters![0]!.valueCondition!.measure).toBe(0);
+    expect(deletedOther.values[0]!.caption).toBe("Average");
+    const deletedSelected = removePivotField(original, "values", 1);
+    expect(deletedSelected.axisFilters![0]!.valueCondition).toBeUndefined();
+    expect(deletedSelected.axisFilters![0]).toMatchObject({
+      values: ["East"],
+      labelCondition: { value: "E" },
+    });
+    expect(original.axisFilters![0]!.valueCondition!.measure).toBe(1);
+  });
+  test("dimension reorder retains its rules while removing or moving its dimension removes them", () => {
+    const original = filteredTable();
+    const choice = { field: 0, label: "Region", numeric: false };
+    const reordered = placePivotField(
+      original,
+      { field: 0, area: "rows", index: 0 },
+      "rows",
+      2,
+      choice,
+      caption,
+    );
+    expect(reordered.rowFields).toEqual([1, 0]);
+    expect(reordered.axisFilters).toEqual(original.axisFilters);
+    expect(removePivotField(original, "rows", 1).axisFilters).toEqual(original.axisFilters);
+    expect(removePivotField(original, "rows", 0).axisFilters).toBeUndefined();
+    const moved = placePivotField(
+      original,
+      { field: 0, area: "rows", index: 0 },
+      "columns",
+      0,
+      choice,
+      caption,
+    );
+    expect(moved.columnFields).toEqual([0]);
+    expect(moved.axisFilters).toBeUndefined();
+  });
   test("allows repeated measures with independent settings", () => {
     const f = fixture();
     f.actions.open();

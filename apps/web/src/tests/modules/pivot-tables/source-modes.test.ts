@@ -121,6 +121,97 @@ function matrixFixture() {
 }
 
 describe("PivotTable source modes", () => {
+  test("clearing a configured report removes axis rules together with their fields", () => {
+    const f = configuredReport();
+    expect(
+      f.actions.update({
+        ...f.sheet.pivotTables![0]!,
+        axisFilters: [
+          {
+            axis: "rows",
+            field: 0,
+            values: ["East"],
+            valueCondition: {
+              measure: 0,
+              condition: { kind: "number", operator: "greaterThan", value: 0 },
+            },
+          },
+        ],
+      }),
+    ).toBe(true);
+    f.actions.clear();
+    expect(f.onError).not.toHaveBeenCalled();
+    expect(f.sheet.pivotTables![0]).toMatchObject({
+      rowFields: [],
+      columnFields: [],
+      values: [],
+      filters: [],
+    });
+    expect(f.sheet.pivotTables![0]!.axisFilters).toBeUndefined();
+  });
+  test.each([true, false])(
+    "source replacement remaps axis identity and retained measure with keepAmount=%s",
+    (keepAmount) => {
+      const f = configuredReport();
+      expect(
+        f.actions.update({
+          ...f.sheet.pivotTables![0]!,
+          values: [
+            { field: 1, aggregate: "count", caption: "Quarter count" },
+            { field: 2, aggregate: "sum", caption: "Amount" },
+          ],
+          axisFilters: [
+            {
+              axis: "rows",
+              field: 0,
+              values: ["East"],
+              valueCondition: {
+                measure: 1,
+                condition: { kind: "number", operator: "greaterThan", value: 0 },
+              },
+            },
+          ],
+        }),
+      ).toBe(true);
+      const second = createSheet("Replacement", "replacement-source");
+      insertSheet(f.workbook, second);
+      const rows = keepAmount
+        ? [
+            ["Amount", "Region"],
+            [50, "East"],
+            [60, "West"],
+          ]
+        : [["Region"], ["East"], ["West"]];
+      rows.forEach((row, r) =>
+        row.forEach((value, column) =>
+          setCellContent(second, { row: r, column }, { kind: "literal", value: value! }),
+        ),
+      );
+      f.actions.source();
+      f.actions.confirm({
+        ...f.actions.editing.value!,
+        source: keepAmount ? "Replacement!A1:B3" : "Replacement!A1:A3",
+      });
+      expect(f.actions.error.value).toBe(false);
+      const table = f.sheet.pivotTables![0]!;
+      expect(table.rowFields).toEqual([keepAmount ? 1 : 0]);
+      expect(table.axisFilters![0]).toMatchObject({
+        axis: "rows",
+        field: keepAmount ? 1 : 0,
+        values: ["East"],
+      });
+      if (keepAmount) {
+        expect(table.values).toEqual([{ field: 0, aggregate: "sum", caption: "Amount" }]);
+        expect(table.axisFilters![0]!.valueCondition).toEqual({
+          measure: 0,
+          condition: { kind: "number", operator: "greaterThan", value: 0 },
+        });
+      } else {
+        expect(table.values).toEqual([]);
+        expect(table.axisFilters![0]!.valueCondition).toBeUndefined();
+      }
+    },
+  );
   test("defaults to a cell range and validates only the selected source mode", async () => {
     const { wrapper } = mountDialog(fixture(), {
       sources: ["Missing!A1:C2"],

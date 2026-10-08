@@ -4,7 +4,7 @@ import { AutoComplete as TAutoComplete } from "tdesign-vue-next/es/auto-complete
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import FilterConditionDialog from "../../../../modules/data-tools/components/FilterConditionDialog.vue";
+import FilterConditionDialog from "../../../../shared/filter/components/FilterConditionDialog.vue";
 import { createAppI18n } from "../../../../shared/i18n";
 
 let wrapper: ReturnType<typeof mount> | undefined;

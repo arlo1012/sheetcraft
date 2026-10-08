@@ -3,7 +3,7 @@ import { datePartsToExcelSerial } from "@idea10/core/formula";
 import {
   buildFilterCondition,
   createFilterConditionDraft,
-} from "../../../../modules/data-tools/filter-conditions";
+} from "../../../../shared/filter/filter-conditions";
 
 describe("filter condition editing", () => {
   test("reopens and reapplies numeric operators without changing their meaning", () => {

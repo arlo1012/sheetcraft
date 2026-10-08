@@ -1,5 +1,5 @@
 import { pinyin } from "pinyin-pro";
-import type { DataToolFilterValueOption } from "./data-tools-types";
+import type { FilterValueOption } from "./filter-types";
 
 export interface FilterSearchOptions {
   mode: "all" | "any" | "phrase";
@@ -67,10 +67,10 @@ function matchesPhrase(label: SearchableLabel, phrase: string, includePinyin: bo
 
 /** Matches displayed filter values by keywords, literal phrase, and optional pinyin. */
 export function getMatchingFilterValues(
-  values: readonly DataToolFilterValueOption[],
+  values: readonly FilterValueOption[],
   query: string,
   options: FilterSearchOptions = DEFAULT_FILTER_SEARCH_OPTIONS,
-): DataToolFilterValueOption[] {
+): FilterValueOption[] {
   const normalizedQuery = query.trim().toLocaleLowerCase();
   if (!normalizedQuery) return [...values];
 

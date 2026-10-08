@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   DEFAULT_FILTER_SEARCH_OPTIONS,
   getMatchingFilterValues,
-} from "../../../modules/data-tools/filter-value-options";
+} from "../../../shared/filter/filter-value-options";
 
 const values = [
   { key: { kind: "string" as const, value: "beijing north" }, label: "北京 North", count: 4 },

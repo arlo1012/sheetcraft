@@ -2261,7 +2261,9 @@ function filterValueKey(value: SheetFilterValue): string {
       : `${value.kind}:${String(value.value)}`;
 }
 
-function normalizeSheetFilterCondition(condition: SheetFilterCondition): SheetFilterCondition {
+export function normalizeSheetFilterCondition(
+  condition: SheetFilterCondition,
+): SheetFilterCondition {
   const text =
     condition.kind === "text" &&
     typeof condition.value === "string" &&

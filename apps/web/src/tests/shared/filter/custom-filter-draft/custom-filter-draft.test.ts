@@ -3,7 +3,7 @@ import { datePartsToExcelSerial } from "@idea10/core/formula";
 import {
   buildCustomFilterCondition,
   createCustomFilterDraft,
-} from "../../../../modules/data-tools/custom-filter-draft";
+} from "../../../../shared/filter/custom-filter-draft";
 
 describe("custom filter draft", () => {
   test("builds two populated rows with AND and OR independently", () => {

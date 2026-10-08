@@ -10,8 +10,13 @@ import { useMenu } from "../../../shared/menu/useMenu";
 import type { FilterConditionAction } from "../filter-condition-actions";
 
 const props = withDefaults(
-  defineProps<{ kind: "text" | "number" | "date"; disabled?: boolean }>(),
-  { disabled: false },
+  defineProps<{
+    kind: "text" | "number" | "date";
+    disabled?: boolean;
+    label?: string;
+    statistics?: boolean;
+  }>(),
+  { disabled: false, statistics: true },
 );
 const emit = defineEmits<{ select: [action: FilterConditionAction] }>();
 const { t } = useAppI18n();
@@ -19,7 +24,7 @@ const buttonRef = ref<InstanceType<typeof TButton> | null>(null);
 const triggerRef = computed<HTMLElement | null>(() => buttonRef.value?.$el ?? null);
 const surfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `filter-condition-${useId().replaceAll(":", "")}`;
-const label = computed(() => t(`dataTools.filter.${props.kind}Filters`));
+const label = computed(() => props.label ?? t(`dataTools.filter.${props.kind}Filters`));
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef: surfaceRef,
@@ -107,7 +112,7 @@ function select(action: FilterConditionAction): void {
         <MenuItem data-filter-condition-action="between" @select="select('between')">{{
           t("dataTools.filter.between")
         }}</MenuItem>
-        <template v-if="kind === 'number'">
+        <template v-if="kind === 'number' && statistics">
           <MenuSeparator />
           <MenuItem data-filter-condition-action="rank" @select="select('rank')">{{
             t("dataTools.filter.topItems")

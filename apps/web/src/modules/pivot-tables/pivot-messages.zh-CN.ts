@@ -1,4 +1,8 @@
 export const pivotsZhCN = {
+  "pivot.labelFilters": "标签筛选",
+  "pivot.valueFilters": "值筛选",
+  "pivot.filterMeasure": "汇总依据",
+  "pivot.clearFilters": "清除筛选",
   "pivot.error.overwrite": "目标区域已有内容。勾选允许覆盖后重试，或选择空白位置。",
   "pivot.error.sourceOverlap": "放置区域与数据源重叠，不能覆盖源数据。请选择其他位置。",
   "pivot.error.merged": "放置区域包含合并单元格。请先取消合并，或选择其他位置。",

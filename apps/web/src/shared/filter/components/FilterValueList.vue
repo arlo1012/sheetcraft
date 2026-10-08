@@ -7,7 +7,7 @@ import { Input as TInput } from "tdesign-vue-next/es/input";
 import { getSheetFilterValueKey } from "@idea10/core/commands";
 import type { SheetFilterValue } from "@idea10/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
-import type { DataToolFilterValueOption } from "../data-tools-types";
+import type { FilterValueOption } from "../filter-types";
 import {
   getMatchingFilterValues,
   DEFAULT_FILTER_SEARCH_OPTIONS,
@@ -22,12 +22,13 @@ type SortDirection = "ascending" | "descending";
 
 const props = withDefaults(
   defineProps<{
-    values: readonly DataToolFilterValueOption[];
+    values: readonly FilterValueOption[];
     modelValue: readonly SheetFilterValue[];
     query: string;
     disabled: boolean;
     settings: FilterPanelSettings;
     searchOptions?: FilterSearchOptions;
+    compact?: boolean;
   }>(),
   { searchOptions: () => ({ ...DEFAULT_FILTER_SEARCH_OPTIONS }) },
 );
@@ -113,7 +114,7 @@ watch(
   },
 );
 
-function compareNames(left: DataToolFilterValueOption, right: DataToolFilterValueOption): number {
+function compareNames(left: FilterValueOption, right: FilterValueOption): number {
   if (left.key.kind === "number" && right.key.kind === "number")
     return left.key.value - right.key.value;
   return left.label.localeCompare(right.label, undefined, { numeric: true, sensitivity: "base" });
@@ -146,7 +147,7 @@ function changeSettings(settings: FilterPanelSettings): void {
   emit("update:settings", settings);
 }
 
-function toggle(option: DataToolFilterValueOption, checked: boolean): void {
+function toggle(option: FilterValueOption, checked: boolean): void {
   const key = getSheetFilterValueKey(option.key);
   const next = props.modelValue.filter((value) => getSheetFilterValueKey(value) !== key);
   if (checked) next.push({ ...option.key });
@@ -190,7 +191,11 @@ function selectDuplicates(): void {
 </script>
 
 <template>
-  <section class="filter-value-list" :aria-label="t('dataTools.filter.listOrder')">
+  <section
+    class="filter-value-list"
+    :class="{ 'filter-value-list--compact': compact }"
+    :aria-label="t('dataTools.filter.listOrder')"
+  >
     <div
       class="filter-value-list__search-bar"
       role="group"
@@ -218,6 +223,7 @@ function selectDuplicates(): void {
         </TInput>
       </div>
       <TButton
+        v-if="!compact"
         :variant="sortField === 'name' ? 'base' : 'text'"
         theme="default"
         size="small"
@@ -234,6 +240,7 @@ function selectDuplicates(): void {
         <ArrowDown v-else-if="sortField === 'name'" class="idea-action-icon" aria-hidden="true" />
       </TButton>
       <TButton
+        v-if="!compact"
         :variant="sortField === 'count' ? 'base' : 'text'"
         theme="default"
         size="small"
@@ -250,6 +257,7 @@ function selectDuplicates(): void {
         <ArrowDown v-else-if="sortField === 'count'" class="idea-action-icon" aria-hidden="true" />
       </TButton>
       <FilterSettingsMenu
+        v-if="!compact"
         ref="settingsMenuRef"
         :settings="settings"
         :disabled="disabled"
@@ -279,6 +287,7 @@ function selectDuplicates(): void {
           variant="text"
           size="small"
           :disabled="disabled || !matchingValues.length"
+          v-if="!compact"
           @click="selectDuplicates"
         >
           {{ t("dataTools.filter.selectDuplicates") }}
@@ -335,6 +344,10 @@ function selectDuplicates(): void {
   gap: var(--idea-space-4);
   min-width: 0;
   font: inherit;
+
+  &--compact &__search-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
 
   &__search-bar {
     display: grid;

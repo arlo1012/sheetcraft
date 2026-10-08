@@ -1,4 +1,4 @@
-import { isFormulaError, createFormulaError, type FormulaValue } from "./formula/types.js";
+import { isFormulaError, type FormulaValue } from "./formula/types.js";
 import {
   MAX_SHEET_ROWS,
   MAX_SHEET_COLUMNS,
@@ -8,6 +8,18 @@ import {
   type CellValue,
   type Workbook,
 } from "./workbook.js";
+import {
+  filterPivotRecords,
+  normalizePivotAxisFilters,
+  type PivotAxisFilter,
+} from "./pivot-filters.js";
+import {
+  addPivotValue,
+  createPivotAccumulator,
+  getPivotAggregateValue,
+  type PivotAccumulator,
+} from "./pivot-aggregate.js";
+export type { PivotAxisFilter, PivotLabelCondition, PivotValueCondition } from "./pivot-filters.js";
 export type PivotAggregate = "sum" | "count" | "average" | "min" | "max";
 export type PivotValueField = { field: number; aggregate: PivotAggregate; caption: string };
 export type PivotFilter = { field: number; values: CellValue[]; all?: boolean };
@@ -33,6 +45,8 @@ export type PivotReportLayout = {
   columnLabel: string;
   allLabel: string;
   multipleLabel: string;
+  fillColor?: string;
+  borderColor?: string;
 };
 export type PivotSourceRange = {
   sheetId: string;
@@ -53,6 +67,7 @@ export type SheetPivotTable = {
   source: CellRange | null;
   consolidation?: PivotConsolidation;
   reportLayout?: PivotReportLayout;
+  axisFilters?: PivotAxisFilter[];
   anchor: CellAddress;
   outputRange: CellRange | null;
   rowFields: number[];
@@ -177,6 +192,14 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
       ].some((label) => !text(label)))
   )
     throw new RangeError("Invalid pivot report layout.");
+  if (
+    reportLayout &&
+    [reportLayout.fillColor, reportLayout.borderColor].some(
+      (color) => color !== undefined && !/^#[0-9a-f]{6}$/i.test(color),
+    )
+  )
+    throw new RangeError("Invalid pivot report colors.");
+  const axisFilters = normalizePivotAxisFilters(table);
   const consolidation = table.consolidation;
   const pageFields = consolidation?.pageFields;
   if (
@@ -268,6 +291,7 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
       : {}),
     anchor: { ...table.anchor },
     outputRange: cloneRange(table.outputRange),
+    ...(axisFilters ? { axisFilters } : {}),
     rowFields: [...table.rowFields],
     columnFields: [...table.columnFields],
     values: table.values.map((value) => ({ ...value })),
@@ -478,15 +502,6 @@ export type PivotResult = {
   rowIndents: number[];
   subtotalRows: number[];
 };
-type Accumulator = {
-  sum: number;
-  mean: number;
-  count: number;
-  countAll: number;
-  min: number;
-  max: number;
-  error?: Extract<FormulaValue, { kind: string }>;
-};
 const valueKey = (value: FormulaValue) =>
   value === null || value === ""
     ? ["blank"]
@@ -519,7 +534,7 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
   const columns = new Map<string, FormulaValue[]>();
   if (!table.rowFields.length) rows.set(groupKey([]), []);
   if (!table.columnFields.length) columns.set(groupKey([]), []);
-  const aggregates = new Map<string, Accumulator>();
+  const aggregates = new Map<string, PivotAccumulator>();
   let sourceRows = 0;
   const filterKeys = table.filters
     .filter((filter) => !filter.all)
@@ -531,19 +546,12 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
     const key = JSON.stringify([row, column, field]);
     let aggregate = aggregates.get(key);
     if (!aggregate) {
-      aggregate = { sum: 0, mean: 0, count: 0, countAll: 0, min: Infinity, max: -Infinity };
+      aggregate = createPivotAccumulator();
       aggregates.set(key, aggregate);
     }
-    if (value !== null && value !== "") aggregate.countAll++;
-    if (isFormulaError(value)) aggregate.error ??= value;
-    if (typeof value === "number" && Number.isFinite(value)) {
-      aggregate.sum += value;
-      aggregate.count++;
-      aggregate.mean = aggregate.mean * (1 - 1 / aggregate.count) + value / aggregate.count;
-      aggregate.min = Math.min(aggregate.min, value);
-      aggregate.max = Math.max(aggregate.max, value);
-    }
+    addPivotValue(aggregate, value);
   };
+  const records: FormulaValue[][] = [];
   for (const record of source.records()) {
     if (record.every((value) => value === null || value === "")) continue;
     if (
@@ -552,6 +560,9 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       )
     )
       continue;
+    records.push(record);
+  }
+  for (const record of filterPivotRecords(table, records)) {
     sourceRows++;
     const rowValues = table.rowFields.map((index) => record[index] ?? null);
     const columnValues = table.columnFields.map((index) => record[index] ?? null);
@@ -626,12 +637,7 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
     const acc = aggregates.get(JSON.stringify([row, column, index]));
     const type = table.values[index]!.aggregate;
     if (!acc && table.reportLayout) return null;
-    if (type === "count") return acc?.countAll ?? 0;
-    if (acc?.error) return acc.error;
-    if (!acc?.count) return type === "average" ? null : 0;
-    const number =
-      type === "sum" ? acc.sum : type === "average" ? acc.mean : type === "min" ? acc.min : acc.max;
-    return Number.isFinite(number) ? number : createFormulaError("NUM");
+    return getPivotAggregateValue(acc, type);
   };
   const seriesLabels = heading.slice(rowLabelColumns).map((value) => String(value ?? ""));
   const matrix: FormulaValue[][] = [];
@@ -903,6 +909,10 @@ export function transformPivotReferences(
           table.source = null;
         else {
           table.source = next;
+          table.axisFilters = table.axisFilters?.map((filter) => ({
+            ...filter,
+            field: field(filter.field),
+          }));
           table.rowFields = table.rowFields.map(field);
           table.columnFields = table.columnFields.map(field);
           table.values = table.values.map((value) => ({ ...value, field: field(value.field) }));

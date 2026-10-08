@@ -4,10 +4,10 @@ import { Button as TButton } from "tdesign-vue-next/es/button";
 import { defineComponent, nextTick, ref } from "vue";
 import { describe, expect, test } from "vitest";
 import type { SheetFilterValue } from "@idea10/core/workbook";
-import FilterValueList from "../../../../modules/data-tools/components/FilterValueList.vue";
+import FilterValueList from "../../../../shared/filter/components/FilterValueList.vue";
 import type { DataToolFilterValueOption } from "../../../../modules/data-tools/data-tools-types";
 import { createAppI18n } from "../../../../shared/i18n";
-import { readFilterPanelSettings } from "../../../../modules/data-tools/filter-panel-settings";
+import { readFilterPanelSettings } from "../../../../shared/filter/filter-panel-settings";
 
 function stringOption(value: string, count = 1): DataToolFilterValueOption {
   return { key: { kind: "string", value }, label: value, count };

@@ -146,12 +146,56 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
     customStyle ??
     styles.find((style) => style.id === table.styleId) ??
     (table.reportLayout ? DEFAULT_PIVOT_TABLE_STYLE : styles[0]!);
+  const reportStyle =
+    style === DEFAULT_PIVOT_TABLE_STYLE && table.reportLayout
+      ? {
+          ...style,
+          elements: {
+            ...style.elements,
+            headerRow: {
+              style: {
+                ...style.elements.headerRow!.style,
+                fillColor:
+                  table.reportLayout.fillColor ?? style.elements.headerRow!.style.fillColor,
+                borderBottom: {
+                  style: "thin" as const,
+                  color: table.reportLayout.borderColor ?? "#8db4e2",
+                },
+              },
+            },
+            totalRow: {
+              style: {
+                ...style.elements.totalRow!.style,
+                fillColor: table.reportLayout.fillColor ?? style.elements.totalRow!.style.fillColor,
+                borderTop: {
+                  style: "thin" as const,
+                  color: table.reportLayout.borderColor ?? "#8db4e2",
+                },
+              },
+            },
+            pageFieldLabels: {
+              style: {
+                ...style.elements.pageFieldLabels!.style,
+                fillColor:
+                  table.reportLayout.fillColor ?? style.elements.pageFieldLabels!.style.fillColor,
+              },
+            },
+            pageFieldValues: {
+              style: {
+                ...style.elements.pageFieldValues!.style,
+                fillColor:
+                  table.reportLayout.fillColor ?? style.elements.pageFieldValues!.style.fillColor,
+              },
+            },
+          },
+        }
+      : style;
   const styledTable: SheetTable = {
     id: table.id,
     name: table.name,
     range: { ...range, start: { ...range.start, row: range.start.row + result.headerStart } },
     columns: [],
-    style,
+    style: reportStyle,
     headerRow: presentation.columnHeaders,
     totalRow: result.totalRow !== null,
     firstColumn: presentation.rowHeaders,
@@ -181,8 +225,8 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
             : original?.style,
           rowIndex < result.headerStart
             ? columnIndex < 2 && rowIndex < table.filters.length
-              ? (style.elements[columnIndex === 0 ? "pageFieldLabels" : "pageFieldValues"]?.style ??
-                (columnIndex === 0 ? { bold: true } : {}))
+              ? (reportStyle.elements[columnIndex === 0 ? "pageFieldLabels" : "pageFieldValues"]
+                  ?.style ?? (columnIndex === 0 ? { bold: true } : {}))
               : {}
             : (resolveTableCellStyle(
                 styledTable,
