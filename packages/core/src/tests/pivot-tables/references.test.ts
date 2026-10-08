@@ -162,7 +162,16 @@ describe("pivot structural references", () => {
     expect(f.current().outputRange!.start.row).toBe(4);
     undoWorkbookCommand(f.session);
     expect(serializeWorkbook(f.workbook)).toEqual(before);
-    executeWorkbookCommand(f.session, createDeleteSheetAxisCommand(f.destination.id, "row", 2));
+    const output = f.current().outputRange!;
+    executeWorkbookCommand(
+      f.session,
+      createDeleteSheetAxisCommand(
+        f.destination.id,
+        "row",
+        output.start.row,
+        output.end.row - output.start.row + 1,
+      ),
+    );
     expect(f.destination.pivotTables).toEqual([]);
     undoWorkbookCommand(f.session);
     expect(serializeWorkbook(f.workbook)).toEqual(before);

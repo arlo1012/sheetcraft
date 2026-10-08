@@ -5,6 +5,7 @@ export type WorkbookErrorCode =
   | "last_sheet_removal"
   | "last_visible_sheet"
   | "sheet_protected"
+  | "pivot_result_protected"
   | "workbook_protected"
   | "incorrect_protection_password"
   | "sheet_name_conflict"

@@ -10,7 +10,12 @@ import {
   createDeleteSheetAxisCommand,
   createInsertSheetAxisCommand,
 } from "../../commands/structure.js";
-import { executeWorkbookCommand } from "../../history.js";
+import {
+  createWorkbookHistory,
+  executeWorkbookCommand,
+  undoWorkbookCommand,
+} from "../../history.js";
+import { serializeWorkbook } from "../../serialization.js";
 import { createSheetEvaluator } from "../../workbook.js";
 import { getSheetChartData } from "../../sheet-charts.js";
 import type { SheetChartDrawing } from "../../sheet-drawings.js";
@@ -142,36 +147,63 @@ describe("pivot presentation", () => {
     expect(f.table.resultLayout!.rowLabels[0]).toBe("East / A");
   });
   test.each(["insert", "delete"] as const)(
-    "keeps chart leaf labels and values aligned after a row %s inside the report",
+    "rejects a row %s inside the report without altering leaf data, chart, or history",
     (operation) => {
       const f = grouped({ subtotals: "top", blankRows: true });
       executeWorkbookCommand(
         f.session,
         createSetPivotTableCommand(f.destination.id, f.table, { chartId: "chart" }),
       );
+      f.session.history = createWorkbookHistory();
+      const before = serializeWorkbook(f.workbook);
       const table = f.destination.pivotTables![0]!;
       const secondLeafRow = table.anchor.row + table.resultLayout!.dataRows[1]!;
-      executeWorkbookCommand(
-        f.session,
-        operation === "insert"
-          ? createInsertSheetAxisCommand(f.destination.id, "row", secondLeafRow, 1)
-          : createDeleteSheetAxisCommand(f.destination.id, "row", secondLeafRow, 1),
-      );
-
-      const updated = f.destination.pivotTables![0]!;
-      expect(updated.resultLayout).toMatchObject({
-        dataRows: operation === "insert" ? [2, 4, 7] : [2, 5],
-        rowLabels:
-          operation === "insert" ? ["East / A", "East / B", "West / A"] : ["East / A", "West / A"],
-      });
       const drawing = f.destination.drawings![0] as SheetChartDrawing;
+      const chart = getSheetChartData(
+        f.destination,
+        drawing.chart,
+        createSheetEvaluator(f.destination),
+      );
+      expect(() =>
+        executeWorkbookCommand(
+          f.session,
+          operation === "insert"
+            ? createInsertSheetAxisCommand(f.destination.id, "row", secondLeafRow, 1)
+            : createDeleteSheetAxisCommand(f.destination.id, "row", secondLeafRow, 1),
+        ),
+      ).toThrow(
+        expect.objectContaining({
+          data: expect.objectContaining({ code: "pivot_result_protected" }),
+        }),
+      );
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
       expect(
         getSheetChartData(f.destination, drawing.chart, createSheetEvaluator(f.destination)),
-      ).toMatchObject({
-        categories:
-          operation === "insert" ? ["East / A", "East / B", "West / A"] : ["East / A", "West / A"],
-        series: [{ name: "Amount", values: operation === "insert" ? [30, 30, 40] : [30, 40] }],
-      });
+      ).toEqual(chart);
+      expect(undoWorkbookCommand(f.session)).toBe(false);
     },
   );
+
+  test("preserves chart leaf data when a complete report shifts after insertion before its anchor", () => {
+    const f = grouped({ subtotals: "top", blankRows: true });
+    executeWorkbookCommand(
+      f.session,
+      createSetPivotTableCommand(f.destination.id, f.table, { chartId: "chart" }),
+    );
+    const before = serializeWorkbook(f.workbook);
+    const drawing = f.destination.drawings![0] as SheetChartDrawing;
+    const chart = getSheetChartData(
+      f.destination,
+      drawing.chart,
+      createSheetEvaluator(f.destination),
+    );
+    executeWorkbookCommand(f.session, createInsertSheetAxisCommand(f.destination.id, "row", 0, 1));
+    const moved = f.destination.drawings![0] as SheetChartDrawing;
+    expect(f.destination.pivotTables![0]!.anchor.row).toBe(f.table.anchor.row + 1);
+    expect(
+      getSheetChartData(f.destination, moved.chart, createSheetEvaluator(f.destination)),
+    ).toEqual(chart);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
 });

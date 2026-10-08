@@ -90,9 +90,10 @@ describe("validation feedback actions", () => {
         "No",
         "Cancel",
       ]);
-      expect(document.querySelector('[role="alertdialog"] .t-dialog__body')?.textContent).toBe(
-        "Choose a number from 1 to 10",
-      );
+      expect(
+        document.querySelector('[role="alertdialog"] :is(.t-dialog__body, .t-dialog__body__icon)')
+          ?.textContent,
+      ).toBe("Choose a number from 1 to 10");
       await click("No");
       expect(session.state).toMatchObject({
         active: true,

@@ -1,3 +1,4 @@
+import { assertPivotRangeIsWritable } from "./pivot-result-guard.js";
 import {
   cloneCellContent,
   createWorkbookEvaluator,
@@ -211,6 +212,7 @@ export function applySplitColumnCommand(
         "Splitting would overwrite existing cells.",
       );
   }
+  if (width > 0 && rows.length) assertPivotRangeIsWritable(sheet, destinationRange);
   let changed = false;
   for (let index = 0; index < rows.length; index += 1) {
     const sourceStyle = sourceStyles[index];

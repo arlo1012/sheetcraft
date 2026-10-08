@@ -135,6 +135,8 @@ export const pivotsEnUS = {
   "pivot.min": "Minimum",
   "pivot.max": "Maximum",
   "pivot.total": "Grand Total",
+  "pivot.resultProtected":
+    "Cannot change a PivotTable result. Use PivotTable tools to change or remove the report.",
   "pivot.empty": "(blank)",
   "pivot.destination": "Destination cell",
   "pivot.newSheet": "New worksheet",

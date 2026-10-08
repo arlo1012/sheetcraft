@@ -1,3 +1,4 @@
+import { assertPivotRangeIsWritable } from "./pivot-result-guard.js";
 import { cloneCellStyle } from "../style.js";
 import {
   createSheetSparseState,
@@ -366,6 +367,7 @@ export function applyAdvancedFilterCommand(
             command.overwrite,
             "Advanced filter would overwrite existing cells.",
           );
+  assertPivotRangeIsWritable(target, output);
   const previous = createSheetSparseState(target);
   const evaluator = createWorkbookEvaluator(workbook, source.id);
   const sourceRows = [range.start.row, ...rows];

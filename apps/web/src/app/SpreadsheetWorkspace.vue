@@ -3639,9 +3639,11 @@ const gridInert = computed(
           @fill-feedback="
             MessagePlugin.warning(
               t(
-                $event === 'duplicate'
-                  ? 'dataTools.duplicates.duplicateRejected'
-                  : `autoFill.${$event}`,
+                $event === 'pivotResultProtected'
+                  ? 'pivot.resultProtected'
+                  : $event === 'duplicate'
+                    ? 'dataTools.duplicates.duplicateRejected'
+                    : `autoFill.${$event}`,
               ),
             )
           "

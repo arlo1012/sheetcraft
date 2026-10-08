@@ -127,6 +127,7 @@ export const pivotsZhCN = {
   "pivot.min": "最小值",
   "pivot.max": "最大值",
   "pivot.total": "总计",
+  "pivot.resultProtected": "不能更改数据透视表的结果，请使用透视表工具调整或删除报表。",
   "pivot.empty": "（空白）",
   "pivot.destination": "放置单元格",
   "pivot.newSheet": "新建工作表",
