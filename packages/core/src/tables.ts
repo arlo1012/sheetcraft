@@ -611,6 +611,7 @@ export function applyUpdateTableCommand(
     filter: current.filter,
   });
   const previous = createRestoreTableTransactionCommand(workbook);
+  if (rangeChanged) resizeTableTotals(workbook, sheet, current, planned.range);
   let next =
     headerRowChange === undefined
       ? { ...planned, totalRow: current.totalRow }
@@ -629,6 +630,45 @@ export function applyUpdateTableCommand(
   return previous;
 }
 
+function resizeTableTotals(
+  workbook: Workbook,
+  sheet: ReturnType<typeof getSheetOrThrow>,
+  current: SheetTable,
+  range: CellRange,
+): void {
+  if (!current.totalRow) return;
+  if (range.end.row > current.range.end.row) {
+    const count = range.end.row - current.range.end.row;
+    applyCellShiftCommand(workbook, {
+      type: "insertCells",
+      sheetId: sheet.id,
+      range: {
+        start: { row: current.range.end.row, column: current.range.start.column },
+        end: { row: current.range.end.row + count - 1, column: current.range.end.column },
+      },
+      direction: "down",
+    });
+  }
+  // Expansion moves the old totals down; shrinking leaves them in their old row.
+  // Clear their entire old width, including columns excluded by the new range.
+  const previousTotalRow = Math.max(current.range.end.row, range.end.row);
+  for (let column = current.range.start.column; column <= current.range.end.column; column += 1)
+    setCellContent(sheet, { row: previousTotalRow, column }, null);
+  for (let column = range.start.column; column <= range.end.column; column += 1) {
+    const dataStart = range.start.row + (current.headerRow ? 2 : 1);
+    const dataEnd = range.end.row;
+    const label = columnLabel(column);
+    setCellContent(
+      sheet,
+      { row: range.end.row, column },
+      {
+        kind: "formula",
+        formula: { source: `=SUBTOTAL(109,${label}${dataStart}:${label}${dataEnd})` },
+      },
+    );
+  }
+}
+
 export function applyResizeTableCommand(
   workbook: Workbook,
   command: ResizeTableCommand,
@@ -641,49 +681,7 @@ export function applyResizeTableCommand(
   // A rejected overlap must leave the workbook untouched.
   const next = normalizeTable(workbook, command.sheetId, { ...current, range, columns: [] });
   const previous = createRestoreTableTransactionCommand(workbook);
-  if (current.totalRow && range.end.row > current.range.end.row) {
-    const count = range.end.row - current.range.end.row;
-    applyCellShiftCommand(workbook, {
-      type: "insertCells",
-      sheetId: sheet.id,
-      range: {
-        start: { row: current.range.end.row, column: current.range.start.column },
-        end: { row: current.range.end.row + count - 1, column: current.range.end.column },
-      },
-      direction: "down",
-    });
-    for (let column = range.start.column; column <= range.end.column; column += 1) {
-      const dataStart = range.start.row + (current.headerRow ? 2 : 1);
-      const dataEnd = range.end.row;
-      setCellContent(
-        sheet,
-        { row: range.end.row, column },
-        {
-          kind: "formula",
-          formula: {
-            source: `=SUBTOTAL(109,${columnLabel(column)}${dataStart}:${columnLabel(column)}${dataEnd})`,
-          },
-        },
-      );
-    }
-  } else if (current.totalRow && range.end.row < current.range.end.row) {
-    for (let column = current.range.start.column; column <= current.range.end.column; column += 1)
-      setCellContent(sheet, { row: current.range.end.row, column }, null);
-    for (let column = range.start.column; column <= range.end.column; column += 1) {
-      const dataStart = range.start.row + (current.headerRow ? 2 : 1);
-      const dataEnd = range.end.row;
-      setCellContent(
-        sheet,
-        { row: range.end.row, column },
-        {
-          kind: "formula",
-          formula: {
-            source: `=SUBTOTAL(109,${columnLabel(column)}${dataStart}:${columnLabel(column)}${dataEnd})`,
-          },
-        },
-      );
-    }
-  }
+  resizeTableTotals(workbook, sheet, current, range);
   sheet.tables = (sheet.tables ?? []).map((table) => (table.id === next.id ? next : table));
   return previous;
 }
