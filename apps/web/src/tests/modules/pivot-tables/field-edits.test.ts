@@ -29,6 +29,54 @@ function filteredTable(): SheetPivotTable {
   };
 }
 describe("pivot field placement", () => {
+  test("removing a base dimension resets only dependent display calculations", () => {
+    const original = filteredTable();
+    original.values[0]!.display = {
+      type: "difference",
+      baseField: 0,
+      baseItem: { kind: "previous" },
+    };
+    original.values[1]!.display = { type: "runTotal", baseField: 1 };
+    const next = removePivotField(original, "rows", 0);
+    expect(next.values[0]!.display).toEqual({ type: "normal" });
+    expect(next.values[1]!.display).toEqual({ type: "runTotal", baseField: 1 });
+    expect(original.values[0]!.display).toEqual({
+      type: "difference",
+      baseField: 0,
+      baseItem: { kind: "previous" },
+    });
+  });
+  test("moving or reordering a base dimension retains its display calculation", () => {
+    const original = filteredTable();
+    const display = {
+      type: "percentDiff" as const,
+      baseField: 0,
+      baseItem: { kind: "value" as const, value: "East" },
+    };
+    original.values[0]!.display = display;
+    const choice = { field: 0, label: "Region", numeric: false };
+    for (const area of ["rows", "columns"] as const) {
+      const next = placePivotField(
+        original,
+        { field: 0, area: "rows", index: 0 },
+        area,
+        2,
+        choice,
+        caption,
+      );
+      expect(next.values[0]!.display).toEqual(display);
+    }
+    const filtered = placePivotField(
+      original,
+      { field: 0, area: "rows", index: 0 },
+      "filters",
+      0,
+      choice,
+      caption,
+    );
+    expect(filtered.values[0]!.display).toEqual({ type: "normal" });
+    expect(original.values[0]!.display).toEqual(display);
+  });
   test("sort rules follow measure reorder and fall back to label sorting when their measure is deleted", () => {
     const original = filteredTable();
     original.sortFields = [{ axis: "rows", field: 0, order: "descending", measure: 1 }];
@@ -45,7 +93,11 @@ describe("pivot field placement", () => {
     ]);
     expect(removePivotField(original, "values", 0).sortFields![0]!.measure).toBe(0);
     const deleted = removePivotField(original, "values", 1);
-    expect(deleted.sortFields![0]).toMatchObject({ axis: "rows", field: 0, order: "descending" });
+    expect(deleted.sortFields![0]).toMatchObject({
+      axis: "rows",
+      field: 0,
+      order: "descending",
+    });
     expect(deleted.sortFields![0]!.measure).toBeUndefined();
     expect(original.sortFields[0]!.measure).toBe(1);
   });

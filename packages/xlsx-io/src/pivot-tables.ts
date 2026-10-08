@@ -1,3 +1,5 @@
+import { fromExcelNumberFormat, builtinNumberFormat } from "./number-format.js";
+import type { CellNumberFormat } from "@idea10/core/style";
 import { nativePivotGroupXml, nativePivotDateTime } from "./pivot-native-groups.js";
 import { createPivotNumberFormatReader } from "./pivot-number-formats.js";
 import type { SheetPivotTable } from "@idea10/core/pivot-tables";
@@ -32,6 +34,11 @@ export function writeXlsxPivotTables(
   for (const [sheetIndex, sheet] of [...workbook.sheets.values()].entries()) {
     const sheetPart = `xl/worksheets/sheet${sheetIndex + 1}.xml`;
     for (const table of sheet.pivotTables ?? []) {
+      if (table.values.some((value) => value.aggregate === "distinctCount")) {
+        // Standard worksheet PivotTables have no native distinct-count aggregator.
+        report?.add("feature-omitted", "warning", `${table.name}.distinctCount`);
+        continue;
+      }
       if (!table.includeHidden)
         report?.add("filter-omitted", "warning", `${table.name}.includeHidden`);
       const cache = createPivotCache(workbook, table);
@@ -46,7 +53,8 @@ export function writeXlsxPivotTables(
         report?.add("feature-omitted", "warning", `${table.name}.groups`);
         continue;
       }
-      cache.numberFormats = readNumberFormats(table, cache.headers.length);
+      cache.numberFormats = readNumberFormats.source(table, cache.headers.length);
+      cache.valueNumberFormats = readNumberFormats.values(sheet.id, table);
       index++;
       const cachePart = `xl/pivotCache/pivotCacheDefinition${index}.xml`;
       const recordsPart = `xl/pivotCache/pivotCacheRecords${index}.xml`;
@@ -107,6 +115,16 @@ export function readXlsxPivotTables(
   report: CompatibilityReportBuilder,
 ): void {
   const entries = unzipSync(bytes);
+  const styleRoot = entries["xl/styles.xml"]
+    ? child(parseXml(entries["xl/styles.xml"]), "styleSheet")
+    : {};
+  const numberFormats = new Map<number, CellNumberFormat>();
+  for (const item of nodes(child(styleRoot, "numFmts").numFmt)) {
+    const format = fromExcelNumberFormat(attr(item, "formatCode"));
+    if (format) numberFormats.set(Number(attr(item, "numFmtId")), format);
+  }
+  const readFormat = (id: number) =>
+    numberFormats.get(id) ?? fromExcelNumberFormat(builtinNumberFormat(id)) ?? undefined;
   const workbookRoot = child(parseXml(entries["xl/workbook.xml"]), "workbook");
   const workbookRels = relationships(entries, "xl/workbook.xml");
   const caches = new Map<string, string>();
@@ -142,6 +160,7 @@ export function readXlsxPivotTables(
             ? entries[recordRelation.target]
             : undefined,
           sheet.id,
+          readFormat,
         );
         if (seen.has(table.id)) table.id = `xlsx-pivot-${index}-${sheet.pivotTables?.length ?? 0}`;
         seen.add(table.id);

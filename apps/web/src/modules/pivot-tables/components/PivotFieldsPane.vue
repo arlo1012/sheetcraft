@@ -321,6 +321,13 @@ defineExpose({
       :index="settings.index"
       :name="settingName"
       :choices="settingChoices"
+      :headers="source?.headers ?? []"
+      :records="
+        settings.area === 'values'
+          ? (table.dataCache?.records ?? [...(source?.records() ?? [])])
+          : []
+      "
+      :date-system="workbook.dateSystem"
       :disabled="disabled"
       @confirm="confirmSettings"
       @close="settings = undefined"

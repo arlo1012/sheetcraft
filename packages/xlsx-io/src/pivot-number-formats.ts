@@ -8,7 +8,10 @@ import { attr, child, nodes, parseXml } from "./pivot-xml.js";
 export function createPivotNumberFormatReader(
   entries: Record<string, Uint8Array>,
   workbook: Workbook,
-): (table: SheetPivotTable, fieldCount: number) => number[] {
+): {
+  source: (table: SheetPivotTable, fieldCount: number) => number[];
+  values: (sheetId: string, table: SheetPivotTable) => Array<number | undefined>;
+} {
   const sheets = [...workbook.sheets.values()];
   const sheetStyles = readXlsxWorksheetStyleIds(entries);
   const formats = nodes(
@@ -19,20 +22,30 @@ export function createPivotNumberFormatReader(
     const styleId = sheetStyles[index]?.get(formatCellAddress(address));
     return styleId === undefined ? 0 : (formats[styleId] ?? 0);
   };
-  return (table, fieldCount) =>
-    Array.from({ length: fieldCount }, (_, field) => {
-      if (!table.consolidation)
-        return table.source
-          ? formatAt(table.sourceSheetId, {
-              row: table.source.start.row + 1,
-              column: table.source.start.column + field,
-            })
-          : 0;
-      const area = table.consolidation.ranges[0];
-      if (!area?.range || field > 2) return 0;
-      return formatAt(area.sheetId, {
-        row: area.range.start.row + (field === 1 ? 0 : 1),
-        column: area.range.start.column + (field === 0 ? 0 : 1),
-      });
-    });
+  return {
+    values: (sheetId, table) =>
+      table.values.map((value, index) => {
+        const id = formatAt(sheetId, {
+          row: table.anchor.row + (table.resultLayout?.headerRows ?? 1),
+          column: table.anchor.column + (table.resultLayout?.labelColumns ?? 1) + index,
+        });
+        return value.numberFormat !== undefined || id > 0 ? id : undefined;
+      }),
+    source: (table, fieldCount) =>
+      Array.from({ length: fieldCount }, (_, field) => {
+        if (!table.consolidation)
+          return table.source
+            ? formatAt(table.sourceSheetId, {
+                row: table.source.start.row + 1,
+                column: table.source.start.column + field,
+              })
+            : 0;
+        const area = table.consolidation.ranges[0];
+        if (!area?.range || field > 2) return 0;
+        return formatAt(area.sheetId, {
+          row: area.range.start.row + (field === 1 ? 0 : 1),
+          column: area.range.start.column + (field === 0 ? 0 : 1),
+        });
+      }),
+  };
 }

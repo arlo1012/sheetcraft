@@ -174,7 +174,7 @@ describe("V38 pivot metadata protocol", () => {
           }),
         })),
       };
-      expect(snapshot.version).toBe(40);
+      expect(snapshot.version).toBe(41);
       expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
       expect(() => deserializeWorkbook({ ...snapshot, version: 37 })).toThrow();
     },
@@ -200,6 +200,6 @@ describe("V38 pivot metadata protocol", () => {
         }),
       })),
     };
-    expect(serializeWorkbook(deserializeWorkbook(historical)).version).toBe(40);
+    expect(serializeWorkbook(deserializeWorkbook(historical)).version).toBe(41);
   });
 });

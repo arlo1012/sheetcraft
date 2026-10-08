@@ -4,11 +4,9 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input } from "tdesign-vue-next/es/input";
 import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import {
-  normalizePivotTable,
-  type PivotAggregate,
-  type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
+import { normalizePivotTable, type SheetPivotTable } from "@idea10/core/pivot-tables";
+import type { FormulaValue } from "@idea10/core/formula";
+import PivotValueSettings from "./PivotValueSettings.vue";
 import type { CellValue } from "@idea10/core/workbook";
 import type { PivotArea } from "../pivot-field-edits";
 import { useAppI18n } from "../../../shared/i18n";
@@ -19,6 +17,9 @@ const props = defineProps<{
   name: string;
   choices: Array<{ label: string; value: string }>;
   disabled: boolean;
+  dateSystem?: "1900" | "1904";
+  headers?: string[];
+  records?: FormulaValue[][];
 }>();
 const emit = defineEmits<{ confirm: [table: SheetPivotTable]; close: [] }>();
 const { t } = useAppI18n();
@@ -56,7 +57,6 @@ const sortMeasure = computed({
   get: () => sortRule.value?.measure ?? -1,
   set: (measure: number) => setSort(sortOrder.value, measure < 0 ? undefined : measure),
 });
-const aggregates: PivotAggregate[] = ["sum", "count", "average", "min", "max"];
 function setValues(values: unknown): void {
   if (filter.value && Array.isArray(values))
     filter.value.values = values
@@ -68,8 +68,8 @@ function setValues(values: unknown): void {
   <Dialog
     attach="body"
     :visible="true"
-    :header="t('pivot.fieldSettings')"
-    width="400px"
+    :header="t(area === 'values' ? 'pivot.valueFieldSettings' : 'pivot.fieldSettings')"
+    :width="area === 'values' ? '470px' : '400px'"
     :close-on-overlay-click="false"
     :confirm-btn="{
       content: t('picture.confirm'),
@@ -80,19 +80,20 @@ function setValues(values: unknown): void {
     @close="emit('close')"
   >
     <div class="pivot-field-settings">
-      <strong>{{ name }}</strong>
+      <div>{{ t("pivot.sourceName") }}: {{ name }}</div>
       <template v-if="area === 'values' && value">
         <label
-          >{{ t("pivot.caption")
+          >{{ t("pivot.customName")
           }}<Input v-model="value.caption" :maxlength="200" :disabled="disabled"
         /></label>
-        <label
-          >{{ t("pivot.aggregate")
-          }}<Select
-            v-model="value.aggregate"
-            :options="aggregates.map((value) => ({ value, label: t(`pivot.${value}`) }))"
-            :disabled="disabled"
-        /></label>
+        <PivotValueSettings
+          :value="value"
+          :table="draft"
+          :headers="headers ?? []"
+          :records="records ?? []"
+          :date-system="dateSystem"
+          :disabled="disabled"
+        />
       </template>
       <template v-else-if="area === 'filters' && filter">
         <Checkbox

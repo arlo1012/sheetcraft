@@ -29,6 +29,7 @@ export type PivotCache = {
   shared: FormulaValue[][];
   records: number[][];
   numberFormats: number[];
+  valueNumberFormats?: Array<number | undefined>;
 };
 export function createPivotCache(workbook: Workbook, table: SheetPivotTable): PivotCache {
   const source = table.dataCache

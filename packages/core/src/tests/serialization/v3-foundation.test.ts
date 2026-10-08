@@ -47,7 +47,7 @@ describe("formula and image foundation snapshots", () => {
     });
     const snapshot = serializeWorkbook(workbook);
     const restored = deserializeWorkbook(JSON.parse(JSON.stringify(snapshot)));
-    expect(snapshot.version).toBe(40);
+    expect(snapshot.version).toBe(41);
     expect(snapshot.dateSystem).toBe("1904");
     expect(serializeWorkbook(restored)).toEqual(snapshot);
     expect(getCellContent(getActiveSheet(restored), { row: 0, column: 1 })).toEqual({
@@ -94,7 +94,7 @@ describe("formula and image foundation snapshots", () => {
         value: "#N/A",
       });
       expect(serializeWorkbook(restored)).toMatchObject({
-        version: 40,
+        version: 41,
         dateSystem: "1900",
       });
     },
@@ -171,7 +171,7 @@ describe("formula and image foundation snapshots", () => {
     };
     const restored = deserializeWorkbook(v3);
     expect(serializeWorkbook(restored)).toMatchObject({
-      version: 40,
+      version: 41,
       dateSystem: "1900",
       sheets: [{ floatingImages: [] }],
     });

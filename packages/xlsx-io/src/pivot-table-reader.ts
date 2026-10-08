@@ -1,3 +1,5 @@
+import type { CellNumberFormat } from "@idea10/core/style";
+import { readNativeValue } from "./pivot-native-values.js";
 import { cacheGroupFingerprint, readNativePivotGroups } from "./pivot-native-groups.js";
 import type { FormulaValue } from "@idea10/core/formula";
 import { createWorkbookEvaluator, type Workbook } from "@idea10/core/workbook";
@@ -5,7 +7,6 @@ import {
   buildPivotResult,
   getPivotTableSource,
   normalizePivotTable,
-  type PivotAggregate,
   type SheetPivotTable,
 } from "@idea10/core/pivot-tables";
 import { primitivePivotValue, readPivotSharedItems, readPivotCacheRecords } from "./pivot-cache.js";
@@ -180,6 +181,7 @@ export function readPivotTable(
   id: string,
   recordsBytes?: Uint8Array,
   reportSheetId?: string,
+  readNumberFormat?: (id: number) => CellNumberFormat | undefined,
 ): SheetPivotTable {
   const root = child(parseXml(definitionBytes), "pivotTableDefinition");
   const cacheRoot = child(parseXml(cacheBytes), "pivotCacheDefinition");
@@ -238,17 +240,26 @@ export function readPivotTable(
       values: selection.hidden ? selection.values.map(primitivePivotValue) : [],
     };
   });
+  const baseMembers = cache.headers.map((_, index) => {
+    const items = readValues(index).itemValues;
+    return items.length
+      ? items
+      : (groups.find((group) => group.field === index)?.labels ?? cache.shared[index]!);
+  });
   const values = nodes(child(root, "dataFields").dataField).map((field) => {
-    const aggregate = attr(field, "subtotal", "sum");
-    if (
-      !["sum", "count", "average", "min", "max"].includes(aggregate) ||
-      !["", "normal"].includes(attr(field, "showDataAs"))
-    )
-      throw new Error("Unsupported pivot aggregate.");
     const index = Number(attr(field, "fld", "-1"));
+    const value = readNativeValue(field, baseMembers);
+    const formatId = Number(attr(field, "numFmtId", "0"));
+    const type = value.display?.type;
+    const format =
+      readNumberFormat?.(formatId) ??
+      (formatId === 0 && type && (type.startsWith("percent") || type === "percentDiff")
+        ? { kind: "custom" as const, code: "General" }
+        : undefined);
     return {
       field: index,
-      aggregate: aggregate as PivotAggregate,
+      ...value,
+      ...(format ? { numberFormat: format } : {}),
       caption: attr(field, "name", cache.headers[index] ?? "Value"),
     };
   });

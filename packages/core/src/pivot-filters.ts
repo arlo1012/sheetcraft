@@ -163,7 +163,7 @@ export function filterPivotRecords(
     for (const record of labelFiltered) {
       const member = key(record[filter.field] ?? null);
       const acc = members.get(member) ?? createPivotAccumulator();
-      addPivotValue(acc, getValue(record, field.field));
+      addPivotValue(acc, getValue(record, field.field), field.aggregate === "distinctCount");
       members.set(member, acc);
     }
     const values = [...members].map(([member, acc]) => ({

@@ -23,6 +23,13 @@ export function reconcilePivotAxisFilters(
   table: SheetPivotTable,
   measureIndices?: readonly number[],
 ): SheetPivotTable {
+  for (const value of table.values) {
+    if (
+      value.display?.baseField !== undefined &&
+      ![...table.rowFields, ...table.columnFields].includes(value.display.baseField)
+    )
+      value.display = { type: "normal" };
+  }
   table.axisFilters = table.axisFilters?.flatMap((filter) => {
     if (!(filter.axis === "rows" ? table.rowFields : table.columnFields).includes(filter.field))
       return [];
@@ -124,6 +131,14 @@ export function placePivotField(
       value ?? { field: drag.field, aggregate, caption: caption(aggregate, choice.label) },
     );
   }
+  next.values.forEach((value, index) => {
+    const original = table.values[measureIndices[index] ?? -1]?.display;
+    if (original)
+      value.display = {
+        ...original,
+        ...(original.baseItem ? { baseItem: { ...original.baseItem } } : {}),
+      };
+  });
   next.axisFilters = table.axisFilters;
   next.sortFields = table.sortFields;
   return reconcilePivotAxisFilters(next, measureIndices);

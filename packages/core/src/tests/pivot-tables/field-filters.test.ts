@@ -429,7 +429,7 @@ describe("pivot field filters", () => {
       }),
     ).toMatchObject({ fillColor: "#ffffff" });
     const after = serializeWorkbook(f.workbook);
-    expect(after.version).toBe(40);
+    expect(after.version).toBe(41);
     expect(serializeWorkbook(deserializeWorkbook(after))).toEqual(after);
     const sheet = serializeSheet(f.destination);
     expect(serializeSheet(deserializeSheet(sheet))).toEqual(sheet);
@@ -477,7 +477,7 @@ describe("pivot field filters", () => {
     expect(
       serializeWorkbook(deserializeWorkbook({ ...withoutV38Layout(snapshot), version: 35 }))
         .version,
-    ).toBe(40);
+    ).toBe(41);
   });
 
   test("follows source field identities through structural insertion and undo", () => {
@@ -580,7 +580,7 @@ describe("pivot lexical label comparisons", () => {
         expect(result.sourceRows).toBe(expected.length);
         executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, table));
         const snapshot = serializeWorkbook(f.workbook);
-        expect(snapshot.version).toBe(40);
+        expect(snapshot.version).toBe(41);
         expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
         expect(() => deserializeWorkbook({ ...withoutV38Layout(snapshot), version: 36 })).toThrow();
       }

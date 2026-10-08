@@ -1,3 +1,4 @@
+import { nativeValueXml } from "./pivot-native-values.js";
 import { nativeGroupFingerprint } from "./pivot-native-groups.js";
 import { strToU8 } from "fflate/browser";
 import type { Workbook } from "@idea10/core/workbook";
@@ -121,7 +122,30 @@ export function pivotTableXml(
     (rowHeaderCaption === undefined ? "" : ` rowHeaderCaption="${xml(rowHeaderCaption)}"`) +
     (columnHeaderCaption === undefined ? "" : ` colHeaderCaption="${xml(columnHeaderCaption)}"`);
   // missingCaption fills empty data intersections; emptyLabel names blank axis members.
-  const native = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><pivotTableDefinition xmlns="${MAIN_NS}" xmlns:r="${REL_NS}" name="${xml(nativeName)}" cacheId="${cacheId}" dataCaption="Values" grandTotalCaption="${xml(table.totalLabel)}" missingCaption="" showMissing="1" rowGrandTotals="${table.columnTotals ? 1 : 0}" colGrandTotals="${table.rowTotals ? 1 : 0}" compact="${presentation.layout === "compact" ? 1 : 0}" compactData="${presentation.layout === "compact" ? 1 : 0}" outline="${presentation.layout === "tabular" ? 0 : 1}" showHeaders="${presentation.rowHeaders || presentation.columnHeaders ? 1 : 0}"${headerCaptions} multipleFieldFilters="1" preserveFormatting="1" useAutoFormatting="1" createdVersion="6" updatedVersion="6" minRefreshableVersion="3"${table.values.length > 1 ? ` dataPosition="${table.columnFields.length}"` : ""}><location ref="${rangeRef(location)}" firstHeaderRow="${Math.max(0, result.headerRows - result.headerStart - 1)}" firstDataRow="${Math.max(1, result.headerRows - result.headerStart)}" firstDataCol="${result.rowLabelColumns}"${table.filters.length ? ` rowPageCount="${table.filters.length}" colPageCount="1"` : ""}/><pivotFields count="${cache.headers.length}">${fields}</pivotFields>${list("rowFields", rowFields)}${list("colFields", columnFields)}${pageFields ? `<pageFields count="${table.filters.length}">${pageFields}</pageFields>` : ""}${table.values.length ? `<dataFields count="${table.values.length}">${table.values.map((value, index) => `<dataField name="${xml(captions[index])}" fld="${value.field}" subtotal="${value.aggregate}" numFmtId="${value.aggregate === "count" ? 0 : (cache.numberFormats[value.field] ?? 0)}" baseField="0" baseItem="0"/>`).join("")}</dataFields>` : ""}<pivotTableStyleInfo name="${xml(styleName)}" showRowHeaders="${presentation.rowHeaders ? 1 : 0}" showColHeaders="${presentation.columnHeaders ? 1 : 0}" showRowStripes="${presentation.bandedRows ? 1 : 0}" showColStripes="${presentation.bandedColumns ? 1 : 0}" showLastColumn="1"/>${nativePivotFiltersXml(table, report)}</pivotTableDefinition>`;
+  const native = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><pivotTableDefinition xmlns="${MAIN_NS}" xmlns:r="${REL_NS}" name="${xml(nativeName)}" cacheId="${cacheId}" dataCaption="Values" grandTotalCaption="${xml(table.totalLabel)}" missingCaption="" showMissing="1" rowGrandTotals="${table.columnTotals ? 1 : 0}" colGrandTotals="${table.rowTotals ? 1 : 0}" compact="${presentation.layout === "compact" ? 1 : 0}" compactData="${presentation.layout === "compact" ? 1 : 0}" outline="${presentation.layout === "tabular" ? 0 : 1}" showHeaders="${presentation.rowHeaders || presentation.columnHeaders ? 1 : 0}"${headerCaptions} multipleFieldFilters="1" preserveFormatting="1" useAutoFormatting="1" createdVersion="6" updatedVersion="6" minRefreshableVersion="3"${table.values.length > 1 ? ` dataPosition="${table.columnFields.length}"` : ""}><location ref="${rangeRef(location)}" firstHeaderRow="${Math.max(0, result.headerRows - result.headerStart - 1)}" firstDataRow="${Math.max(1, result.headerRows - result.headerStart)}" firstDataCol="${result.rowLabelColumns}"${table.filters.length ? ` rowPageCount="${table.filters.length}" colPageCount="1"` : ""}/><pivotFields count="${cache.headers.length}">${fields}</pivotFields>${list("rowFields", rowFields)}${list("colFields", columnFields)}${pageFields ? `<pageFields count="${table.filters.length}">${pageFields}</pageFields>` : ""}${
+    table.values.length
+      ? `<dataFields count="${table.values.length}">${table.values
+          .map((value, index) =>
+            nativeValueXml(
+              value,
+              captions[index]!,
+              cache.valueNumberFormats?.[index] ??
+                (value.aggregate === "count" || value.aggregate === "countNums"
+                  ? 0
+                  : (cache.numberFormats[value.field] ?? 0)),
+              cache.headers.map((_, field) =>
+                table.groups?.find((group) => group.field === field)
+                  ? getPivotGroupLabels(
+                      table.groups.find((group) => group.field === field)!,
+                      workbook.dateSystem,
+                    )
+                  : cache.shared[field]!,
+              ),
+            ),
+          )
+          .join("")}</dataFields>`
+      : ""
+  }<pivotTableStyleInfo name="${xml(styleName)}" showRowHeaders="${presentation.rowHeaders ? 1 : 0}" showColHeaders="${presentation.columnHeaders ? 1 : 0}" showRowStripes="${presentation.bandedRows ? 1 : 0}" showColStripes="${presentation.bandedColumns ? 1 : 0}" showLastColumn="1"/>${nativePivotFiltersXml(table, report)}</pivotTableDefinition>`;
   const metadata = {
     version: 1,
     table: { ...table, dataCache: undefined },

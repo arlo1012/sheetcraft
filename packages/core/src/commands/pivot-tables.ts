@@ -194,6 +194,20 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
         cell.style = mergeCellStyle(cell.style, { indent: result.rowIndents[rowIndex] });
       if (result.subtotalRows.includes(rowIndex))
         cell.style = mergeCellStyle(cell.style, { bold: true });
+      if (
+        rowIndex >= result.headerRows &&
+        columnIndex >= result.rowLabelColumns &&
+        table.values.length
+      ) {
+        const measure = table.values[(columnIndex - result.rowLabelColumns) % table.values.length]!;
+        const type = measure.display?.type;
+        const numberFormat =
+          measure.numberFormat ??
+          (type && (type.startsWith("percent") || type === "percentDiff")
+            ? { kind: "custom" as const, code: "0.00%" }
+            : undefined);
+        if (numberFormat) cell.style = mergeCellStyle(cell.style, { numberFormat });
+      }
       delete cell.namedStyle;
       const content = literal(value);
       if (content) cell.content = content;

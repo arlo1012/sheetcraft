@@ -327,3 +327,19 @@ function normalizeSemanticCode(code: string): string {
   // backslashes. In a number format section both forms are literal parens.
   return normalizeCanonicalCurrencyCode(code).replace(/\\([()])/g, "$1");
 }
+
+export function builtinNumberFormat(id: number): string | undefined {
+  return new Map<number, string>([
+    [0, "General"],
+    [1, "0"],
+    [2, "0.00"],
+    [3, "#,##0"],
+    [4, "#,##0.00"],
+    [9, "0%"],
+    [10, "0.00%"],
+    [11, "0.00E+00"],
+    [14, "mm-dd-yy"],
+    [22, "m/d/yy h:mm"],
+    [49, "@"],
+  ]).get(id);
+}
