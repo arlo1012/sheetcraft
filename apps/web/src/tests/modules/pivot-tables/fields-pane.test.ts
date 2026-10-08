@@ -2,7 +2,8 @@ import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h, shallowRef } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
 import type { SheetPivotTable } from "@idea10/core/pivot-tables";
-import { getCellValue } from "@idea10/core/workbook";
+import { getCellValue, setCellContent } from "@idea10/core/workbook";
+import type { CellContent } from "@idea10/core/formula";
 import PivotFieldsPane from "../../../modules/pivot-tables/components/PivotFieldsPane.vue";
 import { createAppI18n } from "../../../shared/i18n";
 import { fixture } from "./fixture";
@@ -10,8 +11,9 @@ const mounted: Array<{ unmount(): void }> = [];
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
 });
-function paneFixture(disabled = false) {
+function paneFixture(disabled = false, amount?: CellContent | null) {
   const f = fixture();
+  if (amount !== undefined) setCellContent(f.source, { row: 2, column: 2 }, amount);
   f.actions.open();
   f.actions.confirm(f.actions.editing.value!);
   const table = shallowRef(f.sheet.pivotTables![0]!);
@@ -37,6 +39,28 @@ function paneFixture(disabled = false) {
   return { ...f, wrapper, table };
 }
 describe("pivot fields pane", () => {
+  test("checking a numeric field with a blank keeps it in Values and defaults to Count", async () => {
+    const f = paneFixture(false, null);
+    await f.wrapper.get('[data-pivot-source-field="2"] input[type="checkbox"]').setValue(true);
+    expect(f.table.value.rowFields).toEqual([]);
+    expect(f.table.value.values).toMatchObject([{ field: 2, aggregate: "count" }]);
+    expect(f.onError).not.toHaveBeenCalled();
+  });
+  test.each([
+    ["blank", null],
+    ["empty string", { kind: "literal", value: "" }],
+    ["text", { kind: "literal", value: "pending" }],
+    ["error", { kind: "formula", formula: { source: "=1/0" } }],
+  ] as const)(
+    "numeric field containing %s defaults to Count rather than Sum",
+    async (_label, content) => {
+      const f = paneFixture(false, content);
+      await f.wrapper.get('[data-pivot-source-field="2"]').trigger("dragstart");
+      await f.wrapper.get('[data-pivot-area="values"] ul').trigger("drop");
+      expect(f.table.value.values).toMatchObject([{ field: 2, aggregate: "count" }]);
+      expect(f.onError).not.toHaveBeenCalled();
+    },
+  );
   test("checkboxes automatically place text in Rows and numeric data in Values", async () => {
     const f = paneFixture();
     await f.wrapper.get('[data-pivot-source-field="0"] input[type="checkbox"]').setValue(true);

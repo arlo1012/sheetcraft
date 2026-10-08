@@ -20,6 +20,20 @@ import { getSheetChartData } from "../../sheet-charts.js";
 import type { SheetChartDrawing } from "../../sheet-drawings.js";
 import { fixture } from "./fixture.js";
 
+function withoutV38Layout(snapshot: ReturnType<typeof serializeWorkbook>) {
+  return {
+    ...snapshot,
+    sheets: snapshot.sheets.map((sheet) => ({
+      ...sheet,
+      pivotTables: sheet.pivotTables?.map((pivot) => {
+        if (!pivot.resultLayout) return pivot;
+        const { rowFieldIndices: _indices, ...resultLayout } = pivot.resultLayout;
+        return { ...pivot, resultLayout };
+      }),
+    })),
+  };
+}
+
 const greater = (value: number): PivotValueCondition => ({
   kind: "number",
   operator: "greaterThan",
@@ -414,7 +428,7 @@ describe("pivot field filters", () => {
       }),
     ).toMatchObject({ fillColor: "#ffffff" });
     const after = serializeWorkbook(f.workbook);
-    expect(after.version).toBe(37);
+    expect(after.version).toBe(38);
     expect(serializeWorkbook(deserializeWorkbook(after))).toEqual(after);
     const sheet = serializeSheet(f.destination);
     expect(serializeSheet(deserializeSheet(sheet))).toEqual(sheet);
@@ -451,7 +465,7 @@ describe("pivot field filters", () => {
         }),
       );
       const snapshot = serializeWorkbook(f.workbook);
-      expect(() => deserializeWorkbook({ ...snapshot, version: 35 })).toThrow();
+      expect(() => deserializeWorkbook({ ...withoutV38Layout(snapshot), version: 35 })).toThrow();
     },
   );
 
@@ -459,7 +473,10 @@ describe("pivot field filters", () => {
     const f = fixture();
     executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, f.table));
     const snapshot = serializeWorkbook(f.workbook);
-    expect(serializeWorkbook(deserializeWorkbook({ ...snapshot, version: 35 })).version).toBe(37);
+    expect(
+      serializeWorkbook(deserializeWorkbook({ ...withoutV38Layout(snapshot), version: 35 }))
+        .version,
+    ).toBe(38);
   });
 
   test("follows source field identities through structural insertion and undo", () => {
@@ -562,9 +579,9 @@ describe("pivot lexical label comparisons", () => {
         expect(result.sourceRows).toBe(expected.length);
         executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, table));
         const snapshot = serializeWorkbook(f.workbook);
-        expect(snapshot.version).toBe(37);
+        expect(snapshot.version).toBe(38);
         expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
-        expect(() => deserializeWorkbook({ ...snapshot, version: 36 })).toThrow();
+        expect(() => deserializeWorkbook({ ...withoutV38Layout(snapshot), version: 36 })).toThrow();
       }
     },
   );

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { Button } from "tdesign-vue-next/es/button";
 import { Select } from "tdesign-vue-next/es/select";
 import { getSheetFilterValue, getSheetFilterValueKey } from "@idea10/core/commands";
 import { isFormulaError } from "@idea10/core/formula";
@@ -155,13 +156,33 @@ function close(): void {
 }
 function sort(order: SheetPivotTable["sort"]): void {
   if (props.disabled) return;
-  emit("update", { ...normalizePivotTable(props.table), sort: order });
+  if (props.area === "filters" || order === "source") return;
+  const table = normalizePivotTable(props.table);
+  table.sortFields = (table.sortFields ?? []).filter(
+    (rule) => rule.axis !== props.area || rule.field !== field.value,
+  );
+  table.sortFields.push({ axis: props.area, field: field.value, order });
+  emit("update", table);
   close();
 }
 function changeSettings(value: FilterPanelSettings): void {
   settings.value = value;
   writeFilterPanelSettings(value);
 }
+function clear(): void {
+  if (props.disabled) return;
+  query.value = "";
+  selection.value = choices.value.map((entry) => entry.key);
+  labelCondition.value = undefined;
+  valueCondition.value = undefined;
+}
+const filtered = computed(
+  () =>
+    !!labelCondition.value ||
+    !!valueCondition.value ||
+    selection.value.length !== choices.value.length ||
+    !!query.value.trim(),
+);
 function apply(): void {
   if (props.disabled) return;
   const values = includedChoices.value.map((choice) => choice.value);
@@ -222,6 +243,14 @@ function apply(): void {
         :disabled="disabled"
         @editing="conditionEditing = $event"
       />
+      <Button
+        theme="default"
+        variant="text"
+        :disabled="disabled || !filtered"
+        :aria-label="t('pivot.clearFilters')"
+        @click="clear"
+        >{{ t("pivot.clearFilters") }}</Button
+      >
       <FilterValueList
         ref="list"
         v-model="selection"

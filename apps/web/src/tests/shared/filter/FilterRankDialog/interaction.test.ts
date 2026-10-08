@@ -25,7 +25,7 @@ function fixture(initial?: { bottom: boolean; percent: boolean; count: number })
 describe("FilterRankDialog", () => {
   test("accepts a 12.5 percent rank draft", async () => {
     const w = fixture();
-    w.findAllComponents(TSelect)[1]!.vm.$emit("update:modelValue", true);
+    w.findAllComponents(TSelect)[1]!.vm.$emit("update:modelValue", "percent");
     w.findComponent(TInputNumber).vm.$emit("update:modelValue", 12.5);
     await w.vm.$nextTick();
     expect(w.findComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: false });

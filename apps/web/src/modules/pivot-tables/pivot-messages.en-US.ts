@@ -137,6 +137,11 @@ export const pivotsEnUS = {
   "pivot.total": "Grand Total",
   "pivot.resultProtected":
     "Cannot change a PivotTable result. Use PivotTable tools to change or remove the report.",
+  "pivot.clearLabelFilter": "Clear label filter",
+  "pivot.clearValueFilter": "Clear value filter",
+  "pivot.rankSum": "Sum",
+  "pivot.sortBy": "Sort by",
+  "pivot.fieldLabel": "Label",
   "pivot.empty": "(blank)",
   "pivot.destination": "Destination cell",
   "pivot.newSheet": "New worksheet",

@@ -53,12 +53,13 @@ const choices = computed<PivotFieldChoice[]>(() => {
   for (const record of info.records())
     record.forEach((value, field) => {
       if (typeof value === "number") types[field]!.number = true;
-      else if (value !== null && value !== "" && !isFormulaError(value)) types[field]!.other = true;
+      else types[field]!.other = true;
     });
   return info.headers.map((label, field) => ({
     field,
     label,
     numeric: types[field]!.number && !types[field]!.other,
+    hasNumbers: types[field]!.number,
   }));
 });
 const filtered = computed(() =>
@@ -108,7 +109,7 @@ function toggle(field: number, checked: boolean): void {
   if (props.disabled) return;
   if (checked) {
     const choice = choices.value.find((entry) => entry.field === field);
-    if (choice) add(choice.numeric ? "values" : "rows", field);
+    if (choice) add((choice.hasNumbers ?? choice.numeric) ? "values" : "rows", field);
   } else {
     let next = normalizePivotTable(props.table);
     for (const area of ["rows", "columns", "values", "filters"] as const) {

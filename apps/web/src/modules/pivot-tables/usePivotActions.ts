@@ -225,6 +225,7 @@ export function usePivotActions(options: {
           values: [],
           filters: [],
           axisFilters: undefined,
+          sortFields: undefined,
         }),
       ).headers;
       // Source changes retain fields by header identity; missing fields are removed, never rebound by index.
@@ -316,6 +317,9 @@ export function usePivotActions(options: {
             return [{ ...filter, field, values: [...new Set(values)] }];
           }),
         };
+        fields.sortFields = previous.sortFields?.flatMap((rule) =>
+          remap(rule.field) < 0 ? [] : [{ ...rule, field: remap(rule.field) }],
+        );
         fields.axisFilters = previous.axisFilters?.flatMap((filter) =>
           remap(filter.field) < 0 ? [] : [{ ...filter, field: remap(filter.field) }],
         );
@@ -501,6 +505,7 @@ export function usePivotActions(options: {
         values: [],
         filters: [],
         axisFilters: undefined,
+        sortFields: undefined,
       });
   }
   function remove(clearOutput = false) {

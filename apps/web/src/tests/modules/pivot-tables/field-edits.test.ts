@@ -29,6 +29,49 @@ function filteredTable(): SheetPivotTable {
   };
 }
 describe("pivot field placement", () => {
+  test("sort rules follow measure reorder and fall back to label sorting when their measure is deleted", () => {
+    const original = filteredTable();
+    original.sortFields = [{ axis: "rows", field: 0, order: "descending", measure: 1 }];
+    const reordered = placePivotField(
+      original,
+      { field: 2, area: "values", index: 1 },
+      "values",
+      0,
+      numeric,
+      caption,
+    );
+    expect(reordered.sortFields).toEqual([
+      { axis: "rows", field: 0, order: "descending", measure: 0 },
+    ]);
+    expect(removePivotField(original, "values", 0).sortFields![0]!.measure).toBe(0);
+    const deleted = removePivotField(original, "values", 1);
+    expect(deleted.sortFields![0]).toMatchObject({ axis: "rows", field: 0, order: "descending" });
+    expect(deleted.sortFields![0]!.measure).toBeUndefined();
+    expect(original.sortFields[0]!.measure).toBe(1);
+  });
+  test("dimension reorder retains sort rules while removal or moving to another axis removes only its rule", () => {
+    const original = filteredTable();
+    original.sortFields = [
+      { axis: "rows", field: 0, order: "descending" },
+      { axis: "rows", field: 1, order: "ascending" },
+    ];
+    const choice = { field: 0, label: "Region", numeric: false };
+    const reordered = placePivotField(
+      original,
+      { field: 0, area: "rows", index: 0 },
+      "rows",
+      2,
+      choice,
+      caption,
+    );
+    expect(reordered.sortFields).toEqual(original.sortFields);
+    expect(removePivotField(original, "rows", 0).sortFields).toEqual([original.sortFields[1]]);
+    expect(
+      placePivotField(original, { field: 0, area: "rows", index: 0 }, "columns", 0, choice, caption)
+        .sortFields,
+    ).toEqual([original.sortFields[1]]);
+    expect(original.sortFields).toHaveLength(2);
+  });
   test("measure reorder and deletion keep value rules bound to the same measure", () => {
     const original = filteredTable();
     const reordered = placePivotField(

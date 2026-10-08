@@ -147,7 +147,7 @@ describe("cell sparklines", () => {
   test("round trips snapshot V27 and rejects sparkline fields in V26", () => {
     const f = fixture();
     const snapshot = serializeWorkbook(f.session.workbook);
-    expect(snapshot.version).toBe(37);
+    expect(snapshot.version).toBe(38);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 26 })).toThrow();
   });

@@ -4,6 +4,7 @@ import { setCellContent } from "@idea10/core/workbook";
 import type { SheetPivotTable } from "@idea10/core/pivot-tables";
 import PivotValueFilterDialog from "../../../modules/pivot-tables/components/PivotValueFilterDialog.vue";
 import PivotFieldFilterPanel from "../../../modules/pivot-tables/components/PivotFieldFilterPanel.vue";
+import PivotFieldFilterConditions from "../../../modules/pivot-tables/components/PivotFieldFilterConditions.vue";
 import FilterConditionMenu from "../../../shared/filter/components/FilterConditionMenu.vue";
 import FilterConditionDialog from "../../../shared/filter/components/FilterConditionDialog.vue";
 import FilterValueList from "../../../shared/filter/components/FilterValueList.vue";
@@ -15,7 +16,12 @@ afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
   document.querySelectorAll("[data-test-trigger]").forEach((node) => node.remove());
 });
-function setup(area: "filters" | "rows" | "columns" = "filters", disabled = false, blanks = false) {
+function setup(
+  area: "filters" | "rows" | "columns" = "filters",
+  disabled = false,
+  blanks = false,
+  overrides: Partial<SheetPivotTable> = {},
+) {
   const f = fixture();
   ["North", "Q1", 5].forEach((value, column) =>
     setCellContent(f.source, { row: 4, column }, { kind: "literal", value }),
@@ -38,6 +44,7 @@ function setup(area: "filters" | "rows" | "columns" = "filters", disabled = fals
       { field: 2, aggregate: "sum", caption: "Revenue" },
       { field: 2, aggregate: "count", caption: "Orders" },
     ],
+    ...overrides,
   };
   const trigger = document.createElement("button");
   trigger.dataset.testTrigger = "true";
@@ -136,11 +143,12 @@ describe("pivot field filter panel", () => {
       .findComponent(FilterConditionDialog)
       .vm.$emit("apply", { kind: "text", operator: "contains", value: "E" });
     await flushPromises();
-    wrapper.findAllComponents(FilterConditionMenu)[1]!.vm.$emit("select", "aboveAverage");
+    wrapper.findAllComponents(FilterConditionMenu)[1]!.vm.$emit("select", "greaterThan");
     await flushPromises();
-    wrapper
-      .findComponent(PivotValueFilterDialog)
-      .vm.$emit("apply", { measure: 1, condition: { kind: "average", above: true } });
+    wrapper.findComponent(PivotValueFilterDialog).vm.$emit("apply", {
+      measure: 1,
+      condition: { kind: "number", operator: "greaterThan", value: 3 },
+    });
     await flushPromises();
     await confirm();
     expect(updated(wrapper).axisFilters).toEqual([
@@ -149,7 +157,10 @@ describe("pivot field filter panel", () => {
         field: 0,
         values: ["East"],
         labelCondition: { kind: "text", operator: "contains", value: "E" },
-        valueCondition: { measure: 1, condition: { kind: "average", above: true } },
+        valueCondition: {
+          measure: 1,
+          condition: { kind: "number", operator: "greaterThan", value: 3 },
+        },
       },
     ]);
     expect(updated(wrapper).filters).toEqual(table.filters);
@@ -159,15 +170,96 @@ describe("pivot field filter panel", () => {
     const { wrapper, table } = setup("columns");
     await panel().findAll(".filter-sort-bar button")[1]!.trigger("click");
     expect(updated(wrapper)).toMatchObject({
-      sort: "descending",
+      sort: table.sort,
+      sortFields: [{ axis: "columns", field: 1, order: "descending" }],
       filters: table.filters,
       values: table.values,
     });
     expect(wrapper.emitted("close")?.length).toBeGreaterThan(0);
   });
+  test.each(["apply", "cancel"] as const)(
+    "clearing manual and both condition filters is local until %s",
+    async (action) => {
+      const axisFilters: SheetPivotTable["axisFilters"] = [
+        {
+          axis: "rows",
+          field: 0,
+          values: ["East"],
+          labelCondition: { kind: "text", operator: "contains", value: "E" },
+          valueCondition: {
+            measure: 0,
+            condition: { kind: "number", operator: "greaterThan", value: 5 },
+          },
+        },
+        { axis: "columns", field: 1, values: ["Q1"] },
+      ];
+      const { wrapper, table } = setup("rows", false, false, { axisFilters });
+      await panel().get('[aria-label="Clear filters"]').trigger("click");
+      expect(wrapper.emitted("update")).toBeUndefined();
+      expect(
+        wrapper.findComponent(PivotFieldFilterConditions).props("labelCondition"),
+      ).toBeUndefined();
+      expect(
+        wrapper.findComponent(PivotFieldFilterConditions).props("valueCondition"),
+      ).toBeUndefined();
+      expect(wrapper.findComponent(FilterValueList).props("modelValue")).toHaveLength(3);
+      if (action === "apply") {
+        await confirm();
+        expect(updated(wrapper).axisFilters).toEqual([axisFilters[1]]);
+        expect(updated(wrapper).filters).toEqual(table.filters);
+      } else {
+        await panel().get(".filter-panel-actions .t-button--theme-default").trigger("click");
+        expect(wrapper.emitted("update")).toBeUndefined();
+      }
+      expect(table.axisFilters).toEqual(axisFilters);
+    },
+  );
+  test("sorting replaces only the chosen field and preserves other sort rules", async () => {
+    const { wrapper } = setup("rows", false, false, {
+      sort: "source",
+      sortFields: [
+        { axis: "rows", field: 0, order: "ascending", measure: 1 },
+        { axis: "columns", field: 1, order: "ascending" },
+      ],
+    });
+    await panel().findAll(".filter-sort-bar button")[1]!.trigger("click");
+    expect(updated(wrapper).sort).toBe("source");
+    expect(updated(wrapper).sortFields).toEqual(
+      expect.arrayContaining([
+        { axis: "rows", field: 0, order: "descending" },
+        { axis: "columns", field: 1, order: "ascending" },
+      ]),
+    );
+    expect(updated(wrapper).sortFields).toHaveLength(2);
+  });
+  test("clearing only a label condition retains manual and value filters", async () => {
+    const valueCondition = {
+      measure: 0,
+      condition: { kind: "number", operator: "greaterThan", value: 5 },
+    } as const;
+    const { wrapper } = setup("rows", false, false, {
+      axisFilters: [
+        {
+          axis: "rows",
+          field: 0,
+          values: ["East"],
+          labelCondition: { kind: "text", operator: "contains", value: "E" },
+          valueCondition,
+        },
+      ],
+    });
+    wrapper.findComponent(PivotFieldFilterConditions).vm.$emit("update:labelCondition", undefined);
+    await flushPromises();
+    expect(wrapper.emitted("update")).toBeUndefined();
+    await confirm();
+    expect(updated(wrapper).axisFilters).toEqual([
+      { axis: "rows", field: 0, values: ["East"], valueCondition },
+    ]);
+  });
+
   test("cancelling a value condition leaves the panel draft unchanged", async () => {
     const { wrapper } = setup("rows");
-    wrapper.findAllComponents(FilterConditionMenu)[1]!.vm.$emit("select", "aboveAverage");
+    wrapper.findAllComponents(FilterConditionMenu)[1]!.vm.$emit("select", "greaterThan");
     await flushPromises();
     expect(wrapper.findComponent(PivotValueFilterDialog).props("visible")).toBe(true);
     wrapper.findComponent(PivotValueFilterDialog).vm.$emit("close");

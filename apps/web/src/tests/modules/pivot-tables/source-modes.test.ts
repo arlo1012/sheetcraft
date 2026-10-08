@@ -242,8 +242,8 @@ describe("PivotTable source modes", () => {
       await flushPromises();
       expect(editor().find('input[value="single"]').exists()).toBe(false);
       await mode("consolidation");
-      expect(editor().get('input[value="single"]').exists()).toBe(true);
-      expect(editor().get('input[value="custom"]').exists()).toBe(true);
+      expect(editor().find('input[value="single"]').exists()).toBe(true);
+      expect(editor().find('input[value="custom"]').exists()).toBe(true);
       await mode(pageMode);
       await openRangesWizard();
       expect(wizard().find(".pivot-consolidation-wizard__count").exists()).toBe(

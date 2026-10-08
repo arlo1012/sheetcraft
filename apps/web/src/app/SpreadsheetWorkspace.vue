@@ -89,6 +89,7 @@ import { usePivotActions } from "../modules/pivot-tables/usePivotActions";
 import { getPivotTableSource } from "@idea10/core/pivot-tables";
 import { createThemedTableStyles } from "@idea10/core/table-styles";
 import type { PivotArea } from "../modules/pivot-tables/pivot-field-edits";
+import { getPivotActiveField } from "../modules/pivot-tables/pivot-active-field";
 import PivotFieldsPane from "../modules/pivot-tables/components/PivotFieldsPane.vue";
 import PivotAnalysisToolbar from "../modules/pivot-tables/components/PivotAnalysisToolbar.vue";
 import PivotDesignToolbar from "../modules/pivot-tables/components/PivotDesignToolbar.vue";
@@ -1176,22 +1177,7 @@ const pivotActiveField = computed<{ area: PivotArea; index: number; name: string
     } catch {
       return undefined;
     }
-    const offset = activeAddress.value.column - table.anchor.column;
-    const labels = table.resultLayout?.labelColumns ?? Math.max(1, table.rowFields.length);
-    if (table.values.length && offset >= labels) {
-      const index = (offset - labels) % table.values.length;
-      return { area: "values", index, name: table.values[index]!.caption };
-    }
-    if (table.rowFields.length) {
-      const index = Math.max(0, Math.min(offset, table.rowFields.length - 1));
-      return { area: "rows", index, name: headers[table.rowFields[index]!] ?? "" };
-    }
-    if (table.values.length) return { area: "values", index: 0, name: table.values[0]!.caption };
-    if (table.columnFields.length)
-      return { area: "columns", index: 0, name: headers[table.columnFields[0]!] ?? "" };
-    if (table.filters.length)
-      return { area: "filters", index: 0, name: headers[table.filters[0]!.field] ?? "" };
-    return undefined;
+    return getPivotActiveField(table, headers, activeAddress.value);
   },
 );
 watch(

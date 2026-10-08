@@ -224,7 +224,8 @@ export type WorkbookSnapshotV34 = Omit<WorkbookSnapshotV33, "version"> & { versi
 export type WorkbookSnapshotV35 = Omit<WorkbookSnapshotV34, "version"> & { version: 35 };
 export type WorkbookSnapshotV36 = Omit<WorkbookSnapshotV35, "version"> & { version: 36 };
 export type WorkbookSnapshotV37 = Omit<WorkbookSnapshotV36, "version"> & { version: 37 };
-export type WorkbookSnapshot = WorkbookSnapshotV37;
+export type WorkbookSnapshotV38 = Omit<WorkbookSnapshotV37, "version"> & { version: 38 };
+export type WorkbookSnapshot = WorkbookSnapshotV38;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -278,7 +279,8 @@ type SnapshotVersion =
   | 34
   | 35
   | 36
-  | 37;
+  | 37
+  | 38;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -774,6 +776,26 @@ function parseSparseState(
   )
     return fail(path, "Pivot field filters and report colors require snapshot version 36.");
   if (
+    version < 38 &&
+    record.pivotTables !== undefined &&
+    asArray(record.pivotTables, path).some((pivot) => {
+      const table = asRecord(pivot, path);
+      return (
+        table.sortFields !== undefined ||
+        (table.resultLayout !== undefined &&
+          asRecord(table.resultLayout, path).rowFieldIndices !== undefined) ||
+        (Array.isArray(table.axisFilters) &&
+          table.axisFilters.some((filter) => {
+            const entry = asRecord(filter, path);
+            if (!entry.valueCondition) return false;
+            const rule = asRecord(asRecord(entry.valueCondition, path).condition, path);
+            return rule.kind === "rank" && rule.mode !== undefined;
+          }))
+      );
+    })
+  )
+    return fail(path, "Pivot field sorting and rank units require snapshot version 38.");
+  if (
     version < 37 &&
     Array.isArray(record.tables) &&
     record.tables.some((item) => {
@@ -933,9 +955,9 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
             ?.image?.transform?.annotations !== undefined,
       );
     version = hasAnnotations
-      ? 37
+      ? 38
       : Object.hasOwn(record, "pivotTables") || Object.hasOwn(record, "filter")
-        ? 37
+        ? 38
         : Object.hasOwn(record, "drawings")
           ? 31
           : cells.some((cell) => Object.hasOwn(asRecord(cell, path), "sparkline"))
@@ -1074,7 +1096,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 37,
+    version: 38,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1143,7 +1165,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 34 &&
     record.version !== 35 &&
     record.version !== 36 &&
-    record.version !== 37
+    record.version !== 37 &&
+    record.version !== 38
   ) {
     throw new WorkbookDomainError(
       {

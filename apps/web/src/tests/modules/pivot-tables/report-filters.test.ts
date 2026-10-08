@@ -151,7 +151,14 @@ describe("report page filter overlay", () => {
       await flushPromises();
       await menu().findAll(".filter-sort-bar button")[1]!.trigger("click");
       const updated = wrapper.emitted("update")![0]![0] as SheetPivotTable;
-      expect(updated.sort).toBe("descending");
+      expect(updated.sort).toBe(table.sort);
+      expect(updated.sortFields).toEqual([
+        {
+          axis: area,
+          field: area === "rows" ? table.rowFields[0] : table.columnFields[0],
+          order: "descending",
+        },
+      ]);
       expect(updated.rowFields).toEqual(table.rowFields);
       expect(updated.columnFields).toEqual(table.columnFields);
       expect(updated.filters).toEqual(table.filters);

@@ -109,7 +109,7 @@ describe("embedded attachments", () => {
     redoWorkbookCommand(session);
     expect(sheet.drawings).toEqual([drawing()]);
     const snapshot = serializeWorkbook(session.workbook);
-    expect(snapshot.version).toBe(37);
+    expect(snapshot.version).toBe(38);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 28 })).toThrow();
     const standalone = serializeSheet(sheet);

@@ -4,7 +4,12 @@ import {
   type SheetPivotTable,
 } from "@idea10/core/pivot-tables";
 export type PivotArea = "filters" | "columns" | "rows" | "values";
-export type PivotFieldChoice = { field: number; label: string; numeric: boolean };
+export type PivotFieldChoice = {
+  field: number;
+  label: string;
+  numeric: boolean;
+  hasNumbers?: boolean;
+};
 export type PivotFieldDrag = { field: number; area?: PivotArea; index?: number };
 export function pivotAreaFields(table: SheetPivotTable, area: PivotArea): number[] {
   return area === "rows"
@@ -37,6 +42,26 @@ export function reconcilePivotAxisFilters(
       },
     ];
   });
+  table.sortFields = table.sortFields?.flatMap((rule) => {
+    if (!(rule.axis === "rows" ? table.rowFields : table.columnFields).includes(rule.field))
+      return [];
+    const measure =
+      rule.measure === undefined
+        ? undefined
+        : measureIndices
+          ? measureIndices.indexOf(rule.measure)
+          : rule.measure;
+    return [
+      {
+        ...rule,
+        measure:
+          measure !== undefined && measure >= 0 && measure < table.values.length
+            ? measure
+            : undefined,
+      },
+    ];
+  });
+  if (!table.sortFields?.length) table.sortFields = undefined;
   if (!table.axisFilters?.length) table.axisFilters = undefined;
   return table;
 }
@@ -100,5 +125,6 @@ export function placePivotField(
     );
   }
   next.axisFilters = table.axisFilters;
+  next.sortFields = table.sortFields;
   return reconcilePivotAxisFilters(next, measureIndices);
 }

@@ -5,27 +5,34 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SheetFilterCondition } from "@idea10/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 
-type RankCondition = Extract<SheetFilterCondition, { kind: "rank" }>;
-const props = defineProps<{ initial?: RankCondition; disabled?: boolean }>();
+type RankCondition = Extract<SheetFilterCondition, { kind: "rank" }> & {
+  mode?: "items" | "percent" | "sum";
+};
+const props = defineProps<{ initial?: RankCondition; disabled?: boolean; pivotUnits?: boolean }>();
 const emit = defineEmits<{ "update:condition": [condition: RankCondition | undefined] }>();
 const { t } = useAppI18n();
 const root = ref<HTMLElement | null>(null);
 const popupProps = { attach: () => root.value ?? document.body };
 const bottom = ref(false);
-const percent = ref(false);
+const unit = ref<"items" | "percent" | "sum">("items");
+const percent = computed(() => unit.value === "percent");
 const count = ref<number | undefined>(10);
 const valid = computed(
   () =>
     typeof count.value === "number" &&
     Number.isFinite(count.value) &&
     count.value > 0 &&
-    (percent.value ? count.value <= 100 : Number.isInteger(count.value) && count.value <= 500),
+    (unit.value === "sum"
+      ? props.pivotUnits
+      : percent.value
+        ? count.value <= 100
+        : Number.isInteger(count.value) && count.value <= 500),
 );
 watch(
   () => props.initial,
   () => {
     bottom.value = props.initial?.bottom ?? false;
-    percent.value = props.initial?.percent ?? false;
+    unit.value = props.initial?.mode ?? (props.initial?.percent ? "percent" : "items");
     count.value = props.initial?.count ?? 10;
   },
   { immediate: true },
@@ -37,6 +44,7 @@ const condition = computed<RankCondition | undefined>(() =>
         bottom: bottom.value,
         percent: percent.value,
         count: count.value!,
+        ...(props.pivotUnits ? { mode: unit.value } : {}),
       }
     : undefined,
 );
@@ -56,19 +64,20 @@ watch(condition, (value) => emit("update:condition", value), { immediate: true }
     />
     <TInputNumber
       v-model="count"
-      :min="percent ? 0.01 : 1"
-      :max="percent ? 100 : 500"
-      :decimal-places="percent ? 2 : 0"
+      :min="unit === 'items' ? 1 : 0.01"
+      :max="unit === 'sum' ? Number.MAX_SAFE_INTEGER : percent ? 100 : 500"
+      :decimal-places="unit === 'items' ? 0 : 2"
       :disabled="disabled"
       :aria-label="t('dataTools.filter.rankCount')"
       theme="column"
       class="idea-input-number--persistent-controls"
     />
     <TSelect
-      v-model="percent"
+      v-model="unit"
       :options="[
-        { value: false, label: t('dataTools.filter.items') },
-        { value: true, label: t('dataTools.filter.percent') },
+        { value: 'items', label: t('dataTools.filter.items') },
+        { value: 'percent', label: t('dataTools.filter.percent') },
+        ...(pivotUnits ? [{ value: 'sum', label: t('pivot.rankSum') }] : []),
       ]"
       :disabled="disabled"
       :popup-props="popupProps"

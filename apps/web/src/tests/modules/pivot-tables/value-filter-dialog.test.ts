@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select } from "tdesign-vue-next/es/select";
 import { AutoComplete } from "tdesign-vue-next/es/auto-complete";
+import { InputNumber } from "tdesign-vue-next/es/input-number";
 import type { PivotValueCondition } from "@idea10/core/pivot-tables";
 import type { FilterConditionAction } from "../../../shared/filter/filter-condition-actions";
 import PivotValueFilterDialog from "../../../modules/pivot-tables/components/PivotValueFilterDialog.vue";
@@ -43,6 +44,26 @@ async function confirm(wrapper: ReturnType<typeof setup>) {
 }
 
 describe("pivot value filter dialog", () => {
+  test("rank Sum supports a decimal amount above 500 and preserves it when reopened", async () => {
+    const condition = {
+      kind: "rank",
+      bottom: false,
+      percent: false,
+      mode: "sum",
+      count: 950.75,
+    } as const;
+    const wrapper = setup("rank");
+    const editor = wrapper.findComponent(FilterRankEditor);
+    editor.findAllComponents(Select)[1]!.vm.$emit("update:modelValue", "sum");
+    editor.findComponent(InputNumber).vm.$emit("update:modelValue", condition.count);
+    await flushPromises();
+    await confirm(wrapper);
+    expect(wrapper.emitted("apply")).toEqual([[{ measure: 0, condition }]]);
+    await wrapper.setProps({ visible: false, initial: condition });
+    await wrapper.setProps({ visible: true });
+    await confirm(wrapper);
+    expect(wrapper.emitted("apply")?.at(-1)).toEqual([{ measure: 0, condition }]);
+  });
   test("not-between opens two numeric boundaries and applies their OR condition", async () => {
     const wrapper = setup("notBetween");
     wrapper.findComponent(Select).vm.$emit("update:modelValue", 1);

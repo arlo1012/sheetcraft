@@ -33,11 +33,18 @@ export type PivotPresentation = {
   bandedRows: boolean;
   bandedColumns: boolean;
 };
+export type PivotFieldSort = {
+  axis: "rows" | "columns";
+  field: number;
+  order: "ascending" | "descending";
+  measure?: number;
+};
 export type PivotResultLayout = {
   labelColumns: number;
   dataRows: number[];
   rowLabels: string[];
   headerRows?: number;
+  rowFieldIndices?: Array<number | null>;
   seriesLabels?: string[];
 };
 export type PivotReportLayout = {
@@ -68,6 +75,7 @@ export type SheetPivotTable = {
   consolidation?: PivotConsolidation;
   reportLayout?: PivotReportLayout;
   axisFilters?: PivotAxisFilter[];
+  sortFields?: PivotFieldSort[];
   anchor: CellAddress;
   outputRange: CellRange | null;
   rowFields: number[];
@@ -168,6 +176,12 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
           (index > 0 && row <= resultLayout.dataRows[index - 1]!),
       ) ||
       resultLayout.rowLabels.some((label) => typeof label !== "string" || label.length > 1048576) ||
+      (resultLayout.rowFieldIndices !== undefined &&
+        (!Array.isArray(resultLayout.rowFieldIndices) ||
+          resultLayout.rowFieldIndices.length > MAX_PIVOT_OUTPUT_CELLS ||
+          resultLayout.rowFieldIndices.some(
+            (index) => index !== null && (!Number.isInteger(index) || index < 0 || index >= 32),
+          ))) ||
       (resultLayout.headerRows !== undefined &&
         (!Number.isInteger(resultLayout.headerRows) ||
           resultLayout.headerRows < 1 ||
@@ -200,6 +214,25 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
   )
     throw new RangeError("Invalid pivot report colors.");
   const axisFilters = normalizePivotAxisFilters(table);
+  const sortFields = table.sortFields;
+  if (
+    sortFields !== undefined &&
+    (!Array.isArray(sortFields) ||
+      sortFields.length > 64 ||
+      sortFields.some(
+        (rule) =>
+          !rule ||
+          !["rows", "columns"].includes(rule.axis) ||
+          !(rule.axis === "rows" ? table.rowFields : table.columnFields).includes(rule.field) ||
+          !["ascending", "descending"].includes(rule.order) ||
+          (rule.measure !== undefined &&
+            (!Number.isInteger(rule.measure) ||
+              rule.measure < 0 ||
+              rule.measure >= table.values.length)),
+      ) ||
+      new Set(sortFields.map((rule) => `${rule.axis}:${rule.field}`)).size !== sortFields.length)
+  )
+    throw new RangeError("Invalid pivot field sort.");
   const consolidation = table.consolidation;
   const pageFields = consolidation?.pageFields;
   if (
@@ -292,6 +325,7 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
     anchor: { ...table.anchor },
     outputRange: cloneRange(table.outputRange),
     ...(axisFilters ? { axisFilters } : {}),
+    ...(sortFields ? { sortFields: sortFields.map((rule) => ({ ...rule })) } : {}),
     rowFields: [...table.rowFields],
     columnFields: [...table.columnFields],
     values: table.values.map((value) => ({ ...value })),
@@ -315,6 +349,9 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
             labelColumns: resultLayout.labelColumns,
             dataRows: [...resultLayout.dataRows],
             rowLabels: [...resultLayout.rowLabels],
+            ...(resultLayout.rowFieldIndices
+              ? { rowFieldIndices: [...resultLayout.rowFieldIndices] }
+              : {}),
             ...(resultLayout.headerRows !== undefined
               ? { headerRows: resultLayout.headerRows }
               : {}),
@@ -500,6 +537,7 @@ export type PivotResult = {
   dataRows: number[];
   rowLabels: string[];
   rowIndents: number[];
+  rowFieldIndices: Array<number | null>;
   subtotalRows: number[];
 };
 const valueKey = (value: FormulaValue) =>
@@ -527,6 +565,7 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       dataRows: [],
       rowLabels: [],
       rowIndents: [],
+      rowFieldIndices: [],
       subtotalRows: [],
     };
   const presentation = getPivotPresentation(table);
@@ -562,7 +601,8 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       continue;
     records.push(record);
   }
-  for (const record of filterPivotRecords(table, records)) {
+  const filteredRecords = filterPivotRecords(table, records);
+  for (const record of filteredRecords) {
     sourceRows++;
     const rowValues = table.rowFields.map((index) => record[index] ?? null);
     const columnValues = table.columnFields.map((index) => record[index] ?? null);
@@ -594,25 +634,55 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
         table.values.forEach((value, index) => add(r, c, index, record[value.field] ?? null));
   }
   if (!columns.size) columns.set(groupKey([]), []);
-  const sorted = (groups: Map<string, FormulaValue[]>) => {
+  const sorted = (groups: Map<string, FormulaValue[]>, axis: "rows" | "columns") => {
     const entries = [...groups];
-    if (table.sort === "source") return entries;
+    const fields = axis === "rows" ? table.rowFields : table.columnFields;
+    const levels = fields.map((field, level) => {
+      const rule = table.sortFields?.find((rule) => rule.axis === axis && rule.field === field);
+      const order = rule?.order ?? table.sort;
+      const positions = new Map<string, number>();
+      const measures = new Map<string, PivotAccumulator>();
+      for (const [, values] of entries) {
+        const prefix = groupKey(values.slice(0, level + 1));
+        if (!positions.has(prefix)) positions.set(prefix, positions.size);
+      }
+      if (rule?.measure !== undefined) {
+        for (const record of filteredRecords) {
+          const prefix = groupKey(fields.slice(0, level + 1).map((index) => record[index] ?? null));
+          const acc = measures.get(prefix) ?? createPivotAccumulator();
+          addPivotValue(acc, record[table.values[rule.measure]!.field] ?? null);
+          measures.set(prefix, acc);
+        }
+      }
+      return { rule, order, positions, measures };
+    });
     return entries.sort((a, b) => {
-      let comparison = 0;
-      for (let index = 0; index < Math.max(a[1].length, b[1].length); index++) {
-        const left = a[1][index],
-          right = b[1][index];
-        comparison =
+      for (let level = 0; level < fields.length; level++) {
+        const { rule, order, positions, measures } = levels[level]!;
+        const leftKey = groupKey(a[1].slice(0, level + 1));
+        const rightKey = groupKey(b[1].slice(0, level + 1));
+        if (leftKey === rightKey) continue;
+        if (order === "source") return positions.get(leftKey)! - positions.get(rightKey)!;
+        const left =
+          rule?.measure !== undefined
+            ? getPivotAggregateValue(measures.get(leftKey), table.values[rule.measure]!.aggregate)
+            : a[1][level];
+        const right =
+          rule?.measure !== undefined
+            ? getPivotAggregateValue(measures.get(rightKey), table.values[rule.measure]!.aggregate)
+            : b[1][level];
+        const comparison =
           typeof left === "number" && typeof right === "number"
             ? left - right
             : String(left ?? "").localeCompare(String(right ?? ""), "en");
-        if (comparison) break;
+        if (comparison) return order === "descending" ? -comparison : comparison;
+        return positions.get(leftKey)! - positions.get(rightKey)!;
       }
-      return table.sort === "descending" ? -comparison : comparison;
+      return 0;
     });
   };
-  const rowEntries = sorted(rows);
-  const columnEntries = sorted(columns);
+  const rowEntries = sorted(rows, "rows");
+  const columnEntries = sorted(columns, "columns");
   const rowLabelColumns =
     presentation.layout === "compact" ? 1 : Math.max(1, table.rowFields.length);
   const totalColumnStart =
@@ -702,6 +772,7 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
     rowLabels: string[] = [],
     rowIndents: number[] = matrix.map(() => 0),
     subtotalRows: number[] = [];
+  const rowFieldIndices: Array<number | null> = matrix.map(() => null);
   const append = (
     key: string,
     values: FormulaValue[],
@@ -740,6 +811,11 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       else if (table.columnFields.length) cells.push(null);
     const index = matrix.length;
     matrix.push(pad(cells));
+    rowFieldIndices.push(
+      kind === "total" || !table.rowFields.length
+        ? null
+        : Math.min(depth, table.rowFields.length - 1),
+    );
     rowIndents.push(presentation.layout === "compact" ? Math.min(depth, 15) : 0);
     if (kind === "leaf") {
       dataRows.push(index);
@@ -781,6 +857,7 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       if (presentation.blankRows) {
         matrix.push(Array.from({ length: heading.length }, () => null));
         rowIndents.push(0);
+        rowFieldIndices.push(null);
       }
     }
   };
@@ -803,6 +880,7 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
     dataRows,
     rowLabels,
     rowIndents,
+    rowFieldIndices,
     subtotalRows,
   };
 }
@@ -909,6 +987,10 @@ export function transformPivotReferences(
           table.source = null;
         else {
           table.source = next;
+          table.sortFields = table.sortFields?.map((rule) => ({
+            ...rule,
+            field: field(rule.field),
+          }));
           table.axisFilters = table.axisFilters?.map((filter) => ({
             ...filter,
             field: field(filter.field),

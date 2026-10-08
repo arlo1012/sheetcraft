@@ -256,6 +256,7 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
       labelColumns: result.rowLabelColumns,
       dataRows: result.dataRows,
       rowLabels: result.rowLabels,
+      rowFieldIndices: result.rowFieldIndices,
       ...(table.reportLayout && result.headerRows > 0
         ? { headerRows: result.headerRows, seriesLabels: result.seriesLabels }
         : {}),

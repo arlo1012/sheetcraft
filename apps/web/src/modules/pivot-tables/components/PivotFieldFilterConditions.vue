@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from "tdesign-vue-next/es/button";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import type { ExcelDateSystem } from "@idea10/core/formula";
 import type { SheetFilterCondition } from "@idea10/core/workbook";
@@ -27,8 +28,8 @@ const props = defineProps<{
   showSummary?: boolean;
 }>();
 const emit = defineEmits<{
-  "update:labelCondition": [condition: PivotLabelCondition];
-  "update:valueCondition": [condition: ValueRule];
+  "update:labelCondition": [condition: PivotLabelCondition | undefined];
+  "update:valueCondition": [condition: ValueRule | undefined];
   editing: [value: boolean];
 }>();
 const { t } = useAppI18n();
@@ -82,6 +83,22 @@ function acceptValue(condition: ValueRule): void {
         :disabled="disabled || !measures.length"
         @select="edit('value', $event)"
       />
+      <Button
+        v-if="labelCondition"
+        variant="text"
+        :disabled="disabled"
+        :aria-label="t('pivot.clearLabelFilter')"
+        @click="emit('update:labelCondition', undefined)"
+        >{{ t("pivot.clearLabelFilter") }}</Button
+      >
+      <Button
+        v-if="valueCondition"
+        variant="text"
+        :disabled="disabled"
+        :aria-label="t('pivot.clearValueFilter')"
+        @click="emit('update:valueCondition', undefined)"
+        >{{ t("pivot.clearValueFilter") }}</Button
+      >
     </div>
     <p
       v-if="showSummary && (labelCondition || valueCondition)"
@@ -132,6 +149,7 @@ function acceptValue(condition: ValueRule): void {
   &__actions {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: var(--idea-space-2);
   }
   &__summary {

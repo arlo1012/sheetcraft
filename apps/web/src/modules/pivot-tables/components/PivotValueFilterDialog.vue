@@ -91,6 +91,7 @@ function apply(): void {
           v-if="action === 'rank'"
           @update:condition="condition = $event"
           :initial="rankInitial"
+          pivot-units
           :disabled="disabled"
         />
         <Select

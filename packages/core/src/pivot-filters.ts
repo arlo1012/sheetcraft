@@ -23,7 +23,8 @@ type NumericCondition = Extract<SheetFilterCondition, { kind: "number" | "date" 
 export type PivotValueCondition =
   | NumericCondition
   | { kind: "compound"; operator: "and" | "or"; conditions: [NumericCondition, NumericCondition] }
-  | Extract<SheetFilterCondition, { kind: "rank" | "average" }>;
+  | (Extract<SheetFilterCondition, { kind: "rank" }> & { mode?: "items" | "percent" | "sum" })
+  | Extract<SheetFilterCondition, { kind: "average" }>;
 export type PivotAxisFilter = {
   axis: "rows" | "columns";
   field: number;
@@ -44,6 +45,27 @@ function condition(
   numeric: boolean,
 ): PivotLabelCondition | PivotValueCondition {
   if (!value || typeof value !== "object") throw new RangeError("Invalid pivot condition.");
+  if (numeric && value.kind === "rank") {
+    const rank = value as Extract<PivotValueCondition, { kind: "rank" }>;
+    const mode = rank.mode ?? (rank.percent ? "percent" : "items");
+    if (
+      !["items", "percent", "sum"].includes(mode) ||
+      typeof rank.bottom !== "boolean" ||
+      typeof rank.percent !== "boolean" ||
+      !Number.isFinite(rank.count) ||
+      rank.count <= 0 ||
+      (mode === "items" && (!Number.isInteger(rank.count) || rank.count > 500)) ||
+      (mode === "percent" && rank.count > 100)
+    )
+      throw new RangeError("Invalid pivot rank.");
+    return {
+      kind: "rank",
+      bottom: rank.bottom,
+      percent: mode === "percent",
+      count: rank.count,
+      ...(rank.mode !== undefined ? { mode } : {}),
+    };
+  }
   const next = normalizeSheetFilterCondition(value);
   const kinds = numeric
     ? ["number", "compound", "rank", "average"]
@@ -150,15 +172,24 @@ export function filterPivotRecords(
       .flatMap(({ value }) => (typeof value === "number" ? [value] : []))
       .sort((a, b) => a - b);
     const mean = numbers.reduce((sum, value) => sum + value / numbers.length, 0);
-    const count =
-      rule.kind === "rank"
-        ? Math.min(
-            numbers.length,
-            rule.percent ? Math.max(1, Math.ceil((numbers.length * rule.count) / 100)) : rule.count,
-          )
-        : 0;
-    const cutoff =
-      rule.kind === "rank" ? numbers[rule.bottom ? count - 1 : numbers.length - count] : undefined;
+    let cutoff: number | undefined;
+    if (rule.kind === "rank" && numbers.length) {
+      const mode = rule.mode ?? (rule.percent ? "percent" : "items");
+      const ranked = rule.bottom ? numbers : [...numbers].reverse();
+      if (mode === "items") cutoff = ranked[Math.min(ranked.length, rule.count) - 1];
+      else {
+        const target =
+          mode === "percent"
+            ? (numbers.reduce((sum, value) => sum + value, 0) * rule.count) / 100
+            : rule.count;
+        let total = 0;
+        for (const value of ranked) {
+          total += value;
+          cutoff = value;
+          if (total >= target) break;
+        }
+      }
+    }
     const allowed = new Set(
       values
         .filter(({ value }) => {
