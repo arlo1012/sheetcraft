@@ -28,9 +28,9 @@ const props = withDefaults(
     disabled: boolean;
     settings: FilterPanelSettings;
     searchOptions?: FilterSearchOptions;
-    compact?: boolean;
+    mergedCellSettings?: boolean;
   }>(),
-  { searchOptions: () => ({ ...DEFAULT_FILTER_SEARCH_OPTIONS }) },
+  { searchOptions: () => ({ ...DEFAULT_FILTER_SEARCH_OPTIONS }), mergedCellSettings: true },
 );
 const emit = defineEmits<{
   "update:modelValue": [values: SheetFilterValue[]];
@@ -191,11 +191,7 @@ function selectDuplicates(): void {
 </script>
 
 <template>
-  <section
-    class="filter-value-list"
-    :class="{ 'filter-value-list--compact': compact }"
-    :aria-label="t('dataTools.filter.listOrder')"
-  >
+  <section class="filter-value-list" :aria-label="t('dataTools.filter.listOrder')">
     <div
       class="filter-value-list__search-bar"
       role="group"
@@ -223,7 +219,6 @@ function selectDuplicates(): void {
         </TInput>
       </div>
       <TButton
-        v-if="!compact"
         :variant="sortField === 'name' ? 'base' : 'text'"
         theme="default"
         size="small"
@@ -240,7 +235,6 @@ function selectDuplicates(): void {
         <ArrowDown v-else-if="sortField === 'name'" class="idea-action-icon" aria-hidden="true" />
       </TButton>
       <TButton
-        v-if="!compact"
         :variant="sortField === 'count' ? 'base' : 'text'"
         theme="default"
         size="small"
@@ -257,10 +251,10 @@ function selectDuplicates(): void {
         <ArrowDown v-else-if="sortField === 'count'" class="idea-action-icon" aria-hidden="true" />
       </TButton>
       <FilterSettingsMenu
-        v-if="!compact"
         ref="settingsMenuRef"
         :settings="settings"
         :disabled="disabled"
+        :merged-cell-settings="mergedCellSettings"
         @change="changeSettings"
       />
     </div>
@@ -287,7 +281,6 @@ function selectDuplicates(): void {
           variant="text"
           size="small"
           :disabled="disabled || !matchingValues.length"
-          v-if="!compact"
           @click="selectDuplicates"
         >
           {{ t("dataTools.filter.selectDuplicates") }}
@@ -344,10 +337,6 @@ function selectDuplicates(): void {
   gap: var(--idea-space-4);
   min-width: 0;
   font: inherit;
-
-  &--compact &__search-bar {
-    grid-template-columns: minmax(0, 1fr);
-  }
 
   &__search-bar {
     display: grid;

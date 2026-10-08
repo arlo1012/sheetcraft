@@ -2,7 +2,7 @@ import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import { setCellContent } from "@idea10/core/workbook";
 import type { SheetPivotTable } from "@idea10/core/pivot-tables";
-import { Select } from "tdesign-vue-next/es/select";
+import PivotValueFilterDialog from "../../../modules/pivot-tables/components/PivotValueFilterDialog.vue";
 import PivotFieldFilterPanel from "../../../modules/pivot-tables/components/PivotFieldFilterPanel.vue";
 import FilterConditionMenu from "../../../shared/filter/components/FilterConditionMenu.vue";
 import FilterConditionDialog from "../../../shared/filter/components/FilterConditionDialog.vue";
@@ -54,7 +54,7 @@ function panel() {
   return new DOMWrapper(document.querySelector(".pivot-field-filter-panel")!);
 }
 async function confirm() {
-  await panel().get(".pivot-field-filter-panel__footer .t-button--theme-primary").trigger("click");
+  await panel().get(".filter-panel-actions .t-button--theme-primary").trigger("click");
 }
 function updated(wrapper: ReturnType<typeof setup>["wrapper"]) {
   return wrapper.emitted("update")![0]![0] as SheetPivotTable;
@@ -121,9 +121,7 @@ describe("pivot field filter panel", () => {
   test("cancel discards edits without emitting a report update", async () => {
     const { wrapper } = setup();
     await panel().get('.filter-value-list__tools input[type="checkbox"]').setValue(false);
-    await panel()
-      .get(".pivot-field-filter-panel__footer .t-button--theme-default")
-      .trigger("click");
+    await panel().get(".filter-panel-actions .t-button--theme-default").trigger("click");
     expect(wrapper.emitted("update")).toBeUndefined();
     expect(wrapper.emitted("close")?.length).toBeGreaterThan(0);
   });
@@ -138,8 +136,11 @@ describe("pivot field filter panel", () => {
       .findComponent(FilterConditionDialog)
       .vm.$emit("apply", { kind: "text", operator: "contains", value: "E" });
     await flushPromises();
-    wrapper.findComponent(Select).vm.$emit("update:modelValue", 1);
     wrapper.findAllComponents(FilterConditionMenu)[1]!.vm.$emit("select", "aboveAverage");
+    await flushPromises();
+    wrapper
+      .findComponent(PivotValueFilterDialog)
+      .vm.$emit("apply", { measure: 1, condition: { kind: "average", above: true } });
     await flushPromises();
     await confirm();
     expect(updated(wrapper).axisFilters).toEqual([
@@ -156,7 +157,7 @@ describe("pivot field filter panel", () => {
   });
   test("sort preserves report filters and values", async () => {
     const { wrapper, table } = setup("columns");
-    await panel().findAll(".pivot-field-filter-panel__sort button")[1]!.trigger("click");
+    await panel().findAll(".filter-sort-bar button")[1]!.trigger("click");
     expect(updated(wrapper)).toMatchObject({
       sort: "descending",
       filters: table.filters,
@@ -164,10 +165,20 @@ describe("pivot field filter panel", () => {
     });
     expect(wrapper.emitted("close")?.length).toBeGreaterThan(0);
   });
+  test("cancelling a value condition leaves the panel draft unchanged", async () => {
+    const { wrapper } = setup("rows");
+    wrapper.findAllComponents(FilterConditionMenu)[1]!.vm.$emit("select", "aboveAverage");
+    await flushPromises();
+    expect(wrapper.findComponent(PivotValueFilterDialog).props("visible")).toBe(true);
+    wrapper.findComponent(PivotValueFilterDialog).vm.$emit("close");
+    await flushPromises();
+    await confirm();
+    expect(updated(wrapper).axisFilters).toBeUndefined();
+  });
   test("disabled panel does not apply or sort", async () => {
     const { wrapper } = setup("rows", true);
     await confirm();
-    await panel().findAll(".pivot-field-filter-panel__sort button")[1]!.trigger("click");
+    await panel().findAll(".filter-sort-bar button")[1]!.trigger("click");
     expect(wrapper.emitted("update")).toBeUndefined();
     expect(
       panel()

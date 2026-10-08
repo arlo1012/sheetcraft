@@ -149,7 +149,7 @@ describe("report page filter overlay", () => {
       const { wrapper, table } = setup(false, true);
       await wrapper.get(`[data-pivot-report-dimension="${area}"]`).trigger("click");
       await flushPromises();
-      await menu().findAll(".pivot-field-filter-panel__sort button")[1]!.trigger("click");
+      await menu().findAll(".filter-sort-bar button")[1]!.trigger("click");
       const updated = wrapper.emitted("update")![0]![0] as SheetPivotTable;
       expect(updated.sort).toBe("descending");
       expect(updated.rowFields).toEqual(table.rowFields);

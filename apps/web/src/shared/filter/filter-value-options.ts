@@ -66,11 +66,11 @@ function matchesPhrase(label: SearchableLabel, phrase: string, includePinyin: bo
 }
 
 /** Matches displayed filter values by keywords, literal phrase, and optional pinyin. */
-export function getMatchingFilterValues(
-  values: readonly FilterValueOption[],
+export function getMatchingFilterValues<T extends FilterValueOption>(
+  values: readonly T[],
   query: string,
   options: FilterSearchOptions = DEFAULT_FILTER_SEARCH_OPTIONS,
-): FilterValueOption[] {
+): T[] {
   const normalizedQuery = query.trim().toLocaleLowerCase();
   if (!normalizedQuery) return [...values];
 

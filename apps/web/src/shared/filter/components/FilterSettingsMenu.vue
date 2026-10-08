@@ -9,10 +9,14 @@ import { useAppI18n } from "../../../shared/i18n";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import type { FilterPanelSettings } from "../filter-panel-settings";
 
-const props = defineProps<{
-  settings: FilterPanelSettings;
-  disabled?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    settings: FilterPanelSettings;
+    disabled?: boolean;
+    mergedCellSettings?: boolean;
+  }>(),
+  { mergedCellSettings: true },
+);
 const emit = defineEmits<{ change: [settings: FilterPanelSettings] }>();
 const { t } = useAppI18n();
 const buttonRef = ref<HTMLElement | null>(null);
@@ -103,15 +107,17 @@ function isSelectedSort(
         <template #icon><Check v-if="settings.checkedFirst" /></template>
         {{ t("dataTools.filter.checkedFirst") }}
       </MenuItem>
-      <MenuSeparator />
-      <MenuItem
-        role="menuitemcheckbox"
-        :aria-checked="settings.allowMergedCells"
-        @select="toggle('allowMergedCells')"
-      >
-        <template #icon><Check v-if="settings.allowMergedCells" /></template>
-        {{ t("dataTools.filter.allowMergedCells") }}
-      </MenuItem>
+      <template v-if="mergedCellSettings">
+        <MenuSeparator />
+        <MenuItem
+          role="menuitemcheckbox"
+          :aria-checked="settings.allowMergedCells"
+          @select="toggle('allowMergedCells')"
+        >
+          <template #icon><Check v-if="settings.allowMergedCells" /></template>
+          {{ t("dataTools.filter.allowMergedCells") }}
+        </MenuItem>
+      </template>
       <MenuSeparator />
       <MenuItem
         role="menuitemradio"

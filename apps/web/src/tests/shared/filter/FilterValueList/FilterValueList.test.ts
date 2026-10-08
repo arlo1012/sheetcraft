@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { DOMWrapper, mount } from "@vue/test-utils";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { defineComponent, nextTick, ref } from "vue";
@@ -54,6 +54,41 @@ function buttonWithText(wrapper: ReturnType<typeof mount>, text: string) {
 }
 
 describe("FilterValueList", () => {
+  test.each([true, false])(
+    "keeps full controls and ordinary settings while merged-cell settings are enabled=%s",
+    async (mergedCellSettings) => {
+      const settings = readFilterPanelSettings();
+      const wrapper = mount(FilterValueList, {
+        attachTo: document.body,
+        props: {
+          values: [stringOption("Alpha")],
+          modelValue: [],
+          query: "",
+          settings,
+          disabled: false,
+          mergedCellSettings,
+        },
+        global: { plugins: [createAppI18n("en-US")] },
+      });
+      try {
+        expect(wrapper.text()).toContain("Invert");
+        expect(wrapper.text()).toContain("Select duplicates");
+        await wrapper.get(".filter-settings-menu__trigger").trigger("click");
+        const menu = new DOMWrapper(document.body).get(".filter-settings-menu");
+        expect(menu.text().includes("Allow filtering merged cells")).toBe(mergedCellSettings);
+        const countItem = menu
+          .findAll('[role="menuitemcheckbox"]')
+          .find((item) => item.text().trim() === "Show item counts")!;
+        expect(countItem).toBeDefined();
+        await countItem.trigger("click");
+        expect(wrapper.emitted("update:settings")?.at(-1)).toEqual([
+          { ...settings, showItemCount: !settings.showItemCount },
+        ]);
+      } finally {
+        wrapper.unmount();
+      }
+    },
+  );
   test("selects and inverts all 200 matching values rather than only the rendered page", async () => {
     const values = Array.from({ length: 200 }, (_, index) => stringOption(`Value ${index + 1}`));
     const { wrapper, selected } = mountList(values);

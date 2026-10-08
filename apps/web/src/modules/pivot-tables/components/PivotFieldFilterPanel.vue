@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { ListOrdered } from "lucide-vue-next";
 import { Button } from "tdesign-vue-next/es/button";
 import { Select } from "tdesign-vue-next/es/select";
 import { getSheetFilterValue, getSheetFilterValueKey } from "@idea10/core/commands";
@@ -9,29 +10,25 @@ import {
   normalizePivotTable,
   type PivotAxisFilter,
   type PivotLabelCondition,
-  type PivotValueCondition,
   type SheetPivotTable,
 } from "@idea10/core/pivot-tables";
-import type {
-  CellValue,
-  SheetFilterCondition,
-  SheetFilterValue,
-  Workbook,
-} from "@idea10/core/workbook";
+import type { CellValue, SheetFilterValue, Workbook } from "@idea10/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import FilterPanelActions from "../../../shared/filter/components/FilterPanelActions.vue";
 import FilterValueList from "../../../shared/filter/components/FilterValueList.vue";
-import FilterConditionMenu from "../../../shared/filter/components/FilterConditionMenu.vue";
-import FilterConditionDialog from "../../../shared/filter/components/FilterConditionDialog.vue";
-import FilterRankDialog from "../../../shared/filter/components/FilterRankDialog.vue";
-import { readFilterPanelSettings } from "../../../shared/filter/filter-panel-settings";
+import FilterSortBar from "../../../shared/filter/components/FilterSortBar.vue";
+import PivotFieldFilterConditions from "./PivotFieldFilterConditions.vue";
+import {
+  readFilterPanelSettings,
+  writeFilterPanelSettings,
+  type FilterPanelSettings,
+} from "../../../shared/filter/filter-panel-settings";
 import {
   DEFAULT_FILTER_SEARCH_OPTIONS,
   getMatchingFilterValues,
 } from "../../../shared/filter/filter-value-options";
-import type { FilterConditionAction } from "../../../shared/filter/filter-condition-actions";
 
 const props = defineProps<{
   table: SheetPivotTable;
@@ -45,12 +42,11 @@ const emit = defineEmits<{ update: [table: SheetPivotTable]; close: [] }>();
 const { t } = useAppI18n();
 const panel = ref<InstanceType<typeof FloatingPanelSurface> | null>(null);
 const list = ref<InstanceType<typeof FilterValueList> | null>(null);
-const labelMenu = ref<InstanceType<typeof FilterConditionMenu> | null>(null);
-const valueMenu = ref<InstanceType<typeof FilterConditionMenu> | null>(null);
-const editor = ref<{ target: "label" | "value"; action: FilterConditionAction }>();
+const conditions = ref<InstanceType<typeof PivotFieldFilterConditions> | null>(null);
+const conditionEditing = ref(false);
 const query = ref("");
 const searchOptions = ref({ ...DEFAULT_FILTER_SEARCH_OPTIONS });
-const settings = ref({ ...readFilterPanelSettings(), showItemCount: false });
+const settings = ref(readFilterPanelSettings());
 const field = ref(
   props.area === "filters"
     ? props.table.filters[props.index]!.field
@@ -60,8 +56,7 @@ const field = ref(
 );
 const selection = ref<SheetFilterValue[]>([]);
 const labelCondition = ref<PivotLabelCondition>();
-const valueCondition = ref<PivotValueCondition>();
-const measure = ref(0);
+const valueCondition = ref<PivotAxisFilter["valueCondition"]>();
 const source = computed(() => getPivotTableSource(props.workbook, props.table));
 const fieldLabel = computed(() => source.value.headers[field.value] ?? "");
 const dimensions = computed(() =>
@@ -101,23 +96,36 @@ const labelKind = computed(() =>
     ? "number"
     : "text",
 );
-const initialCondition = computed(() =>
-  editor.value?.target === "label" ? labelCondition.value : valueCondition.value,
+const matchingChoices = computed(() =>
+  getMatchingFilterValues(choices.value, query.value, searchOptions.value),
 );
-const rankInitial = computed(() =>
-  valueCondition.value?.kind === "rank" ? valueCondition.value : undefined,
+const includedChoices = computed(() => {
+  const keys = new Set(selection.value.map(getSheetFilterValueKey));
+  return matchingChoices.value.filter((choice) => keys.has(getSheetFilterValueKey(choice.key)));
+});
+const selectionSummary = computed(() =>
+  settings.value.showTotalCount
+    ? {
+        selected: includedChoices.value.reduce((count, choice) => count + choice.count, 0),
+        total: matchingChoices.value.reduce((count, choice) => count + choice.count, 0),
+        records: true,
+      }
+    : {
+        selected: includedChoices.value.length,
+        total: matchingChoices.value.length,
+        search: !!query.value.trim(),
+      },
 );
 const reference = computed(() => props.trigger);
 const root = computed(() => panel.value?.rootElement ?? null);
-const listening = computed(() => !editor.value);
+const listening = computed(() => !conditionEditing.value);
 const { floatingStyles } = useDismissibleFloatingPanel(reference, root, listening, {
   placement: "bottom-start",
   offset: 4,
   additionalInside: () => [
     list.value?.settingsMenuElement,
     list.value?.searchMenuElement,
-    labelMenu.value?.rootElement,
-    valueMenu.value?.rootElement,
+    ...(conditions.value?.menuElements ?? []),
   ],
   onDismiss: () => emit("close"),
 });
@@ -136,8 +144,7 @@ watch(
         ? choices.value.map((entry) => entry.key)
         : values.map((value) => getSheetFilterValue(value === "" ? null : value));
     labelCondition.value = axis?.labelCondition;
-    valueCondition.value = axis?.valueCondition?.condition;
-    measure.value = axis?.valueCondition?.measure ?? 0;
+    valueCondition.value = axis?.valueCondition;
   },
   { immediate: true },
 );
@@ -153,33 +160,13 @@ function sort(order: SheetPivotTable["sort"]): void {
   emit("update", { ...normalizePivotTable(props.table), sort: order });
   close();
 }
-function conditionAction(target: "label" | "value", action: FilterConditionAction): void {
-  if (action === "aboveAverage" || action === "belowAverage") {
-    valueCondition.value = { kind: "average", above: action === "aboveAverage" };
-    return;
-  }
-  editor.value = { target, action };
-}
-function acceptCondition(condition: SheetFilterCondition): void {
-  if (editor.value?.target === "label") labelCondition.value = condition as PivotLabelCondition;
-  else valueCondition.value = condition as PivotValueCondition;
-  editor.value = undefined;
+function changeSettings(value: FilterPanelSettings): void {
+  settings.value = value;
+  writeFilterPanelSettings(value);
 }
 function apply(): void {
   if (props.disabled) return;
-  const selected = new Set(selection.value.map(getSheetFilterValueKey));
-  const matching = new Set(
-    getMatchingFilterValues(choices.value, query.value, searchOptions.value).map((item) =>
-      getSheetFilterValueKey(item.key),
-    ),
-  );
-  const values = choices.value
-    .filter(
-      (entry) =>
-        selected.has(getSheetFilterValueKey(entry.key)) &&
-        matching.has(getSheetFilterValueKey(entry.key)),
-    )
-    .map((entry) => entry.value);
+  const values = includedChoices.value.map((choice) => choice.value);
   const all = values.length === choices.value.length;
   const table = normalizePivotTable(props.table);
   if (props.area === "filters")
@@ -190,9 +177,7 @@ function apply(): void {
       field: field.value,
       ...(!all ? { values } : {}),
       ...(labelCondition.value ? { labelCondition: labelCondition.value } : {}),
-      ...(valueCondition.value
-        ? { valueCondition: { measure: measure.value, condition: valueCondition.value } }
-        : {}),
+      ...(valueCondition.value ? { valueCondition: valueCondition.value } : {}),
     };
     table.axisFilters = (table.axisFilters ?? []).filter(
       (entry) => entry.axis !== props.area || entry.field !== field.value,
@@ -208,10 +193,13 @@ function apply(): void {
   <Teleport to="body">
     <FloatingPanelSurface
       ref="panel"
+      v-show="!conditionEditing"
       class="pivot-field-filter-panel"
       :label="fieldLabel"
       :style="floatingStyles"
       padding="tool"
+      layer="popover"
+      viewport-inset="8px"
     >
       <Select
         v-if="dimensions.length > 1"
@@ -221,75 +209,26 @@ function apply(): void {
         :aria-label="t(area === 'rows' ? 'pivot.rows' : 'pivot.columns')"
         :disabled="disabled"
       />
-      <template v-if="area !== 'filters'">
-        <div class="pivot-field-filter-panel__sort">
-          <Button
-            variant="text"
-            theme="default"
-            size="small"
-            :disabled="disabled"
-            @click="sort('ascending')"
-            >{{ t("pivot.ascending") }}</Button
-          >
-          <Button
-            variant="text"
-            theme="default"
-            size="small"
-            :disabled="disabled"
-            @click="sort('descending')"
-            >{{ t("pivot.descending") }}</Button
-          >
-          <Button
-            variant="text"
-            theme="default"
-            size="small"
-            :disabled="disabled"
-            @click="sort('source')"
-            >{{ t("pivot.sourceOrder") }}</Button
-          >
-        </div>
-        <div class="pivot-field-filter-panel__conditions">
-          <FilterConditionMenu
-            ref="labelMenu"
-            :kind="labelKind"
-            :label="t('pivot.labelFilters')"
-            :statistics="false"
-            :disabled="disabled"
-            @select="conditionAction('label', $event)"
-          />
-          <FilterConditionMenu
-            ref="valueMenu"
-            kind="number"
-            :label="t('pivot.valueFilters')"
-            :disabled="disabled || !table.values.length"
-            @select="conditionAction('value', $event)"
-          />
-        </div>
-        <label v-if="table.values.length" class="pivot-field-filter-panel__measure">
-          <span>{{ t("pivot.filterMeasure") }}</span>
-          <Select
-            v-model="measure"
-            :options="table.values.map((value, index) => ({ value: index, label: value.caption }))"
-            :popup-props="popupProps"
-            :aria-label="t('pivot.filterMeasure')"
-            :disabled="disabled"
-          />
-        </label>
-        <p
-          v-if="labelCondition || valueCondition"
-          class="pivot-field-filter-panel__active"
-          role="status"
-        >
-          {{
-            [
-              labelCondition ? t("pivot.labelFilters") : "",
-              valueCondition ? t("pivot.valueFilters") : "",
-            ]
-              .filter(Boolean)
-              .join(" · ")
-          }}
-        </p>
-      </template>
+      <FilterSortBar v-if="area !== 'filters'" :disabled="disabled" @sort="sort">
+        <Button variant="text" size="small" :disabled="disabled" @click="sort('source')">
+          <template #icon><ListOrdered class="idea-action-icon" /></template>
+          {{ t("pivot.sourceOrder") }}
+        </Button>
+      </FilterSortBar>
+      <PivotFieldFilterConditions
+        v-if="area !== 'filters'"
+        ref="conditions"
+        v-model:label-condition="labelCondition"
+        v-model:value-condition="valueCondition"
+        :field-label="fieldLabel"
+        :kind="labelKind"
+        :values="choices"
+        :measures="table.values"
+        :show-summary="settings.showCriteria"
+        :date-system="workbook.dateSystem"
+        :disabled="disabled"
+        @editing="conditionEditing = $event"
+      />
       <FilterValueList
         ref="list"
         v-model="selection"
@@ -298,57 +237,23 @@ function apply(): void {
         :settings="settings"
         :values="choices"
         :disabled="disabled"
-        compact
+        :merged-cell-settings="false"
+        @update:settings="changeSettings"
       />
       <FilterPanelActions
         class="pivot-field-filter-panel__footer"
         :disabled="disabled"
+        :summary="selectionSummary"
         @apply="apply"
         @cancel="close"
       />
     </FloatingPanelSurface>
-    <FilterConditionDialog
-      :visible="!!editor && editor.action !== 'rank'"
-      :column-label="fieldLabel"
-      :caption="editor?.target === 'value' ? table.values[measure]?.caption : fieldLabel"
-      :kind="editor?.target === 'value' ? 'number' : labelKind"
-      :strict-kind="editor?.target === 'value'"
-      :initial="initialCondition"
-      :action="editor?.action"
-      :values="editor?.target === 'label' ? choices : []"
-      :date-system="workbook.dateSystem"
-      :disabled="disabled"
-      @apply="acceptCondition"
-      @close="editor = undefined"
-    />
-    <FilterRankDialog
-      :visible="editor?.action === 'rank'"
-      :initial="rankInitial"
-      :disabled="disabled"
-      @apply="acceptCondition"
-      @close="editor = undefined"
-    />
   </Teleport>
 </template>
 <style scoped lang="scss">
 .pivot-field-filter-panel {
   display: grid;
-  gap: var(--idea-space-3);
-  width: min(320px, calc(100vw - 32px));
-  &__sort,
-  &__conditions {
-    display: flex;
-    align-items: center;
-    gap: var(--idea-space-2);
-    flex-wrap: wrap;
-  }
-  &__measure {
-    display: grid;
-    gap: var(--idea-space-2);
-  }
-  &__active {
-    margin: 0;
-    color: var(--idea-text-secondary);
-  }
+  gap: var(--idea-space-4);
+  width: min(420px, calc(100vw - 16px));
 }
 </style>
