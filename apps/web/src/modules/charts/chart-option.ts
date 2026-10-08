@@ -1,7 +1,9 @@
 import type { EChartsOption, SeriesOption } from "echarts";
+import { formatCellNumberValue } from "@idea10/core/number-format";
+import type { CellNumberFormat } from "@idea10/core/style";
 import type { ChartData, SheetChart } from "@idea10/core/sheet-charts";
 const colors = ["#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#db2777"];
-export function createChartOption(chart: SheetChart, data: ChartData): EChartsOption {
+function buildChartOption(chart: SheetChart, data: ChartData): EChartsOption {
   const common: EChartsOption = {
     animation: false,
     color: colors,
@@ -167,4 +169,61 @@ export function createChartOption(chart: SheetChart, data: ChartData): EChartsOp
     yAxis: horizontal ? { type: "category", data: data.categories } : { type: "value" },
     series,
   };
+}
+
+/** Keep chart calculations numeric; format only their presentation. */
+export function createChartOption(chart: SheetChart, data: ChartData): EChartsOption {
+  const option = buildChartOption(chart, data);
+  const formatValue = (value: unknown, format?: CellNumberFormat): string => {
+    if (Array.isArray(value)) return value.map((entry) => formatValue(entry, format)).join(" / ");
+    return typeof value === "number"
+      ? formatCellNumberValue(value, format).text
+      : String(value ?? "");
+  };
+  const plotted = chart.type === "scatter" ? data.series.slice(1) : data.series;
+  const uniformFormat = (entries: ChartData["series"]) => {
+    const format = entries[0]?.numberFormat;
+    return format &&
+      entries.every((entry) => JSON.stringify(entry.numberFormat) === JSON.stringify(format))
+      ? format
+      : undefined;
+  };
+  if (Array.isArray(option.series))
+    option.series = option.series.map((series, index) => {
+      const format = plotted[index]?.numberFormat;
+      if (!format && chart.type !== "radar") return series;
+      const formatLabel = (params: { value?: unknown; dataIndex?: number }) => {
+        const numberFormat =
+          chart.type === "radar" ? data.series[params.dataIndex ?? 0]?.numberFormat : format;
+        const value =
+          chart.type === "scatter" && Array.isArray(params.value) ? params.value[1] : params.value;
+        return formatValue(value, numberFormat);
+      };
+      return {
+        ...series,
+        label: { ...("label" in series ? series.label : {}), formatter: formatLabel },
+        tooltip: {
+          ...series.tooltip,
+          valueFormatter: (value: unknown) => {
+            if (Array.isArray(value) && chart.type === "scatter")
+              return `${formatValue(value[0], data.series[0]?.numberFormat)} / ${formatValue(value[1], format)}`;
+            return formatValue(
+              Array.isArray(value) && chart.type === "river" ? value[1] : value,
+              format,
+            );
+          },
+        },
+      } as SeriesOption;
+    });
+  const valueAxis = (format?: CellNumberFormat) => ({
+    type: "value" as const,
+    ...(format ? { axisLabel: { formatter: (value: number) => formatValue(value, format) } } : {}),
+  });
+  if (option.xAxis && !Array.isArray(option.xAxis) && option.xAxis.type === "value")
+    option.xAxis = valueAxis(
+      chart.type === "scatter" ? data.series[0]?.numberFormat : uniformFormat(plotted),
+    );
+  if (option.yAxis && !Array.isArray(option.yAxis) && option.yAxis.type === "value")
+    option.yAxis = valueAxis(uniformFormat(plotted));
+  return option;
 }

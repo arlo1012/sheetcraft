@@ -95,10 +95,15 @@ const options = computed(() => types.map((type) => ({ label: t(`chart.${type}`),
       <label>{{ t("chart.type") }}<Select v-model="draft.chart.type" :options="options" /></label>
       <label>{{ t("chart.title") }}<Input v-model="draft.chart.title" :maxlength="1000" /></label>
       <div class="chart-editor__row">
-        <Checkbox v-model="draft.chart.headerRow">{{ t("chart.headerRow") }}</Checkbox
-        ><Checkbox v-model="draft.chart.headerColumn">{{ t("chart.headerColumn") }}</Checkbox
+        <Checkbox v-model="draft.chart.headerRow" :disabled="!!draft.chart.pivotTableId">{{
+          t("chart.headerRow")
+        }}</Checkbox
+        ><Checkbox v-model="draft.chart.headerColumn" :disabled="!!draft.chart.pivotTableId">{{
+          t("chart.headerColumn")
+        }}</Checkbox
         ><Checkbox
           :checked="draft.chart.seriesBy === 'rows'"
+          :disabled="!!draft.chart.pivotTableId"
           @change="draft.chart.seriesBy = $event ? 'rows' : 'columns'"
           >{{ t("chart.seriesByRows") }}</Checkbox
         >
@@ -112,11 +117,13 @@ const options = computed(() => types.map((type) => ({ label: t(`chart.${type}`),
       <p class="chart-editor__hint">
         {{
           t(
-            draft.chart.type === "sankey"
-              ? "chart.sankeyHint"
-              : draft.chart.type === "scatter"
-                ? "chart.scatterHint"
-                : "chart.sourceHint",
+            draft.chart.pivotTableId
+              ? "chart.pivotSourceHint"
+              : draft.chart.type === "sankey"
+                ? "chart.sankeyHint"
+                : draft.chart.type === "scatter"
+                  ? "chart.scatterHint"
+                  : "chart.sourceHint",
           )
         }}
       </p>

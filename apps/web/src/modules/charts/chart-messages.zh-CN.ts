@@ -11,6 +11,7 @@ export const chartsZhCN = {
   "chart.labels": "数据标签",
   "chart.stacked": "堆积",
   "chart.showHidden": "包含隐藏数据",
+  "chart.pivotSourceHint": "数据来源和行列布局由关联的数据透视表决定，请通过“编辑数据透视表”调整。",
   "chart.sourceHint": "图表引用当前工作表的数据，最多 10,000 个单元格。修改数据后图表自动更新。",
   "chart.sankeyHint": "前三列依次为来源、去向、数值。来源与去向不能形成循环。",
   "chart.scatterHint": "第一组数值为 X，后续数值列为 Y。数值 X 列不要设置为类别列。",

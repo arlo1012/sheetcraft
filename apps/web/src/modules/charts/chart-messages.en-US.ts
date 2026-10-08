@@ -11,6 +11,8 @@ export const chartsEnUS = {
   "chart.labels": "Data labels",
   "chart.stacked": "Stacked",
   "chart.showHidden": "Include hidden data",
+  "chart.pivotSourceHint":
+    "The linked PivotTable controls the source and row/column layout. Use Edit PivotTable to change them.",
   "chart.sourceHint":
     "Use up to 10,000 cells from this sheet. Charts update when the source values change.",
   "chart.sankeyHint":
