@@ -13,26 +13,47 @@ const mounted: Array<{ unmount(): void }> = [];
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
 });
-function setup(disabled = false) {
+function setup(disabled = false, normalRange = false) {
   const f = fixture();
   f.source.cells.clear();
-  [
-    ["Region", "Q1", "Q2"],
-    ["East", 10, 20],
-  ].forEach((row, r) =>
+  const data = normalRange
+    ? [
+        ["title1", "title2", "title3", "title4"],
+        [2, 3, 4, 5],
+        [3, 5, 7, 9],
+      ]
+    : [
+        ["Region", "Q1", "Q2"],
+        ["East", 10, 20],
+      ];
+  data.forEach((row, r) =>
     row.forEach((value, column) =>
       setCellContent(f.source, { row: r, column }, { kind: "literal", value }),
     ),
   );
   f.actions.open();
-  f.actions.confirm({
-    ...f.actions.editing.value!,
-    sourceKind: "consolidation",
-    sources: ["'Source Data'!A1:C2"],
-    consolidationPageMode: "custom",
-    consolidationPageCount: 2,
-    consolidationPageItems: [["Group", "2026"]],
-  });
+  f.actions.confirm(
+    normalRange
+      ? {
+          ...f.actions.editing.value!,
+          source: "'Source Data'!A1:D3",
+          table: {
+            ...f.actions.editing.value!.table,
+            filters: [{ field: 0, all: true, values: [] }],
+            columnFields: [1],
+            rowFields: [2],
+            values: [{ field: 3, aggregate: "sum", caption: "Sum of title4" }],
+          },
+        }
+      : {
+          ...f.actions.editing.value!,
+          sourceKind: "consolidation",
+          sources: ["'Source Data'!A1:C2"],
+          consolidationPageMode: "custom",
+          consolidationPageCount: 2,
+          consolidationPageItems: [["Group", "2026"]],
+        },
+  );
   expect(f.actions.error.value).toBe(false);
   const table = f.sheet.pivotTables![0]!;
   const layout = createSheetViewportLayout({
@@ -101,8 +122,55 @@ describe("report page filter overlay", () => {
     expect(
       wrapper
         .findAll("[data-pivot-report-filter]")
-        .every((button) => (button.element as HTMLButtonElement).disabled),
+        .every((button) => button.attributes("aria-disabled") === "true"),
     ).toBe(true);
     expect(document.querySelector('[role="menu"]')).toBeNull();
+  });
+  test("positions ordinary range filter and dimension controls beside their real field names", () => {
+    const { wrapper } = setup(false, true);
+    const filter = wrapper.get('[data-pivot-report-filter="0"]');
+    const column = wrapper.get('[data-pivot-report-dimension="columns"]');
+    const row = wrapper.get('[data-pivot-report-dimension="rows"]');
+    expect(filter.attributes("aria-label")).toContain("title1");
+    expect(column.attributes("aria-label")).toContain("title2");
+    expect(row.attributes("aria-label")).toContain("title3");
+    for (const [control, left, top] of [
+      [filter, "182px", "27px"],
+      [column, "182px", "67px"],
+      [row, "102px", "87px"],
+    ] as const) {
+      expect((control.element as HTMLElement).style.left).toBe(left);
+      expect((control.element as HTMLElement).style.top).toBe(top);
+    }
+  });
+  test.each(["rows", "columns"])(
+    "sorting from %s preserves report fields and filters",
+    async (area) => {
+      const { wrapper, table } = setup(false, true);
+      await wrapper.get(`[data-pivot-report-dimension="${area}"]`).trigger("click");
+      await flushPromises();
+      await menu().findAll('[role="menuitemradio"]')[1]!.trigger("click");
+      const updated = wrapper.emitted("update")![0]![0] as SheetPivotTable;
+      expect(updated.sort).toBe("descending");
+      expect(updated.rowFields).toEqual(table.rowFields);
+      expect(updated.columnFields).toEqual(table.columnFields);
+      expect(updated.filters).toEqual(table.filters);
+      expect(updated.values).toEqual(table.values);
+      expect(updated.reportLayout).toEqual(table.reportLayout);
+      expect(table.sort).toBe("ascending");
+    },
+  );
+  test("hiding row and column headers hides their controls while retaining page filters", async () => {
+    const { wrapper, table } = setup(false, true);
+    await wrapper.setProps({
+      tables: [
+        {
+          ...table,
+          presentation: { ...table.presentation!, rowHeaders: false, columnHeaders: false },
+        },
+      ],
+    });
+    expect(wrapper.findAll("[data-pivot-report-dimension]")).toHaveLength(0);
+    expect(wrapper.findAll("[data-pivot-report-filter]")).toHaveLength(1);
   });
 });

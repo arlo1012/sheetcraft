@@ -129,6 +129,7 @@ export function usePivotActions(options: {
           },
           totalLabel: options.total(),
           emptyLabel: options.empty(),
+          reportLayout: defaultReportLayout(),
           ...(workbook.defaultPivotTableStyleId
             ? { styleId: workbook.defaultPivotTableStyleId }
             : {}),
@@ -322,9 +323,7 @@ export function usePivotActions(options: {
       }
       const table = normalizePivotTable({
         ...fields,
-        ...(source.consolidation && !fields.reportLayout
-          ? { reportLayout: defaultReportLayout() }
-          : {}),
+        ...(!fields.reportLayout ? { reportLayout: defaultReportLayout() } : {}),
         ...source,
         anchor: draft.newSheet ? { row: 0, column: 0 } : destination!.range.start,
       });
@@ -444,8 +443,19 @@ export function usePivotActions(options: {
       return false;
     try {
       table = upgradeLegacyConsolidation(table);
-      if (table.consolidation && !table.reportLayout)
-        table = { ...table, reportLayout: defaultReportLayout() };
+      if (!table.reportLayout) {
+        const headers = getPivotTableSource(options.getWorkbook(), table).headers;
+        table = {
+          ...table,
+          reportLayout: defaultReportLayout(),
+          values: table.values.map((value) => {
+            const field = headers[value.field]!;
+            return value.aggregate === "sum" && value.caption === options.sumCaption(field)
+              ? { ...value, caption: options.valueCaption?.("sum", field) ?? value.caption }
+              : value;
+          }),
+        };
+      }
       options.execute(
         createSetPivotTableCommand(
           sheet.id,

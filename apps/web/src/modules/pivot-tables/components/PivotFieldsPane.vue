@@ -84,7 +84,9 @@ const items = (area: PivotArea) =>
         : (choices.value.find((choice) => choice.field === field)?.label ?? String(field + 1)),
   }));
 const caption = (aggregate: PivotAggregate, label: string) =>
-  `${t(`pivot.${aggregate}`)} · ${label}`;
+  aggregate === "sum" || aggregate === "count"
+    ? t(aggregate === "sum" ? "pivot.sumOf" : "pivot.countOf", { field: label })
+    : `${t(`pivot.${aggregate}`)} · ${label}`;
 function place(drag: PivotFieldDrag, area: PivotArea, index: number): void {
   if (props.disabled) return;
   const choice = choices.value.find((choice) => choice.field === drag.field);

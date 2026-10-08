@@ -77,8 +77,8 @@ describe("pivot fields pane", () => {
     ).trigger("click");
     await flushPromises();
     expect(f.table.value.filters).toEqual([{ field: 1, values: ["Q1"], all: false }]);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(10);
-    expect(getCellValue(f.sheet, { row: 2, column: 1 })).toBe(40);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(10);
+    expect(getCellValue(f.sheet, { row: 4, column: 1 })).toBe(40);
   });
   test("disables field edits and drag targets when editing is unavailable", async () => {
     const f = paneFixture(true);

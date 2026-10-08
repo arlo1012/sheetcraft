@@ -621,6 +621,7 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       for (const value of table.values)
         heading.push([...values.map(label), value.caption].join(" / "));
     else if (table.columnFields.length) heading.push(values.map(label).join(" / "));
+  if (table.reportLayout && table.filters.length && heading.length < 2) heading.push(null);
   const aggregateValue = (row: string, column: string, index: number): FormulaValue => {
     const acc = aggregates.get(JSON.stringify([row, column, index]));
     const type = table.values[index]!.aggregate;
@@ -657,7 +658,9 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       pad([
         table.values.length === 1 ? table.values[0]!.caption : table.name,
         ...Array.from({ length: rowLabelColumns - 1 }, () => null),
-        table.reportLayout.columnLabel,
+        table.consolidation
+          ? table.reportLayout.columnLabel
+          : table.columnFields.map((field) => headers[field]!).join(" / "),
       ]),
     );
     for (let level = 0; level < table.columnFields.length; level++) {
@@ -730,7 +733,7 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
         );
       else if (table.columnFields.length) cells.push(null);
     const index = matrix.length;
-    matrix.push(cells);
+    matrix.push(pad(cells));
     rowIndents.push(presentation.layout === "compact" ? Math.min(depth, 15) : 0);
     if (kind === "leaf") {
       dataRows.push(index);

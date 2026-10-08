@@ -24,6 +24,10 @@ import {
   type SheetSparseCell,
 } from "../workbook.js";
 import { createThemedTableStyles, resolveTableCellStyle } from "../table-styles.js";
+import {
+  DEFAULT_PIVOT_TABLE_STYLE,
+  type PivotTableStyleDefinition,
+} from "../pivot-table-styles.js";
 import { mergeCellStyle } from "../style.js";
 import { deserializeSheet, serializeSheet } from "../serialization.js";
 import { createAddSheetCommand } from "./sheets.js";
@@ -138,7 +142,10 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
     (style) => style.id === (table.styleId ?? workbook.defaultPivotTableStyleId),
   );
   const styles = createThemedTableStyles();
-  const style = customStyle ?? styles.find((style) => style.id === table.styleId) ?? styles[0]!;
+  const style: PivotTableStyleDefinition =
+    customStyle ??
+    styles.find((style) => style.id === table.styleId) ??
+    (table.reportLayout ? DEFAULT_PIVOT_TABLE_STYLE : styles[0]!);
   const styledTable: SheetTable = {
     id: table.id,
     name: table.name,
@@ -173,8 +180,9 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
             ? undefined
             : original?.style,
           rowIndex < result.headerStart
-            ? columnIndex === 0 && rowIndex < table.filters.length
-              ? { bold: true }
+            ? columnIndex < 2 && rowIndex < table.filters.length
+              ? (style.elements[columnIndex === 0 ? "pageFieldLabels" : "pageFieldValues"]?.style ??
+                (columnIndex === 0 ? { bold: true } : {}))
               : {}
             : (resolveTableCellStyle(
                 styledTable,
@@ -204,7 +212,7 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
       labelColumns: result.rowLabelColumns,
       dataRows: result.dataRows,
       rowLabels: result.rowLabels,
-      ...(table.reportLayout
+      ...(table.reportLayout && result.headerRows > 0
         ? { headerRows: result.headerRows, seriesLabels: result.seriesLabels }
         : {}),
     },
