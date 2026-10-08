@@ -1,6 +1,7 @@
 import { shallowRef, ref } from "vue";
 import {
   createSetPivotTableCommand,
+  createPivotDetailsSheetCommand,
   createPivotSheetCommand,
   createRemovePivotTableCommand,
   type WorkbookCommand,
@@ -18,7 +19,13 @@ import {
 import { WorkbookDomainError } from "@idea10/core/errors";
 import { canUseSheetPermission } from "@idea10/core";
 import { resolveDataRange } from "@idea10/core/data-range";
-import { type Workbook, type Sheet, type CellRange, getNextSheetName } from "@idea10/core/workbook";
+import {
+  type Workbook,
+  type Sheet,
+  type CellRange,
+  type CellAddress,
+  getNextSheetName,
+} from "@idea10/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import {
   formatRangeReference,
@@ -64,6 +71,8 @@ export function usePivotActions(options: {
   reportLayout?: () => PivotReportLayout;
   activate?: (sheetId: string, table: SheetPivotTable) => void;
   onError: () => void;
+  activateDetails?: (sheetId: string) => void;
+  onDetailsError?: (reason: "cache" | "protected" | "invalid") => void;
 }) {
   const editing = shallowRef<PivotDraft>();
   const error = ref(false);
@@ -220,6 +229,7 @@ export function usePivotActions(options: {
         normalizePivotTable({
           ...draft.table,
           ...source,
+          dataCache: undefined,
           rowFields: [],
           columnFields: [],
           values: [],
@@ -342,6 +352,7 @@ export function usePivotActions(options: {
           ...getPivotReportColors(),
         },
         ...source,
+        dataCache: undefined,
         anchor: draft.newSheet ? { row: 0, column: 0 } : destination!.range.start,
       });
       const chartId = draft.chart ? idFactory("pivot-chart") : undefined;
@@ -491,6 +502,34 @@ export function usePivotActions(options: {
       return false;
     }
   }
+  function showDetails(id?: string, address?: CellAddress): boolean {
+    if (options.isBusy() || !options.flush()) return false;
+    const table = selected(id);
+    if (!table) return false;
+    const workbook = options.getWorkbook();
+    const fail = (reason: "cache" | "protected" | "invalid") => {
+      if (options.onDetailsError) options.onDetailsError(reason);
+      else options.onError();
+      return false;
+    };
+    if (workbook.structureProtected || !canUseSheetPermission(options.getSheet(), "pivotTables"))
+      return fail("protected");
+    if (!table.dataCache) return fail("cache");
+    try {
+      const command = createPivotDetailsSheetCommand(
+        workbook,
+        options.getSheet().id,
+        table.id,
+        address ?? options.getRange().start,
+        { id: idFactory("pivot-details") },
+      );
+      if (!options.execute(command)) return false;
+      options.activateDetails?.(command.activeSheetId);
+      return true;
+    } catch {
+      return fail("invalid");
+    }
+  }
   function refresh() {
     const table = selected();
     if (table) update(table);
@@ -539,6 +578,7 @@ export function usePivotActions(options: {
     open,
     confirm,
     refresh,
+    showDetails,
     remove,
     selected,
     close,

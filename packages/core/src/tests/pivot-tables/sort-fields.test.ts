@@ -174,7 +174,7 @@ describe("V38 pivot metadata protocol", () => {
           }),
         })),
       };
-      expect(snapshot.version).toBe(38);
+      expect(snapshot.version).toBe(39);
       expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
       expect(() => deserializeWorkbook({ ...snapshot, version: 37 })).toThrow();
     },
@@ -190,11 +190,16 @@ describe("V38 pivot metadata protocol", () => {
       sheets: current.sheets.map((sheet) => ({
         ...sheet,
         pivotTables: sheet.pivotTables?.map((pivot) => {
-          const { rowFieldIndices: _indices, ...resultLayout } = pivot.resultLayout!;
-          return { ...pivot, resultLayout };
+          const { dataCache: _cache, ...table } = pivot;
+          const {
+            rowFieldIndices: _indices,
+            valueRows: _rows,
+            ...resultLayout
+          } = pivot.resultLayout!;
+          return { ...table, resultLayout };
         }),
       })),
     };
-    expect(serializeWorkbook(deserializeWorkbook(historical)).version).toBe(38);
+    expect(serializeWorkbook(deserializeWorkbook(historical)).version).toBe(39);
   });
 });

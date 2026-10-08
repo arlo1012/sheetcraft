@@ -1,4 +1,8 @@
 export const pivotsEnUS = {
+  "pivot.showDetails": "Show Details",
+  "pivot.detailsNeedRefresh": "Refresh this pivot table before showing details.",
+  "pivot.detailsFailed":
+    "Cannot show details for this cell. Refresh the pivot table and try again.",
   "pivot.labelFilters": "Label filters",
   "pivot.top10Items": "Top 10…",
   "pivot.valueFilters": "Value filters",

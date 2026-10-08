@@ -1,5 +1,5 @@
 import type { FormulaValue } from "@idea10/core/formula";
-import type { Workbook } from "@idea10/core/workbook";
+import { createWorkbookEvaluator, type Workbook } from "@idea10/core/workbook";
 import {
   buildPivotResult,
   getPivotTableSource,
@@ -7,7 +7,7 @@ import {
   type PivotAggregate,
   type SheetPivotTable,
 } from "@idea10/core/pivot-tables";
-import { primitivePivotValue, readPivotSharedItems } from "./pivot-cache.js";
+import { primitivePivotValue, readPivotSharedItems, readPivotCacheRecords } from "./pivot-cache.js";
 import { readNativePivotFilters } from "./pivot-native-filters.js";
 import {
   attr,
@@ -154,7 +154,8 @@ function restoreMetadata(
       restored.sourceSheetId !== native.sourceSheetId
     )
       return native;
-    const result = buildPivotResult(workbook, restored);
+    restored.dataCache = native.dataCache;
+    const result = buildPivotResult(workbook, restored, { useCache: true });
     if (
       restored.anchor.row + result.headerStart !==
         parseRange(attr(child(root, "location"), "ref")).start.row ||
@@ -171,6 +172,8 @@ export function readPivotTable(
   definitionBytes: Uint8Array,
   cacheBytes: Uint8Array,
   id: string,
+  recordsBytes?: Uint8Array,
+  reportSheetId?: string,
 ): SheetPivotTable {
   const root = child(parseXml(definitionBytes), "pivotTableDefinition");
   const cacheRoot = child(parseXml(cacheBytes), "pivotCacheDefinition");
@@ -246,6 +249,14 @@ export function readPivotTable(
   const rowField = fields[rowFields[0] ?? -1] ?? {};
   const table: SheetPivotTable = {
     id,
+    ...(recordsBytes
+      ? {
+          dataCache: {
+            headers: cache.headers,
+            records: readPivotCacheRecords(recordsBytes, cache, workbook.dateSystem),
+          },
+        }
+      : {}),
     name: attr(root, "name", "PivotTable"),
     ...source,
     anchor: {
@@ -329,8 +340,50 @@ export function readPivotTable(
   readNativePivotFilters(root, table);
   const normalized = normalizePivotTable(table);
   // Validate actual sources without replacing the already cached worksheet results.
-  const actual = getPivotTableSource(workbook, normalized);
-  if (actual.headers.length !== cache.headers.length)
-    throw new Error("Pivot source fields changed.");
-  return restoreMetadata(root, workbook, normalized);
+  const width =
+    normalized.consolidation?.labels.length ??
+    (normalized.source ? normalized.source.end.column - normalized.source.start.column + 1 : 0);
+  if (width !== cache.headers.length) throw new Error("Pivot source fields changed.");
+  if (!normalized.dataCache) getPivotTableSource(workbook, normalized);
+  const restored = restoreMetadata(root, workbook, normalized);
+  if (restored.dataCache && !restored.resultLayout) {
+    // Offer drill-through only when our rebuilt layout agrees with the imported displayed cells.
+    // External clients may retain manual ordering/layouts that this model cannot reproduce.
+    try {
+      const result = buildPivotResult(workbook, restored, { useCache: true });
+      if (
+        reportSheetId &&
+        restored.outputRange &&
+        result.matrix.length === restored.outputRange.end.row - restored.anchor.row + 1 &&
+        result.matrix[0]?.length === restored.outputRange.end.column - restored.anchor.column + 1
+      ) {
+        const evaluator = createWorkbookEvaluator(workbook, reportSheetId);
+        const matches = result.matrix.every((row, rowIndex) =>
+          row.every(
+            (value, column) =>
+              JSON.stringify(value === "" ? null : value) ===
+              JSON.stringify(
+                evaluator.getComputedValue({
+                  row: restored.anchor.row + rowIndex,
+                  column: restored.anchor.column + column,
+                }),
+              ),
+          ),
+        );
+        if (matches)
+          restored.resultLayout = {
+            labelColumns: result.rowLabelColumns,
+            dataRows: result.dataRows,
+            rowLabels: result.rowLabels,
+            headerRows: result.headerRows,
+            rowFieldIndices: result.rowFieldIndices,
+            valueRows: result.rowMembers.flatMap((members, row) => (members === null ? [] : [row])),
+            seriesLabels: result.seriesLabels,
+          };
+      }
+    } catch {
+      /* Keep the native report and cache available for a subsequent explicit refresh. */
+    }
+  }
+  return restored;
 }

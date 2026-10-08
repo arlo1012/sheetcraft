@@ -125,7 +125,7 @@ describe("sheet drawings", () => {
     }));
     executeWorkbookCommand(session, createSetSheetDrawingsCommand(sheet.id, values));
     const snapshot = serializeWorkbook(session.workbook);
-    expect(snapshot.version).toBe(38);
+    expect(snapshot.version).toBe(39);
     expect(getActiveSheet(deserializeWorkbook(snapshot)).drawings).toEqual(values);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 24 })).toThrow(/version 25/);

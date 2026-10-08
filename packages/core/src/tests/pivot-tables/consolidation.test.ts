@@ -196,7 +196,7 @@ describe("pivot matrix consolidation", () => {
     const f = matrices();
     executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, f.table));
     const snapshot = serializeWorkbook(f.workbook);
-    expect(snapshot.version).toBe(38);
+    expect(snapshot.version).toBe(39);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 33 })).toThrow();
   });

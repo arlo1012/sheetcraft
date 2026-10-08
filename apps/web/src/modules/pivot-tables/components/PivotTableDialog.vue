@@ -58,6 +58,7 @@ const validSource = computed(() => {
       normalizePivotTable({
         ...draft.value.table,
         ...resolvePivotDraftSource(props.workbook, draft.value),
+        dataCache: undefined,
         rowFields: [],
         columnFields: [],
         values: [],

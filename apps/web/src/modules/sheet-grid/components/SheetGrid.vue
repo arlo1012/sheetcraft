@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PivotReportFilters from "../../pivot-tables/components/PivotReportFilters.vue";
-import type { SheetPivotTable } from "@idea10/core/pivot-tables";
+import { isPivotValueCell, type SheetPivotTable } from "@idea10/core/pivot-tables";
 import PivotEmptyReports from "../../pivot-tables/components/PivotEmptyReports.vue";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer.vue";
@@ -298,6 +298,7 @@ const emit = defineEmits<{
   configurePivot: [id: string];
   updatePivot: [table: SheetPivotTable];
   configurePivotFilter: [id: string, index: number];
+  showPivotDetails: [id: string, address: CellAddress];
   changeControl: [id: string, value: unknown];
   unlockRange: [range: CellRange];
   contextAction: [request: SheetContextRequest];
@@ -2574,6 +2575,18 @@ function requestCellClear(): void {
   focusEditor();
 }
 
+const contextPivotDetails = computed(() =>
+  props.sheet.pivotTables?.find((table) =>
+    isPivotValueCell(table, cellContextMenu.value?.noteAddress ?? activeCell.value),
+  ),
+);
+function requestPivotDetails(): void {
+  const table = contextPivotDetails.value;
+  const address = cellContextMenu.value?.noteAddress;
+  if (table && address) emit("showPivotDetails", table.id, address);
+  closeCellContextMenu(false);
+}
+
 function closeCellContextMenu(restoreFocus: boolean): void {
   cellContextMenu.value = undefined;
   if (restoreFocus) {
@@ -2592,6 +2605,13 @@ function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
   if (content?.kind === "image") {
     event.preventDefault();
     openImagePreview(content.image);
+    return;
+  }
+  if (isComposing.value) return;
+  const pivot = props.sheet.pivotTables?.find((table) => isPivotValueCell(table, address));
+  if (pivot) {
+    event.preventDefault();
+    emit("showPivotDetails", pivot.id, address);
     return;
   }
   if (props.readOnly && (!props.sheet.properties.protected || !canEditCell(props.sheet, address))) {
@@ -3432,6 +3452,8 @@ defineExpose({
       :sheet="sheet"
       :range="selectedRange"
       @action="requestContextAction"
+      :show-pivot-details="Boolean(contextPivotDetails)"
+      @show-pivot-details="requestPivotDetails"
       :has-image="Boolean(cellContextMenu.imageAddress)"
       :has-note="
         Boolean(

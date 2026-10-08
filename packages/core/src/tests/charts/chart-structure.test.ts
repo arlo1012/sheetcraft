@@ -130,7 +130,7 @@ describe("chart structural references", () => {
   test("round trips V26 charts and rejects their payload in V25", () => {
     const f = fixture();
     const snapshot = serializeWorkbook(f.session.workbook);
-    expect(snapshot.version).toBe(38);
+    expect(snapshot.version).toBe(39);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 25 })).toThrow();
   });

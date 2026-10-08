@@ -1,6 +1,7 @@
 import { isFormulaError, type CellContent, type FormulaValue } from "../formula/types.js";
 import {
   buildPivotResult,
+  getPivotDetails,
   getPivotTableRange,
   getPivotSourceRanges,
   getPivotPresentation,
@@ -15,6 +16,10 @@ import {
   createSheetSparseState,
   replaceSheetSparseState,
   createSheet,
+  setCellContent,
+  getCellStyle,
+  setCellStyle,
+  type CellAddress,
   createWorkbookEvaluator,
   MAX_SHEET_ROWS,
   MAX_SHEET_COLUMNS,
@@ -52,7 +57,9 @@ export function createSetPivotTableCommand(
   return {
     type: "setPivotTable",
     sheetId,
-    table: validateCommandPayload("pivot", table, () => normalizePivotTable(table)),
+    table: validateCommandPayload("pivot", table, () =>
+      normalizePivotTable({ ...table, dataCache: undefined }),
+    ),
     overwrite: options.overwrite ?? false,
     ...(options.chartId ? { chartId: options.chartId } : {}),
   };
@@ -198,9 +205,11 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
   const nextTable: SheetPivotTable = {
     ...table,
     outputRange: result.matrix.length ? range : null,
+    dataCache: result.dataCache,
     resultLayout: {
       labelColumns: result.rowLabelColumns,
       dataRows: result.dataRows,
+      valueRows: result.rowMembers.flatMap((members, row) => (members === null ? [] : [row])),
       rowLabels: result.rowLabels,
       rowFieldIndices: result.rowFieldIndices,
       ...(table.reportLayout && result.headerRows > 0
@@ -343,4 +352,46 @@ export function applyRemovePivotTableCommand(
   });
   replaceSheetSparseState(sheet, createSheetSparseState(temporary));
   return createRestoreSheetStateCommand(sheet.id, before);
+}
+
+/** A single add-sheet command preserves one-step undo/redo for Show Details. */
+export function createPivotDetailsSheetCommand(
+  workbook: Workbook,
+  sheetId: string,
+  tableId: string,
+  address: CellAddress,
+  options?: Parameters<typeof createAddSheetCommand>[1],
+): AddSheetCommand {
+  const table = getSheetOrThrow(workbook, sheetId).pivotTables?.find((item) => item.id === tableId);
+  if (!table) throw new RangeError("Missing pivot table.");
+  const details = getPivotDetails(workbook, table, address);
+  if (details.records.length + 1 > MAX_SHEET_ROWS || details.headers.length > MAX_SHEET_COLUMNS)
+    throw new RangeError("Pivot details exceed sheet bounds.");
+  const command = createAddSheetCommand(workbook, options);
+  const sheet = deserializeSheet(command.sheet);
+  details.headers.forEach((header, column) =>
+    setCellContent(sheet, { row: 0, column }, { kind: "literal", value: header }),
+  );
+  const formats = details.headers.map((_, field) => {
+    const area = table.consolidation?.ranges[0];
+    const sourceSheet = workbook.sheets.get(area?.sheetId ?? table.sourceSheetId);
+    const range = area?.range ?? table.source;
+    if (!sourceSheet || !range || (table.consolidation && field > 2)) return undefined;
+    const address = table.consolidation
+      ? {
+          row: range.start.row + (field === 1 ? 0 : 1),
+          column: range.start.column + (field === 0 ? 0 : 1),
+        }
+      : { row: range.start.row + 1, column: range.start.column + field };
+    return getCellStyle(sourceSheet, address)?.numberFormat;
+  });
+  details.records.forEach((record, row) =>
+    record.forEach((value, column) => {
+      const address = { row: row + 1, column };
+      setCellContent(sheet, address, literal(value));
+      const numberFormat = formats[column];
+      if (typeof value === "number" && numberFormat) setCellStyle(sheet, address, { numberFormat });
+    }),
+  );
+  return { ...command, sheet: serializeSheet(sheet) };
 }

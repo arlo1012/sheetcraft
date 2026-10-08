@@ -1,4 +1,7 @@
 export const pivotsZhCN = {
+  "pivot.showDetails": "显示明细",
+  "pivot.detailsNeedRefresh": "请先刷新此透视表，再查看明细。",
+  "pivot.detailsFailed": "无法查看此单元格的透视明细，请刷新后重试。",
   "pivot.labelFilters": "标签筛选",
   "pivot.top10Items": "前 10 项…",
   "pivot.valueFilters": "值筛选",

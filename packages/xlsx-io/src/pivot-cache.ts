@@ -2,7 +2,11 @@ import { canRefreshNativePivotOnLoad } from "./pivot-native-filters.js";
 import { XMLParser } from "fast-xml-parser";
 import { strToU8, strFromU8 } from "fflate/browser";
 import type { Workbook, CellValue } from "@idea10/core/workbook";
-import { getPivotTableSource, type SheetPivotTable } from "@idea10/core/pivot-tables";
+import {
+  MAX_PIVOT_CACHE_CELLS,
+  getPivotTableSource,
+  type SheetPivotTable,
+} from "@idea10/core/pivot-tables";
 import {
   isFormulaError,
   FORMULA_ERROR_TOKENS,
@@ -32,7 +36,9 @@ export type PivotCache = {
   numberFormats: number[];
 };
 export function createPivotCache(workbook: Workbook, table: SheetPivotTable): PivotCache {
-  const source = getPivotTableSource(workbook, table);
+  const source = table.dataCache
+    ? { headers: table.dataCache.headers, records: () => table.dataCache!.records.values() }
+    : getPivotTableSource(workbook, table);
   const shared = source.headers.map(() => [] as FormulaValue[]);
   const indices = source.headers.map(() => new Map<string, number>());
   const records = [...source.records()].map((record) =>
@@ -83,7 +89,7 @@ export function cacheDefinitionXml(
   recordId: string,
 ): Uint8Array {
   return strToU8(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><pivotCacheDefinition xmlns="${MAIN_NS}" xmlns:r="${REL_NS}" r:id="${recordId}" refreshOnLoad="${canRefreshNativePivotOnLoad(table) ? 1 : 0}" enableRefresh="1" saveData="1" createdVersion="6" refreshedVersion="6" minRefreshableVersion="3" recordCount="${cache.records.length}">${sourceXml(workbook, table)}<cacheFields count="${cache.headers.length}">${cache.headers
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><pivotCacheDefinition xmlns="${MAIN_NS}" xmlns:r="${REL_NS}" r:id="${recordId}" refreshOnLoad="${!table.dataCache && canRefreshNativePivotOnLoad(table) ? 1 : 0}" enableRefresh="1" saveData="1" createdVersion="6" refreshedVersion="6" minRefreshableVersion="3" recordCount="${cache.records.length}">${sourceXml(workbook, table)}<cacheFields count="${cache.headers.length}">${cache.headers
       .map((name, field) => {
         const values = cache.shared[field]!;
         const numbers = values.filter((value): value is number => typeof value === "number");
@@ -130,38 +136,7 @@ export function readPivotSharedItems(
       const kind = Object.keys(item).find((key) => key !== ":@");
       const attributes = (item[":@"] ?? {}) as XmlNode;
       const value = attr(attributes, "v");
-      if (kind === "m") return null;
-      if (kind === "n") {
-        const number = Number(value);
-        if (!Number.isFinite(number)) throw new Error("Invalid cache number.");
-        return number;
-      }
-      if (kind === "b") return value === "1" || value === "true";
-      if (kind === "s") return value;
-      if (kind === "e") {
-        const code = formulaErrorCodeFromToken(value);
-        if (!code) throw new Error("Invalid cache error.");
-        return createFormulaError(code);
-      }
-      if (kind === "d") {
-        const parts = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?Z?$/.exec(
-          value,
-        );
-        if (!parts) throw new Error("Invalid pivot cache date.");
-        return datePartsToExcelSerial(
-          {
-            year: Number(parts[1]),
-            month: Number(parts[2]),
-            day: Number(parts[3]),
-            hour: Number(parts[4]),
-            minute: Number(parts[5]),
-            second: Number(parts[6]),
-            millisecond: Number((parts[7] ?? "").padEnd(3, "0")),
-          },
-          dateSystem,
-        );
-      }
-      throw new Error("Unsupported pivot cache item.");
+      return readCacheValue(kind, value, dateSystem);
     }),
   );
   return { headers: fields.map((field) => attr(field, "name")), shared };
@@ -170,4 +145,73 @@ export function primitivePivotValue(value: FormulaValue): CellValue {
   if (isFormulaError(value))
     throw new Error("Error members cannot be selected by this pivot model.");
   return value;
+}
+
+function readCacheValue(
+  kind: string | undefined,
+  value: string,
+  dateSystem: "1900" | "1904",
+): FormulaValue {
+  if (kind === "m") return null;
+  if (kind === "n") {
+    const number = Number(value);
+    if (!Number.isFinite(number)) throw new Error("Invalid cache number.");
+    return number;
+  }
+  if (kind === "b") return value === "1" || value === "true";
+  if (kind === "s") return value;
+  if (kind === "e") {
+    const code = formulaErrorCodeFromToken(value);
+    if (!code) throw new Error("Invalid cache error.");
+    return createFormulaError(code);
+  }
+  if (kind === "d") {
+    const parts = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?Z?$/.exec(value);
+    if (!parts) throw new Error("Invalid pivot cache date.");
+    return datePartsToExcelSerial(
+      {
+        year: Number(parts[1]),
+        month: Number(parts[2]),
+        day: Number(parts[3]),
+        hour: Number(parts[4]),
+        minute: Number(parts[5]),
+        second: Number(parts[6]),
+        millisecond: Number((parts[7] ?? "").padEnd(3, "0")),
+      },
+      dateSystem,
+    );
+  }
+  throw new Error("Unsupported pivot cache item.");
+}
+export function readPivotCacheRecords(
+  bytes: Uint8Array,
+  cache: { headers: string[]; shared: FormulaValue[][] },
+  dateSystem: "1900" | "1904",
+): FormulaValue[][] {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    removeNSPrefix: true,
+    preserveOrder: true,
+    parseAttributeValue: false,
+    parseTagValue: false,
+  });
+  const ordered = parser.parse(strFromU8(bytes)) as XmlNode[];
+  const root = ordered.find((node) => "pivotCacheRecords" in node);
+  const rows = (root?.pivotCacheRecords ?? []) as XmlNode[];
+  const records = rows.filter((node) => "r" in node);
+  if ((records.length + 1) * cache.headers.length > MAX_PIVOT_CACHE_CELLS)
+    throw new Error("Pivot cache is too large.");
+  return records.map((node) => {
+    const items = node.r as XmlNode[];
+    if (items.length !== cache.headers.length) throw new Error("Invalid cache record width.");
+    return items.map((item, field) => {
+      const kind = Object.keys(item).find((key) => key !== ":@");
+      const value = attr((item[":@"] ?? {}) as XmlNode, "v");
+      if (kind !== "x") return readCacheValue(kind, value, dateSystem);
+      const index = Number(value);
+      if (!Number.isInteger(index) || index < 0 || index >= cache.shared[field]!.length)
+        throw new Error("Invalid cache item index.");
+      return cache.shared[field]![index]!;
+    });
+  });
 }

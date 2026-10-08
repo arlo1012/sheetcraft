@@ -119,11 +119,17 @@ export function readXlsxPivotTables(
         const cachePart = caches.get(attr(root, "cacheId"));
         if (!definition || !cachePart || !entries[cachePart])
           throw new Error("Missing pivot cache.");
+        const cacheRoot = child(parseXml(entries[cachePart]), "pivotCacheDefinition");
+        const recordRelation = relationships(entries, cachePart).get(attr(cacheRoot, "id"));
         const table = readPivotTable(
           workbook,
           definition,
           entries[cachePart]!,
           `xlsx-pivot-${index}-${sheet.pivotTables?.length ?? 0}`,
+          recordRelation?.type.endsWith("/pivotCacheRecords")
+            ? entries[recordRelation.target]
+            : undefined,
+          sheet.id,
         );
         if (seen.has(table.id)) table.id = `xlsx-pivot-${index}-${sheet.pivotTables?.length ?? 0}`;
         seen.add(table.id);

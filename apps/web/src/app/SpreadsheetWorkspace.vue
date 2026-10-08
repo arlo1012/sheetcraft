@@ -1147,6 +1147,21 @@ const pivotActions = usePivotActions({
       pivotFieldsVisible.value = true;
     });
   },
+  activateDetails: (sheetId) => {
+    selectSheet(sheetId);
+    void nextTick(() => sheetGridRef.value?.navigateToCell({ row: 0, column: 0 }));
+  },
+  onDetailsError: (reason) => {
+    void MessagePlugin.error(
+      t(
+        reason === "cache"
+          ? "pivot.detailsNeedRefresh"
+          : reason === "protected"
+            ? "pivot.error.protected"
+            : "pivot.detailsFailed",
+      ),
+    );
+  },
   onError: () => {
     void MessagePlugin.error(t("pivot.refreshFailed"));
   },
@@ -3599,6 +3614,7 @@ const gridInert = computed(
           @edit-drawing="editSheetDrawing"
           @configure-pivot="openPivotFields"
           @update-pivot="pivotActions.update"
+          @show-pivot-details="(id, address) => pivotActions.showDetails(id, address)"
           @configure-pivot-filter="
             (id, index) => {
               openPivotFields(id);

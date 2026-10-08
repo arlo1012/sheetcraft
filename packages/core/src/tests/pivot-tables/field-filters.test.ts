@@ -26,9 +26,10 @@ function withoutV38Layout(snapshot: ReturnType<typeof serializeWorkbook>) {
     sheets: snapshot.sheets.map((sheet) => ({
       ...sheet,
       pivotTables: sheet.pivotTables?.map((pivot) => {
-        if (!pivot.resultLayout) return pivot;
-        const { rowFieldIndices: _indices, ...resultLayout } = pivot.resultLayout;
-        return { ...pivot, resultLayout };
+        const { dataCache: _cache, ...table } = pivot;
+        if (!pivot.resultLayout) return table;
+        const { rowFieldIndices: _indices, valueRows: _rows, ...resultLayout } = pivot.resultLayout;
+        return { ...table, resultLayout };
       }),
     })),
   };
@@ -428,7 +429,7 @@ describe("pivot field filters", () => {
       }),
     ).toMatchObject({ fillColor: "#ffffff" });
     const after = serializeWorkbook(f.workbook);
-    expect(after.version).toBe(38);
+    expect(after.version).toBe(39);
     expect(serializeWorkbook(deserializeWorkbook(after))).toEqual(after);
     const sheet = serializeSheet(f.destination);
     expect(serializeSheet(deserializeSheet(sheet))).toEqual(sheet);
@@ -476,7 +477,7 @@ describe("pivot field filters", () => {
     expect(
       serializeWorkbook(deserializeWorkbook({ ...withoutV38Layout(snapshot), version: 35 }))
         .version,
-    ).toBe(38);
+    ).toBe(39);
   });
 
   test("follows source field identities through structural insertion and undo", () => {
@@ -579,7 +580,7 @@ describe("pivot lexical label comparisons", () => {
         expect(result.sourceRows).toBe(expected.length);
         executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, table));
         const snapshot = serializeWorkbook(f.workbook);
-        expect(snapshot.version).toBe(38);
+        expect(snapshot.version).toBe(39);
         expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
         expect(() => deserializeWorkbook({ ...withoutV38Layout(snapshot), version: 36 })).toThrow();
       }
