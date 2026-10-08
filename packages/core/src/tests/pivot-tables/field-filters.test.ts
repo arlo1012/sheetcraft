@@ -363,7 +363,7 @@ describe("pivot field filters", () => {
     ).toThrow();
   });
 
-  test("persists field rules and report colors in V36 with reversible output and chart refresh", () => {
+  test("persists field rules and report colors in V37 with reversible output and chart refresh", () => {
     const f = fixture();
     executeWorkbookCommand(
       f.session,
@@ -414,7 +414,7 @@ describe("pivot field filters", () => {
       }),
     ).toMatchObject({ fillColor: "#ffffff" });
     const after = serializeWorkbook(f.workbook);
-    expect(after.version).toBe(36);
+    expect(after.version).toBe(37);
     expect(serializeWorkbook(deserializeWorkbook(after))).toEqual(after);
     const sheet = serializeSheet(f.destination);
     expect(serializeSheet(deserializeSheet(sheet))).toEqual(sheet);
@@ -459,7 +459,7 @@ describe("pivot field filters", () => {
     const f = fixture();
     executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, f.table));
     const snapshot = serializeWorkbook(f.workbook);
-    expect(serializeWorkbook(deserializeWorkbook({ ...snapshot, version: 35 })).version).toBe(36);
+    expect(serializeWorkbook(deserializeWorkbook({ ...snapshot, version: 35 })).version).toBe(37);
   });
 
   test("follows source field identities through structural insertion and undo", () => {
@@ -482,6 +482,112 @@ describe("pivot field filters", () => {
       ],
     });
     undoWorkbookCommand(f.session);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
+});
+
+describe("pivot lexical label comparisons", () => {
+  test("keeps lexical text label comparison distinct from numeric label comparison", () => {
+    const f = fixture([
+      ["Region", "Quarter", "Amount"],
+      [2, "Q1", 10],
+      [20, "Q1", 20],
+      [3, "Q1", 30],
+    ]);
+    const lexical = buildPivotResult(f.workbook, {
+      ...f.table,
+      axisFilters: [
+        {
+          axis: "rows",
+          field: 0,
+          labelCondition: { kind: "text", operator: "lessThan", value: "3" },
+        },
+      ],
+    });
+    const numeric = buildPivotResult(f.workbook, {
+      ...f.table,
+      axisFilters: [
+        {
+          axis: "rows",
+          field: 0,
+          labelCondition: { kind: "number", operator: "lessThan", value: 3 },
+        },
+      ],
+    });
+    expect(lexical.rowLabels).toEqual(["2", "20"]);
+    expect(lexical.matrix.at(-1)).toEqual(["Grand Total", 30, 30]);
+    expect(numeric.rowLabels).toEqual(["2"]);
+    expect(numeric.matrix.at(-1)).toEqual(["Grand Total", 10, 10]);
+  });
+
+  test.each([
+    { operator: "doesNotBeginWith", value: "b*", expected: ["Alpha", "charlie", "DELTA"] },
+    { operator: "doesNotEndWith", value: "?a", expected: ["charlie"] },
+    { operator: "greaterThan", value: "beta", expected: ["charlie", "DELTA"] },
+    { operator: "greaterThanOrEqual", value: "beta", expected: ["BETA", "charlie", "DELTA"] },
+    { operator: "lessThan", value: "beta", expected: ["Alpha"] },
+    { operator: "lessThanOrEqual", value: "beta", expected: ["Alpha", "BETA"] },
+    { operator: "between", value: "beta", value2: "delta", expected: ["BETA", "charlie", "DELTA"] },
+    { operator: "notBetween", value: "beta", value2: "delta", expected: ["Alpha"] },
+  ] as const)(
+    "applies $operator labels and gates simple and compound rules at V37",
+    ({ operator, value, expected, ...bounds }) => {
+      for (const compound of [false, true]) {
+        const f = fixture([
+          ["Region", "Quarter", "Amount"],
+          ["Alpha", "Q1", 1],
+          ["BETA", "Q1", 2],
+          ["charlie", "Q1", 3],
+          ["DELTA", "Q1", 4],
+        ]);
+        const condition = { kind: "text" as const, operator, value, ...bounds };
+        const table: SheetPivotTable = {
+          ...f.table,
+          axisFilters: [
+            {
+              axis: "rows",
+              field: 0,
+              labelCondition: compound
+                ? {
+                    kind: "compound",
+                    operator: "and",
+                    conditions: [condition, { kind: "text", operator: "contains", value: "*" }],
+                  }
+                : condition,
+            },
+          ],
+        };
+        const result = buildPivotResult(f.workbook, table);
+        expect(result.rowLabels).toEqual(expected);
+        expect(result.sourceRows).toBe(expected.length);
+        executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, table));
+        const snapshot = serializeWorkbook(f.workbook);
+        expect(snapshot.version).toBe(37);
+        expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
+        expect(() => deserializeWorkbook({ ...snapshot, version: 36 })).toThrow();
+      }
+    },
+  );
+
+  test.each([
+    { kind: "text", operator: "between", value: "a" },
+    { kind: "text", operator: "notBetween", value: "a", value2: 3 },
+  ])("rejects malformed pivot lexical bounds %# without changing output", (condition) => {
+    const f = fixture();
+    const before = serializeWorkbook(f.workbook);
+    const table: SheetPivotTable = {
+      ...f.table,
+      axisFilters: [
+        {
+          axis: "rows",
+          field: 0,
+          labelCondition: condition as NonNullable<PivotAxisFilter["labelCondition"]>,
+        },
+      ],
+    };
+    expect(() =>
+      executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, table)),
+    ).toThrow();
     expect(serializeWorkbook(f.workbook)).toEqual(before);
   });
 });

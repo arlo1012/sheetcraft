@@ -43,7 +43,9 @@ const labels: Record<FilterConditionOperator, MessageKey> = {
   contains: "dataTools.filter.contains",
   doesNotContain: "dataTools.filter.doesNotContain",
   beginsWith: "dataTools.filter.beginsWith",
+  doesNotBeginWith: "dataTools.filter.doesNotBeginWith",
   endsWith: "dataTools.filter.endsWith",
+  doesNotEndWith: "dataTools.filter.doesNotEndWith",
   greaterThan: "dataTools.filter.greaterThan",
   greaterThanOrEqual: "dataTools.filter.greaterThanOrEqual",
   lessThan: "dataTools.filter.lessThan",
@@ -60,7 +62,7 @@ const operatorOptions = computed(() => {
         : [
             ...NUMBER_FILTER_OPERATORS,
             ...TEXT_FILTER_OPERATORS.filter(
-              (operator) => operator !== "equals" && operator !== "notEquals",
+              (operator) => !NUMBER_FILTER_OPERATORS.some((numeric) => numeric === operator),
             ),
           ];
   return operators.map((operator) => ({ value: operator, label: t(labels[operator]) }));

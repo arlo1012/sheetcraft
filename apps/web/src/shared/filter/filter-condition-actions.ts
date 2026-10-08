@@ -13,12 +13,21 @@ export const TEXT_FILTER_CONDITION_ACTIONS = [
   "contains",
   "doesNotContain",
   "beginsWith",
+  "doesNotBeginWith",
   "endsWith",
+  "doesNotEndWith",
+  "greaterThan",
+  "greaterThanOrEqual",
+  "lessThan",
+  "lessThanOrEqual",
+  "between",
+  "notBetween",
 ] as const;
 
 export const NUMERIC_FILTER_CONDITION_ACTIONS = [
   ...BASIC_NUMERIC_FILTER_CONDITION_ACTIONS,
   "between",
+  "notBetween",
   "rank",
   "aboveAverage",
   "belowAverage",
@@ -28,6 +37,7 @@ export const NUMERIC_FILTER_CONDITION_ACTIONS = [
 export const DATE_FILTER_CONDITION_ACTIONS = [
   ...BASIC_NUMERIC_FILTER_CONDITION_ACTIONS,
   "between",
+  "notBetween",
   "custom",
 ] as const;
 

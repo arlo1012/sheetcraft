@@ -19,7 +19,15 @@ export const TEXT_FILTER_OPERATORS = [
   "contains",
   "doesNotContain",
   "beginsWith",
+  "doesNotBeginWith",
   "endsWith",
+  "doesNotEndWith",
+  "greaterThan",
+  "greaterThanOrEqual",
+  "lessThan",
+  "lessThanOrEqual",
+  "between",
+  "notBetween",
 ] as const;
 export const NUMBER_FILTER_OPERATORS = [
   "equals",
@@ -95,6 +103,9 @@ export function buildFilterCondition(
         kind: "text",
         operator: draft.operator as (typeof TEXT_FILTER_OPERATORS)[number],
         value: draft.first,
+        ...(draft.operator === "between" || draft.operator === "notBetween"
+          ? { value2: draft.second }
+          : {}),
       },
     };
   }

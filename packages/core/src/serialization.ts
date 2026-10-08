@@ -223,7 +223,8 @@ export type WorkbookSnapshotV33 = Omit<WorkbookSnapshotV32, "version"> & { versi
 export type WorkbookSnapshotV34 = Omit<WorkbookSnapshotV33, "version"> & { version: 34 };
 export type WorkbookSnapshotV35 = Omit<WorkbookSnapshotV34, "version"> & { version: 35 };
 export type WorkbookSnapshotV36 = Omit<WorkbookSnapshotV35, "version"> & { version: 36 };
-export type WorkbookSnapshot = WorkbookSnapshotV36;
+export type WorkbookSnapshotV37 = Omit<WorkbookSnapshotV36, "version"> & { version: 37 };
+export type WorkbookSnapshot = WorkbookSnapshotV37;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -276,7 +277,8 @@ type SnapshotVersion =
   | 33
   | 34
   | 35
-  | 36;
+  | 36
+  | 37;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -529,6 +531,19 @@ function parseFilterValue(
   return fail(path, "Invalid filter value.");
 }
 
+function requiresTextFilterV37(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const condition = value as UnknownRecord;
+  if (condition.kind === "compound")
+    return Array.isArray(condition.conditions) && condition.conditions.some(requiresTextFilterV37);
+  return (
+    condition.kind === "text" &&
+    !["contains", "doesNotContain", "beginsWith", "endsWith", "equals", "notEquals"].includes(
+      String(condition.operator),
+    )
+  );
+}
+
 function parseFilter(value: unknown, path: string, version: SnapshotVersion): SheetFilter {
   const record = asRecord(value, path);
   const advancedRecord =
@@ -572,6 +587,8 @@ function parseFilter(value: unknown, path: string, version: SnapshotVersion): Sh
     columns: asArray(record.columns, `${path}.columns`).map((column, index) => {
       const columnRecord = asRecord(column, `${path}.columns[${index}]`);
       const condition = columnRecord.condition;
+      if (version < 37 && requiresTextFilterV37(condition))
+        return fail(path, "Text comparison filters require snapshot version 37.");
       return {
         column: asInteger(columnRecord.column, `${path}.columns[${index}].column`),
         allowedValues: asArray(
@@ -756,6 +773,34 @@ function parseSparseState(
     })
   )
     return fail(path, "Pivot field filters and report colors require snapshot version 36.");
+  if (
+    version < 37 &&
+    Array.isArray(record.tables) &&
+    record.tables.some((item) => {
+      const table = asRecord(item, path);
+      if (!table.filter || typeof table.filter !== "object") return false;
+      const filter = table.filter as UnknownRecord;
+      return (
+        Array.isArray(filter.columns) &&
+        filter.columns.some((column) => requiresTextFilterV37(asRecord(column, path).condition))
+      );
+    })
+  )
+    return fail(path, "Text comparison filters require snapshot version 37.");
+  if (
+    version < 37 &&
+    Array.isArray(record.pivotTables) &&
+    record.pivotTables.some((item) => {
+      const table = asRecord(item, path);
+      return (
+        Array.isArray(table.axisFilters) &&
+        table.axisFilters.some((filter) =>
+          requiresTextFilterV37(asRecord(filter, path).labelCondition),
+        )
+      );
+    })
+  )
+    return fail(path, "Text comparison filters require snapshot version 37.");
   if (version < 31 && Object.hasOwn(record, "pivotTables"))
     return fail(path, "Pivot tables require snapshot version 31.");
   if (version < 25 && Object.hasOwn(record, "drawings"))
@@ -888,9 +933,9 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
             ?.image?.transform?.annotations !== undefined,
       );
     version = hasAnnotations
-      ? 36
-      : Object.hasOwn(record, "pivotTables")
-        ? 36
+      ? 37
+      : Object.hasOwn(record, "pivotTables") || Object.hasOwn(record, "filter")
+        ? 37
         : Object.hasOwn(record, "drawings")
           ? 31
           : cells.some((cell) => Object.hasOwn(asRecord(cell, path), "sparkline"))
@@ -1029,7 +1074,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 36,
+    version: 37,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1097,7 +1142,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 33 &&
     record.version !== 34 &&
     record.version !== 35 &&
-    record.version !== 36
+    record.version !== 36 &&
+    record.version !== 37
   ) {
     throw new WorkbookDomainError(
       {

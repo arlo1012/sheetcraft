@@ -18,6 +18,7 @@ defineProps<{
   dateSystem: ExcelDateSystem;
   disabled?: boolean;
   caption?: string;
+  title?: string;
   strictKind?: boolean;
 }>();
 const emit = defineEmits<{ close: []; apply: [condition: SheetFilterCondition] }>();
@@ -27,7 +28,7 @@ const condition = ref<SheetFilterCondition>();
 <template>
   <Dialog
     :visible="visible"
-    :header="t('dataTools.filter.customFilterTitle')"
+    :header="title ?? t('dataTools.filter.customFilterTitle')"
     width="min(440px, calc(100vw - 32px))"
     placement="center"
     :close-on-overlay-click="false"

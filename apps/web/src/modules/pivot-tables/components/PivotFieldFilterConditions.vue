@@ -69,12 +69,15 @@ function acceptValue(condition: ValueRule): void {
         :kind="kind"
         :label="t('pivot.labelFilters')"
         :statistics="false"
+        filter-target="label"
         :disabled="disabled"
         @select="edit('label', $event)"
       />
       <FilterConditionMenu
         ref="valueMenu"
         kind="number"
+        filter-target="value"
+        :rank-label="t('pivot.top10Items')"
         :label="t('pivot.valueFilters')"
         :disabled="disabled || !measures.length"
         @select="edit('value', $event)"
@@ -98,6 +101,7 @@ function acceptValue(condition: ValueRule): void {
     </p>
     <FilterConditionDialog
       :visible="editor?.target === 'label'"
+      :title="t('pivot.labelFilters')"
       :column-label="fieldLabel"
       :caption="fieldLabel"
       :kind="kind"

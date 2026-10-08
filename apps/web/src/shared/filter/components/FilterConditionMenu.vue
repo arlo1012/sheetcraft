@@ -15,6 +15,8 @@ const props = withDefaults(
     disabled?: boolean;
     label?: string;
     statistics?: boolean;
+    filterTarget?: "label" | "value";
+    rankLabel?: string;
   }>(),
   { disabled: false, statistics: true },
 );
@@ -73,8 +75,24 @@ function select(action: FilterConditionAction): void {
       <MenuItem data-filter-condition-action="notEquals" @select="select('notEquals')">{{
         t("dataTools.filter.notEquals")
       }}</MenuItem>
-      <template v-if="kind === 'text'">
+      <template v-if="filterTarget === 'label' || kind === 'text'">
         <MenuSeparator />
+        <MenuItem data-filter-condition-action="beginsWith" @select="select('beginsWith')">{{
+          t("dataTools.filter.beginsWith")
+        }}</MenuItem>
+        <MenuItem
+          data-filter-condition-action="doesNotBeginWith"
+          @select="select('doesNotBeginWith')"
+          >{{ t("dataTools.filter.doesNotBeginWith") }}</MenuItem
+        >
+        <MenuItem data-filter-condition-action="endsWith" @select="select('endsWith')">{{
+          t("dataTools.filter.endsWith")
+        }}</MenuItem>
+        <MenuItem
+          data-filter-condition-action="doesNotEndWith"
+          @select="select('doesNotEndWith')"
+          >{{ t("dataTools.filter.doesNotEndWith") }}</MenuItem
+        >
         <MenuItem data-filter-condition-action="contains" @select="select('contains')">{{
           t("dataTools.filter.contains")
         }}</MenuItem>
@@ -83,40 +101,41 @@ function select(action: FilterConditionAction): void {
           @select="select('doesNotContain')"
           >{{ t("dataTools.filter.doesNotContain") }}</MenuItem
         >
-        <MenuItem data-filter-condition-action="beginsWith" @select="select('beginsWith')">{{
-          t("dataTools.filter.beginsWith")
-        }}</MenuItem>
-        <MenuItem data-filter-condition-action="endsWith" @select="select('endsWith')">{{
-          t("dataTools.filter.endsWith")
-        }}</MenuItem>
       </template>
-      <template v-else>
+      <MenuSeparator />
+      <MenuItem data-filter-condition-action="greaterThan" @select="select('greaterThan')">{{
+        t("dataTools.filter.greaterThan")
+      }}</MenuItem>
+      <MenuItem
+        data-filter-condition-action="greaterThanOrEqual"
+        @select="select('greaterThanOrEqual')"
+        >{{ t("dataTools.filter.greaterThanOrEqual") }}</MenuItem
+      >
+      <MenuItem data-filter-condition-action="lessThan" @select="select('lessThan')">{{
+        t("dataTools.filter.lessThan")
+      }}</MenuItem>
+      <MenuItem
+        data-filter-condition-action="lessThanOrEqual"
+        @select="select('lessThanOrEqual')"
+        >{{ t("dataTools.filter.lessThanOrEqual") }}</MenuItem
+      >
+      <MenuSeparator />
+      <MenuItem data-filter-condition-action="between" @select="select('between')">{{
+        t("dataTools.filter.between")
+      }}</MenuItem>
+      <MenuItem data-filter-condition-action="notBetween" @select="select('notBetween')">{{
+        t("dataTools.filter.notBetween")
+      }}</MenuItem>
+      <template
+        v-if="
+          (kind === 'number' && statistics && filterTarget !== 'label') || filterTarget === 'value'
+        "
+      >
         <MenuSeparator />
-        <MenuItem data-filter-condition-action="greaterThan" @select="select('greaterThan')">{{
-          t("dataTools.filter.greaterThan")
+        <MenuItem data-filter-condition-action="rank" @select="select('rank')">{{
+          rankLabel ?? t("dataTools.filter.topItems")
         }}</MenuItem>
-        <MenuItem
-          data-filter-condition-action="greaterThanOrEqual"
-          @select="select('greaterThanOrEqual')"
-          >{{ t("dataTools.filter.greaterThanOrEqual") }}</MenuItem
-        >
-        <MenuItem data-filter-condition-action="lessThan" @select="select('lessThan')">{{
-          t("dataTools.filter.lessThan")
-        }}</MenuItem>
-        <MenuItem
-          data-filter-condition-action="lessThanOrEqual"
-          @select="select('lessThanOrEqual')"
-          >{{ t("dataTools.filter.lessThanOrEqual") }}</MenuItem
-        >
-        <MenuSeparator />
-        <MenuItem data-filter-condition-action="between" @select="select('between')">{{
-          t("dataTools.filter.between")
-        }}</MenuItem>
-        <template v-if="kind === 'number' && statistics">
-          <MenuSeparator />
-          <MenuItem data-filter-condition-action="rank" @select="select('rank')">{{
-            t("dataTools.filter.topItems")
-          }}</MenuItem>
+        <template v-if="!filterTarget">
           <MenuItem data-filter-condition-action="aboveAverage" @select="select('aboveAverage')">{{
             t("dataTools.filter.aboveAverage")
           }}</MenuItem>
@@ -125,10 +144,12 @@ function select(action: FilterConditionAction): void {
           }}</MenuItem>
         </template>
       </template>
-      <MenuSeparator />
-      <MenuItem data-filter-condition-action="custom" @select="select('custom')">{{
-        t("dataTools.filter.customFilter")
-      }}</MenuItem>
+      <template v-if="!filterTarget">
+        <MenuSeparator />
+        <MenuItem data-filter-condition-action="custom" @select="select('custom')">{{
+          t("dataTools.filter.customFilter")
+        }}</MenuItem>
+      </template>
     </MenuSurface>
   </Teleport>
 </template>

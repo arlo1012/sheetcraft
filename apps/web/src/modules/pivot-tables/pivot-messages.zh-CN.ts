@@ -1,5 +1,6 @@
 export const pivotsZhCN = {
   "pivot.labelFilters": "标签筛选",
+  "pivot.top10Items": "前 10 项…",
   "pivot.valueFilters": "值筛选",
   "pivot.filterMeasure": "汇总依据",
   "pivot.clearFilters": "清除筛选",

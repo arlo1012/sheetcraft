@@ -6,6 +6,40 @@ import {
 } from "../../../../shared/filter/custom-filter-draft";
 
 describe("custom filter draft", () => {
+  test.each([
+    ["between", "and", "greaterThanOrEqual", "lessThanOrEqual"],
+    ["notBetween", "or", "lessThan", "greaterThan"],
+  ] as const)(
+    "builds lexical text %s as two editable comparisons",
+    (action, operator, first, second) => {
+      const draft = createCustomFilterDraft("text", undefined, "1900", action);
+      draft.first.value = "Apple";
+      draft.second.value = "Pear";
+      expect(buildCustomFilterCondition(draft, "1900")).toEqual({
+        kind: "compound",
+        operator,
+        conditions: [
+          { kind: "text", operator: first, value: "Apple" },
+          { kind: "text", operator: second, value: "Pear" },
+        ],
+      });
+      expect(
+        createCustomFilterDraft("text", buildCustomFilterCondition(draft, "1900"), "1900"),
+      ).toEqual(draft);
+    },
+  );
+  test.each(["doesNotBeginWith", "doesNotEndWith"] as const)(
+    "numeric members support text label action %s",
+    (operator) => {
+      const draft = createCustomFilterDraft("number", undefined, "1900", operator);
+      draft.first.value = "12";
+      expect(buildCustomFilterCondition(draft, "1900")).toEqual({
+        kind: "text",
+        operator,
+        value: "12",
+      });
+    },
+  );
   test("builds two populated rows with AND and OR independently", () => {
     const draft = createCustomFilterDraft("number", undefined, "1900");
     draft.first = { kind: "number", operator: "greaterThan", value: "12", value2: "" };

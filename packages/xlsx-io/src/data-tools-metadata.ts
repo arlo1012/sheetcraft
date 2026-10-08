@@ -43,8 +43,23 @@ export type XlsxFilterValue =
 export type XlsxSimpleFilterCondition =
   | {
       kind: "text";
-      operator: "contains" | "doesNotContain" | "beginsWith" | "endsWith" | "equals" | "notEquals";
+      operator:
+        | "contains"
+        | "doesNotContain"
+        | "beginsWith"
+        | "doesNotBeginWith"
+        | "endsWith"
+        | "doesNotEndWith"
+        | "equals"
+        | "notEquals"
+        | "greaterThan"
+        | "greaterThanOrEqual"
+        | "lessThan"
+        | "lessThanOrEqual"
+        | "between"
+        | "notBetween";
       value: string;
+      value2?: string;
     }
   | {
       kind: "number" | "date";
@@ -330,7 +345,7 @@ function decodeCustomFilter(
   value: string,
 ): XlsxSimpleFilterCondition | null {
   const comparison = operator ?? "equal";
-  if (/[~*?]/.test(value)) {
+  if ((comparison === "equal" || comparison === "notEqual") && /[~*?]/.test(value)) {
     const starts = value.startsWith("*");
     const trailingEscapes = /(~*)\*$/.exec(value)?.[1]?.length ?? 0;
     const ends = value.endsWith("*") && trailingEscapes % 2 === 0;
@@ -339,6 +354,10 @@ function decodeCustomFilter(
       return { kind: "text", operator: "doesNotContain", value: raw };
     if (comparison === "equal" && starts && ends)
       return { kind: "text", operator: "contains", value: raw };
+    if (comparison === "notEqual" && starts)
+      return { kind: "text", operator: "doesNotEndWith", value: raw };
+    if (comparison === "notEqual" && ends)
+      return { kind: "text", operator: "doesNotBeginWith", value: raw };
     if (comparison === "equal" && starts) return { kind: "text", operator: "endsWith", value: raw };
     if (comparison === "equal" && ends) return { kind: "text", operator: "beginsWith", value: raw };
     if (comparison === "equal") return { kind: "text", operator: "equals", value };
@@ -365,6 +384,12 @@ function decodeCustomFilter(
   }
   if (comparison === "equal") return { kind: "text", operator: "equals", value };
   if (comparison === "notEqual") return { kind: "text", operator: "notEquals", value };
+  if (["greaterThan", "greaterThanOrEqual", "lessThan", "lessThanOrEqual"].includes(comparison))
+    return {
+      kind: "text",
+      operator: comparison as Extract<XlsxSimpleFilterCondition, { kind: "text" }>["operator"],
+      value,
+    };
   return null;
 }
 
@@ -725,16 +750,21 @@ function validationXml(validation: XlsxDataValidation): string {
 function customCriterion(condition: XlsxSimpleFilterCondition): string[] | null {
   if (condition.kind === "text") {
     const pattern = condition.value;
-    const map: Record<typeof condition.operator, [string, string]> = {
+    const map: Partial<Record<typeof condition.operator, [string, string]>> = {
       contains: ["equal", `*${pattern}*`],
       doesNotContain: ["notEqual", `*${pattern}*`],
       beginsWith: ["equal", `${pattern}*`],
+      doesNotBeginWith: ["notEqual", `${pattern}*`],
       endsWith: ["equal", `*${pattern}`],
+      doesNotEndWith: ["notEqual", `*${pattern}`],
+      greaterThan: ["greaterThan", pattern],
+      greaterThanOrEqual: ["greaterThanOrEqual", pattern],
+      lessThan: ["lessThan", pattern],
+      lessThanOrEqual: ["lessThanOrEqual", pattern],
       equals: ["equal", pattern],
       notEquals: ["notEqual", pattern],
     };
-    const [operator, value] = map[condition.operator];
-    return [operator, value];
+    return map[condition.operator] ?? null;
   }
   const map: Record<string, string> = {
     equals: "equal",
@@ -802,13 +832,15 @@ export function writeXlsxAutoFilter(
         } else if (column.condition.kind === "date" && column.condition.operator === "equals") {
           filters = dateGroupXml(column.condition.value) ?? filters;
         } else if (
-          (column.condition.kind === "number" || column.condition.kind === "date") &&
+          (column.condition.kind === "number" ||
+            column.condition.kind === "date" ||
+            column.condition.kind === "text") &&
           (column.condition.operator === "between" || column.condition.operator === "notBetween") &&
           column.condition.value2 !== undefined
         ) {
           const lower = column.condition.operator === "between" ? "greaterThanOrEqual" : "lessThan";
           const upper = column.condition.operator === "between" ? "lessThanOrEqual" : "greaterThan";
-          custom = `<customFilters${column.condition.operator === "between" ? ' and="1"' : ""}><customFilter operator="${lower}" val="${column.condition.value}"/><customFilter operator="${upper}" val="${column.condition.value2}"/></customFilters>`;
+          custom = `<customFilters${column.condition.operator === "between" ? ' and="1"' : ""}><customFilter operator="${lower}" val="${encodeXml(String(column.condition.value))}"/><customFilter operator="${upper}" val="${encodeXml(String(column.condition.value2))}"/></customFilters>`;
         } else if (
           column.condition.kind === "text" ||
           column.condition.kind === "number" ||

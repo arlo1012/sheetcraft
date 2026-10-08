@@ -56,10 +56,7 @@ export function createCustomFilterDraft(
     }
     if (condition?.kind === "text" || condition?.kind === "number" || condition?.kind === "date") {
       draft.first = rowFor(condition, dateSystem);
-      if (
-        condition.kind !== "text" &&
-        (condition.operator === "between" || condition.operator === "notBetween")
-      ) {
+      if (condition.operator === "between" || condition.operator === "notBetween") {
         draft.first.operator = condition.operator === "between" ? "greaterThanOrEqual" : "lessThan";
         draft.second = {
           ...emptyRow(condition.kind),
@@ -73,9 +70,10 @@ export function createCustomFilterDraft(
     }
     return draft;
   }
-  if (action === "between") {
-    draft.first.operator = "greaterThanOrEqual";
-    draft.second.operator = "lessThanOrEqual";
+  if (action === "between" || action === "notBetween") {
+    draft.first.operator = action === "between" ? "greaterThanOrEqual" : "lessThan";
+    draft.second.operator = action === "between" ? "lessThanOrEqual" : "greaterThan";
+    draft.join = action === "between" ? "and" : "or";
   } else if (action !== "rank" && action !== "aboveAverage" && action !== "belowAverage") {
     draft.first.operator = action;
   }
@@ -91,7 +89,9 @@ function buildRow(
     row.operator === "contains" ||
     row.operator === "doesNotContain" ||
     row.operator === "beginsWith" ||
-    row.operator === "endsWith";
+    row.operator === "doesNotBeginWith" ||
+    row.operator === "endsWith" ||
+    row.operator === "doesNotEndWith";
   const textValue =
     row.kind === "number" &&
     (row.operator === "equals" || row.operator === "notEquals") &&

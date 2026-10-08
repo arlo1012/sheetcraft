@@ -154,8 +154,23 @@ export type SheetFilterColumn = {
 export type SheetFilterValueCondition =
   | {
       kind: "text";
-      operator: "contains" | "doesNotContain" | "beginsWith" | "endsWith" | "equals" | "notEquals";
+      operator:
+        | "contains"
+        | "doesNotContain"
+        | "beginsWith"
+        | "doesNotBeginWith"
+        | "endsWith"
+        | "doesNotEndWith"
+        | "equals"
+        | "notEquals"
+        | "greaterThan"
+        | "greaterThanOrEqual"
+        | "lessThan"
+        | "lessThanOrEqual"
+        | "between"
+        | "notBetween";
       value: string;
+      value2?: string;
     }
   | {
       kind: "number" | "date";
@@ -2267,9 +2282,25 @@ export function normalizeSheetFilterCondition(
   const text =
     condition.kind === "text" &&
     typeof condition.value === "string" &&
-    ["contains", "doesNotContain", "beginsWith", "endsWith", "equals", "notEquals"].includes(
-      condition.operator,
-    );
+    [
+      "contains",
+      "doesNotContain",
+      "beginsWith",
+      "doesNotBeginWith",
+      "endsWith",
+      "doesNotEndWith",
+      "equals",
+      "notEquals",
+      "greaterThan",
+      "greaterThanOrEqual",
+      "lessThan",
+      "lessThanOrEqual",
+      "between",
+      "notBetween",
+    ].includes(condition.operator) &&
+    (condition.value2 === undefined || typeof condition.value2 === "string") &&
+    (!["between", "notBetween"].includes(condition.operator) ||
+      typeof condition.value2 === "string");
   const numeric =
     (condition.kind === "number" || condition.kind === "date") &&
     typeof condition.value === "number" &&

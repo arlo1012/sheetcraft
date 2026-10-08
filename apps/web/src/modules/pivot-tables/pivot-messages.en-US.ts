@@ -1,5 +1,6 @@
 export const pivotsEnUS = {
   "pivot.labelFilters": "Label filters",
+  "pivot.top10Items": "Top 10…",
   "pivot.valueFilters": "Value filters",
   "pivot.filterMeasure": "Aggregate measure",
   "pivot.clearFilters": "Clear filters",

@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select } from "tdesign-vue-next/es/select";
+import { AutoComplete } from "tdesign-vue-next/es/auto-complete";
 import type { PivotValueCondition } from "@idea10/core/pivot-tables";
 import type { FilterConditionAction } from "../../../shared/filter/filter-condition-actions";
 import PivotValueFilterDialog from "../../../modules/pivot-tables/components/PivotValueFilterDialog.vue";
@@ -42,6 +43,30 @@ async function confirm(wrapper: ReturnType<typeof setup>) {
 }
 
 describe("pivot value filter dialog", () => {
+  test("not-between opens two numeric boundaries and applies their OR condition", async () => {
+    const wrapper = setup("notBetween");
+    wrapper.findComponent(Select).vm.$emit("update:modelValue", 1);
+    const inputs = wrapper.findComponent(FilterConditionEditor).findAllComponents(AutoComplete);
+    inputs[0]!.vm.$emit("update:modelValue", "10");
+    inputs[1]!.vm.$emit("update:modelValue", "20");
+    await flushPromises();
+    await confirm(wrapper);
+    expect(wrapper.emitted("apply")).toEqual([
+      [
+        {
+          measure: 1,
+          condition: {
+            kind: "compound",
+            operator: "or",
+            conditions: [
+              { kind: "number", operator: "lessThan", value: 10 },
+              { kind: "number", operator: "greaterThan", value: 20 },
+            ],
+          },
+        },
+      ],
+    ]);
+  });
   test("numeric condition applies the selected aggregate measure only on confirmation", async () => {
     const wrapper = setup();
     wrapper.findComponent(Select).vm.$emit("update:modelValue", 1);
