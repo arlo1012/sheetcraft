@@ -66,6 +66,7 @@ function setValues(values: unknown): void {
 </script>
 <template>
   <Dialog
+    attach="body"
     :visible="true"
     :header="t('pivot.fieldSettings')"
     width="400px"
