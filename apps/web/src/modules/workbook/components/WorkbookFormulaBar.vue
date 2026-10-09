@@ -447,7 +447,7 @@ defineExpose({
               spellcheck: false,
             },
           }"
-          class="idea-formula-textarea"
+          class="sheetcraft-formula-textarea"
           :class="{ 'has-formula-colors': showFormulaColors, 'is-expanded': expanded }"
           :value="previewing ? (previewValue ?? '') : formulaDraft"
           :readonly="readOnly || previewing"

@@ -12,7 +12,7 @@ export type StatusBarSettings = {
   sum: boolean;
 };
 
-export const STATUS_BAR_SETTINGS_STORAGE_KEY = "idea10.status-bar.settings";
+export const STATUS_BAR_SETTINGS_STORAGE_KEY = "sheetcraft.status-bar.settings";
 
 const DEFAULT_SETTINGS: StatusBarSettings = {
   average: true,

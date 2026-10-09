@@ -35,7 +35,7 @@ const all = ref(false);
           :max="7500"
           :decimal-places="2"
           theme="column"
-          class="idea-input-number--persistent-controls"
+          class="sheetcraft-input-number--persistent-controls"
         />
       </div>
       <div class="picture-batch-size__field" role="group" :aria-label="t('image.heightPoints')">
@@ -47,7 +47,7 @@ const all = ref(false);
           :max="7500"
           :decimal-places="2"
           theme="column"
-          class="idea-input-number--persistent-controls"
+          class="sheetcraft-input-number--persistent-controls"
         />
       </div>
       <Checkbox v-model="locked">{{ t("picture.keepEachRatio") }}</Checkbox>

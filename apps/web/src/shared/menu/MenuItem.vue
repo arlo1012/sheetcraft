@@ -40,41 +40,41 @@ function onKeydown(event: KeyboardEvent): void {
 <template>
   <li
     v-if="$slots.trailing"
-    class="idea-menu-item"
+    class="sheetcraft-menu-item"
     :class="{
-      'idea-menu-item--danger': danger,
-      'idea-menu-item--disabled': disabled,
-      'idea-menu-item--with-icon': $slots.icon,
-      'idea-menu-item--compound': $slots.trailing,
+      'sheetcraft-menu-item--danger': danger,
+      'sheetcraft-menu-item--disabled': disabled,
+      'sheetcraft-menu-item--with-icon': $slots.icon,
+      'sheetcraft-menu-item--compound': $slots.trailing,
     }"
     role="none"
   >
     <span
       v-bind="$attrs"
-      class="idea-menu-item__command"
+      class="sheetcraft-menu-item__command"
       :role="role"
       tabindex="-1"
       :aria-disabled="disabled"
       @click="requestSelect"
       @keydown="onKeydown"
     >
-      <span v-if="$slots.icon" class="idea-menu-item__icon" aria-hidden="true">
+      <span v-if="$slots.icon" class="sheetcraft-menu-item__icon" aria-hidden="true">
         <slot name="icon" />
       </span>
-      <span class="idea-menu-item__label"><slot /></span>
+      <span class="sheetcraft-menu-item__label"><slot /></span>
     </span>
-    <span class="idea-menu-item__trailing">
+    <span class="sheetcraft-menu-item__trailing">
       <slot name="trailing" />
     </span>
   </li>
   <li
     v-else
     v-bind="$attrs"
-    class="idea-menu-item"
+    class="sheetcraft-menu-item"
     :class="{
-      'idea-menu-item--danger': danger,
-      'idea-menu-item--disabled': disabled,
-      'idea-menu-item--with-icon': $slots.icon,
+      'sheetcraft-menu-item--danger': danger,
+      'sheetcraft-menu-item--disabled': disabled,
+      'sheetcraft-menu-item--with-icon': $slots.icon,
     }"
     :role="role"
     tabindex="-1"
@@ -82,18 +82,18 @@ function onKeydown(event: KeyboardEvent): void {
     @click="requestSelect"
     @keydown="onKeydown"
   >
-    <span v-if="$slots.icon" class="idea-menu-item__icon" aria-hidden="true">
+    <span v-if="$slots.icon" class="sheetcraft-menu-item__icon" aria-hidden="true">
       <slot name="icon" />
     </span>
-    <span class="idea-menu-item__label"><slot /></span>
-    <span v-if="$slots.shortcut" class="idea-menu-item__trailing" aria-hidden="true">
+    <span class="sheetcraft-menu-item__label"><slot /></span>
+    <span v-if="$slots.shortcut" class="sheetcraft-menu-item__trailing" aria-hidden="true">
       <slot name="shortcut" />
     </span>
   </li>
 </template>
 
 <style scoped lang="scss">
-.idea-menu-item {
+.sheetcraft-menu-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -118,7 +118,7 @@ function onKeydown(event: KeyboardEvent): void {
   &--compound {
     grid-template-columns: minmax(0, 1fr) auto;
 
-    &.idea-menu-item--with-icon {
+    &.sheetcraft-menu-item--with-icon {
       grid-template-columns: minmax(0, 1fr) auto;
     }
   }
@@ -166,7 +166,7 @@ function onKeydown(event: KeyboardEvent): void {
     min-width: 0;
     align-self: stretch;
 
-    .idea-menu-item--with-icon & {
+    .sheetcraft-menu-item--with-icon & {
       grid-template-columns: 16px minmax(0, 1fr);
       gap: 8px;
     }

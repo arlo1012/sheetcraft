@@ -94,7 +94,7 @@ watch(
     @confirm="save"
     @close="close"
   >
-    <TForm class="custom-theme-fonts-dialog idea-form-grid" label-align="top">
+    <TForm class="custom-theme-fonts-dialog sheetcraft-form-grid" label-align="top">
       <TFormItem :label="t('pageTools.themeSchemeName')" label-align="left" label-width="48px">
         <div ref="nameInputRef" class="custom-theme-fonts-dialog__name">
           <TInput v-model="draft.name" autofocus clearable :status="error ? 'error' : undefined" />

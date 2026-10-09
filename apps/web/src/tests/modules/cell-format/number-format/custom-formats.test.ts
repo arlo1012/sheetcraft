@@ -5,7 +5,7 @@ import {
   removeCustomNumberFormat,
 } from "../../../../modules/cell-format/number-format/custom-formats";
 
-const STORAGE_KEY = "idea10.custom-number-formats";
+const STORAGE_KEY = "sheetcraft.custom-number-formats";
 
 afterEach(() => localStorage.removeItem(STORAGE_KEY));
 

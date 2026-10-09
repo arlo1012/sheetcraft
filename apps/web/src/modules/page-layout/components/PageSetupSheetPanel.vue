@@ -67,7 +67,7 @@ function resetManualBreaks(): void {
 </script>
 <template>
   <TForm
-    class="page-setup-sheet idea-form-grid"
+    class="page-setup-sheet sheetcraft-form-grid"
     :data="references"
     label-align="right"
     :label-width="locale === 'zh-CN' ? 104 : 176"

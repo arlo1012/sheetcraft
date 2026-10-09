@@ -304,7 +304,7 @@ test("dragging sheet rules saves the changed priority only on confirmation", asy
   await wrapper.vm.$nextTick();
   const table = dragFirstRuleLast(wrapper);
   expect(table.props("dragSort")).toBe("row-handler");
-  expect(table.findAll("svg.idea-table-drag-icon")).toHaveLength(
+  expect(table.findAll("svg.sheetcraft-table-drag-icon")).toHaveLength(
     (table.props("data") ?? []).length,
   );
   await wrapper.vm.$nextTick();

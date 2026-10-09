@@ -1,5 +1,5 @@
 // Keep the interaction box stable; only the inset surface carries feedback.
-@mixin feedback($prefix: "idea-icon") {
+@mixin feedback($prefix: "sheetcraft-icon") {
   --#{$prefix}-feedback-background: transparent;
   position: relative;
   isolation: isolate;

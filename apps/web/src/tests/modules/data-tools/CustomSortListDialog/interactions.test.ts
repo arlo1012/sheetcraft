@@ -10,7 +10,7 @@ import { createAppI18n } from "../../../../shared/i18n";
 const mounted: Array<{ unmount: () => void }> = [];
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
-  localStorage.removeItem("idea10.sort.customLists");
+  localStorage.removeItem("sheetcraft.sort.customLists");
   document.body.innerHTML = "";
 });
 function fixture(initialOrder?: string[]) {

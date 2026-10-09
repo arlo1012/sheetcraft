@@ -17,7 +17,7 @@ import {
   type WordRule,
 } from "./proofreading";
 import { parseDictionaryText } from "./dictionary-transfer";
-const storageKey = "idea10.word-proofreading.v1";
+const storageKey = "sheetcraft.word-proofreading.v1";
 export function useWordProofreading(options: {
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;

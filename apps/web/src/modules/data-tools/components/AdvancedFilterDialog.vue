@@ -82,7 +82,7 @@ const canApply = computed(() =>
         >
           <template #suffixIcon
             ><SquareMousePointer
-              class="idea-input-action-icon"
+              class="sheetcraft-input-action-icon"
               :aria-disabled="busy"
               :aria-label="`${t('dataTools.advanced.pickRange')}：${t('dataTools.advanced.listRange')}`"
               @click="!busy && emit('pickRange', 'listRange')"
@@ -100,7 +100,7 @@ const canApply = computed(() =>
         >
           <template #suffixIcon
             ><SquareMousePointer
-              class="idea-input-action-icon"
+              class="sheetcraft-input-action-icon"
               :aria-disabled="busy"
               :aria-label="`${t('dataTools.advanced.pickRange')}：${t('dataTools.advanced.criteriaRange')}`"
               @click="!busy && emit('pickRange', 'criteriaRange')"
@@ -120,7 +120,7 @@ const canApply = computed(() =>
         >
           <template #suffixIcon
             ><SquareMousePointer
-              class="idea-input-action-icon"
+              class="sheetcraft-input-action-icon"
               :aria-disabled="busy || draft.mode === 'inPlace'"
               :aria-label="`${t('dataTools.advanced.pickRange')}：${t('dataTools.advanced.copyTo')}`"
               @click="!(busy || draft.mode === 'inPlace') && emit('pickRange', 'destination')"

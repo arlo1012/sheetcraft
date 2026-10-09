@@ -311,7 +311,7 @@ async function selectRange(current: string): Promise<string | undefined> {
         <TableHeightWrapper v-slot="{ height }">
           <TTable
             :key="draft.mode"
-            class="idea-table--mini"
+            class="sheetcraft-table--mini"
             row-key="id"
             :data="itemRows"
             :columns="itemColumns"
@@ -333,7 +333,7 @@ async function selectRange(current: string): Promise<string | undefined> {
             @drag-sort="reorderItems"
           >
             <template #drag>
-              <GripVertical class="idea-table-drag-icon" aria-hidden="true" />
+              <GripVertical class="sheetcraft-table-drag-icon" aria-hidden="true" />
             </template>
             <template #text="{ row, rowIndex }">
               <div class="dropdown-list-dialog__item">

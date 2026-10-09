@@ -108,7 +108,7 @@ describe("independent native XLSX pivot import", () => {
     expect(Object.keys(entries)).not.toContain("xl/connections.xml");
     expect(Object.keys(entries)).not.toContain("xl/pivotCache/pivotCacheDefinition5.xml");
     expect(Object.keys(entries)).not.toContain("xl/pivotCache/pivotCacheDefinition6.xml");
-    expect(strFromU8(entries["xl/pivotTables/pivotTable3.xml"]!)).not.toContain("urn:idea10");
+    expect(strFromU8(entries["xl/pivotTables/pivotTable3.xml"]!)).not.toContain("urn:sheetcraft");
     const { workbook, report } = await decodeXlsx(bytes);
     expect(report.issues.filter((issue) => issue.severity === "block")).toEqual([]);
     const source = sheetNamed(workbook, "Area Source");
@@ -140,7 +140,7 @@ describe("independent native XLSX pivot import", () => {
   test("imports native consolidation ranges and page assignments, preserves cached cells, and refreshes from source", async () => {
     const bytes = await nativeFixture();
     const entries = unzipSync(bytes);
-    expect(strFromU8(entries["xl/pivotTables/pivotTable7.xml"]!)).not.toContain("urn:idea10");
+    expect(strFromU8(entries["xl/pivotTables/pivotTable7.xml"]!)).not.toContain("urn:sheetcraft");
     const { workbook } = await decodeXlsx(bytes);
     const source = sheetNamed(workbook, "Consolidate");
     const destination = sheetNamed(workbook, "Consolidate - PT");

@@ -8,7 +8,7 @@ export type FilterPanelSettings = {
   sortDirection: "ascending" | "descending";
 };
 
-export const FILTER_PANEL_SETTINGS_STORAGE_KEY = "idea10.filter.panel.settings";
+export const FILTER_PANEL_SETTINGS_STORAGE_KEY = "sheetcraft.filter.panel.settings";
 const STORAGE_VERSION = 1;
 
 const DEFAULT_FILTER_PANEL_SETTINGS: Readonly<FilterPanelSettings> = {

@@ -91,7 +91,7 @@ const filterOptions = computed(() => [
       {
         value: "clear",
         label: t("formulaTools.clearNameFilters"),
-        class: "idea-select-option--action",
+        class: "sheetcraft-select-option--action",
       },
     ],
   },
@@ -290,7 +290,7 @@ watch(
       </div>
       <TableHeightWrapper v-slot="{ height }">
         <TTable
-          class="idea-table--mini idea-table--row-dividers"
+          class="sheetcraft-table--mini sheetcraft-table--row-dividers"
           row-key="id"
           drag-sort="row-handler"
           :data="filteredRanges"
@@ -319,7 +319,7 @@ watch(
           @row-dblclick="editRow"
         >
           <template #drag>
-            <GripVertical class="idea-table-drag-icon" aria-hidden="true" />
+            <GripVertical class="sheetcraft-table-drag-icon" aria-hidden="true" />
           </template>
           <template #actions="{ row, rowIndex }">
             <div class="named-ranges-dialog__row-actions" @dblclick.stop>
@@ -329,7 +329,7 @@ watch(
                 :aria-label="t('formulaTools.editName')"
                 :title="t('formulaTools.editName')"
                 @click.stop="editRange(row)"
-                class="idea-table-action-icon"
+                class="sheetcraft-table-action-icon"
               />
               <Trash2
                 v-icon-action
@@ -337,7 +337,7 @@ watch(
                 :aria-label="t('formulaTools.deleteName')"
                 :title="t('formulaTools.deleteName')"
                 @click.stop="remove(row.id)"
-                class="idea-table-action-icon"
+                class="sheetcraft-table-action-icon"
               />
               <ArrowUp
                 v-icon-action="rowIndex === 0"
@@ -345,7 +345,7 @@ watch(
                 :aria-label="t('formulaTools.moveNameUp')"
                 :title="t('formulaTools.moveNameUp')"
                 @click.stop="moveName(rowIndex, -1)"
-                class="idea-table-action-icon"
+                class="sheetcraft-table-action-icon"
               />
               <ArrowDown
                 v-icon-action="rowIndex === filteredRanges.length - 1"
@@ -353,14 +353,14 @@ watch(
                 :aria-label="t('formulaTools.moveNameDown')"
                 :title="t('formulaTools.moveNameDown')"
                 @click.stop="moveName(rowIndex, 1)"
-                class="idea-table-action-icon"
+                class="sheetcraft-table-action-icon"
               />
             </div>
           </template>
         </TTable>
       </TableHeightWrapper>
       <TForm
-        class="idea-form-grid"
+        class="sheetcraft-form-grid"
         layout="vertical"
         label-align="right"
         :label-width="locale === 'zh-CN' ? 64 : 80"

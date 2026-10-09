@@ -13,7 +13,7 @@ defineSlots<{ default(): unknown; shortcut?(): unknown; icon?(): unknown }>();
   <MenuItem
     v-bind="$attrs"
     role="menuitemradio"
-    :class="{ 'idea-menu-radio-text-selected': indicator === 'none' && checked }"
+    :class="{ 'sheetcraft-menu-radio-text-selected': indicator === 'none' && checked }"
     :aria-checked="checked"
     :disabled="disabled"
     @select="emit('select', $event)"
@@ -22,9 +22,9 @@ defineSlots<{ default(): unknown; shortcut?(): unknown; icon?(): unknown }>();
       <slot name="icon">
         <!-- The menu row owns focus and activation; the radio supplies its visual state. -->
         <Check v-if="indicator === 'check' && checked" />
-        <span v-else-if="indicator !== 'check'" class="idea-menu-radio" inert>
+        <span v-else-if="indicator !== 'check'" class="sheetcraft-menu-radio" inert>
           <TRadio
-            class="idea-menu-radio__control"
+            class="sheetcraft-menu-radio__control"
             :checked="checked"
             :disabled="disabled"
             readonly
@@ -38,11 +38,11 @@ defineSlots<{ default(): unknown; shortcut?(): unknown; icon?(): unknown }>();
 </template>
 
 <style scoped lang="scss">
-.idea-menu-radio-text-selected {
+.sheetcraft-menu-radio-text-selected {
   color: var(--sheetcraft-action-primary);
 }
 
-.idea-menu-radio {
+.sheetcraft-menu-radio {
   display: flex;
   align-items: center;
 

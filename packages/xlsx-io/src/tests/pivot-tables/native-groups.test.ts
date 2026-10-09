@@ -87,7 +87,7 @@ function parts(bytes: Uint8Array, strip = true) {
   if (strip)
     entries[pivot] = strToU8(
       strFromU8(entries[pivot]!).replace(
-        /<ext\b[^>]*\buri="urn:idea10:pivot:1"[^>]*>[\s\S]*?<\/ext>/g,
+        /<ext\b[^>]*\buri="urn:sheetcraft:pivot:1"[^>]*>[\s\S]*?<\/ext>/g,
         "",
       ),
     );

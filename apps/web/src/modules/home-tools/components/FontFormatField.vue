@@ -48,7 +48,7 @@ const popupProps = computed<PopupProps>(() => ({
   attach: props.popupAttach,
   placement: "bottom-left",
   trigger: "click",
-  overlayInnerClassName: "idea-font-options-popup",
+  overlayInnerClassName: "sheetcraft-font-options-popup",
   ...(props.matchPanelWidth
     ? {
         overlayInnerStyle: (trigger: HTMLElement) => ({ width: `${trigger.offsetWidth}px` }),
@@ -127,7 +127,7 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
     @click="clickInput"
   >
     <TSelectInput
-      class="idea-ribbon-font-input"
+      class="sheetcraft-ribbon-font-input"
       :value="draft"
       v-model:input-value="draft"
       allow-input

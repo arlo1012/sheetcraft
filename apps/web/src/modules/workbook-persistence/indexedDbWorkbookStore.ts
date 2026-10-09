@@ -6,7 +6,7 @@ import {
   type WorkbookStore,
 } from "./workbookStore";
 
-const DATABASE_NAME = "idea10-workbook";
+const DATABASE_NAME = "sheetcraft-workbook";
 const DATABASE_VERSION = 1;
 const STORE_NAME = "workbooks";
 const CURRENT_WORKBOOK_KEY = "current";

@@ -106,7 +106,7 @@ function mountController(
 
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
-  localStorage.removeItem("idea10.findHistory");
+  localStorage.removeItem("sheetcraft.findHistory");
 });
 
 describe("useWorkbookFindController", () => {
@@ -465,7 +465,7 @@ describe("useWorkbookFindController", () => {
     controller.reset();
     expect(controller.history.value).toEqual(["first", "second"]);
     expect(mountController().controller.history.value).toEqual(["first", "second"]);
-    expect(JSON.parse(localStorage.getItem("idea10.findHistory") ?? "{}")).toMatchObject({
+    expect(JSON.parse(localStorage.getItem("sheetcraft.findHistory") ?? "{}")).toMatchObject({
       version: 1,
       queries: ["first", "second"],
     });

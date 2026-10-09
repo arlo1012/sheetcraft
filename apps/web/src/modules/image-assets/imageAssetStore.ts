@@ -11,7 +11,7 @@ export type ImageAssetStore = {
   put(asset: ImageAsset): Promise<void>;
 };
 
-const DATABASE_NAME = "idea10-image-assets";
+const DATABASE_NAME = "sheetcraft-image-assets";
 const STORE_NAME = "assets";
 
 export function createMemoryImageAssetStore(): ImageAssetStore {

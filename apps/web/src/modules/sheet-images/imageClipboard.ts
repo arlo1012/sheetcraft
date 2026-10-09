@@ -1,6 +1,6 @@
 import { normalizeFloatingImageForSheet, type FloatingImage } from "@sheetcraft/core/workbook";
 
-export const FLOATING_IMAGE_CLIPBOARD_TYPE = "application/x-idea10-floating-image";
+export const FLOATING_IMAGE_CLIPBOARD_TYPE = "application/x-sheetcraft-floating-image";
 
 export function readFloatingImageClipboard(
   data: Pick<DataTransfer, "getData">,

@@ -5,9 +5,9 @@ product-owned CSS tokens. Its runtime-neutral packages provide a sparse
 workbook model, reversible commands, versioned snapshots, and headless Sheet
 geometry and interaction state.
 
-Workspace packages use the `@sheetcraft/*` namespace. Existing browser storage
-keys, JSON format identifiers, clipboard MIME types, and XLSX extension namespaces
-retain their original `idea10` values so saved workbooks and settings remain readable.
+Workspace packages use the `@sheetcraft/*` namespace. Browser storage keys,
+JSON format identifiers, clipboard MIME types, and XLSX extension namespaces
+also use the Sheetcraft name.
 
 The Web application supports virtualized cells, range and axis selection,
 keyboard navigation, IME-safe editing, row and column resizing and insertion,

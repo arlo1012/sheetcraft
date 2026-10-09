@@ -75,7 +75,7 @@ watch(
               :min="0"
               :decimal-places="0"
               theme="column"
-              class="idea-input-number--persistent-controls"
+              class="sheetcraft-input-number--persistent-controls"
               :aria-label="t('dataTools.fill.index')"
             />
           </TFormItem>

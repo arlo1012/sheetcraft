@@ -93,7 +93,7 @@ async function pickReference(): Promise<void> {
       <template #suffixIcon>
         <SquareMousePointer
           v-if="showPicker !== false"
-          class="idea-input-action-icon"
+          class="sheetcraft-input-action-icon"
           :aria-disabled="disabled || !selectReference"
           :aria-label="pickLabel ?? t('formulaTools.selectRange')"
           data-select-formula-reference

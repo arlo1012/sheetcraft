@@ -2,7 +2,7 @@
 
 The following files are unmodified copies of ClosedXML test resources retrieved
 on 2026-10-08. They contain ordinary native pivot grouping with shared raw caches,
-and no idea10 metadata. The tests pass these files directly to `decodeXlsx`.
+and no product extension metadata. The tests pass these files directly to `decodeXlsx`.
 
 | Local file                        | Upstream resource                                                                                                                          | SHA-256                                                            |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |

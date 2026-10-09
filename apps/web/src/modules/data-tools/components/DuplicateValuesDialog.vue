@@ -87,7 +87,7 @@ watch(
           >
             <template #suffixIcon
               ><SquareMousePointer
-                class="idea-input-action-icon"
+                class="sheetcraft-input-action-icon"
                 :aria-disabled="busy"
                 :aria-label="`${t('dataTools.duplicates.pickRange')}：${t('dataTools.duplicates.range')}`"
                 @click="!busy && emit('pickRange')"

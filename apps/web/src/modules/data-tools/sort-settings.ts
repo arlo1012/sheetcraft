@@ -6,7 +6,7 @@ const STORAGE_VERSION = 1;
 
 function storageKey(workbookId: string, target: SortTarget): string {
   const { start, end } = target.range;
-  return `idea10.sort.settings:${JSON.stringify([
+  return `sheetcraft.sort.settings:${JSON.stringify([
     workbookId,
     target.sheetId,
     Math.min(start.row, end.row),

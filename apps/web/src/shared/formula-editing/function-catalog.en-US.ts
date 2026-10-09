@@ -357,27 +357,27 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
     },
     LEN: {
       description: "Returns the number of characters in text.",
-      example: '=LEN("idea")',
+      example: '=LEN("text")',
     },
     LEFT: {
       description: "Returns characters from the left of text.",
-      example: '=LEFT("idea",2)',
+      example: '=LEFT("text",2)',
     },
     RIGHT: {
       description: "Returns characters from the right of text.",
-      example: '=RIGHT("idea",2)',
+      example: '=RIGHT("text",2)',
     },
     MID: {
       description: "Returns characters from the middle of text.",
-      example: '=MID("idea",2,2)',
+      example: '=MID("text",2,2)',
     },
     UPPER: {
       description: "Converts text to uppercase.",
-      example: '=UPPER("idea")',
+      example: '=UPPER("text")',
     },
     LOWER: {
       description: "Converts text to lowercase.",
-      example: '=LOWER("IDEA")',
+      example: '=LOWER("TEXT")',
     },
     TRIM: {
       description: "Removes extra spaces from text.",
@@ -385,36 +385,36 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
     },
     CLEAN: {
       description: "Removes non-printing characters from text.",
-      example: '=CLEAN("idea")',
+      example: '=CLEAN("text")',
     },
-    CONCAT: { description: "Joins text items.", example: '=CONCAT("i","dea")' },
+    CONCAT: { description: "Joins text items.", example: '=CONCAT("t","ext")' },
     CONCATENATE: {
       description: "Joins text items.",
-      example: '=CONCATENATE("i","dea")',
+      example: '=CONCATENATE("t","ext")',
     },
     TEXTJOIN: {
       description: "Joins text with a delimiter.",
-      example: '=TEXTJOIN("-",TRUE,"i","dea")',
+      example: '=TEXTJOIN("-",TRUE,"t","ext")',
     },
     SUBSTITUTE: {
       description: "Replaces text occurrences with new text.",
-      example: '=SUBSTITUTE("idea","i","I")',
+      example: '=SUBSTITUTE("text","t","T")',
     },
     REPLACE: {
       description: "Replaces characters at a position in text.",
-      example: '=REPLACE("idea",2,1,"D")',
+      example: '=REPLACE("text",2,1,"E")',
     },
     FIND: {
       description: "Returns a text position, matching case.",
-      example: '=FIND("d","idea")',
+      example: '=FIND("e","text")',
     },
     SEARCH: {
       description: "Returns a text position without matching case.",
-      example: '=SEARCH("D","idea")',
+      example: '=SEARCH("E","text")',
     },
     EXACT: {
       description: "Checks whether two text values are exactly equal.",
-      example: '=EXACT("idea","idea")',
+      example: '=EXACT("text","text")',
     },
     REPT: {
       description: "Repeats text a given number of times.",

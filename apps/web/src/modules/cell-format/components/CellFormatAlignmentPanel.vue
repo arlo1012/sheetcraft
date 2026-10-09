@@ -213,7 +213,7 @@ function checkboxPressed(
                 :decimal-places="0"
                 :disabled="!canIndent"
                 theme="column"
-                class="idea-input-number--persistent-controls"
+                class="sheetcraft-input-number--persistent-controls"
                 :placeholder="state.indent.mixed ? t('format.mixed') : undefined"
                 data-cell-format-indent
                 @change="setIndent"

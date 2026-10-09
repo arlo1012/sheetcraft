@@ -328,7 +328,7 @@ onBeforeUnmount(() => {
               :aria-label="t('dataTools.filter.clear')"
               :title="t('dataTools.filter.clear')"
               @click="emit('clear')"
-              ><FilterX class="idea-action-icon" aria-hidden="true" />
+              ><FilterX class="sheetcraft-action-icon" aria-hidden="true" />
             </span>
           </div>
         </template>

@@ -60,7 +60,7 @@ export const vIconAction: ObjectDirective<IconActionElement, boolean | undefined
 };
 
 function sync(element: IconActionElement, state: IconActionState): void {
-  element.classList.add("idea-icon-action");
+  element.classList.add("sheetcraft-icon-action");
   element.setAttribute("tabindex", state.disabled ? "-1" : state.tabIndex);
   element.setAttribute("aria-disabled", String(state.disabled));
 }

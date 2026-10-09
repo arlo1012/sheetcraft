@@ -5,7 +5,7 @@ import type { SelectionBorderState } from "@sheetcraft/core/style-state";
 import CellFormatDialog from "../../../../../modules/cell-format/components/CellFormatDialog.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 
-const STORAGE_KEY = "idea10.custom-number-formats";
+const STORAGE_KEY = "sheetcraft.custom-number-formats";
 const wrappers: Array<{ unmount(): void }> = [];
 
 function borderState(): SelectionBorderState {

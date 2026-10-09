@@ -70,7 +70,7 @@ function apply(): void {
           <TInputNumber
             v-model="draft.start"
             theme="column"
-            class="idea-input-number--persistent-controls"
+            class="sheetcraft-input-number--persistent-controls"
             :aria-label="t('dataTools.fill.startValue')"
           />
         </TFormItem>
@@ -78,7 +78,7 @@ function apply(): void {
           <TInputNumber
             v-model="draft.step"
             theme="column"
-            class="idea-input-number--persistent-controls"
+            class="sheetcraft-input-number--persistent-controls"
             :aria-label="t('dataTools.fill.step')"
           />
         </TFormItem>

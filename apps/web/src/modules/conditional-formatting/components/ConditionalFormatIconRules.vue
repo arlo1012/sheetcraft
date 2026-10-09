@@ -149,7 +149,7 @@ function iconLabel(icon: Exclude<IconChoice, null>): string {
           class="icon-rules__icon-select"
           :model-value="iconValue(index)"
           :popup-props="{
-            overlayClassName: 'idea-icon-grid-options',
+            overlayClassName: 'sheetcraft-icon-grid-options',
             overlayInnerStyle: { width: '224px' },
           }"
           :aria-label="`${t('conditionalFormatting.icon')} ${index + 1}`"
@@ -160,7 +160,7 @@ function iconLabel(icon: Exclude<IconChoice, null>): string {
             <ConditionalFormatPreview v-else compact :condition="condition" :icon-index="index" />
           </template>
           <TOption
-            class="idea-icon-grid-options__none"
+            class="sheetcraft-icon-grid-options__none"
             value="none"
             :label="t('conditionalFormatting.noIcon')"
           >

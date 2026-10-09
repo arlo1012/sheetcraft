@@ -121,10 +121,10 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
 <template>
   <ul
     ref="rootElement"
-    class="idea-menu-surface"
+    class="sheetcraft-menu-surface"
     :class="{
-      'idea-menu-surface--structured': hasStructuredContent,
-      'idea-menu-surface--contained-body': !bodyScrollable,
+      'sheetcraft-menu-surface--structured': hasStructuredContent,
+      'sheetcraft-menu-surface--contained-body': !bodyScrollable,
     }"
     role="menu"
     :aria-label="label"
@@ -133,17 +133,20 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
     @keydown="onKeydown"
   >
     <template v-if="hasStructuredContent">
-      <li v-if="$slots.header" class="idea-menu-surface__header" role="none">
+      <li v-if="$slots.header" class="sheetcraft-menu-surface__header" role="none">
         <slot name="header" />
       </li>
-      <li v-if="$slots.body || $slots.items" class="idea-menu-surface__body" role="none">
-        <ul v-if="$slots.items" class="idea-menu-surface__list" role="presentation">
+      <li v-if="$slots.body || $slots.items" class="sheetcraft-menu-surface__body" role="none">
+        <ul v-if="$slots.items" class="sheetcraft-menu-surface__list" role="presentation">
           <slot name="items" />
         </ul>
         <slot v-else name="body" />
       </li>
-      <li v-if="$slots.footer" class="idea-menu-surface__footer" role="none">
-        <ul class="idea-menu-surface__list idea-menu-surface__footer-list" role="presentation">
+      <li v-if="$slots.footer" class="sheetcraft-menu-surface__footer" role="none">
+        <ul
+          class="sheetcraft-menu-surface__list sheetcraft-menu-surface__footer-list"
+          role="presentation"
+        >
           <slot name="footer" />
         </ul>
       </li>
@@ -156,7 +159,7 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
 @use "../option-list/option-list";
 @use "../floating/floating-panel" as panel;
 
-.idea-menu-surface {
+.sheetcraft-menu-surface {
   @include option-list.scrollbar;
   @include panel.chrome;
 

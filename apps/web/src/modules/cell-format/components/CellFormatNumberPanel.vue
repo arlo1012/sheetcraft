@@ -118,7 +118,7 @@ function selectNegative(code: string): void {
               :decimal-places="0"
               :placeholder="t('cellFormat.decimalPlaces')"
               theme="column"
-              class="cell-format-number__digits idea-input-number--persistent-controls"
+              class="cell-format-number__digits sheetcraft-input-number--persistent-controls"
               data-cell-format-decimals
               @change="updateDigits"
             />
@@ -131,7 +131,7 @@ function selectNegative(code: string): void {
               filterable
               :value-display="currencyDisplay"
               :popup-props="{
-                overlayClassName: 'idea-number-format-options',
+                overlayClassName: 'sheetcraft-number-format-options',
                 overlayInnerStyle: { maxHeight: '240px' },
               }"
               data-cell-format-currency
@@ -189,7 +189,7 @@ function selectNegative(code: string): void {
               :options="regionOptions"
               :filterable="category === 'date' || category === 'time'"
               :popup-props="{
-                overlayClassName: 'idea-number-format-options',
+                overlayClassName: 'sheetcraft-number-format-options',
                 overlayInnerStyle: { maxHeight: '240px' },
               }"
               data-cell-format-region

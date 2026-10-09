@@ -186,7 +186,7 @@ function onBlur(_value: InputNumberValue, context: { e: FocusEvent }): void {
   >
     <TInputNumber
       :model-value="draft"
-      class="sheet-dimension-input__number idea-input-number--persistent-controls"
+      class="sheet-dimension-input__number sheetcraft-input-number--persistent-controls"
       :style="{ width: inputWidth, minWidth: '0' }"
       :min="unitMinimum"
       :max="unitMaximum"
@@ -206,7 +206,7 @@ function onBlur(_value: InputNumberValue, context: { e: FocusEvent }): void {
     <TSelect
       :model-value="unit"
       class="sheet-dimension-input__unit"
-      :class="{ 'idea-select--compact': compact }"
+      :class="{ 'sheetcraft-select--compact': compact }"
       :style="{ width: selectWidth, minWidth: '0' }"
       :options="unitOptions"
       :popup-props="popupProps"

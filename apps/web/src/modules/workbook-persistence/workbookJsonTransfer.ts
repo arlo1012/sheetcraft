@@ -46,7 +46,7 @@ export async function readWorkbookFile(file: Pick<File, "text">): Promise<Workbo
 
 type PortableImage = { id: string; mimeType: string; width: number; height: number; data: string };
 type PortableEnvelope = {
-  format: "idea10-workbook";
+  format: "sheetcraft-workbook";
   version: 1;
   snapshot: unknown;
   images: PortableImage[];
@@ -77,7 +77,7 @@ function isEnvelope(value: unknown): value is PortableEnvelope {
     !!value &&
     typeof value === "object" &&
     !Array.isArray(value) &&
-    (value as { format?: unknown }).format === "idea10-workbook"
+    (value as { format?: unknown }).format === "sheetcraft-workbook"
   );
 }
 
@@ -221,7 +221,7 @@ export async function downloadWorkbookBundle(
     });
   }
   const blob = new Blob(
-    [JSON.stringify({ format: "idea10-workbook", version: 1, snapshot, images }, null, 2)],
+    [JSON.stringify({ format: "sheetcraft-workbook", version: 1, snapshot, images }, null, 2)],
     { type: "application/json" },
   );
   const url = URL.createObjectURL(blob);

@@ -73,7 +73,7 @@ function foreignBytes(bytes: Uint8Array, missingCaption: string) {
   const { entries, path, xml } = pivotPart(bytes);
   entries[path] = strToU8(
     xml
-      .replace(/<ext\b[^>]*\buri="urn:idea10:pivot:1"[^>]*>[\s\S]*?<\/ext>/g, "")
+      .replace(/<ext\b[^>]*\buri="urn:sheetcraft:pivot:1"[^>]*>[\s\S]*?<\/ext>/g, "")
       .replace(/\bmissingCaption="[^"]*"/, `missingCaption="${missingCaption}"`),
   );
   return zipSync(entries);

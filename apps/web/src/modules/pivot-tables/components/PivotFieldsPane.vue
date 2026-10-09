@@ -210,7 +210,7 @@ defineExpose({
         :aria-label="t('picture.close')"
         :title="t('picture.close')"
         @click="emit('close')"
-        ><X class="idea-action-icon" aria-hidden="true"
+        ><X class="sheetcraft-action-icon" aria-hidden="true"
       /></span>
     </header>
     <section
@@ -226,7 +226,9 @@ defineExpose({
         :aria-label="t('pivot.searchFields')"
         clearable
       >
-        <template #prefixIcon><Search class="idea-action-icon" aria-hidden="true" /></template>
+        <template #prefixIcon
+          ><Search class="sheetcraft-action-icon" aria-hidden="true"
+        /></template>
       </Input>
       <ul class="pivot-fields-pane__fields">
         <li
@@ -237,7 +239,7 @@ defineExpose({
           @dragstart="start($event, choice)"
           @dragend="dragging = undefined"
         >
-          <GripVertical class="idea-action-icon pivot-fields-pane__grip" aria-hidden="true" />
+          <GripVertical class="sheetcraft-action-icon pivot-fields-pane__grip" aria-hidden="true" />
           <Checkbox
             class="pivot-fields-pane__field-check"
             :checked="used.has(choice.field)"

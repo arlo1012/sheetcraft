@@ -51,7 +51,7 @@ function insert(): void {
       >
         <TInputNumber
           v-model="draft"
-          class="axis-insert-menu-item__count idea-input-number--persistent-controls"
+          class="axis-insert-menu-item__count sheetcraft-input-number--persistent-controls"
           :style="{ width: compact ? '48px' : '64px', minWidth: '0' }"
           :min="1"
           :max="Math.max(1, maximum)"

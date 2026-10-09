@@ -638,7 +638,7 @@ function confirm(): void {
         >
           <TableHeightWrapper v-slot="{ height }">
             <TTable
-              class="idea-table--mini"
+              class="sheetcraft-table--mini"
               row-key="row"
               :data="previewData"
               :columns="previewColumns"

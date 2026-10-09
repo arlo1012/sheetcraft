@@ -12,7 +12,7 @@ Other devices, browsers, private sessions, and different development ports do
 not share it. Clearing browser site data removes it. Export JSON for a separate
 backup; local browser storage is not a durable backup service.
 
-The Web adapter uses IndexedDB database `idea10-workbook`, object store
+The Web adapter uses IndexedDB database `sheetcraft-workbook`, object store
 `workbooks`, and key `current`. The envelope contains a storage revision, save
 timestamp, and Core snapshot. Core remains independent of browser APIs.
 
@@ -71,7 +71,7 @@ only the displayed "Saved locally" state confirms that a transaction finished.
 
 Export downloads `sheetcraft-workbook.json`: an image-free V16 snapshot, or a versioned
 portable envelope containing that snapshot and every referenced image as base64.
-Image blobs are stored separately in the `idea10-image-assets` IndexedDB database.
+Image blobs are stored separately in the `sheetcraft-image-assets` IndexedDB database.
 Blobs are saved before document references and retained through undoable deletion.
 Import accepts image-free V1–V16 snapshots and portable image envelopes. It
 validates and decodes all images, derives asset metadata from the bytes, and

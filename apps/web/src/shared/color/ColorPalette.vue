@@ -358,7 +358,7 @@ function getPanelAttach(): HTMLElement {
       :class="{ 'is-active': showingMore }"
     >
       <ColorPickerPanel
-        class="idea-color-palette-panel"
+        class="sheetcraft-color-palette-panel"
         :style="stableSize ? { width: '100%' } : undefined"
         :model-value="draftColor"
         :color-modes="['monochrome']"

@@ -70,7 +70,7 @@ watch(condition, (value) => emit("update:condition", value), { immediate: true }
       :disabled="disabled"
       :aria-label="t('dataTools.filter.rankCount')"
       theme="column"
-      class="idea-input-number--persistent-controls"
+      class="sheetcraft-input-number--persistent-controls"
     />
     <TSelect
       v-model="unit"

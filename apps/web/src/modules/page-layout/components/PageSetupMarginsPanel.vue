@@ -90,14 +90,14 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
 </script>
 
 <template>
-  <TForm class="page-setup-margins idea-form-grid" :data="setup" label-align="top">
+  <TForm class="page-setup-margins sheetcraft-form-grid" :data="setup" label-align="top">
     <div class="page-setup-margins__diagram">
       <TFormItem class="page-setup-margins__top" :label="t('pageLayout.marginTop')"
         ><TInputNumber
           :model-value="displayed('top')"
           :aria-label="t('pageLayout.marginTop')"
           theme="column"
-          class="idea-input-number--persistent-controls"
+          class="sheetcraft-input-number--persistent-controls"
           :min="0"
           :decimal-places="2"
           :input-props="{ onFocus: selectMarginValue }"
@@ -110,7 +110,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           :model-value="displayed('header')"
           :aria-label="t('pageLayout.marginHeader')"
           theme="column"
-          class="idea-input-number--persistent-controls"
+          class="sheetcraft-input-number--persistent-controls"
           :min="0"
           :decimal-places="2"
           :input-props="{ onFocus: selectMarginValue }"
@@ -123,7 +123,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           :model-value="displayed('left')"
           :aria-label="t('pageLayout.marginLeft')"
           theme="column"
-          class="idea-input-number--persistent-controls"
+          class="sheetcraft-input-number--persistent-controls"
           :min="0"
           :decimal-places="2"
           :input-props="{ onFocus: selectMarginValue }"
@@ -203,7 +203,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           :model-value="displayed('right')"
           :aria-label="t('pageLayout.marginRight')"
           theme="column"
-          class="idea-input-number--persistent-controls"
+          class="sheetcraft-input-number--persistent-controls"
           :min="0"
           :decimal-places="2"
           :input-props="{ onFocus: selectMarginValue }"
@@ -226,7 +226,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           :model-value="displayed('bottom')"
           :aria-label="t('pageLayout.marginBottom')"
           theme="column"
-          class="idea-input-number--persistent-controls"
+          class="sheetcraft-input-number--persistent-controls"
           :min="0"
           :decimal-places="2"
           :input-props="{ onFocus: selectMarginValue }"
@@ -239,7 +239,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           :model-value="displayed('footer')"
           :aria-label="t('pageLayout.marginFooter')"
           theme="column"
-          class="idea-input-number--persistent-controls"
+          class="sheetcraft-input-number--persistent-controls"
           :min="0"
           :decimal-places="2"
           :input-props="{ onFocus: selectMarginValue }"

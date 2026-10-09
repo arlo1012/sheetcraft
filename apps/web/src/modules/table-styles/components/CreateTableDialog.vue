@@ -62,7 +62,7 @@ const styleOnly = computed(() => draft.value.mode === "styleOnly");
             <span>{{ t("tables.headerRows") }}</span>
             <InputNumber
               v-model="draft.headerRows"
-              class="create-table-dialog__header-count idea-input-number--persistent-controls"
+              class="create-table-dialog__header-count sheetcraft-input-number--persistent-controls"
               theme="column"
               :aria-label="t('tables.headerRows')"
               :disabled="!styleOnly"

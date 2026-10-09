@@ -1,9 +1,9 @@
 <template>
-  <li class="idea-menu-separator" role="separator" />
+  <li class="sheetcraft-menu-separator" role="separator" />
 </template>
 
 <style scoped lang="scss">
-.idea-menu-separator {
+.sheetcraft-menu-separator {
   height: 1px;
   margin: 4px 0;
   list-style: none;

@@ -99,7 +99,7 @@ function native(bytes: Uint8Array) {
     xml,
   ).pivotTableDefinition;
   entries[path] = strToU8(
-    xml.replace(/<ext\b[^>]*\buri="urn:idea10:pivot:1"[^>]*>[\s\S]*?<\/ext>/g, ""),
+    xml.replace(/<ext\b[^>]*\buri="urn:sheetcraft:pivot:1"[^>]*>[\s\S]*?<\/ext>/g, ""),
   );
   return { entries, xml, field: root.dataFields.dataField, bytes: zipSync(entries) };
 }

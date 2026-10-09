@@ -98,7 +98,7 @@ watch(
 </script>
 
 <template>
-  <div ref="control" class="panel-select idea-panel-select">
+  <div ref="control" class="panel-select sheetcraft-panel-select">
     <TSelectInput
       :value="{ value: modelValue, label: valueLabel }"
       :disabled="disabled"

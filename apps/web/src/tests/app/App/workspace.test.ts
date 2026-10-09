@@ -256,7 +256,7 @@ describe("App", () => {
     );
     expect(menu.text()).toContain("在下方插入");
     expect(document.documentElement.lang).toBe("zh-CN");
-    expect(localStorage.getItem("idea10.locale")).toBe("zh-CN");
+    expect(localStorage.getItem("sheetcraft.locale")).toBe("zh-CN");
   });
 
   test("summarizes the populated values in the current selection", async () => {

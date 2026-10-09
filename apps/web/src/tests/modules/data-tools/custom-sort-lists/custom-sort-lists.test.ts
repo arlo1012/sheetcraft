@@ -6,7 +6,7 @@ import {
   writeCustomSortLists,
 } from "../../../../modules/data-tools/custom-sort-lists";
 
-const STORAGE_KEY = "idea10.sort.customLists";
+const STORAGE_KEY = "sheetcraft.sort.customLists";
 
 afterEach(() => {
   vi.unstubAllGlobals();

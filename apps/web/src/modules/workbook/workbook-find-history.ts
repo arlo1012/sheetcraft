@@ -1,6 +1,6 @@
 const FIND_HISTORY_VERSION = 1;
 const FIND_HISTORY_LIMIT = 20;
-export const WORKBOOK_FIND_HISTORY_STORAGE_KEY = "idea10.findHistory";
+export const WORKBOOK_FIND_HISTORY_STORAGE_KEY = "sheetcraft.findHistory";
 
 type FindHistorySnapshot = {
   version: number;

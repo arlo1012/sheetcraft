@@ -283,7 +283,7 @@ watch(
                   spellcheck: false,
                 },
               }"
-              class="idea-formula-editor-textarea"
+              class="sheetcraft-formula-editor-textarea"
               :class="{ 'has-formula-colors': references.length > 0 }"
               :value="value"
               :autosize="{ minRows: 4, maxRows: 8 }"

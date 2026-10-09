@@ -127,7 +127,7 @@ describe("useFloatingImageClipboard", () => {
 
     expect(event.defaultPrevented).toBe(true);
     expect(data.get("text/plain")).toBe("Chart");
-    expect(data.get("application/x-idea10-floating-image")).toBe(JSON.stringify(image));
+    expect(data.get("application/x-sheetcraft-floating-image")).toBe(JSON.stringify(image));
     expect(fixture.port.writeNativeRich).toHaveBeenCalledOnce();
     expect(fixture.port.write).not.toHaveBeenCalled();
   });

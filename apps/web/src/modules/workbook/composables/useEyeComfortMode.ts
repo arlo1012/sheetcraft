@@ -1,6 +1,6 @@
 import { ref, watch, type Ref } from "vue";
 
-const STORAGE_KEY = "idea10.eye-comfort.enabled";
+const STORAGE_KEY = "sheetcraft.eye-comfort.enabled";
 
 function readEnabled(): boolean {
   try {

@@ -35,7 +35,7 @@ const all = ref(false);
           :max="4096"
           :disabled="busy"
           theme="column"
-          class="idea-input-number--persistent-controls"
+          class="sheetcraft-input-number--persistent-controls"
         />
       </div>
       <div class="picture-compress__field" role="group" :aria-label="t('picture.quality')">
@@ -46,7 +46,7 @@ const all = ref(false);
           :max="100"
           :disabled="busy"
           theme="column"
-          class="idea-input-number--persistent-controls"
+          class="sheetcraft-input-number--persistent-controls"
         />
       </div>
       <RadioGroup v-model="format" :disabled="busy"

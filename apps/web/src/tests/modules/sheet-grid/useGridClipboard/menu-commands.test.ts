@@ -407,7 +407,7 @@ describe("useGridClipboard menu commands", () => {
     fixture.clipboard.onCut(cut.event);
     fixture.setTransfer({
       text: "move",
-      localToken: cut.data.get("application/x-idea10-cells"),
+      localToken: cut.data.get("application/x-sheetcraft-cells"),
     });
     fixture.setSelection(createCellSelection({ row: 2, column: 2 }));
     const paste = fixture.clipboard.pasteSelection();
@@ -442,7 +442,7 @@ describe("useGridClipboard menu commands", () => {
 
     fixture.setTransfer({
       text: "move",
-      localToken: cut.data.get("application/x-idea10-cells"),
+      localToken: cut.data.get("application/x-sheetcraft-cells"),
     });
     fixture.setSelection(createCellSelection({ row: 2, column: 2 }));
     await fixture.clipboard.pasteSelection();

@@ -151,7 +151,7 @@ function nativeParts(bytes: Uint8Array) {
 function stripProductMetadata(entries: Record<string, Uint8Array>): string {
   const table = part(entries, /^xl\/pivotTables\/[^/]+\.xml$/);
   const native = table.xml
-    .replace(/<ext uri="urn:idea10:pivot:1">[\s\S]*?<\/ext>/g, "")
+    .replace(/<ext uri="urn:sheetcraft:pivot:1">[\s\S]*?<\/ext>/g, "")
     .replace(/<extLst>\s*<\/extLst>/g, "");
   expect(native).not.toContain("i10:metadata");
   expect(native).toContain("2946ED86-A175-432a-8AC1-64E0C546D7DE");

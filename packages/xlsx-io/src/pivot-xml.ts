@@ -7,7 +7,7 @@ export type XmlNode = Record<string, unknown>;
 export const MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 export const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 export const PACKAGE_NS = "http://schemas.openxmlformats.org/package/2006/relationships";
-export const PIVOT_EXT = "urn:idea10:pivot:1";
+export const PIVOT_EXT = "urn:sheetcraft:pivot:1";
 export const xml = (value: unknown): string =>
   String(value)
     .replace(/&/g, "&amp;")

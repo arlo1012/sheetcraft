@@ -97,7 +97,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
     <TTable
       :key="`${Boolean(reorderable)}:${Boolean(readonly)}`"
       :drag-sort="reorderable && !readonly ? 'row-handler' : undefined"
-      class="idea-table--mini"
+      class="sheetcraft-table--mini"
       row-key="id"
       :data="rows"
       :columns="columns"
@@ -171,7 +171,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
         </div>
       </template>
       <template #drag>
-        <GripVertical class="idea-table-drag-icon" aria-hidden="true" />
+        <GripVertical class="sheetcraft-table-drag-icon" aria-hidden="true" />
       </template>
       <template #actions="{ row, rowIndex }">
         <div
@@ -179,7 +179,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
           @dblclick.stop
         >
           <Pencil
-            class="idea-table-action-icon"
+            class="sheetcraft-table-action-icon"
             data-cf-action="edit"
             role="button"
             :tabindex="readonly ? -1 : 0"
@@ -191,7 +191,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
             @keydown.space.prevent.stop="editAction(row.id)"
           />
           <Trash2
-            class="idea-table-action-icon"
+            class="sheetcraft-table-action-icon"
             data-cf-action="delete"
             role="button"
             :tabindex="readonly ? -1 : 0"
@@ -204,7 +204,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
           />
           <ArrowUp
             v-if="reorderable && !readonly"
-            class="idea-table-action-icon"
+            class="sheetcraft-table-action-icon"
             data-cf-action="up"
             role="button"
             :tabindex="canMove(rowIndex, -1) ? 0 : -1"
@@ -217,7 +217,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
           />
           <ArrowDown
             v-if="reorderable && !readonly"
-            class="idea-table-action-icon"
+            class="sheetcraft-table-action-icon"
             data-cf-action="down"
             role="button"
             :tabindex="canMove(rowIndex, 1) ? 0 : -1"

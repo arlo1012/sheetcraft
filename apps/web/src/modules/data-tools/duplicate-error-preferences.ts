@@ -26,7 +26,7 @@ export type DuplicateErrorChecksPreferences = ErrorCheckSettings & {
   ignored: DuplicateErrorIgnoredIssue[];
 };
 
-export const DUPLICATE_ERROR_CHECKS_STORAGE_KEY = "idea10.duplicateErrorChecks";
+export const DUPLICATE_ERROR_CHECKS_STORAGE_KEY = "sheetcraft.duplicateErrorChecks";
 const STORAGE_VERSION = 3;
 
 function getStorage(): Storage | undefined {

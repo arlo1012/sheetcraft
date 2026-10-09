@@ -82,7 +82,7 @@ function onTableKeydown(event: KeyboardEvent): void {
     <div class="workbook-find-results__table">
       <TableHeightWrapper v-slot="{ height }">
         <TTable
-          class="idea-table--mini"
+          class="sheetcraft-table--mini"
           row-key="id"
           :data="rows"
           :columns="columns"

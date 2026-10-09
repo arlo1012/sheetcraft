@@ -59,7 +59,7 @@ function custom(): void {
     @click="toggleMenu"
     @keydown="onTriggerKeydown"
   >
-    <template #icon><PaintBucket class="idea-action-icon" aria-hidden="true" /></template>
+    <template #icon><PaintBucket class="sheetcraft-action-icon" aria-hidden="true" /></template>
     {{ t("dataTools.filter.colorSort") }}
   </TButton>
   <Teleport to="body">

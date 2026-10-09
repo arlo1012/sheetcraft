@@ -1,4 +1,4 @@
-export const RECENT_COLORS_STORAGE_KEY = "idea10.recent-colors.v1";
+export const RECENT_COLORS_STORAGE_KEY = "sheetcraft.recent-colors.v1";
 
 export const PRESET_COLORS = [
   "#ffffff",

@@ -711,7 +711,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     @close="emit('close')"
   >
     <TForm
-      class="conditional-format-editor idea-form-grid"
+      class="conditional-format-editor sheetcraft-form-grid"
       layout="vertical"
       label-align="right"
       :label-width="88"

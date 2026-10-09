@@ -63,7 +63,7 @@ function paste(event: ClipboardEvent, index: number, column: number) {
     <div class="dictionary-entry__table">
       <TableHeightWrapper v-slot="{ height }">
         <BaseTable
-          class="idea-table--mini idea-table--row-dividers"
+          class="sheetcraft-table--mini sheetcraft-table--row-dividers"
           size="small"
           row-key="index"
           :data="rows"
@@ -97,14 +97,14 @@ function paste(event: ClipboardEvent, index: number, column: number) {
                 :aria-label="t('wordProof.remove')"
                 :title="t('wordProof.remove')"
                 @click.stop="remove(row.index)"
-                ><Trash2 class="idea-action-icon" aria-hidden="true"
+                ><Trash2 class="sheetcraft-action-icon" aria-hidden="true"
               /></span>
               <span
                 v-icon-action="model.length >= 5000"
                 :aria-label="t('wordProof.addRow')"
                 :title="t('wordProof.addRow')"
                 @click.stop="insert(row.index)"
-                ><Plus class="idea-action-icon" aria-hidden="true"
+                ><Plus class="sheetcraft-action-icon" aria-hidden="true"
               /></span>
             </div>
           </template>

@@ -1,7 +1,7 @@
 import type { PageMargins } from "./page-margin-presets";
 
 const PAGE_MARGIN_HISTORY_VERSION = 1;
-export const PAGE_MARGIN_HISTORY_STORAGE_KEY = "idea10.pageMarginHistory";
+export const PAGE_MARGIN_HISTORY_STORAGE_KEY = "sheetcraft.pageMarginHistory";
 
 type PageMarginHistorySnapshot = {
   version: number;

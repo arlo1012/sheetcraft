@@ -231,7 +231,7 @@ function reset(): void {
                   :min="0"
                   :max="200"
                   theme="column"
-                  class="idea-input-number--persistent-controls"
+                  class="sheetcraft-input-number--persistent-controls"
                   size="small"
                   @change="number('brightness', $event)"
                 />
@@ -247,7 +247,7 @@ function reset(): void {
                   :min="0"
                   :max="200"
                   theme="column"
-                  class="idea-input-number--persistent-controls"
+                  class="sheetcraft-input-number--persistent-controls"
                   size="small"
                   @change="number('contrast', $event)"
                 />
@@ -263,7 +263,7 @@ function reset(): void {
                   :min="0"
                   :max="200"
                   theme="column"
-                  class="idea-input-number--persistent-controls"
+                  class="sheetcraft-input-number--persistent-controls"
                   size="small"
                   @change="number('saturation', $event)"
                 />
@@ -290,7 +290,7 @@ function reset(): void {
                 :min="0"
                 :max="20"
                 theme="column"
-                class="idea-input-number--persistent-controls"
+                class="sheetcraft-input-number--persistent-controls"
                 size="small"
                 @change="
                   typeof $event === 'number' &&
@@ -324,7 +324,7 @@ function reset(): void {
                 :min="0"
                 :max="100"
                 theme="column"
-                class="idea-input-number--persistent-controls"
+                class="sheetcraft-input-number--persistent-controls"
                 size="small"
                 @change="number('opacity', $event)"
               />

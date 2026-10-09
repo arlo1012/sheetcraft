@@ -18,25 +18,25 @@ defineSlots<{ default(): VNode[]; actions?(): VNode[] }>();
   <slot v-if="inline" />
   <section
     v-else
-    class="idea-gallery-section"
+    class="sheetcraft-gallery-section"
     :class="{
-      'idea-gallery-section--scrollable': scrollable,
-      'idea-gallery-section--content-inset': contentInset,
+      'sheetcraft-gallery-section--scrollable': scrollable,
+      'sheetcraft-gallery-section--content-inset': contentInset,
     }"
     :aria-label="title"
   >
-    <div v-if="title || $slots.actions" class="idea-gallery-section__header">
-      <h3 v-if="title" class="idea-gallery-section__title">{{ title }}</h3>
+    <div v-if="title || $slots.actions" class="sheetcraft-gallery-section__header">
+      <h3 v-if="title" class="sheetcraft-gallery-section__title">{{ title }}</h3>
       <slot name="actions" />
     </div>
-    <div class="idea-gallery-section__content"><slot /></div>
+    <div class="sheetcraft-gallery-section__content"><slot /></div>
   </section>
 </template>
 
 <style scoped lang="scss">
 @use "../option-list/option-list";
 
-.idea-gallery-section {
+.sheetcraft-gallery-section {
   min-width: 0;
 
   &__header {
@@ -65,11 +65,11 @@ defineSlots<{ default(): VNode[]; actions?(): VNode[] }>();
     min-height: 0;
     flex-direction: column;
 
-    .idea-gallery-section__header {
+    .sheetcraft-gallery-section__header {
       flex: none;
     }
 
-    .idea-gallery-section__content {
+    .sheetcraft-gallery-section__content {
       @include option-list.scrollbar;
 
       flex: 1;

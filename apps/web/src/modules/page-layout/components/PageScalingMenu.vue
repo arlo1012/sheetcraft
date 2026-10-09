@@ -108,7 +108,7 @@ function openSetup(): void {
             <span>{{ t("pageLayout.scale") }}</span>
             <TInputNumber
               :model-value="setup.scale"
-              class="page-scaling-menu__scale-input idea-input-number--persistent-controls"
+              class="page-scaling-menu__scale-input sheetcraft-input-number--persistent-controls"
               :aria-label="t('pageLayout.scale')"
               data-page-scaling="scale"
               theme="column"

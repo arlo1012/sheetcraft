@@ -181,7 +181,7 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
         <div class="data-table-dialog__table-wrap">
           <TableHeightWrapper v-slot="{ height }">
             <BaseTable
-              class="idea-table--mini"
+              class="sheetcraft-table--mini"
               row-key="id"
               :data="previewRows"
               :columns="previewColumns"

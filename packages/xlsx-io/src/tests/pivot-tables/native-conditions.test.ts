@@ -85,8 +85,11 @@ function nativeOnly(bytes: Uint8Array) {
   const entries = unzipSync(bytes);
   const path = Object.keys(entries).find((name) => /^xl\/pivotTables\/[^/]+\.xml$/.test(name))!;
   const original = strFromU8(entries[path]!);
-  const xml = original.replace(/<ext\b[^>]*\buri="urn:idea10:pivot:1"[^>]*>[\s\S]*?<\/ext>/g, "");
-  expect(xml).not.toContain('uri="urn:idea10:pivot:1"');
+  const xml = original.replace(
+    /<ext\b[^>]*\buri="urn:sheetcraft:pivot:1"[^>]*>[\s\S]*?<\/ext>/g,
+    "",
+  );
+  expect(xml).not.toContain('uri="urn:sheetcraft:pivot:1"');
   expect(original).toContain("x14:pivotField");
   expect(xml).toContain("x14:pivotField");
   entries[path] = strToU8(xml);

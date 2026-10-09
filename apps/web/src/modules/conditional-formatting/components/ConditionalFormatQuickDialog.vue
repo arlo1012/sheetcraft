@@ -208,7 +208,7 @@ watch(
             v-model="count"
             :aria-label="t('conditionalFormatting.count')"
             theme="column"
-            class="idea-input-number--persistent-controls"
+            class="sheetcraft-input-number--persistent-controls"
             :min="1"
             :max="isPercent ? 100 : 1000"
             :decimal-places="0"

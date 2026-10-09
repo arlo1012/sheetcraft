@@ -125,7 +125,7 @@ function fitSelection(): void {
         <div role="group" :aria-label="t('statusBar.customZoom')">
           <span>{{ t("statusBar.customZoom") }}</span
           ><TInputNumber
-            class="sheet-zoom-menu__custom-input idea-input-number--persistent-controls"
+            class="sheet-zoom-menu__custom-input sheetcraft-input-number--persistent-controls"
             :model-value="customZoom"
             :min="MIN_SHEET_ZOOM"
             :max="MAX_SHEET_ZOOM"

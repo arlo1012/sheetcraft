@@ -63,7 +63,7 @@ function isSelectedSort(
     @click="toggleMenu"
     @keydown="onTriggerKeydown"
   >
-    <ListFilter class="idea-action-icon" aria-hidden="true" />
+    <ListFilter class="sheetcraft-action-icon" aria-hidden="true" />
   </span>
   <Teleport to="body">
     <MenuSurface

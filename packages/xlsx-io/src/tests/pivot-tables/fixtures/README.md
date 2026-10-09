@@ -12,7 +12,7 @@ The test builds a clean workbook containing the original ordinary worksheet and
 consolidation source/output cell values, then copies their native pivot table,
 cache, record, and relationship XML unchanged. It omits unrelated connection,
 external-workbook, and scenario sources. The input to `decodeXlsx` contains no
-idea10 pivot extension and never passes through the product pivot exporter.
+product pivot extension and never passes through the product pivot exporter.
 
 The ordinary fixture pivot has no configured fields; its recovered source is
 configured through Core in the test. The consolidation pivot retains its two

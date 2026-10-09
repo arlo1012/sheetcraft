@@ -56,7 +56,7 @@ function select(action: FilterConditionAction): void {
     @click="toggleMenu"
     @keydown="onTriggerKeydown"
   >
-    <template #icon><Filter class="idea-action-icon" aria-hidden="true" /></template>
+    <template #icon><Filter class="sheetcraft-action-icon" aria-hidden="true" /></template>
     {{ label }}
   </TButton>
   <Teleport to="body">

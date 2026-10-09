@@ -358,7 +358,7 @@ watch(
         <div v-else class="lookup-fill-dialog__sample">
           <TableHeightWrapper v-slot="{ height }">
             <TTable
-              class="idea-table--mini"
+              class="sheetcraft-table--mini"
               row-key="id"
               :data="previewRows"
               :columns="previewColumns"

@@ -432,7 +432,7 @@ function readColorFilter(body: string, dxfs: readonly string[]): XlsxFilterCondi
 }
 
 const PRODUCT_COLOR_FILTER_SETS_URI = "{F05D2C50-AD53-4CE0-8F27-4BE69CF538D1}";
-const PRODUCT_COLOR_FILTER_SETS_NAMESPACE = "https://idea10.dev/xlsx/filter/v1";
+const PRODUCT_COLOR_FILTER_SETS_NAMESPACE = "https://sheetcraft.dev/xlsx/filter/v1";
 
 function productColorFilterSetExtension(xml: string): string | null {
   const extension = new RegExp(
@@ -448,7 +448,7 @@ function readProductColorFilterSets(xml: string, filter: XlsxFilter | null): Xls
   if (!extension) return filter;
   const columns = filter.columns.map((column) => ({ ...column }));
   for (const entry of extension.matchAll(
-    /<idea10:colorFilterSet\b([^>]*)>([\s\S]*?)<\/idea10:colorFilterSet>/gi,
+    /<sheetcraft:colorFilterSet\b([^>]*)>([\s\S]*?)<\/sheetcraft:colorFilterSet>/gi,
   )) {
     const attributes = entry[1] ?? "";
     const column = Number(attribute(attributes, "column"));
@@ -460,13 +460,13 @@ function readProductColorFilterSets(xml: string, filter: XlsxFilter | null): Xls
       (target !== "fill" && target !== "text")
     )
       continue;
-    const colors = [...(entry[2] ?? "").matchAll(/<idea10:color\b([^>]*)\/?\s*>/gi)]
+    const colors = [...(entry[2] ?? "").matchAll(/<sheetcraft:color\b([^>]*)\/?\s*>/gi)]
       .map((color) => attribute(color[1] ?? "", "value"))
       .filter(
         (color): color is string => typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color),
       )
       .map((color) => color.toLowerCase());
-    const hasNoFill = /<idea10:noFill\s*\/?\s*>/i.test(entry[2] ?? "");
+    const hasNoFill = /<sheetcraft:noFill\s*\/?\s*>/i.test(entry[2] ?? "");
     const normalized = [...new Set([...colors, ...(hasNoFill ? [null] : [])])];
     if (!normalized.length || (target === "text" && hasNoFill)) continue;
     const index = columns.findIndex((candidate) => candidate.column === column);
@@ -484,7 +484,7 @@ function readProductColorFilterSets(xml: string, filter: XlsxFilter | null): Xls
 function readProductColorFilterSetHiddenRows(xml: string): number[] {
   const extension = productColorFilterSetExtension(xml);
   const container = extension
-    ? /<idea10:colorFilterSets\b([^>]*)>/i.exec(extension)?.[1]
+    ? /<sheetcraft:colorFilterSets\b([^>]*)>/i.exec(extension)?.[1]
     : undefined;
   const rows = attribute(container ?? "", "hiddenRows");
   if (!rows) return [];
@@ -881,15 +881,15 @@ function writeProductColorFilterSets(
       const colors = condition.colors
         .map((color) =>
           color === null
-            ? "<idea10:noFill/>"
-            : `<idea10:color value="${encodeXml(color.toUpperCase())}"/>`,
+            ? "<sheetcraft:noFill/>"
+            : `<sheetcraft:color value="${encodeXml(color.toUpperCase())}"/>`,
         )
         .join("");
-      return `<idea10:colorFilterSet column="${column.column}" target="${condition.target}">${colors}</idea10:colorFilterSet>`;
+      return `<sheetcraft:colorFilterSet column="${column.column}" target="${condition.target}">${colors}</sheetcraft:colorFilterSet>`;
     })
     .join("");
   return entries || hiddenRows.length
-    ? `<ext uri="${PRODUCT_COLOR_FILTER_SETS_URI}"><idea10:colorFilterSets xmlns:idea10="${PRODUCT_COLOR_FILTER_SETS_NAMESPACE}"${hiddenRows.length ? ` hiddenRows="${hiddenRows.join(",")}"` : ""}>${entries}</idea10:colorFilterSets></ext>`
+    ? `<ext uri="${PRODUCT_COLOR_FILTER_SETS_URI}"><sheetcraft:colorFilterSets xmlns:sheetcraft="${PRODUCT_COLOR_FILTER_SETS_NAMESPACE}"${hiddenRows.length ? ` hiddenRows="${hiddenRows.join(",")}"` : ""}>${entries}</sheetcraft:colorFilterSets></ext>`
     : "";
 }
 

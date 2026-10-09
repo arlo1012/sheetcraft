@@ -47,7 +47,7 @@ Display and ordering changes preserve an edited search and value selection.
 Short value lists shrink to their content; long lists retain the adaptive scroll
 limit and load-more control.
 
-Preferences are browser-wide, stored under `idea10.filter.panel.settings` as a
+Preferences are browser-wide, stored under `sheetcraft.filter.panel.settings` as a
 version-1 record. The defaults show individual counts, hide totals/criteria,
 retain normal name order, and allow merged-cell filtering. Preferences are not
 part of the workbook snapshot. Invalid or unavailable browser storage falls

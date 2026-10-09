@@ -65,7 +65,7 @@ describe("MenuItem", () => {
     });
 
     expect(wrapper.attributes("role")).toBe("menuitem");
-    const shortcut = wrapper.get(".idea-menu-item__trailing");
+    const shortcut = wrapper.get(".sheetcraft-menu-item__trailing");
     expect(shortcut.text()).toBe("Ctrl+C");
     expect(shortcut.attributes("aria-hidden")).toBe("true");
     await shortcut.trigger("click");

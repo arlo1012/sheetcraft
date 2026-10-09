@@ -64,7 +64,7 @@
 }
 
 // 默认由外框绘制底边；需要完整行分隔线的表格保留末行底线。
-.t-table:not(.t-table--bordered, .idea-table--row-dividers) {
+.t-table:not(.t-table--bordered, .sheetcraft-table--row-dividers) {
   .t-table__body > tr:last-child > td {
     border-bottom: none;
   }
@@ -117,7 +117,7 @@
 }
 
 // Optional mini density; the migrated table defaults above remain unchanged.
-.t-table.idea-table--mini {
+.t-table.sheetcraft-table--mini {
   // Keep native selection controls filling their cells so flex centering applies.
   td.t-table__cell-check,
   th.t-table__cell-check {
@@ -133,15 +133,15 @@
 }
 
 // Split rulers and character cells share an exact horizontal origin for dragging.
-.t-table.idea-table--split-preview {
-  .t-table__header > tr > th.idea-table__split-text,
-  .t-table__body > tr > td.idea-table__split-text {
+.t-table.sheetcraft-table--split-preview {
+  .t-table__header > tr > th.sheetcraft-table__split-text,
+  .t-table__body > tr > td.sheetcraft-table__split-text {
     padding: 0;
   }
 }
 
 // Direct SVG actions retain a compact pointer target without button chrome.
-.idea-table-action-icon {
+.sheetcraft-table-action-icon {
   box-sizing: content-box;
   width: var(--sheetcraft-action-icon-size);
   height: var(--sheetcraft-action-icon-size);
@@ -161,7 +161,7 @@
   }
 }
 
-.idea-table-drag-icon {
+.sheetcraft-table-drag-icon {
   display: block;
   width: var(--sheetcraft-action-icon-size);
   height: var(--sheetcraft-action-icon-size);
@@ -178,7 +178,12 @@
 // All table icon actions share foreground-only hover feedback, including
 // existing directive containers and reference pickers inside editable cells.
 .t-table {
-  :is(.idea-icon-action, .idea-table-action-icon, .idea-input-action-icon, .idea-table-drag-icon) {
+  :is(
+    .sheetcraft-icon-action,
+    .sheetcraft-table-action-icon,
+    .sheetcraft-input-action-icon,
+    .sheetcraft-table-drag-icon
+  ) {
     background: transparent;
 
     &::before {

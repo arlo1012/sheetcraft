@@ -94,14 +94,18 @@ function drop(event: DragEvent, index: number): void {
 <template>
   <section class="pivot-area" :data-pivot-area="area" :aria-label="t(`pivot.${area}`)">
     <header class="pivot-area__header">
-      <Filter v-if="area === 'filters'" class="idea-action-icon" aria-hidden="true" /><Columns3
+      <Filter
+        v-if="area === 'filters'"
+        class="sheetcraft-action-icon"
+        aria-hidden="true"
+      /><Columns3
         v-else-if="area === 'columns'"
-        class="idea-action-icon"
+        class="sheetcraft-action-icon"
         aria-hidden="true"
       />
-      <Rows3 v-else-if="area === 'rows'" class="idea-action-icon" aria-hidden="true" /><Sigma
+      <Rows3 v-else-if="area === 'rows'" class="sheetcraft-action-icon" aria-hidden="true" /><Sigma
         v-else
-        class="idea-action-icon"
+        class="sheetcraft-action-icon"
         aria-hidden="true"
       />
       <span class="pivot-area__title">{{ t(`pivot.${area}`) }}</span>
@@ -112,7 +116,7 @@ function drop(event: DragEvent, index: number): void {
         :title="t('pivot.addToArea', { area: t(`pivot.${area}`) })"
         @click="menu($event, null)"
       >
-        <Plus class="idea-action-icon" aria-hidden="true" />
+        <Plus class="sheetcraft-action-icon" aria-hidden="true" />
       </span>
     </header>
     <ul
@@ -133,7 +137,7 @@ function drop(event: DragEvent, index: number): void {
         @dragover="over($event, index)"
         @drop="drop($event, index)"
       >
-        <GripVertical class="idea-action-icon pivot-area__grip" aria-hidden="true" />
+        <GripVertical class="sheetcraft-action-icon pivot-area__grip" aria-hidden="true" />
         <button
           class="pivot-area__label"
           type="button"
@@ -151,7 +155,7 @@ function drop(event: DragEvent, index: number): void {
           :aria-expanded="open && selectedIndex === index"
           @click="menu($event, index)"
         >
-          <ChevronDown class="idea-action-icon" aria-hidden="true" />
+          <ChevronDown class="sheetcraft-action-icon" aria-hidden="true" />
         </span>
       </li>
       <li v-if="!items.length" class="pivot-area__empty">{{ t("pivot.dropHere") }}</li>

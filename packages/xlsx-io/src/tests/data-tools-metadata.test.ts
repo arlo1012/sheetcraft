@@ -208,8 +208,8 @@ describe("XLSX data-tool metadata", () => {
     const xml = strFromU8(unzipSync(encoded.bytes)["xl/worksheets/sheet1.xml"]!);
     expect(xml).not.toContain("<colorFilter");
     expect(xml).toContain('uri="{F05D2C50-AD53-4CE0-8F27-4BE69CF538D1}"');
-    expect(xml).toContain('<idea10:color value="#FF0000"/>');
-    expect(xml).toContain('<idea10:color value="#0000FF"/>');
+    expect(xml).toContain('<sheetcraft:color value="#FF0000"/>');
+    expect(xml).toContain('<sheetcraft:color value="#0000FF"/>');
     expect(xml).toContain('hiddenRows="2"');
     expect(xml).toMatch(/<row[^>]*r="2"[^>]*hidden="1"/);
     expect(xml).toMatch(/<row[^>]*r="3"[^>]*hidden="1"/);
@@ -272,7 +272,7 @@ describe("XLSX data-tool metadata", () => {
 
     const entries = unzipSync((await encodeXlsx(workbook)).bytes);
     expect(strFromU8(entries["xl/worksheets/sheet1.xml"]!)).toContain('hiddenRows="2"');
-    expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain("idea10:colorFilterSet");
+    expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain("sheetcraft:colorFilterSet");
 
     const decoded = [...(await decodeXlsx(zipSync(entries))).workbook.sheets.values()][0]!;
     expect(decoded.filter).toBeNull();

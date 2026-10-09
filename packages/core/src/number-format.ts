@@ -58,7 +58,7 @@ function registerMissingDateLocales(): void {
     }
     const data = createDateLocaleData(entry.locale);
     if (!data) continue;
-    const key = `idea10l${entry.lcid.toLowerCase()}`;
+    const key = `sheetcraftl${entry.lcid.toLowerCase()}`;
     addLocale({ ...getLegacyFallbackLocale(language), ...data }, key);
     DATE_LOCALE_KEY_BY_LCID.set(entry.lcid, key);
   }
@@ -489,7 +489,7 @@ function createMarker(code: string, value: unknown, purpose: string, index: numb
   let suffix = 0;
   let marker = "";
   do {
-    marker = `\uE000idea10-${purpose}-${index}-${suffix}\uE001`;
+    marker = `\uE000sheetcraft-${purpose}-${index}-${suffix}\uE001`;
     suffix += 1;
   } while (code.includes(marker) || String(value).includes(marker));
   return marker;

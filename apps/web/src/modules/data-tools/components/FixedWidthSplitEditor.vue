@@ -31,8 +31,8 @@ const columns = computed<BaseTableCol[]>(() => [
     width: length.value * characterWidth,
     title: "ruler",
     cell: "characters",
-    className: "idea-table__split-text",
-    thClassName: "idea-table__split-text",
+    className: "sheetcraft-table__split-text",
+    thClassName: "sheetcraft-table__split-text",
   },
 ]);
 const tableData = computed(() => [...props.rows]);
@@ -126,7 +126,7 @@ onBeforeUnmount(() => endDrag?.());
     <div class="fixed-width-split-editor__preview">
       <TableHeightWrapper v-slot="{ height }">
         <TTable
-          class="idea-table--mini idea-table--split-preview"
+          class="sheetcraft-table--mini sheetcraft-table--split-preview"
           row-key="row"
           :data="tableData"
           :columns="columns"

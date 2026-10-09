@@ -145,7 +145,7 @@ function select(keys: Array<string | number>): void {
       <div class="pivot-consolidation-ranges__list" @keydown.delete.stop.prevent="remove()">
         <TableHeightWrapper v-slot="{ height }">
           <BaseTable
-            class="idea-table--mini idea-table--row-dividers"
+            class="sheetcraft-table--mini sheetcraft-table--row-dividers"
             row-key="index"
             :data="rows"
             :columns="columns"
@@ -171,7 +171,7 @@ function select(keys: Array<string | number>): void {
                   :aria-label="t('pivot.remove')"
                   :title="t('pivot.remove')"
                   @click.stop="remove(row.index)"
-                  ><Trash2 class="idea-action-icon" aria-hidden="true"
+                  ><Trash2 class="sheetcraft-action-icon" aria-hidden="true"
                 /></span>
                 <span
                   v-icon-action="disabled"
@@ -179,7 +179,7 @@ function select(keys: Array<string | number>): void {
                   :aria-label="t('pivot.browse')"
                   :title="t('pivot.browse')"
                   @click.stop="browse(row.index)"
-                  ><Eye class="idea-action-icon" aria-hidden="true"
+                  ><Eye class="sheetcraft-action-icon" aria-hidden="true"
                 /></span>
               </div>
             </template>

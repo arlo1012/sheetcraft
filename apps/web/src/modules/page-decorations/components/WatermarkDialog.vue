@@ -342,7 +342,7 @@ onBeforeUnmount(clearLocalImage);
               <TInputNumber
                 v-model="opacityPercent"
                 theme="column"
-                class="idea-input-number--persistent-controls"
+                class="sheetcraft-input-number--persistent-controls"
                 :disabled="!textEnabled || busy"
                 :min="0"
                 :max="100"

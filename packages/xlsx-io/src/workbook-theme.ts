@@ -30,7 +30,9 @@ function attribute(attributes: string, name: string): string | undefined {
   return new RegExp(`\\b${escaped}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, "i").exec(attributes)?.[2];
 }
 function readThemeCatalog(xml: string): Pick<WorkbookTheme, "customColors" | "customFonts"> {
-  const encoded = new RegExp(`<idea10:themeCatalog\\b[^>]*\\bdata="([^"]*)"`, "i").exec(xml)?.[1];
+  const encoded = new RegExp(`<sheetcraft:themeCatalog\\b[^>]*\\bdata="([^"]*)"`, "i").exec(
+    xml,
+  )?.[1];
   if (!encoded) return {};
   try {
     const catalog = JSON.parse(decodeURIComponent(decodeXml(encoded))) as Record<string, unknown>;
@@ -48,7 +50,7 @@ function writeThemeCatalog(xml: string, theme: Required<WorkbookTheme>): string 
       JSON.stringify({ customColors: theme.customColors, customFonts: theme.customFonts }),
     ),
   );
-  const extension = `<a:ext uri="${catalogUri}"><idea10:themeCatalog xmlns:idea10="urn:idea10:theme-catalog" data="${data}"/></a:ext>`;
+  const extension = `<a:ext uri="${catalogUri}"><sheetcraft:themeCatalog xmlns:sheetcraft="urn:sheetcraft:theme-catalog" data="${data}"/></a:ext>`;
   const existing = new RegExp(
     `<a:ext\\b[^>]*\\buri="${catalogUri}"[^>]*>[\\s\\S]*?<\\/a:ext>`,
     "i",

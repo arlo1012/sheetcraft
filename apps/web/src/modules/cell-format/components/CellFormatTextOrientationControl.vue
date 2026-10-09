@@ -72,7 +72,7 @@ function endDialDrag(event: PointerEvent): void {
         {{ t("cellFormat.orientationText") }}
       </button>
       <div
-        class="cell-format-text-orientation__dial idea-focus-container"
+        class="cell-format-text-orientation__dial sheetcraft-focus-container"
         :class="{ 'is-disabled': modelValue === 'vertical' }"
       >
         <svg viewBox="0 0 100 144" preserveAspectRatio="none" aria-hidden="true">
@@ -130,7 +130,7 @@ function endDialDrag(event: PointerEvent): void {
         :decimal-places="0"
         :disabled="modelValue === 'vertical'"
         theme="column"
-        class="idea-input-number--persistent-controls cell-format-text-orientation__degrees"
+        class="sheetcraft-input-number--persistent-controls cell-format-text-orientation__degrees"
         :placeholder="mixed ? t('format.mixed') : undefined"
         data-cell-format-rotation
         @change="setDegrees"

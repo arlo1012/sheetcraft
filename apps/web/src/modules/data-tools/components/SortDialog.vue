@@ -380,7 +380,7 @@ function apply(): void {
       </div>
       <TableHeightWrapper v-slot="{ height }">
         <TTable
-          class="idea-table--mini idea-table--row-dividers"
+          class="sheetcraft-table--mini sheetcraft-table--row-dividers"
           row-key="id"
           drag-sort="row-handler"
           :data="rows"
@@ -518,7 +518,7 @@ function apply(): void {
             </div>
           </template>
           <template #drag>
-            <GripVertical class="idea-table-drag-icon" aria-hidden="true" />
+            <GripVertical class="sheetcraft-table-drag-icon" aria-hidden="true" />
           </template>
           <template #actions="{ rowIndex }">
             <div class="sort-dialog__row-actions" @dblclick.stop>
@@ -528,7 +528,7 @@ function apply(): void {
                 :aria-label="t('dataTools.sort.copyLevel')"
                 :title="t('dataTools.sort.copyLevel')"
                 @click.stop="copyLevel(rowIndex)"
-                class="idea-table-action-icon"
+                class="sheetcraft-table-action-icon"
               />
               <Trash2
                 v-icon-action="rows.length <= 1"
@@ -536,7 +536,7 @@ function apply(): void {
                 :aria-label="t('dataTools.sort.deleteLevel')"
                 :title="t('dataTools.sort.deleteLevel')"
                 @click.stop="removeLevel(rowIndex)"
-                class="idea-table-action-icon"
+                class="sheetcraft-table-action-icon"
               />
               <ArrowUp
                 v-icon-action="rowIndex === 0"
@@ -544,7 +544,7 @@ function apply(): void {
                 :aria-label="t('dataTools.sort.moveUp')"
                 :title="t('dataTools.sort.moveUp')"
                 @click.stop="moveLevel(rowIndex, -1)"
-                class="idea-table-action-icon"
+                class="sheetcraft-table-action-icon"
               />
               <ArrowDown
                 v-icon-action="rowIndex === rows.length - 1"
@@ -552,7 +552,7 @@ function apply(): void {
                 :aria-label="t('dataTools.sort.moveDown')"
                 :title="t('dataTools.sort.moveDown')"
                 @click.stop="moveLevel(rowIndex, 1)"
-                class="idea-table-action-icon"
+                class="sheetcraft-table-action-icon"
               />
             </div>
           </template>

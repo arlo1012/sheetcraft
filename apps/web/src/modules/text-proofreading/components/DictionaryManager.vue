@@ -203,7 +203,7 @@ async function importFile(event: Event) {
           <span class="dictionary-manager__info">
             <Tooltip :content="hint"
               ><span tabindex="0" :aria-label="hint"
-                ><Info class="idea-action-icon" aria-hidden="true" /></span
+                ><Info class="sheetcraft-action-icon" aria-hidden="true" /></span
             ></Tooltip>
           </span>
         </div>
@@ -266,7 +266,7 @@ async function importFile(event: Event) {
       <div class="dictionary-manager__table">
         <TableHeightWrapper v-slot="{ height }">
           <PrimaryTable
-            class="idea-table--mini idea-table--row-dividers"
+            class="sheetcraft-table--mini sheetcraft-table--row-dividers"
             size="small"
             row-key="id"
             :data="rows"
@@ -291,14 +291,14 @@ async function importFile(event: Event) {
                   @click.stop="
                     emit('edit', category, { word: row.word, replacement: row.replacement })
                   "
-                  ><Pencil class="idea-action-icon" aria-hidden="true"
+                  ><Pencil class="sheetcraft-action-icon" aria-hidden="true"
                 /></span>
                 <span
                   v-icon-action
                   :aria-label="t('wordProof.remove')"
                   :title="t('wordProof.remove')"
                   @click.stop="emit('remove', category, [row.word])"
-                  ><Trash2 class="idea-action-icon" aria-hidden="true"
+                  ><Trash2 class="sheetcraft-action-icon" aria-hidden="true"
                 /></span>
               </div>
             </template>

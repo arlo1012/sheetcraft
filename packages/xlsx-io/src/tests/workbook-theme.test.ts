@@ -35,7 +35,7 @@ describe("XLSX workbook themes", () => {
     const encoded = await encodeXlsx(workbook);
     expect(strFromU8(unzipSync(encoded.bytes)["xl/theme/theme1.xml"]!)).toContain('val="112233"');
     expect(strFromU8(unzipSync(encoded.bytes)["xl/theme/theme1.xml"]!)).toContain(
-      "idea10:themeCatalog",
+      "sheetcraft:themeCatalog",
     );
     expect((await decodeXlsx(encoded.bytes)).workbook.theme).toEqual(
       normalizeWorkbookTheme(workbook.theme),

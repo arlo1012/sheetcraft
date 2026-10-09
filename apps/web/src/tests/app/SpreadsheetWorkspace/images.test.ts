@@ -131,7 +131,7 @@ describe("workspace cell image entry points", () => {
         write: vi.fn(async () => {}),
         read: vi.fn(async () => [
           {
-            types: ["text/plain", "web application/x-idea10-floating-image"],
+            types: ["text/plain", "web application/x-sheetcraft-floating-image"],
             getType: async (type: string) =>
               new Blob([type === "text/plain" ? "Diagram" : JSON.stringify(image)]),
           },

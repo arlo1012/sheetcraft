@@ -279,7 +279,7 @@ watch(
               >
                 <span>{{ t("tableStyles.stripeSize") }}</span>
                 <TInputNumber
-                  class="new-table-style-dialog__stripe-size idea-input-number--persistent-controls"
+                  class="new-table-style-dialog__stripe-size sheetcraft-input-number--persistent-controls"
                   theme="column"
                   :aria-label="t('tableStyles.stripeSize')"
                   :model-value="selectedFormat?.stripeSize ?? 1"

@@ -48,13 +48,13 @@ defineExpose({ rootElement });
     ref="rootElement"
     v-bind="$attrs"
     :class="[
-      'idea-floating-panel-surface',
-      `idea-floating-panel-surface--padding-${padding}`,
-      `idea-floating-panel-surface--layer-${layer}`,
-      { 'idea-floating-panel-surface--note': appearance === 'note' },
+      'sheetcraft-floating-panel-surface',
+      `sheetcraft-floating-panel-surface--padding-${padding}`,
+      `sheetcraft-floating-panel-surface--layer-${layer}`,
+      { 'sheetcraft-floating-panel-surface--note': appearance === 'note' },
       {
-        'idea-floating-panel-surface--scrollable': scrollable,
-        'idea-floating-panel-surface--constrained': constrainToViewport,
+        'sheetcraft-floating-panel-surface--scrollable': scrollable,
+        'sheetcraft-floating-panel-surface--constrained': constrainToViewport,
       },
       $attrs.class,
     ]"
@@ -70,7 +70,7 @@ defineExpose({ rootElement });
 <style scoped lang="scss">
 @use "./floating-panel" as panel;
 
-.idea-floating-panel-surface {
+.sheetcraft-floating-panel-surface {
   @include panel.surface;
 
   outline: none;
@@ -119,11 +119,11 @@ defineExpose({ rootElement });
     z-index: var(--sheetcraft-layer-sheet-menu);
   }
 
-  &:not(.idea-floating-panel-surface--scrollable) {
+  &:not(.sheetcraft-floating-panel-surface--scrollable) {
     overflow: visible;
   }
 
-  &:not(.idea-floating-panel-surface--constrained) {
+  &:not(.sheetcraft-floating-panel-surface--constrained) {
     max-width: none;
     max-height: none;
   }

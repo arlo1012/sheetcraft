@@ -28,7 +28,7 @@ const { t } = useAppI18n();
       />
       <TInputNumber
         v-model="count"
-        class="idea-input-number--persistent-controls"
+        class="sheetcraft-input-number--persistent-controls"
         theme="column"
         :aria-label="t('conditionalFormatting.count')"
         :min="1"
@@ -53,7 +53,7 @@ const { t } = useAppI18n();
     > * {
       min-width: 0;
     }
-    .idea-input-number--persistent-controls {
+    .sheetcraft-input-number--persistent-controls {
       width: 100%;
     }
     @media (max-width: 560px) {

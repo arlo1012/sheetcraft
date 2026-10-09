@@ -3,7 +3,7 @@ export type CustomSortList = {
   values: string[];
 };
 
-const STORAGE_KEY = "idea10.sort.customLists";
+const STORAGE_KEY = "sheetcraft.sort.customLists";
 const STORAGE_VERSION = 1;
 const BUILTIN_ID_PREFIX = "builtin:";
 

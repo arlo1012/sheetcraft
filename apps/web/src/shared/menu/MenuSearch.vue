@@ -10,8 +10,8 @@ defineExpose({ focus: () => inputRef.value?.focus() });
 </script>
 
 <template>
-  <li class="idea-menu-search" role="presentation">
-    <div class="idea-menu-search__field">
+  <li class="sheetcraft-menu-search" role="presentation">
+    <div class="sheetcraft-menu-search__field">
       <input
         v-bind="$attrs"
         ref="inputRef"
@@ -26,7 +26,7 @@ defineExpose({ focus: () => inputRef.value?.focus() });
 </template>
 
 <style scoped lang="scss">
-.idea-menu-search {
+.sheetcraft-menu-search {
   position: sticky;
   z-index: 1;
   top: 0;

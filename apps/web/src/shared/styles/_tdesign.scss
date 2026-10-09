@@ -231,7 +231,7 @@
 
 // A single visible formula line still needs textarea selection and line breaks.
 // Keep compact textarea sizing in the shared adapter.
-.idea-formula-textarea.t-textarea {
+.sheetcraft-formula-textarea.t-textarea {
   .t-textarea__inner {
     height: var(--td-comp-size-m);
     min-height: var(--td-comp-size-m);
@@ -265,7 +265,7 @@
   }
 }
 
-.idea-formula-editor-textarea.t-textarea {
+.sheetcraft-formula-editor-textarea.t-textarea {
   .t-textarea__inner {
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
     line-height: var(--sheetcraft-line-height-body-medium);
@@ -291,23 +291,23 @@
   }
 }
 
-.idea-select-option--action .t-checkbox__input {
+.sheetcraft-select-option--action .t-checkbox__input {
   visibility: hidden;
 }
 
-.idea-action-icon {
+.sheetcraft-action-icon {
   width: var(--sheetcraft-action-icon-size);
   height: var(--sheetcraft-action-icon-size);
   stroke-width: var(--sheetcraft-icon-stroke-width);
 }
 
-.idea-control-icon,
-.idea-input-action-icon {
+.sheetcraft-control-icon,
+.sheetcraft-input-action-icon {
   width: var(--sheetcraft-control-icon-size);
   height: var(--sheetcraft-control-icon-size);
 }
 
-.idea-input-action-icon {
+.sheetcraft-input-action-icon {
   cursor: pointer;
 
   &[aria-disabled="true"] {
@@ -317,7 +317,7 @@
 
 // Custom panel selects render the selected preview across the input's value area.
 // SelectInput places valueDisplay in its prefix; the native input remains focusable.
-.idea-panel-select .t-input {
+.sheetcraft-panel-select .t-input {
   > .t-input__prefix:not(:empty) {
     flex: 1;
     min-width: 0;
@@ -331,7 +331,7 @@
 }
 
 // SelectInput supplies no indicator; share Select's native arrow and color mapping.
-.idea-panel-select .t-fake-arrow {
+.sheetcraft-panel-select .t-fake-arrow {
   color: var(--td-text-color-placeholder);
 
   &.t-fake-arrow--active {
@@ -339,7 +339,7 @@
   }
 }
 
-.idea-number-format-options .t-select-option {
+.sheetcraft-number-format-options .t-select-option {
   &:hover:not(.t-is-selected):not(.t-is-disabled) {
     background: var(--sheetcraft-surface-secondary);
   }
@@ -351,7 +351,7 @@
 }
 
 // Compact icon choices retain Select's selection, focus, and dismissal behavior.
-.idea-icon-grid-options {
+.sheetcraft-icon-grid-options {
   .t-select__list {
     display: grid;
     grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -366,7 +366,7 @@
     padding: 0;
   }
 
-  .idea-icon-grid-options__none {
+  .sheetcraft-icon-grid-options__none {
     grid-column: 1 / -1;
     margin-bottom: 4px;
     background: var(--sheetcraft-surface-secondary);
@@ -438,7 +438,7 @@
 }
 
 // Grid forms own row gaps; keep feedback in flow instead of reserving extra margins.
-.t-form.idea-form-grid:not(.t-form-inline) {
+.t-form.sheetcraft-form-grid:not(.t-form-inline) {
   .t-form__item {
     margin: 0;
   }
@@ -516,7 +516,7 @@
 
 // Embedded color panels share their owner's floating surface and reserve most
 // of the format row for color values.
-.idea-color-palette-panel {
+.sheetcraft-color-palette-panel {
   --td-pop-padding-xl: var(--sheetcraft-tool-panel-padding);
 
   &.t-color-picker__panel {
@@ -540,7 +540,7 @@
 
 // Shared compact number input appearance; TDesign exposes neither the column
 // stepper width nor persistent controls and their resting appearance as public props.
-.idea-input-number--persistent-controls.t-input-number.t-is-controls-right {
+.sheetcraft-input-number--persistent-controls.t-input-number.t-is-controls-right {
   --sheetcraft-input-number-icon-size: var(--sheetcraft-control-icon-size);
   --sheetcraft-input-number-padding: 4px;
   --sheetcraft-input-number-stepper-width: 16px;
@@ -584,7 +584,7 @@
 }
 
 // Opt-in spacing for selects embedded in compact menus and controls.
-.idea-select--compact {
+.sheetcraft-select--compact {
   .t-input {
     padding-left: 4px;
     padding-right: 4px;
@@ -596,7 +596,7 @@
 }
 
 // Ribbon font fields share split-action feedback, without input chrome.
-.idea-ribbon-font-input.t-select-input .t-input {
+.sheetcraft-ribbon-font-input.t-select-input .t-input {
   &,
   &:hover,
   &:focus,
@@ -630,7 +630,7 @@
 }
 
 // MenuSurface owns the chrome within SelectInput's native popup.
-.idea-font-options-popup.t-popup__content {
+.sheetcraft-font-options-popup.t-popup__content {
   padding: 0;
   border: 0;
   background: transparent;

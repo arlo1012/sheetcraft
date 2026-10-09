@@ -131,7 +131,7 @@ describe("workbook JSON transfer", () => {
       {
         text: async () =>
           JSON.stringify({
-            format: "idea10-workbook",
+            format: "sheetcraft-workbook",
             version: 1,
             snapshot,
             images: [
@@ -174,7 +174,7 @@ describe("workbook JSON transfer", () => {
 
   test("downloads a fixed JSON filename and revokes its object URL", () => {
     vi.useFakeTimers();
-    const createObjectURL = vi.fn(() => "blob:idea10-workbook");
+    const createObjectURL = vi.fn(() => "blob:sheetcraft-workbook");
     const revokeObjectURL = vi.fn();
     vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
     const click = vi
@@ -191,6 +191,6 @@ describe("workbook JSON transfer", () => {
     expect(document.querySelector('a[download="sheetcraft-workbook.json"]')).toBeNull();
     expect(revokeObjectURL).not.toHaveBeenCalled();
     vi.runAllTimers();
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:idea10-workbook");
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:sheetcraft-workbook");
   });
 });

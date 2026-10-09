@@ -5,7 +5,7 @@ import {
   readFloatingImageGroup,
   serializeFloatingImageClipboard,
 } from "../sheet-images/imageClipboard";
-export const SHEETCRAFT_CLIPBOARD_TYPE = "application/x-idea10-cells";
+export const SHEETCRAFT_CLIPBOARD_TYPE = "application/x-sheetcraft-cells";
 export const WEB_SHEETCRAFT_CLIPBOARD_TYPE = `web ${SHEETCRAFT_CLIPBOARD_TYPE}`;
 export const WEB_FLOATING_IMAGE_CLIPBOARD_TYPE = `web ${FLOATING_IMAGE_CLIPBOARD_TYPE}`;
 

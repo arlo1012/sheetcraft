@@ -109,7 +109,7 @@ async function dragOption(dialog: ReturnType<typeof mount>, from: number, to: nu
 test("drags a manual option to its final position and applies the order", async () => {
   const dialog = mountDialog({ initial: { ...initial(), items: ["Open", "Closed", "Pending"] } });
   expect(dialog.getComponent(PrimaryTable).props("dragSort")).toBe("row-handler");
-  expect(dialog.findAll("svg.idea-table-drag-icon")).toHaveLength(3);
+  expect(dialog.findAll("svg.sheetcraft-table-drag-icon")).toHaveLength(3);
   await dragOption(dialog, 0, 2);
   expect(dialog.findAll('[role="option"]').map((row) => row.text())).toEqual([
     "Closed",

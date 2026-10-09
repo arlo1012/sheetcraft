@@ -119,7 +119,7 @@ function scan() {
       <div class="word-review__table">
         <TableHeightWrapper v-slot="{ height }">
           <PrimaryTable
-            class="idea-table--mini idea-table--row-dividers"
+            class="sheetcraft-table--mini sheetcraft-table--row-dividers"
             row-key="id"
             :data="rows"
             :columns="columns"

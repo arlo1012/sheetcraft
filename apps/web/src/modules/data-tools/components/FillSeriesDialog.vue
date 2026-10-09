@@ -184,7 +184,7 @@ function apply(): void {
             :decimal-places="isDate ? 0 : undefined"
             :aria-label="stepLabel"
             theme="column"
-            class="idea-input-number--persistent-controls"
+            class="sheetcraft-input-number--persistent-controls"
             style="width: 100%; min-width: 0"
           />
         </div>
@@ -209,7 +209,7 @@ function apply(): void {
             :disabled="isAuto"
             :aria-label="t('dataTools.fill.stop')"
             theme="column"
-            class="idea-input-number--persistent-controls"
+            class="sheetcraft-input-number--persistent-controls"
             style="width: 100%; min-width: 0"
             @update:model-value="updateNumericStop"
           />

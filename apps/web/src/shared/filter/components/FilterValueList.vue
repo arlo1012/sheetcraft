@@ -229,10 +229,14 @@ function selectDuplicates(): void {
         {{ t("dataTools.filter.name") }}
         <ArrowUp
           v-if="sortField === 'name' && sortDirection === 'ascending'"
-          class="idea-action-icon"
+          class="sheetcraft-action-icon"
           aria-hidden="true"
         />
-        <ArrowDown v-else-if="sortField === 'name'" class="idea-action-icon" aria-hidden="true" />
+        <ArrowDown
+          v-else-if="sortField === 'name'"
+          class="sheetcraft-action-icon"
+          aria-hidden="true"
+        />
       </TButton>
       <TButton
         :variant="sortField === 'count' ? 'base' : 'text'"
@@ -245,10 +249,14 @@ function selectDuplicates(): void {
         {{ t("dataTools.filter.count") }}
         <ArrowUp
           v-if="sortField === 'count' && sortDirection === 'ascending'"
-          class="idea-action-icon"
+          class="sheetcraft-action-icon"
           aria-hidden="true"
         />
-        <ArrowDown v-else-if="sortField === 'count'" class="idea-action-icon" aria-hidden="true" />
+        <ArrowDown
+          v-else-if="sortField === 'count'"
+          class="sheetcraft-action-icon"
+          aria-hidden="true"
+        />
       </TButton>
       <FilterSettingsMenu
         ref="settingsMenuRef"

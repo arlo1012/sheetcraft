@@ -119,7 +119,7 @@ function selectIssues(keys: Array<string | number>): void {
       <div v-if="hasScanned && issues.length" class="data-proofreading-dialog__table">
         <TableHeightWrapper v-slot="{ height }">
           <TTable
-            class="idea-table--mini"
+            class="sheetcraft-table--mini"
             row-key="id"
             :data="rows"
             :columns="columns"

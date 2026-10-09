@@ -10,11 +10,11 @@ const { t } = useAppI18n();
 <template>
   <header class="filter-sort-bar" role="group" :aria-label="t('dataTools.sort.title')">
     <Button variant="text" size="small" :disabled="disabled" @click="emit('sort', 'ascending')">
-      <template #icon><ArrowUpAZ class="idea-action-icon" /></template>
+      <template #icon><ArrowUpAZ class="sheetcraft-action-icon" /></template>
       {{ t("dataTools.sort.ascending") }}
     </Button>
     <Button variant="text" size="small" :disabled="disabled" @click="emit('sort', 'descending')">
-      <template #icon><ArrowDownAZ class="idea-action-icon" /></template>
+      <template #icon><ArrowDownAZ class="sheetcraft-action-icon" /></template>
       {{ t("dataTools.sort.descending") }}
     </Button>
     <slot />

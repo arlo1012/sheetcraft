@@ -149,7 +149,7 @@ watch(
           >
             <template #suffixIcon>
               <SquareMousePointer
-                class="idea-input-action-icon"
+                class="sheetcraft-input-action-icon"
                 :aria-disabled="busy"
                 :aria-label="`${t('dataTools.comparison.pickRange')}：${t('dataTools.comparison.firstRange')}`"
                 @click="!busy && emit('pickRange', 'firstRange')"
@@ -171,7 +171,7 @@ watch(
           >
             <template #suffixIcon>
               <SquareMousePointer
-                class="idea-input-action-icon"
+                class="sheetcraft-input-action-icon"
                 :aria-disabled="busy"
                 :aria-label="`${t('dataTools.comparison.pickRange')}：${t('dataTools.comparison.secondRange')}`"
                 @click="!busy && emit('pickRange', 'secondRange')"

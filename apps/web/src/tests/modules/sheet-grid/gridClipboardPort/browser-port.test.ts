@@ -4,7 +4,7 @@ import {
   WEB_FLOATING_IMAGE_CLIPBOARD_TYPE,
 } from "../../../../modules/sheet-grid/gridClipboardPort";
 
-const WEB_SHEETCRAFT_CLIPBOARD_TYPE = "web application/x-idea10-cells";
+const WEB_SHEETCRAFT_CLIPBOARD_TYPE = "web application/x-sheetcraft-cells";
 
 function stubClipboard(clipboard: Partial<Clipboard>): void {
   vi.stubGlobal("navigator", { clipboard });
@@ -43,7 +43,7 @@ function createRichClipboardItem(text: string, token: string) {
     getType: vi.fn(async (type: string) =>
       type === "text/plain"
         ? new Blob([text], { type: "text/plain" })
-        : new Blob([token], { type: "application/x-idea10-cells" }),
+        : new Blob([token], { type: "application/x-sheetcraft-cells" }),
     ),
   };
 }
@@ -142,7 +142,7 @@ describe("browser grid clipboard port", () => {
         createBrowserGridClipboardPort().write({ text: "legacy", localToken: "token-legacy" }),
       ).resolves.toEqual({ localTokenWritten: true });
       expect(setData).toHaveBeenCalledWith("text/plain", "legacy");
-      expect(setData).toHaveBeenCalledWith("application/x-idea10-cells", "token-legacy");
+      expect(setData).toHaveBeenCalledWith("application/x-sheetcraft-cells", "token-legacy");
     } finally {
       Reflect.deleteProperty(document, "execCommand");
     }
@@ -177,7 +177,7 @@ describe("browser grid clipboard port", () => {
       getType: vi.fn(async (type: string) =>
         type === "text/plain"
           ? new Blob(["cell value"], { type: "text/plain" })
-          : new Blob(["token-3"], { type: "application/x-idea10-cells" }),
+          : new Blob(["token-3"], { type: "application/x-sheetcraft-cells" }),
       ),
     };
     const read = vi.fn().mockResolvedValue([item]);

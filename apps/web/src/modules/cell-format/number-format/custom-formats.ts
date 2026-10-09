@@ -1,6 +1,6 @@
 import { validateCellNumberFormatCode } from "@sheetcraft/core/number-format";
 
-const STORAGE_KEY = "idea10.custom-number-formats";
+const STORAGE_KEY = "sheetcraft.custom-number-formats";
 const MAX_CUSTOM_FORMATS = 100;
 
 export function readCustomNumberFormats(): string[] {

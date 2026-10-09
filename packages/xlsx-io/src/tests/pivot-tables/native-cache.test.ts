@@ -103,7 +103,7 @@ function nativeEntries(bytes: Uint8Array) {
   )!;
   entries[definition] = strToU8(
     strFromU8(entries[definition]!).replace(
-      /<ext\b[^>]*\buri="urn:idea10:pivot:1"[^>]*>[\s\S]*?<\/ext>/g,
+      /<ext\b[^>]*\buri="urn:sheetcraft:pivot:1"[^>]*>[\s\S]*?<\/ext>/g,
       "",
     ),
   );

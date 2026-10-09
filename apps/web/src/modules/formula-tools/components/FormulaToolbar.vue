@@ -489,7 +489,7 @@ function insertFunction(name: string): void {
           >
             <span>{{ t("formulaTools.maximumIterations") }}</span>
             <TInputNumber
-              class="idea-input-number--persistent-controls"
+              class="sheetcraft-input-number--persistent-controls"
               theme="column"
               :value="calculationSettings.maxIterations"
               :min="1"
@@ -508,7 +508,7 @@ function insertFunction(name: string): void {
           >
             <span>{{ t("formulaTools.maximumChange") }}</span>
             <TInputNumber
-              class="idea-input-number--persistent-controls"
+              class="sheetcraft-input-number--persistent-controls"
               theme="column"
               :value="calculationSettings.maxChange"
               :min="0.000000001"

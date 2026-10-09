@@ -164,7 +164,7 @@ test("dragging filtered names emits the full order with hidden names in their ex
   await wrapper.vm.$nextTick();
   const table = wrapper.getComponent(PrimaryTable);
   expect(table.props("dragSort")).toBe("row-handler");
-  expect(table.findAll("svg.idea-table-drag-icon")).toHaveLength(
+  expect(table.findAll("svg.sheetcraft-table-drag-icon")).toHaveLength(
     (table.props("data") ?? []).length,
   );
   const rows = [...(table.props("data") ?? [])];

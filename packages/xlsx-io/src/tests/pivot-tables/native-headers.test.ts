@@ -69,7 +69,7 @@ function native(bytes: Uint8Array) {
   const xml = strFromU8(entries[path]!);
   const root = new XMLParser({ ignoreAttributes: false }).parse(xml).pivotTableDefinition;
   entries[path] = strToU8(
-    xml.replace(/<ext\b[^>]*\buri="urn:idea10:pivot:1"[^>]*>[\s\S]*?<\/ext>/g, ""),
+    xml.replace(/<ext\b[^>]*\buri="urn:sheetcraft:pivot:1"[^>]*>[\s\S]*?<\/ext>/g, ""),
   );
   return { xml, root, bytes: zipSync(entries) };
 }

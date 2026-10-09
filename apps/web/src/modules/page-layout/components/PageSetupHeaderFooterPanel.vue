@@ -81,7 +81,7 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
 
 <template>
   <TForm
-    class="page-setup-header-footer idea-form-grid"
+    class="page-setup-header-footer sheetcraft-form-grid"
     :data="setup"
     label-align="right"
     :label-width="locale === 'zh-CN' ? 96 : 144"

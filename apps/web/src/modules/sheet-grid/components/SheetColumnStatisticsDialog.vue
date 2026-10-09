@@ -100,7 +100,7 @@ function columnLabel(column: number): string {
         <div class="column-statistics__table">
           <TableHeightWrapper v-slot="{ height }">
             <BaseTable
-              class="idea-table--mini idea-table--row-dividers"
+              class="sheetcraft-table--mini sheetcraft-table--row-dividers"
               row-key="value"
               :data="distribution"
               :columns="distributionColumns"

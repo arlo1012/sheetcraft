@@ -63,7 +63,7 @@ function change(index: number, key: keyof LookupFillFieldDraft, value: unknown):
     <div class="lookup-field-mapping-table__table">
       <TableHeightWrapper v-slot="{ height }">
         <TTable
-          class="idea-table--mini"
+          class="sheetcraft-table--mini"
           row-key="id"
           :data="rows"
           :columns="columns"

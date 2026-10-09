@@ -35,7 +35,7 @@
 
 ## Data tables
 
-- Use TDesign `BaseTable` or `PrimaryTable` directly with `idea-table--mini` and
+- Use TDesign `BaseTable` or `PrimaryTable` directly with `sheetcraft-table--mini` and
   `size="small"`; keep library overrides in the shared TDesign adapter.
 - For a bounded or scrollable table, give its feature-owned outer container a
   definite height and `min-height: 0`. Place `TableHeightWrapper` inside it and
@@ -80,7 +80,7 @@ Use CSS pixels at 100% scale; size and line height are a pair.
   Input prefix/suffix icons use slots; the input owns their
   spacing. Stop action clicks from bubbling into the input focus handler.
 - `InputNumber` uses `theme="column"` and
-  `idea-input-number--persistent-controls`; place it in a labelled group. Use
+  `sheetcraft-input-number--persistent-controls`; place it in a labelled group. Use
   no native `label` wrapper, which would forward focus to its buttons. Use
   `--sheetcraft-icon-button-hover-bg` for ribbon/status icon hover; foreground stays
   unchanged.

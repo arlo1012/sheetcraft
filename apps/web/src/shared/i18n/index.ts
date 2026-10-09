@@ -5,7 +5,7 @@ import type { AppLocale, MessageKey, MessageParams, MessageSchema } from "./sche
 
 export type { AppLocale, MessageKey, MessageParams, MessageSchema } from "./schema";
 
-export const APP_LOCALE_STORAGE_KEY = "idea10.locale";
+export const APP_LOCALE_STORAGE_KEY = "sheetcraft.locale";
 export const APP_LOCALES = ["zh-CN", "en-US"] as const;
 
 export function isAppLocale(locale: string | null | undefined): locale is AppLocale {

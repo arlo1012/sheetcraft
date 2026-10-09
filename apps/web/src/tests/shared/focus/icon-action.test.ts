@@ -45,7 +45,7 @@ describe("interactive icon containers", () => {
     expect(customKey).not.toHaveBeenCalled();
     await wrapper.setProps({ disabled: false });
     expect(wrapper.attributes("tabindex")).toBe("0");
-    expect(wrapper.classes()).toContain("idea-icon-action");
+    expect(wrapper.classes()).toContain("sheetcraft-icon-action");
     await wrapper.trigger("keydown", { key: "Enter" });
     expect(activate).toHaveBeenCalledTimes(1);
     wrapper.unmount();

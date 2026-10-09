@@ -154,7 +154,7 @@ function save(protect = false): void {
       </div>
       <TableHeightWrapper v-slot="{ height }">
         <TTable
-          class="idea-table--mini idea-table--row-dividers"
+          class="sheetcraft-table--mini sheetcraft-table--row-dividers"
           row-key="id"
           :data="tableRows"
           :columns="columns"
@@ -182,7 +182,7 @@ function save(protect = false): void {
                 :aria-label="t('review.unlockRange')"
                 :title="t('review.unlockRange')"
                 @click.stop="emit('unlock', row.name)"
-                ><LockKeyholeOpen class="idea-action-icon" aria-hidden="true"
+                ><LockKeyholeOpen class="sheetcraft-action-icon" aria-hidden="true"
               /></span>
               <template v-else>
                 <span
@@ -191,7 +191,7 @@ function save(protect = false): void {
                   :aria-label="t('review.editRange')"
                   :title="t('review.editRange')"
                   @click.stop="edit(row.id)"
-                  ><Pencil class="idea-action-icon" aria-hidden="true"
+                  ><Pencil class="sheetcraft-action-icon" aria-hidden="true"
                 /></span>
                 <span
                   v-icon-action
@@ -199,7 +199,7 @@ function save(protect = false): void {
                   :aria-label="t('review.removeRange')"
                   :title="t('review.removeRange')"
                   @click.stop="remove(row.id)"
-                  ><Trash2 class="idea-action-icon" aria-hidden="true"
+                  ><Trash2 class="sheetcraft-action-icon" aria-hidden="true"
                 /></span>
               </template>
             </div>

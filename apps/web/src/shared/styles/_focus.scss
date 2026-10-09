@@ -8,13 +8,13 @@
   box-shadow: var(--sheetcraft-keyboard-focus-shadow);
 }
 
-.idea-focus-container:has(:focus-visible) {
+.sheetcraft-focus-container:has(:focus-visible) {
   outline: none;
   box-shadow: var(--sheetcraft-keyboard-focus-shadow);
 }
 
 // Direct icon actions share alignment and feedback without button chrome.
-:where(.idea-icon-action) {
+:where(.sheetcraft-icon-action) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -24,11 +24,11 @@
 }
 
 // SVG-only actions keep their foreground feedback; containers own the surface.
-:where(.idea-icon-action:not(svg)) {
+:where(.sheetcraft-icon-action:not(svg)) {
   @include icon-feedback.feedback;
 }
 
-:where(.idea-icon-action[aria-disabled="true"]) {
+:where(.sheetcraft-icon-action[aria-disabled="true"]) {
   color: var(--sheetcraft-text-disabled);
   cursor: not-allowed;
 }
