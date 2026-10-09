@@ -1,39 +1,82 @@
-import ExcelJS from "exceljs";
+import {
+  createWorkbook,
+  getActiveSheet,
+  setCellContent,
+  setCellStyle,
+  setColumnWidth,
+  setRowHeight,
+  type Workbook,
+} from "@sheetcraft/core/workbook";
+import { decodeXlsx, encodeXlsx, type XlsxDecodeResult } from "@sheetcraft/xlsx-io";
 
 export const SYNTHETIC_FIXTURE_LABEL = "synthetic-not-excel-verified";
 
-export async function createSyntheticWorkbookBuffer(): Promise<Uint8Array> {
-  const workbook = new ExcelJS.Workbook();
-  workbook.properties.date1904 = true;
-  const sheet = workbook.addWorksheet("Synthetic Data", {
-    views: [{ state: "frozen", xSplit: 1, ySplit: 1 }],
+export function createSyntheticWorkbook(): Workbook {
+  const workbook = createWorkbook({
+    id: "lab-synthetic",
+    sheetId: "lab-data",
+    sheetName: "Synthetic Data",
+    dateSystem: "1904",
   });
-  sheet.autoFilter = "A1:C4";
-  sheet.getColumn(1).width = 18;
-  sheet.getColumn(2).width = 14;
-  sheet.getRow(4).height = 30;
+  const sheet = getActiveSheet(workbook);
+  sheet.freezePanes = { rows: 1, columns: 1 };
+  sheet.filter = {
+    range: { start: { row: 0, column: 0 }, end: { row: 3, column: 2 } },
+    columns: [],
+    allowMergedCells: true,
+  };
+  setColumnWidth(sheet, 0, 126);
+  setColumnWidth(sheet, 1, 98);
+  setRowHeight(sheet, 3, 40);
 
-  sheet.getCell("A1").value = "Amount";
-  sheet.getCell("B1").value = "When";
-  sheet.getCell("C1").value = "Formula";
-  sheet.getRow(1).font = { bold: true, color: { argb: "FF112233" } };
-  sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE68A" } };
-  sheet.getCell("A2").value = 41;
-  sheet.getCell("B2").value = new Date(Date.UTC(1904, 0, 2));
-  sheet.getCell("B2").numFmt = "yyyy-mm-dd";
-  sheet.getCell("C2").value = { formula: "A2+1", result: 42 };
-  sheet.mergeCells("A4:C4");
-  sheet.getCell("A4").value = "Merged synthetic note";
-  sheet.getCell("A4").alignment = { horizontal: "center" };
-
-  return new Uint8Array(await workbook.xlsx.writeBuffer());
+  for (const [column, value] of ["Amount", "When", "Formula"].entries()) {
+    setCellContent(sheet, { row: 0, column }, { kind: "literal", value });
+    setCellStyle(
+      sheet,
+      { row: 0, column },
+      {
+        bold: true,
+        textColor: "#112233",
+        fillColor: "#fde68a",
+      },
+    );
+  }
+  setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: 41 });
+  // 1904-01-02 is serial 1 in this workbook; no host Date or timezone is involved.
+  setCellContent(sheet, { row: 1, column: 1 }, { kind: "literal", value: 1 });
+  setCellStyle(
+    sheet,
+    { row: 1, column: 1 },
+    {
+      numberFormat: { kind: "date", code: "yyyy-mm-dd" },
+    },
+  );
+  setCellContent(
+    sheet,
+    { row: 1, column: 2 },
+    {
+      kind: "formula",
+      formula: { source: "=A2+1" },
+    },
+  );
+  // Keep the merge entirely to the right of the frozen first column.
+  sheet.mergedCells = [{ start: { row: 3, column: 1 }, end: { row: 3, column: 2 } }];
+  setCellContent(
+    sheet,
+    { row: 3, column: 1 },
+    {
+      kind: "literal",
+      value: "Merged synthetic note",
+    },
+  );
+  setCellStyle(sheet, { row: 3, column: 1 }, { horizontalAlign: "center" });
+  return workbook;
 }
 
-export async function readSyntheticWorkbook(buffer: Uint8Array): Promise<ExcelJS.Workbook> {
-  const workbook = new ExcelJS.Workbook();
-  // ExcelJS 4.4.0's Buffer declaration is incompatible with Node 24's
-  // resizable-ArrayBuffer Buffer type, although the runtime API accepts bytes.
-  type ExcelJsLoadBytes = Parameters<typeof workbook.xlsx.load>[0];
-  await workbook.xlsx.load(Buffer.from(buffer) as unknown as ExcelJsLoadBytes);
-  return workbook;
+export async function createSyntheticWorkbookBuffer(): Promise<Uint8Array> {
+  return (await encodeXlsx(createSyntheticWorkbook())).bytes;
+}
+
+export async function readSyntheticWorkbook(buffer: Uint8Array): Promise<XlsxDecodeResult> {
+  return decodeXlsx(buffer);
 }

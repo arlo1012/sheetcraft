@@ -1,32 +1,25 @@
 import {
-  COUNTIF,
-  DATE,
-  IF,
-  MATCH,
-  NA,
-  PMT,
-  ROUND,
-  SUM,
-  SUMIFS,
-  TEXT,
-  WORKDAY,
-} from "@formulajs/formulajs";
+  evaluateFormula,
+  type FormulaEvaluationOptions,
+  type FormulaEvaluationResolver,
+  type FormulaValue,
+} from "@sheetcraft/core/formula";
 
-/** Pure adapter examples: parsed arguments go in, library results come out. */
-export const formulaAdapter = {
-  sum: (values: unknown[]) => SUM(...values),
-  round: (value: number, digits: number) => ROUND(value, digits),
-  countIf: (values: unknown[], criteria: string) => COUNTIF(values, criteria),
-  sumIfs: (sumRange: unknown[], criteriaRange: unknown[], criteria: string) =>
-    SUMIFS(sumRange, criteriaRange, criteria),
-  if: (condition: unknown, whenTrue: unknown, whenFalse: unknown) =>
-    IF(condition, whenTrue, whenFalse),
-  match: (needle: unknown, values: unknown[], matchType: number) =>
-    MATCH(needle, values, matchType),
-  notAvailable: () => NA(),
-  date: (year: number, month: number, day: number) => DATE(year, month, day),
-  workday: (start: Date, days: number) => WORKDAY(start, days),
-  payment: (rate: number, periods: number, presentValue: number) =>
-    PMT(rate, periods, presentValue),
-  text: (value: number, format: string) => TEXT(value, format),
-};
+/** Exercise the public parser/evaluator with an explicit, zero-based cell grid. */
+export function evaluateFormulaProbe(
+  source: string,
+  cells: readonly (readonly FormulaValue[])[] = [],
+  options?: FormulaEvaluationOptions,
+): FormulaValue {
+  const resolver: FormulaEvaluationResolver = {
+    resolveCell: ({ row, column }) => cells[row]?.[column] ?? null,
+    resolveRange: ({ start, end }) => {
+      const values: FormulaValue[] = [];
+      for (let row = start.row; row <= end.row; row += 1)
+        for (let column = start.column; column <= end.column; column += 1)
+          values.push(cells[row]?.[column] ?? null);
+      return values;
+    },
+  };
+  return evaluateFormula(source, resolver, options);
+}

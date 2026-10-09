@@ -1,3 +1,5 @@
+> Historical proposal: the library-candidate sections below are retained as design history. The current runtime uses first-party Core formulas and first-party OOXML conversion. Formula.js/ExcelJS/SheetJS-engine adoption is no longer the implementation direction; see [native migration](native-xlsx-migration.md).
+
 # 公式与 Excel 兼容边界方案
 
 状态：Draft / 待确认。整理日期：2026-09-05。

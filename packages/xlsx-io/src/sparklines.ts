@@ -4,6 +4,7 @@ import { getCellAddressLabel, parseCellAddress } from "@sheetcraft/core/coordina
 import { normalizeCellSparkline, type CellSparkline } from "@sheetcraft/core/sparklines";
 import type { Sheet } from "@sheetcraft/core/workbook";
 import { readXlsxWorksheetPartTargets } from "./raw-cell-values.js";
+import { appendNativeWorksheetExtension } from "./native/worksheet-order.js";
 const URI = "{05C60535-1F16-4fd2-B633-F4F36F0B64E0}";
 function escape(value: string): string {
   return value.replace(
@@ -44,13 +45,9 @@ export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[])
       ];
     });
     if (!groups.length) return;
-    let xml = strFromU8(entries[part]!);
+    const xml = strFromU8(entries[part]!);
     const extension = `<ext uri="${URI}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:sparklineGroups xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main">${groups.join("")}</x14:sparklineGroups></ext>`;
-    if (/<extLst\b[^>]*\/>/.test(xml))
-      xml = xml.replace(/<extLst\b[^>]*\/>/, `<extLst>${extension}</extLst>`);
-    else if (xml.includes("</extLst>")) xml = xml.replace("</extLst>", `${extension}</extLst>`);
-    else xml = xml.replace("</worksheet>", `<extLst>${extension}</extLst></worksheet>`);
-    entries[part] = strToU8(xml);
+    entries[part] = strToU8(appendNativeWorksheetExtension(xml, extension));
   });
 }
 export function readXlsxSparklines(

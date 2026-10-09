@@ -1,5 +1,5 @@
 import type { Workbook } from "@sheetcraft/core/workbook";
-import { decodeWithExcelJs, encodeWithExcelJs } from "./codec.js";
+import { decodeWithNativeXlsx, encodeWithNativeXlsx } from "./codec.js";
 import { mergeCompatibilityReports } from "./report.js";
 import {
   XlsxAbortError,
@@ -36,7 +36,7 @@ export async function decodeXlsx(
   assertNotAborted(options);
   const preflight = await preflightXlsxArchive(bytes, options?.signal);
   assertNotAborted(options);
-  const decoded = await decodeWithExcelJs(bytes);
+  const decoded = await decodeWithNativeXlsx(bytes);
   return { ...decoded, report: mergeCompatibilityReports(preflight, decoded.report) };
 }
 
@@ -44,7 +44,7 @@ export async function encodeXlsx(
   workbook: Workbook,
   options?: XlsxEncodeOptions,
 ): Promise<XlsxEncodeResult> {
-  return encodeWithExcelJs(workbook, options);
+  return encodeWithNativeXlsx(workbook, options);
 }
 
 export {

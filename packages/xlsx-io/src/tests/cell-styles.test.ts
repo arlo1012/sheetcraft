@@ -16,12 +16,45 @@ import {
 } from "@sheetcraft/core/commands";
 import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
 import { describe, expect, test } from "vitest";
+import { XMLValidator } from "fast-xml-parser";
 import { decodeXlsx, encodeXlsx } from "../index.js";
 import { readXlsxCellStyles } from "../cell-styles.js";
 import { readXlsxHyperlinks, writeXlsxHyperlinks } from "../hyperlinks.js";
 import { materializeXlsxStyleColors } from "../xlsx-colors.js";
 
 describe("named cell styles", () => {
+  test("writes valid named-style bindings on blank cells", async () => {
+    const workbook = createWorkbook({ id: "blank-named-binding", sheetId: "sheet" });
+    workbook.cellStyles = [
+      {
+        id: "accent",
+        name: "Accent blank",
+        category: "custom",
+        includes: ["font", "fill"],
+        style: { bold: true, fillColor: "#4472c4" },
+      },
+    ];
+    const sheet = getActiveSheet(workbook);
+    sheet.cells.set("0:0", {
+      style: { bold: true, fillColor: "#4472c4" },
+      namedStyle: { styleId: "accent", includes: ["font", "fill"] },
+    });
+    const encoded = await encodeXlsx(workbook);
+    const entries = unzipSync(encoded.bytes);
+    for (const [path, bytes] of Object.entries(entries))
+      if (path.endsWith(".xml") || path.endsWith(".rels"))
+        expect(XMLValidator.validate(strFromU8(bytes)), path).toBe(true);
+    expect(encoded.report.issues).toEqual([]);
+    const restored = getActiveSheet((await decodeXlsx(encoded.bytes)).workbook);
+    expect(getCellNamedStyle(restored, { row: 0, column: 0 })).toMatchObject({
+      styleId: "xlsx-cell-style-Accent blank",
+    });
+    expect(getCellStyle(restored, { row: 0, column: 0 })).toMatchObject({
+      bold: true,
+      fillColor: "#4472c4",
+    });
+  });
+
   test("writes and restores a custom style through cellStyleXfs and cellStyles", async () => {
     const workbook = createWorkbook({ id: "cell-styles", sheetId: "sheet" });
     workbook.cellStyles = [

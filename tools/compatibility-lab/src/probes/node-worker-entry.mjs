@@ -1,8 +1,4 @@
 import { parentPort } from "node:worker_threads";
-import { SUM } from "@formulajs/formulajs";
-import ExcelJS from "exceljs";
+import { runWorkerProbe } from "./worker-probe.mjs";
 
-parentPort?.postMessage({
-  formulaSum: SUM(1, 2, 3),
-  excelJsWorkbookConstructed: new ExcelJS.Workbook() instanceof ExcelJS.Workbook,
-});
+parentPort?.postMessage(await runWorkerProbe());

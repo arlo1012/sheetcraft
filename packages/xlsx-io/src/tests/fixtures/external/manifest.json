@@ -1,0 +1,115 @@
+{
+  "producer": "ExcelJS 4.4.0 browser distribution (fixture creation only)",
+  "frozen": "2026-10-09",
+  "sourceRevision": "173aa37",
+  "fixtures": [
+    {
+      "file": "fills-gradients.xlsx",
+      "sha256": "c0421ab0df9fda70f78ea66cecb30afc0772b377591cef4a956f2c3b336fe05f",
+      "bytes": 6543,
+      "source": "styles/fills.test.ts"
+    },
+    {
+      "file": "fills-malformed-gradient.xlsx",
+      "sha256": "4e2313887919a2c8b65bc33854576cdf1b37cf00f603fbc4702ad8fb1567eee3",
+      "bytes": 6467,
+      "source": "styles/fills.test.ts"
+    },
+    {
+      "file": "fills-unrepresentable-colors.xlsx",
+      "sha256": "22f4a363c22904ce20ba8f60dee9cf2962f4b09c13a8df3fd5ddf05534d4ba69",
+      "bytes": 6489,
+      "source": "styles/fills.test.ts"
+    },
+    {
+      "file": "codec-sparse-styles.xlsx",
+      "sha256": "5e7cca61f252ff914d558ff2807e8161b24ec302eff280a7a68c7a18a3ed1f05",
+      "bytes": 6116,
+      "source": "codec-loss.test.ts"
+    },
+    {
+      "file": "codec-shared-formulas.xlsx",
+      "sha256": "9bd082b33201154fd63935951ec9e676e8e50c2efb4b5fddbde6d625015a0525",
+      "bytes": 6241,
+      "source": "codec-loss.test.ts"
+    },
+    {
+      "file": "codec-invalid-font.xlsx",
+      "sha256": "88528542bfb96646bbcec2cd00f6e5cd918b91a3f0dfff638c6c6bef7eceb208",
+      "bytes": 6421,
+      "source": "codec-loss.test.ts"
+    },
+    {
+      "file": "codec-explicit-no-fill.xlsx",
+      "sha256": "0f818023409195c5dc0618b1647243b2680cb819c3e6445c615bdb0586c4c17d",
+      "bytes": 6380,
+      "source": "codec-loss.test.ts"
+    },
+    {
+      "file": "codec-malformed-number-format.xlsx",
+      "sha256": "0db453a4c011050a20ba3ffe9f02b9144c18f30d0628fa617725c85abe8c7f1e",
+      "bytes": 6136,
+      "source": "codec-loss.test.ts"
+    },
+    {
+      "file": "codec-active-tab.xlsx",
+      "sha256": "0594641381deeb54a913c9f868009adc564ac4bf5760b5920713922a1bf23aa9",
+      "bytes": 6660,
+      "source": "codec-loss.test.ts"
+    },
+    {
+      "file": "codec-invisible-diagonal.xlsx",
+      "sha256": "0886f96623fc6aeda08374103560ee55fdb69b572e93a1696f41a9e89a337e18",
+      "bytes": 6435,
+      "source": "codec-loss.test.ts"
+    },
+    {
+      "file": "codec-unsupported-borders.xlsx",
+      "sha256": "5a623ba1c97c990a392ca749f128a3adf9b3062d0e571f9a4d769a2a69e052e0",
+      "bytes": 6445,
+      "source": "codec-loss.test.ts"
+    },
+    {
+      "file": "data-tools-base.xlsx",
+      "sha256": "1a903915099554dda69c49b29c21e67414672991e1bfe1e23cfa63055453d3ea",
+      "bytes": 6534,
+      "source": "data-tools-metadata.test.ts"
+    },
+    {
+      "file": "number-formats-conditional-dbnum.xlsx",
+      "sha256": "25c0203684debfca8d6cc9e67573ec9c017ff57898fc4ca3cde0a9a7a3aa8821",
+      "bytes": 6197,
+      "source": "number-formats/xlsx-number-formats.test.ts"
+    },
+    {
+      "file": "io-values-1904.xlsx",
+      "sha256": "946f674ccf074fbfe11be293972438e98d7e94706400ce69f64970803bad716d",
+      "bytes": 6576,
+      "source": "xlsx-io.test.ts"
+    },
+    {
+      "file": "io-formula-no-cache.xlsx",
+      "sha256": "b486a05ec2d94dab66791ea81ecb84fc890907253159ec2fded7acad516d4a28",
+      "bytes": 6099,
+      "source": "xlsx-io.test.ts"
+    },
+    {
+      "file": "io-formula-zero-false-cache.xlsx",
+      "sha256": "66613433d87f0a5f320292eb6e86b7ea0b3fe7e04e3e2ff07b626a3edca1759e",
+      "bytes": 6102,
+      "source": "xlsx-io.test.ts"
+    },
+    {
+      "file": "io-relocated-notes.xlsx",
+      "sha256": "31795ee637d5a6b22c0e6591686ad8737de7aceb6db2288062dea56c20abd6ab",
+      "bytes": 8271,
+      "source": "xlsx-io.test.ts"
+    },
+    {
+      "file": "pivot-closedxml-clean-sources.xlsx",
+      "sha256": "65bbf984ad13cbc5f38e81844a901d3705bc629b521eb749211b0ff2ae84a69e",
+      "bytes": 15162,
+      "source": "pivot-tables/native-import.test.ts"
+    }
+  ]
+}

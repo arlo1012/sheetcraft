@@ -8,9 +8,11 @@
 - Retrieved: 2026-10-08
 - SHA-256: `0dfd174fbe668c27db490c5dfc1e7d8df8d075211424f5bd0b393bdc0a8ed73a`
 
-The test builds a clean workbook containing the original ordinary worksheet and
-consolidation source/output cell values, then copies their native pivot table,
-cache, record, and relationship XML unchanged. It omits unrelated connection,
+The frozen `../../fixtures/external/pivot-closedxml-clean-sources.xlsx` test input
+contains the original ordinary worksheet and consolidation source/output cell
+values, with their native pivot table, cache, record, and relationship XML copied
+unchanged. The original fixture-building recipe was run once using ExcelJS 4.4.0
+and is archived with the frozen input, its checksum, and provenance. It omits unrelated connection,
 external-workbook, and scenario sources. The input to `decodeXlsx` contains no
 product pivot extension and never passes through the product pivot exporter.
 

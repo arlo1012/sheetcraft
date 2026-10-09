@@ -1,56 +1,67 @@
 # Compatibility Lab
 
-This is an isolated Node 24 qualification package. It is intentionally outside
-the workspace globs and does not introduce Formula.js or ExcelJS to product
-runtime dependencies.
+This private development workspace exercises Sheetcraft's first-party formula
+runtime and XLSX codec through the public `@sheetcraft/core/formula`,
+`@sheetcraft/core/workbook` and `@sheetcraft/xlsx-io` package outputs. It is not
+imported by the web application and adds no lab dependency to product runtime.
+The repository's root lockfile owns installation; there is no independent lab
+lockfile or third-party spreadsheet-engine qualification dependency.
 
 The probes establish only the executed evidence recorded in the generated
 report:
 
-- direct Formula.js calls for a small, labelled representative sample;
-- ExcelJS in-memory XLSX write/read of a synthetic fixture;
-- cache provenance, known losses, an actual resolved runtime dependency tree,
-  a separate installed development inventory, and a browser / Worker-target
-  bundle attempt;
-- a Node `worker_threads` import smoke. It is Node-only evidence, never a
-  browser Worker qualification.
+- Core formula parsing/evaluation for math, case-insensitive criteria, ranges,
+  lazy branches, lookup, per-call date systems, financial/text functions and
+  typed errors;
+- first-party OOXML encode/decode of a labelled synthetic workbook, including
+  values, formula source, dates, number formats, styles, dimensions, filters,
+  frozen panes and merges;
+- imported-cache discard and recalculation after an input edit, invalid-archive
+  rejection and pre-aborted import handling;
+- actual resolved runtime dependency metadata, declared development-tool
+  metadata and public Core function metadata (not a compatibility count);
+- a browser-target Worker bundle, measured from its emitted bytes and SHA-256;
+- a Node `worker_threads` formula calculation and XLSX encode/decode smoke.
 
-They do not execute Excel, compare with an Excel-generated fixture, parse or
-evaluate formulas themselves, or claim Excel compatibility.
+The browser bundle is compile-only evidence. The Node smoke is Node-only
+evidence, never a browser Worker qualification. The lab does not execute Excel
+or compare with Excel-authored files and does not claim complete compatibility.
+
+Run from the repository root with Bun and Node 24:
 
 ```sh
-cd tools/compatibility-lab
 bun install --frozen-lockfile
+bun run build:core
+bun run build:xlsx-io
+cd tools/compatibility-lab
 bun run qualify
 ```
 
-All fixture data is synthetic and must not be labelled Excel-verified.
+Build the product packages again after changing them: the lab intentionally
+uses their public `dist` exports, without source aliases or internal imports.
+`qualify` runs typecheck, tests, browser-target bundling and a Node Worker smoke,
+then writes `reports/qualification-report.{md,json}`. These filenames remain
+stable for existing report consumers; their purpose is first-party regression
+evidence. Reports and bundles are generated, ignored artifacts.
 
-`qualify` writes `reports/qualification-report.{md,json}` after typecheck,
-tests, browser-target bundling, and the Node worker smoke all complete. The
-bundle size and SHA-256 are measured from the emitted bundle; bundling remains
-compile-only evidence. License fields are inventory metadata, not legal
-clearance; `UNSPECIFIED` entries and all obligations need legal review.
+## Regression semantics and limits
 
-## Initial observations (2026-09-05)
+- `COUNTIF(A1:A3,"North")` over `North`, `south`, `NORTH` returns `2` under Core's
+  case-insensitive criteria rules.
+- `DATE` and `WORKDAY` return numeric date serials. A 1904-system call followed
+  by a 1900-system call does not change another call's date system.
+- `NA()` returns Core's typed `{ kind: "formula-error", code: "NA" }` value;
+  errors propagate through referenced ranges, and lazy branches are tested.
+- The synthetic `Synthetic Data!C2` source is `=A2+1`. Core computes `42`; the
+  encoder writes an eligible formula cache, the importer reports/discards it,
+  and Core computes `43` after changing the restored input from `41` to `42`.
+  This is calculated synthetic provenance, not Excel-authored evidence.
+- Function metadata is the current implementation inventory, not proof of
+  exhaustive argument, reference, coercion, array or Excel compatibility.
+- Invalid-file and cancellation probes are deliberately small; the package's
+  own regression suites cover a broader surface. Neither suite substitutes
+  for an external application/oracle corpus.
 
-The lockfile pins Formula.js 4.6.1 and ExcelJS 4.4.0. The initial run passed
-three test cases containing the labelled probes and a Node-worker import smoke.
-Formula.js exposes 399 top-level exports in this package; export count is not
-an Excel function-coverage count.
-
-- Direct `COUNTIF(["North", "south", "NORTH"], "North")` returned `1`; criteria
-  case/coercion rules need adaptation and Excel-authored comparison vectors.
-- Date calls return JavaScript dates in the exercised default mode. Per-workbook
-  date-system and timezone isolation remain unqualified.
-- ExcelJS round-trips the supplied formula cache; it does not produce a newly
-  calculated value. This is not an Excel-authored roundtrip fixture.
-- The unminified browser-target bundle measured 1,776,413 bytes. This is a lab
-  artifact, not a product-entry size estimate; browser execution is untested.
-- License metadata and notice filenames are inventoried, including legacy
-  `licenses` declarations. `buffers@0.1.1` has no declaration in its installed
-  manifest and remains unresolved. jStat declares MIT in its legacy metadata
-  and includes a LICENSE file. This inventory is not redistribution clearance.
-
-The result is an adapter qualification baseline, not approval to wire either
-library directly into Core or to promise complete Excel fidelity.
+All fixture data must retain the `synthetic-not-excel-verified` label. License
+fields and notice filenames are inventory metadata, not legal clearance;
+missing declarations and redistribution obligations need review.

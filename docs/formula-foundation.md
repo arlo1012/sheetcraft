@@ -1,14 +1,21 @@
 # 公式与 Excel：基础阶段
 
-日期：2026-09-05。对应[整体兼容方案](formula-excel-compatibility-plan.md)的范围清单、Core 基础模型和候选库隔离试验。
-这不是全部公式或 XLSX 功能完成的声明；产品计算能力仍是单 Sheet A1、四则运算和 SUM。
+基础设计记录：2026-09-05；验证工具更新：2026-10-09。对应[整体兼容方案](formula-excel-compatibility-plan.md)的范围清单与 Core 基础模型。
+本文后续章节中的“本阶段”保留基础阶段设计背景，不是当前产品功能上限，也不是全部公式或 XLSX 功能完成的声明。
+
+## 当前验证入口
+
+产品公式由 Core 自有解析器、函数注册表和工作簿求值器执行；XLSX 通过 `@sheetcraft/xlsx-io` 的公开 `encodeXlsx` / `decodeXlsx` 入口读写。
+[兼容性回归实验室](../tools/compatibility-lab/README.md)直接消费这两个包的公开构建输出，覆盖代表公式、合成 OOXML 往返、缓存丢弃与重算、无效文件和取消导入。
+实验室是私有开发 workspace，使用根目录锁文件；它不会被 Web 应用导入。原候选电子表格库资格试验已替换，不再安装或调用候选计算/工作簿库。
+函数元数据数量是实现清单，合成样本是回归证据；二者都不能自动升级为 Excel 对照验证。
 
 ## 本阶段交付
 
 - [函数清单](compatibility/function-inventory.json)：Microsoft 目录快照中 521 个去重函数，逐项保留分类、来源、执行范围和六方向状态。目录刷新不覆盖人工审核的状态。
 - [特性清单](compatibility/feature-inventory.json)：41 项公式与 Excel 特性；函数数量不能代替语法、引用、重算和文件保真的验收。
 - Core：错误值、空白与空字符串区分；工作簿日期系统；共享 A1 解析与带 Sheet ID 的引用契约；可撤销日期设置；V3 快照及 V1/V2 迁移。
-- [隔离试验](../tools/compatibility-lab/README.md)：固定 Formula.js 4.6.1、ExcelJS 4.4.0，验证代表调用、合成文件往返、包依赖与构建可行性。它们没有进入产品依赖。
+- [回归实验室](../tools/compatibility-lab/README.md)：通过公开 Core / XLSX 包验证代表计算、合成文件往返和 Worker 构建/Node 运行；保留依赖元数据、缓存来源和未验证边界。
 
 清单的 `verified` 需要明确的 Excel 基准与对照样本。本阶段不把合成样本或库自身行为升级为 Excel 兼容结论，也不缩减整体函数范围。
 
@@ -76,14 +83,16 @@ Web 保存接口使用当前 `WorkbookSnapshot` 类型；旧版本类型仅用�
 bun run check:compatibility
 bun run test:core -- src/tests/formula src/tests/serialization src/tests/history src/tests/commands/workbook-settings
 bun run test:web -- src/tests/app/SpreadsheetWorkspace/formula-foundation.test.ts
-cd tools/compatibility-lab
 bun install --frozen-lockfile
+bun run build:core
+bun run build:xlsx-io
+cd tools/compatibility-lab
 bun run qualify
 ```
 
 Core 测试运行在 Node；Web 集成测试检查加载、显示、保存、富内容粘贴及无效导入不替换文档。
-产品 CI 检查类型、测试、边界、公共包导入、Worker 消费、体积，以及不联网的清单校验。候选库试验单独运行，不把它们捆入产品首屏。
+产品 CI 检查类型、测试、边界、公共包导入、Worker 消费、体积，以及不联网的清单校验。实验室回归命令单独运行，消费同一套公开构建输出；浏览器 Worker 打包仅证明编译通过，Node Worker 往返也不能充当浏览器运行证据。
 
-下一步是实现完整公式运行时的语法与求值契约、依赖图和函数适配，再按照清单建立逐函数 Excel 对照证据。
-XLSX 产品适配仍需自定义数字格式等模型、类型映射、导入原子性、资源限制与有损报告；目前只有合成文件试验，不提供产品导入导出入口。
+基础阶段后续方向包括公式运行时、依赖图、函数实现以及 XLSX 类型映射、资源限制和有损报告；这些能力的当前实现以 Core / XLSX 源码和各自测试为准，不再以当时的候选库试验为依据。
+逐函数 Excel 对照证据和外部应用文件保真验收仍需按清单单独建立。
 真实 Excel 样本、基准版本、性能预算和复杂文件保真要求仍是后续资格门槛，不因本阶段测试通过而自动满足。

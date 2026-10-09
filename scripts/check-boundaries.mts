@@ -326,6 +326,9 @@ function getDependencyDirectionViolation(
   packageName: string,
   specifier: string,
 ): string | undefined {
+  if (/^(?:exceljs|xlsx|sheetjs|@formulajs\/formulajs)(?:\/|$)/u.test(specifier)) {
+    return `${packageName} must use first-party workbook/formula engines, not ${specifier}`;
+  }
   if (packageName === "@sheetcraft/core") {
     if (/^@sheetcraft\/(?:sheet-engine|xlsx-io|web)(?:\/|$)/u.test(specifier)) {
       return `@sheetcraft/core must not depend on ${specifier}`;
@@ -345,14 +348,20 @@ function getDependencyDirectionViolation(
     if (/^@sheetcraft\/(?:sheet-engine|web)(?:\/|$)/u.test(specifier)) {
       return `@sheetcraft/xlsx-io must not depend on ${specifier}`;
     }
-    if (specifier.startsWith("exceljs/") && specifier !== "exceljs/dist/exceljs.min.js") {
-      return "@sheetcraft/xlsx-io must use the audited ExcelJS browser artifact, never the Node entry";
-    }
   }
   return undefined;
 }
 
 function assertDependencyDirection(): void {
+  for (const specifier of [
+    "exceljs",
+    "exceljs/dist/exceljs.min.js",
+    "xlsx",
+    "@formulajs/formulajs",
+  ]) {
+    if (!getDependencyDirectionViolation("@sheetcraft/xlsx-io", specifier))
+      throw new Error(`Boundary detector must reject external spreadsheet engine ${specifier}.`);
+  }
   const rejectedCoreDependency = getDependencyDirectionViolation(
     "@sheetcraft/core",
     "@sheetcraft/sheet-engine/selection",
@@ -400,15 +409,6 @@ function checkRuntimeNeutralPackage(
       continue;
     }
     const moduleName = specifier.replace(/^node:/u, "").split("/")[0] ?? specifier;
-    if (packageName === "@sheetcraft/xlsx-io" && specifier === "exceljs") {
-      addViolation(
-        violations,
-        path,
-        source,
-        match.index ?? 0,
-        "XLSX IO must import the audited browser artifact, not the ExcelJS Node entry",
-      );
-    }
     if (forbiddenRuntimeImports.some((pattern) => pattern.test(specifier))) {
       addViolation(
         violations,

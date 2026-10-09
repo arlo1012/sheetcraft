@@ -60,7 +60,7 @@ function themeColors(themeXml: string | undefined): readonly string[] {
   return colors.every((color): color is string => !!color) ? colors : DEFAULT_THEME;
 }
 
-function tint(color: string, amount: number | undefined): string {
+export function tint(color: string, amount: number | undefined): string {
   if (amount === undefined || !Number.isFinite(amount) || amount === 0) return color;
   const factor = Math.max(-1, Math.min(1, amount));
   const rgb = [0, 2, 4].map((offset) => Number.parseInt(color.slice(offset, offset + 2), 16) / 255);

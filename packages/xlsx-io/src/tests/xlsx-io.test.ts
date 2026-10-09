@@ -1,4 +1,4 @@
-import ExcelJSImport from "exceljs/dist/exceljs.min.js";
+import { readExternalFixture } from "./external-fixtures.js";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
 import { inflateRawSync } from "node:zlib";
 import {
@@ -21,85 +21,6 @@ import { DEFAULT_SHEET_PAGE_SETUP } from "@sheetcraft/core/page-setup";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx, XlsxCompatibilityError } from "../index.js";
 import { writeXlsxPageSetups } from "../page-setup.js";
-
-type BrowserWorkbook = {
-  properties: { date1904?: boolean };
-  calcProperties: { fullCalcOnLoad?: boolean };
-  addWorksheet: (
-    name: string,
-    options?: { views?: Record<string, unknown>[] },
-  ) => {
-    getCell: (address: string) => {
-      value: unknown;
-      numFmt?: string;
-      note?: string | { texts?: Array<{ text: string }> };
-    };
-    getColumn: (index: number) => { width?: number };
-    getRow: (index: number) => { height?: number };
-    mergeCells: (range: string) => void;
-  };
-  xlsx: {
-    load: (bytes: Uint8Array) => Promise<unknown>;
-    writeBuffer: () => Promise<ArrayBuffer | Uint8Array>;
-  };
-};
-const ExcelJS = ExcelJSImport as unknown as { Workbook: new () => BrowserWorkbook };
-
-async function fixtureBytes(): Promise<Uint8Array> {
-  const workbook = new ExcelJS.Workbook();
-  workbook.properties.date1904 = true;
-  const sheet = workbook.addWorksheet("Data", { views: [{ state: "frozen", ySplit: 1 }] });
-  sheet.getCell("A1").value = 41;
-  sheet.getCell("B1").value = { formula: "A1+1", result: 42 };
-  sheet.getCell("C1").value = "text";
-  sheet.getColumn(1).width = 18;
-  sheet.getRow(1).height = 30;
-  sheet.mergeCells("A3:B3");
-  sheet.getCell("A3").value = "merged";
-  const bytes = await workbook.xlsx.writeBuffer();
-  return bytes instanceof Uint8Array ? new Uint8Array(bytes) : new Uint8Array(bytes);
-}
-
-async function simpleFormulaBytes(): Promise<Uint8Array> {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Formula");
-  sheet.getCell("A1").value = 1;
-  sheet.getCell("B1").value = { formula: "A1+1" };
-  const bytes = await workbook.xlsx.writeBuffer();
-  return bytes instanceof Uint8Array ? new Uint8Array(bytes) : new Uint8Array(bytes);
-}
-
-async function formulaCacheBytes(): Promise<Uint8Array> {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Caches");
-  sheet.getCell("A1").value = { formula: "1-1", result: 0 };
-  sheet.getCell("B1").value = { formula: "1=1", result: false };
-  const bytes = await workbook.xlsx.writeBuffer();
-  return bytes instanceof Uint8Array ? new Uint8Array(bytes) : new Uint8Array(bytes);
-}
-
-async function noteFixtureBytes(): Promise<Uint8Array> {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Notes");
-  sheet.getCell("B2").value = "review me";
-  sheet.getCell("B2").note = { texts: [{ text: "First line\nSecond line" }] };
-  sheet.getCell("D4").note = { texts: [{ text: "Blank cell note" }] };
-  const bytes = await workbook.xlsx.writeBuffer();
-  const entries = unzipSync(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
-  const comments = strFromU8(entries["xl/comments1.xml"]!);
-  const commentPart = "xl/review/comments/note-part.xml";
-  entries[commentPart] = strToU8(
-    comments.replace("<author>Author</author>", "<author>Ada Lovelace</author>"),
-  );
-  delete entries["xl/comments1.xml"];
-  entries["xl/worksheets/_rels/sheet1.xml.rels"] = strToU8(
-    strFromU8(entries["xl/worksheets/_rels/sheet1.xml.rels"]!).replace(
-      'Target="../comments1.xml"',
-      'Target="/xl/review/comments/note-part.xml"',
-    ),
-  );
-  return zipSync(entries);
-}
 
 function storedZip(name: string): Uint8Array {
   const fileName = new TextEncoder().encode(name);
@@ -145,7 +66,7 @@ function xlsxEntryText(bytes: Uint8Array, targetName: string): string {
 
 describe("XLSX IO", () => {
   test("imports classic notes with their multiline text and author", async () => {
-    const result = await decodeXlsx(await noteFixtureBytes());
+    const result = await decodeXlsx(await readExternalFixture("io-relocated-notes"));
     const sheet = [...result.workbook.sheets.values()][0]!;
     expect(getCellNote(sheet, { row: 1, column: 1 })).toMatchObject({
       text: "First line\nSecond line",
@@ -193,8 +114,8 @@ describe("XLSX IO", () => {
     });
   });
 
-  test("uses the published browser artifact to decode supported values and reports uncalculated formula cache", async () => {
-    const input = await fixtureBytes();
+  test("decodes independently authored supported values and reports uncalculated formula cache", async () => {
+    const input = await readExternalFixture("io-values-1904");
     const original = new Uint8Array(input);
     const result = await decodeXlsx(input);
     const sheet = [...result.workbook.sheets.values()][0]!;
@@ -620,7 +541,7 @@ describe("XLSX IO", () => {
   });
 
   test("roundtrips the supported Core subset with a fresh formula cache", async () => {
-    const decoded = await decodeXlsx(await fixtureBytes());
+    const decoded = await decodeXlsx(await readExternalFixture("io-values-1904"));
     const encoded = await encodeXlsx(decoded.workbook as Workbook);
     const restored = await decodeXlsx(encoded.bytes);
     expect(encoded.report.issues).not.toEqual(
@@ -632,7 +553,7 @@ describe("XLSX IO", () => {
   });
 
   test("does not warn while importing a generated formula without a cache", async () => {
-    const decoded = await decodeXlsx(await simpleFormulaBytes());
+    const decoded = await decodeXlsx(await readExternalFixture("io-formula-no-cache"));
     expect(decoded.report.issues).toEqual([]);
     const encoded = await encodeXlsx(decoded.workbook as Workbook);
     const restored = await decodeXlsx(encoded.bytes);
@@ -643,7 +564,7 @@ describe("XLSX IO", () => {
   });
 
   test("recognizes zero and false formula results as real caches", async () => {
-    const decoded = await decodeXlsx(await formulaCacheBytes());
+    const decoded = await decodeXlsx(await readExternalFixture("io-formula-zero-false-cache"));
     expect(decoded.report.issues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: "formula-cache-discarded", count: 2 }),
@@ -941,7 +862,21 @@ describe("XLSX IO", () => {
     const decoded = await decodeXlsx(encoded.bytes);
     expect(decoded.report.issues).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: "formula-cache-discarded", count: 7 }),
+        // Native OOXML preserves the explicit empty-string cache at F1 too.
+        expect.objectContaining({
+          code: "formula-cache-discarded",
+          count: 8,
+          locations: [
+            "Sheet1!B1",
+            "Sheet1!C1",
+            "Sheet1!E1",
+            "Sheet1!F1",
+            "Sheet1!G1",
+            "Sheet1!H1",
+            "Sheet1!J1",
+            "Sheet1!K1",
+          ],
+        }),
       ]),
     );
   });
@@ -977,7 +912,7 @@ describe("XLSX IO", () => {
     ).toEqual({ kind: "literal", value: 6 });
   });
 
-  test("blocks unsupported parts and oversized archives before ExcelJS loads them", async () => {
+  test("blocks unsupported parts and oversized archives before workbook decoding", async () => {
     await expect(decodeXlsx(storedZip("xl/vbaProject.bin"))).rejects.toBeInstanceOf(
       XlsxCompatibilityError,
     );

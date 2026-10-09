@@ -2,7 +2,7 @@
   "name": "@sheetcraft/compatibility-lab",
   "version": "0.0.0-private",
   "private": true,
-  "description": "Isolated Formula.js and ExcelJS qualification probes; not a product dependency.",
+  "description": "First-party Core formula and XLSX regression probes through public package outputs.",
   "type": "module",
   "scripts": {
     "test": "vitest run --reporter=default --reporter=json --outputFile=reports/test-results.json",
@@ -14,9 +14,9 @@
     "qualify": "bun run typecheck && bun run test && bun run bundle:browser-worker && bun run smoke:node-worker && bun run report"
   },
   "devDependencies": {
-    "@formulajs/formulajs": "4.6.1",
+    "@sheetcraft/core": "workspace:*",
+    "@sheetcraft/xlsx-io": "workspace:*",
     "@types/node": "26.3.0",
-    "exceljs": "4.4.0",
     "typescript": "6.0.3",
     "vitest": "4.1.11"
   },

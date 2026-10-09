@@ -1,7 +1,7 @@
 import { readXlsxPivotTables } from "./pivot-tables.js";
 import { readXlsxSparklines } from "./sparklines.js";
 import { readXlsxProtection } from "./protection.js";
-import ExcelJSImport from "exceljs/dist/exceljs.min.js";
+import { NativeWorkbook } from "./native/workbook.js";
 import { unzipSync } from "fflate/browser";
 import { readExcelBorder, writeExcelBorder } from "./border.js";
 import { createFormulaCacheEligibility, formulaCacheValue } from "./formula-cache.js";
@@ -66,20 +66,11 @@ import {
 } from "./raw-cell-values.js";
 import { readXlsxDataMetadata, type XlsxDataMetadata } from "./data-tools-metadata.js";
 import { readXlsxConditionalFormatMetadata } from "./conditional-formatting.js";
-import {
-  readXlsxTableMetadata,
-  withoutTableAutoFiltersForExcelJs,
-  xlsxPivotTableStyleId,
-  xlsxTableStyleId,
-} from "./table-styles.js";
+import { readXlsxTableMetadata, xlsxPivotTableStyleId, xlsxTableStyleId } from "./table-styles.js";
 import { readXlsxCellStyles, readXlsxNamedCellStyleBindings } from "./cell-styles.js";
 import { readXlsxThemeStyleBindings } from "./theme-style-bindings.js";
 import { readXlsxHyperlinks, readXlsxWorksheetStyleIds } from "./hyperlinks.js";
-import {
-  readXlsxCellNoteVmlBoxes,
-  readXlsxCellNotes,
-  withExcelJsCompatibleCellNotes,
-} from "./cell-notes.js";
+import { readXlsxCellNoteVmlBoxes, readXlsxCellNotes } from "./cell-notes.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
   createXlsxImageExporter,
@@ -195,8 +186,6 @@ function colorSetHiddenRows(sheet: Sheet): number[] {
   }
   return rows;
 }
-type BrowserExcelJs = { Workbook: new () => BrowserWorkbook };
-const ExcelJS = ExcelJSImport as BrowserExcelJs;
 const EXCEL_FILL_PATTERNS = new Set<string>(CELL_FILL_PATTERNS);
 
 function columnLabel(column: number): string {
@@ -611,7 +600,7 @@ function readContent(
   return undefined;
 }
 
-export async function decodeWithExcelJs(
+export async function decodeWithNativeXlsx(
   bytes: Uint8Array,
 ): Promise<{ workbook: Workbook; report: XlsxCompatibilityReport }> {
   const report = new CompatibilityReportBuilder();
@@ -634,8 +623,8 @@ export async function decodeWithExcelJs(
   );
   const rawNoteBoxes = readXlsxCellNoteVmlBoxes(archive);
   const protection = readXlsxProtection(archive, report);
-  const source = new ExcelJS.Workbook();
-  await source.xlsx.load(withoutTableAutoFiltersForExcelJs(withExcelJsCompatibleCellNotes(bytes)));
+  const source: BrowserWorkbook = new NativeWorkbook();
+  await source.xlsx.load(bytes);
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
   const rawSparklines = readXlsxSparklines(
     archive,
@@ -1082,12 +1071,12 @@ function writeStyle(
   if (diagonalConflict) add(report, "style-omitted", issueLocation);
 }
 
-export async function encodeWithExcelJs(
+export async function encodeWithNativeXlsx(
   workbook: Workbook,
   options?: XlsxEncodeOptions,
 ): Promise<{ bytes: Uint8Array; report: XlsxCompatibilityReport }> {
   const report = new CompatibilityReportBuilder();
-  const target = new ExcelJS.Workbook();
+  const target: BrowserWorkbook = new NativeWorkbook();
   const imageExporter = createXlsxImageExporter(target, options);
   const cellImages: NativeCellImage[] = [];
   const dataMetadata: Array<
@@ -1246,7 +1235,7 @@ export async function encodeWithExcelJs(
       writeStyle(outputCell, cell.style, issueLocation, report);
       if (cell.note) outputCell.note = { texts: [{ text: cell.note.text }] };
     }
-    // ExcelJS shares the anchor's current style when merging. Apply styles first
+    // The exchange model shares the anchor style across the merge. Apply styles first
     // so every physical cell in the merged area receives its perimeter borders.
     for (const range of sheet.mergedCells) {
       output.mergeCells(

@@ -1,4 +1,4 @@
-import ExcelJSImport from "exceljs/dist/exceljs.min.js";
+import { readExternalFixture } from "./external-fixtures.js";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
 import { createSheetFilterHiddenRowIntervals } from "@sheetcraft/core/commands";
 import { createWorkbook, setCellContent, setCellStyle } from "@sheetcraft/core/workbook";
@@ -6,18 +6,8 @@ import { createBuiltinTableStyles } from "@sheetcraft/core/table-styles";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../index.js";
 
-const ExcelJS = ExcelJSImport as unknown as { Workbook: new () => any };
-
 async function workbookWith(xml: string): Promise<Uint8Array> {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Data");
-  sheet.getCell("A1").value = "Name";
-  sheet.getCell("B1").value = "Score";
-  sheet.getCell("A2").value = "Ada";
-  sheet.getCell("B2").value = 3;
-  sheet.getCell("A3").value = "Grace";
-  sheet.getCell("B3").value = 8;
-  const entries = unzipSync(new Uint8Array(await workbook.xlsx.writeBuffer()));
+  const entries = unzipSync(await readExternalFixture("data-tools-base"));
   const source = strFromU8(entries["xl/worksheets/sheet1.xml"]!);
   entries["xl/worksheets/sheet1.xml"] = strToU8(
     source.replace("</worksheet>", `${xml}</worksheet>`),

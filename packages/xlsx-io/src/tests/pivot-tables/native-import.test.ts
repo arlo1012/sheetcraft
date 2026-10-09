@@ -1,5 +1,4 @@
-import ExcelJSImport from "exceljs/dist/exceljs.min.js";
-import { readFile } from "node:fs/promises";
+import { readExternalFixture } from "../external-fixtures.js";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
 import { describe, expect, test } from "vitest";
 import { createSetPivotTableCommand, createSetCellContentCommand } from "@sheetcraft/core/commands";
@@ -13,88 +12,6 @@ import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import { getCellValue, type Workbook } from "@sheetcraft/core/workbook";
 import { decodeXlsx, XlsxCompatibilityError } from "../../index.js";
-
-type FixtureCell = { address: string; value: unknown };
-type FixtureSheet = {
-  getCell(address: string): { value: unknown };
-  eachRow(callback: (row: { eachCell(callback: (cell: FixtureCell) => void): void }) => void): void;
-};
-type FixtureWorkbook = {
-  addWorksheet(name: string): FixtureSheet;
-  getWorksheet(name: string): FixtureSheet | undefined;
-  xlsx: { load(bytes: Uint8Array): Promise<unknown>; writeBuffer(): Promise<ArrayBuffer> };
-};
-const ExcelJS = ExcelJSImport as unknown as { Workbook: new () => FixtureWorkbook };
-const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const PACKAGE_NS = "http://schemas.openxmlformats.org/package/2006/relationships";
-const SOURCE_SHEETS = ["Area Source", "Area - PT", "Consolidate", "Consolidate - PT"];
-
-/** Keep native pivot XML independent of the product exporter and omit external/scenario sources. */
-async function nativeFixture(): Promise<Uint8Array> {
-  const bytes = new Uint8Array(
-    await readFile(new URL("./fixtures/closedxml-all-sources.xlsx", import.meta.url)),
-  );
-  const original = new ExcelJS.Workbook();
-  await original.xlsx.load(bytes);
-  const clean = new ExcelJS.Workbook();
-  for (const name of SOURCE_SHEETS) {
-    const destination = clean.addWorksheet(name);
-    original.getWorksheet(name)!.eachRow((row) =>
-      row.eachCell((cell) => {
-        destination.getCell(cell.address).value = cell.value;
-      }),
-    );
-  }
-  const entries = unzipSync(new Uint8Array(await clean.xlsx.writeBuffer()));
-  const independent = unzipSync(bytes);
-  const bindings = [
-    { sheet: 2, pivot: 3, cache: 1, records: 1, cacheId: 0 },
-    { sheet: 4, pivot: 7, cache: 7, records: 6, cacheId: 6 },
-  ];
-  const overrides: string[] = [];
-  for (const binding of bindings) {
-    const pivotPath = `xl/pivotTables/pivotTable${binding.pivot}.xml`;
-    const cachePath = `xl/pivotCache/pivotCacheDefinition${binding.cache}.xml`;
-    const recordsPath = `xl/pivotCache/pivotCacheRecords${binding.records}.xml`;
-    for (const path of [
-      pivotPath,
-      `xl/pivotTables/_rels/pivotTable${binding.pivot}.xml.rels`,
-      cachePath,
-      `xl/pivotCache/_rels/pivotCacheDefinition${binding.cache}.xml.rels`,
-      recordsPath,
-    ])
-      entries[path] = independent[path]!;
-    for (const [path, type] of [
-      [pivotPath, "pivotTable"],
-      [cachePath, "pivotCacheDefinition"],
-      [recordsPath, "pivotCacheRecords"],
-    ])
-      overrides.push(
-        `<Override PartName="/${path}" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.${type}+xml"/>`,
-      );
-    entries[`xl/worksheets/_rels/sheet${binding.sheet}.xml.rels`] = strToU8(
-      `<Relationships xmlns="${PACKAGE_NS}"><Relationship Id="rIdNativePivot" Type="${REL_NS}/pivotTable" Target="../pivotTables/pivotTable${binding.pivot}.xml"/></Relationships>`,
-    );
-  }
-  const workbookPath = "xl/workbook.xml";
-  entries[workbookPath] = strToU8(
-    strFromU8(entries[workbookPath]!).replace(
-      "</workbook>",
-      `<pivotCaches>${bindings.map((binding) => `<pivotCache cacheId="${binding.cacheId}" r:id="rIdNativeCache${binding.cacheId}"/>`).join("")}</pivotCaches></workbook>`,
-    ),
-  );
-  const relsPath = "xl/_rels/workbook.xml.rels";
-  entries[relsPath] = strToU8(
-    strFromU8(entries[relsPath]!).replace(
-      "</Relationships>",
-      `${bindings.map((binding) => `<Relationship Id="rIdNativeCache${binding.cacheId}" Type="${REL_NS}/pivotCacheDefinition" Target="pivotCache/pivotCacheDefinition${binding.cache}.xml"/>`).join("")}</Relationships>`,
-    ),
-  );
-  entries["[Content_Types].xml"] = strToU8(
-    strFromU8(entries["[Content_Types].xml"]!).replace("</Types>", `${overrides.join("")}</Types>`),
-  );
-  return zipSync(entries);
-}
 function sheetNamed(workbook: Workbook, name: string) {
   const sheet = [...workbook.sheets.values()].find((sheet) => sheet.name === name);
   if (!sheet) throw new Error(`Missing imported sheet: ${name}`);
@@ -103,7 +20,7 @@ function sheetNamed(workbook: Workbook, name: string) {
 
 describe("independent native XLSX pivot import", () => {
   test("imports an ordinary worksheet pivot without a product extension and allows configuring its fields", async () => {
-    const bytes = await nativeFixture();
+    const bytes = await readExternalFixture("pivot-closedxml-clean-sources");
     const entries = unzipSync(bytes);
     expect(Object.keys(entries)).not.toContain("xl/connections.xml");
     expect(Object.keys(entries)).not.toContain("xl/pivotCache/pivotCacheDefinition5.xml");
@@ -138,7 +55,7 @@ describe("independent native XLSX pivot import", () => {
   });
 
   test("imports native consolidation ranges and page assignments, preserves cached cells, and refreshes from source", async () => {
-    const bytes = await nativeFixture();
+    const bytes = await readExternalFixture("pivot-closedxml-clean-sources");
     const entries = unzipSync(bytes);
     expect(strFromU8(entries["xl/pivotTables/pivotTable7.xml"]!)).not.toContain("urn:sheetcraft");
     const { workbook } = await decodeXlsx(bytes);
@@ -192,7 +109,7 @@ describe("independent native XLSX pivot import", () => {
   test.each(["grouped", "calculated"] as const)(
     "reports an unsupported %s native cache while preserving its saved output cells",
     async (kind) => {
-      const entries = unzipSync(await nativeFixture());
+      const entries = unzipSync(await readExternalFixture("pivot-closedxml-clean-sources"));
       const path = "xl/pivotCache/pivotCacheDefinition7.xml";
       const cache = strFromU8(entries[path]!);
       entries[path] = strToU8(
@@ -219,7 +136,7 @@ describe("independent native XLSX pivot import", () => {
   );
 
   test("blocks DTD declarations in a pivot cache during public archive preflight", async () => {
-    const entries = unzipSync(await nativeFixture());
+    const entries = unzipSync(await readExternalFixture("pivot-closedxml-clean-sources"));
     const path = "xl/pivotCache/pivotCacheDefinition7.xml";
     entries[path] = strToU8(
       strFromU8(entries[path]!).replace(

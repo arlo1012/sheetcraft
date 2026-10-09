@@ -1,4 +1,4 @@
-import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
+import { strFromU8, strToU8, unzipSync } from "fflate/browser";
 import {
   createBuiltinTableStyles,
   TABLE_STYLE_ELEMENTS,
@@ -321,25 +321,6 @@ export function readXlsxTableMetadata(bytes: Uint8Array): {
   };
 }
 
-/**
- * ExcelJS rejects valid table auto-filter children such as colorFilter. Table
- * metadata is read directly above, so load a table-filter-free copy only for
- * ExcelJS's cell/grid parser and restore the raw table contract afterwards.
- */
-export function withoutTableAutoFiltersForExcelJs(bytes: Uint8Array): Uint8Array {
-  const entries = unzipSync(bytes);
-  let changed = false;
-  for (const [path, entry] of Object.entries(entries)) {
-    if (!/^xl\/tables\/table\d+\.xml$/i.test(path)) continue;
-    const xml = strFromU8(entry);
-    const next = xml.replace(/<autoFilter\b[^>]*(?:\/>|>[\s\S]*?<\/autoFilter>)/i, "");
-    if (next === xml) continue;
-    entries[path] = strToU8(next);
-    changed = true;
-  }
-  return changed ? zipSync(entries) : bytes;
-}
-
 export function xlsxTableStyleId(name: string | undefined): string | undefined {
   if (!name) return undefined;
   return /^TableStyle(Light|Medium|Dark)(\d+)$/i.test(name)
@@ -573,7 +554,7 @@ export function writeXlsxTableMetadata(
     );
     entries[path] = strToU8(
       xml.replace(
-        /<extLst\b|<\/worksheet>/i,
+        /<\/worksheet>/i,
         (match) => `<tableParts count="${parts.length}">${parts.join("")}</tableParts>${match}`,
       ),
     );

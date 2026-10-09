@@ -56,6 +56,14 @@ Charts, conditional formatting, printing,
 additional Ribbon categories, and view/zoom controls remain unimplemented;
 their existing disabled UI entries are placeholders.
 
+## Engine ownership
+
+Workbook formulas and XLSX byte conversion use first-party implementations. The
+external-library qualification lab has become a first-party regression workspace.
+ZIP/XML helpers and the existing Office encryption/container helpers remain.
+See [native XLSX migration](docs/native-xlsx-migration.md) for exact scope, fixture
+provenance, validation and compatibility limits.
+
 ## Commands
 
 ```bash

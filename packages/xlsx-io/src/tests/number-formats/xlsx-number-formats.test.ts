@@ -1,4 +1,4 @@
-import ExcelJSImport from "exceljs/dist/exceljs.min.js";
+import { readExternalFixture } from "../external-fixtures.js";
 import {
   createWorkbook,
   getActiveSheet,
@@ -11,15 +11,6 @@ import type { CellNumberFormat } from "@sheetcraft/core/style";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../../index.js";
 import { fromExcelNumberFormat, toExcelNumberFormat } from "../../number-format.js";
-
-type BrowserWorkbook = {
-  properties: { date1904?: boolean };
-  addWorksheet: (name: string) => {
-    getCell: (address: string) => { value: unknown; numFmt?: string };
-  };
-  xlsx: { writeBuffer: () => Promise<ArrayBuffer | Uint8Array> };
-};
-const ExcelJS = ExcelJSImport as unknown as { Workbook: new () => BrowserWorkbook };
 
 const formats: readonly CellNumberFormat[] = [
   { kind: "number", fractionDigits: 2 },
@@ -92,15 +83,7 @@ describe("XLSX number formats", () => {
   );
 
   test("keeps valid conditional and DBNum codes instead of reporting them as omitted", async () => {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Formats");
-    sheet.getCell("A1").value = 1;
-    sheet.getCell("A1").numFmt = "[Red][<=0]0.00;[Blue]0.00";
-    sheet.getCell("B1").value = 123;
-    sheet.getCell("B1").numFmt = "[DBNum2]General";
-    const bytes = await workbook.xlsx.writeBuffer();
-
-    const decoded = await decodeXlsx(new Uint8Array(bytes));
+    const decoded = await decodeXlsx(await readExternalFixture("number-formats-conditional-dbnum"));
     const restored = getActiveSheet(decoded.workbook);
     expect(getCellStyle(restored, { row: 0, column: 0 })?.numberFormat).toEqual({
       kind: "custom",

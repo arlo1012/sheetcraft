@@ -38,7 +38,7 @@ review    Needs a separate compatibility/product decision before a promise.
 The Microsoft [alphabetical catalog](https://support.microsoft.com/en-us/excel/excel-functions-alphabetical)
 is the function enumeration source; its [category catalog](https://support.microsoft.com/en-us/excel/excel-functions-by-category)
 is retained as a reconciliation source. The project must not infer a completed
-inventory from Formula.js or any other calculation library.
+inventory from a calculation engine's exports, including Core's own function registry.
 
 ## Validation and controlled refresh
 
@@ -52,8 +52,11 @@ node --test scripts/compatibility/catalog/catalog.test.mjs
 It checks schema versions, captured timestamps, source URLs, unique function
 names/feature IDs, required scopes, and complete six-direction statuses. It
 does not fetch the network. Root `bun run check:compatibility` runs both checks,
-and `bun run ci` includes that offline gate. Library qualification remains a
-separate isolated command, not part of the product dependency graph.
+and `bun run ci` includes that offline gate. The
+[first-party regression lab](../../tools/compatibility-lab/README.md) remains a
+separate development command. It consumes public Core/XLSX package outputs and
+the root workspace lockfile, but is not imported by product runtime. Its
+synthetic formula and OOXML probes do not promote catalog entries to `verified`.
 
 The updater is a deliberate review action, not CI behavior:
 

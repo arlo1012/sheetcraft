@@ -1,4 +1,9 @@
-import * as Formula from "@formulajs/formulajs";
-import ExcelJS from "exceljs/dist/exceljs.min.js";
+import { runWorkerProbe } from "./worker-probe.mjs";
 
-export { ExcelJS, Formula };
+globalThis.onmessage = async () => {
+  try {
+    globalThis.postMessage({ runtime: "browser-worker", ...(await runWorkerProbe()) });
+  } catch (error) {
+    globalThis.postMessage({ error: String(error) });
+  }
+};

@@ -1,5 +1,6 @@
 import { strFromU8, unzipSync } from "fflate/browser";
 import { describe, expect, test } from "vitest";
+import { XMLValidator } from "fast-xml-parser";
 import {
   createWorkbook,
   getActiveSheet,
@@ -13,6 +14,31 @@ import { readXlsxCellStyles } from "../cell-styles.js";
 import { readXlsxWorkbookTheme } from "../workbook-theme.js";
 
 describe("XLSX workbook themes", () => {
+  test("writes valid theme-bound styles on blank cells", async () => {
+    const workbook = createWorkbook({ id: "blank-theme-reference", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        fillColor: "#aabbcc",
+        fillColorTheme: { slot: "accent1" },
+        fontTheme: "major",
+      },
+    );
+    const encoded = await encodeXlsx(workbook);
+    const entries = unzipSync(encoded.bytes);
+    for (const [path, bytes] of Object.entries(entries))
+      if (path.endsWith(".xml") || path.endsWith(".rels"))
+        expect(XMLValidator.validate(strFromU8(bytes)), path).toBe(true);
+    expect(encoded.report.issues).toEqual([]);
+    const restored = getActiveSheet((await decodeXlsx(encoded.bytes)).workbook);
+    expect(getCellStyle(restored, { row: 0, column: 0 })).toMatchObject({
+      fillColorTheme: { slot: "accent1" },
+      fontTheme: "major",
+    });
+  });
+
   test("projects document theme colors and fonts into theme1.xml and restores them", async () => {
     const workbook = createWorkbook({ id: "theme-book", sheetId: "sheet" });
     workbook.theme = {

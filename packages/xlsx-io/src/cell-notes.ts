@@ -1,4 +1,4 @@
-import { strFromU8, strToU8, unzipSync, zipSync, type Unzipped } from "fflate/browser";
+import { strFromU8, strToU8, type Unzipped } from "fflate/browser";
 import {
   getColumnWidth,
   getRowHeight,
@@ -7,6 +7,8 @@ import {
   type Sheet,
 } from "@sheetcraft/core/workbook";
 import { readXlsxWorksheetPartTargets } from "./raw-cell-values.js";
+import { decodeSpreadsheetText } from "./native/reader-xml.js";
+import { xlsxText } from "./native/writer-text.js";
 
 type RawCellNotes = Array<Map<string, CellNote>>;
 export type XlsxVmlNoteBox = Readonly<{ left: number; top: number; width: number; height: number }>;
@@ -23,14 +25,6 @@ function decodeXml(value: string): string {
       ? String.fromCodePoint(codePoint)
       : entity;
   });
-}
-
-function escapeXml(value: string): string {
-  return value.replace(
-    /[&<>"']/g,
-    (character) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character]!,
-  );
 }
 
 function attribute(attributes: string, name: string): string | undefined {
@@ -105,7 +99,7 @@ function readComments(
     ...(/<(?:\w+:)?authors\b[^>]*>([\s\S]*?)<\/(?:\w+:)?authors>/i.exec(xml)?.[1] ?? "").matchAll(
       /<(?:\w+:)?author\b[^>]*>([\s\S]*?)<\/(?:\w+:)?author>|<(?:\w+:)?author\b[^>]*\/>/gi,
     ),
-  ].map((match) => decodeXml(match[1] ?? ""));
+  ].map((match) => decodeSpreadsheetText(decodeXml(match[1] ?? "")));
   const notes = new Map<string, CellNote>();
   for (const comment of xml.matchAll(
     /<(?:\w+:)?comment\b([^>]*)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?comment>)/gi,
@@ -114,7 +108,7 @@ function readComments(
     if (!ref) continue;
     const content = comment[2] ?? "";
     const text = [...content.matchAll(/<(?:\w+:)?t\b[^>]*>([\s\S]*?)<\/(?:\w+:)?t>/gi)]
-      .map((match) => decodeXml(match[1] ?? ""))
+      .map((match) => decodeSpreadsheetText(decodeXml(match[1] ?? "")))
       .join("");
     const authorId = Number(attribute(comment[1] ?? "", "authorId"));
     const author = Number.isInteger(authorId) && authorId >= 0 ? authors[authorId] : undefined;
@@ -129,7 +123,7 @@ function readComments(
   return notes;
 }
 
-/** Reads classic XLSX cell notes, including author identity, outside ExcelJS's incomplete comment model. */
+/** Reads classic XLSX cell notes, including author identity, through relationship targets. */
 export function readXlsxCellNotes(
   entries: Record<string, Uint8Array>,
   onMalformedNote?: (sheetIndex: number, reference: string) => void,
@@ -222,44 +216,6 @@ export function readXlsxCellNoteVmlBoxes(
   });
 }
 
-/**
- * ExcelJS only discovers comments named `commentsN.xml`. Retain the original
- * package for our raw reader, but give its grid parser a temporary conventional
- * alias for any valid comments relationship target.
- */
-export function withExcelJsCompatibleCellNotes(bytes: Uint8Array): Uint8Array {
-  const entries = unzipSync(bytes);
-  const worksheetParts = readXlsxWorksheetPartTargets(entries);
-  let nextPartNumber = 1;
-  let changed = false;
-  for (const worksheetPart of worksheetParts) {
-    const relationship = commentRelationshipForWorksheet(entries, worksheetPart);
-    if (!relationship) continue;
-    const relsPart = worksheetRelationshipPart(worksheetPart);
-    const rels = strFromU8(entries[relsPart]!);
-    let alias = `xl/comments${nextPartNumber}.xml`;
-    while (entries[alias] && alias !== relationship.part)
-      alias = `xl/comments${++nextPartNumber}.xml`;
-    nextPartNumber += 1;
-    const relativeAlias = `../${alias.slice("xl/".length)}`;
-    if (relationship.part === alias && relationship.target === relativeAlias) continue;
-    entries[alias] = entries[relationship.part]!;
-    entries[relsPart] = strToU8(
-      rels.replace(/<Relationship\b([^>]*)\/?\s*>/gi, (whole, attrs: string) =>
-        /\/comments$/i.test(attribute(attrs, "Type") ?? "") &&
-        attribute(attrs, "Target") === relationship.target
-          ? whole.replace(
-              attrs,
-              attrs.replace(/\bTarget\s*=\s*(["'])[^"']*\1/i, `Target="${relativeAlias}"`),
-            )
-          : whole,
-      ),
-    );
-    changed = true;
-  }
-  return changed ? zipSync(entries) : bytes;
-}
-
 function cellAddress(key: string): string | undefined {
   const [row, column, extra] = key.split(":").map(Number);
   if (
@@ -313,7 +269,7 @@ export function writeXlsxCellNotes(entries: Unzipped, sheets: readonly Sheet[]):
         return whole.replace(attrs, `${withoutAuthorId} authorId="${id}"`);
       },
     );
-    const authorXml = `<authors>${authors.map((author) => `<author>${escapeXml(author)}</author>`).join("")}</authors>`;
+    const authorXml = `<authors>${authors.map((author) => `<author>${xlsxText(author)}</author>`).join("")}</authors>`;
     entries[commentPart] = strToU8(
       comments.replace(/<authors\b[^>]*>[\s\S]*?<\/authors>/i, authorXml),
     );
