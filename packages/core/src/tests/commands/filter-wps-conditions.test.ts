@@ -147,7 +147,7 @@ describe("WPS filter conditions", () => {
     ]);
     expect(
       createWorkbookEvaluator(session.workbook, sheet.id).getComputedValue({ row: 0, column: 2 }),
-    ).toBe(20);
+    ).toBe(19); // The visible rows contain 10 and 9; filtered rows never enter SUBTOTAL.
     expect(
       deserializeWorkbook(serializeWorkbook(session.workbook)).sheets.get(sheet.id)?.filter,
     ).toMatchObject({

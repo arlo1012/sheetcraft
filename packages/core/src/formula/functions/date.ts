@@ -48,11 +48,12 @@ function system(context: FormulaFunctionContext) {
 function dateParts(
   context: FormulaFunctionContext,
   index: number,
+  preserveTime = false,
 ): ExcelDateParts | ReturnType<typeof formulaError> {
   const value = number(context, index);
   if (isFormulaError(value)) return value;
   try {
-    return excelSerialToDateParts(Math.floor(value), system(context));
+    return excelSerialToDateParts(preserveTime ? value : Math.floor(value), system(context));
   } catch {
     return formulaError("NUM");
   }
@@ -465,7 +466,11 @@ export const DATE_FUNCTIONS = [
         lazy: false,
       },
       (context) => {
-        const parts = dateParts(context, 0);
+        const parts = dateParts(
+          context,
+          0,
+          name === "HOUR" || name === "MINUTE" || name === "SECOND",
+        );
         if (isFormulaError(parts)) return parts;
         return name === "YEAR"
           ? parts.year
