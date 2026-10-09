@@ -20,9 +20,8 @@ round trip, and production bundle budgets.
 The Worker smoke transfers a snapshot and command, evaluates a formula, checks
 undo/redo and Sheet geometry, and validates the returned snapshot in the host.
 It runs in Bun's Worker runtime after browser-target bundling; real-browser
-interaction checks remain separate. Gitea Actions runs the root gate on pushes
-and pull requests when repository Actions and a matching runner are enabled;
-see [Continuous Integration](../ci.md) for the deployment requirements.
+interaction checks remain separate. Run the root gate locally with `bun run ci`;
+see [Quality Checks](../ci.md) for the command and its scope.
 
 Core structural history stores sparse axis slices for row and column changes.
 An inverse records only deleted entries or entries truncated at the final axis

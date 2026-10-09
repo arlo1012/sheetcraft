@@ -91,7 +91,7 @@ server together.
 
 See [Development](docs/development.md) for the local edit/verify/commit workflow,
 [Web Component Contracts](docs/web-components.md) for shared interactions, and
-[Continuous Integration](docs/ci.md) for the Gitea workflow and runner setup.
+[Quality Checks](docs/ci.md) for the local verification gate.
 
 ## UI Composition
 
