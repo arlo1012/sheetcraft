@@ -317,6 +317,7 @@ export async function preflightXlsxArchive(
         lowerName === "[content_types].xml" ||
         lowerName.endsWith(".rels") ||
         lowerName === "xl/workbook.xml" ||
+        /^xl\/pivot[^/]*\/[^/]+\.xml$/.test(lowerName) ||
         /^xl\/worksheets\/[^/]+\.xml$/.test(lowerName);
       const content = await verifyActualUncompressedSize(entry, bytes, signal, inspect);
       if (content) inspectedContents.set(entry.name.toLowerCase(), content);
@@ -359,7 +360,6 @@ export async function preflightXlsxArchive(
       report.add("macro-content", "block", entry.name);
     if (
       name.startsWith("xl/tables/") ||
-      name.startsWith("xl/pivot") ||
       name.startsWith("xl/charts") ||
       name.startsWith("customxml/") ||
       name.startsWith("xl/connections")

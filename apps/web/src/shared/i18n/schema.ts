@@ -407,7 +407,9 @@ export type MessageSchema = ToolMessageSchema & {
       contains: string;
       doesNotContain: string;
       beginsWith: string;
+      doesNotBeginWith: string;
       endsWith: string;
+      doesNotEndWith: string;
       greaterThan: string;
       greaterThanOrEqual: string;
       lessThan: string;

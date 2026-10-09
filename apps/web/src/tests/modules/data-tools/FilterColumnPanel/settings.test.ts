@@ -6,7 +6,7 @@ import FilterColumnPanel from "../../../../modules/data-tools/components/FilterC
 import {
   readFilterPanelSettings,
   type FilterPanelSettings,
-} from "../../../../modules/data-tools/filter-panel-settings";
+} from "../../../../shared/filter/filter-panel-settings";
 
 const values = [
   { key: { kind: "string" as const, value: "Alpha" }, label: "Alpha", count: 2 },
@@ -102,7 +102,7 @@ describe("filter-column settings", () => {
       new DOMWrapper(document.body).findAll(".filter-value-list__row .filter-value-list__count"),
     ).toHaveLength(0);
     expect(panel().text()).toContain("0 of 2 records selected");
-    expect(panel().get(".filter-column-panel__summary").text()).toBe("0 of 2 records selected");
+    expect(panel().get(".filter-panel-actions__summary").text()).toBe("0 of 2 records selected");
     const bottom = panel().get(".filter-column-panel__bottom");
     expect(bottom.element.firstElementChild?.className).toBe("filter-column-panel__criteria");
     expect(panel().text()).toContain("Search values：Alpha");

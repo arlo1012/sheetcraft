@@ -222,7 +222,14 @@ export type WorkbookSnapshotV32 = Omit<WorkbookSnapshotV31, "version"> & { versi
 export type WorkbookSnapshotV33 = Omit<WorkbookSnapshotV32, "version"> & { version: 33 };
 export type WorkbookSnapshotV34 = Omit<WorkbookSnapshotV33, "version"> & { version: 34 };
 export type WorkbookSnapshotV35 = Omit<WorkbookSnapshotV34, "version"> & { version: 35 };
-export type WorkbookSnapshot = WorkbookSnapshotV35;
+export type WorkbookSnapshotV36 = Omit<WorkbookSnapshotV35, "version"> & { version: 36 };
+export type WorkbookSnapshotV37 = Omit<WorkbookSnapshotV36, "version"> & { version: 37 };
+export type WorkbookSnapshotV38 = Omit<WorkbookSnapshotV37, "version"> & { version: 38 };
+export type WorkbookSnapshotV39 = Omit<WorkbookSnapshotV38, "version"> & { version: 39 };
+export type WorkbookSnapshotV40 = Omit<WorkbookSnapshotV39, "version"> & { version: 40 };
+export type WorkbookSnapshotV41 = Omit<WorkbookSnapshotV40, "version"> & { version: 41 };
+export type WorkbookSnapshotV42 = Omit<WorkbookSnapshotV41, "version"> & { version: 42 };
+export type WorkbookSnapshot = WorkbookSnapshotV42;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -274,7 +281,14 @@ type SnapshotVersion =
   | 32
   | 33
   | 34
-  | 35;
+  | 35
+  | 36
+  | 37
+  | 38
+  | 39
+  | 40
+  | 41
+  | 42;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -527,6 +541,19 @@ function parseFilterValue(
   return fail(path, "Invalid filter value.");
 }
 
+function requiresTextFilterV37(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const condition = value as UnknownRecord;
+  if (condition.kind === "compound")
+    return Array.isArray(condition.conditions) && condition.conditions.some(requiresTextFilterV37);
+  return (
+    condition.kind === "text" &&
+    !["contains", "doesNotContain", "beginsWith", "endsWith", "equals", "notEquals"].includes(
+      String(condition.operator),
+    )
+  );
+}
+
 function parseFilter(value: unknown, path: string, version: SnapshotVersion): SheetFilter {
   const record = asRecord(value, path);
   const advancedRecord =
@@ -570,6 +597,8 @@ function parseFilter(value: unknown, path: string, version: SnapshotVersion): Sh
     columns: asArray(record.columns, `${path}.columns`).map((column, index) => {
       const columnRecord = asRecord(column, `${path}.columns[${index}]`);
       const condition = columnRecord.condition;
+      if (version < 37 && requiresTextFilterV37(condition))
+        return fail(path, "Text comparison filters require snapshot version 37.");
       return {
         column: asInteger(columnRecord.column, `${path}.columns[${index}].column`),
         allowedValues: asArray(
@@ -739,6 +768,116 @@ function parseSparseState(
     })
   )
     return fail(path, "Pivot page fields and standard report layouts require snapshot version 35.");
+  if (
+    version < 36 &&
+    Array.isArray(record.pivotTables) &&
+    record.pivotTables.some((item) => {
+      const table = asRecord(item, path);
+      const report =
+        table.reportLayout === undefined ? undefined : asRecord(table.reportLayout, path);
+      return (
+        table.axisFilters !== undefined ||
+        report?.fillColor !== undefined ||
+        report?.borderColor !== undefined
+      );
+    })
+  )
+    return fail(path, "Pivot field filters and report colors require snapshot version 36.");
+  if (
+    version < 42 &&
+    Array.isArray(record.drawings) &&
+    record.drawings.some((item) => {
+      const drawing = asRecord(item, path);
+      return drawing.kind === "chart" && asRecord(drawing.chart, path).dataCache !== undefined;
+    })
+  )
+    return fail(path, "Static chart data requires snapshot version 42.");
+  if (
+    version < 41 &&
+    Array.isArray(record.pivotTables) &&
+    record.pivotTables.some((item) => {
+      const values = asRecord(item, path).values;
+      return (
+        Array.isArray(values) &&
+        values.some((item) => {
+          const value = asRecord(item, path);
+          return (
+            value.display !== undefined ||
+            value.numberFormat !== undefined ||
+            !["sum", "count", "average", "min", "max"].includes(String(value.aggregate))
+          );
+        })
+      );
+    })
+  )
+    return fail(path, "Pivot value calculations require snapshot version 41.");
+  if (
+    version < 40 &&
+    Array.isArray(record.pivotTables) &&
+    record.pivotTables.some((item) => asRecord(item, path).groups !== undefined)
+  )
+    return fail(path, "Pivot grouping requires snapshot version 40.");
+  if (
+    version < 39 &&
+    Array.isArray(record.pivotTables) &&
+    record.pivotTables.some((item) => {
+      const table = asRecord(item, path);
+      return (
+        table.dataCache !== undefined ||
+        (table.resultLayout !== undefined &&
+          asRecord(table.resultLayout, path).valueRows !== undefined)
+      );
+    })
+  )
+    return fail(path, "Pivot data caches require snapshot version 39.");
+  if (
+    version < 38 &&
+    record.pivotTables !== undefined &&
+    asArray(record.pivotTables, path).some((pivot) => {
+      const table = asRecord(pivot, path);
+      return (
+        table.sortFields !== undefined ||
+        (table.resultLayout !== undefined &&
+          asRecord(table.resultLayout, path).rowFieldIndices !== undefined) ||
+        (Array.isArray(table.axisFilters) &&
+          table.axisFilters.some((filter) => {
+            const entry = asRecord(filter, path);
+            if (!entry.valueCondition) return false;
+            const rule = asRecord(asRecord(entry.valueCondition, path).condition, path);
+            return rule.kind === "rank" && rule.mode !== undefined;
+          }))
+      );
+    })
+  )
+    return fail(path, "Pivot field sorting and rank units require snapshot version 38.");
+  if (
+    version < 37 &&
+    Array.isArray(record.tables) &&
+    record.tables.some((item) => {
+      const table = asRecord(item, path);
+      if (!table.filter || typeof table.filter !== "object") return false;
+      const filter = table.filter as UnknownRecord;
+      return (
+        Array.isArray(filter.columns) &&
+        filter.columns.some((column) => requiresTextFilterV37(asRecord(column, path).condition))
+      );
+    })
+  )
+    return fail(path, "Text comparison filters require snapshot version 37.");
+  if (
+    version < 37 &&
+    Array.isArray(record.pivotTables) &&
+    record.pivotTables.some((item) => {
+      const table = asRecord(item, path);
+      return (
+        Array.isArray(table.axisFilters) &&
+        table.axisFilters.some((filter) =>
+          requiresTextFilterV37(asRecord(filter, path).labelCondition),
+        )
+      );
+    })
+  )
+    return fail(path, "Text comparison filters require snapshot version 37.");
   if (version < 31 && Object.hasOwn(record, "pivotTables"))
     return fail(path, "Pivot tables require snapshot version 31.");
   if (version < 25 && Object.hasOwn(record, "drawings"))
@@ -871,11 +1010,11 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
             ?.image?.transform?.annotations !== undefined,
       );
     version = hasAnnotations
-      ? 35
-      : Object.hasOwn(record, "pivotTables")
-        ? 35
+      ? 42
+      : Object.hasOwn(record, "pivotTables") || Object.hasOwn(record, "filter")
+        ? 42
         : Object.hasOwn(record, "drawings")
-          ? 31
+          ? 42
           : cells.some((cell) => Object.hasOwn(asRecord(cell, path), "sparkline"))
             ? 27
             : (Array.isArray(record.floatingImages) &&
@@ -1012,7 +1151,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 35,
+    version: 42,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1079,7 +1218,14 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 32 &&
     record.version !== 33 &&
     record.version !== 34 &&
-    record.version !== 35
+    record.version !== 35 &&
+    record.version !== 36 &&
+    record.version !== 37 &&
+    record.version !== 38 &&
+    record.version !== 39 &&
+    record.version !== 40 &&
+    record.version !== 41 &&
+    record.version !== 42
   ) {
     throw new WorkbookDomainError(
       {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { getPivotActiveField } from "../../pivot-tables/pivot-active-field";
 import PivotReportFilters from "../../pivot-tables/components/PivotReportFilters.vue";
-import type { SheetPivotTable } from "@idea10/core/pivot-tables";
+import { isPivotValueCell, type SheetPivotTable } from "@idea10/core/pivot-tables";
 import PivotEmptyReports from "../../pivot-tables/components/PivotEmptyReports.vue";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer.vue";
@@ -298,6 +299,9 @@ const emit = defineEmits<{
   configurePivot: [id: string];
   updatePivot: [table: SheetPivotTable];
   configurePivotFilter: [id: string, index: number];
+  showPivotDetails: [id: string, address: CellAddress];
+  groupPivotField: [id: string];
+  ungroupPivotField: [id: string];
   changeControl: [id: string, value: unknown];
   unlockRange: [range: CellRange];
   contextAction: [request: SheetContextRequest];
@@ -2574,6 +2578,37 @@ function requestCellClear(): void {
   focusEditor();
 }
 
+const contextPivotDetails = computed(() =>
+  props.sheet.pivotTables?.find((table) =>
+    isPivotValueCell(table, cellContextMenu.value?.noteAddress ?? activeCell.value),
+  ),
+);
+const contextPivotGroup = computed(() => {
+  const address = cellContextMenu.value?.noteAddress ?? activeCell.value;
+  for (const table of props.sheet.pivotTables ?? []) {
+    const active = getPivotActiveField(table, [], address);
+    if (active?.area === "rows" || active?.area === "columns") {
+      const field = (active.area === "rows" ? table.rowFields : table.columnFields)[active.index]!;
+      return { table, field };
+    }
+  }
+  return undefined;
+});
+function requestPivotGroup(ungroup = false): void {
+  const table = contextPivotGroup.value?.table;
+  if (table) {
+    if (ungroup) emit("ungroupPivotField", table.id);
+    else emit("groupPivotField", table.id);
+  }
+  closeCellContextMenu(false);
+}
+function requestPivotDetails(): void {
+  const table = contextPivotDetails.value;
+  const address = cellContextMenu.value?.noteAddress;
+  if (table && address) emit("showPivotDetails", table.id, address);
+  closeCellContextMenu(false);
+}
+
 function closeCellContextMenu(restoreFocus: boolean): void {
   cellContextMenu.value = undefined;
   if (restoreFocus) {
@@ -2592,6 +2627,13 @@ function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
   if (content?.kind === "image") {
     event.preventDefault();
     openImagePreview(content.image);
+    return;
+  }
+  if (isComposing.value) return;
+  const pivot = props.sheet.pivotTables?.find((table) => isPivotValueCell(table, address));
+  if (pivot) {
+    event.preventDefault();
+    emit("showPivotDetails", pivot.id, address);
     return;
   }
   if (props.readOnly && (!props.sheet.properties.protected || !canEditCell(props.sheet, address))) {
@@ -3432,6 +3474,18 @@ defineExpose({
       :sheet="sheet"
       :range="selectedRange"
       @action="requestContextAction"
+      :group-pivot-field="Boolean(contextPivotGroup)"
+      :ungroup-pivot-field="
+        Boolean(
+          contextPivotGroup?.table.groups?.some(
+            (group) => group.field === contextPivotGroup?.field,
+          ),
+        )
+      "
+      @group-pivot-field="requestPivotGroup(false)"
+      @ungroup-pivot-field="requestPivotGroup(true)"
+      :show-pivot-details="Boolean(contextPivotDetails)"
+      @show-pivot-details="requestPivotDetails"
       :has-image="Boolean(cellContextMenu.imageAddress)"
       :has-note="
         Boolean(

@@ -1,6 +1,7 @@
 import { shallowRef, ref } from "vue";
 import {
   createSetPivotTableCommand,
+  createPivotDetailsSheetCommand,
   createPivotSheetCommand,
   createRemovePivotTableCommand,
   type WorkbookCommand,
@@ -18,12 +19,20 @@ import {
 import { WorkbookDomainError } from "@idea10/core/errors";
 import { canUseSheetPermission } from "@idea10/core";
 import { resolveDataRange } from "@idea10/core/data-range";
-import { type Workbook, type Sheet, type CellRange, getNextSheetName } from "@idea10/core/workbook";
+import {
+  type Workbook,
+  type Sheet,
+  type CellRange,
+  type CellAddress,
+  getNextSheetName,
+} from "@idea10/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import {
   formatRangeReference,
   resolveRangeReference,
 } from "../../shared/range-reference/formatRangeReference";
+import { reconcilePivotAxisFilters } from "./pivot-field-edits";
+import { getPivotReportColors } from "./pivot-report-colors";
 import { resolvePivotDraftSource } from "./pivot-draft-source";
 export type PivotDraft = {
   table: SheetPivotTable;
@@ -62,6 +71,8 @@ export function usePivotActions(options: {
   reportLayout?: () => PivotReportLayout;
   activate?: (sheetId: string, table: SheetPivotTable) => void;
   onError: () => void;
+  activateDetails?: (sheetId: string) => void;
+  onDetailsError?: (reason: "cache" | "protected" | "invalid") => void;
 }) {
   const editing = shallowRef<PivotDraft>();
   const error = ref(false);
@@ -129,6 +140,7 @@ export function usePivotActions(options: {
           },
           totalLabel: options.total(),
           emptyLabel: options.empty(),
+          reportLayout: defaultReportLayout(),
           ...(workbook.defaultPivotTableStyleId
             ? { styleId: workbook.defaultPivotTableStyleId }
             : {}),
@@ -159,7 +171,9 @@ export function usePivotActions(options: {
       consolidationPageItems:
         table.consolidation?.ranges.map((area) => [...(area.pageItems ?? [])]) ?? [],
       consolidationItemPrefix: options.pageItemPrefix?.() ?? "Item",
-      destination: formatRangeReference(sheet.name, { start: table.anchor, end: table.anchor }),
+      destination: existing
+        ? formatRangeReference(sheet.name, { start: table.anchor, end: table.anchor })
+        : "",
       newSheet: !existing,
       newSheetName: getNextSheetName(workbook),
       overwrite: false,
@@ -215,10 +229,14 @@ export function usePivotActions(options: {
         normalizePivotTable({
           ...draft.table,
           ...source,
+          dataCache: undefined,
+          groups: undefined,
           rowFields: [],
           columnFields: [],
           values: [],
           filters: [],
+          axisFilters: undefined,
+          sortFields: undefined,
         }),
       ).headers;
       // Source changes retain fields by header identity; missing fields are removed, never rebound by index.
@@ -310,6 +328,19 @@ export function usePivotActions(options: {
             return [{ ...filter, field, values: [...new Set(values)] }];
           }),
         };
+        fields.sortFields = previous.sortFields?.flatMap((rule) =>
+          remap(rule.field) < 0 ? [] : [{ ...rule, field: remap(rule.field) }],
+        );
+        fields.groups = previous.groups?.flatMap((group) =>
+          remap(group.field) < 0 ? [] : [{ ...group, field: remap(group.field) }],
+        );
+        fields.axisFilters = previous.axisFilters?.flatMap((filter) =>
+          remap(filter.field) < 0 ? [] : [{ ...filter, field: remap(filter.field) }],
+        );
+        reconcilePivotAxisFilters(
+          fields,
+          previous.values.flatMap((value, index) => (remap(value.field) < 0 ? [] : [index])),
+        );
         if (oldConsolidation && nextConsolidation)
           for (
             let field = oldConsolidation.labels.length;
@@ -320,10 +351,12 @@ export function usePivotActions(options: {
       }
       const table = normalizePivotTable({
         ...fields,
-        ...(source.consolidation && !fields.reportLayout
-          ? { reportLayout: defaultReportLayout() }
-          : {}),
+        reportLayout: {
+          ...(fields.reportLayout ?? defaultReportLayout()),
+          ...getPivotReportColors(),
+        },
         ...source,
+        dataCache: undefined,
         anchor: draft.newSheet ? { row: 0, column: 0 } : destination!.range.start,
       });
       const chartId = draft.chart ? idFactory("pivot-chart") : undefined;
@@ -423,14 +456,15 @@ export function usePivotActions(options: {
     return table;
   }
   function defaultReportLayout(): PivotReportLayout {
-    return (
-      options.reportLayout?.() ?? {
+    return {
+      ...(options.reportLayout?.() ?? {
         rowLabel: "Row",
         columnLabel: "Column",
         allLabel: "(All)",
         multipleLabel: "(Multiple Items)",
-      }
-    );
+      }),
+      ...getPivotReportColors(),
+    };
   }
   function update(table: SheetPivotTable, chart = false): boolean {
     if (options.isBusy() || !options.flush()) return false;
@@ -442,8 +476,20 @@ export function usePivotActions(options: {
       return false;
     try {
       table = upgradeLegacyConsolidation(table);
-      if (table.consolidation && !table.reportLayout)
-        table = { ...table, reportLayout: defaultReportLayout() };
+      if (!table.reportLayout) {
+        const headers = getPivotTableSource(options.getWorkbook(), table).headers;
+        table = {
+          ...table,
+          reportLayout: defaultReportLayout(),
+          values: table.values.map((value) => {
+            const field = headers[value.field]!;
+            return value.aggregate === "sum" && value.caption === options.sumCaption(field)
+              ? { ...value, caption: options.valueCaption?.("sum", field) ?? value.caption }
+              : value;
+          }),
+        };
+      }
+      table = { ...table, reportLayout: { ...table.reportLayout!, ...getPivotReportColors() } };
       options.execute(
         createSetPivotTableCommand(
           sheet.id,
@@ -460,13 +506,51 @@ export function usePivotActions(options: {
       return false;
     }
   }
+  function showDetails(id?: string, address?: CellAddress): boolean {
+    if (options.isBusy() || !options.flush()) return false;
+    const table = selected(id);
+    if (!table) return false;
+    const workbook = options.getWorkbook();
+    const fail = (reason: "cache" | "protected" | "invalid") => {
+      if (options.onDetailsError) options.onDetailsError(reason);
+      else options.onError();
+      return false;
+    };
+    if (workbook.structureProtected || !canUseSheetPermission(options.getSheet(), "pivotTables"))
+      return fail("protected");
+    if (!table.dataCache) return fail("cache");
+    try {
+      const command = createPivotDetailsSheetCommand(
+        workbook,
+        options.getSheet().id,
+        table.id,
+        address ?? options.getRange().start,
+        { id: idFactory("pivot-details") },
+      );
+      if (!options.execute(command)) return false;
+      options.activateDetails?.(command.activeSheetId);
+      return true;
+    } catch {
+      return fail("invalid");
+    }
+  }
   function refresh() {
     const table = selected();
     if (table) update(table);
   }
   function clear() {
     const table = selected();
-    if (table) update({ ...table, rowFields: [], columnFields: [], values: [], filters: [] });
+    if (table)
+      update({
+        ...table,
+        rowFields: [],
+        columnFields: [],
+        values: [],
+        filters: [],
+        axisFilters: undefined,
+        sortFields: undefined,
+        groups: undefined,
+      });
   }
   function remove(clearOutput = false) {
     if (options.isBusy() || !options.flush()) return;
@@ -499,6 +583,7 @@ export function usePivotActions(options: {
     open,
     confirm,
     refresh,
+    showDetails,
     remove,
     selected,
     close,

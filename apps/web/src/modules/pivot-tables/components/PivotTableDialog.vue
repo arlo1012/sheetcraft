@@ -3,7 +3,6 @@ import { computed, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import { Button } from "tdesign-vue-next/es/button";
-import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { getPivotTableSource, normalizePivotTable } from "@idea10/core/pivot-tables";
 import type { Workbook } from "@idea10/core/workbook";
 import type { PivotDraft } from "../usePivotActions";
@@ -11,6 +10,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import OptionList from "../../../shared/option-list/OptionList.vue";
 import PivotConsolidationWizard from "./PivotConsolidationWizard.vue";
+import PivotCreateFeedback from "./PivotCreateFeedback.vue";
 import { resolvePivotDraftSource } from "../pivot-draft-source";
 const props = defineProps<{
   initial: PivotDraft;
@@ -34,12 +34,21 @@ const emit = defineEmits<{ confirm: [draft: PivotDraft]; close: [] }>();
 const { t } = useAppI18n();
 const draft = ref<PivotDraft>(JSON.parse(JSON.stringify(props.initial)) as PivotDraft);
 const wizardOpen = ref(false);
-function confirmRanges(value: PivotDraft): void {
+function completeRanges(value: PivotDraft): void {
+  if (props.disabled) return;
   draft.value.sources = value.sources;
   draft.value.consolidationPageMode = value.consolidationPageMode;
   draft.value.consolidationPageCount = value.consolidationPageCount;
   draft.value.consolidationPageItems = value.consolidationPageItems;
-  wizardOpen.value = false;
+  emit("confirm", draft.value);
+}
+function selectExistingDestination(): void {
+  if (!props.disabled) draft.value.newSheet = false;
+}
+async function selectDestinationReference(current: string): Promise<string | undefined> {
+  if (props.disabled) return undefined;
+  selectExistingDestination();
+  return props.selectReference(current);
 }
 const validSource = computed(() => {
   void props.revision;
@@ -49,6 +58,8 @@ const validSource = computed(() => {
       normalizePivotTable({
         ...draft.value.table,
         ...resolvePivotDraftSource(props.workbook, draft.value),
+        dataCache: undefined,
+        groups: undefined,
         rowFields: [],
         columnFields: [],
         values: [],
@@ -112,7 +123,6 @@ const title = computed(() =>
   >
     <div class="pivot-create">
       <section v-if="initial.mode !== 'move'" class="pivot-create__section">
-        <h3>{{ t("pivot.chooseSource") }}</h3>
         <RadioGroup v-model="draft.sourceKind" class="pivot-create__sources" :disabled="disabled">
           <div class="pivot-create__source">
             <Radio value="range">{{ t("pivot.cellRange") }}</Radio>
@@ -126,19 +136,30 @@ const title = computed(() =>
           </div>
           <div class="pivot-create__source">
             <Radio value="consolidation">{{ t("pivot.consolidationRanges") }}</Radio>
-            <div v-if="draft.sourceKind === 'consolidation'" class="pivot-create__range-summary">
-              <Button
-                size="small"
-                variant="outline"
+            <div v-if="draft.sourceKind === 'consolidation'" class="pivot-create__consolidation">
+              <RadioGroup
+                v-model="draft.consolidationPageMode"
                 :disabled="disabled"
-                @click="wizardOpen = true"
-                >{{ t("pivot.selectRanges") }}</Button
+                :aria-label="t('pivot.pageFieldsPrompt')"
+                class="pivot-create__page-modes"
               >
-              <span>{{
-                draft.sources.length
-                  ? t("pivot.selectedRanges", { count: draft.sources.length })
-                  : t("pivot.noRangesSelected")
-              }}</span>
+                <Radio value="single">{{ t("pivot.singlePageField") }}</Radio>
+                <Radio value="custom">{{ t("pivot.customPageFields") }}</Radio>
+              </RadioGroup>
+              <div class="pivot-create__range-summary">
+                <Button
+                  size="small"
+                  variant="outline"
+                  :disabled="disabled"
+                  @click="wizardOpen = true"
+                  >{{ t("pivot.selectRanges") }}</Button
+                >
+                <span>{{
+                  draft.sources.length
+                    ? t("pivot.selectedRanges", { count: draft.sources.length })
+                    : t("pivot.noRangesSelected")
+                }}</span>
+              </div>
             </div>
           </div>
           <div class="pivot-create__source">
@@ -173,23 +194,27 @@ const title = computed(() =>
           <Radio value="existing">{{ t("pivot.existingSheet") }}</Radio>
         </RadioGroup>
         <p v-else>{{ t("pivot.moveHint") }}</p>
-        <RangeReferenceInput
-          v-if="!draft.newSheet"
-          v-model="draft.destination"
-          :label="t('pivot.destination')"
-          :select-reference="selectReference"
-          :disabled="disabled"
-        />
+        <div
+          class="pivot-create__destination"
+          @pointerdown.capture="selectExistingDestination"
+          @focusin="selectExistingDestination"
+        >
+          <RangeReferenceInput
+            v-model="draft.destination"
+            :label="t('pivot.destination')"
+            :select-reference="selectDestinationReference"
+            :disabled="disabled"
+            @update:model-value="selectExistingDestination"
+          />
+        </div>
       </section>
-      <Checkbox
-        v-if="error && (!errorReason || errorReason === 'overwrite') && !draft.newSheet"
+      <PivotCreateFeedback
         v-model="draft.overwrite"
+        :error="error"
+        :error-reason="errorReason"
+        :new-sheet="draft.newSheet"
         :disabled="disabled"
-        >{{ t("pivot.overwrite") }}</Checkbox
-      >
-      <p v-if="error && errorReason && errorReason !== 'invalid'" role="alert">
-        {{ t(`pivot.error.${errorReason}`) }}
-      </p>
+      />
     </div>
   </Dialog>
   <PivotConsolidationWizard
@@ -200,16 +225,27 @@ const title = computed(() =>
     :disabled="disabled"
     :suspended="suspended"
     :select-reference="selectReference"
-    @confirm="confirmRanges"
+    @confirm="completeRanges"
     @close="wizardOpen = false"
-  />
+  >
+    <template #feedback>
+      <PivotCreateFeedback
+        v-model="draft.overwrite"
+        :error="error"
+        :error-reason="errorReason"
+        :new-sheet="draft.newSheet"
+        :disabled="disabled"
+      />
+    </template>
+  </PivotConsolidationWizard>
 </template>
 <style scoped lang="scss">
 .pivot-create {
   display: grid;
   gap: 16px;
   &__sources,
-  &__source {
+  &__source,
+  &__consolidation {
     display: grid;
     gap: 8px;
   }
@@ -234,7 +270,11 @@ const title = computed(() =>
     display: grid;
     gap: 10px;
   }
-  &__locations {
+  &__destination {
+    margin-left: 20px;
+  }
+  &__locations,
+  &__page-modes {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -248,9 +288,6 @@ const title = computed(() =>
   p {
     margin: 0;
     color: var(--idea-text-secondary);
-  }
-  [role="alert"] {
-    color: var(--idea-status-error);
   }
 }
 </style>

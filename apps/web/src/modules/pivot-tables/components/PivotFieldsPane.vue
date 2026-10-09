@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount } from "vue";
-import { X, GripVertical } from "lucide-vue-next";
-import { Button } from "tdesign-vue-next/es/button";
+import { X, GripVertical, Search } from "lucide-vue-next";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import {
-  getPivotTableSource,
+  getRawPivotTableSource,
   normalizePivotTable,
   type PivotAggregate,
   type SheetPivotTable,
@@ -41,7 +41,7 @@ const settings = ref<{ area: PivotArea; index: number }>();
 const source = computed(() => {
   void props.revision;
   try {
-    return getPivotTableSource(props.workbook, props.table);
+    return getRawPivotTableSource(props.workbook, props.table);
   } catch {
     return undefined;
   }
@@ -53,12 +53,13 @@ const choices = computed<PivotFieldChoice[]>(() => {
   for (const record of info.records())
     record.forEach((value, field) => {
       if (typeof value === "number") types[field]!.number = true;
-      else if (value !== null && value !== "" && !isFormulaError(value)) types[field]!.other = true;
+      else types[field]!.other = true;
     });
   return info.headers.map((label, field) => ({
     field,
     label,
     numeric: types[field]!.number && !types[field]!.other,
+    hasNumbers: types[field]!.number,
   }));
 });
 const filtered = computed(() =>
@@ -84,7 +85,9 @@ const items = (area: PivotArea) =>
         : (choices.value.find((choice) => choice.field === field)?.label ?? String(field + 1)),
   }));
 const caption = (aggregate: PivotAggregate, label: string) =>
-  `${t(`pivot.${aggregate}`)} · ${label}`;
+  aggregate === "sum" || aggregate === "count"
+    ? t(aggregate === "sum" ? "pivot.sumOf" : "pivot.countOf", { field: label })
+    : `${t(`pivot.${aggregate}`)} · ${label}`;
 function place(drag: PivotFieldDrag, area: PivotArea, index: number): void {
   if (props.disabled) return;
   const choice = choices.value.find((choice) => choice.field === drag.field);
@@ -106,13 +109,15 @@ function toggle(field: number, checked: boolean): void {
   if (props.disabled) return;
   if (checked) {
     const choice = choices.value.find((entry) => entry.field === field);
-    if (choice) add(choice.numeric ? "values" : "rows", field);
+    if (choice) add((choice.hasNumbers ?? choice.numeric) ? "values" : "rows", field);
   } else {
-    const next = normalizePivotTable(props.table);
-    next.rowFields = next.rowFields.filter((item) => item !== field);
-    next.columnFields = next.columnFields.filter((item) => item !== field);
-    next.values = next.values.filter((item) => item.field !== field);
-    next.filters = next.filters.filter((item) => item.field !== field);
+    let next = normalizePivotTable(props.table);
+    for (const area of ["rows", "columns", "values", "filters"] as const) {
+      for (let index = pivotAreaFields(next, area).length - 1; index >= 0; index--) {
+        if (pivotAreaFields(next, area)[index] === field)
+          next = removePivotField(next, area, index);
+      }
+    }
     emit("update", next);
   }
 }
@@ -198,10 +203,15 @@ defineExpose({
 <template>
   <aside class="pivot-fields-pane" :aria-label="t('pivot.fieldList')">
     <header class="pivot-fields-pane__header">
-      <strong>{{ t("pivot.title") }}</strong
-      ><Button variant="text" shape="square" :aria-label="t('picture.close')" @click="emit('close')"
-        ><X :size="16"
-      /></Button>
+      <strong>{{ t("pivot.title") }}</strong>
+      <span
+        v-icon-action
+        class="pivot-fields-pane__close"
+        :aria-label="t('picture.close')"
+        :title="t('picture.close')"
+        @click="emit('close')"
+        ><X class="idea-action-icon" aria-hidden="true"
+      /></span>
     </header>
     <section
       class="pivot-fields-pane__available"
@@ -215,7 +225,9 @@ defineExpose({
         :placeholder="t('pivot.searchFields')"
         :aria-label="t('pivot.searchFields')"
         clearable
-      />
+      >
+        <template #prefixIcon><Search class="idea-action-icon" aria-hidden="true" /></template>
+      </Input>
       <ul class="pivot-fields-pane__fields">
         <li
           v-for="choice in filtered"
@@ -225,11 +237,15 @@ defineExpose({
           @dragstart="start($event, choice)"
           @dragend="dragging = undefined"
         >
-          <GripVertical :size="14" aria-hidden="true" /><Checkbox
+          <GripVertical class="idea-action-icon pivot-fields-pane__grip" aria-hidden="true" />
+          <Checkbox
+            class="pivot-fields-pane__field-check"
             :checked="used.has(choice.field)"
             :disabled="disabled"
             @change="toggle(choice.field, Boolean($event))"
-            >{{ choice.label }}</Checkbox
+            ><span class="pivot-fields-pane__field-label" :title="choice.label">{{
+              choice.label
+            }}</span></Checkbox
           >
         </li>
       </ul>
@@ -305,6 +321,13 @@ defineExpose({
       :index="settings.index"
       :name="settingName"
       :choices="settingChoices"
+      :headers="source?.headers ?? []"
+      :records="
+        settings.area === 'values'
+          ? (table.dataCache?.records ?? [...(source?.records() ?? [])])
+          : []
+      "
+      :date-system="workbook.dateSystem"
       :disabled="disabled"
       @confirm="confirmSettings"
       @close="settings = undefined"
@@ -313,26 +336,33 @@ defineExpose({
 </template>
 <style scoped lang="scss">
 .pivot-fields-pane {
-  display: flex;
-  flex-direction: column;
-  width: 360px;
-  flex: 0 0 360px;
+  display: grid;
+  grid-template-rows: auto minmax(180px, 1.1fr) minmax(260px, 1fr);
+  width: 380px;
+  flex: 0 0 380px;
   max-width: 45vw;
   min-height: 0;
-  gap: 14px;
-  padding: 10px 14px;
+  gap: 16px;
+  padding: 12px 14px;
   border-left: 1px solid var(--idea-border-subtle);
   background: var(--idea-surface-secondary);
-  font-size: 12px;
+  font-size: var(--idea-font-size-body-medium);
+  line-height: var(--idea-line-height-body-medium);
   overflow: auto;
   &__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    min-height: 24px;
+  }
+  &__close {
+    padding: 4px;
+    border-radius: 3px;
+    color: var(--idea-text-secondary);
   }
   h3 {
     margin: 0;
-    font-size: 12px;
+    font-size: inherit;
     font-weight: 600;
   }
   p {
@@ -340,18 +370,16 @@ defineExpose({
     color: var(--idea-text-secondary);
   }
   &__available {
-    display: flex;
-    flex: 1 1 45%;
-    flex-direction: column;
-    min-height: 150px;
+    display: grid;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    min-height: 0;
     gap: 8px;
   }
   &__fields {
     list-style: none;
     margin: 0;
-    padding: 8px;
-    flex: 1;
-    min-height: 60px;
+    padding: 6px;
+    min-height: 0;
     overflow: auto;
     border: 1px solid var(--idea-border-control);
     border-radius: 4px;
@@ -359,20 +387,42 @@ defineExpose({
     li {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       min-height: 28px;
+      padding: 0 2px;
       cursor: grab;
+      border-radius: 2px;
+      &:hover {
+        background: var(--idea-surface-hover);
+      }
     }
+  }
+  &__grip {
+    flex-shrink: 0;
+    color: var(--idea-text-secondary);
+  }
+  &__field-check {
+    flex: 1;
+    min-width: 0;
+  }
+  &__field-label {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   &__configuration {
     display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    min-height: 0;
     gap: 8px;
-    flex: 0 0 auto;
   }
   &__areas {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 10px;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    min-height: 0;
+    gap: 10px 12px;
   }
   [role="alert"] {
     color: var(--idea-status-error);

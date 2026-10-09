@@ -85,10 +85,13 @@ import PictureAnnotationDialog from "../modules/sheet-images/components/PictureA
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
 import type { SheetDrawing } from "@idea10/core/sheet-drawings";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
+import PivotGroupingDialog from "../modules/pivot-tables/components/PivotGroupingDialog.vue";
+import { usePivotGrouping } from "../modules/pivot-tables/usePivotGrouping";
 import { usePivotActions } from "../modules/pivot-tables/usePivotActions";
 import { getPivotTableSource } from "@idea10/core/pivot-tables";
 import { createThemedTableStyles } from "@idea10/core/table-styles";
 import type { PivotArea } from "../modules/pivot-tables/pivot-field-edits";
+import { getPivotActiveField } from "../modules/pivot-tables/pivot-active-field";
 import PivotFieldsPane from "../modules/pivot-tables/components/PivotFieldsPane.vue";
 import PivotAnalysisToolbar from "../modules/pivot-tables/components/PivotAnalysisToolbar.vue";
 import PivotDesignToolbar from "../modules/pivot-tables/components/PivotDesignToolbar.vue";
@@ -1146,6 +1149,21 @@ const pivotActions = usePivotActions({
       pivotFieldsVisible.value = true;
     });
   },
+  activateDetails: (sheetId) => {
+    selectSheet(sheetId);
+    void nextTick(() => sheetGridRef.value?.navigateToCell({ row: 0, column: 0 }));
+  },
+  onDetailsError: (reason) => {
+    void MessagePlugin.error(
+      t(
+        reason === "cache"
+          ? "pivot.detailsNeedRefresh"
+          : reason === "protected"
+            ? "pivot.error.protected"
+            : "pivot.detailsFailed",
+      ),
+    );
+  },
   onError: () => {
     void MessagePlugin.error(t("pivot.refreshFailed"));
   },
@@ -1176,24 +1194,30 @@ const pivotActiveField = computed<{ area: PivotArea; index: number; name: string
     } catch {
       return undefined;
     }
-    const offset = activeAddress.value.column - table.anchor.column;
-    const labels = table.resultLayout?.labelColumns ?? Math.max(1, table.rowFields.length);
-    if (table.values.length && offset >= labels) {
-      const index = (offset - labels) % table.values.length;
-      return { area: "values", index, name: table.values[index]!.caption };
-    }
-    if (table.rowFields.length) {
-      const index = Math.max(0, Math.min(offset, table.rowFields.length - 1));
-      return { area: "rows", index, name: headers[table.rowFields[index]!] ?? "" };
-    }
-    if (table.values.length) return { area: "values", index: 0, name: table.values[0]!.caption };
-    if (table.columnFields.length)
-      return { area: "columns", index: 0, name: headers[table.columnFields[0]!] ?? "" };
-    if (table.filters.length)
-      return { area: "filters", index: 0, name: headers[table.filters[0]!.field] ?? "" };
-    return undefined;
+    return getPivotActiveField(table, headers, activeAddress.value);
   },
 );
+const pivotGroupField = computed(() => {
+  const table = activePivot.value,
+    field = pivotActiveField.value;
+  if (!table || !field || (field.area !== "rows" && field.area !== "columns")) return undefined;
+  return (field.area === "rows" ? table.rowFields : table.columnFields)[field.index];
+});
+const pivotGrouping = usePivotGrouping({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  selected: pivotActions.selected,
+  getField: () => pivotGroupField.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => cellEditSession.finish(),
+  execute: executeCommand,
+  onError: () => {
+    void MessagePlugin.error(t("pivot.groupFailed"));
+  },
+});
+const { draft: pivotGroupingDraft } = pivotGrouping;
+watch(workbookGeneration, pivotGrouping.close);
+watch(() => activeSheet.value.id, pivotGrouping.close);
 watch(
   () => activePivot.value?.id,
   (id) => {
@@ -2454,6 +2478,10 @@ const gridInert = computed(
           :disabled="pivotDisabled"
           :fields-visible="pivotFieldsVisible"
           :active-field="pivotActiveField?.name ?? ''"
+          :group-enabled="pivotGroupField !== undefined"
+          :ungroup-enabled="activePivot.groups?.some((group) => group.field === pivotGroupField)"
+          @group="pivotGrouping.open()"
+          @ungroup="pivotGrouping.ungroup()"
           @rename="pivotActions.update({ ...activePivot, name: $event })"
           @settings="openPivotFieldSettings"
           @refresh="pivotActions.refresh"
@@ -3614,6 +3642,9 @@ const gridInert = computed(
           @edit-drawing="editSheetDrawing"
           @configure-pivot="openPivotFields"
           @update-pivot="pivotActions.update"
+          @show-pivot-details="(id, address) => pivotActions.showDetails(id, address)"
+          @group-pivot-field="pivotGrouping.open"
+          @ungroup-pivot-field="pivotGrouping.ungroup"
           @configure-pivot-filter="
             (id, index) => {
               openPivotFields(id);
@@ -3640,9 +3671,11 @@ const gridInert = computed(
           @fill-feedback="
             MessagePlugin.warning(
               t(
-                $event === 'duplicate'
-                  ? 'dataTools.duplicates.duplicateRejected'
-                  : `autoFill.${$event}`,
+                $event === 'pivotResultProtected'
+                  ? 'pivot.resultProtected'
+                  : $event === 'duplicate'
+                    ? 'dataTools.duplicates.duplicateRejected'
+                    : `autoFill.${$event}`,
               ),
             )
           "
@@ -3985,6 +4018,14 @@ const gridInert = computed(
     :drawing="viewingAttachment"
     @download="attachmentActions.download(viewingAttachment)"
     @close="attachmentActions.close"
+  />
+  <PivotGroupingDialog
+    v-if="pivotGroupingDraft"
+    :draft="pivotGroupingDraft"
+    :date-system="session.workbook.dateSystem"
+    :disabled="pivotDisabled"
+    @apply="pivotGrouping.apply"
+    @close="pivotGrouping.close"
   />
   <PivotTableDialog
     v-if="editingPivot"

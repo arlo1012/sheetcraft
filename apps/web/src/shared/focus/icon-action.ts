@@ -18,10 +18,12 @@ export const vIconAction: ObjectDirective<IconActionElement, boolean | undefined
       event.preventDefault();
       event.stopImmediatePropagation();
     };
-    const guardDisabledKey = (event: KeyboardEvent) => {
+    const guardDisabledKey: EventListener = (event) => {
+      if (!(event instanceof KeyboardEvent)) return;
       if (event.key === "Enter" || event.key === " ") guardDisabled(event);
     };
-    const activate = (event: KeyboardEvent) => {
+    const activate: EventListener = (event) => {
+      if (!(event instanceof KeyboardEvent)) return;
       if (event.target !== element || (event.key !== "Enter" && event.key !== " ")) return;
       if (state.disabled || event.defaultPrevented) return;
       event.preventDefault();

@@ -27,7 +27,7 @@ import {
 } from "@idea10/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useDataToolsController } from "../../../../modules/data-tools/useDataToolsController";
-import { readFilterPanelSettings } from "../../../../modules/data-tools/filter-panel-settings";
+import { readFilterPanelSettings } from "../../../../shared/filter/filter-panel-settings";
 
 function fixture(
   selection = {

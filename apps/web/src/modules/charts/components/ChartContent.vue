@@ -117,7 +117,10 @@ onBeforeUnmount(() => {
       </text>
     </svg>
     <div v-else ref="root" class="chart-content__canvas" />
-    <div v-if="!drawing.chart.range || error || result.invalid" class="chart-content__error">
+    <div
+      v-if="(!drawing.chart.range && !drawing.chart.dataCache) || error || result.invalid"
+      class="chart-content__error"
+    >
       {{ t("chart.invalidSource") }}
     </div>
   </div>

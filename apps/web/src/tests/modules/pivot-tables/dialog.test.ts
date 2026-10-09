@@ -1,5 +1,5 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   createSheet,
   insertSheet,
@@ -123,6 +123,9 @@ describe("pivot creation dialog", () => {
     await flushPromises();
     expect(confirmButton().disabled).toBe(false);
     expect(document.querySelector(".pivot-editor__preview")).toBeNull();
+    expect(
+      (document.querySelector(".pivot-create__destination input") as HTMLInputElement).value,
+    ).toBe("");
     confirmButton().click();
     await flushPromises();
     expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({
@@ -143,6 +146,67 @@ describe("pivot creation dialog", () => {
     confirmButton().click();
     await flushPromises();
     expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({ newSheet: false, mode: "create" });
+  });
+  test.each(["pointerdown", "focusin", "input"])(
+    "selects the existing worksheet when the destination receives %s",
+    async (event) => {
+      const { wrapper } = dialogFixture();
+      await flushPromises();
+      const editor = new DOMWrapper(document.querySelector(".pivot-create")!);
+      const destination = editor.get(".pivot-create__destination input.t-input__inner");
+      expect(
+        (editor.get('input[type="radio"][value="new"]').element as HTMLInputElement).checked,
+      ).toBe(true);
+      expect(destination.isVisible()).toBe(true);
+      expect((destination.element as HTMLInputElement).value).toBe("");
+      if (event === "input") await destination.setValue("B7");
+      else await destination.trigger(event);
+      await flushPromises();
+      expect(
+        (editor.get('input[type="radio"][value="existing"]').element as HTMLInputElement).checked,
+      ).toBe(true);
+      confirmButton().click();
+      await flushPromises();
+      expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({
+        newSheet: false,
+        ...(event === "input" ? { destination: "B7" } : {}),
+      });
+    },
+  );
+  test("selects the existing worksheet when opening the destination picker even if it is canceled", async () => {
+    const { wrapper } = dialogFixture();
+    const pick = vi.fn(async (_current: string): Promise<string | undefined> => undefined);
+    await wrapper.setProps({ selectReference: pick });
+    await flushPromises();
+    const editor = new DOMWrapper(document.querySelector(".pivot-create")!);
+    await editor.findAll("[data-select-formula-reference]").at(-1)!.trigger("click");
+    await flushPromises();
+    expect(pick).toHaveBeenCalledTimes(1);
+    expect(
+      (editor.get('input[type="radio"][value="existing"]').element as HTMLInputElement).checked,
+    ).toBe(true);
+    confirmButton().click();
+    await flushPromises();
+    expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({ newSheet: false });
+  });
+  test("ignores destination interactions while editing is disabled", async () => {
+    const { wrapper } = dialogFixture(true);
+    const pick = vi.fn(async (_current: string): Promise<string | undefined> => undefined);
+    await wrapper.setProps({ selectReference: pick });
+    await flushPromises();
+    const editor = new DOMWrapper(document.querySelector(".pivot-create")!);
+    const destination = editor.get(".pivot-create__destination input.t-input__inner");
+    expect((destination.element as HTMLInputElement).disabled).toBe(true);
+    await destination.trigger("pointerdown");
+    await destination.trigger("focusin");
+    await destination.trigger("input");
+    await editor.findAll("[data-select-formula-reference]").at(-1)!.trigger("click");
+    await flushPromises();
+    expect(
+      (editor.get('input[type="radio"][value="new"]').element as HTMLInputElement).checked,
+    ).toBe(true);
+    expect(pick).not.toHaveBeenCalled();
+    expect(confirmButton().disabled).toBe(true);
   });
   test("disables confirmation when the caller disables editing", async () => {
     dialogFixture(true);

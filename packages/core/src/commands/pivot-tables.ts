@@ -1,6 +1,7 @@
 import { isFormulaError, type CellContent, type FormulaValue } from "../formula/types.js";
 import {
   buildPivotResult,
+  getPivotDetails,
   getPivotTableRange,
   getPivotSourceRanges,
   getPivotPresentation,
@@ -9,12 +10,17 @@ import {
   addressInRange,
   rangesIntersect,
   type SheetPivotTable,
+  type PivotFieldGroup,
 } from "../pivot-tables.js";
 import {
   createCellKey,
   createSheetSparseState,
   replaceSheetSparseState,
   createSheet,
+  setCellContent,
+  getCellStyle,
+  setCellStyle,
+  type CellAddress,
   createWorkbookEvaluator,
   MAX_SHEET_ROWS,
   MAX_SHEET_COLUMNS,
@@ -23,7 +29,8 @@ import {
   type SheetTable,
   type SheetSparseCell,
 } from "../workbook.js";
-import { createThemedTableStyles, resolveTableCellStyle } from "../table-styles.js";
+import { resolveTableCellStyle } from "../table-styles.js";
+import { resolvePivotTableStyle } from "../pivot-table-styles.js";
 import { mergeCellStyle } from "../style.js";
 import { deserializeSheet, serializeSheet } from "../serialization.js";
 import { createAddSheetCommand } from "./sheets.js";
@@ -36,6 +43,7 @@ import type {
   RestoreFullSheetStateCommand,
 } from "./contracts.js";
 import type { SheetChartDrawing } from "../sheet-drawings.js";
+import { getSheetChartData } from "../sheet-charts.js";
 function literal(value: FormulaValue): CellContent | undefined {
   return value === null
     ? undefined
@@ -51,7 +59,9 @@ export function createSetPivotTableCommand(
   return {
     type: "setPivotTable",
     sheetId,
-    table: validateCommandPayload("pivot", table, () => normalizePivotTable(table)),
+    table: validateCommandPayload("pivot", table, () =>
+      normalizePivotTable({ ...table, dataCache: undefined }),
+    ),
     overwrite: options.overwrite ?? false,
     ...(options.chartId ? { chartId: options.chartId } : {}),
   };
@@ -134,17 +144,13 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
         else cells.delete(key);
       }
   const presentation = getPivotPresentation(table);
-  const customStyle = (workbook.pivotTableStyles ?? []).find(
-    (style) => style.id === (table.styleId ?? workbook.defaultPivotTableStyleId),
-  );
-  const styles = createThemedTableStyles();
-  const style = customStyle ?? styles.find((style) => style.id === table.styleId) ?? styles[0]!;
+  const reportStyle = resolvePivotTableStyle(workbook, table);
   const styledTable: SheetTable = {
     id: table.id,
     name: table.name,
     range: { ...range, start: { ...range.start, row: range.start.row + result.headerStart } },
     columns: [],
-    style,
+    style: reportStyle,
     headerRow: presentation.columnHeaders,
     totalRow: result.totalRow !== null,
     firstColumn: presentation.rowHeaders,
@@ -173,8 +179,9 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
             ? undefined
             : original?.style,
           rowIndex < result.headerStart
-            ? columnIndex === 0 && rowIndex < table.filters.length
-              ? { bold: true }
+            ? columnIndex < 2 && rowIndex < table.filters.length
+              ? (reportStyle.elements[columnIndex === 0 ? "pageFieldLabels" : "pageFieldValues"]
+                  ?.style ?? (columnIndex === 0 ? { bold: true } : {}))
               : {}
             : (resolveTableCellStyle(
                 styledTable,
@@ -188,6 +195,20 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
         cell.style = mergeCellStyle(cell.style, { indent: result.rowIndents[rowIndex] });
       if (result.subtotalRows.includes(rowIndex))
         cell.style = mergeCellStyle(cell.style, { bold: true });
+      if (
+        rowIndex >= result.headerRows &&
+        columnIndex >= result.rowLabelColumns &&
+        table.values.length
+      ) {
+        const measure = table.values[(columnIndex - result.rowLabelColumns) % table.values.length]!;
+        const type = measure.display?.type;
+        const numberFormat =
+          measure.numberFormat ??
+          (type && (type.startsWith("percent") || type === "percentDiff")
+            ? { kind: "custom" as const, code: "0.00%" }
+            : undefined);
+        if (numberFormat) cell.style = mergeCellStyle(cell.style, { numberFormat });
+      }
       delete cell.namedStyle;
       const content = literal(value);
       if (content) cell.content = content;
@@ -200,11 +221,15 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
   const nextTable: SheetPivotTable = {
     ...table,
     outputRange: result.matrix.length ? range : null,
+    dataCache: result.dataCache,
+    groups: result.groups,
     resultLayout: {
       labelColumns: result.rowLabelColumns,
       dataRows: result.dataRows,
+      valueRows: result.rowMembers.flatMap((members, row) => (members === null ? [] : [row])),
       rowLabels: result.rowLabels,
-      ...(table.reportLayout
+      rowFieldIndices: result.rowFieldIndices,
+      ...(table.reportLayout && result.headerRows > 0
         ? { headerRows: result.headerRows, seriesLabels: result.seriesLabels }
         : {}),
     },
@@ -337,11 +362,98 @@ export function applyRemovePivotTableCommand(
         else temporary.cells.delete(key);
       }
     }
+  const evaluator = createWorkbookEvaluator(workbook, sheet.id);
   temporary.drawings = (temporary.drawings ?? []).map((drawing) => {
     if (drawing.kind !== "chart" || drawing.chart.pivotTableId !== table.id) return drawing;
     const { pivotTableId: _pivotId, ...chart } = drawing.chart;
-    return { ...drawing, chart };
+    return {
+      ...drawing,
+      chart: { ...chart, dataCache: getSheetChartData(sheet, drawing.chart, evaluator) },
+    };
   });
   replaceSheetSparseState(sheet, createSheetSparseState(temporary));
   return createRestoreSheetStateCommand(sheet.id, before);
+}
+
+/** A single add-sheet command preserves one-step undo/redo for Show Details. */
+export function createPivotDetailsSheetCommand(
+  workbook: Workbook,
+  sheetId: string,
+  tableId: string,
+  address: CellAddress,
+  options?: Parameters<typeof createAddSheetCommand>[1],
+): AddSheetCommand {
+  const table = getSheetOrThrow(workbook, sheetId).pivotTables?.find((item) => item.id === tableId);
+  if (!table) throw new RangeError("Missing pivot table.");
+  const details = getPivotDetails(workbook, table, address);
+  if (details.records.length + 1 > MAX_SHEET_ROWS || details.headers.length > MAX_SHEET_COLUMNS)
+    throw new RangeError("Pivot details exceed sheet bounds.");
+  const command = createAddSheetCommand(workbook, options);
+  const sheet = deserializeSheet(command.sheet);
+  details.headers.forEach((header, column) =>
+    setCellContent(sheet, { row: 0, column }, { kind: "literal", value: header }),
+  );
+  const formats = details.headers.map((_, field) => {
+    const area = table.consolidation?.ranges[0];
+    const sourceSheet = workbook.sheets.get(area?.sheetId ?? table.sourceSheetId);
+    const range = area?.range ?? table.source;
+    if (!sourceSheet || !range || (table.consolidation && field > 2)) return undefined;
+    const address = table.consolidation
+      ? {
+          row: range.start.row + (field === 1 ? 0 : 1),
+          column: range.start.column + (field === 0 ? 0 : 1),
+        }
+      : { row: range.start.row + 1, column: range.start.column + field };
+    return getCellStyle(sourceSheet, address)?.numberFormat;
+  });
+  details.records.forEach((record, row) =>
+    record.forEach((value, column) => {
+      const address = { row: row + 1, column };
+      setCellContent(sheet, address, literal(value));
+      const numberFormat = formats[column];
+      if (typeof value === "number" && numberFormat) setCellStyle(sheet, address, { numberFormat });
+    }),
+  );
+  return { ...command, sheet: serializeSheet(sheet) };
+}
+
+/** Grouping changes only axis membership; source cells and measure values remain intact. */
+export function createGroupPivotFieldCommand(
+  sheetId: string,
+  table: SheetPivotTable,
+  group: PivotFieldGroup,
+): SetPivotTableCommand {
+  if (
+    ![
+      ...table.rowFields,
+      ...table.columnFields,
+      ...table.filters.map((filter) => filter.field),
+    ].includes(group.field)
+  )
+    throw new RangeError("Select a pivot dimension field to group.");
+  const next = {
+    ...table,
+    groups: [...(table.groups ?? []).filter((item) => item.field !== group.field), group],
+    axisFilters: table.axisFilters?.filter((filter) => filter.field !== group.field),
+    filters: table.filters.map((filter) =>
+      filter.field === group.field ? { ...filter, all: true, values: [] } : filter,
+    ),
+  };
+  return createSetPivotTableCommand(sheetId, next);
+}
+export function createUngroupPivotFieldCommand(
+  sheetId: string,
+  table: SheetPivotTable,
+  field: number,
+): SetPivotTableCommand {
+  if (!table.groups?.some((group) => group.field === field))
+    throw new RangeError("This pivot field is not grouped.");
+  return createSetPivotTableCommand(sheetId, {
+    ...table,
+    groups: table.groups.filter((group) => group.field !== field),
+    axisFilters: table.axisFilters?.filter((filter) => filter.field !== field),
+    filters: table.filters.map((filter) =>
+      filter.field === field ? { ...filter, all: true, values: [] } : filter,
+    ),
+  });
 }

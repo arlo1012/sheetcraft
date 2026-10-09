@@ -8,7 +8,7 @@ import type { CellStyle } from "@idea10/core/style";
 import type { CellNamedStyleBinding, Sheet } from "@idea10/core/workbook";
 import { createClearCellStylePatch } from "@idea10/core/style";
 import { strFromU8, strToU8, type Zippable } from "fflate/browser";
-import { toExcelNumberFormat } from "./number-format.js";
+import { toExcelNumberFormat, builtinNumberFormat } from "./number-format.js";
 import { readXlsxDxfStyle, xlsxDxfXml } from "./conditional-formatting.js";
 import { materializeXlsxStyleColors } from "./xlsx-colors.js";
 import { readXlsxWorksheetPartTargets } from "./raw-cell-values.js";
@@ -103,22 +103,6 @@ function xfs(content: string | undefined): Xf[] {
     attributes: entry[1] ?? "",
     body: entry[2] ?? "",
   }));
-}
-
-function builtinNumberFormat(id: number): string | undefined {
-  return new Map<number, string>([
-    [0, "General"],
-    [1, "0"],
-    [2, "0.00"],
-    [3, "#,##0"],
-    [4, "#,##0.00"],
-    [9, "0%"],
-    [10, "0.00%"],
-    [11, "0.00E+00"],
-    [14, "mm-dd-yy"],
-    [22, "m/d/yy h:mm"],
-    [49, "@"],
-  ]).get(id);
 }
 
 function alignmentPatch(body: string): Record<string, unknown> {

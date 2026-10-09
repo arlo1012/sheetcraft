@@ -491,13 +491,17 @@ export function useSpreadsheetWorkspaceController(
     } catch (error) {
       if (
         error instanceof WorkbookDomainError &&
-        (error.data.code === "sheet_protected" || error.data.code === "workbook_protected")
+        (error.data.code === "sheet_protected" ||
+          error.data.code === "workbook_protected" ||
+          error.data.code === "pivot_result_protected")
       ) {
         showWorkspaceStatus({
           key:
-            error.data.code === "workbook_protected"
-              ? "review.workbookProtected"
-              : "review.cellsProtected",
+            error.data.code === "pivot_result_protected"
+              ? "pivot.resultProtected"
+              : error.data.code === "workbook_protected"
+                ? "review.workbookProtected"
+                : "review.cellsProtected",
         });
         return false;
       }
@@ -646,8 +650,9 @@ export function useSpreadsheetWorkspaceController(
     failureKey: MessageKey,
   ): boolean {
     try {
-      const changed = execute(createCommand(), operation);
       clearWorkspaceStatus();
+      const changed = execute(createCommand(), operation);
+      if (changed) clearWorkspaceStatus();
       return changed;
     } catch {
       showWorkspaceStatus({ key: failureKey });
@@ -753,10 +758,13 @@ export function useSpreadsheetWorkspaceController(
     )
       return { ok: false, reason: "pasteRejected" };
     try {
-      execute(
+      clearWorkspaceStatus();
+      const changed = execute(
         createGridPasteCommand(activeSheet.value, payload, activeSheetEvaluator.value),
         payload.kind === "all" && payload.moveSource ? "cells.move" : "cells.paste",
       );
+      if (!changed && workspaceStatus.value?.key === "pivot.resultProtected")
+        return { ok: false, reason: "pasteRejected" };
       clearWorkspaceStatus();
       return { ok: true };
     } catch (error) {
@@ -773,7 +781,8 @@ export function useSpreadsheetWorkspaceController(
   function showClipboardFeedback(feedback: GridClipboardFeedback): void {
     if (
       feedback === "pasteRejected" &&
-      workspaceStatus.value?.key === "dataTools.duplicates.duplicateRejected"
+      (workspaceStatus.value?.key === "dataTools.duplicates.duplicateRejected" ||
+        workspaceStatus.value?.key === "pivot.resultProtected")
     )
       return;
     showWorkspaceStatus({ key: `clipboard.${feedback}` });

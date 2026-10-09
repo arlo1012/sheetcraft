@@ -188,17 +188,46 @@ function matchesCondition(value: SheetFilterValue, condition: SheetFilterValueCo
         : value.kind === "error"
           ? `#${value.code}!`
           : String(value.value);
+    const compare = (bound: string) => {
+      const left = text.toLowerCase();
+      const right = bound.toLowerCase();
+      return left.localeCompare(right);
+    };
+    switch (condition.operator) {
+      case "greaterThan":
+        return compare(condition.value) > 0;
+      case "greaterThanOrEqual":
+        return compare(condition.value) >= 0;
+      case "lessThan":
+        return compare(condition.value) < 0;
+      case "lessThanOrEqual":
+        return compare(condition.value) <= 0;
+      case "between":
+        return (
+          condition.value2 !== undefined &&
+          compare(condition.value) >= 0 &&
+          compare(condition.value2) <= 0
+        );
+      case "notBetween":
+        return (
+          condition.value2 !== undefined &&
+          (compare(condition.value) < 0 || compare(condition.value2) > 0)
+        );
+    }
     const pattern = wildcardPattern(condition.value);
     const expression =
       condition.operator === "contains" || condition.operator === "doesNotContain"
         ? pattern
-        : condition.operator === "beginsWith"
+        : condition.operator === "beginsWith" || condition.operator === "doesNotBeginWith"
           ? `^${pattern}`
-          : condition.operator === "endsWith"
+          : condition.operator === "endsWith" || condition.operator === "doesNotEndWith"
             ? `${pattern}$`
             : `^${pattern}$`;
     const matches = new RegExp(expression, "iu").test(text);
-    return condition.operator === "doesNotContain" || condition.operator === "notEquals"
+    return condition.operator === "doesNotContain" ||
+      condition.operator === "notEquals" ||
+      condition.operator === "doesNotBeginWith" ||
+      condition.operator === "doesNotEndWith"
       ? !matches
       : matches;
   }

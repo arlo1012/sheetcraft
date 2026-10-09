@@ -30,7 +30,7 @@ const { t } = useAppI18n();
 function adjustFontSize(direction: 1 | -1): void {
   if (props.disabled) return;
   const current = props.state.fontSize.value ?? DEFAULT_CELL_FONT_SIZE;
-  const largestPreset = CELL_FONT_SIZE_PRESETS[CELL_FONT_SIZE_PRESETS.length - 1];
+  const largestPreset = CELL_FONT_SIZE_PRESETS.at(-1) ?? DEFAULT_CELL_FONT_SIZE;
   const next =
     direction === 1
       ? (CELL_FONT_SIZE_PRESETS.find((size) => size > current) ?? current + 2)

@@ -113,8 +113,10 @@ export function useTableStylesController(options: {
   }
   function execute(command: WorkbookCommand): boolean {
     try {
-      options.execute(command);
-      return true;
+      if (options.execute(command)) return true;
+      error.value = t("tables.failed");
+      if (!modalOpen.value) void MessagePlugin.warning(error.value);
+      return false;
     } catch (cause) {
       const field = cause instanceof WorkbookDomainError ? cause.data.details?.field : undefined;
       error.value = t(

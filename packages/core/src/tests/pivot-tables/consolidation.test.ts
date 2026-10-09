@@ -31,7 +31,11 @@ function matrices() {
   ];
   data.forEach((row, r) =>
     row.forEach((value, c) =>
-      setCellContent(second, { row: r + 4, column: c + 2 }, { kind: "literal", value }),
+      setCellContent(
+        second,
+        { row: r + 4, column: c + 2 },
+        value === null ? null : { kind: "literal", value },
+      ),
     ),
   );
   f.table.consolidation = {
@@ -192,7 +196,7 @@ describe("pivot matrix consolidation", () => {
     const f = matrices();
     executeWorkbookCommand(f.session, createSetPivotTableCommand(f.destination.id, f.table));
     const snapshot = serializeWorkbook(f.workbook);
-    expect(snapshot.version).toBe(35);
+    expect(snapshot.version).toBe(42);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 33 })).toThrow();
   });

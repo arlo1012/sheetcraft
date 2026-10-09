@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
 import { Plus, ChevronDown, GripVertical, Filter, Columns3, Rows3, Sigma } from "lucide-vue-next";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import { useAppI18n } from "../../../shared/i18n";
 import { useMenu } from "../../../shared/menu/useMenu";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -93,20 +94,26 @@ function drop(event: DragEvent, index: number): void {
 <template>
   <section class="pivot-area" :data-pivot-area="area" :aria-label="t(`pivot.${area}`)">
     <header class="pivot-area__header">
-      <Filter v-if="area === 'filters'" :size="14" /><Columns3
+      <Filter v-if="area === 'filters'" class="idea-action-icon" aria-hidden="true" /><Columns3
         v-else-if="area === 'columns'"
-        :size="14"
+        class="idea-action-icon"
+        aria-hidden="true"
       />
-      <Rows3 v-else-if="area === 'rows'" :size="14" /><Sigma v-else :size="14" />
-      <span>{{ t(`pivot.${area}`) }}</span>
-      <button
-        type="button"
-        :disabled="disabled"
+      <Rows3 v-else-if="area === 'rows'" class="idea-action-icon" aria-hidden="true" /><Sigma
+        v-else
+        class="idea-action-icon"
+        aria-hidden="true"
+      />
+      <span class="pivot-area__title">{{ t(`pivot.${area}`) }}</span>
+      <span
+        v-icon-action="disabled"
+        class="pivot-area__icon-action"
         :aria-label="t('pivot.addToArea', { area: t(`pivot.${area}`) })"
+        :title="t('pivot.addToArea', { area: t(`pivot.${area}`) })"
         @click="menu($event, null)"
       >
-        <Plus :size="16" />
-      </button>
+        <Plus class="idea-action-icon" aria-hidden="true" />
+      </span>
     </header>
     <ul
       class="pivot-area__items"
@@ -126,7 +133,7 @@ function drop(event: DragEvent, index: number): void {
         @dragover="over($event, index)"
         @drop="drop($event, index)"
       >
-        <GripVertical :size="13" aria-hidden="true" />
+        <GripVertical class="idea-action-icon pivot-area__grip" aria-hidden="true" />
         <button
           class="pivot-area__label"
           type="button"
@@ -136,14 +143,16 @@ function drop(event: DragEvent, index: number): void {
         >
           {{ item.label }}
         </button>
-        <button
-          type="button"
-          :disabled="disabled"
+        <span
+          v-icon-action="disabled"
+          class="pivot-area__icon-action pivot-area__menu-trigger"
           :aria-label="t('pivot.fieldMenu', { field: item.label })"
+          :title="t('pivot.fieldMenu', { field: item.label })"
+          :aria-expanded="open && selectedIndex === index"
           @click="menu($event, index)"
         >
-          <ChevronDown :size="14" />
-        </button>
+          <ChevronDown class="idea-action-icon" aria-hidden="true" />
+        </span>
       </li>
       <li v-if="!items.length" class="pivot-area__empty">{{ t("pivot.dropHere") }}</li>
     </ul>
@@ -199,44 +208,42 @@ function drop(event: DragEvent, index: number): void {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 100px;
+  min-height: 0;
   &__header {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 0;
-    span {
-      flex: 1;
+    min-height: 28px;
+    padding-bottom: 4px;
+    > svg {
+      color: var(--idea-text-secondary);
     }
   }
-  button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: 0;
-    color: inherit;
+  &__title {
+    flex: 1;
+  }
+  &__icon-action {
+    flex-shrink: 0;
     padding: 3px;
-    cursor: pointer;
-    &:hover:not(:disabled) {
-      background: var(--idea-action-hover);
-    }
-    &:disabled {
-      cursor: default;
-      opacity: 0.5;
-    }
-    &:focus-visible {
-      outline: 2px solid var(--idea-action-primary);
-      outline-offset: -2px;
+    border-radius: 2px;
+    color: var(--idea-text-secondary);
+  }
+  &__grip {
+    flex-shrink: 0;
+    color: var(--idea-text-secondary);
+  }
+  &__menu-trigger {
+    opacity: 0;
+    &[aria-expanded="true"] {
+      opacity: 1;
     }
   }
   &__items {
     list-style: none;
     margin: 0;
-    padding: 5px;
+    padding: 4px;
     flex: 1;
-    min-height: 70px;
-    max-height: 200px;
+    min-height: 0;
     overflow: auto;
     background: var(--idea-surface-panel);
     border: 1px solid var(--idea-border-control);
@@ -247,12 +254,17 @@ function drop(event: DragEvent, index: number): void {
     li {
       display: flex;
       align-items: center;
-      gap: 3px;
+      gap: 4px;
       min-height: 28px;
-      margin-bottom: 4px;
-      border: 1px solid var(--idea-border-subtle);
-      background: var(--idea-surface-secondary);
-      border-radius: 3px;
+      padding: 0 2px;
+      border-radius: 2px;
+      &:hover,
+      &:focus-within {
+        background: var(--idea-surface-hover);
+        .pivot-area__menu-trigger {
+          opacity: 1;
+        }
+      }
     }
     li.is-drop-before {
       border-top: 2px solid var(--idea-action-primary);
@@ -260,24 +272,39 @@ function drop(event: DragEvent, index: number): void {
     li.pivot-area__empty {
       border: 0;
       background: transparent;
-      font-size: 12px;
       color: var(--idea-text-secondary);
     }
   }
   &__label {
+    display: block;
     flex: 1;
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
     text-align: left;
-    justify-content: flex-start;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    line-height: inherit;
+    cursor: pointer;
+    &:disabled {
+      color: var(--idea-text-disabled);
+      cursor: default;
+    }
   }
   &__menu {
     z-index: var(--idea-layer-menu);
     min-width: 180px;
     max-height: 380px;
     overflow: auto;
+  }
+  @media (hover: none) {
+    &__menu-trigger {
+      opacity: 1;
+    }
   }
 }
 </style>

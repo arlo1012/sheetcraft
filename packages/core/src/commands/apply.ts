@@ -1,3 +1,4 @@
+import { assertPivotResultsAreWritable } from "./pivot-result-guard.js";
 import { applySetPivotTableCommand, applyRemovePivotTableCommand } from "./pivot-tables.js";
 import { applySetCellSparklinesCommand } from "./sparklines.js";
 import { applySetSheetDrawingsCommand } from "./drawings.js";
@@ -286,6 +287,7 @@ export function applyWorkbookCommand(
     if (!options.fromHistory) {
       assertWorkbookStructureProtection(workbook, command);
       assertCommandDoesNotModifyProtectedSheet(workbook, command);
+      assertPivotResultsAreWritable(workbook, command);
     }
     switch (command.type) {
       case "setSheetProtection":

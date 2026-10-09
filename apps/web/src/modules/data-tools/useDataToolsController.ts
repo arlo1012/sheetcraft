@@ -46,7 +46,7 @@ import {
   readFilterPanelSettings,
   writeFilterPanelSettings,
   type FilterPanelSettings,
-} from "./filter-panel-settings";
+} from "../../shared/filter/filter-panel-settings";
 import { getSortColorColumns } from "./sort-color-options";
 import { getSortIconColumns } from "./sort-icon-options";
 import { resolveTextToColumnsOptions } from "./text-to-columns-options";

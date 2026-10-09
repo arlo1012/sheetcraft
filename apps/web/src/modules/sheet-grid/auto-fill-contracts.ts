@@ -4,6 +4,7 @@ import type { CellRange } from "@idea10/core/workbook";
 export type GridFillFeedback =
   | "rangeTooLarge"
   | "readOnly"
+  | "pivotResultProtected"
   | "mergedCells"
   | "hiddenCells"
   | "outOfBounds"

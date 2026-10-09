@@ -9,7 +9,12 @@ import {
 import { validateDuplicateEntries } from "@idea10/core/duplicate-values";
 import { WorkbookDomainError } from "@idea10/core/errors";
 import type { CellContent } from "@idea10/core/formula";
-import type { CellAddress, SheetDataValidation, Workbook } from "@idea10/core/workbook";
+import {
+  getCellContent,
+  type CellAddress,
+  type SheetDataValidation,
+  type Workbook,
+} from "@idea10/core/workbook";
 
 type Candidate = {
   sheetId: string;
@@ -177,10 +182,16 @@ export function useDataValidationInput(options: {
     }
     dismiss();
     try {
-      options.execute(
+      const changed = options.execute(
         createSetCellContentCommand(candidate.sheetId, candidate.address, candidate.content),
         duplicateBlocked && confirmedDuplicate ? { allowDuplicateEntry: true } : undefined,
       );
+      if (
+        !changed &&
+        JSON.stringify(getCellContent(sheet, candidate.address)) !==
+          JSON.stringify(candidate.content)
+      )
+        return false;
     } catch (error) {
       if (isDuplicateRejection(error)) return rejectDuplicate(workbook, candidate);
       throw error;
@@ -216,7 +227,7 @@ export function useDataValidationInput(options: {
       return rejectDuplicate(workbook, request.candidate);
     }
     try {
-      options.execute(
+      const changed = options.execute(
         createSetCellContentCommand(
           request.candidate.sheetId,
           request.candidate.address,
@@ -224,6 +235,12 @@ export function useDataValidationInput(options: {
         ),
         duplicateBlocked ? { allowDuplicateEntry: true } : undefined,
       );
+      if (
+        !changed &&
+        JSON.stringify(getCellContent(sheet, request.candidate.address)) !==
+          JSON.stringify(request.candidate.content)
+      )
+        return false;
     } catch (error) {
       if (isDuplicateRejection(error)) return rejectDuplicate(workbook, request.candidate);
       throw error;

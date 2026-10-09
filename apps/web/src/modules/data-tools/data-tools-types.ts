@@ -9,7 +9,8 @@ import type {
 
 export type DataToolAxis = "rows" | "columns";
 export type DataToolSortDirection = "ascending" | "descending";
-export type DataToolFilterValueOption = { key: SheetFilterValue; label: string; count: number };
+import type { FilterValueOption as DataToolFilterValueOption } from "../../shared/filter/filter-types";
+export type { DataToolFilterValueOption };
 export type DataToolCapabilities = {
   sort: boolean;
   split: boolean;

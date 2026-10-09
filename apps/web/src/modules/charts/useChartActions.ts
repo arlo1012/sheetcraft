@@ -91,14 +91,17 @@ export function useChartActions(options: {
     )
       return;
     const reference = resolveRangeReference(target.workbook, source, target.sheetId);
-    if (!reference || reference.sheetId !== target.sheetId) {
+    if (!drawing.chart.dataCache && (!reference || reference.sheetId !== target.sheetId)) {
       error.value = true;
       return;
     }
     try {
       const next: SheetChartDrawing = {
         ...drawing,
-        chart: normalizeSheetChart({ ...drawing.chart, range: reference.range }),
+        chart: normalizeSheetChart({
+          ...drawing.chart,
+          range: reference?.range ?? drawing.chart.range,
+        }),
       };
       const data = getSheetChartData(options.getSheet(), next.chart, options.getEvaluator());
       if (
@@ -111,7 +114,9 @@ export function useChartActions(options: {
       if (
         (next.chart.type === "scatter" && data.series.length < 2) ||
         (next.chart.type === "sankey" &&
-          reference.range.end.column - reference.range.start.column < 2)
+          (reference
+            ? reference.range.end.column - reference.range.start.column < 2
+            : !next.chart.dataCache))
       ) {
         error.value = true;
         return;
@@ -136,7 +141,10 @@ export function useChartActions(options: {
           })),
         ];
       else drawings = [...current, next];
-      options.execute(createSetSheetDrawingsCommand(target.sheetId, drawings));
+      if (options.execute(createSetSheetDrawingsCommand(target.sheetId, drawings)) === false) {
+        error.value = true;
+        return;
+      }
       close();
     } catch {
       error.value = true;

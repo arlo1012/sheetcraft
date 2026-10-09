@@ -54,14 +54,10 @@ function wizard() {
   return new DOMWrapper(document.querySelector(".pivot-consolidation-wizard")!);
 }
 function wizardButtons() {
-  return new DOMWrapper(wizard().element.closest(".t-dialog")!).findAll(
-    ".pivot-consolidation-wizard__footer button",
-  );
+  return new DOMWrapper(wizard().element.closest(".t-dialog")!).findAll(".t-dialog__footer button");
 }
 async function openRangesWizard() {
   await editor().get(".pivot-create__range-summary button").trigger("click");
-  await flushPromises();
-  await wizardButtons()[2]!.trigger("click");
   await flushPromises();
 }
 function configuredReport() {
@@ -125,6 +121,97 @@ function matrixFixture() {
 }
 
 describe("PivotTable source modes", () => {
+  test("clearing a configured report removes axis rules together with their fields", () => {
+    const f = configuredReport();
+    expect(
+      f.actions.update({
+        ...f.sheet.pivotTables![0]!,
+        axisFilters: [
+          {
+            axis: "rows",
+            field: 0,
+            values: ["East"],
+            valueCondition: {
+              measure: 0,
+              condition: { kind: "number", operator: "greaterThan", value: 0 },
+            },
+          },
+        ],
+      }),
+    ).toBe(true);
+    f.actions.clear();
+    expect(f.onError).not.toHaveBeenCalled();
+    expect(f.sheet.pivotTables![0]).toMatchObject({
+      rowFields: [],
+      columnFields: [],
+      values: [],
+      filters: [],
+    });
+    expect(f.sheet.pivotTables![0]!.axisFilters).toBeUndefined();
+  });
+  test.each([true, false])(
+    "source replacement remaps axis identity and retained measure with keepAmount=%s",
+    (keepAmount) => {
+      const f = configuredReport();
+      expect(
+        f.actions.update({
+          ...f.sheet.pivotTables![0]!,
+          values: [
+            { field: 1, aggregate: "count", caption: "Quarter count" },
+            { field: 2, aggregate: "sum", caption: "Amount" },
+          ],
+          axisFilters: [
+            {
+              axis: "rows",
+              field: 0,
+              values: ["East"],
+              valueCondition: {
+                measure: 1,
+                condition: { kind: "number", operator: "greaterThan", value: 0 },
+              },
+            },
+          ],
+        }),
+      ).toBe(true);
+      const second = createSheet("Replacement", "replacement-source");
+      insertSheet(f.workbook, second);
+      const rows = keepAmount
+        ? [
+            ["Amount", "Region"],
+            [50, "East"],
+            [60, "West"],
+          ]
+        : [["Region"], ["East"], ["West"]];
+      rows.forEach((row, r) =>
+        row.forEach((value, column) =>
+          setCellContent(second, { row: r, column }, { kind: "literal", value: value! }),
+        ),
+      );
+      f.actions.source();
+      f.actions.confirm({
+        ...f.actions.editing.value!,
+        source: keepAmount ? "Replacement!A1:B3" : "Replacement!A1:A3",
+      });
+      expect(f.actions.error.value).toBe(false);
+      const table = f.sheet.pivotTables![0]!;
+      expect(table.rowFields).toEqual([keepAmount ? 1 : 0]);
+      expect(table.axisFilters![0]).toMatchObject({
+        axis: "rows",
+        field: keepAmount ? 1 : 0,
+        values: ["East"],
+      });
+      if (keepAmount) {
+        expect(table.values).toEqual([{ field: 0, aggregate: "sum", caption: "Amount" }]);
+        expect(table.axisFilters![0]!.valueCondition).toEqual({
+          measure: 0,
+          condition: { kind: "number", operator: "greaterThan", value: 0 },
+        });
+      } else {
+        expect(table.values).toEqual([]);
+        expect(table.axisFilters![0]!.valueCondition).toBeUndefined();
+      }
+    },
+  );
   test("defaults to a cell range and validates only the selected source mode", async () => {
     const { wrapper } = mountDialog(fixture(), {
       sources: ["Missing!A1:C2"],
@@ -140,6 +227,132 @@ describe("PivotTable source modes", () => {
     await flushPromises();
     expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({ sourceKind: "range" });
   });
+  test.each(["single", "custom"] as const)(
+    "selects %s page fields in the parent and finishes directly from range selection",
+    async (pageMode) => {
+      const f = fixture();
+      const second = createSheet("Second", "second");
+      second.cells = new Map(f.source.cells);
+      insertSheet(f.workbook, second);
+      const { wrapper } = mountDialog(f, {
+        sources: ["'Source Data'!A1:C4"],
+        consolidationPageCount: 1,
+        consolidationPageItems: [["Original"]],
+      });
+      await flushPromises();
+      expect(editor().find('input[value="single"]').exists()).toBe(false);
+      await mode("consolidation");
+      expect(editor().find('input[value="single"]').exists()).toBe(true);
+      expect(editor().find('input[value="custom"]').exists()).toBe(true);
+      await mode(pageMode);
+      await openRangesWizard();
+      expect(wizard().find(".pivot-consolidation-wizard__count").exists()).toBe(
+        pageMode === "custom",
+      );
+      expect(wizard().findAll(".pivot-consolidation-ranges__page-items input")).toHaveLength(
+        pageMode === "custom" ? 1 : 0,
+      );
+      if (pageMode === "custom") {
+        await wizard().get(".pivot-consolidation-ranges__page-items input").setValue("Edited");
+      }
+      await wizard().get(".pivot-consolidation-ranges input").setValue("Second!A1:C4");
+      await wizard().get('[data-pivot-range-action="add"]').trigger("click");
+      await flushPromises();
+      if (pageMode === "custom") {
+        await wizard().get(".pivot-consolidation-ranges__page-items input").setValue("Added");
+      }
+      await wizardButtons()[1]!.trigger("click");
+      await flushPromises();
+      expect(wrapper.emitted("confirm")).toHaveLength(1);
+      expect(editor().isVisible()).toBe(false);
+      expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({
+        sourceKind: "consolidation",
+        consolidationPageMode: pageMode,
+        sources: ["'Source Data'!A1:C4", "=Second!$A$1:$C$4"],
+      });
+    },
+  );
+  test.each([true, false])(
+    "Finish creates a report once with newSheet=%s without reopening the parent",
+    async (newSheet) => {
+      const f = fixture();
+      const { wrapper } = mountDialog(f, {
+        sourceKind: "consolidation",
+        sources: ["'Source Data'!A1:C4"],
+        destination: "F8",
+        newSheet,
+        overwrite: true,
+        chart: true,
+      });
+      await wrapper.setProps({ onConfirm: (draft: PivotDraft) => f.actions.confirm(draft) });
+      await flushPromises();
+      await openRangesWizard();
+      const calls = f.execute.mock.calls.length;
+      await wizardButtons()[1]!.trigger("click");
+      await flushPromises();
+      expect(wrapper.emitted("confirm")).toHaveLength(1);
+      expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({
+        newSheet,
+        destination: "F8",
+        overwrite: true,
+        chart: true,
+      });
+      expect(f.actions.error.value).toBe(false);
+      expect(f.execute.mock.calls.length).toBe(calls + 1);
+      expect(f.sheet.pivotTables).toHaveLength(1);
+      expect(editor().isVisible()).toBe(false);
+    },
+  );
+  test("keeps overwrite feedback in range selection for a Finish retry", async () => {
+    const f = fixture();
+    setCellContent(f.source, { row: 7, column: 5 }, { kind: "literal", value: "Occupied" });
+    const { wrapper } = mountDialog(f, {
+      sourceKind: "consolidation",
+      sources: ["'Source Data'!A1:C4"],
+      destination: "F8",
+      newSheet: false,
+    });
+    await wrapper.setProps({
+      onConfirm: (draft: PivotDraft) => {
+        f.actions.confirm(draft);
+        void wrapper.setProps({
+          error: f.actions.error.value,
+          errorReason: f.actions.errorReason.value,
+        });
+      },
+    });
+    await flushPromises();
+    await openRangesWizard();
+    await wizardButtons()[1]!.trigger("click");
+    await flushPromises();
+    expect(f.actions.errorReason.value).toBe("overwrite");
+    expect(wizard().isVisible()).toBe(true);
+    expect(editor().isVisible()).toBe(false);
+    expect(wizard().get('[role="alert"]').text()).toContain("destination contains content");
+    await wizard().get('input[type="checkbox"]').setValue(true);
+    await wizardButtons()[1]!.trigger("click");
+    await flushPromises();
+    expect(f.actions.error.value).toBe(false);
+    expect(f.sheet.pivotTables).toHaveLength(1);
+    expect(wrapper.emitted("confirm")?.at(-1)?.[0]).toMatchObject({
+      overwrite: true,
+      destination: "F8",
+    });
+    expect(editor().isVisible()).toBe(false);
+  });
+  test("disables parent page-field choices while editing is disabled", async () => {
+    const { wrapper } = mountDialog(fixture(), { sourceKind: "consolidation" });
+    await flushPromises();
+    await wrapper.setProps({ disabled: true });
+    for (const pageMode of ["single", "custom"]) {
+      expect(
+        (editor().get(`input[value="${pageMode}"]`).element as HTMLInputElement).disabled,
+      ).toBe(true);
+    }
+    expect(
+      (editor().get(".pivot-create__range-summary button").element as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
   test("adds a selected worksheet range, rejects duplicates, and removes the selection", async () => {
     const { wrapper, selectReference } = mountDialog();
     selectReference.mockResolvedValueOnce("'Source Data'!A1:C4");
@@ -149,24 +362,23 @@ describe("PivotTable source modes", () => {
     const ranges = wizard().get(".pivot-consolidation-ranges");
     await ranges.get("[data-select-formula-reference]").trigger("click");
     await flushPromises();
-    const buttons = ranges.findAll(".pivot-consolidation-ranges__actions button");
-    await buttons[0]!.trigger("click");
+    const add = ranges.get('[data-pivot-range-action="add"]');
+    await add.trigger("click");
     await flushPromises();
-    expect(ranges.findAll('[role="option"]')).toHaveLength(1);
-    expect((buttons[0]!.element as HTMLButtonElement).disabled).toBe(true);
-    expect((wizardButtons()[3]!.element as HTMLButtonElement).disabled).toBe(false);
-    await buttons[1]!.trigger("click");
+    expect(ranges.findAll("tr[data-pivot-range-row]")).toHaveLength(1);
+    expect((add.element as HTMLButtonElement).disabled).toBe(true);
+    expect((wizardButtons()[1]!.element as HTMLButtonElement).disabled).toBe(false);
+    await ranges.get('[data-pivot-range-action="remove"]').trigger("click");
     await flushPromises();
-    expect(ranges.findAll('[role="option"]')).toHaveLength(0);
-    expect((buttons[1]!.element as HTMLButtonElement).disabled).toBe(true);
-    expect((wizardButtons()[3]!.element as HTMLButtonElement).disabled).toBe(true);
-    await buttons[0]!.trigger("click");
+    expect(ranges.findAll("tr[data-pivot-range-row]")).toHaveLength(0);
+    expect(ranges.find('[data-pivot-range-action="remove"]').exists()).toBe(false);
+    expect((wizardButtons()[1]!.element as HTMLButtonElement).disabled).toBe(true);
+    await add.trigger("click");
     await flushPromises();
-    await wizardButtons()[3]!.trigger("click");
+    await wizardButtons()[1]!.trigger("click");
     await flushPromises();
-    expect(confirmButton().disabled).toBe(false);
-    confirmButton().click();
-    await flushPromises();
+    expect(editor().isVisible()).toBe(false);
+    expect(wrapper.emitted("confirm")).toHaveLength(1);
     expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({
       sourceKind: "consolidation",
       sources: ["='Source Data'!$A$1:$C$4"],
@@ -180,7 +392,7 @@ describe("PivotTable source modes", () => {
           resolve = done;
         }),
     );
-    mountDialog(fixture(), {}, selectReference);
+    const { wrapper } = mountDialog(fixture(), {}, selectReference);
     await flushPromises();
     await mode("consolidation");
     await openRangesWizard();
@@ -191,12 +403,13 @@ describe("PivotTable source modes", () => {
     resolve(undefined);
     await flushPromises();
     expect((ranges.get("input").element as HTMLInputElement).value).toBe("'Source Data'!A1:C4");
-    await ranges.get(".pivot-consolidation-ranges__actions button").trigger("click");
+    await ranges.get('[data-pivot-range-action="add"]').trigger("click");
     await flushPromises();
-    expect((wizardButtons()[3]!.element as HTMLButtonElement).disabled).toBe(false);
-    await wizardButtons()[3]!.trigger("click");
+    expect((wizardButtons()[1]!.element as HTMLButtonElement).disabled).toBe(false);
+    await wizardButtons()[1]!.trigger("click");
     await flushPromises();
-    expect(confirmButton().disabled).toBe(false);
+    expect(wrapper.emitted("confirm")).toHaveLength(1);
+    expect(editor().isVisible()).toBe(false);
   });
   test("requires an existing report selection and emits its stable identifiers", async () => {
     const f = configuredReport();

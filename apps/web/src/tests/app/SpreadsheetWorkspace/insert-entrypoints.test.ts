@@ -59,7 +59,7 @@ describe("workspace insert entry points", () => {
     { tool: "shape", selector: '[data-insert-tool="shape"]', dialog: ".drawing-editor" },
     {
       tool: "chart",
-      selector: '.chart-insert-tools button[aria-label="Column"]',
+      selector: '.chart-insert-tools [role="button"][aria-label="Column"]',
       dialog: ".chart-editor",
     },
     { tool: "camera", selector: '[data-insert-tool="camera"]', dialog: ".camera-editor" },

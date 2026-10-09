@@ -1,4 +1,23 @@
-import { isFormulaError, createFormulaError, type FormulaValue } from "./formula/types.js";
+import {
+  normalizePivotGroups,
+  refreshPivotGroupBounds,
+  groupPivotRecords,
+  getPivotGroupLabels,
+  type PivotFieldGroup,
+} from "./pivot-groups.js";
+export {
+  getPivotGroupLabels,
+  getPivotGroupedValue,
+  type PivotFieldGroup,
+  type PivotDateGroupUnit,
+} from "./pivot-groups.js";
+import { normalizeCellNumberFormat, type CellNumberFormat } from "./style.js";
+import {
+  createPivotDisplayCache,
+  displayPivotValue,
+  normalizePivotValueDisplay,
+} from "./pivot-value-display.js";
+import { isFormulaError, type FormulaValue } from "./formula/types.js";
 import {
   MAX_SHEET_ROWS,
   MAX_SHEET_COLUMNS,
@@ -8,8 +27,63 @@ import {
   type CellValue,
   type Workbook,
 } from "./workbook.js";
-export type PivotAggregate = "sum" | "count" | "average" | "min" | "max";
-export type PivotValueField = { field: number; aggregate: PivotAggregate; caption: string };
+import {
+  filterPivotRecords,
+  normalizePivotAxisFilters,
+  type PivotAxisFilter,
+} from "./pivot-filters.js";
+import {
+  addPivotValue,
+  createPivotAccumulator,
+  getPivotAggregateValue,
+  type PivotAccumulator,
+} from "./pivot-aggregate.js";
+export type { PivotAxisFilter, PivotLabelCondition, PivotValueCondition } from "./pivot-filters.js";
+export const PIVOT_AGGREGATES = [
+  "sum",
+  "count",
+  "average",
+  "max",
+  "min",
+  "product",
+  "countNums",
+  "stdev",
+  "stdevp",
+  "var",
+  "varp",
+  "distinctCount",
+] as const;
+export type PivotAggregate = (typeof PIVOT_AGGREGATES)[number];
+export const PIVOT_DISPLAY_TYPES = [
+  "normal",
+  "percentOfTotal",
+  "percentOfCol",
+  "percentOfRow",
+  "percent",
+  "percentOfParentRow",
+  "percentOfParentCol",
+  "percentOfParent",
+  "difference",
+  "percentDiff",
+  "runTotal",
+  "percentOfRunningTotal",
+  "rankAscending",
+  "rankDescending",
+  "index",
+] as const;
+export type PivotDisplayType = (typeof PIVOT_DISPLAY_TYPES)[number];
+export type PivotValueDisplay = {
+  type: PivotDisplayType;
+  baseField?: number;
+  baseItem?: { kind: "previous" | "next" } | { kind: "value"; value: CellValue };
+};
+export type PivotValueField = {
+  field: number;
+  aggregate: PivotAggregate;
+  caption: string;
+  numberFormat?: CellNumberFormat;
+  display?: PivotValueDisplay;
+};
 export type PivotFilter = { field: number; values: CellValue[]; all?: boolean };
 export type PivotPresentation = {
   layout: "compact" | "outline" | "tabular";
@@ -21,11 +95,19 @@ export type PivotPresentation = {
   bandedRows: boolean;
   bandedColumns: boolean;
 };
+export type PivotFieldSort = {
+  axis: "rows" | "columns";
+  field: number;
+  order: "ascending" | "descending";
+  measure?: number;
+};
 export type PivotResultLayout = {
   labelColumns: number;
   dataRows: number[];
   rowLabels: string[];
   headerRows?: number;
+  rowFieldIndices?: Array<number | null>;
+  valueRows?: number[];
   seriesLabels?: string[];
 };
 export type PivotReportLayout = {
@@ -33,6 +115,8 @@ export type PivotReportLayout = {
   columnLabel: string;
   allLabel: string;
   multipleLabel: string;
+  fillColor?: string;
+  borderColor?: string;
 };
 export type PivotSourceRange = {
   sheetId: string;
@@ -46,13 +130,18 @@ export type PivotConsolidation = {
   labels: string[];
   pageFields?: { mode: "single" | "custom"; count: number };
 };
+export type PivotDataCache = { headers: string[]; records: FormulaValue[][] };
 export type SheetPivotTable = {
+  dataCache?: PivotDataCache;
+  groups?: PivotFieldGroup[];
   id: string;
   name: string;
   sourceSheetId: string;
   source: CellRange | null;
   consolidation?: PivotConsolidation;
   reportLayout?: PivotReportLayout;
+  axisFilters?: PivotAxisFilter[];
+  sortFields?: PivotFieldSort[];
   anchor: CellAddress;
   outputRange: CellRange | null;
   rowFields: number[];
@@ -71,6 +160,8 @@ export type SheetPivotTable = {
 };
 export const MAX_PIVOT_SOURCE_CELLS = 100000;
 export const MAX_PIVOT_OUTPUT_CELLS = 10000;
+/** Consolidation expands each physical value into at most seven logical fields. */
+export const MAX_PIVOT_CACHE_CELLS = MAX_PIVOT_SOURCE_CELLS * 7;
 const validAddress = (a: CellAddress) =>
   !!a &&
   Number.isInteger(a.row) &&
@@ -120,6 +211,24 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
     (table.styleId !== undefined && !text(table.styleId))
   )
     throw new RangeError("Invalid pivot table.");
+  const dataCache = table.dataCache;
+  if (
+    dataCache !== undefined &&
+    (!dataCache ||
+      !Array.isArray(dataCache.headers) ||
+      !dataCache.headers.length ||
+      dataCache.headers.length > MAX_SHEET_COLUMNS ||
+      dataCache.headers.some((header) => !text(header, 32767)) ||
+      !Array.isArray(dataCache.records) ||
+      (dataCache.records.length + 1) * dataCache.headers.length > MAX_PIVOT_CACHE_CELLS ||
+      dataCache.records.some(
+        (record) =>
+          !Array.isArray(record) ||
+          record.length !== dataCache.headers.length ||
+          record.some((value) => !primitive(value) && !isFormulaError(value)),
+      ))
+  )
+    throw new RangeError("Invalid pivot data cache.");
   const presentation = table.presentation;
   if (
     presentation &&
@@ -153,6 +262,22 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
           (index > 0 && row <= resultLayout.dataRows[index - 1]!),
       ) ||
       resultLayout.rowLabels.some((label) => typeof label !== "string" || label.length > 1048576) ||
+      (resultLayout.valueRows !== undefined &&
+        (!Array.isArray(resultLayout.valueRows) ||
+          resultLayout.valueRows.length > MAX_PIVOT_OUTPUT_CELLS ||
+          resultLayout.valueRows.some(
+            (row, index) =>
+              !Number.isInteger(row) ||
+              row < 1 ||
+              row >= MAX_PIVOT_OUTPUT_CELLS ||
+              (index > 0 && row <= resultLayout.valueRows![index - 1]!),
+          ))) ||
+      (resultLayout.rowFieldIndices !== undefined &&
+        (!Array.isArray(resultLayout.rowFieldIndices) ||
+          resultLayout.rowFieldIndices.length > MAX_PIVOT_OUTPUT_CELLS ||
+          resultLayout.rowFieldIndices.some(
+            (index) => index !== null && (!Number.isInteger(index) || index < 0 || index >= 32),
+          ))) ||
       (resultLayout.headerRows !== undefined &&
         (!Number.isInteger(resultLayout.headerRows) ||
           resultLayout.headerRows < 1 ||
@@ -177,6 +302,33 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
       ].some((label) => !text(label)))
   )
     throw new RangeError("Invalid pivot report layout.");
+  if (
+    reportLayout &&
+    [reportLayout.fillColor, reportLayout.borderColor].some(
+      (color) => color !== undefined && !/^#[0-9a-f]{6}$/i.test(color),
+    )
+  )
+    throw new RangeError("Invalid pivot report colors.");
+  const axisFilters = normalizePivotAxisFilters(table);
+  const sortFields = table.sortFields;
+  if (
+    sortFields !== undefined &&
+    (!Array.isArray(sortFields) ||
+      sortFields.length > 64 ||
+      sortFields.some(
+        (rule) =>
+          !rule ||
+          !["rows", "columns"].includes(rule.axis) ||
+          !(rule.axis === "rows" ? table.rowFields : table.columnFields).includes(rule.field) ||
+          !["ascending", "descending"].includes(rule.order) ||
+          (rule.measure !== undefined &&
+            (!Number.isInteger(rule.measure) ||
+              rule.measure < 0 ||
+              rule.measure >= table.values.length)),
+      ) ||
+      new Set(sortFields.map((rule) => `${rule.axis}:${rule.field}`)).size !== sortFields.length)
+  )
+    throw new RangeError("Invalid pivot field sort.");
   const consolidation = table.consolidation;
   const pageFields = consolidation?.pageFields;
   if (
@@ -224,6 +376,9 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
     : source
       ? source.end.column - source.start.column + 1
       : MAX_SHEET_COLUMNS;
+  if (dataCache && (source || consolidation) && dataCache.headers.length !== width)
+    throw new RangeError("Invalid pivot cache field count.");
+  const groups = normalizePivotGroups(table.groups, width);
   const field = (index: number) => Number.isInteger(index) && index >= 0 && index < width;
   if (
     table.rowFields.length > 32 ||
@@ -235,7 +390,7 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
       (value) =>
         !value ||
         !field(value.field) ||
-        !["sum", "count", "average", "min", "max"].includes(value.aggregate) ||
+        !PIVOT_AGGREGATES.includes(value.aggregate) ||
         !text(value.caption),
     ) ||
     table.filters.some(
@@ -253,6 +408,17 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
   )
     throw new RangeError("Invalid pivot fields.");
   return {
+    ...(dataCache
+      ? {
+          dataCache: {
+            headers: [...dataCache.headers],
+            records: dataCache.records.map((record) =>
+              record.map((value) => (isFormulaError(value) ? { ...value } : value)),
+            ),
+          },
+        }
+      : {}),
+    ...(groups?.length ? { groups } : {}),
     id: table.id,
     name: table.name,
     sourceSheetId: ranges ? ranges[0]!.sheetId : table.sourceSheetId,
@@ -268,9 +434,21 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
       : {}),
     anchor: { ...table.anchor },
     outputRange: cloneRange(table.outputRange),
+    ...(axisFilters ? { axisFilters } : {}),
+    ...(sortFields ? { sortFields: sortFields.map((rule) => ({ ...rule })) } : {}),
     rowFields: [...table.rowFields],
     columnFields: [...table.columnFields],
-    values: table.values.map((value) => ({ ...value })),
+    values: table.values.map((value) => ({
+      ...value,
+      ...(value.numberFormat !== undefined
+        ? { numberFormat: normalizeCellNumberFormat(value.numberFormat) }
+        : {}),
+      ...(value.display !== undefined
+        ? {
+            display: normalizePivotValueDisplay(value.display, table.rowFields, table.columnFields),
+          }
+        : {}),
+    })),
     filters: table.filters.map((filter) => ({
       field: filter.field,
       values: [...filter.values],
@@ -290,7 +468,11 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
           resultLayout: {
             labelColumns: resultLayout.labelColumns,
             dataRows: [...resultLayout.dataRows],
+            ...(resultLayout.valueRows ? { valueRows: [...resultLayout.valueRows] } : {}),
             rowLabels: [...resultLayout.rowLabels],
+            ...(resultLayout.rowFieldIndices
+              ? { rowFieldIndices: [...resultLayout.rowFieldIndices] }
+              : {}),
             ...(resultLayout.headerRows !== undefined
               ? { headerRows: resultLayout.headerRows }
               : {}),
@@ -343,7 +525,7 @@ export function getPivotSourceRanges(table: SheetPivotTable): PivotSourceRange[]
   );
 }
 /** Uniform record stream for ordinary lists and labeled consolidation matrices. */
-export function getPivotTableSource(workbook: Workbook, table: SheetPivotTable) {
+export function getRawPivotTableSource(workbook: Workbook, table: SheetPivotTable) {
   if (!table.consolidation) {
     const info = getPivotSource(workbook, table.sourceSheetId, table.source);
     return {
@@ -427,6 +609,16 @@ export function getPivotTableSource(workbook: Workbook, table: SheetPivotTable) 
     },
   };
 }
+/** Field menus use the same group members as the displayed report. */
+export function getPivotTableSource(workbook: Workbook, table: SheetPivotTable) {
+  const source = getRawPivotTableSource(workbook, table);
+  if (!table.groups?.length) return source;
+  return {
+    headers: source.headers,
+    records: () =>
+      groupPivotRecords([...source.records()], table.groups, workbook.dateSystem).values(),
+  };
+}
 export const rangesIntersect = (a: CellRange, b: CellRange) =>
   a.start.row <= b.end.row &&
   a.end.row >= b.start.row &&
@@ -465,6 +657,11 @@ export function getPivotPresentation(table: SheetPivotTable): PivotPresentation 
 }
 export type PivotResult = {
   matrix: FormulaValue[][];
+  dataCache: PivotDataCache;
+  groups?: PivotFieldGroup[];
+  rowMembers: Array<FormulaValue[] | null>;
+  columnMembers: FormulaValue[][];
+  filteredRecords: FormulaValue[][];
   headerRows: number;
   rowLabelColumns: number;
   headerStart: number;
@@ -476,16 +673,8 @@ export type PivotResult = {
   dataRows: number[];
   rowLabels: string[];
   rowIndents: number[];
+  rowFieldIndices: Array<number | null>;
   subtotalRows: number[];
-};
-type Accumulator = {
-  sum: number;
-  mean: number;
-  count: number;
-  countAll: number;
-  min: number;
-  max: number;
-  error?: Extract<FormulaValue, { kind: string }>;
 };
 const valueKey = (value: FormulaValue) =>
   value === null || value === ""
@@ -494,13 +683,33 @@ const valueKey = (value: FormulaValue) =>
       ? ["error", value.code]
       : [typeof value, value];
 const groupKey = (values: FormulaValue[]) => JSON.stringify(values.map(valueKey));
-export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): PivotResult {
+export function buildPivotResult(
+  workbook: Workbook,
+  input: SheetPivotTable,
+  options?: { useCache?: boolean },
+): PivotResult {
   const table = normalizePivotTable(input);
-  const source = getPivotTableSource(workbook, table);
+  const source =
+    options?.useCache && table.dataCache
+      ? { headers: table.dataCache.headers, records: () => table.dataCache!.records.values() }
+      : getRawPivotTableSource(workbook, table);
   const { headers } = source;
+  const dataCache = {
+    headers: [...headers],
+    records: [...source.records()].map((record) =>
+      record.map((value) => (isFormulaError(value) ? { ...value } : value)),
+    ),
+  };
+  if ((dataCache.records.length + 1) * headers.length > MAX_PIVOT_CACHE_CELLS)
+    throw new RangeError("Pivot data cache is too large.");
   if (!table.rowFields.length && !table.columnFields.length && !table.values.length)
     return {
       matrix: [],
+      dataCache,
+      ...(table.groups?.length ? { groups: table.groups } : {}),
+      rowMembers: [],
+      columnMembers: [],
+      filteredRecords: [],
       headerRows: 0,
       rowLabelColumns: 1,
       headerStart: 0,
@@ -512,6 +721,7 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       dataRows: [],
       rowLabels: [],
       rowIndents: [],
+      rowFieldIndices: [],
       subtotalRows: [],
     };
   const presentation = getPivotPresentation(table);
@@ -519,7 +729,7 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
   const columns = new Map<string, FormulaValue[]>();
   if (!table.rowFields.length) rows.set(groupKey([]), []);
   if (!table.columnFields.length) columns.set(groupKey([]), []);
-  const aggregates = new Map<string, Accumulator>();
+  const aggregates = new Map<string, PivotAccumulator>();
   let sourceRows = 0;
   const filterKeys = table.filters
     .filter((filter) => !filter.all)
@@ -531,20 +741,21 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
     const key = JSON.stringify([row, column, field]);
     let aggregate = aggregates.get(key);
     if (!aggregate) {
-      aggregate = { sum: 0, mean: 0, count: 0, countAll: 0, min: Infinity, max: -Infinity };
+      aggregate = createPivotAccumulator();
       aggregates.set(key, aggregate);
     }
-    if (value !== null && value !== "") aggregate.countAll++;
-    if (isFormulaError(value)) aggregate.error ??= value;
-    if (typeof value === "number" && Number.isFinite(value)) {
-      aggregate.sum += value;
-      aggregate.count++;
-      aggregate.mean = aggregate.mean * (1 - 1 / aggregate.count) + value / aggregate.count;
-      aggregate.min = Math.min(aggregate.min, value);
-      aggregate.max = Math.max(aggregate.max, value);
-    }
+    addPivotValue(aggregate, value, table.values[field]!.aggregate === "distinctCount");
   };
-  for (const record of source.records()) {
+  const records: FormulaValue[][] = [];
+  if (!options?.useCache)
+    table.groups = refreshPivotGroupBounds(table.groups, dataCache.records, workbook.dateSystem);
+  const groupedRecords = groupPivotRecords(dataCache.records, table.groups, workbook.dateSystem);
+  const originals = new Map(
+    groupedRecords.map((record, index) => [record, dataCache.records[index]!]),
+  );
+  const rawValue = (record: FormulaValue[], field: number) =>
+    originals.get(record)?.[field] ?? null;
+  for (const record of groupedRecords) {
     if (record.every((value) => value === null || value === "")) continue;
     if (
       filterKeys.some(
@@ -552,6 +763,10 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       )
     )
       continue;
+    records.push(record);
+  }
+  const filteredRecords = filterPivotRecords(table, records, rawValue);
+  for (const record of filteredRecords) {
     sourceRows++;
     const rowValues = table.rowFields.map((index) => record[index] ?? null);
     const columnValues = table.columnFields.map((index) => record[index] ?? null);
@@ -569,39 +784,87 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       throw new RangeError("Pivot output exceeds 10,000 cells.");
     const rowKeys = [
       rowKey,
-      ...(table.rowTotals && table.rowFields.length ? ["@total"] : []),
+      ...(table.rowFields.length ? ["@total"] : []),
       ...rowValues
         .slice(0, -1)
         .map((_, index) => `@group:${groupKey(rowValues.slice(0, index + 1))}`),
     ];
     const columnKeys = [
       columnKey,
-      ...(table.columnTotals && table.columnFields.length ? ["@total"] : []),
+      ...(table.columnFields.length ? ["@total"] : []),
+      ...columnValues
+        .slice(0, -1)
+        .map((_, index) => `@group:${groupKey(columnValues.slice(0, index + 1))}`),
     ];
     for (const r of rowKeys)
       for (const c of columnKeys)
-        table.values.forEach((value, index) => add(r, c, index, record[value.field] ?? null));
+        table.values.forEach((value, index) => add(r, c, index, rawValue(record, value.field)));
   }
   if (!columns.size) columns.set(groupKey([]), []);
-  const sorted = (groups: Map<string, FormulaValue[]>) => {
+  const sorted = (groups: Map<string, FormulaValue[]>, axis: "rows" | "columns") => {
     const entries = [...groups];
-    if (table.sort === "source") return entries;
+    const fields = axis === "rows" ? table.rowFields : table.columnFields;
+    const levels = fields.map((field, level) => {
+      const rule = table.sortFields?.find((rule) => rule.axis === axis && rule.field === field);
+      const order = rule?.order ?? table.sort;
+      const positions = new Map<string, number>();
+      const measures = new Map<string, PivotAccumulator>();
+      for (const [, values] of entries) {
+        const prefix = groupKey(values.slice(0, level + 1));
+        if (!positions.has(prefix)) positions.set(prefix, positions.size);
+      }
+      if (rule?.measure !== undefined) {
+        for (const record of filteredRecords) {
+          const prefix = groupKey(fields.slice(0, level + 1).map((index) => record[index] ?? null));
+          const acc = measures.get(prefix) ?? createPivotAccumulator();
+          addPivotValue(
+            acc,
+            rawValue(record, table.values[rule.measure]!.field),
+            table.values[rule.measure]!.aggregate === "distinctCount",
+          );
+          measures.set(prefix, acc);
+        }
+      }
+      const group =
+        rule?.measure === undefined
+          ? table.groups?.find((group) => group.field === field)
+          : undefined;
+      return {
+        rule,
+        order,
+        positions,
+        measures,
+        groupLabels: group ? getPivotGroupLabels(group, workbook.dateSystem) : undefined,
+      };
+    });
     return entries.sort((a, b) => {
-      let comparison = 0;
-      for (let index = 0; index < Math.max(a[1].length, b[1].length); index++) {
-        const left = a[1][index],
-          right = b[1][index];
-        comparison =
-          typeof left === "number" && typeof right === "number"
+      for (let level = 0; level < fields.length; level++) {
+        const { rule, order, positions, measures, groupLabels } = levels[level]!;
+        const leftKey = groupKey(a[1].slice(0, level + 1));
+        const rightKey = groupKey(b[1].slice(0, level + 1));
+        if (leftKey === rightKey) continue;
+        if (order === "source") return positions.get(leftKey)! - positions.get(rightKey)!;
+        const left =
+          rule?.measure !== undefined
+            ? getPivotAggregateValue(measures.get(leftKey), table.values[rule.measure]!.aggregate)
+            : a[1][level];
+        const right =
+          rule?.measure !== undefined
+            ? getPivotAggregateValue(measures.get(rightKey), table.values[rule.measure]!.aggregate)
+            : b[1][level];
+        const comparison = groupLabels
+          ? groupLabels.indexOf(String(left)) - groupLabels.indexOf(String(right))
+          : typeof left === "number" && typeof right === "number"
             ? left - right
             : String(left ?? "").localeCompare(String(right ?? ""), "en");
-        if (comparison) break;
+        if (comparison) return order === "descending" ? -comparison : comparison;
+        return positions.get(leftKey)! - positions.get(rightKey)!;
       }
-      return table.sort === "descending" ? -comparison : comparison;
+      return 0;
     });
   };
-  const rowEntries = sorted(rows);
-  const columnEntries = sorted(columns);
+  const rowEntries = sorted(rows, "rows");
+  const columnEntries = sorted(columns, "columns");
   const rowLabelColumns =
     presentation.layout === "compact" ? 1 : Math.max(1, table.rowFields.length);
   const totalColumnStart =
@@ -621,16 +884,28 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       for (const value of table.values)
         heading.push([...values.map(label), value.caption].join(" / "));
     else if (table.columnFields.length) heading.push(values.map(label).join(" / "));
+  if (table.reportLayout && table.filters.length && heading.length < 2) heading.push(null);
   const aggregateValue = (row: string, column: string, index: number): FormulaValue => {
     const acc = aggregates.get(JSON.stringify([row, column, index]));
     const type = table.values[index]!.aggregate;
     if (!acc && table.reportLayout) return null;
-    if (type === "count") return acc?.countAll ?? 0;
-    if (acc?.error) return acc.error;
-    if (!acc?.count) return type === "average" ? null : 0;
-    const number =
-      type === "sum" ? acc.sum : type === "average" ? acc.mean : type === "min" ? acc.min : acc.max;
-    return Number.isFinite(number) ? number : createFormulaError("NUM");
+    return getPivotAggregateValue(acc, type);
+  };
+  const displayCaches = table.values.map(() => createPivotDisplayCache());
+  const displayRows = rowEntries.map(([, members]) => members);
+  const displayColumns = columnEntries
+    .filter(([key]) => key !== "@total")
+    .map(([, members]) => members);
+  const rawAt = (row: FormulaValue[], column: FormulaValue[], index: number) => {
+    const key = (members: FormulaValue[], fields: number[]) =>
+      !fields.length
+        ? groupKey([])
+        : !members.length
+          ? "@total"
+          : members.length < fields.length
+            ? `@group:${groupKey(members)}`
+            : groupKey(members);
+    return aggregateValue(key(row, table.rowFields), key(column, table.columnFields), index);
   };
   const seriesLabels = heading.slice(rowLabelColumns).map((value) => String(value ?? ""));
   const matrix: FormulaValue[][] = [];
@@ -657,7 +932,9 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       pad([
         table.values.length === 1 ? table.values[0]!.caption : table.name,
         ...Array.from({ length: rowLabelColumns - 1 }, () => null),
-        table.reportLayout.columnLabel,
+        table.consolidation
+          ? table.reportLayout.columnLabel
+          : table.columnFields.map((field) => headers[field]!).join(" / "),
       ]),
     );
     for (let level = 0; level < table.columnFields.length; level++) {
@@ -693,8 +970,10 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
     rowLabels: string[] = [],
     rowIndents: number[] = matrix.map(() => 0),
     subtotalRows: number[] = [];
+  const rowFieldIndices: Array<number | null> = matrix.map(() => null);
+  const rowMembers: Array<FormulaValue[] | null> = matrix.map(() => null);
   const append = (
-    key: string,
+    _key: string,
     values: FormulaValue[],
     depth: number,
     kind: "leaf" | "group" | "subtotal" | "total",
@@ -726,11 +1005,30 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
     for (const [column] of columnEntries)
       if (table.values.length)
         table.values.forEach((_, index) =>
-          cells.push(kind === "group" ? null : aggregateValue(key, column, index)),
+          cells.push(
+            kind === "group"
+              ? null
+              : displayPivotValue(table.values[index]!.display, {
+                  cache: displayCaches[index],
+                  row: kind === "total" ? [] : values,
+                  column: column === "@total" ? [] : (columns.get(column) ?? []),
+                  rowFields: table.rowFields,
+                  columnFields: table.columnFields,
+                  rows: displayRows,
+                  columns: displayColumns,
+                  raw: (row, column) => rawAt(row, column, index),
+                }),
+          ),
         );
       else if (table.columnFields.length) cells.push(null);
     const index = matrix.length;
-    matrix.push(cells);
+    matrix.push(pad(cells));
+    rowMembers.push(kind === "group" ? null : kind === "total" ? [] : values);
+    rowFieldIndices.push(
+      kind === "total" || !table.rowFields.length
+        ? null
+        : Math.min(depth, table.rowFields.length - 1),
+    );
     rowIndents.push(presentation.layout === "compact" ? Math.min(depth, 15) : 0);
     if (kind === "leaf") {
       dataRows.push(index);
@@ -772,6 +1070,8 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
       if (presentation.blankRows) {
         matrix.push(Array.from({ length: heading.length }, () => null));
         rowIndents.push(0);
+        rowFieldIndices.push(null);
+        rowMembers.push(null);
       }
     }
   };
@@ -783,6 +1083,11 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
     throw new RangeError("Pivot output exceeds 10,000 cells.");
   return {
     matrix,
+    dataCache,
+    ...(table.groups?.length ? { groups: table.groups } : {}),
+    rowMembers,
+    columnMembers: columnEntries.map(([key, values]) => (key === "@total" ? [] : values)),
+    filteredRecords: filteredRecords.map((record) => originals.get(record)!),
     headerRows,
     headerStart,
     seriesLabels,
@@ -794,7 +1099,72 @@ export function buildPivotResult(workbook: Workbook, input: SheetPivotTable): Pi
     dataRows,
     rowLabels,
     rowIndents,
+    rowFieldIndices,
     subtotalRows,
+  };
+}
+
+/** Numeric result cells, including subtotals and grand totals, support Show Details. */
+export function isPivotValueCell(table: SheetPivotTable, address: CellAddress): boolean {
+  if (
+    !validAddress(address) ||
+    !table.outputRange ||
+    !addressInRange(address, table.outputRange) ||
+    !table.values.length
+  )
+    return false;
+  const layout = table.resultLayout;
+  if (!layout) return false;
+  const row = address.row - table.anchor.row;
+  return (
+    address.column - table.anchor.column >= layout.labelColumns &&
+    (layout.valueRows ?? layout.dataRows).includes(row)
+  );
+}
+/** Uses the last refresh cache so details reconcile with the displayed report. */
+export function getPivotDetails(
+  workbook: Workbook,
+  table: SheetPivotTable,
+  address: CellAddress,
+): PivotDataCache {
+  if (!table.dataCache) throw new RangeError("Refresh this pivot table before showing details.");
+  if (
+    !validAddress(address) ||
+    !table.outputRange ||
+    !addressInRange(address, table.outputRange) ||
+    !table.values.length
+  )
+    throw new RangeError("Select a pivot value cell.");
+  const result = buildPivotResult(workbook, table, { useCache: true });
+  const row = address.row - table.anchor.row;
+  const column = address.column - table.anchor.column - result.rowLabelColumns;
+  const members = result.rowMembers[row];
+  const columnMembers = result.columnMembers[Math.floor(column / table.values.length)];
+  if (
+    !members ||
+    column < 0 ||
+    !columnMembers ||
+    column >= result.matrix[row]!.length - result.rowLabelColumns
+  )
+    throw new RangeError("Select a pivot value cell.");
+  const matches = (record: FormulaValue[], fields: number[], values: FormulaValue[]) =>
+    values.every(
+      (value, index) => groupKey([record[fields[index]!] ?? null]) === groupKey([value]),
+    );
+  const memberRecords = groupPivotRecords(
+    result.filteredRecords,
+    table.groups,
+    workbook.dateSystem,
+  );
+  return {
+    headers: [...result.headers],
+    records: result.filteredRecords
+      .filter(
+        (_, index) =>
+          matches(memberRecords[index]!, table.rowFields, members) &&
+          matches(memberRecords[index]!, table.columnFields, columnMembers),
+      )
+      .map((record) => record.map((value) => (isFormulaError(value) ? { ...value } : value))),
   };
 }
 
@@ -884,6 +1254,11 @@ export function transformPivotReferences(
           });
           return address && next ? address.column - next.start.column : -1;
         };
+        const cacheFieldsChanged =
+          table.dataCache?.headers.some((_, index) => field(index) !== index) ||
+          !next ||
+          next.end.column - next.start.column !== previous.end.column - previous.start.column;
+        if (cacheFieldsChanged) delete table.dataCache;
         const fields = [
           ...table.rowFields,
           ...table.columnFields,
@@ -896,13 +1271,31 @@ export function transformPivotReferences(
           fields.some(
             (index) => field(index) < 0 || field(index) > next.end.column - next.start.column,
           )
-        )
+        ) {
           table.source = null;
-        else {
+          table.groups = table.groups?.filter((group) => field(group.field) >= 0);
+        } else {
           table.source = next;
+          table.groups = table.groups?.flatMap((group) =>
+            field(group.field) < 0 ? [] : [{ ...group, field: field(group.field) }],
+          );
+          table.sortFields = table.sortFields?.map((rule) => ({
+            ...rule,
+            field: field(rule.field),
+          }));
+          table.axisFilters = table.axisFilters?.map((filter) => ({
+            ...filter,
+            field: field(filter.field),
+          }));
           table.rowFields = table.rowFields.map(field);
           table.columnFields = table.columnFields.map(field);
-          table.values = table.values.map((value) => ({ ...value, field: field(value.field) }));
+          table.values = table.values.map((value) => ({
+            ...value,
+            field: field(value.field),
+            ...(value.display?.baseField === undefined
+              ? {}
+              : { display: { ...value.display, baseField: field(value.display.baseField) } }),
+          }));
           table.filters = table.filters.map((filter) => ({
             ...filter,
             field: field(filter.field),

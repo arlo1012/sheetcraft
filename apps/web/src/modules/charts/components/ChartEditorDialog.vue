@@ -84,21 +84,34 @@ const options = computed(() => types.map((type) => ({ label: t(`chart.${type}`),
           t("pivot.edit")
         }}</Button>
       </p>
+      <p v-if="draft.chart.dataCache">
+        {{ t("chart.cachedSourceHint") }}
+        <Button size="small" @click="draft.chart.dataCache = undefined">{{
+          t("chart.linkSource")
+        }}</Button>
+      </p>
       <label
         >{{ t("chart.source")
         }}<RangeReferenceInput
           v-model="source"
-          :disabled="!!draft.chart.pivotTableId"
+          :disabled="!!draft.chart.pivotTableId || !!draft.chart.dataCache"
           :label="t('chart.source')"
           :select-reference="selectReference"
       /></label>
       <label>{{ t("chart.type") }}<Select v-model="draft.chart.type" :options="options" /></label>
       <label>{{ t("chart.title") }}<Input v-model="draft.chart.title" :maxlength="1000" /></label>
       <div class="chart-editor__row">
-        <Checkbox v-model="draft.chart.headerRow">{{ t("chart.headerRow") }}</Checkbox
-        ><Checkbox v-model="draft.chart.headerColumn">{{ t("chart.headerColumn") }}</Checkbox
+        <Checkbox
+          v-model="draft.chart.headerRow"
+          :disabled="!!draft.chart.pivotTableId || !!draft.chart.dataCache"
+          >{{ t("chart.headerRow") }}</Checkbox
+        ><Checkbox
+          v-model="draft.chart.headerColumn"
+          :disabled="!!draft.chart.pivotTableId || !!draft.chart.dataCache"
+          >{{ t("chart.headerColumn") }}</Checkbox
         ><Checkbox
           :checked="draft.chart.seriesBy === 'rows'"
+          :disabled="!!draft.chart.pivotTableId || !!draft.chart.dataCache"
           @change="draft.chart.seriesBy = $event ? 'rows' : 'columns'"
           >{{ t("chart.seriesByRows") }}</Checkbox
         >
@@ -107,16 +120,20 @@ const options = computed(() => types.map((type) => ({ label: t(`chart.${type}`),
         <Checkbox v-model="draft.chart.legend">{{ t("chart.legend") }}</Checkbox
         ><Checkbox v-model="draft.chart.labels">{{ t("chart.labels") }}</Checkbox
         ><Checkbox v-model="draft.chart.stacked">{{ t("chart.stacked") }}</Checkbox
-        ><Checkbox v-model="draft.chart.showHidden">{{ t("chart.showHidden") }}</Checkbox>
+        ><Checkbox v-model="draft.chart.showHidden" :disabled="!!draft.chart.dataCache">{{
+          t("chart.showHidden")
+        }}</Checkbox>
       </div>
-      <p class="chart-editor__hint">
+      <p v-if="!draft.chart.dataCache" class="chart-editor__hint">
         {{
           t(
-            draft.chart.type === "sankey"
-              ? "chart.sankeyHint"
-              : draft.chart.type === "scatter"
-                ? "chart.scatterHint"
-                : "chart.sourceHint",
+            draft.chart.pivotTableId
+              ? "chart.pivotSourceHint"
+              : draft.chart.type === "sankey"
+                ? "chart.sankeyHint"
+                : draft.chart.type === "scatter"
+                  ? "chart.scatterHint"
+                  : "chart.sourceHint",
           )
         }}
       </p>

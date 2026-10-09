@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { ArrowDownAZ, ArrowUpAZ, FilterX } from "lucide-vue-next";
-import { Button as TButton } from "tdesign-vue-next/es/button";
+import { FilterX } from "lucide-vue-next";
 import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { getSheetFilterValueKey } from "@idea10/core/commands";
 import type { SheetFilterCondition, SheetFilterValue } from "@idea10/core/workbook";
@@ -11,25 +10,33 @@ import { vIconAction } from "../../../shared/focus/icon-action";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
-import { createFilterConditionDraft, type FilterConditionOperator } from "../filter-conditions";
-import type { FilterConditionAction } from "../filter-condition-actions";
+import {
+  createFilterConditionDraft,
+  type FilterConditionOperator,
+} from "../../../shared/filter/filter-conditions";
+import type { FilterConditionAction } from "../../../shared/filter/filter-condition-actions";
 import {
   getMatchingFilterValues,
   DEFAULT_FILTER_SEARCH_OPTIONS,
   type FilterSearchOptions,
-} from "../filter-value-options";
-import { readFilterPanelSettings, type FilterPanelSettings } from "../filter-panel-settings";
+} from "../../../shared/filter/filter-value-options";
+import {
+  readFilterPanelSettings,
+  type FilterPanelSettings,
+} from "../../../shared/filter/filter-panel-settings";
 import type {
   DataToolFilterCriteria,
   DataToolFilterValueOption,
   FilterColorSort,
 } from "../data-tools-types";
-import FilterValueList from "./FilterValueList.vue";
+import FilterSortBar from "../../../shared/filter/components/FilterSortBar.vue";
+import FilterPanelActions from "../../../shared/filter/components/FilterPanelActions.vue";
+import FilterValueList from "../../../shared/filter/components/FilterValueList.vue";
 import FilterColorOptions from "./FilterColorOptions.vue";
 import FilterColorSortMenu from "./FilterColorSortMenu.vue";
-import FilterConditionMenu from "./FilterConditionMenu.vue";
-import FilterConditionDialog from "./FilterConditionDialog.vue";
-import FilterRankDialog from "./FilterRankDialog.vue";
+import FilterConditionMenu from "../../../shared/filter/components/FilterConditionMenu.vue";
+import FilterConditionDialog from "../../../shared/filter/components/FilterConditionDialog.vue";
+import FilterRankDialog from "../../../shared/filter/components/FilterRankDialog.vue";
 
 type ColorCondition = Extract<SheetFilterCondition, { kind: "color" | "color-set" }>;
 
@@ -134,7 +141,9 @@ const operatorLabels: Record<FilterConditionOperator, MessageKey> = {
   contains: "dataTools.filter.contains",
   doesNotContain: "dataTools.filter.doesNotContain",
   beginsWith: "dataTools.filter.beginsWith",
+  doesNotBeginWith: "dataTools.filter.doesNotBeginWith",
   endsWith: "dataTools.filter.endsWith",
+  doesNotEndWith: "dataTools.filter.doesNotEndWith",
   greaterThan: "dataTools.filter.greaterThan",
   greaterThanOrEqual: "dataTools.filter.greaterThanOrEqual",
   lessThan: "dataTools.filter.lessThan",
@@ -296,35 +305,15 @@ onBeforeUnmount(() => {
       layer="popover"
       viewport-inset="8px"
     >
-      <header class="filter-column-panel__heading">
-        <div class="filter-column-panel__sort" role="group" :aria-label="t('dataTools.sort.title')">
-          <TButton
-            variant="text"
-            size="small"
-            :disabled="disabled || !canSort"
-            @click="emit('sort', 'ascending')"
-          >
-            <template #icon><ArrowUpAZ class="idea-action-icon" /></template>
-            {{ t("dataTools.sort.ascending") }}
-          </TButton>
-          <TButton
-            variant="text"
-            size="small"
-            :disabled="disabled || !canSort"
-            @click="emit('sort', 'descending')"
-          >
-            <template #icon><ArrowDownAZ class="idea-action-icon" /></template>
-            {{ t("dataTools.sort.descending") }}
-          </TButton>
-          <FilterColorSortMenu
-            ref="colorSortMenuRef"
-            :colors="colors"
-            :disabled="disabled || !canSort"
-            @select="emit('sortColor', $event)"
-            @custom="emit('openSort')"
-          />
-        </div>
-      </header>
+      <FilterSortBar :disabled="disabled || !canSort" @sort="emit('sort', $event)">
+        <FilterColorSortMenu
+          ref="colorSortMenuRef"
+          :colors="colors"
+          :disabled="disabled || !canSort"
+          @select="emit('sortColor', $event)"
+          @custom="emit('openSort')"
+        />
+      </FilterSortBar>
       <TTabs v-model="tab" class="filter-column-panel__tabs" size="medium">
         <template #action>
           <div class="filter-column-panel__actions">
@@ -386,33 +375,22 @@ onBeforeUnmount(() => {
             })
           }}
         </p>
-        <footer>
-          <span
-            v-if="tab === 'values' && !pendingValueCriteria"
-            class="filter-column-panel__summary"
-            role="status"
-          >
-            {{
-              settings.showTotalCount
-                ? t("dataTools.filter.recordSummary", recordTotals)
-                : t(
-                    query.trim()
-                      ? "dataTools.filter.searchSelectionSummary"
-                      : "dataTools.filter.selectionSummary",
-                    {
-                      selected: includedKeys.length,
-                      total: matchingValues.length,
-                    },
-                  )
-            }}
-          </span>
-          <TButton theme="default" variant="base" size="small" @click="emit('close')">{{
-            t("dataTools.filter.cancel")
-          }}</TButton>
-          <TButton theme="primary" size="small" :disabled="!canApply" @click="apply">{{
-            t("dataTools.filter.apply")
-          }}</TButton>
-        </footer>
+        <FilterPanelActions
+          :disabled="!canApply"
+          :summary="
+            tab === 'values' && !pendingValueCriteria
+              ? settings.showTotalCount
+                ? { ...recordTotals, records: true }
+                : {
+                    selected: includedKeys.length,
+                    total: matchingValues.length,
+                    search: !!query.trim(),
+                  }
+              : undefined
+          "
+          @cancel="emit('close')"
+          @apply="apply"
+        />
       </div>
     </FloatingPanelSurface>
   </Teleport>
@@ -443,19 +421,6 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--idea-space-4);
   width: min(420px, calc(100vw - 16px));
-  &__heading {
-    display: flex;
-    align-items: center;
-    min-height: 32px;
-    gap: var(--idea-space-4);
-    border-bottom: 1px solid var(--idea-border-subtle);
-  }
-  &__sort {
-    display: flex;
-    align-items: center;
-    flex: none;
-    gap: var(--idea-space-4);
-  }
   &__tabs {
     min-width: 0;
   }
@@ -484,12 +449,6 @@ onBeforeUnmount(() => {
     margin: 0;
     color: var(--idea-text-danger);
   }
-  &__summary {
-    min-width: 0;
-    margin-right: auto;
-    color: var(--idea-text-secondary);
-    font-variant-numeric: tabular-nums;
-  }
   &__bottom {
     position: sticky;
     z-index: 1;
@@ -497,12 +456,6 @@ onBeforeUnmount(() => {
     display: grid;
     gap: var(--idea-space-4);
     background: var(--idea-surface-panel);
-  }
-  footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--idea-space-4);
   }
 }
 </style>
