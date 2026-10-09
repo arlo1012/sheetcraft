@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
 import { createAutoRowHeightCalculator } from "../../row-height.js";
-import type { Cell } from "@idea10/core/workbook";
+import type { Cell } from "@sheetcraft/core/workbook";
 
 test("an image replaces wrapped text without retaining text-derived row height", () => {
   const calculator = createAutoRowHeightCalculator({ measure: (text) => text.length * 10 });

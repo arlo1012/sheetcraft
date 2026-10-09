@@ -1,14 +1,14 @@
-import type { CellNumberFormat } from "@idea10/core/style";
+import type { CellNumberFormat } from "@sheetcraft/core/style";
 import { readNativeValue } from "./pivot-native-values.js";
 import { cacheGroupFingerprint, readNativePivotGroups } from "./pivot-native-groups.js";
-import type { FormulaValue } from "@idea10/core/formula";
-import { createWorkbookEvaluator, type Workbook } from "@idea10/core/workbook";
+import type { FormulaValue } from "@sheetcraft/core/formula";
+import { createWorkbookEvaluator, type Workbook } from "@sheetcraft/core/workbook";
 import {
   buildPivotResult,
   getPivotTableSource,
   normalizePivotTable,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
+} from "@sheetcraft/core/pivot-tables";
 import { primitivePivotValue, readPivotSharedItems, readPivotCacheRecords } from "./pivot-cache.js";
 import { readNativePivotFilters } from "./pivot-native-filters.js";
 import {

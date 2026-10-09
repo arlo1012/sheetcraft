@@ -1,6 +1,6 @@
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
-import { setCellStyle, setCellValue } from "@idea10/core/workbook";
+import { setCellStyle, setCellValue } from "@sheetcraft/core/workbook";
 import { recordCanvasRenderPlans } from "./canvas-render-fixture";
 import { mountSheetGrid } from "./fixture";
 

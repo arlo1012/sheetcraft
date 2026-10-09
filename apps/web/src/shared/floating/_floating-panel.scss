@@ -1,27 +1,31 @@
 @use "../option-list/option-list";
 
 @mixin chrome {
-  background: var(--idea-surface-panel);
-  border: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-default);
-  box-shadow: var(--idea-shadow-menu);
+  background: var(--sheetcraft-surface-panel);
+  border: 1px solid var(--sheetcraft-border-subtle);
+  border-radius: var(--sheetcraft-radius-default);
+  box-shadow: var(--sheetcraft-shadow-menu);
 }
 
 @mixin surface {
   @include option-list.scrollbar;
   @include chrome;
 
-  z-index: var(--idea-layer-menu);
-  max-width: calc(100vw - var(--idea-floating-panel-inset) - var(--idea-floating-panel-inset));
-  max-height: calc(100vh - var(--idea-floating-panel-inset) - var(--idea-floating-panel-inset));
+  z-index: var(--sheetcraft-layer-menu);
+  max-width: calc(
+    100vw - var(--sheetcraft-floating-panel-inset) - var(--sheetcraft-floating-panel-inset)
+  );
+  max-height: calc(
+    100vh - var(--sheetcraft-floating-panel-inset) - var(--sheetcraft-floating-panel-inset)
+  );
   overflow: auto;
   overscroll-behavior: contain;
 }
 
 @mixin toolbar-surface(
-  $layer: var(--idea-layer-menu),
-  $border: 1px solid var(--idea-border-subtle),
-  $shadow: var(--idea-shadow-menu)
+  $layer: var(--sheetcraft-layer-menu),
+  $border: 1px solid var(--sheetcraft-border-subtle),
+  $shadow: var(--sheetcraft-shadow-menu)
 ) {
   @include chrome;
 

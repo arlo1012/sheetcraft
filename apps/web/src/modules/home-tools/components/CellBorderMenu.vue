@@ -7,7 +7,7 @@ import type {
   CellBorderFormatPatch,
   CellBorderLineStyle,
   CellBorderPreset,
-} from "@idea10/core/style";
+} from "@sheetcraft/core/style";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useRovingFocus } from "../../../shared/focus/useRovingFocus";
@@ -393,7 +393,7 @@ onBeforeUnmount(() => {
     max-height: calc(100vh - 16px);
   }
   &__presets {
-    padding: 0 var(--idea-tool-panel-padding);
+    padding: 0 var(--sheetcraft-tool-panel-padding);
     list-style: none;
   }
   &__submenu {

@@ -1,10 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import type { FloatingImage } from "@idea10/core/workbook";
-import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
-import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
-import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { FloatingImage } from "@sheetcraft/core/workbook";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
+import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import SheetFloatingImageLayer from "../../../../../modules/sheet-images/components/SheetFloatingImageLayer.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 

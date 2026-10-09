@@ -67,7 +67,7 @@ function preview(): void {
 .picture-view {
   @include ribbon.tool;
   &__menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
   }
 }
 </style>

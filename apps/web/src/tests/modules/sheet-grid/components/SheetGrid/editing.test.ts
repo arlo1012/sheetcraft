@@ -1,6 +1,6 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { DEFAULT_ROW_HEIGHT, getCellValue, setCellValue } from "@idea10/core/workbook";
+import { DEFAULT_ROW_HEIGHT, getCellValue, setCellValue } from "@sheetcraft/core/workbook";
 import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 import { useCellEditSession } from "../../../../../shared/cell-editing/useCellEditSession";
 

@@ -5,7 +5,7 @@ import {
   getDimensionUnits,
   pixelsToDimensionValue,
   type DimensionUnit,
-} from "@idea10/core/dimension-units";
+} from "@sheetcraft/core/dimension-units";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import { Select as TSelect } from "tdesign-vue-next/es/select";

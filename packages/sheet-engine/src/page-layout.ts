@@ -3,7 +3,7 @@ import {
   getPagePaperSize,
   type CellRange,
   type SheetPageSetup,
-} from "@idea10/core";
+} from "@sheetcraft/core";
 import type { Point, Rect, SheetGeometry, Size, VisibleCellRange } from "./geometry.js";
 import type { RowVisibilityIndex, VisibleRow } from "./visibility.js";
 import {

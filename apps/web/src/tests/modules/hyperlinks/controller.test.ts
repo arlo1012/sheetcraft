@@ -6,8 +6,8 @@ import {
   executeWorkbookCommand,
   undoWorkbookCommand,
   redoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createSheet,
   createWorkbook,
@@ -17,7 +17,7 @@ import {
   getCellStyle,
   insertSheet,
   setCellContent,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useHyperlinksController } from "../../../modules/hyperlinks/useHyperlinksController";
 import { createAppI18n } from "../../../shared/i18n";
 

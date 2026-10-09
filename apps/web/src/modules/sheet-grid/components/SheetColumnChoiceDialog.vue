@@ -2,7 +2,7 @@
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { computed, ref, watch } from "vue";
-import type { CellAddress, Sheet, SheetEvaluator } from "@idea10/core/workbook";
+import type { CellAddress, Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import { getColumnChoices } from "../column-context-data";
 
@@ -112,15 +112,15 @@ watch(
   &__list {
     max-height: min(360px, 48vh);
     padding: 0;
-    margin: var(--idea-space-3) 0 0;
+    margin: var(--sheetcraft-space-3) 0 0;
     overflow: auto;
     list-style: none;
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-small);
+    border: 1px solid var(--sheetcraft-border-control);
+    border-radius: var(--sheetcraft-radius-small);
   }
 
   li + li {
-    border-top: 1px solid var(--idea-border-control);
+    border-top: 1px solid var(--sheetcraft-border-control);
   }
 
   button {
@@ -128,16 +128,16 @@ watch(
     width: 100%;
     min-width: 0;
     align-items: center;
-    gap: var(--idea-space-2);
-    padding: 8px var(--idea-space-3);
-    color: var(--idea-text-primary);
+    gap: var(--sheetcraft-space-2);
+    padding: 8px var(--sheetcraft-space-3);
+    color: var(--sheetcraft-text-primary);
     text-align: left;
     cursor: pointer;
     background: transparent;
     border: 0;
 
     &:hover:not(:disabled) {
-      background: var(--idea-surface-hover);
+      background: var(--sheetcraft-surface-hover);
       outline: none;
     }
     &:disabled {
@@ -154,14 +154,14 @@ watch(
 
     small {
       margin-left: auto;
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
       font-variant-numeric: tabular-nums;
     }
   }
 
   &__empty {
-    padding: var(--idea-space-4);
-    color: var(--idea-text-secondary);
+    padding: var(--sheetcraft-space-4);
+    color: var(--sheetcraft-text-secondary);
     text-align: center;
   }
 }

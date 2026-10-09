@@ -1,15 +1,15 @@
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   getCellContent,
   getCellStyle,
   MAX_SHEET_ROWS,
   setCellContent,
   setCellStyle,
-} from "@idea10/core/workbook";
-import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
+} from "@sheetcraft/core/workbook";
+import { createSheetGridViewState } from "@sheetcraft/sheet-engine/view-state";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import { createAppI18n } from "../../../shared/i18n";
 

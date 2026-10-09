@@ -1,9 +1,9 @@
 import { strFromU8, unzipSync } from "fflate/browser";
-import { createApplyCellBordersCommand, createMergeCellsCommand } from "@idea10/core/commands";
-import { createWorkbookSession, executeWorkbookCommand } from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { serializeWorkbook } from "@idea10/core/serialization";
-import { createWorkbook, getActiveSheet, type CellRange } from "@idea10/core/workbook";
+import { createApplyCellBordersCommand, createMergeCellsCommand } from "@sheetcraft/core/commands";
+import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { createWorkbook, getActiveSheet, type CellRange } from "@sheetcraft/core/workbook";
 import { describe, expect, test } from "vitest";
 import { encodeXlsx } from "../../index.js";
 

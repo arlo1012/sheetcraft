@@ -1,5 +1,5 @@
-import { formatCellNumberValue, getNumberFormatLocaleId } from "@idea10/core/number-format";
-import type { CellNumberFormat } from "@idea10/core/style";
+import { formatCellNumberValue, getNumberFormatLocaleId } from "@sheetcraft/core/number-format";
+import type { CellNumberFormat } from "@sheetcraft/core/style";
 import type { MessageKey } from "../../../shared/i18n";
 import { getDateFormatPresets } from "../../../shared/number-format/date-presets";
 

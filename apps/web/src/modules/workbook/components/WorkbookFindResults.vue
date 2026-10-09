@@ -109,28 +109,28 @@ function onTableKeydown(event: KeyboardEvent): void {
 <style scoped lang="scss">
 .workbook-find-results {
   display: grid;
-  gap: var(--idea-space-3);
+  gap: var(--sheetcraft-space-3);
   min-width: 0;
 
   &__header {
     display: flex;
     align-items: baseline;
     flex-wrap: wrap;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
 
   &__count {
     margin: 0;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
 
   &__heading {
     margin: 0;
-    font-size: var(--idea-font-size-body-large);
-    font-weight: var(--idea-font-weight-semibold);
-    line-height: var(--idea-line-height-body-large);
+    font-size: var(--sheetcraft-font-size-body-large);
+    font-weight: var(--sheetcraft-font-weight-semibold);
+    line-height: var(--sheetcraft-line-height-body-large);
   }
 
   &__table {

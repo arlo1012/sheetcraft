@@ -12,7 +12,7 @@ import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import LookupFieldMappingTable from "./LookupFieldMappingTable.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
-import type { LookupFillPreview } from "@idea10/core/commands";
+import type { LookupFillPreview } from "@sheetcraft/core/commands";
 import type { DataToolColumn } from "../data-tools-types";
 import type { LookupFillDraft, LookupFillFieldDraft } from "../lookup-fill-types";
 
@@ -408,7 +408,7 @@ watch(
 <style scoped lang="scss">
 .lookup-fill-dialog {
   display: grid;
-  gap: var(--idea-space-5);
+  gap: var(--sheetcraft-space-5);
 }
 .lookup-fill-dialog__fields {
   display: grid;
@@ -441,15 +441,15 @@ watch(
 .lookup-fill-dialog__empty,
 .lookup-fill-dialog__error {
   margin: 0;
-  font-size: var(--idea-font-size-body-small);
-  line-height: var(--idea-line-height-body-small);
+  font-size: var(--sheetcraft-font-size-body-small);
+  line-height: var(--sheetcraft-line-height-body-small);
 }
 .lookup-fill-dialog__notice,
 .lookup-fill-dialog__empty {
-  color: var(--idea-text-secondary);
+  color: var(--sheetcraft-text-secondary);
 }
 .lookup-fill-dialog__empty {
-  padding-block: var(--idea-space-2);
+  padding-block: var(--sheetcraft-space-2);
 }
 .lookup-fill-dialog__error {
   color: var(--td-error-color);
@@ -457,26 +457,26 @@ watch(
 .lookup-fill-dialog__summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  border: 1px solid var(--idea-border-control);
-  border-radius: var(--idea-radius-medium);
+  border: 1px solid var(--sheetcraft-border-control);
+  border-radius: var(--sheetcraft-radius-medium);
   overflow: hidden;
 }
 .lookup-fill-dialog__summary div {
   display: grid;
-  gap: var(--idea-space-1);
-  padding: var(--idea-space-3);
-  border-right: 1px solid var(--idea-border-control);
+  gap: var(--sheetcraft-space-1);
+  padding: var(--sheetcraft-space-3);
+  border-right: 1px solid var(--sheetcraft-border-control);
 }
 .lookup-fill-dialog__summary div:last-child {
   border-right: 0;
 }
 .lookup-fill-dialog__summary strong {
-  font-size: var(--idea-font-size-title-medium);
-  line-height: var(--idea-line-height-title-medium);
+  font-size: var(--sheetcraft-font-size-title-medium);
+  line-height: var(--sheetcraft-line-height-title-medium);
 }
 .lookup-fill-dialog__summary span {
-  color: var(--idea-text-secondary);
-  font-size: var(--idea-font-size-body-small);
+  color: var(--sheetcraft-text-secondary);
+  font-size: var(--sheetcraft-font-size-body-small);
 }
 .lookup-fill-dialog__preview {
   display: grid;
@@ -492,7 +492,7 @@ watch(
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: var(--idea-space-2);
+  gap: var(--sheetcraft-space-2);
 }
 @media (max-width: 520px) {
   .lookup-fill-dialog__summary {
@@ -502,7 +502,7 @@ watch(
     border-right: 0;
   }
   .lookup-fill-dialog__summary div:nth-child(-n + 2) {
-    border-bottom: 1px solid var(--idea-border-control);
+    border-bottom: 1px solid var(--sheetcraft-border-control);
   }
 }
 </style>

@@ -5,11 +5,11 @@ import {
   getPivotTableSource,
   getPivotPresentation,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
-import type { Workbook } from "@idea10/core/workbook";
-import { getFloatingImageViewportFragments } from "@idea10/sheet-engine/floating-image-layout";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
-import type { Rect } from "@idea10/sheet-engine/geometry";
+} from "@sheetcraft/core/pivot-tables";
+import type { Workbook } from "@sheetcraft/core/workbook";
+import { getFloatingImageViewportFragments } from "@sheetcraft/sheet-engine/floating-image-layout";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
+import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 import { useAppI18n } from "../../../shared/i18n";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import PivotFieldFilterPanel from "./PivotFieldFilterPanel.vue";
@@ -191,9 +191,9 @@ watch(
     justify-content: center;
     padding: 0;
     pointer-events: auto;
-    border: 1px solid var(--idea-border-control);
-    background: var(--idea-surface-secondary);
-    color: var(--idea-text-primary);
+    border: 1px solid var(--sheetcraft-border-control);
+    background: var(--sheetcraft-surface-secondary);
+    color: var(--sheetcraft-text-primary);
     cursor: pointer;
     &[aria-disabled="true"] {
       cursor: default;

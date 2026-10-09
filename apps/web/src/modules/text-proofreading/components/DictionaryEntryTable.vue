@@ -4,7 +4,7 @@ import { BaseTable } from "tdesign-vue-next/es/table";
 import { Input } from "tdesign-vue-next/es/input";
 import { Plus, Trash2 } from "lucide-vue-next";
 import { vIconAction } from "../../../shared/focus/icon-action";
-import { parseTsvToCellTexts } from "@idea10/core/clipboard";
+import { parseTsvToCellTexts } from "@sheetcraft/core/clipboard";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{ firstLabel: string; secondLabel: string }>();
@@ -125,7 +125,7 @@ function paste(event: ClipboardEvent, index: number, column: number) {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     > span {
       width: 24px;
       height: 28px;
@@ -133,7 +133,7 @@ function paste(event: ClipboardEvent, index: number, column: number) {
   }
   p {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

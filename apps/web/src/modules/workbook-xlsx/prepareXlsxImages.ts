@@ -1,9 +1,9 @@
-import { deserializeWorkbook, type WorkbookSnapshot } from "@idea10/core/serialization";
+import { deserializeWorkbook, type WorkbookSnapshot } from "@sheetcraft/core/serialization";
 import {
   getWorkbookSheets,
   normalizeImageTransform,
   type ImageTransform,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStore";
 import { paintImagePresentation } from "../../shared/images/imageAppearance";
 import { getImagePresentation } from "../../shared/images/imagePresentation";

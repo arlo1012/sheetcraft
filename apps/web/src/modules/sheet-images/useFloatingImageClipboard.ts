@@ -3,7 +3,7 @@ import {
   type CellAddress,
   type FloatingImage,
   type Sheet,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import type { MessageKey } from "../../shared/i18n";
 import type { GridClipboardPort, GridClipboardTransfer } from "../sheet-grid/gridClipboardPort";

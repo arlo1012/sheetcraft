@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
-import { createSheet, setCellStyle } from "@idea10/core/workbook";
-import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
-import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
-import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
+import { createSheet, setCellStyle } from "@sheetcraft/core/workbook";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
+import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import {
   createBorderPaintPlan,
   paintSheetBorders,

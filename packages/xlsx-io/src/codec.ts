@@ -17,7 +17,7 @@ import {
   parseFormula,
   type CellContent,
   type FormulaValue,
-} from "@idea10/core/formula";
+} from "@sheetcraft/core/formula";
 import {
   createSheetEvaluator,
   getDefaultColumnWidth,
@@ -28,10 +28,10 @@ import {
   type Sheet,
   type SheetFilter,
   type Workbook,
-} from "@idea10/core/workbook";
-import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
-import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
-import type { SheetPageSetup } from "@idea10/core/page-setup";
+} from "@sheetcraft/core/workbook";
+import { createSheetFilterHiddenRowIntervals } from "@sheetcraft/core/commands";
+import type { SheetConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
+import type { SheetPageSetup } from "@sheetcraft/core/page-setup";
 import {
   CELL_FILL_PATTERNS,
   DEFAULT_CELL_FONT_SIZE,
@@ -39,7 +39,7 @@ import {
   MIN_CELL_FONT_SIZE,
   type CellFillGradient,
   type CellStyle,
-} from "@idea10/core/style";
+} from "@sheetcraft/core/style";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
@@ -48,7 +48,7 @@ import {
   MAX_SHEET_ROWS,
   MIN_COLUMN_WIDTH,
   createSheet,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { CompatibilityReportBuilder } from "./report.js";
 import { finalizeXlsxExport } from "./export-finalizer.js";
 import { readXlsxWorkbookTheme } from "./workbook-theme.js";
@@ -175,7 +175,7 @@ function hasColorSetFilter(filter: SheetFilter | null): boolean {
 /**
  * Excel's AutoFilter can only express one color. Preserve the current visible
  * rows when a product multi-color filter is exported, while its full criterion
- * lives in the product extension for a future Idea10 import.
+ * lives in the product extension for a future Sheetcraft import.
  */
 function colorSetHiddenRows(sheet: Sheet): number[] {
   if (
@@ -657,10 +657,10 @@ export async function decodeWithExcelJs(
       address: { row: number; column: number };
       content?: CellContent;
       style?: CellStyle;
-      hyperlink?: import("@idea10/core/workbook").CellHyperlink;
-      namedStyle?: import("@idea10/core/workbook").CellNamedStyleBinding;
-      note?: import("@idea10/core/workbook").CellNote;
-      sparkline?: import("@idea10/core/sparklines").CellSparkline;
+      hyperlink?: import("@sheetcraft/core/workbook").CellHyperlink;
+      namedStyle?: import("@sheetcraft/core/workbook").CellNamedStyleBinding;
+      note?: import("@sheetcraft/core/workbook").CellNote;
+      sparkline?: import("@sheetcraft/core/sparklines").CellSparkline;
     }> = [];
     const rowHeights: Array<{ index: number; size: number }> = [];
     const columnWidths: Array<{ index: number; size: number }> = [];
@@ -733,7 +733,7 @@ export async function decodeWithExcelJs(
         );
         if (themeStyle) style = { ...style, ...themeStyle };
         const rawHyperlink = rawHyperlinks[sheetIndex]?.get(modelCell.address.toUpperCase());
-        let hyperlink: import("@idea10/core/workbook").CellHyperlink | undefined;
+        let hyperlink: import("@sheetcraft/core/workbook").CellHyperlink | undefined;
         if (rawHyperlink) {
           try {
             hyperlink = normalizeCellHyperlink(rawHyperlink);

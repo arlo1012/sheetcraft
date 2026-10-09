@@ -1,7 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createSheet } from "@idea10/core/workbook";
+import { createSheet } from "@sheetcraft/core/workbook";
 import WorkbookSheetTabs from "../../../../../modules/workbook/components/WorkbookSheetTabs.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 

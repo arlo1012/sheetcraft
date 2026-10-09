@@ -1,12 +1,12 @@
-import { canUseSheetPermission } from "@idea10/core";
+import { canUseSheetPermission } from "@sheetcraft/core";
 import { computed, nextTick, ref, shallowRef, watch } from "vue";
 import {
   createClearCellNotesCommand,
   createSetCellNoteCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import { formatCellAddress } from "@idea10/core/coordinates";
-import { getMergedCellAnchor } from "@idea10/core";
+} from "@sheetcraft/core/commands";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
+import { getMergedCellAnchor } from "@sheetcraft/core";
 import {
   getCellNote,
   type CellAddress,
@@ -14,7 +14,7 @@ import {
   type CellNote,
   type Sheet,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { DEFAULT_NOTE_BOX } from "../../shared/cell-notes/note-box";
 import { useAppI18n } from "../../shared/i18n";
 

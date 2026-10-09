@@ -5,9 +5,9 @@ import {
   resolveVisibleDiagonalBorderSegments,
   type SheetBorderSegment,
 } from "../../../../modules/sheet-grid/border-presentation";
-import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
-import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
-import { createSheet, setCellStyle } from "@idea10/core/workbook";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
+import { createSheet, setCellStyle } from "@sheetcraft/core/workbook";
 
 function coversPoint(segment: SheetBorderSegment, x: number, y: number): boolean {
   if (segment.orientation === "horizontal") {

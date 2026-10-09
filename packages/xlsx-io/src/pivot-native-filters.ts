@@ -2,7 +2,7 @@ import type {
   PivotLabelCondition,
   PivotValueCondition,
   SheetPivotTable,
-} from "@idea10/core/pivot-tables";
+} from "@sheetcraft/core/pivot-tables";
 import type { CompatibilityReportBuilder } from "./report.js";
 import { attr, child, flag, nodes, xml, type XmlNode } from "./pivot-xml.js";
 

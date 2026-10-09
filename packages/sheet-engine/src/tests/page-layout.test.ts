@@ -1,4 +1,4 @@
-import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core";
+import { DEFAULT_SHEET_PAGE_SETUP } from "@sheetcraft/core";
 import { describe, expect, test } from "vitest";
 import { createSheetGeometry } from "../geometry.js";
 import {

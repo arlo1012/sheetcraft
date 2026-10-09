@@ -1,15 +1,15 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { serializeWorkbook } from "@idea10/core/serialization";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import {
   createWorkbook,
   getCellContent,
   getActiveSheet,
   setCellContent,
   type SheetDataValidation,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import DataValidationFeedbackDialog from "../../../modules/data-tools/components/DataValidationFeedbackDialog.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";

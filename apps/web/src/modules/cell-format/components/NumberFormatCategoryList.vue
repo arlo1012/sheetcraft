@@ -49,15 +49,15 @@ const options = computed(() =>
   gap: 8px;
   min-width: 0;
   min-height: 0;
-  font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
+  font-size: var(--sheetcraft-font-size-body-medium);
+  line-height: var(--sheetcraft-line-height-body-medium);
 
   &__label {
     margin: 0;
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
     font-size: inherit;
-    font-weight: var(--idea-font-weight-semibold);
-    line-height: var(--idea-line-height-body-medium);
+    font-weight: var(--sheetcraft-font-weight-semibold);
+    line-height: var(--sheetcraft-line-height-body-medium);
   }
   &__list {
     flex: 1;

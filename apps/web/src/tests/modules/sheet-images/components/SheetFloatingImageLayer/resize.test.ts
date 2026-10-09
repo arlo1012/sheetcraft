@@ -1,10 +1,10 @@
 import { mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import type { FloatingImage } from "@idea10/core/workbook";
-import { getFloatingImageSheetRect } from "@idea10/sheet-engine/floating-image-layout";
-import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
-import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
-import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { FloatingImage } from "@sheetcraft/core/workbook";
+import { getFloatingImageSheetRect } from "@sheetcraft/sheet-engine/floating-image-layout";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
+import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import SheetFloatingImageLayer from "../../../../../modules/sheet-images/components/SheetFloatingImageLayer.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 

@@ -1,12 +1,12 @@
 import { describe, expect, test, vi } from "vitest";
 import { reactive } from "vue";
-import { createSheet, createSheetEvaluator, setCellContent } from "@idea10/core/workbook";
-import type { SheetTable } from "@idea10/core/workbook";
-import { createBuiltinTableStyles } from "@idea10/core/table-styles";
-import { DEFAULT_WORKBOOK_THEME, resolveThemeFontFamily } from "@idea10/core/workbook-theme";
-import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
-import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
-import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
+import { createSheet, createSheetEvaluator, setCellContent } from "@sheetcraft/core/workbook";
+import type { SheetTable } from "@sheetcraft/core/workbook";
+import { createBuiltinTableStyles } from "@sheetcraft/core/table-styles";
+import { DEFAULT_WORKBOOK_THEME, resolveThemeFontFamily } from "@sheetcraft/core/workbook-theme";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
+import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import {
   createCellPresentationCache,
   createSheetCanvasScene,

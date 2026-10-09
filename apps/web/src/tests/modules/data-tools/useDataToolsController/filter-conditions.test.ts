@@ -1,21 +1,21 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { defineComponent, reactive } from "vue";
 import { mount } from "@vue/test-utils";
-import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
+import { createSheetFilterHiddenRowIntervals } from "@sheetcraft/core/commands";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
   redoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
 import {
   createSheetEvaluator,
   getActiveSheet,
   setCellContent,
   setCellStyle,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useDataToolsController } from "../../../../modules/data-tools/useDataToolsController";
 

@@ -3,13 +3,13 @@ import {
   createSetSheetDataValidationsCommand,
   subtractSheetDataValidation,
   type WorkbookCommand,
-} from "@idea10/core/commands";
+} from "@sheetcraft/core/commands";
 import {
   getActiveSheet,
   type CellRange,
   type SheetDataValidation,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";

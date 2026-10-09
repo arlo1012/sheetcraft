@@ -13,7 +13,7 @@ import {
   ListTree,
   ListX,
 } from "lucide-vue-next";
-import type { SheetPivotTable } from "@idea10/core/pivot-tables";
+import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
@@ -180,10 +180,10 @@ function rename(value: string): void {
   &__field {
     box-sizing: border-box;
     height: var(--ribbon-control-height, 26px);
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
     padding: 2px 6px;
-    border: 1px solid var(--idea-border-control);
+    border: 1px solid var(--sheetcraft-border-control);
     border-radius: 3px;
     overflow: hidden;
     white-space: nowrap;

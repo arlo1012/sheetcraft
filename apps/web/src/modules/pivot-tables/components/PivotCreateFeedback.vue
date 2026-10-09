@@ -28,6 +28,6 @@ const { t } = useAppI18n();
 <style scoped lang="scss">
 [role="alert"] {
   margin: 0;
-  color: var(--idea-status-error);
+  color: var(--sheetcraft-status-error);
 }
 </style>

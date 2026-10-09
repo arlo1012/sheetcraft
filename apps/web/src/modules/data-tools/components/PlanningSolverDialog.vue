@@ -376,16 +376,16 @@ const methodHint = computed(() =>
     grid-template-columns: minmax(140px, 1fr) 110px minmax(140px, 1fr) 28px;
   }
   &__action-icon {
-    width: var(--idea-action-icon-size);
-    height: var(--idea-action-icon-size);
+    width: var(--sheetcraft-action-icon-size);
+    height: var(--sheetcraft-action-icon-size);
   }
   &__hint {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__error {
     margin: 0;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 @media (max-width: 600px) {

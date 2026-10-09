@@ -98,7 +98,7 @@ function apply(): void {
 
   &__error {
     @include fill-dialog.auxiliary-text;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

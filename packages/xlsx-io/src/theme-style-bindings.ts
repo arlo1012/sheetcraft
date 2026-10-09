@@ -1,12 +1,12 @@
 import { strFromU8, strToU8, type Zippable } from "fflate/browser";
-import type { CellStyle } from "@idea10/core/style";
+import type { CellStyle } from "@sheetcraft/core/style";
 import {
   resolveThemeFont,
   type ThemeColorReference,
   type ThemeColorSlot,
   type WorkbookTheme,
-} from "@idea10/core/workbook-theme";
-import type { Sheet } from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook-theme";
+import type { Sheet } from "@sheetcraft/core/workbook";
 
 type Xf = { attributes: string; body: string };
 

@@ -1,13 +1,13 @@
 import { defineComponent, h, nextTick, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createWorkbook,
   createWorkbookEvaluator,
   getActiveSheet,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useWorkbookGoToController } from "../../../modules/workbook/composables/useWorkbookGoToController";
 import { createAppI18n } from "../../../shared/i18n";
 

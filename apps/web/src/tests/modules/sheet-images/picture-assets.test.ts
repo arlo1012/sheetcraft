@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { createWorkbook, getActiveSheet, type FloatingImage } from "@idea10/core/workbook";
-import { applyWorkbookCommand, type WorkbookCommand } from "@idea10/core/commands";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createWorkbook, getActiveSheet, type FloatingImage } from "@sheetcraft/core/workbook";
+import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { prepareImageAsset } from "../../../modules/image-assets/prepareImageAsset";
 import { convertPictureBlob } from "../../../modules/sheet-images/picture-asset-conversion";

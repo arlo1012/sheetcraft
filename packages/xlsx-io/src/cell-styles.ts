@@ -3,10 +3,10 @@ import {
   normalizeCellStyleIncludes,
   type CellStyleDefinition,
   type CellStyleInclude,
-} from "@idea10/core/cell-styles";
-import type { CellStyle } from "@idea10/core/style";
-import type { CellNamedStyleBinding, Sheet } from "@idea10/core/workbook";
-import { createClearCellStylePatch } from "@idea10/core/style";
+} from "@sheetcraft/core/cell-styles";
+import type { CellStyle } from "@sheetcraft/core/style";
+import type { CellNamedStyleBinding, Sheet } from "@sheetcraft/core/workbook";
+import { createClearCellStylePatch } from "@sheetcraft/core/style";
 import { strFromU8, strToU8, type Zippable } from "fflate/browser";
 import { toExcelNumberFormat, builtinNumberFormat } from "./number-format.js";
 import { readXlsxDxfStyle, xlsxDxfXml } from "./conditional-formatting.js";

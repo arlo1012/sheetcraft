@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useFloatingPanel } from "../floating/useFloatingPanel";
 import { useAppI18n } from "../i18n";
-import type { CellRange } from "@idea10/core/workbook";
+import type { CellRange } from "@sheetcraft/core/workbook";
 import {
   applyFunctionCompletion,
   cycleFormulaReferenceAbsoluteMarkers,
@@ -368,7 +368,7 @@ defineExpose<
   min-width: 210px;
   max-width: min(480px, calc(100vw - 24px));
   max-height: min(360px, calc(100vh - 40px));
-  box-shadow: var(--idea-shadow-menu);
+  box-shadow: var(--sheetcraft-shadow-menu);
 
   // Argument help may overlap the grid but must not intercept reference picks.
   &.is-help-only {
@@ -379,17 +379,17 @@ defineExpose<
     @include option-list.item;
     display: grid;
     grid-template-columns: 100px minmax(0, 1fr);
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
 
     strong {
-      font-weight: var(--idea-font-weight-medium);
+      font-weight: var(--sheetcraft-font-weight-medium);
     }
 
     span {
       overflow: hidden;
-      color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-body-small);
-      line-height: var(--idea-line-height-body-small);
+      color: var(--sheetcraft-text-secondary);
+      font-size: var(--sheetcraft-font-size-body-small);
+      line-height: var(--sheetcraft-line-height-body-small);
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -400,10 +400,10 @@ defineExpose<
     gap: 3px;
     margin: 4px 0 0;
     padding: 8px;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
-    border-top: 1px solid var(--idea-border-subtle);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
+    border-top: 1px solid var(--sheetcraft-border-subtle);
 
     code {
       font-size: inherit;

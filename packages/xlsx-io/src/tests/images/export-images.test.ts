@@ -5,9 +5,9 @@ import {
   setCellContent,
   setColumnWidth,
   setRowHeight,
-} from "@idea10/core/workbook";
-import { serializeWorkbook } from "@idea10/core/serialization";
-import { createBuiltinTableStyles } from "@idea10/core/table-styles";
+} from "@sheetcraft/core/workbook";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { createBuiltinTableStyles } from "@sheetcraft/core/table-styles";
 import { describe, expect, test } from "vitest";
 import { encodeXlsx, type XlsxImageAsset } from "../../index.js";
 

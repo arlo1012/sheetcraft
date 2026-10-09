@@ -1,5 +1,5 @@
-import type { FormControlType } from "@idea10/core/form-controls";
-import type { SheetControlDrawing } from "@idea10/core/sheet-drawings";
+import type { FormControlType } from "@sheetcraft/core/form-controls";
+import type { SheetControlDrawing } from "@sheetcraft/core/sheet-drawings";
 export function controlDrawing(type: FormControlType = "checkbox"): SheetControlDrawing {
   return {
     id: "control",

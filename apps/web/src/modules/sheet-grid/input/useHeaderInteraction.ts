@@ -4,8 +4,8 @@ import {
   MIN_COLUMN_WIDTH,
   MIN_ROW_HEIGHT,
   type SheetDimensionAxis,
-} from "@idea10/core/workbook";
-import type { Point, SheetGeometry } from "@idea10/sheet-engine/geometry";
+} from "@sheetcraft/core/workbook";
+import type { Point, SheetGeometry } from "@sheetcraft/sheet-engine/geometry";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
 import { containsPoint } from "../rendering/sheet-render-frame";
 import type {

@@ -1,4 +1,4 @@
-import { canUseSheetPermission } from "@idea10/core";
+import { canUseSheetPermission } from "@sheetcraft/core";
 import { computed, ref } from "vue";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import {
@@ -24,11 +24,11 @@ import {
   suggestSplitColumnOptions,
   subtractSheetDataValidation,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import { resolveDataRange } from "@idea10/core/data-range";
-import { WorkbookDomainError } from "@idea10/core/errors";
-import { translateFormulaForCopy } from "@idea10/core/formula";
-import { formatCellNumberValue } from "@idea10/core/number-format";
+} from "@sheetcraft/core/commands";
+import { resolveDataRange } from "@sheetcraft/core/data-range";
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
+import { translateFormulaForCopy } from "@sheetcraft/core/formula";
+import { formatCellNumberValue } from "@sheetcraft/core/number-format";
 import {
   getActiveSheet,
   getCellStyle,
@@ -37,7 +37,7 @@ import {
   type SheetDataValidation,
   type SheetEvaluator,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";

@@ -1,5 +1,5 @@
-import { normalizeMergedCellRange } from "@idea10/core";
-import type { CellRange } from "@idea10/core/workbook";
+import { normalizeMergedCellRange } from "@sheetcraft/core";
+import type { CellRange } from "@sheetcraft/core/workbook";
 
 export type CellFormatBorderCapabilities = Readonly<{
   innerHorizontal: boolean;

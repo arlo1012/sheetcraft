@@ -1,4 +1,4 @@
-import type { SheetTable } from "@idea10/core/workbook";
+import type { SheetTable } from "@sheetcraft/core/workbook";
 
 export type CreateTableDraft = {
   range: string;

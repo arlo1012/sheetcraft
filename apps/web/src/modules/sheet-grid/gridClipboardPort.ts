@@ -1,12 +1,12 @@
-import type { FloatingImage } from "@idea10/core/workbook";
+import type { FloatingImage } from "@sheetcraft/core/workbook";
 import {
   FLOATING_IMAGE_CLIPBOARD_TYPE,
   readFloatingImageClipboard,
   readFloatingImageGroup,
   serializeFloatingImageClipboard,
 } from "../sheet-images/imageClipboard";
-export const IDEA10_CLIPBOARD_TYPE = "application/x-idea10-cells";
-export const WEB_IDEA10_CLIPBOARD_TYPE = `web ${IDEA10_CLIPBOARD_TYPE}`;
+export const SHEETCRAFT_CLIPBOARD_TYPE = "application/x-idea10-cells";
+export const WEB_SHEETCRAFT_CLIPBOARD_TYPE = `web ${SHEETCRAFT_CLIPBOARD_TYPE}`;
 export const WEB_FLOATING_IMAGE_CLIPBOARD_TYPE = `web ${FLOATING_IMAGE_CLIPBOARD_TYPE}`;
 
 export type GridClipboardTransfer = {
@@ -57,7 +57,9 @@ export function readGridClipboardLocalToken(
   data: Pick<DataTransfer, "getData">,
 ): string | undefined {
   return (
-    data.getData(IDEA10_CLIPBOARD_TYPE) || data.getData(WEB_IDEA10_CLIPBOARD_TYPE) || undefined
+    data.getData(SHEETCRAFT_CLIPBOARD_TYPE) ||
+    data.getData(WEB_SHEETCRAFT_CLIPBOARD_TYPE) ||
+    undefined
   );
 }
 
@@ -100,7 +102,7 @@ function writeWithClipboardEvent(transfer: {
     event.preventDefault();
     event.stopImmediatePropagation();
     event.clipboardData.setData("text/plain", transfer.text);
-    event.clipboardData.setData(IDEA10_CLIPBOARD_TYPE, transfer.localToken);
+    event.clipboardData.setData(SHEETCRAFT_CLIPBOARD_TYPE, transfer.localToken);
     if (transfer.floatingImage)
       event.clipboardData.setData(
         FLOATING_IMAGE_CLIPBOARD_TYPE,
@@ -182,7 +184,9 @@ async function writeWithAsyncClipboard(transfer: {
 
   const item = new ClipboardItem({
     "text/plain": new Blob([transfer.text], { type: "text/plain" }),
-    [WEB_IDEA10_CLIPBOARD_TYPE]: new Blob([transfer.localToken], { type: IDEA10_CLIPBOARD_TYPE }),
+    [WEB_SHEETCRAFT_CLIPBOARD_TYPE]: new Blob([transfer.localToken], {
+      type: SHEETCRAFT_CLIPBOARD_TYPE,
+    }),
     ...(transfer.floatingImage
       ? {
           [WEB_FLOATING_IMAGE_CLIPBOARD_TYPE]: new Blob(
@@ -206,10 +210,10 @@ async function readWithAsyncClipboard(): Promise<GridClipboardTransfer> {
     const items = await navigator.clipboard.read();
     for (const item of items) {
       const textType = item.types.includes("text/plain") ? "text/plain" : undefined;
-      const tokenType = item.types.includes(WEB_IDEA10_CLIPBOARD_TYPE)
-        ? WEB_IDEA10_CLIPBOARD_TYPE
-        : item.types.includes(IDEA10_CLIPBOARD_TYPE)
-          ? IDEA10_CLIPBOARD_TYPE
+      const tokenType = item.types.includes(WEB_SHEETCRAFT_CLIPBOARD_TYPE)
+        ? WEB_SHEETCRAFT_CLIPBOARD_TYPE
+        : item.types.includes(SHEETCRAFT_CLIPBOARD_TYPE)
+          ? SHEETCRAFT_CLIPBOARD_TYPE
           : undefined;
       const imageType = item.types.find((type) => type.startsWith("image/"));
       const floatingType = item.types.includes(WEB_FLOATING_IMAGE_CLIPBOARD_TYPE)

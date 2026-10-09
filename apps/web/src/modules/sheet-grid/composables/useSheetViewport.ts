@@ -13,21 +13,27 @@ import {
   expandGridExtentForAddress,
   type GridExtent,
   type GridExtentPolicy,
-} from "@idea10/sheet-engine/extent";
-import { createSheetGeometry, type Point, type Size } from "@idea10/sheet-engine/geometry";
-import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+} from "@sheetcraft/sheet-engine/extent";
+import { createSheetGeometry, type Point, type Size } from "@sheetcraft/sheet-engine/geometry";
+import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import {
   createPageLayoutProjection,
   createPageLayoutViewportLayout,
   createSheetPagination,
   getPageLayoutRange,
   type SheetViewMode,
-} from "@idea10/sheet-engine/page-layout";
-import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@idea10/core/page-setup";
-import { createRowVisibilityIndex, type HiddenRowInterval } from "@idea10/sheet-engine/visibility";
-import { getSelectionMode, type CellSelection } from "@idea10/sheet-engine/selection";
-import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet-engine/view-state";
-import { MergedCellRangeResolver } from "@idea10/core";
+} from "@sheetcraft/sheet-engine/page-layout";
+import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@sheetcraft/core/page-setup";
+import {
+  createRowVisibilityIndex,
+  type HiddenRowInterval,
+} from "@sheetcraft/sheet-engine/visibility";
+import { getSelectionMode, type CellSelection } from "@sheetcraft/sheet-engine/selection";
+import {
+  createSheetGridViewState,
+  type SheetGridViewState,
+} from "@sheetcraft/sheet-engine/view-state";
+import { MergedCellRangeResolver } from "@sheetcraft/core";
 import {
   DEFAULT_ROW_HEIGHT,
   DEFAULT_COLUMN_WIDTH,
@@ -35,7 +41,7 @@ import {
   MAX_SHEET_COLUMNS,
   type CellAddress,
   type CellRange,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { clientPointToElementSurface } from "../../../shared/sheet-input/surface-coordinates";
 import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 

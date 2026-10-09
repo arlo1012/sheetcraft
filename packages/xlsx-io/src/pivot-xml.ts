@@ -1,7 +1,7 @@
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { strFromU8, strToU8 } from "fflate/browser";
-import type { CellRange } from "@idea10/core/workbook";
-import { parseCellAddress, formatCellAddress } from "@idea10/core/coordinates";
+import type { CellRange } from "@sheetcraft/core/workbook";
+import { parseCellAddress, formatCellAddress } from "@sheetcraft/core/coordinates";
 
 export type XmlNode = Record<string, unknown>;
 export const MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";

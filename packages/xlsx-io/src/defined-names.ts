@@ -1,6 +1,6 @@
 import { strFromU8, strToU8, unzipSync, type Unzipped } from "fflate/browser";
-import type { CellRange, DefinedName, Sheet, Workbook } from "@idea10/core/workbook";
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "@idea10/core/workbook";
+import type { CellRange, DefinedName, Sheet, Workbook } from "@sheetcraft/core/workbook";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "@sheetcraft/core/workbook";
 import type { CompatibilityReportBuilder } from "./report.js";
 
 const NAME_PATTERN = /^[\p{L}_][\p{L}\p{N}_]*$/u;

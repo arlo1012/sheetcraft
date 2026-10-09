@@ -214,8 +214,8 @@ function onFileChange(event: Event): void {
   align-items: center;
   min-width: 0;
   gap: 8px;
-  font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
+  font-size: var(--sheetcraft-font-size-body-medium);
+  line-height: var(--sheetcraft-line-height-body-medium);
 
   &__trigger {
     display: inline-flex;
@@ -223,21 +223,21 @@ function onFileChange(event: Event): void {
     align-items: center;
     gap: 3px;
     padding: 0 8px;
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
     font: inherit;
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
     white-space: nowrap;
     cursor: pointer;
     background: transparent;
     border: 0;
 
     &:hover:not(:disabled) {
-      background: var(--idea-surface-hover);
+      background: var(--sheetcraft-surface-hover);
     }
 
     &:disabled {
-      color: var(--idea-text-disabled);
+      color: var(--sheetcraft-text-disabled);
       cursor: default;
     }
   }
@@ -246,27 +246,27 @@ function onFileChange(event: Event): void {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    color: var(--idea-status-warning);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    color: var(--sheetcraft-status-warning);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
     white-space: nowrap;
   }
 
   &__status {
     overflow: hidden;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
     text-overflow: ellipsis;
     white-space: nowrap;
 
     &--error {
-      color: var(--idea-status-error);
+      color: var(--sheetcraft-status-error);
     }
   }
 }
 
 .workbook-file-menu {
-  z-index: var(--idea-layer-menu);
+  z-index: var(--sheetcraft-layer-menu);
 }
 </style>

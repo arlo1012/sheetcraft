@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { ThemeColorReference } from "@idea10/core/workbook-theme";
+import type { ThemeColorReference } from "@sheetcraft/core/workbook-theme";
 import { useAppI18n } from "../i18n";
 import PanelSelect from "../panel-select/PanelSelect.vue";
 import ColorPalette from "./ColorPalette.vue";
@@ -92,7 +92,7 @@ function select(
 
   &__swatch {
     height: 16px;
-    border-radius: var(--idea-radius-small);
+    border-radius: var(--sheetcraft-radius-small);
   }
 
   &__label {
@@ -105,7 +105,7 @@ function select(
     flex: none;
     width: 14px;
     height: 14px;
-    border-radius: var(--idea-radius-small);
+    border-radius: var(--sheetcraft-radius-small);
   }
 }
 </style>

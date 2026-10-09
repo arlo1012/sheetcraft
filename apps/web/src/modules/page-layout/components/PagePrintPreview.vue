@@ -4,9 +4,9 @@ import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { ChevronLeft, ChevronRight, Printer } from "lucide-vue-next";
-import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
-import type { SheetPageSetup } from "@idea10/core/page-setup";
-import type { WorkbookTheme } from "@idea10/core/workbook-theme";
+import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
+import type { SheetPageSetup } from "@sheetcraft/core/page-setup";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   createPrintPreviewDocument,
@@ -256,7 +256,7 @@ onBeforeUnmount(() => renderer.dispose());
     height: min(640px, calc(100vh - 220px));
     min-height: 200px;
     overflow: hidden;
-    background: var(--idea-surface-secondary);
+    background: var(--sheetcraft-surface-secondary);
   }
   &__thumbnails {
     overflow: auto;
@@ -264,8 +264,8 @@ onBeforeUnmount(() => renderer.dispose());
     display: grid;
     align-content: start;
     gap: 10px;
-    background: var(--idea-surface-panel);
-    border-right: 1px solid var(--idea-border-subtle);
+    background: var(--sheetcraft-surface-panel);
+    border-right: 1px solid var(--sheetcraft-border-subtle);
   }
   &__thumbnails button {
     display: grid;
@@ -274,13 +274,13 @@ onBeforeUnmount(() => renderer.dispose());
     padding: 6px;
     border: 1px solid transparent;
     background: transparent;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     cursor: pointer;
   }
   &__thumbnails button.is-active {
-    border-color: var(--idea-action-primary);
-    background: var(--idea-action-primary-subtle);
-    color: var(--idea-action-primary);
+    border-color: var(--sheetcraft-action-primary);
+    background: var(--sheetcraft-action-primary-subtle);
+    color: var(--sheetcraft-action-primary);
   }
   &__thumbnails canvas {
     max-width: 132px;
@@ -302,7 +302,7 @@ onBeforeUnmount(() => renderer.dispose());
   }
   &__page p {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__footer {
     display: grid;

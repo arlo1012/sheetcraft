@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from "vue";
-import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
-import type { WorkbookTheme } from "@idea10/core/workbook-theme";
-import type { SheetDrawing } from "@idea10/core/sheet-drawings";
+import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 const FormControlContent = defineAsyncComponent(
   () => import("../../form-controls/components/FormControlContent.vue"),
 );

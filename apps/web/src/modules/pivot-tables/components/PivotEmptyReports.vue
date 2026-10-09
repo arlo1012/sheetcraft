@@ -5,11 +5,11 @@ import {
   getPivotTableRange,
   addressInRange,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
-import type { CellAddress } from "@idea10/core/workbook";
-import { getFloatingImageViewportFragments } from "@idea10/sheet-engine/floating-image-layout";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
-import type { Rect } from "@idea10/sheet-engine/geometry";
+} from "@sheetcraft/core/pivot-tables";
+import type { CellAddress } from "@sheetcraft/core/workbook";
+import { getFloatingImageViewportFragments } from "@sheetcraft/sheet-engine/floating-image-layout";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
+import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{
   tables: readonly SheetPivotTable[];
@@ -95,9 +95,9 @@ const inner = (rect: Rect, clip: Rect): CSSProperties => ({
     padding: 20px 12px;
     box-sizing: border-box;
     pointer-events: auto;
-    border: 1px solid var(--idea-border-control);
-    background: var(--idea-surface-panel);
-    color: var(--idea-text-primary);
+    border: 1px solid var(--sheetcraft-border-control);
+    background: var(--sheetcraft-surface-panel);
+    color: var(--sheetcraft-text-primary);
     cursor: pointer;
     strong {
       max-width: 100%;
@@ -105,21 +105,21 @@ const inner = (rect: Rect, clip: Rect): CSSProperties => ({
       text-overflow: ellipsis;
       white-space: nowrap;
       font-weight: 500;
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
     }
     span {
       font-size: 12px;
       line-height: 20px;
     }
     svg {
-      color: var(--idea-action-primary);
+      color: var(--sheetcraft-action-primary);
       margin-block: 12px;
     }
     &.is-active {
-      border-color: var(--idea-action-primary);
+      border-color: var(--sheetcraft-action-primary);
     }
     &:focus-visible {
-      outline: 2px solid var(--idea-action-primary);
+      outline: 2px solid var(--sheetcraft-action-primary);
       outline-offset: -3px;
     }
   }

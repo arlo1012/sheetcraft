@@ -205,14 +205,14 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
 
 <style scoped lang="scss">
 .ribbon-toolbar {
-  --ribbon-control-height: var(--idea-ribbon-row-height, 26px);
-  --ribbon-row-gap: var(--idea-ribbon-row-gap, 2px);
+  --ribbon-control-height: var(--sheetcraft-ribbon-row-height, 26px);
+  --ribbon-row-gap: var(--sheetcraft-ribbon-row-gap, 2px);
 
   position: relative;
   min-width: 0;
-  height: var(--idea-ribbon-toolbar-height, 68px);
+  height: var(--sheetcraft-ribbon-toolbar-height, 68px);
   overflow: hidden;
-  background: var(--idea-surface-panel);
+  background: var(--sheetcraft-surface-panel);
 
   &__viewport {
     width: 100%;
@@ -237,7 +237,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
     display: flex;
     align-items: stretch;
     width: max-content;
-    height: var(--idea-ribbon-group-height, 56px);
+    height: var(--sheetcraft-ribbon-group-height, 56px);
   }
 
   &__overflow-cue {
@@ -256,12 +256,12 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
 
     &--left {
       left: 0;
-      background: linear-gradient(to right, var(--idea-surface-panel) 48%, transparent);
+      background: linear-gradient(to right, var(--sheetcraft-surface-panel) 48%, transparent);
     }
 
     &--right {
       right: 0;
-      background: linear-gradient(to left, var(--idea-surface-panel) 48%, transparent);
+      background: linear-gradient(to left, var(--sheetcraft-surface-panel) 48%, transparent);
     }
   }
 
@@ -275,10 +275,10 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
     justify-content: center;
     width: 24px;
     padding: 0;
-    background: var(--idea-surface-panel);
+    background: var(--sheetcraft-surface-panel);
     border: 1px solid transparent;
     border-radius: 2px;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     cursor: pointer;
     outline: none;
 
@@ -291,17 +291,17 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
     }
 
     &:hover:not([aria-disabled="true"]) {
-      background: var(--idea-surface-hover);
-      color: var(--idea-text-primary);
+      background: var(--sheetcraft-surface-hover);
+      color: var(--sheetcraft-text-primary);
     }
 
     &:focus-visible {
-      border-color: var(--idea-action-focus);
-      box-shadow: var(--idea-keyboard-focus-shadow);
+      border-color: var(--sheetcraft-action-focus);
+      box-shadow: var(--sheetcraft-keyboard-focus-shadow);
     }
 
     &[aria-disabled="true"] {
-      color: var(--idea-text-muted);
+      color: var(--sheetcraft-text-muted);
       cursor: default;
       opacity: 0.38;
     }

@@ -1,4 +1,4 @@
-import type { CellAddress, CellRange } from "@idea10/core/workbook";
+import type { CellAddress, CellRange } from "@sheetcraft/core/workbook";
 import { computed, readonly, shallowRef, watch, type Ref } from "vue";
 
 export type DeferredSelectionSnapshot = {

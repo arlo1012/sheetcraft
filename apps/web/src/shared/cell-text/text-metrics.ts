@@ -1,5 +1,8 @@
 import { ref } from "vue";
-import { createApproximateTextMeasurer, type TextMeasurer } from "@idea10/sheet-engine/row-height";
+import {
+  createApproximateTextMeasurer,
+  type TextMeasurer,
+} from "@sheetcraft/sheet-engine/row-height";
 
 const approximate = createApproximateTextMeasurer();
 const widths = new Map<string, number>();

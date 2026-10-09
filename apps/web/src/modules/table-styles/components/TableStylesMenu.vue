@@ -6,8 +6,8 @@ import {
   createBuiltinTableStyles,
   createThemedTableStyles,
   type TableStyleDefinition,
-} from "@idea10/core/table-styles";
-import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
+} from "@sheetcraft/core/table-styles";
+import type { PivotTableStyleDefinition } from "@sheetcraft/core/pivot-table-styles";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -287,8 +287,8 @@ function manage(): void {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 2px var(--idea-space-5) 8px;
-    color: var(--idea-text-primary);
+    padding: 2px var(--sheetcraft-space-5) 8px;
+    color: var(--sheetcraft-text-primary);
 
     > div {
       display: flex;
@@ -300,28 +300,28 @@ function manage(): void {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--idea-space-3);
-    padding: 2px var(--idea-space-5) 8px;
-    color: var(--idea-text-primary);
+    gap: var(--sheetcraft-space-3);
+    padding: 2px var(--sheetcraft-space-5) 8px;
+    color: var(--sheetcraft-text-primary);
   }
 
   &__view {
     display: flex;
     align-items: center;
-    gap: var(--idea-space-2);
-    color: var(--idea-text-secondary);
+    gap: var(--sheetcraft-space-2);
+    color: var(--sheetcraft-text-secondary);
     white-space: nowrap;
   }
 
   &__color {
     width: 18px;
     height: 18px;
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-circle);
+    border: 1px solid var(--sheetcraft-border-control);
+    border-radius: var(--sheetcraft-radius-circle);
     cursor: pointer;
 
     &.is-selected {
-      outline: 2px solid var(--idea-action-primary);
+      outline: 2px solid var(--sheetcraft-action-primary);
       outline-offset: 2px;
     }
   }

@@ -2,7 +2,7 @@ import { flushPromises } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import { PrimaryTable } from "tdesign-vue-next/es/table";
 import SheetGrid from "../../../../modules/sheet-grid/components/SheetGrid.vue";
-import { deserializeWorkbook } from "@idea10/core/serialization";
+import { deserializeWorkbook } from "@sheetcraft/core/serialization";
 import SpreadsheetRibbon from "../../../../app/SpreadsheetRibbon.vue";
 import NamedRangesDialog from "../../../../modules/formula-tools/components/NamedRangesDialog.vue";
 import NamedRangeEditorDialog from "../../../../modules/formula-tools/components/NamedRangeEditorDialog.vue";

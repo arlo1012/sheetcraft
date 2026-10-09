@@ -2,16 +2,16 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Select } from "tdesign-vue-next/es/select";
-import { getSheetFilterValue, getSheetFilterValueKey } from "@idea10/core/commands";
-import { isFormulaError } from "@idea10/core/formula";
+import { getSheetFilterValue, getSheetFilterValueKey } from "@sheetcraft/core/commands";
+import { isFormulaError } from "@sheetcraft/core/formula";
 import {
   getPivotTableSource,
   normalizePivotTable,
   type PivotAxisFilter,
   type PivotLabelCondition,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
-import type { CellValue, SheetFilterValue, Workbook } from "@idea10/core/workbook";
+} from "@sheetcraft/core/pivot-tables";
+import type { CellValue, SheetFilterValue, Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
@@ -275,7 +275,7 @@ function apply(): void {
 <style scoped lang="scss">
 .pivot-field-filter-panel {
   display: grid;
-  gap: var(--idea-space-4);
+  gap: var(--sheetcraft-space-4);
   width: min(420px, calc(100vw - 16px));
 }
 </style>

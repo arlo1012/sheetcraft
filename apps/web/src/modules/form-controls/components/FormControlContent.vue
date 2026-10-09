@@ -6,10 +6,10 @@ import { Select } from "tdesign-vue-next/es/select";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Slider } from "tdesign-vue-next/es/slider";
 import { Button } from "tdesign-vue-next/es/button";
-import { canEditCell } from "@idea10/core";
-import { getFormControlItems } from "@idea10/core/form-controls";
-import type { SheetControlDrawing } from "@idea10/core/sheet-drawings";
-import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
+import { canEditCell } from "@sheetcraft/core";
+import { getFormControlItems } from "@sheetcraft/core/form-controls";
+import type { SheetControlDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 const props = defineProps<{
   drawing: SheetControlDrawing;
   sheet: Sheet;

@@ -1,4 +1,4 @@
-import type { CellBorder } from "@idea10/core/style";
+import type { CellBorder } from "@sheetcraft/core/style";
 
 const EXCEL_BORDER_LINE_STYLES = new Set<CellBorder["style"]>([
   "hair",

@@ -1,5 +1,5 @@
-import { datePartsToExcelSerial, type ExcelDateSystem } from "@idea10/core/formula";
-import { DataFillError } from "@idea10/core/commands";
+import { datePartsToExcelSerial, type ExcelDateSystem } from "@sheetcraft/core/formula";
+import { DataFillError } from "@sheetcraft/core/commands";
 import type { FillSeriesDraft } from "./fill-tool-types";
 
 type DateUnit = FillSeriesDraft["dateUnit"];

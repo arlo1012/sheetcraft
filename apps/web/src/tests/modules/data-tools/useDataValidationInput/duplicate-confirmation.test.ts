@@ -1,12 +1,12 @@
 import { ref } from "vue";
 import { describe, expect, test, vi } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createWorkbook,
   getActiveSheet,
   setCellContent,
   type SheetDataValidation,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useDataValidationInput } from "../../../../modules/data-tools/useDataValidationInput";
 
 const target = { row: 1, column: 0 };

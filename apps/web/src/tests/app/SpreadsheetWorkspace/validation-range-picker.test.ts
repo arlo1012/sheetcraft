@@ -1,14 +1,14 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, expect, test, vi } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createSheet,
   createWorkbook,
   getActiveSheet,
   insertSheet,
   setCellValue,
-} from "@idea10/core/workbook";
-import { serializeWorkbook, type WorkbookSnapshot } from "@idea10/core/serialization";
+} from "@sheetcraft/core/workbook";
+import { serializeWorkbook, type WorkbookSnapshot } from "@sheetcraft/core/serialization";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SpreadsheetRibbon from "../../../app/SpreadsheetRibbon.vue";
 import DataToolbar from "../../../modules/data-tools/components/DataToolbar.vue";

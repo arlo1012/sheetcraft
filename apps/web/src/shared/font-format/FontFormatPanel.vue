@@ -247,14 +247,14 @@ const previewText = computed(() =>
 .font-format {
   display: grid;
   gap: 16px;
-  color: var(--idea-text-primary);
-  font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
+  color: var(--sheetcraft-text-primary);
+  font-size: var(--sheetcraft-font-size-body-medium);
+  line-height: var(--sheetcraft-line-height-body-medium);
 
   h3 {
     margin: 0;
     font-size: inherit;
-    font-weight: var(--idea-font-weight-semibold);
+    font-weight: var(--sheetcraft-font-weight-semibold);
   }
   &__lists,
   &__appearance {
@@ -294,9 +294,9 @@ const previewText = computed(() =>
     height: 72px;
     overflow: hidden;
     padding: 12px 8px;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
-    background: var(--idea-surface-panel);
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-default);
+    background: var(--sheetcraft-surface-panel);
     line-height: normal;
     white-space: pre;
   }
@@ -313,7 +313,7 @@ const previewText = computed(() =>
   }
   &__preview-rule {
     flex: 1 0 16px;
-    border-top: 1px solid var(--idea-text-primary);
+    border-top: 1px solid var(--sheetcraft-text-primary);
   }
 }
 @media (max-width: 480px) {

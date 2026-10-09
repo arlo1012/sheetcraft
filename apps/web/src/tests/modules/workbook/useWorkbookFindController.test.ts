@@ -1,14 +1,14 @@
 import { defineComponent, h, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
-import { createBatchSetCellContentsCommand } from "@idea10/core/commands";
-import { mergeCellStyle } from "@idea10/core/style";
+} from "@sheetcraft/core/history";
+import { createBatchSetCellContentsCommand } from "@sheetcraft/core/commands";
+import { mergeCellStyle } from "@sheetcraft/core/style";
 import {
   createSheet,
   createWorkbook,
@@ -21,7 +21,7 @@ import {
   getCellStyle,
   type CellAddress,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useWorkbookFindController } from "../../../modules/workbook/composables/useWorkbookFindController";
 import { DEFAULT_WORKBOOK_FIND_OPTIONS } from "../../../modules/workbook/workbook-find-types";
 import { createAppI18n } from "../../../shared/i18n";

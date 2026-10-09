@@ -271,13 +271,13 @@ watch(
 
 .data-comparison-dialog {
   display: grid;
-  gap: var(--idea-space-2);
+  gap: var(--sheetcraft-space-2);
 
   &__comparison {
     display: grid;
     width: 100%;
     min-width: 0;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
 
   &__mode {
@@ -291,9 +291,9 @@ watch(
     width: 100%;
     display: grid;
     align-content: start;
-    gap: var(--idea-space-1);
+    gap: var(--sheetcraft-space-1);
     max-height: 180px;
-    padding: var(--idea-space-2);
+    padding: var(--sheetcraft-space-2);
     border-color: var(--td-border-level-2-color);
     border-radius: var(--td-radius-default);
     background: var(--td-bg-color-specialcomponent);
@@ -307,13 +307,13 @@ watch(
   &__selection-actions {
     display: flex;
     align-items: center;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
   }
 
   &__color-label {
     display: inline-flex;
     align-items: center;
-    gap: var(--idea-space-1);
+    gap: var(--sheetcraft-space-1);
     vertical-align: top;
   }
 
@@ -321,20 +321,20 @@ watch(
     flex: none;
     width: 14px;
     height: 14px;
-    border: 1px solid var(--idea-border-subtle);
+    border: 1px solid var(--sheetcraft-border-subtle);
     border-radius: 2px;
   }
 
   &__hint {
     margin: 0;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
 
   &__error {
     margin: 0;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

@@ -1,6 +1,6 @@
-import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellRange } from "@idea10/core/workbook";
-import type { SheetPageSetup } from "@idea10/core/page-setup";
+import { formatCellAddress, parseCellAddress } from "@sheetcraft/core/coordinates";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellRange } from "@sheetcraft/core/workbook";
+import type { SheetPageSetup } from "@sheetcraft/core/page-setup";
 
 export type PageSetupReferences = {
   printArea: string;

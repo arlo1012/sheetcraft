@@ -149,7 +149,7 @@ function onClearOutline(): void {
 .data-outline-tools {
   display: contents;
   &__menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
   }
 }
 </style>

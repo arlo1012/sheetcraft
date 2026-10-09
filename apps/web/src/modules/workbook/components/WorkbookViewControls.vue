@@ -204,7 +204,7 @@ function onNativeSliderInput(event: Event): void {
   align-items: center;
   min-width: 0;
   height: 22px;
-  color: var(--idea-text-secondary);
+  color: var(--sheetcraft-text-secondary);
 
   &__zoom {
     display: inline-flex;
@@ -229,7 +229,7 @@ function onNativeSliderInput(event: Event): void {
     }
 
     &[aria-disabled="true"] {
-      color: var(--idea-text-disabled);
+      color: var(--sheetcraft-text-disabled);
       cursor: default;
     }
   }
@@ -238,19 +238,19 @@ function onNativeSliderInput(event: Event): void {
     border-radius: 2px;
 
     &.is-active {
-      background: var(--idea-action-focus);
-      color: var(--idea-action-primary);
+      background: var(--sheetcraft-action-focus);
+      color: var(--sheetcraft-action-primary);
     }
   }
 
   &__modes {
     display: inline-flex;
     margin-left: 2px;
-    border-right: 1px solid var(--idea-sheet-bar-border);
+    border-right: 1px solid var(--sheetcraft-sheet-bar-border);
 
     .workbook-view-controls__button.is-active {
-      background: var(--idea-action-focus);
-      color: var(--idea-action-primary);
+      background: var(--sheetcraft-action-focus);
+      color: var(--sheetcraft-action-primary);
     }
   }
 
@@ -281,8 +281,8 @@ function onNativeSliderInput(event: Event): void {
       border-radius: 999px;
       background: linear-gradient(
         to right,
-        var(--idea-action-primary) 0 var(--zoom-progress),
-        var(--idea-sheet-bar-thumb) var(--zoom-progress) 100%
+        var(--sheetcraft-action-primary) 0 var(--zoom-progress),
+        var(--sheetcraft-sheet-bar-thumb) var(--zoom-progress) 100%
       );
     }
 
@@ -291,31 +291,31 @@ function onNativeSliderInput(event: Event): void {
       height: 10px;
       margin-top: -4px;
       appearance: none;
-      border: 1px solid var(--idea-surface-panel);
+      border: 1px solid var(--sheetcraft-surface-panel);
       border-radius: 50%;
-      background: var(--idea-action-primary);
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--idea-action-primary), transparent 45%);
+      background: var(--sheetcraft-action-primary);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--sheetcraft-action-primary), transparent 45%);
     }
 
     &::-moz-range-track {
       height: 3px;
       border-radius: 999px;
-      background: var(--idea-sheet-bar-thumb);
+      background: var(--sheetcraft-sheet-bar-thumb);
     }
 
     &::-moz-range-progress {
       height: 3px;
       border-radius: 999px;
-      background: var(--idea-action-primary);
+      background: var(--sheetcraft-action-primary);
     }
 
     &::-moz-range-thumb {
       width: 10px;
       height: 10px;
-      border: 1px solid var(--idea-surface-panel);
+      border: 1px solid var(--sheetcraft-surface-panel);
       border-radius: 50%;
-      background: var(--idea-action-primary);
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--idea-action-primary), transparent 45%);
+      background: var(--sheetcraft-action-primary);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--sheetcraft-action-primary), transparent 45%);
     }
 
     &:focus-visible::-webkit-slider-thumb {

@@ -135,9 +135,9 @@ function apply(): void {
     width: 100%;
     min-width: 0;
     display: grid;
-    gap: var(--idea-space-1);
+    gap: var(--sheetcraft-space-1);
     max-height: 180px;
-    padding: var(--idea-space-2);
+    padding: var(--sheetcraft-space-2);
     border-color: var(--td-border-level-2-color);
     border-radius: var(--td-radius-default);
     background: var(--td-bg-color-specialcomponent);
@@ -148,7 +148,7 @@ function apply(): void {
   }
   &__options {
     display: grid;
-    gap: var(--idea-space-1);
+    gap: var(--sheetcraft-space-1);
   }
 }
 </style>

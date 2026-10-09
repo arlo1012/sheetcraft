@@ -4,7 +4,7 @@ import { nextTick } from "vue";
 import { FormItem } from "tdesign-vue-next/es/form";
 import { Select } from "tdesign-vue-next/es/select";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
-import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
+import type { SheetConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
 import ConditionalFormatEditorDialog from "../../../modules/conditional-formatting/components/ConditionalFormatEditorDialog.vue";
 import ConditionalFormatIconRules from "../../../modules/conditional-formatting/components/ConditionalFormatIconRules.vue";
 import DataBarAdvancedSettingsDialog from "../../../modules/conditional-formatting/components/DataBarAdvancedSettingsDialog.vue";

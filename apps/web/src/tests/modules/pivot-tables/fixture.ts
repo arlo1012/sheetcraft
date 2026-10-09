@@ -1,12 +1,12 @@
-import { createWorkbookSession, executeWorkbookCommand } from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createWorkbook,
   getActiveSheet,
   setCellContent,
   type CellRange,
-} from "@idea10/core/workbook";
-import type { WorkbookCommand } from "@idea10/core/commands";
+} from "@sheetcraft/core/workbook";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
 import { vi } from "vitest";
 import { usePivotActions } from "../../../modules/pivot-tables/usePivotActions";
 export function fixture() {

@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import type { SheetWatermark } from "@idea10/core/page-decoration";
+import type { SheetWatermark } from "@sheetcraft/core/page-decoration";
 import {
   paintSheetWatermark,
   paintWatermarkInRect,

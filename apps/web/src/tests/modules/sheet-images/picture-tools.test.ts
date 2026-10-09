@@ -1,8 +1,8 @@
 import { ref } from "vue";
 import { describe, expect, test, vi } from "vitest";
-import { createWorkbook, getActiveSheet, type FloatingImage } from "@idea10/core/workbook";
-import { applyWorkbookCommand, type WorkbookCommand } from "@idea10/core/commands";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createWorkbook, getActiveSheet, type FloatingImage } from "@sheetcraft/core/workbook";
+import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   usePictureTools,
   type PictureLayerAction,

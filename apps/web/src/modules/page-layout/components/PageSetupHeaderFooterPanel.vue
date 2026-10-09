@@ -10,7 +10,7 @@ import {
   type SheetHeaderFooterParts,
   type SheetHeaderFooterOptions,
   type SheetPageSetup,
-} from "@idea10/core/page-setup";
+} from "@sheetcraft/core/page-setup";
 import type { HeaderFooterEditTarget } from "../header-footer-editor";
 import { useAppI18n } from "../../../shared/i18n";
 import PageHeaderFooterField from "./PageHeaderFooterField.vue";
@@ -242,20 +242,20 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     height: 70px;
     box-sizing: border-box;
-    border: 1px solid var(--idea-border-control);
-    margin-bottom: var(--idea-space-2);
-    background: var(--idea-surface-panel);
+    border: 1px solid var(--sheetcraft-border-control);
+    margin-bottom: var(--sheetcraft-space-2);
+    background: var(--sheetcraft-surface-panel);
   }
   &__row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     width: 100%;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     align-items: center;
   }
   &__options {
     display: grid;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
 }
 </style>

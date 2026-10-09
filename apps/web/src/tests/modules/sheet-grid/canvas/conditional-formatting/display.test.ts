@@ -9,7 +9,7 @@ import {
   insertSheet,
   setCellValue,
   setCellStyle,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   createSheetDisplaySnapshot,
   useSheetDisplaySnapshot,

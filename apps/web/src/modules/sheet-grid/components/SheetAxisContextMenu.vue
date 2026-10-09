@@ -15,7 +15,7 @@ import {
   Trash2,
 } from "lucide-vue-next";
 import { computed, ref } from "vue";
-import type { CellRange, Sheet, SheetDimensionAxis } from "@idea10/core/workbook";
+import type { CellRange, Sheet, SheetDimensionAxis } from "@sheetcraft/core/workbook";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import { useContextMenu } from "../../../shared/menu/useContextMenu";
@@ -296,7 +296,7 @@ function requestClear(mode: "contents" | "formats" | "all"): void {
 
 <style scoped lang="scss">
 .sheet-axis-context-menu-panel {
-  z-index: var(--idea-layer-context-menu);
+  z-index: var(--sheetcraft-layer-context-menu);
   display: grid;
   gap: 6px;
   width: max-content;

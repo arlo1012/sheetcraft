@@ -9,8 +9,8 @@ import {
   getPagePaperSize,
   DEFAULT_SHEET_PAGE_PRINT_OPTIONS,
   type SheetPageSetup,
-} from "@idea10/core/page-setup";
-import { pixelsToDimensionValue, dimensionValueToPixels } from "@idea10/core/dimension-units";
+} from "@sheetcraft/core/page-setup";
+import { pixelsToDimensionValue, dimensionValueToPixels } from "@sheetcraft/core/dimension-units";
 import { useAppI18n } from "../../../shared/i18n";
 
 const setup = defineModel<SheetPageSetup>("setup", { required: true });
@@ -274,7 +274,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-areas: ". top header" "left preview right" "unit bottom footer";
-    gap: var(--idea-space-3) var(--idea-space-4);
+    gap: var(--sheetcraft-space-3) var(--sheetcraft-space-4);
     align-items: center;
     max-width: 420px;
     margin: 0 auto;
@@ -314,23 +314,23 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
     align-items: center;
     justify-content: center;
     height: 150px;
-    color: var(--idea-text-muted);
+    color: var(--sheetcraft-text-muted);
     svg {
       width: 100%;
       height: 140px;
     }
   }
   &__paper {
-    fill: var(--idea-surface-panel);
-    stroke: var(--idea-text-primary);
+    fill: var(--sheetcraft-surface-panel);
+    stroke: var(--sheetcraft-text-primary);
     stroke-width: 1;
   }
   &__sample-sheet {
-    fill: var(--idea-surface-panel);
+    fill: var(--sheetcraft-surface-panel);
   }
   &__cell-grid,
   &__sample-outline {
-    stroke: var(--idea-border-control);
+    stroke: var(--sheetcraft-border-control);
     stroke-width: 0.6;
   }
   &__cell-grid {
@@ -338,18 +338,18 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
   }
   &__guides {
     fill: none;
-    stroke: var(--idea-border-control);
+    stroke: var(--sheetcraft-border-control);
     stroke-width: 0.65;
   }
   &__header-footer-guides {
     fill: none;
-    stroke: var(--idea-border-control);
+    stroke: var(--sheetcraft-border-control);
     stroke-width: 0.6;
     stroke-dasharray: 1 2;
   }
   &__centering {
     display: flex;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
   }
 }
 </style>

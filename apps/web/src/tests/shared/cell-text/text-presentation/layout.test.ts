@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { CellStyle } from "@idea10/core/style";
+import type { CellStyle } from "@sheetcraft/core/style";
 import {
   layoutCellText,
   resolveCellTextDirection,

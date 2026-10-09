@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
-import { createWorkbook, createSheet, getActiveSheet } from "@idea10/core/workbook";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { applyWorkbookCommand, type WorkbookCommand } from "@idea10/core/commands";
+import { createWorkbook, createSheet, getActiveSheet } from "@sheetcraft/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import { useDrawingActions } from "../../../modules/sheet-drawings/useDrawingActions";
 
 function fixture() {

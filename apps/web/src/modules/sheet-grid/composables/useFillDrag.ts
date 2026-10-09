@@ -1,11 +1,11 @@
-import type { CellAddress, CellRange } from "@idea10/core/workbook";
+import type { CellAddress, CellRange } from "@sheetcraft/core/workbook";
 import {
   getFillRange,
   getSelectionAutoScrollDelta,
   type FillBounds,
   type FillRange,
-} from "@idea10/sheet-engine";
-import type { Point, Size } from "@idea10/sheet-engine/geometry";
+} from "@sheetcraft/sheet-engine";
+import type { Point, Size } from "@sheetcraft/sheet-engine/geometry";
 import { onScopeDispose, shallowRef } from "vue";
 import {
   startPointerSession,

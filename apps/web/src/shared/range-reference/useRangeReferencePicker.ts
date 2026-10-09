@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, ref } from "vue";
-import type { CellRange } from "@idea10/core/workbook";
+import type { CellRange } from "@sheetcraft/core/workbook";
 import type { FormulaReferenceEditor } from "../formula-editing/formula-editor-contract";
 import { getFormulaReferenceTokens } from "../formula-editing/formula-reference-tokens";
 import { formatRangeReference } from "./formatRangeReference";

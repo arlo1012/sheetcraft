@@ -1,5 +1,5 @@
 import type { CSSProperties } from "vue";
-import { DEFAULT_CELL_FONT_SIZE, type CellStyle } from "@idea10/core/style";
+import { DEFAULT_CELL_FONT_SIZE, type CellStyle } from "@sheetcraft/core/style";
 
 /** Relative font size for a cell displayed as superscript or subscript. */
 export const CELL_TEXT_SCRIPT_SCALE = 0.75;

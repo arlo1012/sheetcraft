@@ -1,8 +1,8 @@
-import { extendCellSelection, type CellSelection } from "@idea10/sheet-engine/selection";
+import { extendCellSelection, type CellSelection } from "@sheetcraft/sheet-engine/selection";
 import { onScopeDispose } from "vue";
-import type { CellAddress } from "@idea10/core/workbook";
-import type { Point, Size } from "@idea10/sheet-engine/geometry";
-import { getSelectionAutoScrollDelta } from "@idea10/sheet-engine/selection";
+import type { CellAddress } from "@sheetcraft/core/workbook";
+import type { Point, Size } from "@sheetcraft/sheet-engine/geometry";
+import { getSelectionAutoScrollDelta } from "@sheetcraft/sheet-engine/selection";
 import {
   startPointerSession,
   type GestureEvent,

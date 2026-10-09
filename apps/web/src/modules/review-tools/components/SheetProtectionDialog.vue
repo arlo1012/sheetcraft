@@ -4,7 +4,7 @@ import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import { normalizeSheetProtection, type SheetProtection } from "@idea10/core";
+import { normalizeSheetProtection, type SheetProtection } from "@sheetcraft/core";
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{
   visible: boolean;

@@ -5,8 +5,8 @@ import {
   createInsertCellsCommand,
   createInsertSheetAxisCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import { isCellAddressInBounds, type CellRange, type Sheet } from "@idea10/core/workbook";
+} from "@sheetcraft/core/commands";
+import { isCellAddressInBounds, type CellRange, type Sheet } from "@sheetcraft/core/workbook";
 
 export type CellOperationPayload = {
   operation: "insert" | "delete";

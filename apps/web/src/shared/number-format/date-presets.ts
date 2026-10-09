@@ -1,4 +1,4 @@
-import { formatCellNumberValue, getNumberFormatLocaleId } from "@idea10/core/number-format";
+import { formatCellNumberValue, getNumberFormatLocaleId } from "@sheetcraft/core/number-format";
 
 export type DateFormatPreset = Readonly<{
   id: string;

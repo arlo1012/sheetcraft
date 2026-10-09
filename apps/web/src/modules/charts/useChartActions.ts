@@ -1,10 +1,14 @@
 import { shallowRef, ref } from "vue";
-import { canUseSheetPermission } from "@idea10/core";
-import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@idea10/core/commands";
-import { normalizeSheetChart, getSheetChartData, type ChartType } from "@idea10/core/sheet-charts";
-import type { SheetChartDrawing, SheetDrawing } from "@idea10/core/sheet-drawings";
-import type { Workbook, Sheet, CellRange, SheetEvaluator } from "@idea10/core/workbook";
-import { resolveDataRange } from "@idea10/core/data-range";
+import { canUseSheetPermission } from "@sheetcraft/core";
+import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import {
+  normalizeSheetChart,
+  getSheetChartData,
+  type ChartType,
+} from "@sheetcraft/core/sheet-charts";
+import type { SheetChartDrawing, SheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { Workbook, Sheet, CellRange, SheetEvaluator } from "@sheetcraft/core/workbook";
+import { resolveDataRange } from "@sheetcraft/core/data-range";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
 export function useChartActions(options: {

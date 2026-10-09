@@ -3,7 +3,7 @@ import { computed, type CSSProperties } from "vue";
 import type {
   FloatingImageResizeDirection,
   FloatingImageViewportFragment,
-} from "@idea10/sheet-engine/floating-image-layout";
+} from "@sheetcraft/sheet-engine/floating-image-layout";
 import SheetObjectResizeHandle from "./SheetObjectResizeHandle.vue";
 
 const props = defineProps<{ fragment: FloatingImageViewportFragment }>();
@@ -58,7 +58,7 @@ function onResize(direction: FloatingImageResizeDirection, event: PointerEvent):
   &__outline {
     position: absolute;
     box-sizing: border-box;
-    border: 1px solid var(--idea-action-primary);
+    border: 1px solid var(--sheetcraft-action-primary);
     border-style: var(--image-selection-style, solid);
   }
 }

@@ -6,7 +6,7 @@ import {
   getPivotPresentation,
   type PivotPresentation,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
+} from "@sheetcraft/core/pivot-tables";
 import { useAppI18n } from "../../../shared/i18n";
 import { useMenu } from "../../../shared/menu/useMenu";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -257,7 +257,7 @@ function totals(rows: boolean, columns: boolean): void {
     max-width: 600px;
   }
   &__menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
     min-width: 220px;
   }
 }

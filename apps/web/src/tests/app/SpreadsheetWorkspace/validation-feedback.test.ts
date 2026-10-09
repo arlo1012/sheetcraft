@@ -1,13 +1,13 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { serializeWorkbook } from "@idea10/core/serialization";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import {
   createWorkbook,
   getActiveSheet,
   getCellContent,
   setCellContent,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";

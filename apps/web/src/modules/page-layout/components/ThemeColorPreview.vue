@@ -46,8 +46,8 @@ const barHeights = [14, 26, 36, 30, 20, 10];
     justify-content: center;
     gap: 16px;
     padding: 12px;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-small);
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-small);
     font-size: 14px;
     line-height: 22px;
   }

@@ -1,4 +1,4 @@
-import { parseFormula } from "@idea10/core/formula";
+import { parseFormula } from "@sheetcraft/core/formula";
 
 /**
  * Adds only tail closing parentheses, and only if the current Core grammar can

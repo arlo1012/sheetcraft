@@ -1,7 +1,7 @@
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
-import type { CellRange, Sheet, Workbook } from "@idea10/core/workbook";
-import type { WorkbookCommand } from "@idea10/core/commands";
+import type { CellRange, Sheet, Workbook } from "@sheetcraft/core/workbook";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
 import { useAppI18n } from "../../shared/i18n";
 import {
   collectReviewText,

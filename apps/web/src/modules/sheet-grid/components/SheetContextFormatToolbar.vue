@@ -6,8 +6,8 @@ import {
   DEFAULT_CELL_TEXT_COLOR,
   type CellBorderAction,
   type CellStylePatch,
-} from "@idea10/core/style";
-import type { CellMergeMode } from "@idea10/core/commands";
+} from "@sheetcraft/core/style";
+import type { CellMergeMode } from "@sheetcraft/core/commands";
 import { useAppI18n } from "../../../shared/i18n";
 import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import CellBorderPresetIcon from "../../../shared/borders/CellBorderPresetIcon.vue";
@@ -242,7 +242,7 @@ function getPopupAttach(): HTMLElement {
 @use "../../../shared/floating/floating-panel" as panel;
 
 .sheet-context-format-toolbar {
-  @include panel.toolbar-surface(var(--idea-layer-context-menu), 0, none);
+  @include panel.toolbar-surface(var(--sheetcraft-layer-context-menu), 0, none);
 
   --cell-format-font-width: 130px;
   --cell-format-font-size-width: 48px;
@@ -255,7 +255,7 @@ function getPopupAttach(): HTMLElement {
   width: 302px;
   gap: 4px;
   padding: 6px 8px;
-  border-bottom: 1px solid var(--idea-border-subtle);
+  border-bottom: 1px solid var(--sheetcraft-border-subtle);
 
   &__row {
     display: grid;

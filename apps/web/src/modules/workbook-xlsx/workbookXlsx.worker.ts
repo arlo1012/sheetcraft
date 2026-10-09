@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
+import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
 import type {
   XlsxCompatibilityReport,
   XlsxWorkerRequest,
@@ -16,7 +16,7 @@ worker.addEventListener("message", (event: MessageEvent<XlsxWorkerRequest>) => {
 async function handleRequest(request: XlsxWorkerRequest): Promise<void> {
   try {
     // The codec stays behind this worker-only dynamic import so ExcelJS never enters the app bundle.
-    const codec = await import("@idea10/xlsx-io");
+    const codec = await import("@sheetcraft/xlsx-io");
     if (request.type === "decode") {
       const input = new Uint8Array(request.bytes);
       const plaintext = codec.isOfficeEncryptedFile(input)

@@ -1,17 +1,17 @@
 import { computed, nextTick, shallowRef, type Ref } from "vue";
-import type { FloatingImage, ImageCrop } from "@idea10/core/workbook";
+import type { FloatingImage, ImageCrop } from "@sheetcraft/core/workbook";
 import {
   cropFloatingImage,
   flipFloatingImage,
   type ImageFlipAxis,
   rotateFloatingImage,
   restoreFloatingImage,
-} from "@idea10/sheet-engine/floating-image-transform";
+} from "@sheetcraft/sheet-engine/floating-image-transform";
 import {
   adjustImageCropSelection,
   type ImageCropGesture,
-} from "@idea10/sheet-engine/image-crop-selection";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+} from "@sheetcraft/sheet-engine/image-crop-selection";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 const MINIMUM_IMAGE_SIZE = 24;
 
 export function useFloatingImageEditing(options: {

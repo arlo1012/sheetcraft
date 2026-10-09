@@ -154,7 +154,7 @@ function clearFilter(): void {
 }
 
 .filter-value-menu {
-  z-index: var(--idea-layer-menu);
+  z-index: var(--sheetcraft-layer-menu);
   min-width: 220px;
   max-height: min(360px, calc(100vh - 16px));
 }

@@ -1,4 +1,4 @@
-import { isConditionalFormatIcon } from "@idea10/core/conditional-formatting";
+import { isConditionalFormatIcon } from "@sheetcraft/core/conditional-formatting";
 import type { DataToolRangeSnapshot, SortInitial, SortLevel } from "./data-tools-types";
 
 type SortTarget = Pick<DataToolRangeSnapshot, "sheetId" | "range">;

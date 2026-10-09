@@ -1,5 +1,5 @@
-import type { SheetDimensionAxis } from "@idea10/core/workbook";
-import type { SheetViewportRangeFragment } from "@idea10/sheet-engine/viewport-layout";
+import type { SheetDimensionAxis } from "@sheetcraft/core/workbook";
+import type { SheetViewportRangeFragment } from "@sheetcraft/sheet-engine/viewport-layout";
 
 export type FormulaReferenceOverlay = Readonly<{
   key: string;

@@ -6,8 +6,8 @@ import {
   setCellValue,
   setColumnWidth,
   setRowHeight,
-} from "@idea10/core/workbook";
-import { createWorkbookCalculationSession } from "@idea10/core/formula";
+} from "@sheetcraft/core/workbook";
+import { createWorkbookCalculationSession } from "@sheetcraft/core/formula";
 import {
   activeCell,
   getCanvasLayout,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import type { SheetFilterCondition } from "@idea10/core/workbook";
+import type { SheetFilterCondition } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../i18n";
 import FilterRankEditor from "./FilterRankEditor.vue";
 type RankCondition = Extract<SheetFilterCondition, { kind: "rank" }>;

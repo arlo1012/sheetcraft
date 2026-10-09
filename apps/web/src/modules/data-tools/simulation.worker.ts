@@ -1,7 +1,7 @@
-import { previewDataTable } from "@idea10/core";
-import { solveGoalSeek } from "@idea10/core/goal-seek";
-import { solvePlanning } from "@idea10/core/planning-solver";
-import { deserializeWorkbook } from "@idea10/core/serialization";
+import { previewDataTable } from "@sheetcraft/core";
+import { solveGoalSeek } from "@sheetcraft/core/goal-seek";
+import { solvePlanning } from "@sheetcraft/core/planning-solver";
+import { deserializeWorkbook } from "@sheetcraft/core/serialization";
 
 type Request =
   | {

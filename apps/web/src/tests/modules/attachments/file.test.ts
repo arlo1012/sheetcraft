@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { MAX_ATTACHMENT_BYTES } from "@idea10/core/sheet-attachments";
+import { MAX_ATTACHMENT_BYTES } from "@sheetcraft/core/sheet-attachments";
 import {
   prepareAttachment,
   attachmentBlob,

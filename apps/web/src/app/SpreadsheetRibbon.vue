@@ -1,18 +1,22 @@
 <script setup lang="ts">
-import type { WorkbookTheme } from "@idea10/core/workbook-theme";
-import type { CellStyleDefinition } from "@idea10/core/cell-styles";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import type { CellStyleDefinition } from "@sheetcraft/core/cell-styles";
 import { nextTick, ref, useId, watch } from "vue";
 import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
 import FormulaToolbar from "../modules/formula-tools/components/FormulaToolbar.vue";
-import type { CellMergeMode, CellValueConversionMode } from "@idea10/core/commands";
-import type { DefinedNameLabelPosition } from "@idea10/core/commands";
-import type { WorkbookCalculationSettings } from "@idea10/core/workbook";
+import type { CellMergeMode, CellValueConversionMode } from "@sheetcraft/core/commands";
+import type { DefinedNameLabelPosition } from "@sheetcraft/core/commands";
+import type { WorkbookCalculationSettings } from "@sheetcraft/core/workbook";
 import type { CellFormatTab } from "../modules/cell-format/components/CellFormatDialog.vue";
 import type { ConditionalFormatQuickRule } from "../modules/conditional-formatting/components/ConditionalFormattingMenu.vue";
-import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
-import type { TableStyleDefinition } from "@idea10/core/table-styles";
-import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
+import type {
+  CellBorderAction,
+  CellBorderFormatPatch,
+  CellStylePatch,
+} from "@sheetcraft/core/style";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
+import type { TableStyleDefinition } from "@sheetcraft/core/table-styles";
+import type { PivotTableStyleDefinition } from "@sheetcraft/core/pivot-table-styles";
 import { useAppI18n } from "../shared/i18n";
 import LocaleSwitcher from "./LocaleSwitcher.vue";
 import type {
@@ -543,8 +547,8 @@ defineSlots<{
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: var(--idea-surface-canvas);
-  border-bottom: 1px solid var(--idea-border-control);
+  background: var(--sheetcraft-surface-canvas);
+  border-bottom: 1px solid var(--sheetcraft-border-control);
 
   &__categories {
     display: flex;
@@ -552,7 +556,7 @@ defineSlots<{
     align-items: stretch;
     justify-content: space-between;
     min-width: 0;
-    border-bottom: 1px solid var(--idea-border-subtle);
+    border-bottom: 1px solid var(--sheetcraft-border-subtle);
   }
 
   &__category-list {
@@ -573,20 +577,20 @@ defineSlots<{
     padding: 0 10px;
     border: 0;
     background: transparent;
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
     font: inherit;
     cursor: pointer;
-    font-size: var(--idea-font-size-body-medium);
-    font-weight: var(--idea-font-weight-medium);
-    line-height: var(--idea-line-height-body-medium);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    font-weight: var(--sheetcraft-font-weight-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
     white-space: nowrap;
 
     &--contextual {
-      color: var(--idea-action-primary);
+      color: var(--sheetcraft-action-primary);
     }
 
     &.is-active {
-      color: var(--idea-action-primary);
+      color: var(--sheetcraft-action-primary);
     }
 
     &.is-active::after {
@@ -595,17 +599,17 @@ defineSlots<{
       bottom: -1px;
       left: 8px;
       height: 2px;
-      background: var(--idea-action-primary);
+      background: var(--sheetcraft-action-primary);
       content: "";
     }
   }
 
   &__panel {
-    flex: 0 0 var(--idea-ribbon-toolbar-height);
+    flex: 0 0 var(--sheetcraft-ribbon-toolbar-height);
     min-width: 0;
     margin: 0 8px;
     overflow: hidden;
-    background: var(--idea-surface-panel);
+    background: var(--sheetcraft-surface-panel);
     border-radius: 6px;
   }
 }

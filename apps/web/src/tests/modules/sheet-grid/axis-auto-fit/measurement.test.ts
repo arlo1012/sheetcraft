@@ -7,9 +7,9 @@ import {
   setCellValue,
   type Cell,
   type CellAddress,
-} from "@idea10/core/workbook";
-import type { FormulaValue } from "@idea10/core/formula";
-import type { TextMeasurer } from "@idea10/sheet-engine/text-layout";
+} from "@sheetcraft/core/workbook";
+import type { FormulaValue } from "@sheetcraft/core/formula";
+import type { TextMeasurer } from "@sheetcraft/sheet-engine/text-layout";
 import {
   getAutoFitColumnWidths,
   getAutoFitRowHeights,

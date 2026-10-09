@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { validateCellNumberFormatCode } from "@idea10/core/number-format";
+import { validateCellNumberFormatCode } from "@sheetcraft/core/number-format";
 import {
   getDateFormatPresets,
   supportsDateFormatLocale,

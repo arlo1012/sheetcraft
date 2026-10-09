@@ -1,7 +1,12 @@
 import { describe, expect, test, vi } from "vitest";
-import { applyWorkbookCommand, type WorkbookCommand } from "@idea10/core/commands";
-import { createWorkbook, createSheet, getActiveSheet, insertSheet } from "@idea10/core/workbook";
-import type { SheetCameraDrawing } from "@idea10/core/sheet-drawings";
+import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import {
+  createWorkbook,
+  createSheet,
+  getActiveSheet,
+  insertSheet,
+} from "@sheetcraft/core/workbook";
+import type { SheetCameraDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useCameraActions } from "../../../modules/camera/useCameraActions";
 
 function fixture() {

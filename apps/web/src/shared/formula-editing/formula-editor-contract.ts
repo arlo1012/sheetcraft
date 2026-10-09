@@ -1,4 +1,4 @@
-import type { CellRange } from "@idea10/core/workbook";
+import type { CellRange } from "@sheetcraft/core/workbook";
 import type { FormulaReferenceRangeKind, FormulaReferenceToken } from "./formula-reference-tokens";
 
 export type FormulaReferencePickPhase = "start" | "update" | "end";

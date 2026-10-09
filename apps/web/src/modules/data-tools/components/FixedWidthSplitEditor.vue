@@ -248,7 +248,7 @@ onBeforeUnmount(() => endDrag?.());
   }
   p {
     margin: 4px 0 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

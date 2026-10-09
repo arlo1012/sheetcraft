@@ -3,8 +3,8 @@ import {
   getNumberFormatLocaleCurrency,
   toCellNumberFormatCode,
   validateCellNumberFormatCode,
-} from "@idea10/core/number-format";
-import type { CellNumberFormat, CellNumberFormatNegativeStyle } from "@idea10/core/style";
+} from "@sheetcraft/core/number-format";
+import type { CellNumberFormat, CellNumberFormatNegativeStyle } from "@sheetcraft/core/style";
 
 export function toExcelNumberFormat(format: CellNumberFormat): string {
   return toCellNumberFormatCode(format);

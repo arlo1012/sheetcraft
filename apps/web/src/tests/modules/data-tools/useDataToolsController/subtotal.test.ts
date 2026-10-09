@@ -5,9 +5,9 @@ import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createWorkbookEvaluator, getActiveSheet, setCellValue } from "@idea10/core/workbook";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { createWorkbookEvaluator, getActiveSheet, setCellValue } from "@sheetcraft/core/workbook";
 import { useDataToolsController } from "../../../../modules/data-tools/useDataToolsController";
 import { createAppI18n } from "../../../../shared/i18n";
 let wrapper: ReturnType<typeof mount> | undefined;

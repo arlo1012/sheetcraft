@@ -4,7 +4,7 @@ import {
   createSetSheetDimensionHiddenCommand,
   createSetSheetDimensionSizesCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
+} from "@sheetcraft/core/commands";
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
@@ -12,9 +12,9 @@ import {
   type Sheet,
   type SheetDimensionAxis,
   type SheetEvaluator,
-} from "@idea10/core/workbook";
-import type { ExcelDateSystem } from "@idea10/core/formula";
-import type { TextMeasurer } from "@idea10/sheet-engine/row-height";
+} from "@sheetcraft/core/workbook";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
+import type { TextMeasurer } from "@sheetcraft/sheet-engine/row-height";
 import {
   getAutoFitColumnWidths,
   getAutoFitRowHeights,

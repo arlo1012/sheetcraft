@@ -17,7 +17,7 @@ import { useContextMenu } from "../../../shared/menu/useContextMenu";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
-import type { Sheet } from "@idea10/core/workbook";
+import type { Sheet } from "@sheetcraft/core/workbook";
 import SheetTabColorPanel from "./SheetTabColorPanel.vue";
 
 const { t } = useAppI18n();

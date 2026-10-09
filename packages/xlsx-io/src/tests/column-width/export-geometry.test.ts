@@ -11,8 +11,8 @@ import {
   setDefaultColumnWidth,
   setRowHeight,
   setSheetDimensionHidden,
-} from "@idea10/core/workbook";
-import { serializeWorkbook } from "@idea10/core/serialization";
+} from "@sheetcraft/core/workbook";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../../index.js";
 

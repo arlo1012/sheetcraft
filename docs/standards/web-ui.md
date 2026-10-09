@@ -55,7 +55,7 @@ Use CSS pixels at 100% scale; size and line height are a pair.
 | Section heading | 14px / 22px        | 600    | Panels and popovers                             |
 | Dialog heading  | 16px / 24px        | 600    | Dialog titles                                   |
 
-- Use product typography tokens and `--idea-font-sans`. Selected navigation and
+- Use product typography tokens and `--sheetcraft-font-sans`. Selected navigation and
   small group headings may use 500. States never change text size or line
   height; do not use 11px interface text.
 - A 28px control uses 12px / 20px. Change its container, not its text. Numeric
@@ -64,12 +64,12 @@ Use CSS pixels at 100% scale; size and line height are a pair.
 
 ## Surfaces, controls, and focus
 
-| Surface        | Padding                    | Owner                                                             |
-| -------------- | -------------------------- | ----------------------------------------------------------------- |
-| Content panel  | 8px, inside border         | `--idea-tool-panel-padding`                                       |
-| List menu      | 8px vertical, 0 horizontal | `--idea-menu-padding`; rows own insets                            |
-| Dialog frame   | 16px                       | Shared TDesign adapter                                            |
-| Dialog content | 12px vertical              | `--idea-dialog-content-padding-block`; adapter or body-owning tab |
+| Surface        | Padding                    | Owner                                                                   |
+| -------------- | -------------------------- | ----------------------------------------------------------------------- |
+| Content panel  | 8px, inside border         | `--sheetcraft-tool-panel-padding`                                       |
+| List menu      | 8px vertical, 0 horizontal | `--sheetcraft-menu-padding`; rows own insets                            |
+| Dialog frame   | 16px                       | Shared TDesign adapter                                                  |
+| Dialog content | 12px vertical              | `--sheetcraft-dialog-content-padding-block`; adapter or body-owning tab |
 
 - One layer owns each inset. Keep control/row padding and gaps separate; hover
   and selected menu backgrounds span the row. Suggestions, input assists, and
@@ -82,11 +82,11 @@ Use CSS pixels at 100% scale; size and line height are a pair.
 - `InputNumber` uses `theme="column"` and
   `idea-input-number--persistent-controls`; place it in a labelled group. Use
   no native `label` wrapper, which would forward focus to its buttons. Use
-  `--idea-icon-button-hover-bg` for ribbon/status icon hover; foreground stays
+  `--sheetcraft-icon-button-hover-bg` for ribbon/status icon hover; foreground stays
   unchanged.
 - Ordinary controls inherit shared focus styling. Menu/list keyboard focus uses
-  `--idea-keyboard-focus-bg`; compact triggers use
-  `--idea-keyboard-focus-shadow` with their existing radius. Keep focus visible
+  `--sheetcraft-keyboard-focus-bg`; compact triggers use
+  `--sheetcraft-keyboard-focus-shadow` with their existing radius. Keep focus visible
   and separate from selected/checked state. Do not add feature-local focus
   overrides; canvas/SVG editing may keep target-specific feedback.
 
@@ -113,9 +113,9 @@ Use CSS pixels at 100% scale; size and line height are a pair.
 
 ## Ribbon and menus
 
-- Action/menu icons use `--idea-action-icon-size` (15px); tall ribbon actions
-  use `--idea-ribbon-large-icon-size` (22px); Lucide stroke is
-  `--idea-icon-stroke-width` (2). Auxiliary/control icons keep their own shared
+- Action/menu icons use `--sheetcraft-action-icon-size` (15px); tall ribbon actions
+  use `--sheetcraft-ribbon-large-icon-size` (22px); Lucide stroke is
+  `--sheetcraft-icon-stroke-width` (2). Auxiliary/control icons keep their own shared
   sizes; border previews keep semantic line weights. Feature slots do not set
   action size or stroke.
 - Compose tab groups inside `RibbonToolbar`; it owns viewport, rail, overflow,
@@ -157,10 +157,10 @@ return, menu roles, rows, surface treatment, and overlay layer.
   extend the closest primitive with a typed prop, emit, composable option, or
   named slot that can serve another consumer. Do not import Floating UI directly
   outside `shared/floating`, or create a feature-local document dismissal loop.
-- Use `--idea-layer-menu`, `--idea-layer-submenu`, `--idea-layer-context-menu`,
-  `--idea-layer-context-submenu`, `--idea-layer-popover`, and
-  `--idea-layer-popover-submenu`, `--idea-layer-toolbar`, and
-  `--idea-layer-sheet-menu` for document-level overlays. Numeric `z-index` values
+- Use `--sheetcraft-layer-menu`, `--sheetcraft-layer-submenu`, `--sheetcraft-layer-context-menu`,
+  `--sheetcraft-layer-context-submenu`, `--sheetcraft-layer-popover`, and
+  `--sheetcraft-layer-popover-submenu`, `--sheetcraft-layer-toolbar`, and
+  `--sheetcraft-layer-sheet-menu` for document-level overlays. Numeric `z-index` values
   through 30 are only for local composition within a component; values above that
   threshold are reserved and rejected by `bun run check:web-ui`.
 - Use `MenuSurface` for menu semantics. `BorderLineStylePanel` is the intentional

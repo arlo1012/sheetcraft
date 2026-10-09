@@ -16,8 +16,8 @@ import {
   setCellStyle,
   setColumnWidth,
   type Workbook,
-} from "@idea10/core/workbook";
-import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
+} from "@sheetcraft/core/workbook";
+import { DEFAULT_SHEET_PAGE_SETUP } from "@sheetcraft/core/page-setup";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx, XlsxCompatibilityError } from "../index.js";
 import { writeXlsxPageSetups } from "../page-setup.js";

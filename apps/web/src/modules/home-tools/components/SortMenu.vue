@@ -74,6 +74,6 @@ function select(direction: "ascending" | "descending"): void {
 }
 
 .sort-menu {
-  z-index: var(--idea-layer-menu);
+  z-index: var(--sheetcraft-layer-menu);
 }
 </style>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ChevronDown, Minus, Plus } from "lucide-vue-next";
 import { computed, nextTick, ref, useId, watch } from "vue";
-import { columnIndexToLabel } from "@idea10/core/coordinates";
-import type { CellAddress, CellRange, SheetDimensionAxis } from "@idea10/core/workbook";
+import { columnIndexToLabel } from "@sheetcraft/core/coordinates";
+import type { CellAddress, CellRange, SheetDimensionAxis } from "@sheetcraft/core/workbook";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
 import {
   createOutlinePanes,
@@ -498,14 +498,14 @@ watch(
     padding: 0;
     border: 0;
     border-radius: 2px;
-    color: var(--idea-text-secondary);
-    background: color-mix(in srgb, var(--idea-surface-panel) 78%, transparent);
+    color: var(--sheetcraft-text-secondary);
+    background: color-mix(in srgb, var(--sheetcraft-surface-panel) 78%, transparent);
     cursor: pointer;
     pointer-events: auto;
 
     &.is-active {
-      color: var(--idea-action-primary);
-      background: var(--idea-action-subtle, var(--idea-action-hover));
+      color: var(--sheetcraft-action-primary);
+      background: var(--sheetcraft-action-subtle, var(--sheetcraft-action-hover));
     }
     &[aria-disabled="true"] {
       cursor: default;
@@ -515,22 +515,26 @@ watch(
 
   &__outline {
     border-radius: 0;
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
     background: transparent;
 
     &::before {
       content: "";
       position: absolute;
       inset: 2px;
-      border: 1px solid var(--idea-border-control);
+      border: 1px solid var(--sheetcraft-border-control);
       border-radius: 0;
-      background: var(--idea-surface-panel);
+      background: var(--sheetcraft-surface-panel);
     }
     svg {
       position: relative;
     }
     &:hover:not([aria-disabled="true"])::before {
-      background: color-mix(in srgb, var(--idea-text-primary) 8%, var(--idea-surface-panel));
+      background: color-mix(
+        in srgb,
+        var(--sheetcraft-text-primary) 8%,
+        var(--sheetcraft-surface-panel)
+      );
     }
   }
 
@@ -538,16 +542,16 @@ watch(
     position: absolute;
     width: 2px;
     height: 2px;
-    background: var(--idea-text-primary);
+    background: var(--sheetcraft-text-primary);
     transform: translate(-50%, -50%);
   }
 
   &__validation-menu {
     @include option-list.scrollbar;
-    z-index: var(--idea-layer-sheet-menu);
+    z-index: var(--sheetcraft-layer-sheet-menu);
     display: flex;
     flex-direction: column;
-    max-height: min(320px, calc(100vh - var(--idea-space-4) - var(--idea-space-4)));
+    max-height: min(320px, calc(100vh - var(--sheetcraft-space-4) - var(--sheetcraft-space-4)));
     scroll-padding-top: 32px;
     pointer-events: auto;
   }
@@ -559,9 +563,9 @@ watch(
 
   &__validation-empty {
     padding: 6px 14px;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
     list-style: none;
   }
 
@@ -580,12 +584,12 @@ watch(
     top: 0;
     bottom: 0;
     width: 4px;
-    border-left: 1px solid var(--idea-text-primary);
+    border-left: 1px solid var(--sheetcraft-text-primary);
     &.has-start {
-      border-top: 1px solid var(--idea-text-primary);
+      border-top: 1px solid var(--sheetcraft-text-primary);
     }
     &.has-end {
-      border-bottom: 1px solid var(--idea-text-primary);
+      border-bottom: 1px solid var(--sheetcraft-text-primary);
     }
     &.has-button {
       bottom: 16px;
@@ -608,9 +612,9 @@ watch(
     left: 0;
     right: 0;
     height: 4px;
-    border-top: 1px solid var(--idea-text-primary);
+    border-top: 1px solid var(--sheetcraft-text-primary);
     &.has-start {
-      border-left: 1px solid var(--idea-text-primary);
+      border-left: 1px solid var(--sheetcraft-text-primary);
     }
     &.has-button {
       right: 16px;
@@ -634,17 +638,17 @@ watch(
       width: 16px;
       height: 16px;
       padding: 0;
-      border: 1px solid var(--idea-border-control);
+      border: 1px solid var(--sheetcraft-border-control);
       border-radius: 0;
-      color: var(--idea-text-primary);
-      background: var(--idea-surface-panel);
+      color: var(--sheetcraft-text-primary);
+      background: var(--sheetcraft-surface-panel);
       cursor: pointer;
       font-size: 12px;
       line-height: 1;
     }
     button:hover {
-      color: var(--idea-action-primary);
-      background: var(--idea-action-hover);
+      color: var(--sheetcraft-action-primary);
+      background: var(--sheetcraft-action-hover);
       outline: none;
     }
     &--rows {

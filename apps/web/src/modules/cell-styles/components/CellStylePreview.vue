@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CellStyleDefinition } from "@idea10/core/cell-styles";
+import type { CellStyleDefinition } from "@sheetcraft/core/cell-styles";
 import { computed } from "vue";
 import { cellStylePreviewCss } from "../cell-style-presentation";
 
@@ -22,9 +22,9 @@ const previewStyle = computed(() => cellStylePreviewCss(props.style.style));
   justify-content: flex-start;
   padding: 3px 7px;
   overflow: hidden;
-  background: var(--idea-surface-panel);
-  color: var(--idea-text-primary);
-  font-size: var(--idea-font-size-body-small);
+  background: var(--sheetcraft-surface-panel);
+  color: var(--sheetcraft-text-primary);
+  font-size: var(--sheetcraft-font-size-body-small);
   line-height: 1.2;
   text-align: left;
 

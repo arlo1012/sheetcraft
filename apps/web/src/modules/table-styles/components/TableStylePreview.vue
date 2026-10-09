@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { TableStyleDefinition, TableStyleElement } from "@idea10/core/table-styles";
+import type { TableStyleDefinition, TableStyleElement } from "@sheetcraft/core/table-styles";
 import type {
   PivotTableStyleDefinition,
   PivotTableStyleElement,
-} from "@idea10/core/pivot-table-styles";
+} from "@sheetcraft/core/pivot-table-styles";
 import { computed, nextTick, ref, watch } from "vue";
 import {
   cellStyleToCss,
@@ -112,8 +112,8 @@ function previewValue(row: number, column: number): string {
   height: 52px;
   overflow: hidden;
   border: 0;
-  background: var(--idea-surface-panel);
-  color: var(--idea-text-primary);
+  background: var(--sheetcraft-surface-panel);
+  color: var(--sheetcraft-text-primary);
 
   i {
     display: grid;
@@ -147,7 +147,7 @@ function previewValue(row: number, column: number): string {
     height: auto;
     min-height: 100%;
     overflow: visible;
-    font-size: var(--idea-font-size-body-medium);
+    font-size: var(--sheetcraft-font-size-body-medium);
 
     i {
       display: flex;
@@ -155,8 +155,8 @@ function previewValue(row: number, column: number): string {
       justify-content: flex-end;
       overflow: hidden;
       padding: 3px 6px;
-      border-right: 1px solid var(--idea-border-subtle);
-      border-bottom: 1px solid var(--idea-border-subtle);
+      border-right: 1px solid var(--sheetcraft-border-subtle);
+      border-bottom: 1px solid var(--sheetcraft-border-subtle);
       font-style: normal;
       line-height: 1.4;
       white-space: nowrap;

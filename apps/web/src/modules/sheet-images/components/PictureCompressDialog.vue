@@ -69,7 +69,7 @@ const all = ref(false);
   }
   p {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

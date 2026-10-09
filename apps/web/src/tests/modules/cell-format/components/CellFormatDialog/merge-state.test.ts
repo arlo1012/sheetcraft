@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
+import { createDefaultSelectionCellStyleState } from "@sheetcraft/core/style-state";
 import CellFormatDialog from "../../../../../modules/cell-format/components/CellFormatDialog.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 

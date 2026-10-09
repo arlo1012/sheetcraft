@@ -1,4 +1,4 @@
-import type { SheetPageSetup } from "@idea10/core/page-setup";
+import type { SheetPageSetup } from "@sheetcraft/core/page-setup";
 
 export type PageMargins = SheetPageSetup["margins"];
 

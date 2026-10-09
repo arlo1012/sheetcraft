@@ -69,7 +69,7 @@ function select(action: "set" | "clear" | "openSetup"): void {
 .page-print-area-menu {
   @include ribbon.tool;
   &__surface {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
   }
 }
 </style>

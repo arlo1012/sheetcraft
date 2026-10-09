@@ -1,4 +1,4 @@
-import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
+import type { SheetConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
 
 export type ConditionalFormatManagerSheet = {
   id: string;

@@ -1,13 +1,13 @@
 import { ref, shallowRef } from "vue";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
-import { canUseSheetPermission } from "@idea10/core";
-import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@idea10/core/commands";
+import { canUseSheetPermission } from "@sheetcraft/core";
+import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import type {
   SheetDrawing,
   SheetGraphicDrawing,
   SheetGraphicKind,
-} from "@idea10/core/sheet-drawings";
-import type { Sheet, CellAddress } from "@idea10/core/workbook";
+} from "@sheetcraft/core/sheet-drawings";
+import type { Sheet, CellAddress } from "@sheetcraft/core/workbook";
 export function useDrawingActions(options: {
   getSheet: () => Sheet;
   getAddress: () => CellAddress;

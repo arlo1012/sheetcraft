@@ -1,7 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { expect, test } from "vitest";
-import { createBuiltinTableStyles } from "@idea10/core/table-styles";
-import type { SheetTable } from "@idea10/core/workbook";
+import { createBuiltinTableStyles } from "@sheetcraft/core/table-styles";
+import type { SheetTable } from "@sheetcraft/core/workbook";
 import TableToolsToolbar from "../../../modules/table-styles/components/TableToolsToolbar.vue";
 import { createAppI18n } from "../../../shared/i18n";
 

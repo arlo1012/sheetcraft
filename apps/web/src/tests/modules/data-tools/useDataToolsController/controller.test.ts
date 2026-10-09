@@ -1,21 +1,21 @@
 import { defineComponent, reactive } from "vue";
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, test } from "vitest";
-import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
+import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
 import {
   createAddSheetCommand,
   createSetCellContentCommand,
   createSetSheetDataValidationsCommand,
   createSheetFilterHiddenRowIntervals,
-} from "@idea10/core/commands";
+} from "@sheetcraft/core/commands";
 import {
   executeWorkbookCommand,
   createWorkbookSession,
   undoWorkbookCommand,
   redoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createBuiltinTableStyles } from "@idea10/core/table-styles";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { createBuiltinTableStyles } from "@sheetcraft/core/table-styles";
 import {
   createSheetEvaluator,
   getActiveSheet,
@@ -24,7 +24,7 @@ import {
   setCellContent,
   getCellContent,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useDataToolsController } from "../../../../modules/data-tools/useDataToolsController";
 import { readFilterPanelSettings } from "../../../../shared/filter/filter-panel-settings";

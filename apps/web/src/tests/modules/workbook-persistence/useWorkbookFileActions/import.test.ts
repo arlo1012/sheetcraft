@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { serializeWorkbook } from "@idea10/core/serialization";
-import { createWorkbook } from "@idea10/core/workbook";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { createWorkbook } from "@sheetcraft/core/workbook";
 import { createWorkbookFile, deferred, mountFileActions } from "./fixture";
 
 const wrappers: Array<{ unmount(): void }> = [];

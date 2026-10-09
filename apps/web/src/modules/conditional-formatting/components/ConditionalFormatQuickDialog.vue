@@ -3,14 +3,14 @@ import { computed, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import { toWorkbookErrorData } from "@idea10/core/errors";
+import { toWorkbookErrorData } from "@sheetcraft/core/errors";
 import {
   normalizeConditionalFormatRules,
   type ConditionalFormatCondition,
   type ConditionalFormatDatePeriod,
   type ConditionalFormatStyle,
   type SheetConditionalFormatRule,
-} from "@idea10/core/conditional-formatting";
+} from "@sheetcraft/core/conditional-formatting";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import {
   createConditionalFormatRuleId,
@@ -342,7 +342,7 @@ watch(
   }
   &__error {
     margin: 0;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

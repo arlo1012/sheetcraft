@@ -3,14 +3,14 @@ import {
   createGroupPivotFieldCommand,
   createUngroupPivotFieldCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
+} from "@sheetcraft/core/commands";
 import {
   getRawPivotTableSource,
   type PivotFieldGroup,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
-import { getCellStyle, type Workbook, type Sheet } from "@idea10/core/workbook";
-import { canUseSheetPermission } from "@idea10/core";
+} from "@sheetcraft/core/pivot-tables";
+import { getCellStyle, type Workbook, type Sheet } from "@sheetcraft/core/workbook";
+import { canUseSheetPermission } from "@sheetcraft/core";
 export type PivotGroupingDraft = {
   tableId: string;
   field: number;

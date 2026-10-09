@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { TextWrap } from "lucide-vue-next";
-import type { CellMergeMode } from "@idea10/core/commands";
-import type { CellStylePatch } from "@idea10/core/style";
-import type { SelectionCellStyleState, ToggleStyleState } from "@idea10/core/style-state";
+import type { CellMergeMode } from "@sheetcraft/core/commands";
+import type { CellStylePatch } from "@sheetcraft/core/style";
+import type { SelectionCellStyleState, ToggleStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import type { MergeCellsState } from "./data-tool-state";
 import HorizontalAlignmentControls from "./HorizontalAlignmentControls.vue";

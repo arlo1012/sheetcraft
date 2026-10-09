@@ -1,4 +1,4 @@
-import type { Workbook } from "@idea10/core/workbook";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import { decodeWithExcelJs, encodeWithExcelJs } from "./codec.js";
 import { mergeCompatibilityReports } from "./report.js";
 import {

@@ -1,15 +1,15 @@
 import { onBeforeUnmount, ref } from "vue";
-import { cloneSheetPageSetup, type SheetPageSetup } from "@idea10/core/page-setup";
-import type { CellRange } from "@idea10/core/workbook";
-import type { Point, SheetGeometry } from "@idea10/sheet-engine/geometry";
+import { cloneSheetPageSetup, type SheetPageSetup } from "@sheetcraft/core/page-setup";
+import type { CellRange } from "@sheetcraft/core/workbook";
+import type { Point, SheetGeometry } from "@sheetcraft/sheet-engine/geometry";
 import {
   adjustSheetPageBoundary,
   adjustSheetPrintCorner,
   type SheetPrintCorner,
   type SheetPageBoundary,
   type SheetPagination,
-} from "@idea10/sheet-engine/page-layout";
-import type { RowVisibilityIndex } from "@idea10/sheet-engine/visibility";
+} from "@sheetcraft/sheet-engine/page-layout";
+import type { RowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import type { SheetRenderFrame } from "../sheet-grid/rendering/sheet-render-frame";
 import type { PageViewPaintState } from "./page-view-types";
 

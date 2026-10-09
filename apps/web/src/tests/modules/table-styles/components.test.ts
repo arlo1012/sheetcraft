@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { DOMWrapper, mount } from "@vue/test-utils";
-import { createBuiltinTableStyles, createThemedTableStyles } from "@idea10/core/table-styles";
+import { createBuiltinTableStyles, createThemedTableStyles } from "@sheetcraft/core/table-styles";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { createAppI18n } from "../../../shared/i18n";
@@ -11,8 +11,8 @@ import NewTableStyleDialog from "../../../modules/table-styles/components/NewTab
 import CellFormatDialog from "../../../modules/cell-format/components/CellFormatDialog.vue";
 import { previewCells } from "../../../modules/table-styles/table-style-presentation";
 import { previewPivotCells } from "../../../modules/table-styles/table-style-presentation";
-import type { TableStyleDefinition } from "@idea10/core/table-styles";
-import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
+import type { TableStyleDefinition } from "@sheetcraft/core/table-styles";
+import type { PivotTableStyleDefinition } from "@sheetcraft/core/pivot-table-styles";
 import { mergeStyleFormatChange } from "../../../shared/cell-format/style-format-dialog";
 
 const editableStyle = {

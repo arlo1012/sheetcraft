@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { formatCellNumberValue, toCellNumberFormatCode } from "@idea10/core/number-format";
-import { normalizeCellNumberFormat } from "@idea10/core/style";
+import { formatCellNumberValue, toCellNumberFormatCode } from "@sheetcraft/core/number-format";
+import { normalizeCellNumberFormat } from "@sheetcraft/core/style";
 import {
   getCurrencyChoiceValue,
   getCurrencySymbolOptions,

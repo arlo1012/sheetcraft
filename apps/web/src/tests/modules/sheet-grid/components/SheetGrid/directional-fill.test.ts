@@ -3,8 +3,13 @@ import {
   executeReplaceableWorkbookCommand,
   undoWorkbookCommand,
   redoWorkbookCommand,
-} from "@idea10/core/history";
-import { getCellContent, setCellContent, setCellStyle, getCellStyle } from "@idea10/core/workbook";
+} from "@sheetcraft/core/history";
+import {
+  getCellContent,
+  setCellContent,
+  setCellStyle,
+  getCellStyle,
+} from "@sheetcraft/core/workbook";
 import { createCellFillActions } from "../../../../../modules/sheet-grid/cell-fill-actions";
 import { mountSheetGrid, triggerCell } from "./fixture";
 

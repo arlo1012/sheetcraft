@@ -6,16 +6,16 @@ import {
   executeWorkbookCommand,
   undoWorkbookCommand,
   redoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createSetCellNoteCommand } from "@idea10/core/commands";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { createSetCellNoteCommand } from "@sheetcraft/core/commands";
 import {
   createWorkbook,
   getActiveSheet,
   getCellNote,
   type CellAddress,
   type CellRange,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useReviewController } from "../../../modules/review-tools/useReviewController";
 import { createAppI18n } from "../../../shared/i18n";
 

@@ -2,8 +2,8 @@ import {
   MAX_FORMULA_COLUMNS,
   MAX_FORMULA_ROWS,
   parseA1FormulaReference,
-} from "@idea10/core/formula";
-import type { CellRange } from "@idea10/core/workbook";
+} from "@sheetcraft/core/formula";
+import type { CellRange } from "@sheetcraft/core/workbook";
 
 export type FormulaReferenceRangeKind = "cells" | "row-axis" | "column-axis" | "spill";
 

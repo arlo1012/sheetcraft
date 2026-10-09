@@ -4,7 +4,7 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select } from "tdesign-vue-next/es/select";
 import { AutoComplete } from "tdesign-vue-next/es/auto-complete";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
-import type { PivotValueCondition } from "@idea10/core/pivot-tables";
+import type { PivotValueCondition } from "@sheetcraft/core/pivot-tables";
 import type { FilterConditionAction } from "../../../shared/filter/filter-condition-actions";
 import PivotValueFilterDialog from "../../../modules/pivot-tables/components/PivotValueFilterDialog.vue";
 import FilterConditionEditor from "../../../shared/filter/components/FilterConditionEditor.vue";

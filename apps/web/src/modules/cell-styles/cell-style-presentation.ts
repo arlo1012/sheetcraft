@@ -1,9 +1,9 @@
-import type { CellStyle, CellStylePatch } from "@idea10/core/style";
+import type { CellStyle, CellStylePatch } from "@sheetcraft/core/style";
 import type { CSSProperties } from "vue";
 import { getCellFillStyle } from "../../shared/cell-fill/fill-presentation";
 import { getCellTextTypographyStyle } from "../../shared/cell-text/font-presentation";
 import type { MessageKey } from "../../shared/i18n";
-import type { CellStyleDefinition } from "@idea10/core/cell-styles";
+import type { CellStyleDefinition } from "@sheetcraft/core/cell-styles";
 
 export const CELL_STYLE_CATEGORIES = [
   "goodBadNeutral",

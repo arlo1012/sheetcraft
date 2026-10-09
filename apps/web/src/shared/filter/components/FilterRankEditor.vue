@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import type { SheetFilterCondition } from "@idea10/core/workbook";
+import type { SheetFilterCondition } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 
 type RankCondition = Extract<SheetFilterCondition, { kind: "rank" }> & {
@@ -89,6 +89,6 @@ watch(condition, (value) => emit("update:condition", value), { immediate: true }
 .filter-rank-editor {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: var(--idea-space-4);
+  gap: var(--sheetcraft-space-4);
 }
 </style>

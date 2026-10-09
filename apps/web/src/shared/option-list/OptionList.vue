@@ -142,7 +142,7 @@ function confirmOption(value: Option["value"]): void {
       white-space: normal;
 
       &[aria-selected="true"] {
-        font-weight: var(--idea-font-weight-medium);
+        font-weight: var(--sheetcraft-font-weight-medium);
       }
     }
   }

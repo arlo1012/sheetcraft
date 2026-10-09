@@ -1,7 +1,7 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import { nextTick, shallowRef, type ShallowRef } from "vue";
-import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "@idea10/core/workbook-theme";
+import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { workbookThemeKey } from "../../../../../shared/color/workbook-theme-context";
 import CellColorControl from "../../../../../modules/home-tools/components/CellColorControl.vue";
 import { createAppI18n } from "../../../../../shared/i18n";

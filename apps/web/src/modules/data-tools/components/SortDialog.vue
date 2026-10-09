@@ -15,7 +15,7 @@ import type {
 } from "tdesign-vue-next/es/table/type";
 import { useAppI18n } from "../../../shared/i18n";
 import { vIconAction } from "../../../shared/focus/icon-action";
-import type { SortIcon } from "@idea10/core/commands";
+import type { SortIcon } from "@sheetcraft/core/commands";
 import ConditionalFormatIcon from "../../../shared/conditional-formatting/ConditionalFormatIcon.vue";
 import { sortIconKey } from "../sort-icon-options";
 import CustomSortListDialog from "./CustomSortListDialog.vue";
@@ -617,14 +617,14 @@ function apply(): void {
 <style scoped lang="scss">
 .sort-dialog-options {
   display: grid;
-  gap: var(--idea-space-6);
+  gap: var(--sheetcraft-space-6);
 
   &__group {
     display: grid;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
 
     strong {
-      font-weight: var(--idea-font-weight-semibold);
+      font-weight: var(--sheetcraft-font-weight-semibold);
     }
   }
 }
@@ -635,8 +635,8 @@ function apply(): void {
   height: min(300px, calc(100dvh - 180px));
   min-height: 0;
   min-width: 0;
-  gap: var(--idea-space-4);
-  color: var(--idea-text-primary);
+  gap: var(--sheetcraft-space-4);
+  color: var(--sheetcraft-text-primary);
 
   &__toolbar {
     display: flex;
@@ -648,13 +648,13 @@ function apply(): void {
   &__actions {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
   }
   &__row-actions {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__column {
     display: grid;
@@ -682,15 +682,15 @@ function apply(): void {
     width: 14px;
     height: 14px;
     flex: 0 0 14px;
-    border: 1px solid var(--idea-border-control);
+    border: 1px solid var(--sheetcraft-border-control);
     border-radius: 2px;
 
     &.is-empty {
       background: linear-gradient(
         135deg,
         transparent 46%,
-        var(--idea-status-error) 48%,
-        var(--idea-status-error) 52%,
+        var(--sheetcraft-status-error) 48%,
+        var(--sheetcraft-status-error) 52%,
         transparent 54%
       );
     }

@@ -233,7 +233,7 @@ function editEntry(target: DictionaryCategory, entry: WordRule) {
   gap: 12px;
   p {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__footer {
     display: flex;
@@ -242,7 +242,7 @@ function editEntry(target: DictionaryCategory, entry: WordRule) {
     text-align: left;
   }
   &__hint {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     flex: 1;
   }
   &__footer-actions {

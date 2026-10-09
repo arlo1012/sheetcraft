@@ -9,7 +9,7 @@ import {
   normalizeImageTransform,
   type FloatingImage,
   type ImageAnnotation,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import { paintImagePresentation } from "../../../shared/images/imageAppearance";
 import {
@@ -250,7 +250,7 @@ onBeforeUnmount(() => {
     justify-content: center;
     overflow: auto;
     max-height: 60vh;
-    background: var(--idea-bg-secondary);
+    background: var(--sheetcraft-bg-secondary);
     canvas {
       max-width: 100%;
       height: auto;
@@ -261,7 +261,7 @@ onBeforeUnmount(() => {
   }
   p {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

@@ -15,8 +15,8 @@ import {
   rotateFloatingImages,
   flipFloatingImages,
   resizeFloatingImagesBy,
-} from "@idea10/sheet-engine/floating-image-group";
-import { MAX_FLOATING_IMAGE_SIZE, type FloatingImage } from "@idea10/core/workbook";
+} from "@sheetcraft/sheet-engine/floating-image-group";
+import { MAX_FLOATING_IMAGE_SIZE, type FloatingImage } from "@sheetcraft/core/workbook";
 import {
   moveFloatingImageBy,
   getFloatingImageSheetRect,
@@ -24,13 +24,13 @@ import {
   resizeFloatingImageBy,
   type FloatingImageResizeDirection,
   type FloatingImageViewportFragment,
-} from "@idea10/sheet-engine/floating-image-layout";
+} from "@sheetcraft/sheet-engine/floating-image-layout";
 import {
   adjustImageCropSelection,
   type ImageCropGesture,
-} from "@idea10/sheet-engine/image-crop-selection";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
-import type { Point } from "@idea10/sheet-engine/geometry";
+} from "@sheetcraft/sheet-engine/image-crop-selection";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
+import type { Point } from "@sheetcraft/sheet-engine/geometry";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
@@ -953,7 +953,7 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     pointer-events: auto;
     touch-action: none;
     cursor: move;
-    outline: 1px solid var(--idea-action-primary);
+    outline: 1px solid var(--sheetcraft-action-primary);
 
     &[data-floating-image-group] {
       pointer-events: none;

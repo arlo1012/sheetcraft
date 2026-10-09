@@ -1,4 +1,4 @@
-import type { SplitColumnSuggestion, SplitTextOptions } from "@idea10/core/commands";
+import type { SplitColumnSuggestion, SplitTextOptions } from "@sheetcraft/core/commands";
 import type { TextToColumnsDraft } from "./data-tools-types";
 
 /** Resolve automatic recommendations once, then use the same rule for every row. */

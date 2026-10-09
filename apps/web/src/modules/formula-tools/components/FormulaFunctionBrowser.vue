@@ -183,9 +183,9 @@ function onKeydown(event: KeyboardEvent): void {
     display: grid;
     gap: 12px;
     min-width: 0;
-    color: var(--idea-text-primary);
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
+    color: var(--sheetcraft-text-primary);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
   }
   &__body {
     display: grid;
@@ -220,15 +220,15 @@ function onKeydown(event: KeyboardEvent): void {
   &__result-description {
     min-width: 0;
     overflow: hidden;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   &__empty {
     margin: 0;
     padding: 24px 8px;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     text-align: center;
   }
   &__details {
@@ -239,11 +239,11 @@ function onKeydown(event: KeyboardEvent): void {
     }
   }
   &__signature {
-    font-weight: var(--idea-font-weight-semibold);
+    font-weight: var(--sheetcraft-font-weight-semibold);
     overflow-wrap: anywhere;
   }
   &__example {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     code {
       font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
       font-size: inherit;

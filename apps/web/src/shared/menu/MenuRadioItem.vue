@@ -39,7 +39,7 @@ defineSlots<{ default(): unknown; shortcut?(): unknown; icon?(): unknown }>();
 
 <style scoped lang="scss">
 .idea-menu-radio-text-selected {
-  color: var(--idea-action-primary);
+  color: var(--sheetcraft-action-primary);
 }
 
 .idea-menu-radio {

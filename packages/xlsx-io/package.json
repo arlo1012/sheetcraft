@@ -1,5 +1,5 @@
 {
-  "name": "@idea10/xlsx-io",
+  "name": "@sheetcraft/xlsx-io",
   "version": "0.1.0",
   "private": true,
   "files": [
@@ -18,10 +18,10 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
-    "@idea10/core": "workspace:*",
     "@noble/ciphers": "2.1.1",
     "@noble/hashes": "2.0.1",
     "@scure/base": "2.0.0",
+    "@sheetcraft/core": "workspace:*",
     "cfb": "1.2.2",
     "exceljs": "4.4.0",
     "fast-xml-parser": "5.3.8",

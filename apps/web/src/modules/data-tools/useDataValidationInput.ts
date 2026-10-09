@@ -1,20 +1,20 @@
-import { canEditCell } from "@idea10/core";
+import { canEditCell } from "@sheetcraft/core";
 import { shallowRef, watch } from "vue";
-import { createSetCellContentCommand, type WorkbookCommand } from "@idea10/core/commands";
-import { isCellInRange } from "@idea10/sheet-engine/selection";
+import { createSetCellContentCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import { isCellInRange } from "@sheetcraft/sheet-engine/selection";
 import {
   getCellDataValidation,
   validateCellContentDataValidation,
-} from "@idea10/core/data-validation";
-import { validateDuplicateEntries } from "@idea10/core/duplicate-values";
-import { WorkbookDomainError } from "@idea10/core/errors";
-import type { CellContent } from "@idea10/core/formula";
+} from "@sheetcraft/core/data-validation";
+import { validateDuplicateEntries } from "@sheetcraft/core/duplicate-values";
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
+import type { CellContent } from "@sheetcraft/core/formula";
 import {
   getCellContent,
   type CellAddress,
   type SheetDataValidation,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 
 type Candidate = {
   sheetId: string;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Coins, Calculator } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -86,7 +86,7 @@ function select(choice: "currency" | "accounting"): void {
   @include ribbon.tool;
   flex: 0 0 auto;
   &__menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
   }
 }
 </style>

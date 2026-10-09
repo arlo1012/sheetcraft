@@ -5,8 +5,8 @@ import type {
   CellBorderAction,
   CellBorderFormatPatch,
   CellBorderLineStyle,
-} from "@idea10/core/style";
-import type { SelectionBorderState } from "@idea10/core/style-state";
+} from "@sheetcraft/core/style";
+import type { SelectionBorderState } from "@sheetcraft/core/style-state";
 import BorderLinePreview from "../../../shared/borders/BorderLinePreview.vue";
 import BorderLineStylePanel from "../../../shared/borders/BorderLineStylePanel.vue";
 import CellBorderPresetIcon from "../../../shared/borders/CellBorderPresetIcon.vue";
@@ -294,14 +294,14 @@ const previewState = computed<SelectionBorderState>(() => ({
 .cell-format-border-panel {
   display: grid;
   gap: 20px;
-  color: var(--idea-text-primary);
-  font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
+  color: var(--sheetcraft-text-primary);
+  font-size: var(--sheetcraft-font-size-body-medium);
+  line-height: var(--sheetcraft-line-height-body-medium);
 
   h3 {
     margin: 0;
     font-size: inherit;
-    font-weight: var(--idea-font-weight-semibold);
+    font-weight: var(--sheetcraft-font-weight-semibold);
   }
   &__layout {
     display: grid;
@@ -314,7 +314,7 @@ const previewState = computed<SelectionBorderState>(() => ({
     gap: 4px;
     min-width: 0;
     padding-right: 16px;
-    border-right: 1px solid var(--idea-border-subtle);
+    border-right: 1px solid var(--sheetcraft-border-subtle);
   }
   &__field,
   &__section {
@@ -327,10 +327,10 @@ const previewState = computed<SelectionBorderState>(() => ({
     margin-top: 4px;
   }
   &__style-list {
-    padding: var(--idea-tool-panel-padding);
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
-    background: var(--idea-surface-panel);
+    padding: var(--sheetcraft-tool-panel-padding);
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-default);
+    background: var(--sheetcraft-surface-panel);
   }
   &__line-sample {
     display: flex;
@@ -340,9 +340,9 @@ const previewState = computed<SelectionBorderState>(() => ({
     height: 28px;
     padding: 0 8px;
     overflow: hidden;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
-    background: var(--idea-surface-panel);
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-default);
+    background: var(--sheetcraft-surface-panel);
     color: inherit;
     font: inherit;
   }
@@ -365,7 +365,7 @@ const previewState = computed<SelectionBorderState>(() => ({
       min-width: 0;
       padding: 0;
       border: 0;
-      border-radius: var(--idea-radius-default);
+      border-radius: var(--sheetcraft-radius-default);
       background: transparent;
       color: inherit;
       font: inherit;
@@ -373,11 +373,11 @@ const previewState = computed<SelectionBorderState>(() => ({
       cursor: pointer;
 
       &:hover:not(:disabled) .cell-format-border-panel__preset-icon {
-        background: var(--idea-icon-button-hover-bg);
+        background: var(--sheetcraft-icon-button-hover-bg);
       }
 
       &:disabled {
-        color: var(--idea-text-muted);
+        color: var(--sheetcraft-text-muted);
         opacity: 0.45;
         cursor: not-allowed;
       }
@@ -388,15 +388,15 @@ const previewState = computed<SelectionBorderState>(() => ({
     place-items: center;
     width: 48px;
     height: 48px;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
-    background: var(--idea-surface-panel);
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-default);
+    background: var(--sheetcraft-surface-panel);
   }
   &__hint {
     margin: 0;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
 }
 @media (max-width: 560px) {
@@ -409,7 +409,7 @@ const previewState = computed<SelectionBorderState>(() => ({
       gap: 4px 12px;
       padding: 0 0 16px;
       border-right: 0;
-      border-bottom: 1px solid var(--idea-border-subtle);
+      border-bottom: 1px solid var(--sheetcraft-border-subtle);
 
       > h3 {
         grid-column: 1 / -1;

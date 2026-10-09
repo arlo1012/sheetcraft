@@ -1,5 +1,5 @@
-import type { ExcelDateSystem } from "@idea10/core/formula";
-import type { SheetFilterCondition, SheetFilterValueCondition } from "@idea10/core/workbook";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
+import type { SheetFilterCondition, SheetFilterValueCondition } from "@sheetcraft/core/workbook";
 import {
   buildFilterCondition,
   createFilterConditionDraft,

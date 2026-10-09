@@ -1,6 +1,6 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { getCellValue } from "@idea10/core/workbook";
+import { getCellValue } from "@sheetcraft/core/workbook";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { getCanvasLayout, mountSheetGrid, triggerCell } from "./fixture";
 

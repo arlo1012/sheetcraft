@@ -69,7 +69,7 @@ function position(page: PageViewPaintState["pages"][number]) {
     pointer-events: auto;
     &:hover,
     &:focus-visible {
-      background: color-mix(in srgb, var(--idea-action-primary) 10%, transparent);
+      background: color-mix(in srgb, var(--sheetcraft-action-primary) 10%, transparent);
     }
   }
 }

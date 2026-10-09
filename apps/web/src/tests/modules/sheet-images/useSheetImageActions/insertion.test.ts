@@ -4,8 +4,8 @@ import {
   getActiveSheet,
   setCellContent,
   type FloatingImage,
-} from "@idea10/core/workbook";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { useSheetImageActions } from "../../../../modules/sheet-images/useSheetImageActions";
 import { prepareImageAsset } from "../../../../modules/image-assets/prepareImageAsset";
 import { createMemoryImageAssetStore } from "../../../../modules/image-assets/imageAssetStore";

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { ChartData, SheetChart } from "@idea10/core/sheet-charts";
+import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 import { createChartOption } from "../../../modules/charts/chart-option";
 const chart: SheetChart = {
   type: "column",

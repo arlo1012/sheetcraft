@@ -1,6 +1,6 @@
 import { strFromU8, unzipSync } from "fflate/browser";
-import { createSheet, createWorkbook, getActiveSheet } from "@idea10/core/workbook";
-import { serializeWorkbook } from "@idea10/core/serialization";
+import { createSheet, createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import { describe, expect, test } from "vitest";
 import { encodeXlsx } from "../../index.js";
 

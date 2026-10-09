@@ -1,7 +1,7 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
-import { createSheet } from "@idea10/core/workbook";
+import { createSheet } from "@sheetcraft/core/workbook";
 import WorkbookSheetNavigator from "../../../../../modules/workbook/components/WorkbookSheetNavigator.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 

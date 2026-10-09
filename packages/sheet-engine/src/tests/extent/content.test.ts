@@ -8,8 +8,8 @@ import {
   setCellStyle,
   setColumnWidth,
   setRowHeight,
-} from "@idea10/core/workbook";
-import type { SheetPivotTable } from "@idea10/core/pivot-tables";
+} from "@sheetcraft/core/workbook";
+import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import { getSheetContentExtent } from "../../extent.js";
 
 function createTestSheet() {

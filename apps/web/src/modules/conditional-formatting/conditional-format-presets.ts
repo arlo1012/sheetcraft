@@ -1,7 +1,7 @@
 import type {
   ConditionalFormatCondition,
   ConditionalFormatIconSet,
-} from "@idea10/core/conditional-formatting";
+} from "@sheetcraft/core/conditional-formatting";
 
 const BAR_COLORS = {
   Blue: "#638EC6",

@@ -110,7 +110,7 @@ function toggleMenu(): void {
 @use "./ribbon-actions" as ribbon;
 
 .ribbon-split-button {
-  --ribbon-icon-size: var(--idea-action-icon-size);
+  --ribbon-icon-size: var(--sheetcraft-action-icon-size);
   position: relative;
   display: inline-flex;
   flex: 0 0 auto;
@@ -118,14 +118,14 @@ function toggleMenu(): void {
   width: var(--ribbon-split-button-width, 40px);
   height: var(--ribbon-control-height, 26px);
   padding: 0;
-  border-radius: var(--idea-radius-default);
+  border-radius: var(--sheetcraft-radius-default);
 
   &:has(> [aria-disabled="false"]:hover)::after,
   &:has(> [aria-expanded="true"][aria-disabled="false"])::after {
     position: absolute;
     inset: 1px;
-    border-radius: var(--idea-radius-default);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--idea-text-primary) 14%, transparent);
+    border-radius: var(--sheetcraft-radius-default);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sheetcraft-text-primary) 14%, transparent);
     content: "";
     pointer-events: none;
   }
@@ -143,7 +143,7 @@ function toggleMenu(): void {
     --ribbon-feedback-inset: 1px 0 1px 1px;
 
     &::before {
-      border-radius: var(--idea-radius-default) 0 0 var(--idea-radius-default);
+      border-radius: var(--sheetcraft-radius-default) 0 0 var(--sheetcraft-radius-default);
     }
   }
 
@@ -158,19 +158,19 @@ function toggleMenu(): void {
     padding-right: 1px;
 
     &::before {
-      border-radius: 0 var(--idea-radius-default) var(--idea-radius-default) 0;
+      border-radius: 0 var(--sheetcraft-radius-default) var(--sheetcraft-radius-default) 0;
     }
   }
 
   &.is-tall {
-    --ribbon-icon-size: var(--idea-ribbon-large-icon-size);
+    --ribbon-icon-size: var(--sheetcraft-ribbon-large-icon-size);
     @include ribbon.tall-content;
     align-items: stretch;
     justify-items: stretch;
     align-self: stretch;
     width: max-content;
     min-width: var(--ribbon-tall-action-min-width, 48px);
-    height: var(--idea-ribbon-content-height, 54px);
+    height: var(--sheetcraft-ribbon-content-height, 54px);
     padding: 0;
 
     &:has(> [aria-pressed="true"][aria-disabled="false"])::after,
@@ -179,8 +179,9 @@ function toggleMenu(): void {
     &:has(> [aria-disabled="false"]:active)::after {
       position: absolute;
       inset: 1px;
-      border-radius: var(--idea-radius-default);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--idea-text-primary) 14%, transparent);
+      border-radius: var(--sheetcraft-radius-default);
+      box-shadow: inset 0 0 0 1px
+        color-mix(in srgb, var(--sheetcraft-text-primary) 14%, transparent);
       content: "";
       pointer-events: none;
     }
@@ -195,17 +196,17 @@ function toggleMenu(): void {
       padding: 0 6px;
 
       &::before {
-        border-radius: var(--idea-radius-default) var(--idea-radius-default) 0 0;
+        border-radius: var(--sheetcraft-radius-default) var(--sheetcraft-radius-default) 0 0;
       }
     }
 
     .ribbon-split-button__menu {
       gap: 2px;
       padding: 0 6px;
-      border-radius: 0 0 var(--idea-radius-default) var(--idea-radius-default);
+      border-radius: 0 0 var(--sheetcraft-radius-default) var(--sheetcraft-radius-default);
 
       &::before {
-        border-radius: 0 0 var(--idea-radius-default) var(--idea-radius-default);
+        border-radius: 0 0 var(--sheetcraft-radius-default) var(--sheetcraft-radius-default);
       }
     }
   }
@@ -221,7 +222,7 @@ function toggleMenu(): void {
     background: transparent;
     border: 0;
     border-radius: 2px;
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
     cursor: pointer;
     font: inherit;
     outline: none;
@@ -232,7 +233,7 @@ function toggleMenu(): void {
 
   &__main {
     flex: 1 1 auto;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     padding: 0 3px;
   }
 

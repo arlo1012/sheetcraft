@@ -1,4 +1,4 @@
-import { createWorkbook, getActiveSheet, setCellContent } from "@idea10/core/workbook";
+import { createWorkbook, getActiveSheet, setCellContent } from "@sheetcraft/core/workbook";
 import { describe, expect, test } from "vitest";
 import { createFormulaCacheEligibility } from "../formula-cache.js";
 

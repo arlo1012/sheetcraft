@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { createSheetEvaluator, createWorkbook, getActiveSheet } from "@idea10/core/workbook";
-import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
+import { createSheetEvaluator, createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
+import { DEFAULT_SHEET_PAGE_SETUP } from "@sheetcraft/core/page-setup";
 import { createPrintPreviewDocument } from "../../../modules/page-layout/page-print-renderer";
 
 function documentFor(setup = DEFAULT_SHEET_PAGE_SETUP) {

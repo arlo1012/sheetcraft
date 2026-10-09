@@ -1,4 +1,4 @@
-import type { CellStyle } from "@idea10/core/style";
+import type { CellStyle } from "@sheetcraft/core/style";
 import { describe, expect, test } from "vitest";
 import { paintGridLines } from "../../../../../modules/sheet-grid/canvas/grid-line-painter";
 

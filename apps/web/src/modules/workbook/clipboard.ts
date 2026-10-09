@@ -1,1 +1,1 @@
-export { getCellMatrixSize } from "@idea10/core/clipboard";
+export { getCellMatrixSize } from "@sheetcraft/core/clipboard";

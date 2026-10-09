@@ -1,9 +1,9 @@
 import { defineComponent, reactive, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { createWorkbookSession } from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { getActiveSheet } from "@idea10/core/workbook";
+import { createWorkbookSession } from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { getActiveSheet } from "@sheetcraft/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useSimulationController } from "../../../../modules/data-tools/useSimulationController";
 

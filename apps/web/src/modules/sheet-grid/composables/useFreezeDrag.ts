@@ -1,10 +1,10 @@
 import { ref } from "vue";
-import type { FreezePanes, SheetDimensionAxis } from "@idea10/core/workbook";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { FreezePanes, SheetDimensionAxis } from "@sheetcraft/core/workbook";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import {
   getViewportAxisBoundary,
   getViewportAxisBoundaryOffset,
-} from "@idea10/sheet-engine/axis-interactions";
+} from "@sheetcraft/sheet-engine/axis-interactions";
 import {
   startPointerSession,
   type PointerSession,

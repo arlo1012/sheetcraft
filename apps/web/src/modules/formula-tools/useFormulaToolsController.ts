@@ -1,4 +1,4 @@
-import { canEditCell } from "@idea10/core";
+import { canEditCell } from "@sheetcraft/core";
 import { computed, nextTick, ref } from "vue";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import {
@@ -10,9 +10,9 @@ import {
   type DefinedNameLabelPosition,
   type DefinedNameDraft,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import { findAutoSumRange, formatFormulaAddress } from "@idea10/core/formula";
-import { formatCellContentForInput } from "@idea10/core/input";
+} from "@sheetcraft/core/commands";
+import { findAutoSumRange, formatFormulaAddress } from "@sheetcraft/core/formula";
+import { formatCellContentForInput } from "@sheetcraft/core/input";
 import {
   getActiveSheet,
   getCellContent,
@@ -21,7 +21,7 @@ import {
   type SheetEvaluator,
   type WorkbookCalculationSettings,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { getNamedRangeValue } from "./named-range-values";
 import type { CellEditSession } from "../../shared/cell-editing/useCellEditSession";
 import { useAppI18n } from "../../shared/i18n";

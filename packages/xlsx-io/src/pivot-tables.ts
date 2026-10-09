@@ -1,10 +1,10 @@
 import { fromExcelNumberFormat, builtinNumberFormat } from "./number-format.js";
-import type { CellNumberFormat } from "@idea10/core/style";
+import type { CellNumberFormat } from "@sheetcraft/core/style";
 import { nativePivotGroupXml, nativePivotDateTime } from "./pivot-native-groups.js";
 import { createPivotNumberFormatReader } from "./pivot-number-formats.js";
-import type { SheetPivotTable } from "@idea10/core/pivot-tables";
+import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import { strFromU8, strToU8, unzipSync } from "fflate/browser";
-import type { Workbook } from "@idea10/core/workbook";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import { createPivotCache, cacheDefinitionXml, cacheRecordsXml } from "./pivot-cache.js";
 import { pivotTableXml } from "./pivot-table-writer.js";
 import { readPivotTable } from "./pivot-table-reader.js";

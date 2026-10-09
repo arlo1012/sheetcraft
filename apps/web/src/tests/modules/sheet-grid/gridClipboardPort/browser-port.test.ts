@@ -4,7 +4,7 @@ import {
   WEB_FLOATING_IMAGE_CLIPBOARD_TYPE,
 } from "../../../../modules/sheet-grid/gridClipboardPort";
 
-const WEB_IDEA10_CLIPBOARD_TYPE = "web application/x-idea10-cells";
+const WEB_SHEETCRAFT_CLIPBOARD_TYPE = "web application/x-idea10-cells";
 
 function stubClipboard(clipboard: Partial<Clipboard>): void {
   vi.stubGlobal("navigator", { clipboard });
@@ -39,7 +39,7 @@ function stubLegacyPaste(text: string): () => void {
 
 function createRichClipboardItem(text: string, token: string) {
   return {
-    types: ["text/plain", WEB_IDEA10_CLIPBOARD_TYPE],
+    types: ["text/plain", WEB_SHEETCRAFT_CLIPBOARD_TYPE],
     getType: vi.fn(async (type: string) =>
       type === "text/plain"
         ? new Blob([text], { type: "text/plain" })
@@ -173,7 +173,7 @@ describe("browser grid clipboard port", () => {
 
   test("preserves text and the local token from a custom clipboard item", async () => {
     const item = {
-      types: ["text/plain", WEB_IDEA10_CLIPBOARD_TYPE],
+      types: ["text/plain", WEB_SHEETCRAFT_CLIPBOARD_TYPE],
       getType: vi.fn(async (type: string) =>
         type === "text/plain"
           ? new Blob(["cell value"], { type: "text/plain" })

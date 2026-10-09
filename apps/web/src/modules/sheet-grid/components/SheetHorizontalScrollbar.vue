@@ -181,12 +181,12 @@ function onWheel(event: WheelEvent): void {
     place-items: center;
     border: 0;
     border-radius: 2px;
-    color: var(--idea-text-muted);
+    color: var(--sheetcraft-text-muted);
     background: transparent;
     cursor: pointer;
 
     &[aria-disabled="true"] {
-      color: var(--idea-text-disabled);
+      color: var(--sheetcraft-text-disabled);
       cursor: default;
     }
   }
@@ -205,7 +205,7 @@ function onWheel(event: WheelEvent): void {
     }
 
     &:focus-visible .sheet-horizontal-scrollbar__thumb::after {
-      background: var(--idea-sheet-bar-thumb-hover);
+      background: var(--sheetcraft-sheet-bar-thumb-hover);
     }
   }
 
@@ -222,18 +222,18 @@ function onWheel(event: WheelEvent): void {
       left: 0;
       height: 8px;
       border-radius: 999px;
-      background: var(--idea-sheet-bar-thumb);
+      background: var(--sheetcraft-sheet-bar-thumb);
       content: "";
     }
   }
 
   &__thumb:hover::after,
   &__track.is-dragging &__thumb::after {
-    background: var(--idea-sheet-bar-thumb-hover);
+    background: var(--sheetcraft-sheet-bar-thumb-hover);
   }
 
   &__track.is-disabled &__thumb::after {
-    background: var(--idea-text-disabled);
+    background: var(--sheetcraft-text-disabled);
   }
 }
 </style>

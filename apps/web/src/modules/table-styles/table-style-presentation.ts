@@ -3,13 +3,13 @@ import {
   resolveTableCellStyle,
   type TableStyleDefinition,
   type TableStyleElement,
-} from "@idea10/core/table-styles";
+} from "@sheetcraft/core/table-styles";
 import type { CSSProperties } from "vue";
 import type {
   PivotTableStyleDefinition,
   PivotTableStyleElement,
-} from "@idea10/core/pivot-table-styles";
-import { mergeCellStyle, type CellStyle } from "@idea10/core/style";
+} from "@sheetcraft/core/pivot-table-styles";
+import { mergeCellStyle, type CellStyle } from "@sheetcraft/core/style";
 import { getCellFillStyle } from "../../shared/cell-fill/fill-presentation";
 import { getCellTextDecorationStyle } from "../../shared/cell-text/font-presentation";
 

@@ -4,8 +4,8 @@ import type {
   ConditionalFormatIconSet,
   ConditionalFormatIconThreshold,
   ConditionalFormatThreshold,
-} from "@idea10/core/conditional-formatting";
-import { getConditionalFormatIcon } from "@idea10/core/conditional-formatting";
+} from "@sheetcraft/core/conditional-formatting";
+import { getConditionalFormatIcon } from "@sheetcraft/core/conditional-formatting";
 import { Option as TOption, Select as TSelect } from "tdesign-vue-next/es/select";
 import { computed } from "vue";
 import { iconSetPresetTiles } from "../conditional-format-presets";
@@ -245,7 +245,7 @@ function iconLabel(icon: Exclude<IconChoice, null>): string {
   h4 {
     margin: 0;
     font: inherit;
-    font-weight: var(--idea-font-weight-semibold);
+    font-weight: var(--sheetcraft-font-weight-semibold);
   }
   &__table {
     display: grid;
@@ -265,7 +265,7 @@ function iconLabel(icon: Exclude<IconChoice, null>): string {
   }
   &__header {
     min-height: 20px;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__row {
     min-height: 28px;
@@ -287,7 +287,7 @@ function iconLabel(icon: Exclude<IconChoice, null>): string {
     grid-column: 2 / -1;
   }
   &__no-icon {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__legacy-value {
     padding-inline: 8px;

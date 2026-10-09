@@ -1,7 +1,7 @@
 import { computed, onScopeDispose, ref, watch, type ComputedRef, type Ref } from "vue";
-import { WorkbookDomainError } from "@idea10/core/errors";
-import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
-import { createWorkbook, type Workbook } from "@idea10/core/workbook";
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
+import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
+import { createWorkbook, type Workbook } from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { WorkbookStoreError, type PersistedWorkbook, type WorkbookStore } from "./workbookStore";
 

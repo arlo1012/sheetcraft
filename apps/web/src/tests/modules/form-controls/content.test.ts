@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import { createWorkbook, getActiveSheet, createSheetEvaluator } from "@idea10/core/workbook";
+import { createWorkbook, getActiveSheet, createSheetEvaluator } from "@sheetcraft/core/workbook";
 import FormControlContent from "../../../modules/form-controls/components/FormControlContent.vue";
 import { controlDrawing } from "./fixture";
 const mounted: Array<{ unmount(): void }> = [];

@@ -1,7 +1,7 @@
 import { paintSparkline } from "../../sparklines/sparkline-painter";
-import type { CellAddress } from "@idea10/core/workbook";
-import type { Rect } from "@idea10/sheet-engine/geometry";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { CellAddress } from "@sheetcraft/core/workbook";
+import type { Rect } from "@sheetcraft/sheet-engine/geometry";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import { paintCellFill } from "./cell-fill-painter";
 import { paintConditionalFormatVisual } from "../../../shared/conditional-formatting/conditional-format-painter";
 import { paintCellText } from "./cell-text-painter";

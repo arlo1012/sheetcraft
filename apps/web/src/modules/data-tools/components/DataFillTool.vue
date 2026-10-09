@@ -12,7 +12,7 @@ import {
   Trophy,
   WandSparkles,
 } from "lucide-vue-next";
-import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
+import type { FillDirection } from "@sheetcraft/sheet-engine/fill-selection";
 import { computed, ref, useId } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";

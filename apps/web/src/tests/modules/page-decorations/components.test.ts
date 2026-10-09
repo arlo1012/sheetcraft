@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { DOMWrapper, mount } from "@vue/test-utils";
-import { DEFAULT_SHEET_WATERMARK } from "@idea10/core/page-decoration";
+import { DEFAULT_SHEET_WATERMARK } from "@sheetcraft/core/page-decoration";
 import { createAppI18n } from "../../../shared/i18n";
 import PageWatermarkMenu from "../../../modules/page-decorations/components/PageWatermarkMenu.vue";
 

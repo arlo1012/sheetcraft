@@ -4,16 +4,20 @@ import {
   createApplyCellStyleCommand,
   createSetWorkbookCellStylesCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import type { CellStyleDefinition } from "@idea10/core/cell-styles";
-import { cloneCellStyle, createClearCellStylePatch, type CellStylePatch } from "@idea10/core/style";
+} from "@sheetcraft/core/commands";
+import type { CellStyleDefinition } from "@sheetcraft/core/cell-styles";
+import {
+  cloneCellStyle,
+  createClearCellStylePatch,
+  type CellStylePatch,
+} from "@sheetcraft/core/style";
 import {
   getCellStyle,
   type CellAddress,
   type CellRange,
   type Sheet,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import {

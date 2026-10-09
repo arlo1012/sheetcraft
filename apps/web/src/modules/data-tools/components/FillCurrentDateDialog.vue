@@ -83,7 +83,7 @@ const sample = computed(() => formatFillDateSample(draft.value.format, draft.val
   @include fill-dialog.subdued-text;
 }
 .fill-dialog__error {
-  color: var(--idea-status-error);
+  color: var(--sheetcraft-status-error);
 }
 .fill-dialog__group {
   @include fill-dialog.group;

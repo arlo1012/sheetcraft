@@ -1,17 +1,17 @@
 import { defineComponent, h, nextTick } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createBuiltinTableStyles,
   createThemedTableStyles,
   resolveTableCellStyle,
   type TableStyleDefinition,
-} from "@idea10/core/table-styles";
-import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
-import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
-import { createWorkbook, getCellContent, setCellContent } from "@idea10/core/workbook";
-import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
+} from "@sheetcraft/core/table-styles";
+import type { PivotTableStyleDefinition } from "@sheetcraft/core/pivot-table-styles";
+import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
+import { createWorkbook, getCellContent, setCellContent } from "@sheetcraft/core/workbook";
+import { createSheetGridViewState } from "@sheetcraft/sheet-engine/view-state";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import { useTableStylesController } from "../../../modules/table-styles/useTableStylesController";
 import { createAppI18n } from "../../../shared/i18n";

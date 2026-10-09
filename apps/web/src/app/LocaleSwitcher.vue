@@ -41,7 +41,7 @@ function onLocaleChange(value: SelectValue): void {
   gap: 4px;
   height: 30px;
   padding: 0 6px;
-  color: var(--idea-text-muted);
+  color: var(--sheetcraft-text-muted);
 
   &__select {
     width: 112px;

@@ -1,7 +1,7 @@
 import { effectScope, ref } from "vue";
 import { describe, expect, test, vi } from "vitest";
-import { createWorkbook, getActiveSheet, setCellContent } from "@idea10/core/workbook";
-import { serializeWorkbook } from "@idea10/core/serialization";
+import { createWorkbook, getActiveSheet, setCellContent } from "@sheetcraft/core/workbook";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import type { ImageAsset, ImageAssetStore } from "../../../../modules/image-assets/imageAssetStore";
 import { useWorkbookXlsxActions } from "../../../../modules/workbook-xlsx/useWorkbookXlsxActions";
 import type { XlsxWorkerPort } from "../../../../modules/workbook-xlsx/workbookXlsxWorker";

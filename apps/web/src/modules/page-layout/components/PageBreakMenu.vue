@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
 import { BetweenHorizontalStart } from "lucide-vue-next";
-import type { CellAddress } from "@idea10/core/workbook";
-import type { SheetPageSetup } from "@idea10/core/page-setup";
-import type { SelectionMode } from "@idea10/sheet-engine/selection";
+import type { CellAddress } from "@sheetcraft/core/workbook";
+import type { SheetPageSetup } from "@sheetcraft/core/page-setup";
+import type { SelectionMode } from "@sheetcraft/sheet-engine/selection";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -86,7 +86,7 @@ function select(action: PageBreakAction): void {
 .page-break-menu {
   @include ribbon.tool;
   &__surface {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
   }
 }
 </style>

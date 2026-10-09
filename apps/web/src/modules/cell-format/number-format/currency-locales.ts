@@ -1,4 +1,4 @@
-import { NUMBER_FORMAT_LOCALES } from "@idea10/core/number-format";
+import { NUMBER_FORMAT_LOCALES } from "@sheetcraft/core/number-format";
 
 /**
  * Currency choices derived from NUMBER_FORMAT_LOCALES, whose current tender

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SelectionBorderState } from "@idea10/core/style-state";
+import type { SelectionBorderState } from "@sheetcraft/core/style-state";
 import CellBorderPresetIcon from "../../../shared/borders/CellBorderPresetIcon.vue";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import { useAppI18n } from "../../../shared/i18n";
@@ -76,7 +76,7 @@ const { t } = useAppI18n();
         <g
           class="cell-format-border-preview__guides"
           fill="none"
-          stroke="var(--idea-border-control)"
+          stroke="var(--sheetcraft-border-control)"
           stroke-width="1"
           vector-effect="non-scaling-stroke"
           aria-hidden="true"
@@ -238,18 +238,18 @@ const { t } = useAppI18n();
       width: 32px;
       height: 32px;
       padding: 0;
-      border: 1px solid var(--idea-border-subtle);
-      border-radius: var(--idea-radius-default);
-      background: var(--idea-surface-panel);
-      color: var(--idea-text-primary);
+      border: 1px solid var(--sheetcraft-border-subtle);
+      border-radius: var(--sheetcraft-radius-default);
+      background: var(--sheetcraft-surface-panel);
+      color: var(--sheetcraft-text-primary);
       cursor: pointer;
       &[aria-pressed="true"] {
-        border-color: var(--idea-action-primary);
-        background: var(--idea-surface-selected);
+        border-color: var(--sheetcraft-action-primary);
+        background: var(--sheetcraft-surface-selected);
       }
       &[aria-pressed="mixed"] {
         border-style: dashed;
-        color: var(--idea-text-muted);
+        color: var(--sheetcraft-text-muted);
       }
 
       &[aria-disabled="true"] {
@@ -262,9 +262,9 @@ const { t } = useAppI18n();
     position: relative;
     min-width: 0;
     overflow: hidden;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
-    background: var(--idea-surface-panel);
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-default);
+    background: var(--sheetcraft-surface-panel);
 
     > svg {
       position: absolute;
@@ -284,7 +284,7 @@ const { t } = useAppI18n();
     grid-template-rows: minmax(0, 1fr);
     place-items: center;
     overflow: hidden;
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
     pointer-events: none;
 
     &.has-rows {

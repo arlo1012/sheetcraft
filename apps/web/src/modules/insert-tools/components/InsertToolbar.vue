@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import PivotInsertTools from "../../pivot-tables/components/PivotInsertTools.vue";
 import ChartInsertTools from "../../charts/components/ChartInsertTools.vue";
-import type { ChartType } from "@idea10/core/sheet-charts";
-import type { SheetGraphicDrawing } from "@idea10/core/sheet-drawings";
+import type { ChartType } from "@sheetcraft/core/sheet-charts";
+import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   Camera,
   PanelsTopLeft,

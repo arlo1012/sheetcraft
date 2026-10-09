@@ -6,9 +6,9 @@ import {
   createSheetEvaluator,
   getActiveSheet,
   setCellValue,
-} from "@idea10/core/workbook";
-import { createWorkbookSession } from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/workbook";
+import { createWorkbookSession } from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   DUPLICATE_ERROR_CHECKS_STORAGE_KEY,
   readDuplicateErrorChecks,

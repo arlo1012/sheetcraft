@@ -3,15 +3,15 @@ import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createSheetEvaluator,
   getActiveSheet,
   getColumnWidth,
   getRowHeight,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { createAxisToolActions } from "../../../../modules/sheet-grid/axis-tool-actions";
 
 function fixture() {

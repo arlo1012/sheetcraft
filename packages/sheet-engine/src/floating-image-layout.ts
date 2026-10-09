@@ -1,4 +1,4 @@
-import type { CellAddress } from "@idea10/core/workbook";
+import type { CellAddress } from "@sheetcraft/core/workbook";
 import type { FrozenPaneId } from "./frozen-layout.js";
 import type { Rect } from "./geometry.js";
 import type { SheetViewportLayout } from "./viewport-layout.js";

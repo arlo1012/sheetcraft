@@ -21,7 +21,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
-import type { Sheet, SheetProperties } from "@idea10/core/workbook";
+import type { Sheet, SheetProperties } from "@sheetcraft/core/workbook";
 import { getVisibleSheets } from "../sheet-navigation";
 import { getSheetTabColorStyles } from "../sheet-tab-color";
 import SheetTabMenu from "./SheetTabMenu.vue";
@@ -598,15 +598,15 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
   align-items: stretch;
   height: 26px;
   min-width: 0;
-  font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
+  font-size: var(--sheetcraft-font-size-body-medium);
+  line-height: var(--sheetcraft-line-height-body-medium);
 
   &__navigation {
     display: flex;
     flex: 0 0 auto;
     align-items: center;
     margin-right: 2px;
-    border-right: 1px solid var(--idea-sheet-bar-border);
+    border-right: 1px solid var(--sheetcraft-sheet-bar-border);
   }
 
   &__viewport {
@@ -643,20 +643,24 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     background: transparent;
     border-top: 2px solid transparent;
     border-radius: 0 0 6px 6px;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
 
     &:hover,
     &:focus-within,
     &.is-menu-open {
-      background: color-mix(in srgb, var(--idea-sheet-bar-surface), var(--idea-text-primary) 8%);
+      background: color-mix(
+        in srgb,
+        var(--sheetcraft-sheet-bar-surface),
+        var(--sheetcraft-text-primary) 8%
+      );
     }
 
     &.is-active {
-      background: var(--idea-surface-panel);
-      color: var(--idea-action-primary);
+      background: var(--sheetcraft-surface-panel);
+      color: var(--sheetcraft-action-primary);
 
       &:hover {
-        background: var(--idea-surface-hover);
+        background: var(--sheetcraft-surface-hover);
       }
     }
 
@@ -688,7 +692,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
       top: 3px;
       bottom: 3px;
       width: 2px;
-      background: var(--idea-action-primary);
+      background: var(--sheetcraft-action-primary);
       content: "";
       pointer-events: none;
     }
@@ -725,7 +729,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     cursor: pointer;
 
     &.is-active {
-      font-weight: var(--idea-font-weight-medium);
+      font-weight: var(--sheetcraft-font-weight-medium);
     }
   }
 
@@ -742,9 +746,9 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
   &__rename-input {
     width: 132px;
-    background: var(--idea-surface-panel);
-    color: var(--idea-text-primary);
-    outline: 1px solid var(--idea-action-primary);
+    background: var(--sheetcraft-surface-panel);
+    color: var(--sheetcraft-text-primary);
+    outline: 1px solid var(--sheetcraft-action-primary);
     outline-offset: -2px;
   }
 
@@ -760,11 +764,11 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     background: transparent;
     border: 0;
     border-radius: 3px;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     cursor: pointer;
 
     &[aria-disabled="true"] {
-      color: var(--idea-text-disabled);
+      color: var(--sheetcraft-text-disabled);
       cursor: default;
     }
   }
@@ -785,7 +789,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
   &__scroll {
     width: 18px;
-    color: var(--idea-text-muted);
+    color: var(--sheetcraft-text-muted);
   }
 }
 </style>

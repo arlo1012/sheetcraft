@@ -1,8 +1,8 @@
 import { effectScope, ref } from "vue";
 import { describe, expect, test, vi } from "vitest";
-import { createWorkbook } from "@idea10/core/workbook";
-import { serializeWorkbook } from "@idea10/core/serialization";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createWorkbook } from "@sheetcraft/core/workbook";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { useWorkbookXlsxActions } from "../../../modules/workbook-xlsx/useWorkbookXlsxActions";
 import type {
   XlsxWorkerFactory,

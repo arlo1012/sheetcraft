@@ -2,8 +2,8 @@ import {
   getPivotPresentation,
   getPivotTableRange,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
-import type { CellAddress } from "@idea10/core/workbook";
+} from "@sheetcraft/core/pivot-tables";
+import type { CellAddress } from "@sheetcraft/core/workbook";
 import type { PivotArea } from "./pivot-field-edits";
 
 /** Resolve the field represented by a report cell, including page and nested row headings. */

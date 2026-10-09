@@ -821,7 +821,7 @@ export const enUS = {
       "Another tab saved a newer copy. Your edits are still here. Export them before reloading the local copy.",
     quota: "There is not enough browser storage to save. Export a JSON file to keep your changes.",
     invalidJson:
-      "This file is not a valid idea10 workbook or uses an unsupported version. The current workbook has not been replaced.",
+      "This file is not a valid Sheetcraft workbook or uses an unsupported version. The current workbook has not been replaced.",
     readFailed: "The file could not be read. The current workbook has not been replaced.",
     exportFailed: "The file could not be exported. Your workbook is still here.",
     exportStarted: "JSON download started.",
@@ -840,7 +840,7 @@ export const enUS = {
     cancel: "Cancel",
   },
   app: {
-    workspace: "idea10 workspace",
+    workspace: "Sheetcraft workspace",
     language: "Language",
     localeChinese: "Chinese",
     localeEnglish: "English",

@@ -216,17 +216,17 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
 <style scoped lang="scss">
 .data-table-dialog {
   display: grid;
-  gap: var(--idea-space-3);
+  gap: var(--sheetcraft-space-3);
 
   &__inputs {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--idea-space-3);
+    gap: var(--sheetcraft-space-3);
   }
 
   &__field {
     display: grid;
-    gap: var(--idea-space-1);
+    gap: var(--sheetcraft-space-1);
     min-width: 0;
 
     span {
@@ -238,11 +238,11 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
   &__recalculation,
   &__preview p {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 
   &__hint {
-    padding-top: var(--idea-space-1);
+    padding-top: var(--sheetcraft-space-1);
   }
 
   &__footer {
@@ -264,9 +264,9 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
 
   &__preview {
     display: grid;
-    gap: var(--idea-space-2);
-    border-top: 1px solid var(--idea-border-subtle);
-    padding-top: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
+    border-top: 1px solid var(--sheetcraft-border-subtle);
+    padding-top: var(--sheetcraft-space-2);
   }
 
   &__preview-heading {
@@ -274,14 +274,14 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
     flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
 
     strong {
       font-weight: 600;
     }
 
     span {
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
       font-variant-numeric: tabular-nums;
     }
   }
@@ -293,7 +293,7 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
 
   &__error {
     margin: 0;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 

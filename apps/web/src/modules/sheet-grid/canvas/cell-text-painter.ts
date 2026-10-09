@@ -1,5 +1,5 @@
-import type { CellStyle } from "@idea10/core/style";
-import { getCellTextGraphemes } from "@idea10/sheet-engine/text-layout";
+import type { CellStyle } from "@sheetcraft/core/style";
+import { getCellTextGraphemes } from "@sheetcraft/sheet-engine/text-layout";
 import type { CellTextLayout, CellTextLine } from "../../../shared/cell-text/text-presentation";
 
 type FontMetrics = Readonly<{ ascent: number; descent: number }>;

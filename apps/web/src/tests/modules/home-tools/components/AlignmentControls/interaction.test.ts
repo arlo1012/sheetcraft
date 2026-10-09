@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import HorizontalAlignmentControls from "../../../../../modules/home-tools/components/HorizontalAlignmentControls.vue";
 import IndentationControls from "../../../../../modules/home-tools/components/IndentationControls.vue";
 import VerticalAlignmentControls from "../../../../../modules/home-tools/components/VerticalAlignmentControls.vue";

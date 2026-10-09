@@ -11,7 +11,7 @@ import {
   TextAlignCenter,
 } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
-import type { CellMergeMode } from "@idea10/core/commands";
+import type { CellMergeMode } from "@sheetcraft/core/commands";
 import { useSubmenu } from "../../../shared/menu/useSubmenu";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -245,10 +245,10 @@ function onMenuFocusin(event: FocusEvent): void {
 }
 
 .merge-cells-menu {
-  z-index: var(--idea-layer-menu);
+  z-index: var(--sheetcraft-layer-menu);
 
   &--same {
-    z-index: var(--idea-layer-submenu);
+    z-index: var(--sheetcraft-layer-submenu);
   }
 }
 </style>

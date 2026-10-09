@@ -10,10 +10,10 @@ import {
   type PivotValueField,
   type PivotDisplayType,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
-import type { FormulaValue } from "@idea10/core/formula";
-import { isFormulaError } from "@idea10/core/formula";
-import type { CellFormatChange } from "@idea10/core/commands";
+} from "@sheetcraft/core/pivot-tables";
+import type { FormulaValue } from "@sheetcraft/core/formula";
+import { isFormulaError } from "@sheetcraft/core/formula";
+import type { CellFormatChange } from "@sheetcraft/core/commands";
 import OptionList from "../../../shared/option-list/OptionList.vue";
 import CellFormatDialog from "../../cell-format/components/CellFormatDialog.vue";
 import {
@@ -207,11 +207,11 @@ function confirmFormat(change: CellFormatChange): void {
 .pivot-value-settings__panel {
   margin-top: 12px;
   padding: 12px;
-  border: 1px solid var(--idea-border-subtle);
+  border: 1px solid var(--sheetcraft-border-subtle);
   border-radius: 6px;
   p {
     margin: 0 0 8px;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   :deep(.option-list) {
     height: 214px;

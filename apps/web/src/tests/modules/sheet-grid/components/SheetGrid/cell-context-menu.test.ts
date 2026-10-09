@@ -1,6 +1,6 @@
 import { DOMWrapper } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
-import { getCellValue, setCellNote, setCellValue } from "@idea10/core/workbook";
+import { getCellValue, setCellNote, setCellValue } from "@sheetcraft/core/workbook";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import {
   activeCell,

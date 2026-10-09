@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { createSheet, setCellStyle } from "@idea10/core/workbook";
-import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
-import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
+import { createSheet, setCellStyle } from "@sheetcraft/core/workbook";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import {
   resolveVisibleBorderSegments,
   resolveVisibleDiagonalBorderSegments,

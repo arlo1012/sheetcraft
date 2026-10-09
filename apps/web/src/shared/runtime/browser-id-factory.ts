@@ -1,4 +1,4 @@
-import type { IdFactory } from "@idea10/core/runtime";
+import type { IdFactory } from "@sheetcraft/core/runtime";
 
 export function createBrowserIdFactory(): IdFactory {
   let sequence = 0;

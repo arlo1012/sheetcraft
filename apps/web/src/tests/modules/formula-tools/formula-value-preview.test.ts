@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createSheet,
   createWorkbook,
@@ -7,7 +7,7 @@ import {
   getActiveSheet,
   setCellContent,
   setCellStyle,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { previewFormulaInput } from "../../../modules/formula-tools/formula-value-preview";
 
 function createPreviewWorkbook() {

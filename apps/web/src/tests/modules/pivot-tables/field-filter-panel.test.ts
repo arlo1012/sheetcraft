@@ -1,7 +1,7 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import { setCellContent } from "@idea10/core/workbook";
-import type { SheetPivotTable } from "@idea10/core/pivot-tables";
+import { setCellContent } from "@sheetcraft/core/workbook";
+import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import PivotValueFilterDialog from "../../../modules/pivot-tables/components/PivotValueFilterDialog.vue";
 import PivotFieldFilterPanel from "../../../modules/pivot-tables/components/PivotFieldFilterPanel.vue";
 import PivotFieldFilterConditions from "../../../modules/pivot-tables/components/PivotFieldFilterConditions.vue";

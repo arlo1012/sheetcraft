@@ -4,20 +4,20 @@ import { afterEach, describe, expect, test } from "vitest";
 import {
   createSheetFilterHiddenRowIntervals,
   createSetCellContentCommand,
-} from "@idea10/core/commands";
+} from "@sheetcraft/core/commands";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createSheet,
   createWorkbookEvaluator,
   getActiveSheet,
   getCellContent,
   insertSheet,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useDataToolsController } from "../../../../modules/data-tools/useDataToolsController";
 import type { AdvancedFilterDraft } from "../../../../modules/data-tools/data-tools-types";
 import { createAppI18n } from "../../../../shared/i18n";

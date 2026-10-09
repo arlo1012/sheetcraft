@@ -1,5 +1,5 @@
-import type { Workbook } from "@idea10/core/workbook";
-import type { ImageTransform } from "@idea10/core/workbook";
+import type { Workbook } from "@sheetcraft/core/workbook";
+import type { ImageTransform } from "@sheetcraft/core/workbook";
 
 export type AbortSignalLike = Readonly<{ aborted: boolean }>;
 

@@ -253,11 +253,11 @@ watch(
 .consolidate-dialog {
   display: grid;
   grid-template-columns: 144px minmax(0, 1fr);
-  gap: var(--idea-space-4);
+  gap: var(--sheetcraft-space-4);
   &__functions {
     display: flex;
     flex-direction: column;
-    gap: var(--idea-space-1);
+    gap: var(--sheetcraft-space-1);
     min-width: 0;
   }
   &__function-list {
@@ -266,16 +266,16 @@ watch(
   &__settings {
     display: flex;
     flex-direction: column;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     min-width: 0;
   }
   &__field,
   &__labels {
     display: grid;
-    gap: var(--idea-space-1);
+    gap: var(--sheetcraft-space-1);
   }
   &__labels {
-    margin-top: var(--idea-space-1);
+    margin-top: var(--sheetcraft-space-1);
   }
   &__heading {
     font-weight: 600;
@@ -284,13 +284,13 @@ watch(
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__actions,
   &__checks {
     display: flex;
     align-items: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__references {
     display: flex;
@@ -302,36 +302,36 @@ watch(
     height: 104px;
   }
   &__preview {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     summary {
       cursor: pointer;
     }
     p {
-      margin: var(--idea-space-1) 0;
+      margin: var(--sheetcraft-space-1) 0;
     }
   }
   &__sample {
-    border: 1px solid var(--idea-border-subtle);
+    border: 1px solid var(--sheetcraft-border-subtle);
   }
   &__sample-row {
     display: grid;
     span {
-      padding: var(--idea-space-1);
+      padding: var(--sheetcraft-space-1);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      border-right: 1px solid var(--idea-border-subtle);
+      border-right: 1px solid var(--sheetcraft-border-subtle);
     }
   }
   &__error {
     margin: 0;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 @media (max-width: 560px) {
   .consolidate-dialog {
     grid-template-columns: 112px minmax(0, 1fr);
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     &__checks {
       flex-wrap: wrap;
     }

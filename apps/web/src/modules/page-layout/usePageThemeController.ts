@@ -1,5 +1,5 @@
-import { createSetWorkbookThemeCommand, type WorkbookCommand } from "@idea10/core/commands";
-import type { WorkbookTheme } from "@idea10/core/workbook-theme";
+import { createSetWorkbookThemeCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { nextTick } from "vue";
 
 export function usePageThemeController(options: {

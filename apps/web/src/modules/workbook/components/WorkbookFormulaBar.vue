@@ -6,8 +6,8 @@ import { vNativeControl } from "../../../shared/tdesign/native-control";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import { isCellEditSessionTarget } from "../../../shared/cell-editing/cell-edit-focus";
-import type { CellAddress, CellRange } from "@idea10/core/workbook";
-import { getCellAddressLabel } from "@idea10/core/coordinates";
+import type { CellAddress, CellRange } from "@sheetcraft/core/workbook";
+import { getCellAddressLabel } from "@sheetcraft/core/coordinates";
 import FormulaInputAssist from "../../../shared/formula-editing/FormulaInputAssist.vue";
 import FormulaTextOverlay from "../../../shared/formula-editing/FormulaTextOverlay.vue";
 import { getFormulaReferenceTokens } from "../../../shared/formula-editing/formula-reference-tokens";
@@ -537,16 +537,16 @@ defineExpose({
 <style scoped lang="scss">
 .workbook-formula-bar {
   --formula-bar-action-size: var(--td-comp-size-m);
-  --formula-bar-action-gap: var(--idea-space-2);
+  --formula-bar-action-gap: var(--sheetcraft-space-2);
 
   display: grid;
   grid-template-columns: 80px minmax(0, 1fr) 1px var(--formula-bar-action-size);
   gap: var(--formula-bar-action-gap);
   align-items: center;
   min-width: 0;
-  padding: var(--idea-space-2) var(--idea-space-4);
-  background: var(--idea-surface-secondary);
-  border-bottom: 1px solid var(--idea-border-control);
+  padding: var(--sheetcraft-space-2) var(--sheetcraft-space-4);
+  background: var(--sheetcraft-surface-secondary);
+  border-bottom: 1px solid var(--sheetcraft-border-control);
 
   &__editor {
     display: grid;
@@ -576,7 +576,7 @@ defineExpose({
     gap: var(--formula-bar-action-gap);
     align-items: center;
     height: var(--formula-bar-action-size);
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 
   &__action {
@@ -586,12 +586,12 @@ defineExpose({
     padding: calc((var(--formula-bar-action-size) - 15px) / 2);
     flex: none;
     cursor: pointer;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     outline: none;
 
     &:hover,
     &[aria-pressed="true"] {
-      color: var(--idea-text-primary);
+      color: var(--sheetcraft-text-primary);
     }
 
     &[aria-disabled="true"] {
@@ -619,12 +619,12 @@ defineExpose({
   &__search-divider {
     align-self: center;
     height: 16px;
-    background: var(--idea-border-control);
+    background: var(--sheetcraft-border-control);
   }
 
   @media (max-width: 520px) {
     grid-template-columns: 72px minmax(0, 1fr) 1px var(--formula-bar-action-size);
-    padding-inline: var(--idea-space-2);
+    padding-inline: var(--sheetcraft-space-2);
   }
 }
 </style>

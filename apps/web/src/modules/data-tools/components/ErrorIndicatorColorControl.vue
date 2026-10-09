@@ -17,7 +17,7 @@ const panelSurfaceRef = ref<InstanceType<typeof FloatingPanelSurface> | null>(nu
 const panelRef = computed(() => panelSurfaceRef.value?.rootElement ?? null);
 const open = ref(false);
 const panelId = `error-indicator-color-${useId().replaceAll(":", "")}`;
-const color = computed(() => props.modelValue ?? "var(--idea-status-success)");
+const color = computed(() => props.modelValue ?? "var(--sheetcraft-status-success)");
 const valueLabel = computed(() => props.modelValue?.toUpperCase() ?? props.automaticLabel);
 const { floatingStyles, dismiss } = useDismissibleFloatingPanel(triggerRef, panelRef, open, {
   offset: 4,
@@ -99,35 +99,35 @@ watch(
   &__trigger {
     display: inline-flex;
     align-items: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     min-width: 136px;
     min-height: 28px;
     justify-content: space-between;
-    padding: 0 var(--idea-space-3);
-    color: var(--idea-text-primary);
+    padding: 0 var(--sheetcraft-space-3);
+    color: var(--sheetcraft-text-primary);
     font: inherit;
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-default);
+    background: var(--sheetcraft-surface-panel);
+    border: 1px solid var(--sheetcraft-border-control);
+    border-radius: var(--sheetcraft-radius-default);
   }
   &__trigger:hover:not(:disabled) {
-    background: var(--idea-surface-hover);
+    background: var(--sheetcraft-surface-hover);
   }
 
   &__trigger:disabled {
-    color: var(--idea-text-disabled);
+    color: var(--sheetcraft-text-disabled);
     cursor: not-allowed;
   }
   &__value {
     display: inline-flex;
     align-items: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__swatch {
     width: 14px;
     height: 14px;
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-small);
+    border: 1px solid var(--sheetcraft-border-control);
+    border-radius: var(--sheetcraft-radius-small);
   }
 }
 </style>

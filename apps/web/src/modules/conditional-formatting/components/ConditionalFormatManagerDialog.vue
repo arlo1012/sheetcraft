@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
+import type { SheetConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -398,7 +398,7 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
   grid-template-rows: auto minmax(0, 1fr);
   height: min(340px, calc(100dvh - 180px));
   min-height: 0;
-  gap: var(--idea-space-4);
+  gap: var(--sheetcraft-space-4);
   &__scope {
     display: flex;
     align-items: center;
@@ -413,7 +413,7 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
   }
   &__error {
     margin: 0;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

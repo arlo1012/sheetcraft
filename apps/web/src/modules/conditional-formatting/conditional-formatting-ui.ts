@@ -3,14 +3,14 @@ import {
   type ConditionalFormatOperand,
   type ConditionalFormatTextOperand,
   type SheetConditionalFormatRule,
-} from "@idea10/core/conditional-formatting";
-import { formatCellAddress } from "@idea10/core/coordinates";
+} from "@sheetcraft/core/conditional-formatting";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   type CellAddress,
   type CellRange,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 
 export type ConditionalFormatValueOperand = ConditionalFormatOperand;
 

@@ -1,7 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
-import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
-import type { CellStylePatch } from "@idea10/core/style";
+import { createDefaultSelectionCellStyleState } from "@sheetcraft/core/style-state";
+import type { CellStylePatch } from "@sheetcraft/core/style";
 import CellFormatNumberPanel from "../../../../../modules/cell-format/components/CellFormatNumberPanel.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 

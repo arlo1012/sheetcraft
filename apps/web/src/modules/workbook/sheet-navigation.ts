@@ -1,4 +1,4 @@
-import type { Sheet } from "@idea10/core/workbook";
+import type { Sheet } from "@sheetcraft/core/workbook";
 
 /** Pinned tabs keep their workbook order within a separate leading group. */
 export function getVisibleSheets(sheets: readonly Sheet[]): Sheet[] {

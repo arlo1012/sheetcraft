@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { File } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
-import type { SheetPageSetup } from "@idea10/core/page-setup";
+import type { SheetPageSetup } from "@sheetcraft/core/page-setup";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -74,7 +74,7 @@ function select(orientation: SheetPageSetup["orientation"]): void {
 .page-orientation-menu {
   @include ribbon.tool;
   &__surface {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
     min-width: 150px;
   }
 }

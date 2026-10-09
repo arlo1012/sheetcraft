@@ -2,7 +2,7 @@
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { ref } from "vue";
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellRange } from "@idea10/core/workbook";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellRange } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 
 const props = defineProps<{

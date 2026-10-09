@@ -7,8 +7,8 @@ import { Tabs, TabPanel } from "tdesign-vue-next/es/tabs";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { computed, ref } from "vue";
 import { Select, Option } from "tdesign-vue-next/es/select";
-import { columnIndexToLabel } from "@idea10/core/coordinates";
-import type { CellRange, Sheet, SheetEvaluator } from "@idea10/core/workbook";
+import { columnIndexToLabel } from "@sheetcraft/core/coordinates";
+import type { CellRange, Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import { getColumnStatistics } from "../column-context-data";
 
@@ -215,7 +215,7 @@ function columnLabel(column: number): string {
   }
   &__hint,
   &__notes {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__metrics {
     display: grid;
@@ -226,12 +226,12 @@ function columnLabel(column: number): string {
   &__unavailable {
     display: grid;
     gap: 8px;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     strong {
       font-size: 24px;
       line-height: 32px;
       font-weight: 500;
-      color: var(--idea-text-primary);
+      color: var(--sheetcraft-text-primary);
     }
   }
   &__table {

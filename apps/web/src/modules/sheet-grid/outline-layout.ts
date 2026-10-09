@@ -1,4 +1,4 @@
-import type { SheetDimensionAxis } from "@idea10/core/workbook";
+import type { SheetDimensionAxis } from "@sheetcraft/core/workbook";
 import type { HeaderPane } from "./rendering/sheet-render-frame";
 
 export const OUTLINE_LEVEL_STEP = 20;

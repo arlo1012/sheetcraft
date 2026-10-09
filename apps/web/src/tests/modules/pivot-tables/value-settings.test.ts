@@ -4,7 +4,7 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input } from "tdesign-vue-next/es/input";
 import { Select } from "tdesign-vue-next/es/select";
 import { Tabs } from "tdesign-vue-next/es/tabs";
-import type { SheetPivotTable, PivotValueField } from "@idea10/core/pivot-tables";
+import type { SheetPivotTable, PivotValueField } from "@sheetcraft/core/pivot-tables";
 import PivotFieldSettingsDialog from "../../../modules/pivot-tables/components/PivotFieldSettingsDialog.vue";
 import CellFormatDialog from "../../../modules/cell-format/components/CellFormatDialog.vue";
 import OptionList from "../../../shared/option-list/OptionList.vue";

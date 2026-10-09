@@ -3,11 +3,11 @@ import {
   CellFillError,
   createCellFillCommand,
   type CellFillPlan,
-} from "@idea10/core/cell-autofill";
-import type { WorkbookCommand } from "@idea10/core/commands";
-import { WorkbookDomainError } from "@idea10/core/errors";
-import type { ReplaceableWorkbookCommandToken } from "@idea10/core/history";
-import type { Workbook } from "@idea10/core/workbook";
+} from "@sheetcraft/core/cell-autofill";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
+import type { ReplaceableWorkbookCommandToken } from "@sheetcraft/core/history";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import type {
   GridFillFeedback,
   GridFillRequest,

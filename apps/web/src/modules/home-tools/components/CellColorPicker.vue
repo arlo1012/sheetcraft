@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, watch } from "vue";
-import type { ThemeColorReference } from "@idea10/core/workbook-theme";
+import type { ThemeColorReference } from "@sheetcraft/core/workbook-theme";
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
 import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";

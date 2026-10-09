@@ -1,7 +1,7 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import type { CellNumberFormat } from "@idea10/core/style";
-import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
+import type { CellNumberFormat } from "@sheetcraft/core/style";
+import { createDefaultSelectionCellStyleState } from "@sheetcraft/core/style-state";
 import NumberFormatMenu from "../../../../../modules/home-tools/components/NumberFormatMenu.vue";
 import { createAppI18n, type AppLocale } from "../../../../../shared/i18n";
 

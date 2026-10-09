@@ -5,7 +5,7 @@ import {
   MIN_COLUMN_WIDTH,
   MIN_ROW_HEIGHT,
   type SheetDimensionAxis,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   startPointerSession,
   type PointerSession,

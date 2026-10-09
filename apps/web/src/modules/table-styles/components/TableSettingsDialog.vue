@@ -80,30 +80,30 @@ const draft = ref({ ...props.initial });
 <style scoped lang="scss">
 .table-settings-dialog {
   display: grid;
-  gap: var(--idea-space-3);
+  gap: var(--sheetcraft-space-3);
 
   &__field {
     display: grid;
-    gap: var(--idea-space-1);
+    gap: var(--sheetcraft-space-1);
   }
   &__options {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   p {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__convert {
     display: grid;
     justify-items: start;
-    gap: var(--idea-space-2);
-    padding-top: var(--idea-space-3);
-    border-top: 1px solid var(--idea-border-subtle);
+    gap: var(--sheetcraft-space-2);
+    padding-top: var(--sheetcraft-space-3);
+    border-top: 1px solid var(--sheetcraft-border-subtle);
   }
   &__error {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

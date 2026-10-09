@@ -1,5 +1,5 @@
-import type { CellAddress, SheetFilterValue } from "@idea10/core/workbook";
-import type { CellMergeMode } from "@idea10/core/commands";
+import type { CellAddress, SheetFilterValue } from "@sheetcraft/core/workbook";
+import type { CellMergeMode } from "@sheetcraft/core/commands";
 
 export type FilterValueKey = SheetFilterValue;
 

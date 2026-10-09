@@ -41,11 +41,11 @@ const summaryLabel = computed(() =>
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--idea-space-4);
+  gap: var(--sheetcraft-space-4);
   &__summary {
     min-width: 0;
     margin-right: auto;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     font-variant-numeric: tabular-nums;
   }
 }

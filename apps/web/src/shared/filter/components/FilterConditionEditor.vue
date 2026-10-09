@@ -4,8 +4,8 @@ import { ChevronDown } from "lucide-vue-next";
 import { AutoComplete as TAutoComplete } from "tdesign-vue-next/es/auto-complete";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
-import type { SheetFilterCondition } from "@idea10/core/workbook";
-import type { ExcelDateSystem } from "@idea10/core/formula";
+import type { SheetFilterCondition } from "@sheetcraft/core/workbook";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import {
   createCustomFilterDraft,
@@ -182,7 +182,7 @@ watch(condition, (value) => emit("update:condition", value), { immediate: true }
 <style scoped lang="scss">
 .filter-condition-editor {
   display: grid;
-  gap: var(--idea-space-4);
+  gap: var(--sheetcraft-space-4);
   &__caption,
   &__hint {
     margin: 0;
@@ -190,10 +190,10 @@ watch(condition, (value) => emit("update:condition", value), { immediate: true }
   &__row {
     display: grid;
     grid-template-columns: 150px minmax(0, 1fr);
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
   }
   &__hint {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

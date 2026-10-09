@@ -2,7 +2,7 @@
 
 Use the narrowest existing contract that expresses the product behavior. These
 contracts belong to `apps/web`; they do not move workbook semantics out of
-`@idea10/core` or Sheet interaction semantics out of `@idea10/sheet-engine`.
+`@sheetcraft/core` or Sheet interaction semantics out of `@sheetcraft/sheet-engine`.
 
 ## Choose The Surface
 
@@ -15,7 +15,7 @@ behavior, stable styling, or accessibility contract. Examples are the shared
 menu primitives and the ribbon's `RibbonIconAction`. A feature can use native
 HTML controls when their semantics are sufficient.
 
-Feature styles use `--idea-*` semantic tokens. The token definitions and the
+Feature styles use `--sheetcraft-*` semantic tokens. The token definitions and the
 TDesign variable mapping live in `src/shared/styles/`; local feature styles
 must not target TDesign internal `.t-*` structure. The compact ribbon select
 override is intentionally isolated in `_tdesign.scss`.

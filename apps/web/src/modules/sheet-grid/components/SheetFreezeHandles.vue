@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type FreezePanes } from "@idea10/core/workbook";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type FreezePanes } from "@sheetcraft/core/workbook";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import { useFreezeDrag, type FreezeAxis } from "../composables/useFreezeDrag";
 import type {
   FreezeHandleTarget,

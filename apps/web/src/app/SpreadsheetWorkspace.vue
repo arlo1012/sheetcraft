@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FloatingImage, Workbook } from "@idea10/core/workbook";
+import type { FloatingImage, Workbook } from "@sheetcraft/core/workbook";
 import { useWordProofreading } from "../modules/text-proofreading/useWordProofreading";
 import ProofreadingToolbar from "../modules/text-proofreading/components/ProofreadingToolbar.vue";
 import WordReviewDialog from "../modules/text-proofreading/components/WordReviewDialog.vue";
@@ -7,7 +7,7 @@ import WordDictionaryDialog from "../modules/text-proofreading/components/WordDi
 import DocumentPasswordDialog from "../modules/workbook-xlsx/components/DocumentPasswordDialog.vue";
 import { useTextReviewController } from "../modules/review-tools/useTextReviewController";
 import TextReviewDialog from "../modules/review-tools/components/TextReviewDialog.vue";
-import { canEditCell, canUseSheetPermission } from "@idea10/core";
+import { canEditCell, canUseSheetPermission } from "@sheetcraft/core";
 import { useProtectionController } from "../modules/review-tools/useProtectionController";
 import UnlockRangeDialog from "../modules/review-tools/components/UnlockRangeDialog.vue";
 import SheetProtectionDialog from "../modules/review-tools/components/SheetProtectionDialog.vue";
@@ -15,9 +15,9 @@ import EditableRangesDialog from "../modules/review-tools/components/EditableRan
 import WorkbookProtectionDialog from "../modules/review-tools/components/WorkbookProtectionDialog.vue";
 import ReviewToolbar from "../modules/review-tools/components/ReviewToolbar.vue";
 import { useReviewController } from "../modules/review-tools/useReviewController";
-import { formatCellAddress } from "@idea10/core/coordinates";
-import { cloneConditionalFormatRule } from "@idea10/core/conditional-formatting";
-import type { SheetGoToOptions } from "@idea10/core/go-to";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
+import { cloneConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
+import type { SheetGoToOptions } from "@sheetcraft/core/go-to";
 import {
   computed,
   nextTick,
@@ -37,9 +37,9 @@ import {
   createSetSheetsWatermarkCommand,
   createSetWorkbookWatermarkPresetsCommand,
   type CellFormatChange,
-} from "@idea10/core/commands";
-import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@idea10/core/page-setup";
-import type { SheetViewMode } from "@idea10/sheet-engine/page-layout";
+} from "@sheetcraft/core/commands";
+import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@sheetcraft/core/page-setup";
+import type { SheetViewMode } from "@sheetcraft/sheet-engine/page-layout";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { useWorkbookFullscreen } from "../modules/workbook/composables/useWorkbookFullscreen";
 import { useEyeComfortMode } from "../modules/workbook/composables/useEyeComfortMode";
@@ -75,7 +75,7 @@ import PageThemeMenu from "../modules/page-layout/components/PageThemeMenu.vue";
 import { usePageThemeController } from "../modules/page-layout/usePageThemeController";
 import { workbookThemeKey } from "../shared/color/workbook-theme-context";
 import PageBackgroundMenu from "../modules/page-decorations/components/PageBackgroundMenu.vue";
-import type { SheetWatermark, WatermarkPreset } from "@idea10/core/page-decoration";
+import type { SheetWatermark, WatermarkPreset } from "@sheetcraft/core/page-decoration";
 import { usePictureAssetTools } from "../modules/sheet-images/usePictureAssetTools";
 import PictureCompressDialog from "../modules/sheet-images/components/PictureCompressDialog.vue";
 import PictureBatchSizeDialog from "../modules/sheet-images/components/PictureBatchSizeDialog.vue";
@@ -83,13 +83,13 @@ import { usePictureTools } from "../modules/sheet-images/usePictureTools";
 import PictureSelectionPane from "../modules/sheet-images/components/PictureSelectionPane.vue";
 import PictureAnnotationDialog from "../modules/sheet-images/components/PictureAnnotationDialog.vue";
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
-import type { SheetDrawing } from "@idea10/core/sheet-drawings";
+import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
 import PivotGroupingDialog from "../modules/pivot-tables/components/PivotGroupingDialog.vue";
 import { usePivotGrouping } from "../modules/pivot-tables/usePivotGrouping";
 import { usePivotActions } from "../modules/pivot-tables/usePivotActions";
-import { getPivotTableSource } from "@idea10/core/pivot-tables";
-import { createThemedTableStyles } from "@idea10/core/table-styles";
+import { getPivotTableSource } from "@sheetcraft/core/pivot-tables";
+import { createThemedTableStyles } from "@sheetcraft/core/table-styles";
 import type { PivotArea } from "../modules/pivot-tables/pivot-field-edits";
 import { getPivotActiveField } from "../modules/pivot-tables/pivot-active-field";
 import PivotFieldsPane from "../modules/pivot-tables/components/PivotFieldsPane.vue";
@@ -157,7 +157,7 @@ import DropdownListDialog from "../modules/data-tools/components/DropdownListDia
 import LookupFillDialog from "../modules/data-tools/components/LookupFillDialog.vue";
 import DataComparisonDialog from "../modules/data-tools/components/DataComparisonDialog.vue";
 import AdvancedFilterDialog from "../modules/data-tools/components/AdvancedFilterDialog.vue";
-import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
+import type { FillDirection } from "@sheetcraft/sheet-engine/fill-selection";
 import type { AdvancedFilterDraft } from "../modules/data-tools/data-tools-types";
 import FilterColumnPanel from "../modules/data-tools/components/FilterColumnPanel.vue";
 import DataValidationFeedbackDialog from "../modules/data-tools/components/DataValidationFeedbackDialog.vue";
@@ -235,7 +235,7 @@ import type { WorkbookStore } from "../modules/workbook-persistence/workbookStor
 import XlsxFileActions from "../modules/workbook-xlsx/components/XlsxFileActions.vue";
 import XlsxFileFeedback from "../modules/workbook-xlsx/components/XlsxFileFeedback.vue";
 import { useWorkbookXlsxActions } from "../modules/workbook-xlsx/useWorkbookXlsxActions";
-import type { CellAddress, SheetDimensionAxis, SheetProperties } from "@idea10/core/workbook";
+import type { CellAddress, SheetDimensionAxis, SheetProperties } from "@sheetcraft/core/workbook";
 
 const props = defineProps<{
   workbookStore?: WorkbookStore;
@@ -4121,7 +4121,7 @@ const gridInert = computed(
   min-width: 320px;
   min-height: 360px;
   overflow: hidden;
-  background: var(--idea-surface-panel);
+  background: var(--sheetcraft-surface-panel);
 
   &.is-formula-bar-hidden {
     grid-template-rows: auto auto minmax(0, 1fr) 49px;
@@ -4143,9 +4143,9 @@ const gridInert = computed(
     min-height: 0;
 
     &.is-eye-comfort {
-      --idea-surface-panel: var(--idea-eye-comfort-surface);
-      --idea-surface-secondary: var(--idea-eye-comfort-header);
-      --idea-border-subtle: var(--idea-eye-comfort-gridline);
+      --sheetcraft-surface-panel: var(--sheetcraft-eye-comfort-surface);
+      --sheetcraft-surface-secondary: var(--sheetcraft-eye-comfort-header);
+      --sheetcraft-border-subtle: var(--sheetcraft-eye-comfort-gridline);
     }
   }
 }

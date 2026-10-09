@@ -1,5 +1,5 @@
 import { mount } from "@vue/test-utils";
-import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@idea10/core/page-setup";
+import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@sheetcraft/core/page-setup";
 import { describe, expect, test } from "vitest";
 import PageHeaderFooterOverlay from "../../../../../modules/page-layout/components/PageHeaderFooterOverlay.vue";
 import type { PageViewPaintState } from "../../../../../modules/page-layout/page-view-types";

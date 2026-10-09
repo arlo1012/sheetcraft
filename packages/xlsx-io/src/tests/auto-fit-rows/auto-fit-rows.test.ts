@@ -4,7 +4,7 @@ import {
   setCellContent,
   setCellStyle,
   setRowHeight,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { describe, expect, test } from "vitest";
 import { getAutoFitRowNumbers } from "../../auto-fit-rows.js";
 

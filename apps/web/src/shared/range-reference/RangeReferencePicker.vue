@@ -41,8 +41,8 @@ const { t } = useAppI18n();
 <style scoped lang="scss">
 .range-reference-picker {
   &__hint {
-    margin: var(--idea-space-2) 0 0;
-    color: var(--idea-text-secondary);
+    margin: var(--sheetcraft-space-2) 0 0;
+    color: var(--sheetcraft-text-secondary);
     font-size: 12px;
   }
 }

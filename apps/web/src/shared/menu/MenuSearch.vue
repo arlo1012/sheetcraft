@@ -31,7 +31,7 @@ defineExpose({ focus: () => inputRef.value?.focus() });
   z-index: 1;
   top: 0;
   flex: 0 0 auto;
-  background: var(--idea-surface-panel);
+  background: var(--sheetcraft-surface-panel);
   list-style: none;
 
   // Cover the menu's top inset while options scroll behind the sticky search.
@@ -40,8 +40,8 @@ defineExpose({ focus: () => inputRef.value?.focus() });
     right: 0;
     bottom: 100%;
     left: 0;
-    height: var(--idea-space-4);
-    background: var(--idea-surface-panel);
+    height: var(--sheetcraft-space-4);
+    background: var(--sheetcraft-surface-panel);
     content: "";
     pointer-events: none;
   }
@@ -54,17 +54,17 @@ defineExpose({ focus: () => inputRef.value?.focus() });
       width: 100%;
       height: 26px;
       padding: 0 8px;
-      background: var(--idea-surface-canvas);
-      border: 1px solid var(--idea-border-control);
+      background: var(--sheetcraft-surface-canvas);
+      border: 1px solid var(--sheetcraft-border-control);
       border-radius: 3px;
-      color: var(--idea-text-primary);
+      color: var(--sheetcraft-text-primary);
       font: inherit;
-      font-size: var(--idea-font-size-body-medium);
-      line-height: var(--idea-line-height-body-medium);
+      font-size: var(--sheetcraft-font-size-body-medium);
+      line-height: var(--sheetcraft-line-height-body-medium);
 
       &:focus-visible {
-        border-color: var(--idea-action-primary);
-        box-shadow: 0 0 0 2px var(--idea-action-focus);
+        border-color: var(--sheetcraft-action-primary);
+        box-shadow: 0 0 0 2px var(--sheetcraft-action-focus);
         outline: none;
       }
     }

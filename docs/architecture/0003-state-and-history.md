@@ -10,9 +10,9 @@ formatting, navigation, and undo disagree about the user's current location.
 
 ## Decision
 
-Workbook state and reversible domain commands belong to `@idea10/core`.
+Workbook state and reversible domain commands belong to `@sheetcraft/core`.
 Per-Sheet selection, scroll position, visible extent, editing state, floating
-panels, and focus belong to the frontend or `@idea10/sheet-engine` contracts.
+panels, and focus belong to the frontend or `@sheetcraft/sheet-engine` contracts.
 View state is not stored in core command history.
 
 Each frontend keeps one `SheetViewState` record per Sheet identity. Selection

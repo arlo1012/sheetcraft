@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { AArrowUp, AArrowDown } from "lucide-vue-next";
-import { DEFAULT_CELL_FONT_SIZE, MIN_CELL_FONT_SIZE } from "@idea10/core/style";
+import { DEFAULT_CELL_FONT_SIZE, MIN_CELL_FONT_SIZE } from "@sheetcraft/core/style";
 import { CELL_FONT_SIZE_PRESETS } from "../../../shared/cell-text/font-catalog";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
-import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type {
+  CellBorderAction,
+  CellBorderFormatPatch,
+  CellStylePatch,
+} from "@sheetcraft/core/style";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import CellColorControl from "./CellColorControl.vue";
 import CellBorderMenu from "./CellBorderMenu.vue";

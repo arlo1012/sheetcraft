@@ -5,7 +5,7 @@ import {
   DEFAULT_SHEET_WATERMARK,
   type SheetWatermark,
   type WatermarkPreset,
-} from "@idea10/core/page-decoration";
+} from "@sheetcraft/core/page-decoration";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -306,7 +306,7 @@ function deletePreset(preset: WatermarkPreset): void {
   &__grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--idea-space-3);
+    gap: var(--sheetcraft-space-3);
   }
 
   &__card-wrap {
@@ -315,7 +315,7 @@ function deletePreset(preset: WatermarkPreset): void {
   }
 
   &__card {
-    @include gallery-choice.choice(var(--idea-space-2));
+    @include gallery-choice.choice(var(--sheetcraft-space-2));
 
     display: grid;
     width: 100%;
@@ -323,8 +323,8 @@ function deletePreset(preset: WatermarkPreset): void {
     place-items: center;
     overflow: hidden;
     color: #b7b7b7;
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-subtle);
+    background: var(--sheetcraft-surface-panel);
+    border: 1px solid var(--sheetcraft-border-subtle);
   }
 
   &__text-preview {
@@ -356,14 +356,14 @@ function deletePreset(preset: WatermarkPreset): void {
   }
 
   &__add {
-    gap: var(--idea-space-1);
-    color: var(--idea-action-primary);
-    font-size: var(--idea-font-size-body-small);
+    gap: var(--sheetcraft-space-1);
+    color: var(--sheetcraft-action-primary);
+    font-size: var(--sheetcraft-font-size-body-small);
 
     :deep(svg) {
       width: 22px;
       height: 22px;
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
     }
   }
 
@@ -376,15 +376,15 @@ function deletePreset(preset: WatermarkPreset): void {
     height: 20px;
     padding: 0;
     place-items: center;
-    color: var(--idea-text-secondary);
-    background: var(--idea-surface-panel);
+    color: var(--sheetcraft-text-secondary);
+    background: var(--sheetcraft-surface-panel);
     border: 0;
-    border-radius: var(--idea-radius-small);
+    border-radius: var(--sheetcraft-radius-small);
     cursor: pointer;
 
     &:hover,
     &:focus-visible {
-      background: var(--idea-surface-hover);
+      background: var(--sheetcraft-surface-hover);
       outline: none;
     }
     :deep(svg) {

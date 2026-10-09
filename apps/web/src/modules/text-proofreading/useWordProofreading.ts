@@ -1,6 +1,6 @@
 import { ref, shallowRef, watch } from "vue";
-import type { Workbook, Sheet, CellRange, CellAddress } from "@idea10/core/workbook";
-import type { WorkbookCommand } from "@idea10/core/commands";
+import type { Workbook, Sheet, CellRange, CellAddress } from "@sheetcraft/core/workbook";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
 import { useAppI18n } from "../../shared/i18n";
 import {
   collectReviewText,

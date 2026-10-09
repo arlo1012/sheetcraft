@@ -2,8 +2,8 @@
 
 @mixin focus-ring {
   &:focus-visible {
-    border-color: var(--idea-action-focus);
-    box-shadow: var(--idea-keyboard-focus-shadow);
+    border-color: var(--sheetcraft-action-focus);
+    box-shadow: var(--sheetcraft-keyboard-focus-shadow);
   }
 }
 
@@ -21,8 +21,8 @@
   margin: 0;
   background: transparent;
   border: 0;
-  border-radius: var(--idea-radius-default);
-  color: var(--idea-text-primary);
+  border-radius: var(--sheetcraft-radius-default);
+  color: var(--sheetcraft-text-primary);
   cursor: pointer;
   font: inherit;
   outline: none;
@@ -33,15 +33,15 @@
 }
 
 @mixin icon-slot {
-  --idea-icon-size: var(--ribbon-icon-size, var(--idea-action-icon-size));
+  --sheetcraft-icon-size: var(--ribbon-icon-size, var(--sheetcraft-action-icon-size));
 
   :deep(svg) {
-    width: var(--idea-icon-size);
-    height: var(--idea-icon-size);
+    width: var(--sheetcraft-icon-size);
+    height: var(--sheetcraft-icon-size);
   }
 
   :deep(svg.lucide) {
-    stroke-width: var(--idea-icon-stroke-width);
+    stroke-width: var(--sheetcraft-icon-stroke-width);
   }
 
   display: inline-flex;
@@ -56,7 +56,7 @@
 
 @mixin action-text {
   overflow: hidden;
-  font-size: var(--idea-font-size-body-medium);
+  font-size: var(--sheetcraft-font-size-body-medium);
   line-height: var(--ribbon-action-text-line-height, normal);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -64,7 +64,7 @@
 
 // Share row centers with stacked tools so every second-row label has the same baseline.
 @mixin tall-content {
-  --ribbon-action-text-line-height: var(--idea-line-height-body-medium);
+  --ribbon-action-text-line-height: var(--sheetcraft-line-height-body-medium);
 
   display: grid;
   grid-template-rows: repeat(2, var(--ribbon-control-height, 26px));

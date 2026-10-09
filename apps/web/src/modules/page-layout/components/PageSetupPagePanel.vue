@@ -13,7 +13,7 @@ import {
   PAGE_PAPER_SIZES_MM,
   type SheetPageSetup,
   type SheetPaperSize,
-} from "@idea10/core/page-setup";
+} from "@sheetcraft/core/page-setup";
 import { useAppI18n } from "../../../shared/i18n";
 import { PAGE_PAPER_LABELS } from "../page-paper-labels";
 
@@ -257,12 +257,12 @@ function setQuality(value: SelectValue): void {
   @include panel.panel;
   &__orientation {
     display: flex;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
   }
   &__paper-icon {
     width: 14px;
     height: 14px;
-    margin-right: var(--idea-space-1);
+    margin-right: var(--sheetcraft-space-1);
     vertical-align: middle;
     &--landscape {
       transform: rotate(90deg);
@@ -275,9 +275,9 @@ function setQuality(value: SelectValue): void {
   &__scaling-row {
     display: flex;
     align-items: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     & + & {
-      margin-top: var(--idea-space-2);
+      margin-top: var(--sheetcraft-space-2);
     }
     > :first-child {
       flex: none;
@@ -293,12 +293,12 @@ function setQuality(value: SelectValue): void {
   }
   &__fields {
     display: grid;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__paper-select {
     width: 100%;
     display: flex;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     min-width: 0;
     > :first-child {
       flex: 1;
@@ -311,7 +311,7 @@ function setQuality(value: SelectValue): void {
   &__paper-dimensions,
   &__fit-dimensions {
     display: grid;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__paper-dimension {
     width: 160px;

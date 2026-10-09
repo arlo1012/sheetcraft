@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CellBorder, CellBorderAction, CellBorderPreset } from "@idea10/core/style";
+import type { CellBorder, CellBorderAction, CellBorderPreset } from "@sheetcraft/core/style";
 import { useAppI18n } from "../../../shared/i18n";
 import CellBorderPresetIcon from "../../../shared/borders/CellBorderPresetIcon.vue";
 import { vIconAction } from "../../../shared/focus/icon-action";
@@ -179,7 +179,7 @@ function selectPreset(preset: CellBorderPreset): void {
     background: transparent;
     border: 1px solid transparent;
     border-radius: 2px;
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
     cursor: pointer;
   }
 }

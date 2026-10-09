@@ -1,7 +1,7 @@
 # Portable Core Consumers
 
-`@idea10/core` is the runtime-neutral workbook package for Web applications,
-other frontends, Workers, and servers. `@idea10/sheet-engine` adds headless Grid
+`@sheetcraft/core` is the runtime-neutral workbook package for Web applications,
+other frontends, Workers, and servers. `@sheetcraft/sheet-engine` adds headless Grid
 geometry and interaction state and depends only on Core.
 
 ## Runtime Contract
@@ -12,8 +12,8 @@ Workbook and Sheet creation require explicit IDs or an `IdFactory`; factories
 keep tests and non-browser runtimes deterministic.
 
 ```ts
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createWorkbook } from "@idea10/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { createWorkbook } from "@sheetcraft/core/workbook";
 
 const idFactory = createSequentialIdFactory();
 const workbook = createWorkbook({ idFactory });
@@ -28,10 +28,10 @@ Commands are structured-cloneable data. Use a `WorkbookSession` when the
 consumer needs bounded inverse-command undo and redo.
 
 ```ts
-import { createSetCellValueCommand } from "@idea10/core/commands";
-import { createWorkbookSession, executeWorkbookCommand } from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { getActiveSheet } from "@idea10/core/workbook";
+import { createSetCellValueCommand } from "@sheetcraft/core/commands";
+import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { getActiveSheet } from "@sheetcraft/core/workbook";
 
 const session = createWorkbookSession({ idFactory: createSequentialIdFactory() });
 const sheet = getActiveSheet(session.workbook);
@@ -63,7 +63,7 @@ snapshot contains arrays and plain records rather than internal Maps, so it
 can be serialized as JSON or transferred with structured clone.
 
 ```ts
-import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
+import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
 
 const payload = structuredClone(serializeWorkbook(session.workbook));
 const restored = deserializeWorkbook(payload);
@@ -86,10 +86,10 @@ ordinary Sheet navigation remains outside undo history. See
 Import from package roots or declared subpaths only:
 
 ```ts
-import { createWorkbook } from "@idea10/core/workbook";
-import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
+import { createWorkbook } from "@sheetcraft/core/workbook";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
 ```
 
-Paths under `@idea10/core/src`, `@idea10/core/dist`,
-`@idea10/sheet-engine/src`, and `@idea10/sheet-engine/dist` are implementation
+Paths under `@sheetcraft/core/src`, `@sheetcraft/core/dist`,
+`@sheetcraft/sheet-engine/src`, and `@sheetcraft/sheet-engine/dist` are implementation
 details and are rejected by repository checks.

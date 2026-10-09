@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getCellContent, setCellContent } from "@idea10/core/workbook";
+import { getCellContent, setCellContent } from "@sheetcraft/core/workbook";
 import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 
 describe("SheetGrid read-only mode", () => {

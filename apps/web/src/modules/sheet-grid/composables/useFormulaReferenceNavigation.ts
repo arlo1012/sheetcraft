@@ -1,5 +1,5 @@
-import type { CellAddress, CellRange } from "@idea10/core/workbook";
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "@idea10/core/workbook";
+import type { CellAddress, CellRange } from "@sheetcraft/core/workbook";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "@sheetcraft/core/workbook";
 import type { CellEditSession } from "../../../shared/cell-editing/useCellEditSession";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 

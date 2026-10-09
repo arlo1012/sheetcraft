@@ -173,7 +173,7 @@ watch(
 }
 .custom-theme-colors-dialog__error {
   margin: -8px 0 0;
-  color: var(--idea-status-error);
+  color: var(--sheetcraft-status-error);
   font-size: 12px;
   line-height: 18px;
 }
@@ -195,7 +195,7 @@ watch(
   align-content: start;
   gap: 8px;
   padding-left: 12px;
-  border-left: 1px solid var(--idea-border-subtle);
+  border-left: 1px solid var(--sheetcraft-border-subtle);
 }
 .custom-theme-colors-dialog__content strong {
   font-size: 12px;
@@ -212,7 +212,7 @@ watch(
   }
   .custom-theme-colors-dialog__preview {
     padding: 12px 0 0;
-    border-top: 1px solid var(--idea-border-subtle);
+    border-top: 1px solid var(--sheetcraft-border-subtle);
     border-left: 0;
   }
 }

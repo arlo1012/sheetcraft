@@ -106,10 +106,10 @@ const { t } = useAppI18n();
   p {
     margin: 0;
     font-size: 12px;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__error {
-    color: var(--idea-color-error) !important;
+    color: var(--sheetcraft-color-error) !important;
   }
 }
 </style>

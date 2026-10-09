@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { createWorkbook, getActiveSheet } from "@idea10/core/workbook";
-import { DEFAULT_SHEET_WATERMARK } from "@idea10/core/page-decoration";
-import { createSetSheetPageDecorationCommand } from "@idea10/core/commands";
+import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
+import { DEFAULT_SHEET_WATERMARK } from "@sheetcraft/core/page-decoration";
+import { createSetSheetPageDecorationCommand } from "@sheetcraft/core/commands";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { prepareImageAsset } from "../../../modules/image-assets/prepareImageAsset";
 import { usePageDecorationActions } from "../../../modules/page-decorations/usePageDecorationActions";

@@ -4,7 +4,7 @@ import {
   getCellValue,
   setCellContent,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   WorkbookFileError,
@@ -13,8 +13,8 @@ import {
   readWorkbookFile,
   readWorkbookBundleFile,
 } from "../../../../modules/workbook-persistence/workbookJsonTransfer";
-import { serializeWorkbook } from "@idea10/core/serialization";
-import { DEFAULT_SHEET_WATERMARK } from "@idea10/core/page-decoration";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { DEFAULT_SHEET_WATERMARK } from "@sheetcraft/core/page-decoration";
 import { createMemoryImageAssetStore } from "../../../../modules/image-assets/imageAssetStore";
 
 function createTestWorkbook() {
@@ -186,9 +186,9 @@ describe("workbook JSON transfer", () => {
     expect(createObjectURL).toHaveBeenCalledOnce();
     expect(click).toHaveBeenCalledOnce();
     expect((click.mock.instances[0] as HTMLAnchorElement | undefined)?.download).toBe(
-      "idea10-workbook.json",
+      "sheetcraft-workbook.json",
     );
-    expect(document.querySelector('a[download="idea10-workbook.json"]')).toBeNull();
+    expect(document.querySelector('a[download="sheetcraft-workbook.json"]')).toBeNull();
     expect(revokeObjectURL).not.toHaveBeenCalled();
     vi.runAllTimers();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:idea10-workbook");

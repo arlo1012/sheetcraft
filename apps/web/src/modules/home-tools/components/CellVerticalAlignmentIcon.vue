@@ -7,7 +7,7 @@ defineProps<{ alignment: "top" | "middle" | "bottom" }>();
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    style="stroke-width: var(--idea-icon-stroke-width)"
+    style="stroke-width: var(--sheetcraft-icon-stroke-width)"
     stroke-linecap="round"
     aria-hidden="true"
     focusable="false"

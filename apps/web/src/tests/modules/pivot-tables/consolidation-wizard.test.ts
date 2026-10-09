@@ -1,7 +1,7 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createSheet, insertSheet, setCellContent } from "@idea10/core/workbook";
-import { getPivotTableSource } from "@idea10/core/pivot-tables";
+import { createSheet, insertSheet, setCellContent } from "@sheetcraft/core/workbook";
+import { getPivotTableSource } from "@sheetcraft/core/pivot-tables";
 import PivotConsolidationWizard from "../../../modules/pivot-tables/components/PivotConsolidationWizard.vue";
 import PivotTableDialog from "../../../modules/pivot-tables/components/PivotTableDialog.vue";
 import type { PivotDraft } from "../../../modules/pivot-tables/usePivotActions";

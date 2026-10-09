@@ -2,16 +2,16 @@ import ExcelJSImport from "exceljs/dist/exceljs.min.js";
 import { readFile } from "node:fs/promises";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
 import { describe, expect, test } from "vitest";
-import { createSetPivotTableCommand, createSetCellContentCommand } from "@idea10/core/commands";
+import { createSetPivotTableCommand, createSetCellContentCommand } from "@sheetcraft/core/commands";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
-import { buildPivotResult } from "@idea10/core/pivot-tables";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { serializeWorkbook } from "@idea10/core/serialization";
-import { getCellValue, type Workbook } from "@idea10/core/workbook";
+} from "@sheetcraft/core/history";
+import { buildPivotResult } from "@sheetcraft/core/pivot-tables";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { getCellValue, type Workbook } from "@sheetcraft/core/workbook";
 import { decodeXlsx, XlsxCompatibilityError } from "../../index.js";
 
 type FixtureCell = { address: string; value: unknown };

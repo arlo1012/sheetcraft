@@ -1,11 +1,11 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
-import { createWorkbook, getActiveSheet, setCellContent } from "@idea10/core/workbook";
+import { createWorkbook, getActiveSheet, setCellContent } from "@sheetcraft/core/workbook";
 import {
   createBuiltinTableStyles,
   createThemedTableStyles,
   type TableStyleDefinition,
-} from "@idea10/core/table-styles";
-import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
+} from "@sheetcraft/core/table-styles";
+import type { PivotTableStyleDefinition } from "@sheetcraft/core/pivot-table-styles";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../index.js";
 
@@ -70,12 +70,12 @@ describe("XLSX structured tables", () => {
     expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain('showFirstColumn="1"');
     expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain('<customFilters and="1">');
     expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain('dateTimeGrouping="day"');
-    expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain('name="Idea10 Medium 1"');
+    expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain('name="Sheetcraft Medium 1"');
     expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain(
       '<tableColumn id="1" name="Name"/>',
     );
     expect(strFromU8(entries["xl/worksheets/sheet1.xml"]!)).not.toContain("<autoFilter");
-    expect(strFromU8(entries["xl/styles.xml"]!)).toContain('tableStyle name="Idea10 Medium 1"');
+    expect(strFromU8(entries["xl/styles.xml"]!)).toContain('tableStyle name="Sheetcraft Medium 1"');
 
     const imported = getActiveSheet((await decodeXlsx(encoded.bytes)).workbook).tables;
     expect(imported).toEqual([
@@ -116,12 +116,12 @@ describe("XLSX structured tables", () => {
 
     const encoded = await encodeXlsx(workbook);
     const styles = strFromU8(unzipSync(encoded.bytes)["xl/styles.xml"]!);
-    expect(styles).toContain('defaultTableStyle="Idea10 Medium 1"');
-    expect(styles).toContain('tableStyle name="Idea10 Medium 1"');
+    expect(styles).toContain('defaultTableStyle="Sheetcraft Medium 1"');
+    expect(styles).toContain('tableStyle name="Sheetcraft Medium 1"');
 
     const imported = await decodeXlsx(encoded.bytes);
-    expect(imported.workbook.defaultTableStyleId).toBe("xlsx-table-style-Idea10 Medium 1");
-    expect(imported.workbook.tableStyles?.[0]).toMatchObject({ name: "Idea10 Medium 1" });
+    expect(imported.workbook.defaultTableStyleId).toBe("xlsx-table-style-Sheetcraft Medium 1");
+    expect(imported.workbook.tableStyles?.[0]).toMatchObject({ name: "Sheetcraft Medium 1" });
   });
 
   test("roundtrips table color filters through shared differential formats", async () => {
@@ -212,7 +212,7 @@ describe("XLSX structured tables", () => {
       const entries = unzipSync(encoded.bytes);
       entries["xl/tables/table1.xml"] = strToU8(
         strFromU8(entries["xl/tables/table1.xml"]!).replace(
-          /name="Idea10 Medium 1"/,
+          /name="Sheetcraft Medium 1"/,
           `name="TableStyle${category}${index}"`,
         ),
       );
@@ -359,7 +359,7 @@ describe("XLSX structured tables", () => {
     };
     const occupied: TableStyleDefinition = {
       id: "table-occupied",
-      name: "Idea10 Pivot Shared",
+      name: "Sheetcraft Pivot Shared",
       category: "custom",
       elements: { headerRow: { style: { fillColor: "#70ad47" } } },
     };
@@ -375,8 +375,8 @@ describe("XLSX structured tables", () => {
 
     const encoded = await encodeXlsx(workbook);
     const styles = strFromU8(unzipSync(encoded.bytes)["xl/styles.xml"]!);
-    expect(styles).toContain('tableStyle name="Idea10 Pivot shared 2" pivot="1" table="0"');
-    expect(styles).toContain('defaultPivotStyle="Idea10 Pivot shared 2"');
+    expect(styles).toContain('tableStyle name="Sheetcraft Pivot shared 2" pivot="1" table="0"');
+    expect(styles).toContain('defaultPivotStyle="Sheetcraft Pivot shared 2"');
   });
 
   test("keeps disjoint definitions separate when their shared element coverage differs", async () => {
@@ -401,7 +401,7 @@ describe("XLSX structured tables", () => {
     const encoded = await encodeXlsx(workbook);
     const styles = strFromU8(unzipSync(encoded.bytes)["xl/styles.xml"]!);
     expect(styles).toContain('tableStyle name="Shared" pivot="0" table="1"');
-    expect(styles).toContain('tableStyle name="Idea10 Pivot Shared" pivot="1" table="0"');
+    expect(styles).toContain('tableStyle name="Sheetcraft Pivot Shared" pivot="1" table="0"');
 
     const imported = await decodeXlsx(encoded.bytes);
     expect(imported.workbook.tableStyles?.[0]?.elements).toMatchObject({

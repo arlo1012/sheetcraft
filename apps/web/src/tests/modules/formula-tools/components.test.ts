@@ -8,7 +8,7 @@ import {
   parseFormula,
   type FormulaEvaluationResolver,
   type FormulaValue,
-} from "@idea10/core/formula";
+} from "@sheetcraft/core/formula";
 import {
   formulaArgumentLabelsEnUS,
   formulaFunctionCopyEnUS,

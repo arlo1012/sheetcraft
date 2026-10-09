@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import CellHorizontalAlignmentIcon from "./CellHorizontalAlignmentIcon.vue";
 import { computed } from "vue";
-import type { CellStylePatch, HorizontalCellAlignment } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type { CellStylePatch, HorizontalCellAlignment } from "@sheetcraft/core/style";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 
@@ -109,7 +109,7 @@ function align(alignment: HorizontalCellAlignment): void {
     bottom: 2px;
     left: 6px;
     height: 2px;
-    background: var(--idea-text-muted);
+    background: var(--sheetcraft-text-muted);
     content: "";
     pointer-events: none;
   }

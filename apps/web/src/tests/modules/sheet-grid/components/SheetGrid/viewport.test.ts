@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setCellStyle, setCellValue } from "@idea10/core/workbook";
+import { setCellStyle, setCellValue } from "@sheetcraft/core/workbook";
 import { activeCell, getCanvasLayout, mountSheetGrid, triggerCell } from "./fixture";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { FloatingImage } from "@idea10/core/workbook";
+import type { FloatingImage } from "@sheetcraft/core/workbook";
 import {
   cropFloatingImage,
   flipFloatingImage,

@@ -1,5 +1,5 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
-import { createWorkbook, getActiveSheet } from "@idea10/core/workbook";
+import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../index.js";
 

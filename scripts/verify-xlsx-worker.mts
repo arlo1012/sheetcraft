@@ -7,7 +7,7 @@ import {
   deserializeWorkbook,
   serializeWorkbook,
   type WorkbookSnapshot,
-} from "@idea10/core/serialization";
+} from "@sheetcraft/core/serialization";
 import {
   createWorkbook,
   getActiveSheet,
@@ -21,7 +21,7 @@ import {
   setColumnWidth,
   setRowHeight,
   setSheetMetadata,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 
 type CompatibilityIssue = {
   code: string;
@@ -242,7 +242,9 @@ async function main(): Promise<void> {
   }
   if (!existsSync(workerEntry)) throw new Error(`XLSX worker entry is missing: ${workerEntry}`);
   if (!existsSync(xlsxArtifact)) {
-    throw new Error("@idea10/xlsx-io is not built. Run: bun run --filter @idea10/xlsx-io build");
+    throw new Error(
+      "@sheetcraft/xlsx-io is not built. Run: bun run --filter @sheetcraft/xlsx-io build",
+    );
   }
 
   const temporaryDirectory = mkdtempSync(join(workspaceRoot, ".xlsx-worker-smoke-"));

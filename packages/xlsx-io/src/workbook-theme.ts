@@ -5,7 +5,7 @@ import {
   normalizeWorkbookTheme,
   type WorkbookTheme,
   type WorkbookThemeEffects,
-} from "@idea10/core/workbook-theme";
+} from "@sheetcraft/core/workbook-theme";
 
 const themeEntry = "xl/theme/theme1.xml";
 const catalogUri = "{A2D8FC83-5106-4D1E-9D45-8D6B870A6F4D}";

@@ -244,10 +244,10 @@ function selectIssues(keys: Array<string | number>): void {
     flex: 1;
   }
   &__error {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
   &__summary {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__summary {
     flex-wrap: wrap;
@@ -261,7 +261,7 @@ function selectIssues(keys: Array<string | number>): void {
   }
   &__footer {
     justify-content: space-between;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__footer-actions {
     display: flex;

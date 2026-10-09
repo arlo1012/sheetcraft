@@ -69,10 +69,10 @@ const tooltip = ref(props.draft.tooltip);
     margin: 0;
   }
   &__hint {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__error {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
   &__remove {
     grid-column: 2;

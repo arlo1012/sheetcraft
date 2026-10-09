@@ -5,7 +5,7 @@
     stroke="currentColor"
     stroke-linecap="round"
     stroke-linejoin="round"
-    style="stroke-width: var(--idea-icon-stroke-width)"
+    style="stroke-width: var(--sheetcraft-icon-stroke-width)"
     aria-hidden="true"
     focusable="false"
   >

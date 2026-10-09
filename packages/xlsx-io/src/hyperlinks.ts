@@ -1,5 +1,5 @@
 import { strFromU8, strToU8, type Zippable } from "fflate/browser";
-import type { CellHyperlink, Sheet } from "@idea10/core/workbook";
+import type { CellHyperlink, Sheet } from "@sheetcraft/core/workbook";
 import { readXlsxWorksheetPartTargets } from "./raw-cell-values.js";
 
 type RawHyperlinks = Array<Map<string, CellHyperlink>>;

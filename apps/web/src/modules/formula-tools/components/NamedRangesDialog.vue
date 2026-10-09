@@ -417,8 +417,8 @@ watch(
     grid-template-rows: auto minmax(0, 1fr) auto;
     height: min(340px, calc(100dvh - 180px));
     min-height: 0;
-    gap: var(--idea-space-4);
-    color: var(--idea-text-primary);
+    gap: var(--sheetcraft-space-4);
+    color: var(--sheetcraft-text-primary);
   }
   &__toolbar {
     display: flex;
@@ -436,7 +436,7 @@ watch(
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__filters {
     display: flex;
@@ -458,7 +458,7 @@ watch(
     justify-content: center;
     width: 26px;
     height: 26px;
-    border-radius: var(--idea-radius-small);
+    border-radius: var(--sheetcraft-radius-small);
     cursor: pointer;
   }
 

@@ -10,7 +10,7 @@ import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { useAppI18n } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import type { RangeReferenceSelectionOptions } from "../../../shared/range-reference/useRangeReferencePicker";
-import type { ExcelDateSystem } from "@idea10/core/formula";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
 import type { DataValidationDraft, DataValidationInitial } from "../data-tools-types";
 import {
   createValidationDraft,
@@ -274,18 +274,18 @@ async function selectDraftReference(
 
   &__form {
     display: grid;
-    padding-top: var(--idea-dialog-content-padding-block);
+    padding-top: var(--sheetcraft-dialog-content-padding-block);
     max-height: calc(100dvh - 240px);
     overflow: auto;
     align-content: start;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
   }
 
   &__field {
     display: grid;
     grid-template-columns: 72px minmax(0, 1fr);
     align-items: center;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
     min-width: 0;
 
     > span {
@@ -296,7 +296,7 @@ async function selectDraftReference(
       align-items: start;
 
       > span {
-        padding-top: var(--idea-space-2);
+        padding-top: var(--sheetcraft-space-2);
       }
     }
   }
@@ -305,14 +305,14 @@ async function selectDraftReference(
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--idea-space-4) var(--idea-space-6);
+    gap: var(--sheetcraft-space-4) var(--sheetcraft-space-6);
     padding-left: 80px;
   }
 
   @media (max-width: 560px) {
     &__field {
       grid-template-columns: minmax(0, 1fr);
-      gap: var(--idea-space-2);
+      gap: var(--sheetcraft-space-2);
     }
 
     &__options {

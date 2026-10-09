@@ -1,4 +1,7 @@
-import { getNumberFormatLocaleCurrency, toCellNumberFormatCode } from "@idea10/core/number-format";
+import {
+  getNumberFormatLocaleCurrency,
+  toCellNumberFormatCode,
+} from "@sheetcraft/core/number-format";
 import { getDateFormatPresets } from "../../../shared/number-format/date-presets";
 
 /**

@@ -4,8 +4,8 @@ import {
   type PivotAggregate,
   type PivotValueDisplay,
   type PivotValueField,
-} from "@idea10/core/pivot-tables";
-import type { FormulaValue } from "@idea10/core/formula";
+} from "@sheetcraft/core/pivot-tables";
+import type { FormulaValue } from "@sheetcraft/core/formula";
 import { attr, child, nodes, xml, type XmlNode } from "./pivot-xml.js";
 import { pivotValueKey, primitivePivotValue } from "./pivot-cache.js";
 export const DATA_FIELD_EXT = "{E15A36E0-9728-4E99-A89B-3F7291B0FE68}";

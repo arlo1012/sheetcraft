@@ -1,5 +1,5 @@
 import { computed, ref, watch } from "vue";
-import type { ThemeColorReference } from "@idea10/core/workbook-theme";
+import type { ThemeColorReference } from "@sheetcraft/core/workbook-theme";
 import {
   DEFAULT_CELL_FONT_FAMILY,
   DEFAULT_CELL_FONT_SIZE,
@@ -9,8 +9,8 @@ import {
   type CellStyle,
   type CellStylePatch,
   type CellUnderlineStyle,
-} from "@idea10/core/style";
-import type { SelectionCellStyleState, ToggleStyleState } from "@idea10/core/style-state";
+} from "@sheetcraft/core/style";
+import type { SelectionCellStyleState, ToggleStyleState } from "@sheetcraft/core/style-state";
 import { CELL_FONT_FAMILY_PRESETS, CELL_FONT_SIZE_PRESETS } from "../cell-text/font-catalog";
 import { useAppI18n } from "../i18n";
 import { findOptionMatch } from "../option-list/option-list";

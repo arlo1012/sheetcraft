@@ -1,6 +1,6 @@
 # Saving And Recovery
 
-The File menu saves the current workbook locally, imports an idea10 JSON file,
+The File menu saves the current workbook locally, imports a Sheetcraft JSON file,
 exports a JSON backup, and reloads the browser's saved copy. All feedback and
 confirmation text is available in Chinese and English.
 
@@ -69,7 +69,7 @@ only the displayed "Saved locally" state confirms that a transaction finished.
 
 ## Files And Failures
 
-Export downloads `idea10-workbook.json`: an image-free V16 snapshot, or a versioned
+Export downloads `sheetcraft-workbook.json`: an image-free V16 snapshot, or a versioned
 portable envelope containing that snapshot and every referenced image as base64.
 Image blobs are stored separately in the `idea10-image-assets` IndexedDB database.
 Blobs are saved before document references and retained through undoable deletion.

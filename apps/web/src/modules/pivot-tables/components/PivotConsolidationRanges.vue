@@ -11,8 +11,8 @@ import {
   type TableRowAttributes,
   type TableRowData,
 } from "tdesign-vue-next/es/table";
-import { rangesIntersect } from "@idea10/core/pivot-tables";
-import type { Workbook } from "@idea10/core/workbook";
+import { rangesIntersect } from "@sheetcraft/core/pivot-tables";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
@@ -214,7 +214,7 @@ function select(keys: Array<string | number>): void {
   min-width: 0;
   p {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__add {
     display: grid;
@@ -251,7 +251,7 @@ function select(keys: Array<string | number>): void {
     min-height: 0;
   }
   [role="alert"] {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
   @media (max-width: 420px) {
     &__page-grid {

@@ -15,7 +15,7 @@ import {
 import { computed, nextTick, ref, useId, watch, type ComponentPublicInstance } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import type { Sheet as WorkbookSheet, SheetProperties } from "@idea10/core/workbook";
+import type { Sheet as WorkbookSheet, SheetProperties } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
@@ -359,7 +359,7 @@ watch(
 }
 
 .worksheet-operations-menu {
-  z-index: var(--idea-layer-menu);
+  z-index: var(--sheetcraft-layer-menu);
 }
 .worksheet-operations-menu__hidden-sheets {
   display: grid;
@@ -368,14 +368,14 @@ watch(
 .worksheet-operations-menu__hidden-sheets button {
   min-height: 32px;
   padding: 0 10px;
-  color: var(--idea-text-primary);
+  color: var(--sheetcraft-text-primary);
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: var(--idea-radius-small);
+  border-radius: var(--sheetcraft-radius-small);
 }
 .worksheet-operations-menu__hidden-sheets button:hover {
-  background: var(--idea-surface-hover);
+  background: var(--sheetcraft-surface-hover);
   outline: none;
 }
 </style>

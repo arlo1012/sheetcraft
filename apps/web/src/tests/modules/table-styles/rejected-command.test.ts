@@ -1,10 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { WorkbookCommand } from "@idea10/core/commands";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { serializeWorkbook } from "@idea10/core/serialization";
-import { setCellContent } from "@idea10/core/workbook";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { setCellContent } from "@sheetcraft/core/workbook";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import { useTableStylesController } from "../../../modules/table-styles/useTableStylesController";
 import { createAppI18n } from "../../../shared/i18n";

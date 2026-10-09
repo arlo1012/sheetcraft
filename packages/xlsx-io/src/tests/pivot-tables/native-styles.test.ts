@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { strFromU8, unzipSync } from "fflate/browser";
 import { XMLParser } from "fast-xml-parser";
-import { createSetPivotTableCommand } from "@idea10/core/commands";
-import { createWorkbookSession, executeWorkbookCommand } from "@idea10/core/history";
-import { buildPivotResult, type SheetPivotTable } from "@idea10/core/pivot-tables";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createSetPivotTableCommand } from "@sheetcraft/core/commands";
+import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
+import { buildPivotResult, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createSheet,
   createWorkbook,
@@ -13,7 +13,7 @@ import {
   insertSheet,
   setCellContent,
   setCellStyle,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { decodeXlsx, encodeXlsx } from "../../index.js";
 
 type XmlNode = Record<string, unknown>;
@@ -150,7 +150,7 @@ describe("native pivot styles and number formats", () => {
       },
       {
         id: "table-occupied",
-        name: "Idea10 Pivot Shared",
+        name: "Sheetcraft Pivot Shared",
         category: "custom",
         elements: { headerRow: { style: { fillColor: "#70ad47" } } },
       },
@@ -171,7 +171,7 @@ describe("native pivot styles and number formats", () => {
     });
     const encoded = await encodeXlsx(f.workbook);
     const style = pivotStyle(unzipSync(encoded.bytes));
-    expect(style.name).toBe("Idea10 Pivot Shared 2");
+    expect(style.name).toBe("Sheetcraft Pivot Shared 2");
     expect(style.definitions.find((definition) => definition["@_name"] === "Shared")).toMatchObject(
       { "@_table": "1", "@_pivot": "0" },
     );

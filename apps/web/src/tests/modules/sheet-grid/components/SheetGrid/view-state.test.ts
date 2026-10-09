@@ -1,6 +1,6 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
+import { createSheetGridViewState } from "@sheetcraft/sheet-engine/view-state";
 import { activeCell, mountSheetGrid } from "./fixture";
 
 describe("SheetGrid view state", () => {

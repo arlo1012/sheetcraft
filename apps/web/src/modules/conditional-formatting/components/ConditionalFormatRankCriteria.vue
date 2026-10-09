@@ -65,7 +65,7 @@ const { t } = useAppI18n();
   }
   &__error {
     margin: 0;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

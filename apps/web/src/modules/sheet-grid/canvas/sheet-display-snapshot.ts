@@ -1,23 +1,23 @@
-import { createDuplicateHighlightResolver } from "@idea10/core/duplicate-values";
+import { createDuplicateHighlightResolver } from "@sheetcraft/core/duplicate-values";
 import {
   applyConditionalFormatStyle,
   createConditionalFormatResolver,
   createConditionalFormatVisualResolver,
-} from "@idea10/core/conditional-formatting";
-import type { ConditionalFormatVisual } from "@idea10/core/conditional-formatting";
-import { mergeCellStyle, type CellStyle } from "@idea10/core/style";
+} from "@sheetcraft/core/conditional-formatting";
+import type { ConditionalFormatVisual } from "@sheetcraft/core/conditional-formatting";
+import { mergeCellStyle, type CellStyle } from "@sheetcraft/core/style";
 import {
   DEFAULT_WORKBOOK_THEME,
   resolveThemeColor,
   resolveThemeFontFamily,
   type WorkbookTheme,
-} from "@idea10/core/workbook-theme";
-import { getTableAtAddress, resolveTableCellStyle } from "@idea10/core/table-styles";
-import type { ExcelDateSystem } from "@idea10/core/formula";
+} from "@sheetcraft/core/workbook-theme";
+import { getTableAtAddress, resolveTableCellStyle } from "@sheetcraft/core/table-styles";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
 import { computed, type ComputedRef } from "vue";
-import type { CellAddress, Sheet, SheetEvaluator } from "@idea10/core/workbook";
-import type { FormulaValue } from "@idea10/core/formula";
-import { getSheetContentExtent, type GridExtent } from "@idea10/sheet-engine/extent";
+import type { CellAddress, Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
+import type { FormulaValue } from "@sheetcraft/core/formula";
+import { getSheetContentExtent, type GridExtent } from "@sheetcraft/sheet-engine/extent";
 
 export type SpillProjection = Readonly<{
   root: CellAddress;

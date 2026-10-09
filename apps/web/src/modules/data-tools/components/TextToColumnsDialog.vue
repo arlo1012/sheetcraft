@@ -16,9 +16,9 @@ import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceI
 import { useAppI18n } from "../../../shared/i18n";
 import FixedWidthSplitEditor from "./FixedWidthSplitEditor.vue";
 import type { TextToColumnsDraft } from "../data-tools-types";
-import { convertSplitColumnField, type SplitColumnSuggestion } from "@idea10/core/commands";
-import { formatCellNumberValue } from "@idea10/core/number-format";
-import type { ExcelDateSystem } from "@idea10/core/formula";
+import { convertSplitColumnField, type SplitColumnSuggestion } from "@sheetcraft/core/commands";
+import { formatCellNumberValue } from "@sheetcraft/core/number-format";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
 
 const props = withDefaults(
   defineProps<{
@@ -698,7 +698,7 @@ function confirm(): void {
   min-width: 0;
   &__hint {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__suggestions,
   &__keywords {
@@ -733,7 +733,7 @@ function confirm(): void {
     min-width: 0;
     > span {
       overflow-wrap: anywhere;
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
     }
   }
   &__break-controls {
@@ -793,7 +793,7 @@ function confirm(): void {
     }
     span {
       margin-left: auto;
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
     }
   }
   &__preview {
@@ -801,10 +801,10 @@ function confirm(): void {
     min-width: 0;
     min-height: 0;
     :deep(.text-to-columns-dialog__column--selected) {
-      background: var(--idea-surface-active);
+      background: var(--sheetcraft-surface-active);
     }
     :deep(.text-to-columns-dialog__column--skipped) {
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
       text-decoration: line-through;
     }
   }

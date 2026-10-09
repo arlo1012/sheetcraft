@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
+import type { SheetConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
 import { computed } from "vue";
 import { GripVertical, ArrowDown, ArrowUp, Pencil, Trash2 } from "lucide-vue-next";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
@@ -265,7 +265,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
   &__error {
     margin: 0;
     white-space: normal;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

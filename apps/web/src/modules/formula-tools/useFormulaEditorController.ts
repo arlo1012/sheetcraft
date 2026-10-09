@@ -1,8 +1,8 @@
-import { canEditCell } from "@idea10/core";
+import { canEditCell } from "@sheetcraft/core";
 import { computed, nextTick, ref, watch } from "vue";
-import { formatCellAddress } from "@idea10/core/coordinates";
-import { formatCellContentForInput } from "@idea10/core/input";
-import { getCellContent, type CellAddress, type Workbook } from "@idea10/core/workbook";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
+import { formatCellContentForInput } from "@sheetcraft/core/input";
+import { getCellContent, type CellAddress, type Workbook } from "@sheetcraft/core/workbook";
 import type { CellEditSession } from "../../shared/cell-editing/useCellEditSession";
 import { useAppI18n } from "../../shared/i18n";
 import { previewFormulaInput } from "./formula-value-preview";

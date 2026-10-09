@@ -1,8 +1,8 @@
 import { mount } from "@vue/test-utils";
 import { defineComponent, ref } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
-import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
-import type { CellFillGradient, CellStylePatch } from "@idea10/core/style";
+import { createDefaultSelectionCellStyleState } from "@sheetcraft/core/style-state";
+import type { CellFillGradient, CellStylePatch } from "@sheetcraft/core/style";
 import CellFormatFillPanel from "../../../../../modules/cell-format/components/CellFormatFillPanel.vue";
 import CellFormatFillEffectsDialog from "../../../../../modules/cell-format/components/CellFormatFillEffectsDialog.vue";
 import CellFormatColorControl from "../../../../../modules/cell-format/components/CellFormatColorControl.vue";

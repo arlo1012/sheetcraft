@@ -6,7 +6,7 @@ import {
   setCellValue,
   setColumnWidth,
   setRowHeight,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { mountSheetGrid } from "./fixture";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 

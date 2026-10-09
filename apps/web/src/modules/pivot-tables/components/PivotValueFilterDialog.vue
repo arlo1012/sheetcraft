@@ -2,8 +2,8 @@
 import { computed, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select } from "tdesign-vue-next/es/select";
-import type { PivotValueCondition, PivotValueField } from "@idea10/core/pivot-tables";
-import type { SheetFilterCondition } from "@idea10/core/workbook";
+import type { PivotValueCondition, PivotValueField } from "@sheetcraft/core/pivot-tables";
+import type { SheetFilterCondition } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import FilterConditionEditor from "../../../shared/filter/components/FilterConditionEditor.vue";
 import FilterRankEditor from "../../../shared/filter/components/FilterRankEditor.vue";
@@ -123,10 +123,10 @@ function apply(): void {
 <style scoped lang="scss">
 .pivot-value-filter-dialog {
   display: grid;
-  gap: var(--idea-space-4);
+  gap: var(--sheetcraft-space-4);
   &__measure {
     display: grid;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
 }
 </style>

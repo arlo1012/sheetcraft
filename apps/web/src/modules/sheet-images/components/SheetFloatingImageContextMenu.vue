@@ -91,6 +91,6 @@ function onKeydown(event: KeyboardEvent): void {
 
 <style scoped lang="scss">
 .sheet-floating-image-context-menu {
-  z-index: var(--idea-layer-context-menu);
+  z-index: var(--sheetcraft-layer-context-menu);
 }
 </style>

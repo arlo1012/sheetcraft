@@ -1,5 +1,5 @@
-import type { ImageTransform } from "@idea10/core/workbook";
-import type { Rect } from "@idea10/sheet-engine/geometry";
+import type { ImageTransform } from "@sheetcraft/core/workbook";
+import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 import { paintImagePresentation } from "../../../shared/images/imageAppearance";
 import { getImagePresentation } from "../../../shared/images/imagePresentation";
 

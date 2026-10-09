@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
-import type { ImageCrop } from "@idea10/core/workbook";
-import type { FloatingImageViewportFragment } from "@idea10/sheet-engine/floating-image-layout";
-import type { ImageCropGesture } from "@idea10/sheet-engine/image-crop-selection";
+import type { ImageCrop } from "@sheetcraft/core/workbook";
+import type { FloatingImageViewportFragment } from "@sheetcraft/sheet-engine/floating-image-layout";
+import type { ImageCropGesture } from "@sheetcraft/sheet-engine/image-crop-selection";
 import { useAppI18n } from "../../../shared/i18n";
 import SheetFloatingImageResizeHandle from "../../../shared/sheet-objects/SheetObjectResizeHandle.vue";
 

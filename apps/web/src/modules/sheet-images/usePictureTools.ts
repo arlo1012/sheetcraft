@@ -1,12 +1,15 @@
 import { ref, type Ref } from "vue";
-import { createSetSheetFloatingImagesCommand, type WorkbookCommand } from "@idea10/core/commands";
-import { canUseSheetPermission } from "@idea10/core";
+import {
+  createSetSheetFloatingImagesCommand,
+  type WorkbookCommand,
+} from "@sheetcraft/core/commands";
+import { canUseSheetPermission } from "@sheetcraft/core";
 import {
   normalizeImageTransform,
   type ImageAppearance,
   type FloatingImage,
   type Sheet,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 export type PictureLayerAction = "front" | "forward" | "backward" | "back";
 export type PictureAlignment =

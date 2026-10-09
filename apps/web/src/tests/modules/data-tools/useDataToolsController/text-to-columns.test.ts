@@ -1,14 +1,14 @@
 import { defineComponent, reactive } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import { createSetCellContentCommand } from "@idea10/core/commands";
+import { createSetCellContentCommand } from "@sheetcraft/core/commands";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { datePartsToExcelSerial } from "@idea10/core/formula";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { datePartsToExcelSerial } from "@sheetcraft/core/formula";
 import {
   createSheet,
   createSheetEvaluator,
@@ -16,7 +16,7 @@ import {
   getActiveSheet,
   getCellStyle,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import type { TextToColumnsDraft } from "../../../../modules/data-tools/data-tools-types";
 import { useDataToolsController } from "../../../../modules/data-tools/useDataToolsController";
 import { createAppI18n } from "../../../../shared/i18n";

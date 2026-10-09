@@ -8,7 +8,7 @@ import {
   getSupportedFormulaCandidates,
   replaceFormulaReference,
 } from "../../../shared/formula-editing/formula-input-lexical";
-import { getFormulaFunctionMetadata } from "@idea10/core/formula";
+import { getFormulaFunctionMetadata } from "@sheetcraft/core/formula";
 
 function completion(value: string, start = value.length, end = start) {
   const context = getFormulaCompletionContext(value, start, end);

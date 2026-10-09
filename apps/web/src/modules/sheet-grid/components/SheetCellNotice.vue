@@ -2,7 +2,7 @@
 import { TriangleAlert, X } from "lucide-vue-next";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import { computed, ref } from "vue";
-import type { CellAddress } from "@idea10/core/workbook";
+import type { CellAddress } from "@sheetcraft/core/workbook";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
 
 const props = withDefaults(
@@ -110,25 +110,25 @@ const overlay = computed(() => {
   z-index: 20;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  column-gap: var(--idea-space-4);
+  column-gap: var(--sheetcraft-space-4);
   align-items: start;
   box-sizing: border-box;
   width: max-content;
-  padding: var(--idea-tool-panel-padding);
-  color: var(--idea-text-primary);
-  background: var(--idea-surface-panel);
+  padding: var(--sheetcraft-tool-panel-padding);
+  color: var(--sheetcraft-text-primary);
+  background: var(--sheetcraft-surface-panel);
   pointer-events: none;
-  border: 1px solid var(--idea-border-control);
-  border-radius: var(--idea-radius-small);
-  box-shadow: var(--idea-shadow-menu);
+  border: 1px solid var(--sheetcraft-border-control);
+  border-radius: var(--sheetcraft-radius-small);
+  box-shadow: var(--sheetcraft-shadow-menu);
 
   &--warning {
     width: 280px;
     grid-template-columns: 28px minmax(0, 1fr);
-    background: var(--idea-palette-warning-1);
+    background: var(--sheetcraft-palette-warning-1);
 
     .sheet-cell-notice__icon {
-      color: var(--idea-status-warning);
+      color: var(--sheetcraft-status-warning);
     }
   }
 
@@ -138,7 +138,7 @@ const overlay = computed(() => {
 
   &__icon {
     margin-top: 2px;
-    color: var(--idea-action-primary);
+    color: var(--sheetcraft-action-primary);
   }
 
   &__content {
@@ -147,16 +147,16 @@ const overlay = computed(() => {
 
     strong {
       display: block;
-      font-size: var(--idea-font-size-body-medium);
-      font-weight: var(--idea-font-weight-semibold);
-      line-height: var(--idea-line-height-body-medium);
+      font-size: var(--sheetcraft-font-size-body-medium);
+      font-weight: var(--sheetcraft-font-weight-semibold);
+      line-height: var(--sheetcraft-line-height-body-medium);
     }
 
     p {
       margin: 0;
-      color: var(--idea-text-primary);
-      font-size: var(--idea-font-size-body-small);
-      line-height: var(--idea-line-height-body-small);
+      color: var(--sheetcraft-text-primary);
+      font-size: var(--sheetcraft-font-size-body-small);
+      line-height: var(--sheetcraft-line-height-body-small);
       overflow-wrap: anywhere;
       white-space: pre-line;
     }
@@ -165,8 +165,8 @@ const overlay = computed(() => {
   &__header {
     display: flex;
     align-items: center;
-    gap: var(--idea-space-4);
-    margin-bottom: var(--idea-space-1);
+    gap: var(--sheetcraft-space-4);
+    margin-bottom: var(--sheetcraft-space-1);
   }
 
   &__close {
@@ -177,10 +177,10 @@ const overlay = computed(() => {
     width: 18px;
     height: 18px;
     padding: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     background: transparent;
     border: 0;
-    border-radius: var(--idea-radius-small);
+    border-radius: var(--sheetcraft-radius-small);
     cursor: pointer;
   }
 }

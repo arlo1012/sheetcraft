@@ -1,8 +1,13 @@
-import { MergedCellRangeResolver } from "@idea10/core";
-import type { CellBorder, CellStyle } from "@idea10/core/style";
-import { getCellStyle, type CellAddress, type CellRange, type Sheet } from "@idea10/core/workbook";
-import type { Point, SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
-import type { RowVisibilityIndex } from "@idea10/sheet-engine/visibility";
+import { MergedCellRangeResolver } from "@sheetcraft/core";
+import type { CellBorder, CellStyle } from "@sheetcraft/core/style";
+import {
+  getCellStyle,
+  type CellAddress,
+  type CellRange,
+  type Sheet,
+} from "@sheetcraft/core/workbook";
+import type { Point, SheetGeometry, VisibleCellRange } from "@sheetcraft/sheet-engine/geometry";
+import type { RowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import {
   getBorderLinePresentation,
   getCellBorderCss,

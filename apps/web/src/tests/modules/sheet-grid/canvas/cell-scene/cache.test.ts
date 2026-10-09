@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
-import { MergedCellRangeResolver } from "@idea10/core";
-import type { ConditionalFormatCondition } from "@idea10/core/conditional-formatting";
-import { createBuiltinTableStyles } from "@idea10/core/table-styles";
+import { MergedCellRangeResolver } from "@sheetcraft/core";
+import type { ConditionalFormatCondition } from "@sheetcraft/core/conditional-formatting";
+import { createBuiltinTableStyles } from "@sheetcraft/core/table-styles";
 import {
   createSheet,
   createSheetEvaluator,
@@ -9,10 +9,10 @@ import {
   setCellNote,
   setCellStyle,
   setCellValue,
-} from "@idea10/core/workbook";
-import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
-import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
-import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
+} from "@sheetcraft/core/workbook";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
+import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import {
   createCellPresentationCache,
   createSheetCanvasScene,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { formatCellNumberValue } from "@idea10/core/number-format";
+import { formatCellNumberValue } from "@sheetcraft/core/number-format";
 import {
   formatCellValueForGrid,
   getCellValuePresentationForGrid,

@@ -3,8 +3,8 @@ import type {
   SheetPageDecoration,
   SheetWatermark,
   WatermarkPreset,
-} from "@idea10/core/page-decoration";
-import type { Sheet, Workbook } from "@idea10/core/workbook";
+} from "@sheetcraft/core/page-decoration";
+import type { Sheet, Workbook } from "@sheetcraft/core/workbook";
 import type { ImageAssetStore } from "../image-assets/imageAssetStore";
 import { ImageAssetError, prepareImageAsset } from "../image-assets/prepareImageAsset";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";

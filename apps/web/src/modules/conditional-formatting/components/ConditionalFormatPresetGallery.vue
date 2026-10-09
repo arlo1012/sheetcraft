@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ConditionalFormatIconSet } from "@idea10/core/conditional-formatting";
+import type { ConditionalFormatIconSet } from "@sheetcraft/core/conditional-formatting";
 import { paintConditionalFormatVisual } from "../../../shared/conditional-formatting/conditional-format-painter";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
@@ -282,8 +282,8 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
   width: 46px;
   height: 36px;
   overflow: hidden;
-  border: 1px solid var(--idea-border-control);
-  background: var(--idea-surface-panel);
+  border: 1px solid var(--sheetcraft-border-control);
+  background: var(--sheetcraft-surface-panel);
 
   i {
     display: block;
@@ -296,13 +296,13 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
     background-image: repeating-linear-gradient(
       to bottom,
       transparent 0 10px,
-      var(--idea-border-subtle) 10px 11px
+      var(--sheetcraft-border-subtle) 10px 11px
     );
     i {
       background: linear-gradient(
         90deg,
         var(--bar-color),
-        color-mix(in srgb, var(--bar-color) 18%, var(--idea-surface-panel))
+        color-mix(in srgb, var(--bar-color) 18%, var(--sheetcraft-surface-panel))
       );
     }
   }
@@ -312,7 +312,7 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
   &--scale {
     grid-template-rows: repeat(5, 1fr);
     gap: 1px;
-    background: var(--idea-surface-panel);
+    background: var(--sheetcraft-surface-panel);
     i {
       background-image: linear-gradient(
         90deg,

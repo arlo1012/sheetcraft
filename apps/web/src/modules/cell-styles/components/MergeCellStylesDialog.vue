@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import type { CellStyleDefinition } from "@idea10/core/cell-styles";
+import type { CellStyleDefinition } from "@sheetcraft/core/cell-styles";
 import { useAppI18n } from "../../../shared/i18n";
 
 const props = defineProps<{
@@ -104,17 +104,17 @@ function confirm(): void {
   &__empty,
   &__error {
     margin: 0;
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-medium);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-medium);
   }
 
   &__hint,
   &__empty {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 
   &__error {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

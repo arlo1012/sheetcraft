@@ -19,17 +19,17 @@ const sourceExtensions = new Set([".ts", ".tsx", ".vue", ".css", ".scss"]);
 const ignoredDirectories = new Set(["dist", "node_modules", ".git", "coverage"]);
 const runtimePackages = [
   {
-    name: "@idea10/core",
+    name: "@sheetcraft/core",
     sourceDirectory: "packages/core/src",
     manifest: "packages/core/package.json",
   },
   {
-    name: "@idea10/sheet-engine",
+    name: "@sheetcraft/sheet-engine",
     sourceDirectory: "packages/sheet-engine/src",
     manifest: "packages/sheet-engine/package.json",
   },
   {
-    name: "@idea10/xlsx-io",
+    name: "@sheetcraft/xlsx-io",
     sourceDirectory: "packages/xlsx-io/src",
     manifest: "packages/xlsx-io/package.json",
   },
@@ -326,27 +326,27 @@ function getDependencyDirectionViolation(
   packageName: string,
   specifier: string,
 ): string | undefined {
-  if (packageName === "@idea10/core") {
-    if (/^@idea10\/(?:sheet-engine|xlsx-io|web)(?:\/|$)/u.test(specifier)) {
-      return `@idea10/core must not depend on ${specifier}`;
+  if (packageName === "@sheetcraft/core") {
+    if (/^@sheetcraft\/(?:sheet-engine|xlsx-io|web)(?:\/|$)/u.test(specifier)) {
+      return `@sheetcraft/core must not depend on ${specifier}`;
     }
     return undefined;
   }
-  if (packageName === "@idea10/sheet-engine") {
+  if (packageName === "@sheetcraft/sheet-engine") {
     if (specifier.startsWith(".") || specifier.startsWith("/")) {
       return undefined;
     }
-    if (specifier === "@idea10/core" || specifier.startsWith("@idea10/core/")) {
+    if (specifier === "@sheetcraft/core" || specifier.startsWith("@sheetcraft/core/")) {
       return undefined;
     }
-    return `@idea10/sheet-engine may only depend on @idea10/core, not ${specifier}`;
+    return `@sheetcraft/sheet-engine may only depend on @sheetcraft/core, not ${specifier}`;
   }
-  if (packageName === "@idea10/xlsx-io") {
-    if (/^@idea10\/(?:sheet-engine|web)(?:\/|$)/u.test(specifier)) {
-      return `@idea10/xlsx-io must not depend on ${specifier}`;
+  if (packageName === "@sheetcraft/xlsx-io") {
+    if (/^@sheetcraft\/(?:sheet-engine|web)(?:\/|$)/u.test(specifier)) {
+      return `@sheetcraft/xlsx-io must not depend on ${specifier}`;
     }
     if (specifier.startsWith("exceljs/") && specifier !== "exceljs/dist/exceljs.min.js") {
-      return "@idea10/xlsx-io must use the audited ExcelJS browser artifact, never the Node entry";
+      return "@sheetcraft/xlsx-io must use the audited ExcelJS browser artifact, never the Node entry";
     }
   }
   return undefined;
@@ -354,16 +354,16 @@ function getDependencyDirectionViolation(
 
 function assertDependencyDirection(): void {
   const rejectedCoreDependency = getDependencyDirectionViolation(
-    "@idea10/core",
-    "@idea10/sheet-engine/selection",
+    "@sheetcraft/core",
+    "@sheetcraft/sheet-engine/selection",
   );
   const rejectedSheetEngineDependency = getDependencyDirectionViolation(
-    "@idea10/sheet-engine",
-    "@idea10/web",
+    "@sheetcraft/sheet-engine",
+    "@sheetcraft/web",
   );
   const allowedSheetEngineDependency = getDependencyDirectionViolation(
-    "@idea10/sheet-engine",
-    "@idea10/core/workbook",
+    "@sheetcraft/sheet-engine",
+    "@sheetcraft/core/workbook",
   );
   if (!rejectedCoreDependency || !rejectedSheetEngineDependency || allowedSheetEngineDependency) {
     throw new Error("Boundary detector dependency-direction regression.");
@@ -400,7 +400,7 @@ function checkRuntimeNeutralPackage(
       continue;
     }
     const moduleName = specifier.replace(/^node:/u, "").split("/")[0] ?? specifier;
-    if (packageName === "@idea10/xlsx-io" && specifier === "exceljs") {
+    if (packageName === "@sheetcraft/xlsx-io" && specifier === "exceljs") {
       addViolation(
         violations,
         path,
@@ -497,7 +497,7 @@ function checkWebSource(path: string, violations: Violation[]): void {
     if (!specifier) {
       continue;
     }
-    if (/^@idea10\/(?:core|sheet-engine|xlsx-io)\/src(?:\/|$)/u.test(specifier)) {
+    if (/^@sheetcraft\/(?:core|sheet-engine|xlsx-io)\/src(?:\/|$)/u.test(specifier)) {
       addViolation(
         violations,
         path,

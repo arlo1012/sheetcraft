@@ -1,6 +1,6 @@
 import { shallowRef, watch } from "vue";
-import { createSetCellContentCommand, type WorkbookCommand } from "@idea10/core/commands";
-import type { CellAddress, CellRange, Sheet } from "@idea10/core/workbook";
+import { createSetCellContentCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import type { CellAddress, CellRange, Sheet } from "@sheetcraft/core/workbook";
 import type {
   SheetContextMenuState,
   SheetContextRequest,

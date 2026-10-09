@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import type { CellFillGradient } from "@idea10/core/style";
+import type { CellFillGradient } from "@sheetcraft/core/style";
 import CellFormatColorControl from "../../../../../modules/cell-format/components/CellFormatColorControl.vue";
 import CellFormatFillEffectsDialog from "../../../../../modules/cell-format/components/CellFormatFillEffectsDialog.vue";
 import { createAppI18n } from "../../../../../shared/i18n";

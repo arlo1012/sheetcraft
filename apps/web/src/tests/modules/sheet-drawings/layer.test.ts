@@ -1,10 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import type { SheetDrawing } from "@idea10/core/sheet-drawings";
-import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
-import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
-import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
+import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import SheetDrawingLayer from "../../../modules/sheet-drawings/components/SheetDrawingLayer.vue";
 import { createAppI18n } from "../../../shared/i18n";
 

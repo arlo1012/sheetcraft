@@ -2,15 +2,15 @@ import {
   DEFAULT_CELL_FONT_FAMILY,
   DEFAULT_CELL_FONT_SIZE,
   type CellStyle,
-} from "@idea10/core/style";
-import { formatComputedValueForDisplay, type FormulaValue } from "@idea10/core";
+} from "@sheetcraft/core/style";
+import { formatComputedValueForDisplay, type FormulaValue } from "@sheetcraft/core";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
   MAX_ROW_HEIGHT,
   type CellAddress,
   type Cell,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   getCellTextGraphemes,
   isCellTextCjkGrapheme,

@@ -12,15 +12,15 @@ import {
   DataFillError,
   type SetCellContentsCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import { parseCellInput } from "@idea10/core/input";
+} from "@sheetcraft/core/commands";
+import { parseCellInput } from "@sheetcraft/core/input";
 import {
   getActiveSheet,
   isCellAddressInBounds,
   type CellAddress,
   type CellRange,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import {
   formatRangeReference,

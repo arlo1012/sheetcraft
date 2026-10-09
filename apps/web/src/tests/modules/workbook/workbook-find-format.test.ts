@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import type { SheetSearchFormat } from "@idea10/core/search";
-import type { CellStyle } from "@idea10/core/style";
+import type { SheetSearchFormat } from "@sheetcraft/core/search";
+import type { CellStyle } from "@sheetcraft/core/style";
 import {
   applyFindFormatChange,
   buildFindFormatFromCell,

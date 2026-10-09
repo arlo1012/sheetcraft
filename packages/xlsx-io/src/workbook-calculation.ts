@@ -3,7 +3,7 @@ import {
   DEFAULT_WORKBOOK_CALCULATION_SETTINGS,
   normalizeWorkbookCalculationSettings,
   type WorkbookCalculationSettings,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 
 function readAttribute(attributes: string, name: string): string | undefined {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

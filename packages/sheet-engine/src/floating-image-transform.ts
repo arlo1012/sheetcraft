@@ -5,7 +5,7 @@ import {
   type FloatingImage,
   type ImageCrop,
   type ImageTransform,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import type { SheetViewportLayout } from "./viewport-layout.js";
 import {
   getFloatingImageSheetRect,

@@ -2,21 +2,26 @@ import {
   applyWorkbookCommand,
   createApplyCellFormatCommand,
   type CellFormatChange,
-} from "@idea10/core/commands";
+} from "@sheetcraft/core/commands";
 import {
   CELL_STYLE_KEYS,
   cloneCellStyle,
   type CellBorderAction,
   type CellStyle,
-} from "@idea10/core/style";
+} from "@sheetcraft/core/style";
 import {
   getSelectionBorderState,
   getSelectionCellStyleState,
   type SelectionBorderState,
   type SelectionCellStyleState,
-} from "@idea10/core/style-state";
-import { createWorkbook, getActiveSheet, getCellStyle, setCellStyle } from "@idea10/core/workbook";
-import type { SheetSearchFormat } from "@idea10/core/search";
+} from "@sheetcraft/core/style-state";
+import {
+  createWorkbook,
+  getActiveSheet,
+  getCellStyle,
+  setCellStyle,
+} from "@sheetcraft/core/workbook";
+import type { SheetSearchFormat } from "@sheetcraft/core/search";
 import type { WorkbookFindFormatMode } from "./workbook-find-types";
 
 export type FindFormatDraft = {

@@ -7,8 +7,8 @@ import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Slider as TSlider } from "tdesign-vue-next/es/slider";
-import type { SheetWatermark } from "@idea10/core/page-decoration";
-import { DEFAULT_SHEET_WATERMARK } from "@idea10/core/page-decoration";
+import type { SheetWatermark } from "@sheetcraft/core/page-decoration";
+import { DEFAULT_SHEET_WATERMARK } from "@sheetcraft/core/page-decoration";
 import {
   CELL_FONT_FAMILY_PRESETS,
   CELL_FONT_SIZE_PRESETS,
@@ -385,24 +385,24 @@ onBeforeUnmount(clearLocalImage);
   &__image-controls {
     margin: 10px 0 18px;
     padding: 12px 0 0;
-    border-top: 1px dashed var(--idea-border-control);
+    border-top: 1px dashed var(--sheetcraft-border-control);
   }
   &__choose-image {
     width: 100%;
     min-height: 42px;
-    border: 1px dashed var(--idea-border-control);
+    border: 1px dashed var(--sheetcraft-border-control);
     border-radius: 6px;
     background: transparent;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     cursor: pointer;
   }
   &__choose-image:disabled {
     cursor: default;
   }
   &__choose-image.is-drag-over {
-    border-color: var(--idea-action-primary);
-    background: var(--idea-action-primary-subtle);
-    color: var(--idea-action-primary);
+    border-color: var(--sheetcraft-action-primary);
+    background: var(--sheetcraft-action-primary-subtle);
+    color: var(--sheetcraft-action-primary);
   }
   &__form {
     margin-top: 10px;
@@ -410,7 +410,7 @@ onBeforeUnmount(clearLocalImage);
   &__scope {
     margin-top: 18px;
     padding-top: 12px;
-    border-top: 1px solid var(--idea-border-control);
+    border-top: 1px solid var(--sheetcraft-border-control);
   }
   &__opacity {
     display: grid;
@@ -432,12 +432,12 @@ onBeforeUnmount(clearLocalImage);
   &__preview h3 {
     margin: 0 0 16px;
     font-size: 14px;
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
   }
   &__paper {
     aspect-ratio: 210 / 297;
     overflow: hidden;
-    border: 1px solid var(--idea-border-control);
+    border: 1px solid var(--sheetcraft-border-control);
     border-radius: 6px;
     background: white;
     box-shadow: 0 2px 6px rgb(0 0 0 / 4%);

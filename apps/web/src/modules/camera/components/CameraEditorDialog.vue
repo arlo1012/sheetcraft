@@ -3,7 +3,7 @@ import { ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import type { SheetCameraDrawing } from "@idea10/core/sheet-drawings";
+import type { SheetCameraDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useAppI18n } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { formatRangeReference } from "../../../shared/range-reference/formatRangeReference";
@@ -62,7 +62,7 @@ const source = ref(
     color: var(--text-secondary);
   }
   [role="alert"] {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

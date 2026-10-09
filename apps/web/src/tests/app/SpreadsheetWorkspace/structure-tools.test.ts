@@ -1,6 +1,6 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import { getCellValue } from "@idea10/core/workbook";
+import { getCellValue } from "@sheetcraft/core/workbook";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import SheetProtectionDialog from "../../../modules/review-tools/components/SheetProtectionDialog.vue";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";

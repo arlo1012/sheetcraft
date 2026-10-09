@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { placePivotField, removePivotField } from "../../../modules/pivot-tables/pivot-field-edits";
 import { fixture } from "./fixture";
-import type { SheetPivotTable } from "@idea10/core/pivot-tables";
+import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 const caption = (aggregate: string, field: string) => `${aggregate} ${field}`;
 const numeric = { field: 2, label: "Amount", numeric: true };
 function filteredTable(): SheetPivotTable {

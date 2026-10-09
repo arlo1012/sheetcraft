@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { WorkbookDomainError } from "@idea10/core/errors";
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
 import { reactive } from "vue";
 import {
   createWorkbookSession,
@@ -7,16 +7,16 @@ import {
   executeWorkbookCommand,
   undoWorkbookCommand,
   redoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createSetCellContentCommand } from "@idea10/core/commands";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { createSetCellContentCommand } from "@sheetcraft/core/commands";
 import {
   getActiveSheet,
   getCellValue,
   getCellStyle,
   setCellValue,
   setCellStyle,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { createCellFillActions } from "../../../../modules/sheet-grid/cell-fill-actions";
 
 function setup() {

@@ -5,15 +5,15 @@ import {
   type LookupFillOptions,
   type LookupFillPreview,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import { WorkbookDomainError } from "@idea10/core/errors";
+} from "@sheetcraft/core/commands";
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
 import {
   createWorkbookEvaluator,
   getActiveSheet,
   type CellRange,
   type Workbook,
-} from "@idea10/core/workbook";
-import { formatFormulaAddress } from "@idea10/core/formula";
+} from "@sheetcraft/core/workbook";
+import { formatFormulaAddress } from "@sheetcraft/core/formula";
 import { useAppI18n } from "../../shared/i18n";
 import {
   formatRangeReference,

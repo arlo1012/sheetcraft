@@ -24,8 +24,8 @@ import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/
 import type { RadioValue } from "tdesign-vue-next/es/radio/type";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
-import type { DefinedNameLabelPosition } from "@idea10/core/commands";
-import type { WorkbookCalculationSettings } from "@idea10/core/workbook";
+import type { DefinedNameLabelPosition } from "@sheetcraft/core/commands";
+import type { WorkbookCalculationSettings } from "@sheetcraft/core/workbook";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -544,12 +544,12 @@ function insertFunction(name: string): void {
     letter-spacing: -0.5px;
   }
   &__sum-menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
   }
   &__name-menu,
   &__calculation-menu {
-    color: var(--idea-text-primary);
-    font-size: var(--idea-font-size-body-medium);
+    color: var(--sheetcraft-text-primary);
+    font-size: var(--sheetcraft-font-size-body-medium);
   }
   &__name-menu {
     display: grid;
@@ -557,8 +557,8 @@ function insertFunction(name: string): void {
     min-width: 210px;
     p {
       margin: 0 0 2px;
-      color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-body-small);
+      color: var(--sheetcraft-text-secondary);
+      font-size: var(--sheetcraft-font-size-body-small);
     }
   }
   &__name-menu-actions {
@@ -576,7 +576,7 @@ function insertFunction(name: string): void {
     display: grid;
     gap: 8px;
     > span {
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
     }
   }
   &__number-field {

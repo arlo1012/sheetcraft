@@ -1,7 +1,7 @@
-import type { CellAddress } from "@idea10/core/workbook";
-import type { FrozenPaneId } from "@idea10/sheet-engine/frozen-layout";
-import type { Point, Rect, Size } from "@idea10/sheet-engine/geometry";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { CellAddress } from "@sheetcraft/core/workbook";
+import type { FrozenPaneId } from "@sheetcraft/sheet-engine/frozen-layout";
+import type { Point, Rect, Size } from "@sheetcraft/sheet-engine/geometry";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 
 export type HeaderItem = Readonly<{ index: number; offset: number; size: number }>;
 export type HeaderPane = Readonly<{

@@ -19,8 +19,8 @@ const harness = vi.hoisted(() => {
   };
 });
 
-vi.mock("@idea10/core/workbook", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@idea10/core/workbook")>();
+vi.mock("@sheetcraft/core/workbook", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@sheetcraft/core/workbook")>();
   return {
     ...actual,
     createSheetEvaluator(sheet: Parameters<typeof actual.createSheetEvaluator>[0]) {
@@ -32,8 +32,8 @@ vi.mock("@idea10/core/workbook", async (importOriginal) => {
   };
 });
 
-vi.mock("@idea10/sheet-engine/row-height", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@idea10/sheet-engine/row-height")>();
+vi.mock("@sheetcraft/sheet-engine/row-height", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@sheetcraft/sheet-engine/row-height")>();
   return {
     ...actual,
     createAutoRowHeightCalculator: () => ({ reconcile: harness.reconcile, clear: vi.fn() }),
@@ -45,8 +45,8 @@ import {
   getActiveSheet,
   setCellContent,
   setCellValue,
-} from "@idea10/core/workbook";
-import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
+} from "@sheetcraft/core/workbook";
+import { createSheetGridViewState } from "@sheetcraft/sheet-engine/view-state";
 import SheetGrid from "../../../../../modules/sheet-grid/components/SheetGrid.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 

@@ -388,7 +388,7 @@ watch(
   &__content {
     display: flex;
     flex-direction: column;
-    gap: var(--idea-space-5);
+    gap: var(--sheetcraft-space-5);
     min-width: 0;
     max-height: calc(100dvh - 180px);
   }
@@ -398,7 +398,7 @@ watch(
   &__section-heading {
     display: flex;
     align-items: center;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
     min-width: 0;
   }
 
@@ -412,27 +412,27 @@ watch(
     flex-wrap: wrap;
 
     label {
-      font-weight: var(--idea-font-weight-medium);
+      font-weight: var(--sheetcraft-font-weight-medium);
     }
   }
 
   &__target {
     min-width: 0;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
     overflow-wrap: anywhere;
 
     strong {
-      margin-inline-start: var(--idea-space-2);
-      color: var(--idea-text-primary);
-      font-weight: var(--idea-font-weight-medium);
+      margin-inline-start: var(--sheetcraft-space-2);
+      color: var(--sheetcraft-text-primary);
+      font-weight: var(--sheetcraft-font-weight-medium);
     }
   }
 
   &__body {
     display: grid;
     align-content: start;
-    gap: var(--idea-space-6);
+    gap: var(--sheetcraft-space-6);
     min-height: 0;
     overflow: auto;
   }
@@ -440,7 +440,7 @@ watch(
   &__editor,
   &__arguments {
     display: grid;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
     min-width: 0;
   }
 
@@ -452,34 +452,34 @@ watch(
   &__hint,
   &__details p {
     margin: 0;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
 
   &__section-heading {
-    font-size: var(--idea-font-size-body-small);
-    color: var(--idea-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    color: var(--sheetcraft-text-secondary);
 
     strong {
-      font-weight: var(--idea-font-weight-medium);
-      color: var(--idea-text-primary);
+      font-weight: var(--sheetcraft-font-weight-medium);
+      color: var(--sheetcraft-text-primary);
     }
   }
 
   &__argument-fields {
     display: grid;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
 
     label {
       display: grid;
       grid-template-columns: minmax(80px, 128px) minmax(0, 1fr);
       align-items: center;
-      gap: var(--idea-space-5);
+      gap: var(--sheetcraft-space-5);
       min-width: 0;
 
       > span {
-        color: var(--idea-text-secondary);
+        color: var(--sheetcraft-text-secondary);
         text-align: right;
         overflow-wrap: anywhere;
       }
@@ -488,7 +488,7 @@ watch(
 
   &__details {
     display: grid;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     min-width: 0;
     overflow-wrap: anywhere;
 
@@ -498,34 +498,34 @@ watch(
     }
 
     .formula-editor-dialog__argument {
-      color: var(--idea-text-primary);
+      color: var(--sheetcraft-text-primary);
     }
   }
 
   &__signature {
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
   }
 
   &__result {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: baseline;
-    gap: var(--idea-space-5);
+    gap: var(--sheetcraft-space-5);
     flex: none;
-    padding-top: var(--idea-space-5);
-    border-top: 1px solid var(--idea-border-control);
+    padding-top: var(--sheetcraft-space-5);
+    border-top: 1px solid var(--sheetcraft-border-control);
 
     > span {
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
     }
 
     output {
       max-height: 84px;
       overflow: auto;
-      font-size: var(--idea-font-size-body-large);
-      line-height: var(--idea-line-height-body-large);
-      font-weight: var(--idea-font-weight-medium);
-      color: var(--idea-text-primary);
+      font-size: var(--sheetcraft-font-size-body-large);
+      line-height: var(--sheetcraft-line-height-body-large);
+      font-weight: var(--sheetcraft-font-weight-medium);
+      color: var(--sheetcraft-text-primary);
       white-space: pre-wrap;
       overflow-wrap: anywhere;
     }
@@ -534,15 +534,15 @@ watch(
   &__error {
     flex: none;
     margin: 0;
-    color: var(--idea-text-danger);
-    font-size: var(--idea-font-size-body-small);
+    color: var(--sheetcraft-text-danger);
+    font-size: var(--sheetcraft-font-size-body-small);
   }
 }
 
 @media (max-width: 560px) {
   .formula-editor-dialog__argument-fields label {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
 
     > span {
       text-align: start;

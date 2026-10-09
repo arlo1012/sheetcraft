@@ -4,19 +4,19 @@ import {
   type CellStyle,
   type CellTextDirection,
   type HorizontalCellAlignment,
-} from "@idea10/core/style";
-import type { FormulaValue } from "@idea10/core/formula";
-import type { CellNumberFormatPresentation } from "@idea10/core/number-format";
+} from "@sheetcraft/core/style";
+import type { FormulaValue } from "@sheetcraft/core/formula";
+import type { CellNumberFormatPresentation } from "@sheetcraft/core/number-format";
 import {
   getCellTextGraphemes,
   splitCellTextLines,
   MAX_CELL_TEXT_LAYOUT_LINES,
-} from "@idea10/sheet-engine/text-layout";
+} from "@sheetcraft/sheet-engine/text-layout";
 import {
   WRAPPED_CELL_LINE_HEIGHT,
   type AutoRowHeightFont,
   type TextMeasurer,
-} from "@idea10/sheet-engine/row-height";
+} from "@sheetcraft/sheet-engine/row-height";
 import { getCellTextRenderFontSize } from "./font-presentation";
 
 export type ResolvedCellTextAlignment =

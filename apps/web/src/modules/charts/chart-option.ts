@@ -1,7 +1,7 @@
 import type { EChartsOption, SeriesOption } from "echarts";
-import { formatCellNumberValue } from "@idea10/core/number-format";
-import type { CellNumberFormat } from "@idea10/core/style";
-import type { ChartData, SheetChart } from "@idea10/core/sheet-charts";
+import { formatCellNumberValue } from "@sheetcraft/core/number-format";
+import type { CellNumberFormat } from "@sheetcraft/core/style";
+import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 const colors = ["#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#db2777"];
 function buildChartOption(chart: SheetChart, data: ChartData): EChartsOption {
   const common: EChartsOption = {

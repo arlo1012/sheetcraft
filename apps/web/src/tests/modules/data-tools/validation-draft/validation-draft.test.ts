@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { datePartsToExcelSerial } from "@idea10/core/formula";
+import { datePartsToExcelSerial } from "@sheetcraft/core/formula";
 import {
   createValidationDraft,
   isValidationDraftComplete,

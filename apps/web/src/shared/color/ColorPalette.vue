@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ChevronRight } from "lucide-vue-next";
-import type { ThemeColorReference } from "@idea10/core/workbook-theme";
+import type { ThemeColorReference } from "@sheetcraft/core/workbook-theme";
 import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useAppI18n } from "../i18n";
@@ -392,9 +392,9 @@ function getPanelAttach(): HTMLElement {
   --color-palette-swatch-size: 16px;
 
   width: 208px;
-  padding: var(--idea-tool-panel-padding);
-  background: var(--idea-surface-panel);
-  color: var(--idea-text-primary);
+  padding: var(--sheetcraft-tool-panel-padding);
+  background: var(--sheetcraft-surface-panel);
+  color: var(--sheetcraft-text-primary);
 
   &__default,
   &__more,
@@ -402,17 +402,17 @@ function getPanelAttach(): HTMLElement {
   &__actions button {
     width: 100%;
     min-height: 25px;
-    border: 1px solid var(--idea-border-control);
+    border: 1px solid var(--sheetcraft-border-control);
     border-radius: 2px;
-    background: var(--idea-surface-panel);
+    background: var(--sheetcraft-surface-panel);
     color: inherit;
     font: inherit;
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
     cursor: pointer;
 
     &:hover {
-      background: var(--idea-surface-hover);
+      background: var(--sheetcraft-surface-hover);
     }
   }
 
@@ -421,10 +421,10 @@ function getPanelAttach(): HTMLElement {
   }
   &__heading {
     margin: 0 0 3px;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-medium);
-    font-weight: var(--idea-font-weight-medium);
-    line-height: var(--idea-line-height-body-medium);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    font-weight: var(--sheetcraft-font-weight-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
   }
   &__grid {
     display: grid;
@@ -446,17 +446,17 @@ function getPanelAttach(): HTMLElement {
       border-color: rgb(0 0 0 / 32%);
     }
     &.is-selected {
-      outline: 1px solid var(--idea-text-primary);
+      outline: 1px solid var(--sheetcraft-text-primary);
       outline-offset: 1px;
     }
     &:focus-visible {
-      outline: 2px solid var(--idea-action-primary);
+      outline: 2px solid var(--sheetcraft-action-primary);
       outline-offset: 1px;
     }
   }
   &__swatch--empty {
-    border-color: var(--idea-border-control);
-    background: var(--idea-surface-panel);
+    border-color: var(--sheetcraft-border-control);
+    background: var(--sheetcraft-surface-panel);
   }
   &__more {
     display: flex;
@@ -466,7 +466,7 @@ function getPanelAttach(): HTMLElement {
     margin-top: 9px;
     border-width: 0;
     text-align: left;
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
   }
   &__clear {
     margin-top: 8px;
@@ -483,7 +483,8 @@ function getPanelAttach(): HTMLElement {
   &__actions {
     display: flex;
     gap: 6px;
-    padding: var(--idea-space-2) var(--idea-tool-panel-padding) var(--idea-tool-panel-padding);
+    padding: var(--sheetcraft-space-2) var(--sheetcraft-tool-panel-padding)
+      var(--sheetcraft-tool-panel-padding);
   }
   &__actions button {
     width: auto;
@@ -495,8 +496,8 @@ function getPanelAttach(): HTMLElement {
     padding: 0;
 
     .color-palette__apply {
-      border-color: var(--idea-action-primary);
-      background: var(--idea-action-primary);
+      border-color: var(--sheetcraft-action-primary);
+      background: var(--sheetcraft-action-primary);
       color: #fff;
     }
   }
@@ -506,7 +507,7 @@ function getPanelAttach(): HTMLElement {
     padding: 0;
     width: calc(
       var(--color-palette-columns) * var(--color-palette-swatch-size) +
-        (var(--color-palette-columns) - 1) * 3px + 2 * var(--idea-tool-panel-padding)
+        (var(--color-palette-columns) - 1) * 3px + 2 * var(--sheetcraft-tool-panel-padding)
     );
     max-width: min(360px, 100%, calc(100vw - 32px));
 
@@ -517,7 +518,7 @@ function getPanelAttach(): HTMLElement {
     .color-palette__view--palette {
       display: flex;
       flex-direction: column;
-      padding: var(--idea-tool-panel-padding);
+      padding: var(--sheetcraft-tool-panel-padding);
 
       .color-palette__section:last-of-type {
         margin-bottom: 9px;

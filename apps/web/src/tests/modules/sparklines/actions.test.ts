@@ -3,16 +3,16 @@ import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
+} from "@sheetcraft/core/history";
 import {
   createWorkbook,
   createSheet,
   getActiveSheet,
   getCellSparkline,
   insertSheet,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useSparklineActions } from "../../../modules/sparklines/useSparklineActions";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 
 function fixture() {
   let workbook = createWorkbook({ id: "sparklines", sheetId: "first" });

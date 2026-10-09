@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import type { SheetFilterCondition } from "@idea10/core/workbook";
-import type { ExcelDateSystem } from "@idea10/core/formula";
+import type { SheetFilterCondition } from "@sheetcraft/core/workbook";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
 import { useAppI18n } from "../../i18n";
 import type { FilterValueKind } from "../custom-filter-draft";
 import type { FilterConditionAction } from "../filter-condition-actions";
@@ -59,7 +59,7 @@ const condition = ref<SheetFilterCondition>();
 <style scoped lang="scss">
 .filter-condition-dialog {
   display: grid;
-  gap: var(--idea-space-4);
+  gap: var(--sheetcraft-space-4);
   &__caption {
     margin: 0;
   }

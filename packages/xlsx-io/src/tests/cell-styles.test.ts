@@ -7,14 +7,14 @@ import {
   getCellNamedStyle,
   getCellStyle,
   setCellStyle,
-} from "@idea10/core/workbook";
-import { createClearCellStylePatch } from "@idea10/core/style";
+} from "@sheetcraft/core/workbook";
+import { createClearCellStylePatch } from "@sheetcraft/core/style";
 import {
   applySetWorkbookCellStylesCommand,
   createApplyCellStyleCommand,
   createSetWorkbookCellStylesCommand,
-} from "@idea10/core/commands";
-import { createWorkbookSession, executeWorkbookCommand } from "@idea10/core/history";
+} from "@sheetcraft/core/commands";
+import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../index.js";
 import { readXlsxCellStyles } from "../cell-styles.js";

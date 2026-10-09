@@ -222,7 +222,7 @@ watch(
 @use "../../../shared/floating/floating-panel" as panel;
 
 .sheet-floating-image-toolbar {
-  @include panel.toolbar-surface(var(--idea-layer-toolbar));
+  @include panel.toolbar-surface(var(--sheetcraft-layer-toolbar));
 
   position: fixed;
   display: inline-flex;
@@ -242,7 +242,7 @@ watch(
     background: transparent;
     border: 1px solid transparent;
     border-radius: 2px;
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
     cursor: pointer;
 
     &:not(:last-child)::after {
@@ -251,7 +251,7 @@ watch(
       right: -5px;
       width: 1px;
       height: 14px;
-      background: var(--idea-border-strong);
+      background: var(--sheetcraft-border-strong);
       transform: translateY(-50%);
       pointer-events: none;
       content: "";
@@ -259,7 +259,7 @@ watch(
 
     &:disabled,
     &[aria-disabled="true"] {
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
       cursor: default;
     }
   }
@@ -270,7 +270,7 @@ watch(
 
   &__rotate-menu {
     position: fixed;
-    z-index: var(--idea-layer-sheet-menu);
+    z-index: var(--sheetcraft-layer-sheet-menu);
   }
 }
 </style>

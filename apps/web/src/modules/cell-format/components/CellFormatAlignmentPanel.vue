@@ -11,8 +11,8 @@ import type {
   CellTextRotation,
   HorizontalCellAlignment,
   VerticalCellAlignment,
-} from "@idea10/core/style";
-import type { SelectionCellStyleState, ToggleStyleState } from "@idea10/core/style-state";
+} from "@sheetcraft/core/style";
+import type { SelectionCellStyleState, ToggleStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import CellFormatTextOrientationControl from "./CellFormatTextOrientationControl.vue";
 
@@ -282,8 +282,8 @@ function checkboxPressed(
 <style scoped lang="scss">
 .cell-format-alignment {
   padding-inline: 2px;
-  color: var(--idea-text-primary);
-  font-size: var(--idea-font-size-body-medium);
+  color: var(--sheetcraft-text-primary);
+  font-size: var(--sheetcraft-font-size-body-medium);
   &__layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 156px;
@@ -302,7 +302,7 @@ function checkboxPressed(
   h3 {
     margin: 0;
     font-size: inherit;
-    font-weight: var(--idea-font-weight-semibold);
+    font-weight: var(--sheetcraft-font-weight-semibold);
   }
   &__fields {
     display: grid;

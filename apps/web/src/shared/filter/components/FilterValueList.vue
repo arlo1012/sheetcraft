@@ -4,8 +4,8 @@ import { ArrowDown, ArrowUp } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import { getSheetFilterValueKey } from "@idea10/core/commands";
-import type { SheetFilterValue } from "@idea10/core/workbook";
+import { getSheetFilterValueKey } from "@sheetcraft/core/commands";
+import type { SheetFilterValue } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import type { FilterValueOption } from "../filter-types";
 import {
@@ -334,7 +334,7 @@ function selectDuplicates(): void {
 
 .filter-value-list {
   display: grid;
-  gap: var(--idea-space-4);
+  gap: var(--sheetcraft-space-4);
   min-width: 0;
   font: inherit;
 
@@ -342,7 +342,7 @@ function selectDuplicates(): void {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto auto;
     align-items: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
 
   &__search {
@@ -357,10 +357,10 @@ function selectDuplicates(): void {
   &__tools {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--idea-space-2) var(--idea-space-4);
+    gap: var(--sheetcraft-space-2) var(--sheetcraft-space-4);
     align-items: center;
-    padding-inline: var(--idea-space-4);
-    padding-bottom: var(--idea-space-2);
+    padding-inline: var(--sheetcraft-space-4);
+    padding-bottom: var(--sheetcraft-space-2);
   }
 
   &__values {
@@ -368,7 +368,7 @@ function selectDuplicates(): void {
     display: grid;
     align-content: start;
     max-height: min(300px, calc(100vh - 280px));
-    padding-top: var(--idea-space-2);
+    padding-top: var(--sheetcraft-space-2);
     overflow: auto;
   }
 
@@ -396,15 +396,15 @@ function selectDuplicates(): void {
 
   &__count {
     flex: none;
-    margin-inline-start: var(--idea-space-3);
-    color: var(--idea-text-secondary);
+    margin-inline-start: var(--sheetcraft-space-3);
+    color: var(--sheetcraft-text-secondary);
     font-variant-numeric: tabular-nums;
   }
 
   &__empty {
     margin: 0;
-    padding: var(--idea-space-6) var(--idea-space-4);
-    color: var(--idea-text-secondary);
+    padding: var(--sheetcraft-space-6) var(--sheetcraft-space-4);
+    color: var(--sheetcraft-text-secondary);
     text-align: center;
   }
 

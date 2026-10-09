@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import type { SheetChartDrawing } from "@idea10/core/sheet-drawings";
-import { getSheetChartData } from "@idea10/core/sheet-charts";
-import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
+import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
+import { getSheetChartData } from "@sheetcraft/core/sheet-charts";
+import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import { init, type EChartsType } from "../chart-runtime";
 import { createChartOption } from "../chart-option";
 import { useAppI18n } from "../../../shared/i18n";

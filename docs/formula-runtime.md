@@ -40,4 +40,4 @@ Core 提供与运行环境无关的公式解析、计算、函数注册和工作
 
 公式只能访问当前工作簿中的 Sheet；外部工作簿引用和 3D 引用不支持。LET、LAMBDA 和通用隐式交集 `@` 也不支持；表格当前行 `[@列名]` 单独支持。完整 Excel 隐式类型转换、区域相关文本数值规则和未注册函数同样不在当前范围；未注册函数返回 `#NAME?`，不支持的语法返回 `#PARSE!`。
 
-定向验证位于 `packages/core/src/tests/formula`。变更公式契约时至少运行对应场景测试和 `bun run --filter @idea10/core typecheck`。
+定向验证位于 `packages/core/src/tests/formula`。变更公式契约时至少运行对应场景测试和 `bun run --filter @sheetcraft/core typecheck`。

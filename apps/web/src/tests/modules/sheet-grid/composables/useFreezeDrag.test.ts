@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
-import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
-import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
+import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import { useFreezeDrag } from "../../../../modules/sheet-grid/composables/useFreezeDrag";
 
 function createPointerEvent(

@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Button as TButton } from "tdesign-vue-next/es/button";
-import type { ConditionalFormatStyle } from "@idea10/core/conditional-formatting";
+import type { ConditionalFormatStyle } from "@sheetcraft/core/conditional-formatting";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import {
   CONDITIONAL_FORMAT_STYLE_PRESETS,

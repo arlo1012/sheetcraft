@@ -1,5 +1,5 @@
-import type { WorkbookSnapshot } from "@idea10/core/serialization";
-import type { ImageTransform } from "@idea10/core/workbook";
+import type { WorkbookSnapshot } from "@sheetcraft/core/serialization";
+import type { ImageTransform } from "@sheetcraft/core/workbook";
 
 export type XlsxCompatibilitySeverity = "warning" | "block";
 

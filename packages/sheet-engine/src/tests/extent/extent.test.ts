@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "@idea10/core/workbook";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "@sheetcraft/core/workbook";
 import {
   DEFAULT_INITIAL_GRID_EXTENT,
   createGridExtent,

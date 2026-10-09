@@ -1,6 +1,10 @@
-import type { ConditionalFormatStyle } from "@idea10/core/conditional-formatting";
-import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
-import type { SelectionBorderState, SelectionCellStyleState } from "@idea10/core/style-state";
+import type { ConditionalFormatStyle } from "@sheetcraft/core/conditional-formatting";
+import type {
+  CellBorderAction,
+  CellBorderFormatPatch,
+  CellStylePatch,
+} from "@sheetcraft/core/style";
+import type { SelectionBorderState, SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import {
   mergeStyleFormatChange,
   styleFormatToBorderState,

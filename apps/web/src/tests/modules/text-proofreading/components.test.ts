@@ -6,9 +6,9 @@ import {
   getActiveSheet,
   getCellContent,
   setCellContent,
-} from "@idea10/core/workbook";
-import { createWorkbookSession, executeWorkbookCommand } from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/workbook";
+import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { createAppI18n } from "../../../shared/i18n";
 import { useWordProofreading } from "../../../modules/text-proofreading/useWordProofreading";
 import WordReviewDialog from "../../../modules/text-proofreading/components/WordReviewDialog.vue";

@@ -4,8 +4,8 @@ import {
   createAddSheetOutlineGroupCommand,
   createSetSheetDefaultColumnWidthCommand,
   createSetSheetDimensionHiddenCommand,
-} from "@idea10/core/commands";
-import { executeWorkbookCommand, undoWorkbookCommand } from "@idea10/core/history";
+} from "@sheetcraft/core/commands";
+import { executeWorkbookCommand, undoWorkbookCommand } from "@sheetcraft/core/history";
 import { activeCell, getCanvasLayout, mountSheetGrid } from "./fixture";
 
 describe("hidden axis rendering and navigation", () => {

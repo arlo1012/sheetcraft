@@ -1,7 +1,7 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
-import { createSheet, type CellRange } from "@idea10/core/workbook";
+import { createSheet, type CellRange } from "@sheetcraft/core/workbook";
 import SheetDimensionInput from "../../../../../modules/sheet-grid/components/SheetDimensionInput.vue";
 import RowColumnOperationsMenu from "../../../../../modules/sheet-grid/components/RowColumnOperationsMenu.vue";
 import { createAppI18n } from "../../../../../shared/i18n";

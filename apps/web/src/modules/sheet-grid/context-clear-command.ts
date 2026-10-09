@@ -2,8 +2,8 @@ import {
   createBatchSetCellContentsCommand,
   createClearCellRangeCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import type { CellRange, Sheet } from "@idea10/core/workbook";
+} from "@sheetcraft/core/commands";
+import type { CellRange, Sheet } from "@sheetcraft/core/workbook";
 
 /** Clears sparse content/style records without materializing a whole selected axis. */
 export function createContextClearCommand(

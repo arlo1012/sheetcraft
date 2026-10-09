@@ -5,8 +5,8 @@ import {
   parseFormula,
   type FormulaExpression,
   type FormulaValue,
-} from "@idea10/core/formula";
-import type { Sheet } from "@idea10/core/workbook";
+} from "@sheetcraft/core/formula";
+import type { Sheet } from "@sheetcraft/core/workbook";
 
 type FormulaCell = Readonly<{ key: string; row: number; column: number }>;
 

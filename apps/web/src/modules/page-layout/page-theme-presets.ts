@@ -4,7 +4,7 @@ import type {
   WorkbookTheme,
   WorkbookThemeColors,
   WorkbookThemeEffects,
-} from "@idea10/core/workbook-theme";
+} from "@sheetcraft/core/workbook-theme";
 
 /**
  * The WPS catalog names and four picker categories follow

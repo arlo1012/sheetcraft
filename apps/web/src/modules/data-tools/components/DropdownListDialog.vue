@@ -396,8 +396,8 @@ async function selectRange(current: string): Promise<string | undefined> {
 <style scoped lang="scss">
 .dropdown-list-dialog {
   display: grid;
-  gap: var(--idea-space-2);
-  color: var(--idea-text-primary);
+  gap: var(--sheetcraft-space-2);
+  color: var(--sheetcraft-text-primary);
 }
 .dropdown-list-dialog__mode {
   display: flex;

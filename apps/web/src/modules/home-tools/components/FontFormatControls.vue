@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import FontFormatField from "./FontFormatField.vue";
-import { resolveThemeFontFamily } from "@idea10/core/workbook-theme";
+import { resolveThemeFontFamily } from "@sheetcraft/core/workbook-theme";
 import { useWorkbookTheme } from "../../../shared/color/workbook-theme-context";
 import {
   DEFAULT_CELL_FONT_FAMILY,
@@ -9,8 +9,8 @@ import {
   MAX_CELL_FONT_SIZE,
   MIN_CELL_FONT_SIZE,
   type CellStylePatch,
-} from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+} from "@sheetcraft/core/style";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   CELL_FONT_FAMILY_PRESETS,

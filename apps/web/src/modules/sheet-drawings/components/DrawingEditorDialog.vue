@@ -5,7 +5,7 @@ import { Input } from "tdesign-vue-next/es/input";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import type { SheetGraphicDrawing, DrawingShape } from "@idea10/core/sheet-drawings";
+import type { SheetGraphicDrawing, DrawingShape } from "@sheetcraft/core/sheet-drawings";
 import { useAppI18n } from "../../../shared/i18n";
 import DrawingContent from "./DrawingContent.vue";
 const props = defineProps<{ drawing: SheetGraphicDrawing; disabled: boolean }>();
@@ -173,11 +173,11 @@ const shapes: DrawingShape[] = [
       height: 42px;
       padding: 6px;
       background: transparent;
-      border: 1px solid var(--idea-border-default);
+      border: 1px solid var(--sheetcraft-border-default);
       cursor: pointer;
       &[aria-pressed="true"] {
-        border-color: var(--idea-action-primary);
-        background: var(--idea-surface-hover);
+        border-color: var(--sheetcraft-action-primary);
+        background: var(--sheetcraft-surface-hover);
       }
     }
   }
@@ -186,13 +186,13 @@ const shapes: DrawingShape[] = [
     align-items: center;
     justify-content: center;
     min-height: 180px;
-    background: var(--idea-surface-default);
-    border: 1px solid var(--idea-border-default);
+    background: var(--sheetcraft-surface-default);
+    border: 1px solid var(--sheetcraft-border-default);
     overflow: hidden;
   }
   &__hint {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     font-size: 12px;
   }
 }

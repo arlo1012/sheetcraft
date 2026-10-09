@@ -1,4 +1,4 @@
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { describe, expect, test } from "vitest";
 import {
   createWorkbook,
@@ -9,12 +9,12 @@ import {
   setCellNote,
   getCellNote,
   getCellStyle,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
+} from "@sheetcraft/core/history";
 import {
   collectReviewText,
   createReviewTextCommand,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { CellBorderLineStyle } from "@idea10/core/style";
+import type { CellBorderLineStyle } from "@sheetcraft/core/style";
 import { getBorderLinePresentation } from "./borderPresentation";
 
 const props = withDefaults(

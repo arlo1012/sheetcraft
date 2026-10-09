@@ -1,5 +1,5 @@
-import { createWorkbook, getActiveSheet, createSheet } from "@idea10/core/workbook";
-import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
+import { createWorkbook, getActiveSheet, createSheet } from "@sheetcraft/core/workbook";
+import type { SheetConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
 import { strFromU8, unzipSync } from "fflate/browser";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../index.js";

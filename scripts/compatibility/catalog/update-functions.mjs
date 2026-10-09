@@ -145,7 +145,7 @@ async function main() {
     throw new Error("Refusing network update without --write. This script is not for CI.");
   }
   const response = await fetch(alphabeticalUrl, {
-    headers: { "user-agent": "idea10-catalog-updater/1.0" },
+    headers: { "user-agent": "sheetcraft-catalog-updater/1.0" },
   });
   if (!response.ok) throw new Error(`Microsoft catalog request failed: ${response.status}`);
   const harvestedFunctions = parseRows(await response.text());

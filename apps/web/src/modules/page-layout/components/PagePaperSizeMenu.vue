@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { FileStack } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
-import type { SheetPageSetup, SheetPaperSize } from "@idea10/core/page-setup";
+import type { SheetPageSetup, SheetPaperSize } from "@sheetcraft/core/page-setup";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import PagePaperSizeOption from "./PagePaperSizeOption.vue";
@@ -126,7 +126,7 @@ function openSetup(): void {
 .page-paper-size-menu {
   @include ribbon.tool;
   &__surface {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
     min-width: 220px;
   }
 }

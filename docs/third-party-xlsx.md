@@ -1,6 +1,6 @@
 # XLSX browser bundle: third-party record
 
-`@idea10/xlsx-io` imports the published `exceljs/dist/exceljs.min.js` browser
+`@sheetcraft/xlsx-io` imports the published `exceljs/dist/exceljs.min.js` browser
 UMD entry from `exceljs@4.4.0`; it does not import ExcelJS's Node entry. The
 release package identifies that entry as its browser field and identifies
 ExcelJS as MIT-licensed. ExcelJS's own v4.4.0 build configuration makes the

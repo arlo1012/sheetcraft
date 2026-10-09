@@ -16,7 +16,7 @@ import {
   normalizeImageTransform,
   type FloatingImage,
   type ImageAppearance,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
@@ -497,7 +497,7 @@ function reset(): void {
     @include ribbon.stack;
   }
   &__menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
     width: 260px;
   }
   &__field {
@@ -509,7 +509,7 @@ function reset(): void {
   }
   &__hint {
     margin: 0 0 8px;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

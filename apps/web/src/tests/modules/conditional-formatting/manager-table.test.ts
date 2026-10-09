@@ -3,7 +3,7 @@ import { afterEach, expect, test } from "vitest";
 import { PrimaryTable } from "tdesign-vue-next/es/table";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select } from "tdesign-vue-next/es/select";
-import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
+import type { SheetConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
 import ConditionalFormatManagerDialog from "../../../modules/conditional-formatting/components/ConditionalFormatManagerDialog.vue";
 import { createAppI18n } from "../../../shared/i18n";
 

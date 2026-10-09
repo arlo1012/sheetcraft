@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
-import type { Sheet } from "@idea10/core/workbook";
+import type { Sheet } from "@sheetcraft/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import CustomHeaderFooterDialog from "../../../modules/page-layout/components/CustomHeaderFooterDialog.vue";

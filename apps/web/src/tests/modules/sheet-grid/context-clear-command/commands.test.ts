@@ -4,8 +4,8 @@ import {
   executeWorkbookCommand,
   undoWorkbookCommand,
   redoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createSheetSparseState,
   getActiveSheet,
@@ -17,7 +17,7 @@ import {
   setCellStyle,
   setCellNote,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { createContextClearCommand } from "../../../../modules/sheet-grid/context-clear-command";
 
 describe("context menu clear commands", () => {

@@ -5,16 +5,16 @@ import {
   deserializeWorkbook,
   serializeWorkbook,
   type WorkbookSnapshot,
-} from "@idea10/core/serialization";
+} from "@sheetcraft/core/serialization";
 import {
   createWorkbook,
   getActiveSheet,
   getCellComputedValue,
   getCellContent,
   setCellValue,
-} from "@idea10/core/workbook";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { getFormulaFunctionMetadata } from "@idea10/core/formula";
+} from "@sheetcraft/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { getFormulaFunctionMetadata } from "@sheetcraft/core/formula";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetSurface from "../../../modules/sheet-grid/components/SheetSurface.vue";
 import type { WorkbookStore } from "../../../modules/workbook-persistence/workbookStore";

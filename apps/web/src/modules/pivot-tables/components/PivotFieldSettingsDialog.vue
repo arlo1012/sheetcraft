@@ -4,10 +4,10 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input } from "tdesign-vue-next/es/input";
 import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import { normalizePivotTable, type SheetPivotTable } from "@idea10/core/pivot-tables";
-import type { FormulaValue } from "@idea10/core/formula";
+import { normalizePivotTable, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
+import type { FormulaValue } from "@sheetcraft/core/formula";
 import PivotValueSettings from "./PivotValueSettings.vue";
-import type { CellValue } from "@idea10/core/workbook";
+import type { CellValue } from "@sheetcraft/core/workbook";
 import type { PivotArea } from "../pivot-field-edits";
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{
@@ -148,7 +148,7 @@ function setValues(values: unknown): void {
   }
   p {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createFormulaError } from "@idea10/core/formula";
+import { createFormulaError } from "@sheetcraft/core/formula";
 import {
   createSheet,
   createSheetEvaluator,
@@ -8,7 +8,7 @@ import {
   setCellContent,
   setCellStyle,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   getColumnChoices,
   getColumnStatistics,

@@ -5,8 +5,8 @@ import {
   normalizeSheetPageSetup,
   type SheetHeaderFooterOptions,
   type SheetPageSetup,
-} from "@idea10/core/page-setup";
-import type { CellRange, Sheet, Workbook } from "@idea10/core/workbook";
+} from "@sheetcraft/core/page-setup";
+import type { CellRange, Sheet, Workbook } from "@sheetcraft/core/workbook";
 import type { CompatibilityReportBuilder } from "./report.js";
 
 const MILLIMETRES_PER_INCH = 25.4;

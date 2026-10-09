@@ -1,15 +1,15 @@
 import { describe, expect, test } from "vitest";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createSetPivotTableCommand } from "@idea10/core/commands";
-import { createWorkbookSession, executeWorkbookCommand } from "@idea10/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { createSetPivotTableCommand } from "@sheetcraft/core/commands";
+import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
 import {
   buildPivotResult,
   getPivotDetails,
   isPivotValueCell,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
-import { createFormulaError } from "@idea10/core/formula";
+} from "@sheetcraft/core/pivot-tables";
+import { createFormulaError } from "@sheetcraft/core/formula";
 import {
   createWorkbook,
   createSheet,
@@ -17,7 +17,7 @@ import {
   getCellValue,
   insertSheet,
   setCellContent,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { readPivotCacheRecords } from "../../pivot-cache.js";
 import { encodeXlsx, decodeXlsx } from "../../index.js";
 

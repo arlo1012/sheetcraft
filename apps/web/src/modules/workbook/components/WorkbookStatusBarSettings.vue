@@ -164,14 +164,14 @@ function selectNumberFormat(numberFormat: StatusBarNumberFormat): void {
     padding: 0;
     place-items: center;
     border: 0;
-    border-right: 1px solid var(--idea-sheet-bar-border);
+    border-right: 1px solid var(--sheetcraft-sheet-bar-border);
     background: transparent;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     cursor: pointer;
   }
 
   &__menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
   }
 }
 </style>

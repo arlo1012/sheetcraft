@@ -216,7 +216,7 @@ function drop(event: DragEvent, index: number): void {
     min-height: 28px;
     padding-bottom: 4px;
     > svg {
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
     }
   }
   &__title {
@@ -226,11 +226,11 @@ function drop(event: DragEvent, index: number): void {
     flex-shrink: 0;
     padding: 3px;
     border-radius: 2px;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__grip {
     flex-shrink: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__menu-trigger {
     opacity: 0;
@@ -245,11 +245,11 @@ function drop(event: DragEvent, index: number): void {
     flex: 1;
     min-height: 0;
     overflow: auto;
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-control);
+    background: var(--sheetcraft-surface-panel);
+    border: 1px solid var(--sheetcraft-border-control);
     border-radius: 4px;
     &.is-drop-target {
-      border-color: var(--idea-action-primary);
+      border-color: var(--sheetcraft-action-primary);
     }
     li {
       display: flex;
@@ -260,19 +260,19 @@ function drop(event: DragEvent, index: number): void {
       border-radius: 2px;
       &:hover,
       &:focus-within {
-        background: var(--idea-surface-hover);
+        background: var(--sheetcraft-surface-hover);
         .pivot-area__menu-trigger {
           opacity: 1;
         }
       }
     }
     li.is-drop-before {
-      border-top: 2px solid var(--idea-action-primary);
+      border-top: 2px solid var(--sheetcraft-action-primary);
     }
     li.pivot-area__empty {
       border: 0;
       background: transparent;
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
     }
   }
   &__label {
@@ -291,12 +291,12 @@ function drop(event: DragEvent, index: number): void {
     line-height: inherit;
     cursor: pointer;
     &:disabled {
-      color: var(--idea-text-disabled);
+      color: var(--sheetcraft-text-disabled);
       cursor: default;
     }
   }
   &__menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
     min-width: 180px;
     max-height: 380px;
     overflow: auto;

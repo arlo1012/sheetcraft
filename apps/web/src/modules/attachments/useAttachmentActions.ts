@@ -1,8 +1,8 @@
 import { ref, shallowRef } from "vue";
-import { canUseSheetPermission } from "@idea10/core";
-import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@idea10/core/commands";
-import type { SheetAttachmentDrawing } from "@idea10/core/sheet-drawings";
-import type { Workbook, Sheet, CellAddress } from "@idea10/core/workbook";
+import { canUseSheetPermission } from "@sheetcraft/core";
+import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import type { SheetAttachmentDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { Workbook, Sheet, CellAddress } from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { downloadBlob } from "../../shared/files/download";
 import { prepareAttachment, attachmentBlob } from "./attachment-file";

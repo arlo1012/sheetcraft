@@ -1,5 +1,5 @@
-import type { CellNumberFormat } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type { CellNumberFormat } from "@sheetcraft/core/style";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { getDateFormatPresets } from "../../shared/number-format/date-presets";
 
 /** The concise set exposed by the Home ribbon, modelled after Excel's list. */

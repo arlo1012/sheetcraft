@@ -1,7 +1,7 @@
 import { flushPromises } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
-import { deserializeWorkbook } from "@idea10/core/serialization";
-import { getActiveSheet, getCellComputedValue, getCellContent } from "@idea10/core/workbook";
+import { deserializeWorkbook } from "@sheetcraft/core/serialization";
+import { getActiveSheet, getCellComputedValue, getCellContent } from "@sheetcraft/core/workbook";
 import SpreadsheetRibbon from "../../../../app/SpreadsheetRibbon.vue";
 import WorkbookFormulaBar from "../../../../modules/workbook/components/WorkbookFormulaBar.vue";
 import SheetGrid from "../../../../modules/sheet-grid/components/SheetGrid.vue";

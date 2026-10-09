@@ -92,13 +92,13 @@ function insert(): void {
     height: 24px;
     padding: 0;
     border: 0;
-    border-radius: var(--idea-radius-default);
-    color: var(--idea-text-secondary);
+    border-radius: var(--sheetcraft-radius-default);
+    color: var(--sheetcraft-text-secondary);
     background: transparent;
     cursor: pointer;
 
     &[aria-disabled="true"] {
-      color: var(--idea-text-disabled);
+      color: var(--sheetcraft-text-disabled);
       cursor: default;
     }
   }

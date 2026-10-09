@@ -4,8 +4,8 @@ import {
   deserializeWorkbook,
   serializeWorkbook,
   type WorkbookSnapshot,
-} from "@idea10/core/serialization";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/serialization";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createWorkbook,
   getActiveSheet,
@@ -14,7 +14,7 @@ import {
   setCellContent,
   setCellStyle,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import type { WorkbookStore } from "../../../modules/workbook-persistence/workbookStore";

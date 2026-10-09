@@ -107,26 +107,26 @@ function invertSelection(): void {
 <style scoped lang="scss">
 .remove-duplicates-dialog {
   display: grid;
-  gap: var(--idea-space-2);
+  gap: var(--sheetcraft-space-2);
   min-width: min(360px, calc(100vw - 64px));
   &__summary {
-    margin: var(--idea-space-2) 0 0;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    margin: var(--sheetcraft-space-2) 0 0;
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
   &__columns {
     display: grid;
     align-content: start;
-    gap: var(--idea-space-3);
+    gap: var(--sheetcraft-space-3);
     max-height: 220px;
     overflow: auto;
-    padding: var(--idea-tool-panel-padding) 0;
+    padding: var(--sheetcraft-tool-panel-padding) 0;
   }
   &__selection-actions {
     display: flex;
     align-items: center;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
   }
 }
 </style>

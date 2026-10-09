@@ -1,4 +1,4 @@
-import type { CellAddress, CellRange } from "@idea10/core/workbook";
+import type { CellAddress, CellRange } from "@sheetcraft/core/workbook";
 import type { Point } from "./geometry.js";
 import type { SheetViewportLayout } from "./viewport-layout.js";
 

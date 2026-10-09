@@ -16,29 +16,29 @@ import {
   createResizeSheetDimensionCommand,
   createSetSheetFreezePanesCommand,
   createSetCellContentCommand,
-} from "@idea10/core/commands";
+} from "@sheetcraft/core/commands";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
   redoWorkbookCommand,
   undoWorkbookCommand,
   type WorkbookSession,
-} from "@idea10/core/history";
-import { parseCellContent } from "@idea10/core/input";
+} from "@sheetcraft/core/history";
+import { parseCellContent } from "@sheetcraft/core/input";
 import {
   getActiveSheet,
   type CellRange,
   type SheetDimensionAxis,
   type SheetEvaluator,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import SheetGrid from "../../../../../modules/sheet-grid/components/SheetGrid.vue";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import type { AxisMovePayload } from "../../../../../modules/sheet-grid/composables/useAxisMoveDrag";
 import { createAppI18n } from "../../../../../shared/i18n";
 import { createBrowserIdFactory } from "../../../../../shared/runtime/browser-id-factory";
-import type { CellAddress } from "@idea10/core/workbook";
+import type { CellAddress } from "@sheetcraft/core/workbook";
 import type { SheetRenderFrame } from "../../../../../modules/sheet-grid/rendering/sheet-render-frame";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import type { ActiveCellValidationInfo } from "../../../../../modules/sheet-grid/components/SheetDataControls.vue";
 import type { CellEditSession } from "../../../../../shared/cell-editing/useCellEditSession";
 

@@ -99,11 +99,11 @@ function onKeydown(event: KeyboardEvent): void {
   align-items: center;
   min-height: 30px;
   gap: 8px;
-  padding: 0 var(--idea-menu-item-padding-inline, 14px);
-  color: var(--idea-text-primary);
+  padding: 0 var(--sheetcraft-menu-item-padding-inline, 14px);
+  color: var(--sheetcraft-text-primary);
   font: inherit;
-  font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
+  font-size: var(--sheetcraft-font-size-body-medium);
+  line-height: var(--sheetcraft-line-height-body-medium);
   letter-spacing: 0;
   list-style: none;
   text-align: left;
@@ -125,33 +125,33 @@ function onKeydown(event: KeyboardEvent): void {
 
   &:hover:not(&--disabled),
   &:focus-visible:not(&--disabled) {
-    background: var(--idea-surface-hover);
+    background: var(--sheetcraft-surface-hover);
     outline: none;
   }
 
   &:focus-visible:not(&--disabled) {
-    background: var(--idea-keyboard-focus-bg);
+    background: var(--sheetcraft-keyboard-focus-bg);
   }
 
   &--compound:has(&__command:focus-visible):not(&--disabled) {
-    background: var(--idea-keyboard-focus-bg);
+    background: var(--sheetcraft-keyboard-focus-bg);
   }
 
   &--danger:not(&--disabled) {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 
   &--disabled {
-    color: var(--idea-text-disabled);
+    color: var(--sheetcraft-text-disabled);
   }
 
   &__icon {
-    --idea-icon-size: var(--idea-menu-icon-size);
+    --sheetcraft-icon-size: var(--sheetcraft-menu-icon-size);
 
     :deep(svg.lucide) {
-      width: var(--idea-icon-size);
-      height: var(--idea-icon-size);
-      stroke-width: var(--idea-icon-stroke-width);
+      width: var(--sheetcraft-icon-size);
+      height: var(--sheetcraft-icon-size);
+      stroke-width: var(--sheetcraft-icon-stroke-width);
     }
 
     display: grid;
@@ -187,14 +187,14 @@ function onKeydown(event: KeyboardEvent): void {
     align-items: center;
     justify-content: flex-end;
     gap: 5px;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
 
     :deep(svg.lucide) {
-      width: var(--idea-menu-icon-size);
-      height: var(--idea-menu-icon-size);
-      stroke-width: var(--idea-icon-stroke-width);
+      width: var(--sheetcraft-menu-icon-size);
+      height: var(--sheetcraft-menu-icon-size);
+      stroke-width: var(--sheetcraft-icon-stroke-width);
     }
   }
 }

@@ -1,8 +1,8 @@
-import type { DataTableRequest } from "@idea10/core";
-import type { GoalSeekRequest } from "@idea10/core/goal-seek";
-import type { PlanningRequest } from "@idea10/core/planning-solver";
-import { serializeWorkbook, type WorkbookSnapshot } from "@idea10/core/serialization";
-import type { Workbook } from "@idea10/core/workbook";
+import type { DataTableRequest } from "@sheetcraft/core";
+import type { GoalSeekRequest } from "@sheetcraft/core/goal-seek";
+import type { PlanningRequest } from "@sheetcraft/core/planning-solver";
+import { serializeWorkbook, type WorkbookSnapshot } from "@sheetcraft/core/serialization";
+import type { Workbook } from "@sheetcraft/core/workbook";
 
 type Work =
   | { kind: "dataTable"; workbook: Workbook; request: DataTableRequest }

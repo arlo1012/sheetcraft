@@ -7,7 +7,7 @@ import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import FontFormatPanel from "../../../../../shared/font-format/FontFormatPanel.vue";
 import HeaderFooterFontDialog from "../../../../../modules/page-layout/components/HeaderFooterFontDialog.vue";
 import ColorPaletteSelect from "../../../../../shared/color/ColorPaletteSelect.vue";
-import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
+import { DEFAULT_SHEET_PAGE_SETUP } from "@sheetcraft/core/page-setup";
 import CustomHeaderFooterDialog from "../../../../../modules/page-layout/components/CustomHeaderFooterDialog.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 describe("CustomHeaderFooterDialog", () => {

@@ -1,5 +1,5 @@
-import type { ConditionalFormatVisual } from "@idea10/core/conditional-formatting";
-import type { Rect } from "@idea10/sheet-engine/geometry";
+import type { ConditionalFormatVisual } from "@sheetcraft/core/conditional-formatting";
+import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 
 import { paintConditionalFormatIcon } from "./conditional-format-icons";
 

@@ -162,11 +162,11 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
 
   display: grid;
   width: max-content;
-  max-width: calc(100vw - var(--idea-space-4) - var(--idea-space-4));
-  max-height: calc(100vh - var(--idea-space-4) - var(--idea-space-4));
-  padding: var(--idea-menu-padding);
+  max-width: calc(100vw - var(--sheetcraft-space-4) - var(--sheetcraft-space-4));
+  max-height: calc(100vh - var(--sheetcraft-space-4) - var(--sheetcraft-space-4));
+  padding: var(--sheetcraft-menu-padding);
   margin: 0;
-  z-index: var(--idea-layer-menu);
+  z-index: var(--sheetcraft-layer-menu);
   overflow-y: auto;
   overscroll-behavior: contain;
   list-style: none;

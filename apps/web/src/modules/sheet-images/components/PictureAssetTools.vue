@@ -91,7 +91,7 @@ function exportImage(format: PictureFileFormat, all = false): void {
 .picture-asset-tools {
   @include ribbon.columns;
   &__menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
   }
 }
 </style>

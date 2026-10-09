@@ -5,11 +5,11 @@ import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
+} from "@sheetcraft/core/history";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { datePartsToExcelSerial } from "@idea10/core/formula";
-import { createSheet, getActiveSheet, getCellValue, setCellValue } from "@idea10/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { datePartsToExcelSerial } from "@sheetcraft/core/formula";
+import { createSheet, getActiveSheet, getCellValue, setCellValue } from "@sheetcraft/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useFillToolsController } from "../../../../modules/data-tools/useFillToolsController";
 const wrappers: Array<{ unmount(): void }> = [];

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { PAGE_PAPER_SIZES_MM, type SheetPaperSize } from "@idea10/core/page-setup";
+import { PAGE_PAPER_SIZES_MM, type SheetPaperSize } from "@sheetcraft/core/page-setup";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import { PAGE_PAPER_LABELS } from "../page-paper-labels";
@@ -53,7 +53,7 @@ const dimensions = computed(() => {
 .page-paper-size-option {
   display: flex;
   align-items: center;
-  gap: var(--idea-space-2);
+  gap: var(--sheetcraft-space-2);
   min-height: 48px;
 
   &__preview {
@@ -64,14 +64,14 @@ const dimensions = computed(() => {
     height: 44px;
 
     &--selected {
-      background: var(--idea-surface-hover);
+      background: var(--sheetcraft-surface-hover);
     }
 
     svg {
       width: 44px;
       height: 44px;
-      fill: var(--idea-surface-panel);
-      stroke: var(--idea-text-primary);
+      fill: var(--sheetcraft-surface-panel);
+      stroke: var(--sheetcraft-text-primary);
       stroke-width: 1;
     }
   }
@@ -79,7 +79,7 @@ const dimensions = computed(() => {
   &__details {
     display: flex;
     flex-direction: column;
-    line-height: var(--idea-line-height-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
   }
 
   &__name {

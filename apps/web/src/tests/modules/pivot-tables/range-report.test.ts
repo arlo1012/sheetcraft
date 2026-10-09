@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getCellValue, setCellContent, type CellRange } from "@idea10/core/workbook";
+import { getCellValue, setCellContent, type CellRange } from "@sheetcraft/core/workbook";
 import { usePivotActions } from "../../../modules/pivot-tables/usePivotActions";
 import { fixture } from "./fixture";
 

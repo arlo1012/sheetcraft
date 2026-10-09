@@ -125,12 +125,12 @@ function custom(): void {
 
 <style scoped lang="scss">
 .filter-color-sort-menu {
-  z-index: var(--idea-layer-popover-submenu);
+  z-index: var(--sheetcraft-layer-popover-submenu);
   width: max-content;
 
   &__label {
     padding: 4px 14px;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__choices {
     display: grid;
@@ -145,33 +145,33 @@ function custom(): void {
     width: 24px;
     height: 24px;
     padding: 0;
-    border: 1px solid var(--idea-border-control);
+    border: 1px solid var(--sheetcraft-border-control);
     border-radius: 50%;
-    background: var(--idea-surface-panel);
+    background: var(--sheetcraft-surface-panel);
     cursor: pointer;
 
     &:hover:not(:disabled) {
-      border-color: var(--idea-action-primary);
+      border-color: var(--sheetcraft-action-primary);
     }
     &.is-no-fill {
       background: linear-gradient(
         135deg,
         transparent 46%,
-        var(--idea-border-control) 48%,
-        var(--idea-border-control) 52%,
+        var(--sheetcraft-border-control) 48%,
+        var(--sheetcraft-border-control) 52%,
         transparent 54%
       );
     }
   }
   &__font {
     font-size: 18px;
-    font-weight: var(--idea-font-weight-semibold);
+    font-weight: var(--sheetcraft-font-weight-semibold);
     line-height: 1;
   }
   &__empty {
     grid-column: 1 / -1;
     white-space: nowrap;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

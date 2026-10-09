@@ -1,5 +1,5 @@
-import type { CellFillGradientStop, CellFillPatternStyle, CellStyle } from "@idea10/core/style";
-import type { Rect } from "@idea10/sheet-engine/geometry";
+import type { CellFillGradientStop, CellFillPatternStyle, CellStyle } from "@sheetcraft/core/style";
+import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 
 const DEFAULT_PATTERN_COLOR = "#000000";
 const patternsByContext = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasPattern>>();

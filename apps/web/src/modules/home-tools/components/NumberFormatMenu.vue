@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import NumberFormatIcon from "./NumberFormatIcon.vue";
 import { computed, ref, useId } from "vue";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
@@ -134,8 +134,8 @@ function openCellFormat(): void {
   min-width: 72px;
 
   &__surface {
-    z-index: var(--idea-layer-menu);
-    max-height: min(480px, calc(100vh - var(--idea-space-4) - var(--idea-space-4)));
+    z-index: var(--sheetcraft-layer-menu);
+    max-height: min(480px, calc(100vh - var(--sheetcraft-space-4) - var(--sheetcraft-space-4)));
   }
 }
 </style>

@@ -126,9 +126,9 @@
 
   .t-table__header > tr > th:not(.t-table__th-drag, .t-table__cell-check),
   .t-table__body > tr > td:not(.t-table__handle-draggable, .t-table__cell-check) {
-    padding-block: var(--idea-space-1);
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
+    padding-block: var(--sheetcraft-space-1);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
   }
 }
 
@@ -143,31 +143,31 @@
 // Direct SVG actions retain a compact pointer target without button chrome.
 .idea-table-action-icon {
   box-sizing: content-box;
-  width: var(--idea-action-icon-size);
-  height: var(--idea-action-icon-size);
+  width: var(--sheetcraft-action-icon-size);
+  height: var(--sheetcraft-action-icon-size);
   padding: 3px;
-  color: var(--idea-text-secondary);
-  stroke-width: var(--idea-icon-stroke-width);
+  color: var(--sheetcraft-text-secondary);
+  stroke-width: var(--sheetcraft-icon-stroke-width);
   cursor: pointer;
 
   &:focus-visible:not([aria-disabled="true"]) {
     outline: none;
-    box-shadow: var(--idea-keyboard-focus-shadow);
+    box-shadow: var(--sheetcraft-keyboard-focus-shadow);
   }
 
   &[aria-disabled="true"] {
-    color: var(--idea-text-disabled);
+    color: var(--sheetcraft-text-disabled);
     cursor: not-allowed;
   }
 }
 
 .idea-table-drag-icon {
   display: block;
-  width: var(--idea-action-icon-size);
-  height: var(--idea-action-icon-size);
+  width: var(--sheetcraft-action-icon-size);
+  height: var(--sheetcraft-action-icon-size);
   margin-inline: auto;
-  color: var(--idea-text-secondary);
-  stroke-width: var(--idea-icon-stroke-width);
+  color: var(--sheetcraft-text-secondary);
+  stroke-width: var(--sheetcraft-icon-stroke-width);
   cursor: grab;
 
   &:active {
@@ -186,7 +186,7 @@
     }
 
     &:hover:not([aria-disabled="true"], :disabled) {
-      color: var(--idea-action-primary);
+      color: var(--sheetcraft-action-primary);
     }
   }
 }

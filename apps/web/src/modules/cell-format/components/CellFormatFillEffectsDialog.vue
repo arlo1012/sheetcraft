@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
-import { cloneCellFillGradient, type CellFillGradient } from "@idea10/core/style";
+import { cloneCellFillGradient, type CellFillGradient } from "@sheetcraft/core/style";
 import { getCellFillStyle } from "../../../shared/cell-fill/fill-presentation";
 import { useAppI18n } from "../../../shared/i18n";
 import CellFormatColorControl from "./CellFormatColorControl.vue";
@@ -221,14 +221,14 @@ watch(() => props.gradient, resetDraft, { immediate: true });
     display: grid;
     grid-template-columns: max-content minmax(0, 1fr);
     gap: 16px 20px;
-    color: var(--idea-text-primary);
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
+    color: var(--sheetcraft-text-primary);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
   }
   h3 {
     margin: 0;
     font: inherit;
-    font-weight: var(--idea-font-weight-semibold);
+    font-weight: var(--sheetcraft-font-weight-semibold);
   }
   &__colors,
   &__style,
@@ -271,22 +271,22 @@ watch(() => props.gradient, resetDraft, { immediate: true });
   &__variant {
     width: 100%;
     height: 38px;
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-default);
-    background-color: var(--idea-surface-panel);
+    border: 1px solid var(--sheetcraft-border-control);
+    border-radius: var(--sheetcraft-radius-default);
+    background-color: var(--sheetcraft-surface-panel);
     cursor: pointer;
     &:hover {
-      border-color: var(--idea-action-primary-hover);
+      border-color: var(--sheetcraft-action-primary-hover);
     }
 
     &--selected {
-      border: 2px solid var(--idea-action-primary);
+      border: 2px solid var(--sheetcraft-action-primary);
     }
   }
   &__preview {
     height: 68px;
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-default);
+    border: 1px solid var(--sheetcraft-border-control);
+    border-radius: var(--sheetcraft-radius-default);
   }
 }
 @media (max-width: 420px) {

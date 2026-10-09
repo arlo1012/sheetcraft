@@ -143,25 +143,25 @@ const canApply = computed(() =>
 <style scoped lang="scss">
 .advanced-filter-dialog {
   display: grid;
-  gap: var(--idea-space-3);
+  gap: var(--sheetcraft-space-3);
   &__modes {
     display: grid;
     justify-items: start;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__field {
     display: grid;
     grid-template-columns: 84px minmax(0, 1fr);
     align-items: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     &.is-disabled {
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
     }
   }
   &__hint {
     margin: 0;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
   }
   &__error {
     margin: 0;

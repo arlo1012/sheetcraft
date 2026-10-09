@@ -150,7 +150,7 @@ watch(
 .page-background-menu {
   @include ribbon.tool;
   &__surface {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
     min-width: 180px;
   }
 }

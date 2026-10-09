@@ -16,7 +16,7 @@ these boundaries.
 
 Packages do not import Vue, browser APIs, TDesign, storage, or application
 translations. Import public package subpaths only. Workbook changes travel
-through a `@idea10/core` command and history session; do not mutate workbook
+through a `@sheetcraft/core` command and history session; do not mutate workbook
 state from a Vue component.
 
 ## Build A Feature
@@ -34,7 +34,7 @@ state from a Vue component.
    validation feedback, status text, and menu text use `useAppI18n()` and the
    typed schema in `src/shared/i18n/schema.ts`.
 5. Put feature layout and interaction state in scoped SCSS. Use semantic
-   `--idea-*` tokens; add framework mappings or approved internal overrides
+   `--sheetcraft-*` tokens; add framework mappings or approved internal overrides
    only in `src/shared/styles/_tdesign.scss`.
 
 For a new command-backed intent, the component emits a typed payload and its

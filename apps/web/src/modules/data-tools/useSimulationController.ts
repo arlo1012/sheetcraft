@@ -3,25 +3,25 @@ import {
   createApplyGoalSeekCommand,
   type GoalSeekRequest,
   type GoalSeekResult,
-} from "@idea10/core/goal-seek";
+} from "@sheetcraft/core/goal-seek";
 import {
   createApplyPlanningCommand,
   type PlanningRequest,
   type PlanningResult,
-} from "@idea10/core/planning-solver";
+} from "@sheetcraft/core/planning-solver";
 import {
   createDataTableCommand,
   type DataTableRequest,
   type DataTablePreviewResult,
-} from "@idea10/core";
+} from "@sheetcraft/core";
 import type { DataTableDraft, DataTablePreview } from "./data-table-types";
-import type { WorkbookCommand } from "@idea10/core/commands";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
 import {
   getActiveSheet,
   type CellAddress,
   type CellRange,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import {
   formatRangeReference,

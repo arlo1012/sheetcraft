@@ -1,9 +1,9 @@
 import { defineComponent, nextTick, reactive, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import { createWorkbookSession, executeWorkbookCommand } from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createSheet, getActiveSheet, setCellValue } from "@idea10/core/workbook";
+import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { createSheet, getActiveSheet, setCellValue } from "@sheetcraft/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useLookupFillController } from "../../../../modules/data-tools/useLookupFillController";
 const wrappers: Array<{ unmount(): void }> = [];

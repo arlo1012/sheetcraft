@@ -33,7 +33,7 @@
 日期系统和错误/空字符串模型已进入[基础阶段](formula-foundation.md)；自定义数字格式、命名区域、结构化表、条件格式等仍需要对应的文档模型。
 依据：[Workbook](../packages/core/src/workbook.ts)、[Style](../packages/core/src/style.ts)、[Snapshot](../packages/core/src/serialization.ts)。
 
-因此，不能把“文件库能够读出某个字段”直接等同于“idea10 能保存、编辑并重新导出该字段”。
+因此，不能把“文件库能够读出某个字段”直接等同于“Sheetcraft 能保存、编辑并重新导出该字段”。
 
 ## 3. 模块所有权
 

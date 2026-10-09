@@ -1,17 +1,17 @@
 import { ref, shallowRef } from "vue";
-import { canEditCell, canUseSheetPermission } from "@idea10/core";
+import { canEditCell, canUseSheetPermission } from "@sheetcraft/core";
 import {
   createSetSheetDrawingsCommand,
   createSetCellContentCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import { normalizeSheetDrawing, type SheetControlDrawing } from "@idea10/core/sheet-drawings";
+} from "@sheetcraft/core/commands";
+import { normalizeSheetDrawing, type SheetControlDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   getFormControlItems,
   resolveFormControlValue,
   type FormControlType,
-} from "@idea10/core/form-controls";
-import type { Workbook, Sheet, CellAddress, SheetEvaluator } from "@idea10/core/workbook";
+} from "@sheetcraft/core/form-controls";
+import type { Workbook, Sheet, CellAddress, SheetEvaluator } from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
 export function useFormControlActions(options: {

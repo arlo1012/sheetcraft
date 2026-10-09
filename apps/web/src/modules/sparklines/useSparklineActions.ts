@@ -1,11 +1,11 @@
 import { ref, shallowRef } from "vue";
-import { canEditRange, canUseSheetPermission, doMergedCellRangesIntersect } from "@idea10/core";
+import { canEditRange, canUseSheetPermission, doMergedCellRangesIntersect } from "@sheetcraft/core";
 import {
   createSetCellSparklinesCommand,
   createClearCellSparklinesCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import { normalizeCellSparkline, type CellSparkline } from "@idea10/core/sparklines";
+} from "@sheetcraft/core/commands";
+import { normalizeCellSparkline, type CellSparkline } from "@sheetcraft/core/sparklines";
 import {
   getCellSparkline,
   MAX_SHEET_COLUMNS,
@@ -13,7 +13,7 @@ import {
   type Sheet,
   type Workbook,
   type CellRange,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   formatRangeReference,
   resolveRangeReference,

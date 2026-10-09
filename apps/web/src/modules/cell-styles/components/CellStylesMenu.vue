@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId } from "vue";
 import { Combine, Palette, Plus } from "lucide-vue-next";
-import { createBuiltinCellStyles, type CellStyleDefinition } from "@idea10/core/cell-styles";
-import type { WorkbookTheme } from "@idea10/core/workbook-theme";
+import { createBuiltinCellStyles, type CellStyleDefinition } from "@sheetcraft/core/cell-styles";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";

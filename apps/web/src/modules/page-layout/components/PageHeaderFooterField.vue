@@ -108,7 +108,7 @@ function open(): void {
     overflow: hidden;
     cursor: pointer;
     &:focus-visible {
-      outline: 2px solid var(--idea-action-primary);
+      outline: 2px solid var(--sheetcraft-action-primary);
       outline-offset: -2px;
     }
     &:disabled {
@@ -116,8 +116,8 @@ function open(): void {
     }
   }
   &__placeholder {
-    color: var(--idea-text-muted);
-    font-family: var(--idea-font-sans);
+    color: var(--sheetcraft-text-muted);
+    font-family: var(--sheetcraft-font-sans);
     font-size: calc(20px * v-bind(uiScale));
     line-height: calc(24px * v-bind(uiScale));
   }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setCellHyperlink } from "@idea10/core/workbook";
+import { setCellHyperlink } from "@sheetcraft/core/workbook";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 

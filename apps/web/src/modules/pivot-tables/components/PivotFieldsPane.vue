@@ -9,9 +9,9 @@ import {
   normalizePivotTable,
   type PivotAggregate,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
-import { isFormulaError } from "@idea10/core/formula";
-import type { Workbook } from "@idea10/core/workbook";
+} from "@sheetcraft/core/pivot-tables";
+import { isFormulaError } from "@sheetcraft/core/formula";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import PivotFieldArea from "./PivotFieldArea.vue";
 import PivotFieldSettingsDialog from "./PivotFieldSettingsDialog.vue";
@@ -344,10 +344,10 @@ defineExpose({
   min-height: 0;
   gap: 16px;
   padding: 12px 14px;
-  border-left: 1px solid var(--idea-border-subtle);
-  background: var(--idea-surface-secondary);
-  font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
+  border-left: 1px solid var(--sheetcraft-border-subtle);
+  background: var(--sheetcraft-surface-secondary);
+  font-size: var(--sheetcraft-font-size-body-medium);
+  line-height: var(--sheetcraft-line-height-body-medium);
   overflow: auto;
   &__header {
     display: flex;
@@ -358,7 +358,7 @@ defineExpose({
   &__close {
     padding: 4px;
     border-radius: 3px;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   h3 {
     margin: 0;
@@ -367,7 +367,7 @@ defineExpose({
   }
   p {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__available {
     display: grid;
@@ -381,9 +381,9 @@ defineExpose({
     padding: 6px;
     min-height: 0;
     overflow: auto;
-    border: 1px solid var(--idea-border-control);
+    border: 1px solid var(--sheetcraft-border-control);
     border-radius: 4px;
-    background: var(--idea-surface-panel);
+    background: var(--sheetcraft-surface-panel);
     li {
       display: flex;
       align-items: center;
@@ -393,13 +393,13 @@ defineExpose({
       cursor: grab;
       border-radius: 2px;
       &:hover {
-        background: var(--idea-surface-hover);
+        background: var(--sheetcraft-surface-hover);
       }
     }
   }
   &__grip {
     flex-shrink: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__field-check {
     flex: 1;
@@ -425,7 +425,7 @@ defineExpose({
     gap: 10px 12px;
   }
   [role="alert"] {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

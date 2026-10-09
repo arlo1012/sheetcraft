@@ -1,4 +1,4 @@
-import { normalizeFloatingImageForSheet, type FloatingImage } from "@idea10/core/workbook";
+import { normalizeFloatingImageForSheet, type FloatingImage } from "@sheetcraft/core/workbook";
 
 export const FLOATING_IMAGE_CLIPBOARD_TYPE = "application/x-idea10-floating-image";
 

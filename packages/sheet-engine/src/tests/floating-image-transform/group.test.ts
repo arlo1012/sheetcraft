@@ -3,7 +3,7 @@ import {
   MIN_FLOATING_IMAGE_SIZE,
   MAX_FLOATING_IMAGE_SIZE,
   type FloatingImage,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   rotateFloatingImages,
   flipFloatingImages,

@@ -1,4 +1,4 @@
-import type { SheetPageDecoration } from "@idea10/core/page-decoration";
+import type { SheetPageDecoration } from "@sheetcraft/core/page-decoration";
 import type { PageViewPaintState } from "../page-layout/page-view-types";
 import type { SheetRenderFrame } from "../sheet-grid/rendering/sheet-render-frame";
 

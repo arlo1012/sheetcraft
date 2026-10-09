@@ -1,7 +1,7 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
-import { DEFAULT_ROW_HEIGHT } from "@idea10/core/workbook";
+import { DEFAULT_SHEET_PAGE_SETUP } from "@sheetcraft/core/page-setup";
+import { DEFAULT_ROW_HEIGHT } from "@sheetcraft/core/workbook";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import {
   activeCell,

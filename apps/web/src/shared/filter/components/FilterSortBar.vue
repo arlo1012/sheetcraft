@@ -25,7 +25,7 @@ const { t } = useAppI18n();
   display: flex;
   align-items: center;
   min-height: 32px;
-  gap: var(--idea-space-4);
-  border-bottom: 1px solid var(--idea-border-subtle);
+  gap: var(--sheetcraft-space-4);
+  border-bottom: 1px solid var(--sheetcraft-border-subtle);
 }
 </style>

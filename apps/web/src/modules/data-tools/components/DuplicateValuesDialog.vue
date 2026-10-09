@@ -131,23 +131,23 @@ watch(
 <style scoped lang="scss">
 .duplicate-values-dialog {
   display: grid;
-  gap: var(--idea-space-2);
+  gap: var(--sheetcraft-space-2);
   &__color-label {
     display: inline-flex;
     align-items: center;
-    gap: var(--idea-space-1);
+    gap: var(--sheetcraft-space-1);
     vertical-align: top;
   }
   &__swatch {
     flex: none;
     width: 14px;
     height: 14px;
-    border: 1px solid var(--idea-border-subtle);
+    border: 1px solid var(--sheetcraft-border-subtle);
     border-radius: 2px;
   }
   &__error {
     margin: 0;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

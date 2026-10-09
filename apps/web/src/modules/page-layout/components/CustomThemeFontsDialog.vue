@@ -159,7 +159,7 @@ watch(
 }
 .custom-theme-fonts-dialog__error {
   margin: -8px 0 0;
-  color: var(--idea-status-error);
+  color: var(--sheetcraft-status-error);
   font-size: 12px;
   line-height: 18px;
 }
@@ -192,9 +192,9 @@ watch(
   grid-template-rows: repeat(2, minmax(0, 1fr));
   min-height: 240px;
   padding: 24px 32px;
-  background: var(--idea-surface-panel);
-  border: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-default);
+  background: var(--sheetcraft-surface-panel);
+  border: 1px solid var(--sheetcraft-border-subtle);
+  border-radius: var(--sheetcraft-radius-default);
 }
 .custom-theme-fonts-dialog__preview-sheet section {
   display: grid;
@@ -203,7 +203,7 @@ watch(
   padding: 16px 0;
 
   + section {
-    border-top: 1px solid var(--idea-border-subtle);
+    border-top: 1px solid var(--sheetcraft-border-subtle);
   }
 }
 .custom-theme-fonts-dialog__preview span {

@@ -5,7 +5,7 @@ import { Select as TSelect, Option as TOption } from "tdesign-vue-next/es/select
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
-import { formatCellAddress } from "@idea10/core/coordinates";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import { useAppI18n } from "../../../shared/i18n";
 import type {
   ReviewTextCell,

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
-import type { CellAddress } from "@idea10/core/workbook";
-import type { SheetPageDecoration } from "@idea10/core/page-decoration";
-import type { ExcelDateSystem } from "@idea10/core/formula";
-import type { Rect, SheetGeometry } from "@idea10/sheet-engine/geometry";
-import type { RowVisibilityIndex } from "@idea10/sheet-engine/visibility";
+import type { CellAddress } from "@sheetcraft/core/workbook";
+import type { SheetPageDecoration } from "@sheetcraft/core/page-decoration";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
+import type { Rect, SheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import type { RowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   browserCellTextMeasurer,
@@ -36,7 +36,7 @@ import {
   paintSheetChrome,
 } from "../rendering/overlay-painter";
 import type { PageViewPaintState } from "../../page-layout/page-view-types";
-import type { SheetPagination } from "@idea10/sheet-engine/page-layout";
+import type { SheetPagination } from "@sheetcraft/sheet-engine/page-layout";
 import {
   clipPageBreakPreviewOutside,
   clipPageBreakPreviewPrintArea,

@@ -1,10 +1,10 @@
 import { defineComponent, reactive } from "vue";
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
-import { createSetCellContentCommand } from "@idea10/core/commands";
-import { createWorkbookSession, executeWorkbookCommand } from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { getActiveSheet } from "@idea10/core/workbook";
+import { createSetCellContentCommand } from "@sheetcraft/core/commands";
+import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { getActiveSheet } from "@sheetcraft/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useDataProofreadingController } from "../../../../modules/data-tools/useDataProofreadingController";
 

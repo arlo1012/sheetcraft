@@ -1,9 +1,9 @@
 import {
   formatCellNumberValue,
   type CellNumberFormatPresentation,
-} from "@idea10/core/number-format";
-import type { ExcelDateSystem, FormulaValue } from "@idea10/core/formula";
-import type { CellStyle } from "@idea10/core/style";
+} from "@sheetcraft/core/number-format";
+import type { ExcelDateSystem, FormulaValue } from "@sheetcraft/core/formula";
+import type { CellStyle } from "@sheetcraft/core/style";
 
 export type GridCellValuePresentation = Readonly<{
   text: string;

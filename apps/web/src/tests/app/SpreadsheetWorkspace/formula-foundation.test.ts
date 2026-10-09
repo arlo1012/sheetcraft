@@ -1,20 +1,20 @@
 import { defineComponent, h } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createFormulaError } from "@idea10/core/formula";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createFormulaError } from "@sheetcraft/core/formula";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   deserializeWorkbook,
   serializeWorkbook,
   type WorkbookSnapshot,
-} from "@idea10/core/serialization";
+} from "@sheetcraft/core/serialization";
 import {
   createWorkbook,
   getActiveSheet,
   getCellComputedValue,
   getCellContent,
   setCellContent,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import WorkbookFileActions from "../../../modules/workbook-persistence/components/WorkbookFileActions.vue";
@@ -206,7 +206,7 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     expect(wrapper.find("[data-sheet-canvas]").exists()).toBe(true);
 
     expect(wrapper.get('[data-workbook-file="feedback"]').attributes("aria-label")).toContain(
-      "not a valid idea10 workbook",
+      "not a valid Sheetcraft workbook",
     );
   });
 });

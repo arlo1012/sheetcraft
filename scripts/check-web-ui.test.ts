@@ -8,7 +8,7 @@ import { checkWebUi } from "./check-web-ui.mts";
 const temporaryRoots: string[] = [];
 
 function fixture(files: Record<string, string>): string {
-  const root = mkdtempSync(join(tmpdir(), "idea10-web-ui-"));
+  const root = mkdtempSync(join(tmpdir(), "sheetcraft-web-ui-"));
   temporaryRoots.push(root);
   for (const [path, content] of Object.entries(files)) {
     const file = join(root, path);
@@ -46,7 +46,7 @@ describe("checkWebUi", () => {
     expect(checkWebUi(root).map((violation) => violation.rule)).toEqual([
       "Import Floating UI only through shared/floating; extend its composables instead.",
       "Use MenuSurface for menu semantics; keep only its approved shared implementations raw.",
-      "Use an --idea-layer-* token for global overlays; numeric z-index values above 30 are reserved.",
+      "Use an --sheetcraft-layer-* token for global overlays; numeric z-index values above 30 are reserved.",
     ]);
   });
 
@@ -57,7 +57,7 @@ describe("checkWebUi", () => {
 
     expect(checkWebUi(root)).toMatchObject([
       {
-        rule: "Use an --idea-layer-* token for global overlays; numeric z-index values above 30 are reserved.",
+        rule: "Use an --sheetcraft-layer-* token for global overlays; numeric z-index values above 30 are reserved.",
       },
     ]);
   });

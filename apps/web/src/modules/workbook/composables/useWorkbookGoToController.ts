@@ -3,10 +3,10 @@ import {
   findSheetGoToTargets,
   type SheetGoToOptions,
   type SheetGoToResult,
-} from "@idea10/core/go-to";
-import { formatCellAddress } from "@idea10/core/coordinates";
-import { formatComputedValueForDisplay } from "@idea10/core/input";
-import type { CellAddress, CellRange, SheetEvaluator, Workbook } from "@idea10/core/workbook";
+} from "@sheetcraft/core/go-to";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
+import { formatComputedValueForDisplay } from "@sheetcraft/core/input";
+import type { CellAddress, CellRange, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import type { WorkbookFindResult } from "../workbook-find-types";
 

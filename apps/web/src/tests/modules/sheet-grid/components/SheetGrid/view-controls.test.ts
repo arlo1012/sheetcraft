@@ -1,6 +1,6 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { DEFAULT_COLUMN_WIDTH, getColumnWidth } from "@idea10/core/workbook";
+import { DEFAULT_COLUMN_WIDTH, getColumnWidth } from "@sheetcraft/core/workbook";
 import {
   activeCell,
   mountSheetGrid,

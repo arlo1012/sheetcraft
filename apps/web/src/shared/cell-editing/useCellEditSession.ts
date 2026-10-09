@@ -1,4 +1,4 @@
-import type { CellAddress } from "@idea10/core/workbook";
+import type { CellAddress } from "@sheetcraft/core/workbook";
 import { reactive, readonly } from "vue";
 import { completeFormulaForCommit } from "../formula-editing/formula-commit";
 

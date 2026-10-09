@@ -8,7 +8,7 @@ defineProps<{ alignment: "left" | "center" | "right" | "justify" | "distributed"
     fill="none"
     stroke="currentColor"
     stroke-linecap="round"
-    style="stroke-width: var(--idea-icon-stroke-width)"
+    style="stroke-width: var(--sheetcraft-icon-stroke-width)"
     aria-hidden="true"
     focusable="false"
   >

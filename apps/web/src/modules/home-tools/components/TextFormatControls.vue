@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Bold, Italic, Strikethrough, Underline } from "lucide-vue-next";
-import type { CellStylePatch } from "@idea10/core/style";
-import type { SelectionCellStyleState, ToggleStyleState } from "@idea10/core/style-state";
+import type { CellStylePatch } from "@sheetcraft/core/style";
+import type { SelectionCellStyleState, ToggleStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 
@@ -86,7 +86,7 @@ function toggle(
       bottom: 3px;
       left: 5px;
       height: 2px;
-      background: var(--idea-text-muted);
+      background: var(--sheetcraft-text-muted);
       content: "";
     }
   }

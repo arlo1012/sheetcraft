@@ -6,7 +6,7 @@ import {
   setCellContent,
   getCellContent,
   getCellValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import type { PivotDraft } from "../../../modules/pivot-tables/usePivotActions";
 import PivotTableDialog from "../../../modules/pivot-tables/components/PivotTableDialog.vue";
 import { createAppI18n } from "../../../shared/i18n";

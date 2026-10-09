@@ -1,6 +1,6 @@
 import type { CSSProperties } from "vue";
-import type { CellStyle } from "@idea10/core/style";
-import type { FormulaValue } from "@idea10/core/formula";
+import type { CellStyle } from "@sheetcraft/core/style";
+import type { FormulaValue } from "@sheetcraft/core/formula";
 import {
   resolveCellHorizontalAlignment,
   resolveCellTextDirection,

@@ -2,8 +2,8 @@ import {
   datePartsToExcelSerial,
   excelSerialToDateParts,
   type ExcelDateSystem,
-} from "@idea10/core/formula";
-import type { SheetFilterValueCondition } from "@idea10/core/workbook";
+} from "@sheetcraft/core/formula";
+import type { SheetFilterValueCondition } from "@sheetcraft/core/workbook";
 
 export type FilterConditionKind = "values" | SheetFilterValueCondition["kind"];
 export type FilterConditionOperator = SheetFilterValueCondition["operator"];

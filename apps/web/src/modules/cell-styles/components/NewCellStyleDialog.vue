@@ -9,15 +9,15 @@ import {
   createBuiltinCellStyles,
   type CellStyleDefinition,
   type CellStyleInclude,
-} from "@idea10/core/cell-styles";
+} from "@sheetcraft/core/cell-styles";
 import { cellStyleLabel } from "../cell-style-presentation";
-import type { CellFormatChange } from "@idea10/core/commands";
+import type { CellFormatChange } from "@sheetcraft/core/commands";
 import {
   DEFAULT_CELL_FONT_FAMILY,
   DEFAULT_CELL_FONT_SIZE,
   type CellBorder,
   type CellStylePatch,
-} from "@idea10/core/style";
+} from "@sheetcraft/core/style";
 import CellFormatDialog from "../../cell-format/components/CellFormatDialog.vue";
 import { getCellFormatBorderCapabilities } from "../../cell-format/border-capabilities";
 import {
@@ -336,18 +336,18 @@ watch(
 .new-cell-style-dialog__name p {
   grid-column: 2 / -1;
   margin: -3px 0 0;
-  color: var(--idea-status-error);
-  font-size: var(--idea-font-size-body-small);
+  color: var(--sheetcraft-status-error);
+  font-size: var(--sheetcraft-font-size-body-small);
 }
 .new-cell-style-dialog__error {
   margin: 0;
-  color: var(--idea-status-error);
-  font-size: var(--idea-font-size-body-small);
+  color: var(--sheetcraft-status-error);
+  font-size: var(--sheetcraft-font-size-body-small);
 }
 .new-cell-style-dialog__summary h3 {
   margin: 0 0 7px;
-  font-size: var(--idea-font-size-body-medium);
-  font-weight: var(--idea-font-weight-medium);
+  font-size: var(--sheetcraft-font-size-body-medium);
+  font-weight: var(--sheetcraft-font-weight-medium);
 }
 .new-cell-style-dialog dl {
   display: grid;
@@ -359,16 +359,16 @@ watch(
 .new-cell-style-dialog dd {
   min-height: 20px;
   padding: 0;
-  font-size: var(--idea-font-size-body-small);
+  font-size: var(--sheetcraft-font-size-body-small);
 }
 .new-cell-style-dialog dt {
-  color: var(--idea-text-secondary);
+  color: var(--sheetcraft-text-secondary);
 }
 .new-cell-style-dialog dt :deep(.t-checkbox) {
   margin: 0;
 }
 .new-cell-style-dialog dd {
   margin: 0;
-  color: var(--idea-text-primary);
+  color: var(--sheetcraft-text-primary);
 }
 </style>

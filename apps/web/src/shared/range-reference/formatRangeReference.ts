@@ -1,5 +1,5 @@
-import { formatFormulaAddress, parseFormulaReference } from "@idea10/core/formula";
-import type { CellAddress, CellRange, Workbook } from "@idea10/core/workbook";
+import { formatFormulaAddress, parseFormulaReference } from "@sheetcraft/core/formula";
+import type { CellAddress, CellRange, Workbook } from "@sheetcraft/core/workbook";
 import { quoteFormulaSheetName } from "../formula-editing/formula-input-lexical";
 
 export type ResolvedRangeReference = Readonly<{ sheetId: string; range: CellRange }>;

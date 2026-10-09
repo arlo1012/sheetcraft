@@ -1,4 +1,4 @@
-import type { SheetDimensionAxis } from "@idea10/core/workbook";
+import type { SheetDimensionAxis } from "@sheetcraft/core/workbook";
 import type { FrozenPaneId } from "./frozen-layout.js";
 import type { SheetViewportLayout, ViewportAxisItem } from "./viewport-layout.js";
 

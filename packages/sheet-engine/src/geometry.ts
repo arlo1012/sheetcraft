@@ -5,7 +5,7 @@ import {
   MAX_SHEET_ROWS,
   isCellAddressInBounds,
   type CellAddress,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 
 export type Size = {
   width: number;

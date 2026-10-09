@@ -11,7 +11,7 @@ import {
   DEFAULT_SHEET_PAGE_PRINT_OPTIONS,
   type SheetPageSetup,
   type SheetPagePrintOptions,
-} from "@idea10/core/page-setup";
+} from "@sheetcraft/core/page-setup";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type {
@@ -234,47 +234,47 @@ function resetManualBreaks(): void {
   }
   &__section {
     min-width: 0;
-    border-top: 1px solid var(--idea-border-subtle);
-    padding-top: var(--idea-space-3);
+    border-top: 1px solid var(--sheetcraft-border-subtle);
+    padding-top: var(--sheetcraft-space-3);
   }
   &__titles {
     display: grid;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__print-options {
     display: grid;
-    gap: var(--idea-space-3);
+    gap: var(--sheetcraft-space-3);
   }
   &__flags {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--idea-space-2) var(--idea-space-4);
+    gap: var(--sheetcraft-space-2) var(--sheetcraft-space-4);
     width: 100%;
   }
   &__print-selects {
     display: grid;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__order {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__order-option {
     display: inline-flex;
     align-items: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     vertical-align: middle;
     svg {
-      width: var(--idea-action-icon-size);
-      height: var(--idea-action-icon-size);
-      color: var(--idea-text-secondary);
+      width: var(--sheetcraft-action-icon-size);
+      height: var(--sheetcraft-action-icon-size);
+      color: var(--sheetcraft-text-secondary);
     }
   }
   &__error {
     margin: 0;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
-import type { CellContentMatrix } from "@idea10/core/clipboard";
+import type { CellContentMatrix } from "@sheetcraft/core/clipboard";
 import {
   createWorkbookHistory,
   executeWorkbookCommand,
   redoWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
 import {
   createWorkbook,
   getActiveSheet,
@@ -23,7 +23,7 @@ import {
   setCellStyle,
   setCellValue,
   type Sheet,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   createGridPasteCommand,
   GridPasteError,

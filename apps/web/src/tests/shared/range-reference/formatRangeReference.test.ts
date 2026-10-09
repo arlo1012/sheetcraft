@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createSheet, createWorkbook } from "@idea10/core/workbook";
+import { createSheet, createWorkbook } from "@sheetcraft/core/workbook";
 import {
   formatRangeReference,
   resolveRangeReference,

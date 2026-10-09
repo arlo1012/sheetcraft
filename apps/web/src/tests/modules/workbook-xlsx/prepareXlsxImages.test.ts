@@ -1,5 +1,5 @@
-import { serializeWorkbook } from "@idea10/core/serialization";
-import { createWorkbook, getActiveSheet, setCellContent } from "@idea10/core/workbook";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { createWorkbook, getActiveSheet, setCellContent } from "@sheetcraft/core/workbook";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { ImageAsset, ImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { prepareXlsxImages } from "../../../modules/workbook-xlsx/prepareXlsxImages";

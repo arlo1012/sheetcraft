@@ -2,7 +2,7 @@ import {
   normalizePivotTable,
   type PivotAggregate,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
+} from "@sheetcraft/core/pivot-tables";
 export type PivotArea = "filters" | "columns" | "rows" | "values";
 export type PivotFieldChoice = {
   field: number;

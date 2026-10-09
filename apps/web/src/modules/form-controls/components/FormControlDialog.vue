@@ -5,8 +5,8 @@ import { Input } from "tdesign-vue-next/es/input";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { Select } from "tdesign-vue-next/es/select";
-import type { SheetControlDrawing } from "@idea10/core/sheet-drawings";
-import type { FormControlType } from "@idea10/core/form-controls";
+import type { SheetControlDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { FormControlType } from "@sheetcraft/core/form-controls";
 import { useAppI18n } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { formatRangeReference } from "../../../shared/range-reference/formatRangeReference";
@@ -157,7 +157,7 @@ function confirm() {
     color: var(--text-secondary);
   }
   [role="alert"] {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

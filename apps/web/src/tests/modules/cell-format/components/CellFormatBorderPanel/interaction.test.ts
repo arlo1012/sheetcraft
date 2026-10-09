@@ -1,7 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import type { CellBorderAction } from "@idea10/core/style";
-import type { SelectionBorderState } from "@idea10/core/style-state";
+import type { CellBorderAction } from "@sheetcraft/core/style";
+import type { SelectionBorderState } from "@sheetcraft/core/style-state";
 import CellFormatBorderPanel from "../../../../../modules/cell-format/components/CellFormatBorderPanel.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 

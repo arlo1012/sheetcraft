@@ -3,7 +3,7 @@
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    style="stroke-width: var(--idea-icon-stroke-width)"
+    style="stroke-width: var(--sheetcraft-icon-stroke-width)"
     stroke-linecap="round"
     stroke-linejoin="round"
     aria-hidden="true"

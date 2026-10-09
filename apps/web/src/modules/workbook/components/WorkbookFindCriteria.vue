@@ -5,7 +5,7 @@ import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dropdown, DropdownItem, DropdownMenu } from "tdesign-vue-next/es/dropdown";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { ChevronDown, ChevronUp } from "lucide-vue-next";
-import type { SheetSearchFormat } from "@idea10/core/search";
+import type { SheetSearchFormat } from "@sheetcraft/core/search";
 import WorkbookFindFormatControl from "./WorkbookFindFormatControl.vue";
 import WorkbookFindQueryInput from "./WorkbookFindQueryInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -203,13 +203,13 @@ defineExpose({ focusQuery });
 <style scoped lang="scss">
 .workbook-find-criteria {
   display: grid;
-  gap: var(--idea-space-4);
+  gap: var(--sheetcraft-space-4);
   min-width: 0;
   &__query-row {
     display: grid;
     grid-template-columns: 6em minmax(0, 1fr);
     align-items: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     min-width: 0;
     &.is-expanded {
       grid-template-columns: 6em minmax(0, 1fr) 108px auto;
@@ -226,13 +226,13 @@ defineExpose({ focusQuery });
   &__options {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--idea-space-3);
+    gap: var(--sheetcraft-space-3);
     min-width: 0;
   }
   &__option {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     min-width: 0;
     > * {
       min-width: 0;
@@ -243,18 +243,18 @@ defineExpose({ focusQuery });
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     min-width: 0;
   }
   &__special-content {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
     width: 100%;
   }
   &__special-token {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 @media (max-width: 520px) {

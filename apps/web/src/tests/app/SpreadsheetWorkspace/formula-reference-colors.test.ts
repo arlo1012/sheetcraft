@@ -1,19 +1,19 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   deserializeWorkbook,
   serializeWorkbook,
   type WorkbookSnapshot,
-} from "@idea10/core/serialization";
+} from "@sheetcraft/core/serialization";
 import {
   createWorkbook,
   getActiveSheet,
   getCellComputedValue,
   getCellContent,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetSurface from "../../../modules/sheet-grid/components/SheetSurface.vue";
 import type { WorkbookStore } from "../../../modules/workbook-persistence/workbookStore";

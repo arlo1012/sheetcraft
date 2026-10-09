@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { recordCanvasRenderPlans } from "./canvas-render-fixture";
-import { getCellContent, setCellContent } from "@idea10/core/workbook";
+import { getCellContent, setCellContent } from "@sheetcraft/core/workbook";
 import { createTestClipboardEvent } from "./clipboard-fixture";
 import { mountSheetGrid, triggerCell } from "./fixture";
 

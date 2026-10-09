@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
-import { getCellStyle } from "@idea10/core/workbook";
+import { getCellStyle } from "@sheetcraft/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import CellFormatDialog from "../../../modules/cell-format/components/CellFormatDialog.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";

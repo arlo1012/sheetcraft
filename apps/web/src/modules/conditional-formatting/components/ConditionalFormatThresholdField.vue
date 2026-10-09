@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ConditionalFormatThreshold } from "@idea10/core/conditional-formatting";
+import type { ConditionalFormatThreshold } from "@sheetcraft/core/conditional-formatting";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { computed } from "vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";

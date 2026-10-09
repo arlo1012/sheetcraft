@@ -4,9 +4,9 @@ import {
   executeWorkbookCommand,
   undoWorkbookCommand,
   redoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import type { WorkbookCommand } from "@idea10/core/commands";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
 import {
   createWorkbook,
   createSheet,
@@ -14,8 +14,8 @@ import {
   getCellContent,
   createSheetEvaluator,
   insertSheet,
-} from "@idea10/core/workbook";
-import type { SheetControlDrawing } from "@idea10/core/sheet-drawings";
+} from "@sheetcraft/core/workbook";
+import type { SheetControlDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useFormControlActions } from "../../../modules/form-controls/useFormControlActions";
 import { controlDrawing } from "./fixture";
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { TableStyleDefinition } from "@idea10/core/table-styles";
+import type { TableStyleDefinition } from "@sheetcraft/core/table-styles";
 import {
   cellStyleToCss,
   previewCells,

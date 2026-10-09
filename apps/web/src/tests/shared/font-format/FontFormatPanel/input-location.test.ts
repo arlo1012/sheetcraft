@@ -2,8 +2,8 @@ import { mount } from "@vue/test-utils";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { describe, expect, test } from "vitest";
 import { defineComponent, ref } from "vue";
-import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
-import type { CellStylePatch } from "@idea10/core/style";
+import { createDefaultSelectionCellStyleState } from "@sheetcraft/core/style-state";
+import type { CellStylePatch } from "@sheetcraft/core/style";
 import FontFormatPanel from "../../../../shared/font-format/FontFormatPanel.vue";
 import { createAppI18n } from "../../../../shared/i18n";
 

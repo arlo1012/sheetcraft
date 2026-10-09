@@ -4,7 +4,7 @@ import type {
   CellFillGradientStop,
   CellFillPatternStyle,
   CellStyle,
-} from "@idea10/core/style";
+} from "@sheetcraft/core/style";
 
 const DEFAULT_PATTERN_COLOR = "#000000";
 

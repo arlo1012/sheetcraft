@@ -8,8 +8,8 @@ import {
   setCellContent,
   MAX_SHEET_ROWS,
   MAX_SHEET_COLUMNS,
-} from "@idea10/core/workbook";
-import type { SheetCameraDrawing } from "@idea10/core/sheet-drawings";
+} from "@sheetcraft/core/workbook";
+import type { SheetCameraDrawing } from "@sheetcraft/core/sheet-drawings";
 import CameraContent from "../../../modules/camera/components/CameraContent.vue";
 
 const wrappers: Array<{ unmount(): void }> = [];

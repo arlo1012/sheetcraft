@@ -127,7 +127,7 @@ function confirm() {
     width: 100%;
   }
   &__error {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
     margin: 0;
   }
 }

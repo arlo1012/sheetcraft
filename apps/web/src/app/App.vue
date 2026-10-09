@@ -25,8 +25,8 @@ const tdesignLocale = computed<GlobalConfigProvider>(
 .app-workspace {
   width: 100%;
   min-height: 100dvh;
-  background: var(--idea-surface-canvas);
-  color: var(--idea-text-primary);
+  background: var(--sheetcraft-surface-canvas);
+  color: var(--sheetcraft-text-primary);
   isolation: isolate;
 }
 </style>

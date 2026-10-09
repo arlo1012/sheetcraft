@@ -1,5 +1,5 @@
 {
-  "schema": "idea10-bounded-bundle-sbom-v1",
+  "schema": "sheetcraft-bounded-bundle-sbom-v1",
   "generatedFrom": "ExcelJS 4.4.0 published browser UMD source map",
   "scope": "Embedded source-map package groups only; this is not the workspace dependency tree.",
   "artifact": {

@@ -1,8 +1,8 @@
 import { onScopeDispose, shallowRef } from "vue";
-import type { SheetDimensionAxis } from "@idea10/core/workbook";
-import type { Size } from "@idea10/sheet-engine/geometry";
-import { getViewportAxisBoundary } from "@idea10/sheet-engine/axis-interactions";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { SheetDimensionAxis } from "@sheetcraft/core/workbook";
+import type { Size } from "@sheetcraft/sheet-engine/geometry";
+import { getViewportAxisBoundary } from "@sheetcraft/sheet-engine/axis-interactions";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import {
   startPointerSession,
   type PointerSession,

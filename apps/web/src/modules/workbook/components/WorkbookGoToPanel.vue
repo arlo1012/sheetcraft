@@ -3,7 +3,7 @@ import { ref } from "vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
-import type { SheetGoToOptions } from "@idea10/core/go-to";
+import type { SheetGoToOptions } from "@sheetcraft/core/go-to";
 import { useAppI18n } from "../../../shared/i18n";
 
 type ValueType = "number" | "text" | "logical" | "error";
@@ -99,11 +99,11 @@ defineExpose({ focus });
 <style scoped lang="scss">
 .workbook-go-to-panel {
   display: grid;
-  gap: var(--idea-space-4);
+  gap: var(--sheetcraft-space-4);
   &__kinds {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--idea-space-3) var(--idea-space-2);
+    gap: var(--sheetcraft-space-3) var(--sheetcraft-space-2);
   }
   &__data,
   &__data-options {
@@ -112,19 +112,19 @@ defineExpose({ focus });
   &__data-options {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--idea-space-3);
-    padding-inline-start: var(--idea-space-6);
+    gap: var(--sheetcraft-space-3);
+    padding-inline-start: var(--sheetcraft-space-6);
   }
   &__value-types {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--idea-space-3);
+    gap: var(--sheetcraft-space-3);
     width: 100%;
   }
   &__actions {
     display: flex;
     justify-content: flex-end;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
 }
 @media (max-width: 520px) {

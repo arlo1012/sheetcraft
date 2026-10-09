@@ -5,7 +5,7 @@ import {
   createFormulaError,
   datePartsToExcelSerial,
   type FormulaValue,
-} from "@idea10/core/formula";
+} from "@sheetcraft/core/formula";
 import { xml } from "./pivot-xml.js";
 export function readPivotCacheValue(
   kind: string | undefined,

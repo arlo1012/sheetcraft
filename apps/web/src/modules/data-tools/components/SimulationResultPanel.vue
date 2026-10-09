@@ -50,7 +50,7 @@ const statusLabel = computed(() =>
 .simulation-result {
   display: grid;
   gap: 8px;
-  border-top: 1px solid var(--idea-border-subtle);
+  border-top: 1px solid var(--sheetcraft-border-subtle);
   padding-top: 8px;
 
   &__heading {
@@ -77,7 +77,7 @@ const statusLabel = computed(() =>
   }
   p {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

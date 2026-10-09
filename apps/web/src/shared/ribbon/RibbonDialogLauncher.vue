@@ -47,7 +47,7 @@ function activate(): void {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 2px;
-  color: var(--idea-text-muted);
+  color: var(--sheetcraft-text-muted);
   cursor: pointer;
   outline: none;
 
@@ -58,12 +58,12 @@ function activate(): void {
   }
 
   &:hover:not([aria-disabled="true"]) {
-    background: var(--idea-icon-button-hover-bg);
+    background: var(--sheetcraft-icon-button-hover-bg);
   }
 
   &[aria-disabled="true"] {
     cursor: default;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

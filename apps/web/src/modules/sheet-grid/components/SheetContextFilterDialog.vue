@@ -93,7 +93,7 @@ function toggle(key: FilterValueKey): void {
       padding: 0;
       border: 0;
       background: none;
-      color: var(--idea-action-primary);
+      color: var(--sheetcraft-action-primary);
       font: inherit;
       cursor: pointer;
     }

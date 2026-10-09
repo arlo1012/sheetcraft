@@ -1,7 +1,7 @@
 import { computed, ref, type ComputedRef } from "vue";
-import { getDuplicateEntryIssues } from "@idea10/core/duplicate-values";
-import { isNumericText } from "@idea10/core/input";
-import { isCellInRange, normalizeCellRange } from "@idea10/sheet-engine/selection";
+import { getDuplicateEntryIssues } from "@sheetcraft/core/duplicate-values";
+import { isNumericText } from "@sheetcraft/core/input";
+import { isCellInRange, normalizeCellRange } from "@sheetcraft/sheet-engine/selection";
 import {
   createCellKey,
   type CellAddress,
@@ -9,7 +9,7 @@ import {
   type Sheet,
   type SheetEvaluator,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   readDuplicateErrorChecks,
   writeDuplicateErrorChecks,

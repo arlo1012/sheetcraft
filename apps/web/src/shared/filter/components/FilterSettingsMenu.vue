@@ -141,7 +141,7 @@ function isSelectedSort(
 
 <style scoped lang="scss">
 .filter-settings-menu {
-  z-index: var(--idea-layer-popover-submenu);
+  z-index: var(--sheetcraft-layer-popover-submenu);
 
   &__trigger {
     width: 24px;

@@ -1,5 +1,9 @@
-import { createPastePlan, getCellMatrixSize, type CellValueMatrix } from "@idea10/core/clipboard";
-import { doMergedCellRangesIntersect } from "@idea10/core";
+import {
+  createPastePlan,
+  getCellMatrixSize,
+  type CellValueMatrix,
+} from "@sheetcraft/core/clipboard";
+import { doMergedCellRangesIntersect } from "@sheetcraft/core";
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
@@ -7,8 +11,11 @@ import {
   type CellRange,
   type Sheet,
   type SheetEvaluator,
-} from "@idea10/core/workbook";
-import { createRowVisibilityIndex, type RowVisibilityIndex } from "@idea10/sheet-engine/visibility";
+} from "@sheetcraft/core/workbook";
+import {
+  createRowVisibilityIndex,
+  type RowVisibilityIndex,
+} from "@sheetcraft/sheet-engine/visibility";
 import type { GridPastePlan } from "./useGridClipboard";
 import { createSheetHiddenRowIntervals } from "./data-visibility";
 

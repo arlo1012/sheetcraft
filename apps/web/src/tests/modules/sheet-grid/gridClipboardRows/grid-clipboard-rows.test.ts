@@ -8,8 +8,8 @@ import {
   getActiveSheet,
   setCellContent,
   setCellValue,
-} from "@idea10/core/workbook";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createGridClipboardRowVisibility,
   createVisibleGridPastePlan,

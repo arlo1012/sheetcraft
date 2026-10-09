@@ -5,7 +5,7 @@ import {
   normalizeCellNote,
   type CellNote,
   type Sheet,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { readXlsxWorksheetPartTargets } from "./raw-cell-values.js";
 
 type RawCellNotes = Array<Map<string, CellNote>>;

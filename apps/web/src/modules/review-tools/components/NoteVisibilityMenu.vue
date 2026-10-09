@@ -73,6 +73,6 @@ function select(action: "toggle" | "showAll" | "hideAll"): void {
   @include ribbon.tool;
 }
 .note-menu {
-  z-index: var(--idea-layer-menu);
+  z-index: var(--sheetcraft-layer-menu);
 }
 </style>

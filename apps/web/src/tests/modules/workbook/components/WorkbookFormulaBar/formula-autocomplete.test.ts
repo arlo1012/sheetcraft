@@ -1,6 +1,6 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import { getFormulaFunctionMetadata } from "@idea10/core/formula";
+import { getFormulaFunctionMetadata } from "@sheetcraft/core/formula";
 import WorkbookFormulaBar from "../../../../../modules/workbook/components/WorkbookFormulaBar.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 

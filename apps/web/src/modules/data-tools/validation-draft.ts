@@ -2,7 +2,7 @@ import {
   datePartsToExcelSerial,
   excelSerialToDateParts,
   type ExcelDateSystem,
-} from "@idea10/core/formula";
+} from "@sheetcraft/core/formula";
 import type { DataValidationDraft, DataValidationInitial } from "./data-tools-types";
 
 function isReference(value: string): boolean {

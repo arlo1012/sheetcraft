@@ -4,15 +4,15 @@ import {
   executeWorkbookCommand,
   redoWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   getActiveSheet,
   getCellContent,
   getCellValue,
   setCellContent,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { createCellOperationActions } from "../../../../modules/sheet-grid/cell-operation-actions";
 
 function fixture() {

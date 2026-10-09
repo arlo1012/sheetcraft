@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, markRaw, onBeforeUnmount, ref, shallowRef } from "vue";
-import type { CellAddress, CellNote, CellNoteBox } from "@idea10/core/workbook";
-import { getCellAddressLabel } from "@idea10/core/coordinates";
+import type { CellAddress, CellNote, CellNoteBox } from "@sheetcraft/core/workbook";
+import { getCellAddressLabel } from "@sheetcraft/core/coordinates";
 import { useAppI18n } from "../../../shared/i18n";
 import { DEFAULT_NOTE_BOX } from "../../../shared/cell-notes/note-box";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
@@ -207,7 +207,7 @@ onBeforeUnmount(clearNoteBoxGesture);
 <style scoped lang="scss">
 .sheet-note-preview {
   position: fixed;
-  z-index: var(--idea-layer-popover);
+  z-index: var(--sheetcraft-layer-popover);
 
   width: var(--note-width);
   height: var(--note-height);
@@ -220,7 +220,7 @@ onBeforeUnmount(clearNoteBoxGesture);
     height: 1px;
     overflow: visible;
     pointer-events: none;
-    stroke: var(--idea-note-border);
+    stroke: var(--sheetcraft-note-border);
     stroke-width: 1px;
   }
 
@@ -237,8 +237,8 @@ onBeforeUnmount(clearNoteBoxGesture);
     width: 6px;
     height: 6px;
     margin: -3px;
-    border: 1px solid var(--idea-note-border);
-    background: var(--idea-note-background);
+    border: 1px solid var(--sheetcraft-note-border);
+    background: var(--sheetcraft-note-background);
   }
   &__handle.is-n {
     top: 0;

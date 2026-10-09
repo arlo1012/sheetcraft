@@ -795,7 +795,7 @@ export const zhCN = {
       "本地文档暂时无法打开，自动保存已暂停。原数据仍保留，你可以重试、导入备份，或放弃旧数据新建空白文档。",
     conflict: "其他标签页已保存了新副本，当前编辑仍保留在页面中。请先导出，再重新加载本地副本。",
     quota: "浏览器存储空间不足，无法保存，请导出 JSON 文件保留更改。",
-    invalidJson: "文件不是有效的 idea10 工作簿，或使用了不支持的版本，当前工作簿未被替换。",
+    invalidJson: "文件不是有效的 Sheetcraft 工作簿，或使用了不支持的版本，当前工作簿未被替换。",
     readFailed: "无法读取文件，当前工作簿未被替换。",
     exportFailed: "无法导出文件，当前工作簿仍保留在页面中。",
     exportStarted: "已开始下载 JSON 文件。",
@@ -814,7 +814,7 @@ export const zhCN = {
     cancel: "取消",
   },
   app: {
-    workspace: "idea10 工作区",
+    workspace: "Sheetcraft 工作区",
     language: "语言",
     localeChinese: "中文",
     localeEnglish: "English",

@@ -5,7 +5,7 @@ import type {
   WorkbookCustomColor,
   WorkbookCustomFont,
   WorkbookTheme,
-} from "@idea10/core/workbook-theme";
+} from "@sheetcraft/core/workbook-theme";
 import { useAppI18n } from "../../../shared/i18n";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -506,7 +506,7 @@ watch(
   width: 132px;
 }
 .page-theme-menu__submenu {
-  z-index: var(--idea-layer-submenu);
+  z-index: var(--sheetcraft-layer-submenu);
   width: min(480px, calc(100vw - 24px));
   max-height: min(700px, calc(100vh - 16px));
 }
@@ -528,14 +528,14 @@ watch(
 }
 .page-theme-menu__theme-preview,
 .page-theme-menu__effect-preview {
-  @include gallery.choice(var(--idea-space-2));
+  @include gallery.choice(var(--sheetcraft-space-2));
 
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 2px;
-  border: 1px solid var(--idea-border-subtle);
-  background: var(--idea-surface-panel);
-  color: var(--idea-text-primary);
+  border: 1px solid var(--sheetcraft-border-subtle);
+  background: var(--sheetcraft-surface-panel);
+  color: var(--sheetcraft-text-primary);
   text-align: center;
 }
 .page-theme-menu__theme-preview > span {
@@ -565,20 +565,20 @@ watch(
 .page-theme-menu__refresh {
   border: 0;
   background: transparent;
-  color: var(--idea-text-link);
+  color: var(--sheetcraft-text-link);
   font: inherit;
   cursor: pointer;
 }
 .page-theme-menu__color-row,
 .page-theme-menu__font-row {
-  @include gallery.choice(var(--idea-space-2));
+  @include gallery.choice(var(--sheetcraft-space-2));
 
   display: grid;
   grid-template-columns: 144px minmax(0, 1fr);
   align-items: center;
   min-height: 30px;
-  gap: var(--idea-space-4);
-  color: var(--idea-text-primary);
+  gap: var(--sheetcraft-space-4);
+  color: var(--sheetcraft-text-primary);
   text-align: left;
   font: inherit;
 }
@@ -600,7 +600,7 @@ watch(
   width: 42px;
   height: 42px;
   place-items: center;
-  border: 1px solid var(--idea-border-control);
+  border: 1px solid var(--sheetcraft-border-control);
   font-size: 15px;
 }
 .page-theme-menu__font-row > span:last-child {

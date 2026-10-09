@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ChevronDown, Table2 } from "lucide-vue-next";
-import type { CellFillMode } from "@idea10/core/cell-autofill";
+import type { CellFillMode } from "@sheetcraft/core/cell-autofill";
 import { computed, ref, useId } from "vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 
-export type { CellFillMode } from "@idea10/core/cell-autofill";
+export type { CellFillMode } from "@sheetcraft/core/cell-autofill";
 
 const props = withDefaults(
   defineProps<{
@@ -172,7 +172,7 @@ function selectMode(mode: CellFillMode): void {
 .sheet-auto-fill-options {
   &__trigger {
     position: absolute;
-    z-index: var(--idea-layer-toolbar);
+    z-index: var(--sheetcraft-layer-toolbar);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -180,16 +180,16 @@ function selectMode(mode: CellFillMode): void {
     height: calc(24px / var(--sheet-scale, 1));
     gap: calc(3px / var(--sheet-scale, 1));
     padding: 0;
-    color: var(--idea-text-secondary);
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-default);
+    color: var(--sheetcraft-text-secondary);
+    background: var(--sheetcraft-surface-panel);
+    border: 1px solid var(--sheetcraft-border-control);
+    border-radius: var(--sheetcraft-radius-default);
     box-shadow: none;
     cursor: pointer;
 
     &:hover,
     &[aria-expanded="true"] {
-      background: var(--idea-surface-hover);
+      background: var(--sheetcraft-surface-hover);
     }
   }
 
@@ -200,7 +200,7 @@ function selectMode(mode: CellFillMode): void {
   }
 
   &__menu {
-    z-index: var(--idea-layer-context-menu);
+    z-index: var(--sheetcraft-layer-context-menu);
     outline: none;
   }
 }

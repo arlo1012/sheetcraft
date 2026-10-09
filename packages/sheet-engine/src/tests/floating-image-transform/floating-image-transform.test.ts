@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { normalizeFloatingImageForSheet, type FloatingImage } from "@idea10/core/workbook";
+import { normalizeFloatingImageForSheet, type FloatingImage } from "@sheetcraft/core/workbook";
 import { getFloatingImageSheetRect } from "../../floating-image-layout.js";
 import {
   cropFloatingImage,

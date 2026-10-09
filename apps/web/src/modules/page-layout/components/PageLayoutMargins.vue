@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
-import { getPagePaperSize, type SheetPageSetup } from "@idea10/core/page-setup";
-import type { SheetPageMargin } from "@idea10/sheet-engine/page-layout";
+import { getPagePaperSize, type SheetPageSetup } from "@sheetcraft/core/page-setup";
+import type { SheetPageMargin } from "@sheetcraft/sheet-engine/page-layout";
 import type { SheetRenderFrame } from "../../sheet-grid/rendering/sheet-render-frame";
 import type { PageViewPage, PageViewPaintState } from "../page-view-types";
 import type { PageMarginDragStart } from "../usePageMarginDrag";
@@ -293,7 +293,7 @@ function keydown(margin: SheetPageMargin, event: KeyboardEvent): void {
       left: 0;
       right: 0;
       top: 50%;
-      border-top: 1px dashed var(--idea-text-muted);
+      border-top: 1px dashed var(--sheetcraft-text-muted);
     }
     &.is-vertical {
       cursor: col-resize;
@@ -303,7 +303,7 @@ function keydown(margin: SheetPageMargin, event: KeyboardEvent): void {
         left: 50%;
         right: auto;
         border-top: 0;
-        border-left: 1px dashed var(--idea-text-muted);
+        border-left: 1px dashed var(--sheetcraft-text-muted);
       }
     }
     &.is-header-footer::after {
@@ -312,9 +312,9 @@ function keydown(margin: SheetPageMargin, event: KeyboardEvent): void {
     &:hover,
     &:focus-visible,
     &.is-active {
-      background: color-mix(in srgb, var(--idea-action-primary) 12%, transparent);
+      background: color-mix(in srgb, var(--sheetcraft-action-primary) 12%, transparent);
       &::after {
-        border-color: var(--idea-action-primary);
+        border-color: var(--sheetcraft-action-primary);
         opacity: 1;
       }
     }
@@ -326,14 +326,14 @@ function keydown(margin: SheetPageMargin, event: KeyboardEvent): void {
     position: absolute;
     z-index: 1;
     pointer-events: none;
-    background: color-mix(in srgb, var(--idea-action-primary) 12%, transparent);
+    background: color-mix(in srgb, var(--sheetcraft-action-primary) 12%, transparent);
     &::after {
       content: "";
       position: absolute;
       left: 0;
       right: 0;
       top: 50%;
-      border-top: 1px solid var(--idea-action-primary);
+      border-top: 1px solid var(--sheetcraft-action-primary);
     }
     &.is-vertical::after {
       left: 50%;
@@ -341,7 +341,7 @@ function keydown(margin: SheetPageMargin, event: KeyboardEvent): void {
       top: 0;
       bottom: 0;
       border-top: 0;
-      border-left: 1px solid var(--idea-action-primary);
+      border-left: 1px solid var(--sheetcraft-action-primary);
     }
   }
   &__drag-value {
@@ -350,9 +350,9 @@ function keydown(margin: SheetPageMargin, event: KeyboardEvent): void {
     pointer-events: none;
     padding: 2px 5px;
     border-radius: 2px;
-    border: 1px solid var(--idea-border-strong);
-    background: var(--idea-surface-panel);
-    color: var(--idea-text-primary);
+    border: 1px solid var(--sheetcraft-border-strong);
+    background: var(--sheetcraft-surface-panel);
+    color: var(--sheetcraft-text-primary);
     white-space: nowrap;
   }
 }

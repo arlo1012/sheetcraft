@@ -80,6 +80,6 @@ function insertImage(mode: "cell" | "floating"): void {
 }
 
 .image-insert-menu {
-  z-index: var(--idea-layer-menu);
+  z-index: var(--sheetcraft-layer-menu);
 }
 </style>

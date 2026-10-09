@@ -1,15 +1,15 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { serializeWorkbook } from "@idea10/core/serialization";
+import { createSheetGridViewState } from "@sheetcraft/sheet-engine/view-state";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import {
   createWorkbook,
   createSheetEvaluator,
   getCellContent,
   getCellStyle,
   setCellContent,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import { DUPLICATE_ERROR_CHECKS_STORAGE_KEY } from "../../../modules/data-tools/duplicate-error-preferences";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";

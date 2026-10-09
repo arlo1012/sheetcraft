@@ -5,7 +5,7 @@ import {
   type CellAddress,
   type CellRange,
   type Sheet,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 
 export type CellTextSpan = Readonly<{
   source: CellAddress;

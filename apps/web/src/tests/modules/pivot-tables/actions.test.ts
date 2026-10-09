@@ -13,9 +13,9 @@ import {
   getCellHyperlink,
   getCellSparkline,
   getCellStyle,
-} from "@idea10/core/workbook";
-import { serializeWorkbook } from "@idea10/core/serialization";
-import { undoWorkbookCommand } from "@idea10/core/history";
+} from "@sheetcraft/core/workbook";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { undoWorkbookCommand } from "@sheetcraft/core/history";
 import { fixture } from "./fixture";
 
 function configured() {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
-import { getSheetHeaderFooterOptions, type SheetPageSetup } from "@idea10/core/page-setup";
+import { getSheetHeaderFooterOptions, type SheetPageSetup } from "@sheetcraft/core/page-setup";
 import { parseHeaderFooterRuns } from "../header-footer-text";
 import type {
   HeaderFooterEditTarget,
@@ -236,7 +236,7 @@ function sectionEmpty(section: HeaderFooterSection, page: PageViewPage): boolean
     pointer-events: auto;
     overflow: hidden;
     &:hover :deep(.page-header-footer-field__preview:not(:disabled)) {
-      outline: 1px solid var(--idea-border-control);
+      outline: 1px solid var(--sheetcraft-border-control);
       outline-offset: -1px;
     }
   }

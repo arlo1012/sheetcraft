@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
-import { resolveThemeColor, type ThemeColorReference } from "@idea10/core/workbook-theme";
+import { resolveThemeColor, type ThemeColorReference } from "@sheetcraft/core/workbook-theme";
 import { useWorkbookTheme } from "../../../shared/color/workbook-theme-context";
 import {
   DEFAULT_CELL_FILL_COLOR,
   DEFAULT_CELL_TEXT_COLOR,
   type CellStylePatch,
-} from "@idea10/core/style";
+} from "@sheetcraft/core/style";
 import { useAppI18n } from "../../../shared/i18n";
 import CellColorPicker from "./CellColorPicker.vue";
 
@@ -107,11 +107,11 @@ function applyColor(color: string | null, reference?: ThemeColorReference): void
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: var(--idea-icon-size, var(--idea-action-icon-size));
-    height: var(--idea-icon-size, var(--idea-action-icon-size));
+    width: var(--sheetcraft-icon-size, var(--sheetcraft-action-icon-size));
+    height: var(--sheetcraft-icon-size, var(--sheetcraft-action-icon-size));
 
     svg {
-      stroke-width: var(--idea-icon-stroke-width);
+      stroke-width: var(--sheetcraft-icon-stroke-width);
     }
   }
 

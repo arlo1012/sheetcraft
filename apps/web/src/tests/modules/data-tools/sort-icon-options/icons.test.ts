@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { createWorkbookSession } from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
-import { createSheetEvaluator, getActiveSheet, setCellContent } from "@idea10/core/workbook";
+import { createWorkbookSession } from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import type { SheetConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
+import { createSheetEvaluator, getActiveSheet, setCellContent } from "@sheetcraft/core/workbook";
 import { getSortIconColumns } from "../../../../modules/data-tools/sort-icon-options";
 
 describe("getSortIconColumns", () => {

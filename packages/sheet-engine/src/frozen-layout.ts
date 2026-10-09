@@ -1,4 +1,4 @@
-import type { CellAddress } from "@idea10/core/workbook";
+import type { CellAddress } from "@sheetcraft/core/workbook";
 import type { Point, Rect, SheetGeometry, Size, VisibleCellRange } from "./geometry.js";
 
 export type FreezePanes = {

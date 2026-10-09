@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { formatCellNumberValue } from "@idea10/core/number-format";
-import type { CellBorder, CellStyle } from "@idea10/core/style";
-import type { SheetSearchFormat } from "@idea10/core/search";
+import { formatCellNumberValue } from "@sheetcraft/core/number-format";
+import type { CellBorder, CellStyle } from "@sheetcraft/core/style";
+import type { SheetSearchFormat } from "@sheetcraft/core/search";
 import { getBorderLinePresentation } from "../../../shared/borders/borderPresentation";
 import { getCellFillStyle } from "../../../shared/cell-fill/fill-presentation";
 import {
@@ -169,17 +169,17 @@ const borderLines = computed<PreviewBorderLine[]>(() => {
   border: 1px solid var(--td-component-stroke);
   border-radius: var(--td-radius-default);
   background: var(--td-bg-color-container);
-  color: var(--idea-text-primary);
-  font-size: var(--idea-font-size-body-small);
+  color: var(--sheetcraft-text-primary);
+  font-size: var(--sheetcraft-font-size-body-small);
 
   &.is-unset {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__empty {
     display: grid;
     flex: 1;
     place-items: center;
-    padding-inline: var(--idea-space-2);
+    padding-inline: var(--sheetcraft-space-2);
   }
   &__sample {
     position: relative;
@@ -190,7 +190,7 @@ const borderLines = computed<PreviewBorderLine[]>(() => {
     height: 100%;
     overflow: hidden;
     border-radius: inherit;
-    padding: 3px var(--idea-space-2);
+    padding: 3px var(--sheetcraft-space-2);
     white-space: nowrap;
   }
   &__text {

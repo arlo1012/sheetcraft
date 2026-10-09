@@ -153,7 +153,7 @@ function align(action: PictureAlignment): void {
     @include ribbon.stack;
   }
   &__menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
   }
 }
 </style>

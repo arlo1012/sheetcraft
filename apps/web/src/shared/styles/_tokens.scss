@@ -1,37 +1,37 @@
 @layer theme {
   :root {
-    --idea-note-background: #ffffe1;
-    --idea-note-text: #20242c;
-    --idea-note-border: #20242c;
-    --idea-layer-menu: 80;
-    --idea-layer-submenu: 81;
-    --idea-layer-toolbar: 90;
-    --idea-layer-context-menu: 100;
-    --idea-layer-context-submenu: 101;
-    --idea-layer-sheet-menu: 120;
-    --idea-layer-popover: 2200;
-    --idea-layer-popover-submenu: 2201;
-    --idea-tool-panel-padding: var(--idea-space-4);
-    --idea-dialog-content-padding-block: var(--idea-space-5);
-    --idea-menu-padding: var(--idea-space-4) 0;
-    --idea-control-icon-size: 14px;
-    --idea-action-icon-size: 15px;
-    --idea-ribbon-large-icon-size: 22px;
-    --idea-ribbon-row-height: 26px;
-    --idea-ribbon-row-gap: 2px;
-    --idea-ribbon-content-height: calc(
-      var(--idea-ribbon-row-height) * 2 + var(--idea-ribbon-row-gap)
+    --sheetcraft-note-background: #ffffe1;
+    --sheetcraft-note-text: #20242c;
+    --sheetcraft-note-border: #20242c;
+    --sheetcraft-layer-menu: 80;
+    --sheetcraft-layer-submenu: 81;
+    --sheetcraft-layer-toolbar: 90;
+    --sheetcraft-layer-context-menu: 100;
+    --sheetcraft-layer-context-submenu: 101;
+    --sheetcraft-layer-sheet-menu: 120;
+    --sheetcraft-layer-popover: 2200;
+    --sheetcraft-layer-popover-submenu: 2201;
+    --sheetcraft-tool-panel-padding: var(--sheetcraft-space-4);
+    --sheetcraft-dialog-content-padding-block: var(--sheetcraft-space-5);
+    --sheetcraft-menu-padding: var(--sheetcraft-space-4) 0;
+    --sheetcraft-control-icon-size: 14px;
+    --sheetcraft-action-icon-size: 15px;
+    --sheetcraft-ribbon-large-icon-size: 22px;
+    --sheetcraft-ribbon-row-height: 26px;
+    --sheetcraft-ribbon-row-gap: 2px;
+    --sheetcraft-ribbon-content-height: calc(
+      var(--sheetcraft-ribbon-row-height) * 2 + var(--sheetcraft-ribbon-row-gap)
     );
-    --idea-ribbon-group-height: calc(var(--idea-ribbon-content-height) + 2px);
-    --idea-ribbon-toolbar-height: calc(var(--idea-ribbon-group-height) + 12px);
-    --idea-menu-icon-size: var(--idea-action-icon-size);
-    --idea-icon-stroke-width: 2;
-    --idea-keyboard-focus-bg: var(--idea-action-focus);
-    --idea-keyboard-focus-shadow: 0 0 0 2px var(--idea-action-focus);
-    font-family: var(--idea-font-sans);
-    font-size: var(--idea-font-size-body-medium);
-    font-weight: var(--idea-font-weight-regular);
-    line-height: var(--idea-line-height-body-medium);
+    --sheetcraft-ribbon-group-height: calc(var(--sheetcraft-ribbon-content-height) + 2px);
+    --sheetcraft-ribbon-toolbar-height: calc(var(--sheetcraft-ribbon-group-height) + 12px);
+    --sheetcraft-menu-icon-size: var(--sheetcraft-action-icon-size);
+    --sheetcraft-icon-stroke-width: 2;
+    --sheetcraft-keyboard-focus-bg: var(--sheetcraft-action-focus);
+    --sheetcraft-keyboard-focus-shadow: 0 0 0 2px var(--sheetcraft-action-focus);
+    font-family: var(--sheetcraft-font-sans);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    font-weight: var(--sheetcraft-font-weight-regular);
+    line-height: var(--sheetcraft-line-height-body-medium);
     font-synthesis: none;
     text-rendering: optimizeLegibility;
   }

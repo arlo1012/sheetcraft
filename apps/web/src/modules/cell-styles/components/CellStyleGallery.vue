@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CellStyleDefinition } from "@idea10/core/cell-styles";
+import type { CellStyleDefinition } from "@sheetcraft/core/cell-styles";
 import { nextTick, shallowRef } from "vue";
 import { MoreHorizontal } from "lucide-vue-next";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
@@ -201,11 +201,11 @@ defineExpose({ focusFirstStyle, contextMenuElement });
   width: 18px;
   height: 18px;
   padding: 0;
-  color: var(--idea-text-secondary);
+  color: var(--sheetcraft-text-secondary);
   visibility: hidden;
-  background: var(--idea-surface-panel);
-  border: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-small);
+  background: var(--sheetcraft-surface-panel);
+  border: 1px solid var(--sheetcraft-border-subtle);
+  border-radius: var(--sheetcraft-radius-small);
   cursor: pointer;
 }
 .cell-style-gallery__item:hover .cell-style-gallery__more,

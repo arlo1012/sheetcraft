@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, watch, onBeforeUnmount } from "vue";
-import type { SheetCameraDrawing } from "@idea10/core/sheet-drawings";
-import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
-import type { WorkbookTheme } from "@idea10/core/workbook-theme";
-import { DEFAULT_ROW_HEIGHT, getDefaultColumnWidth } from "@idea10/core/workbook";
-import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
-import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
-import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { SheetCameraDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import { DEFAULT_ROW_HEIGHT, getDefaultColumnWidth } from "@sheetcraft/core/workbook";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
+import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import { browserCellTextMeasurer } from "../../../shared/cell-text/text-metrics";
 import { createSheetDisplaySnapshot } from "../../sheet-grid/canvas/sheet-display-snapshot";
 import {

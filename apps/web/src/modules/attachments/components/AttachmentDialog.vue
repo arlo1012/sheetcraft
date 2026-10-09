@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import type { SheetAttachmentDrawing } from "@idea10/core/sheet-drawings";
+import type { SheetAttachmentDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useAppI18n } from "../../../shared/i18n";
 import { attachmentText } from "../attachment-file";
 const props = defineProps<{ drawing: SheetAttachmentDrawing }>();

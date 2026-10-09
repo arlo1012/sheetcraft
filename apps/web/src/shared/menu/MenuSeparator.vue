@@ -7,6 +7,6 @@
   height: 1px;
   margin: 4px 0;
   list-style: none;
-  background: var(--idea-border-subtle);
+  background: var(--sheetcraft-border-subtle);
 }
 </style>

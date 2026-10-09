@@ -1,11 +1,11 @@
-import type { SortIcon, SortKey, SortMethod } from "@idea10/core/commands";
+import type { SortIcon, SortKey, SortMethod } from "@sheetcraft/core/commands";
 import type {
   CellRange,
   DataValidationOperator,
   SheetDataValidation,
   SheetFilterColumn,
   SheetFilterValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 
 export type DataToolAxis = "rows" | "columns";
 export type DataToolSortDirection = "ascending" | "descending";

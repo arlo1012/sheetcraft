@@ -1,4 +1,4 @@
-import type { Rect, Size } from "@idea10/sheet-engine/geometry";
+import type { Rect, Size } from "@sheetcraft/sheet-engine/geometry";
 import { normalizeSheetZoom } from "../../shared/sheet-view/zoom";
 
 /** Viewport size is in screen pixels; selection, frozen panes and headers use sheet units. */

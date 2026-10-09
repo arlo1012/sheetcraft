@@ -1,5 +1,5 @@
-import type { Rect } from "@idea10/sheet-engine/geometry";
-import type { SheetViewportRangeFragment } from "@idea10/sheet-engine/viewport-layout";
+import type { Rect } from "@sheetcraft/sheet-engine/geometry";
+import type { SheetViewportRangeFragment } from "@sheetcraft/sheet-engine/viewport-layout";
 import type { SheetRenderFrame } from "./sheet-render-frame";
 import type { FreezeHandleTarget, SheetOverlayPalette, SheetOverlayState } from "./overlay-types";
 

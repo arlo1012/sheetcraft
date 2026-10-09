@@ -5,7 +5,7 @@ import {
   type ThemeColorSlot,
   type ThemeFontRole,
   type WorkbookTheme,
-} from "@idea10/core/workbook-theme";
+} from "@sheetcraft/core/workbook-theme";
 
 const paletteSlots: readonly ThemeColorSlot[] = [
   "light1",

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { ConditionalFormatStyle } from "@idea10/core/conditional-formatting";
-import type { CellFormatChange } from "@idea10/core/commands";
+import type { ConditionalFormatStyle } from "@sheetcraft/core/conditional-formatting";
+import type { CellFormatChange } from "@sheetcraft/core/commands";
 import CellFormatDialog from "../../cell-format/components/CellFormatDialog.vue";
 import {
   conditionalStyleToBorderState,

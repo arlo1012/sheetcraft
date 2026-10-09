@@ -1,5 +1,5 @@
-import { formatComputedValueForDisplay, parseCellContent } from "@idea10/core/input";
-import { isTextCellNumberFormat } from "@idea10/core/number-format";
+import { formatComputedValueForDisplay, parseCellContent } from "@sheetcraft/core/input";
+import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
 import {
   createWorkbookEvaluator,
   getCellStyle,
@@ -7,7 +7,7 @@ import {
   type CellAddress,
   type Sheet,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 
 function contentForPreview(sheet: Sheet, address: CellAddress, input: string) {
   return parseCellContent(input, {

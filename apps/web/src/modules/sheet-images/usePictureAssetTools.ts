@@ -1,7 +1,10 @@
 import { readonly, ref } from "vue";
-import { canUseSheetPermission } from "@idea10/core";
-import { createSetSheetFloatingImagesCommand, type WorkbookCommand } from "@idea10/core/commands";
-import type { FloatingImage, Sheet, Workbook } from "@idea10/core/workbook";
+import { canUseSheetPermission } from "@sheetcraft/core";
+import {
+  createSetSheetFloatingImagesCommand,
+  type WorkbookCommand,
+} from "@sheetcraft/core/commands";
+import type { FloatingImage, Sheet, Workbook } from "@sheetcraft/core/workbook";
 import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStore";
 import { prepareImageAsset } from "../image-assets/prepareImageAsset";
 import { downloadBlob } from "../../shared/files/download";

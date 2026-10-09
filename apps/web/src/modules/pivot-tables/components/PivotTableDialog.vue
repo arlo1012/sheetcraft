@@ -3,8 +3,8 @@ import { computed, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import { Button } from "tdesign-vue-next/es/button";
-import { getPivotTableSource, normalizePivotTable } from "@idea10/core/pivot-tables";
-import type { Workbook } from "@idea10/core/workbook";
+import { getPivotTableSource, normalizePivotTable } from "@sheetcraft/core/pivot-tables";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import type { PivotDraft } from "../usePivotActions";
 import { useAppI18n } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
@@ -259,7 +259,7 @@ const title = computed(() =>
     display: flex;
     align-items: center;
     gap: 8px;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__reports {
     display: grid;
@@ -282,12 +282,12 @@ const title = computed(() =>
   }
   h3 {
     margin: 0;
-    font-size: var(--idea-font-size-body-medium);
+    font-size: var(--sheetcraft-font-size-body-medium);
     font-weight: 600;
   }
   p {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

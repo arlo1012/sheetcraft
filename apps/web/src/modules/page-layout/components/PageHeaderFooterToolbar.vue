@@ -99,11 +99,11 @@ watch(
 .page-header-footer-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--idea-space-2);
+  gap: var(--sheetcraft-space-2);
 
   &__font {
-    font-family: var(--idea-font-sans);
-    font-size: var(--idea-font-size-body-medium);
+    font-family: var(--sheetcraft-font-sans);
+    font-size: var(--sheetcraft-font-size-body-medium);
     line-height: 1;
   }
 }

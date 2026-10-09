@@ -74,7 +74,7 @@ watch(
 
 .fill-blanks-dialog {
   display: grid;
-  gap: var(--idea-space-5);
+  gap: var(--sheetcraft-space-5);
 
   &__options {
     @include fill-dialog.group;
@@ -92,20 +92,20 @@ watch(
   &__hint {
     display: flex;
     align-items: flex-start;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
 
     > svg {
       flex: none;
-      margin-top: var(--idea-space-1);
+      margin-top: var(--sheetcraft-space-1);
     }
   }
 
   &__value {
-    padding-inline-start: calc(16px + var(--idea-space-4));
+    padding-inline-start: calc(16px + var(--sheetcraft-space-4));
   }
 
   &__error {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

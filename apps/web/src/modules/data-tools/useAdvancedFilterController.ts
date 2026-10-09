@@ -1,8 +1,8 @@
 import { ref, watch } from "vue";
-import { createAdvancedFilterCommand, type WorkbookCommand } from "@idea10/core/commands";
-import { resolveDataRange } from "@idea10/core/data-range";
-import { WorkbookDomainError } from "@idea10/core/errors";
-import { getActiveSheet, type CellRange, type Workbook } from "@idea10/core/workbook";
+import { createAdvancedFilterCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import { resolveDataRange } from "@sheetcraft/core/data-range";
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
+import { getActiveSheet, type CellRange, type Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import {
   formatRangeReference,

@@ -1,6 +1,6 @@
-import { createSortCellIconResolver, type SortIcon } from "@idea10/core/commands";
-import type { ExcelDateSystem } from "@idea10/core/formula";
-import type { CellRange, Sheet, SheetEvaluator } from "@idea10/core/workbook";
+import { createSortCellIconResolver, type SortIcon } from "@sheetcraft/core/commands";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
+import type { CellRange, Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import type { SortIconColumn } from "./data-tools-types";
 
 export function sortIconKey(icon: SortIcon | null): string {

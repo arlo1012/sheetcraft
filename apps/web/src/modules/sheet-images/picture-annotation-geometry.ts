@@ -1,4 +1,4 @@
-import type { ImageTransform } from "@idea10/core/workbook";
+import type { ImageTransform } from "@sheetcraft/core/workbook";
 import { getImagePresentation } from "../../shared/images/imagePresentation";
 
 /** Maps a point in the displayed picture back into original, uncropped image coordinates. */

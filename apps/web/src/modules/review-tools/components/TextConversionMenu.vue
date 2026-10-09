@@ -66,6 +66,6 @@ function select(scope: "sheet" | "workbook"): void {
   @include ribbon.tool;
 }
 .text-conversion-menu {
-  z-index: var(--idea-layer-menu);
+  z-index: var(--sheetcraft-layer-menu);
 }
 </style>

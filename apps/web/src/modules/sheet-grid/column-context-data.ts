@@ -1,6 +1,6 @@
-import { isFormulaError, type FormulaValue } from "@idea10/core/formula";
-import { MAX_SHEET_ROWS } from "@idea10/core/workbook";
-import type { CellAddress, CellRange, Sheet, SheetEvaluator } from "@idea10/core/workbook";
+import { isFormulaError, type FormulaValue } from "@sheetcraft/core/formula";
+import { MAX_SHEET_ROWS } from "@sheetcraft/core/workbook";
+import type { CellAddress, CellRange, Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import { createSheetHiddenRowIntervals, isInHiddenAxisIntervals } from "./data-visibility";
 
 export type ColumnValueDistribution = Readonly<{

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { FileText, Paperclip } from "lucide-vue-next";
-import type { SheetAttachmentDrawing } from "@idea10/core/sheet-drawings";
+import type { SheetAttachmentDrawing } from "@sheetcraft/core/sheet-drawings";
 import { attachmentText } from "../attachment-file";
 const props = defineProps<{ drawing: SheetAttachmentDrawing }>();
 const text = computed(() =>

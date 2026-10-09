@@ -1,7 +1,7 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import WorkbookStatusBar from "../../../../../modules/workbook/components/WorkbookStatusBar.vue";
-import { createSheet } from "@idea10/core/workbook";
+import { createSheet } from "@sheetcraft/core/workbook";
 import { createAppI18n } from "../../../../../shared/i18n";
 import { STATUS_BAR_SETTINGS_STORAGE_KEY } from "../../../../../modules/workbook/composables/useStatusBarSettings";
 

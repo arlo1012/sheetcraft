@@ -1,10 +1,10 @@
-import type { CellBorder, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
+import type { CellBorder, CellBorderFormatPatch, CellStylePatch } from "@sheetcraft/core/style";
 import {
   createDefaultSelectionCellStyleState,
   type SelectionBorderState,
   type SelectionCellStyleState,
-} from "@idea10/core/style-state";
-import type { CellFormatChange } from "@idea10/core/commands";
+} from "@sheetcraft/core/style-state";
+import type { CellFormatChange } from "@sheetcraft/core/commands";
 
 const STYLE_KEYS = [
   "numberFormat",

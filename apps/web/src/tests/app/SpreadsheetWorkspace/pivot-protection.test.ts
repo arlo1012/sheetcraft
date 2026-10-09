@@ -1,9 +1,9 @@
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createSetPivotTableCommand } from "@idea10/core/commands";
-import { getCellValue, setCellValue } from "@idea10/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { createSetPivotTableCommand } from "@sheetcraft/core/commands";
+import { getCellValue, setCellValue } from "@sheetcraft/core/workbook";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import { createAppI18n } from "../../../shared/i18n";
 

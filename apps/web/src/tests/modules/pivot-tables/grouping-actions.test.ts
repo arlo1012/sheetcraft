@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
-import { undoWorkbookCommand } from "@idea10/core/history";
-import type { WorkbookCommand } from "@idea10/core/commands";
-import type { PivotFieldGroup } from "@idea10/core/pivot-tables";
-import { getCellValue, setCellContent, setCellStyle, type Sheet } from "@idea10/core/workbook";
+import { undoWorkbookCommand } from "@sheetcraft/core/history";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
+import type { PivotFieldGroup } from "@sheetcraft/core/pivot-tables";
+import { getCellValue, setCellContent, setCellStyle, type Sheet } from "@sheetcraft/core/workbook";
 import { usePivotGrouping } from "../../../modules/pivot-tables/usePivotGrouping";
 import { fixture } from "./fixture";
 const group: PivotFieldGroup = {

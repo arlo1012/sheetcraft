@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ChevronDown, CircleAlert } from "lucide-vue-next";
 import { computed, ref, useId, watch } from "vue";
-import type { CellAddress } from "@idea10/core/workbook";
+import type { CellAddress } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
@@ -218,17 +218,17 @@ watch(
     width: 38px;
     height: 22px;
     padding: 0 4px;
-    color: var(--idea-text-secondary);
-    background: var(--idea-surface-panel);
+    color: var(--sheetcraft-text-secondary);
+    background: var(--sheetcraft-surface-panel);
     border: 0;
     outline: none;
     box-shadow: none;
-    border-radius: var(--idea-radius-small);
+    border-radius: var(--sheetcraft-radius-small);
     cursor: pointer;
 
     &:hover:not(:disabled),
     &[aria-expanded="true"] {
-      background: var(--idea-icon-button-hover-bg);
+      background: var(--sheetcraft-icon-button-hover-bg);
     }
 
     &:disabled {
@@ -238,7 +238,7 @@ watch(
   }
 
   &__icon {
-    color: var(--idea-status-warning);
+    color: var(--sheetcraft-status-warning);
   }
 
   &__arrow--open {
@@ -246,22 +246,22 @@ watch(
   }
 
   &__surface {
-    z-index: var(--idea-layer-sheet-menu);
+    z-index: var(--sheetcraft-layer-sheet-menu);
     width: min(184px, calc(100vw - 32px));
   }
 
   &__message {
-    padding: 0 var(--idea-space-4) var(--idea-space-2);
+    padding: 0 var(--sheetcraft-space-4) var(--sheetcraft-space-2);
     list-style: none;
 
     p {
       margin: 0;
-      padding: var(--idea-space-3);
-      color: var(--idea-text-secondary);
-      background: var(--idea-surface-secondary);
-      border-radius: var(--idea-radius-small);
-      font-size: var(--idea-font-size-body-small);
-      line-height: var(--idea-line-height-body-small);
+      padding: var(--sheetcraft-space-3);
+      color: var(--sheetcraft-text-secondary);
+      background: var(--sheetcraft-surface-secondary);
+      border-radius: var(--sheetcraft-radius-small);
+      font-size: var(--sheetcraft-font-size-body-small);
+      line-height: var(--sheetcraft-line-height-body-small);
       overflow-wrap: anywhere;
     }
   }

@@ -1,4 +1,4 @@
-import type { CellAddress, CellRange } from "@idea10/core/workbook";
+import type { CellAddress, CellRange } from "@sheetcraft/core/workbook";
 import type { FreezePanes, FrozenPaneId } from "./frozen-layout.js";
 import type { Point, Rect, SheetGeometry, Size } from "./geometry.js";
 import type { RowVisibilityIndex, VisibleRow } from "./visibility.js";

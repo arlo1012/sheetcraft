@@ -68,6 +68,6 @@ function select(mode: "position" | "size" | "all"): void {
   @include ribbon.tool;
 }
 .note-menu {
-  z-index: var(--idea-layer-menu);
+  z-index: var(--sheetcraft-layer-menu);
 }
 </style>

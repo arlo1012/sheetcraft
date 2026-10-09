@@ -2,7 +2,7 @@ import {
   normalizeSheetAttachment,
   MAX_ATTACHMENT_BYTES,
   type SheetAttachment,
-} from "@idea10/core/sheet-attachments";
+} from "@sheetcraft/core/sheet-attachments";
 export async function prepareAttachment(
   file: File,
   display: SheetAttachment["display"],

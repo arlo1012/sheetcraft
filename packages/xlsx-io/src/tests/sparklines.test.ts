@@ -9,9 +9,9 @@ import {
   setCellSparkline,
   setCellContent,
   setCellNote,
-} from "@idea10/core/workbook";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import type { CellSparkline } from "@idea10/core/sparklines";
+} from "@sheetcraft/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import type { CellSparkline } from "@sheetcraft/core/sparklines";
 import { encodeXlsx, decodeXlsx } from "../index.js";
 import { readXlsxSparklines } from "../sparklines.js";
 

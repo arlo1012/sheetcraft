@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
-import { undoWorkbookCommand, redoWorkbookCommand } from "@idea10/core/history";
-import type { WorkbookCommand } from "@idea10/core/commands";
-import { getCellValue, setCellContent, type CellAddress } from "@idea10/core/workbook";
+import { undoWorkbookCommand, redoWorkbookCommand } from "@sheetcraft/core/history";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
+import { getCellValue, setCellContent, type CellAddress } from "@sheetcraft/core/workbook";
 import { usePivotActions } from "../../../modules/pivot-tables/usePivotActions";
 import { fixture } from "./fixture";
 

@@ -2,13 +2,13 @@
 import type {
   ConditionalFormatCondition,
   ConditionalFormatStyle,
-} from "@idea10/core/conditional-formatting";
+} from "@sheetcraft/core/conditional-formatting";
 import {
   applyConditionalFormatStyle,
   getConditionalFormatIcon,
-} from "@idea10/core/conditional-formatting";
-import { formatCellNumberValue } from "@idea10/core/number-format";
-import type { CellStyle } from "@idea10/core/style";
+} from "@sheetcraft/core/conditional-formatting";
+import { formatCellNumberValue } from "@sheetcraft/core/number-format";
+import type { CellStyle } from "@sheetcraft/core/style";
 import { computed, onBeforeUnmount, ref, watchPostEffect } from "vue";
 import { getCellBorderCss } from "../../../shared/borders/borderPresentation";
 import { getCellFillStyle } from "../../../shared/cell-fill/fill-presentation";
@@ -237,8 +237,8 @@ watchPostEffect(() => {
   width: 100px;
   height: 30px;
   flex: 0 0 auto;
-  border: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-small);
+  border: 1px solid var(--sheetcraft-border-subtle);
+  border-radius: var(--sheetcraft-radius-small);
 
   &__visual {
     width: 90px;
@@ -265,16 +265,16 @@ watchPostEffect(() => {
     box-sizing: border-box;
     height: 28px;
     padding: 0 8px;
-    border-color: var(--idea-border-strong);
-    border-radius: var(--idea-radius-default);
-    background: var(--idea-surface-special);
+    border-color: var(--sheetcraft-border-strong);
+    border-radius: var(--sheetcraft-radius-default);
+    background: var(--sheetcraft-surface-special);
   }
 
   &__swatch {
     flex: 1;
     min-width: 0;
     height: 16px;
-    border-radius: var(--idea-radius-small);
+    border-radius: var(--sheetcraft-radius-small);
   }
 
   &__sample {

@@ -1,5 +1,5 @@
 import { mount } from "@vue/test-utils";
-import type { ConditionalFormatCondition } from "@idea10/core/conditional-formatting";
+import type { ConditionalFormatCondition } from "@sheetcraft/core/conditional-formatting";
 import { describe, expect, test, vi } from "vitest";
 import ConditionalFormatPreview from "../../../modules/conditional-formatting/components/ConditionalFormatPreview.vue";
 import { paintConditionalFormatVisual } from "../../../shared/conditional-formatting/conditional-format-painter";

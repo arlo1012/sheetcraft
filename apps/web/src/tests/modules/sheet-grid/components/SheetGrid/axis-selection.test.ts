@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { undoWorkbookCommand } from "@idea10/core/history";
-import { getCellValue, setCellValue } from "@idea10/core/workbook";
+import { undoWorkbookCommand } from "@sheetcraft/core/history";
+import { getCellValue, setCellValue } from "@sheetcraft/core/workbook";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { createTestClipboardEvent } from "./clipboard-fixture";
 import {

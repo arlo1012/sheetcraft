@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ConditionalFormatIconSet } from "@idea10/core/conditional-formatting";
+import type { ConditionalFormatIconSet } from "@sheetcraft/core/conditional-formatting";
 import { ref, watchPostEffect } from "vue";
 import { paintConditionalFormatIcon } from "./conditional-format-icons";
 

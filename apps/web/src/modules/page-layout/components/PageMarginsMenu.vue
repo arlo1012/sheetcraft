@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Ruler, Settings2 } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
-import { getPagePaperSize, type SheetPageSetup } from "@idea10/core/page-setup";
+import { getPagePaperSize, type SheetPageSetup } from "@sheetcraft/core/page-setup";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
@@ -137,7 +137,7 @@ function openSetup(): void {
 .page-margins-menu {
   @include ribbon.tool;
   &__surface {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
     min-width: min(320px, calc(100vw - 32px));
   }
   &__options {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ArrowRightLeft, CaseSensitive, Hash } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
-import type { CellValueConversionMode } from "@idea10/core/commands";
+import type { CellValueConversionMode } from "@sheetcraft/core/commands";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -72,7 +72,7 @@ function convert(mode: CellValueConversionMode): void {
   @include ribbon.tool;
 
   &__surface {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
   }
 }
 </style>

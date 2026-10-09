@@ -53,13 +53,13 @@ function insert() {
     button {
       height: 34px;
       font-size: 20px;
-      color: var(--idea-text-primary);
-      background: var(--idea-surface-default);
-      border: 1px solid var(--idea-border-default);
+      color: var(--sheetcraft-text-primary);
+      background: var(--sheetcraft-surface-default);
+      border: 1px solid var(--sheetcraft-border-default);
       cursor: pointer;
       &[aria-pressed="true"] {
-        border-color: var(--idea-action-primary);
-        background: var(--idea-surface-hover);
+        border-color: var(--sheetcraft-action-primary);
+        background: var(--sheetcraft-surface-hover);
       }
     }
   }

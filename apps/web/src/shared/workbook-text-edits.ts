@@ -1,6 +1,6 @@
-import { canEditCell } from "@idea10/core";
-import type { CellAddress, CellRange, Workbook } from "@idea10/core/workbook";
-import { createBatchSetCellContentsCommand } from "@idea10/core/commands";
+import { canEditCell } from "@sheetcraft/core";
+import type { CellAddress, CellRange, Workbook } from "@sheetcraft/core/workbook";
+import { createBatchSetCellContentsCommand } from "@sheetcraft/core/commands";
 
 export type ReviewTextCell = {
   sheetId: string;

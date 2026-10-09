@@ -1,8 +1,8 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { serializeWorkbook, type WorkbookSnapshot } from "@idea10/core/serialization";
-import { createWorkbook, getActiveSheet, setCellValue } from "@idea10/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { serializeWorkbook, type WorkbookSnapshot } from "@sheetcraft/core/serialization";
+import { createWorkbook, getActiveSheet, setCellValue } from "@sheetcraft/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import WorkbookFileActions from "../../../modules/workbook-persistence/components/WorkbookFileActions.vue";
 import WorkbookFileFeedback from "../../../modules/workbook-persistence/components/WorkbookFileFeedback.vue";

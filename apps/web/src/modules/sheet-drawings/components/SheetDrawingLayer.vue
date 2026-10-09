@@ -8,17 +8,17 @@ import {
   watch,
   type CSSProperties,
 } from "vue";
-import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
-import type { WorkbookTheme } from "@idea10/core/workbook-theme";
-import type { SheetDrawing } from "@idea10/core/sheet-drawings";
+import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   getFloatingImageViewportFragments,
   moveFloatingImageBy,
   resizeFloatingImageBy,
   type FloatingImageResizeDirection,
   type FloatingImageViewportFragment,
-} from "@idea10/sheet-engine/floating-image-layout";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+} from "@sheetcraft/sheet-engine/floating-image-layout";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import {
   startPointerSession,
   type PointerSession,

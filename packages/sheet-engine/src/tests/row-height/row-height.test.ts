@@ -6,7 +6,7 @@ import {
   type AutoRowHeightFont,
   type TextMeasurer,
 } from "../../row-height.js";
-import { DEFAULT_ROW_HEIGHT, MAX_ROW_HEIGHT } from "@idea10/core/workbook";
+import { DEFAULT_ROW_HEIGHT, MAX_ROW_HEIGHT } from "@sheetcraft/core/workbook";
 
 const baseFont: AutoRowHeightFont = {
   family: "Test Sans",

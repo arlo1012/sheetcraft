@@ -1,19 +1,19 @@
-import { translateCellSparkline } from "@idea10/core/sparklines";
+import { translateCellSparkline } from "@sheetcraft/core/sparklines";
 import {
   createBatchSetCellContentsCommand,
   createMoveCellRangeCommand,
   createPasteCellContentsCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
+} from "@sheetcraft/core/commands";
 import {
   clearConditionalFormatRanges,
   copyConditionalFormatRules,
   getCellMatrixSize,
   translateCellContentForCopy,
-} from "@idea10/core/clipboard";
-import type { CellContent } from "@idea10/core/formula";
-import { parseCellContent } from "@idea10/core/input";
-import { isTextCellNumberFormat } from "@idea10/core/number-format";
+} from "@sheetcraft/core/clipboard";
+import type { CellContent } from "@sheetcraft/core/formula";
+import { parseCellContent } from "@sheetcraft/core/input";
+import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
 import {
   getCellContent,
   getCellStyle,
@@ -23,7 +23,7 @@ import {
   type CellRange,
   type Sheet,
   type SheetEvaluator,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   createGridClipboardRowVisibility,
   MAX_GRID_CLIPBOARD_CELLS,

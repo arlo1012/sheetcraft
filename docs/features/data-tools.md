@@ -252,7 +252,7 @@ validation settings, and row/column outlines. XLSX export reports that
 duplicate-owned highlight/rejection rules were omitted because it does not map
 them to a superficially similar conditional-formatting or validation rule.
 Unsupported XLSX filter forms retain import diagnostics. Subtotal formulas
-remain ordinary formulas in XLSX; generated-row ownership is an idea10 snapshot
+remain ordinary formulas in XLSX; generated-row ownership is a Sheetcraft snapshot
 feature. Subtotal page breaks and outline summary placement are written to XLSX
 for printing in Excel/WPS; XLSX import does not recreate subtotal ownership or
 these product settings. JSON snapshots preserve them.

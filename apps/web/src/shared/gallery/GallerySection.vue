@@ -43,21 +43,21 @@ defineSlots<{ default(): VNode[]; actions?(): VNode[] }>();
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--idea-space-2);
-    padding: var(--idea-space-1) var(--idea-space-5);
-    background: var(--idea-surface-secondary);
-    color: var(--idea-text-secondary);
+    gap: var(--sheetcraft-space-2);
+    padding: var(--sheetcraft-space-1) var(--sheetcraft-space-5);
+    background: var(--sheetcraft-surface-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 
   &__title {
     margin: 0;
-    font-size: var(--idea-font-size-body-small);
-    font-weight: var(--idea-font-weight-medium);
-    line-height: var(--idea-line-height-body-medium);
+    font-size: var(--sheetcraft-font-size-body-small);
+    font-weight: var(--sheetcraft-font-weight-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
   }
 
   &--content-inset &__content {
-    padding: var(--idea-space-3) var(--idea-tool-panel-padding);
+    padding: var(--sheetcraft-space-3) var(--sheetcraft-tool-panel-padding);
   }
 
   &--scrollable {

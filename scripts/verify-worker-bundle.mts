@@ -9,8 +9,8 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { createSetCellContentCommand } from "@idea10/core/commands";
-import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
+import { createSetCellContentCommand } from "@sheetcraft/core/commands";
+import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
 import {
   createWorkbook,
   createSheet,
@@ -20,7 +20,7 @@ import {
   getCellContent,
   getCellValue,
   setCellContent,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 
 type PackageManifest = {
   name: string;
@@ -229,7 +229,7 @@ async function main(): Promise<void> {
 
   const core = readPackage("packages/core", true);
   if (!core) {
-    throw new Error("Required package @idea10/core could not be loaded.");
+    throw new Error("Required package @sheetcraft/core could not be loaded.");
   }
   const sheetEngine = readPackage("packages/sheet-engine", false);
   const temporaryDirectory = mkdtempSync(join(workspaceRoot, ".worker-bundle-smoke-"));

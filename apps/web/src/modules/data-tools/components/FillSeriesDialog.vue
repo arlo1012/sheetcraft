@@ -227,13 +227,13 @@ function apply(): void {
 
   &__error {
     @include fill-dialog.auxiliary-text;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 
   &__options {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--idea-space-6);
+    gap: var(--sheetcraft-space-6);
   }
 
   &__group {
@@ -241,11 +241,11 @@ function apply(): void {
     align-content: start;
 
     > span {
-      font-weight: var(--idea-font-weight-medium);
+      font-weight: var(--sheetcraft-font-weight-medium);
     }
 
     &.is-disabled > span {
-      color: var(--idea-text-disabled);
+      color: var(--sheetcraft-text-disabled);
     }
   }
 
@@ -260,25 +260,25 @@ function apply(): void {
   &__fields {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--idea-space-6);
+    gap: var(--sheetcraft-space-6);
   }
 
   &__field {
     @include fill-dialog.field-label;
     grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
     min-width: 0;
   }
 
   @media (max-width: 440px) {
     &__options {
-      gap: var(--idea-space-4);
+      gap: var(--sheetcraft-space-4);
     }
 
     &__fields {
       grid-template-columns: minmax(0, 1fr);
-      gap: var(--idea-space-4);
+      gap: var(--sheetcraft-space-4);
     }
   }
 }

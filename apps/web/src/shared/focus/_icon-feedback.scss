@@ -10,7 +10,7 @@
     position: absolute;
     z-index: -1;
     inset: var(--#{$prefix}-feedback-inset, 1px);
-    border-radius: var(--idea-radius-default);
+    border-radius: var(--sheetcraft-radius-default);
     background: var(--#{$prefix}-feedback-background, transparent);
     content: "";
     pointer-events: none;
@@ -18,30 +18,46 @@
 
   &:hover:not([aria-disabled="true"]),
   &[aria-expanded="true"]:not([aria-disabled="true"]) {
-    --#{$prefix}-feedback-background: color-mix(in srgb, var(--idea-text-primary) 8%, transparent);
+    --#{$prefix}-feedback-background: color-mix(
+      in srgb,
+      var(--sheetcraft-text-primary) 8%,
+      transparent
+    );
   }
 
   &[aria-pressed="true"]:not([aria-disabled="true"]) {
-    --#{$prefix}-feedback-background: color-mix(in srgb, var(--idea-text-primary) 12%, transparent);
+    --#{$prefix}-feedback-background: color-mix(
+      in srgb,
+      var(--sheetcraft-text-primary) 12%,
+      transparent
+    );
   }
 
   &[aria-pressed="mixed"]:not([aria-disabled="true"]) {
-    --#{$prefix}-feedback-background: color-mix(in srgb, var(--idea-text-primary) 7%, transparent);
+    --#{$prefix}-feedback-background: color-mix(
+      in srgb,
+      var(--sheetcraft-text-primary) 7%,
+      transparent
+    );
 
     &::before {
-      outline: 1px dotted var(--idea-text-muted);
+      outline: 1px dotted var(--sheetcraft-text-muted);
       outline-offset: -2px;
     }
   }
 
   &[aria-pressed="true"]:hover:not([aria-disabled="true"]),
   &:active:not([aria-disabled="true"]) {
-    --#{$prefix}-feedback-background: color-mix(in srgb, var(--idea-text-primary) 18%, transparent);
+    --#{$prefix}-feedback-background: color-mix(
+      in srgb,
+      var(--sheetcraft-text-primary) 18%,
+      transparent
+    );
   }
 
   &[aria-disabled="true"] {
     --#{$prefix}-feedback-background: transparent;
-    color: var(--idea-text-disabled);
+    color: var(--sheetcraft-text-disabled);
     cursor: default;
   }
 }

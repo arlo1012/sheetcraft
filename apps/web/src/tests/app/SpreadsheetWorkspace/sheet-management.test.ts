@@ -1,8 +1,8 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
-import { DEFAULT_WORKBOOK_THEME } from "@idea10/core/workbook-theme";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
+import { DEFAULT_WORKBOOK_THEME } from "@sheetcraft/core/workbook-theme";
 import {
   createSheet,
   createWorkbook,
@@ -10,7 +10,7 @@ import {
   getCellValue,
   insertSheet,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import EditableRangesDialog from "../../../modules/review-tools/components/EditableRangesDialog.vue";
 import WorkbookProtectionDialog from "../../../modules/review-tools/components/WorkbookProtectionDialog.vue";

@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
-import type { CellTextRotation } from "@idea10/core/style";
+import type { CellTextRotation } from "@sheetcraft/core/style";
 import { useAppI18n } from "../../../shared/i18n";
 
 const props = defineProps<{
@@ -159,7 +159,7 @@ function endDialDrag(event: PointerEvent): void {
   > h3 {
     margin: 0;
     font-size: inherit;
-    font-weight: var(--idea-font-weight-semibold);
+    font-weight: var(--sheetcraft-font-weight-semibold);
   }
 
   &__controls {
@@ -174,21 +174,21 @@ function endDialDrag(event: PointerEvent): void {
     place-items: center;
     min-width: 0;
     padding: 0;
-    border: 1px solid var(--idea-border-strong);
-    border-radius: var(--idea-radius-default);
-    background: var(--idea-surface-panel);
-    color: var(--idea-text-primary);
+    border: 1px solid var(--sheetcraft-border-strong);
+    border-radius: var(--sheetcraft-radius-default);
+    background: var(--sheetcraft-surface-panel);
+    color: var(--sheetcraft-text-primary);
     font: inherit;
     writing-mode: vertical-rl;
     text-orientation: upright;
     cursor: pointer;
 
     &:hover {
-      background: var(--idea-icon-button-hover-bg);
+      background: var(--sheetcraft-icon-button-hover-bg);
     }
     &.is-selected {
-      color: var(--idea-action-primary);
-      background: var(--idea-surface-secondary);
+      color: var(--sheetcraft-action-primary);
+      background: var(--sheetcraft-surface-secondary);
     }
   }
 
@@ -196,15 +196,15 @@ function endDialDrag(event: PointerEvent): void {
     position: relative;
     min-width: 0;
     overflow: hidden;
-    border: 1px solid var(--idea-border-strong);
-    border-radius: var(--idea-radius-default);
-    background: var(--idea-surface-panel);
+    border: 1px solid var(--sheetcraft-border-strong);
+    border-radius: var(--sheetcraft-radius-default);
+    background: var(--sheetcraft-surface-panel);
 
     svg {
       display: block;
       width: 100%;
       height: 100%;
-      fill: var(--idea-text-primary);
+      fill: var(--sheetcraft-text-primary);
     }
     input {
       position: absolute;
@@ -226,11 +226,11 @@ function endDialDrag(event: PointerEvent): void {
       font: inherit;
     }
     line {
-      stroke: var(--idea-text-primary);
+      stroke: var(--sheetcraft-text-primary);
       stroke-width: 1;
     }
     rect {
-      fill: var(--idea-action-primary);
+      fill: var(--sheetcraft-action-primary);
     }
   }
 

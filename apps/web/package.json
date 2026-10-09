@@ -1,5 +1,5 @@
 {
-  "name": "@idea10/web",
+  "name": "@sheetcraft/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,9 +14,9 @@
   },
   "dependencies": {
     "@floating-ui/vue": "^2.0.1",
-    "@idea10/core": "workspace:*",
-    "@idea10/sheet-engine": "workspace:*",
-    "@idea10/xlsx-io": "workspace:*",
+    "@sheetcraft/core": "workspace:*",
+    "@sheetcraft/sheet-engine": "workspace:*",
+    "@sheetcraft/xlsx-io": "workspace:*",
     "dictionary-en": "^4.0.0",
     "dictionary-en-gb": "^3.0.0",
     "echarts": "^6.1.0",

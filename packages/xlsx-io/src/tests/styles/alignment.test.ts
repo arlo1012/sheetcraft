@@ -5,8 +5,8 @@ import {
   getCellStyle,
   setCellContent,
   setCellStyle,
-} from "@idea10/core/workbook";
-import type { CellStyle } from "@idea10/core/style";
+} from "@sheetcraft/core/workbook";
+import type { CellStyle } from "@sheetcraft/core/style";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../../index.js";
 

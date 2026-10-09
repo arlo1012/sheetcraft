@@ -36,7 +36,7 @@ import {
   MAX_SHEET_ROWS,
   type CellRange,
   type Sheet,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { useContextMenu } from "../../../shared/menu/useContextMenu";
@@ -481,7 +481,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
 
 <style scoped lang="scss">
 .sheet-cell-context-menu-panel {
-  z-index: var(--idea-layer-context-menu);
+  z-index: var(--sheetcraft-layer-context-menu);
   display: grid;
   gap: 6px;
   width: max-content;
@@ -489,7 +489,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
 .sheet-cell-context-menu {
   width: max-content;
   &--submenu {
-    z-index: var(--idea-layer-context-submenu);
+    z-index: var(--sheetcraft-layer-context-submenu);
     width: max-content;
   }
   &--counted {

@@ -2,9 +2,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { FilterX } from "lucide-vue-next";
 import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
-import { getSheetFilterValueKey } from "@idea10/core/commands";
-import type { SheetFilterCondition, SheetFilterValue } from "@idea10/core/workbook";
-import type { ExcelDateSystem } from "@idea10/core/formula";
+import { getSheetFilterValueKey } from "@sheetcraft/core/commands";
+import type { SheetFilterCondition, SheetFilterValue } from "@sheetcraft/core/workbook";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
@@ -419,7 +419,7 @@ onBeforeUnmount(() => {
 <style scoped lang="scss">
 .filter-column-panel {
   display: grid;
-  gap: var(--idea-space-4);
+  gap: var(--sheetcraft-space-4);
   width: min(420px, calc(100vw - 16px));
   &__tabs {
     min-width: 0;
@@ -427,7 +427,7 @@ onBeforeUnmount(() => {
   &__actions {
     display: flex;
     align-items: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
 
     > [role="button"] {
       width: 24px;
@@ -435,27 +435,27 @@ onBeforeUnmount(() => {
     }
   }
   &__content {
-    padding-top: var(--idea-space-4);
+    padding-top: var(--sheetcraft-space-4);
   }
   &__criteria {
     min-width: 0;
     margin: 0;
     overflow: hidden;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   &__error {
     margin: 0;
-    color: var(--idea-text-danger);
+    color: var(--sheetcraft-text-danger);
   }
   &__bottom {
     position: sticky;
     z-index: 1;
     bottom: 0;
     display: grid;
-    gap: var(--idea-space-4);
-    background: var(--idea-surface-panel);
+    gap: var(--sheetcraft-space-4);
+    background: var(--sheetcraft-surface-panel);
   }
 }
 </style>

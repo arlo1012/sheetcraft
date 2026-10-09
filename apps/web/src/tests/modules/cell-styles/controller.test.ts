@@ -1,11 +1,11 @@
 import { defineComponent, h, nextTick, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { serializeWorkbook } from "@idea10/core/serialization";
-import type { CellStyleDefinition } from "@idea10/core/cell-styles";
-import { getCellNamedStyle, getCellStyle } from "@idea10/core/workbook";
-import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import type { CellStyleDefinition } from "@sheetcraft/core/cell-styles";
+import { getCellNamedStyle, getCellStyle } from "@sheetcraft/core/workbook";
+import { createSheetGridViewState } from "@sheetcraft/sheet-engine/view-state";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import { useCellStylesController } from "../../../modules/cell-styles/useCellStylesController";
 import { createAppI18n } from "../../../shared/i18n";

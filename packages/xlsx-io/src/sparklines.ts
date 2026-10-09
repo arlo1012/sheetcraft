@@ -1,8 +1,8 @@
 import { strFromU8, strToU8, type Unzipped } from "fflate/browser";
-import { parseFormulaReference } from "@idea10/core/formula";
-import { getCellAddressLabel, parseCellAddress } from "@idea10/core/coordinates";
-import { normalizeCellSparkline, type CellSparkline } from "@idea10/core/sparklines";
-import type { Sheet } from "@idea10/core/workbook";
+import { parseFormulaReference } from "@sheetcraft/core/formula";
+import { getCellAddressLabel, parseCellAddress } from "@sheetcraft/core/coordinates";
+import { normalizeCellSparkline, type CellSparkline } from "@sheetcraft/core/sparklines";
+import type { Sheet } from "@sheetcraft/core/workbook";
 import { readXlsxWorksheetPartTargets } from "./raw-cell-values.js";
 const URI = "{05C60535-1F16-4fd2-B633-F4F36F0B64E0}";
 function escape(value: string): string {

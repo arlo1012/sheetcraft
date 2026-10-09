@@ -10,9 +10,13 @@ import {
   type TableRowData,
   type TableRowAttributes,
 } from "tdesign-vue-next/es/table";
-import { normalizeSheetProtection, type SheetProtection, type EditableRange } from "@idea10/core";
-import type { CellRange } from "@idea10/core/workbook";
-import { formatCellAddress } from "@idea10/core/coordinates";
+import {
+  normalizeSheetProtection,
+  type SheetProtection,
+  type EditableRange,
+} from "@sheetcraft/core";
+import type { CellRange } from "@sheetcraft/core/workbook";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import EditableRangeEditorDialog from "./EditableRangeEditorDialog.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -221,11 +225,11 @@ function save(protect = false): void {
 .editable-ranges {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: var(--idea-space-4);
+  gap: var(--sheetcraft-space-4);
   height: min(300px, calc(100dvh - 240px));
   min-height: 0;
   min-width: 0;
-  color: var(--idea-text-primary);
+  color: var(--sheetcraft-text-primary);
 
   &__toolbar {
     display: flex;
@@ -241,13 +245,13 @@ function save(protect = false): void {
     display: flex;
     flex-shrink: 0;
     align-items: center;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
   }
   &__row-actions {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
 
     > span {
       width: 24px;

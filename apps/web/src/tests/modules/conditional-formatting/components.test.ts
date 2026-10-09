@@ -7,7 +7,7 @@ import ConditionalFormatContainingCriteria from "../../../modules/conditional-fo
 import ConditionalFormatStyleDialog from "../../../modules/conditional-formatting/components/ConditionalFormatStyleDialog.vue";
 import { createAppI18n } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
-import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
+import type { SheetConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
 
 const mounted: Array<{ unmount(): void }> = [];
 

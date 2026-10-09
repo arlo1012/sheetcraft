@@ -3,9 +3,9 @@ import { computed, nextTick, ref, watch } from "vue";
 import { Eraser, ListMinus, Table2, TableProperties } from "lucide-vue-next";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import { createThemedTableStyles, type TableStyleDefinition } from "@idea10/core/table-styles";
-import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
-import type { SheetTable } from "@idea10/core/workbook";
+import { createThemedTableStyles, type TableStyleDefinition } from "@sheetcraft/core/table-styles";
+import type { PivotTableStyleDefinition } from "@sheetcraft/core/pivot-table-styles";
+import type { SheetTable } from "@sheetcraft/core/workbook";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -244,7 +244,7 @@ function onNameKeydown(_value: string | number, context: { e: KeyboardEvent }): 
 .table-tools-toolbar {
   &__group {
     @include ribbon.columns;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__stack {
     @include ribbon.stack;
@@ -252,15 +252,15 @@ function onNameKeydown(_value: string | number, context: { e: KeyboardEvent }): 
   &__name {
     @include ribbon.stack;
     width: 116px;
-    padding-inline: var(--idea-space-1);
-    font-size: var(--idea-font-size-body-small);
+    padding-inline: var(--sheetcraft-space-1);
+    font-size: var(--sheetcraft-font-size-body-small);
   }
   &__options {
     display: grid;
     grid-template-columns: repeat(4, max-content);
     grid-template-rows: repeat(2, var(--ribbon-control-height, 26px));
     align-items: center;
-    column-gap: var(--idea-space-3);
+    column-gap: var(--sheetcraft-space-3);
     row-gap: var(--ribbon-row-gap, 2px);
   }
 }

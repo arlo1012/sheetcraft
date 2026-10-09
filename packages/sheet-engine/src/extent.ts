@@ -1,10 +1,10 @@
-import { getPivotTableRange } from "@idea10/core/pivot-tables";
+import { getPivotTableRange } from "@sheetcraft/core/pivot-tables";
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   type CellAddress,
   type Sheet,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { createSheetGeometry, type Point, type SheetGeometry, type Size } from "./geometry.js";
 
 export type GridExtent = {

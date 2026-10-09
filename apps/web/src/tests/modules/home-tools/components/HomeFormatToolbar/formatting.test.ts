@@ -2,8 +2,8 @@ import { DOMWrapper, mount } from "@vue/test-utils";
 import FontFormatField from "../../../../../modules/home-tools/components/FontFormatField.vue";
 import { afterEach, describe, expect, test } from "vitest";
 import HomeFormatToolbar from "../../../../../modules/home-tools/components/HomeFormatToolbar.vue";
-import { createClearCellStylePatch } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import { createClearCellStylePatch } from "@sheetcraft/core/style";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { createAppI18n } from "../../../../../shared/i18n";
 
 function createStyleState(

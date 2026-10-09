@@ -1,8 +1,8 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createSheet, insertSheet, getCellValue, setCellContent } from "@idea10/core/workbook";
-import { getPivotTableSource } from "@idea10/core/pivot-tables";
-import { serializeWorkbook } from "@idea10/core/serialization";
+import { createSheet, insertSheet, getCellValue, setCellContent } from "@sheetcraft/core/workbook";
+import { getPivotTableSource } from "@sheetcraft/core/pivot-tables";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import PivotFieldsPane from "../../../modules/pivot-tables/components/PivotFieldsPane.vue";
 import PivotTableDialog from "../../../modules/pivot-tables/components/PivotTableDialog.vue";
 import type { PivotDraft } from "../../../modules/pivot-tables/usePivotActions";

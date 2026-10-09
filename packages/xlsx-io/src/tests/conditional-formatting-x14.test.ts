@@ -4,12 +4,12 @@ import {
   getActiveSheet,
   createWorkbookEvaluator,
   setCellValue,
-} from "@idea10/core/workbook";
-import { createConditionalFormatVisualResolver } from "@idea10/core/conditional-formatting";
+} from "@sheetcraft/core/workbook";
+import { createConditionalFormatVisualResolver } from "@sheetcraft/core/conditional-formatting";
 import type {
   ConditionalFormatIconSet,
   ConditionalFormatThreshold,
-} from "@idea10/core/conditional-formatting";
+} from "@sheetcraft/core/conditional-formatting";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../index.js";
 import {

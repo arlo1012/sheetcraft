@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { Check } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
-import type { SheetFilterCondition } from "@idea10/core/workbook";
+import type { SheetFilterCondition } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 
 type ColorCondition = Extract<SheetFilterCondition, { kind: "color" | "color-set" }>;
@@ -147,22 +147,22 @@ function choose(target: ColorCondition["target"], color: string | null): void {
 .filter-color-options {
   display: grid;
   align-content: start;
-  gap: var(--idea-space-5);
+  gap: var(--sheetcraft-space-5);
 
   &__group {
     display: grid;
-    gap: var(--idea-space-3);
+    gap: var(--sheetcraft-space-3);
   }
 
   &__label {
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
   }
 
   &__choices {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--idea-space-4);
-    padding: 0 var(--idea-space-2) var(--idea-space-2);
+    gap: var(--sheetcraft-space-4);
+    padding: 0 var(--sheetcraft-space-2) var(--sheetcraft-space-2);
   }
 
   &__choice {
@@ -182,7 +182,7 @@ function choose(target: ColorCondition["target"], color: string | null): void {
     box-sizing: border-box;
     width: 22px;
     height: 22px;
-    border: 1px solid var(--idea-border-control);
+    border: 1px solid var(--sheetcraft-border-control);
     border-radius: 50%;
   }
 
@@ -193,8 +193,8 @@ function choose(target: ColorCondition["target"], color: string | null): void {
       background: linear-gradient(
         135deg,
         transparent 46%,
-        var(--idea-border-control) 48%,
-        var(--idea-border-control) 52%,
+        var(--sheetcraft-border-control) 48%,
+        var(--sheetcraft-border-control) 52%,
         transparent 54%
       );
     }
@@ -203,9 +203,9 @@ function choose(target: ColorCondition["target"], color: string | null): void {
   &__font {
     display: grid;
     place-items: center;
-    background: var(--idea-surface-panel);
+    background: var(--sheetcraft-surface-panel);
     font-size: 18px;
-    font-weight: var(--idea-font-weight-semibold);
+    font-weight: var(--sheetcraft-font-weight-semibold);
     line-height: 1;
   }
 
@@ -219,10 +219,10 @@ function choose(target: ColorCondition["target"], color: string | null): void {
     box-sizing: border-box;
     width: 14px;
     height: 14px;
-    border: 1px solid var(--idea-surface-panel);
+    border: 1px solid var(--sheetcraft-surface-panel);
     border-radius: 50%;
-    color: var(--idea-text-inverse);
-    background: var(--idea-status-success);
+    color: var(--sheetcraft-text-inverse);
+    background: var(--sheetcraft-status-success);
     pointer-events: none;
 
     svg {
@@ -234,7 +234,7 @@ function choose(target: ColorCondition["target"], color: string | null): void {
 
   &__empty {
     align-self: center;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

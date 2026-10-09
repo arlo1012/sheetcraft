@@ -5,10 +5,10 @@ import {
   getActiveSheet,
   setCellContent,
   createSheetEvaluator,
-} from "@idea10/core/workbook";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { applyWorkbookCommand, type WorkbookCommand } from "@idea10/core/commands";
-import type { SheetChartDrawing } from "@idea10/core/sheet-drawings";
+} from "@sheetcraft/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useChartActions } from "../../../modules/charts/useChartActions";
 function fixture() {
   let workbook = createWorkbook({ idFactory: createSequentialIdFactory() });

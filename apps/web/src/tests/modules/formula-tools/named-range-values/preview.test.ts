@@ -1,12 +1,12 @@
 import { expect, test } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createWorkbook,
   createWorkbookEvaluator,
   getActiveSheet,
   setCellContent,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { getNamedRangeValue } from "../../../../modules/formula-tools/named-range-values";
 
 function fixture() {

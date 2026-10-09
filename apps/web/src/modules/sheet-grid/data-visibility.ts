@@ -1,6 +1,6 @@
-import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
-import { getOutlineHiddenIntervals } from "@idea10/core";
-import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
+import { createSheetFilterHiddenRowIntervals } from "@sheetcraft/core/commands";
+import { getOutlineHiddenIntervals } from "@sheetcraft/core";
+import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 
 export type HiddenAxisInterval = Readonly<{ start: number; end: number }>;
 

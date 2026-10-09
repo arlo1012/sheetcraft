@@ -1,9 +1,13 @@
-# idea10
+# Sheetcraft
 
 A spreadsheet editor built with Vue 3, TypeScript, TDesign, Vite, Bun, SCSS, and
 product-owned CSS tokens. Its runtime-neutral packages provide a sparse
 workbook model, reversible commands, versioned snapshots, and headless Sheet
 geometry and interaction state.
+
+Workspace packages use the `@sheetcraft/*` namespace. Existing browser storage
+keys, JSON format identifiers, clipboard MIME types, and XLSX extension namespaces
+retain their original `idea10` values so saved workbooks and settings remain readable.
 
 The Web application supports virtualized cells, range and axis selection,
 keyboard navigation, IME-safe editing, row and column resizing and insertion,
@@ -58,7 +62,7 @@ their existing disabled UI entries are placeholders.
 bun install
 bun run dev
 bun run test
-bun run --filter @idea10/web test -- src/tests/modules/workbook
+bun run --filter @sheetcraft/web test -- src/tests/modules/workbook
 bun run typecheck
 bun run lint
 bun run format:check
@@ -131,11 +135,11 @@ Do not create a shared abstraction for code used by only one module.
 Consumers import only the explicit package exports. Deep imports into `src` or
 `dist` are unsupported and rejected by the quality gates.
 
-| Package                | Public subpaths                                                                                                                                                                |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@idea10/core`         | `commands`, `history`, `serialization`, `workbook`, `errors`, `runtime`, `clipboard`, `coordinates`, `formula`, `input`, `search`, `selection-summary`, `style`, `style-state` |
-| `@idea10/sheet-engine` | `extent`, `frozen-layout`, `geometry`, `row-height`, `selection`, `view-state`, `viewport-layout`, `visibility`                                                                |
-| `@idea10/xlsx-io`      | root export: `decodeXlsx`, `encodeXlsx`, typed compatibility reports and errors                                                                                                |
+| Package                    | Public subpaths                                                                                                                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@sheetcraft/core`         | `commands`, `history`, `serialization`, `workbook`, `errors`, `runtime`, `clipboard`, `coordinates`, `formula`, `input`, `search`, `selection-summary`, `style`, `style-state` |
+| `@sheetcraft/sheet-engine` | `extent`, `frozen-layout`, `geometry`, `row-height`, `selection`, `view-state`, `viewport-layout`, `visibility`                                                                |
+| `@sheetcraft/xlsx-io`      | root export: `decodeXlsx`, `encodeXlsx`, typed compatibility reports and errors                                                                                                |
 
 See [Portable Core Consumers](docs/portable-core.md) for deterministic runtime
 ports, serializable commands and snapshots, and Worker/server integration.

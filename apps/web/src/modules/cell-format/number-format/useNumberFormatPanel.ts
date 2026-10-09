@@ -3,13 +3,13 @@ import {
   formatCellNumberValue,
   toCellNumberFormatCode,
   validateCellNumberFormatCode,
-} from "@idea10/core/number-format";
+} from "@sheetcraft/core/number-format";
 import type {
   CellNumberFormat,
   CellNumberFormatNegativeStyle,
   CellStylePatch,
-} from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+} from "@sheetcraft/core/style";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
 import { useAppI18n } from "../../../shared/i18n";

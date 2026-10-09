@@ -1,13 +1,18 @@
 import { describe, expect, test } from "vitest";
-import { createWorkbook, getActiveSheet, getCellValue, setCellValue } from "@idea10/core/workbook";
+import {
+  createWorkbook,
+  getActiveSheet,
+  getCellValue,
+  setCellValue,
+} from "@sheetcraft/core/workbook";
 import {
   createWorkbookHistory,
   executeWorkbookCommand,
   undoWorkbookCommand,
   redoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import type { SheetConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
 import { createGridPasteCommand } from "../../../../modules/sheet-grid/createGridPasteCommand";
 
 function fixture() {

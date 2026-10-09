@@ -1,5 +1,5 @@
-import type { CellSparkline } from "@idea10/core/sparklines";
-import type { Rect } from "@idea10/sheet-engine/geometry";
+import type { CellSparkline } from "@sheetcraft/core/sparklines";
+import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 export function paintSparkline(
   context: CanvasRenderingContext2D,
   rect: Rect,

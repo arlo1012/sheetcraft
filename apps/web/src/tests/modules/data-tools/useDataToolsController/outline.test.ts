@@ -5,14 +5,14 @@ import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
+} from "@sheetcraft/core/history";
 import {
   createSheetEvaluator,
   getActiveSheet,
   type SheetOutlineGroup,
-} from "@idea10/core/workbook";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import type { SelectionMode } from "@idea10/sheet-engine/selection";
+} from "@sheetcraft/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import type { SelectionMode } from "@sheetcraft/sheet-engine/selection";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useDataToolsController } from "../../../../modules/data-tools/useDataToolsController";
 

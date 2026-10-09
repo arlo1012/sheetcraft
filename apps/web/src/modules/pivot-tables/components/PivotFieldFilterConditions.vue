@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { Button } from "tdesign-vue-next/es/button";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import type { ExcelDateSystem } from "@idea10/core/formula";
-import type { SheetFilterCondition } from "@idea10/core/workbook";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
+import type { SheetFilterCondition } from "@sheetcraft/core/workbook";
 import type {
   PivotLabelCondition,
   PivotValueCondition,
   PivotValueField,
-} from "@idea10/core/pivot-tables";
+} from "@sheetcraft/core/pivot-tables";
 import { useAppI18n } from "../../../shared/i18n";
 import FilterConditionMenu from "../../../shared/filter/components/FilterConditionMenu.vue";
 import FilterConditionDialog from "../../../shared/filter/components/FilterConditionDialog.vue";
@@ -145,16 +145,16 @@ function acceptValue(condition: ValueRule): void {
 <style scoped lang="scss">
 .pivot-field-filter-conditions {
   display: grid;
-  gap: var(--idea-space-2);
+  gap: var(--sheetcraft-space-2);
   &__actions {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__summary {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

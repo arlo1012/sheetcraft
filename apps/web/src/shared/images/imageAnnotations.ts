@@ -1,4 +1,4 @@
-import type { ImageAnnotation } from "@idea10/core/workbook";
+import type { ImageAnnotation } from "@sheetcraft/core/workbook";
 
 export function paintImageAnnotations(
   context: CanvasRenderingContext2D,

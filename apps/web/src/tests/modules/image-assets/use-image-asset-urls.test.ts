@@ -5,13 +5,13 @@ import {
   getActiveSheet,
   setCellContent,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import type { ImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import {
   collectWorkbookImageAssetIds,
   useImageAssetUrls,
 } from "../../../modules/image-assets/useImageAssetUrls";
-import { DEFAULT_SHEET_WATERMARK } from "@idea10/core/page-decoration";
+import { DEFAULT_SHEET_WATERMARK } from "@sheetcraft/core/page-decoration";
 function imageWorkbook(id: string): Workbook {
   const workbook = createWorkbook({ id: `book-${id}`, sheetId: "sheet", sheetName: "Sheet" });
   setCellContent(

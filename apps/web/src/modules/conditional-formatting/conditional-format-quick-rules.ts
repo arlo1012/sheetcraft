@@ -1,4 +1,4 @@
-import type { ConditionalFormatStyle } from "@idea10/core/conditional-formatting";
+import type { ConditionalFormatStyle } from "@sheetcraft/core/conditional-formatting";
 
 export const QUICK_RULE_KINDS = [
   "greaterThan",

@@ -1,4 +1,4 @@
-import type { CellImage } from "@idea10/core/formula";
+import type { CellImage } from "@sheetcraft/core/formula";
 import {
   DEFAULT_ROW_HEIGHT,
   MAX_SHEET_COLUMNS,
@@ -7,7 +7,7 @@ import {
   normalizeImageTransform,
   type FloatingImage,
   type Sheet,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import type { XlsxEncodeOptions, XlsxImageAsset } from "./types.js";
 
 const EMU_PER_PIXEL = 9525;

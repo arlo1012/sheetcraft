@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CellBorderLineStyle } from "@idea10/core/style";
+import type { CellBorderLineStyle } from "@sheetcraft/core/style";
 import BorderLinePreview from "./BorderLinePreview.vue";
 import { useAppI18n } from "../i18n";
 import { vIconAction } from "../focus/icon-action";
@@ -179,18 +179,18 @@ const { t } = useAppI18n();
     height: 29px;
     padding: 0 12px;
     background: transparent;
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
     border: 0;
     border-radius: 3px;
     cursor: pointer;
     font: inherit;
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
 
     &[aria-checked="true"] {
-      --idea-icon-feedback-background: color-mix(
+      --sheetcraft-icon-feedback-background: color-mix(
         in srgb,
-        var(--idea-text-primary) 12%,
+        var(--sheetcraft-text-primary) 12%,
         transparent
       );
     }

@@ -1,4 +1,4 @@
-import { normalizeImageTransform, type ImageTransform } from "@idea10/core/workbook";
+import { normalizeImageTransform, type ImageTransform } from "@sheetcraft/core/workbook";
 
 export type ImagePresentation = {
   cropX: number;

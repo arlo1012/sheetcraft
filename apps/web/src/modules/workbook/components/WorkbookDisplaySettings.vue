@@ -102,9 +102,9 @@ const { open, floatingStyles, toggleMenu, onTriggerKeydown } = useMenu({
     height: 22px;
     padding: 0;
     border: 0;
-    border-radius: var(--idea-radius-small);
+    border-radius: var(--sheetcraft-radius-small);
     background: transparent;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     cursor: pointer;
   }
 
@@ -122,7 +122,7 @@ const { open, floatingStyles, toggleMenu, onTriggerKeydown } = useMenu({
     box-sizing: content-box;
     padding: 1px;
     border-radius: 2px;
-    background: var(--idea-sheet-bar-surface);
+    background: var(--sheetcraft-sheet-bar-surface);
   }
 
   &__menu {

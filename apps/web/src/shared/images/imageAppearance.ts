@@ -1,5 +1,5 @@
 import { paintImageAnnotations } from "./imageAnnotations";
-import type { ImageAppearance, ImageTransform } from "@idea10/core/workbook";
+import type { ImageAppearance, ImageTransform } from "@sheetcraft/core/workbook";
 import { getImagePresentation } from "./imagePresentation";
 
 type Rect = { x: number; y: number; width: number; height: number };

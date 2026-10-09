@@ -1,5 +1,5 @@
-import { formatComputedValueForDisplay, MergedCellRangeResolver } from "@idea10/core";
-import type { FormulaValue } from "@idea10/core/formula";
+import { formatComputedValueForDisplay, MergedCellRangeResolver } from "@sheetcraft/core";
+import type { FormulaValue } from "@sheetcraft/core/formula";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
@@ -11,14 +11,14 @@ import {
   type CellAddress,
   type CellRange,
   type Sheet,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   getCellTextGraphemes,
   splitCellTextLines,
   type AutoRowHeightFont,
   type TextMeasurer,
-} from "@idea10/sheet-engine/text-layout";
-import { WRAPPED_CELL_LINE_HEIGHT } from "@idea10/sheet-engine/row-height";
+} from "@sheetcraft/sheet-engine/text-layout";
+import { WRAPPED_CELL_LINE_HEIGHT } from "@sheetcraft/sheet-engine/row-height";
 import {
   getCellIndentPixels,
   getCellTextRenderFont,

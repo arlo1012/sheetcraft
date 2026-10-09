@@ -1,7 +1,7 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { DEFAULT_WORKBOOK_THEME } from "@idea10/core/workbook-theme";
+import { DEFAULT_WORKBOOK_THEME } from "@sheetcraft/core/workbook-theme";
 import PageThemeMenu from "../../../../../modules/page-layout/components/PageThemeMenu.vue";
 import {
   PAGE_THEME_COLOR_PRESETS,

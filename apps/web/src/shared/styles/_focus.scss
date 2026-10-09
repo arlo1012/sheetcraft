@@ -5,12 +5,12 @@
     [aria-disabled="true"]
   ) {
   outline: none;
-  box-shadow: var(--idea-keyboard-focus-shadow);
+  box-shadow: var(--sheetcraft-keyboard-focus-shadow);
 }
 
 .idea-focus-container:has(:focus-visible) {
   outline: none;
-  box-shadow: var(--idea-keyboard-focus-shadow);
+  box-shadow: var(--sheetcraft-keyboard-focus-shadow);
 }
 
 // Direct icon actions share alignment and feedback without button chrome.
@@ -18,7 +18,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--idea-space-2);
+  gap: var(--sheetcraft-space-2);
   cursor: pointer;
   user-select: none;
 }
@@ -29,6 +29,6 @@
 }
 
 :where(.idea-icon-action[aria-disabled="true"]) {
-  color: var(--idea-text-disabled);
+  color: var(--sheetcraft-text-disabled);
   cursor: not-allowed;
 }

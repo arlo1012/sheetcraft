@@ -10,11 +10,11 @@
   &::-webkit-scrollbar-thumb {
     border: 1px solid transparent;
     border-radius: 999px;
-    background: var(--idea-scrollbar-thumb);
+    background: var(--sheetcraft-scrollbar-thumb);
     background-clip: padding-box;
 
     &:hover {
-      background-color: var(--idea-scrollbar-thumb-hover);
+      background-color: var(--sheetcraft-scrollbar-thumb-hover);
     }
   }
   &::-webkit-scrollbar-button {
@@ -24,7 +24,7 @@
   }
   @supports not selector(::-webkit-scrollbar) {
     scrollbar-width: thin;
-    scrollbar-color: var(--idea-scrollbar-thumb) transparent;
+    scrollbar-color: var(--sheetcraft-scrollbar-thumb) transparent;
   }
 }
 
@@ -35,9 +35,9 @@
   min-height: 0;
   overflow: auto;
   padding: 4px;
-  border: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-default);
-  background: var(--idea-surface-panel);
+  border: 1px solid var(--sheetcraft-border-subtle);
+  border-radius: var(--sheetcraft-radius-default);
+  background: var(--sheetcraft-surface-panel);
 }
 
 @mixin item {
@@ -46,29 +46,29 @@
   min-height: 24px;
   padding: 2px 8px;
   border: 0;
-  border-radius: var(--idea-radius-small);
+  border-radius: var(--sheetcraft-radius-small);
   background: transparent;
-  color: var(--idea-text-primary);
+  color: var(--sheetcraft-text-primary);
   font: inherit;
-  font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
+  font-size: var(--sheetcraft-font-size-body-medium);
+  line-height: var(--sheetcraft-line-height-body-medium);
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
 
   &:hover:not([aria-selected="true"]) {
-    background: var(--idea-surface-secondary);
+    background: var(--sheetcraft-surface-secondary);
   }
   &[aria-selected="true"] {
-    background: var(--idea-surface-active);
+    background: var(--sheetcraft-surface-active);
   }
   &.is-located:not([aria-selected="true"]) {
-    background: var(--idea-surface-secondary);
-    outline: 1px solid var(--idea-border-control);
+    background: var(--sheetcraft-surface-secondary);
+    outline: 1px solid var(--sheetcraft-border-control);
     outline-offset: -1px;
   }
   &:focus-visible {
     outline: none;
-    background: var(--idea-keyboard-focus-bg);
+    background: var(--sheetcraft-keyboard-focus-bg);
   }
 }

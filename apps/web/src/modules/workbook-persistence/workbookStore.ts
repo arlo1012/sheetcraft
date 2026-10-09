@@ -1,4 +1,4 @@
-import type { WorkbookSnapshot } from "@idea10/core/serialization";
+import type { WorkbookSnapshot } from "@sheetcraft/core/serialization";
 
 export type PersistedWorkbook = {
   revision: number;

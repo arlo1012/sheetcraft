@@ -1,23 +1,23 @@
 import { defineComponent, h, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import type { WorkbookCommand } from "@idea10/core/commands";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
 import {
   createApplyCellStyleCommand,
   createSetSheetProtectionCommand,
-} from "@idea10/core/commands";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/commands";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
+} from "@sheetcraft/core/history";
 import {
   createWorkbook,
   getActiveSheet,
   getCellContent,
   setCellContent,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useWordProofreading } from "../../../modules/text-proofreading/useWordProofreading";
 import { createAppI18n } from "../../../shared/i18n";
 

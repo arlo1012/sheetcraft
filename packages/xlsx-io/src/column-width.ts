@@ -1,4 +1,4 @@
-import { COLUMN_MAX_DIGIT_WIDTH, COLUMN_PADDING_PIXELS } from "@idea10/core/dimension-units";
+import { COLUMN_MAX_DIGIT_WIDTH, COLUMN_PADDING_PIXELS } from "@sheetcraft/core/dimension-units";
 
 const MAX_DIGIT_WIDTH = COLUMN_MAX_DIGIT_WIDTH;
 const CELL_PADDING_PIXELS = COLUMN_PADDING_PIXELS;

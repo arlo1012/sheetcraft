@@ -349,8 +349,8 @@ function onMenuKeydown(event: KeyboardEvent): void {
     max-height: calc(100vh - 32px);
   }
   &__chevron {
-    width: var(--idea-control-icon-size);
-    height: var(--idea-control-icon-size);
+    width: var(--sheetcraft-control-icon-size);
+    height: var(--sheetcraft-control-icon-size);
   }
 }
 </style>

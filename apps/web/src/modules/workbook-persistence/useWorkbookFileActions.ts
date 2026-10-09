@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, readonly, ref, shallowRef } from "vue";
-import type { Workbook } from "@idea10/core/workbook";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import type { ImageAssetStore } from "../image-assets/imageAssetStore";
 import type { MessageKey } from "../../shared/i18n";
 import type { useWorkbookPersistence } from "./useWorkbookPersistence";

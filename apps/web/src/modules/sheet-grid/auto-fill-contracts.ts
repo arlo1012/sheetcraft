@@ -1,5 +1,5 @@
-import type { CellFillMode } from "@idea10/core/cell-autofill";
-import type { CellRange } from "@idea10/core/workbook";
+import type { CellFillMode } from "@sheetcraft/core/cell-autofill";
+import type { CellRange } from "@sheetcraft/core/workbook";
 
 export type GridFillFeedback =
   | "rangeTooLarge"

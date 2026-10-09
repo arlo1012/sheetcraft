@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { cloneSheetPageSetup, DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
+import { cloneSheetPageSetup, DEFAULT_SHEET_PAGE_SETUP } from "@sheetcraft/core/page-setup";
 import {
   getPageBreakPatch,
   canChangePageBreak,

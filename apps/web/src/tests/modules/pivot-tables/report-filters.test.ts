@@ -1,10 +1,10 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
-import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
-import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
-import type { SheetPivotTable } from "@idea10/core/pivot-tables";
-import { setCellContent } from "@idea10/core/workbook";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
+import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
+import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
+import { setCellContent } from "@sheetcraft/core/workbook";
 import PivotReportFilters from "../../../modules/pivot-tables/components/PivotReportFilters.vue";
 import { createAppI18n } from "../../../shared/i18n";
 import { fixture } from "./fixture";

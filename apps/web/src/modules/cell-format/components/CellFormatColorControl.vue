@@ -82,7 +82,7 @@ function select(value: string | null, close: () => void): void {
 
   &__swatch {
     height: 16px;
-    border-radius: var(--idea-radius-small);
+    border-radius: var(--sheetcraft-radius-small);
   }
 
   &__label {
@@ -95,7 +95,7 @@ function select(value: string | null, close: () => void): void {
     flex: none;
     width: 14px;
     height: 14px;
-    border-radius: var(--idea-radius-small);
+    border-radius: var(--sheetcraft-radius-small);
   }
 }
 </style>

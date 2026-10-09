@@ -209,7 +209,7 @@ function apply(): void {
   gap: 12px;
   height: min(390px, calc(100dvh - 180px));
   min-height: 0;
-  color: var(--idea-text-primary);
+  color: var(--sheetcraft-text-primary);
 
   &__column {
     display: grid;

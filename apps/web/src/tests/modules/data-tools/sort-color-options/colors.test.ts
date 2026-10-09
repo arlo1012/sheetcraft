@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createWorkbookSession } from "@idea10/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { createWorkbookSession } from "@sheetcraft/core/history";
 import {
   createSheetEvaluator,
   getActiveSheet,
   setCellContent,
   setCellStyle,
-} from "@idea10/core/workbook";
-import { DEFAULT_CELL_TEXT_COLOR } from "@idea10/core/style";
+} from "@sheetcraft/core/workbook";
+import { DEFAULT_CELL_TEXT_COLOR } from "@sheetcraft/core/style";
 import { getSortColorColumns } from "../../../../modules/data-tools/sort-color-options";
 
 describe("getSortColorColumns", () => {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CellVerticalAlignmentIcon from "./CellVerticalAlignmentIcon.vue";
-import type { CellStylePatch, VerticalCellAlignment } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type { CellStylePatch, VerticalCellAlignment } from "@sheetcraft/core/style";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 

@@ -1,4 +1,4 @@
-import type { Sheet } from "@idea10/core/workbook";
+import type { Sheet } from "@sheetcraft/core/workbook";
 
 type RowInterval = { start: number; end: number };
 

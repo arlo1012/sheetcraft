@@ -1,5 +1,5 @@
-import { canEditCell, canEditRange } from "@idea10/core";
-import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
+import { canEditCell, canEditRange } from "@sheetcraft/core";
+import type { FillDirection } from "@sheetcraft/sheet-engine/fill-selection";
 import {
   computed,
   nextTick,
@@ -53,14 +53,18 @@ import {
   type CellValueConversionOptions,
   type WorkbookCommand,
   type WorkbookOperation,
-} from "@idea10/core/commands";
+} from "@sheetcraft/core/commands";
 import {
   cloneConditionalFormatRule,
   type SheetConditionalFormatRule,
-} from "@idea10/core/conditional-formatting";
+} from "@sheetcraft/core/conditional-formatting";
 import type { ConditionalFormatSheetChange } from "../../modules/conditional-formatting/conditional-format-manager-types";
-import { getCellMatrixSize, tileCellMatrix, type CellValueMatrix } from "@idea10/core/clipboard";
-import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
+import {
+  getCellMatrixSize,
+  tileCellMatrix,
+  type CellValueMatrix,
+} from "@sheetcraft/core/clipboard";
+import { formatCellAddress, parseCellAddress } from "@sheetcraft/core/coordinates";
 import {
   createWorkbookSession,
   createWorkbookHistory,
@@ -70,45 +74,45 @@ import {
   undoWorkbookCommand,
   type WorkbookSession,
   type ReplaceableWorkbookCommandToken,
-} from "@idea10/core/history";
+} from "@sheetcraft/core/history";
 import {
   formatCellContentForInput,
   formatComputedValueForDisplay,
   parseCellContent,
-} from "@idea10/core/input";
-import { isTextCellNumberFormat } from "@idea10/core/number-format";
-import type { ExcelDateSystem } from "@idea10/core/formula";
+} from "@sheetcraft/core/input";
+import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
 import {
   createAutoSumFormula,
   createFormulaError,
   createWorkbookCalculationSession,
-} from "@idea10/core/formula";
-import { doMergedCellRangesIntersect } from "@idea10/core";
+} from "@sheetcraft/core/formula";
+import { doMergedCellRangesIntersect } from "@sheetcraft/core";
 import {
   getCellDataValidation,
   resolveDataValidationListValues,
   validateCellContentDataValidation,
-} from "@idea10/core/data-validation";
-import { validateDuplicateEntries } from "@idea10/core/duplicate-values";
-import { WorkbookDomainError } from "@idea10/core/errors";
-import type { IdFactory } from "@idea10/core/runtime";
-import { getTableAtAddress } from "@idea10/core/table-styles";
+} from "@sheetcraft/core/data-validation";
+import { validateDuplicateEntries } from "@sheetcraft/core/duplicate-values";
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
+import type { IdFactory } from "@sheetcraft/core/runtime";
+import { getTableAtAddress } from "@sheetcraft/core/table-styles";
 import { useWorkbookFindController } from "../../modules/workbook/composables/useWorkbookFindController";
 import { useWorkbookGoToController } from "../../modules/workbook/composables/useWorkbookGoToController";
-import { getSelectionSummary } from "@idea10/core/selection-summary";
+import { getSelectionSummary } from "@sheetcraft/core/selection-summary";
 import {
   mergeCellStyle,
   type CellBorderAction,
   type CellBorderFormatPatch,
   type CellStylePatch,
-} from "@idea10/core/style";
+} from "@sheetcraft/core/style";
 import {
   getSelectionCellStyleState,
   getSelectionBorderState,
   isCellStyleRangeSupported,
   type SelectionCellStyleState,
   type SelectionBorderState,
-} from "@idea10/core/style-state";
+} from "@sheetcraft/core/style-state";
 import {
   getActiveSheet,
   getCellContent,
@@ -127,13 +131,16 @@ import {
   type SheetProperties,
   type Sheet,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   getSelectionMode,
   getSelectionRange,
   type SelectionMode,
-} from "@idea10/sheet-engine/selection";
-import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet-engine/view-state";
+} from "@sheetcraft/sheet-engine/selection";
+import {
+  createSheetGridViewState,
+  type SheetGridViewState,
+} from "@sheetcraft/sheet-engine/view-state";
 import type { AxisMovePayload } from "../../modules/sheet-grid/composables/useAxisMoveDrag";
 import {
   getCellRangeStyles,

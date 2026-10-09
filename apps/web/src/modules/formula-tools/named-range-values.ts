@@ -1,6 +1,6 @@
-import { isFormulaError, type FormulaValue } from "@idea10/core/formula";
-import { formatComputedValueForDisplay } from "@idea10/core/input";
-import type { CellAddress, CellRange, Sheet, SheetEvaluator } from "@idea10/core/workbook";
+import { isFormulaError, type FormulaValue } from "@sheetcraft/core/formula";
+import { formatComputedValueForDisplay } from "@sheetcraft/core/input";
+import type { CellAddress, CellRange, Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 
 const MAX_PREVIEW_CELLS = 24;
 const MAX_PREVIEW_TEXT = 200;

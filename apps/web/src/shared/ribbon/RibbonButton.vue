@@ -55,7 +55,7 @@ function activate(): void {
 @use "./ribbon-actions" as ribbon;
 
 .ribbon-button {
-  --ribbon-icon-size: var(--idea-action-icon-size);
+  --ribbon-icon-size: var(--sheetcraft-action-icon-size);
   @include ribbon.action-button(var(--ribbon-button-width, 27px));
 
   padding: 0;
@@ -68,7 +68,7 @@ function activate(): void {
     justify-content: var(--ribbon-labeled-action-justify, flex-start);
     width: var(--ribbon-labeled-action-width, auto);
     min-width: 27px;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     padding: 0 var(--ribbon-labeled-action-padding, 4px);
   }
 
@@ -77,12 +77,12 @@ function activate(): void {
   }
 
   &.is-tall {
-    --ribbon-icon-size: var(--idea-ribbon-large-icon-size);
+    --ribbon-icon-size: var(--sheetcraft-ribbon-large-icon-size);
     align-self: stretch;
     justify-content: center;
     width: max-content;
     min-width: var(--ribbon-tall-action-min-width, 48px);
-    height: var(--idea-ribbon-content-height, 54px);
+    height: var(--sheetcraft-ribbon-content-height, 54px);
     @include ribbon.tall-content;
     padding: 0 6px;
 

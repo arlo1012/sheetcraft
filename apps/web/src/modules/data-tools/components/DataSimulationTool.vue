@@ -70,7 +70,7 @@ function choose(kind: "goalSeek" | "planning" | "dataTable") {
 .data-simulation-tool {
   display: contents;
   &__menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
   }
 }
 </style>

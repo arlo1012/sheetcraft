@@ -1,5 +1,5 @@
-import type { Rect } from "@idea10/sheet-engine/geometry";
-import type { SheetViewMode } from "@idea10/sheet-engine/page-layout";
+import type { Rect } from "@sheetcraft/sheet-engine/geometry";
+import type { SheetViewMode } from "@sheetcraft/sheet-engine/page-layout";
 
 export type PageViewPage = {
   pageNumber?: number;

@@ -333,7 +333,7 @@ async function importFile(event: Event) {
       @include option-list.item;
       min-height: 28px;
       &[aria-current="page"]:not(:focus-visible) {
-        background: var(--idea-surface-active);
+        background: var(--sheetcraft-surface-active);
       }
     }
   }
@@ -377,7 +377,7 @@ async function importFile(event: Event) {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
     > span {
       width: 24px;
       height: 28px;
@@ -396,7 +396,7 @@ async function importFile(event: Event) {
   }
   &__count,
   &__note {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__table {
     height: min(320px, calc(100dvh - 340px));

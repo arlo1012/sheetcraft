@@ -3,13 +3,13 @@ import { nativePivotGroupXml, nativePivotDateTime } from "./pivot-native-groups.
 import { canRefreshNativePivotOnLoad } from "./pivot-native-filters.js";
 import { XMLParser } from "fast-xml-parser";
 import { strToU8, strFromU8 } from "fflate/browser";
-import type { Workbook, CellValue } from "@idea10/core/workbook";
+import type { Workbook, CellValue } from "@sheetcraft/core/workbook";
 import {
   MAX_PIVOT_CACHE_CELLS,
   getRawPivotTableSource,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
-import { isFormulaError, type FormulaValue } from "@idea10/core/formula";
+} from "@sheetcraft/core/pivot-tables";
+import { isFormulaError, type FormulaValue } from "@sheetcraft/core/formula";
 import {
   MAIN_NS,
   REL_NS,

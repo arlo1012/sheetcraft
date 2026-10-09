@@ -5,15 +5,15 @@ import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
-import type { WorkbookCommand } from "@idea10/core/commands";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/history";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   getActiveSheet,
   getCellContent,
   setCellContent,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useSimulationController } from "../../../../modules/data-tools/useSimulationController";
 import type { DataTableDraft } from "../../../../modules/data-tools/data-table-types";

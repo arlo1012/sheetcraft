@@ -14,7 +14,7 @@ TDesign Vue is the primary component framework for `apps/web`. The application
 keeps a root `ConfigProvider`, locale synchronization, and direct ESM component
 imports for tree shaking.
 
-Product-owned semantic variables use the `--idea-*` prefix. A shared TDesign
+Product-owned semantic variables use the `--sheetcraft-*` prefix. A shared TDesign
 adapter maps product theme roles to TDesign variables and contains the small
 set of approved framework overrides. Feature styles may use TDesign public
 component APIs, but must not target internal `.t-*` structure with local deep

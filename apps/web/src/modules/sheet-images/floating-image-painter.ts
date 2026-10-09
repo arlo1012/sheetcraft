@@ -1,11 +1,11 @@
 import { createCanvasImageCache } from "../sheet-grid/canvas/image-painter";
-import type { FloatingImage, ImageTransform } from "@idea10/core/workbook";
+import type { FloatingImage, ImageTransform } from "@sheetcraft/core/workbook";
 import {
   getFloatingImageViewportFragments,
   type FloatingImageViewportFragment,
-} from "@idea10/sheet-engine/floating-image-layout";
-import type { Rect } from "@idea10/sheet-engine/geometry";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+} from "@sheetcraft/sheet-engine/floating-image-layout";
+import type { Rect } from "@sheetcraft/sheet-engine/geometry";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import { paintImagePresentation } from "../../shared/images/imageAppearance";
 import { hasVisibleDrawingThemeEffects, type DrawingThemeEffects } from "./drawing-theme-effects";
 

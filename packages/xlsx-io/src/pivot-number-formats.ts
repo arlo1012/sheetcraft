@@ -1,6 +1,6 @@
-import type { Workbook, CellAddress } from "@idea10/core/workbook";
-import type { SheetPivotTable } from "@idea10/core/pivot-tables";
-import { formatCellAddress } from "@idea10/core/coordinates";
+import type { Workbook, CellAddress } from "@sheetcraft/core/workbook";
+import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import { readXlsxWorksheetStyleIds } from "./hyperlinks.js";
 import { attr, child, nodes, parseXml } from "./pivot-xml.js";
 

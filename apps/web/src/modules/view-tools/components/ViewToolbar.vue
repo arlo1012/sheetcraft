@@ -267,10 +267,10 @@ const pageRulerUnitOptions = computed(() => [
   &__checks {
     @include ribbon.two-rows;
     grid-template-columns: repeat(2, max-content);
-    column-gap: var(--idea-space-3);
+    column-gap: var(--sheetcraft-space-3);
     min-width: 150px;
-    padding: 0 var(--idea-space-2);
-    font-size: var(--idea-font-size-body-small);
+    padding: 0 var(--sheetcraft-space-2);
+    font-size: var(--sheetcraft-font-size-body-small);
     &--page-layout {
       grid-template-columns: max-content minmax(88px, 1fr);
     }

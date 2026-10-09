@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { CellStyleDefinition } from "@idea10/core/cell-styles";
-import type { TableStyleDefinition } from "@idea10/core/table-styles";
-import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
-import type { WorkbookTheme } from "@idea10/core/workbook-theme";
+import type { CellStyleDefinition } from "@sheetcraft/core/cell-styles";
+import type { TableStyleDefinition } from "@sheetcraft/core/table-styles";
+import type { PivotTableStyleDefinition } from "@sheetcraft/core/pivot-table-styles";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import CellStylesMenu from "../../cell-styles/components/CellStylesMenu.vue";
 import TableStylesMenu from "../../table-styles/components/TableStylesMenu.vue";
 import { useAppI18n } from "../../../shared/i18n";

@@ -1,29 +1,29 @@
 @mixin choice($padding: 3px) {
   padding: $padding;
   border: 0;
-  border-radius: var(--idea-radius-small);
+  border-radius: var(--sheetcraft-radius-small);
   background: transparent;
   color: inherit;
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    background: var(--idea-surface-secondary);
+    background: var(--sheetcraft-surface-secondary);
   }
 
   &:active:not(:disabled) {
-    background: var(--idea-surface-active);
+    background: var(--sheetcraft-surface-active);
   }
 
   &.is-selected,
   &[aria-pressed="true"],
   &[aria-checked="true"] {
-    background: var(--idea-action-primary-subtle);
+    background: var(--sheetcraft-action-primary-subtle);
   }
 
   &:focus-visible:not(:disabled) {
     outline: none;
-    background: var(--idea-keyboard-focus-bg);
-    box-shadow: var(--idea-keyboard-focus-shadow);
+    background: var(--sheetcraft-keyboard-focus-bg);
+    box-shadow: var(--sheetcraft-keyboard-focus-shadow);
   }
 
   &:disabled {

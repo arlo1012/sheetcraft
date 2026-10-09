@@ -1,8 +1,8 @@
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { getCellContent, MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "@idea10/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { getCellContent, MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "@sheetcraft/core/workbook";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import { createAppI18n } from "../../../shared/i18n";
 

@@ -3,10 +3,10 @@ import { computed } from "vue";
 import SheetPageBreakIcon from "../../../shared/sheet-view/SheetPageBreakIcon.vue";
 import { Printer, Rows3, PanelsTopBottom } from "lucide-vue-next";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
-import { DEFAULT_SHEET_PAGE_PRINT_OPTIONS, type SheetPageSetup } from "@idea10/core/page-setup";
-import type { CellAddress } from "@idea10/core/workbook";
-import type { SelectionMode } from "@idea10/sheet-engine/selection";
-import type { SheetViewMode } from "@idea10/sheet-engine/page-layout";
+import { DEFAULT_SHEET_PAGE_PRINT_OPTIONS, type SheetPageSetup } from "@sheetcraft/core/page-setup";
+import type { CellAddress } from "@sheetcraft/core/workbook";
+import type { SelectionMode } from "@sheetcraft/sheet-engine/selection";
+import type { SheetViewMode } from "@sheetcraft/sheet-engine/page-layout";
 import type { PageMargins } from "../page-margin-presets";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
@@ -210,7 +210,7 @@ function setPrintOption(key: "gridLines" | "headings", value: boolean): void {
     align-items: center;
   }
   &__checks {
-    padding-inline: var(--idea-space-2);
+    padding-inline: var(--sheetcraft-space-2);
   }
 }
 </style>

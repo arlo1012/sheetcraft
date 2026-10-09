@@ -1,14 +1,14 @@
 import { ref, shallowRef } from "vue";
-import { canUseSheetPermission } from "@idea10/core";
-import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@idea10/core/commands";
-import { normalizeSheetDrawing, type SheetCameraDrawing } from "@idea10/core/sheet-drawings";
+import { canUseSheetPermission } from "@sheetcraft/core";
+import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import { normalizeSheetDrawing, type SheetCameraDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   DEFAULT_ROW_HEIGHT,
   getDefaultColumnWidth,
   type Workbook,
   type Sheet,
   type CellRange,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
 export function useCameraActions(options: {

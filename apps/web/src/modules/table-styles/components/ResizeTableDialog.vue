@@ -47,11 +47,11 @@ const range = ref(props.initial);
 <style scoped lang="scss">
 .resize-table-dialog {
   display: grid;
-  gap: var(--idea-space-2);
+  gap: var(--sheetcraft-space-2);
 
   p {
     margin: 0;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

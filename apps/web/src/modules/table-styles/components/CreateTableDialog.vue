@@ -120,7 +120,7 @@ const styleOnly = computed(() => draft.value.mode === "styleOnly");
     margin-inline-start: 20px;
 
     &.is-disabled {
-      color: var(--idea-text-disabled);
+      color: var(--sheetcraft-text-disabled);
     }
   }
   &__header-count {
@@ -131,10 +131,10 @@ const styleOnly = computed(() => draft.value.mode === "styleOnly");
   }
   p {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__error {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

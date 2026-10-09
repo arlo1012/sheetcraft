@@ -1,4 +1,4 @@
-import type { WorkbookSnapshot } from "@idea10/core/serialization";
+import type { WorkbookSnapshot } from "@sheetcraft/core/serialization";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createIndexedDbWorkbookStore } from "../../../../modules/workbook-persistence/indexedDbWorkbookStore";
 

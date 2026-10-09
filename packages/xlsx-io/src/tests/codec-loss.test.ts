@@ -1,5 +1,10 @@
 import ExcelJSImport from "exceljs/dist/exceljs.min.js";
-import { getActiveSheet, getCellContent, getCellStyle, getRowHeight } from "@idea10/core/workbook";
+import {
+  getActiveSheet,
+  getCellContent,
+  getCellStyle,
+  getRowHeight,
+} from "@sheetcraft/core/workbook";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx } from "../index.js";
 

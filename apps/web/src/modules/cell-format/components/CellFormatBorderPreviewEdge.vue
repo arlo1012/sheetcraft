@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { CellBorder } from "@idea10/core/style";
-import type { SelectionBorderState } from "@idea10/core/style-state";
+import type { CellBorder } from "@sheetcraft/core/style";
+import type { SelectionBorderState } from "@sheetcraft/core/style-state";
 import { getBorderLinePresentation } from "../../../shared/borders/borderPresentation";
 
 const props = defineProps<{
@@ -69,7 +69,7 @@ const normal = computed(() => {
         :y1="points[1] + normal.y * offset"
         :x2="points[2] + normal.x * offset"
         :y2="points[3] + normal.y * offset"
-        :stroke="border?.color ?? 'var(--idea-text-muted)'"
+        :stroke="border?.color ?? 'var(--sheetcraft-text-muted)'"
         :stroke-width="presentation.strokeWidth"
         :stroke-dasharray="presentation.dashArray"
         :stroke-linecap="presentation.lineCap"
@@ -95,10 +95,10 @@ const normal = computed(() => {
   }
   &:hover &__hit,
   &:focus-visible &__hit {
-    stroke: var(--idea-surface-hover);
+    stroke: var(--sheetcraft-surface-hover);
   }
   &:focus-visible &__hit {
-    stroke: var(--idea-action-focus);
+    stroke: var(--sheetcraft-action-focus);
   }
 }
 </style>

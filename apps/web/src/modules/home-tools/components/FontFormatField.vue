@@ -54,7 +54,7 @@ const popupProps = computed<PopupProps>(() => ({
         overlayInnerStyle: (trigger: HTMLElement) => ({ width: `${trigger.offsetWidth}px` }),
       }
     : {}),
-  overlayStyle: { zIndex: "var(--idea-layer-menu)" },
+  overlayStyle: { zIndex: "var(--sheetcraft-layer-menu)" },
 }));
 let selectOnClick = false;
 function focus(_value: unknown, { e }: { e: FocusEvent }): void {
@@ -173,7 +173,7 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
                   width: '100%',
                   minWidth: '0',
                   boxSizing: 'border-box',
-                  '--idea-menu-item-padding-inline': '6px',
+                  '--sheetcraft-menu-item-padding-inline': '6px',
                 }
               : { minWidth: `${control?.offsetWidth ?? 48}px` }
           "
@@ -205,8 +205,8 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
   &:not(.is-disabled):is(:hover, .is-open)::after {
     position: absolute;
     inset: 1px;
-    border-radius: var(--idea-radius-default);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--idea-text-primary) 14%, transparent);
+    border-radius: var(--sheetcraft-radius-default);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sheetcraft-text-primary) 14%, transparent);
     content: "";
     pointer-events: none;
   }
@@ -225,7 +225,7 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
     --ribbon-feedback-inset: 1px 1px 1px 0;
 
     &::before {
-      border-radius: 0 var(--idea-radius-default) var(--idea-radius-default) 0;
+      border-radius: 0 var(--sheetcraft-radius-default) var(--sheetcraft-radius-default) 0;
     }
 
     &[aria-disabled="true"] {
@@ -234,7 +234,7 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
   }
 
   &__menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
     min-width: 48px;
     max-height: min(360px, calc(100vh - 32px));
   }

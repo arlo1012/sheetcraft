@@ -3,7 +3,7 @@ import { Eye, EyeOff, X } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
-import type { FloatingImage } from "@idea10/core/workbook";
+import type { FloatingImage } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{
   images: readonly FloatingImage[];
@@ -91,8 +91,8 @@ function toggle(id: string): void {
   flex: 0 0 280px;
   min-height: 0;
   padding: 8px;
-  border-left: 1px solid var(--idea-border-subtle);
-  background: var(--idea-surface-panel);
+  border-left: 1px solid var(--sheetcraft-border-subtle);
+  background: var(--sheetcraft-surface-panel);
   &__header {
     display: flex;
     align-items: center;
@@ -110,7 +110,7 @@ function toggle(id: string): void {
     align-items: center;
     padding: 4px;
     &.is-selected {
-      background: var(--idea-surface-hover);
+      background: var(--sheetcraft-surface-hover);
     }
   }
 }

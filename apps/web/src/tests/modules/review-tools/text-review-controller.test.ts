@@ -1,13 +1,13 @@
 import { defineComponent, h, nextTick, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import type { WorkbookCommand } from "@idea10/core/commands";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
+} from "@sheetcraft/core/history";
 import {
   createSheet,
   createWorkbook,
@@ -15,7 +15,7 @@ import {
   getCellContent,
   setCellContent,
   type CellRange,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useTextReviewController } from "../../../modules/review-tools/useTextReviewController";
 import { createAppI18n } from "../../../shared/i18n";
 import type {

@@ -1,4 +1,4 @@
-import { getFormulaFunctionMetadata } from "@idea10/core/formula";
+import { getFormulaFunctionMetadata } from "@sheetcraft/core/formula";
 
 export type FormulaFunctionLocalizedSource = Readonly<{
   description: string;

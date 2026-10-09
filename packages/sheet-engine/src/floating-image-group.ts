@@ -3,7 +3,7 @@ import {
   MIN_FLOATING_IMAGE_SIZE,
   normalizeImageTransform,
   type FloatingImage,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   getFloatingImageSheetRect,
   reanchorFloatingImageAtSheetRect,

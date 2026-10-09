@@ -1,7 +1,11 @@
-import type { CellRange, SheetDimensionAxis } from "@idea10/core/workbook";
-import type { CellMergeMode } from "@idea10/core/commands";
-import type { CellStylePatch, CellBorderAction, CellBorderFormatPatch } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type { CellRange, SheetDimensionAxis } from "@sheetcraft/core/workbook";
+import type { CellMergeMode } from "@sheetcraft/core/commands";
+import type {
+  CellStylePatch,
+  CellBorderAction,
+  CellBorderFormatPatch,
+} from "@sheetcraft/core/style";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import type { HomeDataToolState, MergeCellsState } from "../home-tools/components/data-tool-state";
 
 export type SheetContextMenuState = {

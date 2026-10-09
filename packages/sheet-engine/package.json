@@ -1,5 +1,5 @@
 {
-  "name": "@idea10/sheet-engine",
+  "name": "@sheetcraft/sheet-engine",
   "version": "0.1.0",
   "private": true,
   "files": [
@@ -82,7 +82,7 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
-    "@idea10/core": "workspace:*"
+    "@sheetcraft/core": "workspace:*"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

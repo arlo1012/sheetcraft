@@ -13,7 +13,7 @@ import {
   type CellSparklineMatrix,
   type CellValueMatrix,
   type PastePlan,
-} from "@idea10/core/clipboard";
+} from "@sheetcraft/core/clipboard";
 import {
   createSheetEvaluator,
   getCellStyle,
@@ -29,23 +29,23 @@ import {
   type CellRange,
   type Sheet,
   type SheetEvaluator,
-} from "@idea10/core/workbook";
-import { isFormulaError } from "@idea10/core/formula";
-import { formatComputedValueForDisplay } from "@idea10/core/input";
-import { cloneCellStyle, type CellStyle } from "@idea10/core/style";
+} from "@sheetcraft/core/workbook";
+import { isFormulaError } from "@sheetcraft/core/formula";
+import { formatComputedValueForDisplay } from "@sheetcraft/core/input";
+import { cloneCellStyle, type CellStyle } from "@sheetcraft/core/style";
 import {
   cloneConditionalFormatRule,
   type SheetConditionalFormatRule,
-} from "@idea10/core/conditional-formatting";
+} from "@sheetcraft/core/conditional-formatting";
 import {
   getSelectionMode,
   getSelectionRange,
   type CellSelection,
-} from "@idea10/sheet-engine/selection";
+} from "@sheetcraft/sheet-engine/selection";
 import {
   createBrowserGridClipboardPort,
   areGridClipboardTextsEqual,
-  IDEA10_CLIPBOARD_TYPE,
+  SHEETCRAFT_CLIPBOARD_TYPE,
   readGridClipboardLocalToken,
   type GridClipboardPort,
   type GridClipboardTransfer,
@@ -365,7 +365,7 @@ export function useGridClipboard(options: {
     }
 
     event.clipboardData.setData("text/plain", prepared.text);
-    event.clipboardData.setData(IDEA10_CLIPBOARD_TYPE, prepared.token);
+    event.clipboardData.setData(SHEETCRAFT_CLIPBOARD_TYPE, prepared.token);
     clipboardOperation += 1;
     commitPreparedSelection({ ...prepared, localTokenWritten: true });
     // Native MIME data is not exposed by every browser's Async Clipboard API.

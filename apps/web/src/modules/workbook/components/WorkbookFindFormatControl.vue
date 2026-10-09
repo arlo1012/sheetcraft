@@ -3,7 +3,7 @@ import { ref } from "vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Dropdown, DropdownItem, DropdownMenu } from "tdesign-vue-next/es/dropdown";
 import { ChevronDown } from "lucide-vue-next";
-import type { SheetSearchFormat } from "@idea10/core/search";
+import type { SheetSearchFormat } from "@sheetcraft/core/search";
 import WorkbookFindFormatPreview from "./WorkbookFindFormatPreview.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { WorkbookFindFormatMode } from "../workbook-find-types";

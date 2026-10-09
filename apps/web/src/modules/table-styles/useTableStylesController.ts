@@ -9,18 +9,24 @@ import {
   createSetWorkbookTableStylesCommand,
   createSetWorkbookPivotTableStylesCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import { resolveDataRange } from "@idea10/core/data-range";
-import { WorkbookDomainError } from "@idea10/core/errors";
+} from "@sheetcraft/core/commands";
+import { resolveDataRange } from "@sheetcraft/core/data-range";
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
 import {
   createBuiltinTableStyles,
   createThemedTableStyles,
   getTableAtAddress,
   hasHighlightedFirstColumn,
   type TableStyleDefinition,
-} from "@idea10/core/table-styles";
-import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
-import type { CellAddress, CellRange, Sheet, SheetTable, Workbook } from "@idea10/core/workbook";
+} from "@sheetcraft/core/table-styles";
+import type { PivotTableStyleDefinition } from "@sheetcraft/core/pivot-table-styles";
+import type {
+  CellAddress,
+  CellRange,
+  Sheet,
+  SheetTable,
+  Workbook,
+} from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import {
   formatRangeReference,

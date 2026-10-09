@@ -4,9 +4,9 @@ import {
   normalizeProtectionPassword,
   type ProtectionPassword,
   type SheetProtection,
-} from "@idea10/core";
-import type { Sheet } from "@idea10/core/workbook";
-import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
+} from "@sheetcraft/core";
+import type { Sheet } from "@sheetcraft/core/workbook";
+import { formatCellAddress, parseCellAddress } from "@sheetcraft/core/coordinates";
 import { readXlsxWorksheetPartTargets } from "./raw-cell-values.js";
 import type { CompatibilityReportBuilder } from "./report.js";
 

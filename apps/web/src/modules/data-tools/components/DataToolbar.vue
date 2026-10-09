@@ -22,7 +22,7 @@ import DataFilterTool from "./DataFilterTool.vue";
 import DataDuplicatesTool from "./DataDuplicatesTool.vue";
 import DataComparisonTool from "./DataComparisonTool.vue";
 import type { DataComparisonAction } from "../data-comparison-types";
-import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
+import type { FillDirection } from "@sheetcraft/sheet-engine/fill-selection";
 import DataFillTool from "./DataFillTool.vue";
 import DataSortTool from "./DataSortTool.vue";
 import type { DuplicateToolMode } from "../duplicate-tools-types";

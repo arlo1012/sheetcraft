@@ -1,5 +1,5 @@
-import type { ConditionalFormatIconSet } from "@idea10/core/conditional-formatting";
-import type { Rect } from "@idea10/sheet-engine/geometry";
+import type { ConditionalFormatIconSet } from "@sheetcraft/core/conditional-formatting";
+import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 
 type Ink = { fill: string; edge: string };
 const GREEN: Ink = { fill: "#70AC98", edge: "#417766" };

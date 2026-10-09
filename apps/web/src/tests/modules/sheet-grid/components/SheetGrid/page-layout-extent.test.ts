@@ -1,9 +1,9 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
-import { getCellValue } from "@idea10/core/workbook";
-import type { SheetGridViewState } from "@idea10/sheet-engine/view-state";
-import type { SheetGeometry } from "@idea10/sheet-engine/geometry";
+import { DEFAULT_SHEET_PAGE_SETUP } from "@sheetcraft/core/page-setup";
+import { getCellValue } from "@sheetcraft/core/workbook";
+import type { SheetGridViewState } from "@sheetcraft/sheet-engine/view-state";
+import type { SheetGeometry } from "@sheetcraft/sheet-engine/geometry";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import type { PageViewPaintState } from "../../../../../modules/page-layout/page-view-types";
 import { activeCell, getCanvasLayout, mountSheetGrid, triggerCell } from "./fixture";

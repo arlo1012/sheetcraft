@@ -431,20 +431,20 @@ function readColorFilter(body: string, dxfs: readonly string[]): XlsxFilterCondi
   return null;
 }
 
-const IDEA10_COLOR_FILTER_SETS_URI = "{F05D2C50-AD53-4CE0-8F27-4BE69CF538D1}";
-const IDEA10_COLOR_FILTER_SETS_NAMESPACE = "https://idea10.dev/xlsx/filter/v1";
+const PRODUCT_COLOR_FILTER_SETS_URI = "{F05D2C50-AD53-4CE0-8F27-4BE69CF538D1}";
+const PRODUCT_COLOR_FILTER_SETS_NAMESPACE = "https://idea10.dev/xlsx/filter/v1";
 
-function idea10ColorFilterSetExtension(xml: string): string | null {
+function productColorFilterSetExtension(xml: string): string | null {
   const extension = new RegExp(
-    `<ext\\b(?=[^>]*\\buri=["']${IDEA10_COLOR_FILTER_SETS_URI.replace(/[{}]/g, "\\$&")}["'])[^>]*>([\\s\\S]*?)<\\/ext>`,
+    `<ext\\b(?=[^>]*\\buri=["']${PRODUCT_COLOR_FILTER_SETS_URI.replace(/[{}]/g, "\\$&")}["'])[^>]*>([\\s\\S]*?)<\\/ext>`,
     "i",
   ).exec(xml);
   return extension?.[1] ?? null;
 }
 
-function readIdea10ColorFilterSets(xml: string, filter: XlsxFilter | null): XlsxFilter | null {
+function readProductColorFilterSets(xml: string, filter: XlsxFilter | null): XlsxFilter | null {
   if (!filter) return filter;
-  const extension = idea10ColorFilterSetExtension(xml);
+  const extension = productColorFilterSetExtension(xml);
   if (!extension) return filter;
   const columns = filter.columns.map((column) => ({ ...column }));
   for (const entry of extension.matchAll(
@@ -481,8 +481,8 @@ function readIdea10ColorFilterSets(xml: string, filter: XlsxFilter | null): Xlsx
   return { ...filter, columns };
 }
 
-function readIdea10ColorFilterSetHiddenRows(xml: string): number[] {
-  const extension = idea10ColorFilterSetExtension(xml);
+function readProductColorFilterSetHiddenRows(xml: string): number[] {
+  const extension = productColorFilterSetExtension(xml);
   const container = extension
     ? /<idea10:colorFilterSets\b([^>]*)>/i.exec(extension)?.[1]
     : undefined;
@@ -622,7 +622,7 @@ export function readXlsxAutoFilter(
       ...(condition ? { condition } : {}),
     });
   }
-  return { value: readIdea10ColorFilterSets(xml, { range, columns }), unsupported };
+  return { value: readProductColorFilterSets(xml, { range, columns }), unsupported };
 }
 
 function groupsFromLevels(
@@ -704,7 +704,7 @@ export function readXlsxDataMetadata(bytes: Uint8Array): XlsxDataMetadata[] {
     return {
       filter: filter.value,
       hiddenRows: [],
-      colorSetHiddenRows: readIdea10ColorFilterSetHiddenRows(xml),
+      colorSetHiddenRows: readProductColorFilterSetHiddenRows(xml),
       dataValidations: validations.values,
       outlineGroups: readOutlineGroups(xml),
       unsupportedFilters: filter.unsupported,
@@ -870,7 +870,7 @@ export function writeXlsxAutoFilter(
  * product extension. Only an explicitly supplied value criterion is emitted;
  * deriving values from colors would falsely narrow the file.
  */
-function writeIdea10ColorFilterSets(
+function writeProductColorFilterSets(
   filter: XlsxFilter | null,
   hiddenRows: readonly number[] = [],
 ): string {
@@ -889,19 +889,19 @@ function writeIdea10ColorFilterSets(
     })
     .join("");
   return entries || hiddenRows.length
-    ? `<ext uri="${IDEA10_COLOR_FILTER_SETS_URI}"><idea10:colorFilterSets xmlns:idea10="${IDEA10_COLOR_FILTER_SETS_NAMESPACE}"${hiddenRows.length ? ` hiddenRows="${hiddenRows.join(",")}"` : ""}>${entries}</idea10:colorFilterSets></ext>`
+    ? `<ext uri="${PRODUCT_COLOR_FILTER_SETS_URI}"><idea10:colorFilterSets xmlns:idea10="${PRODUCT_COLOR_FILTER_SETS_NAMESPACE}"${hiddenRows.length ? ` hiddenRows="${hiddenRows.join(",")}"` : ""}>${entries}</idea10:colorFilterSets></ext>`
     : "";
 }
 
-function writeIdea10ColorFilterSetExtension(
+function writeProductColorFilterSetExtension(
   xml: string,
   filter: XlsxFilter | null,
   hiddenRows: readonly number[] = [],
 ): string {
-  const extension = writeIdea10ColorFilterSets(filter, hiddenRows);
+  const extension = writeProductColorFilterSets(filter, hiddenRows);
   if (!extension) return xml;
   const existing = new RegExp(
-    `<ext\\b(?=[^>]*\\buri=["']${IDEA10_COLOR_FILTER_SETS_URI.replace(/[{}]/g, "\\$&")}["'])[^>]*(?:\\/>|>[\\s\\S]*?<\\/ext>)`,
+    `<ext\\b(?=[^>]*\\buri=["']${PRODUCT_COLOR_FILTER_SETS_URI.replace(/[{}]/g, "\\$&")}["'])[^>]*(?:\\/>|>[\\s\\S]*?<\\/ext>)`,
     "i",
   );
   const withoutExisting = xml.replace(existing, "");
@@ -999,7 +999,7 @@ export function writeXlsxFilterColorFormats(
         writeXlsxAutoFilter(filter, options),
       ),
     );
-    entries[path] = strToU8(writeIdea10ColorFilterSetExtension(strFromU8(entries[path]!), filter));
+    entries[path] = strToU8(writeProductColorFilterSetExtension(strFromU8(entries[path]!), filter));
   }
   const dxfContainer = `<dxfs count="${dxfs.length}">${dxfs.join("")}</dxfs>`;
   entries["xl/styles.xml"] = strToU8(
@@ -1199,7 +1199,7 @@ export function writeXlsxDataMetadata(
         /<sheetData\b[^>]*(?:\/>|>[\s\S]*?<\/sheetData>)/i,
       );
     if (metadata.filter || metadata.colorSetHiddenRows?.length)
-      xml = writeIdea10ColorFilterSetExtension(xml, metadata.filter, metadata.colorSetHiddenRows);
+      xml = writeProductColorFilterSetExtension(xml, metadata.filter, metadata.colorSetHiddenRows);
     if (metadata.dataValidations.length) {
       const after = /<autoFilter\b/i.test(xml)
         ? /<autoFilter\b[^>]*(?:\/>|>[\s\S]*?<\/autoFilter>)/i

@@ -3,7 +3,7 @@ import { Maximize2 } from "lucide-vue-next";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import { computed, ref, useId } from "vue";
-import type { SheetPageFitToPage, SheetPageSetup } from "@idea10/core/page-setup";
+import type { SheetPageFitToPage, SheetPageSetup } from "@sheetcraft/core/page-setup";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
@@ -135,14 +135,14 @@ function openSetup(): void {
 .page-scaling-menu {
   @include ribbon.tool;
   &__surface {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
     min-width: 220px;
   }
   &__scale {
     padding: 4px 14px;
-    color: var(--idea-text-primary);
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
+    color: var(--sheetcraft-text-primary);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
     list-style: none;
 
     > [role="group"] {

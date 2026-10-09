@@ -3,8 +3,8 @@ import {
   deserializeWorkbook,
   serializeWorkbook,
   type WorkbookSnapshot,
-} from "@idea10/core/serialization";
-import type { Workbook } from "@idea10/core/workbook";
+} from "@sheetcraft/core/serialization";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import type { ImageAssetStore } from "../image-assets/imageAssetStore";
 import type { useWorkbookPersistence } from "../workbook-persistence/useWorkbookPersistence";
 import { prepareXlsxImages } from "./prepareXlsxImages";

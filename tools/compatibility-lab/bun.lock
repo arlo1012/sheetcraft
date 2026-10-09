@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@idea10/compatibility-lab",
+      "name": "@sheetcraft/compatibility-lab",
       "devDependencies": {
         "@formulajs/formulajs": "4.6.1",
         "@types/node": "26.3.0",

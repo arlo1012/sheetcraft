@@ -1,8 +1,8 @@
 import {
   cloneCellStyleDefinition as cloneDefinition,
   type CellStyleDefinition,
-} from "@idea10/core/cell-styles";
-import type { Workbook } from "@idea10/core/workbook";
+} from "@sheetcraft/core/cell-styles";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import { readWorkbookFile } from "../workbook-persistence/workbookJsonTransfer";
 
 export function cloneCellStyleDefinition(style: CellStyleDefinition): CellStyleDefinition {
@@ -61,7 +61,7 @@ export async function readCellStylesFile(
 
 async function readXlsxCellStyles(file: Pick<File, "arrayBuffer">): Promise<Workbook> {
   // This import remains asynchronous so the XLSX codec stays outside normal cell-style UI loading.
-  const codec = await import("@idea10/xlsx-io");
+  const codec = await import("@sheetcraft/xlsx-io");
   const result = await codec.decodeXlsx(new Uint8Array(await file.arrayBuffer()));
   return result.workbook;
 }

@@ -6,8 +6,8 @@ import {
   getCellStyle,
   setCellContent,
   setCellStyle,
-} from "@idea10/core/workbook";
-import { normalizeWorkbookTheme, resolveThemeFontFamily } from "@idea10/core/workbook-theme";
+} from "@sheetcraft/core/workbook";
+import { normalizeWorkbookTheme, resolveThemeFontFamily } from "@sheetcraft/core/workbook-theme";
 import { decodeXlsx, encodeXlsx } from "../index.js";
 import { readXlsxCellStyles } from "../cell-styles.js";
 import { readXlsxWorkbookTheme } from "../workbook-theme.js";

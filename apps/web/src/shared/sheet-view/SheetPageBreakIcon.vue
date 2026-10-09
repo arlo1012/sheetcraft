@@ -15,8 +15,8 @@
 
 <style scoped lang="scss">
 svg {
-  width: var(--idea-icon-size, var(--idea-action-icon-size));
-  height: var(--idea-icon-size, var(--idea-action-icon-size));
-  stroke-width: var(--idea-icon-stroke-width);
+  width: var(--sheetcraft-icon-size, var(--sheetcraft-action-icon-size));
+  height: var(--sheetcraft-icon-size, var(--sheetcraft-action-icon-size));
+  stroke-width: var(--sheetcraft-icon-stroke-width);
 }
 </style>

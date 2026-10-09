@@ -104,7 +104,7 @@ function change(options: Partial<FilterSearchOptions>): void {
 
 <style scoped lang="scss">
 .filter-search-menu {
-  z-index: var(--idea-layer-popover-submenu);
+  z-index: var(--sheetcraft-layer-popover-submenu);
 
   &__trigger {
     width: 32px;
@@ -114,12 +114,12 @@ function change(options: Partial<FilterSearchOptions>): void {
   &__icons {
     display: flex;
     align-items: center;
-    gap: var(--idea-space-1);
+    gap: var(--sheetcraft-space-1);
   }
 
   &__search-icon {
-    width: var(--idea-control-icon-size);
-    height: var(--idea-control-icon-size);
+    width: var(--sheetcraft-control-icon-size);
+    height: var(--sheetcraft-control-icon-size);
   }
 
   &__arrow {

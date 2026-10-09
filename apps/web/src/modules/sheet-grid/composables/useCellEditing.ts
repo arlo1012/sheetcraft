@@ -1,6 +1,6 @@
 import { computed, nextTick, ref } from "vue";
-import type { CellAddress } from "@idea10/core/workbook";
-import type { CellSelection } from "@idea10/sheet-engine/selection";
+import type { CellAddress } from "@sheetcraft/core/workbook";
+import type { CellSelection } from "@sheetcraft/sheet-engine/selection";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 import { isCellEditSessionTarget } from "../../../shared/cell-editing/cell-edit-focus";
 import {

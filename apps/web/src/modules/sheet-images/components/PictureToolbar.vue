@@ -8,7 +8,7 @@ import {
   MAX_FLOATING_IMAGE_SIZE,
   type FloatingImage,
   type ImageAppearance,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";

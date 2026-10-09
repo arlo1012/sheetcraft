@@ -9,12 +9,12 @@ import {
   datePartsToExcelSerial,
   excelSerialToDateParts,
   type ExcelDateSystem,
-} from "@idea10/core/formula";
+} from "@sheetcraft/core/formula";
 import {
   getPivotGroupLabels,
   type PivotFieldGroup,
   type PivotDateGroupUnit,
-} from "@idea10/core/pivot-tables";
+} from "@sheetcraft/core/pivot-tables";
 import type { PivotGroupingDraft } from "../usePivotGrouping";
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{

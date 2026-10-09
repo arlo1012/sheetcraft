@@ -1,4 +1,4 @@
-import type { CellAddress } from "@idea10/core/workbook";
+import type { CellAddress } from "@sheetcraft/core/workbook";
 import type { VueWrapper } from "@vue/test-utils";
 import SheetSurface from "../../modules/sheet-grid/components/SheetSurface.vue";
 import type { SheetRenderFrame } from "../../modules/sheet-grid/rendering/sheet-render-frame";

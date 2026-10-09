@@ -4,8 +4,8 @@ import RemoveDuplicatesDialog from "./RemoveDuplicatesDialog.vue";
 import SortDialog from "./SortDialog.vue";
 import SubtotalDialog from "./SubtotalDialog.vue";
 import TextToColumnsDialog from "./TextToColumnsDialog.vue";
-import type { SplitColumnSuggestion } from "@idea10/core/commands";
-import type { ExcelDateSystem } from "@idea10/core/formula";
+import type { SplitColumnSuggestion } from "@sheetcraft/core/commands";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
 import type { RangeReferenceSelectionOptions } from "../../../shared/range-reference/useRangeReferencePicker";
 import type {
   DataToolColumn,

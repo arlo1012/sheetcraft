@@ -5,7 +5,7 @@ import {
   createPivotSheetCommand,
   createRemovePivotTableCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
+} from "@sheetcraft/core/commands";
 import {
   getPivotTableSource,
   type PivotConsolidation,
@@ -15,17 +15,17 @@ import {
   getPivotTableRange,
   normalizePivotTable,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
-import { WorkbookDomainError } from "@idea10/core/errors";
-import { canUseSheetPermission } from "@idea10/core";
-import { resolveDataRange } from "@idea10/core/data-range";
+} from "@sheetcraft/core/pivot-tables";
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
+import { canUseSheetPermission } from "@sheetcraft/core";
+import { resolveDataRange } from "@sheetcraft/core/data-range";
 import {
   type Workbook,
   type Sheet,
   type CellRange,
   type CellAddress,
   getNextSheetName,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import {
   formatRangeReference,

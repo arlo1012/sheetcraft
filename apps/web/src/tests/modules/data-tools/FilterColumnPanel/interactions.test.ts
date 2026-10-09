@@ -2,7 +2,7 @@ import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import type { SheetFilterCondition } from "@idea10/core/workbook";
+import type { SheetFilterCondition } from "@sheetcraft/core/workbook";
 import FilterColumnPanel from "../../../../modules/data-tools/components/FilterColumnPanel.vue";
 import { createAppI18n } from "../../../../shared/i18n";
 

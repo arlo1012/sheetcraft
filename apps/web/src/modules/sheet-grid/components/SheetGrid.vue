@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { getPivotActiveField } from "../../pivot-tables/pivot-active-field";
 import PivotReportFilters from "../../pivot-tables/components/PivotReportFilters.vue";
-import { isPivotValueCell, type SheetPivotTable } from "@idea10/core/pivot-tables";
+import { isPivotValueCell, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import PivotEmptyReports from "../../pivot-tables/components/PivotEmptyReports.vue";
-import type { SheetDrawing } from "@idea10/core/sheet-drawings";
+import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer.vue";
-import { canEditCell, canEditRange, canSelectCell, canUseSheetPermission } from "@idea10/core";
+import { canEditCell, canEditRange, canSelectCell, canUseSheetPermission } from "@sheetcraft/core";
 import {
   computed,
   nextTick,
@@ -21,16 +21,16 @@ import type {
   SheetContextMenuState,
   SheetContextRequest,
 } from "../context-menu-contracts";
-import { formatCellContentForInput } from "@idea10/core/input";
-import type { ExcelDateSystem } from "@idea10/core/formula";
-import type { WorkbookTheme } from "@idea10/core/workbook-theme";
-import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@idea10/core/page-setup";
-import type { SheetViewMode } from "@idea10/sheet-engine/page-layout";
+import { formatCellContentForInput } from "@sheetcraft/core/input";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@sheetcraft/core/page-setup";
+import type { SheetViewMode } from "@sheetcraft/sheet-engine/page-layout";
 import type { PageViewPaintState } from "../../page-layout/page-view-types";
 import PageHeaderFooterOverlay from "../../page-layout/components/PageHeaderFooterOverlay.vue";
 import { usePageBreakDrag } from "../../page-layout/usePageBreakDrag";
 import { usePageMarginDrag } from "../../page-layout/usePageMarginDrag";
-import { adjustSheetPageMargin } from "@idea10/sheet-engine/page-layout";
+import { adjustSheetPageMargin } from "@sheetcraft/sheet-engine/page-layout";
 import PageLayoutRulers, {
   PAGE_LAYOUT_RULER_SIZE,
   type PageLayoutRulerUnit,
@@ -38,7 +38,7 @@ import PageLayoutRulers, {
 import PageLayoutMargins from "../../page-layout/components/PageLayoutMargins.vue";
 import PageWhiteSpaceControls from "../../page-layout/components/PageWhiteSpaceControls.vue";
 import type { HeaderFooterEditTarget } from "../../page-layout/header-footer-editor";
-import { columnIndexToLabel, getCellAddressLabel } from "@idea10/core/coordinates";
+import { columnIndexToLabel, getCellAddressLabel } from "@sheetcraft/core/coordinates";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
 import { getSelectionFitZoom } from "../selection-zoom";
@@ -74,12 +74,12 @@ import {
   type Workbook,
   type SheetEvaluator,
   type SheetDimensionAxis,
-} from "@idea10/core/workbook";
-import { expandSelectionToMergedCellRanges } from "@idea10/core";
+} from "@sheetcraft/core/workbook";
+import { expandSelectionToMergedCellRanges } from "@sheetcraft/core";
 import {
   DEFAULT_GRID_EXTENT_POLICY,
   DEFAULT_INITIAL_GRID_EXTENT,
-} from "@idea10/sheet-engine/extent";
+} from "@sheetcraft/sheet-engine/extent";
 import {
   areCellAddressesEqual,
   createAxisSelection,
@@ -93,21 +93,24 @@ import {
   moveActiveCellWithinSelection,
   moveCellSelection,
   type CellSelection,
-} from "@idea10/sheet-engine/selection";
+} from "@sheetcraft/sheet-engine/selection";
 import {
   useGridClipboard,
   type GridClipboardFeedback,
   type GridPastePayload,
   type GridPasteResult,
 } from "../useGridClipboard";
-import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet-engine/view-state";
+import {
+  createSheetGridViewState,
+  type SheetGridViewState,
+} from "@sheetcraft/sheet-engine/view-state";
 import {
   createAutoRowHeightCalculator,
   mergeRowHeightOverrides,
-} from "@idea10/sheet-engine/row-height";
+} from "@sheetcraft/sheet-engine/row-height";
 import { useDimensionResize } from "../composables/useDimensionResize";
 import { useAxisMoveDrag, type AxisMovePayload } from "../composables/useAxisMoveDrag";
-import { getViewportAxisBoundaryOffset } from "@idea10/sheet-engine/axis-interactions";
+import { getViewportAxisBoundaryOffset } from "@sheetcraft/sheet-engine/axis-interactions";
 import { useCellEditing } from "../composables/useCellEditing";
 import { useFormulaReferenceNavigation } from "../composables/useFormulaReferenceNavigation";
 import { useDragSelection } from "../composables/useDragSelection";
@@ -121,7 +124,7 @@ import SheetImagePreview from "../../sheet-images/components/SheetImagePreview.v
 import SheetNotePreview from "./SheetNotePreview.vue";
 import { useFloatingImageClipboard } from "../../sheet-images/useFloatingImageClipboard";
 import { areGridClipboardTextsEqual, createBrowserGridClipboardPort } from "../gridClipboardPort";
-import { getFloatingImageSheetRect } from "@idea10/sheet-engine/floating-image-layout";
+import { getFloatingImageSheetRect } from "@sheetcraft/sheet-engine/floating-image-layout";
 import {
   readFloatingImageClipboard,
   readFloatingImageGroup,
@@ -3549,7 +3552,7 @@ defineExpose({
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--idea-surface-panel);
+  background: var(--sheetcraft-surface-panel);
 
   &.is-resizing-column {
     cursor: col-resize;
@@ -3567,9 +3570,9 @@ defineExpose({
     position: absolute;
     inset: var(--sheet-column-header-height) 0 0 var(--sheet-row-header-width);
     overflow: auto;
-    background: var(--idea-surface-panel);
+    background: var(--sheetcraft-surface-panel);
     outline: none;
-    scrollbar-color: var(--idea-border-control) var(--idea-sheet-bar-surface);
+    scrollbar-color: var(--sheetcraft-border-control) var(--sheetcraft-sheet-bar-surface);
     scrollbar-width: auto;
 
     @supports selector(::-webkit-scrollbar) {
@@ -3582,16 +3585,16 @@ defineExpose({
     }
 
     &::-webkit-scrollbar-track {
-      background: var(--idea-sheet-bar-surface);
+      background: var(--sheetcraft-sheet-bar-surface);
     }
 
     &::-webkit-scrollbar-thumb {
-      border: calc(4px / var(--sheet-scale, 1)) solid var(--idea-sheet-bar-surface);
+      border: calc(4px / var(--sheet-scale, 1)) solid var(--sheetcraft-sheet-bar-surface);
       border-radius: 999px;
-      background: var(--idea-sheet-bar-thumb);
+      background: var(--sheetcraft-sheet-bar-thumb);
 
       &:hover {
-        background: var(--idea-sheet-bar-thumb-hover);
+        background: var(--sheetcraft-sheet-bar-thumb-hover);
       }
     }
 
@@ -3626,8 +3629,8 @@ defineExpose({
     &::after {
       width: calc(6px / var(--sheet-scale, 1));
       height: calc(6px / var(--sheet-scale, 1));
-      border: calc(1px / var(--sheet-scale, 1)) solid var(--idea-surface-panel);
-      background: var(--idea-action-primary);
+      border: calc(1px / var(--sheet-scale, 1)) solid var(--sheetcraft-surface-panel);
+      background: var(--sheetcraft-action-primary);
       content: "";
     }
   }

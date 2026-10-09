@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getCellValue, setCellValue } from "@idea10/core/workbook";
+import { getCellValue, setCellValue } from "@sheetcraft/core/workbook";
 import { mountSheetGrid } from "./fixture";
 
 type GridSaveContract = {

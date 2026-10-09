@@ -1,6 +1,6 @@
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellRange } from "@idea10/core/workbook";
-import { formatCellAddress } from "@idea10/core/coordinates";
-import { getFormulaFunctionMetadata, type FormulaFunctionMetadata } from "@idea10/core/formula";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellRange } from "@sheetcraft/core/workbook";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
+import { getFormulaFunctionMetadata, type FormulaFunctionMetadata } from "@sheetcraft/core/formula";
 import {
   getFormulaReferenceTokens,
   type FormulaReferenceRangeKind,

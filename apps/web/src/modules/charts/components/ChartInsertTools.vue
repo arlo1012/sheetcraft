@@ -8,7 +8,7 @@ import {
   ChartNetwork,
   LayoutDashboard,
 } from "lucide-vue-next";
-import type { ChartType } from "@idea10/core/sheet-charts";
+import type { ChartType } from "@sheetcraft/core/sheet-charts";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";

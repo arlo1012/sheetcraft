@@ -124,7 +124,7 @@ function openErrorCheckOptions(): void {
 .data-duplicates-tool {
   display: contents;
   &__menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
   }
 }
 </style>

@@ -69,7 +69,7 @@ watch(
   gap: 16px;
 
   &__label {
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
   }
 
   &__axes {

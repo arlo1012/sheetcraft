@@ -1,7 +1,7 @@
 import { DOMWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { getCellContent } from "@idea10/core/workbook";
+import { getCellContent } from "@sheetcraft/core/workbook";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { activeCell, mountSheetGrid, triggerAxisHeader, triggerCell } from "./fixture";
 

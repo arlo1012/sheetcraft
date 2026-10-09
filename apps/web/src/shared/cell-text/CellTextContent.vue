@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, type CSSProperties } from "vue";
-import type { FormulaValue } from "@idea10/core/formula";
-import type { CellStyle } from "@idea10/core/style";
-import type { CellNumberFormatPresentation } from "@idea10/core/number-format";
-import { DEFAULT_COLUMN_WIDTH, DEFAULT_ROW_HEIGHT } from "@idea10/core/workbook";
+import type { FormulaValue } from "@sheetcraft/core/formula";
+import type { CellStyle } from "@sheetcraft/core/style";
+import type { CellNumberFormatPresentation } from "@sheetcraft/core/number-format";
+import { DEFAULT_COLUMN_WIDTH, DEFAULT_ROW_HEIGHT } from "@sheetcraft/core/workbook";
 import { browserCellTextMeasurer, cellTextFontRevision } from "./text-metrics";
 import { layoutCellText } from "./text-presentation";
 import {

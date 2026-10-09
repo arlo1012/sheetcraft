@@ -156,6 +156,6 @@ function select(action: FilterConditionAction): void {
 
 <style scoped lang="scss">
 .filter-condition-menu {
-  z-index: var(--idea-layer-popover-submenu);
+  z-index: var(--sheetcraft-layer-popover-submenu);
 }
 </style>

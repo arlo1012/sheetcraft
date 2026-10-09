@@ -4,15 +4,15 @@ import {
   createMarkDataComparisonCommand,
   type DataComparisonOptions,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import { WorkbookDomainError } from "@idea10/core/errors";
-import { formatFormulaAddress } from "@idea10/core/formula";
+} from "@sheetcraft/core/commands";
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
+import { formatFormulaAddress } from "@sheetcraft/core/formula";
 import {
   createWorkbookEvaluator,
   getActiveSheet,
   type CellRange,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import {
   formatRangeReference,

@@ -76,7 +76,7 @@ function flip(axis: "horizontal" | "vertical"): void {
 .picture-rotation {
   @include ribbon.tool;
   &__menu {
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
   }
 }
 </style>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Star } from "lucide-vue-next";
-import type { SheetCustomPaperSize } from "@idea10/core/page-setup";
+import type { SheetCustomPaperSize } from "@sheetcraft/core/page-setup";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import type { PageMargins } from "../page-margin-presets";
@@ -73,8 +73,8 @@ const preview = computed(() => {
 .page-margins-option {
   display: flex;
   align-items: center;
-  gap: var(--idea-space-2);
-  padding-block: var(--idea-space-2);
+  gap: var(--sheetcraft-space-2);
+  padding-block: var(--sheetcraft-space-2);
 
   &__preview {
     position: relative;
@@ -85,7 +85,7 @@ const preview = computed(() => {
     height: 64px;
 
     &--selected {
-      background: var(--idea-surface-hover);
+      background: var(--sheetcraft-surface-hover);
     }
   }
 
@@ -93,13 +93,13 @@ const preview = computed(() => {
     width: 44px;
     height: 52px;
     rect {
-      fill: var(--idea-surface-panel);
-      stroke: var(--idea-text-primary);
+      fill: var(--sheetcraft-surface-panel);
+      stroke: var(--sheetcraft-text-primary);
       stroke-width: 1;
     }
     path {
       fill: none;
-      stroke: var(--idea-action-primary);
+      stroke: var(--sheetcraft-action-primary);
       stroke-width: 0.75;
     }
   }
@@ -110,15 +110,15 @@ const preview = computed(() => {
     bottom: 2px;
     width: 18px;
     height: 18px;
-    fill: var(--idea-surface-panel);
-    stroke: var(--idea-text-primary);
+    fill: var(--sheetcraft-surface-panel);
+    stroke: var(--sheetcraft-text-primary);
   }
 
   &__details {
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: var(--idea-space-1);
+    gap: var(--sheetcraft-space-1);
   }
 
   &__name {
@@ -128,8 +128,8 @@ const preview = computed(() => {
   &__values {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: var(--idea-space-4);
-    row-gap: var(--idea-space-1);
+    column-gap: var(--sheetcraft-space-4);
+    row-gap: var(--sheetcraft-space-1);
     font-variant-numeric: tabular-nums;
   }
 }

@@ -133,16 +133,16 @@ function apply(): void {
     @include fill-dialog.subdued-text;
     display: flex;
     align-items: flex-start;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
 
     > svg {
       flex: none;
-      margin-top: var(--idea-space-1);
+      margin-top: var(--sheetcraft-space-1);
     }
   }
 
   &__error {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 
   &__reference {

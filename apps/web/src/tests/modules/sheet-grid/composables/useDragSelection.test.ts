@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { effectScope } from "vue";
-import { createCellSelection } from "@idea10/sheet-engine/selection";
+import { createCellSelection } from "@sheetcraft/sheet-engine/selection";
 import { useDragSelection } from "../../../../modules/sheet-grid/composables/useDragSelection";
 
 describe("useDragSelection", () => {

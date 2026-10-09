@@ -1,6 +1,6 @@
-import type { CellAddress } from "@idea10/core/workbook";
-import type { SheetPageSetup } from "@idea10/core/page-setup";
-import type { SelectionMode } from "@idea10/sheet-engine/selection";
+import type { CellAddress } from "@sheetcraft/core/workbook";
+import type { SheetPageSetup } from "@sheetcraft/core/page-setup";
+import type { SelectionMode } from "@sheetcraft/sheet-engine/selection";
 
 export type PageBreakAction = "insert" | "remove" | "reset";
 export type PageSetupTab = "page" | "margins" | "header-footer" | "sheet";

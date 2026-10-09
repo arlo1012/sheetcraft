@@ -1,4 +1,4 @@
-import type { CellBorder, CellBorderLineStyle } from "@idea10/core/style";
+import type { CellBorder, CellBorderLineStyle } from "@sheetcraft/core/style";
 
 export type BorderLinePresentation = Readonly<{
   thickness: number;

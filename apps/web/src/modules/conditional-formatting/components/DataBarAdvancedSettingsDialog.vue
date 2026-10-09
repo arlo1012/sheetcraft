@@ -156,13 +156,13 @@ watch(
     align-items: center;
     gap: 12px;
     margin: 0;
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
-    font-weight: var(--idea-font-weight-semibold);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
+    font-weight: var(--sheetcraft-font-weight-semibold);
     &::after {
       content: "";
       flex: 1;
-      border-top: 1px solid var(--idea-border-subtle);
+      border-top: 1px solid var(--sheetcraft-border-subtle);
     }
   }
 

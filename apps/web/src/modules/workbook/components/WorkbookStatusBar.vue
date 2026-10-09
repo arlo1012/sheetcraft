@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
-import type { SelectionSummary } from "@idea10/core/selection-summary";
-import type { Sheet, SheetProperties } from "@idea10/core/workbook";
+import type { SelectionSummary } from "@sheetcraft/core/selection-summary";
+import type { Sheet, SheetProperties } from "@sheetcraft/core/workbook";
 import { useStatusBarSettings } from "../composables/useStatusBarSettings";
 import { useSheetTabsWidth } from "../composables/useSheetTabsWidth";
 import { formatStatusBarNumber } from "../status-bar-number-format";
@@ -242,10 +242,10 @@ function formatNumber(value: number): string {
   grid-template-rows: 26px 22px;
   min-width: 0;
   min-height: 48px;
-  background: var(--idea-sheet-bar-surface);
-  color: var(--idea-text-secondary);
-  font-size: var(--idea-font-size-body-small);
-  line-height: var(--idea-line-height-body-small);
+  background: var(--sheetcraft-sheet-bar-surface);
+  color: var(--sheetcraft-text-secondary);
+  font-size: var(--sheetcraft-font-size-body-small);
+  line-height: var(--sheetcraft-line-height-body-small);
 
   &__top-row,
   &__bottom-row {
@@ -256,7 +256,7 @@ function formatNumber(value: number): string {
     display: flex;
     align-items: stretch;
     overflow: hidden;
-    background: var(--idea-sheet-bar-surface);
+    background: var(--sheetcraft-sheet-bar-surface);
   }
 
   &__sheets {
@@ -280,7 +280,7 @@ function formatNumber(value: number): string {
       width: 2px;
       height: 8px;
       border-radius: 1px;
-      background: var(--idea-sheet-bar-thumb);
+      background: var(--sheetcraft-sheet-bar-thumb);
       transform: translateY(-50%);
       content: "";
     }
@@ -292,12 +292,12 @@ function formatNumber(value: number): string {
 
       &::after {
         height: 12px;
-        background: var(--idea-sheet-bar-thumb-hover);
+        background: var(--sheetcraft-sheet-bar-thumb-hover);
       }
     }
 
     &:focus-visible::after {
-      background: var(--idea-action-primary);
+      background: var(--sheetcraft-action-primary);
     }
   }
 
@@ -314,7 +314,7 @@ function formatNumber(value: number): string {
     display: grid;
     grid-template-columns: 30px minmax(0, 1fr);
     align-items: center;
-    border-top: 1px solid var(--idea-sheet-bar-border);
+    border-top: 1px solid var(--sheetcraft-sheet-bar-border);
   }
 
   &__metrics {
@@ -351,7 +351,7 @@ function formatNumber(value: number): string {
       min-width: 0;
       margin: 0;
       overflow: hidden;
-      color: var(--idea-text-primary);
+      color: var(--sheetcraft-text-primary);
       text-overflow: ellipsis;
     }
   }
@@ -359,7 +359,7 @@ function formatNumber(value: number): string {
   &__view-controls {
     flex: 0 0 auto;
     margin-left: auto;
-    border-left: 1px solid var(--idea-border-subtle);
+    border-left: 1px solid var(--sheetcraft-border-subtle);
   }
 
   @media (max-width: 480px) {

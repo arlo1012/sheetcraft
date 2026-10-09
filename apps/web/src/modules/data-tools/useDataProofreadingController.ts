@@ -3,10 +3,10 @@ import {
   createApplyDataProofreadingCommand,
   scanDataProofreading,
   type DataProofreadingIssue as CoreDataProofreadingIssue,
-} from "@idea10/core/data-proofreading";
-import { formatCellAddress } from "@idea10/core/coordinates";
-import type { WorkbookCommand } from "@idea10/core/commands";
-import { WorkbookDomainError } from "@idea10/core/errors";
+} from "@sheetcraft/core/data-proofreading";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
 import {
   getActiveSheet,
   MAX_SHEET_COLUMNS,
@@ -14,7 +14,7 @@ import {
   type CellAddress,
   type CellRange,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import {
   formatRangeReference,

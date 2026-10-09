@@ -1,21 +1,21 @@
 import { computed, readonly, ref, shallowRef } from "vue";
-import { formatFormulaAddress } from "@idea10/core/formula";
-import { formatComputedValueForDisplay, parseCellContent } from "@idea10/core/input";
-import type { CellContentChange } from "@idea10/core/commands";
-import { isTextCellNumberFormat } from "@idea10/core/number-format";
+import { formatFormulaAddress } from "@sheetcraft/core/formula";
+import { formatComputedValueForDisplay, parseCellContent } from "@sheetcraft/core/input";
+import type { CellContentChange } from "@sheetcraft/core/commands";
+import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
 import {
   findCellsByText,
   buildSheetTextReplacements,
   findSheetTextReplacementAddresses,
   type SheetSearchDirection,
   type SheetSearchFormat,
-} from "@idea10/core/search";
+} from "@sheetcraft/core/search";
 import {
   getWorkbookSheets,
   type CellAddress,
   type SheetEvaluator,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useAppI18n, type MessageKey, type MessageParams } from "../../../shared/i18n";
 import {
   DEFAULT_WORKBOOK_FIND_OPTIONS,

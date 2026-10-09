@@ -5,7 +5,7 @@ import {
   MAX_ROW_HEIGHT,
   getColumnWidth,
   getRowHeight,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { getCanvasLayout, mountSheetGrid, triggerAxisResize, triggerCell } from "./fixture";
 

@@ -3,7 +3,7 @@ import { DOMWrapper, mount } from "@vue/test-utils";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import CellFormatDialog from "../../../modules/cell-format/components/CellFormatDialog.vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { createBuiltinCellStyles } from "@idea10/core/cell-styles";
+import { createBuiltinCellStyles } from "@sheetcraft/core/cell-styles";
 import { createAppI18n } from "../../../shared/i18n";
 import CellStyleGallery from "../../../modules/cell-styles/components/CellStyleGallery.vue";
 import CellStylesMenu from "../../../modules/cell-styles/components/CellStylesMenu.vue";

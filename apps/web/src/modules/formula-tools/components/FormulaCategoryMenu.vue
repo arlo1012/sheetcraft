@@ -176,7 +176,7 @@ watch(open, (isOpen) => {
     max-height: min(360px, calc(100vh - 24px));
 
     &--searchable {
-      width: min(320px, calc(100vw - var(--idea-space-4) - var(--idea-space-4)));
+      width: min(320px, calc(100vw - var(--sheetcraft-space-4) - var(--sheetcraft-space-4)));
     }
   }
 
@@ -187,9 +187,9 @@ watch(open, (isOpen) => {
 
   &__empty {
     padding: 6px 14px;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
     list-style: none;
   }
 
@@ -202,9 +202,9 @@ watch(open, (isOpen) => {
     display: inline;
     max-width: 240px;
     overflow: hidden;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
     text-overflow: ellipsis;
     white-space: nowrap;
 

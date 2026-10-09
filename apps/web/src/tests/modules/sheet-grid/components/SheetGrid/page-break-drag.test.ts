@@ -4,13 +4,13 @@ import {
   cloneSheetPageSetup,
   DEFAULT_SHEET_PAGE_SETUP,
   type SheetPageSetup,
-} from "@idea10/core/page-setup";
-import { createSetSheetPageSetupCommand } from "@idea10/core/commands";
+} from "@sheetcraft/core/page-setup";
+import { createSetSheetPageSetupCommand } from "@sheetcraft/core/commands";
 import {
   executeWorkbookCommand,
   undoWorkbookCommand,
   redoWorkbookCommand,
-} from "@idea10/core/history";
+} from "@sheetcraft/core/history";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import type { PageViewPaintState } from "../../../../../modules/page-layout/page-view-types";
 import { activeCell, getSheetRenderFrame, mountSheetGrid, triggerCell } from "./fixture";

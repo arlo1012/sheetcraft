@@ -10,12 +10,12 @@ import {
   setCellStyle,
   setCellValue,
   type SheetEvaluator,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   createAxisSelection,
   createCellSelection,
   type CellSelection,
-} from "@idea10/sheet-engine/selection";
+} from "@sheetcraft/sheet-engine/selection";
 import type {
   GridClipboardPort,
   GridClipboardTransfer,

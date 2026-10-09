@@ -1,6 +1,6 @@
 import { flushPromises } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
-import { getCellContent } from "@idea10/core/workbook";
+import { getCellContent } from "@sheetcraft/core/workbook";
 import FormulaEditorDialog from "../../../../modules/formula-tools/components/FormulaEditorDialog.vue";
 import SheetGrid from "../../../../modules/sheet-grid/components/SheetGrid.vue";
 import WorkbookFormulaBar from "../../../../modules/workbook/components/WorkbookFormulaBar.vue";

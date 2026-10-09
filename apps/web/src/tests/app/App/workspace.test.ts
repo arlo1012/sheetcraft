@@ -5,7 +5,7 @@ import App from "../../../app/App.vue";
 import LocaleSwitcher from "../../../app/LocaleSwitcher.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import SheetSurface from "../../../modules/sheet-grid/components/SheetSurface.vue";
-import { getCellStyle } from "@idea10/core/workbook";
+import { getCellStyle } from "@sheetcraft/core/workbook";
 import { createAppI18n, type AppLocale } from "../../../shared/i18n";
 import { triggerCanvasCell, triggerCanvasCorner, triggerCanvasHeader } from "../canvas-interaction";
 
@@ -56,7 +56,7 @@ describe("App", () => {
   test("mounts the spreadsheet workspace", () => {
     const wrapper = mountApp();
 
-    expect(wrapper.get("[data-app-root]").attributes("aria-label")).toBe("idea10 workspace");
+    expect(wrapper.get("[data-app-root]").attributes("aria-label")).toBe("Sheetcraft workspace");
     expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet1 worksheet");
     expect(wrapper.get('[role="grid"]').attributes("aria-rowcount")).toBe("100");
     expect(wrapper.get('[role="grid"]').attributes("aria-colcount")).toBe("26");
@@ -234,7 +234,7 @@ describe("App", () => {
     localeSelect.vm.$emit("change", "zh-CN");
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.get("[data-app-root]").attributes("aria-label")).toBe("idea10 工作区");
+    expect(wrapper.get("[data-app-root]").attributes("aria-label")).toBe("Sheetcraft 工作区");
     expect(wrapper.get("section.sheet-grid").attributes("aria-label")).toBe("Sheet1 工作表");
     expect(wrapper.get(".spreadsheet-ribbon").attributes("aria-label")).toBe("工作簿工具");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("开始");

@@ -1,4 +1,4 @@
-import type { ConsolidateFunction } from "@idea10/core/commands";
+import type { ConsolidateFunction } from "@sheetcraft/core/commands";
 
 export type ConsolidateDraft = {
   sources: string[];

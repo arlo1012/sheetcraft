@@ -196,7 +196,7 @@ function selectHighlightColor(value: string | null): void {
   align-items: center;
   height: 100%;
   &.is-status {
-    border-radius: var(--idea-radius-small);
+    border-radius: var(--sheetcraft-radius-small);
     &.is-active {
       background: var(--highlight-background);
       color: var(--highlight-foreground);
@@ -204,7 +204,7 @@ function selectHighlightColor(value: string | null): void {
   }
   &.is-ribbon {
     align-self: stretch;
-    height: var(--idea-ribbon-content-height, 54px);
+    height: var(--sheetcraft-ribbon-content-height, 54px);
   }
   &__status-button,
   &__color-trigger {

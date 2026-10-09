@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, useId, watchEffect } from "vue";
-import type { ImageTransform } from "@idea10/core/workbook";
+import type { ImageTransform } from "@sheetcraft/core/workbook";
 import { createPictureCanvas } from "../../../shared/images/imageAppearance";
 import { getSheetImagePresentation } from "./sheetImagePresentation";
 

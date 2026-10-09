@@ -6,15 +6,15 @@ import {
   executeWorkbookCommand,
   redoWorkbookCommand,
   undoWorkbookCommand,
-} from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createSheet,
   getActiveSheet,
   setCellContent,
   type CellRange,
   type SheetDataValidation,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useDropdownListController } from "../../../../modules/data-tools/useDropdownListController";
 

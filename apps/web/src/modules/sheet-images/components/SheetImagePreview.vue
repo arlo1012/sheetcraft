@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { createPictureCanvas } from "../../../shared/images/imageAppearance";
-import type { ImageTransform } from "@idea10/core/workbook";
+import type { ImageTransform } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   createSheetImagePresentationBlobUrl,

@@ -1,4 +1,4 @@
-import type { SheetPaperSize } from "@idea10/core/page-setup";
+import type { SheetPaperSize } from "@sheetcraft/core/page-setup";
 import type { MessageKey } from "../../shared/i18n";
 
 export const PAGE_PAPER_LABELS = {

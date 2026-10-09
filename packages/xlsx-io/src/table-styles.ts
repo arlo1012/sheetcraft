@@ -4,13 +4,13 @@ import {
   TABLE_STYLE_ELEMENTS,
   type TableStyleDefinition,
   type TableStyleElementFormat,
-} from "@idea10/core/table-styles";
+} from "@sheetcraft/core/table-styles";
 import {
   PIVOT_TABLE_STYLE_ELEMENTS,
   type PivotTableStyleDefinition,
-} from "@idea10/core/pivot-table-styles";
-import type { CellRange, SheetFilter, SheetTable } from "@idea10/core/workbook";
-import type { CellBorder } from "@idea10/core/style";
+} from "@sheetcraft/core/pivot-table-styles";
+import type { CellRange, SheetFilter, SheetTable } from "@sheetcraft/core/workbook";
+import type { CellBorder } from "@sheetcraft/core/style";
 import { readXlsxDxfEntries, readXlsxDxfStyle, xlsxDxfXml } from "./conditional-formatting.js";
 import { readXlsxAutoFilter, writeXlsxAutoFilter } from "./data-tools-metadata.js";
 
@@ -353,7 +353,7 @@ export function xlsxPivotTableStyleId(name: string | undefined): string | undefi
 
 function xlsxStyleName(style: TableStyleDefinition): string {
   return /^(?:Light|Medium|Dark) \d+$|^TableStyle(?:Light|Medium|Dark)\d+$/i.test(style.name)
-    ? `Idea10 ${style.name}`
+    ? `Sheetcraft ${style.name}`
     : style.name;
 }
 
@@ -441,7 +441,7 @@ function writeTableStyles(
   for (const style of customPivots) {
     const existing = entriesByName.get(style.name.toLowerCase());
     const conflicts = existing && hasConflictingSharedElements(existing.elements, style.elements);
-    const name = conflicts ? nextAvailableName(`Idea10 Pivot ${style.name}`) : style.name;
+    const name = conflicts ? nextAvailableName(`Sheetcraft Pivot ${style.name}`) : style.name;
     pivotStyleNames.set(style.id, name);
     const entry = entriesByName.get(name.toLowerCase());
     if (entry) {

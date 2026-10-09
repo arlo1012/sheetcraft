@@ -1,8 +1,8 @@
 import { defineComponent, h, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createWorkbook, getActiveSheet, getCellContent } from "@idea10/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { createWorkbook, getActiveSheet, getCellContent } from "@sheetcraft/core/workbook";
 import { useCellEditSession } from "../../../shared/cell-editing/useCellEditSession";
 import { createAppI18n } from "../../../shared/i18n";
 import { useFormulaEditorController } from "../../../modules/formula-tools/useFormulaEditorController";

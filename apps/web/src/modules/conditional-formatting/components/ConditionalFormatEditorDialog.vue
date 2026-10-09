@@ -8,9 +8,9 @@ import {
   type ConditionalFormatIconThreshold,
   type ConditionalFormatThreshold,
   type SheetConditionalFormatRule,
-} from "@idea10/core/conditional-formatting";
-import { translateFormulaForCopy } from "@idea10/core/formula";
-import { toWorkbookErrorData } from "@idea10/core/errors";
+} from "@sheetcraft/core/conditional-formatting";
+import { translateFormulaForCopy } from "@sheetcraft/core/formula";
+import { toWorkbookErrorData } from "@sheetcraft/core/errors";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -1066,13 +1066,13 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
   }
   h3 {
     margin: 0;
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
-    font-weight: var(--idea-font-weight-semibold);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
+    font-weight: var(--sheetcraft-font-weight-semibold);
   }
   &__description {
     margin: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__formula {
     display: grid;
@@ -1101,7 +1101,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     gap: 8px;
     > span:first-child {
       text-align: right;
-      color: var(--idea-text-secondary);
+      color: var(--sheetcraft-text-secondary);
     }
   }
   &__thresholds {
@@ -1126,7 +1126,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     gap: 8px;
     align-items: center;
     text-align: right;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__threshold-column {
     display: grid;
@@ -1171,7 +1171,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     }
   }
   &__error {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
     margin: 0;
   }
 }

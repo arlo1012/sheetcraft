@@ -189,7 +189,7 @@ function checkFile(root: string, file: string, violations: WebUiViolation[]): vo
       file,
       source,
       match.index ?? 0,
-      "Use an --idea-layer-* token for global overlays; numeric z-index values above 30 are reserved.",
+      "Use an --sheetcraft-layer-* token for global overlays; numeric z-index values above 30 are reserved.",
     );
   }
 }

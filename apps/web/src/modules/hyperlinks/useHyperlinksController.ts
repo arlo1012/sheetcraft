@@ -1,12 +1,12 @@
-import { canUseSheetPermission } from "@idea10/core";
+import { canUseSheetPermission } from "@sheetcraft/core";
 import { nextTick, ref, shallowRef, watch } from "vue";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
-import { formatCellContentForInput } from "@idea10/core/input";
+import { formatCellContentForInput } from "@sheetcraft/core/input";
 import {
   createSetCellHyperlinkCommand,
   createMarkCellHyperlinkVisitedCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
+} from "@sheetcraft/core/commands";
 import {
   getCellContent,
   getCellHyperlink,
@@ -14,7 +14,7 @@ import {
   type CellAddress,
   type Sheet,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
 

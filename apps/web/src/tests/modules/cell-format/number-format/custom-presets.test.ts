@@ -1,4 +1,4 @@
-import { validateCellNumberFormatCode } from "@idea10/core/number-format";
+import { validateCellNumberFormatCode } from "@sheetcraft/core/number-format";
 import { describe, expect, test } from "vitest";
 import { getCustomFormatPresets } from "../../../../modules/cell-format/number-format/custom-presets";
 

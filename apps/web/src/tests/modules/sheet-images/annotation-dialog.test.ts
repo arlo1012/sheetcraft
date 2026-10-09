@@ -1,6 +1,6 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, expect, test, vi } from "vitest";
-import type { FloatingImage } from "@idea10/core/workbook";
+import type { FloatingImage } from "@sheetcraft/core/workbook";
 import PictureAnnotationDialog from "../../../modules/sheet-images/components/PictureAnnotationDialog.vue";
 import { createAppI18n } from "../../../shared/i18n";
 

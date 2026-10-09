@@ -2,9 +2,13 @@
 import { computed, nextTick, onMounted, ref, toRaw } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { TabPanel, Tabs } from "tdesign-vue-next/es/tabs";
-import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
-import type { CellFormatChange } from "@idea10/core/commands";
-import type { SelectionBorderState, SelectionCellStyleState } from "@idea10/core/style-state";
+import type {
+  CellBorderAction,
+  CellBorderFormatPatch,
+  CellStylePatch,
+} from "@sheetcraft/core/style";
+import type { CellFormatChange } from "@sheetcraft/core/commands";
+import type { SelectionBorderState, SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import CellFormatAlignmentPanel from "./CellFormatAlignmentPanel.vue";
 import CellFormatBorderPanel from "./CellFormatBorderPanel.vue";

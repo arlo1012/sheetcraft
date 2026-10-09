@@ -1,13 +1,13 @@
 import { defineComponent, h, ref } from "vue";
 import { mount } from "@vue/test-utils";
-import { serializeWorkbook, type WorkbookSnapshot } from "@idea10/core/serialization";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { serializeWorkbook, type WorkbookSnapshot } from "@sheetcraft/core/serialization";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createWorkbook,
   getActiveSheet,
   setCellContent,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   useWorkbookPersistence,
   type UseWorkbookPersistenceOptions,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { CellBorderAction } from "@idea10/core/style";
+import type { CellBorderAction } from "@sheetcraft/core/style";
 
 const props = defineProps<{ preset: CellBorderAction["preset"] }>();
 
@@ -68,9 +68,9 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
 <style scoped lang="scss">
 .cell-border-preset-icon {
   display: block;
-  width: var(--idea-icon-size, 18px);
-  height: var(--idea-icon-size, 18px);
-  stroke-width: var(--idea-icon-stroke-width);
+  width: var(--sheetcraft-icon-size, 18px);
+  height: var(--sheetcraft-icon-size, 18px);
+  stroke-width: var(--sheetcraft-icon-stroke-width);
   stroke-linecap: square;
 
   &__guide {

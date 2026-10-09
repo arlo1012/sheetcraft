@@ -1,8 +1,8 @@
 import ExcelJSImport from "exceljs/dist/exceljs.min.js";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
-import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
-import { createWorkbook, setCellContent, setCellStyle } from "@idea10/core/workbook";
-import { createBuiltinTableStyles } from "@idea10/core/table-styles";
+import { createSheetFilterHiddenRowIntervals } from "@sheetcraft/core/commands";
+import { createWorkbook, setCellContent, setCellStyle } from "@sheetcraft/core/workbook";
+import { createBuiltinTableStyles } from "@sheetcraft/core/table-styles";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../index.js";
 

@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { createWorkbook, getActiveSheet, type FloatingImage } from "@idea10/core/workbook";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createWorkbook, getActiveSheet, type FloatingImage } from "@sheetcraft/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { useFloatingImageClipboard } from "../../../../modules/sheet-images/useFloatingImageClipboard";
 
 function fixture() {

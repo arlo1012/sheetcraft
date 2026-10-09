@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { SheetPivotTable } from "@idea10/core/pivot-tables";
+import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import { getPivotActiveField } from "../../../modules/pivot-tables/pivot-active-field";
 import { fixture } from "./fixture";
 

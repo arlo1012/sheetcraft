@@ -4,8 +4,8 @@ import { Button } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input } from "tdesign-vue-next/es/input";
 import { TabPanel, Tabs } from "tdesign-vue-next/es/tabs";
-import type { SheetSearchFormat } from "@idea10/core/search";
-import type { SheetGoToOptions } from "@idea10/core/go-to";
+import type { SheetSearchFormat } from "@sheetcraft/core/search";
+import type { SheetGoToOptions } from "@sheetcraft/core/go-to";
 import WorkbookFindFormatControl from "./WorkbookFindFormatControl.vue";
 import WorkbookFindCriteria from "./WorkbookFindCriteria.vue";
 import WorkbookGoToPanel from "./WorkbookGoToPanel.vue";
@@ -257,8 +257,8 @@ defineExpose({ focusQuery });
   min-width: 0;
   &__pane {
     display: grid;
-    gap: var(--idea-space-4);
-    padding-top: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
+    padding-top: var(--sheetcraft-space-4);
     min-width: 0;
   }
   &__replacement {
@@ -268,19 +268,19 @@ defineExpose({ focusQuery });
       grid-template-columns: 6em minmax(0, 1fr) 108px auto;
     }
     align-items: center;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__actions {
     display: flex;
     justify-content: flex-end;
     align-items: center;
     flex-wrap: wrap;
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
   &__status {
     margin: 0;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
     overflow-wrap: anywhere;
   }
 }

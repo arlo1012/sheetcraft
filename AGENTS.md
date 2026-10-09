@@ -1,4 +1,4 @@
-# idea10 Agent Protocol
+# Sheetcraft Agent Protocol
 
 ## Scope
 

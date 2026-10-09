@@ -1,7 +1,7 @@
-import { createSortCellColorResolver, getSortCellColor } from "@idea10/core/commands";
-import { DEFAULT_CELL_TEXT_COLOR } from "@idea10/core/style";
-import type { ExcelDateSystem } from "@idea10/core/formula";
-import type { CellRange, Sheet, SheetEvaluator } from "@idea10/core/workbook";
+import { createSortCellColorResolver, getSortCellColor } from "@sheetcraft/core/commands";
+import { DEFAULT_CELL_TEXT_COLOR } from "@sheetcraft/core/style";
+import type { ExcelDateSystem } from "@sheetcraft/core/formula";
+import type { CellRange, Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import type { SortColorColumn } from "./data-tools-types";
 
 type SortColorOptions = { dateSystem?: ExcelDateSystem };

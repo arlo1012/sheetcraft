@@ -2,8 +2,8 @@
 import { computed, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
-import { getPivotTableSource, normalizePivotTable } from "@idea10/core/pivot-tables";
-import type { Workbook } from "@idea10/core/workbook";
+import { getPivotTableSource, normalizePivotTable } from "@sheetcraft/core/pivot-tables";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import type { PivotDraft } from "../usePivotActions";
 import { resolvePivotDraftSource } from "../pivot-draft-source";
 import { useAppI18n } from "../../../shared/i18n";

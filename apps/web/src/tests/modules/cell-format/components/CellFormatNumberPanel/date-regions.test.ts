@@ -1,8 +1,8 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
-import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
-import type { CellStylePatch } from "@idea10/core/style";
-import { formatCellNumberValue, getNumberFormatLocaleId } from "@idea10/core/number-format";
+import { createDefaultSelectionCellStyleState } from "@sheetcraft/core/style-state";
+import type { CellStylePatch } from "@sheetcraft/core/style";
+import { formatCellNumberValue, getNumberFormatLocaleId } from "@sheetcraft/core/number-format";
 import CellFormatNumberPanel from "../../../../../modules/cell-format/components/CellFormatNumberPanel.vue";
 import { getDateFormatPresets } from "../../../../../shared/number-format/date-presets";
 import { createAppI18n } from "../../../../../shared/i18n";

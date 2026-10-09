@@ -1,5 +1,5 @@
-import type { ConditionalFormatIconSet } from "@idea10/core/conditional-formatting";
-import { createWorkbook, getActiveSheet } from "@idea10/core/workbook";
+import type { ConditionalFormatIconSet } from "@sheetcraft/core/conditional-formatting";
+import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../index.js";

@@ -1,7 +1,7 @@
 import { defineComponent, h } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
 import { mount } from "@vue/test-utils";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   getCellContent,
   getCellStyle,
@@ -10,8 +10,8 @@ import {
   setCellValue,
   type CellAddress,
   type CellRange,
-} from "@idea10/core/workbook";
-import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
+} from "@sheetcraft/core/workbook";
+import { createSheetGridViewState } from "@sheetcraft/sheet-engine/view-state";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import { createAppI18n } from "../../../shared/i18n";
 

@@ -3,7 +3,7 @@ import { computed, type CSSProperties } from "vue";
 import type {
   FloatingImageResizeDirection,
   FloatingImageViewportFragment,
-} from "@idea10/sheet-engine/floating-image-layout";
+} from "@sheetcraft/sheet-engine/floating-image-layout";
 import { useAppI18n, type MessageKey } from "../i18n";
 
 const props = defineProps<{
@@ -107,7 +107,7 @@ const handleStyle = computed<CSSProperties>(() => ({
     inset: 2px;
     box-sizing: border-box;
     border: 2px solid white;
-    background: var(--idea-action-primary);
+    background: var(--sheetcraft-action-primary);
     box-shadow: 0 0 1px 1px rgb(0 0 0 / 12%);
     content: "";
   }

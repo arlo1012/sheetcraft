@@ -1,5 +1,5 @@
-import type { FrozenPaneId } from "@idea10/sheet-engine/frozen-layout";
-import type { PageBreak, SheetPagination } from "@idea10/sheet-engine/page-layout";
+import type { FrozenPaneId } from "@sheetcraft/sheet-engine/frozen-layout";
+import type { PageBreak, SheetPagination } from "@sheetcraft/sheet-engine/page-layout";
 import { createCanvasPixelGrid } from "../../../shared/canvas/pixel-grid";
 import type { SheetRenderFrame } from "../../sheet-grid/rendering/sheet-render-frame";
 

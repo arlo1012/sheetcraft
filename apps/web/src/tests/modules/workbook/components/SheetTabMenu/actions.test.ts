@@ -1,6 +1,6 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import { createSheet } from "@idea10/core/workbook";
+import { createSheet } from "@sheetcraft/core/workbook";
 import SheetTabMenu from "../../../../../modules/workbook/components/SheetTabMenu.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 

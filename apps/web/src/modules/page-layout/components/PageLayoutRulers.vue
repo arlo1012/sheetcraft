@@ -1,8 +1,8 @@
 <script lang="ts">
-import type { CellRange } from "@idea10/core/workbook";
-import { getPagePaperSize, type SheetPageSetup } from "@idea10/core/page-setup";
-import type { SheetPageMargin } from "@idea10/sheet-engine/page-layout";
-import type { Point } from "@idea10/sheet-engine/geometry";
+import type { CellRange } from "@sheetcraft/core/workbook";
+import { getPagePaperSize, type SheetPageSetup } from "@sheetcraft/core/page-setup";
+import type { SheetPageMargin } from "@sheetcraft/sheet-engine/page-layout";
+import type { Point } from "@sheetcraft/sheet-engine/geometry";
 import type { SheetRenderFrame } from "../../sheet-grid/rendering/sheet-render-frame";
 import type { PageMarginDragStart } from "../usePageMarginDrag";
 import type { PageViewPage, PageViewPaintState } from "../page-view-types";
@@ -506,7 +506,7 @@ const tooltipStyle = computed(() => {
   inset: 0;
   z-index: 5;
   pointer-events: none;
-  color: var(--idea-text-secondary);
+  color: var(--sheetcraft-text-secondary);
   &--disabled {
     opacity: 0.55;
   }
@@ -514,13 +514,13 @@ const tooltipStyle = computed(() => {
   &__vertical {
     position: absolute;
     overflow: hidden;
-    background: var(--idea-surface-secondary);
+    background: var(--sheetcraft-surface-secondary);
   }
   &__margin {
-    fill: color-mix(in srgb, var(--idea-text-secondary) 15%, transparent);
+    fill: color-mix(in srgb, var(--sheetcraft-text-secondary) 15%, transparent);
   }
   &__selection {
-    fill: color-mix(in srgb, var(--idea-action-primary) 24%, transparent);
+    fill: color-mix(in srgb, var(--sheetcraft-action-primary) 24%, transparent);
   }
   &__tick {
     stroke: currentcolor;
@@ -532,7 +532,7 @@ const tooltipStyle = computed(() => {
   }
   &__label {
     fill: currentcolor;
-    font-family: var(--idea-font-sans);
+    font-family: var(--sheetcraft-font-sans);
     opacity: 0.75;
   }
   &__marker {
@@ -550,7 +550,7 @@ const tooltipStyle = computed(() => {
       left: 50%;
       width: calc(7px / v-bind(printScale));
       height: calc(5px / v-bind(printScale));
-      background: var(--idea-text-muted);
+      background: var(--sheetcraft-text-muted);
       clip-path: polygon(50% 0, 100% 100%, 0 100%);
       transform: translateX(-50%);
     }
@@ -571,7 +571,7 @@ const tooltipStyle = computed(() => {
     &:focus-visible,
     &.is-active {
       &::after {
-        background: var(--idea-action-primary);
+        background: var(--sheetcraft-action-primary);
       }
     }
   }
@@ -580,9 +580,9 @@ const tooltipStyle = computed(() => {
     z-index: 2;
     padding: 2px 5px;
     border-radius: 2px;
-    border: 1px solid var(--idea-border-strong);
-    background: var(--idea-surface-panel);
-    color: var(--idea-text-primary);
+    border: 1px solid var(--sheetcraft-border-strong);
+    background: var(--sheetcraft-surface-panel);
+    color: var(--sheetcraft-text-primary);
     white-space: nowrap;
   }
 }

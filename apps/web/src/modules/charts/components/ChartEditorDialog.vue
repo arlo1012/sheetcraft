@@ -5,9 +5,9 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input } from "tdesign-vue-next/es/input";
 import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import type { SheetChartDrawing } from "@idea10/core/sheet-drawings";
-import type { ChartType } from "@idea10/core/sheet-charts";
-import type { Sheet, SheetEvaluator, Workbook } from "@idea10/core/workbook";
+import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ChartType } from "@sheetcraft/core/sheet-charts";
+import type { Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import {
@@ -170,7 +170,7 @@ const options = computed(() => types.map((type) => ({ label: t(`chart.${type}`),
     width: 100%;
     height: 260px;
     overflow: hidden;
-    border: 1px solid var(--idea-border-default);
+    border: 1px solid var(--sheetcraft-border-default);
   }
   &__hint,
   &__error {
@@ -178,10 +178,10 @@ const options = computed(() => types.map((type) => ({ label: t(`chart.${type}`),
     font-size: 12px;
   }
   &__hint {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__error {
-    color: var(--idea-color-error);
+    color: var(--sheetcraft-color-error);
   }
 }
 </style>

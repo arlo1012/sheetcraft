@@ -14,20 +14,20 @@ runtime boundary is conventional rather than enforced.
 Use a Bun workspace with these ownership boundaries:
 
 - `apps/web` owns the Vue 3 and TDesign application.
-- `packages/core` publishes `@idea10/core` and owns workbook state, commands,
+- `packages/core` publishes `@sheetcraft/core` and owns workbook state, commands,
   history, serialization, input rules, queries, and domain errors.
-- `packages/sheet-engine` publishes `@idea10/sheet-engine` and owns headless
+- `packages/sheet-engine` publishes `@sheetcraft/sheet-engine` and owns headless
   Sheet geometry, selection, view state, and interaction contracts.
 
 The allowed dependency direction is:
 
 ```text
-apps/web -> @idea10/sheet-engine -> @idea10/core
-apps/web ------------------------> @idea10/core
-worker/server/other frontend ----> @idea10/core
+apps/web -> @sheetcraft/sheet-engine -> @sheetcraft/core
+apps/web ------------------------> @sheetcraft/core
+worker/server/other frontend ----> @sheetcraft/core
 ```
 
-`@idea10/core` and `@idea10/sheet-engine` target ES2022 and are tested without
+`@sheetcraft/core` and `@sheetcraft/sheet-engine` target ES2022 and are tested without
 DOM libraries. They must not import Vue, TDesign, application i18n, browser
 storage, clipboard APIs, or network clients. Runtime capabilities such as ID
 generation are supplied through explicit ports when deterministic or portable

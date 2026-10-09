@@ -1,5 +1,5 @@
-import type { CellFillMode } from "@idea10/core/cell-autofill";
-import { formatCellAddress } from "@idea10/core/coordinates";
+import type { CellFillMode } from "@sheetcraft/core/cell-autofill";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import {
   getCellContent,
   MAX_SHEET_COLUMNS,
@@ -8,15 +8,15 @@ import {
   type CellRange,
   type Sheet,
   type SheetEvaluator,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   getDoubleClickFillRange,
   getFillHandlePoint,
   type FillRange,
   type FillDirection,
-} from "@idea10/sheet-engine/fill-selection";
-import type { Point, Size } from "@idea10/sheet-engine/geometry";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+} from "@sheetcraft/sheet-engine/fill-selection";
+import type { Point, Size } from "@sheetcraft/sheet-engine/geometry";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import { computed, onMounted, onScopeDispose, ref, shallowRef, watch } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type {

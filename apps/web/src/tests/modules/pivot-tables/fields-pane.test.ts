@@ -1,9 +1,9 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h, shallowRef } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
-import type { SheetPivotTable } from "@idea10/core/pivot-tables";
-import { getCellValue, setCellContent } from "@idea10/core/workbook";
-import type { CellContent } from "@idea10/core/formula";
+import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
+import { getCellValue, setCellContent } from "@sheetcraft/core/workbook";
+import type { CellContent } from "@sheetcraft/core/formula";
 import PivotFieldsPane from "../../../modules/pivot-tables/components/PivotFieldsPane.vue";
 import { createAppI18n } from "../../../shared/i18n";
 import { fixture } from "./fixture";

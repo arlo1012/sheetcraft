@@ -31,7 +31,7 @@ const props = withDefaults(
     padding: "none",
     scrollable: true,
     constrainToViewport: true,
-    viewportInset: "var(--idea-space-4)",
+    viewportInset: "var(--sheetcraft-space-4)",
     layer: "menu",
     appearance: "default",
     tabindex: -1,
@@ -58,7 +58,7 @@ defineExpose({ rootElement });
       },
       $attrs.class,
     ]"
-    :style="[{ '--idea-floating-panel-inset': viewportInset }, $attrs.style]"
+    :style="[{ '--sheetcraft-floating-panel-inset': viewportInset }, $attrs.style]"
     :role="role"
     :aria-label="label"
     :tabindex="tabindex"
@@ -76,47 +76,47 @@ defineExpose({ rootElement });
   outline: none;
 
   &--note {
-    color: var(--idea-note-text);
-    background: var(--idea-note-background);
-    border: 1px solid var(--idea-note-border);
+    color: var(--sheetcraft-note-text);
+    background: var(--sheetcraft-note-background);
+    border: 1px solid var(--sheetcraft-note-border);
     border-radius: 0;
     box-shadow: none;
   }
 
   &--padding-compact {
-    padding: var(--idea-space-2);
+    padding: var(--sheetcraft-space-2);
   }
 
   &--padding-menu {
-    padding: var(--idea-menu-padding);
+    padding: var(--sheetcraft-menu-padding);
   }
 
   &--padding-tool {
-    padding: var(--idea-tool-panel-padding);
+    padding: var(--sheetcraft-tool-panel-padding);
   }
 
   &--layer-submenu {
-    z-index: var(--idea-layer-submenu);
+    z-index: var(--sheetcraft-layer-submenu);
   }
 
   &--layer-context-menu {
-    z-index: var(--idea-layer-context-menu);
+    z-index: var(--sheetcraft-layer-context-menu);
   }
 
   &--layer-context-submenu {
-    z-index: var(--idea-layer-context-submenu);
+    z-index: var(--sheetcraft-layer-context-submenu);
   }
 
   &--layer-popover {
-    z-index: var(--idea-layer-popover);
+    z-index: var(--sheetcraft-layer-popover);
   }
 
   &--layer-toolbar {
-    z-index: var(--idea-layer-toolbar);
+    z-index: var(--sheetcraft-layer-toolbar);
   }
 
   &--layer-sheet-menu {
-    z-index: var(--idea-layer-sheet-menu);
+    z-index: var(--sheetcraft-layer-sheet-menu);
   }
 
   &:not(.idea-floating-panel-surface--scrollable) {

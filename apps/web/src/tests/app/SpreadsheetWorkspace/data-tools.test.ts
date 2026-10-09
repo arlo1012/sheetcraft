@@ -4,18 +4,18 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   createSheetFilterHiddenRowIntervals,
   createSetSheetFilterCriteriaCommand,
-} from "@idea10/core/commands";
-import { executeWorkbookCommand } from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
+} from "@sheetcraft/core/commands";
+import { executeWorkbookCommand } from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   getCellContent,
   setCellContent,
   setSheetMetadata,
   type CellAddress,
   type CellRange,
-} from "@idea10/core/workbook";
-import type { CellSelection } from "@idea10/sheet-engine/selection";
-import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
+} from "@sheetcraft/core/workbook";
+import type { CellSelection } from "@sheetcraft/sheet-engine/selection";
+import { createSheetGridViewState } from "@sheetcraft/sheet-engine/view-state";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import { createAppI18n } from "../../../shared/i18n";
 

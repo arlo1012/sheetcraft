@@ -1,9 +1,9 @@
-import { excelSerialToDateParts, type ExcelDateSystem } from "@idea10/core/formula";
+import { excelSerialToDateParts, type ExcelDateSystem } from "@sheetcraft/core/formula";
 import {
   getPivotGroupLabels,
   type PivotFieldGroup,
   type PivotDateGroupUnit,
-} from "@idea10/core/pivot-tables";
+} from "@sheetcraft/core/pivot-tables";
 import { strToU8 } from "fflate/browser";
 import { readPivotCacheValue } from "./pivot-cache-values.js";
 import { attr, child, nodes, parseXml, xml, type XmlNode } from "./pivot-xml.js";

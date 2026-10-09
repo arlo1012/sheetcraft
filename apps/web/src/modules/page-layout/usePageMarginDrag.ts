@@ -1,7 +1,7 @@
 import { nextTick, onBeforeUnmount, ref } from "vue";
-import { cloneSheetPageSetup, type SheetPageSetup } from "@idea10/core/page-setup";
-import { adjustSheetPageMargin, type SheetPageMargin } from "@idea10/sheet-engine/page-layout";
-import type { Point } from "@idea10/sheet-engine/geometry";
+import { cloneSheetPageSetup, type SheetPageSetup } from "@sheetcraft/core/page-setup";
+import { adjustSheetPageMargin, type SheetPageMargin } from "@sheetcraft/sheet-engine/page-layout";
+import type { Point } from "@sheetcraft/sheet-engine/geometry";
 import type { SheetRenderFrame } from "../sheet-grid/rendering/sheet-render-frame";
 import type { PageViewPage, PageViewPaintState } from "./page-view-types";
 

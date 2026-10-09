@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { ThemeColorReference } from "@idea10/core/workbook-theme";
+import type { ThemeColorReference } from "@sheetcraft/core/workbook-theme";
 import {
   CELL_FILL_PATTERNS,
   mergeCellStyle,
@@ -8,8 +8,8 @@ import {
   type CellFillPatternStyle,
   type CellStyle,
   type CellStylePatch,
-} from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+} from "@sheetcraft/core/style";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
 import { getCellFillStyle } from "../../../shared/cell-fill/fill-presentation";
 import { useAppI18n } from "../../../shared/i18n";
@@ -188,13 +188,13 @@ function setGradient(gradient: CellFillGradient): void {
 .cell-format-fill {
   display: grid;
   gap: 4px;
-  color: var(--idea-text-primary);
-  font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
+  color: var(--sheetcraft-text-primary);
+  font-size: var(--sheetcraft-font-size-body-medium);
+  line-height: var(--sheetcraft-line-height-body-medium);
   h3 {
     margin: 0;
     font-size: inherit;
-    font-weight: var(--idea-font-weight-semibold);
+    font-weight: var(--sheetcraft-font-weight-semibold);
   }
   &__layout {
     display: grid;
@@ -214,26 +214,26 @@ function setGradient(gradient: CellFillGradient): void {
   &__effects {
     height: 28px;
     padding: 0 12px;
-    border: 1px solid var(--idea-border-strong);
-    border-radius: var(--idea-radius-default);
-    background: var(--idea-surface-panel);
+    border: 1px solid var(--sheetcraft-border-strong);
+    border-radius: var(--sheetcraft-radius-default);
+    background: var(--sheetcraft-surface-panel);
     color: inherit;
     font: inherit;
     cursor: pointer;
     &:hover {
-      background: var(--idea-surface-hover);
+      background: var(--sheetcraft-surface-hover);
     }
   }
   &__no-fill {
     width: 100%;
     &[aria-pressed="true"] {
-      background: var(--idea-surface-hover);
+      background: var(--sheetcraft-surface-hover);
     }
   }
   &__palette {
     max-width: 100%;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-default);
     overflow: hidden;
   }
   &__pattern {
@@ -261,10 +261,10 @@ function setGradient(gradient: CellFillGradient): void {
     height: 96px;
     min-width: 0;
     overflow: hidden;
-    color: var(--idea-text-muted);
+    color: var(--sheetcraft-text-muted);
     background-color: #fff;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-default);
   }
 }
 @media (max-width: 560px) {

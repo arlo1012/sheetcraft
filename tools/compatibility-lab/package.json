@@ -1,5 +1,5 @@
 {
-  "name": "@idea10/compatibility-lab",
+  "name": "@sheetcraft/compatibility-lab",
   "version": "0.0.0-private",
   "private": true,
   "description": "Isolated Formula.js and ExcelJS qualification probes; not a product dependency.",

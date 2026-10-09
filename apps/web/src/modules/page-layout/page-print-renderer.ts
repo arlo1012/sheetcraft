@@ -1,21 +1,21 @@
-import { isFormulaError, type FormulaValue } from "@idea10/core/formula";
+import { isFormulaError, type FormulaValue } from "@sheetcraft/core/formula";
 import {
   DEFAULT_ROW_HEIGHT,
   getDefaultColumnWidth,
   type Sheet,
   type SheetEvaluator,
-} from "@idea10/core/workbook";
-import type { WorkbookTheme } from "@idea10/core/workbook-theme";
+} from "@sheetcraft/core/workbook";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import {
   DEFAULT_SHEET_PAGE_SETUP,
   cloneSheetPageSetup,
   getSheetHeaderFooterOptions,
   type SheetPageSetup,
-} from "@idea10/core/page-setup";
-import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
-import { createSheetPagination, type SheetPagination } from "@idea10/sheet-engine/page-layout";
-import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
-import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+} from "@sheetcraft/core/page-setup";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import { createSheetPagination, type SheetPagination } from "@sheetcraft/sheet-engine/page-layout";
+import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
+import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import { browserCellTextMeasurer } from "../../shared/cell-text/text-metrics";
 import { createBorderPaintPlan, paintSheetBorders } from "../sheet-grid/canvas/border-painter";
 import {

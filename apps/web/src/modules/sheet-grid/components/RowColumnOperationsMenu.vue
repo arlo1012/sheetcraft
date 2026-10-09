@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { canUseSheetPermission, type SheetProtectionPermission } from "@idea10/core";
+import { canUseSheetPermission, type SheetProtectionPermission } from "@sheetcraft/core";
 import {
   PanelTopDashed,
   PanelBottomDashed,
@@ -29,7 +29,7 @@ import {
   type CellRange,
   type Sheet,
   type SheetDimensionAxis,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import AxisInsertMenuItem from "./AxisInsertMenuItem.vue";
 import SheetDimensionInput from "./SheetDimensionInput.vue";
 import CellOperationDialog from "./CellOperationDialog.vue";
@@ -655,10 +655,10 @@ watch(
   }
 
   &__insert-icon {
-    color: var(--idea-status-success);
+    color: var(--sheetcraft-status-success);
   }
   &__delete-icon {
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 
   &__size-field {
@@ -666,7 +666,7 @@ watch(
     grid-template-columns: minmax(0, 1fr) 200px;
     align-items: center;
     gap: 8px;
-    color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
   }
 }
 </style>

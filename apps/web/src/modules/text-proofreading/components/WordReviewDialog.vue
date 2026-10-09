@@ -6,7 +6,7 @@ import { Input } from "tdesign-vue-next/es/input";
 import { Select, Option } from "tdesign-vue-next/es/select";
 import { PrimaryTable } from "tdesign-vue-next/es/table";
 import type { PrimaryTableCol } from "tdesign-vue-next/es/table/type";
-import { formatCellAddress } from "@idea10/core/coordinates";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { useWordProofreading } from "../useWordProofreading";
@@ -222,7 +222,7 @@ function scan() {
   }
   &__hint,
   &__summary {
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__table {
     height: min(320px, calc(100dvh - 280px));

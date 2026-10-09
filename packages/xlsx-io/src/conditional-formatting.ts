@@ -4,7 +4,7 @@ import {
   MAX_SHEET_ROWS,
   type CellRange,
   type CellAddress,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   conditionalFormatFormulaSources,
   normalizeConditionalFormatRules,
@@ -15,15 +15,15 @@ import {
   type ConditionalFormatTextOperand,
   type ConditionalFormatThreshold,
   type SheetConditionalFormatRule,
-} from "@idea10/core/conditional-formatting";
-import { translateFormulaForCopy } from "@idea10/core/formula";
+} from "@sheetcraft/core/conditional-formatting";
+import { translateFormulaForCopy } from "@sheetcraft/core/formula";
 import {
   CELL_BORDER_LINE_STYLES,
   CELL_FILL_PATTERNS,
   type CellBorder,
   type CellFillGradient,
   type CellFillPatternStyle,
-} from "@idea10/core/style";
+} from "@sheetcraft/core/style";
 import { CompatibilityReportBuilder } from "./report.js";
 import { fromExcelNumberFormat, toExcelNumberFormat } from "./number-format.js";
 

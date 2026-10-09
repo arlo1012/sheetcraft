@@ -1,8 +1,8 @@
 import { mount } from "@vue/test-utils";
-import { createSetCellContentCommand } from "@idea10/core/commands";
-import { createWorkbookSession, executeWorkbookCommand } from "@idea10/core/history";
-import { getActiveSheet, type CellRange } from "@idea10/core/workbook";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import { createSetCellContentCommand } from "@sheetcraft/core/commands";
+import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
+import { getActiveSheet, type CellRange } from "@sheetcraft/core/workbook";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import { defineComponent, ref } from "vue";
 import { describe, expect, test, vi } from "vitest";
 import { useSheetAutoFill } from "../../../../../modules/sheet-grid/composables/useSheetAutoFill";

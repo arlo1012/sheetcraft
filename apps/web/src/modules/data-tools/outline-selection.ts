@@ -3,8 +3,8 @@ import type {
   Sheet,
   SheetDimensionAxis,
   SheetOutlineGroup,
-} from "@idea10/core/workbook";
-import type { SelectionMode } from "@idea10/sheet-engine/selection";
+} from "@sheetcraft/core/workbook";
+import type { SelectionMode } from "@sheetcraft/sheet-engine/selection";
 
 export type OutlineSelection = { range: CellRange; mode?: SelectionMode };
 

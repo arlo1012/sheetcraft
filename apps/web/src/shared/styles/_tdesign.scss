@@ -4,194 +4,194 @@
 // here so feature styles never depend on its internal token names or DOM structure.
 :root {
   --td-comp-size-m: 28px;
-  --td-brand-color-1: var(--idea-palette-brand-1);
-  --td-brand-color-2: var(--idea-palette-brand-2);
-  --td-brand-color-3: var(--idea-palette-brand-3);
-  --td-brand-color-4: var(--idea-palette-brand-4);
-  --td-brand-color-5: var(--idea-palette-brand-5);
-  --td-brand-color-6: var(--idea-palette-brand-6);
-  --td-brand-color-7: var(--idea-palette-brand-7);
-  --td-brand-color-8: var(--idea-palette-brand-8);
-  --td-brand-color-9: var(--idea-palette-brand-9);
-  --td-brand-color-10: var(--idea-palette-brand-10);
-  --td-warning-color-1: var(--idea-palette-warning-1);
-  --td-warning-color-2: var(--idea-palette-warning-2);
-  --td-warning-color-3: var(--idea-palette-warning-3);
-  --td-warning-color-4: var(--idea-palette-warning-4);
-  --td-warning-color-5: var(--idea-palette-warning-5);
-  --td-warning-color-6: var(--idea-palette-warning-6);
-  --td-warning-color-7: var(--idea-palette-warning-7);
-  --td-warning-color-8: var(--idea-palette-warning-8);
-  --td-warning-color-9: var(--idea-palette-warning-9);
-  --td-warning-color-10: var(--idea-palette-warning-10);
-  --td-error-color-1: var(--idea-palette-error-1);
-  --td-error-color-2: var(--idea-palette-error-2);
-  --td-error-color-3: var(--idea-palette-error-3);
-  --td-error-color-4: var(--idea-palette-error-4);
-  --td-error-color-5: var(--idea-palette-error-5);
-  --td-error-color-6: var(--idea-palette-error-6);
-  --td-error-color-7: var(--idea-palette-error-7);
-  --td-error-color-8: var(--idea-palette-error-8);
-  --td-error-color-9: var(--idea-palette-error-9);
-  --td-error-color-10: var(--idea-palette-error-10);
-  --td-success-color-1: var(--idea-palette-success-1);
-  --td-success-color-2: var(--idea-palette-success-2);
-  --td-success-color-3: var(--idea-palette-success-3);
-  --td-success-color-4: var(--idea-palette-success-4);
-  --td-success-color-5: var(--idea-palette-success-5);
-  --td-success-color-6: var(--idea-palette-success-6);
-  --td-success-color-7: var(--idea-palette-success-7);
-  --td-success-color-8: var(--idea-palette-success-8);
-  --td-success-color-9: var(--idea-palette-success-9);
-  --td-success-color-10: var(--idea-palette-success-10);
-  --td-gray-color-1: var(--idea-palette-neutral-1);
-  --td-gray-color-2: var(--idea-palette-neutral-2);
-  --td-gray-color-3: var(--idea-palette-neutral-3);
-  --td-gray-color-4: var(--idea-palette-neutral-4);
-  --td-gray-color-5: var(--idea-palette-neutral-5);
-  --td-gray-color-6: var(--idea-palette-neutral-6);
-  --td-gray-color-7: var(--idea-palette-neutral-7);
-  --td-gray-color-8: var(--idea-palette-neutral-8);
-  --td-gray-color-9: var(--idea-palette-neutral-9);
-  --td-gray-color-10: var(--idea-palette-neutral-10);
-  --td-gray-color-11: var(--idea-palette-neutral-11);
-  --td-gray-color-12: var(--idea-palette-neutral-12);
-  --td-gray-color-13: var(--idea-palette-neutral-13);
-  --td-gray-color-14: var(--idea-palette-neutral-14);
-  --td-font-white-1: var(--idea-palette-on-dark-primary);
-  --td-font-white-2: var(--idea-palette-on-dark-secondary);
-  --td-font-white-3: var(--idea-palette-on-dark-muted);
-  --td-font-white-4: var(--idea-palette-on-dark-disabled);
-  --td-font-gray-1: var(--idea-palette-on-light-primary);
-  --td-font-gray-2: var(--idea-palette-on-light-secondary);
-  --td-font-gray-3: var(--idea-palette-on-light-muted);
-  --td-font-gray-4: var(--idea-palette-on-light-disabled);
-  --td-brand-color: var(--idea-action-primary);
-  --td-brand-color-hover: var(--idea-action-primary-hover);
-  --td-brand-color-focus: var(--idea-action-focus);
-  --td-brand-color-active: var(--idea-action-primary-active);
-  --td-brand-color-disabled: var(--idea-action-primary-disabled);
-  --td-brand-color-light: var(--idea-action-primary-subtle);
-  --td-brand-color-light-hover: var(--idea-action-focus);
-  --td-warning-color: var(--idea-status-warning);
-  --td-warning-color-hover: var(--idea-palette-warning-4);
-  --td-warning-color-focus: var(--idea-palette-warning-2);
-  --td-warning-color-active: var(--idea-status-warning-strong);
-  --td-warning-color-disabled: var(--idea-palette-warning-3);
-  --td-warning-color-light: var(--idea-palette-warning-1);
-  --td-warning-color-light-hover: var(--idea-palette-warning-2);
-  --td-error-color: var(--idea-status-error);
-  --td-error-color-hover: var(--idea-palette-error-5);
-  --td-error-color-focus: var(--idea-palette-error-2);
-  --td-error-color-active: var(--idea-palette-error-7);
-  --td-error-color-disabled: var(--idea-palette-error-3);
-  --td-error-color-light: var(--idea-palette-error-1);
-  --td-error-color-light-hover: var(--idea-palette-error-2);
-  --td-success-color: var(--idea-status-success);
-  --td-success-color-hover: var(--idea-palette-success-4);
-  --td-success-color-focus: var(--idea-palette-success-2);
-  --td-success-color-active: var(--idea-palette-success-6);
-  --td-success-color-disabled: var(--idea-palette-success-3);
-  --td-success-color-light: var(--idea-palette-success-1);
-  --td-success-color-light-hover: var(--idea-palette-success-2);
-  --td-mask-active: var(--idea-mask-active);
-  --td-mask-disabled: var(--idea-mask-disabled);
-  --td-bg-color-page: var(--idea-surface-canvas);
-  --td-bg-color-container: var(--idea-surface-panel);
-  --td-bg-color-container-hover: var(--idea-surface-hover);
-  --td-bg-color-container-active: var(--idea-surface-active);
-  --td-bg-color-container-select: var(--idea-surface-selected);
-  --td-bg-color-secondarycontainer: var(--idea-surface-secondary);
-  --td-bg-color-secondarycontainer-hover: var(--idea-surface-secondary-hover);
-  --td-bg-color-secondarycontainer-active: var(--idea-surface-secondary-active);
-  --td-bg-color-component: var(--idea-surface-component);
-  --td-bg-color-component-hover: var(--idea-surface-component-hover);
-  --td-bg-color-component-active: var(--idea-surface-component-active);
-  --td-bg-color-secondarycomponent: var(--idea-surface-secondary-component);
-  --td-bg-color-secondarycomponent-hover: var(--idea-surface-secondary-component-hover);
-  --td-bg-color-secondarycomponent-active: var(--idea-surface-secondary-component-active);
-  --td-bg-color-component-disabled: var(--idea-surface-disabled);
-  --td-bg-color-specialcomponent: var(--idea-surface-special);
-  --td-text-color-primary: var(--idea-text-primary);
-  --td-text-color-secondary: var(--idea-text-secondary);
-  --td-text-color-placeholder: var(--idea-text-muted);
-  --td-text-color-disabled: var(--idea-text-disabled);
-  --td-text-color-anti: var(--idea-text-inverse);
-  --td-text-color-brand: var(--idea-action-primary);
-  --td-text-color-link: var(--idea-text-link);
-  --td-border-level-1-color: var(--idea-border-subtle);
-  --td-component-stroke: var(--idea-border-subtle);
-  --td-border-level-2-color: var(--idea-border-strong);
-  --td-component-border: var(--idea-border-control);
-  --td-shadow-1: var(--idea-shadow-raised);
-  --td-shadow-2: var(--idea-shadow-floating);
-  --td-shadow-3: var(--idea-shadow-dialog);
-  --td-shadow-inset-top: inset 0 0.5px 0 var(--idea-shadow-inset);
-  --td-shadow-inset-right: inset 0.5px 0 0 var(--idea-shadow-inset);
-  --td-shadow-inset-bottom: inset 0 -0.5px 0 var(--idea-shadow-inset);
-  --td-table-shadow-color: var(--idea-table-shadow);
-  --td-scrollbar-color: var(--idea-scrollbar-thumb);
-  --td-scrollbar-hover-color: var(--idea-scrollbar-thumb-hover);
-  --td-scroll-track-color: var(--idea-scrollbar-track);
-  --td-font-family: var(--idea-font-sans);
-  --td-font-family-medium: var(--idea-font-sans);
-  --td-font-size-link-small: var(--idea-font-size-link-small);
-  --td-font-size-link-medium: var(--idea-font-size-link-medium);
-  --td-font-size-link-large: var(--idea-font-size-link-large);
-  --td-font-size-mark-small: var(--idea-font-size-mark-small);
-  --td-font-size-mark-medium: var(--idea-font-size-mark-medium);
-  --td-font-size-body-small: var(--idea-font-size-body-small);
-  --td-font-size-body-medium: var(--idea-font-size-body-medium);
-  --td-font-size-body-large: var(--idea-font-size-body-large);
-  --td-font-size-title-small: var(--idea-font-size-title-small);
-  --td-font-size-title-medium: var(--idea-font-size-title-medium);
-  --td-font-size-title-large: var(--idea-font-size-title-large);
-  --td-font-size-title-extraLarge: var(--idea-font-size-title-extra-large);
-  --td-font-size-headline-small: var(--idea-font-size-headline-small);
-  --td-font-size-headline-medium: var(--idea-font-size-headline-medium);
-  --td-font-size-headline-large: var(--idea-font-size-headline-large);
-  --td-font-size-display-medium: var(--idea-font-size-display-medium);
-  --td-font-size-display-large: var(--idea-font-size-display-large);
-  --td-line-height-link-small: var(--idea-line-height-link-small);
-  --td-line-height-link-medium: var(--idea-line-height-link-medium);
-  --td-line-height-link-large: var(--idea-line-height-link-large);
-  --td-line-height-mark-small: var(--idea-line-height-mark-small);
-  --td-line-height-mark-medium: var(--idea-line-height-mark-medium);
-  --td-line-height-body-small: var(--idea-line-height-body-small);
-  --td-line-height-body-medium: var(--idea-line-height-body-medium);
-  --td-line-height-body-large: var(--idea-line-height-body-large);
-  --td-line-height-title-small: var(--idea-line-height-title-small);
-  --td-line-height-title-medium: var(--idea-line-height-title-medium);
-  --td-line-height-title-large: var(--idea-line-height-title-large);
-  --td-line-height-title-extraLarge: var(--idea-line-height-title-extra-large);
-  --td-line-height-headline-small: var(--idea-line-height-headline-small);
-  --td-line-height-headline-medium: var(--idea-line-height-headline-medium);
-  --td-line-height-headline-large: var(--idea-line-height-headline-large);
-  --td-line-height-display-medium: var(--idea-line-height-display-medium);
-  --td-line-height-display-large: var(--idea-line-height-display-large);
-  --td-radius-small: var(--idea-radius-small);
-  --td-radius-default: var(--idea-radius-default);
-  --td-radius-medium: var(--idea-radius-medium);
-  --td-radius-large: var(--idea-radius-large);
-  --td-radius-extraLarge: var(--idea-radius-extra-large);
-  --td-radius-round: var(--idea-radius-round);
-  --td-radius-circle: var(--idea-radius-circle);
-  --td-size-1: var(--idea-space-1);
-  --td-size-2: var(--idea-space-2);
-  --td-size-3: var(--idea-space-3);
-  --td-size-4: var(--idea-space-4);
-  --td-size-5: var(--idea-space-5);
-  --td-size-6: var(--idea-space-6);
-  --td-size-7: var(--idea-space-7);
-  --td-size-8: var(--idea-space-8);
-  --td-size-9: var(--idea-space-9);
-  --td-size-10: var(--idea-space-10);
-  --td-size-11: var(--idea-space-11);
-  --td-size-12: var(--idea-space-12);
-  --td-size-13: var(--idea-space-13);
-  --td-size-14: var(--idea-space-14);
-  --td-size-15: var(--idea-space-15);
-  --td-size-16: var(--idea-space-16);
+  --td-brand-color-1: var(--sheetcraft-palette-brand-1);
+  --td-brand-color-2: var(--sheetcraft-palette-brand-2);
+  --td-brand-color-3: var(--sheetcraft-palette-brand-3);
+  --td-brand-color-4: var(--sheetcraft-palette-brand-4);
+  --td-brand-color-5: var(--sheetcraft-palette-brand-5);
+  --td-brand-color-6: var(--sheetcraft-palette-brand-6);
+  --td-brand-color-7: var(--sheetcraft-palette-brand-7);
+  --td-brand-color-8: var(--sheetcraft-palette-brand-8);
+  --td-brand-color-9: var(--sheetcraft-palette-brand-9);
+  --td-brand-color-10: var(--sheetcraft-palette-brand-10);
+  --td-warning-color-1: var(--sheetcraft-palette-warning-1);
+  --td-warning-color-2: var(--sheetcraft-palette-warning-2);
+  --td-warning-color-3: var(--sheetcraft-palette-warning-3);
+  --td-warning-color-4: var(--sheetcraft-palette-warning-4);
+  --td-warning-color-5: var(--sheetcraft-palette-warning-5);
+  --td-warning-color-6: var(--sheetcraft-palette-warning-6);
+  --td-warning-color-7: var(--sheetcraft-palette-warning-7);
+  --td-warning-color-8: var(--sheetcraft-palette-warning-8);
+  --td-warning-color-9: var(--sheetcraft-palette-warning-9);
+  --td-warning-color-10: var(--sheetcraft-palette-warning-10);
+  --td-error-color-1: var(--sheetcraft-palette-error-1);
+  --td-error-color-2: var(--sheetcraft-palette-error-2);
+  --td-error-color-3: var(--sheetcraft-palette-error-3);
+  --td-error-color-4: var(--sheetcraft-palette-error-4);
+  --td-error-color-5: var(--sheetcraft-palette-error-5);
+  --td-error-color-6: var(--sheetcraft-palette-error-6);
+  --td-error-color-7: var(--sheetcraft-palette-error-7);
+  --td-error-color-8: var(--sheetcraft-palette-error-8);
+  --td-error-color-9: var(--sheetcraft-palette-error-9);
+  --td-error-color-10: var(--sheetcraft-palette-error-10);
+  --td-success-color-1: var(--sheetcraft-palette-success-1);
+  --td-success-color-2: var(--sheetcraft-palette-success-2);
+  --td-success-color-3: var(--sheetcraft-palette-success-3);
+  --td-success-color-4: var(--sheetcraft-palette-success-4);
+  --td-success-color-5: var(--sheetcraft-palette-success-5);
+  --td-success-color-6: var(--sheetcraft-palette-success-6);
+  --td-success-color-7: var(--sheetcraft-palette-success-7);
+  --td-success-color-8: var(--sheetcraft-palette-success-8);
+  --td-success-color-9: var(--sheetcraft-palette-success-9);
+  --td-success-color-10: var(--sheetcraft-palette-success-10);
+  --td-gray-color-1: var(--sheetcraft-palette-neutral-1);
+  --td-gray-color-2: var(--sheetcraft-palette-neutral-2);
+  --td-gray-color-3: var(--sheetcraft-palette-neutral-3);
+  --td-gray-color-4: var(--sheetcraft-palette-neutral-4);
+  --td-gray-color-5: var(--sheetcraft-palette-neutral-5);
+  --td-gray-color-6: var(--sheetcraft-palette-neutral-6);
+  --td-gray-color-7: var(--sheetcraft-palette-neutral-7);
+  --td-gray-color-8: var(--sheetcraft-palette-neutral-8);
+  --td-gray-color-9: var(--sheetcraft-palette-neutral-9);
+  --td-gray-color-10: var(--sheetcraft-palette-neutral-10);
+  --td-gray-color-11: var(--sheetcraft-palette-neutral-11);
+  --td-gray-color-12: var(--sheetcraft-palette-neutral-12);
+  --td-gray-color-13: var(--sheetcraft-palette-neutral-13);
+  --td-gray-color-14: var(--sheetcraft-palette-neutral-14);
+  --td-font-white-1: var(--sheetcraft-palette-on-dark-primary);
+  --td-font-white-2: var(--sheetcraft-palette-on-dark-secondary);
+  --td-font-white-3: var(--sheetcraft-palette-on-dark-muted);
+  --td-font-white-4: var(--sheetcraft-palette-on-dark-disabled);
+  --td-font-gray-1: var(--sheetcraft-palette-on-light-primary);
+  --td-font-gray-2: var(--sheetcraft-palette-on-light-secondary);
+  --td-font-gray-3: var(--sheetcraft-palette-on-light-muted);
+  --td-font-gray-4: var(--sheetcraft-palette-on-light-disabled);
+  --td-brand-color: var(--sheetcraft-action-primary);
+  --td-brand-color-hover: var(--sheetcraft-action-primary-hover);
+  --td-brand-color-focus: var(--sheetcraft-action-focus);
+  --td-brand-color-active: var(--sheetcraft-action-primary-active);
+  --td-brand-color-disabled: var(--sheetcraft-action-primary-disabled);
+  --td-brand-color-light: var(--sheetcraft-action-primary-subtle);
+  --td-brand-color-light-hover: var(--sheetcraft-action-focus);
+  --td-warning-color: var(--sheetcraft-status-warning);
+  --td-warning-color-hover: var(--sheetcraft-palette-warning-4);
+  --td-warning-color-focus: var(--sheetcraft-palette-warning-2);
+  --td-warning-color-active: var(--sheetcraft-status-warning-strong);
+  --td-warning-color-disabled: var(--sheetcraft-palette-warning-3);
+  --td-warning-color-light: var(--sheetcraft-palette-warning-1);
+  --td-warning-color-light-hover: var(--sheetcraft-palette-warning-2);
+  --td-error-color: var(--sheetcraft-status-error);
+  --td-error-color-hover: var(--sheetcraft-palette-error-5);
+  --td-error-color-focus: var(--sheetcraft-palette-error-2);
+  --td-error-color-active: var(--sheetcraft-palette-error-7);
+  --td-error-color-disabled: var(--sheetcraft-palette-error-3);
+  --td-error-color-light: var(--sheetcraft-palette-error-1);
+  --td-error-color-light-hover: var(--sheetcraft-palette-error-2);
+  --td-success-color: var(--sheetcraft-status-success);
+  --td-success-color-hover: var(--sheetcraft-palette-success-4);
+  --td-success-color-focus: var(--sheetcraft-palette-success-2);
+  --td-success-color-active: var(--sheetcraft-palette-success-6);
+  --td-success-color-disabled: var(--sheetcraft-palette-success-3);
+  --td-success-color-light: var(--sheetcraft-palette-success-1);
+  --td-success-color-light-hover: var(--sheetcraft-palette-success-2);
+  --td-mask-active: var(--sheetcraft-mask-active);
+  --td-mask-disabled: var(--sheetcraft-mask-disabled);
+  --td-bg-color-page: var(--sheetcraft-surface-canvas);
+  --td-bg-color-container: var(--sheetcraft-surface-panel);
+  --td-bg-color-container-hover: var(--sheetcraft-surface-hover);
+  --td-bg-color-container-active: var(--sheetcraft-surface-active);
+  --td-bg-color-container-select: var(--sheetcraft-surface-selected);
+  --td-bg-color-secondarycontainer: var(--sheetcraft-surface-secondary);
+  --td-bg-color-secondarycontainer-hover: var(--sheetcraft-surface-secondary-hover);
+  --td-bg-color-secondarycontainer-active: var(--sheetcraft-surface-secondary-active);
+  --td-bg-color-component: var(--sheetcraft-surface-component);
+  --td-bg-color-component-hover: var(--sheetcraft-surface-component-hover);
+  --td-bg-color-component-active: var(--sheetcraft-surface-component-active);
+  --td-bg-color-secondarycomponent: var(--sheetcraft-surface-secondary-component);
+  --td-bg-color-secondarycomponent-hover: var(--sheetcraft-surface-secondary-component-hover);
+  --td-bg-color-secondarycomponent-active: var(--sheetcraft-surface-secondary-component-active);
+  --td-bg-color-component-disabled: var(--sheetcraft-surface-disabled);
+  --td-bg-color-specialcomponent: var(--sheetcraft-surface-special);
+  --td-text-color-primary: var(--sheetcraft-text-primary);
+  --td-text-color-secondary: var(--sheetcraft-text-secondary);
+  --td-text-color-placeholder: var(--sheetcraft-text-muted);
+  --td-text-color-disabled: var(--sheetcraft-text-disabled);
+  --td-text-color-anti: var(--sheetcraft-text-inverse);
+  --td-text-color-brand: var(--sheetcraft-action-primary);
+  --td-text-color-link: var(--sheetcraft-text-link);
+  --td-border-level-1-color: var(--sheetcraft-border-subtle);
+  --td-component-stroke: var(--sheetcraft-border-subtle);
+  --td-border-level-2-color: var(--sheetcraft-border-strong);
+  --td-component-border: var(--sheetcraft-border-control);
+  --td-shadow-1: var(--sheetcraft-shadow-raised);
+  --td-shadow-2: var(--sheetcraft-shadow-floating);
+  --td-shadow-3: var(--sheetcraft-shadow-dialog);
+  --td-shadow-inset-top: inset 0 0.5px 0 var(--sheetcraft-shadow-inset);
+  --td-shadow-inset-right: inset 0.5px 0 0 var(--sheetcraft-shadow-inset);
+  --td-shadow-inset-bottom: inset 0 -0.5px 0 var(--sheetcraft-shadow-inset);
+  --td-table-shadow-color: var(--sheetcraft-table-shadow);
+  --td-scrollbar-color: var(--sheetcraft-scrollbar-thumb);
+  --td-scrollbar-hover-color: var(--sheetcraft-scrollbar-thumb-hover);
+  --td-scroll-track-color: var(--sheetcraft-scrollbar-track);
+  --td-font-family: var(--sheetcraft-font-sans);
+  --td-font-family-medium: var(--sheetcraft-font-sans);
+  --td-font-size-link-small: var(--sheetcraft-font-size-link-small);
+  --td-font-size-link-medium: var(--sheetcraft-font-size-link-medium);
+  --td-font-size-link-large: var(--sheetcraft-font-size-link-large);
+  --td-font-size-mark-small: var(--sheetcraft-font-size-mark-small);
+  --td-font-size-mark-medium: var(--sheetcraft-font-size-mark-medium);
+  --td-font-size-body-small: var(--sheetcraft-font-size-body-small);
+  --td-font-size-body-medium: var(--sheetcraft-font-size-body-medium);
+  --td-font-size-body-large: var(--sheetcraft-font-size-body-large);
+  --td-font-size-title-small: var(--sheetcraft-font-size-title-small);
+  --td-font-size-title-medium: var(--sheetcraft-font-size-title-medium);
+  --td-font-size-title-large: var(--sheetcraft-font-size-title-large);
+  --td-font-size-title-extraLarge: var(--sheetcraft-font-size-title-extra-large);
+  --td-font-size-headline-small: var(--sheetcraft-font-size-headline-small);
+  --td-font-size-headline-medium: var(--sheetcraft-font-size-headline-medium);
+  --td-font-size-headline-large: var(--sheetcraft-font-size-headline-large);
+  --td-font-size-display-medium: var(--sheetcraft-font-size-display-medium);
+  --td-font-size-display-large: var(--sheetcraft-font-size-display-large);
+  --td-line-height-link-small: var(--sheetcraft-line-height-link-small);
+  --td-line-height-link-medium: var(--sheetcraft-line-height-link-medium);
+  --td-line-height-link-large: var(--sheetcraft-line-height-link-large);
+  --td-line-height-mark-small: var(--sheetcraft-line-height-mark-small);
+  --td-line-height-mark-medium: var(--sheetcraft-line-height-mark-medium);
+  --td-line-height-body-small: var(--sheetcraft-line-height-body-small);
+  --td-line-height-body-medium: var(--sheetcraft-line-height-body-medium);
+  --td-line-height-body-large: var(--sheetcraft-line-height-body-large);
+  --td-line-height-title-small: var(--sheetcraft-line-height-title-small);
+  --td-line-height-title-medium: var(--sheetcraft-line-height-title-medium);
+  --td-line-height-title-large: var(--sheetcraft-line-height-title-large);
+  --td-line-height-title-extraLarge: var(--sheetcraft-line-height-title-extra-large);
+  --td-line-height-headline-small: var(--sheetcraft-line-height-headline-small);
+  --td-line-height-headline-medium: var(--sheetcraft-line-height-headline-medium);
+  --td-line-height-headline-large: var(--sheetcraft-line-height-headline-large);
+  --td-line-height-display-medium: var(--sheetcraft-line-height-display-medium);
+  --td-line-height-display-large: var(--sheetcraft-line-height-display-large);
+  --td-radius-small: var(--sheetcraft-radius-small);
+  --td-radius-default: var(--sheetcraft-radius-default);
+  --td-radius-medium: var(--sheetcraft-radius-medium);
+  --td-radius-large: var(--sheetcraft-radius-large);
+  --td-radius-extraLarge: var(--sheetcraft-radius-extra-large);
+  --td-radius-round: var(--sheetcraft-radius-round);
+  --td-radius-circle: var(--sheetcraft-radius-circle);
+  --td-size-1: var(--sheetcraft-space-1);
+  --td-size-2: var(--sheetcraft-space-2);
+  --td-size-3: var(--sheetcraft-space-3);
+  --td-size-4: var(--sheetcraft-space-4);
+  --td-size-5: var(--sheetcraft-space-5);
+  --td-size-6: var(--sheetcraft-space-6);
+  --td-size-7: var(--sheetcraft-space-7);
+  --td-size-8: var(--sheetcraft-space-8);
+  --td-size-9: var(--sheetcraft-space-9);
+  --td-size-10: var(--sheetcraft-space-10);
+  --td-size-11: var(--sheetcraft-space-11);
+  --td-size-12: var(--sheetcraft-space-12);
+  --td-size-13: var(--sheetcraft-space-13);
+  --td-size-14: var(--sheetcraft-space-14);
+  --td-size-15: var(--sheetcraft-space-15);
+  --td-size-16: var(--sheetcraft-space-16);
 }
 
 // Control icons have their own dimensions even when TDesign uses font tokens
@@ -200,11 +200,11 @@
 .t-input-number:not(.t-size-s, .t-size-l),
 .t-button:not(.t-size-s, .t-size-l),
 .t-select-option:not(.t-size-s, .t-size-l) {
-  --td-font-size-body-large: var(--idea-control-icon-size);
+  --td-font-size-body-large: var(--sheetcraft-control-icon-size);
 
   .t-fake-arrow {
-    width: var(--idea-control-icon-size);
-    height: var(--idea-control-icon-size);
+    width: var(--sheetcraft-control-icon-size);
+    height: var(--sheetcraft-control-icon-size);
   }
 }
 
@@ -236,7 +236,7 @@
     height: var(--td-comp-size-m);
     min-height: var(--td-comp-size-m);
     padding-block: calc((var(--td-comp-size-m) - var(--td-line-height-body-medium) - 2px) / 2);
-    padding-inline: var(--idea-space-4);
+    padding-inline: var(--sheetcraft-space-4);
     resize: none;
     white-space: pre;
     overflow: auto;
@@ -249,7 +249,7 @@
 
   &.has-formula-colors .t-textarea__inner {
     -webkit-text-fill-color: transparent;
-    caret-color: var(--idea-text-primary);
+    caret-color: var(--sheetcraft-text-primary);
   }
 
   &.is-expanded .t-textarea__inner {
@@ -257,7 +257,7 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     scrollbar-width: thin;
-    box-shadow: var(--idea-shadow-menu);
+    box-shadow: var(--sheetcraft-shadow-menu);
 
     &::-webkit-scrollbar {
       display: block;
@@ -268,12 +268,12 @@
 .idea-formula-editor-textarea.t-textarea {
   .t-textarea__inner {
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    line-height: var(--idea-line-height-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
   }
 
   &.has-formula-colors .t-textarea__inner {
     -webkit-text-fill-color: transparent;
-    caret-color: var(--idea-text-primary);
+    caret-color: var(--sheetcraft-text-primary);
   }
 }
 
@@ -287,7 +287,7 @@
   padding-left: var(--ribbon-labeled-action-padding, 4px);
 
   .t-checkbox__label {
-    margin-left: var(--idea-space-2);
+    margin-left: var(--sheetcraft-space-2);
   }
 }
 
@@ -296,15 +296,15 @@
 }
 
 .idea-action-icon {
-  width: var(--idea-action-icon-size);
-  height: var(--idea-action-icon-size);
-  stroke-width: var(--idea-icon-stroke-width);
+  width: var(--sheetcraft-action-icon-size);
+  height: var(--sheetcraft-action-icon-size);
+  stroke-width: var(--sheetcraft-icon-stroke-width);
 }
 
 .idea-control-icon,
 .idea-input-action-icon {
-  width: var(--idea-control-icon-size);
-  height: var(--idea-control-icon-size);
+  width: var(--sheetcraft-control-icon-size);
+  height: var(--sheetcraft-control-icon-size);
 }
 
 .idea-input-action-icon {
@@ -341,12 +341,12 @@
 
 .idea-number-format-options .t-select-option {
   &:hover:not(.t-is-selected):not(.t-is-disabled) {
-    background: var(--idea-surface-secondary);
+    background: var(--sheetcraft-surface-secondary);
   }
 
   &.t-is-selected:not(.t-is-disabled) {
-    color: var(--idea-text-primary);
-    background: var(--idea-surface-active);
+    color: var(--sheetcraft-text-primary);
+    background: var(--sheetcraft-surface-active);
   }
 }
 
@@ -355,7 +355,7 @@
   .t-select__list {
     display: grid;
     grid-template-columns: repeat(8, minmax(0, 1fr));
-    padding: var(--idea-tool-panel-padding);
+    padding: var(--sheetcraft-tool-panel-padding);
   }
 
   .t-select-option {
@@ -369,7 +369,7 @@
   .idea-icon-grid-options__none {
     grid-column: 1 / -1;
     margin-bottom: 4px;
-    background: var(--idea-surface-secondary);
+    background: var(--sheetcraft-surface-secondary);
   }
 }
 
@@ -378,16 +378,16 @@
 }
 
 .t-dialog {
-  --td-comp-paddingTB-xxl: var(--idea-space-6);
-  --td-comp-paddingLR-xxl: var(--idea-space-6);
+  --td-comp-paddingTB-xxl: var(--sheetcraft-space-6);
+  --td-comp-paddingLR-xxl: var(--sheetcraft-space-6);
 }
 
 .t-dialog__header {
-  font-weight: var(--idea-font-weight-semibold);
+  font-weight: var(--sheetcraft-font-weight-semibold);
 }
 
 .t-dialog__body {
-  padding-block: var(--idea-dialog-content-padding-block);
+  padding-block: var(--sheetcraft-dialog-content-padding-block);
 }
 
 // Find owns actions and results in its body; the frame owns the bottom inset.
@@ -469,7 +469,7 @@
 }
 
 .t-tabs__nav-item.t-is-active {
-  font-weight: var(--idea-font-weight-medium);
+  font-weight: var(--sheetcraft-font-weight-medium);
 }
 
 .t-tabs__nav-item-text-wrapper {
@@ -495,14 +495,14 @@
 
   .cell-format-dialog__tabs {
     box-sizing: border-box;
-    padding-top: var(--idea-dialog-content-padding-block);
+    padding-top: var(--sheetcraft-dialog-content-padding-block);
 
     > .t-tabs__header {
       flex: none;
     }
 
     > .t-tabs__content {
-      padding-block: var(--idea-dialog-content-padding-block);
+      padding-block: var(--sheetcraft-dialog-content-padding-block);
       flex: 1;
       min-height: 0;
       overflow: auto;
@@ -517,7 +517,7 @@
 // Embedded color panels share their owner's floating surface and reserve most
 // of the format row for color values.
 .idea-color-palette-panel {
-  --td-pop-padding-xl: var(--idea-tool-panel-padding);
+  --td-pop-padding-xl: var(--sheetcraft-tool-panel-padding);
 
   &.t-color-picker__panel {
     box-shadow: none;
@@ -541,26 +541,28 @@
 // Shared compact number input appearance; TDesign exposes neither the column
 // stepper width nor persistent controls and their resting appearance as public props.
 .idea-input-number--persistent-controls.t-input-number.t-is-controls-right {
-  --idea-input-number-icon-size: var(--idea-control-icon-size);
-  --idea-input-number-padding: 4px;
-  --idea-input-number-stepper-width: 16px;
+  --sheetcraft-input-number-icon-size: var(--sheetcraft-control-icon-size);
+  --sheetcraft-input-number-padding: 4px;
+  --sheetcraft-input-number-stepper-width: 16px;
 
   .t-input {
     padding-left: var(--td-comp-paddingLR-s);
-    padding-right: calc(var(--idea-input-number-stepper-width) + var(--idea-input-number-padding));
+    padding-right: calc(
+      var(--sheetcraft-input-number-stepper-width) + var(--sheetcraft-input-number-padding)
+    );
   }
 
   &.t-size-s {
-    --idea-input-number-icon-size: 12px;
+    --sheetcraft-input-number-icon-size: 12px;
   }
 
   &.t-size-l {
-    --idea-input-number-icon-size: 16px;
+    --sheetcraft-input-number-icon-size: 16px;
   }
 
   .t-input-number__decrease,
   .t-input-number__increase {
-    width: var(--idea-input-number-stepper-width);
+    width: var(--sheetcraft-input-number-stepper-width);
     visibility: visible;
     opacity: 1;
     background: transparent;
@@ -570,13 +572,13 @@
     }
 
     &:hover:not(.t-is-disabled):not(:disabled) {
-      background: var(--idea-icon-button-hover-bg);
+      background: var(--sheetcraft-icon-button-hover-bg);
     }
 
     .t-icon {
-      width: var(--idea-input-number-icon-size);
-      height: var(--idea-input-number-icon-size);
-      font-size: var(--idea-input-number-icon-size);
+      width: var(--sheetcraft-input-number-icon-size);
+      height: var(--sheetcraft-input-number-icon-size);
+      font-size: var(--sheetcraft-input-number-icon-size);
     }
   }
 }
@@ -615,10 +617,10 @@
     margin-left: 1px;
     padding-left: 5px;
     transition: none;
-    border-radius: var(--idea-radius-default) 0 0 var(--idea-radius-default);
+    border-radius: var(--sheetcraft-radius-default) 0 0 var(--sheetcraft-radius-default);
 
     &:hover:not(:disabled) {
-      background: color-mix(in srgb, var(--idea-text-primary) 8%, transparent);
+      background: color-mix(in srgb, var(--sheetcraft-text-primary) 8%, transparent);
     }
   }
 

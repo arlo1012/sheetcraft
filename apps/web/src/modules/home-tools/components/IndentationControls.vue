@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ListIndentDecrease, ListIndentIncrease } from "lucide-vue-next";
-import { MAX_CELL_INDENT, MIN_CELL_INDENT } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import { MAX_CELL_INDENT, MIN_CELL_INDENT } from "@sheetcraft/core/style";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 

@@ -31,7 +31,7 @@ const emit = defineEmits<{
 }>();
 const { t, locale } = useAppI18n();
 const contentRef = ref<HTMLElement | null>(null);
-const workbookScopeValue = "__idea10_workbook_scope__";
+const workbookScopeValue = "__sheetcraft_workbook_scope__";
 const scopePopupProps = { attach: () => contentRef.value ?? document.body };
 const draft = ref<NamedRangeDraft>({ name: "", reference: "" });
 const nameError = computed(() =>

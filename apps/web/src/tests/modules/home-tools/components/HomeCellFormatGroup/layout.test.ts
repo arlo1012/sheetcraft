@@ -1,7 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import HomeCellFormatGroup from "../../../../../modules/home-tools/components/HomeCellFormatGroup.vue";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { createAppI18n } from "../../../../../shared/i18n";
 
 function createStyleState(): SelectionCellStyleState {

@@ -1,7 +1,7 @@
 import { flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { getCellContent } from "@idea10/core/workbook";
+import { getCellContent } from "@sheetcraft/core/workbook";
 import WorkbookFormulaBar from "../../../../modules/workbook/components/WorkbookFormulaBar.vue";
 import WorkbookStatusBar from "../../../../modules/workbook/components/WorkbookStatusBar.vue";
 import SheetGrid from "../../../../modules/sheet-grid/components/SheetGrid.vue";

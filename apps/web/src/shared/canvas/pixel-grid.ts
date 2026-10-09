@@ -1,4 +1,4 @@
-import type { Rect } from "@idea10/sheet-engine/geometry";
+import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 
 /** Pixel alignment for the axis-aligned transforms used by Sheet canvases. */
 export function createCanvasPixelGrid(context: CanvasRenderingContext2D, screenScale = 1) {

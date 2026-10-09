@@ -1,7 +1,12 @@
 import { shallowRef } from "vue";
 import { describe, expect, test, vi } from "vitest";
-import { createWorkbook, getActiveSheet, setCellValue, type Sheet } from "@idea10/core/workbook";
-import { createCellSelection, type CellSelection } from "@idea10/sheet-engine/selection";
+import {
+  createWorkbook,
+  getActiveSheet,
+  setCellValue,
+  type Sheet,
+} from "@sheetcraft/core/workbook";
+import { createCellSelection, type CellSelection } from "@sheetcraft/sheet-engine/selection";
 import type {
   GridClipboardPort,
   GridClipboardTransfer,

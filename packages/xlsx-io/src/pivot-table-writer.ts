@@ -1,14 +1,14 @@
 import { nativeValueXml } from "./pivot-native-values.js";
 import { nativeGroupFingerprint } from "./pivot-native-groups.js";
 import { strToU8 } from "fflate/browser";
-import type { Workbook } from "@idea10/core/workbook";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import {
   buildPivotResult,
   getPivotGroupLabels,
   getPivotPresentation,
   getPivotTableRange,
   type SheetPivotTable,
-} from "@idea10/core/pivot-tables";
+} from "@sheetcraft/core/pivot-tables";
 import type { CompatibilityReportBuilder } from "./report.js";
 import {
   MAIN_NS,

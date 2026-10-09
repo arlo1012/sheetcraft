@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { ImageTransform } from "@idea10/core/workbook";
+import type { ImageTransform } from "@sheetcraft/core/workbook";
 import { pictureAnnotationPoint } from "../../../modules/sheet-images/picture-annotation-geometry";
 
 const cases: Array<{

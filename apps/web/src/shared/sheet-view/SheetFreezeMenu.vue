@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { columnIndexToLabel } from "@idea10/core/coordinates";
+import { columnIndexToLabel } from "@sheetcraft/core/coordinates";
 import SheetFreezeIcon from "./SheetFreezeIcon.vue";
 import { computed, ref, useId } from "vue";
 import { useAppI18n } from "../i18n";
@@ -134,6 +134,6 @@ function unfreeze(): void {
   @include ribbon.tool;
 }
 .sheet-freeze-menu__surface {
-  z-index: var(--idea-layer-menu);
+  z-index: var(--sheetcraft-layer-menu);
 }
 </style>

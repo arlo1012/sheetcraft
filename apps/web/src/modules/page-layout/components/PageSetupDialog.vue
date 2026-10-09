@@ -2,7 +2,7 @@
 import { ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
-import { cloneSheetPageSetup, type SheetPageSetup } from "@idea10/core/page-setup";
+import { cloneSheetPageSetup, type SheetPageSetup } from "@sheetcraft/core/page-setup";
 import { useAppI18n } from "../../../shared/i18n";
 import type { HeaderFooterEditTarget } from "../header-footer-editor";
 import {
@@ -174,8 +174,8 @@ watch(
     min-width: 0;
   }
   &__error {
-    margin: var(--idea-space-2) 0 0;
-    color: var(--idea-status-error);
+    margin: var(--sheetcraft-space-2) 0 0;
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

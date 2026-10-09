@@ -4,16 +4,16 @@ import {
   createSetSheetProtectionCommand,
   createSetWorkbookStructureProtectionCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import { isCellStyleRangeSupported } from "@idea10/core/style-state";
+} from "@sheetcraft/core/commands";
+import { isCellStyleRangeSupported } from "@sheetcraft/core/style-state";
 import {
   normalizeSheetProtection,
   unlockEditableRange,
   getProtectedEditableRanges,
   type SheetProtection,
-} from "@idea10/core";
-import type { CellRange, Sheet, Workbook } from "@idea10/core/workbook";
-import { WorkbookDomainError } from "@idea10/core/errors";
+} from "@sheetcraft/core";
+import type { CellRange, Sheet, Workbook } from "@sheetcraft/core/workbook";
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
 import { createBrowserProtectionPassword } from "./protection-password";
 import { useAppI18n } from "../../shared/i18n";
 

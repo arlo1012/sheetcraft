@@ -1,12 +1,17 @@
 import { describe, expect, test } from "vitest";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
-import { createWorkbook, getActiveSheet, setCellStyle, getCellStyle } from "@idea10/core/workbook";
+import {
+  createWorkbook,
+  getActiveSheet,
+  setCellStyle,
+  getCellStyle,
+} from "@sheetcraft/core/workbook";
 import {
   canEditCell,
   createProtectionPassword,
   verifyProtectionPassword,
   unlockEditableRange,
-} from "@idea10/core";
+} from "@sheetcraft/core";
 import { encodeXlsx, decodeXlsx } from "../index.js";
 
 describe("XLSX protection", () => {

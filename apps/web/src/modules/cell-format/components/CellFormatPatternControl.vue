@@ -2,7 +2,7 @@
 import { computed, ref, useId } from "vue";
 import { Search } from "lucide-vue-next";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import { CELL_FILL_PATTERNS, type CellFillPatternStyle } from "@idea10/core/style";
+import { CELL_FILL_PATTERNS, type CellFillPatternStyle } from "@sheetcraft/core/style";
 import { getCellFillStyle } from "../../../shared/cell-fill/fill-presentation";
 import { useAppI18n } from "../../../shared/i18n";
 import CellFormatPanelSelect from "./CellFormatPanelSelect.vue";
@@ -154,15 +154,15 @@ function onKeydown(event: KeyboardEvent): void {
     flex: none;
     width: 40px;
     height: 18px;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-small);
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-small);
   }
   &__panel {
     width: 100%;
-    padding: var(--idea-tool-panel-padding);
-    color: var(--idea-text-primary);
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
+    padding: var(--sheetcraft-tool-panel-padding);
+    color: var(--sheetcraft-text-primary);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
   }
   &__options {
     display: grid;
@@ -178,23 +178,23 @@ function onKeydown(event: KeyboardEvent): void {
     min-width: 0;
     padding: 4px;
     border: 1px solid transparent;
-    border-radius: var(--idea-radius-default);
+    border-radius: var(--sheetcraft-radius-default);
     background: transparent;
     color: inherit;
     font: inherit;
     cursor: pointer;
     &:hover {
-      background: var(--idea-surface-hover);
+      background: var(--sheetcraft-surface-hover);
     }
     &[aria-pressed="true"] {
-      border-color: var(--idea-action-primary);
-      background: var(--idea-surface-selected);
+      border-color: var(--sheetcraft-action-primary);
+      background: var(--sheetcraft-surface-selected);
     }
   }
   &__swatch {
     height: 28px;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-small);
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-small);
   }
   &__option-label {
     overflow: hidden;
@@ -205,7 +205,7 @@ function onKeydown(event: KeyboardEvent): void {
     margin: 0;
     padding: 16px 0;
     text-align: center;
-    color: var(--idea-text-muted);
+    color: var(--sheetcraft-text-muted);
   }
 }
 </style>

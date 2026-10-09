@@ -1,7 +1,7 @@
 import { computed, onBeforeUnmount, onMounted, shallowRef } from "vue";
-import { resolveThemeFontFamily } from "@idea10/core/workbook-theme";
+import { resolveThemeFontFamily } from "@sheetcraft/core/workbook-theme";
 import { useWorkbookTheme } from "../../../shared/color/workbook-theme-context";
-import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
+import { DEFAULT_CELL_FONT_FAMILY } from "@sheetcraft/core/style";
 import { cellTextFontRevision } from "../../../shared/cell-text/text-metrics";
 import { DEFAULT_SHEET_HEADER_PALETTE, type SheetHeaderPalette } from "./header-painter";
 import type { SheetCanvasPalette } from "../canvas/scene-painter";
@@ -51,7 +51,7 @@ export function useSheetRenderEnvironment(getRoot: () => HTMLElement | null) {
     if (!root) return;
     const style = getComputedStyle(root);
     const color = (name: string, fallback: string) =>
-      style.getPropertyValue(`--idea-${name}`).trim() || fallback;
+      style.getPropertyValue(`--sheetcraft-${name}`).trim() || fallback;
     const fontFamily = style.fontFamily.trim() || DEFAULT_CELL_FONT_FAMILY;
     const background = color("surface-panel", "#fff");
     const text = color("text-primary", "#202124");

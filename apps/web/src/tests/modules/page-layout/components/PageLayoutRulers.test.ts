@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
-import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
+import { DEFAULT_SHEET_PAGE_SETUP } from "@sheetcraft/core/page-setup";
 import PageLayoutRulers, {
   createPageLayoutRulerModel,
 } from "../../../../modules/page-layout/components/PageLayoutRulers.vue";

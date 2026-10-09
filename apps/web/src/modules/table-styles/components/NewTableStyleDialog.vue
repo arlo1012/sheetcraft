@@ -5,18 +5,18 @@ import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
-import type { CellFormatChange } from "@idea10/core/commands";
+import type { CellFormatChange } from "@sheetcraft/core/commands";
 import {
   TABLE_STYLE_ELEMENTS,
   type TableStyleDefinition,
   type TableStyleElement,
   type TableStyleElementFormat,
-} from "@idea10/core/table-styles";
+} from "@sheetcraft/core/table-styles";
 import {
   PIVOT_TABLE_STYLE_ELEMENTS,
   type PivotTableStyleDefinition,
   type PivotTableStyleElement,
-} from "@idea10/core/pivot-table-styles";
+} from "@sheetcraft/core/pivot-table-styles";
 import CellFormatDialog from "../../cell-format/components/CellFormatDialog.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import {
@@ -317,18 +317,18 @@ watch(
 .new-table-style-dialog {
   &__content {
     display: grid;
-    gap: var(--idea-space-6);
+    gap: var(--sheetcraft-space-6);
   }
   &__name {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
 
     p {
       grid-column: 2;
       margin: 0;
-      color: var(--idea-status-error);
+      color: var(--sheetcraft-status-error);
     }
   }
 
@@ -336,7 +336,7 @@ watch(
     display: grid;
     grid-template-columns: 184px minmax(0, 1fr);
     align-items: start;
-    gap: var(--idea-space-6);
+    gap: var(--sheetcraft-space-6);
   }
 
   h3,
@@ -345,16 +345,16 @@ watch(
   }
 
   h3 {
-    font-size: var(--idea-font-size-body-medium);
-    font-weight: var(--idea-font-weight-semibold);
-    line-height: var(--idea-line-height-body-medium);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    font-weight: var(--sheetcraft-font-weight-semibold);
+    line-height: var(--sheetcraft-line-height-body-medium);
   }
 
   &__elements {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     align-content: start;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
   }
 
   &__element-list {
@@ -366,22 +366,22 @@ watch(
     display: grid;
     min-width: 0;
     align-content: start;
-    gap: var(--idea-space-6);
+    gap: var(--sheetcraft-space-6);
   }
 
   &__preview,
   &__controls {
     display: grid;
     align-content: start;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
   }
 
   &__preview-frame {
     height: 198px;
     overflow: auto;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
-    background: var(--idea-surface-panel);
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-default);
+    background: var(--sheetcraft-surface-panel);
   }
 
   &__actions,
@@ -389,7 +389,7 @@ watch(
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
   }
 
   &__actions {
@@ -399,7 +399,7 @@ watch(
   &__stripe {
     display: flex;
     align-items: center;
-    gap: var(--idea-space-4);
+    gap: var(--sheetcraft-space-4);
   }
 
   &__stripe-size {

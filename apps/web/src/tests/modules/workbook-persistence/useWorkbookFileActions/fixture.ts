@@ -1,8 +1,8 @@
 import { defineComponent, h, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { vi } from "vitest";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createWorkbook, type Workbook } from "@idea10/core/workbook";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { createWorkbook, type Workbook } from "@sheetcraft/core/workbook";
 import { useWorkbookFileActions } from "../../../../modules/workbook-persistence/useWorkbookFileActions";
 import type {
   WorkbookPersistenceError,

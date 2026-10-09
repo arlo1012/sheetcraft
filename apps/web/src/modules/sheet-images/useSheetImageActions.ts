@@ -8,13 +8,13 @@ import {
   type ImageTransform,
   type Sheet,
   type Workbook,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
   createSetSheetFloatingImagesCommand,
   createBatchSetCellContentsCommand,
   type WorkbookCommand,
-} from "@idea10/core/commands";
-import { getMergedCellAnchor, canUseSheetPermission, canEditCell } from "@idea10/core";
+} from "@sheetcraft/core/commands";
+import { getMergedCellAnchor, canUseSheetPermission, canEditCell } from "@sheetcraft/core";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import type { MessageKey } from "../../shared/i18n";
 import type { ImageAssetStore } from "../image-assets/imageAssetStore";

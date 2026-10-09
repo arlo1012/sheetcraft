@@ -1,5 +1,5 @@
-import { normalizePivotTable, type SheetPivotTable } from "@idea10/core/pivot-tables";
-import type { Workbook } from "@idea10/core/workbook";
+import { normalizePivotTable, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import type { PivotDraft } from "./usePivotActions";
 import {
   formatRangeReference,

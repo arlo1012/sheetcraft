@@ -1,4 +1,4 @@
-import type { Point, Rect, Size } from "@idea10/sheet-engine/geometry";
+import type { Point, Rect, Size } from "@sheetcraft/sheet-engine/geometry";
 import { createCanvasPixelGrid } from "../../../shared/canvas/pixel-grid";
 import type { PageViewPaintState } from "../page-view-types";
 

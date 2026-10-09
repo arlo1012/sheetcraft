@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { setCellValue } from "@idea10/core/workbook";
+import { setCellValue } from "@sheetcraft/core/workbook";
 import * as borderPainter from "../../../../../modules/sheet-grid/canvas/border-painter";
 import * as cellScene from "../../../../../modules/sheet-grid/canvas/cell-scene";
 import * as scenePainter from "../../../../../modules/sheet-grid/canvas/scene-painter";
@@ -97,9 +97,9 @@ describe("SheetSurface invalidation", () => {
       return {
         fontFamily: "Arial",
         getPropertyValue(name: string) {
-          if (name === "--idea-surface-panel") return eyeComfort ? "#f3f0dd" : "#ffffff";
-          if (name === "--idea-surface-secondary") return eyeComfort ? "#e8e5cc" : "#f5f6f7";
-          if (name === "--idea-border-subtle") return eyeComfort ? "#d8d3ad" : "#e5e7eb";
+          if (name === "--sheetcraft-surface-panel") return eyeComfort ? "#f3f0dd" : "#ffffff";
+          if (name === "--sheetcraft-surface-secondary") return eyeComfort ? "#e8e5cc" : "#f5f6f7";
+          if (name === "--sheetcraft-border-subtle") return eyeComfort ? "#d8d3ad" : "#e5e7eb";
           return "";
         },
       } as CSSStyleDeclaration;

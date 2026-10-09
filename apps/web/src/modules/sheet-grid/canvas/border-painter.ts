@@ -1,10 +1,10 @@
-import type { Sheet } from "@idea10/core/workbook";
-import type { CellStyle } from "@idea10/core/style";
-import type { CellAddress } from "@idea10/core/workbook";
-import type { SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
-import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
-import type { FrozenPaneId } from "@idea10/sheet-engine/frozen-layout";
-import type { RowVisibilityIndex } from "@idea10/sheet-engine/visibility";
+import type { Sheet } from "@sheetcraft/core/workbook";
+import type { CellStyle } from "@sheetcraft/core/style";
+import type { CellAddress } from "@sheetcraft/core/workbook";
+import type { SheetGeometry, VisibleCellRange } from "@sheetcraft/sheet-engine/geometry";
+import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
+import type { FrozenPaneId } from "@sheetcraft/sheet-engine/frozen-layout";
+import type { RowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import { createCanvasPixelGrid } from "../../../shared/canvas/pixel-grid";
 import { getBorderLinePresentation } from "../../../shared/borders/borderPresentation";
 import {

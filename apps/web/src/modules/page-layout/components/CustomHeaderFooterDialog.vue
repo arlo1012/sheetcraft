@@ -8,7 +8,7 @@ import {
   type SheetHeaderFooterOptions,
   type SheetHeaderFooterParts,
   type SheetPageSetup,
-} from "@idea10/core/page-setup";
+} from "@sheetcraft/core/page-setup";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   DEFAULT_HEADER_FOOTER_FORMAT,
@@ -446,39 +446,39 @@ watch(
 <style scoped lang="scss">
 .header-footer-custom-dialog {
   display: grid;
-  gap: var(--idea-space-3);
+  gap: var(--sheetcraft-space-3);
 
   &__panel {
     display: grid;
-    gap: var(--idea-space-3);
-    padding: var(--idea-tool-panel-padding);
+    gap: var(--sheetcraft-space-3);
+    padding: var(--sheetcraft-tool-panel-padding);
   }
 
   &__instructions {
     display: grid;
-    gap: var(--idea-space-1);
+    gap: var(--sheetcraft-space-1);
 
     p {
       margin: 0;
-      line-height: var(--idea-line-height-body-medium);
+      line-height: var(--sheetcraft-line-height-body-medium);
     }
   }
 
   &__fields {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--idea-space-2);
+    gap: var(--sheetcraft-space-2);
   }
 
   &__field {
     display: grid;
     min-width: 0;
-    gap: var(--idea-space-1);
+    gap: var(--sheetcraft-space-1);
   }
 
   &__error {
     margin: 0;
-    color: var(--idea-status-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

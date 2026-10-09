@@ -1,4 +1,4 @@
-import { parseTsvToCellTexts, serializeCellValuesToTsv } from "@idea10/core/clipboard";
+import { parseTsvToCellTexts, serializeCellValuesToTsv } from "@sheetcraft/core/clipboard";
 import type { DictionaryCategory, WordDictionary, WordRule } from "./proofreading";
 
 export function isSingleWordCategory(category: DictionaryCategory) {

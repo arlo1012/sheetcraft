@@ -109,7 +109,9 @@ onBeforeUnmount(detachInput);
       <template v-for="(segment, index) in segments" :key="index">
         <span
           v-if="segment.reference"
-          :style="{ color: `var(--idea-formula-reference-${segment.reference.colorIndex % 8})` }"
+          :style="{
+            color: `var(--sheetcraft-formula-reference-${segment.reference.colorIndex % 8})`,
+          }"
           data-formula-reference-token
           :data-reference-key="segment.reference.key"
           :data-reference-color="segment.reference.colorIndex"

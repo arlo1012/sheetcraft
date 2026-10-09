@@ -1,4 +1,4 @@
-import { getFormulaFunctionMetadata, type FormulaFunctionMetadata } from "@idea10/core/formula";
+import { getFormulaFunctionMetadata, type FormulaFunctionMetadata } from "@sheetcraft/core/formula";
 
 export const FORMULA_CATEGORY_ORDER = [
   "Financial",

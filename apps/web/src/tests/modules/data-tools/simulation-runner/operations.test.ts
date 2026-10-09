@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createWorkbook } from "@idea10/core/workbook";
+import { createWorkbook } from "@sheetcraft/core/workbook";
 import { runSimulation } from "../../../../modules/data-tools/simulation-runner";
 
 class FakeWorker {

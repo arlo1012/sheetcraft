@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { createWorkbook, getActiveSheet, type FloatingImage } from "@idea10/core/workbook";
+import { createWorkbook, getActiveSheet, type FloatingImage } from "@sheetcraft/core/workbook";
 import type { MessageKey } from "../../../../shared/i18n";
 import type { GridClipboardPort } from "../../../../modules/sheet-grid/gridClipboardPort";
 import { useFloatingImageClipboard } from "../../../../modules/sheet-images/useFloatingImageClipboard";

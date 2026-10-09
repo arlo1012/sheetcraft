@@ -1,7 +1,7 @@
-import { columnIndexToLabel } from "@idea10/core/coordinates";
-import type { SheetDimensionAxis } from "@idea10/core/workbook";
-import type { SelectionMode } from "@idea10/sheet-engine/selection";
-import type { Rect } from "@idea10/sheet-engine/geometry";
+import { columnIndexToLabel } from "@sheetcraft/core/coordinates";
+import type { SheetDimensionAxis } from "@sheetcraft/core/workbook";
+import type { SelectionMode } from "@sheetcraft/sheet-engine/selection";
+import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 import { createCanvasPixelGrid } from "../../../shared/canvas/pixel-grid";
 import type { HeaderItem, HeaderPane, SheetRenderFrame } from "./sheet-render-frame";
 import { paintGripIcon } from "./grip-painter";

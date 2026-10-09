@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
-import type { CellNote } from "@idea10/core/workbook";
+import type { CellNote } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 
 const props = withDefaults(
@@ -124,7 +124,7 @@ defineExpose({ rootElement, save, cancel, dismiss });
   height: 100%;
   min-height: 0;
   padding: 2px 3px;
-  color: var(--idea-note-text);
+  color: var(--sheetcraft-note-text);
   font-family: SimSun, "Songti SC", serif;
   font-size: calc(12px * var(--note-scale, 1));
   line-height: calc(16px * var(--note-scale, 1));
@@ -191,8 +191,8 @@ defineExpose({ rootElement, save, cancel, dismiss });
 
   &__error {
     margin: 0;
-    color: var(--idea-status-error);
-    font-family: var(--idea-font-sans);
+    color: var(--sheetcraft-status-error);
+    font-family: var(--sheetcraft-font-sans);
     font-size: 11px;
     line-height: 14px;
   }

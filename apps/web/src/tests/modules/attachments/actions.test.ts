@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { applyWorkbookCommand, type WorkbookCommand } from "@idea10/core/commands";
-import { createWorkbook, createSheet, getActiveSheet, insertSheet } from "@idea10/core/workbook";
-import type { SheetAttachment } from "@idea10/core/sheet-attachments";
+import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import {
+  createWorkbook,
+  createSheet,
+  getActiveSheet,
+  insertSheet,
+} from "@sheetcraft/core/workbook";
+import type { SheetAttachment } from "@sheetcraft/core/sheet-attachments";
 import { useAttachmentActions } from "../../../modules/attachments/useAttachmentActions";
 import * as files from "../../../modules/attachments/attachment-file";
 

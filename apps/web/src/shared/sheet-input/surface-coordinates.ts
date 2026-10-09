@@ -1,4 +1,4 @@
-import type { Point, Size } from "@idea10/sheet-engine/geometry";
+import type { Point, Size } from "@sheetcraft/sheet-engine/geometry";
 
 /**
  * The browser reports client coordinates after CSS zoom/transforms while sheet

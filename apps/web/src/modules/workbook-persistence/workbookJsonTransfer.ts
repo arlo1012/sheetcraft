@@ -1,5 +1,5 @@
-import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
-import type { Workbook } from "@idea10/core/workbook";
+import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import { prepareImageAsset, MAX_IMAGE_BYTES } from "../image-assets/prepareImageAsset";
 import { collectWorkbookImageAssetIds } from "../image-assets/useImageAssetUrls";
 import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStore";
@@ -192,7 +192,7 @@ export function downloadWorkbookJson(workbook: Workbook): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "idea10-workbook.json";
+  anchor.download = "sheetcraft-workbook.json";
   anchor.style.display = "none";
   document.body.append(anchor);
   anchor.click();
@@ -227,7 +227,7 @@ export async function downloadWorkbookBundle(
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "idea10-workbook.json";
+  anchor.download = "sheetcraft-workbook.json";
   anchor.style.display = "none";
   document.body.append(anchor);
   anchor.click();

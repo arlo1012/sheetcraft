@@ -1,4 +1,4 @@
-import type { CellFillGradient } from "@idea10/core/style";
+import type { CellFillGradient } from "@sheetcraft/core/style";
 
 export type GradientPresetStyle =
   | "horizontal"

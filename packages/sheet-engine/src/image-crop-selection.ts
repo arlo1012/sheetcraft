@@ -1,4 +1,4 @@
-import type { ImageCrop } from "@idea10/core/workbook";
+import type { ImageCrop } from "@sheetcraft/core/workbook";
 import type { FloatingImageResizeDirection } from "./floating-image-layout.js";
 
 export type ImageCropGesture = "move" | FloatingImageResizeDirection;

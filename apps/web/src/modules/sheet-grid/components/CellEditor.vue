@@ -7,7 +7,7 @@ import FormulaTextOverlay from "../../../shared/formula-editing/FormulaTextOverl
 import { getFormulaReferenceTokens } from "../../../shared/formula-editing/formula-reference-tokens";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 import type { CellEditSession } from "../../../shared/cell-editing/useCellEditSession";
-import type { Rect, Size } from "@idea10/sheet-engine/geometry";
+import type { Rect, Size } from "@sheetcraft/sheet-engine/geometry";
 
 const { t } = useAppI18n();
 
@@ -352,8 +352,8 @@ defineExpose({
 
   &.is-editing {
     z-index: 5;
-    background: var(--idea-surface-panel);
-    border-color: var(--idea-action-primary);
+    background: var(--sheetcraft-surface-panel);
+    border-color: var(--sheetcraft-action-primary);
     pointer-events: auto;
   }
 }
@@ -383,8 +383,8 @@ defineExpose({
     padding: 2px 4px;
     overflow: auto;
     scrollbar-width: none;
-    color: var(--idea-text-primary);
-    caret-color: var(--idea-text-primary);
+    color: var(--sheetcraft-text-primary);
+    caret-color: var(--sheetcraft-text-primary);
     line-height: 1.25;
     pointer-events: auto;
 

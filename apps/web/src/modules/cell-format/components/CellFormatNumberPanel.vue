@@ -5,8 +5,8 @@ import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Button as TButton } from "tdesign-vue-next/es/button";
-import type { CellNumberFormatNegativeStyle, CellStylePatch } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type { CellNumberFormatNegativeStyle, CellStylePatch } from "@sheetcraft/core/style";
+import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import { useNumberFormatPanel } from "../number-format/useNumberFormatPanel";
 import NumberFormatCategoryList from "./NumberFormatCategoryList.vue";
@@ -220,9 +220,9 @@ function selectNegative(code: string): void {
   box-sizing: border-box;
   height: 100%;
   min-height: 0;
-  color: var(--idea-text-primary);
-  font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
+  color: var(--sheetcraft-text-primary);
+  font-size: var(--sheetcraft-font-size-body-medium);
+  line-height: var(--sheetcraft-line-height-body-medium);
 
   &__body {
     display: grid;
@@ -238,14 +238,14 @@ function selectNegative(code: string): void {
     min-height: 0;
   }
   &__label {
-    color: var(--idea-text-primary);
-    font-weight: var(--idea-font-weight-medium);
-    line-height: var(--idea-line-height-body-medium);
+    color: var(--sheetcraft-text-primary);
+    font-weight: var(--sheetcraft-font-weight-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
   }
   &__heading {
     margin: 0;
     font-size: inherit;
-    font-weight: var(--idea-font-weight-semibold);
+    font-weight: var(--sheetcraft-font-weight-semibold);
   }
   &__preview {
     display: grid;
@@ -259,13 +259,13 @@ function selectNegative(code: string): void {
     min-width: 0;
     overflow: auto;
     padding: 8px 12px;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
-    color: var(--idea-text-primary);
-    background: var(--idea-surface-panel);
-    font-size: var(--idea-font-size-body-large);
-    font-weight: var(--idea-font-weight-regular);
-    line-height: var(--idea-line-height-body-large);
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-default);
+    color: var(--sheetcraft-text-primary);
+    background: var(--sheetcraft-surface-panel);
+    font-size: var(--sheetcraft-font-size-body-large);
+    font-weight: var(--sheetcraft-font-weight-regular);
+    line-height: var(--sheetcraft-line-height-body-large);
     font-variant-numeric: tabular-nums;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -320,7 +320,7 @@ function selectNegative(code: string): void {
     flex: none;
 
     > .cell-format-number__label {
-      font-weight: var(--idea-font-weight-regular);
+      font-weight: var(--sheetcraft-font-weight-regular);
     }
   }
   &__custom-actions {
@@ -330,15 +330,15 @@ function selectNegative(code: string): void {
   }
   &__error {
     margin: 0;
-    color: var(--idea-status-error);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    color: var(--sheetcraft-status-error);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
   &__description {
     margin: 0;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
 }
 @media (max-width: 480px) {

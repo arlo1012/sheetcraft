@@ -3,9 +3,9 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "idea10",
+      "name": "sheetcraft",
       "devDependencies": {
-        "@idea10/core": "workspace:*",
+        "@sheetcraft/core": "workspace:*",
         "@types/node": "^26.3.0",
         "@vitejs/plugin-vue": "^6.0.8",
         "@vue/test-utils": "^2.4.11",
@@ -20,13 +20,13 @@
       },
     },
     "apps/web": {
-      "name": "@idea10/web",
+      "name": "@sheetcraft/web",
       "version": "0.0.0",
       "dependencies": {
         "@floating-ui/vue": "^2.0.1",
-        "@idea10/core": "workspace:*",
-        "@idea10/sheet-engine": "workspace:*",
-        "@idea10/xlsx-io": "workspace:*",
+        "@sheetcraft/core": "workspace:*",
+        "@sheetcraft/sheet-engine": "workspace:*",
+        "@sheetcraft/xlsx-io": "workspace:*",
         "dictionary-en": "^4.0.0",
         "dictionary-en-gb": "^3.0.0",
         "echarts": "^6.1.0",
@@ -46,7 +46,7 @@
       },
     },
     "packages/core": {
-      "name": "@idea10/core",
+      "name": "@sheetcraft/core",
       "version": "0.1.0",
       "dependencies": {
         "@noble/hashes": "2.0.1",
@@ -56,17 +56,17 @@
       },
     },
     "packages/sheet-engine": {
-      "name": "@idea10/sheet-engine",
+      "name": "@sheetcraft/sheet-engine",
       "version": "0.1.0",
       "dependencies": {
-        "@idea10/core": "workspace:*",
+        "@sheetcraft/core": "workspace:*",
       },
     },
     "packages/xlsx-io": {
-      "name": "@idea10/xlsx-io",
+      "name": "@sheetcraft/xlsx-io",
       "version": "0.1.0",
       "dependencies": {
-        "@idea10/core": "workspace:*",
+        "@sheetcraft/core": "workspace:*",
         "@noble/ciphers": "2.1.1",
         "@noble/hashes": "2.0.1",
         "@scure/base": "2.0.0",
@@ -105,13 +105,13 @@
 
     "@floating-ui/vue": ["@floating-ui/vue@2.0.1", "", { "dependencies": { "@floating-ui/dom": "^1.8.0", "@floating-ui/utils": "^0.2.12" }, "peerDependencies": { "vue": ">=3.3.0" } }, "sha512-043dyEKD9TDSfz080YH2vobubgg+NIo/9Fw4RAl7sEMpD8Am1DNrrSTl/GpMBjyGHoD/FbJY2QLawY+HSQsEIA=="],
 
-    "@idea10/core": ["@idea10/core@workspace:packages/core"],
+    "@sheetcraft/core": ["@sheetcraft/core@workspace:packages/core"],
 
-    "@idea10/sheet-engine": ["@idea10/sheet-engine@workspace:packages/sheet-engine"],
+    "@sheetcraft/sheet-engine": ["@sheetcraft/sheet-engine@workspace:packages/sheet-engine"],
 
-    "@idea10/web": ["@idea10/web@workspace:apps/web"],
+    "@sheetcraft/web": ["@sheetcraft/web@workspace:apps/web"],
 
-    "@idea10/xlsx-io": ["@idea10/xlsx-io@workspace:packages/xlsx-io"],
+    "@sheetcraft/xlsx-io": ["@sheetcraft/xlsx-io@workspace:packages/xlsx-io"],
 
     "@intlify/core-base": ["@intlify/core-base@11.4.10", "", { "dependencies": { "@intlify/devtools-types": "11.4.10", "@intlify/message-compiler": "11.4.10", "@intlify/shared": "11.4.10" } }, "sha512-+yJ74JRWVJokdgG9zYNMyTSzeNV3O9T4vVxk8PvLFHmI+R/BYA//cITh7vhRK37hWLZ4/kTcKcUz1dlWOpypIg=="],
 

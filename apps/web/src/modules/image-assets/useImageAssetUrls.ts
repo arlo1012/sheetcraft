@@ -1,5 +1,5 @@
 import { onBeforeUnmount, readonly, ref, watch } from "vue";
-import type { Workbook } from "@idea10/core/workbook";
+import type { Workbook } from "@sheetcraft/core/workbook";
 import type { ImageAssetStore } from "./imageAssetStore";
 
 export function collectWorkbookImageAssetIds(workbook: Workbook): Set<string> {

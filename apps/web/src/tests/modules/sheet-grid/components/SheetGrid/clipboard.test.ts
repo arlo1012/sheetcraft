@@ -6,10 +6,10 @@ import {
   setCellContent,
   setCellStyle,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "@sheetcraft/core/workbook";
 import {
-  IDEA10_CLIPBOARD_TYPE,
-  WEB_IDEA10_CLIPBOARD_TYPE,
+  SHEETCRAFT_CLIPBOARD_TYPE,
+  WEB_SHEETCRAFT_CLIPBOARD_TYPE,
 } from "../../../../../modules/sheet-grid/gridClipboardPort";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { createTestClipboardEvent } from "./clipboard-fixture";
@@ -178,12 +178,12 @@ describe("SheetGrid clipboard", () => {
 
     const cut = createTestClipboardEvent("cut");
     wrapper.get("textarea.cell-editor").element.dispatchEvent(cut.event);
-    const token = cut.data.get(IDEA10_CLIPBOARD_TYPE);
+    const token = cut.data.get(SHEETCRAFT_CLIPBOARD_TYPE);
     expect(token).toBeTruthy();
 
     const webClipboardData = new Map(cut.data);
-    webClipboardData.delete(IDEA10_CLIPBOARD_TYPE);
-    webClipboardData.set(WEB_IDEA10_CLIPBOARD_TYPE, token ?? "");
+    webClipboardData.delete(SHEETCRAFT_CLIPBOARD_TYPE);
+    webClipboardData.set(WEB_SHEETCRAFT_CLIPBOARD_TYPE, token ?? "");
     await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0 });
     wrapper
       .get("textarea.cell-editor")

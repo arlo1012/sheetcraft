@@ -9,7 +9,7 @@ import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuSearch from "../../../shared/menu/MenuSearch.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
-import type { Sheet } from "@idea10/core/workbook";
+import type { Sheet } from "@sheetcraft/core/workbook";
 import { getVisibleSheets } from "../sheet-navigation";
 
 const props = defineProps<{
@@ -180,8 +180,8 @@ watch(open, (isOpen) => {
 
 <style scoped lang="scss">
 .workbook-sheet-navigator {
-  font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
+  font-size: var(--sheetcraft-font-size-body-medium);
+  line-height: var(--sheetcraft-line-height-body-medium);
 
   &__trigger {
     display: inline-grid;
@@ -192,9 +192,9 @@ watch(open, (isOpen) => {
     padding: 0;
     background: transparent;
     border: 0;
-    border-right: 1px solid var(--idea-sheet-bar-border);
+    border-right: 1px solid var(--sheetcraft-sheet-bar-border);
     border-radius: 0;
-    color: var(--idea-text-secondary);
+    color: var(--sheetcraft-text-secondary);
     cursor: pointer;
 
     &--overflow {
@@ -206,11 +206,11 @@ watch(open, (isOpen) => {
 
   &__menu {
     position: fixed;
-    z-index: var(--idea-layer-menu);
+    z-index: var(--sheetcraft-layer-menu);
     display: flex;
     flex-direction: column;
-    width: min(180px, calc(100vw - var(--idea-space-4) - var(--idea-space-4)));
-    max-height: min(320px, calc(100vh - var(--idea-space-4) - var(--idea-space-4)));
+    width: min(180px, calc(100vw - var(--sheetcraft-space-4) - var(--sheetcraft-space-4)));
+    max-height: min(320px, calc(100vh - var(--sheetcraft-space-4) - var(--sheetcraft-space-4)));
   }
 
   &__item {
@@ -220,9 +220,9 @@ watch(open, (isOpen) => {
 
   &__empty {
     padding: 6px 14px;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
     list-style: none;
   }
 
@@ -230,17 +230,17 @@ watch(open, (isOpen) => {
     flex: 0 0 auto;
     padding: 6px 14px;
     list-style: none;
-    color: var(--idea-text-muted);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
-    font-weight: var(--idea-font-weight-medium);
+    color: var(--sheetcraft-text-muted);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
+    font-weight: var(--sheetcraft-font-weight-medium);
   }
 
   &__color {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    border: 1px solid var(--idea-border-subtle);
+    border: 1px solid var(--sheetcraft-border-subtle);
   }
 }
 </style>

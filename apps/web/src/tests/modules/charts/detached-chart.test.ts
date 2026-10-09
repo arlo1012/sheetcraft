@@ -8,11 +8,11 @@ import {
   getActiveSheet,
   createSheetEvaluator,
   setCellContent,
-} from "@idea10/core/workbook";
-import { createWorkbookSession, executeWorkbookCommand } from "@idea10/core/history";
-import { createSequentialIdFactory } from "@idea10/core/runtime";
-import type { WorkbookCommand } from "@idea10/core/commands";
-import type { SheetChartDrawing } from "@idea10/core/sheet-drawings";
+} from "@sheetcraft/core/workbook";
+import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
+import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import type { WorkbookCommand } from "@sheetcraft/core/commands";
+import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import ChartEditorDialog from "../../../modules/charts/components/ChartEditorDialog.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useChartActions } from "../../../modules/charts/useChartActions";
