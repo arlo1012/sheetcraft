@@ -1,0 +1,14 @@
+timestamp=2026-10-09T19:01:52Z
+cwd=/workspace/shared/new-project-20261009
+bun=1.3.11
+node=v24.19.0
+command=bun run build:packages
+$ bun run build:core && bun run build:sheet-engine && bun run build:xlsx-io
+$ bun run --filter @sheetcraft/core build
+@sheetcraft/core build: Exited with code 0
+$ bun run --filter @sheetcraft/sheet-engine build
+@sheetcraft/sheet-engine build: Exited with code 0
+$ bun run --filter @sheetcraft/xlsx-io build
+@sheetcraft/xlsx-io build: Exited with code 0
+
+exit_code=0

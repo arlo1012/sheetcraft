@@ -1,0 +1,7 @@
+timestamp=2026-10-09T19:03:00Z
+cwd=/workspace/shared/new-project-20261009
+command=bun run lint:xlsx-io && bun run lint:tools
+$ oxlint --deny-warnings packages/xlsx-io/src packages/xlsx-io/vitest.config.ts
+$ oxlint --deny-warnings scripts tools/compatibility-lab/src tools/compatibility-lab/scripts tools/compatibility-lab/tests tools/compatibility-lab/vitest.config.ts
+
+exit_code=0

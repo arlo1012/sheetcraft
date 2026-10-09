@@ -1,0 +1,6 @@
+timestamp=2026-10-09T19:03:00Z
+cwd=/workspace/shared/new-project-20261009
+command=bun scripts/verify-package-imports.mts
+Built package imports passed for @sheetcraft/core, @sheetcraft/sheet-engine, @sheetcraft/xlsx-io.
+
+exit_code=0

@@ -1,0 +1,320 @@
+Started UTC: 2026-10-09T19:02:49Z
+Bun: 1.3.11
+Node: v24.19.0
+$ vitest run --config vitest.config.ts "--maxWorkers=1" "--reporter=default" "--reporter=json" "--outputFile.json=/workspace/shared/validation-20261009/recovery-core-vitest.json"
+
+ RUN  v4.1.11 /workspace/shared/new-project-20261009/packages/core
+
+ ✓ src/tests/tables/tables.test.ts (30 tests) 135ms
+ ✓ src/tests/commands/style.test.ts (25 tests) 42ms
+ ✓ src/tests/commands/structure.test.ts (26 tests) 68ms
+ ✓ src/tests/commands/sort.test.ts (21 tests) 68ms
+ ✓ src/tests/commands/data-transforms.test.ts (21 tests) 61ms
+ ✓ src/tests/serialization/serialization.test.ts (24 tests) 45ms
+ ✓ src/tests/conditional-formatting/conditional-formatting.test.ts (20 tests) 24ms
+ ✓ src/tests/pivot-tables/field-filters.test.ts (42 tests) 107ms
+ ✓ src/tests/commands/filter.test.ts (15 tests) 344ms
+     ✓ keeps hidden intervals sparse across a million rows and refreshes formula dependencies  311ms
+ ✓ src/tests/commands/metadata.test.ts (16 tests) 80ms
+ ✓ src/tests/images/images.test.ts (12 tests) 40ms
+ ✓ src/tests/commands/duplicates.test.ts (15 tests) 40ms
+ ✓ src/tests/pivot-tables/grouping.test.ts (39 tests) 78ms
+ ✓ src/tests/commands/sheets.test.ts (14 tests) 52ms
+ ✓ src/tests/conditional-formatting/conditional-formatting-visual.test.ts (12 tests) 333ms
+     ✓ handles large sparse numeric scopes without spread-argument limits  310ms
+ ✓ src/tests/pivot-tables/value-settings.test.ts (37 tests) 83ms
+ ✓ src/tests/commands/transport.test.ts (7 tests) 35ms
+ ✓ src/tests/formula/workbook-cross-sheet.test.ts (12 tests) 2209ms
+     ✓ evaluates a deep cross-sheet direct-reference chain without recursion  1072ms
+     ✓ schedules a deep cross-sheet lazy chain with expression and name dependencies  1102ms
+ ✓ src/tests/commands/consolidate/consolidate.test.ts (23 tests) 26ms
+ ✓ src/tests/commands/cell-shift.test.ts (11 tests) 36ms
+ ✓ src/tests/commands/data-validation-outline.test.ts (11 tests) 40ms
+ ✓ src/tests/commands/page-setup.test.ts (9 tests) 36ms
+ ✓ src/tests/style/model.test.ts (9 tests) 14ms
+ ✓ src/tests/commands/paste.test.ts (9 tests) 21ms
+ ✓ src/tests/search/search.test.ts (13 tests) 25ms
+ ✓ src/tests/pivot-tables/details.test.ts (15 tests) 93ms
+ ✓ src/tests/planning-solver/planning-solver.test.ts (14 tests) 362ms
+ ✓ src/tests/history/replaceable-commands.test.ts (10 tests) 24ms
+ ✓ src/tests/pivot-tables/result-protection.test.ts (17 tests) 84ms
+ ✓ src/tests/commands/cell-value-conversion/conversion.test.ts (13 tests) 28ms
+ ✓ src/tests/commands/filter-wps-conditions.test.ts (7 tests) 37ms
+ ✓ src/tests/pivot-tables/wps-report.test.ts (11 tests) 48ms
+ ✓ src/tests/commands/advanced-filter.test.ts (6 tests) 30ms
+ ✓ src/tests/formula/workbook-evaluate.test.ts (13 tests) 846ms
+     ✓ evaluates a 15k nested IF dependency chain without using the JavaScript call stack  589ms
+ ✓ src/tests/formula/structured-tables.test.ts (8 tests) 41ms
+ ✓ src/tests/sparklines/sparklines.test.ts (24 tests) 37ms
+ ✓ src/tests/data-proofreading/data-proofreading.test.ts (7 tests) 28ms
+ ❯ src/tests/cell-styles/cell-styles.test.ts (8 tests | 1 failed) 28ms
+     ✓ provides the WPS gallery groups through stable IDs 3ms
+     ✓ materializes a named style and restores all old fields when Normal is undone 5ms
+     × serializes custom definitions and rejects non-custom snapshot entries 9ms
+     ✓ reports invalid custom libraries as command payload errors 1ms
+     ✓ updates bound custom styles while retaining a direct key override 2ms
+     ✓ uses updated style include groups for existing bindings without clearing direct overrides 2ms
+     ✓ allows unrelated library additions on a protected sheet but blocks an applied style edit 1ms
+     ✓ keeps hyperlink target and display text through undo, redo, and visit state 5ms
+ ❯ src/tests/commands/protection.test.ts (8 tests | 1 failed) 33ms
+     ✓ allows unlocked cells and edit exceptions, rejects a mixed batch atomically 10ms
+     ✓ format permission never permits changing lock state 1ms
+     ✓ structure protection blocks every sheet structure command and supports undo 4ms
+     ✓ protected autofill retains destination lock and format and rejects a locked target atomically 3ms
+     ✓ dimension permissions allow row formatting and undo while rejecting column formatting 1ms
+     × snapshot roundtrip preserves protection and validates ranges 6ms
+     ✓ edit ranges move with row insert/delete/move and restore on undo 6ms
+     ✓ range permission combines overlapping exceptions with sparse unlocked cells 1ms
+ ✓ src/tests/commands/sort-icons.test.ts (4 tests) 28ms
+ ✓ src/tests/style-state/selection-state.test.ts (7 tests) 10ms
+ ✓ src/tests/conditional-formatting/clipboard-commands.test.ts (6 tests) 41ms
+ ✓ src/tests/images/picture-style.test.ts (28 tests) 28ms
+ ✓ src/tests/commands/fill-series/fill-series.test.ts (6 tests) 39ms
+ ✓ src/tests/commands/protection-permissions.test.ts (6 tests) 30ms
+ ✓ src/tests/pivot-tables/references.test.ts (15 tests) 90ms
+ ✓ src/tests/commands/fill-batch/fill-batch.test.ts (9 tests) 24ms
+ ✓ src/tests/pivot-tables/presentation.test.ts (14 tests) 45ms
+ ✓ src/tests/camera/camera.test.ts (21 tests) 32ms
+ ✓ src/tests/pivot-tables/consolidation.test.ts (10 tests) 45ms
+ ✓ src/tests/number-format/number-format.test.ts (9 tests) 19ms
+ ✓ src/tests/commands/fill-numbers/fill-numbers.test.ts (6 tests) 18ms
+ ✓ src/tests/pivot-tables/aggregation.test.ts (17 tests) 69ms
+ ❯ src/tests/commands/notes.test.ts (7 tests | 1 failed) 34ms
+     ✓ edits a note through history and preserves its content cell 5ms
+     × round-trips notes in V21 snapshots and copies, pastes, and clears them with cells 7ms
+     ✓ validates a note batch before changing any cell 1ms
+     ✓ infers V20 for a standalone note-only sheet 2ms
+     ✓ loads V20 notes without geometry and infers V21 standalone geometry 2ms
+     ✓ rejects invalid note geometry before recording history 0ms
+     ✓ carries notes through axes, sorting, and copy autofill 15ms
+ ✓ src/tests/form-controls/form-controls.test.ts (33 tests) 39ms
+ ✓ src/tests/pivot-tables/commands.test.ts (8 tests) 60ms
+ ✓ src/tests/goal-seek/goal-seek.test.ts (7 tests) 36ms
+ ✓ src/tests/pivot-tables/wps-range-report.test.ts (8 tests) 66ms
+ ✓ src/tests/commands/subtotal/labels.test.ts (6 tests) 75ms
+ ✓ src/tests/commands/page-decoration.test.ts (8 tests) 16ms
+ ✓ src/tests/cell-autofill/sequences.test.ts (6 tests) 19ms
+ ✓ src/tests/commands/lookup-fill/lookup-fill.test.ts (5 tests) 19ms
+ ✓ src/tests/filter-values/text-conditions.test.ts (21 tests) 20ms
+ ✓ src/tests/pivot-tables/detached-chart.test.ts (9 tests) 73ms
+ ✓ src/tests/commands/data-comparison/commands.test.ts (5 tests) 26ms
+ ✓ src/tests/formula/workbook-references.test.ts (6 tests) 29ms
+ ✓ src/tests/commands/merged-borders.test.ts (5 tests) 23ms
+ ✓ src/tests/go-to/go-to.test.ts (5 tests) 12ms
+ ✓ src/tests/formula/registry-coverage.test.ts (995 tests) 130ms
+ ✓ src/tests/pivot-tables/sort-fields.test.ts (14 tests) 47ms
+ ✓ src/tests/tables/settings-resize.test.ts (5 tests) 45ms
+ ✓ src/tests/images/annotations.test.ts (27 tests) 23ms
+ ✓ src/tests/drawings/drawings.test.ts (23 tests) 27ms
+ ✓ src/tests/data-table/runtime.test.ts (7 tests) 26ms
+ ✓ src/tests/conditional-formatting/conditional-formatting-move.test.ts (8 tests) 14ms
+ ✓ src/tests/formula/parser.test.ts (20 tests) 12ms
+ ✓ src/tests/serialization/v3-foundation.test.ts (8 tests) 29ms
+ ✓ src/tests/commands/workbook-settings/theme.test.ts (4 tests) 19ms
+ ✓ src/tests/commands/names/order.test.ts (9 tests) 18ms
+ ✓ src/tests/commands/resize-dimensions.test.ts (7 tests) 10ms
+ ✓ src/tests/commands/flash-fill/flash-fill.test.ts (6 tests) 33ms
+ ✓ src/tests/commands/names-from-selection/creation.test.ts (5 tests) 18ms
+ ✓ src/tests/formula/math-statistical-database.test.ts (8 tests) 15ms
+ ✓ src/tests/commands/move-range.test.ts (7 tests) 19ms
+ ✓ src/tests/number-format/special-number-formats.test.ts (4 tests) 18ms
+ ✓ src/tests/pivot-tables/chart-format.test.ts (7 tests) 31ms
+ ✓ src/tests/formula/evaluate.test.ts (18 tests) 12ms
+ ✓ src/tests/formula/runtime-functions.test.ts (8 tests) 13ms
+ ✓ src/tests/data-table/creation.test.ts (5 tests) 25ms
+ ✓ src/tests/formula/reference-model/reference-model.test.ts (8 tests) 7ms
+ ✓ src/tests/commands/fill-validation/fill-validation.test.ts (6 tests) 12ms
+ ✓ src/tests/charts/chart-structure.test.ts (10 tests) 31ms
+ ✓ src/tests/formula/financial-functions.test.ts (13 tests) 15ms
+ ✓ src/tests/cell-autofill/dates-edge.test.ts (6 tests) 37ms
+ ✓ src/tests/formula/references.test.ts (10 tests) 10ms
+ ✓ src/tests/pivot-tables/empty-reports.test.ts (9 tests) 41ms
+ ✓ src/tests/pivot-tables/serialization.test.ts (8 tests) 38ms
+ ✓ src/tests/commands/conditional-formatting-visual-state.test.ts (7 tests) 32ms
+ ✓ src/tests/flash-fill/inference.test.ts (12 tests) 33ms
+ ✓ src/tests/commands/data-comparison/validation.test.ts (3 tests) 10ms
+ ✓ src/tests/commands/subtotal/column-lifecycle.test.ts (3 tests) 37ms
+ ✓ src/tests/charts/chart-data.test.ts (7 tests) 12ms
+ ✓ src/tests/formula/iterative-calculation/iterative-calculation.test.ts (9 tests) 64ms
+ ✓ src/tests/formula/calculation-session/manual.test.ts (3 tests) 15ms
+ ✓ src/tests/formula/value-contracts/value-contracts.test.ts (15 tests) 15ms
+ ✓ src/tests/history/commands.test.ts (5 tests) 14ms
+ ✓ src/tests/formula/function-categories.test.ts (3 tests) 15ms
+ ✓ src/tests/attachments/attachments.test.ts (22 tests) 260ms
+ ✓ src/tests/selection-summary/summary.test.ts (5 tests) 29ms
+ ✓ src/tests/formula/dynamic-array.test.ts (6 tests) 13ms
+ ✓ src/tests/merged-cells/model.test.ts (6 tests) 62ms
+ ✓ src/tests/formula/date-system/date-system.test.ts (6 tests) 7ms
+ ✓ src/tests/formula/database-functions.test.ts (4 tests) 8ms
+ ✓ src/tests/planning-evolutionary/planning-evolutionary.test.ts (7 tests) 17ms
+ ✓ src/tests/formula/time-part-functions.test.ts (10 tests) 12ms
+ ✓ src/tests/serialization/legacy-compatibility.test.ts (22 tests) 29ms
+ ✓ src/tests/formula/lookup-functions.test.ts (7 tests) 10ms
+ ✓ src/tests/data-table/operations.test.ts (4 tests) 23ms
+ ✓ src/tests/commands/merge-formula-values.test.ts (2 tests) 21ms
+ ✓ src/tests/merged-cells/axis-transform.test.ts (4 tests) 6ms
+ ✓ src/tests/formula/workbook-spill.test.ts (5 tests) 17ms
+ ✓ src/tests/formula/function-regressions.test.ts (4 tests) 13ms
+ ✓ src/tests/formula/date-functions.test.ts (7 tests) 13ms
+ ✓ src/tests/formula/expanded-functions.test.ts (4 tests) 11ms
+ ✓ src/tests/commands/data-comparison/comparison.test.ts (3 tests) 8ms
+ ✓ src/tests/formula/text-functions.test.ts (7 tests) 20ms
+ ✓ src/tests/commands/cell-format-merge.test.ts (3 tests) 20ms
+ ✓ src/tests/workbook/model.test.ts (7 tests) 8ms
+ ✓ src/tests/commands/sort-method.test.ts (3 tests) 20ms
+ ✓ src/tests/commands/clear-range.test.ts (3 tests) 10ms
+ ✓ src/tests/data-validation/list-values.test.ts (8 tests) 24ms
+ ✓ src/tests/formula/workbook-subtotal.test.ts (3 tests) 16ms
+ ✓ src/tests/history/formula-foundation.test.ts (2 tests) 30ms
+ ✓ src/tests/formula/workbook-iteration.test.ts (4 tests) 17ms
+ ✓ src/tests/commands/subtotal/transaction.test.ts (2 tests) 27ms
+ ❯ src/tests/commands/conditional-formatting-state.test.ts (2 tests | 1 failed) 18ms
+     × persists rules and restores an exact state through undo and redo 13ms
+     ✓ subtracts a cleared rectangle while retaining the rule anchor and fragments 3ms
+ ✓ src/tests/commands/batch.test.ts (3 tests) 20ms
+ ✓ src/tests/cell-autofill/dates.test.ts (2 tests) 15ms
+ ✓ src/tests/workbook/sheets.test.ts (4 tests) 6ms
+ ✓ src/tests/number-format/date-locales.test.ts (12 tests) 14ms
+ ✓ src/tests/clipboard/content.test.ts (4 tests) 10ms
+ ✓ src/tests/pivot-tables/rank-modes.test.ts (6 tests) 12ms
+ ✓ src/tests/data-validation/bound-references.test.ts (1 test) 11ms
+ ✓ src/tests/clipboard/paste-plan.test.ts (5 tests) 4ms
+ ✓ src/tests/dimension-units/dimension-units.test.ts (9 tests) 12ms
+ ✓ src/tests/commands/workbook-settings/workbook-settings.test.ts (2 tests) 10ms
+ ✓ src/tests/planning-grg/planning-grg.test.ts (4 tests) 6ms
+ ❯ src/tests/commands/workbook-settings/calculation.test.ts (2 tests | 1 failed) 14ms
+     × persists all settings and supports undo/redo 9ms
+     ✓ loads V8 with default policy and rejects invalid iteration settings atomically 4ms
+ ✓ src/tests/commands/subtotal/column-metadata.test.ts (2 tests) 13ms
+ ✓ src/tests/commands/names/comments.test.ts (3 tests) 11ms
+ ✓ src/tests/planning-grg-discrete/planning-grg-discrete.test.ts (4 tests) 5ms
+ ✓ src/tests/workbook/sheet-publication.test.ts (2 tests) 5ms
+ ✓ src/tests/commands/contents.test.ts (2 tests) 9ms
+ ✓ src/tests/serialization/subtotal-generated-columns.test.ts (4 tests) 9ms
+ ✓ src/tests/clipboard/tsv.test.ts (5 tests) 6ms
+ ✓ src/tests/commands/rename-history.test.ts (2 tests) 11ms
+ ✓ src/tests/input/content.test.ts (7 tests) 4ms
+ ✓ src/tests/formula/autosum.test.ts (3 tests) 4ms
+ ✓ src/tests/formula/statistical-errors.test.ts (2 tests) 8ms
+ ✓ src/tests/formula/engineering-functions.test.ts (4 tests) 9ms
+ ✓ src/tests/merged-cells/resolver.test.ts (3 tests) 14ms
+ ✓ src/tests/protection-password.test.ts (4 tests) 10ms
+ ✓ src/tests/merged-cells/selection.test.ts (3 tests) 4ms
+ ✓ src/tests/serialization/subtotal-metadata.test.ts (1 test) 7ms
+ ✓ src/tests/coordinates/coordinates.test.ts (3 tests) 4ms
+ ✓ src/tests/input/numeric-text.test.ts (16 tests) 5ms
+ ✓ src/tests/cell-autofill/boundaries.test.ts (1 test) 4ms
+ ✓ src/tests/input/formatting.test.ts (3 tests) 3ms
+ ✓ src/tests/formula/information-functions.test.ts (1 test) 6ms
+ ✓ src/tests/input/text.test.ts (5 tests) 3ms
+ ✓ src/tests/input/number.test.ts (2 tests) 3ms
+ ✓ src/tests/input/boolean.test.ts (1 test) 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/cell-styles/cell-styles.test.ts > named cell styles > serializes custom definitions and rejects non-custom snapshot entries
+AssertionError: expected 42 to be 21 // Object.is equality
+
+- Expected
++ Received
+
+- 21
++ 42
+
+ ❯ src/tests/cell-styles/cell-styles.test.ts:76:30
+     74|     );
+     75|     const snapshot = serializeWorkbook(session.workbook);
+     76|     expect(snapshot.version).toBe(21);
+       |                              ^
+     77|     expect(snapshot.cellStyles).toEqual([custom]);
+     78|     expect(deserializeWorkbook(snapshot).cellStyles).toEqual([custom]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/tests/commands/conditional-formatting-state.test.ts > conditional-formatting commands > persists rules and restores an exact state through undo and redo
+AssertionError: expected 42 to be 21 // Object.is equality
+
+- Expected
++ Received
+
+- 21
++ 42
+
+ ❯ src/tests/commands/conditional-formatting-state.test.ts:33:31
+     31|     ).toBe(true);
+     32|     const persisted = serializeWorkbook(session.workbook);
+     33|     expect(persisted.version).toBe(21);
+       |                               ^
+     34|     expect(deserializeWorkbook(persisted).sheets.get(sheet.id)?.condit…
+     35|     expect(deserializeSheet(serializeSheet(sheet)).conditionalFormats)…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/tests/commands/notes.test.ts > cell notes > round-trips notes in V21 snapshots and copies, pastes, and clears them with cells
+AssertionError: expected 42 to be 21 // Object.is equality
+
+- Expected
++ Received
+
+- 21
++ 42
+
+ ❯ src/tests/commands/notes.test.ts:76:30
+     74|
+     75|     const snapshot = serializeWorkbook(session.workbook);
+     76|     expect(snapshot.version).toBe(21);
+       |                              ^
+     77|     expect(deserializeWorkbook(snapshot).sheets.get(sheet.id)?.cells.g…
+     78|       text: "Review source",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/tests/commands/protection.test.ts > workbook and sheet protection > snapshot roundtrip preserves protection and validates ranges
+AssertionError: expected 42 to be 23 // Object.is equality
+
+- Expected
++ Received
+
+- 23
++ 42
+
+ ❯ src/tests/commands/protection.test.ts:144:30
+    142|     f.run(createSetWorkbookStructureProtectionCommand(true));
+    143|     const snapshot = serializeWorkbook(f.workbook);
+    144|     expect(snapshot.version).toBe(23);
+       |                              ^
+    145|     const loaded = deserializeWorkbook(snapshot);
+    146|     expect(loaded.structureProtected).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/tests/commands/workbook-settings/calculation.test.ts > workbook calculation settings > persists all settings and supports undo/redo
+AssertionError: expected 42 to be 21 // Object.is equality
+
+- Expected
++ Received
+
+- 21
++ 42
+
+ ❯ src/tests/commands/workbook-settings/calculation.test.ts:25:30
+     23|     );
+     24|     const snapshot = serializeWorkbook(session.workbook);
+     25|     expect(snapshot.version).toBe(21);
+       |                              ^
+     26|     expect(deserializeWorkbook(snapshot).calculation).toEqual(settings…
+     27|     expect(undoWorkbookCommand(session)).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  5 failed | 167 passed (172)
+      Tests  5 failed | 2567 passed (2572)
+   Start at  12:02:49
+   Duration  81.58s (transform 2.70s, setup 0ms, import 49.00s, tests 8.91s, environment 16ms)
+
+JSON report written to /workspace/shared/validation-20261009/recovery-core-vitest.json
+error: script "test" exited with code 1
+
+Exit code: 1
+Finished UTC: 2026-10-09T19:04:11Z

@@ -1,0 +1,15 @@
+bun install v1.3.11 (af24e281)
+
++ @types/node@26.3.0
++ @vitejs/plugin-vue@6.0.8
++ @vue/test-utils@2.4.11
++ happy-dom@20.11.6
++ oxfmt@0.65.0
++ oxlint@1.80.0
++ sass@1.103.1
++ typescript@6.0.3
++ vite@8.2.2
++ vitest@4.1.11
++ vue-tsc@3.3.11
+
+398 packages installed [23.56s]

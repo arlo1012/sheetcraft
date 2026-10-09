@@ -1,0 +1,7 @@
+timestamp=2026-10-09T19:03:02Z
+cwd=/workspace/shared/new-project-20261009
+command=bun scripts/verify-worker-bundle.mts && bun scripts/verify-xlsx-worker.mts
+Worker browser bundle and workbook command round trip passed for @sheetcraft/core, @sheetcraft/sheet-engine (618 exports).
+Browser-target XLSX Worker bundle, codec round trip, image media/anchors, and malformed-archive gate passed.
+
+exit_code=0

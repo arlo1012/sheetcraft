@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-09T19:03:55.313210+00:00",
+  "pinnedSourceCommit": "897addc40fdeec3837837823172a30d4f0f5b8e8",
+  "evidenceKind": "fresh checks executed after recovery; historical records were not counted as fresh passes",
+  "runtime": {
+    "bun": "1.3.11",
+    "node": "v24.19.0",
+    "vitest": "4.1.11"
+  },
+  "checks": [
+    {
+      "name": "build_packages",
+      "command": "bun run build:packages",
+      "status": "passed",
+      "exitCode": 0,
+      "logFile": "logs/recovery-build-packages.log",
+      "logSha256": "6b9477378fefbaffbafbe14ab517347d6c0addc3eb3600e04f60535fdee295ed",
+      "startedAt": "2026-10-09T19:01:52Z",
+      "rawLogSha256": "6b9477378fefbaffbafbe14ab517347d6c0addc3eb3600e04f60535fdee295ed",
+      "logNormalization": "trailing whitespace removed; content and execution result preserved"
+    },
+    {
+      "name": "xlsx_tests",
+      "command": "bun run test:xlsx-io --maxWorkers=1 --no-file-parallelism",
+      "status": "passed",
+      "exitCode": 0,
+      "logFile": "logs/recovery-xlsx-tests.log",
+      "logSha256": "2a8ddce1fb3c31ff43e5cfb18c83310382a26dd86f6d2f3ceecdb5a834f5f985",
+      "startedAt": "2026-10-09T19:02:08Z",
+      "passedFiles": 62,
+      "totalFiles": 62,
+      "passedTests": 632,
+      "totalTests": 632,
+      "durationSeconds": 50.64,
+      "maxWorkers": 1,
+      "fileParallelism": false,
+      "expectedCheckpointCountsMatch": true,
+      "rawLogSha256": "568c933de52cb23512608ae329a8c16214e732bfefbfd28cee46fc4d8a6be861",
+      "logNormalization": "trailing whitespace removed; content and execution result preserved"
+    },
+    {
+      "name": "xlsx_typecheck",
+      "command": "bun run typecheck:xlsx-io",
+      "status": "passed",
+      "exitCode": 0,
+      "logFile": "logs/recovery-xlsx-typecheck.log",
+      "logSha256": "70f30fcaf8f81b75cbb8682abfdaf4a39d8bb01569092dcd691228e63ff62bdc",
+      "startedAt": "2026-10-09T19:02:35Z",
+      "rawLogSha256": "70f30fcaf8f81b75cbb8682abfdaf4a39d8bb01569092dcd691228e63ff62bdc",
+      "logNormalization": "trailing whitespace removed; content and execution result preserved"
+    },
+    {
+      "name": "xlsx_tools_lint",
+      "command": "bun run lint:xlsx-io && bun run lint:tools",
+      "status": "passed",
+      "exitCode": 0,
+      "logFile": "logs/recovery-xlsx-tools-lint.log",
+      "logSha256": "22f5100eca15c8a2b5af7c07e2bc4fd763b0198afacc132254c6ea66f5c38416",
+      "startedAt": "2026-10-09T19:03:00Z",
+      "rawLogSha256": "22f5100eca15c8a2b5af7c07e2bc4fd763b0198afacc132254c6ea66f5c38416",
+      "logNormalization": "trailing whitespace removed; content and execution result preserved"
+    },
+    {
+      "name": "public_package_imports",
+      "command": "bun scripts/verify-package-imports.mts",
+      "status": "passed",
+      "exitCode": 0,
+      "logFile": "logs/recovery-public-package-imports.log",
+      "logSha256": "014b1015d949d0dc024b940c06adb36a3193e8a72ddd0d5933ad966972395b4f",
+      "startedAt": "2026-10-09T19:03:00Z",
+      "rawLogSha256": "014b1015d949d0dc024b940c06adb36a3193e8a72ddd0d5933ad966972395b4f",
+      "logNormalization": "trailing whitespace removed; content and execution result preserved"
+    },
+    {
+      "name": "worker_verification",
+      "command": "bun scripts/verify-worker-bundle.mts && bun scripts/verify-xlsx-worker.mts",
+      "status": "passed",
+      "exitCode": 0,
+      "logFile": "logs/recovery-worker-verification.log",
+      "logSha256": "190b15047698098e78d205db5437d7a5bf07fa4aa52136a5c9715fe6d2bd1f58",
+      "startedAt": "2026-10-09T19:03:02Z",
+      "executionRuntime": "Bun Worker runtime after browser-target bundling; not Chrome/browser E2E",
+      "rawLogSha256": "190b15047698098e78d205db5437d7a5bf07fa4aa52136a5c9715fe6d2bd1f58",
+      "logNormalization": "trailing whitespace removed; content and execution result preserved"
+    },
+    {
+      "name": "pinned_source_integrity",
+      "command": "node scripts/recovery/verify-pinned-source.mjs . docs/recovery/source-manifest-897addc.json /workspace/shared/validation-20261009/recovery-xlsx-source-integrity.json",
+      "status": "passed",
+      "exitCode": 0,
+      "logFile": "logs/recovery-xlsx-source-integrity.log",
+      "logSha256": "ecdf71fbcf9a87286a816f9c9cd5568600dde8821090e43417bd38a4a58c2abe"
+    }
+  ],
+  "pinnedSourceIntegrity": {
+    "schemaVersion": 1,
+    "observedAt": "2026-10-09T19:03:31.466Z",
+    "pinnedCommit": "897addc40fdeec3837837823172a30d4f0f5b8e8",
+    "expectedFiles": 1674,
+    "verifiedFiles": 1674,
+    "missing": [],
+    "mismatches": []
+  },
+  "dependencyIntegrity": {
+    "unchanged": true,
+    "verifiedFiles": 7
+  },
+  "sourceFilesEditedByThisTask": [],
+  "buildArtifactsReused": true,
+  "scopeLimitations": [
+    "Whole-workspace CI was not rerun; known baseline failures remain disclosed.",
+    "These checks do not establish Calc, Excel-web or WPS visual/save-and-reopen acceptance."
+  ],
+  "wholeWorkspaceCiGreenClaimed": false
+}

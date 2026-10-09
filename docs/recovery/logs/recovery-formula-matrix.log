@@ -1,0 +1,17 @@
+Started UTC: 2026-10-09T19:03:00Z
+$ bun scripts/compatibility/formula-regression-matrix.mts --check
+603 | ] as const) {
+604 |   const formatted = await format(path, rawText, { printWidth: 100 });
+605 |   if (formatted.errors.length) throw new Error(`Could not format ${path}`);
+606 |   const text = formatted.code;
+607 |   if (process.argv.includes("--check")) {
+608 |     if (source(path) !== text) throw new Error(`Stale ${path}; regenerate the matrix.`);
+                                               ^
+error: Stale docs/formula-regression-matrix.json; regenerate the matrix.
+      at /workspace/shared/new-project-20261009/scripts/compatibility/formula-regression-matrix.mts:608:42
+
+Bun v1.3.11 (Linux x64)
+error: script "check:formula-regression" exited with code 1
+
+Exit code: 1
+Finished UTC: 2026-10-09T19:03:01Z

@@ -1,0 +1,6 @@
+Started UTC: 2026-10-09T19:03:01Z
+$ bun run --filter @sheetcraft/core typecheck
+@sheetcraft/core typecheck: Exited with code 0
+
+Exit code: 0
+Finished UTC: 2026-10-09T19:03:07Z

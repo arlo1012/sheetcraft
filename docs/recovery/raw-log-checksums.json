@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "normalization": "trailing whitespace removed from persisted text logs",
+  "rawLogSha256": {
+    "recovery-worker-verification.log": "190b15047698098e78d205db5437d7a5bf07fa4aa52136a5c9715fe6d2bd1f58",
+    "recovery-build-packages.log": "6b9477378fefbaffbafbe14ab517347d6c0addc3eb3600e04f60535fdee295ed",
+    "recovery-xlsx-typecheck.log": "70f30fcaf8f81b75cbb8682abfdaf4a39d8bb01569092dcd691228e63ff62bdc",
+    "recovery-core-tests.log": "8b719afe884e0ea1a2bd367fdd0c35603cae1e52961313c94345bd41c6912d5b",
+    "recovery-core-typecheck.log": "5f2191ac97a722bdbd09567955e9059a83a2f3c8cdf7f5a2209455a47a2cd4c1",
+    "recovery-public-package-imports.log": "014b1015d949d0dc024b940c06adb36a3193e8a72ddd0d5933ad966972395b4f",
+    "recovery-xlsx-tools-lint.log": "22f5100eca15c8a2b5af7c07e2bc4fd763b0198afacc132254c6ea66f5c38416",
+    "recovery-formula-matrix.log": "5777c988cc7df0464f3e158fd1bd2ba7f0d943c27acea084d2ead618bc82a97b",
+    "recovery-xlsx-tests.log": "568c933de52cb23512608ae329a8c16214e732bfefbfd28cee46fc4d8a6be861",
+    "bun-frozen-install.log": "0b6037629e442d12a6a11132dc86f5c47c21d6337e5d3d5e29fa96dcb7a1bca6"
+  }
+}

@@ -1,0 +1,16 @@
+timestamp=2026-10-09T19:02:08Z
+cwd=/workspace/shared/new-project-20261009
+command=bun run test:xlsx-io --maxWorkers=1 --no-file-parallelism
+$ bun run --filter @sheetcraft/xlsx-io test "--maxWorkers=1" --no-file-parallelism
+@sheetcraft/xlsx-io test:
+@sheetcraft/xlsx-io test:  RUN  v4.1.11 /workspace/shared/new-project-20261009/packages/xlsx-io
+@sheetcraft/xlsx-io test:
+@sheetcraft/xlsx-io test:
+@sheetcraft/xlsx-io test:  Test Files  62 passed (62)
+@sheetcraft/xlsx-io test:       Tests  632 passed (632)
+@sheetcraft/xlsx-io test:    Start at  12:02:08
+@sheetcraft/xlsx-io test:    Duration  50.64s (transform 1.86s, setup 0ms, import 24.79s, tests 17.20s, environment 6ms)
+@sheetcraft/xlsx-io test:
+@sheetcraft/xlsx-io test: Exited with code 0
+
+exit_code=0

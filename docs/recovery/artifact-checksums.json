@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-09T19:08:57.940146+00:00",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 6761,
+      "sha256": "21e460efc122e763cedbb4b1d32991e533ef7d0ef356f206b51b39faf3158e36"
+    },
+    {
+      "path": "core-verification-20261009.json",
+      "bytes": 6633,
+      "sha256": "6b4445dabc089c72e64fa2c449400cf1cb98cae932c950826b62bb5e5162210d"
+    },
+    {
+      "path": "evidence/calc-about-26.8.1.1.jpeg",
+      "bytes": 191052,
+      "sha256": "c85d251e477628b9c45ea4dcc778ef5fba5d9b39bd40d1a26dc0943593337095"
+    },
+    {
+      "path": "evidence/calc-blank-workbook.jpeg",
+      "bytes": 162948,
+      "sha256": "47090661b6c04512f50406d6408cc7f4fce33fb6bf9b727f0ee7bde1554b837f"
+    },
+    {
+      "path": "logs/bun-frozen-install.log",
+      "bytes": 269,
+      "sha256": "0b6037629e442d12a6a11132dc86f5c47c21d6337e5d3d5e29fa96dcb7a1bca6"
+    },
+    {
+      "path": "logs/recovery-build-packages.log",
+      "bytes": 496,
+      "sha256": "6b9477378fefbaffbafbe14ab517347d6c0addc3eb3600e04f60535fdee295ed"
+    },
+    {
+      "path": "logs/recovery-core-tests.log",
+      "bytes": 18019,
+      "sha256": "8b719afe884e0ea1a2bd367fdd0c35603cae1e52961313c94345bd41c6912d5b"
+    },
+    {
+      "path": "logs/recovery-core-typecheck.log",
+      "bytes": 176,
+      "sha256": "5f2191ac97a722bdbd09567955e9059a83a2f3c8cdf7f5a2209455a47a2cd4c1"
+    },
+    {
+      "path": "logs/recovery-formula-matrix.log",
+      "bytes": 821,
+      "sha256": "5777c988cc7df0464f3e158fd1bd2ba7f0d943c27acea084d2ead618bc82a97b"
+    },
+    {
+      "path": "logs/recovery-public-package-imports.log",
+      "bytes": 232,
+      "sha256": "014b1015d949d0dc024b940c06adb36a3193e8a72ddd0d5933ad966972395b4f"
+    },
+    {
+      "path": "logs/recovery-worker-verification.log",
+      "bytes": 402,
+      "sha256": "190b15047698098e78d205db5437d7a5bf07fa4aa52136a5c9715fe6d2bd1f58"
+    },
+    {
+      "path": "logs/recovery-xlsx-tests.log",
+      "bytes": 760,
+      "sha256": "2a8ddce1fb3c31ff43e5cfb18c83310382a26dd86f6d2f3ceecdb5a834f5f985"
+    },
+    {
+      "path": "logs/recovery-xlsx-tools-lint.log",
+      "bytes": 382,
+      "sha256": "22f5100eca15c8a2b5af7c07e2bc4fd763b0198afacc132254c6ea66f5c38416"
+    },
+    {
+      "path": "logs/recovery-xlsx-typecheck.log",
+      "bytes": 220,
+      "sha256": "70f30fcaf8f81b75cbb8682abfdaf4a39d8bb01569092dcd691228e63ff62bdc"
+    },
+    {
+      "path": "raw-log-checksums.json",
+      "bytes": 1155,
+      "sha256": "69d5b3af1bcb06efc2abcbedc567af166eb48bd0bb7f518063bb6b27ec511c9e"
+    },
+    {
+      "path": "runtime-verification-20261009.json",
+      "bytes": 1352,
+      "sha256": "50177b566008c64275e3ef116e1515eab571c83b93ceb4a52b72e1a4834a77d9"
+    },
+    {
+      "path": "source-manifest-897addc.json",
+      "bytes": 330887,
+      "sha256": "6e0b627d6f70ca2eb7a2b090c4a022f316410cb4a0ea65ec17117fe82cdb890e"
+    },
+    {
+      "path": "xlsx-verification-20261009.json",
+      "bytes": 4955,
+      "sha256": "2a0a0e745a67cb9df501f7b65605a44c3de2b31db3c41aff7067d60026ad9c69"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+timestamp=2026-10-09T19:02:35Z
+cwd=/workspace/shared/new-project-20261009
+command=bun run typecheck:xlsx-io
+$ bun run --filter @sheetcraft/xlsx-io typecheck
+@sheetcraft/xlsx-io typecheck: Exited with code 0
+
+exit_code=0

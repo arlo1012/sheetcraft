@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-09T19:06:40.734279Z",
+  "pinnedCommit": "897addc40fdeec3837837823172a30d4f0f5b8e8",
+  "runtime": {
+    "bun": "1.3.11",
+    "node": "v24.19.0",
+    "vitest": "4.1.11"
+  },
+  "sourceVerification": {
+    "schemaVersion": 1,
+    "observedAt": "2026-10-09T19:05:58.216Z",
+    "pinnedCommit": "897addc40fdeec3837837823172a30d4f0f5b8e8",
+    "expectedFiles": 1674,
+    "verifiedFiles": 1674,
+    "missing": [],
+    "mismatches": []
+  },
+  "core": {
+    "command": "cd packages/core && bun run test --maxWorkers=1 --reporter=default --reporter=json --outputFile.json=<local result file>",
+    "exitCode": 1,
+    "status": "failed_known_baseline",
+    "totalTests": 2572,
+    "passedTests": 2567,
+    "failedTests": 5,
+    "testFiles": 172,
+    "passedFiles": 167,
+    "failedFiles": 5,
+    "durationSeconds": 81.58,
+    "failures": [
+      {
+        "file": "packages/core/src/tests/cell-styles/cell-styles.test.ts",
+        "line": 76,
+        "test": "named cell styles serializes custom definitions and rejects non-custom snapshot entries",
+        "actualSnapshotVersion": 42,
+        "expectedSnapshotVersion": 21,
+        "classification": "known pinned-baseline stale snapshot-version assertion"
+      },
+      {
+        "file": "packages/core/src/tests/commands/conditional-formatting-state.test.ts",
+        "line": 33,
+        "test": "conditional-formatting commands persists rules and restores an exact state through undo and redo",
+        "actualSnapshotVersion": 42,
+        "expectedSnapshotVersion": 21,
+        "classification": "known pinned-baseline stale snapshot-version assertion"
+      },
+      {
+        "file": "packages/core/src/tests/commands/notes.test.ts",
+        "line": 76,
+        "test": "cell notes round-trips notes in V21 snapshots and copies, pastes, and clears them with cells",
+        "actualSnapshotVersion": 42,
+        "expectedSnapshotVersion": 21,
+        "classification": "known pinned-baseline stale snapshot-version assertion"
+      },
+      {
+        "file": "packages/core/src/tests/commands/protection.test.ts",
+        "line": 144,
+        "test": "workbook and sheet protection snapshot roundtrip preserves protection and validates ranges",
+        "actualSnapshotVersion": 42,
+        "expectedSnapshotVersion": 23,
+        "classification": "known pinned-baseline stale snapshot-version assertion"
+      },
+      {
+        "file": "packages/core/src/tests/commands/workbook-settings/calculation.test.ts",
+        "line": 25,
+        "test": "workbook calculation settings persists all settings and supports undo/redo",
+        "actualSnapshotVersion": 42,
+        "expectedSnapshotVersion": 21,
+        "classification": "known pinned-baseline stale snapshot-version assertion"
+      }
+    ],
+    "newRuntimeFailuresObserved": 0
+  },
+  "formula": {
+    "files": 32,
+    "tests": 1226,
+    "passed": 1226,
+    "failed": 0,
+    "registryCoverageTests": 995,
+    "timePartTests": 10,
+    "timeBasedFlakesObserved": []
+  },
+  "coreTypecheck": {
+    "command": "bun run typecheck:core",
+    "exitCode": 0,
+    "status": "passed"
+  },
+  "formulaMatrixCheck": {
+    "command": "bun run check:formula-regression",
+    "exitCode": 1,
+    "status": "failed_reproducibility",
+    "failure": "Stale docs/formula-regression-matrix.json; regenerate the matrix.",
+    "diagnosis": "Unsorted readdirSync discovery and first-match selection make generated output depend on recovered filesystem directory order. Collections reorder; six existing expected reference cases change selection; NA and VALUE implementation pointers match unrelated quoted error codes instead of exact name registrations. Generator counts are unchanged, and remaining per-function content is equal after ignoring collection order and these listed selections. This does not invalidate passing runtime formula tests, but the matrix check remains failed.",
+    "counts": {
+      "registered": 240,
+      "categories": 11,
+      "existingCalculationScenarios": 142,
+      "addedIndependentFunctionCases": 98,
+      "addedExistingExpectedReferenceCases": 95,
+      "referenceApplicableFunctions": 233,
+      "functionsWithReferenceEvidence": 233,
+      "functionsWithLinkedCalculationEvidence": 240
+    },
+    "chosenReferenceCasesChanged": ["IFS", "DATE", "TIME", "EDATE", "EOMONTH", "PMT"],
+    "implementationPointerErrors": {
+      "NA": {
+        "pinned": {
+          "file": "packages/core/src/formula/functions/engineering.ts",
+          "line": 379,
+          "registry": "packages/core/src/formula/functions.ts",
+          "runtime": "first-party Core"
+        },
+        "fresh": {
+          "file": "packages/core/src/formula/functions/lookup.ts",
+          "line": 65,
+          "registry": "packages/core/src/formula/functions.ts",
+          "runtime": "first-party Core"
+        },
+        "actualRegistration": {
+          "file": "packages/core/src/formula/functions/information.ts",
+          "line": 91
+        }
+      },
+      "VALUE": {
+        "pinned": {
+          "file": "packages/core/src/formula/functions/database.ts",
+          "line": 17,
+          "registry": "packages/core/src/formula/functions.ts",
+          "runtime": "first-party Core"
+        },
+        "fresh": {
+          "file": "packages/core/src/formula/functions/lookup.ts",
+          "line": 30,
+          "registry": "packages/core/src/formula/functions.ts",
+          "runtime": "first-party Core"
+        },
+        "actualRegistration": {
+          "file": "packages/core/src/formula/functions/text.ts",
+          "line": 632
+        }
+      }
+    },
+    "otherContentDifferencesIgnoringCollectionOrder": [],
+    "diagnosticMethod": "Instrumented copy of the pinned generator stored outside the product tree, with source and dependency imports made absolute and only output destinations redirected to validation files; checked-in JSON/Markdown were not regenerated.",
+    "checkedInJsonSha256": "621312b289269746c5063b940ef792159590e7793a2f8b9f83544b01dcc81db4",
+    "checkedInMarkdownSha256": "66f1d3014b640329f4007f13235dc8ba85cffaeae7e6ed26987e7a26ad61167f",
+    "freshDiagnosticJsonSha256": "4079808c41d3bdb9596b169eeb4df878791a5539fb647b48d2b5c3589789a4b5",
+    "freshDiagnosticMarkdownSha256": "1b45e59b22497fed046c4aaf867393358c8de5b997baefa5a5d60bf37371272e",
+    "repairStatus": "in progress; historical failed check retained"
+  },
+  "scope": {
+    "broadWebTestsRun": false,
+    "fullCIRun": false,
+    "aggregateGreenClaim": false
+  },
+  "logs": [
+    "logs/recovery-core-tests.log",
+    "logs/recovery-core-typecheck.log",
+    "logs/recovery-formula-matrix.log"
+  ]
+}
