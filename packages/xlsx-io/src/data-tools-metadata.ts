@@ -1,5 +1,6 @@
 import { strFromU8, strToU8, unzipSync } from "fflate/browser";
 import { readXlsxDxfEntries, readXlsxDxfStyle, xlsxDxfXml } from "./conditional-formatting.js";
+import { appendNativeWorksheetExtension } from "./native/worksheet-order.js";
 
 export type XlsxDataValidation = {
   range: XlsxRange;
@@ -106,10 +107,16 @@ export type XlsxOutlineGroup = {
 
 export type XlsxDataMetadata = {
   filter: XlsxFilter | null;
-  /** Rows hidden to preserve an already-applied advanced filter result. */
+  /** Standard row visibility, including manual and derived filter rows. */
   hiddenRows: number[];
+  /** Filter-derived rows whose criteria are restored on Sheetcraft import. */
+  filterHiddenRows?: number[];
+  /** Explicit manual hides, including overlaps with filters and outlines. */
+  manualHiddenRows?: number[];
   /** Rows hidden only to preserve a product multi-color filter's open state. */
   colorSetHiddenRows?: number[];
+  /** Standard worksheet flag for applied AutoFilter or Advanced Filter criteria. */
+  filterMode?: boolean;
   dataValidations: XlsxDataValidation[];
   outlineGroups: XlsxOutlineGroup[];
   /** Zero-based first rows of subsequent printed pages. */
@@ -433,6 +440,27 @@ function readColorFilter(body: string, dxfs: readonly string[]): XlsxFilterCondi
 
 const PRODUCT_COLOR_FILTER_SETS_URI = "{F05D2C50-AD53-4CE0-8F27-4BE69CF538D1}";
 const PRODUCT_COLOR_FILTER_SETS_NAMESPACE = "https://sheetcraft.dev/xlsx/filter/v1";
+const PRODUCT_ROW_VISIBILITY_URI = "{5287BA6D-C3DA-4B63-96FA-DB7F661264EC}";
+const PRODUCT_ROW_VISIBILITY_NAMESPACE = "https://sheetcraft.dev/xlsx/row-visibility/v1";
+
+function readProductRowVisibility(xml: string): {
+  filterHiddenRows?: number[];
+  manualHiddenRows?: number[];
+} {
+  const extension = new RegExp(
+    `<ext\\b(?=[^>]*\\buri=["']${PRODUCT_ROW_VISIBILITY_URI.replace(/[{}]/g, "\\$&")}["'])[^>]*>([\\s\\S]*?)<\\/ext>`,
+    "i",
+  ).exec(xml);
+  const container = /<sheetcraft:rowVisibility\b([^>]*)\/?\s*>/i.exec(extension?.[1] ?? "");
+  const attrs = container?.[1] ?? "";
+  if (attribute(attrs, "xmlns:sheetcraft") !== PRODUCT_ROW_VISIBILITY_NAMESPACE) return {};
+  const rows = (name: string): number[] =>
+    [...new Set((attribute(attrs, name) ?? "").split(","))]
+      .filter((value) => /^\d+$/.test(value))
+      .map(Number)
+      .filter((row) => Number.isInteger(row) && row >= 0 && row < 1_048_576);
+  return { filterHiddenRows: rows("filterHiddenRows"), manualHiddenRows: rows("manualHiddenRows") };
+}
 
 function productColorFilterSetExtension(xml: string): string | null {
   const extension = new RegExp(
@@ -704,6 +732,7 @@ export function readXlsxDataMetadata(bytes: Uint8Array): XlsxDataMetadata[] {
     return {
       filter: filter.value,
       hiddenRows: [],
+      ...readProductRowVisibility(xml),
       colorSetHiddenRows: readProductColorFilterSetHiddenRows(xml),
       dataValidations: validations.values,
       outlineGroups: readOutlineGroups(xml),
@@ -822,7 +851,11 @@ export function writeXlsxAutoFilter(
           return `\n<filter val="${encodeXml(text)}"/>`;
         })
         .join("");
-      let filters = values.length ? `<filters${blanks ? ' blank="1"' : ""}>${items}</filters>` : "";
+      let filters = values.length
+        ? `<filters${blanks ? ' blank="1"' : ""}>${items}</filters>`
+        : column.condition
+          ? ""
+          : "<filters></filters>";
       let custom = "";
       if (column.condition) {
         if (column.condition.kind === "compound") {
@@ -900,11 +933,17 @@ function writeProductColorFilterSetExtension(
 ): string {
   const extension = writeProductColorFilterSets(filter, hiddenRows);
   if (!extension) return xml;
+  return writeProductExtension(xml, PRODUCT_COLOR_FILTER_SETS_URI, extension);
+}
+
+function writeProductExtension(xml: string, uri: string, extension: string): string {
   const existing = new RegExp(
-    `<ext\\b(?=[^>]*\\buri=["']${PRODUCT_COLOR_FILTER_SETS_URI.replace(/[{}]/g, "\\$&")}["'])[^>]*(?:\\/>|>[\\s\\S]*?<\\/ext>)`,
+    `<ext\\b(?=[^>]*\\buri=["']${uri.replace(/[{}]/g, "\\$&")}["'])[^>]*(?:\\/>|>[\\s\\S]*?<\\/ext>)`,
     "i",
   );
   const withoutExisting = xml.replace(existing, "");
+  if (/<(?:\w+:)?worksheet\b/i.test(withoutExisting))
+    return appendNativeWorksheetExtension(withoutExisting, extension);
   if (/<extLst\b[^>]*\/>/i.test(withoutExisting))
     return withoutExisting.replace(/<extLst\b[^>]*\/>/i, `<extLst>${extension}</extLst>`);
   if (/<extLst\b[^>]*>/i.test(withoutExisting))
@@ -912,6 +951,30 @@ function writeProductColorFilterSetExtension(
   if (/<\/worksheet>/i.test(withoutExisting))
     return withoutExisting.replace(/<\/worksheet>/i, `<extLst>${extension}</extLst></worksheet>`);
   return withoutExisting.replace(/<\/table>/i, `<extLst>${extension}</extLst></table>`);
+}
+
+function writeProductRowVisibility(xml: string, metadata: XlsxRowVisibility): string {
+  const filterRows = metadata.filterHiddenRows ?? [];
+  const manualRows = metadata.manualHiddenRows ?? [];
+  if (!filterRows.length && !manualRows.length) return xml;
+  const extension = `<ext uri="${PRODUCT_ROW_VISIBILITY_URI}"><sheetcraft:rowVisibility xmlns:sheetcraft="${PRODUCT_ROW_VISIBILITY_NAMESPACE}"${filterRows.length ? ` filterHiddenRows="${filterRows.join(",")}"` : ""}${manualRows.length ? ` manualHiddenRows="${manualRows.join(",")}"` : ""}/></ext>`;
+  return writeProductExtension(xml, PRODUCT_ROW_VISIBILITY_URI, extension);
+}
+
+type XlsxRowVisibility = Pick<XlsxDataMetadata, "filterHiddenRows" | "manualHiddenRows">;
+
+/** ISO/IEC 29500 sheetPr@filterMode covers worksheet and table AutoFilters. */
+function writeFilterMode(xml: string, enabled: boolean | undefined): string {
+  if (enabled === undefined) return xml;
+  const sheetPr = /<sheetPr\b([^>]*?)(\/?)>/i;
+  if (sheetPr.test(xml))
+    return xml.replace(
+      sheetPr,
+      (_match, attrs: string, closing: string) =>
+        `<sheetPr${attrs.replace(/\sfilterMode\s*=\s*(["'])[^"']*\1/gi, "")}${enabled ? ' filterMode="1"' : ""}${closing}>`,
+    );
+  if (!enabled) return xml;
+  return xml.replace(/<worksheet\b[^>]*>/i, (match) => `${match}<sheetPr filterMode="1"/>`);
 }
 
 /**
@@ -1141,9 +1204,8 @@ function writeRowBreaks(xml: string, rows: readonly number[] | undefined): strin
 }
 
 /**
- * Excel AutoFilter cannot represent Advanced Filter criteria. The generated
- * workbook still needs to open with the same rows visible, including blank
- * rows which ExcelJS does not materialize when only `row.hidden` is assigned.
+ * Persist every filter's current visibility as standard row attributes,
+ * including blank rows which need an explicit sheetData row element.
  */
 function writeHiddenRows(xml: string, rows: readonly number[]): string {
   const hiddenRows = [...new Set(rows)]
@@ -1199,6 +1261,8 @@ export function writeXlsxDataMetadata(
       );
     if (metadata.filter || metadata.colorSetHiddenRows?.length)
       xml = writeProductColorFilterSetExtension(xml, metadata.filter, metadata.colorSetHiddenRows);
+    xml = writeProductRowVisibility(xml, metadata);
+    xml = writeFilterMode(xml, metadata.filterMode);
     if (metadata.dataValidations.length) {
       const after = /<autoFilter\b/i.test(xml)
         ? /<autoFilter\b[^>]*(?:\/>|>[\s\S]*?<\/autoFilter>)/i

@@ -209,6 +209,7 @@ describe("generated XLSX worksheet child ordering", () => {
     const entries = unzipSync(encoded.bytes);
     const xml = strFromU8(entries["xl/worksheets/sheet1.xml"]!);
     expect(topLevelNames(xml)).toEqual([
+      "sheetPr",
       "dimension",
       "sheetViews",
       "sheetFormatPr",

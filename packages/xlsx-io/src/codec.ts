@@ -147,37 +147,18 @@ type BrowserWorkbook = XlsxImageWorkbook & {
   };
 };
 
-function advancedHiddenRows(filter: SheetFilter | null): number[] {
-  const rows: number[] = [];
-  for (const interval of filter?.advanced?.hiddenRows ?? []) {
-    const start = Math.max(0, interval.start);
-    const end = Math.min(MAX_SHEET_ROWS - 1, interval.end);
-    for (let row = start; row <= end; row += 1) {
-      rows.push(row);
-      if (rows.length > MAX_SPARSE_CELLS)
-        throw new RangeError("The workbook exceeds the XLSX v1 hidden-row export limit.");
-    }
-  }
-  return rows;
-}
-
 function hasColorSetFilter(filter: SheetFilter | null): boolean {
   return Boolean(filter?.columns.some((column) => column.condition?.kind === "color-set"));
 }
 
 /**
- * Excel's AutoFilter can only express one color. Preserve the current visible
- * rows when a product multi-color filter is exported, while its full criterion
- * lives in the product extension for a future Sheetcraft import.
+ * AutoFilter criteria alone do not establish the initial visible rows in an
+ * XLSX viewer. Materialize Core's current result, using the same workbook-aware
+ * evaluator as formula caches, including table-owned and advanced filters.
  */
-function colorSetHiddenRows(sheet: Sheet): number[] {
-  if (
-    !hasColorSetFilter(sheet.filter) &&
-    !sheet.tables?.some((table) => hasColorSetFilter(table.filter))
-  )
-    return [];
+function filterHiddenRows(sheet: Sheet, evaluator: SheetEvaluator): number[] {
   const rows: number[] = [];
-  for (const interval of createSheetFilterHiddenRowIntervals(sheet)) {
+  for (const interval of createSheetFilterHiddenRowIntervals(sheet, evaluator)) {
     const start = Math.max(0, interval.start);
     const end = Math.min(MAX_SHEET_ROWS - 1, interval.end);
     for (let row = start; row <= end; row += 1) {
@@ -659,7 +640,11 @@ export async function decodeWithNativeXlsx(
     const hiddenColumns: number[] = [];
     const importedCellAddresses = new Set<string>();
     const metadata = rawDataMetadata[sheetIndex];
-    const derivedColorSetRows = new Set(metadata?.colorSetHiddenRows ?? []);
+    const derivedFilterRows = new Set([
+      ...(metadata?.filterHiddenRows ?? []),
+      ...(metadata?.colorSetHiddenRows ?? []),
+    ]);
+    const manualRows = new Set(metadata?.manualHiddenRows ?? []);
     const conditionalFormats = rawConditionalFormats[sheetIndex]?.rules ?? [];
     const tables = rawTables.sheets[sheetIndex] ?? [];
     const sourceDefaultColumnWidth = sourceSheet.properties.defaultColWidth;
@@ -676,14 +661,15 @@ export async function decodeWithNativeXlsx(
       const rowIndex = rowNumber - 1;
       if (
         row.hidden === true &&
-        !derivedColorSetRows.has(rowIndex) &&
-        !metadata?.outlineGroups.some(
-          (group) =>
-            group.axis === "row" &&
-            group.collapsed &&
-            group.start <= rowIndex &&
-            group.end >= rowIndex,
-        )
+        (manualRows.has(rowIndex) ||
+          (!derivedFilterRows.has(rowIndex) &&
+            !metadata?.outlineGroups.some(
+              (group) =>
+                group.axis === "row" &&
+                group.collapsed &&
+                group.start <= rowIndex &&
+                group.end >= rowIndex,
+            )))
       )
         hiddenRows.push(rowIndex);
       if (typeof row.height === "number") {
@@ -1170,14 +1156,17 @@ export async function encodeWithNativeXlsx(
     for (const [index, size] of sheet.rowHeights) {
       output.getRow(index + 1).height = (size * 3) / 4;
     }
-    const advancedRows = advancedHiddenRows(sheet.filter);
-    const multiColorRows = colorSetHiddenRows(sheet);
-    const derivedMultiColorRows = multiColorRows.filter((row) => !sheet.hiddenRows?.has(row));
-    for (const index of new Set([
-      ...(sheet.hiddenRows ?? []),
-      ...advancedRows,
-      ...multiColorRows,
-    ])) {
+    const filteredRows = filterHiddenRows(sheet, evaluator);
+    const filters = [sheet.filter, ...(sheet.tables ?? []).map((table) => table.filter)];
+    const advancedIntervals = filters.flatMap((filter) => filter?.advanced?.hiddenRows ?? []);
+    // Advanced criteria are intentionally omitted. Keep their visibility-only
+    // downgrade on import instead of removing rows with no restorable filter.
+    const derivedFilterRows = filteredRows.filter(
+      (row) =>
+        !sheet.hiddenRows?.has(row) &&
+        !advancedIntervals.some((interval) => interval.start <= row && interval.end >= row),
+    );
+    for (const index of new Set([...(sheet.hiddenRows ?? []), ...filteredRows])) {
       output.getRow(index + 1).hidden = true;
     }
     for (const [index, size] of sheet.columnWidths) {
@@ -1205,8 +1194,12 @@ export async function encodeWithNativeXlsx(
       filter: exportFilter?.advanced
         ? null
         : (exportFilter as unknown as XlsxDataMetadata["filter"]),
-      hiddenRows: [...new Set([...(sheet.hiddenRows ?? []), ...advancedRows, ...multiColorRows])],
-      colorSetHiddenRows: derivedMultiColorRows,
+      hiddenRows: [...new Set([...(sheet.hiddenRows ?? []), ...filteredRows])],
+      filterHiddenRows: derivedFilterRows,
+      manualHiddenRows: [...(sheet.hiddenRows ?? [])],
+      // Retain the original provenance format for older Sheetcraft readers.
+      colorSetHiddenRows: filters.some(hasColorSetFilter) ? derivedFilterRows : [],
+      filterMode: filters.some((filter) => filter?.advanced || filter?.columns.length),
       dataValidations: (sheet.dataValidations ?? []).map((validation) => {
         const { id: _id, ...value } = validation as { id?: unknown } & Record<string, unknown>;
         return value as XlsxDataMetadata["dataValidations"][number];

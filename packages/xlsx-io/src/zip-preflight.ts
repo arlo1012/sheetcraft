@@ -1,4 +1,5 @@
 import { CompatibilityReportBuilder } from "./report.js";
+import { collectSupportedPivotParts } from "./pivot-package-parts.js";
 import {
   XlsxAbortError,
   XlsxCompatibilityError,
@@ -113,7 +114,7 @@ function hasXmlElement(xml: string, localName: string): boolean {
 
 function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBuilder): void {
   const normalized = decodeXmlEntities(xml);
-  const externalRelationship = /<Relationship\b([^>]*)\/?\s*>/gi;
+  const externalRelationship = /<(?:[a-z_][\w.-]*:)?Relationship\b([^>]*)\/?\s*>/gi;
   const hasExternalNonHyperlinkRelationship = [...normalized.matchAll(externalRelationship)].some(
     (entry) => {
       const attrs = entry[1] ?? "";
@@ -297,6 +298,7 @@ export async function preflightXlsxArchive(
   }
   if (cursor !== directoryOffset + directorySize) fail("archive-invalid", report);
   const inspectedContents = new Map<string, Uint8Array>();
+  const relationshipEntries: Record<string, Uint8Array> = {};
   for (const entry of archiveEntries) {
     try {
       const lowerName = entry.name.toLowerCase();
@@ -307,7 +309,10 @@ export async function preflightXlsxArchive(
         /^xl\/pivot[^/]*\/[^/]+\.xml$/.test(lowerName) ||
         /^xl\/worksheets\/[^/]+\.xml$/.test(lowerName);
       const content = await verifyActualUncompressedSize(entry, bytes, signal, inspect);
-      if (content) inspectedContents.set(entry.name.toLowerCase(), content);
+      if (content) {
+        inspectedContents.set(entry.name.toLowerCase(), content);
+        relationshipEntries[entry.name] = content;
+      }
     } catch (error) {
       if (error instanceof XlsxAbortError) throw error;
       fail("archive-invalid", report, entry.name);
@@ -341,6 +346,25 @@ export async function preflightXlsxArchive(
     if (xml === null) fail("archive-invalid", report, name);
     inspectXmlPart(name, xml, report);
   }
+  const archiveParts = new Map(materialEntries.map((entry) => [entry.name, entry]));
+  let supportedPivotParts: ReadonlySet<string>;
+  try {
+    supportedPivotParts = await collectSupportedPivotParts(relationshipEntries, async (part) => {
+      const entry = archiveParts.get(part);
+      if (!entry) return undefined;
+      const content =
+        relationshipEntries[part] ??
+        (await verifyActualUncompressedSize(entry, bytes, signal, true));
+      if (!content) return undefined;
+      const xml = decodeXml(content);
+      if (xml === null) fail("archive-invalid", report, part);
+      inspectXmlPart(part, xml, report);
+      return content;
+    });
+  } catch (error) {
+    if (error instanceof XlsxAbortError || error instanceof XlsxCompatibilityError) throw error;
+    fail("archive-invalid", report);
+  }
   for (const entry of materialEntries) {
     const name = entry.name.toLowerCase();
     if (name.startsWith("xl/embeddings/") || name.startsWith("xl/activex/"))
@@ -369,7 +393,8 @@ export async function preflightXlsxArchive(
       name.startsWith("xl/pivot") ||
       name.startsWith("xl/charts") ||
       name.startsWith("xl/connections") ||
-      name.startsWith("customxml/");
+      name.startsWith("customxml/") ||
+      supportedPivotParts.has(name);
     if (!knownPart) report.add("feature-omitted", "warning", entry.name);
   }
   if (report.hasBlocks())

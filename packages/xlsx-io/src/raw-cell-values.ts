@@ -1,4 +1,5 @@
 import { strFromU8, unzipSync } from "fflate/browser";
+import { attr, child, nodes, parseXml, relationships } from "./pivot-xml.js";
 
 /**
  * Returns numeric worksheet values as they are stored in the XLSX XML.
@@ -15,7 +16,7 @@ export function readRawWorksheetNumericValues(
   const workbook = entries["xl/workbook.xml"];
   const relationships = entries["xl/_rels/workbook.xml.rels"];
   if (!workbook || !relationships) return [];
-  const targets = readWorksheetTargets(strFromU8(workbook), strFromU8(relationships));
+  const targets = readXlsxWorksheetPartTargets(entries);
   return targets.map((target) => {
     const worksheet = entries[target];
     return worksheet ? readRawNumericValues(strFromU8(worksheet)) : new Map<string, number>();
@@ -40,7 +41,7 @@ export function readRawWorksheetTextDirections(
   if (!workbook || !relationships || !styles) return [];
   const directionsByStyle = readTextDirectionsByStyle(strFromU8(styles));
   if (!directionsByStyle.size) return [];
-  const targets = readWorksheetTargets(strFromU8(workbook), strFromU8(relationships));
+  const targets = readXlsxWorksheetPartTargets(entries);
   return targets.map((target) => {
     const worksheet = entries[target];
     return worksheet
@@ -57,7 +58,7 @@ export function readRawWorksheetFormulas(
   const workbook = entries["xl/workbook.xml"];
   const relationships = entries["xl/_rels/workbook.xml.rels"];
   if (!workbook || !relationships) return [];
-  const targets = readWorksheetTargets(strFromU8(workbook), strFromU8(relationships));
+  const targets = readXlsxWorksheetPartTargets(entries);
   return targets.map((target) => {
     const worksheet = entries[target];
     const formulas = new Map<string, string>();
@@ -76,29 +77,17 @@ export function readXlsxWorksheetPartTargets(
   entries: Record<string, Uint8Array>,
 ): readonly string[] {
   const workbook = entries["xl/workbook.xml"];
-  const relationships = entries["xl/_rels/workbook.xml.rels"];
-  return workbook && relationships
-    ? readWorksheetTargets(strFromU8(workbook), strFromU8(relationships))
-    : [];
-}
-
-function readWorksheetTargets(workbookXml: string, relationshipsXml: string): readonly string[] {
-  const relationships = new Map<string, string>();
-  for (const relationship of relationshipsXml.matchAll(/<Relationship\b([^>]*)\/?\s*>/gi)) {
-    const attributes = relationship[1] ?? "";
-    const id = readAttribute(attributes, "Id");
-    const target = readAttribute(attributes, "Target");
-    const type = readAttribute(attributes, "Type");
-    if (id && target && /\/worksheet$/i.test(type ?? "")) {
-      const normalized = normalizeWorkbookTarget(target);
-      if (normalized) relationships.set(id, normalized);
-    }
-  }
+  if (!workbook || !entries["xl/_rels/workbook.xml.rels"]) return [];
+  const root = child(parseXml(workbook), "workbook");
+  const rels = relationships(entries, "xl/workbook.xml");
   const targets: string[] = [];
-  for (const sheet of workbookXml.matchAll(/<sheet\b([^>]*)\/?\s*>/gi)) {
-    const relationshipId = readAttribute(sheet[1] ?? "", "r:id");
-    const target = relationshipId ? relationships.get(relationshipId) : undefined;
-    if (target) targets.push(target);
+  for (const sheet of nodes(child(root, "sheets").sheet)) {
+    const relation = rels.get(attr(sheet, "id"));
+    if (
+      relation?.type.endsWith("/worksheet") &&
+      /^xl\/worksheets\/[^/]+\.xml$/i.test(relation.target)
+    )
+      targets.push(relation.target);
   }
   return targets;
 }
@@ -107,22 +96,6 @@ function readAttribute(attributes: string, name: string): string | undefined {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = new RegExp(`\\b${escapedName}\\s*=\\s*(["'])(.*?)\\1`, "i").exec(attributes);
   return match?.[2];
-}
-
-function normalizeWorkbookTarget(target: string): string | undefined {
-  const pathSegments = target.replace(/^\/+/, "").split("/");
-  const segments = target.startsWith("/") ? pathSegments : ["xl", ...pathSegments];
-  const normalized: string[] = [];
-  for (const segment of segments) {
-    if (!segment || segment === ".") continue;
-    if (segment === "..") {
-      normalized.pop();
-      continue;
-    }
-    normalized.push(segment);
-  }
-  const path = normalized.join("/");
-  return /^xl\/worksheets\/[^/]+\.xml$/i.test(path) ? path : undefined;
 }
 
 function readRawNumericValues(xml: string): ReadonlyMap<string, number> {

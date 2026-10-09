@@ -20,6 +20,26 @@ The ordinary fixture pivot has no configured fields; its recovered source is
 configured through Core in the test. The consolidation pivot retains its two
 page fields, two source ranges, and cached total of 43.21.
 
+## Repeated-value-fields fixture
+
+`closedxml-two-values.xlsx` is an unmodified copy of ClosedXML's
+`ClosedXML.Tests/Resource/Other/PivotTable/Create/Add_one_column_and_two_values.xlsx`.
+
+- Source: https://raw.githubusercontent.com/ClosedXML/ClosedXML/develop/ClosedXML.Tests/Resource/Other/PivotTable/Create/Add_one_column_and_two_values.xlsx
+- Retrieved: 2026-10-09
+- SHA-256: `9f25de4a5ee25afb0631eda0e320b065b6f1a6f9568a96c242df6000d8b46583`
+- Same upstream MIT license below
+
+Its native pivot uses `Sum of B` and `Count of B`, both referencing source field
+`fld="1"`, and a Values pseudo-field (`field x="-2"`) in the column axis. Both
+`rowItems` and `colItems` are absent. The raw-XML regression reads these bytes
+directly; it does not normalize the fixture or pass it through the product writer.
+
+The fixture's workbook uses namespace-prefixed sheet elements and root-level
+`/pivotCache/` parts. Those are useful independent reader cases as well as
+aggregation/layout evidence. See `docs/native-xlsx-pivot-interop.md` for the
+distinct import-discovery issue repaired during the aggregation investigation.
+
 ## Upstream license
 
 Source: https://github.com/ClosedXML/ClosedXML/blob/develop/LICENSE

@@ -1,7 +1,9 @@
-// MS-XLSX 2.2.3 lists these Core-supported functions with an _xlfn. prefix.
+// MS-XLSX 2.2.3 lists these Core-supported functions with an _xlfn. prefix,
+// supplemented by LibreOffice's primary OOXML import/export mapping for XMATCH.
 // FILTER and SORT also carry the worksheet-only _xlws. namespace. Do not infer
 // prefixes for unknown functions or for unprefixed exceptions such as ISO.CEILING.
 // https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/5d1b6d44-6fc1-4ecd-8fef-0b27406cc2bf
+// https://github.com/LibreOffice/core/blob/master/formula/inc/core_resource.hrc
 const FUTURE_FUNCTIONS = new Set([
   "AGGREGATE",
   "BITAND",
@@ -45,6 +47,7 @@ const FUTURE_FUNCTIONS = new Set([
   "VAR.S",
   "VSTACK",
   "XLOOKUP",
+  "XMATCH",
   "XOR",
 ]);
 const WORKSHEET_FUNCTIONS = new Set(["FILTER", "SORT"]);

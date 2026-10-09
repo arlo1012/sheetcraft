@@ -1,5 +1,6 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
 import { applyWorkbookCommand, createSetCellContentCommand } from "@sheetcraft/core/commands";
+import { getFormulaFunctionMetadata } from "@sheetcraft/core/formula";
 import {
   createWorkbook,
   createWorkbookEvaluator,
@@ -9,60 +10,37 @@ import {
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../../index.js";
 import { xlsxFormula } from "../../native/writer-formulas.js";
+import { OOXML_FUNCTION_CLASSIFICATION } from "./function-classification.js";
 
 describe("native OOXML future-function names", () => {
-  // MS-XLSX 2.2.3 Functions explicitly classifies these supported names.
-  test.each([
-    "AGGREGATE",
-    "BITAND",
-    "BITLSHIFT",
-    "BITOR",
-    "BITRSHIFT",
-    "BITXOR",
-    "CEILING.MATH",
-    "CHOOSECOLS",
-    "CHOOSEROWS",
-    "CONCAT",
-    "DAYS",
-    "DROP",
-    "FLOOR.MATH",
-    "HSTACK",
-    "IFNA",
-    "IFS",
-    "ISOWEEKNUM",
-    "MODE.SNGL",
-    "NUMBERVALUE",
-    "PERCENTILE.EXC",
-    "PERCENTILE.INC",
-    "PERCENTRANK.EXC",
-    "PERCENTRANK.INC",
-    "QUARTILE.EXC",
-    "QUARTILE.INC",
-    "RANK.AVG",
-    "RANK.EQ",
-    "SEQUENCE",
-    "STDEV.P",
-    "STDEV.S",
-    "SWITCH",
-    "TAKE",
-    "TEXTAFTER",
-    "TEXTBEFORE",
-    "TEXTJOIN",
-    "UNICHAR",
-    "UNICODE",
-    "UNIQUE",
-    "VAR.P",
-    "VAR.S",
-    "VSTACK",
-    "XLOOKUP",
-    "XOR",
-  ])("serializes the documented _xlfn. marker for %s", (name) => {
-    expect(xlsxFormula(`=${name}(A1)`)).toBe(`_xlfn.${name}(A1)`);
+  test("classifies every Core function before choosing its OOXML spelling", () => {
+    const classified = Object.entries(OOXML_FUNCTION_CLASSIFICATION).flatMap(([prefix, names]) =>
+      names.map((name) => ({ prefix, name })),
+    );
+    const names = classified.map(({ name }) => name);
+    expect(new Set(names).size).toBe(names.length);
+    expect([...names].sort()).toEqual(
+      getFormulaFunctionMetadata()
+        .map(({ name }) => name)
+        .sort(),
+    );
+    for (const { name, prefix } of classified)
+      expect(xlsxFormula(`=${name}(A1)`), name).toBe(`${prefix}${name}(A1)`);
   });
 
-  test.each(["FILTER", "SORT"])("uses both namespaces for %s", (name) => {
-    expect(xlsxFormula(`${name}(A1:A3)`)).toBe(`_xlfn._xlws.${name}(A1:A3)`);
-  });
+  test.each(OOXML_FUNCTION_CLASSIFICATION["_xlfn."])(
+    "serializes the documented _xlfn. marker for %s",
+    (name) => {
+      expect(xlsxFormula(`=${name}(A1)`)).toBe(`_xlfn.${name}(A1)`);
+    },
+  );
+
+  test.each(OOXML_FUNCTION_CLASSIFICATION["_xlfn._xlws."])(
+    "uses both namespaces for %s",
+    (name) => {
+      expect(xlsxFormula(`${name}(A1:A3)`)).toBe(`_xlfn._xlws.${name}(A1:A3)`);
+    },
+  );
 
   test("marks nested calls while retaining case, spaces and existing prefixes", () => {
     const source =
@@ -127,5 +105,51 @@ describe("native OOXML future-function names", () => {
     ).toBe("合成 data");
     const reencoded = await encodeXlsx(decoded.workbook);
     expect(strFromU8(unzipSync(reencoded.bytes)[path]!)).toBe(xml);
+  });
+
+  test("exports XMATCH with its native marker and recomputes its position cache after import", async () => {
+    const workbook = createWorkbook({ id: "xmatch-interoperability", sheetId: "lab" });
+    for (const [row, value] of [5, 4, 4, 2, 1].entries())
+      applyWorkbookCommand(
+        workbook,
+        createSetCellContentCommand("lab", { row, column: 0 }, { kind: "literal", value }),
+      );
+    applyWorkbookCommand(
+      workbook,
+      createSetCellContentCommand(
+        "lab",
+        { row: 13, column: 1 },
+        {
+          kind: "formula",
+          formula: { source: "=XMATCH(4,A1:A5)" },
+        },
+      ),
+    );
+    const encoded = await encodeXlsx(workbook);
+    const entries = unzipSync(encoded.bytes);
+    const path = "xl/worksheets/sheet1.xml";
+    const xml = strFromU8(entries[path]!);
+    const cell = /<c\b[^>]*\br="B14"[^>]*>[\s\S]*?<\/c>/.exec(xml)![0];
+    expect(encoded.report.issues).toEqual([]);
+    expect(cell).toContain("<f>_xlfn.XMATCH(4,A1:A5)</f><v>2</v>");
+    entries[path] = strToU8(xml.replace(cell, cell.replace("<v>2</v>", "<v>999</v>")));
+    const decoded = await decodeXlsx(zipSync(entries));
+    const sheet = getActiveSheet(decoded.workbook);
+    expect(getCellContent(sheet, { row: 13, column: 1 })).toEqual({
+      kind: "formula",
+      formula: { source: "=_xlfn.XMATCH(4,A1:A5)" },
+    });
+    expect(
+      createWorkbookEvaluator(decoded.workbook, sheet.id).getComputedValue({ row: 13, column: 1 }),
+    ).toBe(2);
+    applyWorkbookCommand(
+      decoded.workbook,
+      createSetCellContentCommand(sheet.id, { row: 1, column: 0 }, { kind: "literal", value: 6 }),
+    );
+    const reencoded = await encodeXlsx(decoded.workbook);
+    expect(strFromU8(unzipSync(reencoded.bytes)[path]!)).toContain(
+      "<f>_xlfn.XMATCH(4,A1:A5)</f><v>3</v>",
+    );
+    expect(strFromU8(unzipSync(reencoded.bytes)[path]!)).not.toContain("_xlfn._xlfn.");
   });
 });
