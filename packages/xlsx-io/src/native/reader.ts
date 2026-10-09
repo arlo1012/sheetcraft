@@ -8,6 +8,7 @@ import type {
 } from "./model.js";
 import { cellPosition, columnName, translateSharedFormula } from "./reader-formulas.js";
 import { readIsoDate } from "./reader-date.js";
+import { assertNativeVisibleSheets, nativeSheetState } from "./sheet-state.js";
 import { colorPalette, readColor, readStyles } from "./reader-styles.js";
 import {
   decodeSpreadsheetText,
@@ -58,6 +59,10 @@ function views(root: XmlNode, kind: "workbookView" | "sheetView"): Record<string
       "workbookViewId",
     ])
       if (numberAttribute(view, key) !== undefined) result[key] = numberAttribute(view, key);
+    // Keep malformed active-tab attributes available for the public codec's
+    // diagnosed visible-sheet fallback rather than silently dropping them.
+    if (view["@_activeTab"] !== undefined && result.activeTab === undefined)
+      result.activeTab = attr(view, "activeTab");
     for (const key of ["showGridLines", "showRowColHeaders", "rightToLeft", "tabSelected"])
       if (view[`@_${key}`] !== undefined) result[key] = flag(view, key);
     if (view.pane !== undefined) {
@@ -111,14 +116,16 @@ function readWorksheet(
   styles: NativeStyle[],
   strings: string[],
   budget: ImportBudget,
-  theme: Uint8Array | undefined,
+  palette: ReturnType<typeof colorPalette>,
 ): NativeSheetData {
   const format = child(root, "sheetFormatPr");
   const properties: NativeSheetData["properties"] = {};
   for (const key of ["defaultRowHeight", "defaultColWidth"] as const)
     if (numberAttribute(format, key) !== undefined) properties[key] = numberAttribute(format, key);
-  const tabColor = readColor(child(child(root, "sheetPr"), "tabColor"), colorPalette(theme));
-  if (typeof tabColor?.argb === "string") properties.tabColor = { argb: tabColor.argb };
+  const sheetProperties = child(root, "sheetPr");
+  const tabColor = readColor(child(sheetProperties, "tabColor"), palette);
+  if (sheetProperties.tabColor !== undefined)
+    properties.tabColor = typeof tabColor?.argb === "string" ? { argb: tabColor.argb } : {};
   const sheet: NativeSheetData = {
     name,
     properties,
@@ -249,7 +256,12 @@ export function readNativeWorkbook(bytes: Uint8Array): NativeWorkbookData {
   for (const part of [stylesPart, stringsPart, themePart])
     if (part !== undefined && !entries[part]) throw new Error(`Missing linked XLSX part: ${part}`);
   const theme = themePart ? entries[themePart] : undefined;
-  const styles = readStyles(stylesPart ? entries[stylesPart] : entries["xl/styles.xml"], theme);
+  const stylesXml = stylesPart ? entries[stylesPart] : entries["xl/styles.xml"];
+  const styles = readStyles(stylesXml, theme);
+  const palette = colorPalette(
+    theme,
+    stylesXml ? child(readXml(stylesXml), "styleSheet") : undefined,
+  );
   const strings = stringsPart
     ? nodes(child(readXml(entries[stringsPart]), "sst").si).map(richText)
     : [];
@@ -263,6 +275,7 @@ export function readNativeWorkbook(bytes: Uint8Array): NativeWorkbookData {
   const budget: ImportBudget = { cells: 0, formulaUnits: 0 };
   const names = new Set<string>();
   for (const sheet of nodes(child(root, "sheets").sheet)) {
+    const state = nativeSheetState(attr(sheet, "state", "visible"));
     // Worksheet titles are XML attributes, not escaped spreadsheet cell strings.
     const name = attr(sheet, "name");
     if (
@@ -281,10 +294,17 @@ export function readNativeWorkbook(bytes: Uint8Array): NativeWorkbookData {
       throw new Error("Missing or unsupported XLSX worksheet relationship.");
     const parsedXml = readXml(entries[relationship.target]);
     if (parsedXml.worksheet === undefined) throw new Error("Missing XLSX worksheet root.");
-    workbook.sheets.push(
-      readWorksheet(child(parsedXml, "worksheet"), name, styles, strings, budget, theme),
+    const worksheet = readWorksheet(
+      child(parsedXml, "worksheet"),
+      name,
+      styles,
+      strings,
+      budget,
+      palette,
     );
+    worksheet.state = state;
+    workbook.sheets.push(worksheet);
   }
-  if (!workbook.sheets.length) throw new Error("The workbook contains no worksheets.");
+  assertNativeVisibleSheets(workbook.sheets);
   return workbook;
 }

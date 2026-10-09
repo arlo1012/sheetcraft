@@ -84,9 +84,11 @@ function replaceCollection(xml: string, name: string, entryName: string, content
   const count = (content.match(new RegExp(`<${entryName}\\b`, "gi")) ?? []).length;
   const replacement = `<${name} count="${count}">${content}</${name}>`;
   const pattern = new RegExp(`<${name}\\b[^><]*(?:/>|>[\\s\\S]*?<\\/${name}>)`, "i");
-  if (pattern.test(xml)) return xml.replace(pattern, replacement);
-  if (name === "numFmts") return xml.replace(/<fonts\b/i, `${replacement}<fonts`);
-  return xml.replace(/<\/styleSheet>/i, `${replacement}</styleSheet>`);
+  // Format codes and style text can contain $$, $&, $` or $'. A replacement
+  // callback keeps that XML literal instead of applying JS substitution tokens.
+  if (pattern.test(xml)) return xml.replace(pattern, () => replacement);
+  if (name === "numFmts") return xml.replace(/<fonts\b/i, () => `${replacement}<fonts`);
+  return xml.replace(/<\/styleSheet>/i, () => `${replacement}</styleSheet>`);
 }
 
 function entryXml(content: string, name: string): string[] {

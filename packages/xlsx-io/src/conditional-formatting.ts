@@ -1508,7 +1508,7 @@ function appendX14ConditionalFormatting(xml: string, body: string): string {
       depth += 1;
     }
   }
-  return xml.replace(/<\/worksheet>/i, `<extLst>${extension}</extLst></worksheet>`);
+  return xml.replace(/<\/worksheet>/i, () => `<extLst>${extension}</extLst></worksheet>`);
 }
 
 /** Keep the first exact duplicate, preserving relative rule priority. Formula rules are
@@ -1574,8 +1574,8 @@ export function writeXlsxConditionalFormats(
   const dxfContainer = `<dxfs count="${dxfs.length}">${dxfs.join("")}</dxfs>`;
   entries["xl/styles.xml"] = strToU8(
     previous.test(stylesXml)
-      ? stylesXml.replace(previous, dxfContainer)
-      : stylesXml.replace(/<tableStyles\b/i, `${dxfContainer}<tableStyles`),
+      ? stylesXml.replace(previous, () => dxfContainer)
+      : stylesXml.replace(/<tableStyles\b/i, () => `${dxfContainer}<tableStyles`),
   );
   let priority = 1;
   for (const [sheetIndex, rules] of exportSheets.entries()) {
@@ -1623,8 +1623,8 @@ export function writeXlsxConditionalFormats(
     const target =
       /<dataValidations\b|<hyperlinks\b|<printOptions\b|<pageMargins\b|<pageSetup\b|<extLst\b|<\/worksheet>/i;
     const withBaseRules = target.test(xml)
-      ? xml.replace(target, `${body}$&`)
-      : xml.replace(/<\/worksheet>/i, `${body}</worksheet>`);
+      ? xml.replace(target, (match) => `${body}${match}`)
+      : xml.replace(/<\/worksheet>/i, () => `${body}</worksheet>`);
     entries[path] = strToU8(appendX14ConditionalFormatting(withBaseRules, x14Body));
   }
 }

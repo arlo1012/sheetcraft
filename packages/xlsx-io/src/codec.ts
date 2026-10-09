@@ -19,7 +19,7 @@ import {
   type FormulaValue,
 } from "@sheetcraft/core/formula";
 import {
-  createSheetEvaluator,
+  createWorkbookEvaluator,
   getDefaultColumnWidth,
   normalizeCellHyperlink,
   normalizeCellNote,
@@ -27,6 +27,7 @@ import {
   type CellRange,
   type Sheet,
   type SheetFilter,
+  type SheetEvaluator,
   type Workbook,
 } from "@sheetcraft/core/workbook";
 import { createSheetFilterHiddenRowIntervals } from "@sheetcraft/core/commands";
@@ -101,10 +102,11 @@ type BrowserRow = {
 };
 type BrowserWorksheet = XlsxImageWorksheet & {
   name: string;
+  state?: "visible" | "hidden" | "veryHidden";
   properties: {
     defaultRowHeight?: number;
     defaultColWidth?: number;
-    tabColor?: { argb: string };
+    tabColor?: { argb?: string };
   };
   views?: Array<Record<string, unknown>> | null;
   columns?: Array<{ number?: number; width?: number; hidden?: boolean }>;
@@ -911,17 +913,30 @@ export async function decodeWithNativeXlsx(
       floatingImages: [],
     });
     sheet.properties.protected = protection.sheets[sheetIndex]?.protected ?? false;
+    sheet.properties.hidden = sourceSheet.state === "hidden" || sourceSheet.state === "veryHidden";
+    if (sourceSheet.state === "veryHidden")
+      add(report, "feature-omitted", `${sourceSheet.name}.veryHidden`);
+    if (sourceSheet.properties.tabColor !== undefined) {
+      const argb = sourceSheet.properties.tabColor.argb;
+      if (typeof argb === "string" && /^ff[0-9a-f]{6}$/i.test(argb))
+        sheet.properties.tabColor = `#${argb.slice(2).toUpperCase()}`;
+      else add(report, "feature-omitted", `${sourceSheet.name}.tabColor`);
+    }
     return sheet;
   });
+  const firstVisibleSheetIndex = sheets.findIndex((sheet) => !sheet.properties.hidden);
+  if (firstVisibleSheetIndex < 0)
+    throw new RangeError("The XLSX workbook must contain a visible worksheet.");
   const activeTab = source.views?.[0]?.activeTab;
   const activeSheetIndex =
     typeof activeTab === "number" &&
     Number.isInteger(activeTab) &&
     activeTab >= 0 &&
-    activeTab < sheets.length
+    activeTab < sheets.length &&
+    !sheets[activeTab]?.properties.hidden
       ? activeTab
-      : 0;
-  if (activeTab !== undefined && activeSheetIndex === 0 && activeTab !== 0)
+      : firstVisibleSheetIndex;
+  if (activeTab !== undefined && activeSheetIndex !== activeTab)
     add(report, "feature-omitted", "workbook.activeTab");
   const workbook: Workbook = {
     id: workbookId(),
@@ -930,7 +945,7 @@ export async function decodeWithNativeXlsx(
     dateSystem,
     calculation,
     theme,
-    activeSheetId: sheets[activeSheetIndex]?.id ?? sheets[0]?.id ?? "",
+    activeSheetId: sheets[activeSheetIndex]!.id,
     sheets: new Map(sheets.map((sheet) => [sheet.id, sheet])),
     definedNames: readDefinedNames(bytes, sheets, report),
     tableStyles: rawTables.tableStyles,
@@ -1076,7 +1091,25 @@ export async function encodeWithNativeXlsx(
   options?: XlsxEncodeOptions,
 ): Promise<{ bytes: Uint8Array; report: XlsxCompatibilityReport }> {
   const report = new CompatibilityReportBuilder();
+  const sheets = [...workbook.sheets.values()];
+  if (!sheets.length) throw new RangeError("The workbook contains no worksheets.");
+  for (const sheet of sheets) {
+    if (typeof sheet.properties.hidden !== "boolean")
+      throw new RangeError("Invalid XLSX worksheet hidden state.");
+    if (
+      sheet.properties.tabColor !== undefined &&
+      (typeof sheet.properties.tabColor !== "string" ||
+        !/^#[0-9a-f]{6}$/i.test(sheet.properties.tabColor))
+    )
+      throw new RangeError("Invalid XLSX worksheet tab color.");
+  }
+  if (sheets.every((sheet) => sheet.properties.hidden))
+    throw new RangeError("The XLSX workbook must contain a visible worksheet.");
+  const activeSheetIndex = sheets.findIndex((sheet) => sheet.id === workbook.activeSheetId);
+  if (activeSheetIndex < 0 || sheets[activeSheetIndex]?.properties.hidden)
+    throw new RangeError("The XLSX active sheet must identify a visible worksheet.");
   const target: BrowserWorkbook = new NativeWorkbook();
+  target.views = [{ activeTab: activeSheetIndex }];
   const imageExporter = createXlsxImageExporter(target, options);
   const cellImages: NativeCellImage[] = [];
   const dataMetadata: Array<
@@ -1088,9 +1121,11 @@ export async function encodeWithNativeXlsx(
   target.properties.date1904 = workbook.dateSystem === "1904";
   target.calcProperties.fullCalcOnLoad = true;
   let encodedCells = 0;
+  let workbookEvaluator: SheetEvaluator | undefined;
+  const isFormulaCacheEligible = createFormulaCacheEligibility(workbook);
   if (workbook.watermarkPresets?.length)
     add(report, "feature-omitted", "workbook.watermarkPresets");
-  for (const [sheetIndex, sheet] of [...workbook.sheets.values()].entries()) {
+  for (const [sheetIndex, sheet] of sheets.entries()) {
     pageSetups.push(sheet.pageSetup);
     // Tiled watermarks have no native worksheet field; do not silently claim XLSX fidelity.
     if (sheet.drawings?.length) add(report, "feature-omitted", `${sheet.name}.drawings`);
@@ -1103,20 +1138,28 @@ export async function encodeWithNativeXlsx(
           )
         : undefined,
     );
-    const evaluator = createSheetEvaluator(sheet);
-    const isFormulaCacheEligible = createFormulaCacheEligibility(sheet);
+    // One fresh calculation cycle resolves workbook names, qualified references,
+    // tables, and the workbook's date system without reusing persisted caches.
+    const evaluator =
+      workbookEvaluator?.forSheet?.(sheet.id) ?? createWorkbookEvaluator(workbook, sheet.id);
+    workbookEvaluator ??= evaluator;
     const output = target.addWorksheet(sheet.name, {
-      views:
-        sheet.freezePanes.rows || sheet.freezePanes.columns
-          ? [
-              {
+      views: [
+        {
+          tabSelected: sheetIndex === activeSheetIndex,
+          ...(sheet.freezePanes.rows || sheet.freezePanes.columns
+            ? {
                 state: "frozen",
                 ySplit: sheet.freezePanes.rows,
                 xSplit: sheet.freezePanes.columns,
-              },
-            ]
-          : undefined,
+              }
+            : {}),
+        },
+      ],
     });
+    output.state = sheet.properties.hidden ? "hidden" : "visible";
+    // Pinned tabs are a local UI ordering feature with no standard XLSX field.
+    if (sheet.properties.pinned) add(report, "feature-omitted", `${sheet.name}.pinned`);
     output.properties.defaultRowHeight = (DEFAULT_ROW_HEIGHT * 3) / 4;
     output.properties.defaultColWidth = pixelsToExcelColumnWidth(getDefaultColumnWidth(sheet));
     if (sheet.properties.tabColor) {
@@ -1197,7 +1240,7 @@ export async function encodeWithNativeXlsx(
           outputCell.value = formulaSnapshotValue(evaluator.getComputedValue({ row, column }));
           add(report, "feature-omitted", issueLocation);
         } else {
-          const result = isFormulaCacheEligible(row, column)
+          const result = isFormulaCacheEligible(sheet.id, row, column)
             ? formulaCacheValue(evaluator.getComputedValue({ row, column }))
             : undefined;
           outputCell.value = {

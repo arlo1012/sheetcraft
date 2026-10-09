@@ -111,14 +111,6 @@ function hasXmlElement(xml: string, localName: string): boolean {
   return new RegExp(`<\\s*(?:[a-z_][\\w.-]*:)?${localName}(?:\\s|/|>)`, "i").test(xml);
 }
 
-function xmlAttributeValues(xml: string, localName: string): string[] {
-  const expression = new RegExp(
-    `(?:[a-z_][\\w.-]*:)?${localName}\\s*=\\s*(["'])([\\s\\S]*?)\\1`,
-    "gi",
-  );
-  return [...xml.matchAll(expression)].map((match) => decodeXmlEntities(match[2] ?? ""));
-}
-
 function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBuilder): void {
   const normalized = decodeXmlEntities(xml);
   const externalRelationship = /<Relationship\b([^>]*)\/?\s*>/gi;
@@ -136,11 +128,6 @@ function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBu
 
   const workbookPart = name.toLowerCase() === "xl/workbook.xml";
   if (workbookPart && ["fileSharing"].some((feature) => hasXmlElement(xml, feature)))
-    report.add("feature-omitted", "warning", name);
-  if (
-    workbookPart &&
-    xmlAttributeValues(xml, "state").some((value) => /^(hidden|veryhidden)$/i.test(value.trim()))
-  )
     report.add("feature-omitted", "warning", name);
 }
 

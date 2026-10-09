@@ -9,6 +9,7 @@ import type {
   NativeImageAnchor,
   NativeRow,
   NativeSheetData,
+  NativeSheetState,
   NativeWorkbookData,
 } from "./model.js";
 
@@ -46,8 +47,17 @@ class ExchangeWorksheet {
   get properties() {
     return this.data.properties;
   }
+  get state() {
+    return this.data.state;
+  }
+  set state(value: NativeSheetState | undefined) {
+    this.data.state = value;
+  }
   get views() {
     return this.data.views;
+  }
+  set views(value: Array<Record<string, unknown>> | null | undefined) {
+    this.data.views = value;
   }
   get autoFilter() {
     return this.data.autoFilter;
@@ -175,6 +185,9 @@ export class NativeWorkbook {
   }
   get views() {
     return this.data.views;
+  }
+  set views(value: Array<Record<string, unknown>> | null | undefined) {
+    this.data.views = value;
   }
   get worksheets(): ExchangeWorksheet[] {
     return this.data.sheets.map((sheet) => new ExchangeWorksheet(sheet));

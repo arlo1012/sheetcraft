@@ -245,7 +245,7 @@ export function writeDefinedNames(
   entries["xl/workbook.xml"] = strToU8(
     withoutExisting.replace(
       /<\/(?:\w+:)?workbook\s*>/i,
-      `<definedNames>${content}</definedNames></workbook>`,
+      () => `<definedNames>${content}</definedNames></workbook>`,
     ),
   );
 }

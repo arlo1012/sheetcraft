@@ -527,9 +527,9 @@ function removeElement(xml: string, tag: string): string {
 
 function replaceElement(xml: string, tag: string, replacement: string, after: RegExp): string {
   const expression = new RegExp(`<${tag}\\b[^>]*(?:/>|>[\\s\\S]*?<\\/${tag}>)`, "i");
-  if (expression.test(xml)) return xml.replace(expression, replacement);
+  if (expression.test(xml)) return xml.replace(expression, () => replacement);
   if (after.test(xml)) return xml.replace(after, (match) => `${match}${replacement}`);
-  return xml.replace(/<\/worksheet\s*>/i, `${replacement}</worksheet>`);
+  return xml.replace(/<\/worksheet\s*>/i, () => `${replacement}</worksheet>`);
 }
 
 function breaksXml(tag: "rowBreaks" | "colBreaks", values: readonly number[]): string {

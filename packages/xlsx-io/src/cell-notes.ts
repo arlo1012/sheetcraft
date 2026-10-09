@@ -271,7 +271,7 @@ export function writeXlsxCellNotes(entries: Unzipped, sheets: readonly Sheet[]):
     );
     const authorXml = `<authors>${authors.map((author) => `<author>${xlsxText(author)}</author>`).join("")}</authors>`;
     entries[commentPart] = strToU8(
-      comments.replace(/<authors\b[^>]*>[\s\S]*?<\/authors>/i, authorXml),
+      comments.replace(/<authors\b[^>]*>[\s\S]*?<\/authors>/i, () => authorXml),
     );
   }
 }

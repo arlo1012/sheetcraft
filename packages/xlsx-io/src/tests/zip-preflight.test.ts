@@ -126,7 +126,7 @@ describe("XLSX ZIP preflight", () => {
     ).rejects.toBeInstanceOf(XlsxCompatibilityError);
   });
 
-  test("reports unsupported workbook and worksheet XML features without warning on default margins", async () => {
+  test("does not warn on supported hidden sheets and worksheet features or default margins", async () => {
     const report = await preflightXlsxArchive(
       storedZip([
         {
@@ -140,14 +140,16 @@ describe("XLSX ZIP preflight", () => {
         },
       ]),
     );
-    expect(report.issues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: "feature-omitted",
-          locations: expect.arrayContaining(["xl/workbook.xml"]),
-        }),
-      ]),
+    expect(report.issues).toEqual([]);
+  });
+
+  test("still reports unsupported workbook file sharing", async () => {
+    const report = await preflightXlsxArchive(
+      storedZip([{ name: "xl/workbook.xml", content: "<workbook><fileSharing/></workbook>" }]),
     );
+    expect(report.issues).toEqual([
+      { code: "feature-omitted", severity: "warning", count: 1, locations: ["xl/workbook.xml"] },
+    ]);
   });
 
   test("accepts classic notes and reports threaded comments as unsupported", async () => {

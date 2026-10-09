@@ -1,49 +1,41 @@
 import {
-  collectFormulaEvaluationDependencies,
   DEFAULT_FORMULA_FUNCTION_REGISTRY,
   isFormulaError,
   parseFormula,
   type FormulaExpression,
   type FormulaValue,
 } from "@sheetcraft/core/formula";
-import type { Sheet } from "@sheetcraft/core/workbook";
+import { resolveTableReferenceBounds } from "@sheetcraft/core/commands";
+import { getDefinedName, type CellAddress, type Workbook } from "@sheetcraft/core/workbook";
 
-type FormulaCell = Readonly<{ key: string; row: number; column: number }>;
-
-function hasSupportedExpression(expression: FormulaExpression): boolean {
-  if (expression.kind === "error") return !["NAME", "PARSE", "CYCLE"].includes(expression.code);
-  if (expression.kind === "identifier") return false;
-  // A whole-axis range is valid and exported verbatim, but cache dependency
-  // analysis is intentionally sparse and cannot prove every formula in it safe.
-  // Leave the cache out so Excel recalculates it rather than emitting a stale value.
-  if (expression.kind === "axis-range") return false;
-  if (expression.kind === "unary") return hasSupportedExpression(expression.operand);
-  if (expression.kind === "binary")
-    return hasSupportedExpression(expression.left) && hasSupportedExpression(expression.right);
-  if (expression.kind === "function")
-    return (
-      DEFAULT_FORMULA_FUNCTION_REGISTRY.get(expression.name) !== undefined &&
-      expression.args.every(hasSupportedExpression)
-    );
-  return true;
-}
+type FormulaCell = Readonly<{ key: string; row: number; column: number; sheetId: string }>;
+type FormulaIndex = { rows: number[]; byRow: Map<number, FormulaCell[]> };
 
 export function createFormulaCacheEligibility(
-  sheet: Sheet,
-): (row: number, column: number) => boolean {
-  const formulaByRow = new Map<number, FormulaCell[]>();
-  for (const [key, cell] of sheet.cells) {
-    if (cell.content?.kind !== "formula") continue;
-    const [row, column] = key.split(":").map(Number);
-    if (row === undefined || column === undefined) continue;
-    const formula = { key, row, column };
-    const rowFormulas = formulaByRow.get(row) ?? [];
-    rowFormulas.push(formula);
-    formulaByRow.set(row, rowFormulas);
+  workbook: Workbook,
+): (sheetId: string, row: number, column: number) => boolean {
+  const keyFor = (sheetId: string, row: number, column: number) =>
+    JSON.stringify([sheetId, row, column]);
+  const formulas = new Map<string, FormulaCell>();
+  const indexes = new Map<string, FormulaIndex>();
+  const sheetsByName = new Map<string, string>();
+  for (const sheet of workbook.sheets.values()) {
+    sheetsByName.set(sheet.name.toLocaleLowerCase("en-US"), sheet.id);
+    const byRow = new Map<number, FormulaCell[]>();
+    for (const [cellKey, cell] of sheet.cells) {
+      if (cell.content?.kind !== "formula") continue;
+      const [row, column] = cellKey.split(":").map(Number);
+      if (row === undefined || column === undefined) continue;
+      const key = keyFor(sheet.id, row, column);
+      const formula = { key, row, column, sheetId: sheet.id };
+      formulas.set(key, formula);
+      const rowFormulas = byRow.get(row) ?? [];
+      rowFormulas.push(formula);
+      byRow.set(row, rowFormulas);
+    }
+    for (const row of byRow.values()) row.sort((left, right) => left.column - right.column);
+    indexes.set(sheet.id, { rows: [...byRow.keys()].sort((left, right) => left - right), byRow });
   }
-  const formulaRows = [...formulaByRow.keys()].sort((left, right) => left - right);
-  for (const formulas of formulaByRow.values())
-    formulas.sort((left, right) => left.column - right.column);
   const safe = new Map<string, boolean>();
   const lowerBound = (values: readonly number[], target: number): number => {
     let start = 0;
@@ -56,34 +48,86 @@ export function createFormulaCacheEligibility(
     return start;
   };
   const dependenciesFor = (key: string): string[] | null => {
-    const source = sheet.cells.get(key)?.content;
+    const formula = formulas.get(key);
+    if (!formula) return [];
+    const source = workbook.sheets
+      .get(formula.sheetId)
+      ?.cells.get(`${formula.row}:${formula.column}`)?.content;
     if (source?.kind !== "formula") return [];
     const parsed = parseFormula(source.formula.source);
-    if (!parsed.ok || !hasSupportedExpression(parsed.ast.expression)) return null;
-    const dependencies = collectFormulaEvaluationDependencies(parsed.ast);
-    const result = dependencies.references.map(
-      (reference) => `${reference.row}:${reference.column}`,
-    );
-    for (const range of dependencies.ranges) {
-      const startRow = Math.min(range.start.row, range.end.row);
-      const endRow = Math.max(range.start.row, range.end.row);
-      const startColumn = Math.min(range.start.column, range.end.column);
-      const endColumn = Math.max(range.start.column, range.end.column);
+    if (!parsed.ok) return null;
+    const result = new Set<string>();
+    const sheetIdFor = (sheetName: string | undefined) =>
+      sheetName ? sheetsByName.get(sheetName.toLocaleLowerCase("en-US")) : formula.sheetId;
+    const addRange = (sheetId: string | undefined, start: CellAddress, end: CellAddress) => {
+      if (sheetId !== undefined && start.row === end.row && start.column === end.column) {
+        const dependency = keyFor(sheetId, start.row, start.column);
+        if (formulas.has(dependency)) result.add(dependency);
+        return;
+      }
+      const index = sheetId === undefined ? undefined : indexes.get(sheetId);
+      // A genuinely missing sheet is evaluated as Excel's #REF!, not as a
+      // dependency on a same-position cell in the current sheet.
+      if (!index) return;
+      const startRow = Math.min(start.row, end.row);
+      const endRow = Math.max(start.row, end.row);
+      const startColumn = Math.min(start.column, end.column);
+      const endColumn = Math.max(start.column, end.column);
       for (
-        let index = lowerBound(formulaRows, startRow);
-        (formulaRows[index] ?? Infinity) <= endRow;
-        index += 1
+        let offset = lowerBound(index.rows, startRow);
+        (index.rows[offset] ?? Infinity) <= endRow;
+        offset += 1
       ) {
-        for (const formula of formulaByRow.get(formulaRows[index] ?? -1) ?? []) {
-          if (formula.column >= startColumn && formula.column <= endColumn)
-            result.push(formula.key);
+        for (const dependency of index.byRow.get(index.rows[offset] ?? -1) ?? []) {
+          if (dependency.column >= startColumn && dependency.column <= endColumn)
+            result.add(dependency.key);
         }
       }
-    }
-    return result;
+    };
+    const visit = (expression: FormulaExpression): boolean => {
+      if (expression.kind === "error") return !["NAME", "PARSE", "CYCLE"].includes(expression.code);
+      // Whole-axis sources stay intact, but remain conservatively uncached.
+      if (expression.kind === "axis-range") return false;
+      if (expression.kind === "reference" || expression.kind === "spill") {
+        addRange(
+          sheetIdFor(expression.reference.sheetName),
+          expression.reference,
+          expression.reference,
+        );
+      } else if (expression.kind === "range") {
+        addRange(
+          sheetIdFor(expression.range.start.sheetName),
+          expression.range.start,
+          expression.range.end,
+        );
+      } else if (expression.kind === "identifier") {
+        const named = getDefinedName(workbook, expression.name, formula.sheetId);
+        if (!named) return false;
+        addRange(named.reference.sheetId, named.reference.start, named.reference.end);
+      } else if (expression.kind === "structured-reference") {
+        const bounds = resolveTableReferenceBounds(
+          workbook,
+          formula.sheetId,
+          expression.reference,
+          formula,
+        );
+        if (!bounds) return false;
+        addRange(bounds.sheetId, bounds.start, bounds.end);
+      } else if (expression.kind === "unary") return visit(expression.operand);
+      else if (expression.kind === "binary")
+        return visit(expression.left) && visit(expression.right);
+      else if (expression.kind === "array") return expression.rows.every((row) => row.every(visit));
+      else if (expression.kind === "function")
+        return (
+          DEFAULT_FORMULA_FUNCTION_REGISTRY.get(expression.name) !== undefined &&
+          expression.args.every(visit)
+        );
+      return true;
+    };
+    return visit(parsed.ast.expression) ? [...result] : null;
   };
-  return (row, column) => {
-    const root = `${row}:${column}`;
+  return (sheetId, row, column) => {
+    const root = keyFor(sheetId, row, column);
     if (safe.has(root)) return safe.get(root) ?? false;
     const visiting = new Set<string>();
     const frames: Array<{ key: string; dependencies?: readonly string[] }> = [{ key: root }];

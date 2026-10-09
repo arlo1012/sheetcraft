@@ -972,9 +972,8 @@ export function writeXlsxFilterColorFormats(
     if (!entry) continue;
     const xml = strFromU8(entry);
     entries[path] = strToU8(
-      xml.replace(
-        /<autoFilter\b[^>]*(?:\/>|>[\s\S]*?<\/autoFilter>)/i,
-        writeXlsxAutoFilter(sheet.filter, options),
+      xml.replace(/<autoFilter\b[^>]*(?:\/>|>[\s\S]*?<\/autoFilter>)/i, () =>
+        writeXlsxAutoFilter(sheet.filter!, options),
       ),
     );
   }
@@ -994,8 +993,7 @@ export function writeXlsxFilterColorFormats(
       : undefined;
     if (!filter) continue;
     entries[path] = strToU8(
-      xml.replace(
-        /<autoFilter\b[^>]*(?:\/>|>[\s\S]*?<\/autoFilter>)/i,
+      xml.replace(/<autoFilter\b[^>]*(?:\/>|>[\s\S]*?<\/autoFilter>)/i, () =>
         writeXlsxAutoFilter(filter, options),
       ),
     );
@@ -1004,14 +1002,14 @@ export function writeXlsxFilterColorFormats(
   const dxfContainer = `<dxfs count="${dxfs.length}">${dxfs.join("")}</dxfs>`;
   entries["xl/styles.xml"] = strToU8(
     /<dxfs\b[^>]*>[\s\S]*?<\/dxfs>|<dxfs\b[^>]*\/?\s*>/i.test(source)
-      ? source.replace(/<dxfs\b[^>]*>[\s\S]*?<\/dxfs>|<dxfs\b[^>]*\/?\s*>/i, dxfContainer)
-      : source.replace(/<tableStyles\b/i, `${dxfContainer}<tableStyles`),
+      ? source.replace(/<dxfs\b[^>]*>[\s\S]*?<\/dxfs>|<dxfs\b[^>]*\/?\s*>/i, () => dxfContainer)
+      : source.replace(/<tableStyles\b/i, () => `${dxfContainer}<tableStyles`),
   );
 }
 
 function replaceElement(xml: string, tag: string, replacement: string, after: RegExp): string {
   const expression = new RegExp(`<${tag}\\b[^>]*(?:\\/>|>[\\s\\S]*?<\\/${tag}>)`, "i");
-  if (expression.test(xml)) return xml.replace(expression, replacement);
+  if (expression.test(xml)) return xml.replace(expression, () => replacement);
   return xml.replace(after, (match) => `${match}${replacement}`);
 }
 
@@ -1038,7 +1036,8 @@ function writeOutlineGroups(xml: string, groups: readonly XlsxOutlineGroup[]): s
     const level = outlineLevel(groups, "row", row);
     const collapsed = rows.some((group) => group.collapsed && group.end + 1 === row);
     const hidden = rows.some((group) => group.collapsed && group.start <= row && group.end >= row);
-    const expression = new RegExp(`(<row\\b(?=[^>]*\\br=["']${row + 1}["'])[^>]*)(/?>)`, "i");
+    // Keep the self-closing slash in the terminator, before appending attributes.
+    const expression = new RegExp(`(<row\\b(?=[^>]*\\br=["']${row + 1}["'])[^>]*?)(/?>)`, "i");
     if (expression.test(output)) {
       output = output.replace(expression, (_match, start: string, close: string) => {
         const normalized = start.replace(/\s(?:outlineLevel|collapsed)=["'][^"']*["']/gi, "");
@@ -1066,7 +1065,7 @@ function writeOutlineGroups(xml: string, groups: readonly XlsxOutlineGroup[]): s
         (group) => group.collapsed && group.start <= column && group.end >= column,
       );
       const expression = new RegExp(
-        `(<col\\b(?=[^>]*\\bmin=["']${column + 1}["'])(?=[^>]*\\bmax=["']${column + 1}["'])[^>]*)(/?>)`,
+        `(<col\\b(?=[^>]*\\bmin=["']${column + 1}["'])(?=[^>]*\\bmax=["']${column + 1}["'])[^>]*?)(/?>)`,
         "i",
       );
       if (expression.test(output)) {
@@ -1172,14 +1171,14 @@ function writeHiddenRows(xml: string, rows: readonly number[]): string {
     const original = opening[1] ?? "";
     const normalized = original.replace(/\shidden\s*=\s*(["'])[^"']*\1/gi, "");
     const replacement = `<row${normalized} hidden="1"${opening[2] ?? ""}>`;
-    return `${additions}${element.replace(opening[0], replacement)}`;
+    return `${additions}${element.replace(opening[0], () => replacement)}`;
   });
   const trailing = hiddenRows
     .slice(nextHidden)
     .map((row) => `<row r="${row + 1}" hidden="1"/>`)
     .join("");
   const replacement = `<sheetData${attributes}>${patched}${trailing}</sheetData>`;
-  return xml.replace(sheetData[0], replacement);
+  return xml.replace(sheetData[0], () => replacement);
 }
 
 export function writeXlsxDataMetadata(

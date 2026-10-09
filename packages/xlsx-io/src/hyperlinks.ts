@@ -162,7 +162,7 @@ function addRelationships(
         `<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${escapeXml(target)}" TargetMode="External"/>`,
     )
     .join("");
-  return existing.replace(/<\/Relationships>\s*$/i, `${entries}</Relationships>`);
+  return existing.replace(/<\/Relationships>\s*$/i, () => `${entries}</Relationships>`);
 }
 
 /** Add real hyperlink relationships after ExcelJS has generated the workbook. */

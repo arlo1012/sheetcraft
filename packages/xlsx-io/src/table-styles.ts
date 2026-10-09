@@ -469,10 +469,13 @@ function writeTableStyles(
   const dxfsContainer = `<dxfs count="${dxfXml.length}">${dxfXml.join("")}</dxfs>`;
   const tableStylesContainer = `<tableStyles count="${entriesByName.size}" defaultTableStyle="${encodeXml(defaultStyle ? xlsxStyleName(defaultStyle) : "TableStyleMedium2")}" defaultPivotStyle="${encodeXml(defaultPivotName)}">${tableStyles}</tableStyles>`;
   const withDxfs = /<dxfs\b[^>]*>([\s\S]*?)<\/dxfs>|<dxfs\b[^>]*\/?\s*>/i.test(source)
-    ? source.replace(/<dxfs\b[^>]*>([\s\S]*?)<\/dxfs>|<dxfs\b[^>]*\/?\s*>/i, dxfsContainer)
-    : source.replace(/<tableStyles\b/i, `${dxfsContainer}<tableStyles`);
+    ? source.replace(/<dxfs\b[^>]*>([\s\S]*?)<\/dxfs>|<dxfs\b[^>]*\/?\s*>/i, () => dxfsContainer)
+    : source.replace(/<tableStyles\b/i, () => `${dxfsContainer}<tableStyles`);
   entries["xl/styles.xml"] = strToU8(
-    withDxfs.replace(/<tableStyles\b[^>]*(?:\/>|>[\s\S]*?<\/tableStyles>)/i, tableStylesContainer),
+    withDxfs.replace(
+      /<tableStyles\b[^>]*(?:\/>|>[\s\S]*?<\/tableStyles>)/i,
+      () => tableStylesContainer,
+    ),
   );
   return pivotStyleNames;
 }

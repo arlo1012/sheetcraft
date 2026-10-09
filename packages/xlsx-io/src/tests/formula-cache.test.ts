@@ -16,7 +16,7 @@ describe("formula cache eligibility", () => {
           formula: { source: `=A${row + 2}+1` },
         },
       );
-    expect(createFormulaCacheEligibility(sheet)(0, 0)).toBe(true);
+    expect(createFormulaCacheEligibility(workbook)(sheet.id, 0, 0)).toBe(true);
   });
 
   test("keeps independent sparse-range formula eligibility isolated", () => {
@@ -49,9 +49,9 @@ describe("formula cache eligibility", () => {
         formula: { source: "=IFERROR(A1001,0)" },
       },
     );
-    const eligible = createFormulaCacheEligibility(sheet);
-    for (let row = 0; row < 500; row += 1) expect(eligible(row, 1)).toBe(true);
-    expect(eligible(1_000, 1)).toBe(false);
+    const eligible = createFormulaCacheEligibility(workbook);
+    for (let row = 0; row < 500; row += 1) expect(eligible(sheet.id, row, 1)).toBe(true);
+    expect(eligible(sheet.id, 1_000, 1)).toBe(false);
   });
 
   test("fails closed for a formula cycle", () => {
@@ -59,7 +59,7 @@ describe("formula cache eligibility", () => {
     const sheet = getActiveSheet(workbook);
     setCellContent(sheet, { row: 0, column: 0 }, { kind: "formula", formula: { source: "=B1" } });
     setCellContent(sheet, { row: 0, column: 1 }, { kind: "formula", formula: { source: "=A1" } });
-    expect(createFormulaCacheEligibility(sheet)(0, 0)).toBe(false);
+    expect(createFormulaCacheEligibility(workbook)(sheet.id, 0, 0)).toBe(false);
   });
 
   test("leaves whole-axis formulas for Excel recalculation while retaining their source", () => {
@@ -70,6 +70,6 @@ describe("formula cache eligibility", () => {
       { row: 0, column: 0 },
       { kind: "formula", formula: { source: "=SUM(A:A)" } },
     );
-    expect(createFormulaCacheEligibility(sheet)(0, 0)).toBe(false);
+    expect(createFormulaCacheEligibility(workbook)(sheet.id, 0, 0)).toBe(false);
   });
 });

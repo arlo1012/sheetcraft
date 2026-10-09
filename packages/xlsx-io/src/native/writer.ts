@@ -6,6 +6,8 @@ import { writeNativeSheetAttachments, type NativePartType } from "./writer-attac
 import { xlsxText } from "./writer-text.js";
 import { writeNativeDefaultTheme } from "./writer-theme.js";
 import { assertNativeWorksheetName } from "./writer-names.js";
+import { assertNativeVisibleSheets, nativeSheetState } from "./sheet-state.js";
+import { xlsxFormula } from "./writer-formulas.js";
 
 const HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
 const CONTENT_NS = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -52,7 +54,7 @@ function cellXml(cell: NativeCell, styles: NativeStyleWriter, date1904: boolean)
     cell.formula ?? (typeof record?.formula === "string" ? record.formula : undefined);
   if (formula !== undefined) {
     const cached = scalarValue(cell.result !== undefined ? cell.result : record?.result, date1904);
-    return `<c${attrs}${cached.type ? ` t="${cached.type}"` : ""}><f>${xml(formula.startsWith("=") ? formula.slice(1) : formula)}</f>${cached.content}</c>`;
+    return `<c${attrs}${cached.type ? ` t="${cached.type}"` : ""}><f>${xml(xlsxFormula(formula))}</f>${cached.content}</c>`;
   }
   let value = cell.value;
   if (Array.isArray(record?.richText))
@@ -155,7 +157,7 @@ function sheetXml(
   date1904: boolean,
   attachments: { drawing?: string; legacyDrawing?: string },
 ): string {
-  const properties = sheet.properties.tabColor
+  const properties = sheet.properties.tabColor?.argb
     ? `<sheetPr>${`<tabColor rgb="${xml(sheet.properties.tabColor.argb)}"/>`}</sheetPr>`
     : "";
   const format = `<sheetFormatPr defaultRowHeight="${sheet.properties.defaultRowHeight ?? 15}"${sheet.properties.defaultColWidth !== undefined ? ` defaultColWidth="${sheet.properties.defaultColWidth}"` : ""}/>`;
@@ -185,8 +187,12 @@ function sheetXml(
 }
 
 function workbookXml(workbook: NativeWorkbookData, sheetIds: string[]): string {
+  const firstVisible = workbook.sheets.findIndex(
+    (sheet) => nativeSheetState(sheet.state) === "visible",
+  );
   const views = (workbook.views?.length ? workbook.views : [{}])
     .map((view) => {
+      view = { ...view, activeTab: view.activeTab ?? firstVisible };
       const attrs = ["x", "y", "width", "height", "activeTab", "firstSheet", "visibility"]
         .filter((key) => view[key] !== undefined)
         .map((key) => {
@@ -208,7 +214,7 @@ function workbookXml(workbook: NativeWorkbookData, sheetIds: string[]): string {
   const sheets = workbook.sheets
     .map(
       (sheet, index) =>
-        `<sheet name="${xml(sheet.name)}" sheetId="${index + 1}" r:id="${sheetIds[index]}"/>`,
+        `<sheet name="${xml(sheet.name)}" sheetId="${index + 1}"${nativeSheetState(sheet.state) === "visible" ? "" : ` state="${sheet.state}"`} r:id="${sheetIds[index]}"/>`,
     )
     .join("");
   return `${HEADER}<workbook xmlns="${MAIN_NS}" xmlns:r="${REL_NS}"><fileVersion appName="Sheetcraft"/><workbookPr date1904="${workbook.properties.date1904 ? 1 : 0}"/><bookViews>${views}</bookViews><sheets>${sheets}</sheets><calcPr calcId="171027" fullCalcOnLoad="${workbook.calcProperties.fullCalcOnLoad ? 1 : 0}"/></workbook>`;
@@ -216,6 +222,19 @@ function workbookXml(workbook: NativeWorkbookData, sheetIds: string[]): string {
 
 /** Generate the package directly; higher-level feature writers extend these parts. */
 export function writeNativeWorkbook(workbook: NativeWorkbookData): Uint8Array {
+  assertNativeVisibleSheets(workbook.sheets);
+  for (const view of workbook.views ?? []) {
+    const activeTab = view.activeTab;
+    if (activeTab === undefined) continue;
+    if (
+      typeof activeTab !== "number" ||
+      !Number.isInteger(activeTab) ||
+      activeTab < 0 ||
+      activeTab >= workbook.sheets.length ||
+      nativeSheetState(workbook.sheets[activeTab]?.state) !== "visible"
+    )
+      throw new RangeError("The XLSX active tab must identify a visible worksheet.");
+  }
   const sheetNames: string[] = [];
   for (const sheet of workbook.sheets) {
     assertNativeWorksheetName(sheet.name, sheetNames);

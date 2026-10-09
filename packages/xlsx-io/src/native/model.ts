@@ -21,9 +21,11 @@ export type NativeImageAnchor = {
   tl: { nativeCol: number; nativeColOff: number; nativeRow: number; nativeRowOff: number };
   ext: { width: number; height: number };
 };
+export type NativeSheetState = "visible" | "hidden" | "veryHidden";
 export type NativeSheetData = {
   name: string;
-  properties: { defaultRowHeight?: number; defaultColWidth?: number; tabColor?: { argb: string } };
+  state?: NativeSheetState;
+  properties: { defaultRowHeight?: number; defaultColWidth?: number; tabColor?: { argb?: string } };
   views?: Array<Record<string, unknown>> | null;
   rows: Map<number, NativeRow>;
   columns: Map<number, NativeColumn>;

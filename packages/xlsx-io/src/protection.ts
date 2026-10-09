@@ -186,7 +186,7 @@ export function writeXlsxProtection(
     const boundary = /<sheetCalcPr\b[^>]*\/>/.test(xml)
       ? /(<sheetCalcPr\b[^>]*\/>)/
       : /(<\/sheetData>|<sheetData\s*\/>)/;
-    entries[part] = strToU8(xml.replace(boundary, `$1${tag}${ranges}`));
+    entries[part] = strToU8(xml.replace(boundary, (match) => `${match}${tag}${ranges}`));
   }
   const part = "xl/workbook.xml";
   if (!entries[part]) return;

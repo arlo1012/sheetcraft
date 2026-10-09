@@ -160,7 +160,8 @@ export function pivotTableXml(
   return strToU8(
     native.replace(
       "</pivotTableDefinition>",
-      `<extLst><ext uri="${PIVOT_EXT}"><i10:metadata xmlns:i10="${PIVOT_EXT}">${xml(JSON.stringify(metadata))}</i10:metadata></ext></extLst></pivotTableDefinition>`,
+      () =>
+        `<extLst><ext uri="${PIVOT_EXT}"><i10:metadata xmlns:i10="${PIVOT_EXT}">${xml(JSON.stringify(metadata))}</i10:metadata></ext></extLst></pivotTableDefinition>`,
     ),
   );
 }
