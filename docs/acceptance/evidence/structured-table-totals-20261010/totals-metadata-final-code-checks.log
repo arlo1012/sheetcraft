@@ -1,0 +1,14 @@
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  Test Files  4 passed (4)
+@sheetcraft/xlsx-io test:       Tests  86 passed (86)
+@sheetcraft/xlsx-io test:    Start at  14:48:38
+@sheetcraft/xlsx-io test:    Duration  4.46s (transform 1.25s, setup 0ms, import 2.89s, tests 1.07s, environment 0ms)
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: Exited with code 0
+$ bun run --filter @sheetcraft/xlsx-io typecheck
+@sheetcraft/xlsx-io typecheck: Exited with code 0
+$ bun run --filter @sheetcraft/xlsx-io build
+@sheetcraft/xlsx-io build: Exited with code 0

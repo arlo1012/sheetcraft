@@ -15,6 +15,7 @@ import type { CellBorder } from "@sheetcraft/core/style";
 import { readXlsxDxfEntries, readXlsxDxfStyle, xlsxDxfXml } from "./conditional-formatting.js";
 import { readXlsxAutoFilter, writeXlsxAutoFilter } from "./data-tools-metadata.js";
 import { materializeXlsxStyleColors } from "./xlsx-colors.js";
+import { readGeneratedTableTotalsCells, xlsxTableTotalsColumn } from "./table-totals.js";
 
 type WorksheetPart = { path: string; xml: string };
 type ImportedTable = SheetTable;
@@ -469,13 +470,21 @@ function tableDxfXml(element: TableStyleElementFormat): string {
     : dxf.replace(/<\/dxf>/i, `<border>${sides}</border></dxf>`);
 }
 
-function tableXml(table: SheetTable, tableId: number): string {
+function tableXml(
+  table: SheetTable,
+  tableId: number,
+  sheet: Sheet,
+  totalsCells: ReturnType<typeof readGeneratedTableTotalsCells>,
+): string {
   const name = encodeXml(table.name);
   const columns = table.columns
-    .map(
-      (column, index) =>
-        `<tableColumn id="${index + 1}" name="${encodeXml(column.name)}"${table.filterButton ? "" : ' hiddenButton="1"'}/>`,
-    )
+    .map((column, index) => {
+      const totals = xlsxTableTotalsColumn(sheet, table, index, totalsCells);
+      const attrs = `id="${index + 1}" name="${encodeXml(column.name)}"${table.filterButton ? "" : ' hiddenButton="1"'}${totals.attributes}`;
+      return totals.body
+        ? `<tableColumn ${attrs}>${totals.body}</tableColumn>`
+        : `<tableColumn ${attrs}/>`;
+    })
     .join("");
   const filter = table.filter
     ? writeXlsxAutoFilter(table.filter as Parameters<typeof writeXlsxAutoFilter>[0])
@@ -606,7 +615,7 @@ function addContentType(entries: Record<string, Uint8Array>, tableId: number): v
 
 export function writeXlsxTableMetadata(
   entries: Record<string, Uint8Array>,
-  sheets: readonly { tables?: readonly SheetTable[] }[],
+  sheets: readonly Sheet[],
   styles: readonly TableStyleDefinition[] = [],
   defaultStyleId?: string,
   pivotStyles: readonly PivotTableStyleDefinition[] = [],
@@ -637,6 +646,7 @@ export function writeXlsxTableMetadata(
     const path = `xl/worksheets/sheet${sheetIndex + 1}.xml`;
     const worksheet = entries[path];
     if (!worksheet) continue;
+    const totalsCells = readGeneratedTableTotalsCells(strFromU8(worksheet), tables);
     const relsPath = `xl/worksheets/_rels/sheet${sheetIndex + 1}.xml.rels`;
     let rels = strFromU8(
       entries[relsPath] ??
@@ -649,7 +659,9 @@ export function writeXlsxTableMetadata(
     for (const table of tables) {
       const currentId = tableId++;
       const relation = `rId${relationshipId++}`;
-      entries[`xl/tables/table${currentId}.xml`] = strToU8(tableXml(table, currentId));
+      entries[`xl/tables/table${currentId}.xml`] = strToU8(
+        tableXml(table, currentId, sheet, totalsCells),
+      );
       addContentType(entries, currentId);
       rels = rels.replace(
         /<\/Relationships>/i,

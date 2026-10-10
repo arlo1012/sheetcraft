@@ -1,0 +1,11 @@
+$ bun run --filter @sheetcraft/xlsx-io test "--maxWorkers=1"
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  Test Files  80 passed (80)
+@sheetcraft/xlsx-io test:       Tests  1138 passed (1138)
+@sheetcraft/xlsx-io test:    Start at  14:49:24
+@sheetcraft/xlsx-io test:    Duration  70.14s (transform 2.24s, setup 0ms, import 31.92s, tests 28.00s, environment 7ms)
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: Exited with code 0

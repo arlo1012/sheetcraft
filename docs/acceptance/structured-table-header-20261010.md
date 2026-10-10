@@ -95,7 +95,10 @@ old total-inclusive snapshot, and undo/redo. Core types/build and final scoped l
 typecheck and scoped Web table run produced no terminal result during the observed
 output stall; only these two assistant-owned checks were interrupted and exited 130. Their partial logs are retained with an interrupted suffix. Neither is
 counted as passed. The command response recovered afterward, which does not prove
-a resource cause. A serial recheck remains pending. The earlier combined Web run still contains
+a resource cause. Later serial checks completed: actual rejected-command file 3/3, complete owned
+Web table suite 8 files / 112 passed, and complete Web typecheck passed. The original
+interrupted logs are preserved separately. No root-cause claim is inferred from
+the successful serial runs. The earlier combined Web run still contains
 two unchanged 5-second close/navigation timeouts; this continuation does not
 replace that failed run. Whole-Insert, full-repository CI and complete dual-app
 structured-table acceptance are not claimed.

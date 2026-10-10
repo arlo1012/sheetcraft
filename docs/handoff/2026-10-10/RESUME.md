@@ -1,5 +1,17 @@
 # Sheetcraft continuation after recovery — 2026-10-10
 
+## Latest totals repair WIP
+
+After `b3db3eed88ecf06d9f13b9678414150390b10778`, actual native positive and
+single-attribute negative controls isolated missing total-column metadata as the
+Excel table1 repair cause. The formal regenerated product now opens editable in
+Excel and WPS; real edits recalculate30/71/131 in both. The writer derives each
+column role from its actual final total cell, retaining custom/label/constant
+differences without changing worksheet/cache. Full XLSX1138 tests pass. Read
+`docs/acceptance/structured-table-totals-20261010.md` for conservative structured
+reference downgrade, failures/checks and still-pending save/reopen/custom/filter
+button acceptance. This remains source/text WIP, not full Insert completion.
+
 ## New header/filter continuation
 
 After `5e823043b80d4aa7b84456322b68562e79bbdcfb`, the actual no-header/empty,

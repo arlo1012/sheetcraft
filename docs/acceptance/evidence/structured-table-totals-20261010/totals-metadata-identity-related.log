@@ -1,0 +1,33 @@
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  ❯ src/tests/native/table-totals-metadata.test.ts (16 tests | 2 failed) 329ms
+@sheetcraft/xlsx-io test:      × proves the matching structured data column rather than blanket sum: =SUBTOTAL(109,Sales[Sum]) 12ms
+@sheetcraft/xlsx-io test:      × proves the matching structured data column rather than blanket sum: =SUBTOTAL(109,[Sum]) 6ms
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  FAIL  src/tests/native/table-totals-metadata.test.ts > native table totals metadata matches actual cells > proves the matching structured data column rather than blanket sum: =SUBTOTAL(109,Sales[Sum])
+@sheetcraft/xlsx-io test:  FAIL  src/tests/native/table-totals-metadata.test.ts > native table totals metadata matches actual cells > proves the matching structured data column rather than blanket sum: =SUBTOTAL(109,[Sum])
+@sheetcraft/xlsx-io test: AssertionError: expected '<?xml version="1.0" encoding="UTF-8" …' to contain 'name="Sum" totalsRowFunction="sum"'
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: Expected: "name="Sum" totalsRowFunction="sum""
+@sheetcraft/xlsx-io test: Received: "<?xml version="1.0" encoding="UTF-8" standalone="yes"?><table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="Sales" displayName="Sales" ref="A1:F4" totalsRowCount="1"><autoFilter ref="A1:F3"></autoFilter><tableColumns count="6"><tableColumn id="1" name="Label" totalsRowLabel="Total &amp; &lt;"/><tableColumn id="2" name="Sum" totalsRowFunction="custom"><totalsRowFormula>SUBTOTAL(109,Sales[Sum])</totalsRowFormula></tableColumn><tableColumn id="3" name="Mean" totalsRowFunction="custom"><totalsRowFormula>SUBTOTAL(101,C2:C3)</totalsRowFormula></tableColumn><tableColumn id="4" name="Custom" totalsRowFunction="custom"><totalsRowFormula>SUM(D2:D3)+1</totalsRowFormula></tableColumn><tableColumn id="5" name="Constant"/><tableColumn id="6" name="Blank"/></tableColumns><tableStyleInfo name="Sheetcraft Light 2" showFirstColumn="0" showLastColumn="0" showRowStripes="1" showColumnStripes="0"/></table>"
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  ❯ src/tests/native/table-totals-metadata.test.ts:163:62
+@sheetcraft/xlsx-io test:     161|       const f = fixture();
+@sheetcraft/xlsx-io test:     162|       setCellContent(f.sheet, { row: 3, column: 1 }, { kind: "formula"…
+@sheetcraft/xlsx-io test:     163|       expect(tableXml((await encodeXlsx(f.workbook)).bytes)).toContain(
+@sheetcraft/xlsx-io test:        |                                                              ^
+@sheetcraft/xlsx-io test:     164|         'name="Sum" totalsRowFunction="sum"',
+@sheetcraft/xlsx-io test:     165|       );
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  Test Files  1 failed | 3 passed (4)
+@sheetcraft/xlsx-io test:       Tests  2 failed | 84 passed (86)
+@sheetcraft/xlsx-io test:    Start at  14:48:09
+@sheetcraft/xlsx-io test:    Duration  4.77s (transform 1.32s, setup 0ms, import 3.09s, tests 1.11s, environment 0ms)
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: Exited with code 1

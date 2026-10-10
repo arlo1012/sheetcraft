@@ -1,0 +1,120 @@
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  ❯ src/tests/native/table-totals-metadata.test.ts (7 tests | 6 failed) 114ms
+@sheetcraft/xlsx-io test:      × writes mixed totals without changing cells/cache or treating all columns as sum (headers=true) 50ms
+@sheetcraft/xlsx-io test:      × writes mixed totals without changing cells/cache or treating all columns as sum (headers=false) 11ms
+@sheetcraft/xlsx-io test:      × keeps a noncanonical SUBTOTAL as its exact custom formula: =SUBTOTAL(109,B2:B2) 12ms
+@sheetcraft/xlsx-io test:      × keeps a noncanonical SUBTOTAL as its exact custom formula: =SUBTOTAL(9,B2:B3) 10ms
+@sheetcraft/xlsx-io test:      × keeps a noncanonical SUBTOTAL as its exact custom formula: =SUBTOTAL(109,C2:C3) 9ms
+@sheetcraft/xlsx-io test:      × keeps filtered and hidden-row worksheet formula/cache unchanged 10ms
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  FAIL  src/tests/native/table-totals-metadata.test.ts > native table totals metadata matches actual cells > writes mixed totals without changing cells/cache or treating all columns as sum (headers=true)
+@sheetcraft/xlsx-io test: AssertionError: expected '<?xml version="1.0" encoding="UTF-8" …' to contain 'name="Label" totalsRowLabel="Total &a…'
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: Expected: "name="Label" totalsRowLabel="Total &amp; &lt;""
+@sheetcraft/xlsx-io test: Received: "<?xml version="1.0" encoding="UTF-8" standalone="yes"?><table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="Sales" displayName="Sales" ref="A1:F4" totalsRowCount="1"><autoFilter ref="A1:F3"></autoFilter><tableColumns count="6"><tableColumn id="1" name="Label"/><tableColumn id="2" name="Sum"/><tableColumn id="3" name="Mean"/><tableColumn id="4" name="Custom"/><tableColumn id="5" name="Constant"/><tableColumn id="6" name="Blank"/></tableColumns><tableStyleInfo name="Sheetcraft Light 2" showFirstColumn="0" showLastColumn="0" showRowStripes="1" showColumnStripes="0"/></table>"
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  ❯ src/tests/native/table-totals-metadata.test.ts:37:17
+@sheetcraft/xlsx-io test:      35|     const encoded = await encodeXlsx(f.workbook);
+@sheetcraft/xlsx-io test:      36|     const xml = tableXml(encoded.bytes);
+@sheetcraft/xlsx-io test:      37|     expect(xml).toContain('name="Label" totalsRowLabel="Total &amp; &l…
+@sheetcraft/xlsx-io test:        |                 ^
+@sheetcraft/xlsx-io test:      38|     expect(xml).toContain('name="Sum" totalsRowFunction="sum"');
+@sheetcraft/xlsx-io test:      39|     expect(xml).toContain('name="Mean" totalsRowFunction="custom"><tot…
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  FAIL  src/tests/native/table-totals-metadata.test.ts > native table totals metadata matches actual cells > writes mixed totals without changing cells/cache or treating all columns as sum (headers=false)
+@sheetcraft/xlsx-io test: AssertionError: expected '<?xml version="1.0" encoding="UTF-8" …' to contain 'name="Label" totalsRowLabel="Total &a…'
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: Expected: "name="Label" totalsRowLabel="Total &amp; &lt;""
+@sheetcraft/xlsx-io test: Received: "<?xml version="1.0" encoding="UTF-8" standalone="yes"?><table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="Sales" displayName="Sales" ref="A1:F4" headerRowCount="0" totalsRowCount="1"><autoFilter ref="A1:F3"></autoFilter><tableColumns count="6"><tableColumn id="1" name="Label"/><tableColumn id="2" name="Sum"/><tableColumn id="3" name="Mean"/><tableColumn id="4" name="Custom"/><tableColumn id="5" name="Constant"/><tableColumn id="6" name="Blank"/></tableColumns><tableStyleInfo name="Sheetcraft Light 2" showFirstColumn="0" showLastColumn="0" showRowStripes="1" showColumnStripes="0"/></table>"
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  ❯ src/tests/native/table-totals-metadata.test.ts:37:17
+@sheetcraft/xlsx-io test:      35|     const encoded = await encodeXlsx(f.workbook);
+@sheetcraft/xlsx-io test:      36|     const xml = tableXml(encoded.bytes);
+@sheetcraft/xlsx-io test:      37|     expect(xml).toContain('name="Label" totalsRowLabel="Total &amp; &l…
+@sheetcraft/xlsx-io test:        |                 ^
+@sheetcraft/xlsx-io test:      38|     expect(xml).toContain('name="Sum" totalsRowFunction="sum"');
+@sheetcraft/xlsx-io test:      39|     expect(xml).toContain('name="Mean" totalsRowFunction="custom"><tot…
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  FAIL  src/tests/native/table-totals-metadata.test.ts > native table totals metadata matches actual cells > keeps a noncanonical SUBTOTAL as its exact custom formula: =SUBTOTAL(109,B2:B2)
+@sheetcraft/xlsx-io test: AssertionError: expected '<?xml version="1.0" encoding="UTF-8" …' to contain 'name="Sum" totalsRowFunction="custom"…'
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: Expected: "name="Sum" totalsRowFunction="custom"><totalsRowFormula>SUBTOTAL(109,B2:B2)</totalsRowFormula>"
+@sheetcraft/xlsx-io test: Received: "<?xml version="1.0" encoding="UTF-8" standalone="yes"?><table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="Sales" displayName="Sales" ref="A1:F4" totalsRowCount="1"><autoFilter ref="A1:F3"></autoFilter><tableColumns count="6"><tableColumn id="1" name="Label"/><tableColumn id="2" name="Sum"/><tableColumn id="3" name="Mean"/><tableColumn id="4" name="Custom"/><tableColumn id="5" name="Constant"/><tableColumn id="6" name="Blank"/></tableColumns><tableStyleInfo name="Sheetcraft Light 2" showFirstColumn="0" showLastColumn="0" showRowStripes="1" showColumnStripes="0"/></table>"
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  ❯ src/tests/native/table-totals-metadata.test.ts:56:60
+@sheetcraft/xlsx-io test:      54|     const f = fixture();
+@sheetcraft/xlsx-io test:      55|     setCellContent(f.sheet, { row: 3, column: 1 }, { kind: "formula", …
+@sheetcraft/xlsx-io test:      56|     expect(tableXml((await encodeXlsx(f.workbook)).bytes)).toContain(`…
+@sheetcraft/xlsx-io test:        |                                                            ^
+@sheetcraft/xlsx-io test:      57|   });
+@sheetcraft/xlsx-io test:      58|   test("keeps filtered and hidden-row worksheet formula/cache unchange…
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  FAIL  src/tests/native/table-totals-metadata.test.ts > native table totals metadata matches actual cells > keeps a noncanonical SUBTOTAL as its exact custom formula: =SUBTOTAL(9,B2:B3)
+@sheetcraft/xlsx-io test: AssertionError: expected '<?xml version="1.0" encoding="UTF-8" …' to contain 'name="Sum" totalsRowFunction="custom"…'
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: Expected: "name="Sum" totalsRowFunction="custom"><totalsRowFormula>SUBTOTAL(9,B2:B3)</totalsRowFormula>"
+@sheetcraft/xlsx-io test: Received: "<?xml version="1.0" encoding="UTF-8" standalone="yes"?><table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="Sales" displayName="Sales" ref="A1:F4" totalsRowCount="1"><autoFilter ref="A1:F3"></autoFilter><tableColumns count="6"><tableColumn id="1" name="Label"/><tableColumn id="2" name="Sum"/><tableColumn id="3" name="Mean"/><tableColumn id="4" name="Custom"/><tableColumn id="5" name="Constant"/><tableColumn id="6" name="Blank"/></tableColumns><tableStyleInfo name="Sheetcraft Light 2" showFirstColumn="0" showLastColumn="0" showRowStripes="1" showColumnStripes="0"/></table>"
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  ❯ src/tests/native/table-totals-metadata.test.ts:56:60
+@sheetcraft/xlsx-io test:      54|     const f = fixture();
+@sheetcraft/xlsx-io test:      55|     setCellContent(f.sheet, { row: 3, column: 1 }, { kind: "formula", …
+@sheetcraft/xlsx-io test:      56|     expect(tableXml((await encodeXlsx(f.workbook)).bytes)).toContain(`…
+@sheetcraft/xlsx-io test:        |                                                            ^
+@sheetcraft/xlsx-io test:      57|   });
+@sheetcraft/xlsx-io test:      58|   test("keeps filtered and hidden-row worksheet formula/cache unchange…
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  FAIL  src/tests/native/table-totals-metadata.test.ts > native table totals metadata matches actual cells > keeps a noncanonical SUBTOTAL as its exact custom formula: =SUBTOTAL(109,C2:C3)
+@sheetcraft/xlsx-io test: AssertionError: expected '<?xml version="1.0" encoding="UTF-8" …' to contain 'name="Sum" totalsRowFunction="custom"…'
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: Expected: "name="Sum" totalsRowFunction="custom"><totalsRowFormula>SUBTOTAL(109,C2:C3)</totalsRowFormula>"
+@sheetcraft/xlsx-io test: Received: "<?xml version="1.0" encoding="UTF-8" standalone="yes"?><table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="Sales" displayName="Sales" ref="A1:F4" totalsRowCount="1"><autoFilter ref="A1:F3"></autoFilter><tableColumns count="6"><tableColumn id="1" name="Label"/><tableColumn id="2" name="Sum"/><tableColumn id="3" name="Mean"/><tableColumn id="4" name="Custom"/><tableColumn id="5" name="Constant"/><tableColumn id="6" name="Blank"/></tableColumns><tableStyleInfo name="Sheetcraft Light 2" showFirstColumn="0" showLastColumn="0" showRowStripes="1" showColumnStripes="0"/></table>"
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  ❯ src/tests/native/table-totals-metadata.test.ts:56:60
+@sheetcraft/xlsx-io test:      54|     const f = fixture();
+@sheetcraft/xlsx-io test:      55|     setCellContent(f.sheet, { row: 3, column: 1 }, { kind: "formula", …
+@sheetcraft/xlsx-io test:      56|     expect(tableXml((await encodeXlsx(f.workbook)).bytes)).toContain(`…
+@sheetcraft/xlsx-io test:        |                                                            ^
+@sheetcraft/xlsx-io test:      57|   });
+@sheetcraft/xlsx-io test:      58|   test("keeps filtered and hidden-row worksheet formula/cache unchange…
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  FAIL  src/tests/native/table-totals-metadata.test.ts > native table totals metadata matches actual cells > keeps filtered and hidden-row worksheet formula/cache unchanged
+@sheetcraft/xlsx-io test: AssertionError: expected '<?xml version="1.0" encoding="UTF-8" …' to contain 'name="Sum" totalsRowFunction="sum"'
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: - Expected
+@sheetcraft/xlsx-io test: + Received
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: - name="Sum" totalsRowFunction="sum"
+@sheetcraft/xlsx-io test: + <?xml version="1.0" encoding="UTF-8" standalone="yes"?><table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="Sales" displayName="Sales" ref="A1:F4" totalsRowCount="1"><autoFilter ref="A1:F3"><filterColumn colId="0"><filters>
+@sheetcraft/xlsx-io test: + <filter val="10"/></filters></filterColumn></autoFilter><tableColumns count="6"><tableColumn id="1" name="Label"/><tableColumn id="2" name="Sum"/><tableColumn id="3" name="Mean"/><tableColumn id="4" name="Custom"/><tableColumn id="5" name="Constant"/><tableColumn id="6" name="Blank"/></tableColumns><tableStyleInfo name="Sheetcraft Light 2" showFirstColumn="0" showLastColumn="0" showRowStripes="1" showColumnStripes="0"/></table>
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  ❯ src/tests/native/table-totals-metadata.test.ts:63:37
+@sheetcraft/xlsx-io test:      61|     f.sheet.hiddenRows = new Set([1]);
+@sheetcraft/xlsx-io test:      62|     const encoded = await encodeXlsx(f.workbook);
+@sheetcraft/xlsx-io test:      63|     expect(tableXml(encoded.bytes)).toContain('name="Sum" totalsRowFun…
+@sheetcraft/xlsx-io test:        |                                     ^
+@sheetcraft/xlsx-io test:      64|     const worksheet = strFromU8(unzipSync(encoded.bytes)["xl/worksheet…
+@sheetcraft/xlsx-io test:      65|     expect(worksheet).toContain('<f>SUBTOTAL(109,B2:B3)</f>');
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test:  Test Files  1 failed (1)
+@sheetcraft/xlsx-io test:       Tests  6 failed | 1 passed (7)
+@sheetcraft/xlsx-io test:    Start at  14:39:36
+@sheetcraft/xlsx-io test:    Duration  1.93s (transform 1.22s, setup 0ms, import 1.68s, tests 114ms, environment 0ms)
+@sheetcraft/xlsx-io test: 
+@sheetcraft/xlsx-io test: Exited with code 1
