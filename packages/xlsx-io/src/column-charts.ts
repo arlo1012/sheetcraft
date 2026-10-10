@@ -75,7 +75,7 @@ export function ordinaryColumnChartSource(
     !range ||
     chart.pivotTableId !== undefined ||
     chart.dataCache !== undefined ||
-    (chart.type !== "column" && chart.type !== "line") ||
+    (chart.type !== "column" && chart.type !== "line" && chart.type !== "bar") ||
     chart.stacked ||
     (range.end.row - range.start.row + 1) * (range.end.column - range.start.column + 1) > 10000 ||
     ![sheet.name, chart.title].every(validXmlText)
@@ -146,11 +146,10 @@ export function ordinaryColumnChartSource(
         }
       : null;
   const evaluator = createWorkbookEvaluator(workbook, sheet.id);
-  // The actual straight-line producer proves numeric points and genuinely blank
-  // gaps. Text/boolean/error points may create native zero segments and have no
-  // proven line-family normalization contract yet. Keep those exports bounded.
+  // Actual line/bar producers prove numeric points and genuinely blank gaps.
+  // No cached-text-zero normalization is inferred for these new families.
   if (
-    chart.type === "line" &&
+    chart.type !== "column" &&
     valueRanges.some((span) => {
       for (let row = span.start.row; row <= span.end.row; row++)
         for (let column = span.start.column; column <= span.end.column; column++) {
@@ -199,7 +198,7 @@ export function ordinaryColumnChartSource(
   };
 }
 
-/** Proven ordinary columns/straight marker lines with live worksheet dependency. */
+/** Proven ordinary columns/straight marker lines/horizontal bars with live worksheet dependency. */
 export function writeXlsxColumnCharts(
   entries: Record<string, Uint8Array>,
   workbook: Workbook,

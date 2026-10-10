@@ -243,35 +243,36 @@ describe("ordinary native straight marker lines", () => {
     expect(decoded.report.issues.some((i) => i.code === "feature-omitted")).toBe(true);
     expect(decoded.report.issues.some((i) => i.code === "chart-cache-normalized")).toBe(false);
   });
-  test.each(["mixed-family", "linked-line", "wrong-namespace", "unknown-leaf", "horizontal-bar"])(
-    "retains package safety rejection for %s",
-    async (mode) => {
-      const f = fixture();
-      const entries = unzipSync((await encodeXlsx(f.workbook)).bytes);
-      let xml = strFromU8(entries["xl/charts/chart1.xml"]!);
-      if (mode === "mixed-family")
-        xml = xml.replace("</c:lineChart>", "</c:lineChart><c:barChart/>");
-      if (mode === "linked-line")
-        xml = xml.replace(
-          "<c:chart>",
-          '<c:pivotSource><c:name>[Book]Data!Pivot1</c:name><c:fmtId val="0"/></c:pivotSource><c:chart>',
+  test.each([
+    "mixed-family",
+    "linked-line",
+    "wrong-namespace",
+    "unknown-leaf",
+    "bar-with-line-payload",
+  ])("retains package safety rejection for %s", async (mode) => {
+    const f = fixture();
+    const entries = unzipSync((await encodeXlsx(f.workbook)).bytes);
+    let xml = strFromU8(entries["xl/charts/chart1.xml"]!);
+    if (mode === "mixed-family") xml = xml.replace("</c:lineChart>", "</c:lineChart><c:barChart/>");
+    if (mode === "linked-line")
+      xml = xml.replace(
+        "<c:chart>",
+        '<c:pivotSource><c:name>[Book]Data!Pivot1</c:name><c:fmtId val="0"/></c:pivotSource><c:chart>',
+      );
+    if (mode === "wrong-namespace")
+      xml = xml.replace(
+        'xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"',
+        'xmlns:c="https://example.invalid/chart"',
+      );
+    if (mode === "unknown-leaf") xml = xml.replace("</c:lineChart>", "<c:unproven/></c:lineChart>");
+    if (mode === "bar-with-line-payload")
+      xml = xml
+        .replace(/c:lineChart/g, "c:barChart")
+        .replace(
+          '<c:grouping val="standard"/>',
+          '<c:barDir val="bar"/><c:grouping val="clustered"/>',
         );
-      if (mode === "wrong-namespace")
-        xml = xml.replace(
-          'xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"',
-          'xmlns:c="https://example.invalid/chart"',
-        );
-      if (mode === "unknown-leaf")
-        xml = xml.replace("</c:lineChart>", "<c:unproven/></c:lineChart>");
-      if (mode === "horizontal-bar")
-        xml = xml
-          .replace(/c:lineChart/g, "c:barChart")
-          .replace(
-            '<c:grouping val="standard"/>',
-            '<c:barDir val="bar"/><c:grouping val="clustered"/>',
-          );
-      entries["xl/charts/chart1.xml"] = strToU8(xml);
-      await expect(decodeXlsx(zipSync(entries))).rejects.toBeInstanceOf(XlsxCompatibilityError);
-    },
-  );
+    entries["xl/charts/chart1.xml"] = strToU8(xml);
+    await expect(decodeXlsx(zipSync(entries))).rejects.toBeInstanceOf(XlsxCompatibilityError);
+  });
 });

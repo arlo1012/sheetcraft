@@ -28,12 +28,14 @@ if (
     "options-blanks",
     "line-product",
     "line-options",
+    "bar-product",
+    "bar-options",
     "roundtrip",
   ].includes(mode!) ||
   (mode === "roundtrip" ? !secondPath : secondPath !== undefined)
 )
   throw new Error(
-    "Usage: bun scripts/compatibility/create-native-column-chart.mts seed|product|options|options-blanks|line-product|line-options output.xlsx OR roundtrip input.xlsx output.xlsx",
+    "Usage: bun scripts/compatibility/create-native-column-chart.mts seed|product|options|options-blanks|line-product|line-options|bar-product|bar-options output.xlsx OR roundtrip input.xlsx output.xlsx",
   );
 const output = resolve(mode === "roundtrip" ? secondPath! : firstPath);
 let workbook: Workbook;
@@ -57,8 +59,9 @@ if (mode === "roundtrip") {
 } else {
   const idFactory = createSequentialIdFactory();
   workbook = createWorkbook({ idFactory });
-  const matrix = mode.startsWith("options") || mode === "line-options";
+  const matrix = mode.startsWith("options") || mode === "line-options" || mode === "bar-options";
   const line = mode.startsWith("line-");
+  const bar = mode.startsWith("bar-");
   const options = matrix
     ? (["columns", "rows"] as const).flatMap((seriesBy) =>
         [true, false].flatMap((headerRow) =>
@@ -77,12 +80,12 @@ if (mode === "roundtrip") {
     [
       ["region", mode === "options-blanks" ? "" : "apple", "pear"],
       [mode === "options-blanks" ? "" : "east", 60, 70],
-      ["north", 100, mode === "options-blanks" || line ? null : 80],
+      ["north", 100, mode === "options-blanks" || line || bar ? null : 80],
       ["south", 120, 90],
     ].forEach((row, r) =>
       row.forEach((initialValue, column) => {
         const resolved =
-          mode === "line-options" &&
+          (mode === "line-options" || mode === "bar-options") &&
           !(option.headerRow && r === 0) &&
           !(option.headerColumn && column === 0)
             ? r === 2 && column === 2
@@ -118,7 +121,7 @@ if (mode === "roundtrip") {
           italic: false,
           rotation: 0,
           chart: {
-            type: line ? "line" : "column",
+            type: line ? "line" : bar ? "bar" : "column",
             range: { start: { row: 0, column: 0 }, end: { row: 3, column: 2 } },
             title: optionName,
             headerRow: option.headerRow,

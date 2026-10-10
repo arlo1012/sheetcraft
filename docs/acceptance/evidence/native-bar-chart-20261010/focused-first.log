@@ -1,0 +1,10 @@
+$ vitest run --config vitest.config.ts src/tests/charts/native-bars.test.ts src/tests/charts/native-lines.test.ts src/tests/charts/native-columns.test.ts src/tests/charts/native-column-options.test.ts src/tests/pivot-tables/native-charts.test.ts src/tests/pivot-tables/native-chart-import.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+
+ Test Files  6 passed (6)
+      Tests  248 passed (248)
+   Start at  13:06:51
+   Duration  11.42s (transform 1.35s, setup 0ms, import 3.79s, tests 6.86s, environment 0ms)
+

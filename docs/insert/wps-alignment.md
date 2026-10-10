@@ -136,3 +136,12 @@ Never upload private business files or infer a permanent limitation from a guess
   distinguishes direct Windows creation from PivotTable-first Mac/web creation.
 - [Native PivotSource naming](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-oi29500/3a82b89e-7264-40c1-a09f-d569374fe6a9)
   requires workbook/sheet/pivot identity, not a bare Core display name.
+
+## Existing horizontal bar native slice
+
+Actual WPS Clustered Bar establishes `barDir=bar`, category-left/value-bottom
+minMax axes and first category bottom-most. The bounded ordinary numeric/true-
+blank rectangular source now retains eight header/direction configurations.
+Native visual legend order differs while XML/Core series order stays stable;
+presentation warnings remain. See [contract](native-bar-charts.md) and
+[real dual-app acceptance](../acceptance/native-bar-chart-20261010.md).

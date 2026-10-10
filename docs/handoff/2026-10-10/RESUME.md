@@ -161,3 +161,15 @@ features or native drawing import. Continue the agreed insert capability roadmap
 in small verified groups, then independent I/O and formula-core APIs, remaining
 existing toolbar parity, and only afterward a whole-round UI merge. Expand chart
 families/layouts only from actual producer evidence plus focused regressions.
+
+## Ordinary horizontal bar continuation
+
+Line checkpoint `7111852c606bad20c165334aa1242b673b799186` is the verified parent.
+Actual WPS clustered-bar producer proves category-left/value-bottom minMax axes
+and first source category bottom-most; Core/Web semantics unchanged. All eight
+series/header configurations passed WPS/Excel live21→41 and save/close/reopen.
+Native edited111/gap and formal WPS-save reexports also passed scoped Excel
+first-open checks. XLSX1120/focused248 and owned static checks passed; existing
+125 architecture diagnostics unchanged. New GUI artifacts remain local.
+See [bar contract](../../insert/native-bar-charts.md) and
+[acceptance](../../acceptance/native-bar-chart-20261010.md).

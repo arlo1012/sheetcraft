@@ -180,7 +180,7 @@ function recoverSource(
   return candidates[0]!;
 }
 
-/** Recover a proven ordinary column/straight marker line, never guessed pivot ownership. */
+/** Recover a proven ordinary column/straight marker line/horizontal bar, never guessed pivot ownership. */
 export function readXlsxColumnCharts(
   workbook: Workbook,
   parts: readonly NativeChartPart[],
@@ -196,6 +196,7 @@ export function readXlsxColumnCharts(
       const plot = single(native, "plotArea");
       const line = plot.lineChart !== undefined;
       const bar = single(plot, line ? "lineChart" : "barChart");
+      const horizontal = !line && attr(single(bar, "barDir"), "val") === "bar";
       if (line && (!chartBoolean(bar, "marker", false) || chartBoolean(bar, "smooth", false)))
         throw new Error("Unsupported line markers or smoothing.");
       if (
@@ -217,12 +218,24 @@ export function readXlsxColumnCharts(
           chartBoolean(axis, "delete", false)
         )
           throw new Error("Unsupported chart axis.");
-        if (line && attr(single(axis, "axPos"), "val") !== (name === "catAx" ? "b" : "l"))
-          throw new Error("Unproven line axis position.");
+        if (
+          (line || horizontal) &&
+          attr(single(axis, "axPos"), "val") !==
+            (name === "catAx" ? (horizontal ? "l" : "b") : horizontal ? "b" : "l")
+        )
+          throw new Error("Unproven chart axis position.");
+        if (horizontal && attr(single(axis, "crosses"), "val") !== "autoZero")
+          throw new Error("Unproven horizontal axis crossing.");
+        if (
+          horizontal &&
+          name === "valAx" &&
+          attr(single(axis, "crossBetween"), "val") !== "between"
+        )
+          throw new Error("Unproven horizontal category placement.");
       }
       const series = nodes(bar.ser);
       const base = {
-        type: line ? ("line" as const) : ("column" as const),
+        type: line ? ("line" as const) : horizontal ? ("bar" as const) : ("column" as const),
         title: readChartTitle(native, true),
         legend: native.legend !== undefined,
         labels: chartBoolean(child(bar, "dLbls"), "showVal", false),

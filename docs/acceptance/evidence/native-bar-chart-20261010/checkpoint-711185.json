@@ -1,0 +1,25 @@
+{
+  "repository": "arlo1012/sheetcraft",
+  "branch": "refactor/native-xlsx-20261009",
+  "sha": "7111852c606bad20c165334aa1242b673b799186",
+  "parent": "17dae1ca443207080adc82170aea312b341595aa",
+  "tree": "a3058944137c7a2eb1bcfe99396c6195468c2684",
+  "verified_head": "7111852c606bad20c165334aa1242b673b799186",
+  "author": {
+    "name": "arlo.wang",
+    "email": "75329932+arlo1012@users.noreply.github.com",
+    "date": "2026-10-10T20:03:29Z"
+  },
+  "committer": {
+    "name": "arlo.wang",
+    "email": "75329932+arlo1012@users.noreply.github.com",
+    "date": "2026-10-10T20:03:29Z"
+  },
+  "checks_total": 0,
+  "status": {
+    "statuses": []
+  },
+  "files": 20,
+  "scope": "Source/text-only bounded ordinary line checkpoint; no new GUI sample/screenshot/session artifacts.",
+  "url": "https://github.com/arlo1012/sheetcraft/commit/7111852c606bad20c165334aa1242b673b799186"
+}

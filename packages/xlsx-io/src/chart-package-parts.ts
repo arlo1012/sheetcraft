@@ -656,7 +656,9 @@ export async function collectNativeChartParts(
           : ["barDir", "grouping", "varyColors", "ser", "dLbls", "gapWidth", "overlap", "axId"],
       );
       if (
-        (!line && attr(single(bar, "barDir"), "val") !== "col") ||
+        (!line &&
+          (!["col", "bar"].includes(attr(single(bar, "barDir"), "val")) ||
+            (kind === "pivot" && attr(single(bar, "barDir"), "val") !== "col"))) ||
         attr(single(bar, "grouping"), "val") !== (line ? "standard" : "clustered")
       )
         reject();
