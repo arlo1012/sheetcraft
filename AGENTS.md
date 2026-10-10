@@ -64,6 +64,10 @@
 - Shared-contract/workbook-correctness changes: run focused feature/module tests.
   Keep other checks scoped; run the full suite only when the boundary requires it
   or the user asks.
+- Excel/WPS compatibility: create the smallest synthetic example in the target
+  app, export and inspect its OOXML against the product export, isolate one cause,
+  then verify the fix in the real app and add a focused regression. Do not infer
+  unsupported behavior or permanent format limitations from an untested guess.
 - Promptly commit completed, verified, self-contained small requirements using
   conventional commit messages; exclude unrelated changes.
 - Keep this file concise: stable collaboration, architecture, and verification rules

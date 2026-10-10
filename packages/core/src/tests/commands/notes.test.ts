@@ -60,7 +60,7 @@ describe("cell notes", () => {
     });
   });
 
-  test("round-trips notes in V21 snapshots and copies, pastes, and clears them with cells", () => {
+  test("round-trips notes in current snapshots and copies, pastes, and clears them with cells", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const source = { row: 0, column: 0 };
@@ -73,7 +73,7 @@ describe("cell notes", () => {
     });
 
     const snapshot = serializeWorkbook(session.workbook);
-    expect(snapshot.version).toBe(21);
+    expect(snapshot.version).toBe(42);
     expect(deserializeWorkbook(snapshot).sheets.get(sheet.id)?.cells.get("0:0")?.note).toEqual({
       text: "Review source",
       author: "Mia",

@@ -84,11 +84,21 @@ export function cacheDefinitionXml(
         const group = table.groups?.find((group) => group.field === field);
         const date = group?.kind === "date";
         const numbers = values.filter((value): value is number => typeof value === "number");
-        const strings = values.some((value) => typeof value === "string" && value !== "");
         const blank = values.some((value) => value === null || value === "");
-        const nonDate = !date && values.some((value) => value !== null && value !== "");
-        const types = new Set(values.map((value) => (value === null ? "blank" : typeof value)));
-        return `<cacheField name="${xml(name)}" numFmtId="${cache.numberFormats[field] ?? 0}"><sharedItems count="${values.length}" containsSemiMixedTypes="${types.size > 1 ? 1 : 0}" containsNonDate="${nonDate ? 1 : 0}" containsDate="${date ? 1 : 0}" containsString="${strings ? 1 : 0}" containsBlank="${blank ? 1 : 0}" containsNumber="${!date && numbers.length ? 1 : 0}" containsInteger="${!date && numbers.length && numbers.every(Number.isInteger) ? 1 : 0}" containsMixedTypes="${types.size > 1 ? 1 : 0}">${values.map((value) => (date && typeof value === "number" ? `<d v="${nativePivotDateTime(value, workbook.dateSystem)}"/>` : pivotCacheValueXml(value))).join("")}</sharedItems>${group ? nativePivotGroupXml(group, workbook.dateSystem) : ""}</cacheField>`;
+        // Office treats boolean/error items as strings for these type flags and excludes
+        // blank items from mixed types. Semi-mixed means any text/blank/boolean/error.
+        const types = new Set(
+          values
+            .filter((value) => value !== null && value !== "")
+            .map((value) => (typeof value === "number" ? (date ? "date" : "number") : "string")),
+        );
+        const numeric = types.has("number");
+        const strings = types.has("string");
+        // MS-OI29500 18.10.1.90: even containsInteger="0" requires containsNumber="1".
+        const integer = numeric
+          ? ` containsInteger="${numbers.every(Number.isInteger) ? 1 : 0}"`
+          : "";
+        return `<cacheField name="${xml(name)}" numFmtId="${cache.numberFormats[field] ?? 0}"><sharedItems count="${values.length}" containsSemiMixedTypes="${strings || blank ? 1 : 0}" containsNonDate="${numeric || strings ? 1 : 0}" containsDate="${types.has("date") ? 1 : 0}" containsString="${strings ? 1 : 0}" containsBlank="${blank ? 1 : 0}" containsNumber="${numeric ? 1 : 0}"${integer} containsMixedTypes="${types.size > 1 ? 1 : 0}">${values.map((value) => (date && typeof value === "number" ? `<d v="${nativePivotDateTime(value, workbook.dateSystem)}"/>` : pivotCacheValueXml(value))).join("")}</sharedItems>${group ? nativePivotGroupXml(group, workbook.dateSystem) : ""}</cacheField>`;
       })
       .join("")}</cacheFields></pivotCacheDefinition>`,
   );

@@ -431,7 +431,7 @@ describe("XLSX data-tool metadata", () => {
       unzipSync((await encodeXlsx(workbook)).bytes)["xl/worksheets/sheet1.xml"]!,
     );
     expect(xml).toContain(
-      '<dataValidations count="1"><dataValidation type="list" sqref="A1:A2"><formula1>&quot;yes,no&quot;</formula1></dataValidation></dataValidations>',
+      '<dataValidations count="1"><dataValidation type="list" showErrorMessage="1" sqref="A1:A2"><formula1>&quot;yes,no&quot;</formula1></dataValidation></dataValidations>',
     );
   });
 

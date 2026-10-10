@@ -1,9 +1,8 @@
 import { MAIN_NS, xml } from "../pivot-xml.js";
 import { builtinNumberFormat } from "../number-format.js";
 import type { NativeCell, NativeStyle } from "./model.js";
+import { createNativeNormalFont } from "./default-font.js";
 
-const DEFAULT_FONT =
-  '<font><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/><family val="2"/></font>';
 const DEFAULT_BORDER = "<border><left/><right/><top/><bottom/><diagonal/></border>";
 const DEFAULT_XF = '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>';
 
@@ -58,6 +57,8 @@ function fontXml(value: unknown): string {
     if (font[key!] !== undefined) body += `<${tag} val="${xml(font[key!])}"/>`;
   return `<font>${body}</font>`;
 }
+
+const DEFAULT_FONT = fontXml(createNativeNormalFont());
 
 function fillXml(value: unknown): string {
   const fill = fields(value);

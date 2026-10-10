@@ -10,6 +10,7 @@ import {
   normalizeCellBorderAction,
   normalizeCellStyle,
   normalizeCellStylePatch,
+  normalizeDirectCellStylePatch,
   type CellBorderAction,
   type CellBorder,
   type CellBorderFormatPatch,
@@ -87,9 +88,9 @@ export function createApplyCellStyleCommand(
   const definition =
     "category" in patch && "style" in patch ? (patch as CellStyleDefinition) : undefined;
   const normalizedPatch = validateCommandPayload("patch", patch, () =>
-    normalizeCellStylePatch(
-      definition ? getCellStyleDefinitionPatch(definition) : (patch as CellStylePatch),
-    ),
+    definition
+      ? normalizeCellStylePatch(getCellStyleDefinitionPatch(definition))
+      : normalizeDirectCellStylePatch(patch as CellStylePatch),
   );
   const includes = definition
     ? definition.includes === undefined
@@ -127,7 +128,7 @@ function normalizeCellFormatChange(change: CellFormatChange): CellFormatChange {
   }
   const normalized: CellFormatChange = {};
   if ("style" in change && change.style !== undefined) {
-    normalized.style = normalizeCellStylePatch(change.style);
+    normalized.style = normalizeDirectCellStylePatch(change.style);
   }
   if ("borders" in change && change.borders !== undefined) {
     if (!Array.isArray(change.borders)) {
@@ -202,7 +203,7 @@ export function createAdjustCellIndentCommand(
 
 export function createRestoreCellStylesCommand(
   sheetId: string,
-  changes: readonly { address: CellAddress; style: CellStyle | null }[],
+  changes: readonly RestoreCellStylesCommand["changes"][number][],
 ): RestoreCellStylesCommand {
   return {
     type: "restoreCellStyles",
@@ -214,6 +215,14 @@ export function createRestoreCellStylesCommand(
           validateCommandPayload("changes.style", change.style, () =>
             cloneCellStyle(change.style ?? undefined),
           ) ?? null,
+        ...("namedStyle" in change
+          ? {
+              namedStyle:
+                validateCommandPayload("changes.namedStyle", change.namedStyle, () =>
+                  cloneCellNamedStyleBinding(change.namedStyle),
+                ) ?? null,
+            }
+          : {}),
       })),
     ),
   };
@@ -313,7 +322,9 @@ export function applyCellStyleCommand(
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const mergeResolver = new MergedCellRangeResolver(sheet.mergedCells);
   const normalizedPatch = validateCommandPayload("patch", command.patch, () =>
-    normalizeCellStylePatch(command.patch),
+    command.styleId && command.includes
+      ? normalizeCellStylePatch(command.patch)
+      : normalizeDirectCellStylePatch(command.patch),
   );
   const patches: StylePatchMap = new Map();
   const targets: BorderPatchMap = new Map();
@@ -816,6 +827,14 @@ export function applyRestoreCellStylesCommand(
           validateCommandPayload("changes.style", change.style, () =>
             normalizeCellStyle(change.style),
           ) ?? null,
+        ...("namedStyle" in change
+          ? {
+              namedStyle:
+                validateCommandPayload("changes.namedStyle", change.namedStyle, () =>
+                  cloneCellNamedStyleBinding(change.namedStyle),
+                ) ?? null,
+            }
+          : {}),
       };
     }),
   );
@@ -824,12 +843,17 @@ export function applyRestoreCellStylesCommand(
     const previousStyle = cloneCellStyle(
       getCellStyle(sheet, change.address) as CellStyle | undefined,
     );
+    const previousNamedStyle = cloneCellNamedStyleBinding(getCellNamedStyle(sheet, change.address));
     const restoredNamedStyle: import("../workbook.js").CellNamedStyleBinding | null | undefined =
       "namedStyle" in change
         ? ((change as RestoreCellStylesCommand["changes"][number]).namedStyle ?? null)
         : getCellNamedStyle(sheet, change.address);
     if (setCellNamedStyle(sheet, change.address, change.style, restoredNamedStyle)) {
-      reverseChanges.push({ address: { ...change.address }, style: previousStyle ?? null });
+      reverseChanges.push({
+        address: { ...change.address },
+        style: previousStyle ?? null,
+        namedStyle: previousNamedStyle ?? null,
+      });
     }
   }
   return reverseChanges.length > 0

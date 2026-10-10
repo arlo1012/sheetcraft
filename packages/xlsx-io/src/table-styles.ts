@@ -9,10 +9,12 @@ import {
   PIVOT_TABLE_STYLE_ELEMENTS,
   type PivotTableStyleDefinition,
 } from "@sheetcraft/core/pivot-table-styles";
-import type { CellRange, SheetFilter, SheetTable } from "@sheetcraft/core/workbook";
+import type { CellRange, Sheet, SheetFilter, SheetTable } from "@sheetcraft/core/workbook";
+import type { CompatibilityReportBuilder } from "./report.js";
 import type { CellBorder } from "@sheetcraft/core/style";
 import { readXlsxDxfEntries, readXlsxDxfStyle, xlsxDxfXml } from "./conditional-formatting.js";
 import { readXlsxAutoFilter, writeXlsxAutoFilter } from "./data-tools-metadata.js";
+import { materializeXlsxStyleColors } from "./xlsx-colors.js";
 
 type WorksheetPart = { path: string; xml: string };
 type ImportedTable = SheetTable;
@@ -54,6 +56,12 @@ function truthy(value: string | undefined): boolean {
   return /^(1|true)$/i.test(value ?? "");
 }
 
+// CT_TableStyle defaults both gallery-availability attributes to true.
+// Availability does not invalidate an existing table's explicit style reference.
+function styleAvailable(value: string | undefined): boolean {
+  return value === undefined || truthy(value.trim());
+}
+
 function columnIndex(label: string): number | null {
   let value = 0;
   for (const character of label.toUpperCase()) {
@@ -90,6 +98,75 @@ function parseRange(reference: string): CellRange | null {
 
 function rangeReference(range: CellRange): string {
   return `${columnLabel(range.start.column)}${range.start.row + 1}:${columnLabel(range.end.column)}${range.end.row + 1}`;
+}
+
+/**
+ * A native worksheet AutoFilter cannot overlap a structured table. The Core
+ * model can still contain a pre-existing, narrower worksheet filter after a
+ * table gains columns. When both filters address precisely the same header
+ * and body rows, owning it in the table changes no row-selection semantics.
+ * This is an export-only projection; the original Core filter is untouched.
+ */
+export function projectXlsxTableFilterOwnership(
+  sheets: readonly Sheet[],
+  report?: CompatibilityReportBuilder,
+): Sheet[] {
+  return sheets.map((sheet) => {
+    const filter = sheet.filter;
+    if (!filter || filter.advanced) return sheet;
+    const overlaps = (sheet.tables ?? []).filter(
+      (table) =>
+        filter.range.start.row <= table.range.end.row &&
+        filter.range.end.row >= table.range.start.row &&
+        filter.range.start.column <= table.range.end.column &&
+        filter.range.end.column >= table.range.start.column,
+    );
+    if (!overlaps.length) return sheet;
+    const overlapError = () =>
+      new RangeError(
+        `Cannot export overlapping worksheet/table filter without changing its criteria or row or column domain: ${sheet.name}!${rangeReference(filter.range)}.`,
+      );
+    if (overlaps.length !== 1) throw overlapError();
+    const table = overlaps[0]!;
+    if (table.filter) {
+      // Keep the existing codec deduplication only for an identical contract.
+      // Different criteria cannot be merged or discarded without changing rows.
+      if (JSON.stringify(filter) === JSON.stringify(table.filter)) return sheet;
+      throw overlapError();
+    }
+    if (
+      !table.headerRow ||
+      filter.range.start.row !== table.range.start.row ||
+      filter.range.end.row !== table.range.end.row - (table.totalRow ? 1 : 0) ||
+      filter.range.start.column < table.range.start.column ||
+      filter.range.end.column > table.range.end.column ||
+      filter.columns.some(
+        (column) =>
+          !Number.isInteger(column.column) ||
+          column.column < filter.range.start.column ||
+          column.column > filter.range.end.column,
+      )
+    )
+      throw overlapError();
+    const nativeRange = {
+      start: { ...table.range.start },
+      end: { ...table.range.end, row: table.range.end.row - (table.totalRow ? 1 : 0) },
+    };
+    report?.add(
+      "filter-table-normalized",
+      "warning",
+      `${sheet.name}!${rangeReference(filter.range)} -> ${table.name}[${rangeReference(nativeRange)}]`,
+    );
+    return {
+      ...sheet,
+      filter: null,
+      tables: sheet.tables!.map((candidate) =>
+        candidate === table
+          ? { ...candidate, filter: { ...filter, range: nativeRange } }
+          : candidate,
+      ),
+    };
+  });
 }
 
 function normalizePath(base: string, target: string): string {
@@ -197,36 +274,51 @@ function styleElements(
   return elements;
 }
 
-function customStyles(stylesXml: string | undefined): Map<string, TableStyleDefinition> {
-  const result = new Map<string, TableStyleDefinition>();
-  const dxfs = readXlsxDxfEntries(stylesXml);
+function customStyles(
+  stylesXml: string | undefined,
+  dxfs: readonly string[],
+): {
+  definitions: Map<string, TableStyleDefinition>;
+  available: Map<string, TableStyleDefinition>;
+} {
+  const definitions = new Map<string, TableStyleDefinition>();
+  const available = new Map<string, TableStyleDefinition>();
   const body = /<tableStyles\b[^>]*>([\s\S]*?)<\/tableStyles>/i.exec(stylesXml ?? "")?.[1] ?? "";
   for (const tableStyle of body.matchAll(
     /<tableStyle\b([^>]*?)(?:\/>|>([\s\S]*?)<\/tableStyle>)/gi,
   )) {
     const attrs = tableStyle[1] ?? "";
     const name = attribute(attrs, "name");
-    if (!name || !truthy(attribute(attrs, "table"))) continue;
+    if (!name) continue;
     const elements = styleElements(
       tableStyle[2] ?? "",
       dxfs,
       new Set<string>(TABLE_STYLE_ELEMENTS),
     ) as TableStyleDefinition["elements"];
-    result.set(name, { id: `xlsx-table-style-${name}`, name, category: "custom", elements });
+    const style: TableStyleDefinition = {
+      id: `xlsx-table-style-${name}`,
+      name,
+      category: "custom",
+      elements,
+    };
+    definitions.set(name, style);
+    if (styleAvailable(attribute(attrs, "table"))) available.set(name, style);
   }
-  return result;
+  return { definitions, available };
 }
 
-function customPivotStyles(stylesXml: string | undefined): Map<string, PivotTableStyleDefinition> {
+function customPivotStyles(
+  stylesXml: string | undefined,
+  dxfs: readonly string[],
+): Map<string, PivotTableStyleDefinition> {
   const result = new Map<string, PivotTableStyleDefinition>();
-  const dxfs = readXlsxDxfEntries(stylesXml);
   const body = /<tableStyles\b[^>]*>([\s\S]*?)<\/tableStyles>/i.exec(stylesXml ?? "")?.[1] ?? "";
   for (const tableStyle of body.matchAll(
     /<tableStyle\b([^>]*?)(?:\/>|>([\s\S]*?)<\/tableStyle>)/gi,
   )) {
     const attrs = tableStyle[1] ?? "";
     const name = attribute(attrs, "name");
-    if (!name || !truthy(attribute(attrs, "pivot"))) continue;
+    if (!name || !styleAvailable(attribute(attrs, "pivot"))) continue;
     result.set(name, {
       id: `xlsx-pivot-table-style-${name}`,
       name,
@@ -257,8 +349,12 @@ function readTable(
   const name = attribute(attrs, "displayName") ?? attribute(attrs, "name");
   if (!range || !name) return null;
   const info = /<tableStyleInfo\b([^>]*)\/?\s*>/i.exec(xml)?.[1] ?? "";
-  const styleName = attribute(info, "name") ?? "TableStyleMedium2";
-  const style = styles.get(styleName) ?? builtinStyle(styleName) ?? fallbackExcelStyle(styleName);
+  const styleName = attribute(info, "name");
+  // WPS stores Clear/None without a name; do not apply the default for new tables.
+  const style: TableStyleDefinition =
+    styleName === undefined
+      ? { id: "table-none", name: "None", category: "custom", elements: {} }
+      : (styles.get(styleName) ?? builtinStyle(styleName) ?? fallbackExcelStyle(styleName));
   const columns = [...xml.matchAll(/<tableColumn\b([^>]*)\/?\s*>/gi)].map((column, index) => ({
     id: attribute(column[1] ?? "", "id") ?? String(index + 1),
     name: attribute(column[1] ?? "", "name") ?? `Column${index + 1}`,
@@ -292,14 +388,20 @@ export function readXlsxTableMetadata(bytes: Uint8Array): {
 } {
   const entries = unzipSync(bytes);
   const stylesXml = strFromU8(entries["xl/styles.xml"] ?? new Uint8Array());
-  const styles = customStyles(stylesXml);
   const dxfs = readXlsxDxfEntries(stylesXml);
-  const pivotStyles = customPivotStyles(stylesXml);
+  const themeXml = entries["xl/theme/theme1.xml"];
+  // Table-style DXFs currently store resolved colors in Core. Resolve their
+  // actual workbook palette/tint without changing live cell-theme bindings.
+  const styleDxfs = dxfs.map((dxf) =>
+    materializeXlsxStyleColors(dxf, themeXml ? strFromU8(themeXml) : undefined),
+  );
+  const styles = customStyles(stylesXml, styleDxfs);
+  const pivotStyles = customPivotStyles(stylesXml, styleDxfs);
   const sheets = worksheetParts(entries).map(({ path, xml }) => {
     const targets = relationshipTargets(entries, path);
     return [...xml.matchAll(/<tablePart\b([^>]*)\/?\s*>/gi)].flatMap((part) => {
       const table = entries[targets.get(attribute(part[1] ?? "", "r:id") ?? "") ?? ""];
-      const parsed = table ? readTable(strFromU8(table), styles, dxfs) : null;
+      const parsed = table ? readTable(strFromU8(table), styles.definitions, dxfs) : null;
       return parsed ? [parsed] : [];
     });
   });
@@ -307,14 +409,19 @@ export function readXlsxTableMetadata(bytes: Uint8Array): {
   const defaultTableStyleName = attribute(tableStylesAttrs, "defaultTableStyle");
   const defaultPivotTableStyleName = attribute(tableStylesAttrs, "defaultPivotStyle");
   const defaultStyle = defaultTableStyleName
-    ? (styles.get(defaultTableStyleName) ??
+    ? (styles.definitions.get(defaultTableStyleName) ??
       builtinStyle(defaultTableStyleName) ??
       fallbackExcelStyle(defaultTableStyleName))
     : undefined;
-  if (defaultStyle) styles.set(defaultTableStyleName!, defaultStyle);
+  if (
+    defaultStyle &&
+    (!styles.definitions.has(defaultTableStyleName!) ||
+      styles.available.has(defaultTableStyleName!))
+  )
+    styles.available.set(defaultTableStyleName!, defaultStyle);
   return {
     sheets,
-    tableStyles: [...styles.values()],
+    tableStyles: [...styles.available.values()],
     pivotTableStyles: [...pivotStyles.values()],
     ...(defaultTableStyleName ? { defaultTableStyleName } : {}),
     ...(defaultPivotTableStyleName ? { defaultPivotTableStyleName } : {}),

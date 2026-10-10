@@ -141,7 +141,7 @@ describe("workbook and sheet protection", () => {
     );
     f.run(createSetWorkbookStructureProtectionCommand(true));
     const snapshot = serializeWorkbook(f.workbook);
-    expect(snapshot.version).toBe(23);
+    expect(snapshot.version).toBe(42);
     const loaded = deserializeWorkbook(snapshot);
     expect(loaded.structureProtected).toBe(true);
     const sheet = getActiveSheet(loaded);

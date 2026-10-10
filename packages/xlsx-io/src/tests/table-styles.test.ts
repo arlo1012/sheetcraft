@@ -414,7 +414,7 @@ describe("XLSX structured tables", () => {
     expect(imported.workbook.pivotTableStyles?.[0]?.elements.headerRow).toBeUndefined();
   });
 
-  test("keeps a table filter when a partially overlapping worksheet filter cannot coexist", async () => {
+  test("rejects conflicting table and partially overlapping worksheet filters", async () => {
     const workbook = createWorkbook({ id: "overlapping-filters", sheetId: "sheet" });
     const sheet = getActiveSheet(workbook);
     const tableFilter = {
@@ -446,15 +446,7 @@ describe("XLSX structured tables", () => {
       columns: [],
     };
 
-    const encoded = await encodeXlsx(workbook);
-    const entries = unzipSync(encoded.bytes);
-    expect(encoded.report.issues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: "filter-omitted", locations: ["Sheet1"] }),
-      ]),
-    );
-    expect(strFromU8(entries["xl/worksheets/sheet1.xml"]!)).not.toContain("<autoFilter");
-    expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain("<autoFilter");
+    await expect(encodeXlsx(workbook)).rejects.toThrow("overlapping worksheet/table filter");
   });
 
   test("keeps custom table differential formats in styles.xml", async () => {

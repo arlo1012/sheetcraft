@@ -68,6 +68,7 @@ import {
   cloneCellStyle,
   normalizeCellStyle,
   normalizeCellStylePatch,
+  normalizeDirectCellStyle,
   type CellStyle,
   type CellStylePatch,
 } from "./style.js";
@@ -1878,7 +1879,7 @@ export function setCellStyle(
   address: CellAddress,
   style: CellStyle | null | undefined,
 ): boolean {
-  const normalizedStyle = normalizeCellStyle(style);
+  const normalizedStyle = normalizeDirectCellStyle(style);
   const key = createCellKey(address);
   const cell = sheet.cells.get(key);
   if (areCellStylesEqual(cell?.style, normalizedStyle) && !cell?.namedStyle) {
@@ -1912,8 +1913,8 @@ export function setCellNamedStyle(
   style: CellStyle | null | undefined,
   namedStyle: CellNamedStyleBinding | null | undefined,
 ): boolean {
-  const normalizedStyle = normalizeCellStyle(style);
   const normalizedBinding = normalizeCellNamedStyleBinding(namedStyle);
+  const normalizedStyle = normalizeCellStyleForBinding(style, normalizedBinding);
   const key = createCellKey(address);
   const cell = sheet.cells.get(key);
   if (
@@ -1939,6 +1940,16 @@ export function setCellNamedStyle(
     });
   } else sheet.cells.delete(key);
   return true;
+}
+
+/** A named style's materialized font color is definition-owned until directly overridden. */
+export function normalizeCellStyleForBinding(
+  style: CellStyle | null | undefined,
+  binding?: CellNamedStyleBinding,
+): CellStyle | undefined {
+  return binding?.includes.includes("font") && !binding.overrides?.includes("textColor")
+    ? normalizeCellStyle(style)
+    : normalizeDirectCellStyle(style);
 }
 
 export function setCellHyperlink(
@@ -2937,19 +2948,30 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
   const columnIndexes = new Set<number>();
   const floatingImageIds = new Set<string>();
 
-  const cells = state.cells.map((cell) => {
+  const cells = state.cells.flatMap((cell) => {
     if (!isCellAddressInBounds(cell.address)) {
       throw new RangeError(
         `Cell address ${cell.address.row}:${cell.address.column} is outside the sheet.`,
       );
     }
     const content = normalizeCellContent(cell.content);
-    const style = normalizeCellStyle(cell.style);
     const namedStyle = cloneCellNamedStyleBinding(cell.namedStyle);
+    const style = normalizeCellStyleForBinding(cell.style, namedStyle);
     const hyperlink = cloneCellHyperlink(cell.hyperlink);
     const note = cloneCellNote(cell.note);
     const sparkline = cloneCellSparkline(cell.sparkline);
-    if (content === undefined && !style && !namedStyle && !hyperlink && !note && !sparkline) {
+    // A legacy default-RGB-only style is now an empty direct style. Validate it
+    // as before, then remove the redundant sparse cell during normalization.
+    const wasDefaultOnlyStyle = !style && normalizeCellStyle(cell.style) !== undefined;
+    if (
+      content === undefined &&
+      !style &&
+      !namedStyle &&
+      !hyperlink &&
+      !note &&
+      !sparkline &&
+      !wasDefaultOnlyStyle
+    ) {
       throw new Error(
         "Sparse state cells must contain content, style, named style, hyperlink, or note.",
       );
@@ -2960,15 +2982,19 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
       throw new Error(`Sparse state contains duplicate cell ${key}.`);
     }
     cellKeys.add(key);
-    return {
-      address,
-      ...(content === undefined ? {} : { content }),
-      ...(style ? { style } : {}),
-      ...(namedStyle ? { namedStyle } : {}),
-      ...(hyperlink ? { hyperlink } : {}),
-      ...(note ? { note } : {}),
-      ...(sparkline ? { sparkline } : {}),
-    };
+    if (content === undefined && !style && !namedStyle && !hyperlink && !note && !sparkline)
+      return [];
+    return [
+      {
+        address,
+        ...(content === undefined ? {} : { content }),
+        ...(style ? { style } : {}),
+        ...(namedStyle ? { namedStyle } : {}),
+        ...(hyperlink ? { hyperlink } : {}),
+        ...(note ? { note } : {}),
+        ...(sparkline ? { sparkline } : {}),
+      },
+    ];
   });
 
   const rowHeights = state.rowHeights.map((dimension) => {

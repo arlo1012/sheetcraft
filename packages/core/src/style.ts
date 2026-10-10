@@ -850,6 +850,30 @@ export function normalizeCellStylePatch(patch: CellStylePatch): CellStylePatch {
   return normalized;
 }
 
+/**
+ * Ordinary direct font RGB equal to the fixed default means restore default.
+ * Definition/display layers use normalizeCellStyle instead; a live theme
+ * reference remains explicit even when its resolved cache equals this RGB.
+ */
+export function normalizeDirectCellStyle(
+  style: CellStyle | null | undefined,
+): CellStyle | undefined {
+  const normalized = normalizeCellStyle(style);
+  if (normalized?.textColor === DEFAULT_CELL_TEXT_COLOR && !normalized.textColorTheme) {
+    delete normalized.textColor;
+  }
+  return normalized && Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+/** Keep a reset in the patch so applying the default actually clears an old override. */
+export function normalizeDirectCellStylePatch(patch: CellStylePatch): CellStylePatch {
+  const normalized = normalizeCellStylePatch(patch);
+  if (normalized.textColor === DEFAULT_CELL_TEXT_COLOR && !normalized.textColorTheme) {
+    normalized.textColor = null;
+  }
+  return normalized;
+}
+
 export function mergeCellStyle(
   style: CellStyle | undefined,
   patch: CellStylePatch,

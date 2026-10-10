@@ -17,6 +17,7 @@ export type XlsxCompatibilityCode =
   | "formula-cache-discarded"
   | "formula-not-calculated"
   | "filter-omitted"
+  | "filter-table-normalized"
   | "advanced-filter-criteria-omitted"
   | "image-omitted"
   | "style-omitted"

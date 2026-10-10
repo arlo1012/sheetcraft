@@ -305,12 +305,15 @@ function readDataValidations(xml: string): { values: XlsxDataValidation[]; unsup
         ...(attribute(attributes, "showDropDown") !== undefined
           ? { showDropdown: !truthy(attribute(attributes, "showDropDown")) }
           : {}),
-        ...(attribute(attributes, "showInputMessage") === "0" ? { showInput: false } : {}),
+        ...(attribute(attributes, "showInputMessage") !== undefined
+          ? { showInput: truthy(attribute(attributes, "showInputMessage")) }
+          : {}),
         ...(attribute(attributes, "promptTitle")
           ? { promptTitle: attribute(attributes, "promptTitle") }
           : {}),
         ...(attribute(attributes, "prompt") ? { prompt: attribute(attributes, "prompt") } : {}),
-        ...(attribute(attributes, "showErrorMessage") === "0" ? { showError: false } : {}),
+        // OOXML defaults to false; Core's omitted showError defaults to true.
+        showError: truthy(attribute(attributes, "showErrorMessage")),
         ...(errorStyle && /^(stop|warning|information)$/.test(errorStyle)
           ? { errorStyle: errorStyle as XlsxDataValidation["errorStyle"] }
           : {}),
@@ -758,10 +761,13 @@ function validationXml(validation: XlsxDataValidation): string {
       : validation.showDropdown === true
         ? 'showDropDown="0"'
         : "",
-    validation.showInput === false ? 'showInputMessage="0"' : "",
+    validation.showInput !== undefined
+      ? `showInputMessage="${validation.showInput ? "1" : "0"}"`
+      : "",
     validation.promptTitle ? `promptTitle="${encodeXml(validation.promptTitle)}"` : "",
     validation.prompt ? `prompt="${encodeXml(validation.prompt)}"` : "",
-    validation.showError === false ? 'showErrorMessage="0"' : "",
+    // Emit Core's default as well, because the OOXML default is false.
+    `showErrorMessage="${validation.showError !== false ? "1" : "0"}"`,
     validation.errorStyle ? `errorStyle="${validation.errorStyle}"` : "",
     validation.errorTitle ? `errorTitle="${encodeXml(validation.errorTitle)}"` : "",
     validation.error ? `error="${encodeXml(validation.error)}"` : "",

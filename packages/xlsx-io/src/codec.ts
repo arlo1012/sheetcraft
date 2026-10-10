@@ -2,9 +2,15 @@ import { readXlsxPivotTables } from "./pivot-tables.js";
 import { readXlsxSparklines } from "./sparklines.js";
 import { readXlsxProtection } from "./protection.js";
 import { NativeWorkbook } from "./native/workbook.js";
+import { createNativeNormalFont } from "./native/default-font.js";
+import { readProjectedDefaultFontColors } from "./cell-font-defaults.js";
 import { unzipSync } from "fflate/browser";
 import { readExcelBorder, writeExcelBorder } from "./border.js";
-import { createFormulaCacheEligibility, formulaCacheValue } from "./formula-cache.js";
+import {
+  createFormulaCacheEligibility,
+  createIterativeFormulaCache,
+  formulaCacheValue,
+} from "./formula-cache.js";
 import { qualifyXlsxStructuredReferences } from "./structured-reference-export.js";
 import { fromExcelNumberFormat, toExcelNumberFormat } from "./number-format.js";
 import { excelColumnWidthToPixels, pixelsToExcelColumnWidth } from "./column-width.js";
@@ -24,6 +30,7 @@ import {
   getDefaultColumnWidth,
   normalizeCellHyperlink,
   normalizeCellNote,
+  normalizeCellStyleForBinding,
   replaceSheetSparseState,
   type CellRange,
   type Sheet,
@@ -598,6 +605,7 @@ export async function decodeWithNativeXlsx(
   const cellStyles = readXlsxCellStyles(archive["xl/styles.xml"], archive["xl/theme/theme1.xml"]);
   const namedStyleBindings = readXlsxNamedCellStyleBindings(archive["xl/styles.xml"]);
   const themeStyleBindings = readXlsxThemeStyleBindings(archive["xl/styles.xml"]);
+  const projectedDefaultFontColors = readProjectedDefaultFontColors(archive);
   const rawHyperlinks = readXlsxHyperlinks(archive, (sheetIndex, reference) =>
     add(report, "feature-omitted", `worksheet${sheetIndex + 1}.hyperlink:${reference}`),
   );
@@ -710,6 +718,15 @@ export async function decodeWithNativeXlsx(
           rawStyleIds[sheetIndex]?.get(modelCell.address.toUpperCase()) ?? -1,
         );
         if (themeStyle) style = { ...style, ...themeStyle };
+        if (
+          style &&
+          projectedDefaultFontColors.has(
+            rawStyleIds[sheetIndex]?.get(modelCell.address.toUpperCase()) ?? 0,
+          )
+        ) {
+          delete style.textColor;
+          delete style.textColorTheme;
+        }
         const rawHyperlink = rawHyperlinks[sheetIndex]?.get(modelCell.address.toUpperCase());
         let hyperlink: import("@sheetcraft/core/workbook").CellHyperlink | undefined;
         if (rawHyperlink) {
@@ -962,8 +979,12 @@ function writeStyle(
   style ??= {};
   // Preserve the font-size control's number across applications. Excel stores
   // points, but the product contract is numeric parity, not CSS-pixel conversion.
-  // A partial font replaces the font rather than inheriting fields from Normal.
+  // Complete an implicit-color font from its own Normal base. Real Excel/WPS
+  // size-only fonts retain the base's color/family metadata; omitting them can
+  // turn the default into a table-color override. Keep explicit RGB/theme
+  // colors in their existing sparse representation, distinct from that base.
   const font: Record<string, unknown> = {
+    ...(!style.textColor && !style.textColorTheme ? createNativeNormalFont() : {}),
     name: style.fontFamily ?? "Calibri",
     size: style.fontSize ?? DEFAULT_CELL_FONT_SIZE,
   };
@@ -1108,8 +1129,9 @@ export async function encodeWithNativeXlsx(
   target.properties.date1904 = workbook.dateSystem === "1904";
   target.calcProperties.fullCalcOnLoad = true;
   let encodedCells = 0;
-  let workbookEvaluator: SheetEvaluator | undefined;
+  const workbookEvaluator = createWorkbookEvaluator(workbook, sheets[0]!.id);
   const isFormulaCacheEligible = createFormulaCacheEligibility(workbook);
+  const iterativeFormulaCache = createIterativeFormulaCache(workbook, workbookEvaluator);
   if (workbook.watermarkPresets?.length)
     add(report, "feature-omitted", "workbook.watermarkPresets");
   for (const [sheetIndex, sheet] of sheets.entries()) {
@@ -1128,8 +1150,7 @@ export async function encodeWithNativeXlsx(
     // One fresh calculation cycle resolves workbook names, qualified references,
     // tables, and the workbook's date system without reusing persisted caches.
     const evaluator =
-      workbookEvaluator?.forSheet?.(sheet.id) ?? createWorkbookEvaluator(workbook, sheet.id);
-    workbookEvaluator ??= evaluator;
+      workbookEvaluator.forSheet?.(sheet.id) ?? createWorkbookEvaluator(workbook, sheet.id);
     const output = target.addWorksheet(sheet.name, {
       views: [
         {
@@ -1236,7 +1257,7 @@ export async function encodeWithNativeXlsx(
         } else {
           const result = isFormulaCacheEligible(sheet.id, row, column)
             ? formulaCacheValue(evaluator.getComputedValue({ row, column }))
-            : undefined;
+            : iterativeFormulaCache(sheet.id, row, column);
           outputCell.value = {
             formula: qualifyXlsxStructuredReferences(
               cell.content.formula.source,
@@ -1274,7 +1295,12 @@ export async function encodeWithNativeXlsx(
           ...imageExporter.registerCellImage(cell.content.image, issueLocation),
         });
       }
-      writeStyle(outputCell, cell.style, issueLocation, report);
+      writeStyle(
+        outputCell,
+        normalizeCellStyleForBinding(cell.style, cell.namedStyle),
+        issueLocation,
+        report,
+      );
       if (cell.note) outputCell.note = { texts: [{ text: cell.note.text }] };
     }
     // The exchange model shares the anchor style across the merge. Apply styles first

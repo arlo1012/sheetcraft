@@ -13,7 +13,7 @@ import {
   type XlsxDataMetadata,
 } from "./data-tools-metadata.js";
 import { writeXlsxConditionalFormats } from "./conditional-formatting.js";
-import { writeXlsxTableMetadata } from "./table-styles.js";
+import { projectXlsxTableFilterOwnership, writeXlsxTableMetadata } from "./table-styles.js";
 import { writeXlsxCellStyles, writeXlsxNamedCellStyleBindings } from "./cell-styles.js";
 import { writeXlsxThemeStyleBindings } from "./theme-style-bindings.js";
 import { writeXlsxHyperlinks } from "./hyperlinks.js";
@@ -84,7 +84,11 @@ export function finalizeXlsxExport(
   }
   addNativeCellImages(entries, cellImages);
   writeDefinedNames(entries, definedNames);
-  writeXlsxDataMetadata(entries, dataMetadata);
+  const tableFilterSheets = projectXlsxTableFilterOwnership(sheets, report);
+  const tableFilterMetadata = dataMetadata.map((metadata, index) =>
+    tableFilterSheets[index] !== sheets[index] ? { ...metadata, filter: null } : metadata,
+  );
+  writeXlsxDataMetadata(entries, tableFilterMetadata);
   writeXlsxPageSetups(entries, pageSetups, report);
   writeXlsxConditionalFormats(entries, conditionalFormats, report);
   const nativePivotStyles = [...pivotTableStyles];
@@ -116,7 +120,7 @@ export function finalizeXlsxExport(
       }
   const pivotStyleNames = writeXlsxTableMetadata(
     entries,
-    sheets,
+    tableFilterSheets,
     tableStyles,
     defaultTableStyleId,
     nativePivotStyles,
@@ -124,7 +128,7 @@ export function finalizeXlsxExport(
   );
   writeXlsxFilterColorFormats(
     entries,
-    sheets as unknown as Parameters<typeof writeXlsxFilterColorFormats>[1],
+    tableFilterSheets as unknown as Parameters<typeof writeXlsxFilterColorFormats>[1],
   );
   writeXlsxHyperlinks(entries, sheets);
   writeXlsxCellNotes(entries, sheets);
