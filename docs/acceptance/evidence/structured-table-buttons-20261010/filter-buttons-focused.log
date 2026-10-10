@@ -1,0 +1,32 @@
+$ vitest run --config vitest.config.ts src/tests/native/table-filter-buttons.test.ts src/tests/native/table-filter-ownership.test.ts src/tests/native/table-totals-metadata.test.ts src/tests/table-styles.test.ts src/tests/data-tools.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+ ❯ src/tests/native/table-filter-ownership.test.ts (13 tests | 1 failed) 230ms
+     × keeps a disjoint worksheet filter in its original worksheet ownership 12ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/native/table-filter-ownership.test.ts > native table filter ownership > keeps a disjoint worksheet filter in its original worksheet ownership
+AssertionError: expected '<?xml version="1.0" encoding="UTF-8" …' not to contain '<autoFilter'
+
+Expected: "<autoFilter"
+Received: "<?xml version="1.0" encoding="UTF-8" standalone="yes"?><table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="SalesTable" displayName="SalesTable" ref="A1:E5"><autoFilter ref="A1:E5"></autoFilter><tableColumns count="5"><tableColumn id="1" name="Region"/><tableColumn id="2" name="Quarter"/><tableColumn id="3" name="Amount"/><tableColumn id="4" name="Units"/><tableColumn id="5" name="Row Total"/></tableColumns><tableStyleInfo name="Sheetcraft Medium 2" showFirstColumn="0" showLastColumn="0" showRowStripes="1" showColumnStripes="0"/></table>"
+
+ ❯ src/tests/native/table-filter-ownership.test.ts:122:44
+    120|     const encoded = await encodeXlsx(workbook);
+    121|     expect(parts(encoded.bytes).worksheet).toContain('<autoFilter ref=…
+    122|     expect(parts(encoded.bytes).table).not.toContain("<autoFilter");
+       |                                            ^
+    123|     expect(encoded.report.issues.some((issue) => issue.code === "filte…
+    124|       false,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  1 failed | 52 passed (53)
+   Start at  15:30:18
+   Duration  5.06s (transform 1.65s, setup 0ms, import 3.40s, tests 1.11s, environment 0ms)
+
+error: script "test" exited with code 1

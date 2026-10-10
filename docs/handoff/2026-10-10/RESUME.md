@@ -1,5 +1,18 @@
 # Sheetcraft continuation after recovery — 2026-10-10
 
+## Table filter-buttons and converted-range continuation
+
+After380cbed, filterColumn metadata fixed the actual buttons-off defect without
+losing active criteria. Actual Sheetcraft Alpha filter→buttons off→Undo/Redo→save
+reload→UI XLSX export passed. Actual WPS and Excel edit10→11, save-close-reopen
+retain criteria/hidden arrows/total11; converted Sheet1 also retains ordinary
+=B2*C2 and SUM121 with former South row visible. Final XLSX81files/1158tests pass;
+first1154pass/3fail and fixture corrections remain logged. Read
+`docs/acceptance/structured-table-filter-buttons-20261010.md`. Partial native
+visibility warns and is not represented as full support. Product import GUI,
+Medium5 persistence, advanced-filter UI rejection and calculated-column observations
+remain open; numeric total literal gate remains. No new raw artifacts uploaded.
+
 ## Numeric total limitation and ordinary mixed totals continuation
 
 The ordinary mixed label/SUM109/custom SUBTOTAL101/custom SUM+1/blank fixture now

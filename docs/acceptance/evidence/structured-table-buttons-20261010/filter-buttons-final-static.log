@@ -1,0 +1,5 @@
+$ tsc --noEmit -p tsconfig.test.json
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 5ms on 6 files using 9 threads.

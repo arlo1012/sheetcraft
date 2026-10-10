@@ -338,10 +338,60 @@ function tableFilter(xml: string, dxfs: readonly string[]): SheetFilter | null {
   return readXlsxAutoFilter(xml, dxfs).value as SheetFilter | null;
 }
 
+function tableFilterButton(
+  xml: string,
+  columnCount: number,
+  name: string,
+  report?: CompatibilityReportBuilder,
+): boolean {
+  const filter = /<autoFilter\b[^>]*(?:\/>|>([\s\S]*?)<\/autoFilter>)/i.exec(xml);
+  if (!filter) return false;
+  const hidden = new Set<number>();
+  const seen = new Set<number>();
+  let unsupported = false;
+  let hasVisibilityMetadata = false;
+  for (const column of (filter[1] ?? "").matchAll(/<filterColumn\b([^>]*)\/?\s*>/gi)) {
+    const attrs = column[1] ?? "";
+    const rawIndex = attribute(attrs, "colId");
+    const index = Number(rawIndex);
+    if (
+      !/^\d+$/.test(rawIndex ?? "") ||
+      !Number.isInteger(index) ||
+      index < 0 ||
+      index >= columnCount ||
+      seen.has(index)
+    ) {
+      unsupported = true;
+      continue;
+    }
+    seen.add(index);
+    const hide = attribute(attrs, "hiddenButton");
+    const show = attribute(attrs, "showButton");
+    hasVisibilityMetadata ||= hide !== undefined || show !== undefined;
+    if ([hide, show].some((flag) => flag !== undefined && !/^(0|1|true|false)$/i.test(flag))) {
+      unsupported = true;
+      continue;
+    }
+    if (truthy(hide) || /^(0|false)$/i.test(show ?? "")) hidden.add(index);
+  }
+  if (unsupported || (hidden.size > 0 && hidden.size !== columnCount))
+    report?.add("feature-omitted", "warning", `${name}.filterButtonVisibility`);
+  if (!unsupported && columnCount > 0 && hidden.size === columnCount) return false;
+  if (unsupported || hasVisibilityMetadata) return true;
+  // Read earlier product workbooks exported with the attribute on tableColumn.
+  const legacy = [...xml.matchAll(/<tableColumn\b([^>]*)\/?\s*>/gi)];
+  return !(
+    legacy.length === columnCount &&
+    legacy.length > 0 &&
+    legacy.every((column) => truthy(attribute(column[1] ?? "", "hiddenButton")))
+  );
+}
+
 function readTable(
   xml: string,
   styles: ReadonlyMap<string, TableStyleDefinition>,
   dxfs: readonly string[],
+  report?: CompatibilityReportBuilder,
 ): ImportedTable | null {
   const root = /<table\b([^>]*)>/i.exec(xml);
   if (!root) return null;
@@ -373,14 +423,15 @@ function readTable(
     bandedRows:
       attribute(info, "showRowStripes") === undefined || truthy(attribute(info, "showRowStripes")),
     bandedColumns: truthy(attribute(info, "showColumnStripes")),
-    filterButton: ![...xml.matchAll(/<tableColumn\b([^>]*)\/?\s*>/gi)].every((column) =>
-      truthy(attribute(column[1] ?? "", "hiddenButton")),
-    ),
+    filterButton: tableFilterButton(xml, columns.length, name, report),
     filter: tableFilter(xml, dxfs),
   };
 }
 
-export function readXlsxTableMetadata(bytes: Uint8Array): {
+export function readXlsxTableMetadata(
+  bytes: Uint8Array,
+  report?: CompatibilityReportBuilder,
+): {
   sheets: ImportedTable[][];
   tableStyles: TableStyleDefinition[];
   defaultTableStyleName?: string;
@@ -402,7 +453,7 @@ export function readXlsxTableMetadata(bytes: Uint8Array): {
     const targets = relationshipTargets(entries, path);
     return [...xml.matchAll(/<tablePart\b([^>]*)\/?\s*>/gi)].flatMap((part) => {
       const table = entries[targets.get(attribute(part[1] ?? "", "r:id") ?? "") ?? ""];
-      const parsed = table ? readTable(strFromU8(table), styles.definitions, dxfs) : null;
+      const parsed = table ? readTable(strFromU8(table), styles.definitions, dxfs, report) : null;
       return parsed ? [parsed] : [];
     });
   });
@@ -480,14 +531,27 @@ function tableXml(
   const columns = table.columns
     .map((column, index) => {
       const totals = xlsxTableTotalsColumn(sheet, table, index, totalsCells);
-      const attrs = `id="${index + 1}" name="${encodeXml(column.name)}"${table.filterButton ? "" : ' hiddenButton="1"'}${totals.attributes}`;
+      const attrs = `id="${index + 1}" name="${encodeXml(column.name)}"${totals.attributes}`;
       return totals.body
         ? `<tableColumn ${attrs}>${totals.body}</tableColumn>`
         : `<tableColumn ${attrs}/>`;
     })
     .join("");
-  const filter = table.filter
-    ? writeXlsxAutoFilter(table.filter as Parameters<typeof writeXlsxAutoFilter>[0])
+  const filterValue =
+    table.filter ??
+    (table.headerRow && table.filterButton
+      ? {
+          range: {
+            start: table.range.start,
+            end: { ...table.range.end, row: table.range.end.row - (table.totalRow ? 1 : 0) },
+          },
+          columns: [],
+        }
+      : null);
+  const filter = filterValue
+    ? writeXlsxAutoFilter(filterValue as Parameters<typeof writeXlsxAutoFilter>[0], {
+        hideButtons: !table.filterButton,
+      })
     : "";
   const style = xlsxStyleName(table.style);
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="${tableId}" name="${name}" displayName="${name}" ref="${rangeReference(table.range)}"${table.headerRow ? "" : ' headerRowCount="0"'}${table.totalRow ? ' totalsRowCount="1"' : ""}>${filter}<tableColumns count="${table.columns.length}">${columns}</tableColumns><tableStyleInfo name="${encodeXml(style)}" showFirstColumn="${table.firstColumn ? 1 : 0}" showLastColumn="${table.lastColumn ? 1 : 0}" showRowStripes="${table.bandedRows ? 1 : 0}" showColumnStripes="${table.bandedColumns ? 1 : 0}"/></table>`;

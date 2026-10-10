@@ -1,0 +1,54 @@
+$ vitest run --config vitest.config.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+ ❯ src/tests/pivot-tables/dynamic-table-sources.test.ts (21 tests | 2 failed) 736ms
+     × row growth, totals and rename preserve last-refresh cache and report with extension stripped=false 6ms
+     × row growth, totals and rename preserve last-refresh cache and report with extension stripped=true 2ms
+ ❯ src/tests/native/table-filter-buttons.test.ts (15 tests | 1 failed) 409ms
+     × does not silently collapse duplicated active filter criteria when hiding buttons 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/native/table-filter-buttons.test.ts > native table filter buttons > does not silently collapse duplicated active filter criteria when hiding buttons
+Error: Filter columns must be unique.
+ ❯ normalizeSheetFilter ../core/src/workbook.ts:2472:11
+ ❯ normalizeSheetTable ../core/src/workbook.ts:2683:18
+ ❯ normalizeSheetMetadata ../core/src/workbook.ts:2831:39
+ ❯ normalizeSheetSparseState ../core/src/workbook.ts:3053:20
+ ❯ createSheetSparseState ../core/src/workbook.ts:3134:10
+ ❯ serializeSheet ../core/src/serialization.ts:1173:47
+ ❯ serializeWorkbook ../core/src/serialization.ts:1192:46
+ ❯ src/tests/native/table-filter-buttons.test.ts:60:20
+     58|       allowedValues: [{ kind: "string", value: "South" }],
+     59|     });
+     60|     const before = serializeWorkbook(f.workbook);
+       |                    ^
+     61|     await expect(encodeXlsx(f.workbook)).rejects.toThrow("Invalid filt…
+     62|     expect(serializeWorkbook(f.workbook)).toEqual(before);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/tests/pivot-tables/dynamic-table-sources.test.ts > native dynamic table-backed pivot sources > row growth, totals and rename preserve last-refresh cache and report with extension stripped=false
+ FAIL  src/tests/pivot-tables/dynamic-table-sources.test.ts > native dynamic table-backed pivot sources > row growth, totals and rename preserve last-refresh cache and report with extension stripped=true
+XlsxCompatibilityError: Numeric constants in table total rows cannot be safely exported to XLSX. The workbook is unchanged.
+ ❯ assertSupportedXlsxTableTotals src/table-totals.ts:34:11
+     32|     }
+     33|   if (blocked)
+     34|     throw new XlsxCompatibilityError(
+       |           ^
+     35|       "Numeric constants in table total rows cannot be safely exported…
+     36|       report.build(),
+ ❯ encodeWithNativeXlsx src/codec.ts:1111:3
+ ❯ encodeXlsx src/index.ts:47:10
+ ❯ src/tests/pivot-tables/dynamic-table-sources.test.ts:263:29
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  2 failed | 79 passed (81)
+      Tests  3 failed | 1154 passed (1157)
+   Start at  15:32:17
+   Duration  72.69s (transform 2.34s, setup 0ms, import 33.13s, tests 28.97s, environment 7ms)
+
+error: script "test" exited with code 1

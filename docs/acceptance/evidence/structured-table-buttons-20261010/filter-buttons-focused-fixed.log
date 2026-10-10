@@ -1,0 +1,10 @@
+$ vitest run --config vitest.config.ts src/tests/native/table-filter-buttons.test.ts src/tests/native/table-filter-ownership.test.ts src/tests/native/table-totals-metadata.test.ts src/tests/table-styles.test.ts src/tests/data-tools-metadata.test.ts src/tests/data-tools-metadata "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+
+ Test Files  7 passed (7)
+      Tests  88 passed (88)
+   Start at  15:31:09
+   Duration  8.21s (transform 1.96s, setup 0ms, import 5.17s, tests 2.10s, environment 1ms)
+

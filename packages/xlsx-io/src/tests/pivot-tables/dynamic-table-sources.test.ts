@@ -259,6 +259,16 @@ describe("native dynamic table-backed pivot sources", () => {
         ],
         { row: 3, column: 0 },
       );
+      // This cache-isolation scenario needs a supported total formula. Literal
+      // numeric totals now have a separate compatibility-block regression below.
+      setCellContent(
+        f.source,
+        { row: 4, column: 1 },
+        {
+          kind: "formula",
+          formula: { source: "=SUM(B2:B4)" },
+        },
+      );
       const before = serializeWorkbook(f.workbook);
       const encoded = await encodeXlsx(f.workbook);
       expect(serializeWorkbook(f.workbook)).toEqual(before);
@@ -285,6 +295,28 @@ describe("native dynamic table-backed pivot sources", () => {
       if (!strip) expect(pivot.emptyLabel).toBe("Product-only blank");
     },
   );
+
+  test("blocks a numeric total in a table-backed pivot source without modifying its cached report", async () => {
+    const f = fixture();
+    f.sourceTable.range.end.row = 3;
+    f.sourceTable.totalRow = true;
+    write(f.source, [["Totals", 130]], { row: 3, column: 0 });
+    const before = serializeWorkbook(f.workbook);
+    await expect(encodeXlsx(f.workbook)).rejects.toMatchObject({
+      name: "XlsxCompatibilityError",
+      report: {
+        issues: [
+          {
+            code: "table-totals-numeric-constant",
+            severity: "block",
+            count: 1,
+            locations: ["Source!B4 (Sales[Amount])"],
+          },
+        ],
+      },
+    });
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
 
   test("pure native table row growth retains eligible product metadata", async () => {
     const parts = pivotParts((await encodeXlsx(fixture().workbook)).bytes);

@@ -136,3 +136,12 @@ Filter visibility single-factor control now shows no Sheet2 arrows in actual WPS
 its Excel check and formal writer fix remain pending. Other table matrix gaps in
 Remaining acceptance remain open. All new actual files/screenshots remain local;
 only code, synthetic regression structures and text are checkpointed.
+
+## Filter-buttons continuation
+
+The separate false-option defect and converted-range native lifecycle are now
+closed within the bounded actual UI/dual-app paths. See
+[filter-button acceptance](structured-table-filter-buttons-20261010.md) for the
+formal UI export, active-filter preservation,1158 final XLSX tests and old failures.
+Remaining earlier statements are historical checkpoint scope; product import,
+Medium5 persistence and advanced-filter/calculate-column observations remain open.

@@ -119,7 +119,10 @@ describe("native table filter ownership", () => {
     };
     const encoded = await encodeXlsx(workbook);
     expect(parts(encoded.bytes).worksheet).toContain('<autoFilter ref="G1:H5">');
-    expect(parts(encoded.bytes).table).not.toContain("<autoFilter");
+    // Visible table buttons need an unfiltered native header range; the disjoint
+    // worksheet criteria must not move into this table.
+    expect(parts(encoded.bytes).table).toContain('<autoFilter ref="A1:E5"></autoFilter>');
+    expect(parts(encoded.bytes).table).not.toContain("<filterColumn");
     expect(encoded.report.issues.some((issue) => issue.code === "filter-table-normalized")).toBe(
       false,
     );

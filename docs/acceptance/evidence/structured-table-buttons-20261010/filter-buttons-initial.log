@@ -1,0 +1,113 @@
+$ vitest run --config vitest.config.ts src/tests/native/table-filter-buttons.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+ ❯ src/tests/native/table-filter-buttons.test.ts (6 tests | 5 failed) 208ms
+     × uses filterColumn visibility without changing criteria or source (criteria=false) 54ms
+     × uses filterColumn visibility without changing criteria or source (criteria=true) 11ms
+     × exports visible buttons for an unfiltered header table even with null Core filter 9ms
+     × reads native removal of autoFilter as buttons off 77ms
+     × warns on a partially hidden native header rather than claiming a global off setting 24ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/native/table-filter-buttons.test.ts > native table filter buttons > uses filterColumn visibility without changing criteria or source (criteria=false)
+AssertionError: expected '<?xml version="1.0" encoding="UTF-8" …' not to match /<tableColumn\b[^>]*hiddenButton/
+
+- Expected:
+/<tableColumn\b[^>]*hiddenButton/
+
++ Received:
+"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><table xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" id=\"1\" name=\"Sales\" displayName=\"Sales\" ref=\"A1:B3\"><autoFilter ref=\"A1:B3\"></autoFilter><tableColumns count=\"2\"><tableColumn id=\"1\" name=\"Region\" hiddenButton=\"1\"/><tableColumn id=\"2\" name=\"Amount\" hiddenButton=\"1\"/></tableColumns><tableStyleInfo name=\"Sheetcraft Light 2\" showFirstColumn=\"0\" showLastColumn=\"0\" showRowStripes=\"1\" showColumnStripes=\"0\"/></table>"
+
+ ❯ src/tests/native/table-filter-buttons.test.ts:62:25
+     60|       const encoded = await encodeXlsx(f.workbook);
+     61|       const p = parts(encoded.bytes);
+     62|       expect(p.xml).not.toMatch(/<tableColumn\b[^>]*hiddenButton/);
+       |                         ^
+     63|       expect(p.xml.match(/hiddenButton="1"/g)).toHaveLength(2);
+     64|       expect(p.xml).toContain('<filterColumn colId="1" hiddenButton="1…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/tests/native/table-filter-buttons.test.ts > native table filter buttons > uses filterColumn visibility without changing criteria or source (criteria=true)
+AssertionError: expected '<?xml version="1.0" encoding="UTF-8" …' not to match /<tableColumn\b[^>]*hiddenButton/
+
+- Expected:
+/<tableColumn\b[^>]*hiddenButton/
+
++ Received:
+"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><table xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" id=\"1\" name=\"Sales\" displayName=\"Sales\" ref=\"A1:B3\"><autoFilter ref=\"A1:B3\"><filterColumn colId=\"0\"><filters>
+<filter val=\"North\"/></filters></filterColumn></autoFilter><tableColumns count=\"2\"><tableColumn id=\"1\" name=\"Region\" hiddenButton=\"1\"/><tableColumn id=\"2\" name=\"Amount\" hiddenButton=\"1\"/></tableColumns><tableStyleInfo name=\"Sheetcraft Light 2\" showFirstColumn=\"0\" showLastColumn=\"0\" showRowStripes=\"1\" showColumnStripes=\"0\"/></table>"
+
+ ❯ src/tests/native/table-filter-buttons.test.ts:62:25
+     60|       const encoded = await encodeXlsx(f.workbook);
+     61|       const p = parts(encoded.bytes);
+     62|       expect(p.xml).not.toMatch(/<tableColumn\b[^>]*hiddenButton/);
+       |                         ^
+     63|       expect(p.xml.match(/hiddenButton="1"/g)).toHaveLength(2);
+     64|       expect(p.xml).toContain('<filterColumn colId="1" hiddenButton="1…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/tests/native/table-filter-buttons.test.ts > native table filter buttons > exports visible buttons for an unfiltered header table even with null Core filter
+AssertionError: expected '<?xml version="1.0" encoding="UTF-8" …' to contain '<autoFilter ref="A1:B3">'
+
+Expected: "<autoFilter ref="A1:B3">"
+Received: "<?xml version="1.0" encoding="UTF-8" standalone="yes"?><table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="Sales" displayName="Sales" ref="A1:B3"><tableColumns count="2"><tableColumn id="1" name="Region"/><tableColumn id="2" name="Amount"/></tableColumns><tableStyleInfo name="Sheetcraft Light 2" showFirstColumn="0" showLastColumn="0" showRowStripes="1" showColumnStripes="0"/></table>"
+
+ ❯ src/tests/native/table-filter-buttons.test.ts:81:38
+     79|     f.sheet.tables![0]!.filter = null;
+     80|     const encoded = await encodeXlsx(f.workbook);
+     81|     expect(parts(encoded.bytes).xml).toContain('<autoFilter ref="A1:B3…
+       |                                      ^
+     82|     expect(parts(encoded.bytes).xml).not.toContain("hiddenButton");
+     83|     expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/tests/native/table-filter-buttons.test.ts > native table filter buttons > reads native removal of autoFilter as buttons off
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/tests/native/table-filter-buttons.test.ts:95:35
+     93|     );
+     94|     const restored = getActiveSheet((await decodeXlsx(zipSync(p.entrie…
+     95|     expect(restored.filterButton).toBe(false);
+       |                                   ^
+     96|     expect(restored.filter).toBeNull();
+     97|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/tests/native/table-filter-buttons.test.ts > native table filter buttons > warns on a partially hidden native header rather than claiming a global off setting
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/tests/native/table-filter-buttons.test.ts:116:71
+    114|     );
+    115|     const decoded = await decodeXlsx(zipSync(p.entries));
+    116|     expect(getActiveSheet(decoded.workbook).tables![0]!.filterButton).…
+       |                                                                       ^
+    117|     expect(decoded.report.issues).toContainEqual(
+    118|       expect.objectContaining({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 1 passed (6)
+   Start at  15:29:43
+   Duration  2.40s (transform 1.48s, setup 0ms, import 2.03s, tests 208ms, environment 0ms)
+
+error: script "test" exited with code 1

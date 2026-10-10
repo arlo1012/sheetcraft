@@ -543,7 +543,7 @@ export function readXlsxAutoFilter(
   const columns: XlsxFilter["columns"] = [];
   let unsupported = false;
   for (const column of (match[2] ?? "").matchAll(
-    /<filterColumn\b([^>]*)>([\s\S]*?)<\/filterColumn>/gi,
+    /<filterColumn\b([^>]*?)(?:\/>|>([\s\S]*?)<\/filterColumn>)/gi,
   )) {
     const offset = Number(attribute(column[1] ?? "", "colId"));
     if (!Number.isInteger(offset) || offset < 0 || range.start.column + offset > range.end.column) {
@@ -551,6 +551,8 @@ export function readXlsxAutoFilter(
       continue;
     }
     const body = column[2] ?? "";
+    // A visibility-only column has no filter criterion, not an empty allow-list.
+    if (!body.trim()) continue;
     const allowedValues: XlsxFilterValue[] = [];
     let condition: XlsxFilterCondition | undefined;
     const filters = /<filters\b([^>]*)>([\s\S]*?)<\/filters>/i.exec(body);
@@ -822,9 +824,12 @@ function dateGroupXml(serial: number): string | null {
 
 export function writeXlsxAutoFilter(
   filter: XlsxFilter,
-  options?: { colorDxfId?: (condition: Extract<XlsxFilterCondition, { kind: "color" }>) => number },
+  options?: {
+    colorDxfId?: (condition: Extract<XlsxFilterCondition, { kind: "color" }>) => number;
+    hideButtons?: boolean;
+  },
 ): string {
-  const columns = filter.columns
+  let columns = filter.columns
     .map((column) => {
       // OOXML can express exactly one color criterion. A color-set is stored
       // in the product extension below, so do not reinterpret it as matching
@@ -901,6 +906,26 @@ export function writeXlsxAutoFilter(
       return `<filterColumn colId="${offset}">${filters}${custom}${special}</filterColumn>`;
     })
     .join("");
+  if (options?.hideButtons) {
+    const sourceColumns = [
+      ...columns.matchAll(/<filterColumn colId="(\d+)">([\s\S]*?)<\/filterColumn>/g),
+    ];
+    const criteria = new Map(sourceColumns.map((match) => [Number(match[1]), match[2]!] as const));
+    const width = filter.range.end.column - filter.range.start.column + 1;
+    if (
+      criteria.size !== sourceColumns.length ||
+      [...criteria.keys()].some(
+        (index) => !Number.isSafeInteger(index) || index < 0 || index >= width,
+      )
+    )
+      throw new RangeError("Invalid filter columns for hidden native table buttons.");
+    columns = Array.from({ length: width }, (_, offset) => {
+      const body = criteria.get(offset);
+      return body === undefined
+        ? `<filterColumn colId="${offset}" hiddenButton="1"/>`
+        : `<filterColumn colId="${offset}" hiddenButton="1">${body}</filterColumn>`;
+    }).join("");
+  }
   return `<autoFilter ref="${rangeReference(filter.range)}">${columns}</autoFilter>`;
 }
 

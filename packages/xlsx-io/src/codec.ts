@@ -604,7 +604,7 @@ export async function decodeWithNativeXlsx(
   const rawTextDirections = readRawWorksheetTextDirections(bytes);
   const rawDataMetadata = readXlsxDataMetadata(bytes);
   const rawConditionalFormats = readXlsxConditionalFormatMetadata(bytes, report);
-  const rawTables = readXlsxTableMetadata(bytes);
+  const rawTables = readXlsxTableMetadata(bytes, report);
   const archive = unzipSync(bytes);
   const cellStyles = readXlsxCellStyles(archive["xl/styles.xml"], archive["xl/theme/theme1.xml"]);
   const namedStyleBindings = readXlsxNamedCellStyleBindings(archive["xl/styles.xml"]);
