@@ -55,7 +55,11 @@ const sortOrder = computed({
 });
 const sortMeasure = computed({
   get: () => sortRule.value?.measure ?? -1,
-  set: (measure: number) => setSort(sortOrder.value, measure < 0 ? undefined : measure),
+  set: (measure: number) =>
+    setSort(
+      sortOrder.value === "manual" ? "ascending" : sortOrder.value,
+      measure < 0 ? undefined : measure,
+    ),
 });
 function setValues(values: unknown): void {
   if (filter.value && Array.isArray(values))

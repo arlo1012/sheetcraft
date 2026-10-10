@@ -230,7 +230,8 @@ export type WorkbookSnapshotV40 = Omit<WorkbookSnapshotV39, "version"> & { versi
 export type WorkbookSnapshotV41 = Omit<WorkbookSnapshotV40, "version"> & { version: 41 };
 export type WorkbookSnapshotV42 = Omit<WorkbookSnapshotV41, "version"> & { version: 42 };
 export type WorkbookSnapshotV43 = Omit<WorkbookSnapshotV42, "version"> & { version: 43 };
-export type WorkbookSnapshot = WorkbookSnapshotV43;
+export type WorkbookSnapshotV44 = Omit<WorkbookSnapshotV43, "version"> & { version: 44 };
+export type WorkbookSnapshot = WorkbookSnapshotV43 | WorkbookSnapshotV44;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -290,7 +291,8 @@ type SnapshotVersion =
   | 40
   | 41
   | 42
-  | 43;
+  | 43
+  | 44;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -703,6 +705,21 @@ function parseSparseState(
   version: SnapshotVersion,
 ): SheetSparseState {
   if (
+    version < 44 &&
+    Array.isArray(record.pivotTables) &&
+    record.pivotTables.some((item) => {
+      const rules = asRecord(item, path).sortFields;
+      return (
+        Array.isArray(rules) &&
+        rules.some((rule) => {
+          const value = asRecord(rule, path);
+          return value.order === "manual" || Object.hasOwn(value, "members");
+        })
+      );
+    })
+  )
+    return fail(path, "Manual pivot member order requires snapshot version 44.");
+  if (
     version < 43 &&
     Array.isArray(record.pivotTables) &&
     record.pivotTables.some((item) => Object.hasOwn(asRecord(item, path), "sourceTableId"))
@@ -1086,6 +1103,16 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
                                   ? 6
                                   : 3;
     if (hasTableBinding) version = 43;
+    if (
+      Array.isArray(record.pivotTables) &&
+      record.pivotTables.some((item) => {
+        const rules = asRecord(item, path).sortFields;
+        return (
+          Array.isArray(rules) && rules.some((rule) => asRecord(rule, path).order === "manual")
+        );
+      })
+    )
+      version = 44;
   }
   if (version < 23 && record.protection !== undefined) {
     const protection = asRecord(record.protection, `${path}.protection`);
@@ -1162,8 +1189,13 @@ export function deserializeSheet(value: unknown): Sheet {
 }
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
+  const sheets = getWorkbookSheets(workbook).map(serializeSheet);
+  const manualOrder = sheets.some((sheet) =>
+    sheet.pivotTables?.some((table) => table.sortFields?.some((rule) => rule.order === "manual")),
+  );
   return {
-    version: 43,
+    // Preserve the existing protocol for documents that do not use the new feature.
+    version: manualOrder ? 44 : 43,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1173,7 +1205,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
     activeSheetId: workbook.activeSheetId,
-    sheets: getWorkbookSheets(workbook).map(serializeSheet),
+    sheets,
     definedNames: [...workbook.definedNames.values()].map((definition) => ({
       ...definition,
       reference: {
@@ -1238,7 +1270,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 40 &&
     record.version !== 41 &&
     record.version !== 42 &&
-    record.version !== 43
+    record.version !== 43 &&
+    record.version !== 44
   ) {
     throw new WorkbookDomainError(
       {

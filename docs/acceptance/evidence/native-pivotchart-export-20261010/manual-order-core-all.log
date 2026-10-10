@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/core
+
+
+ Test Files  177 passed (177)
+      Tests  2621 passed (2621)
+   Start at  10:24:27
+   Duration  84.05s (transform 2.95s, setup 0ms, import 50.26s, tests 9.53s, environment 18ms)
+

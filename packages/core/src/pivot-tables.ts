@@ -99,8 +99,10 @@ export type PivotPresentation = {
 export type PivotFieldSort = {
   axis: "rows" | "columns";
   field: number;
-  order: "ascending" | "descending";
+  order: "ascending" | "descending" | "manual";
   measure?: number;
+  /** Explicit field-member order; unseen members follow in source order. */
+  members?: CellValue[];
 };
 export type PivotResultLayout = {
   labelColumns: number;
@@ -325,7 +327,17 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
           !rule ||
           !["rows", "columns"].includes(rule.axis) ||
           !(rule.axis === "rows" ? table.rowFields : table.columnFields).includes(rule.field) ||
-          !["ascending", "descending"].includes(rule.order) ||
+          !["ascending", "descending", "manual"].includes(rule.order) ||
+          (rule.order === "manual"
+            ? rule.measure !== undefined ||
+              !Array.isArray(rule.members) ||
+              rule.members.length > 10000 ||
+              Array.from(rule.members).some(
+                (value) => !primitive(value) || (typeof value === "string" && value.length > 32767),
+              ) ||
+              new Set(rule.members.map((value) => JSON.stringify(valueKey(value)))).size !==
+                rule.members.length
+            : rule.members !== undefined) ||
           (rule.measure !== undefined &&
             (!Number.isInteger(rule.measure) ||
               rule.measure < 0 ||
@@ -443,7 +455,17 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
     anchor: { ...table.anchor },
     outputRange: cloneRange(table.outputRange),
     ...(axisFilters ? { axisFilters } : {}),
-    ...(sortFields ? { sortFields: sortFields.map((rule) => ({ ...rule })) } : {}),
+    ...(sortFields
+      ? {
+          sortFields: sortFields.map((rule) => ({
+            axis: rule.axis,
+            field: rule.field,
+            order: rule.order,
+            ...(rule.measure !== undefined ? { measure: rule.measure } : {}),
+            ...(rule.order === "manual" ? { members: [...rule.members!] } : {}),
+          })),
+        }
+      : {}),
     rowFields: [...table.rowFields],
     columnFields: [...table.columnFields],
     values: table.values.map((value) => ({
@@ -880,16 +902,29 @@ export function buildPivotResult(
         order,
         positions,
         measures,
+        manualPositions: new Map(
+          (rule?.members ?? []).map((value, index) => [JSON.stringify(valueKey(value)), index]),
+        ),
         groupLabels: group ? getPivotGroupLabels(group, workbook.dateSystem) : undefined,
       };
     });
     return entries.sort((a, b) => {
       for (let level = 0; level < fields.length; level++) {
-        const { rule, order, positions, measures, groupLabels } = levels[level]!;
+        const { rule, order, positions, measures, groupLabels, manualPositions } = levels[level]!;
         const leftKey = groupKey(a[1].slice(0, level + 1));
         const rightKey = groupKey(b[1].slice(0, level + 1));
         if (leftKey === rightKey) continue;
         if (order === "source") return positions.get(leftKey)! - positions.get(rightKey)!;
+        if (order === "manual") {
+          const leftPosition =
+            manualPositions.get(JSON.stringify(valueKey(a[1][level] ?? null))) ??
+            manualPositions.size;
+          const rightPosition =
+            manualPositions.get(JSON.stringify(valueKey(b[1][level] ?? null))) ??
+            manualPositions.size;
+          if (leftPosition !== rightPosition) return leftPosition - rightPosition;
+          return positions.get(leftKey)! - positions.get(rightKey)!;
+        }
         const left =
           rule?.measure !== undefined
             ? getPivotAggregateValue(measures.get(leftKey), table.values[rule.measure]!.aggregate)
