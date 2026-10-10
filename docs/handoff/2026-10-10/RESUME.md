@@ -1,5 +1,19 @@
 # Sheetcraft continuation after recovery — 2026-10-10
 
+## Representative table matrix closure
+
+After659aa, the remaining real UI checks completed: Medium5 survives explicit
+save/reload with identical exported snapshots; the saved synthetic WPS XLSX imports
+through the actual product UI; unsafe advanced-filter header changes retain draft,
+data and history on rejection. Read `docs/acceptance/structured-table-matrix-20261010.md`.
+One native WPS calculated-column observation confirms an explicit overwrite-all
+action, retained manual exceptions, inherited formulas on below-table growth and
+target-only paste/Undo. Read the adjacent candidate-contract record before making
+a product choice. No autofill/template implementation or snapshot migration occurred.
+Numeric literal total-row block and other bounded limits remain. Whole Insert,
+all table permutations and repository CI are not complete. This continuation
+changes only text and uploads no new actual workbook/XML/screenshots.
+
 ## Table filter-buttons and converted-range continuation
 
 After380cbed, filterColumn metadata fixed the actual buttons-off defect without

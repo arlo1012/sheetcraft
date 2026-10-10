@@ -94,6 +94,9 @@ synthetic regression structure and textual evidence are saved to Git.
 
 ## Remaining bounded table matrix
 
+Later text-only closure is recorded in `structured-table-matrix-20261010.md`.
+The pending list below describes this original checkpoint, not that later state.
+
 Stable Medium5 UI persistence, actual native import into the product, explicit
 advanced-filter atomic-rejection UI and bounded WPS calculated-column observations
 remain open. Numeric literal total-row XLSX incompatibility remains an explicit
