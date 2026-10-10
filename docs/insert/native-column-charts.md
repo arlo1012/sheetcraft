@@ -51,15 +51,19 @@ metadata or guessed direction is used. Sparse text-cache points are allowed only
 where the actual worksheet independently proves an empty label.
 
 WPS may save nonnumeric literal text as zero in a numeric cache. Only a point with
-an exact verified value reference, Core missing value, actual nonempty nonnumeric
-literal string, cached zero and disabled value labels may be restored to Core
+an exact verified value reference, Core missing value, actual nonnumeric literal
+string (nonempty text or a proven exact empty string), cached zero and disabled
+value labels may be restored to Core
 missing, with `chart-cache-normalized`. This preserves Core semantics, not native
-zero-versus-gap visual fidelity. Real numeric zero, numeric-looking text, empty or
-whitespace strings, blank cells, booleans, errors, formulas and value-labelled zero
-cannot use that exception. In the actual blank-label matrix, disabling a header
-can expose an empty-string source as a WPS cached zero; six such saved charts are
-currently omitted with `feature-omitted`, while both-header charts retain their
-empty labels and genuine missing numeric points.
+zero-versus-gap visual fidelity. Real numeric zero, numeric-looking text,
+whitespace-only strings, blank cells, booleans, errors, formulas and value-labelled
+zero cannot use that exception. The original options checkpoint omitted six
+disabled-header charts with WPS empty-string numeric zeros. Read-only producer
+proof established that public decode preserves exact literal empty-string identity
+separately from null blank cells and numeric zero. The bounded follow-up now
+recovers all eight saved blank-matrix charts with normalization warnings; genuine
+missing numeric points remain gaps. See the
+[empty-string follow-up](../acceptance/native-column-empty-source-20261010.md).
 
 Invalid or
 unproven safe source/cache/presentation variants omit the individual chart with a

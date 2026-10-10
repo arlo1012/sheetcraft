@@ -4,6 +4,7 @@ import { getSheetChartData } from "@sheetcraft/core/sheet-charts";
 import { serializeWorkbook, deserializeWorkbook } from "@sheetcraft/core/serialization";
 import {
   createWorkbookEvaluator,
+  getCellContent,
   getCellValue,
   setCellContent,
   type Workbook,
@@ -182,7 +183,7 @@ describe("native column source options", () => {
   );
   test.each([
     { name: "plain-text", value: "apple", supported: true, normalized: true },
-    { name: "empty-string", value: "", supported: false, normalized: false },
+    { name: "empty-string", value: "", supported: true, normalized: true },
     { name: "whitespace", value: " ", supported: false, normalized: false },
     { name: "numeric-text", value: "10", supported: false, normalized: false },
     { name: "boolean", value: true, supported: false, normalized: false },
@@ -192,12 +193,13 @@ describe("native column source options", () => {
     { name: "real-zero", value: 0, supported: true, normalized: false },
     { name: "wrong-number", value: 5, supported: false, normalized: false },
     { name: "labels-expose-zero", value: "apple", supported: false, normalized: false },
+    { name: "labels-expose-empty-zero", value: "", supported: false, normalized: false },
   ])(
     "WPS text-zero cache adaptation keeps $name bounded",
     async ({ name, value, supported, normalized }) => {
       const f = nativeColumnFixture();
       f.drawing.chart.headerRow = false;
-      if (name === "labels-expose-zero") f.drawing.chart.labels = true;
+      if (name.startsWith("labels-expose-")) f.drawing.chart.labels = true;
       setCellContent(
         f.sheet,
         { row: 0, column: 1 },
@@ -246,4 +248,69 @@ describe("native column source options", () => {
     expect(imported(decoded.workbook).data.series[0]!.values).toEqual([null, 60, 70]);
     expect(decoded.report.issues.some((item) => item.code === "chart-cache-normalized")).toBe(true);
   });
+  test.each(options)(
+    "proves empty-string identity separately from blank and zero in WPS-like $seriesBy/$headerRow/$headerColumn",
+    async (option) => {
+      const f = nativeColumnFixture();
+      Object.assign(f.drawing.chart, option);
+      setCellContent(f.sheet, { row: 0, column: 1 }, { kind: "literal", value: "" });
+      setCellContent(f.sheet, { row: 1, column: 0 }, { kind: "literal", value: "" });
+      setCellContent(f.sheet, { row: 2, column: 2 }, null);
+      setCellContent(f.sheet, { row: 3, column: 2 }, { kind: "literal", value: 0 });
+      const expected = getSheetChartData(
+        f.sheet,
+        f.drawing.chart,
+        createWorkbookEvaluator(f.workbook, f.sheet.id),
+      );
+      const entries = unzipSync((await encodeXlsx(f.workbook)).bytes);
+      let seriesIndex = 0;
+      entries["xl/charts/chart1.xml"] = strToU8(
+        strFromU8(entries["xl/charts/chart1.xml"]!).replace(
+          /<c:ser>[\s\S]*?<\/c:ser>/g,
+          (series) => {
+            const currentSeries = seriesIndex++;
+            return series.replace(
+              /(<c:numCache>[\s\S]*?<c:ptCount val="\d+"\/>)[\s\S]*?(<\/c:numCache>)/,
+              (_match, head: string, tail: string) =>
+                head +
+                expected.series[currentSeries]!.values.map((value, point) => {
+                  const source = getCellContent(f.sheet, {
+                    row:
+                      Number(option.headerRow) +
+                      (option.seriesBy === "columns" ? point : currentSeries),
+                    column:
+                      Number(option.headerColumn) +
+                      (option.seriesBy === "columns" ? currentSeries : point),
+                  });
+                  const cached =
+                    value === null && source?.kind === "literal" && typeof source.value === "string"
+                      ? 0
+                      : value;
+                  return cached === null ? "" : `<c:pt idx="${point}"><c:v>${cached}</c:v></c:pt>`;
+                }).join("") +
+                tail,
+            );
+          },
+        ),
+      );
+      expect(seriesIndex).toBe(expected.series.length);
+      const decoded = await decodeXlsx(zipSync(entries));
+      const result = imported(decoded.workbook);
+      expect(result.drawing.chart).toEqual(f.drawing.chart);
+      expect(result.data).toEqual(expected);
+      expect(getCellContent(result.sheet, { row: 0, column: 1 })).toEqual({
+        kind: "literal",
+        value: "",
+      });
+      expect(getCellContent(result.sheet, { row: 2, column: 2 })).toBeNull();
+      expect(result.data.series.flatMap((item) => item.values)).toContain(0);
+      expect(decoded.report.issues.some((issue) => issue.code === "chart-cache-normalized")).toBe(
+        !option.headerRow || !option.headerColumn,
+      );
+      const snapshot = deserializeWorkbook(serializeWorkbook(decoded.workbook));
+      expect(
+        imported((await decodeXlsx((await encodeXlsx(snapshot)).bytes)).workbook).data,
+      ).toEqual(expected);
+    },
+  );
 });

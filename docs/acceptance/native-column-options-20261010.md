@@ -138,3 +138,9 @@ Owned logs are under `evidence/native-column-options-20261010/`.
 No full repository CI, merge readiness, all-chart support or all-insert completion
 is asserted. Next bounded work can close the empty-string WPS cache boundary from
 actual source evidence before moving on to existing line/bar chart types.
+
+Subsequent bounded work proved exact empty-string source identity and closed those
+six omissions without normalizing null blanks or whitespace. This record remains
+the 9d3020 checkpoint result; see the
+[separate follow-up](native-column-empty-source-20261010.md) for the later fix and
+1,040-test result.

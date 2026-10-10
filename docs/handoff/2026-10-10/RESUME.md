@@ -39,6 +39,12 @@ The subsequent options continuation reached **77 files / 1,031 passing tests**,
 Core chart-data focused 11 and Web chart focused 21. Full Core/Web suites were not
 rerun in this phase. Read `docs/acceptance/native-column-options-20261010.md` and
 its evidence directory for final checks, preserved initial failures and limitations.
+That options checkpoint was published as `9d3020e92e3b4a7d9e5f0a5b35bb69489d3b0da7`.
+The bounded exact-empty-string follow-up reached 77 files / 1,040 XLSX tests and
+4 files / 168 focused tests, retained all eight actual WPS-saved blank-matrix charts,
+and verified their formal reexport in both apps. Its public source-identity proof,
+warnings and remaining boundaries are in
+`docs/acceptance/native-column-empty-source-20261010.md`.
 Read `docs/acceptance/native-column-chart-20261010.md` and its evidence directory
 for initial failures and exact final logs. The architecture aggregate remains
 failed with 125 prior diagnostics and no additions relative to the earlier 126;
@@ -61,8 +67,10 @@ source, either series direction and all eight existing header configurations,
 with text/blank categories/headers. Headerless 1×1 is deliberately omitted because
 its native source cannot prove direction. Actual WPS cached-zero nonempty text can
 restore Core missing values only with exact source proof and a located warning.
-Empty-string/blank cached zeros are not normalized: the actual saved blank matrix
-retains its two both-header charts but omits its six disabled-header charts.
+Exact literal empty-string source is now separately proven and admitted by the
+follow-up; null blank, whitespace, numeric-looking text, formulas/errors and
+value-labelled zeros still cannot be normalized. The prior six omissions remain
+recorded at 9d3020. Do not claim native zero/Core gap fidelity is lossless.
 They keep a live evaluator dependency: source changes update immediately without
 PivotTable Refresh. Cache/formula proof is mandatory on import; no native identity
 is guessed. Zero/negative values and missing numeric points are retained. Hidden

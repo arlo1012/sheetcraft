@@ -105,10 +105,14 @@ The ordinary clustered-column continuation now carries the existing two series
 directions and independent header flags. Actual WPS and Excel formal product
 eight-sheet matrices passed live edit and save/reopen. Row-oriented header
 captions were corrected without changing Core commands. WPS text-value cache zero
-normalization is source-proven and explicitly warned; empty-string cached zeros
-in disabled-header saved charts remain omissions. Empty labels and genuine missing
+normalization is source-proven and explicitly warned. Exact literal empty strings
+were subsequently proved distinct from null blanks and numeric zero by public
+decode and recovered with the same bounded warning. Whitespace/null/formula/value-
+labelled zeros remain unsupported. Empty labels and genuine missing
 numeric cells in both-header row/column charts retain their semantics. See the
 [exact options acceptance and limits](../acceptance/native-column-options-20261010.md).
+The [empty-source follow-up](../acceptance/native-column-empty-source-20261010.md)
+preserves the initial omissions and records the final actual eight-chart recovery.
 
 For a compatibility discrepancy, create the smallest synthetic workbook in WPS
 or Excel, export through the supported flow, compare actual OOXML with the product,

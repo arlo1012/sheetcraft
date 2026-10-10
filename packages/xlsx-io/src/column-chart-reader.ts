@@ -54,8 +54,10 @@ function numericCacheMatches(
       if (value === expected[index]) return true;
       // Observed WPS saves ordinary nonnumeric text as 0 in numCache. Recover
       // Core's missing point from the literal worksheet source, with a warning.
-      // Never normalize real numbers, blanks, booleans, errors, numeric-looking
-      // strings, formulas or a chart whose data labels would expose that zero.
+      // WPS also retains an exact empty literal string's source identity while
+      // caching it as zero. That is distinguishable from a genuinely blank cell.
+      // Never normalize real numbers, blanks, whitespace-only text, booleans,
+      // errors, numeric-looking strings, formulas or value-labelled zeros.
       const cell = getCellContent(sheet, {
         row: span.start.row + (span.start.column === span.end.column ? index : 0),
         column: span.start.column + (span.start.row === span.end.row ? index : 0),
@@ -66,8 +68,7 @@ function numericCacheMatches(
         value === 0 &&
         cell?.kind === "literal" &&
         typeof cell.value === "string" &&
-        cell.value.trim() !== "" &&
-        !Number.isFinite(Number(cell.value))
+        (cell.value === "" || (cell.value.trim() !== "" && !Number.isFinite(Number(cell.value))))
       ) {
         normalized = true;
         return true;

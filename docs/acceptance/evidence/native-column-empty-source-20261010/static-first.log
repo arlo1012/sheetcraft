@@ -1,0 +1,7 @@
+Formatter initial attempt used repository-relative paths from package cwd and matched no files; no source was changed by that attempt.
+Finished in 2ms on 2 files using 9 threads.
+$ bun run --filter @sheetcraft/xlsx-io typecheck
+@sheetcraft/xlsx-io typecheck: Exited with code 0
+$ bun run --filter @sheetcraft/xlsx-io build
+@sheetcraft/xlsx-io build: Exited with code 0
+Owned final static checks exit 0

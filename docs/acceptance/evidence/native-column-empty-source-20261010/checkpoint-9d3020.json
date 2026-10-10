@@ -1,0 +1,71 @@
+{
+  "repository": "arlo1012/sheetcraft",
+  "branch": "refactor/native-xlsx-20261009",
+  "head": "9d3020e92e3b4a7d9e5f0a5b35bb69489d3b0da7",
+  "parent": "de864504e39e2eab95283f523ce253197b60599f",
+  "tree": "38f359aea43518e5fe141a08ff49cfc63933c628",
+  "paths": 36,
+  "remoteVerified": true,
+  "force": false,
+  "localIndexMatchesRemoteTree": true,
+  "author": {
+    "name": "arlo.wang",
+    "email": "75329932+arlo1012@users.noreply.github.com",
+    "date": "2026-10-10T19:30:44Z"
+  },
+  "committer": {
+    "name": "arlo.wang",
+    "email": "75329932+arlo1012@users.noreply.github.com",
+    "date": "2026-10-10T19:30:44Z"
+  },
+  "checks": {
+    "xlsxFull": {
+      "files": 77,
+      "tests": 1031,
+      "pass": true
+    },
+    "xlsxFocused": {
+      "files": 4,
+      "tests": 159,
+      "pass": true
+    },
+    "coreFocused": {
+      "files": 1,
+      "tests": 11,
+      "pass": true
+    },
+    "webFocused": {
+      "files": 2,
+      "tests": 21,
+      "pass": true
+    },
+    "types": true,
+    "build": true,
+    "webTypes": true,
+    "scriptStrictTypes": true,
+    "scopedLint": true,
+    "scopedFormat": true,
+    "architecture": {
+      "pass": false,
+      "diagnostics": 125,
+      "addedAgainstDe864": 0,
+      "removedAgainstDe864": 0
+    },
+    "remoteCheckRuns": [],
+    "fullCoreWebRerun": false,
+    "remoteStatuses": []
+  },
+  "gui": {
+    "eightProductWpsExcelFirstOpenLiveEditSaveCloseReopen": "pass; B3 100->111 immediately without Refresh",
+    "actualWpsSavedPublicApiEightConfigurations": "pass; 6 chart-cache-normalized warnings",
+    "actualWpsReexportExcelAllEightFirstOpen": "pass;111/direction/names/categories; no repair",
+    "blankLabelBothHeadersWpsExcel": "pass; empty names/categories, missing C3, row111 save/reopen",
+    "wpsSavedBlankMatrix": "2 TT retained;6 disabled-header charts omitted for empty-string numeric cache zero",
+    "excelSavedBytesDownloaded": false
+  },
+  "newGuiBinaryXmlProducerJsonScreenshotsPublished": false,
+  "authenticationStateBackedUp": false,
+  "review": "readonly Core/UI semantics inspection complete; no new adversarial review; prior stopped PivotChart review not repeated",
+  "scope": "ordinary unstacked clustered column only;8 existing configurations except ambiguous headerless1x1; disclosed cache-zero boundaries; not full Insert",
+  "recoveryEntry": "docs/handoff/2026-10-10/RESUME.md"
+}
