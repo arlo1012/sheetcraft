@@ -6,6 +6,8 @@ export const chartsZhCN = {
   "chart.title": "标题",
   "chart.headerRow": "首行为系列名称",
   "chart.headerColumn": "首列为类别",
+  "chart.headerRowCategories": "首行为类别",
+  "chart.headerColumnSeries": "首列为系列名称",
   "chart.seriesByRows": "按行绘制系列",
   "chart.legend": "图例",
   "chart.labels": "数据标签",

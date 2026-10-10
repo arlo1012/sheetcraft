@@ -81,6 +81,56 @@ type FormattedOption = {
   xAxis: { axisLabel: { formatter: (value: number) => string } };
 };
 describe("pivot charts", () => {
+  test("ordinary header captions follow row orientation without changing independent flags", async () => {
+    const f = setup(false);
+    const controls = f.wrapper.findAllComponents(Checkbox);
+    expect(controls[0]!.text()).toContain("First row contains series names");
+    expect(controls[1]!.text()).toContain("First column contains categories");
+    controls[2]!.vm.$emit("change", true);
+    await flushPromises();
+    expect(controls[0]!.text()).toContain("First row contains categories");
+    expect(controls[1]!.text()).toContain("First column contains series names");
+    controls[0]!.vm.$emit("update:modelValue", false);
+    await flushPromises();
+    f.wrapper.findComponent(Dialog).vm.$emit("confirm");
+    const result = f.wrapper.emitted("confirm")![0]![0] as SheetChartDrawing;
+    expect(result.chart).toMatchObject({ seriesBy: "rows", headerRow: false, headerColumn: true });
+    expect(f.drawing.chart).toMatchObject({
+      seriesBy: "columns",
+      headerRow: true,
+      headerColumn: true,
+    });
+    controls[2]!.vm.$emit("change", false);
+    await flushPromises();
+    expect(controls[0]!.text()).toContain("First row contains series names");
+    expect(controls[1]!.text()).toContain("First column contains categories");
+  });
+  test.each(
+    (["columns", "rows"] as const).flatMap((seriesBy) =>
+      [true, false].flatMap((headerRow) =>
+        [true, false].map((headerColumn) => ({ seriesBy, headerRow, headerColumn })),
+      ),
+    ),
+  )(
+    "ordinary dialog emits explicit $seriesBy/$headerRow/$headerColumn without changing the input",
+    async (option) => {
+      const f = setup(false);
+      const controls = f.wrapper.findAllComponents(Checkbox);
+      controls[0]!.vm.$emit("update:modelValue", option.headerRow);
+      controls[1]!.vm.$emit("update:modelValue", option.headerColumn);
+      controls[2]!.vm.$emit("change", option.seriesBy === "rows");
+      await flushPromises();
+      f.wrapper.findComponent(Dialog).vm.$emit("confirm");
+      expect((f.wrapper.emitted("confirm")![0]![0] as SheetChartDrawing).chart).toMatchObject(
+        option,
+      );
+      expect(f.drawing.chart).toMatchObject({
+        seriesBy: "columns",
+        headerRow: true,
+        headerColumn: true,
+      });
+    },
+  );
   test.each([true, false])(
     "linked=%s keeps source orientation fixed while show-hidden remains editable",
     async (linked) => {

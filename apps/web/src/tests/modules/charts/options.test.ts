@@ -27,6 +27,24 @@ describe("chart options", () => {
       series: [{ type: "bar", name: "Sales", data: [2, null, 0] }],
     });
   });
+  test("retains blank/duplicate labels and all-null series without inventing names or zero points", () => {
+    expect(
+      createChartOption(chart, {
+        categories: ["", "same", "same"],
+        series: [
+          { name: "", values: [null, null, null] },
+          { name: "", values: [0, null, -5] },
+        ],
+        records: [],
+      }),
+    ).toMatchObject({
+      xAxis: { data: ["", "same", "same"] },
+      series: [
+        { name: "", data: [null, null, null] },
+        { name: "", data: [0, null, -5] },
+      ],
+    });
+  });
   test("preserves missing line points and disables connections across gaps", () => {
     expect(createChartOption({ ...chart, type: "line" }, data)).toMatchObject({
       series: [{ type: "line", data: [2, null, 0], connectNulls: false }],

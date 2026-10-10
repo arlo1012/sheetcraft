@@ -78,6 +78,62 @@ describe("chart data", () => {
       { name: "3", values: [null, 20, 40] },
     ]);
   });
+  test.each([
+    {
+      headerRow: true,
+      headerColumn: false,
+      categories: ["Region", "Q1", "Q2"],
+      series: [
+        { name: "1", values: [null, 10, 20] },
+        { name: "2", values: [null, 30, 40] },
+      ],
+    },
+    {
+      headerRow: false,
+      headerColumn: true,
+      categories: ["1", "2"],
+      series: [
+        { name: "Region", values: [null, null] },
+        { name: "East", values: [10, 20] },
+        { name: "West", values: [30, 40] },
+      ],
+    },
+    {
+      headerRow: false,
+      headerColumn: false,
+      categories: ["1", "2", "3"],
+      series: [
+        { name: "1", values: [null, null, null] },
+        { name: "2", values: [null, 10, 20] },
+        { name: "3", values: [null, 30, 40] },
+      ],
+    },
+  ])(
+    "row series preserve headerRow=$headerRow/headerColumn=$headerColumn",
+    ({ headerRow, headerColumn, categories, series }) => {
+      expect(fixture().read({ seriesBy: "rows", headerRow, headerColumn })).toMatchObject({
+        categories,
+        series,
+      });
+    },
+  );
+  test("enabled blank labels stay blank and a headerless numeric one-cell source retains explicit direction", () => {
+    const f = fixture();
+    setCellContent(f.sheet, { row: 0, column: 1 }, null);
+    setCellContent(f.sheet, { row: 1, column: 0 }, { kind: "literal", value: "" });
+    expect(f.read().categories).toEqual(["", "West"]);
+    expect(f.read().series[0]!.name).toBe("");
+    const range = { start: { row: 1, column: 1 }, end: { row: 1, column: 1 } };
+    const columns = chart({ range, headerRow: false, headerColumn: false });
+    const rows = chart({ ...columns, seriesBy: "rows" });
+    expect(normalizeSheetChart(columns).seriesBy).toBe("columns");
+    expect(normalizeSheetChart(rows).seriesBy).toBe("rows");
+    expect(f.read(columns)).toEqual(f.read(rows));
+    expect(f.read(rows)).toMatchObject({
+      categories: ["1"],
+      series: [{ name: "1", values: [10] }],
+    });
+  });
   test("omits hidden row and column data unless explicitly enabled", () => {
     const f = fixture();
     f.sheet.hiddenRows = new Set([1]);

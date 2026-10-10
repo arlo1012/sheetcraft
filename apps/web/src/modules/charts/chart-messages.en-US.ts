@@ -6,6 +6,8 @@ export const chartsEnUS = {
   "chart.title": "Title",
   "chart.headerRow": "First row contains series names",
   "chart.headerColumn": "First column contains categories",
+  "chart.headerRowCategories": "First row contains categories",
+  "chart.headerColumnSeries": "First column contains series names",
   "chart.seriesByRows": "Series in rows",
   "chart.legend": "Legend",
   "chart.labels": "Data labels",

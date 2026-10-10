@@ -4,6 +4,7 @@ import { attr, nodes, parseRange, type XmlNode } from "./pivot-xml.js";
 export function readChartCache(
   reference: XmlNode,
   numeric: boolean,
+  sparseText = false,
 ): Array<string | number | null> {
   const root = single(reference, numeric ? "numCache" : "strCache");
   only(reference, ["f", numeric ? "numCache" : "strCache"]);
@@ -36,7 +37,8 @@ export function readChartCache(
       throw new Error("Invalid numeric chart cache.");
     result[index] = numeric ? Number(value) : value;
   }
-  if (!numeric && seen.size !== count) throw new Error("Incomplete chart text cache.");
+  if (!numeric && !sparseText && seen.size !== count)
+    throw new Error("Incomplete chart text cache.");
   return result;
 }
 export function chartReferenceRange(reference: XmlNode, sheetName: string) {

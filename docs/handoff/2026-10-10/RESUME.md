@@ -9,8 +9,10 @@
   producer files; `72bd` exact Excel export acceptance; `32f0` explicit Core manual
   pivot-member ordering; `50ef1ad61e0e29b1d693252de21f79d540a8d25a` bounded import
   WIP and DXF fix; `e513272666288f9bdbf52c08a5fe6aa38d94411a` verified WPS
-  post-save PivotChart import. This continuation adds bounded ordinary native
-  clustered-column export/import and its actual double-app acceptance. The original README/source-checkpoint
+  post-save PivotChart import; `de864504e39e2eab95283f523ce253197b60599f` ordinary
+  both-header column-oriented native charts. The current continuation adds the
+  existing eight ordinary direction/header configurations with disclosed WPS
+  text-cache normalization and blank-source limitations. The original README/source-checkpoint
   in this directory describes the earlier recovery, not the latest remote head.
 - Preserve existing history. No force update, PR, UI merge or website publication
   is part of these checkpoints. API publication must use the freshly verified
@@ -33,6 +35,10 @@ owned feature tests and package types/build. See the exact check logs under
 reached 75 files / 965 passing tests in the prior PivotChart phase. Latest ordinary
 column phase reached **76 files / 996 passing tests** after final shared drawing
 validation, with XLSX types/build/scoped lint/format and full Web typecheck passed.
+The subsequent options continuation reached **77 files / 1,031 passing tests**,
+Core chart-data focused 11 and Web chart focused 21. Full Core/Web suites were not
+rerun in this phase. Read `docs/acceptance/native-column-options-20261010.md` and
+its evidence directory for final checks, preserved initial failures and limitations.
 Read `docs/acceptance/native-column-chart-20261010.md` and its evidence directory
 for initial failures and exact final logs. The architecture aggregate remains
 failed with 125 prior diagnostics and no additions relative to the earlier 126;
@@ -51,7 +57,12 @@ manual display order survives saved layout, snapshots and refresh. Legacy snapsh
 version 43. Unknown members append in source encounter order within each parent.
 
 Ordinary clustered columns now also support a same-sheet contiguous rectangular
-source, both headers, column-oriented series and text/blank categories/headers.
+source, either series direction and all eight existing header configurations,
+with text/blank categories/headers. Headerless 1×1 is deliberately omitted because
+its native source cannot prove direction. Actual WPS cached-zero nonempty text can
+restore Core missing values only with exact source proof and a located warning.
+Empty-string/blank cached zeros are not normalized: the actual saved blank matrix
+retains its two both-header charts but omits its six disabled-header charts.
 They keep a live evaluator dependency: source changes update immediately without
 PivotTable Refresh. Cache/formula proof is mandatory on import; no native identity
 is guessed. Zero/negative values and missing numeric points are retained. Hidden
@@ -90,6 +101,8 @@ For the ordinary slice, the public-entry reproduction script supports:
 
     bun scripts/compatibility/create-native-column-chart.mts seed output.xlsx
     bun scripts/compatibility/create-native-column-chart.mts product output.xlsx
+    bun scripts/compatibility/create-native-column-chart.mts options output.xlsx
+    bun scripts/compatibility/create-native-column-chart.mts options-blanks output.xlsx
     bun scripts/compatibility/create-native-column-chart.mts roundtrip input.xlsx output.xlsx
 
 The data-only seed is Data!A1:C4 with region/apple/pear; east 60/70;

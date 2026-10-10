@@ -5,6 +5,8 @@ import { normalizeSheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import { getSheetChartData } from "@sheetcraft/core/sheet-charts";
 import {
   createWorkbook,
+  createSheet,
+  insertSheet,
   createWorkbookEvaluator,
   getActiveSheet,
   setCellContent,
@@ -19,11 +21,11 @@ import {
 const [mode, firstPath, secondPath] = process.argv.slice(2);
 if (
   !firstPath ||
-  !["seed", "product", "roundtrip"].includes(mode!) ||
+  !["seed", "product", "options", "options-blanks", "roundtrip"].includes(mode!) ||
   (mode === "roundtrip" ? !secondPath : secondPath !== undefined)
 )
   throw new Error(
-    "Usage: bun scripts/compatibility/create-native-column-chart.mts seed|product output.xlsx OR roundtrip input.xlsx output.xlsx",
+    "Usage: bun scripts/compatibility/create-native-column-chart.mts seed|product|options|options-blanks output.xlsx OR roundtrip input.xlsx output.xlsx",
   );
 const output = resolve(mode === "roundtrip" ? secondPath! : firstPath);
 let workbook: Workbook;
@@ -45,54 +47,73 @@ if (mode === "roundtrip") {
   if (!sheet) throw new Error("No supported live ordinary chart was imported.");
   workbook.activeSheetId = sheet.id;
 } else {
-  workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
-  const sheet = getActiveSheet(workbook);
-  sheet.name = "Data";
-  [
-    ["region", "apple", "pear"],
-    ["east", 60, 70],
-    ["north", 100, 80],
-    ["south", 120, 90],
-  ].forEach((row, r) =>
-    row.forEach((value, column) =>
-      setCellContent(sheet, { row: r, column }, { kind: "literal", value: value! }),
-    ),
-  );
-  if (mode === "product")
-    sheet.drawings = [
-      normalizeSheetDrawing({
-        id: "column-chart",
-        name: "Sales",
-        kind: "chart",
-        anchor: { row: 6, column: 3 },
-        offsetX: 8,
-        offsetY: 8,
-        width: 480,
-        height: 300,
-        text: "",
-        shape: "rectangle",
-        fill: "#ffffff",
-        stroke: "#d1d5db",
-        strokeWidth: 1,
-        color: "#111827",
-        fontSize: 14,
-        bold: false,
-        italic: false,
-        rotation: 0,
-        chart: {
-          type: "column",
-          range: { start: { row: 0, column: 0 }, end: { row: 3, column: 2 } },
-          title: "Sales",
-          headerRow: true,
-          headerColumn: true,
-          seriesBy: "columns",
-          legend: true,
-          labels: false,
-          stacked: false,
-          showHidden: false,
-        },
-      }),
-    ];
+  const idFactory = createSequentialIdFactory();
+  workbook = createWorkbook({ idFactory });
+  const options = mode.startsWith("options")
+    ? (["columns", "rows"] as const).flatMap((seriesBy) =>
+        [true, false].flatMap((headerRow) =>
+          [true, false].map((headerColumn) => ({ seriesBy, headerRow, headerColumn })),
+        ),
+      )
+    : [{ seriesBy: "columns" as const, headerRow: true, headerColumn: true }];
+  for (const [index, option] of options.entries()) {
+    const optionName = mode.startsWith("options")
+      ? `${option.seriesBy === "columns" ? "C" : "R"}-${Number(option.headerRow)}${Number(option.headerColumn)}`
+      : "Sales";
+    const sheet =
+      index === 0 ? getActiveSheet(workbook) : createSheet(optionName, undefined, idFactory);
+    sheet.name = mode.startsWith("options") ? optionName : "Data";
+    if (index > 0) insertSheet(workbook, sheet);
+    [
+      ["region", mode === "options-blanks" ? "" : "apple", "pear"],
+      [mode === "options-blanks" ? "" : "east", 60, 70],
+      ["north", 100, mode === "options-blanks" ? null : 80],
+      ["south", 120, 90],
+    ].forEach((row, r) =>
+      row.forEach((value, column) =>
+        setCellContent(
+          sheet,
+          { row: r, column },
+          value === null ? null : { kind: "literal", value: value! },
+        ),
+      ),
+    );
+    if (mode !== "seed")
+      sheet.drawings = [
+        normalizeSheetDrawing({
+          id: "column-chart",
+          name: "Sales",
+          kind: "chart",
+          anchor: { row: 6, column: 3 },
+          offsetX: 8,
+          offsetY: 8,
+          width: 480,
+          height: 300,
+          text: "",
+          shape: "rectangle",
+          fill: "#ffffff",
+          stroke: "#d1d5db",
+          strokeWidth: 1,
+          color: "#111827",
+          fontSize: 14,
+          bold: false,
+          italic: false,
+          rotation: 0,
+          chart: {
+            type: "column",
+            range: { start: { row: 0, column: 0 }, end: { row: 3, column: 2 } },
+            title: optionName,
+            headerRow: option.headerRow,
+            headerColumn: option.headerColumn,
+            seriesBy: option.seriesBy,
+            legend: true,
+            labels: false,
+            stacked: false,
+            showHidden: false,
+          },
+        }),
+      ];
+  }
 }
 const encoded = await encodeXlsx(workbook, { filename: basename(output) });
 await writeFile(output, encoded.bytes, { flag: "wx" });

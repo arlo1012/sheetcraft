@@ -1,0 +1,35 @@
+$ vitest run --config vitest.config.ts src/tests/charts/native-columns.test.ts src/tests/charts/native-column-options.test.ts src/tests/pivot-tables/native-charts.test.ts src/tests/pivot-tables/native-chart-import.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+ ❯ src/tests/pivot-tables/native-charts.test.ts (13 tests | 1 failed) 243ms
+     × omits unsupported ordinary-without-category-header without dangling chart parts 18ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/pivot-tables/native-charts.test.ts > native linked PivotChart export > omits unsupported ordinary-without-category-header without dangling chart parts
+AssertionError: expected [ 'xl/charts/chart1.xml' ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ src/tests/pivot-tables/native-charts.test.ts:212:40
+    210|       filename: mode === "empty-filename" ? "" : "workbook.xlsx",
+    211|     });
+    212|     expect(parts(result.bytes).charts).toHaveLength(0);
+       |                                        ^
+    213|     expect(result.report.issues).toContainEqual(
+    214|       expect.objectContaining({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 120 passed (121)
+   Start at  12:08:35
+   Duration  6.44s (transform 1.28s, setup 0ms, import 2.58s, tests 3.47s, environment 0ms)
+
+error: script "test" exited with code 1

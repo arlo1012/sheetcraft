@@ -54,7 +54,11 @@ export function writeNativeColumnChart(
   report?.add("style-omitted", "warning", `${issuePath}.style`);
 }
 
-export function ordinaryColumnChartSource(workbook: Workbook, sheet: Sheet, input: SheetChart) {
+export function ordinaryColumnChartSource(
+  workbook: Workbook,
+  sheet: Sheet,
+  input: SheetChart,
+): ColumnChartSource | undefined {
   let chart: SheetChart;
   try {
     chart = normalizeSheetChart(input);
@@ -68,49 +72,93 @@ export function ordinaryColumnChartSource(workbook: Workbook, sheet: Sheet, inpu
     chart.dataCache !== undefined ||
     chart.type !== "column" ||
     chart.stacked ||
-    !chart.headerRow ||
-    !chart.headerColumn ||
-    chart.seriesBy !== "columns" ||
-    range.end.row <= range.start.row ||
-    range.end.column <= range.start.column ||
     (range.end.row - range.start.row + 1) * (range.end.column - range.start.column + 1) > 10000 ||
     ![sheet.name, chart.title].every(validXmlText)
   )
     return;
-  const rows = Array.from(
-    { length: range.end.row - range.start.row },
-    (_, index) => range.start.row + 1 + index,
-  );
+  const firstRow = range.start.row + Number(chart.headerRow);
+  const firstColumn = range.start.column + Number(chart.headerColumn);
+  if (firstRow > range.end.row || firstColumn > range.end.column) return;
+  // With no label references, one cell carries no evidence of the explicit
+  // rows/columns option. Do not silently invent a direction on a roundtrip.
+  if (
+    !chart.headerRow &&
+    !chart.headerColumn &&
+    firstRow === range.end.row &&
+    firstColumn === range.end.column
+  )
+    return;
+  const rows = Array.from({ length: range.end.row - firstRow + 1 }, (_, index) => firstRow + index);
   const columns = Array.from(
-    { length: range.end.column - range.start.column },
-    (_, index) => range.start.column + 1 + index,
+    { length: range.end.column - firstColumn + 1 },
+    (_, index) => firstColumn + index,
   );
   // Compact visible cells cannot be represented by this contiguous native range.
   if (
     !chart.showHidden &&
-    (rows.some((row) => sheet.hiddenRows?.has(row)) ||
-      columns.some((column) => sheet.hiddenColumns?.has(column)) ||
-      sheet.hiddenRows?.has(range.start.row) ||
-      sheet.hiddenColumns?.has(range.start.column))
+    (Array.from(
+      { length: range.end.row - range.start.row + 1 },
+      (_, i) => range.start.row + i,
+    ).some((row) => sheet.hiddenRows?.has(row)) ||
+      Array.from(
+        { length: range.end.column - range.start.column + 1 },
+        (_, i) => range.start.column + i,
+      ).some((column) => sheet.hiddenColumns?.has(column)))
   )
     return;
+  const byColumns = chart.seriesBy === "columns";
+  const valueRanges = byColumns
+    ? columns.map((column) => ({
+        start: { row: firstRow, column },
+        end: { row: range.end.row, column },
+      }))
+    : rows.map((row) => ({
+        start: { row, column: firstColumn },
+        end: { row, column: range.end.column },
+      }));
+  const nameRanges = byColumns
+    ? columns.map((column) =>
+        chart.headerRow
+          ? { start: { row: range.start.row, column }, end: { row: range.start.row, column } }
+          : null,
+      )
+    : rows.map((row) =>
+        chart.headerColumn
+          ? { start: { row, column: range.start.column }, end: { row, column: range.start.column } }
+          : null,
+      );
+  const categoryRange = byColumns
+    ? chart.headerColumn
+      ? {
+          start: { row: firstRow, column: range.start.column },
+          end: { row: range.end.row, column: range.start.column },
+        }
+      : null
+    : chart.headerRow
+      ? {
+          start: { row: range.start.row, column: firstColumn },
+          end: { row: range.start.row, column: range.end.column },
+        }
+      : null;
   const evaluator = createWorkbookEvaluator(workbook, sheet.id);
-  // This slice proves text category/header references, not native date/numeric axes.
+  // This slice proves text/blank labels, not native date/numeric category axes.
+  const labelCells = nameRanges.flatMap((span) => (span ? [span.start] : []));
+  if (categoryRange) {
+    for (let row = categoryRange.start.row; row <= categoryRange.end.row; row++)
+      for (let column = categoryRange.start.column; column <= categoryRange.end.column; column++)
+        labelCells.push({ row, column });
+  }
   if (
-    rows.some((row) => {
-      const value = evaluator.getComputedValue({ row, column: range.start.column });
-      return value !== null && typeof value !== "string";
-    }) ||
-    columns.some((column) => {
-      const value = evaluator.getComputedValue({ row: range.start.row, column });
+    labelCells.some((cell) => {
+      const value = evaluator.getComputedValue(cell);
       return value !== null && typeof value !== "string";
     })
   )
     return;
   const data = getSheetChartData(sheet, chart, evaluator);
   if (
-    data.categories.length !== rows.length ||
-    data.series.length !== columns.length ||
+    data.categories.length !== (byColumns ? rows.length : columns.length) ||
+    data.series.length !== valueRanges.length ||
     !data.series.some((series) => series.values.some((value) => value !== null)) ||
     [...data.categories, ...data.series.map((series) => series.name)].some(
       (value) => value.length > 32767 || !validXmlText(value),
@@ -119,10 +167,9 @@ export function ordinaryColumnChartSource(workbook: Workbook, sheet: Sheet, inpu
     return;
   return {
     data,
-    rows,
-    columns,
-    headerRow: range.start.row,
-    categoryColumn: range.start.column,
+    valueRanges,
+    nameRanges,
+    categoryRange,
     names: data.series.map((series) => series.name),
   };
 }

@@ -101,6 +101,15 @@ Do not substitute a mocked visual pass or repeat broad format matrices.
 
 ## Compatibility workflow and sources
 
+The ordinary clustered-column continuation now carries the existing two series
+directions and independent header flags. Actual WPS and Excel formal product
+eight-sheet matrices passed live edit and save/reopen. Row-oriented header
+captions were corrected without changing Core commands. WPS text-value cache zero
+normalization is source-proven and explicitly warned; empty-string cached zeros
+in disabled-header saved charts remain omissions. Empty labels and genuine missing
+numeric cells in both-header row/column charts retain their semantics. See the
+[exact options acceptance and limits](../acceptance/native-column-options-20261010.md).
+
 For a compatibility discrepancy, create the smallest synthetic workbook in WPS
 or Excel, export through the supported flow, compare actual OOXML with the product,
 isolate one cause, add a focused regression, then verify the fix in the real app.

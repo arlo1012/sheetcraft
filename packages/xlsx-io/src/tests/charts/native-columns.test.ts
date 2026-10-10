@@ -121,9 +121,6 @@ describe("ordinary native clustered-column charts", () => {
   });
 
   test.each([
-    "rows",
-    "no-header",
-    "no-category-header",
     "stacked",
     "rotated",
     "detached",
@@ -137,9 +134,6 @@ describe("ordinary native clustered-column charts", () => {
     "out-of-bounds-anchor",
   ])("omits unsupported %s without dangling parts", async (mode) => {
     const f = nativeColumnFixture();
-    if (mode === "rows") f.drawing.chart.seriesBy = "rows";
-    if (mode === "no-header") f.drawing.chart.headerRow = false;
-    if (mode === "no-category-header") f.drawing.chart.headerColumn = false;
     if (mode === "stacked") f.drawing.chart.stacked = true;
     if (mode === "rotated") f.drawing.rotation = 30;
     if (mode === "detached")

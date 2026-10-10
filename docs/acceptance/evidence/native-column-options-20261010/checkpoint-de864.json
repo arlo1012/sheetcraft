@@ -1,0 +1,57 @@
+{
+  "repository": "arlo1012/sheetcraft",
+  "branch": "refactor/native-xlsx-20261009",
+  "head": "de864504e39e2eab95283f523ce253197b60599f",
+  "parent": "e513272666288f9bdbf52c08a5fe6aa38d94411a",
+  "tree": "242178d8323fdaefcaf90625c53b1bc8c45c8423",
+  "paths": 42,
+  "remoteVerified": true,
+  "force": false,
+  "localIndexMatchesRemoteTree": true,
+  "unpreservedDiff": false,
+  "author": {
+    "name": "arlo.wang",
+    "email": "75329932+arlo1012@users.noreply.github.com",
+    "date": "2026-10-10T18:52:43Z"
+  },
+  "committer": {
+    "name": "arlo.wang",
+    "email": "75329932+arlo1012@users.noreply.github.com",
+    "date": "2026-10-10T18:52:43Z"
+  },
+  "checks": {
+    "xlsxFull": {
+      "files": 76,
+      "tests": 996,
+      "pass": true
+    },
+    "focused": {
+      "files": 4,
+      "tests": 132,
+      "pass": true
+    },
+    "types": true,
+    "build": true,
+    "scopedLint": true,
+    "scopedFormat": true,
+    "webTypes": true,
+    "scriptStrictTypes": true,
+    "architectureAggregate": {
+      "pass": false,
+      "diagnostics": 125,
+      "newAgainstE513": 0
+    },
+    "remoteStatuses": [],
+    "remoteCheckRuns": []
+  },
+  "gui": {
+    "ordinaryWpsExcelFirstOpenLiveEditSaveCloseReopen": "pass; source/chart100 to110 without Refresh",
+    "actualWpsSavedReimportReexportExcel": "pass; live rectangle110 and no repair",
+    "actualWpsNativeProducerReexportWps": "pass; 100/category order; implicit default title not recreated",
+    "excelSavedFileDownloaded": false
+  },
+  "newGuiBinaryOrXmlOrScreenshotPublished": false,
+  "recoveryEntry": "docs/handoff/2026-10-10/RESUME.md",
+  "scope": "ordinary clustered column only; both headers, series by columns, text/blank categories; no full insert completion",
+  "review": "ordinary contract readonly inspection complete; no new adversarial import review; earlier stopped PivotChart review not repeated"
+}

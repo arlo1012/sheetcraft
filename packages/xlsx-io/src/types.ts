@@ -14,6 +14,7 @@ export type XlsxCompatibilityCode =
   | "macro-content"
   | "drawing-or-media"
   | "external-content"
+  | "chart-cache-normalized"
   | "formula-cache-discarded"
   | "formula-not-calculated"
   | "filter-omitted"

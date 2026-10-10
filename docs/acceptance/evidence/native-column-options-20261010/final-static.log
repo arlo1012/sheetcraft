@@ -1,0 +1,12 @@
+Final source checks; UTC 2026-10-10T19:25Z; test process local clock differs
+$ bun run --filter @sheetcraft/xlsx-io typecheck
+@sheetcraft/xlsx-io typecheck: Exited with code 0
+$ bun run --filter @sheetcraft/xlsx-io build
+@sheetcraft/xlsx-io build: Exited with code 0
+$ bun run --filter @sheetcraft/web typecheck
+@sheetcraft/web typecheck: Exited with code 0
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 272ms on 20 files using 9 threads.
+All preceding owned static checks exit 0

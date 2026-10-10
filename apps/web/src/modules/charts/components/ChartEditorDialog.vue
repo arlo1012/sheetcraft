@@ -108,11 +108,15 @@ const options = computed(() => types.map((type) => ({ label: t(`chart.${type}`),
         <Checkbox
           v-model="draft.chart.headerRow"
           :disabled="!!draft.chart.pivotTableId || !!draft.chart.dataCache"
-          >{{ t("chart.headerRow") }}</Checkbox
+          >{{
+            t(draft.chart.seriesBy === "rows" ? "chart.headerRowCategories" : "chart.headerRow")
+          }}</Checkbox
         ><Checkbox
           v-model="draft.chart.headerColumn"
           :disabled="!!draft.chart.pivotTableId || !!draft.chart.dataCache"
-          >{{ t("chart.headerColumn") }}</Checkbox
+          >{{
+            t(draft.chart.seriesBy === "rows" ? "chart.headerColumnSeries" : "chart.headerColumn")
+          }}</Checkbox
         ><Checkbox
           :checked="draft.chart.seriesBy === 'rows'"
           :disabled="!!draft.chart.pivotTableId || !!draft.chart.dataCache"

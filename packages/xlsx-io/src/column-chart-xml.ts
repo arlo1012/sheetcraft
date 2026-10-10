@@ -2,7 +2,7 @@ import { strToU8 } from "fflate/browser";
 import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import type { ChartData } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
-import type { Workbook } from "@sheetcraft/core/workbook";
+import type { CellRange, Workbook } from "@sheetcraft/core/workbook";
 import { toExcelNumberFormat } from "./number-format.js";
 import { xml } from "./pivot-xml.js";
 
@@ -11,10 +11,9 @@ const ART_NS = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 export type ColumnChartSource = {
   data: ChartData;
-  rows: number[];
-  columns: number[];
-  headerRow: number;
-  categoryColumn: number;
+  valueRanges: CellRange[];
+  nameRanges: Array<CellRange | null>;
+  categoryRange: CellRange | null;
   names: string[];
 };
 
@@ -32,12 +31,13 @@ export function validXmlText(value: string): boolean {
   });
 }
 
-function reference(sheet: string, startRow: number, endRow: number, column: number): string {
+export function columnChartReference(sheet: string, range: CellRange): string {
   const prefix = `'${sheet.replace(/'/g, "''")}'!`;
-  const absolute = (row: number) =>
-    formatCellAddress({ row, column }).replace(/^([A-Z]+)(\d+)$/, "$$$1$$$2");
-  const first = absolute(startRow);
-  return `${prefix}${first}${startRow === endRow ? "" : `:${absolute(endRow)}`}`;
+  const absolute = (cell: CellRange["start"]) =>
+    formatCellAddress(cell).replace(/^([A-Z]+)(\d+)$/, "$$$1$$$2");
+  const first = absolute(range.start);
+  const last = absolute(range.end);
+  return `${prefix}${first}${first === last ? "" : `:${last}`}`;
 }
 
 function stringCache(values: readonly string[]): string {
@@ -53,13 +53,18 @@ export function columnChartXml(
   source: ColumnChartSource,
   pivotIdentity?: string,
 ): Uint8Array {
-  const firstRow = source.rows[0]!;
-  const lastRow = source.rows.at(-1)!;
-  const categoryReference = reference(sheetName, firstRow, lastRow, source.categoryColumn);
+  const category = source.categoryRange
+    ? `<c:cat><c:strRef><c:f>${xml(columnChartReference(sheetName, source.categoryRange))}</c:f><c:strCache>${stringCache(source.data.categories)}</c:strCache></c:strRef></c:cat>`
+    : "";
   const series = source.data.series
     .map((series, index) => {
-      const column = source.columns[index]!;
       const name = source.names[index]!;
+      const nameRange = source.nameRanges[index]!;
+      // WPS's Edit Series producer uses a quoted string constant when no
+      // worksheet title cell exists. Only generated Core index names use it.
+      const nameReference = nameRange
+        ? columnChartReference(sheetName, nameRange)
+        : JSON.stringify(name);
       const numberFormat = series.numberFormat
         ? toExcelNumberFormat(series.numberFormat)
         : "General";
@@ -68,7 +73,7 @@ export function columnChartXml(
           value === null ? [] : [`<c:pt idx="${point}"><c:v>${value}</c:v></c:pt>`],
         )
         .join("");
-      return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/><c:tx><c:strRef><c:f>${xml(reference(sheetName, source.headerRow, source.headerRow, column))}</c:f><c:strCache>${stringCache([name])}</c:strCache></c:strRef></c:tx><c:spPr><a:solidFill><a:schemeClr val="accent${(index % 6) + 1}"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr><c:invertIfNegative val="0"/><c:cat><c:strRef><c:f>${xml(categoryReference)}</c:f><c:strCache>${stringCache(source.data.categories)}</c:strCache></c:strRef></c:cat><c:val><c:numRef><c:f>${xml(reference(sheetName, firstRow, lastRow, column))}</c:f><c:numCache><c:formatCode>${xml(numberFormat)}</c:formatCode><c:ptCount val="${source.rows.length}"/>${points}</c:numCache></c:numRef></c:val></c:ser>`;
+      return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/><c:tx><c:strRef><c:f>${xml(nameReference)}</c:f><c:strCache>${stringCache([name])}</c:strCache></c:strRef></c:tx><c:spPr><a:solidFill><a:schemeClr val="accent${(index % 6) + 1}"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr><c:invertIfNegative val="0"/>${category}<c:val><c:numRef><c:f>${xml(columnChartReference(sheetName, source.valueRanges[index]!))}</c:f><c:numCache><c:formatCode>${xml(numberFormat)}</c:formatCode><c:ptCount val="${source.data.categories.length}"/>${points}</c:numCache></c:numRef></c:val></c:ser>`;
     })
     .join("");
   const title = drawing.chart.title

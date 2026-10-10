@@ -60,7 +60,22 @@ function chartSource(
     names.some((name) => !validXmlText(name))
   )
     return;
-  return { data, rows, columns, headerRow, categoryColumn: pivot.anchor.column, names };
+  return {
+    data,
+    valueRanges: columns.map((column) => ({
+      start: { row: rows[0]!, column },
+      end: { row: rows.at(-1)!, column },
+    })),
+    nameRanges: columns.map((column) => ({
+      start: { row: headerRow, column },
+      end: { row: headerRow, column },
+    })),
+    categoryRange: {
+      start: { row: rows[0]!, column: pivot.anchor.column },
+      end: { row: rows.at(-1)!, column: pivot.anchor.column },
+    },
+    names,
+  };
 }
 
 /** Export only populated, genuine linked clustered-column reports in this slice. */

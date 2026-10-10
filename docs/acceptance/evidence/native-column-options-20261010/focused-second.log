@@ -1,0 +1,35 @@
+$ vitest run --config vitest.config.ts src/tests/charts/native-columns.test.ts src/tests/charts/native-column-options.test.ts src/tests/pivot-tables/native-charts.test.ts src/tests/pivot-tables/native-chart-import.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+ ❯ src/tests/charts/native-column-options.test.ts (27 tests | 1 failed) 947ms
+     × does not invent generated labels from absent-name native title 22ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/charts/native-column-options.test.ts > native column source options > does not invent generated labels from absent-name native title
+AssertionError: expected [ { …(19) } ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ src/tests/charts/native-column-options.test.ts:179:72
+    177|       entries["xl/charts/chart1.xml"] = strToU8(changed);
+    178|       const decoded = await decodeXlsx(zipSync(entries));
+    179|       expect([...decoded.workbook.sheets.values()][0]!.drawings ?? [])…
+       |                                                                        ^
+    180|       expect(decoded.report.issues.some((item) => item.code === "featu…
+    181|     },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  1 failed | 146 passed (147)
+   Start at  12:09:34
+   Duration  7.97s (transform 1.48s, setup 0ms, import 3.21s, tests 4.23s, environment 0ms)
+
+error: script "test" exited with code 1
