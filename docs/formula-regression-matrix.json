@@ -660,7 +660,7 @@
         "aboveMaximumTest": "n/a: variadic registry contract"
       },
       "coercion": {
-        "observedInputs": ["numeric", "text", "array", "omitted"],
+        "observedInputs": ["numeric", "omitted", "array", "text"],
         "strictNumericTypedErrorTests": null,
         "typedReferenceVariant": null,
         "scope": "Only linked input types are evidenced. No complete Excel/WPS coercion claim.",
@@ -680,31 +680,6 @@
       "references": {
         "applicable": true,
         "scenarios": [
-          {
-            "file": "packages/core/src/tests/formula/workbook-evaluate.test.ts",
-            "line": 48,
-            "formula": "=SUM(A1:K900001)"
-          },
-          {
-            "file": "packages/core/src/tests/formula/workbook-evaluate.test.ts",
-            "line": 246,
-            "formula": "=SUM(A1:A1)"
-          },
-          {
-            "file": "packages/core/src/tests/formula/structured-tables.test.ts",
-            "line": 243,
-            "formula": "=SUM(A2:A3)"
-          },
-          {
-            "file": "packages/core/src/tests/formula/structured-tables.test.ts",
-            "line": 245,
-            "formula": "=SUM(Sales!A2:A3)"
-          },
-          {
-            "file": "packages/core/src/tests/formula/workbook-cross-sheet.test.ts",
-            "line": 31,
-            "formula": "=SUM('Data Set'!A1:A2)^2+'Data Set'!A1%"
-          },
           {
             "file": "packages/core/src/tests/formula/autosum.test.ts",
             "line": 26,
@@ -766,6 +741,31 @@
             "formula": "=SUM(A1:B2)"
           },
           {
+            "file": "packages/core/src/tests/formula/structured-tables.test.ts",
+            "line": 243,
+            "formula": "=SUM(A2:A3)"
+          },
+          {
+            "file": "packages/core/src/tests/formula/structured-tables.test.ts",
+            "line": 245,
+            "formula": "=SUM(Sales!A2:A3)"
+          },
+          {
+            "file": "packages/core/src/tests/formula/workbook-cross-sheet.test.ts",
+            "line": 31,
+            "formula": "=SUM('Data Set'!A1:A2)^2+'Data Set'!A1%"
+          },
+          {
+            "file": "packages/core/src/tests/formula/workbook-evaluate.test.ts",
+            "line": 48,
+            "formula": "=SUM(A1:K900001)"
+          },
+          {
+            "file": "packages/core/src/tests/formula/workbook-evaluate.test.ts",
+            "line": 246,
+            "formula": "=SUM(A1:A1)"
+          },
+          {
             "file": "packages/core/src/tests/formula/workbook-spill.test.ts",
             "line": 27,
             "formula": "=SUM(A1:A3)"
@@ -798,10 +798,27 @@
       "boundaries": {
         "arity": "automated per-function registry boundary checks",
         "formulaCases": [
-          "=SUM(A1:K900001)",
-          "=SUM(A:A)",
-          "=SUM(A1:A1)",
-          "=SUM(Total)/2",
+          "=SUM(C2:C4)",
+          "=SUM(A6:C6)",
+          "=SUM(A5:A5)",
+          "=SUM(SEQUENCE(3))",
+          "=SUM(A1:B2) + (A1 * 2) - B1 / 5",
+          "=SUM(B2:A1)",
+          "=SUM(A1,B1,C1,A2)",
+          "=SUM(A1:B2)",
+          "=SUM(1,,2)",
+          "=SUM(1,)",
+          "=SUM(A1#)",
+          "=SUM(Table1[Amount])",
+          "=SUM(1e308, 1e308)",
+          "=SUM(B2 + 1)",
+          "=SUM(A1)",
+          "=SUM(SEQUENCE(3))",
+          "=SUM(SEQUENCE(2),{3;4})",
+          "=SUM(SEQUENCE(2),{3;#N/A})",
+          "=SUM(A1:B2)",
+          "=SUM(A1:B2)",
+          "=SUM(1,2)",
           "=SUM(SalesTable[Amount])",
           "=SUM(SalesTable[Amount])",
           "=SUM(SalesTable[Amount])",
@@ -822,31 +839,14 @@
           "=SUM(Plan)",
           "=SUM(Budget)",
           "=SUM(Revenue)",
-          "=SUM(SEQUENCE(3))",
-          "=SUM(SEQUENCE(3))",
-          "=SUM(SEQUENCE(2),{3;4})",
-          "=SUM(SEQUENCE(2),{3;#N/A})",
-          "=SUM(C2:C4)",
-          "=SUM(A6:C6)",
-          "=SUM(A5:A5)",
+          "=SUM(A1:K900001)",
+          "=SUM(A:A)",
+          "=SUM(A1:A1)",
+          "=SUM(Total)/2",
           "=SUM(Data!$A:A)+SUM(Data!1:$2)",
           "=SUM(Renamed!$A:A)+SUM(Renamed!1:$2)",
           "=SUM(Data!$A:$B)+SUM(Data!1:2)",
           "=SUM(Data!$B:$B)+SUM(Data!2:2)",
-          "=SUM(A1:B2) + (A1 * 2) - B1 / 5",
-          "=SUM(B2:A1)",
-          "=SUM(A1,B1,C1,A2)",
-          "=SUM(A1:B2)",
-          "=SUM(1,,2)",
-          "=SUM(1,)",
-          "=SUM(A1#)",
-          "=SUM(Table1[Amount])",
-          "=SUM(1e308, 1e308)",
-          "=SUM(B2 + 1)",
-          "=SUM(A1)",
-          "=SUM(A1:B2)",
-          "=SUM(A1:B2)",
-          "=SUM(1,2)",
           "=SUM(A1:A3)",
           "=SUM(A1#)",
           "=SUM(A2:A3)",
@@ -860,10 +860,27 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
-        "packages/core/src/tests/formula/workbook-evaluate.test.ts#L48",
-        "packages/core/src/tests/formula/workbook-evaluate.test.ts#L94",
-        "packages/core/src/tests/formula/workbook-evaluate.test.ts#L246",
-        "packages/core/src/tests/formula/workbook-iteration.test.ts#L55",
+        "packages/core/src/tests/formula/autosum.test.ts#L26",
+        "packages/core/src/tests/formula/autosum.test.ts#L35",
+        "packages/core/src/tests/formula/autosum.test.ts#L46",
+        "packages/core/src/tests/formula/dynamic-array.test.ts#L90",
+        "packages/core/src/tests/formula/evaluate.test.ts#L32",
+        "packages/core/src/tests/formula/evaluate.test.ts#L45",
+        "packages/core/src/tests/formula/evaluate.test.ts#L58",
+        "packages/core/src/tests/formula/evaluate.test.ts#L59",
+        "packages/core/src/tests/formula/evaluate.test.ts#L63",
+        "packages/core/src/tests/formula/evaluate.test.ts#L64",
+        "packages/core/src/tests/formula/evaluate.test.ts#L73",
+        "packages/core/src/tests/formula/evaluate.test.ts#L95",
+        "packages/core/src/tests/formula/evaluate.test.ts#L137",
+        "packages/core/src/tests/formula/evaluate.test.ts#L145",
+        "packages/core/src/tests/formula/evaluate.test.ts#L147",
+        "packages/core/src/tests/formula/math-statistical-database.test.ts#L81",
+        "packages/core/src/tests/formula/math-statistical-database.test.ts#L85",
+        "packages/core/src/tests/formula/math-statistical-database.test.ts#L86",
+        "packages/core/src/tests/formula/runtime-functions.test.ts#L48",
+        "packages/core/src/tests/formula/runtime-functions.test.ts#L54",
+        "packages/core/src/tests/formula/runtime-functions.test.ts#L121",
         "packages/core/src/tests/formula/structured-tables.test.ts#L73",
         "packages/core/src/tests/formula/structured-tables.test.ts#L93",
         "packages/core/src/tests/formula/structured-tables.test.ts#L158",
@@ -884,31 +901,14 @@
         "packages/core/src/tests/formula/workbook-cross-sheet.test.ts#L309",
         "packages/core/src/tests/formula/workbook-cross-sheet.test.ts#L327",
         "packages/core/src/tests/formula/workbook-cross-sheet.test.ts#L398",
-        "packages/core/src/tests/formula/dynamic-array.test.ts#L90",
-        "packages/core/src/tests/formula/math-statistical-database.test.ts#L81",
-        "packages/core/src/tests/formula/math-statistical-database.test.ts#L85",
-        "packages/core/src/tests/formula/math-statistical-database.test.ts#L86",
-        "packages/core/src/tests/formula/autosum.test.ts#L26",
-        "packages/core/src/tests/formula/autosum.test.ts#L35",
-        "packages/core/src/tests/formula/autosum.test.ts#L46",
+        "packages/core/src/tests/formula/workbook-evaluate.test.ts#L48",
+        "packages/core/src/tests/formula/workbook-evaluate.test.ts#L94",
+        "packages/core/src/tests/formula/workbook-evaluate.test.ts#L246",
+        "packages/core/src/tests/formula/workbook-iteration.test.ts#L55",
         "packages/core/src/tests/formula/workbook-references.test.ts#L158",
         "packages/core/src/tests/formula/workbook-references.test.ts#L168",
         "packages/core/src/tests/formula/workbook-references.test.ts#L181",
         "packages/core/src/tests/formula/workbook-references.test.ts#L190",
-        "packages/core/src/tests/formula/evaluate.test.ts#L32",
-        "packages/core/src/tests/formula/evaluate.test.ts#L45",
-        "packages/core/src/tests/formula/evaluate.test.ts#L58",
-        "packages/core/src/tests/formula/evaluate.test.ts#L59",
-        "packages/core/src/tests/formula/evaluate.test.ts#L63",
-        "packages/core/src/tests/formula/evaluate.test.ts#L64",
-        "packages/core/src/tests/formula/evaluate.test.ts#L73",
-        "packages/core/src/tests/formula/evaluate.test.ts#L95",
-        "packages/core/src/tests/formula/evaluate.test.ts#L137",
-        "packages/core/src/tests/formula/evaluate.test.ts#L145",
-        "packages/core/src/tests/formula/evaluate.test.ts#L147",
-        "packages/core/src/tests/formula/runtime-functions.test.ts#L48",
-        "packages/core/src/tests/formula/runtime-functions.test.ts#L54",
-        "packages/core/src/tests/formula/runtime-functions.test.ts#L121",
         "packages/core/src/tests/formula/workbook-spill.test.ts#L27",
         "packages/core/src/tests/formula/workbook-spill.test.ts#L28",
         "packages/core/src/tests/formula/workbook-spill.test.ts#L29",
@@ -5551,7 +5551,7 @@
         "aboveMaximumTest": "packages/core/src/tests/formula/registry-coverage.test.ts: above maximum arity returns VALUE"
       },
       "coercion": {
-        "observedInputs": ["logical", "numeric", "array"],
+        "observedInputs": ["numeric", "logical", "array"],
         "strictNumericTypedErrorTests": null,
         "typedReferenceVariant": null,
         "scope": "Only linked input types are evidenced. No complete Excel/WPS coercion claim.",
@@ -5571,6 +5571,11 @@
       "references": {
         "applicable": true,
         "scenarios": [
+          {
+            "file": "packages/core/src/tests/formula/workbook-cross-sheet.test.ts",
+            "line": 101,
+            "formula": "=IF(TRUE,Data!A1,0)"
+          },
           {
             "file": "packages/core/src/tests/formula/workbook-evaluate.test.ts",
             "line": 113,
@@ -5627,11 +5632,6 @@
             "formula": "=IF(FALSE,B1,7)"
           },
           {
-            "file": "packages/core/src/tests/formula/workbook-cross-sheet.test.ts",
-            "line": 101,
-            "formula": "=IF(TRUE,Data!A1,0)"
-          },
-          {
             "file": "packages/core/src/tests/formula/workbook-spill.test.ts",
             "line": 53,
             "formula": "=IF({TRUE;FALSE},B1,C1)"
@@ -5644,6 +5644,11 @@
       "boundaries": {
         "arity": "automated per-function registry boundary checks",
         "formulaCases": [
+          "=IF(SEQUENCE(3)>1,SEQUENCE(3)*10,0)",
+          "=IF(FALSE,#REF!,42)",
+          "=IF(FALSE,1/0,42)",
+          "=IF(TRUE,42,1/0)",
+          "=IF(TRUE,Data!A1,0)",
           "=IF(FALSE,A1,42)",
           "=1+IF(FALSE,A1,42)",
           "=IF(IFERROR(42,A1),1,0)",
@@ -5655,11 +5660,6 @@
           "=IF(B1>0,A1,42)",
           "=IF(B1>0,A1,42)",
           "=IF(FALSE,B1,7)",
-          "=IF(TRUE,Data!A1,0)",
-          "=IF(SEQUENCE(3)>1,SEQUENCE(3)*10,0)",
-          "=IF(FALSE,#REF!,42)",
-          "=IF(FALSE,1/0,42)",
-          "=IF(TRUE,42,1/0)",
           "=IF({TRUE;FALSE},B1,C1)"
         ],
         "exhaustive": false
@@ -5668,6 +5668,11 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
+        "packages/core/src/tests/formula/dynamic-array.test.ts#L85",
+        "packages/core/src/tests/formula/evaluate.test.ts#L113",
+        "packages/core/src/tests/formula/runtime-functions.test.ts#L34",
+        "packages/core/src/tests/formula/runtime-functions.test.ts#L35",
+        "packages/core/src/tests/formula/workbook-cross-sheet.test.ts#L101",
         "packages/core/src/tests/formula/workbook-evaluate.test.ts#L113",
         "packages/core/src/tests/formula/workbook-evaluate.test.ts#L135",
         "packages/core/src/tests/formula/workbook-evaluate.test.ts#L142",
@@ -5679,11 +5684,6 @@
         "packages/core/src/tests/formula/workbook-evaluate.test.ts#L201",
         "packages/core/src/tests/formula/workbook-evaluate.test.ts#L216",
         "packages/core/src/tests/formula/workbook-iteration.test.ts#L66",
-        "packages/core/src/tests/formula/workbook-cross-sheet.test.ts#L101",
-        "packages/core/src/tests/formula/dynamic-array.test.ts#L85",
-        "packages/core/src/tests/formula/evaluate.test.ts#L113",
-        "packages/core/src/tests/formula/runtime-functions.test.ts#L34",
-        "packages/core/src/tests/formula/runtime-functions.test.ts#L35",
         "packages/core/src/tests/formula/workbook-spill.test.ts#L53"
       ],
       "existingScenarioCount": 17,
@@ -5739,7 +5739,7 @@
         "aboveMaximumTest": "packages/core/src/tests/formula/registry-coverage.test.ts: above maximum arity returns VALUE"
       },
       "coercion": {
-        "observedInputs": ["numeric", "logical", "text"],
+        "observedInputs": ["text", "numeric", "logical"],
         "strictNumericTypedErrorTests": null,
         "typedReferenceVariant": null,
         "scope": "Only linked input types are evidenced. No complete Excel/WPS coercion claim.",
@@ -5796,15 +5796,15 @@
       "boundaries": {
         "arity": "automated per-function registry boundary checks",
         "formulaCases": [
+          "=IFERROR(1/0,\"fallback\")",
+          "=IFERROR(42,1/0)",
           "=IFERROR(42,A1)",
           "=IF(IFERROR(42,A1),1,0)",
           "=IF(TRUE,IFERROR(B1,A1),0)",
           "=IFERROR(IF(TRUE,B1+B1,0),A1)",
           "=IFERROR(IF(FALSE,A1,B1),0)",
           "=IFERROR(IF(FALSE,B1,A1),0)",
-          "=IFERROR(B1,A1)",
-          "=IFERROR(1/0,\"fallback\")",
-          "=IFERROR(42,1/0)"
+          "=IFERROR(B1,A1)"
         ],
         "exhaustive": false
       },
@@ -5813,15 +5813,15 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
+        "packages/core/src/tests/formula/runtime-functions.test.ts#L36",
+        "packages/core/src/tests/formula/runtime-functions.test.ts#L37",
         "packages/core/src/tests/formula/workbook-evaluate.test.ts#L124",
         "packages/core/src/tests/formula/workbook-evaluate.test.ts#L142",
         "packages/core/src/tests/formula/workbook-evaluate.test.ts#L157",
         "packages/core/src/tests/formula/workbook-evaluate.test.ts#L175",
         "packages/core/src/tests/formula/workbook-evaluate.test.ts#L182",
         "packages/core/src/tests/formula/workbook-evaluate.test.ts#L189",
-        "packages/core/src/tests/formula/workbook-evaluate.test.ts#L209",
-        "packages/core/src/tests/formula/runtime-functions.test.ts#L36",
-        "packages/core/src/tests/formula/runtime-functions.test.ts#L37"
+        "packages/core/src/tests/formula/workbook-evaluate.test.ts#L209"
       ],
       "existingScenarioCount": 9,
       "addedIndependentCase": null,
@@ -6697,7 +6697,7 @@
       },
       "boundaries": {
         "arity": "automated per-function registry boundary checks",
-        "formulaCases": ["=AVERAGE(SEQUENCE(2,2))", "=AVERAGE(1e308,1e308)", "=AVERAGE(A1:B2)"],
+        "formulaCases": ["=AVERAGE(1e308,1e308)", "=AVERAGE(SEQUENCE(2,2))", "=AVERAGE(A1:B2)"],
         "exhaustive": false
       },
       "remainingCoverageGaps": [
@@ -6706,8 +6706,8 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
-        "packages/core/src/tests/formula/math-statistical-database.test.ts#L82",
         "packages/core/src/tests/formula/function-regressions.test.ts#L30",
+        "packages/core/src/tests/formula/math-statistical-database.test.ts#L82",
         "packages/core/src/tests/formula/runtime-functions.test.ts#L49"
       ],
       "existingScenarioCount": 3,
@@ -10575,7 +10575,7 @@
         "aboveMaximumTest": "packages/core/src/tests/formula/registry-coverage.test.ts: above maximum arity returns VALUE"
       },
       "coercion": {
-        "observedInputs": ["numeric", "omitted", "text"],
+        "observedInputs": ["omitted", "text", "numeric"],
         "strictNumericTypedErrorTests": null,
         "typedReferenceVariant": null,
         "scope": "Only linked input types are evidenced. No complete Excel/WPS coercion claim.",
@@ -10590,11 +10590,6 @@
         "applicable": true,
         "scenarios": [
           {
-            "file": "packages/core/src/tests/formula/math-statistical-database.test.ts",
-            "line": 139,
-            "formula": "=DCOUNT(D1:F4,2,H1:I3)"
-          },
-          {
             "file": "packages/core/src/tests/formula/database-functions.test.ts",
             "line": 97,
             "formula": "=DCOUNT(A1:B4,,E1:E2)"
@@ -10603,6 +10598,11 @@
             "file": "packages/core/src/tests/formula/database-functions.test.ts",
             "line": 125,
             "formula": "=DCOUNT(A1:C4,\"Amount\",E1:F2)"
+          },
+          {
+            "file": "packages/core/src/tests/formula/math-statistical-database.test.ts",
+            "line": 139,
+            "formula": "=DCOUNT(D1:F4,2,H1:I3)"
           }
         ],
         "typedReferenceVariant": null,
@@ -10612,9 +10612,9 @@
       "boundaries": {
         "arity": "automated per-function registry boundary checks",
         "formulaCases": [
-          "=DCOUNT(D1:F4,2,H1:I3)",
           "=DCOUNT(A1:B4,,E1:E2)",
-          "=DCOUNT(A1:C4,\"Amount\",E1:F2)"
+          "=DCOUNT(A1:C4,\"Amount\",E1:F2)",
+          "=DCOUNT(D1:F4,2,H1:I3)"
         ],
         "exhaustive": false
       },
@@ -10623,9 +10623,9 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
-        "packages/core/src/tests/formula/math-statistical-database.test.ts#L139",
         "packages/core/src/tests/formula/database-functions.test.ts#L97",
-        "packages/core/src/tests/formula/database-functions.test.ts#L125"
+        "packages/core/src/tests/formula/database-functions.test.ts#L125",
+        "packages/core/src/tests/formula/math-statistical-database.test.ts#L139"
       ],
       "existingScenarioCount": 3,
       "addedIndependentCase": null,
@@ -11379,11 +11379,6 @@
         "applicable": true,
         "scenarios": [
           {
-            "file": "packages/core/src/tests/formula/math-statistical-database.test.ts",
-            "line": 138,
-            "formula": "=DSUM(D1:F4,\"Amount\",H1:I3)"
-          },
-          {
             "file": "packages/core/src/tests/formula/database-functions.test.ts",
             "line": 36,
             "formula": "=DSUM(A1:B4,\"Amount\",E1:E2)"
@@ -11412,6 +11407,11 @@
             "file": "packages/core/src/tests/formula/database-functions.test.ts",
             "line": 124,
             "formula": "=DSUM(A1:C4,\"Amount\",E1:F2)"
+          },
+          {
+            "file": "packages/core/src/tests/formula/math-statistical-database.test.ts",
+            "line": 138,
+            "formula": "=DSUM(D1:F4,\"Amount\",H1:I3)"
           }
         ],
         "typedReferenceVariant": null,
@@ -11421,13 +11421,13 @@
       "boundaries": {
         "arity": "automated per-function registry boundary checks",
         "formulaCases": [
-          "=DSUM(D1:F4,\"Amount\",H1:I3)",
           "=DSUM(A1:B4,\"Amount\",E1:E2)",
           "=DSUM(A1:B4,\"Amount\",E1:E2)",
           "=DSUM(A1:B4,\"Amount\",E1:E2)",
           "=DSUM(A1:B4,\"Amount\",E1:E2)",
           "=DSUM(A1:B4,\"Amount\",E1:E2)",
-          "=DSUM(A1:C4,\"Amount\",E1:F2)"
+          "=DSUM(A1:C4,\"Amount\",E1:F2)",
+          "=DSUM(D1:F4,\"Amount\",H1:I3)"
         ],
         "exhaustive": false
       },
@@ -11436,13 +11436,13 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
-        "packages/core/src/tests/formula/math-statistical-database.test.ts#L138",
         "packages/core/src/tests/formula/database-functions.test.ts#L36",
         "packages/core/src/tests/formula/database-functions.test.ts#L39",
         "packages/core/src/tests/formula/database-functions.test.ts#L68",
         "packages/core/src/tests/formula/database-functions.test.ts#L81",
         "packages/core/src/tests/formula/database-functions.test.ts#L96",
-        "packages/core/src/tests/formula/database-functions.test.ts#L124"
+        "packages/core/src/tests/formula/database-functions.test.ts#L124",
+        "packages/core/src/tests/formula/math-statistical-database.test.ts#L138"
       ],
       "existingScenarioCount": 7,
       "addedIndependentCase": null,
@@ -11714,14 +11714,14 @@
         "applicable": true,
         "scenarios": [
           {
-            "file": "packages/core/src/tests/formula/workbook-spill.test.ts",
-            "line": 17,
-            "formula": "=SEQUENCE(2)+A2"
-          },
-          {
             "file": "packages/core/src/tests/formula/calculation-session/manual.test.ts",
             "line": 85,
             "formula": "=SEQUENCE(A1)"
+          },
+          {
+            "file": "packages/core/src/tests/formula/workbook-spill.test.ts",
+            "line": 17,
+            "formula": "=SEQUENCE(2)+A2"
           }
         ],
         "typedReferenceVariant": null,
@@ -11731,9 +11731,7 @@
       "boundaries": {
         "arity": "automated per-function registry boundary checks",
         "formulaCases": [
-          "=SEQUENCE(2,2)",
-          "=SEQUENCE(2)",
-          "=SEQUENCE(2)",
+          "=SEQUENCE(A1)",
           "=SEQUENCE(2,3,4,2)",
           "=SEQUENCE(3,,2)",
           "=SEQUENCE(3)*2",
@@ -11746,12 +11744,14 @@
           "=MIN(SEQUENCE(2,2))",
           "=SUM(SEQUENCE(2),{3;4})",
           "=SUM(SEQUENCE(2),{3;#N/A})",
+          "=SEQUENCE(2)",
+          "=SEQUENCE(2,2)",
+          "=SEQUENCE(2)",
           "=SEQUENCE(2)+A2",
           "=SEQUENCE(3)",
           "=SEQUENCE(2)",
           "=SEQUENCE(2,,10)",
-          "=SEQUENCE(2)",
-          "=SEQUENCE(A1)"
+          "=SEQUENCE(2)"
         ],
         "exhaustive": false
       },
@@ -11759,9 +11759,7 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
-        "packages/core/src/tests/formula/workbook-evaluate.test.ts#L59",
-        "packages/core/src/tests/formula/workbook-evaluate.test.ts#L81",
-        "packages/core/src/tests/formula/workbook-cross-sheet.test.ts#L72",
+        "packages/core/src/tests/formula/calculation-session/manual.test.ts#L85",
         "packages/core/src/tests/formula/dynamic-array.test.ts#L17",
         "packages/core/src/tests/formula/dynamic-array.test.ts#L31",
         "packages/core/src/tests/formula/dynamic-array.test.ts#L70",
@@ -11774,12 +11772,14 @@
         "packages/core/src/tests/formula/math-statistical-database.test.ts#L84",
         "packages/core/src/tests/formula/math-statistical-database.test.ts#L85",
         "packages/core/src/tests/formula/math-statistical-database.test.ts#L86",
+        "packages/core/src/tests/formula/workbook-cross-sheet.test.ts#L72",
+        "packages/core/src/tests/formula/workbook-evaluate.test.ts#L59",
+        "packages/core/src/tests/formula/workbook-evaluate.test.ts#L81",
         "packages/core/src/tests/formula/workbook-spill.test.ts#L17",
         "packages/core/src/tests/formula/workbook-spill.test.ts#L26",
         "packages/core/src/tests/formula/workbook-spill.test.ts#L39",
         "packages/core/src/tests/formula/workbook-spill.test.ts#L40",
-        "packages/core/src/tests/formula/workbook-spill.test.ts#L62",
-        "packages/core/src/tests/formula/calculation-session/manual.test.ts#L85"
+        "packages/core/src/tests/formula/workbook-spill.test.ts#L62"
       ],
       "existingScenarioCount": 21,
       "addedIndependentCase": null,
@@ -13408,8 +13408,8 @@
         "catalogSource": "apps/web/src/shared/formula-editing/function-catalog.ts"
       },
       "implementation": {
-        "file": "packages/core/src/formula/functions/engineering.ts",
-        "line": 379,
+        "file": "packages/core/src/formula/functions/information.ts",
+        "line": 91,
         "registry": "packages/core/src/formula/functions.ts",
         "runtime": "first-party Core"
       },
@@ -14173,11 +14173,6 @@
             "formula": "=MATCH(\"b\",A2:A3,0)"
           },
           {
-            "file": "packages/core/src/tests/formula/lookup-functions.test.ts",
-            "line": 101,
-            "formula": "=MATCH(3,A1:A3,0)"
-          },
-          {
             "file": "packages/core/src/tests/formula/function-regressions.test.ts",
             "line": 66,
             "formula": "=MATCH(\"ap*\",A1:A3,0)"
@@ -14186,6 +14181,11 @@
             "file": "packages/core/src/tests/formula/function-regressions.test.ts",
             "line": 67,
             "formula": "=MATCH(\"a~*\",A1:A3,0)"
+          },
+          {
+            "file": "packages/core/src/tests/formula/lookup-functions.test.ts",
+            "line": 101,
+            "formula": "=MATCH(3,A1:A3,0)"
           }
         ],
         "typedReferenceVariant": null,
@@ -14196,9 +14196,9 @@
         "arity": "automated per-function registry boundary checks",
         "formulaCases": [
           "=MATCH(\"b\",A2:A3,0)",
-          "=MATCH(3,A1:A3,0)",
           "=MATCH(\"ap*\",A1:A3,0)",
-          "=MATCH(\"a~*\",A1:A3,0)"
+          "=MATCH(\"a~*\",A1:A3,0)",
+          "=MATCH(3,A1:A3,0)"
         ],
         "exhaustive": false
       },
@@ -14208,9 +14208,9 @@
       ],
       "tests": [
         "packages/core/src/tests/formula/expanded-functions.test.ts#L80",
-        "packages/core/src/tests/formula/lookup-functions.test.ts#L101",
         "packages/core/src/tests/formula/function-regressions.test.ts#L66",
-        "packages/core/src/tests/formula/function-regressions.test.ts#L67"
+        "packages/core/src/tests/formula/function-regressions.test.ts#L67",
+        "packages/core/src/tests/formula/lookup-functions.test.ts#L101"
       ],
       "existingScenarioCount": 4,
       "addedIndependentCase": null,
@@ -15373,11 +15373,11 @@
       "boundaries": {
         "arity": "automated per-function registry boundary checks",
         "formulaCases": [
-          "=ADDRESS(2,28)",
           "=ADDRESS(2,28,1,0)",
           "=ADDRESS(2,28,2,FALSE)",
           "=ADDRESS(2,28,3,FALSE)",
-          "=ADDRESS(2,28,4,FALSE)"
+          "=ADDRESS(2,28,4,FALSE)",
+          "=ADDRESS(2,28)"
         ],
         "exhaustive": false
       },
@@ -15386,21 +15386,21 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
-        "packages/core/src/tests/formula/math-statistical-database.test.ts#L57",
         "packages/core/src/tests/formula/lookup-functions.test.ts#L73",
         "packages/core/src/tests/formula/lookup-functions.test.ts#L74",
         "packages/core/src/tests/formula/lookup-functions.test.ts#L75",
         "packages/core/src/tests/formula/lookup-functions.test.ts#L76",
+        "packages/core/src/tests/formula/math-statistical-database.test.ts#L57",
         "packages/core/src/tests/formula/registry-coverage.test.ts#L51"
       ],
       "existingScenarioCount": 5,
       "addedIndependentCase": null,
       "addedReferenceCase": {
         "name": "ADDRESS",
-        "formula": "=ADDRESS(2,28)",
-        "expected": "$AB$2",
-        "sourceTest": "packages/core/src/tests/formula/math-statistical-database.test.ts#L57",
-        "sourceExpectedExpression": "\"$AB$2\""
+        "formula": "=ADDRESS(2,28,1,0)",
+        "expected": "R2C28",
+        "sourceTest": "packages/core/src/tests/formula/lookup-functions.test.ts#L73",
+        "sourceExpectedExpression": "\"R2C28\""
       },
       "sourceDocumentation": {
         "excel": "https://support.microsoft.com/en-us/excel/functions/address-function",
@@ -17845,8 +17845,8 @@
         "catalogSource": "apps/web/src/shared/formula-editing/function-catalog.ts"
       },
       "implementation": {
-        "file": "packages/core/src/formula/functions/database.ts",
-        "line": 17,
+        "file": "packages/core/src/formula/functions/text.ts",
+        "line": 632,
         "registry": "packages/core/src/formula/functions.ts",
         "runtime": "first-party Core"
       },
@@ -18063,9 +18063,6 @@
       "boundaries": {
         "arity": "automated per-function registry boundary checks",
         "formulaCases": [
-          "=DATE(1900,2,29)",
-          "=DATE(2008,1,35)",
-          "=EOMONTH(DATE(2024,1,31),1)",
           "=DATE(10000,1,1)",
           "=DATE(9999,12,100000000000)",
           "=EDATE(DATE(9999,12,1),1)",
@@ -18082,7 +18079,10 @@
           "=YEARFRAC(DATE(2024,1,1),DATE(2025,1,1),)",
           "=NETWORKDAYS.INTL(DATE(2024,1,1),DATE(2024,1,7),11)",
           "=NETWORKDAYS.INTL(DATE(2024,1,1),DATE(2024,1,7),\"0000011\")",
-          "=WORKDAY.INTL(DATE(2024,1,5),1,11)"
+          "=WORKDAY.INTL(DATE(2024,1,5),1,11)",
+          "=DATE(1900,2,29)",
+          "=DATE(2008,1,35)",
+          "=EOMONTH(DATE(2024,1,31),1)"
         ],
         "exhaustive": false
       },
@@ -18091,9 +18091,6 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
-        "packages/core/src/tests/formula/function-categories.test.ts#L48",
-        "packages/core/src/tests/formula/function-categories.test.ts#L49",
-        "packages/core/src/tests/formula/function-categories.test.ts#L51",
         "packages/core/src/tests/formula/date-functions.test.ts#L15",
         "packages/core/src/tests/formula/date-functions.test.ts#L16",
         "packages/core/src/tests/formula/date-functions.test.ts#L25",
@@ -18111,16 +18108,22 @@
         "packages/core/src/tests/formula/date-functions.test.ts#L74",
         "packages/core/src/tests/formula/date-functions.test.ts#L78",
         "packages/core/src/tests/formula/date-functions.test.ts#L80",
+        "packages/core/src/tests/formula/function-categories.test.ts#L48",
+        "packages/core/src/tests/formula/function-categories.test.ts#L49",
+        "packages/core/src/tests/formula/function-categories.test.ts#L51",
         "packages/core/src/tests/formula/registry-coverage.test.ts#L51"
       ],
       "existingScenarioCount": 20,
       "addedIndependentCase": null,
       "addedReferenceCase": {
         "name": "DATE",
-        "formula": "=DATE(1900,2,29)",
-        "expected": 60,
-        "sourceTest": "packages/core/src/tests/formula/function-categories.test.ts#L48",
-        "sourceExpectedExpression": "60"
+        "formula": "=DATE(10000,1,1)",
+        "expected": {
+          "kind": "formula-error",
+          "code": "NUM"
+        },
+        "sourceTest": "packages/core/src/tests/formula/date-functions.test.ts#L15",
+        "sourceExpectedExpression": "createFormulaError(\"NUM\")"
       },
       "sourceDocumentation": {
         "excel": "https://support.microsoft.com/en-us/excel/functions/date-function",
@@ -18496,10 +18499,10 @@
       "boundaries": {
         "arity": "automated per-function registry boundary checks",
         "formulaCases": [
-          "=TIME(25,60,60)",
           "=TIME(-1,0,0)",
           "=TIME(1e308,0,0)",
-          "=TIME(32768,0,0)"
+          "=TIME(32768,0,0)",
+          "=TIME(25,60,60)"
         ],
         "exhaustive": false
       },
@@ -18509,21 +18512,23 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
-        "packages/core/src/tests/formula/function-categories.test.ts#L53",
         "packages/core/src/tests/formula/date-functions.test.ts#L19",
         "packages/core/src/tests/formula/date-functions.test.ts#L20",
         "packages/core/src/tests/formula/date-functions.test.ts#L21",
+        "packages/core/src/tests/formula/function-categories.test.ts#L53",
         "packages/core/src/tests/formula/registry-coverage.test.ts#L51"
       ],
       "existingScenarioCount": 4,
       "addedIndependentCase": null,
       "addedReferenceCase": {
         "name": "TIME",
-        "formula": "=TIME(25,60,60)",
-        "expected": 0.08333333333333333,
-        "precision": 2,
-        "sourceTest": "packages/core/src/tests/formula/function-categories.test.ts#L53",
-        "sourceExpectedExpression": "2 / 24"
+        "formula": "=TIME(-1,0,0)",
+        "expected": {
+          "kind": "formula-error",
+          "code": "NUM"
+        },
+        "sourceTest": "packages/core/src/tests/formula/date-functions.test.ts#L19",
+        "sourceExpectedExpression": "createFormulaError(\"NUM\")"
       },
       "sourceDocumentation": {
         "excel": "https://support.microsoft.com/en-us/excel/functions/time-function",
@@ -19230,7 +19235,7 @@
       },
       "boundaries": {
         "arity": "automated per-function registry boundary checks",
-        "formulaCases": ["=EDATE(60,1)", "=EDATE(DATE(9999,12,1),1)"],
+        "formulaCases": ["=EDATE(DATE(9999,12,1),1)", "=EDATE(60,1)"],
         "exhaustive": false
       },
       "remainingCoverageGaps": [
@@ -19239,18 +19244,21 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
-        "packages/core/src/tests/formula/function-categories.test.ts#L50",
         "packages/core/src/tests/formula/date-functions.test.ts#L25",
+        "packages/core/src/tests/formula/function-categories.test.ts#L50",
         "packages/core/src/tests/formula/registry-coverage.test.ts#L51"
       ],
       "existingScenarioCount": 2,
       "addedIndependentCase": null,
       "addedReferenceCase": {
         "name": "EDATE",
-        "formula": "=EDATE(60,1)",
-        "expected": 89,
-        "sourceTest": "packages/core/src/tests/formula/function-categories.test.ts#L50",
-        "sourceExpectedExpression": "89"
+        "formula": "=EDATE(DATE(9999,12,1),1)",
+        "expected": {
+          "kind": "formula-error",
+          "code": "NUM"
+        },
+        "sourceTest": "packages/core/src/tests/formula/date-functions.test.ts#L25",
+        "sourceExpectedExpression": "createFormulaError(\"NUM\")"
       },
       "sourceDocumentation": {
         "excel": "https://support.microsoft.com/en-us/excel/functions/edate-function",
@@ -19321,7 +19329,7 @@
       },
       "boundaries": {
         "arity": "automated per-function registry boundary checks",
-        "formulaCases": ["=EOMONTH(DATE(2024,1,31),1)", "=EOMONTH(DATE(1900,1,1),-2)"],
+        "formulaCases": ["=EOMONTH(DATE(1900,1,1),-2)", "=EOMONTH(DATE(2024,1,31),1)"],
         "exhaustive": false
       },
       "remainingCoverageGaps": [
@@ -19330,18 +19338,21 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
-        "packages/core/src/tests/formula/function-categories.test.ts#L51",
         "packages/core/src/tests/formula/date-functions.test.ts#L28",
+        "packages/core/src/tests/formula/function-categories.test.ts#L51",
         "packages/core/src/tests/formula/registry-coverage.test.ts#L51"
       ],
       "existingScenarioCount": 2,
       "addedIndependentCase": null,
       "addedReferenceCase": {
         "name": "EOMONTH",
-        "formula": "=EOMONTH(DATE(2024,1,31),1)",
-        "expected": 45351,
-        "sourceTest": "packages/core/src/tests/formula/function-categories.test.ts#L51",
-        "sourceExpectedExpression": "45351"
+        "formula": "=EOMONTH(DATE(1900,1,1),-2)",
+        "expected": {
+          "kind": "formula-error",
+          "code": "NUM"
+        },
+        "sourceTest": "packages/core/src/tests/formula/date-functions.test.ts#L28",
+        "sourceExpectedExpression": "createFormulaError(\"NUM\")"
       },
       "sourceDocumentation": {
         "excel": "https://support.microsoft.com/en-us/excel/functions/eomonth-function",
@@ -19985,8 +19996,8 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
-        "packages/core/src/tests/formula/function-categories.test.ts#L55",
-        "packages/core/src/tests/formula/date-functions.test.ts#L48"
+        "packages/core/src/tests/formula/date-functions.test.ts#L48",
+        "packages/core/src/tests/formula/function-categories.test.ts#L55"
       ],
       "existingScenarioCount": 2,
       "addedIndependentCase": null,
@@ -20060,8 +20071,8 @@
         "Not exhaustive across all numeric extremes, reference syntaxes, locales, or cross-app versions."
       ],
       "tests": [
-        "packages/core/src/tests/formula/function-categories.test.ts#L68",
-        "packages/core/src/tests/formula/date-functions.test.ts#L49"
+        "packages/core/src/tests/formula/date-functions.test.ts#L49",
+        "packages/core/src/tests/formula/function-categories.test.ts#L68"
       ],
       "existingScenarioCount": 2,
       "addedIndependentCase": null,

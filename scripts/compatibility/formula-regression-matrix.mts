@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -18,6 +18,7 @@ import {
   type RegistryCoverageCase,
 } from "../../packages/core/src/tests/formula/registry-coverage-cases.js";
 import { referencedCoverageCase } from "../../packages/core/src/tests/formula/registry-coverage-references.js";
+import { functionRegistrationOffset, sourceFiles } from "./formula-regression-discovery.mts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const registryTest = "packages/core/src/tests/formula/registry-coverage.test.ts";
@@ -31,10 +32,7 @@ const metadata = getFormulaFunctionMetadata();
 const names = new Set(metadata.map((item) => item.name));
 const source = (path: string) => readFileSync(resolve(root, path), "utf8");
 const digest = (text: string) => createHash("sha256").update(text).digest("hex");
-const files = (directory: string): string[] =>
-  readdirSync(resolve(root, directory), { withFileTypes: true }).flatMap((entry) =>
-    entry.isDirectory() ? files(`${directory}/${entry.name}`) : [`${directory}/${entry.name}`],
-  );
+const files = (directory: string): string[] => sourceFiles(root, directory);
 
 type Scenario = { file: string; line: number; formula: string; functions: string[] };
 function functionNames(expression: FormulaExpression): string[] {
@@ -298,7 +296,7 @@ const functions = metadata.map((item) => {
   const fixture = REGISTRY_COVERAGE_CASES.find((scenario) => scenario.name === item.name);
   const generatedBaseConversion = /^(?:BIN|OCT|HEX)2(?:BIN|OCT|HEX)$/.test(item.name);
   const implementation =
-    implementationTexts.find(({ text }) => text.includes(`"${item.name}"`)) ??
+    implementationTexts.find(({ text }) => functionRegistrationOffset(text, item.name) >= 0) ??
     (generatedBaseConversion
       ? implementationTexts.find(({ file }) => file.endsWith("/engineering.ts"))
       : undefined);
@@ -307,7 +305,7 @@ const functions = metadata.map((item) => {
   if (!current.length) throw new Error(`Missing independent calculation scenario: ${item.name}`);
   const offset = generatedBaseConversion
     ? implementation.text.indexOf("name: `${labels[from]}2${labels[to]}`")
-    : implementation.text.indexOf(`"${item.name}"`);
+    : functionRegistrationOffset(implementation.text, item.name);
   const referenceCases = current.filter((scenario) =>
     /\b\$?[A-Z]{1,3}\$?[1-9]\d*\b/.test(scenario.formula),
   );
