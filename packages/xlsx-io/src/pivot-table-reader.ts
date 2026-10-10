@@ -7,9 +7,15 @@ import {
   buildPivotResult,
   getPivotTableSource,
   normalizePivotTable,
+  resolvePivotTableSource,
   type SheetPivotTable,
 } from "@sheetcraft/core/pivot-tables";
-import { primitivePivotValue, readPivotSharedItems, readPivotCacheRecords } from "./pivot-cache.js";
+import {
+  pivotCacheSourceFingerprint,
+  primitivePivotValue,
+  readPivotSharedItems,
+  readPivotCacheRecords,
+} from "./pivot-cache.js";
 import { readNativePivotFilters } from "./pivot-native-filters.js";
 import {
   attr,
@@ -24,11 +30,33 @@ import {
 } from "./pivot-xml.js";
 import { xlsxPivotTableStyleId } from "./table-styles.js";
 
+function requiresBoundTable(root: XmlNode, cacheRoot: XmlNode): boolean {
+  const ext = nodes(child(root, "extLst").ext).find((ext) => attr(ext, "uri") === PIVOT_EXT);
+  if (typeof ext?.metadata !== "string") return false;
+  try {
+    const data = JSON.parse(ext.metadata) as {
+      version?: unknown;
+      table?: { sourceTableId?: unknown };
+      nativeFingerprint?: unknown;
+      cacheSourceFingerprint?: unknown;
+    };
+    return (
+      data.version === 1 &&
+      typeof data.table?.sourceTableId === "string" &&
+      !!data.table.sourceTableId.trim() &&
+      data.nativeFingerprint === pivotFingerprint(root) &&
+      data.cacheSourceFingerprint === pivotCacheSourceFingerprint(cacheRoot)
+    );
+  } catch {
+    return false;
+  }
+}
 function nativeSource(
   workbook: Workbook,
   cacheRoot: XmlNode,
   headers: string[],
-): Pick<SheetPivotTable, "sourceSheetId" | "source" | "consolidation"> {
+  boundTableRequired: boolean,
+): Pick<SheetPivotTable, "sourceSheetId" | "sourceTableId" | "source" | "consolidation"> {
   const source = child(cacheRoot, "cacheSource");
   const sheetNamed = (name: string) => {
     const sheet = [...workbook.sheets.values()].find((sheet) => sheet.name === name);
@@ -39,6 +67,29 @@ function nativeSource(
     const worksheet = child(source, "worksheetSource");
     const name = attr(worksheet, "name");
     if (name) {
+      const sheetName = attr(worksheet, "sheet");
+      const tables = [...workbook.sheets.values()].flatMap((sheet) =>
+        (sheet.tables ?? [])
+          .filter((table) => table.name.toLowerCase() === name.toLowerCase())
+          .map((table) => ({ sheet, table })),
+      );
+      if (tables.length) {
+        if (tables.length !== 1) throw new Error("Ambiguous pivot source table.");
+        const { sheet, table } = tables[0]!;
+        if (!table.headerRow || (sheetName && sheet.name !== sheetName))
+          throw new Error("Invalid pivot source table.");
+        return {
+          sourceSheetId: sheet.id,
+          // Native table IDs are rewritten on export; the imported table is authoritative.
+          sourceTableId: table.id,
+          source: {
+            start: { ...table.range.start },
+            end: { ...table.range.end, row: table.range.end.row - (table.totalRow ? 1 : 0) },
+          },
+        };
+      }
+      // A matching own binding cannot turn into an identically named defined range.
+      if (boundTableRequired) throw new Error("Missing bound pivot source table.");
       const definition = [...workbook.definedNames.values()].find(
         (definition) => definition.name.toLowerCase() === name.toLowerCase(),
       );
@@ -47,19 +98,6 @@ function nativeSource(
           sourceSheetId: definition.reference.sheetId,
           source: { start: definition.reference.start, end: definition.reference.end },
         };
-      for (const sheet of workbook.sheets.values()) {
-        const table = sheet.tables?.find(
-          (table) => table.name.toLowerCase() === name.toLowerCase(),
-        );
-        if (table)
-          return {
-            sourceSheetId: sheet.id,
-            source: {
-              start: table.range.start,
-              end: { ...table.range.end, row: table.range.end.row - (table.totalRow ? 1 : 0) },
-            },
-          };
-      }
       throw new Error("Unsupported pivot named source.");
     }
     return {
@@ -113,6 +151,7 @@ function restoreMetadata(
       version?: unknown;
       nativeFingerprint?: string;
       cacheGroupFingerprint?: string;
+      cacheSourceFingerprint?: string;
       table?: SheetPivotTable;
       bindings?: Record<string, string>;
     };
@@ -121,6 +160,9 @@ function restoreMetadata(
       !data.table ||
       !data.bindings ||
       data.nativeFingerprint !== pivotFingerprint(root) ||
+      (data.cacheSourceFingerprint !== undefined &&
+        data.cacheSourceFingerprint !== pivotCacheSourceFingerprint(cacheRoot)) ||
+      (data.table.sourceTableId !== undefined && data.cacheSourceFingerprint === undefined) ||
       (data.cacheGroupFingerprint !== undefined
         ? data.cacheGroupFingerprint !== cacheGroupFingerprint(cacheRoot)
         : !!native.groups?.length)
@@ -136,6 +178,12 @@ function restoreMetadata(
     const restored = normalizePivotTable({
       ...data.table,
       sourceSheetId: remap(data.table.sourceSheetId),
+      ...(data.table.sourceTableId !== undefined
+        ? {
+            // Native identity wins; source remains the last-refresh rectangle.
+            sourceTableId: native.sourceTableId,
+          }
+        : {}),
       ...(data.table.consolidation
         ? {
             consolidation: {
@@ -157,7 +205,11 @@ function restoreMetadata(
         restored.values.map(({ field, aggregate }) => ({ field, aggregate })),
         native.values.map(({ field, aggregate }) => ({ field, aggregate })),
       ) ||
-      !same(restored.source, native.source) ||
+      (data.table.sourceTableId === undefined) !== (native.sourceTableId === undefined) ||
+      !(restored.sourceTableId !== undefined && restored.source && native.source
+        ? restored.source.start.column === native.source.start.column &&
+          restored.source.end.column === native.source.end.column
+        : same(restored.source, native.source)) ||
       restored.sourceSheetId !== native.sourceSheetId
     )
       return native;
@@ -195,7 +247,12 @@ export function readPivotTable(
   const cache = readPivotSharedItems(cacheBytes, workbook.dateSystem);
   const groups = readNativePivotGroups(cacheRoot, workbook.dateSystem);
   const fields = nodes(child(root, "pivotFields").pivotField);
-  const source = nativeSource(workbook, cacheRoot, cache.headers);
+  const source = nativeSource(
+    workbook,
+    cacheRoot,
+    cache.headers,
+    requiresBoundTable(root, cacheRoot),
+  );
   const location = parseRange(attr(child(root, "location"), "ref"));
   const axisFields = (tag: string) =>
     nodes(child(root, tag).field)
@@ -364,7 +421,11 @@ export function readPivotTable(
   // Validate actual sources without replacing the already cached worksheet results.
   const width =
     normalized.consolidation?.labels.length ??
-    (normalized.source ? normalized.source.end.column - normalized.source.start.column + 1 : 0);
+    (normalized.sourceTableId !== undefined
+      ? resolvePivotTableSource(workbook, normalized).headers.length
+      : normalized.source
+        ? normalized.source.end.column - normalized.source.start.column + 1
+        : 0);
   if (width !== cache.headers.length) throw new Error("Pivot source fields changed.");
   if (!normalized.dataCache) getPivotTableSource(workbook, normalized);
   const restored = restoreMetadata(root, cacheRoot, workbook, normalized);

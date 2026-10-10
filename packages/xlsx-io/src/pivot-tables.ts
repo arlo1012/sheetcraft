@@ -2,7 +2,7 @@ import { fromExcelNumberFormat, builtinNumberFormat } from "./number-format.js";
 import type { CellNumberFormat } from "@sheetcraft/core/style";
 import { nativePivotGroupXml, nativePivotDateTime } from "./pivot-native-groups.js";
 import { createPivotNumberFormatReader } from "./pivot-number-formats.js";
-import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
+import { resolvePivotTableSource, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import { strFromU8, strToU8, unzipSync } from "fflate/browser";
 import type { Workbook } from "@sheetcraft/core/workbook";
 import { createPivotCache, cacheDefinitionXml, cacheRecordsXml } from "./pivot-cache.js";
@@ -41,6 +41,15 @@ export function writeXlsxPivotTables(
       }
       if (!table.includeHidden)
         report?.add("filter-omitted", "warning", `${table.name}.includeHidden`);
+      if (table.sourceTableId !== undefined) {
+        try {
+          // A saved cache cannot make a deleted or changed binding exportable.
+          resolvePivotTableSource(workbook, table);
+        } catch {
+          report?.add("feature-omitted", "warning", `${table.name}.sourceTableId`);
+          continue;
+        }
+      }
       const cache = createPivotCache(workbook, table);
       try {
         for (const group of table.groups ?? []) {

@@ -229,7 +229,8 @@ export type WorkbookSnapshotV39 = Omit<WorkbookSnapshotV38, "version"> & { versi
 export type WorkbookSnapshotV40 = Omit<WorkbookSnapshotV39, "version"> & { version: 40 };
 export type WorkbookSnapshotV41 = Omit<WorkbookSnapshotV40, "version"> & { version: 41 };
 export type WorkbookSnapshotV42 = Omit<WorkbookSnapshotV41, "version"> & { version: 42 };
-export type WorkbookSnapshot = WorkbookSnapshotV42;
+export type WorkbookSnapshotV43 = Omit<WorkbookSnapshotV42, "version"> & { version: 43 };
+export type WorkbookSnapshot = WorkbookSnapshotV43;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -288,7 +289,8 @@ type SnapshotVersion =
   | 39
   | 40
   | 41
-  | 42;
+  | 42
+  | 43;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -701,6 +703,12 @@ function parseSparseState(
   version: SnapshotVersion,
 ): SheetSparseState {
   if (
+    version < 43 &&
+    Array.isArray(record.pivotTables) &&
+    record.pivotTables.some((item) => Object.hasOwn(asRecord(item, path), "sourceTableId"))
+  )
+    return fail(path, "Table-backed pivot sources require snapshot version 43.");
+  if (
     version < 28 &&
     Array.isArray(record.drawings) &&
     record.drawings.some((drawing) => asRecord(drawing, path).kind === "camera")
@@ -1009,6 +1017,9 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
           (asRecord(cell, path).content as { image?: { transform?: ImageTransform } } | undefined)
             ?.image?.transform?.annotations !== undefined,
       );
+    const hasTableBinding =
+      Array.isArray(record.pivotTables) &&
+      record.pivotTables.some((item) => Object.hasOwn(asRecord(item, path), "sourceTableId"));
     version = hasAnnotations
       ? 42
       : Object.hasOwn(record, "pivotTables") || Object.hasOwn(record, "filter")
@@ -1074,6 +1085,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
                                 : Object.hasOwn(record, "floatingImages")
                                   ? 6
                                   : 3;
+    if (hasTableBinding) version = 43;
   }
   if (version < 23 && record.protection !== undefined) {
     const protection = asRecord(record.protection, `${path}.protection`);
@@ -1151,7 +1163,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 42,
+    version: 43,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1225,7 +1237,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 39 &&
     record.version !== 40 &&
     record.version !== 41 &&
-    record.version !== 42
+    record.version !== 42 &&
+    record.version !== 43
   ) {
     throw new WorkbookDomainError(
       {

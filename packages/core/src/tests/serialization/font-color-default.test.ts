@@ -72,7 +72,7 @@ describe("default RGB direct-style snapshots", () => {
     expect(getCellNamedStyle(sheet, { row: 0, column: 7 })?.overrides).toEqual(["textColor"]);
     const canonical = serializeWorkbook(restored);
     expect(canonical.version).toBe(snapshot.version);
-    expect(canonical.version).toBe(42);
+    expect(canonical.version).toBe(43);
     expect(serializeWorkbook(deserializeWorkbook(canonical))).toEqual(canonical);
   });
 

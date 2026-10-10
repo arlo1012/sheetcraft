@@ -26,6 +26,7 @@ import {
   type CellRange,
   type CellValue,
   type Workbook,
+  type SheetTable,
 } from "./workbook.js";
 import {
   filterPivotRecords,
@@ -137,6 +138,8 @@ export type SheetPivotTable = {
   id: string;
   name: string;
   sourceSheetId: string;
+  /** Explicit table identity; absent bindings retain fixed-range semantics. */
+  sourceTableId?: string;
   source: CellRange | null;
   consolidation?: PivotConsolidation;
   reportLayout?: PivotReportLayout;
@@ -208,7 +211,9 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
     ) ||
     !text(table.totalLabel) ||
     !text(table.emptyLabel) ||
-    (table.styleId !== undefined && !text(table.styleId))
+    (table.styleId !== undefined && !text(table.styleId)) ||
+    (table.sourceTableId !== undefined &&
+      (!text(table.sourceTableId) || table.consolidation !== undefined))
   )
     throw new RangeError("Invalid pivot table.");
   const dataCache = table.dataCache;
@@ -375,7 +380,9 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
     ? consolidation.labels.length
     : source
       ? source.end.column - source.start.column + 1
-      : MAX_SHEET_COLUMNS;
+      : table.sourceTableId !== undefined && dataCache
+        ? dataCache.headers.length
+        : MAX_SHEET_COLUMNS;
   if (dataCache && (source || consolidation) && dataCache.headers.length !== width)
     throw new RangeError("Invalid pivot cache field count.");
   const groups = normalizePivotGroups(table.groups, width);
@@ -423,6 +430,7 @@ export function normalizePivotTable(table: SheetPivotTable): SheetPivotTable {
     name: table.name,
     sourceSheetId: ranges ? ranges[0]!.sheetId : table.sourceSheetId,
     source,
+    ...(table.sourceTableId !== undefined ? { sourceTableId: table.sourceTableId } : {}),
     ...(consolidation && ranges
       ? {
           consolidation: {
@@ -516,7 +524,45 @@ export function getPivotSource(workbook: Workbook, sourceSheetId: string, range:
     throw new RangeError("Pivot column headers must be unique.");
   return { sheet, range: source, evaluator, headers };
 }
-/** Every physical source area, also used to protect source cells from report output. */
+/** Resolves an ordinary source from live workbook state; a bound source never falls back. */
+export function resolvePivotTableSource(
+  workbook: Workbook,
+  table: SheetPivotTable,
+): ReturnType<typeof getPivotSource> & { sourceTable?: SheetTable } {
+  if (table.sourceTableId === undefined)
+    return {
+      ...getPivotSource(workbook, table.sourceSheetId, table.source),
+      sourceTable: undefined,
+    };
+  const previous = cloneRange(table.source);
+  if (!previous || table.consolidation || !text(table.sourceTableId))
+    throw new RangeError("Repair this pivot table source before refreshing.");
+  const sheet = workbook.sheets.get(table.sourceSheetId);
+  const sourceTable = sheet?.tables?.find((item) => item.id === table.sourceTableId);
+  if (!sheet || !sourceTable || sourceTable.headerRow !== true)
+    throw new RangeError("Pivot source table is missing or has no header row.");
+  const range = {
+    start: { ...sourceTable.range.start },
+    end: {
+      ...sourceTable.range.end,
+      row: sourceTable.range.end.row - Number(sourceTable.totalRow),
+    },
+  };
+  const width = range.end.column - range.start.column + 1;
+  if (width !== previous.end.column - previous.start.column + 1)
+    throw new RangeError("Repair the changed pivot source table columns before refreshing.");
+  const info = getPivotSource(workbook, sheet.id, range);
+  if (
+    sourceTable.columns.length !== width ||
+    info.headers.some((header, index) => header !== sourceTable.columns[index]!.name) ||
+    (table.dataCache &&
+      (table.dataCache.headers.length !== width ||
+        info.headers.some((header, index) => header !== table.dataCache!.headers[index])))
+  )
+    throw new RangeError("Repair the changed pivot source table headers before refreshing.");
+  return { ...info, sourceTable };
+}
+/** Last-refresh physical areas. Bound refreshes must use resolvePivotTableSource instead. */
 export function getPivotSourceRanges(table: SheetPivotTable): PivotSourceRange[] {
   return (
     table.consolidation?.ranges ?? [
@@ -527,7 +573,7 @@ export function getPivotSourceRanges(table: SheetPivotTable): PivotSourceRange[]
 /** Uniform record stream for ordinary lists and labeled consolidation matrices. */
 export function getRawPivotTableSource(workbook: Workbook, table: SheetPivotTable) {
   if (!table.consolidation) {
-    const info = getPivotSource(workbook, table.sourceSheetId, table.source);
+    const info = resolvePivotTableSource(workbook, table);
     return {
       headers: info.headers,
       *records(): Generator<FormulaValue[]> {
@@ -1168,11 +1214,32 @@ export function getPivotDetails(
   };
 }
 
-export type PivotTablesSnapshot = Array<{ sheetId: string; tables: SheetPivotTable[] }>;
+export type PivotTablesSnapshot = Array<{
+  sheetId: string;
+  tables: SheetPivotTable[];
+  /** Live table geometry for structural planning; never part of the persisted pivot. */
+  tableSources?: Array<{ id: string; range: CellRange }>;
+}>;
 export function capturePivotTables(workbook: Workbook): PivotTablesSnapshot {
+  const boundSources = new Set(
+    [...workbook.sheets.values()].flatMap((sheet) =>
+      (sheet.pivotTables ?? []).flatMap((table) =>
+        table.sourceTableId === undefined
+          ? []
+          : [JSON.stringify([table.sourceSheetId, table.sourceTableId])],
+      ),
+    ),
+  );
   return [...workbook.sheets.values()].map((sheet) => ({
     sheetId: sheet.id,
     tables: normalizePivotTables(sheet.pivotTables),
+    ...(boundSources.size
+      ? {
+          tableSources: (sheet.tables ?? [])
+            .filter((table) => boundSources.has(JSON.stringify([sheet.id, table.id])))
+            .map((table) => ({ id: table.id, range: cloneRange(table.range)! })),
+        }
+      : {}),
   }));
 }
 export function restorePivotTables(
@@ -1244,7 +1311,13 @@ export function transformPivotReferences(
           };
         });
       } else if (table.sourceSheetId === sheetId && table.source) {
-        const previous = table.source;
+        const boundRange =
+          table.sourceTableId === undefined
+            ? undefined
+            : snapshot
+                .find((source) => source.sheetId === sheetId)
+                ?.tableSources?.find((source) => source.id === table.sourceTableId)?.range;
+        const previous = boundRange ?? table.source;
         const next = mapRange(previous);
         const header = mapAddress(previous.start);
         const field = (index: number) => {
@@ -1258,6 +1331,23 @@ export function transformPivotReferences(
           table.dataCache?.headers.some((_, index) => field(index) !== index) ||
           !next ||
           next.end.column - next.start.column !== previous.end.column - previous.start.column;
+        if (table.sourceTableId !== undefined) {
+          // Preserve last-refresh geometry, cache and indices, even after invalidation.
+          if (
+            !boundRange ||
+            !next ||
+            !header ||
+            header.row !== next.start.row ||
+            header.column !== next.start.column ||
+            next.end.column - next.start.column !== previous.end.column - previous.start.column ||
+            Array.from(
+              { length: previous.end.column - previous.start.column + 1 },
+              (_, index) => index,
+            ).some((index) => field(index) !== index)
+          )
+            table.source = null;
+          return [normalizePivotTable(table)];
+        }
         if (cacheFieldsChanged) delete table.dataCache;
         const fields = [
           ...table.rowFields,

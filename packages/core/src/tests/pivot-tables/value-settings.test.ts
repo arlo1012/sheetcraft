@@ -379,7 +379,7 @@ describe("pivot value settings protocol and formatting", () => {
         createSetPivotTableCommand(f.destination.id, { ...f.table, values: [value] }),
       );
       const snapshot = serializeWorkbook(f.workbook);
-      expect(snapshot.version).toBe(42);
+      expect(snapshot.version).toBe(43);
       expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
       expect(() => deserializeWorkbook({ ...snapshot, version: 40 })).toThrow();
     },

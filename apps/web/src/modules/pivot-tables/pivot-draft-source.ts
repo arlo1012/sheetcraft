@@ -1,4 +1,8 @@
-import { normalizePivotTable, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
+import {
+  normalizePivotTable,
+  resolvePivotTableSource,
+  type SheetPivotTable,
+} from "@sheetcraft/core/pivot-tables";
 import type { Workbook } from "@sheetcraft/core/workbook";
 import type { PivotDraft } from "./usePivotActions";
 import {
@@ -6,7 +10,10 @@ import {
   resolveRangeReference,
 } from "../../shared/range-reference/formatRangeReference";
 
-type PivotSourceDefinition = Pick<SheetPivotTable, "sourceSheetId" | "source" | "consolidation">;
+type PivotSourceDefinition = Pick<
+  SheetPivotTable,
+  "sourceSheetId" | "sourceTableId" | "source" | "consolidation"
+>;
 
 /** Resolve at confirmation time so deleted reports and stale sheet references cannot be used. */
 export function resolvePivotDraftSource(
@@ -15,8 +22,10 @@ export function resolvePivotDraftSource(
 ): PivotSourceDefinition {
   if (draft.mode === "move") {
     const table = normalizePivotTable(draft.table);
+    if (table.sourceTableId !== undefined) resolvePivotTableSource(workbook, table);
     return {
       sourceSheetId: table.sourceSheetId,
+      sourceTableId: table.sourceTableId,
       source: table.source,
       consolidation: table.consolidation,
     };
@@ -40,6 +49,8 @@ export function resolvePivotDraftSource(
     const table = normalizePivotTable(report);
     return {
       sourceSheetId: table.sourceSheetId,
+      // Reusing a report's stored physical source keeps this mode's fixed-range semantics.
+      sourceTableId: undefined,
       source: table.source,
       consolidation: table.consolidation,
     };
@@ -66,6 +77,7 @@ export function resolvePivotDraftSource(
     });
     return {
       sourceSheetId: ranges[0]!.sheetId,
+      sourceTableId: undefined,
       source: ranges[0]!.range,
       consolidation: {
         ranges,
@@ -74,7 +86,39 @@ export function resolvePivotDraftSource(
       },
     };
   }
+  // Structured names are a pivot-only source choice, not a general A1 reference extension.
+  const name = draft.source.trim().replace(/^=/, "").toLowerCase();
+  const tables = [...workbook.sheets.values()].flatMap((sheet) =>
+    (sheet.tables ?? [])
+      .filter((table) => table.name.toLowerCase() === name)
+      .map((table) => ({ sheet, table })),
+  );
+  const namedRange = [...workbook.definedNames.values()].some(
+    (entry) =>
+      entry.name.toLowerCase() === name &&
+      (entry.scopeSheetId === undefined || entry.scopeSheetId === draft.referenceSheetId),
+  );
+  if (tables.length > 1 || (tables.length && namedRange))
+    throw new RangeError("Ambiguous pivot source table name.");
+  if (tables.length === 1) {
+    const { sheet, table } = tables[0]!;
+    if (table.headerRow !== true) throw new RangeError("Pivot source table needs headers.");
+    return {
+      sourceSheetId: sheet.id,
+      sourceTableId: table.id,
+      source: {
+        start: { ...table.range.start },
+        end: { ...table.range.end, row: table.range.end.row - Number(table.totalRow) },
+      },
+      consolidation: undefined,
+    };
+  }
   const area = resolveRangeReference(workbook, draft.source, draft.referenceSheetId);
   if (!area) throw new RangeError("Invalid pivot source.");
-  return { sourceSheetId: area.sheetId, source: area.range, consolidation: undefined };
+  return {
+    sourceSheetId: area.sheetId,
+    sourceTableId: undefined,
+    source: area.range,
+    consolidation: undefined,
+  };
 }

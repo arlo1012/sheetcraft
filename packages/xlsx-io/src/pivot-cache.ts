@@ -7,6 +7,7 @@ import type { Workbook, CellValue } from "@sheetcraft/core/workbook";
 import {
   MAX_PIVOT_CACHE_CELLS,
   getRawPivotTableSource,
+  resolvePivotTableSource,
   type SheetPivotTable,
 } from "@sheetcraft/core/pivot-tables";
 import { isFormulaError, type FormulaValue } from "@sheetcraft/core/formula";
@@ -53,6 +54,11 @@ export function createPivotCache(workbook: Workbook, table: SheetPivotTable): Pi
 }
 function sourceXml(workbook: Workbook, table: SheetPivotTable): string {
   if (!table.consolidation) {
+    if (table.sourceTableId !== undefined) {
+      const { sourceTable } = resolvePivotTableSource(workbook, table);
+      if (!sourceTable) throw new Error("Missing bound pivot source table.");
+      return `<cacheSource type="worksheet"><worksheetSource name="${xml(sourceTable.name)}"/></cacheSource>`;
+    }
     if (!table.source) throw new Error("Missing pivot source.");
     return `<cacheSource type="worksheet"><worksheetSource ref="${rangeRef(table.source)}" sheet="${xml(workbook.sheets.get(table.sourceSheetId)!.name)}"/></cacheSource>`;
   }
@@ -71,6 +77,23 @@ function sourceXml(workbook: Workbook, table: SheetPivotTable): string {
     })
     .join("")}</rangeSets></consolidation></cacheSource>`;
 }
+/** Cache source edits are independent of the pivot definition and grouping metadata. */
+export function pivotCacheSourceFingerprint(cacheRoot: XmlNode): string {
+  const canonical = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (!value || typeof value !== "object") return value;
+    return Object.fromEntries(
+      Object.entries(value as XmlNode)
+        .filter(([key]) => !key.startsWith("@_xmlns"))
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, item]) => [key, canonical(item)]),
+    );
+  };
+  return JSON.stringify(canonical(child(cacheRoot, "cacheSource")));
+}
+export function nativePivotSourceFingerprint(workbook: Workbook, table: SheetPivotTable): string {
+  return pivotCacheSourceFingerprint(parseXml(strToU8(sourceXml(workbook, table))));
+}
 export function cacheDefinitionXml(
   workbook: Workbook,
   table: SheetPivotTable,
@@ -78,7 +101,7 @@ export function cacheDefinitionXml(
   recordId: string,
 ): Uint8Array {
   return strToU8(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><pivotCacheDefinition xmlns="${MAIN_NS}" xmlns:r="${REL_NS}" r:id="${recordId}" refreshOnLoad="${!table.dataCache && canRefreshNativePivotOnLoad(table) ? 1 : 0}" enableRefresh="1" saveData="1" createdVersion="6" refreshedVersion="6" minRefreshableVersion="3" recordCount="${cache.records.length}">${sourceXml(workbook, table)}<cacheFields count="${cache.headers.length}">${cache.headers
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><pivotCacheDefinition xmlns="${MAIN_NS}" xmlns:r="${REL_NS}" r:id="${recordId}" refreshOnLoad="${table.sourceTableId === undefined && !table.dataCache && canRefreshNativePivotOnLoad(table) ? 1 : 0}" enableRefresh="1" saveData="1" createdVersion="6" refreshedVersion="6" minRefreshableVersion="3" recordCount="${cache.records.length}">${sourceXml(workbook, table)}<cacheFields count="${cache.headers.length}">${cache.headers
       .map((name, field) => {
         const values = cache.shared[field]!;
         const group = table.groups?.find((group) => group.field === field);

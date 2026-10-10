@@ -73,7 +73,7 @@ describe("cell notes", () => {
     });
 
     const snapshot = serializeWorkbook(session.workbook);
-    expect(snapshot.version).toBe(42);
+    expect(snapshot.version).toBe(43);
     expect(deserializeWorkbook(snapshot).sheets.get(sheet.id)?.cells.get("0:0")?.note).toEqual({
       text: "Review source",
       author: "Mia",

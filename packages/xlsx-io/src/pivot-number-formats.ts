@@ -1,5 +1,5 @@
 import type { Workbook, CellAddress } from "@sheetcraft/core/workbook";
-import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
+import { resolvePivotTableSource, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import { readXlsxWorksheetStyleIds } from "./hyperlinks.js";
 import { attr, child, nodes, parseXml } from "./pivot-xml.js";
@@ -31,13 +31,17 @@ export function createPivotNumberFormatReader(
         });
         return value.numberFormat !== undefined || id > 0 ? id : undefined;
       }),
-    source: (table, fieldCount) =>
-      Array.from({ length: fieldCount }, (_, field) => {
+    source: (table, fieldCount) => {
+      const source =
+        table.sourceTableId === undefined
+          ? table.source
+          : resolvePivotTableSource(workbook, table).range;
+      return Array.from({ length: fieldCount }, (_, field) => {
         if (!table.consolidation)
-          return table.source
+          return source
             ? formatAt(table.sourceSheetId, {
-                row: table.source.start.row + 1,
-                column: table.source.start.column + field,
+                row: source.start.row + 1,
+                column: source.start.column + field,
               })
             : 0;
         const area = table.consolidation.ranges[0];
@@ -46,6 +50,7 @@ export function createPivotNumberFormatReader(
           row: area.range.start.row + (field === 1 ? 0 : 1),
           column: area.range.start.column + (field === 0 ? 0 : 1),
         });
-      }),
+      });
+    },
   };
 }

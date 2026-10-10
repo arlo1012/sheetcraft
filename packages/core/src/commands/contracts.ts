@@ -803,6 +803,8 @@ export type SetPivotTableCommand = {
   table: SheetPivotTable;
   overwrite: boolean;
   chartId?: string;
+  /** Explicit Change Source repair; ordinary refreshes retain the stored schema guard. */
+  repairSource?: boolean;
 };
 export type RemovePivotTableCommand = {
   type: "removePivotTable";

@@ -195,10 +195,13 @@ export function createDuplicateSheetCommand(
     ...[...workbook.definedNames.values()].map((definition) => definition.name.toLowerCase()),
   ]);
   const renamedTables = new Map<string, string>();
+  const copiedTableIds = new Map<string, string>();
   sheet.tables = (sheet.tables ?? []).map((table) => {
     const name = getDuplicateTableName(usedTableNames, table.name);
     renamedTables.set(table.name.toLowerCase(), name);
-    return { ...table, id: getDuplicateTableId(usedTableIds, table.id), name };
+    const id = getDuplicateTableId(usedTableIds, table.id);
+    copiedTableIds.set(table.id, id);
+    return { ...table, id, name };
   });
   for (const cell of sheet.cells) {
     if (cell.content?.kind !== "formula") continue;
@@ -211,6 +214,9 @@ export function createDuplicateSheetCommand(
   sheet.pivotTables = normalizePivotTables(sheet.pivotTables).map((table) => ({
     ...table,
     sourceSheetId: table.sourceSheetId === sourceSheetId ? sheetId : table.sourceSheetId,
+    ...(table.sourceSheetId === sourceSheetId && table.sourceTableId !== undefined
+      ? { sourceTableId: copiedTableIds.get(table.sourceTableId) ?? table.sourceTableId }
+      : {}),
     ...(table.consolidation
       ? {
           consolidation: {

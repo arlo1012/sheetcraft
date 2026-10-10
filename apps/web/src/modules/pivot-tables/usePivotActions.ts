@@ -1,6 +1,7 @@
-import { shallowRef, ref } from "vue";
+import { computed, getCurrentScope, onScopeDispose, shallowRef, ref, watch } from "vue";
 import {
   createSetPivotTableCommand,
+  applyWorkbookCommand,
   createPivotDetailsSheetCommand,
   createPivotSheetCommand,
   createRemovePivotTableCommand,
@@ -17,6 +18,7 @@ import {
   type SheetPivotTable,
 } from "@sheetcraft/core/pivot-tables";
 import { WorkbookDomainError } from "@sheetcraft/core/errors";
+import { deserializeSheet, serializeSheet } from "@sheetcraft/core/serialization";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import { resolveDataRange } from "@sheetcraft/core/data-range";
 import { getTableAtAddress } from "@sheetcraft/core/table-styles";
@@ -55,10 +57,23 @@ export type PivotDraft = {
   existing: boolean;
   mode: "create" | "source" | "move";
 };
+type PivotDialogTarget = {
+  dialogId: number;
+  workbook: Workbook;
+  generation: number | undefined;
+  sheet: Sheet;
+  sheetId: string;
+  report?: SheetPivotTable;
+  initial: PivotDraft;
+  confirm: (draft: PivotDraft) => void;
+  close: () => void;
+};
 export function usePivotActions(options: {
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
   getRange: () => CellRange;
+  getGeneration?: () => number;
+  getRevision?: () => number;
   isBusy: () => boolean;
   flush: () => boolean;
   execute: (command: WorkbookCommand) => boolean;
@@ -75,7 +90,8 @@ export function usePivotActions(options: {
   activateDetails?: (sheetId: string) => void;
   onDetailsError?: (reason: "cache" | "protected" | "invalid") => void;
 }) {
-  const editing = shallowRef<PivotDraft>();
+  const dialog = shallowRef<PivotDialogTarget>();
+  const editing = computed(() => dialog.value?.initial);
   const error = ref(false);
   const errorReason = ref<
     | "invalid"
@@ -88,7 +104,36 @@ export function usePivotActions(options: {
     | "destination"
   >("invalid");
   const idFactory = createBrowserIdFactory();
-  let target: { workbook: Workbook; sheetId: string; existing: boolean } | undefined;
+  let dialogId = 0;
+  let confirming = false;
+  let disposed = false;
+  function hasTargetIdentity(target: PivotDialogTarget, includeReport = true): boolean {
+    return (
+      target.workbook === options.getWorkbook() &&
+      target.generation === options.getGeneration?.() &&
+      target.workbook.sheets.get(target.sheetId) === target.sheet &&
+      (!includeReport ||
+        !target.report ||
+        target.sheet.pivotTables?.includes(target.report) === true)
+    );
+  }
+  if (getCurrentScope()) {
+    watch([options.getWorkbook, () => options.getGeneration?.()], () => close(), { flush: "sync" });
+    watch(
+      () => {
+        void options.getRevision?.();
+        return !dialog.value || hasTargetIdentity(dialog.value);
+      },
+      (valid) => {
+        if (!valid && !confirming) close();
+      },
+      { flush: "sync" },
+    );
+    onScopeDispose(() => {
+      disposed = true;
+      close();
+    });
+  }
   function selected(id?: string) {
     const sheet = options.getSheet(),
       address = options.getRange().start;
@@ -97,12 +142,20 @@ export function usePivotActions(options: {
     );
   }
   function open(chart = false, id?: string, mode: PivotDraft["mode"] = "create") {
-    if (options.isBusy() || !options.flush()) return;
+    if (
+      confirming ||
+      disposed ||
+      options.isBusy() ||
+      !options.flush() ||
+      options.isBusy() ||
+      disposed
+    )
+      return;
     const workbook = options.getWorkbook(),
       sheet = options.getSheet(),
       existing = mode === "create" ? undefined : selected(id);
+    if (mode !== "create" && !existing) return;
     if (existing && !canUseSheetPermission(sheet, "pivotTables")) return;
-    target = { workbook, sheetId: sheet.id, existing: !!existing };
     const selection = options.getRange();
     const sourceTable =
       mode === "create" &&
@@ -136,6 +189,7 @@ export function usePivotActions(options: {
           id: idFactory("pivot"),
           name: `${options.name()}${number}`,
           sourceSheetId: sheet.id,
+          ...(sourceTable && !sourceNeedsHeaders ? { sourceTableId: sourceTable.id } : {}),
           source: sourceNeedsHeaders ? null : sourceRange,
           anchor: { row: 0, column: 0 },
           outputRange: null,
@@ -165,12 +219,27 @@ export function usePivotActions(options: {
             : {}),
         };
     const sourceSheet = workbook.sheets.get(table.sourceSheetId);
+    const boundSourceTable =
+      table.sourceTableId === undefined
+        ? undefined
+        : sourceSheet?.tables?.find((item) => item.id === table.sourceTableId);
+    let invalidBoundSource = false;
+    if (existing && table.sourceTableId !== undefined) {
+      try {
+        getPivotTableSource(workbook, table);
+      } catch {
+        invalidBoundSource = true;
+      }
+    }
     sourceRange = table.source ?? sourceRange;
-    editing.value = {
+    const initial: PivotDraft = {
       table,
-      source: sourceNeedsHeaders
-        ? ""
-        : formatRangeReference(sourceSheet?.name ?? sheet.name, sourceRange),
+      source:
+        table.sourceTableId !== undefined
+          ? (boundSourceTable?.name ?? "")
+          : sourceNeedsHeaders
+            ? ""
+            : formatRangeReference(sourceSheet?.name ?? sheet.name, sourceRange),
       sourceKind: table.consolidation ? "consolidation" : "range",
       sources:
         table.consolidation?.ranges.map((area) =>
@@ -203,17 +272,44 @@ export function usePivotActions(options: {
       existing: !!existing,
       mode,
     };
-    error.value = sourceNeedsHeaders;
+    const target: PivotDialogTarget = {
+      dialogId: ++dialogId,
+      workbook,
+      generation: options.getGeneration?.(),
+      sheet,
+      sheetId: sheet.id,
+      report: existing,
+      initial,
+      confirm: (draft) => confirm(draft, target),
+      close: () => close(target),
+    };
+    dialog.value = target;
+    error.value = sourceNeedsHeaders || invalidBoundSource;
     errorReason.value = "invalid";
   }
-  function confirm(draft: PivotDraft) {
+  function confirm(draft: PivotDraft, target = dialog.value) {
+    if (!target || dialog.value !== target || confirming || disposed) return;
+    if (!hasTargetIdentity(target)) {
+      close(target);
+      return;
+    }
     if (
-      options.isBusy() ||
-      !target ||
-      target.workbook !== options.getWorkbook() ||
-      editing.value?.table.id !== draft.table.id
+      draft.table.id !== target.initial.table.id ||
+      draft.existing !== !!target.report ||
+      draft.mode !== target.initial.mode ||
+      draft.referenceSheetId !== target.sheetId
     )
       return;
+    if (options.isBusy()) {
+      error.value = true;
+      errorReason.value = "invalid";
+      return;
+    }
+    if (target.report && !canUseSheetPermission(target.sheet, "pivotTables")) {
+      error.value = true;
+      errorReason.value = "protected";
+      return;
+    }
     errorReason.value = "invalid";
     const destination = resolveRangeReference(
       target.workbook,
@@ -225,22 +321,25 @@ export function usePivotActions(options: {
         (!destination ||
           destination.range.start.row !== destination.range.end.row ||
           destination.range.start.column !== destination.range.end.column)) ||
-      (target.existing && (draft.newSheet || destination?.sheetId !== target.sheetId))
+      (target.report && (draft.newSheet || destination?.sheetId !== target.sheetId))
     ) {
       error.value = true;
       return;
     }
-    if (
-      target.existing &&
-      !target.workbook.sheets
-        .get(target.sheetId)
-        ?.pivotTables?.some((table) => table.id === draft.table.id)
-    ) {
-      close();
-      return;
-    }
+    confirming = true;
     try {
       let source = resolvePivotDraftSource(target.workbook, draft);
+      const initialSource = target.initial.table;
+      const normalizedSourceName = (value: string) => value.trim().replace(/^=/, "").toLowerCase();
+      if (
+        !target.report &&
+        draft.sourceKind === "range" &&
+        initialSource.sourceTableId !== undefined &&
+        normalizedSourceName(draft.source) === normalizedSourceName(target.initial.source) &&
+        (source.sourceSheetId !== initialSource.sourceSheetId ||
+          source.sourceTableId !== initialSource.sourceTableId)
+      )
+        throw new RangeError("The captured pivot source table no longer exists.");
       if (source.consolidation && !source.consolidation.pageFields) {
         const upgraded = upgradeLegacyConsolidation({ ...draft.table, ...source });
         source = { ...source, consolidation: upgraded.consolidation };
@@ -300,7 +399,8 @@ export function usePivotActions(options: {
         try {
           before = getPivotTableSource(target.workbook, draft.table).headers;
         } catch {
-          /* A deleted source can be repaired with a new range. */
+          // Bound source mutations preserve the displayed schema until an explicit repair.
+          before = draft.table.dataCache?.headers;
         }
         const previous = fields;
         const oldConsolidation = previous.consolidation;
@@ -312,9 +412,11 @@ export function usePivotActions(options: {
               : -1
             : before
               ? after.indexOf(before[index] ?? "")
-              : index < after.length
-                ? index
-                : -1;
+              : previous.sourceTableId !== undefined
+                ? -1
+                : index < after.length
+                  ? index
+                  : -1;
         fields = {
           ...previous,
           rowFields: previous.rowFields.map(remap).filter((index) => index >= 0),
@@ -390,6 +492,9 @@ export function usePivotActions(options: {
         : createSetPivotTableCommand(destination!.sheetId, table, {
             overwrite: draft.overwrite,
             chartId,
+            ...(draft.existing && draft.mode === "source" && source.sourceTableId !== undefined
+              ? { repairSource: true }
+              : {}),
           });
       const destinationSheet = destination
         ? target.workbook.sheets.get(destination.sheetId)
@@ -398,20 +503,41 @@ export function usePivotActions(options: {
         (draft.newSheet && target.workbook.structureProtected) ||
         (!draft.newSheet &&
           destinationSheet?.properties.protected &&
-          (!target.existing || !canUseSheetPermission(destinationSheet, "pivotTables")))
+          (!target.report || !canUseSheetPermission(destinationSheet, "pivotTables")))
       ) {
         error.value = true;
         errorReason.value = "protected";
         return;
       }
-      options.execute(command);
+      if (!options.execute(command)) {
+        if (dialog.value !== target || disposed) return;
+        error.value = true;
+        if (target.report && !canUseSheetPermission(target.sheet, "pivotTables"))
+          errorReason.value = "protected";
+        else if (
+          target.report &&
+          command.type === "setPivotTable" &&
+          !draft.chart &&
+          hasTargetIdentity(target)
+        ) {
+          const shadowSheet = deserializeSheet(serializeSheet(target.sheet));
+          const shadow: Workbook = {
+            ...target.workbook,
+            sheets: new Map([...target.workbook.sheets, [shadowSheet.id, shadowSheet]]),
+          };
+          if (!applyWorkbookCommand(shadow, command)) close(target);
+        }
+        return;
+      }
+      if (dialog.value !== target || disposed || !hasTargetIdentity(target, false)) return;
       const sheetId = command.type === "addSheet" ? command.sheet.id : destination!.sheetId;
       const created = target.workbook.sheets
         .get(sheetId)
         ?.pivotTables?.find((item) => item.id === table.id);
       if (created) options.activate?.(sheetId, created);
-      close();
+      close(target);
     } catch (cause) {
+      if (dialog.value !== target) return;
       error.value = true;
       const field = cause instanceof WorkbookDomainError ? cause.data.details?.field : undefined;
       if (
@@ -424,6 +550,9 @@ export function usePivotActions(options: {
         field === "destination"
       )
         errorReason.value = field;
+    } finally {
+      confirming = false;
+      if (dialog.value === target && !hasTargetIdentity(target)) close(target);
     }
   }
   function defaultConsolidationLabels(): string[] {
@@ -591,13 +720,14 @@ export function usePivotActions(options: {
     const table = selected();
     if (table) update(table, true);
   }
-  function close() {
-    editing.value = undefined;
-    target = undefined;
+  function close(target = dialog.value) {
+    if (target !== dialog.value) return;
+    dialog.value = undefined;
     error.value = false;
     errorReason.value = "invalid";
   }
   return {
+    dialog,
     editing,
     error,
     errorReason,

@@ -4,6 +4,7 @@ import {
   getPivotDetails,
   getPivotTableRange,
   getPivotSourceRanges,
+  resolvePivotTableSource,
   getPivotPresentation,
   normalizePivotTable,
   normalizePivotTables,
@@ -54,28 +55,44 @@ function literal(value: FormulaValue): CellContent | undefined {
 export function createSetPivotTableCommand(
   sheetId: string,
   table: SheetPivotTable,
-  options: { overwrite?: boolean; chartId?: string } = {},
+  options: { overwrite?: boolean; chartId?: string; repairSource?: boolean } = {},
 ): SetPivotTableCommand {
   return {
     type: "setPivotTable",
     sheetId,
     table: validateCommandPayload("pivot", table, () =>
-      normalizePivotTable({ ...table, dataCache: undefined }),
+      normalizePivotTable({
+        ...table,
+        dataCache:
+          table.sourceTableId === undefined || options.repairSource ? undefined : table.dataCache,
+      }),
     ),
     overwrite: options.overwrite ?? false,
     ...(options.chartId ? { chartId: options.chartId } : {}),
+    ...(options.repairSource !== undefined ? { repairSource: options.repairSource } : {}),
   };
 }
 function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
   const table = normalizePivotTable(command.table);
   const existing = sheet.pivotTables?.find((item) => item.id === table.id);
+  if (command.repairSource) delete table.dataCache;
+  else if (
+    table.sourceTableId !== undefined &&
+    table.sourceTableId === existing?.sourceTableId &&
+    table.sourceSheetId === existing.sourceSheetId
+  ) {
+    table.source = existing.source;
+    table.dataCache = existing.dataCache;
+  }
   if (
     typeof command.overwrite !== "boolean" ||
+    (command.repairSource !== undefined && typeof command.repairSource !== "boolean") ||
     (command.chartId !== undefined && (!command.chartId || typeof command.chartId !== "string"))
   )
     throw invalidCommandPayload("pivot", command);
   if (sheet.properties.protected && (!existing || !sheet.protection?.pivotTables))
     throw invalidCommandPayload("protected", sheet.id);
+  const source = table.consolidation ? undefined : resolvePivotTableSource(workbook, table);
   const result = buildPivotResult(workbook, table);
   const range = result.matrix.length
     ? {
@@ -89,9 +106,10 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
   if (range.end.row >= MAX_SHEET_ROWS || range.end.column >= MAX_SHEET_COLUMNS)
     throw invalidCommandPayload("destination", range);
   if (
-    getPivotSourceRanges(table).some(
-      (area) => area.sheetId === sheet.id && area.range && rangesIntersect(range, area.range),
-    )
+    (source
+      ? [{ sheetId: source.sheet.id, range: source.range }]
+      : getPivotSourceRanges(table)
+    ).some((area) => area.sheetId === sheet.id && area.range && rangesIntersect(range, area.range))
   )
     throw invalidCommandPayload("sourceOverlap", range);
   if (sheet.mergedCells.some((merge) => rangesIntersect(merge, range)))
@@ -220,6 +238,7 @@ function plan(workbook: Workbook, sheet: Sheet, command: SetPivotTableCommand) {
   );
   const nextTable: SheetPivotTable = {
     ...table,
+    ...(source ? { source: source.range } : {}),
     outputRange: result.matrix.length ? range : null,
     dataCache: result.dataCache,
     groups: result.groups,
@@ -393,10 +412,19 @@ export function createPivotDetailsSheetCommand(
   details.headers.forEach((header, column) =>
     setCellContent(sheet, { row: 0, column }, { kind: "literal", value: header }),
   );
+  // Cached rows remain usable after invalidation, but live formatting must not sample stale columns.
+  let ordinarySource: ReturnType<typeof resolvePivotTableSource> | undefined;
+  if (!table.consolidation) {
+    try {
+      ordinarySource = resolvePivotTableSource(workbook, table);
+    } catch {
+      ordinarySource = undefined;
+    }
+  }
   const formats = details.headers.map((_, field) => {
     const area = table.consolidation?.ranges[0];
-    const sourceSheet = workbook.sheets.get(area?.sheetId ?? table.sourceSheetId);
-    const range = area?.range ?? table.source;
+    const sourceSheet = area ? workbook.sheets.get(area.sheetId) : ordinarySource?.sheet;
+    const range = area ? area.range : ordinarySource?.range;
     if (!sourceSheet || !range || (table.consolidation && field > 2)) return undefined;
     const address = table.consolidation
       ? {

@@ -11,16 +11,18 @@ result. Native XLSX support is tracked separately from internal document support
 1. **Tables → PivotTable source correctness and lifecycle.** Tables already have
    Core commands for creation, generated headers, independent filters, styles,
    totals, resizing and conversion. Native XLSX table parts/styles are supported.
-   Single-cell pivot creation now captures a structured table's header/data range,
+   Single-cell pivot creation now binds a structured table's sheet/table identity,
    excluding totals and touching neighboring columns while retaining internal
    blank rows. Explicit multi-cell selections remain explicit. Header-disabled
-   auto-selection requires the user to supply a header-bearing source. This is a
-   captured range, not dynamic table-name linkage.
+   auto-selection requires the user to supply a header-bearing source. Table row
+   growth is read on explicit refresh; cached output does not refresh on export.
 2. **PivotTable workflow.** Creation, new/existing destinations, field pane,
    refresh, source modes, filters, grouping and styles are existing Core-backed
    features. Verify WPS defaults and interrupted/repeated flows. Native pivot
-   definitions/cache are supported within their documented subset. Sources remain
-   fixed ranges; automatic expansion with a source table is not implemented.
+   definitions/cache are supported within their documented subset. Existing range
+   sources remain fixed; new table-backed sources retain their dynamic identity.
+   See [the bounded source contract](table-backed-pivots.md) for repair, cache,
+   snapshot and native-source precedence rules.
 3. **PivotChart and native chart infrastructure.** PivotChart is an existing
    linked internal chart, created with its pivot atomically. Native XLSX currently
    omits it and all other `sheet.drawings`. Start with a genuinely linked clustered
@@ -53,6 +55,12 @@ the export-warning product policy.
   captured workbook, generation, sheet, table and dialog session. Canceled or
   obsolete callbacks cannot mutate a replacement document or newer dialog.
   Busy/protected targets and rejected commands retain the draft safely.
+- Pivot creation, source and move dialogs now use their own captured sessions,
+  including distinct remount keys for the same report. Rejected commands retain
+  the draft. An unchanged existing-report confirmation closes only after Core's
+  exact plan on a disposable destination-sheet copy proves it is a no-op; that
+  check changes no workbook state, activation or history. Picker navigation and
+  document replacement do not transfer old callbacks to a newer session.
 - Insert Table has its own Create Table entry intent with source, header and
   filter controls. The style-gallery entry retains its appearance/table modes.
   Empty source ranges default to generated headers; populated ranges retain the

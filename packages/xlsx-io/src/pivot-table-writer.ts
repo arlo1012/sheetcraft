@@ -20,7 +20,7 @@ import {
   child,
   pivotFingerprint,
 } from "./pivot-xml.js";
-import { pivotValueKey, type PivotCache } from "./pivot-cache.js";
+import { nativePivotSourceFingerprint, pivotValueKey, type PivotCache } from "./pivot-cache.js";
 import { nativePivotFiltersXml } from "./pivot-native-filters.js";
 
 export function pivotTableXml(
@@ -150,6 +150,7 @@ export function pivotTableXml(
     version: 1,
     table: { ...table, dataCache: undefined },
     bindings,
+    cacheSourceFingerprint: nativePivotSourceFingerprint(workbook, table),
     cacheGroupFingerprint: nativeGroupFingerprint(
       table.groups,
       cache.headers.length,

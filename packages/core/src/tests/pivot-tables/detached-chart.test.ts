@@ -105,7 +105,7 @@ describe("retained charts after removing a pivot report", () => {
     );
     const before = f.read();
     const snapshot = serializeWorkbook(f.workbook);
-    expect(snapshot.version).toBe(42);
+    expect(snapshot.version).toBe(43);
     const restored = deserializeWorkbook(snapshot);
     expect(serializeWorkbook(restored)).toEqual(snapshot);
     const sheet = restored.sheets.get(f.destination.id)!;

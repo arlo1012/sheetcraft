@@ -130,7 +130,7 @@ describe("picture annotations", () => {
         );
       else executeWorkbookCommand(session, createSetFloatingImageCommand(sheet.id, floating()));
       const snapshot = serializeWorkbook(session.workbook);
-      expect(snapshot.version).toBe(42);
+      expect(snapshot.version).toBe(43);
       expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
       expect(() => deserializeWorkbook({ ...snapshot, version: 31 })).toThrow();
       const standalone = serializeSheet(sheet);

@@ -1115,6 +1115,8 @@ const imageActions = useSheetImageActions({
 });
 const pivotActions = usePivotActions({
   getWorkbook: () => session.workbook,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
   getSheet: () => activeSheet.value,
   getRange: () => activeSelectionRange.value,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
@@ -1143,8 +1145,17 @@ const pivotActions = usePivotActions({
     multipleLabel: t("pivot.reportMultiple"),
   }),
   activate: (sheetId, table) => {
+    const workbook = session.workbook;
+    const generation = workbookGeneration.value;
     selectSheet(sheetId);
     void nextTick(() => {
+      if (
+        session.workbook !== workbook ||
+        workbookGeneration.value !== generation ||
+        activeSheet.value.id !== sheetId ||
+        !activeSheet.value.pivotTables?.includes(table)
+      )
+        return;
       sheetGridRef.value?.navigateToCell(table.anchor);
       pivotFieldsVisible.value = true;
     });
@@ -1168,7 +1179,12 @@ const pivotActions = usePivotActions({
     void MessagePlugin.error(t("pivot.refreshFailed"));
   },
 });
-const { editing: editingPivot, error: pivotError, errorReason: pivotErrorReason } = pivotActions;
+const {
+  dialog: pivotDialog,
+  editing: editingPivot,
+  error: pivotError,
+  errorReason: pivotErrorReason,
+} = pivotActions;
 const activePivot = computed(() => {
   void workbookRevision.value;
   return pivotActions.selected();
@@ -1237,16 +1253,21 @@ function openPivotFieldSettings(): void {
 }
 const pivotRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingPivotRange, reference: pickedPivotReference } = pivotRangePicker;
-watch(editingPivot, (value) => {
-  if (!value) pivotRangePicker.cancel();
+const selectPivotReference = computed(() => {
+  const dialog = pivotDialog.value;
+  return (current: string): Promise<string | undefined> =>
+    dialog && pivotDialog.value === dialog
+      ? pivotRangePicker.selectReference(current)
+      : Promise.resolve(undefined);
 });
+watch(editingPivot, () => pivotRangePicker.cancel(), { flush: "sync" });
 watch(
   () => activeSheet.value.id,
   () => {
     if (!pickingPivotRange.value) pivotActions.close();
   },
+  { flush: "sync" },
 );
-watch(workbookGeneration, pivotActions.close);
 function editLinkedPivot(id: string) {
   chartActions.close();
   openPivotFields(id);
@@ -4032,18 +4053,18 @@ const gridInert = computed(
     @close="pivotGrouping.close"
   />
   <PivotTableDialog
-    v-if="editingPivot"
-    :key="editingPivot.table.id"
-    :initial="editingPivot"
+    v-if="pivotDialog"
+    :key="pivotDialog.dialogId"
+    :initial="pivotDialog.initial"
     :workbook="session.workbook"
     :revision="workbookRevision"
     :disabled="loading || fileBusy || xlsxBusy"
     :error="pivotError"
     :error-reason="pivotErrorReason"
     :suspended="pickingPivotRange"
-    :select-reference="pivotRangePicker.selectReference"
-    @confirm="pivotActions.confirm"
-    @close="pivotActions.close"
+    :select-reference="selectPivotReference"
+    @confirm="pivotDialog.confirm"
+    @close="pivotDialog.close"
   />
   <RangeReferencePicker
     v-if="pickingPivotRange"
