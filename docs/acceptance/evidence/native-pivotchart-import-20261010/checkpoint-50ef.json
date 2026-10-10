@@ -1,0 +1,29 @@
+{
+  "repository": "arlo1012/sheetcraft",
+  "branch": "refactor/native-xlsx-20261009",
+  "head": "50ef1ad61e0e29b1d693252de21f79d540a8d25a",
+  "parent": "32f0a5b28af1e2215f087cc938128e864417ed34",
+  "tree": "5d9120a6a4fc726e3719df6eef52cbe8ce1db9d3",
+  "remoteVerified": true,
+  "force": false,
+  "paths": 24,
+  "status": "WIP; final Excel first-open normal, refresh/save/reopen pending at commit",
+  "checks": {
+    "xlsxFiles": 75,
+    "xlsxTests": 951,
+    "focusedFiles": 4,
+    "focusedTests": 90,
+    "types": true,
+    "build": true,
+    "scopedLint": true,
+    "scopedFormat": true,
+    "webTypecheck": true,
+    "remoteStatuses": [],
+    "remoteCheckRuns": []
+  },
+  "author": {
+    "name": "arlo.wang",
+    "email": "75329932+arlo1012@users.noreply.github.com"
+  },
+  "credentialsOrScreenshotsIncluded": false
+}

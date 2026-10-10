@@ -45,8 +45,94 @@ function edit(
   if (before === after) throw new Error(`No-op test mutation: ${part}`);
   entries[part] = strToU8(after);
 }
+const wpsSavedChartProperties =
+  '<c:extLst><c:ext uri="{0b15fc19-7d7d-44ad-8c2d-2c3a37ce22c3}"><chartProps xmlns="https://web.wps.cn/et/2018/main" chartId="{00000000-1111-2222-3333-444444444444}"/></c:ext></c:extLst>';
+async function wpsSavedVariant(extension = wpsSavedChartProperties) {
+  const fixture = nativeChartFixture();
+  const entries = unzipSync((await encodeXlsx(fixture.workbook)).bytes);
+  edit(entries, "xl/charts/chart1.xml", (xml) =>
+    xml.replace("</c:chart>", `${extension}</c:chart>`),
+  );
+  edit(entries, "xl/drawings/drawing1.xml", (xml) =>
+    xml.replace('<a:off x="0" y="0"/>', '<a:off x="1660525" y="1320800"/>'),
+  );
+  return { entries, fixture };
+}
 
 describe("bounded native linked clustered-column PivotChart import", () => {
+  test("imports the observed WPS save-only properties leaf and absolute one-cell frame", async () => {
+    const { entries, fixture } = await wpsSavedVariant();
+    const result = await decodeXlsx(zipSync(entries));
+    const { drawing, data } = importedChart(result.workbook, fixture.output.name);
+    expect(drawing.chart.pivotTableId).toBe(fixture.pivot.id);
+    expect(data.categories).toEqual(["east", "north", "south"]);
+    expect(data.series[0]!.values).toEqual([60, 100, 120]);
+    expect(
+      result.report.issues.some(
+        (issue) =>
+          issue.code === "dimension-approximated" &&
+          issue.locations.includes("xl/drawings/drawing1.xml"),
+      ),
+    ).toBe(true);
+    expect(
+      importedChart(
+        (await decodeXlsx((await encodeXlsx(result.workbook)).bytes)).workbook,
+        fixture.output.name,
+      ).data,
+    ).toEqual(data);
+  });
+
+  test.each([
+    wpsSavedChartProperties.replace("{0b15fc19-7d7d-44ad-8c2d-2c3a37ce22c3}", "unknown"),
+    wpsSavedChartProperties.replace("https://web.wps.cn/et/2018/main", "urn:unknown"),
+    wpsSavedChartProperties.replace("{00000000-1111-2222-3333-444444444444}", "not-a-guid"),
+    wpsSavedChartProperties.replace(' chartId="{00000000-1111-2222-3333-444444444444}"', ""),
+    wpsSavedChartProperties.replace("chartId=", 'other="unexpected" chartId='),
+    wpsSavedChartProperties.replace(" uri=", ' target="unknown" uri='),
+    wpsSavedChartProperties.replace("/></c:ext>", "><payload/></chartProps></c:ext>"),
+    wpsSavedChartProperties.replace("/></c:ext>", ">text</chartProps></c:ext>"),
+    wpsSavedChartProperties.replace("</c:extLst>", '<c:ext uri="unknown"/></c:extLst>'),
+  ])("keeps unrecognized WPS extension variants blocked (%#)", async (extension) => {
+    const { entries } = await wpsSavedVariant(extension);
+    await expect(decodeXlsx(zipSync(entries))).rejects.toBeInstanceOf(XlsxCompatibilityError);
+  });
+
+  test("does not admit the properties leaf outside the observed chart extension location", async () => {
+    const { entries } = await wpsSavedVariant();
+    edit(entries, "xl/charts/chart1.xml", (xml) =>
+      xml
+        .replace(wpsSavedChartProperties, "")
+        .replace("</c:chartSpace>", `${wpsSavedChartProperties}</c:chartSpace>`),
+    );
+    await expect(decodeXlsx(zipSync(entries))).rejects.toBeInstanceOf(XlsxCompatibilityError);
+  });
+
+  test.each(["unmarked", "negative", "extent-mismatch"] as const)(
+    "omits unproved absolute one-cell placement (%s)",
+    async (kind) => {
+      const { entries, fixture } = await wpsSavedVariant();
+      if (kind === "unmarked")
+        edit(entries, "xl/charts/chart1.xml", (xml) => xml.replace(wpsSavedChartProperties, ""));
+      else
+        edit(entries, "xl/drawings/drawing1.xml", (xml) =>
+          kind === "negative"
+            ? xml.replace('x="1660525"', 'x="-1"')
+            : xml.replace(/(<a:ext cx=")[^"]+/, "$110"),
+        );
+      const result = await decodeXlsx(zipSync(entries));
+      expect(
+        [...result.workbook.sheets.values()].find((sheet) => sheet.name === fixture.output.name)!
+          .drawings ?? [],
+      ).toHaveLength(0);
+      expect(
+        result.report.issues.some(
+          (issue) =>
+            issue.code === "feature-omitted" && issue.locations.includes("xl/charts/chart1.xml"),
+        ),
+      ).toBe(true);
+    },
+  );
+
   test.each([
     ["native-created", 100],
     ["native-source-edited-stale", 100],

@@ -179,7 +179,13 @@ export function readXlsxPivotCharts(
         )
           throw new Error("Native chart caches do not match saved report.");
       }
-      const geometry = readNativeChartGeometry(sheet, part.anchorKind, part.anchor, part.frame);
+      const geometry = readNativeChartGeometry(
+        sheet,
+        part.anchorKind,
+        part.anchor,
+        part.frame,
+        part.wpsChartProperties,
+      );
       const name = attr(
         child(single(part.frame, "nvGraphicFramePr"), "cNvPr"),
         "name",

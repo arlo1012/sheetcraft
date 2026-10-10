@@ -1,7 +1,8 @@
 # Native linked PivotChart export
 
 This is the initial, producer-verified export slice on `refactor/native-xlsx-20261009`.
-It does not complete the insert roadmap or implement native chart import.
+It does not complete the insert roadmap. The subsequent bounded native import
+slice is documented in [native-pivotchart-import.md](native-pivotchart-import.md).
 
 ## Contract
 
@@ -17,8 +18,9 @@ It does not complete the insert roadmap or implement native chart import.
   until the user explicitly refreshes the PivotTable. Export never refreshes it.
 - Chart numeric/category caches exclude grand totals. Formula references address
   actual report cells; series title caches agree with their header references.
-- Native `rowItems`/`colItems` refer to `pivotField.items` indices in cache order,
-  while their emitted order follows the cached report. Grand totals are identified
+- Native `rowItems`/`colItems` refer to the actual `pivotField.items` positions,
+  including preserved manual order, while their emitted order follows the cached
+  report. Shared-item cache identities remain unchanged. Grand totals are identified
   structurally, never by a translated caption.
 - Reuse the worksheet's existing picture drawing. Allocate unique drawing object
   IDs, relationship IDs, and chart part names. Notes/VML and worksheet backgrounds
@@ -34,9 +36,10 @@ Invalid/unrepresentable identity text also omits the chart. No dangling chart
 relationship is created in these cases.
 
 Native palette/typography and generic drawing decoration fidelity are not complete;
-an exported chart records `style-omitted` at its `.style` location. Native drawing
-import remains blocked by the existing package preflight, so encode/decode chart
-round-trip is not an acceptance claim.
+an exported chart records `style-omitted` at its `.style` location. Generic drawing import remains blocked by package preflight. The subsequent
+[bounded native import slice](native-pivotchart-import.md) permits only the
+validated linked clustered-column package graph and records its own roundtrip
+acceptance.
 
 The WPS name check established a raw pivot identity containing `Sales O'Brien`
 and separately quoted/doubled-apostrophe formula references. Other special-name

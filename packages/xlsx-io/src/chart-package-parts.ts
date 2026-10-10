@@ -19,6 +19,8 @@ const TYPES_NS = "http://schemas.openxmlformats.org/package/2006/content-types";
 const STYLE_NS = "http://schemas.microsoft.com/office/drawing/2012/chartStyle";
 const MC_NS = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 const C14_NS = "http://schemas.microsoft.com/office/drawing/2007/8/2/chart";
+const WPS_CHART_NS = "https://web.wps.cn/et/2018/main";
+const WPS_CHART_PROPERTIES_URI = "{0b15fc19-7d7d-44ad-8c2d-2c3a37ce22c3}";
 const DRAWING_MIME = "application/vnd.openxmlformats-officedocument.drawing+xml";
 const CHART_MIME = "application/vnd.openxmlformats-officedocument.drawingml.chart+xml";
 const preservedParser = new XMLParser({
@@ -236,6 +238,7 @@ function strictRoot(
     inherited: ReadonlyMap<string, string>,
     root = false,
     parent = "",
+    ancestors: readonly string[] = [],
   ) => {
     for (const entry of values(value)) {
       const node = entry && typeof entry === "object" ? (entry as XmlNode) : {};
@@ -271,6 +274,10 @@ function strictRoot(
         (namespace === CHART_NS && ns === ART_NS && !artElements.has(localName!)) ||
         (namespace === CHART_NS && artElements.has(localName!) && ns !== ART_NS) ||
         (namespace === CHART_NS && ns === C14_NS && !c14Elements.has(localName!)) ||
+        (namespace === CHART_NS &&
+          ns === WPS_CHART_NS &&
+          (localName !== "chartProps" || ancestors.join("/") !== "chartSpace/chart/extLst/ext")) ||
+        (namespace === CHART_NS && localName === "chartProps" && ns !== WPS_CHART_NS) ||
         (namespace === CHART_NS &&
           ns === MC_NS &&
           !["AlternateContent", "Choice", "Fallback"].includes(localName!)) ||
@@ -310,7 +317,7 @@ function strictRoot(
       }
       for (const [childKey, content] of Object.entries(node))
         if (!childKey.startsWith("@_") && childKey !== "#text")
-          walk(childKey, content, bindings, false, localName);
+          walk(childKey, content, bindings, false, localName, [...ancestors, localName!]);
     }
   };
   walk(roots[0]!, raw[roots[0]!], new Map(), true);
@@ -361,6 +368,7 @@ export type NativePivotChartPart = {
   anchor: XmlNode;
   frame: XmlNode;
   chartSpace: XmlNode;
+  wpsChartProperties: boolean;
 };
 export type NativeChartPackage = {
   parts: ReadonlySet<string>;
@@ -539,6 +547,7 @@ export async function collectNativePivotChartParts(
         ART_NS,
         MC_NS,
         C14_NS,
+        WPS_CHART_NS,
       ]);
       only(chartSpace, [
         "date1904",
@@ -580,7 +589,33 @@ export async function collectNativePivotChartParts(
         "plotVisOnly",
         "dispBlanksAs",
         "showDLblsOverMax",
+        "extLst",
       ]);
+      // WPS adds this inert chart UUID only after saving an exported chart. Admit
+      // that observed leaf, not arbitrary extension namespaces or payloads.
+      if (nativeChart.extLst !== undefined) {
+        const extensions = single(nativeChart, "extLst");
+        only(extensions, ["ext"]);
+        const extension = single(extensions, "ext");
+        only(extension, ["chartProps"]);
+        if (
+          attr(extension, "uri") !== WPS_CHART_PROPERTIES_URI ||
+          Object.keys(extension).some(
+            (key) => key.startsWith("@_") && !key.startsWith("@_xmlns") && key !== "@_uri",
+          )
+        )
+          reject();
+        const properties = single(extension, "chartProps");
+        only(properties, []);
+        if (
+          Object.keys(properties).some(
+            (key) => key.startsWith("@_") && !key.startsWith("@_xmlns") && key !== "@_chartId",
+          ) ||
+          (properties["#text"] !== undefined && String(properties["#text"]).trim() !== "") ||
+          !/^\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}$/i.test(attr(properties, "chartId"))
+        )
+          reject();
+      }
       const plot = single(nativeChart, "plotArea");
       only(plot, ["layout", "barChart", "catAx", "valAx", "spPr"]);
       const bar = single(plot, "barChart");
@@ -669,6 +704,7 @@ export async function collectNativePivotChartParts(
         anchor,
         frame,
         chartSpace,
+        wpsChartProperties: nativeChart.extLst !== undefined,
       });
     }
     if (used.size !== drawingRelations.size) reject();

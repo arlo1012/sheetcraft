@@ -1,0 +1,37 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+ ❯ src/tests/pivot-tables/native-chart-import.test.ts (80 tests | 3 failed) 2667ms
+     × omits unproved absolute one-cell placement (unmarked) 54ms
+     × omits unproved absolute one-cell placement (negative) 47ms
+     × omits unproved absolute one-cell placement (extent-mismatch) 40ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/pivot-tables/native-chart-import.test.ts > bounded native linked clustered-column PivotChart import > omits unproved absolute one-cell placement (unmarked)
+ FAIL  src/tests/pivot-tables/native-chart-import.test.ts > bounded native linked clustered-column PivotChart import > omits unproved absolute one-cell placement (negative)
+ FAIL  src/tests/pivot-tables/native-chart-import.test.ts > bounded native linked clustered-column PivotChart import > omits unproved absolute one-cell placement (extent-mismatch)
+AssertionError: expected [] to be undefined
+
+- Expected:
+undefined
+
++ Received:
+[]
+
+ ❯ src/tests/pivot-tables/native-chart-import.test.ts:126:9
+    124|         [...result.workbook.sheets.values()].find((sheet) => sheet.nam…
+    125|           .drawings,
+    126|       ).toBeUndefined();
+       |         ^
+    127|       expect(
+    128|         result.report.issues.some(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  3 failed | 85 passed (88)
+   Start at  11:10:24
+   Duration  6.47s (transform 1.35s, setup 0ms, import 2.33s, tests 3.86s, environment 0ms)
+

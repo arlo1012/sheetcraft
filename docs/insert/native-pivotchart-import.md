@@ -1,7 +1,8 @@
 # Bounded native linked PivotChart import
 
 This slice admits the current Sheetcraft clustered-column export and the three
-committed WPS producer samples. It is not generic drawing or chart import.
+committed WPS producer samples, plus the observed WPS post-save chart-properties
+leaf and absolute one-cell frame variant. It is not generic drawing or chart import.
 
 ## Import contract
 
@@ -21,7 +22,9 @@ committed WPS producer samples. It is not generic drawing or chart import.
   refresh command updates the report and linked chart together. No static chart
   cache detaches the drawing from its PivotTable.
 - One-cell geometry is validated. WPS two-cell frame geometry is projected to Core
-  physical sizes with `dimension-approximated`; native decoration/palette fidelity
+  physical sizes with `dimension-approximated`. WPS post-save absolute one-cell
+  origins use that same disclosed physical projection only after validation of
+  the observed inert chart-properties leaf; native decoration/palette fidelity
   reports `style-omitted`. Geometry fidelity is not an acceptance claim.
 
 ## Boundaries
@@ -50,3 +53,19 @@ and [native example](https://learn.microsoft.com/en-us/dotnet/api/documentformat
 show the corresponding child ordering.
 
 See [the acceptance record](../acceptance/native-pivotchart-import-20261010.md).
+
+## WPS post-save variant
+
+Saving/refreshing a product-created file in real WPS added an inert leaf at
+`c:chart/c:extLst/c:ext/chartProps`: namespace `https://web.wps.cn/et/2018/main`,
+extension URI `{0b15fc19-7d7d-44ad-8c2d-2c3a37ce22c3}`, one GUID-shaped `chartId`,
+no other attributes, text or children. It also rewrote a one-cell graphic frame
+from zero relative origin to a bounded absolute physical origin. Initially this
+variant was blocked, then its chart was omitted for the unproved frame transform.
+Both initial failures are kept in the acceptance record.
+
+Only this observed leaf at this exact ancestor path is admitted. Different
+namespaces, URIs, IDs, extra payload/attributes, duplicate extensions or relocation
+remain blocked. An unmarked, negative, mismatched-extent or out-of-bounds absolute
+one-cell frame is not attached. Recognition is format validation, not proof of
+producer authenticity, and does not enable any outgoing relationships or assets.

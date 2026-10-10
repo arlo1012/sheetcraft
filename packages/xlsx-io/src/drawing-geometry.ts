@@ -67,12 +67,13 @@ export function nativeDrawingAnchor(
   };
 }
 
-/** Project the supported producer anchors into Core; two-cell placement is approximate. */
+/** Project supported producer anchors; physical WPS frame placement is approximate. */
 export function readNativeChartGeometry(
   sheet: Sheet,
   kind: "oneCellAnchor" | "twoCellAnchor",
   anchor: XmlNode,
   frame: XmlNode,
+  wpsChartProperties = false,
 ) {
   const integer = (value: unknown, maximum: number): number => {
     if (typeof value !== "string" || !/^\d+$/.test(value))
@@ -96,26 +97,32 @@ export function readNativeChartGeometry(
   const height = integer(attr(extent, "cy"), 16384 * EMU_PER_PIXEL) / EMU_PER_PIXEL;
   if (width < 1 || height < 1) throw new Error("Invalid chart geometry.");
   let start = from;
+  const off = child(transform, "off");
+  const absoluteFrame =
+    kind === "twoCellAnchor" ||
+    (wpsChartProperties && (attr(off, "x") !== "0" || attr(off, "y") !== "0"));
   if (kind === "twoCellAnchor") {
     const to = marker(child(anchor, "to"));
     if (to.row < from.row || to.column < from.column) throw new Error("Reversed chart anchor.");
-    const off = child(transform, "off");
-    // WPS's two-cell markers and its physical frame disagree under Core's width
+  } else if (
+    (!absoluteFrame && (attr(off, "x") !== "0" || attr(off, "y") !== "0")) ||
+    attr(frameExtent, "cx") !== attr(extent, "cx") ||
+    attr(frameExtent, "cy") !== attr(extent, "cy")
+  ) {
+    throw new Error("Unsupported one-cell frame transform.");
+  }
+  if (absoluteFrame) {
+    // WPS's markers and its physical frame disagree under Core's width
     // and default-row baseline. Preserve frame physical dimensions/origin and
     // disclose approximation rather than asserting exact marker round-trip.
+    // A saved one-cell absolute frame is admitted only with the strictly
+    // validated WPS chart-properties leaf observed in the real saved variant.
     start = {
       row: 0,
       column: 0,
       offsetX: integer(attr(off, "x"), 1000000 * EMU_PER_PIXEL) / EMU_PER_PIXEL,
       offsetY: integer(attr(off, "y"), 1000000 * EMU_PER_PIXEL) / EMU_PER_PIXEL,
     };
-  } else if (
-    attr(child(transform, "off"), "x") !== "0" ||
-    attr(child(transform, "off"), "y") !== "0" ||
-    attr(frameExtent, "cx") !== attr(extent, "cx") ||
-    attr(frameExtent, "cy") !== attr(extent, "cy")
-  ) {
-    throw new Error("Unsupported one-cell frame transform.");
   }
   const normalized = nativeDrawingAnchor(
     sheet,
@@ -132,6 +139,6 @@ export function readNativeChartGeometry(
     offsetY: normalized.tl.nativeRowOff / EMU_PER_PIXEL,
     width,
     height,
-    approximated: kind === "twoCellAnchor",
+    approximated: absoluteFrame,
   };
 }

@@ -1,0 +1,15 @@
+$ tsc --noEmit -p tsconfig.test.json
+$ tsc -b tsconfig.build.json
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 3ms on 5 files using 9 threads.
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+
+ Test Files  2 passed (2)
+      Tests  88 passed (88)
+   Start at  11:15:55
+   Duration  5.96s (transform 1.23s, setup 0ms, import 2.10s, tests 3.60s, environment 0ms)
+

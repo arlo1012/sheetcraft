@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+
+ Test Files  2 passed (2)
+      Tests  88 passed (88)
+   Start at  11:11:20
+   Duration  6.19s (transform 1.32s, setup 0ms, import 2.19s, tests 3.74s, environment 0ms)
+

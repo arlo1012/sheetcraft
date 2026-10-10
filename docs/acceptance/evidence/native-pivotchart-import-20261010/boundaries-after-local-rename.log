@@ -1,0 +1,253 @@
+Architecture boundary check failed:
+- packages/core/src/history.ts:116 runtime-neutral packages cannot reference browser global history
+  if (history.maxEntries <= 0) return undefined;
+- packages/core/src/history.ts:117 runtime-neutral packages cannot reference browser global history
+  const id = history.nextReplacementToken++;
+- packages/core/src/history.ts:118 runtime-neutral packages cannot reference browser global history
+  history.activeReplacementToken = id;
+- packages/core/src/history.ts:119 runtime-neutral packages cannot reference browser global history
+  return { scope: history.replacementScope, id, revision: history.revision };
+- packages/core/src/history.ts:125 runtime-neutral packages cannot reference browser global history
+  return history.activeReplacementToken === undefined
+- packages/core/src/history.ts:128 runtime-neutral packages cannot reference browser global history
+  scope: history.replacementScope,
+- packages/core/src/history.ts:129 runtime-neutral packages cannot reference browser global history
+  id: history.activeReplacementToken,
+- packages/core/src/history.ts:130 runtime-neutral packages cannot reference browser global history
+  revision: history.revision,
+- packages/core/src/history.ts:139 runtime-neutral packages cannot reference browser global history
+  token.scope === history.replacementScope &&
+- packages/core/src/history.ts:140 runtime-neutral packages cannot reference browser global history
+  token.revision === history.revision &&
+- packages/core/src/history.ts:141 runtime-neutral packages cannot reference browser global history
+  token.id === history.activeReplacementToken
+- packages/core/src/history.ts:153 runtime-neutral packages cannot reference browser global history
+  const history = session.history;
+- packages/core/src/history.ts:154 runtime-neutral packages cannot reference browser global history
+  const newest = history.undoStack.at(-1);
+- packages/core/src/history.ts:155 runtime-neutral packages cannot reference browser global history
+  if (token && !isCurrentReplacementToken(history, token)) {
+- packages/core/src/history.ts:174 runtime-neutral packages cannot reference browser global history
+  history.undoStack.pop();
+- packages/core/src/history.ts:175 runtime-neutral packages cannot reference browser global history
+  history.revision += 1;
+- packages/core/src/history.ts:179 runtime-neutral packages cannot reference browser global history
+  token: currentReplacementToken(history),
+- packages/core/src/history.ts:184 runtime-neutral packages cannot reference browser global history
+  history.revision += 1;
+- packages/core/src/history.ts:188 runtime-neutral packages cannot reference browser global history
+  token: currentReplacementToken(history),
+- packages/core/src/history.ts:196 runtime-neutral packages cannot reference browser global history
+  const issued = token ?? createReplacementToken(history);
+- packages/core/src/history.ts:199 runtime-neutral packages cannot reference browser global history
+  const issued = token ?? createReplacementToken(history);
+- packages/core/src/history.ts:201 runtime-neutral packages cannot reference browser global history
+  history.redoStack.splice(0);
+- packages/core/src/history.ts:202 runtime-neutral packages cannot reference browser global history
+  history.revision += 1;
+- packages/core/src/history.ts:206 runtime-neutral packages cannot reference browser global history
+  history.undoStack,
+- packages/core/src/history.ts:208 runtime-neutral packages cannot reference browser global history
+  history.maxEntries,
+- packages/core/src/history.ts:210 runtime-neutral packages cannot reference browser global history
+  history.redoStack.splice(0);
+- packages/core/src/history.ts:211 runtime-neutral packages cannot reference browser global history
+  history.revision += 1;
+- packages/core/src/history.ts:215 runtime-neutral packages cannot reference browser global history
+  token: currentReplacementToken(history),
+- packages/core/src/planning-grg-discrete.ts:16 runtime-neutral packages cannot reference browser global Node
+  type Node = Readonly<{ bounds: readonly Bounds[]; initial: readonly number[] }>;
+- packages/core/src/planning-grg-discrete.ts:109 runtime-neutral packages cannot reference browser global Node
+  const queue: Node[] = [
+- packages/xlsx-io/src/pivot-table-reader.ts:257 runtime-neutral packages cannot reference browser global location
+  const location = parseRange(attr(child(root, "location"), "ref"));
+- packages/xlsx-io/src/pivot-table-reader.ts:343 runtime-neutral packages cannot reference browser global location
+  row: Math.max(0, location.start.row - (filters.length ? filters.length + 1 : 0)),
+- packages/xlsx-io/src/pivot-table-reader.ts:348 runtime-neutral packages cannot reference browser global location
+  row: Math.max(0, location.start.row - (filters.length ? filters.length + 1 : 0)),
+- packages/xlsx-io/src/pivot-table-reader.ts:350 runtime-neutral packages cannot reference browser global location
+  end: location.end,
+- packages/xlsx-io/src/pivot-charts.ts:212 runtime-neutral packages cannot reference browser global location
+  report?.add("style-omitted", "warning", `${location}.style`);
+- packages/xlsx-io/src/hyperlinks.ts:110 runtime-neutral packages cannot reference browser global location
+  const location = attribute(attrs, "location");
+- packages/xlsx-io/src/pivot-table-writer.ts:40 runtime-neutral packages cannot reference browser global location
+  const location = {
+- packages/xlsx-io/src/pivot-table-writer.ts:132 runtime-neutral packages cannot reference browser global location
+  const native = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><pivotTableDefinition xmlns="${MAIN_NS}" xmlns:r="${REL_NS}" name="${xml(nativeName)}" cacheId="${cacheId}" dataCaption="Values" grandTotalCaption="${xml(table.totalLabel)}" missingCaption="" showMissing="1" rowGrandTotals="${table.columnTotals ? 1 : 0}" colGrandTotals="${table.rowTotals ? 1 : 0}" compact="${presentation.layout === "compact" ? 1 : 0}" compactData="${presentation.layout === "compact" ? 1 : 0}" outline="${presentation.layout === "tabular" ? 0 : 1}" showHeaders="${presentation.rowHeaders || presentation.columnHeaders ? 1 : 0}"${headerCaptions} multipleFieldFilters="1" preserveFormatting="1" useAutoFormatting="1" createdVersion="6" updatedVersion="6" minRefreshableVersion="3"${table.values.length > 1 ? ` dataPosition="${table.columnFields.length}"` : ""}><location ref="${rangeRef(location)}" firstHeaderRow="${Math.max(0, result.headerRows - result.headerStart - 1)}" firstDataRow="${Math.max(1, result.headerRows - result.headerStart)}" firstDataCol="${result.rowLabelColumns}"${table.filters.length ? ` rowPageCount="${table.filters.length}" colPageCount="1"` : ""}/><pivotFields count="${cache.headers.length}">${fields}</pivotFields>${list("rowFields", rowFields)}${axisItems.rowItems}${list("colFields", columnFields)}${axisItems.colItems}${pageFields ? `<pageFields count="${table.filters.length}">${pageFields}</pageFields>` : ""}${
+- packages/xlsx-io/src/pivot-tables.ts:186 runtime-neutral packages cannot reference browser global location
+  let location = `${sheet.name}.pivotTable`;
+- packages/xlsx-io/src/pivot-tables.ts:188 runtime-neutral packages cannot reference browser global location
+  location = relation.target;
+- packages/xlsx-io/src/pivot-tables.ts:219 runtime-neutral packages cannot reference browser global location
+  report.add("feature-omitted", "warning", location);
+- apps/web/src/modules/pivot-tables/components/PivotGroupingDialog.vue:240 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  color: var(--td-error-color);
+- apps/web/src/modules/review-tools/components/TextReviewDialog.vue:144 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  color: var(--td-text-color-secondary);
+- apps/web/src/modules/review-tools/components/TextReviewDialog.vue:148 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  background: var(--td-bg-color-secondarycontainer);
+- apps/web/src/modules/text-proofreading/components/DictionaryManager.vue:330 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-right: 1px solid var(--td-component-border);
+- apps/web/src/modules/text-proofreading/components/DictionaryManager.vue:359 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-bottom: 1px solid var(--td-component-border);
+- apps/web/src/modules/text-proofreading/components/ProofreadingToolbar.vue:83 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-right: 1px solid var(--td-component-border);
+- apps/web/src/modules/cell-styles/components/NewCellStyleDialog.vue:367 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .new-cell-style-dialog dt :deep(.t-checkbox) {
+- apps/web/src/modules/data-tools/components/AdvancedFilterDialog.vue:168 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  color: var(--td-error-color);
+- apps/web/src/modules/data-tools/components/SubtotalDialog.vue:141 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-color: var(--td-border-level-2-color);
+- apps/web/src/modules/data-tools/components/SubtotalDialog.vue:142 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-radius: var(--td-radius-default);
+- apps/web/src/modules/data-tools/components/SubtotalDialog.vue:143 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  background: var(--td-bg-color-specialcomponent);
+- apps/web/src/modules/data-tools/components/FixedWidthSplitEditor.vue:219 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-left: 1px solid var(--td-brand-color);
+- apps/web/src/modules/data-tools/components/FixedWidthSplitEditor.vue:231 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  color: var(--td-brand-color);
+- apps/web/src/modules/data-tools/components/DropdownListDialog.vue:408 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  --td-comp-margin-xxl: 0;
+- apps/web/src/modules/data-tools/components/DropdownListDialog.vue:440 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  color: var(--td-error-color);
+- apps/web/src/modules/data-tools/components/LookupFillDialog.vue:455 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  color: var(--td-error-color);
+- apps/web/src/modules/data-tools/components/DataComparisonDialog.vue:297 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-color: var(--td-border-level-2-color);
+- apps/web/src/modules/data-tools/components/DataComparisonDialog.vue:298 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-radius: var(--td-radius-default);
+- apps/web/src/modules/data-tools/components/DataComparisonDialog.vue:299 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  background: var(--td-bg-color-specialcomponent);
+- apps/web/src/modules/data-tools/components/TextToColumnsDialog.vue:748 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  color: var(--td-error-color);
+- apps/web/src/modules/page-decorations/components/BackgroundWatermarkConflictDialog.vue:85 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  color: var(--td-text-color-primary);
+- apps/web/src/modules/page-decorations/components/BackgroundWatermarkConflictDialog.vue:107 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  color: var(--td-text-color-primary);
+- apps/web/src/modules/page-decorations/components/BackgroundWatermarkConflictDialog.vue:112 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  color: var(--td-text-color-secondary);
+- apps/web/src/modules/workbook/components/WorkbookFormulaBar.vue:539 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  --formula-bar-action-size: var(--td-comp-size-m);
+- apps/web/src/modules/workbook/components/WorkbookFormulaBar.vue:570 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  height: var(--td-comp-size-m);
+- apps/web/src/modules/workbook/components/WorkbookFindFormatPreview.vue:169 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border: 1px solid var(--td-component-stroke);
+- apps/web/src/modules/workbook/components/WorkbookFindFormatPreview.vue:170 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-radius: var(--td-radius-default);
+- apps/web/src/modules/workbook/components/WorkbookFindFormatPreview.vue:171 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  background: var(--td-bg-color-container);
+- apps/web/src/app/SpreadsheetWorkspace.vue:1791 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  const dialog = event.target instanceof Element ? event.target.closest(".t-dialog") : null;
+- apps/web/src/shared/styles/_tdesign-table.scss:2 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__pagination {
+- apps/web/src/shared/styles/_tdesign-table.scss:3 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  padding: var(--td-comp-paddingTB-s);
+- apps/web/src/shared/styles/_tdesign-table.scss:6 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  // .t-table 前 不是 .search-tools
+- apps/web/src/shared/styles/_tdesign-table.scss:7 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table:not(.search-tools + .t-table) {
+- apps/web/src/shared/styles/_tdesign-table.scss:8 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__content {
+- apps/web/src/shared/styles/_tdesign-table.scss:9 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-top-left-radius: var(--td-radius-default);
+- apps/web/src/shared/styles/_tdesign-table.scss:10 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-top-right-radius: var(--td-radius-default);
+- apps/web/src/shared/styles/_tdesign-table.scss:13 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  // 当 .t-table 后面不是分页时生效
+- apps/web/src/shared/styles/_tdesign-table.scss:14 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__content:not(:has(+ .t-table__pagination-wrap > .t-table__pagination)) {
+- apps/web/src/shared/styles/_tdesign-table.scss:15 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-bottom-left-radius: var(--td-radius-default);
+- apps/web/src/shared/styles/_tdesign-table.scss:16 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-bottom-right-radius: var(--td-radius-default);
+- apps/web/src/shared/styles/_tdesign-table.scss:20 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table.t-table--bordered:has(.t-table__pagination-wrap > .t-table__pagination) {
+- apps/web/src/shared/styles/_tdesign-table.scss:21 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table--layout-fixed,
+- apps/web/src/shared/styles/_tdesign-table.scss:22 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table--layout-auto {
+- apps/web/src/shared/styles/_tdesign-table.scss:23 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  box-shadow: 0 0.0625em 0 0 var(--td-component-border);
+- apps/web/src/shared/styles/_tdesign-table.scss:26 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__pagination {
+- apps/web/src/shared/styles/_tdesign-table.scss:28 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-radius: 0 0 var(--td-radius-default) var(--td-radius-default);
+- apps/web/src/shared/styles/_tdesign-table.scss:30 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  inset -0.0625em 0 0 0 var(--td-gray-color-2),
+- apps/web/src/shared/styles/_tdesign-table.scss:31 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  inset 0.0625em 0 0 0 var(--td-gray-color-2),
+- apps/web/src/shared/styles/_tdesign-table.scss:32 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  inset 0 -0.0625em 0 0 var(--td-gray-color-2);
+- apps/web/src/shared/styles/_tdesign-table.scss:36 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table.t-table--bordered:not(:has(.t-table__pagination-wrap > .t-table__pagination)) {
+- apps/web/src/shared/styles/_tdesign-table.scss:37 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table--layout-fixed,
+- apps/web/src/shared/styles/_tdesign-table.scss:38 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table--layout-auto {
+- apps/web/src/shared/styles/_tdesign-table.scss:39 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-bottom: 0.0625em solid var(--td-component-border);
+- apps/web/src/shared/styles/_tdesign-table.scss:44 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table:not(.t-table--bordered):has(.t-table__pagination-wrap > .t-table__pagination) {
+- apps/web/src/shared/styles/_tdesign-table.scss:45 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__content {
+- apps/web/src/shared/styles/_tdesign-table.scss:46 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border: 0.0625em solid var(--td-component-border);
+- apps/web/src/shared/styles/_tdesign-table.scss:49 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__pagination {
+- apps/web/src/shared/styles/_tdesign-table.scss:51 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border-radius: 0 0 var(--td-radius-default) var(--td-radius-default);
+- apps/web/src/shared/styles/_tdesign-table.scss:53 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  inset -0.0625em 0 0 0 var(--td-gray-color-2),
+- apps/web/src/shared/styles/_tdesign-table.scss:54 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  inset 0.0625em 0 0 0 var(--td-gray-color-2),
+- apps/web/src/shared/styles/_tdesign-table.scss:55 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  inset 0 -0.0625em 0 0 var(--td-gray-color-2);
+- apps/web/src/shared/styles/_tdesign-table.scss:60 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table:not(.t-table--bordered):not(:has(.t-table__pagination-wrap > .t-table__pagination)) {
+- apps/web/src/shared/styles/_tdesign-table.scss:61 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__content {
+- apps/web/src/shared/styles/_tdesign-table.scss:62 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  border: 0.0625em solid var(--td-component-border);
+- apps/web/src/shared/styles/_tdesign-table.scss:67 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table:not(.t-table--bordered, .sheetcraft-table--row-dividers) {
+- apps/web/src/shared/styles/_tdesign-table.scss:68 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__body > tr:last-child > td {
+- apps/web/src/shared/styles/_tdesign-table.scss:73 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table--column-resizable:not(.t-table--bordered) thead.t-table__header:hover th {
+- apps/web/src/shared/styles/_tdesign-table.scss:81 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table--column-resizable:not(.t-table--bordered) thead.t-table__header th:first-child {
+- apps/web/src/shared/styles/_tdesign-table.scss:85 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table {
+- apps/web/src/shared/styles/_tdesign-table.scss:88 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__content {
+- apps/web/src/shared/styles/_tdesign-table.scss:97 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-button--variant-text {
+- apps/web/src/shared/styles/_tdesign-table.scss:101 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__cell--fixed-right {
+- apps/web/src/shared/styles/_tdesign-table.scss:102 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-button {
+- apps/web/src/shared/styles/_tdesign-table.scss:111 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table.t-size-s,
+- apps/web/src/shared/styles/_tdesign-table.scss:112 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table.t-size-l {
+- apps/web/src/shared/styles/_tdesign-table.scss:120 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table.sheetcraft-table--mini {
+- apps/web/src/shared/styles/_tdesign-table.scss:122 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  td.t-table__cell-check,
+- apps/web/src/shared/styles/_tdesign-table.scss:123 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  th.t-table__cell-check {
+- apps/web/src/shared/styles/_tdesign-table.scss:127 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__header > tr > th:not(.t-table__th-drag, .t-table__cell-check),
+- apps/web/src/shared/styles/_tdesign-table.scss:128 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__body > tr > td:not(.t-table__handle-draggable, .t-table__cell-check) {
+- apps/web/src/shared/styles/_tdesign-table.scss:136 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table.sheetcraft-table--split-preview {
+- apps/web/src/shared/styles/_tdesign-table.scss:137 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__header > tr > th.sheetcraft-table__split-text,
+- apps/web/src/shared/styles/_tdesign-table.scss:138 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table__body > tr > td.sheetcraft-table__split-text {
+- apps/web/src/shared/styles/_tdesign-table.scss:180 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  .t-table {
+- apps/web/src/shared/menu/MenuRadioItem.vue:50 Only the shared TDesign adapter may target --td-* or internal .t-* selectors
+  --td-comp-margin-s: 0px;

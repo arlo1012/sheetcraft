@@ -82,9 +82,13 @@ the export-warning product policy.
   Source 100→110 stays cached until explicit Refresh, then both chart/report update
   and persist after workbook close/reopen. See the [bounded producer evidence](../acceptance/evidence/wps-pivotchart-producer-20261010/README.md).
   The bounded product export subsequently passed first-open, explicit refresh,
-  and save/reopen in both WPS and Excel web. Native chart import and other native
-  chart types remain pending; this is not whole-Insert parity. See the
-  [actual product acceptance record](../acceptance/native-pivotchart-export-20261010.md).
+  and save/reopen in both WPS and Excel web. The subsequent bounded linked
+  clustered-column import now accepts those producer files, the current product
+  export, and the verified WPS post-save properties/frame variant. Its stale cache,
+  manual order, explicit refresh and reexport were checked in the two real apps.
+  Generic drawing import and other native chart families remain outstanding; this
+  is not whole-Insert parity. See the [export acceptance record](../acceptance/native-pivotchart-export-20261010.md)
+  and [bounded import acceptance](../acceptance/native-pivotchart-import-20261010.md).
 
 Focused module tests and exported product-path samples establish only their
 bounded behavior. Supported native controls have recovered and the chart slice

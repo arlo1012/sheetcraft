@@ -32,9 +32,9 @@ export function restoreCachedLeafPivotLayout(
     presentation.blankRows
   )
     return false;
-  const location = child(definition, "location");
-  const headerRows = Number(attr(location, "firstDataRow", "-1"));
-  if (headerRows !== 2 || Number(attr(location, "firstDataCol", "-1")) !== 1) return false;
+  const reportLocation = child(definition, "location");
+  const headerRows = Number(attr(reportLocation, "firstDataRow", "-1"));
+  if (headerRows !== 2 || Number(attr(reportLocation, "firstDataCol", "-1")) !== 1) return false;
   const shared = readPivotSharedItems(cacheBytes, workbook.dateSystem).shared;
   const fields = nodes(child(definition, "pivotFields").pivotField);
   const members = (tag: string, field: number, total: boolean): CellValue[] | undefined => {
