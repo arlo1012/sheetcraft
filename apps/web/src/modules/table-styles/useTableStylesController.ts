@@ -44,7 +44,9 @@ type DialogTarget = {
   table?: SheetTable;
 };
 type Target = DialogTarget & {
+  intent: "insert" | "applyStyle";
   range: CellRange;
+  hasHeaders: boolean;
   style: TableStyleDefinition;
   confirm: (draft: CreateTableDraft) => void;
   cancel: () => void;
@@ -114,7 +116,7 @@ export function useTableStylesController(options: {
           range: formatRangeReference(sheet.name, target.range),
           mode: "table",
           headerRows: 1,
-          hasHeaders: true,
+          hasHeaders: target.hasHeaders,
           filterButton: true,
         }
       : undefined;
@@ -245,9 +247,27 @@ export function useTableStylesController(options: {
       void nextTick(options.focus);
       return;
     }
+    openCreate(style, "applyStyle");
+  }
+  function openCreate(style: TableStyleDefinition, intent: Target["intent"]): void {
+    const captured = captureTarget();
+    const range = resolveDataRange(captured.sheet, options.getSelection());
+    // Preserve the populated-range default; native numeric-header detection is not established.
+    const hasHeaders = [...captured.sheet.cells].some(([key, cell]) => {
+      if (!cell.content) return false;
+      const [row, column] = key.split(":").map(Number) as [number, number];
+      return (
+        row >= range.start.row &&
+        row <= range.end.row &&
+        column >= range.start.column &&
+        column <= range.end.column
+      );
+    });
     const target: Target = {
-      ...captureTarget(),
-      range: resolveDataRange(options.getSheet(), options.getSelection()),
+      ...captured,
+      intent,
+      range,
+      hasHeaders,
       style,
       confirm: (draft) => confirmCreate(draft, target),
       cancel: () => {
@@ -257,7 +277,8 @@ export function useTableStylesController(options: {
     createTarget.value = target;
   }
   function requestCreate(): void {
-    applyStyle(defaultStyle());
+    if (!begin() || activeTable.value) return;
+    openCreate(defaultStyle(), "insert");
   }
   function nextTableName(): string {
     const names = new Set([
@@ -309,7 +330,12 @@ export function useTableStylesController(options: {
         bandedRows: true,
         bandedColumns: false,
         filterButton: draft.filterButton,
-        filter: { range, columns: [] },
+        filter: {
+          range: draft.hasHeaders
+            ? range
+            : { start: { ...range.start }, end: { ...range.end, row: range.end.row + 1 } },
+          columns: [],
+        },
       };
       if (
         execute(createCreateTableCommand(target.sheetId, table, { hasHeaders: draft.hasHeaders }))

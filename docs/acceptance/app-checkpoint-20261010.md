@@ -321,8 +321,9 @@ WPS saved bytes are retained separately from frozen machine originals. Library
 milestone backups include recoverable source and evidence; a backup version is
 reported only after upload and actual retrieval verification.
 
-The user resumed publication, and the verified remote checkpoint is
-`5585ddefbc9f1f6aee3171c79f42dbf2ecf0c2ca`. Its 39 changed production/test/document
+The user resumed publication, and the completed native XLSX/formula checkpoint
+was published and verified at `5585ddefbc9f1f6aee3171c79f42dbf2ecf0c2ca`.
+Its 39 changed production/test/document
 blobs match the selected paths from local `21eb769`; large historical generated
 evidence remains in the verified Library backup. The remote tree is
 `5b36529743c81f718a54a8e0400535403eecf1f9`, with the previous `b4c1b59` as parent.

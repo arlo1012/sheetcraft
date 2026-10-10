@@ -17,7 +17,7 @@ import { useTableStylesController } from "../../../modules/table-styles/useTable
 import { createAppI18n } from "../../../shared/i18n";
 
 let wrapper: ReturnType<typeof mount>;
-function fixture() {
+function fixture(populated = true) {
   let workspace!: ReturnType<typeof useSpreadsheetWorkspaceController>;
   let tables!: ReturnType<typeof useTableStylesController>;
   wrapper = mount(
@@ -42,11 +42,14 @@ function fixture() {
     { global: { plugins: [createAppI18n("en-US")] } },
   );
   const sheet = workspace.activeSheet.value;
-  for (const [row, values] of [
-    ["Region", "Amount"],
-    ["East", 10],
-    ["West", 20],
-  ].entries())
+  for (const [row, values] of (populated
+    ? [
+        ["Region", "Amount"],
+        ["East", 10],
+        ["West", 20],
+      ]
+    : []
+  ).entries())
     for (const [column, value] of values.entries())
       setCellContent(sheet, { row, column }, { kind: "literal", value });
   const start = { row: 0, column: 0 };
@@ -60,6 +63,119 @@ function fixture() {
 afterEach(() => wrapper.unmount());
 
 describe("table style workspace integration", () => {
+  test("blank Insert defaults to generated headers and creates an undoable, serializable table", () => {
+    const { workspace, tables, sheet } = fixture(false);
+    // Appearance without content must still be treated as an empty source.
+    sheet.cells.set("0:0", { style: { fillColor: "#ffffff" } });
+    const before = serializeWorkbook(workspace.session.workbook);
+    tables.requestCreate();
+    expect(tables.createTarget.value?.intent).toBe("insert");
+    expect(tables.createInitial.value).toEqual({
+      range: "=Sheet1!$A$1",
+      mode: "table",
+      headerRows: 1,
+      hasHeaders: false,
+      filterButton: true,
+    });
+    tables.createTarget.value!.confirm(tables.createInitial.value!);
+    expect(tables.modalOpen.value).toBe(false);
+    expect(sheet.tables?.[0]).toMatchObject({
+      name: "Table1",
+      columns: [{ name: "Column1" }],
+      headerRow: true,
+      filterButton: true,
+      range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+      filter: {
+        range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+        columns: [],
+      },
+    });
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toMatchObject({ value: "Column1" });
+    expect(workspace.session.history.undoStack).toHaveLength(1);
+    const created = serializeWorkbook(workspace.session.workbook);
+    const restored = deserializeWorkbook(created);
+    expect(serializeWorkbook(restored)).toEqual(created);
+    workspace.undo();
+    expect(serializeWorkbook(workspace.session.workbook)).toEqual(before);
+    workspace.redo();
+    expect(serializeWorkbook(workspace.session.workbook)).toEqual(created);
+  });
+
+  test("an explicit empty selection ignores content elsewhere in the sheet", () => {
+    const { workspace, tables } = fixture();
+    workspace.updateActiveSheetViewState(
+      createSheetGridViewState({
+        selection: {
+          active: { row: 0, column: 3 },
+          anchor: { row: 0, column: 3 },
+          focus: { row: 2, column: 4 },
+          mode: "cells",
+        },
+      }),
+    );
+    tables.requestCreate();
+    expect(tables.createInitial.value).toMatchObject({
+      range: "=Sheet1!$D$1:$E$3",
+      hasHeaders: false,
+      filterButton: true,
+    });
+  });
+
+  test("the observed populated A1:D7 fixture keeps checked headers and filter with user overrides", () => {
+    const { workspace, tables, sheet } = fixture(false);
+    [
+      ["region", "product", "amount", "qty"],
+      ["north", "apple", 100, 2],
+      ["north", "pear", 80, 1],
+      ["south", "apple", 120, 3],
+      ["south", "pear", 90, 2],
+      ["east", "apple", 60, 1],
+      ["east", "pear", 70, 2],
+    ].forEach((row, r) =>
+      row.forEach((value, column) =>
+        setCellContent(sheet, { row: r, column }, { kind: "literal", value }),
+      ),
+    );
+    const before = serializeWorkbook(workspace.session.workbook);
+    tables.requestCreate();
+    expect(tables.createInitial.value).toMatchObject({
+      range: "=Sheet1!$A$1:$D$7",
+      hasHeaders: true,
+      filterButton: true,
+    });
+    tables.confirmCreate({
+      ...tables.createInitial.value!,
+      hasHeaders: false,
+      filterButton: false,
+    });
+    expect(sheet.tables?.[0]).toMatchObject({
+      columns: [{ name: "Column1" }, { name: "Column2" }, { name: "Column3" }, { name: "Column4" }],
+      filterButton: false,
+      range: { end: { row: 7, column: 3 } },
+      filter: { range: { end: { row: 7, column: 3 } }, columns: [] },
+    });
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toMatchObject({ value: "region" });
+    expect(getCellContent(sheet, { row: 7, column: 2 })).toMatchObject({ value: 70 });
+    const restored = deserializeWorkbook(serializeWorkbook(workspace.session.workbook));
+    expect([...restored.sheets.values()][0]?.tables).toEqual(sheet.tables);
+    workspace.undo();
+    expect(serializeWorkbook(workspace.session.workbook)).toEqual(before);
+  });
+
+  test("Insert does not restyle an existing table while gallery selection still does", () => {
+    const { workspace, tables, sheet } = fixture();
+    tables.requestCreate();
+    tables.confirmCreate(tables.createInitial.value!);
+    const before = serializeWorkbook(workspace.session.workbook);
+    tables.requestCreate();
+    expect(tables.modalOpen.value).toBe(false);
+    expect(serializeWorkbook(workspace.session.workbook)).toEqual(before);
+    expect(workspace.session.history.undoStack).toHaveLength(1);
+    tables.applyStyle(createBuiltinTableStyles()[4]!);
+    expect(sheet.tables?.[0]?.style.id).toBe(createBuiltinTableStyles()[4]!.id);
+    expect(workspace.session.history.undoStack).toHaveLength(2);
+  });
+
   test.each([0, 2])(
     "applies appearance only with %i header rows and reversible cell styles",
     (headerRows) => {
@@ -77,6 +193,7 @@ describe("table style workspace integration", () => {
         },
       };
       tables.applyStyle(style);
+      expect(tables.createTarget.value?.intent).toBe("applyStyle");
       expect(tables.createInitial.value).toMatchObject({
         mode: "table",
         hasHeaders: true,

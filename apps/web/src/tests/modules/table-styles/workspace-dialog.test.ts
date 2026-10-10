@@ -2,6 +2,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import {
@@ -32,14 +33,17 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-async function fixture() {
+async function fixture(populated = true) {
   const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
   const sheet = getActiveSheet(workbook);
-  [
-    ["Region", "Amount"],
-    ["East", 10],
-    ["West", 20],
-  ].forEach((row, r) =>
+  (populated
+    ? [
+        ["Region", "Amount"],
+        ["East", 10],
+        ["West", 20],
+      ]
+    : []
+  ).forEach((row, r) =>
     row.forEach((value, column) =>
       setCellContent(sheet, { row: r, column }, { kind: "literal", value }),
     ),
@@ -76,9 +80,42 @@ function listener<T extends (...args: never[]) => void>(
 }
 
 describe("table dialog workspace integration", () => {
+  test("blank Insert confirms the headerless default through the real dialog with one undo", async () => {
+    const { wrapper, source } = await fixture(false);
+    const dialog = wrapper.getComponent(CreateTableDialog);
+    expect(dialog.props("intent")).toBe("insert");
+    expect(dialog.props("initial")).toMatchObject({
+      range: "=Sheet1!$A$1",
+      hasHeaders: false,
+      filterButton: true,
+    });
+    const checkboxes = dialog.findAllComponents(Checkbox);
+    expect(checkboxes).toHaveLength(2);
+    expect(checkboxes[0]!.props("modelValue")).toBe(false);
+    expect(checkboxes[1]!.props("modelValue")).toBe(true);
+    dialog.getComponent(Dialog).vm.$emit("confirm");
+    await nextTick();
+    expect(wrapper.findComponent(CreateTableDialog).exists()).toBe(false);
+    expect(source.tables?.[0]).toMatchObject({
+      name: "Table1",
+      columns: [{ name: "Column1" }],
+      filterButton: true,
+      range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+      filter: { range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } } },
+    });
+    await wrapper.get('[data-ribbon-category="home"]').trigger("click");
+    await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
+    expect(source.tables).toEqual([]);
+    expect(source.cells.size).toBe(0);
+    await wrapper.get('[data-ribbon-action="redo"]').trigger("click");
+    expect(source.tables?.[0]?.columns[0]?.name).toBe("Column1");
+  });
+
   test("rapid create reopening resets its draft and late old handlers cannot submit or cancel it", async () => {
     const { wrapper, source } = await fixture();
     const old = wrapper.getComponent(CreateTableDialog);
+    expect(old.props("intent")).toBe("insert");
+    expect(old.getComponent(Dialog).props("header")).toBe("Create table");
     const oldConfirm = listener<(draft: CreateTableDraft) => void>(old, "onConfirm");
     const oldCancel = listener<() => void>(old, "onCancel");
     const original = old.props("initial");
@@ -109,6 +146,7 @@ describe("table dialog workspace integration", () => {
   test("picker suspension and cancellation keep the draft and editable captured sheet across navigation", async () => {
     const { wrapper, source } = await fixture();
     const dialog = wrapper.getComponent(CreateTableDialog);
+    await dialog.findAllComponents(Checkbox)[0]!.vm.$emit("update:modelValue", false);
     const input = dialog.getComponent(RangeReferenceInput);
     const original = input.props("modelValue");
     await input.get("[data-select-formula-reference]").trigger("click");
@@ -124,6 +162,7 @@ describe("table dialog workspace integration", () => {
     expect(wrapper.getComponent(CreateTableDialog).vm.$.uid).toBe(dialog.vm.$.uid);
     expect(dialog.props("suspended")).toBe(false);
     expect(input.props("modelValue")).toBe(original);
+    expect(dialog.findAllComponents(Checkbox)[0]!.props("modelValue")).toBe(false);
     dialog.getComponent(Dialog).vm.$emit("confirm");
     await flushPromises();
     expect(wrapper.findComponent(CreateTableDialog).exists()).toBe(false);

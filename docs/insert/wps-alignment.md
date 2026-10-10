@@ -53,6 +53,12 @@ the export-warning product policy.
   captured workbook, generation, sheet, table and dialog session. Canceled or
   obsolete callbacks cannot mutate a replacement document or newer dialog.
   Busy/protected targets and rejected commands retain the draft safely.
+- Insert Table has its own Create Table entry intent with source, header and
+  filter controls. The style-gallery entry retains its appearance/table modes.
+  Empty source ranges default to generated headers; populated ranges retain the
+  existing checked default. Numeric-header inference is not claimed. Generated
+  headers extend both the table and filter range, including the last data row;
+  blank creation now serializes and remains one-command undoable.
 - WPS-authored ordinary source, table and pivot files were actually saved and
   parsed. The synthetic native pivot has region rows, product columns, sum(amount)
   and total 520. Table source is `Table1`, and new-sheet output starts at A3 in this

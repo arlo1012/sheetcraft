@@ -3303,6 +3303,7 @@ const gridInert = computed(
       v-if="createTableTarget && createTableInitial"
       :key="createTableTarget.dialogId"
       :initial="createTableInitial"
+      :intent="createTableTarget.intent"
       :error="tableError"
       :suspended="pickingTableRange"
       :select-reference="tableRangePicker.selectReference"
