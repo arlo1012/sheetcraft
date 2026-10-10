@@ -1,4 +1,4 @@
-import { computed, nextTick, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onScopeDispose, ref, shallowRef, watch } from "vue";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import {
   createApplyTableStyleToRangeCommand,
@@ -35,9 +35,33 @@ import {
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import type { CreateTableDraft, TableOptionsPatch, TableSettingsDraft } from "./table-ui-types";
 
-type Target = { sheetId: string; range: CellRange; style: TableStyleDefinition };
-type SettingsTarget = { sheetId: string; tableId: string; initial: TableSettingsDraft };
-type ResizeTarget = { sheetId: string; tableId: string; range: string };
+type DialogTarget = {
+  dialogId: number;
+  workbook: Workbook;
+  generation: number;
+  sheet: Sheet;
+  sheetId: string;
+  table?: SheetTable;
+};
+type Target = DialogTarget & {
+  range: CellRange;
+  style: TableStyleDefinition;
+  confirm: (draft: CreateTableDraft) => void;
+  cancel: () => void;
+};
+type SettingsTarget = DialogTarget & {
+  tableId: string;
+  initial: TableSettingsDraft;
+  confirm: (draft: TableSettingsDraft) => void;
+  convert: () => void;
+  cancel: () => void;
+};
+type ResizeTarget = DialogTarget & {
+  tableId: string;
+  range: string;
+  confirm: (range: string) => void;
+  cancel: () => void;
+};
 
 export function useTableStylesController(options: {
   getWorkbook: () => Workbook;
@@ -59,6 +83,9 @@ export function useTableStylesController(options: {
   const styleDraft = shallowRef<{ style?: TableStyleDefinition }>();
   const pivotStyleDraft = shallowRef<{ style?: PivotTableStyleDefinition }>();
   const error = ref("");
+  let confirming = false;
+  let dialogId = 0;
+  let disposed = false;
   const activeTable = computed(() => {
     void options.getRevision();
     return getTableAtAddress(options.getSheet(), options.getAddress());
@@ -109,13 +136,66 @@ export function useTableStylesController(options: {
     styleDraft.value = undefined;
     pivotStyleDraft.value = undefined;
     error.value = "";
-    void nextTick(options.focus);
+    void nextTick(() => {
+      if (!disposed && !modalOpen.value) options.focus();
+    });
   }
-  watch(options.getGeneration, close);
+  watch([options.getGeneration, options.getWorkbook], close, { flush: "sync" });
+  onScopeDispose(() => {
+    disposed = true;
+    close();
+  });
 
   function begin(): boolean {
+    if (
+      confirming ||
+      disposed ||
+      options.isBusy() ||
+      options.getSheet().properties.protected ||
+      !options.finishEditing() ||
+      options.isBusy() ||
+      options.getSheet().properties.protected
+    )
+      return false;
     error.value = "";
-    return !options.isBusy() && options.finishEditing();
+    return true;
+  }
+  function captureTarget(table?: SheetTable): DialogTarget {
+    const sheet = options.getSheet();
+    return {
+      dialogId: ++dialogId,
+      workbook: options.getWorkbook(),
+      generation: options.getGeneration(),
+      sheet,
+      sheetId: sheet.id,
+      table,
+    };
+  }
+  function confirmTarget<T extends DialogTarget>(
+    target: T | undefined,
+    current: T | undefined,
+    apply: (target: T) => void,
+  ): void {
+    if (!target || target !== current || confirming || disposed) return;
+    if (
+      target.workbook !== options.getWorkbook() ||
+      target.generation !== options.getGeneration() ||
+      target.workbook.sheets.get(target.sheetId) !== target.sheet ||
+      (target.table && !target.sheet.tables?.some((table) => table === target.table))
+    ) {
+      close();
+      return;
+    }
+    if (options.isBusy() || target.sheet.properties.protected) {
+      error.value = t("tables.failed");
+      return;
+    }
+    confirming = true;
+    try {
+      apply(target);
+    } finally {
+      confirming = false;
+    }
   }
   function execute(command: WorkbookCommand): boolean {
     try {
@@ -165,11 +245,16 @@ export function useTableStylesController(options: {
       void nextTick(options.focus);
       return;
     }
-    createTarget.value = {
-      sheetId: options.getSheet().id,
+    const target: Target = {
+      ...captureTarget(),
       range: resolveDataRange(options.getSheet(), options.getSelection()),
       style,
+      confirm: (draft) => confirmCreate(draft, target),
+      cancel: () => {
+        if (createTarget.value === target) close();
+      },
     };
+    createTarget.value = target;
   }
   function requestCreate(): void {
     applyStyle(defaultStyle());
@@ -185,56 +270,59 @@ export function useTableStylesController(options: {
     while (names.has(`table${index}`)) index += 1;
     return `Table${index}`;
   }
-  function confirmCreate(draft: CreateTableDraft): void {
-    const target = createTarget.value!;
-    const range = resolveRange(draft.range, target.sheetId);
-    if (!range) return;
-    if (draft.mode === "styleOnly") {
-      if (
-        !Number.isInteger(draft.headerRows) ||
-        draft.headerRows < 0 ||
-        draft.headerRows > range.end.row - range.start.row + 1
-      ) {
-        error.value = t("tables.invalidHeaderRows");
+  function confirmCreate(draft: CreateTableDraft, target = createTarget.value): void {
+    confirmTarget(target, createTarget.value, (target) => {
+      const range = resolveRange(draft.range, target.sheetId);
+      if (!range) return;
+      if (draft.mode === "styleOnly") {
+        if (
+          !Number.isInteger(draft.headerRows) ||
+          draft.headerRows < 0 ||
+          draft.headerRows > range.end.row - range.start.row + 1
+        ) {
+          error.value = t("tables.invalidHeaderRows");
+          return;
+        }
+        if (
+          execute(
+            createApplyTableStyleToRangeCommand(
+              target.sheetId,
+              range,
+              target.style,
+              draft.headerRows,
+            ),
+          )
+        )
+          close();
         return;
       }
+      const table: SheetTable = {
+        id: idFactory("table"),
+        name: nextTableName(),
+        range,
+        columns: [],
+        style: target.style,
+        headerRow: true,
+        totalRow: false,
+        firstColumn: hasHighlightedFirstColumn(target.style),
+        lastColumn: false,
+        bandedRows: true,
+        bandedColumns: false,
+        filterButton: draft.filterButton,
+        filter: { range, columns: [] },
+      };
       if (
-        execute(
-          createApplyTableStyleToRangeCommand(
-            target.sheetId,
-            range,
-            target.style,
-            draft.headerRows,
-          ),
-        )
+        execute(createCreateTableCommand(target.sheetId, table, { hasHeaders: draft.hasHeaders }))
       )
         close();
-      return;
-    }
-    const table: SheetTable = {
-      id: idFactory("table"),
-      name: nextTableName(),
-      range,
-      columns: [],
-      style: target.style,
-      headerRow: true,
-      totalRow: false,
-      firstColumn: hasHighlightedFirstColumn(target.style),
-      lastColumn: false,
-      bandedRows: true,
-      bandedColumns: false,
-      filterButton: draft.filterButton,
-      filter: { range, columns: [] },
-    };
-    if (execute(createCreateTableCommand(target.sheetId, table, { hasHeaders: draft.hasHeaders })))
-      close();
+    });
   }
   function openSettings(): void {
     if (!begin()) return;
     const table = activeTable.value;
     if (!table) return;
-    settingsTarget.value = {
-      sheetId: options.getSheet().id,
+    const target: SettingsTarget = {
+      ...captureTarget(table),
       tableId: table.id,
       initial: {
         name: table.name,
@@ -247,23 +335,30 @@ export function useTableStylesController(options: {
         bandedColumns: table.bandedColumns,
         filterButton: table.filterButton,
       },
+      confirm: (draft) => confirmSettings(draft, target),
+      convert: () => convertToRange(target),
+      cancel: () => {
+        if (settingsTarget.value === target) close();
+      },
     };
+    settingsTarget.value = target;
   }
-  function confirmSettings(draft: TableSettingsDraft): void {
-    const target = settingsTarget.value!;
-    const range = resolveRange(draft.range, target.sheetId);
-    if (!range) return;
-    const { range: _range, ...changes } = draft;
-    if (
-      execute(
-        createUpdateTableCommand(target.sheetId, target.tableId, {
-          ...changes,
-          name: changes.name.trim(),
-          range,
-        }),
+  function confirmSettings(draft: TableSettingsDraft, target = settingsTarget.value): void {
+    confirmTarget(target, settingsTarget.value, (target) => {
+      const range = resolveRange(draft.range, target.sheetId);
+      if (!range) return;
+      const { range: _range, ...changes } = draft;
+      if (
+        execute(
+          createUpdateTableCommand(target.sheetId, target.tableId, {
+            ...changes,
+            name: changes.name.trim(),
+            range,
+          }),
+        )
       )
-    )
-      close();
+        close();
+    });
   }
   function updateTable(changes: TableOptionsPatch | { name: string }): void {
     if (!begin()) return;
@@ -278,26 +373,34 @@ export function useTableStylesController(options: {
     if (!begin()) return;
     const table = activeTable.value;
     if (!table) return;
-    resizeTarget.value = {
-      sheetId: options.getSheet().id,
+    const target: ResizeTarget = {
+      ...captureTarget(table),
       tableId: table.id,
       range: formatRangeReference(options.getSheet().name, table.range),
+      confirm: (range) => confirmResize(range, target),
+      cancel: () => {
+        if (resizeTarget.value === target) close();
+      },
     };
+    resizeTarget.value = target;
   }
-  function confirmResize(source: string): void {
-    const target = resizeTarget.value!;
-    const range = resolveRange(source, target.sheetId);
-    if (range && execute(createResizeTableCommand(target.sheetId, target.tableId, range))) close();
+  function confirmResize(source: string, target = resizeTarget.value): void {
+    confirmTarget(target, resizeTarget.value, (target) => {
+      const range = resolveRange(source, target.sheetId);
+      if (range && execute(createResizeTableCommand(target.sheetId, target.tableId, range)))
+        close();
+    });
   }
-  function convertToRange(): void {
-    const target = settingsTarget.value;
-    if (!target && !begin()) return;
-    const tableId = target?.tableId ?? activeTable.value?.id;
-    if (
-      tableId &&
-      execute(createRemoveTableCommand(target?.sheetId ?? options.getSheet().id, tableId))
-    )
-      close();
+  function convertToRange(target = settingsTarget.value): void {
+    if (target) {
+      confirmTarget(target, settingsTarget.value, (target) => {
+        if (execute(createRemoveTableCommand(target.sheetId, target.tableId))) close();
+      });
+      return;
+    }
+    if (settingsTarget.value || !begin()) return;
+    const table = activeTable.value;
+    if (table && execute(createRemoveTableCommand(options.getSheet().id, table.id))) close();
   }
   function clearStyle(): void {
     if (!begin() || !activeTable.value) return;

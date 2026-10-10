@@ -81,4 +81,6 @@ The current application gate is Excel web and WPS desktop only, following the
 user's updated scope on 2026-10-10. LibreOffice testing is stopped and its
 save/reopen checks are no longer required. The frozen 36-entry three-app template
 and Calc-targeted machine assertions remain historical evidence; future
-scope-version-2 templates contain 24 Excel/WPS observations. Stage 1 is open.
+scope-version-2 templates contain 24 Excel/WPS observations. Stage 1 was open at
+this recorded checkpoint; its later conditional conclusion and remaining limits
+are in the [current application checkpoint](app-checkpoint-20261010.md).

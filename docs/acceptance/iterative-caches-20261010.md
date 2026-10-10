@@ -128,6 +128,8 @@ Evidence directories, retained as milestone Library materials:
 `iteration-cache-production-sample-20261010` and the final
 `iteration-cache-production-gui-20261010`.
 
-The local commit has not been pushed while the earlier GitHub cancellation
-remains unresolved. Stage 1 remains open; the reproduced Excel uploaded-workbook
-floating-picture visibility issue is not eliminated by this formula fix.
+The completed production fix and its focused regressions were subsequently
+published at remote `5585ddefbc9f1f6aee3171c79f42dbf2ecf0c2ca`. The user conditionally
+concluded this acceptance phase and approved WPS Insert work. The reproduced
+Excel uploaded-workbook floating-picture visibility issue remains a known
+limitation; it was not eliminated by this formula fix.

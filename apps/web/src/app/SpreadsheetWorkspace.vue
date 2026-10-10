@@ -482,8 +482,7 @@ const tableActions = useTableStylesController({
   getSelection: () => activeSelectionRange.value,
   getGeneration: () => workbookGeneration.value,
   getRevision: () => workbookRevision.value,
-  isBusy: () =>
-    loading.value || fileBusy.value || xlsxBusy.value || activeSheet.value.properties.protected,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   finishEditing: () => cellEditSession.finish(),
   execute: executeCommand,
   focus: focusCellEditor,
@@ -494,6 +493,7 @@ const {
   defaultStyleId: defaultTableStyleId,
   customPivotStyles: customPivotTableStyles,
   defaultPivotStyleId: defaultPivotTableStyleId,
+  createTarget: createTableTarget,
   createInitial: createTableInitial,
   settingsTarget: tableSettingsTarget,
   resizeTarget: tableResizeTarget,
@@ -3300,32 +3300,35 @@ const gridInert = computed(
       @cancel="closeCellFormat"
     />
     <CreateTableDialog
-      v-if="createTableInitial"
+      v-if="createTableTarget && createTableInitial"
+      :key="createTableTarget.dialogId"
       :initial="createTableInitial"
       :error="tableError"
       :suspended="pickingTableRange"
       :select-reference="tableRangePicker.selectReference"
-      @confirm="tableActions.confirmCreate"
-      @cancel="tableActions.close"
+      @confirm="createTableTarget.confirm"
+      @cancel="createTableTarget.cancel"
     />
     <TableSettingsDialog
       v-if="tableSettingsTarget"
+      :key="tableSettingsTarget.dialogId"
       :initial="tableSettingsTarget.initial"
       :error="tableError"
       :suspended="pickingTableRange"
       :select-reference="tableRangePicker.selectReference"
-      @confirm="tableActions.confirmSettings"
-      @convert="tableActions.convertToRange"
-      @cancel="tableActions.close"
+      @confirm="tableSettingsTarget.confirm"
+      @convert="tableSettingsTarget.convert"
+      @cancel="tableSettingsTarget.cancel"
     />
     <ResizeTableDialog
       v-if="tableResizeTarget"
+      :key="tableResizeTarget.dialogId"
       :initial="tableResizeTarget.range"
       :error="tableError"
       :suspended="pickingTableRange"
       :select-reference="tableRangePicker.selectReference"
-      @confirm="tableActions.confirmResize"
-      @cancel="tableActions.close"
+      @confirm="tableResizeTarget.confirm"
+      @cancel="tableResizeTarget.cancel"
     />
     <HyperlinkDialog
       v-if="hyperlinkDraft"

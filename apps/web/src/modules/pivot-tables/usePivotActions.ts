@@ -19,6 +19,7 @@ import {
 import { WorkbookDomainError } from "@sheetcraft/core/errors";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import { resolveDataRange } from "@sheetcraft/core/data-range";
+import { getTableAtAddress } from "@sheetcraft/core/table-styles";
 import {
   type Workbook,
   type Sheet,
@@ -102,7 +103,25 @@ export function usePivotActions(options: {
       existing = mode === "create" ? undefined : selected(id);
     if (existing && !canUseSheetPermission(sheet, "pivotTables")) return;
     target = { workbook, sheetId: sheet.id, existing: !!existing };
-    let sourceRange = resolveDataRange(sheet, options.getRange()) ?? options.getRange();
+    const selection = options.getRange();
+    const sourceTable =
+      mode === "create" &&
+      selection.start.row === selection.end.row &&
+      selection.start.column === selection.end.column
+        ? getTableAtAddress(sheet, selection.start)
+        : undefined;
+    // Capture the table's header/data range, independent of adjacent cells or blank data rows.
+    let sourceRange = sourceTable
+      ? {
+          start: { ...sourceTable.range.start },
+          end: {
+            ...sourceTable.range.end,
+            row: sourceTable.range.end.row - Number(sourceTable.totalRow),
+          },
+        }
+      : resolveDataRange(sheet, selection);
+    // Range sources require physical headers; let the existing invalid-source editor repair this.
+    const sourceNeedsHeaders = sourceTable?.headerRow === false;
     const names = new Set(
       [...workbook.sheets.values()].flatMap((sheet) =>
         (sheet.pivotTables ?? []).map((table) => table.name),
@@ -117,7 +136,7 @@ export function usePivotActions(options: {
           id: idFactory("pivot"),
           name: `${options.name()}${number}`,
           sourceSheetId: sheet.id,
-          source: sourceRange,
+          source: sourceNeedsHeaders ? null : sourceRange,
           anchor: { row: 0, column: 0 },
           outputRange: null,
           rowFields: [],
@@ -149,7 +168,9 @@ export function usePivotActions(options: {
     sourceRange = table.source ?? sourceRange;
     editing.value = {
       table,
-      source: formatRangeReference(sourceSheet?.name ?? sheet.name, sourceRange),
+      source: sourceNeedsHeaders
+        ? ""
+        : formatRangeReference(sourceSheet?.name ?? sheet.name, sourceRange),
       sourceKind: table.consolidation ? "consolidation" : "range",
       sources:
         table.consolidation?.ranges.map((area) =>
@@ -182,7 +203,7 @@ export function usePivotActions(options: {
       existing: !!existing,
       mode,
     };
-    error.value = false;
+    error.value = sourceNeedsHeaders;
     errorReason.value = "invalid";
   }
   function confirm(draft: PivotDraft) {

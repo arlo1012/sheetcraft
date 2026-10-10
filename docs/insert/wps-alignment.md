@@ -1,0 +1,86 @@
+# WPS Insert alignment
+
+The user approved this phase on 2026-10-10 after conditionally concluding the
+native XLSX/formula acceptance phase. Work stays on `refactor/native-xlsx-20261009`.
+Preserve the full ribbon and implement real workbook commands, history, editing,
+cancellation, permissions and persistence. A visible button is not an acceptance
+result. Native XLSX support is tracked separately from internal document support.
+
+## Dependency order and current capability
+
+1. **Tables → PivotTable source correctness and lifecycle.** Tables already have
+   Core commands for creation, generated headers, independent filters, styles,
+   totals, resizing and conversion. Native XLSX table parts/styles are supported.
+   Single-cell pivot creation now captures a structured table's header/data range,
+   excluding totals and touching neighboring columns while retaining internal
+   blank rows. Explicit multi-cell selections remain explicit. Header-disabled
+   auto-selection requires the user to supply a header-bearing source. This is a
+   captured range, not dynamic table-name linkage.
+2. **PivotTable workflow.** Creation, new/existing destinations, field pane,
+   refresh, source modes, filters, grouping and styles are existing Core-backed
+   features. Verify WPS defaults and interrupted/repeated flows. Native pivot
+   definitions/cache are supported within their documented subset. Sources remain
+   fixed ranges; automatic expansion with a source table is not implemented.
+3. **PivotChart and native chart infrastructure.** PivotChart is an existing
+   linked internal chart, created with its pivot atomically. Native XLSX currently
+   omits it and all other `sheet.drawings`. Start with a genuinely linked clustered
+   column PivotChart, using an actual WPS-authored producer and native pivotSource
+   metadata; an ordinary chart over report cells is insufficient. Images and
+   charts must share one worksheet drawing part with collision-free IDs.
+4. **Other charts, images, sparklines, hyperlinks and symbols.** Ordinary chart
+   types and dashboards have real editors and Core-backed persistence, but native
+   chart export is omitted. Cell/floating images have a prepared-raster export
+   path; image import remains blocked. Sparklines and hyperlinks have native
+   export; symbols commit as cell text. Extend WPS parity in small usable slices.
+5. **Drawing and advanced insertion.** Shapes, icons, WordArt, text boxes and
+   equations use the drawing editor/layer. Icons currently share shape selection.
+   Screenshot inserts a floating image; document/attachment, camera, controls and
+   watermark have real owners and internal persistence. Their native drawing,
+   embedded object, camera/control and watermark exports remain omissions.
+
+Table calculated-column autofill and an expanded native drawing/chart importer
+are separate outstanding capabilities. Compatibility diagnostics remain internal
+under the current [XLSX policy](../xlsx-io.md); this phase does not silently change
+the export-warning product policy.
+
+## First bounded closure
+
+- Table → PivotTable/PivotChart source capture excludes a table's total row.
+  The small table with data 10 and 20 and total 30 produces pivot total 30, not 60.
+  Both entry points share this rule; cancellation adds no history and creation/
+  field configuration are independently undoable. Snapshot reload retains it.
+- Table create/settings/resize/conversion confirmations must belong to their
+  captured workbook, generation, sheet, table and dialog session. Canceled or
+  obsolete callbacks cannot mutate a replacement document or newer dialog.
+  Busy/protected targets and rejected commands retain the draft safely.
+- WPS-authored ordinary source, table and pivot files were actually saved and
+  parsed. The synthetic native pivot has region rows, product columns, sum(amount)
+  and total 520. Table source is `Table1`, and new-sheet output starts at A3 in this
+  observed build. These are concrete observations, not universal default claims.
+- A native PivotChart chooser was observed from the configured pivot. The first
+  OK attempt was inconclusive, then native controls failed with `native pipe path
+unavailable`. No chart producer or chart linkage has been obtained. This is an
+  infrastructure acceptance blocker, not evidence of unsupported WPS capability.
+
+Focused module tests and exported product-path samples establish only their
+bounded behavior. Real WPS checks resume after supported native controls recover;
+do not substitute a mocked visual pass or repeat broad format matrices.
+
+## Compatibility workflow and sources
+
+For a compatibility discrepancy, create the smallest synthetic workbook in WPS
+or Excel, export through the supported flow, compare actual OOXML with the product,
+isolate one cause, add a focused regression, then verify the fix in the real app.
+Never upload private business files or infer a permanent limitation from a guess.
+
+- [WPS Create/Delete PivotTable](https://help.wps.com/articles/pivottable-create-delete)
+  documents range selection and new/existing worksheet placement.
+- [WPS PivotChart tutorial](https://www.wps.com/academy/use-pivot-chart-to-create-a-dynamic-chart/)
+  describes a paired PivotTable/PivotChart and refresh. Generic tutorials do not
+  establish Linux 12.1.2 dialog or export details.
+- [Microsoft PivotTable guidance](https://support.microsoft.com/en-us/excel/get-started/create-a-pivottable-to-analyze-worksheet-data)
+  calls for unique, nonblank headers and documents refresh and table-backed sources.
+- [Microsoft PivotChart guidance](https://support.microsoft.com/en-us/excel/get-started/create-a-pivotchart)
+  distinguishes direct Windows creation from PivotTable-first Mac/web creation.
+- [Native PivotSource naming](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-oi29500/3a82b89e-7264-40c1-a09f-d569374fe6a9)
+  requires workbook/sheet/pivot identity, not a bare Core display name.

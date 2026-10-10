@@ -1,8 +1,12 @@
 # Current real-application checkpoint, 2026-10-10
 
-Stage 1 is **open**. The required applications are Excel for the web and WPS
-desktop. LibreOffice work is stopped. This live summary does not rewrite the
-pending records or byte hashes in any frozen paired run.
+Stage 1 **conditionally concluded at the user's direction on 2026-10-10**.
+Excel for the web and WPS desktop are the required applications; LibreOffice
+work is stopped. The uploaded-workbook floating-picture visibility issue below
+remains a known limitation. The user approved proceeding to WPS Insert parity;
+this does not turn unsupported imports, omitted drawings, or whole-project CI
+into passing gates. This live summary does not rewrite pending records or byte
+hashes in any frozen paired run. See the [Insert implementation scope](../insert/wps-alignment.md).
 
 Latest production source: `1b498934dc9a58922a08514db8fa29f64780f86b`, with the
 direct-color rule introduced at `90279cfc654fd1dfad19abdc85afcbda06804913`.
@@ -275,7 +279,8 @@ remains unresolved, but these bytes do not support a native-only drawing defect
 or deletion. No further attribute matrix or production change follows this
 checkpoint. Actual packages, nonblank safe screenshots and records are retained
 in `floating-anchor-control-gui-20261010` and
-`excel-native-reupload-control-20261010`. Stage 1 remains open.
+`excel-native-reupload-control-20261010`. The user subsequently accepted this
+reproduced upload-path issue as a known limitation and approved the Insert phase.
 
 ## Iteration classification
 
@@ -316,8 +321,11 @@ WPS saved bytes are retained separately from frozen machine originals. Library
 milestone backups include recoverable source and evidence; a backup version is
 reported only after upload and actual retrieval verification.
 
-The latest verified remote checkpoint remains
-`b4c1b59b2f54f0c537ed967069406cf761a786f1`; later local commits have not been
-pushed while the earlier publication cancellation remains unresolved. No merge,
-release or deployment has occurred. Later insertion/package/toolbar stages do
-not become accepted merely because the machine checks pass.
+The user resumed publication, and the verified remote checkpoint is
+`5585ddefbc9f1f6aee3171c79f42dbf2ecf0c2ca`. Its 39 changed production/test/document
+blobs match the selected paths from local `21eb769`; large historical generated
+evidence remains in the verified Library backup. The remote tree is
+`5b36529743c81f718a54a8e0400535403eecf1f9`, with the previous `b4c1b59` as parent.
+Unfinished Insert work was excluded. No merge, release or deployment has occurred.
+Later insertion/package/toolbar stages do not become accepted merely because
+machine checks pass.
