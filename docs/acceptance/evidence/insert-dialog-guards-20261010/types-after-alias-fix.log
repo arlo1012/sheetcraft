@@ -1,0 +1,8 @@
+$ bun run --filter @sheetcraft/web typecheck
+@sheetcraft/web typecheck: src/tests/modules/camera/dialog.test.ts(114,5): error TS2304: Cannot find name 'actions'.
+@sheetcraft/web typecheck: src/tests/modules/camera/dialog.test.ts(123,5): error TS2304: Cannot find name 'actions'.
+@sheetcraft/web typecheck: src/tests/modules/form-controls/dialog.test.ts(115,5): error TS2304: Cannot find name 'actions'.
+@sheetcraft/web typecheck: src/tests/modules/form-controls/dialog.test.ts(124,5): error TS2304: Cannot find name 'actions'.
+@sheetcraft/web typecheck: src/tests/modules/sheet-drawings/dialog.test.ts(110,5): error TS2304: Cannot find name 'actions'.
+@sheetcraft/web typecheck: src/tests/modules/sheet-drawings/dialog.test.ts(119,5): error TS2304: Cannot find name 'actions'.
+@sheetcraft/web typecheck: Exited with code 2

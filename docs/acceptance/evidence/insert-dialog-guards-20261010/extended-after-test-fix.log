@@ -1,0 +1,10 @@
+$ vitest run src/tests/modules/camera/actions.test.ts src/tests/modules/sheet-drawings/actions.test.ts src/tests/modules/form-controls/actions.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/apps/web
+
+
+ Test Files  3 passed (3)
+      Tests  90 passed (90)
+   Start at  13:20:35
+   Duration  3.27s (transform 1.02s, setup 0ms, import 2.20s, tests 72ms, environment 583ms)
+

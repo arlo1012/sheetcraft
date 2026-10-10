@@ -173,3 +173,17 @@ first-open checks. XLSX1120/focused248 and owned static checks passed; existing
 125 architecture diagnostics unchanged. New GUI artifacts remain local.
 See [bar contract](../../insert/native-bar-charts.md) and
 [acceptance](../../acceptance/native-bar-chart-20261010.md).
+
+## Existing object editor rejection/lifecycle closure
+
+Verified remote parent is horizontal-bar `9d8fbde5e5615089a396fc694c77153c20edf371`.
+Drawings/camera/controls each reproduced insert/edit draft loss on execute=false;
+drawings also accepted a replaced workbook with the same sheet ID. Initial7failed/
+35passed, then final90 action /108 feature-DOM /222 related workspace tests passed.
+Captured session callbacks, actual identity/generation, reentry and permissions
+are guarded; unchanged existing no-opfalse still closes, rejected edits keep inputs.
+Web types and owned static passed;125 architecture diagnostics remain, one line
+location shifted with no semantic additions. No new GUI/native phase claimed.
+[Acceptance](../../acceptance/insert-dialog-guards-20261010.md) and
+[current complete Insert inventory](../../insert/current-scope-20261010.md) separate
+implemented product paths, unverified/current native limits and real feature gaps.

@@ -1,5 +1,4 @@
-import { ref, shallowRef } from "vue";
-import { canUseSheetPermission } from "@sheetcraft/core";
+import { ref } from "vue";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import { normalizeSheetDrawing, type SheetCameraDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
@@ -9,30 +8,35 @@ import {
   type Sheet,
   type CellRange,
 } from "@sheetcraft/core/workbook";
+import { useDrawingDialogTarget } from "../../shared/drawing-dialog/useDrawingDialogTarget";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
 export function useCameraActions(options: {
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
+  getGeneration?: () => number;
+  getRevision?: () => number;
   getRange: () => CellRange;
   isBusy: () => boolean;
   flush: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
   name: () => string;
 }) {
-  const editing = shallowRef<SheetCameraDrawing>();
   const error = ref(false);
   const idFactory = createBrowserIdFactory();
-  let target: { workbook: Workbook; sheetId: string; existing: boolean } | undefined;
-  const allowed = () =>
-    !options.isBusy() && canUseSheetPermission(options.getSheet(), "editObjects");
+  const targets = useDrawingDialogTarget<SheetCameraDrawing, [source: string]>({
+    ...options,
+    onReset: () => {
+      error.value = false;
+    },
+  });
+  const { dialog, editing, close } = targets;
   function open(drawing?: SheetCameraDrawing) {
-    if (!allowed() || !options.flush()) return;
-    const sheet = options.getSheet();
+    const target = targets.prepare(drawing);
+    if (!target) return;
+    const sheet = target.sheet;
     const range = options.getRange();
-    target = { workbook: options.getWorkbook(), sheetId: sheet.id, existing: !!drawing };
-    error.value = false;
-    editing.value = drawing ?? {
+    const initial = drawing ?? {
       id: idFactory("camera"),
       kind: "camera",
       name: options.name(),
@@ -59,48 +63,43 @@ export function useCameraActions(options: {
       rotation: 0,
       camera: { range, gridLines: true },
     };
+    targets.open(target, initial, (current, next, source) => confirm(next, source, current));
   }
-  function confirm(drawing: SheetCameraDrawing, source: string) {
-    if (
-      !allowed() ||
-      !target ||
-      target.workbook !== options.getWorkbook() ||
-      target.sheetId !== options.getSheet().id ||
-      editing.value?.id !== drawing.id
-    )
-      return;
-    const reference = resolveRangeReference(target.workbook, source, target.sheetId);
-    if (!reference || reference.sheetId !== target.sheetId) {
-      error.value = true;
-      return;
-    }
-    try {
-      const next = normalizeSheetDrawing({
-        ...drawing,
-        camera: { ...drawing.camera, range: reference.range },
-      });
-      const current = options.getSheet().drawings ?? [];
-      if (target.existing && !current.some((item) => item.id === next.id)) {
-        close();
+  function confirm(drawing: SheetCameraDrawing, source: string, target = dialog.value) {
+    targets.run(target, (currentTarget) => {
+      if (drawing.id !== currentTarget.initial.id || drawing.kind !== "camera") return;
+      const reference = resolveRangeReference(
+        currentTarget.workbook,
+        source,
+        currentTarget.sheet.id,
+      );
+      if (!reference || reference.sheetId !== currentTarget.sheet.id) {
+        error.value = true;
         return;
       }
-      options.execute(
-        createSetSheetDrawingsCommand(
-          target.sheetId,
-          target.existing
-            ? current.map((item) => (item.id === next.id ? next : item))
-            : [...current, next],
-        ),
-      );
-      close();
-    } catch {
-      error.value = true;
-    }
+      try {
+        const next = normalizeSheetDrawing({
+          ...drawing,
+          camera: { ...drawing.camera, range: reference.range },
+        });
+        const current = currentTarget.sheet.drawings ?? [];
+        if (
+          !targets.commit(
+            currentTarget,
+            createSetSheetDrawingsCommand(
+              currentTarget.sheet.id,
+              currentTarget.existing
+                ? current.map((item) => (item === currentTarget.existing ? next : item))
+                : [...current, next],
+            ),
+          ) &&
+          dialog.value === currentTarget
+        )
+          error.value = true;
+      } catch {
+        if (dialog.value === currentTarget) error.value = true;
+      }
+    });
   }
-  function close() {
-    editing.value = undefined;
-    target = undefined;
-    error.value = false;
-  }
-  return { editing, error, open, confirm, close };
+  return { dialog, editing, error, open, confirm, close };
 }

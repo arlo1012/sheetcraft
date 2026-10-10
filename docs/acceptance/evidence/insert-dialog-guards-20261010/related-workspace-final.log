@@ -1,0 +1,10 @@
+$ vitest run src/tests/modules/camera src/tests/modules/form-controls src/tests/modules/sheet-drawings src/tests/modules/charts/actions.test.ts src/tests/modules/pivot-tables/dialog-lifecycle.test.ts src/tests/modules/table-styles/dialog-lifecycle.test.ts src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/apps/web
+
+
+ Test Files  13 passed (13)
+      Tests  222 passed (222)
+   Start at  13:24:30
+   Duration  42.01s (transform 9.30s, setup 0ms, import 22.54s, tests 15.05s, environment 2.61s)
+

@@ -1,0 +1,12 @@
+{
+  "baseline": 125,
+  "current": 125,
+  "added_exact": [
+    "- apps/web/src/app/SpreadsheetWorkspace.vue:1789 Only the shared TDesign adapter may target --td-* or internal .t-* selectors"
+  ],
+  "removed_exact": [
+    "- apps/web/src/app/SpreadsheetWorkspace.vue:1791 Only the shared TDesign adapter may target --td-* or internal .t-* selectors"
+  ],
+  "added_semantic": [],
+  "removed_semantic": []
+}

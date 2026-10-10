@@ -1,5 +1,5 @@
-import { ref, shallowRef } from "vue";
-import { canEditCell, canUseSheetPermission } from "@sheetcraft/core";
+import { ref } from "vue";
+import { canEditCell } from "@sheetcraft/core";
 import {
   createSetSheetDrawingsCommand,
   createSetCellContentCommand,
@@ -12,11 +12,14 @@ import {
   type FormControlType,
 } from "@sheetcraft/core/form-controls";
 import type { Workbook, Sheet, CellAddress, SheetEvaluator } from "@sheetcraft/core/workbook";
+import { useDrawingDialogTarget } from "../../shared/drawing-dialog/useDrawingDialogTarget";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
 export function useFormControlActions(options: {
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
+  getGeneration?: () => number;
+  getRevision?: () => number;
   getAddress: () => CellAddress;
   getEvaluator: () => SheetEvaluator;
   isBusy: () => boolean;
@@ -24,21 +27,19 @@ export function useFormControlActions(options: {
   execute: (command: WorkbookCommand) => unknown;
   name: (type: FormControlType) => string;
 }) {
-  const editing = shallowRef<SheetControlDrawing>();
   const error = ref(false);
   const idFactory = createBrowserIdFactory();
-  let target: { workbook: Workbook; sheetId: string; existing: boolean } | undefined;
-  const allowed = () =>
-    !options.isBusy() && canUseSheetPermission(options.getSheet(), "editObjects");
+  const targets = useDrawingDialogTarget<SheetControlDrawing, [linked: string, source: string]>({
+    ...options,
+    onReset: () => {
+      error.value = false;
+    },
+  });
+  const { dialog, editing, close } = targets;
   function open(drawing?: SheetControlDrawing) {
-    if (!allowed() || !options.flush()) return;
-    target = {
-      workbook: options.getWorkbook(),
-      sheetId: options.getSheet().id,
-      existing: !!drawing,
-    };
-    error.value = false;
-    editing.value = drawing ?? {
+    const target = targets.prepare(drawing);
+    if (!target) return;
+    const initial = drawing ?? {
       id: idFactory("control"),
       kind: "control",
       name: options.name("checkbox"),
@@ -70,61 +71,64 @@ export function useFormControlActions(options: {
         resetValue: 0,
       },
     };
+    targets.open(target, initial, (current, next, linked, source) =>
+      confirm(next, linked, source, current),
+    );
   }
-  function confirm(drawing: SheetControlDrawing, linkedReference: string, sourceReference: string) {
-    const sheet = options.getSheet();
-    if (
-      !allowed() ||
-      !target ||
-      target.workbook !== options.getWorkbook() ||
-      target.sheetId !== sheet.id ||
-      editing.value?.id !== drawing.id
-    )
-      return;
-    const linked = linkedReference.trim()
-      ? resolveRangeReference(target.workbook, linkedReference, sheet.id)
-      : undefined;
-    const source = sourceReference.trim()
-      ? resolveRangeReference(target.workbook, sourceReference, sheet.id)
-      : undefined;
-    const passive = drawing.control.type === "label" || drawing.control.type === "group";
-    if (
-      (!passive && !linked) ||
-      (linked &&
-        (linked.sheetId !== sheet.id ||
-          linked.range.start.row !== linked.range.end.row ||
-          linked.range.start.column !== linked.range.end.column)) ||
-      (sourceReference.trim() && (!source || source.sheetId !== sheet.id))
-    ) {
-      error.value = true;
-      return;
-    }
-    try {
-      const next = normalizeSheetDrawing({
-        ...drawing,
-        control: {
-          ...drawing.control,
-          linkedCell: linked?.range.start ?? null,
-          source: source?.range ?? null,
-        },
-      });
-      const current = sheet.drawings ?? [];
-      if (target.existing && !current.some((item) => item.id === next.id)) {
-        close();
+  function confirm(
+    drawing: SheetControlDrawing,
+    linkedReference: string,
+    sourceReference: string,
+    target = dialog.value,
+  ) {
+    targets.run(target, (currentTarget) => {
+      const sheet = currentTarget.sheet;
+      if (drawing.id !== currentTarget.initial.id || drawing.kind !== "control") return;
+      const linked = linkedReference.trim()
+        ? resolveRangeReference(currentTarget.workbook, linkedReference, sheet.id)
+        : undefined;
+      const source = sourceReference.trim()
+        ? resolveRangeReference(currentTarget.workbook, sourceReference, sheet.id)
+        : undefined;
+      const passive = drawing.control.type === "label" || drawing.control.type === "group";
+      if (
+        (!passive && !linked) ||
+        (linked &&
+          (linked.sheetId !== sheet.id ||
+            linked.range.start.row !== linked.range.end.row ||
+            linked.range.start.column !== linked.range.end.column)) ||
+        (sourceReference.trim() && (!source || source.sheetId !== sheet.id))
+      ) {
+        error.value = true;
         return;
       }
-      options.execute(
-        createSetSheetDrawingsCommand(
-          sheet.id,
-          target.existing
-            ? current.map((item) => (item.id === next.id ? next : item))
-            : [...current, next],
-        ),
-      );
-      close();
-    } catch {
-      error.value = true;
-    }
+      try {
+        const next = normalizeSheetDrawing({
+          ...drawing,
+          control: {
+            ...drawing.control,
+            linkedCell: linked?.range.start ?? null,
+            source: source?.range ?? null,
+          },
+        });
+        const current = sheet.drawings ?? [];
+        if (
+          !targets.commit(
+            currentTarget,
+            createSetSheetDrawingsCommand(
+              sheet.id,
+              currentTarget.existing
+                ? current.map((item) => (item === currentTarget.existing ? next : item))
+                : [...current, next],
+            ),
+          ) &&
+          dialog.value === currentTarget
+        )
+          error.value = true;
+      } catch {
+        if (dialog.value === currentTarget) error.value = true;
+      }
+    });
   }
   function change(id: string, requested: unknown) {
     const sheet = options.getSheet();
@@ -151,10 +155,5 @@ export function useFormControlActions(options: {
       ),
     );
   }
-  function close() {
-    editing.value = undefined;
-    target = undefined;
-    error.value = false;
-  }
-  return { editing, error, open, confirm, change, close };
+  return { dialog, editing, error, open, confirm, change, close };
 }

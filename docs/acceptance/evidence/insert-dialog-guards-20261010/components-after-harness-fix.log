@@ -1,0 +1,28 @@
+$ vitest run src/tests/modules/camera src/tests/modules/form-controls src/tests/modules/sheet-drawings "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/apps/web
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: Failed to execute 'getComputedStyle' on 'Window': parameter 1 is not of type 'Element'.
+ ❯ GlobalWindow.getComputedStyle ../../node_modules/.bun/happy-dom@20.11.6/node_modules/happy-dom/lib/window/BrowserWindow.js:1758:19
+ ❯ calculateNodeSize ../../node_modules/.bun/tdesign-vue-next@1.20.7+cbea368d07b71712/node_modules/common/js/utils/helper.ts:261:24
+ ❯ calcTextareaHeight ../../node_modules/.bun/tdesign-vue-next@1.20.7+cbea368d07b71712/node_modules/common/js/utils/calcTextareaHeight.ts:32:65
+ ❯ ../../node_modules/.bun/tdesign-vue-next@1.20.7+cbea368d07b71712/node_modules/components/textarea/textarea.tsx:68:33
+ ❯ processTicksAndRejections node:internal/process/task_queues:104:5
+
+This error originated in "src/tests/modules/sheet-drawings/dialog.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  9 passed (9)
+      Tests  108 passed (108)
+     Errors  1 error
+   Start at  13:22:27
+   Duration  15.07s (transform 2.86s, setup 0ms, import 11.02s, tests 1000ms, environment 1.77s)
+
+error: script "test" exited with code 1

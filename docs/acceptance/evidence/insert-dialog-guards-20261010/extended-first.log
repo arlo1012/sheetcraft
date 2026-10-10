@@ -1,0 +1,39 @@
+$ vitest run src/tests/modules/camera/actions.test.ts src/tests/modules/sheet-drawings/actions.test.ts src/tests/modules/form-controls/actions.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/apps/web
+
+ ❯ src/tests/modules/sheet-drawings/actions.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/modules/sheet-drawings/actions.test.ts [ src/tests/modules/sheet-drawings/actions.test.ts ]
+Error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mIdentifier `saved` has already been declared
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/tests/modules/sheet-drawings/actions.test.ts:197:11 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m197 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249mc[0m[38;5;249mo[0m[38;5;249mn[0m[38;5;249ms[0m[38;5;249mt[0m[38;5;249m [0msaved[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0m[38;5;249mf[0m[38;5;249m.[0m[38;5;249mg[0m[38;5;249me[0m[38;5;249mt[0m[38;5;249mS[0m[38;5;249mh[0m[38;5;249me[0m[38;5;249me[0m[38;5;249mt[0m[38;5;249m([0m[38;5;249m)[0m[38;5;249m.[0m[38;5;249md[0m[38;5;249mr[0m[38;5;249ma[0m[38;5;249mw[0m[38;5;249mi[0m[38;5;249mn[0m[38;5;249mg[0m[38;5;249ms[0m[38;5;249m![0m[38;5;249m[[0m[38;5;249m0[0m[38;5;249m][0m[38;5;249m![0m[38;5;249m;[0m
+ [38;5;240m    │[0m           ──┬──  
+ [38;5;240m    │[0m             ╰──── `saved` has already been declared here
+ [38;5;240m    │[0m 
+ [38;5;246m202 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249mc[0m[38;5;249mo[0m[38;5;249mn[0m[38;5;249ms[0m[38;5;249mt[0m[38;5;249m [0msaved[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0m[38;5;249mf[0m[38;5;249m.[0m[38;5;249mg[0m[38;5;249me[0m[38;5;249mt[0m[38;5;249mS[0m[38;5;249mh[0m[38;5;249me[0m[38;5;249me[0m[38;5;249mt[0m[38;5;249m([0m[38;5;249m)[0m[38;5;249m.[0m[38;5;249md[0m[38;5;249mr[0m[38;5;249ma[0m[38;5;249mw[0m[38;5;249mi[0m[38;5;249mn[0m[38;5;249mg[0m[38;5;249ms[0m[38;5;249m![0m[38;5;249m[[0m[38;5;249m0[0m[38;5;249m][0m[38;5;249m![0m[38;5;249m;[0m
+ [38;5;240m    │[0m           ──┬──  
+ [38;5;240m    │[0m             ╰──── It can not be redeclared here
+[38;5;246m─────╯[0m
+
+  Plugin: vite:oxc
+  File: /workspace/shared/sheetcraft-resume-20261010/apps/web/src/tests/modules/sheet-drawings/actions.test.ts
+ ❯ transformWithOxc ../../node_modules/.bun/vite@8.2.2+6f88173440db1efa/node_modules/vite/dist/node/chunks/node.js:4103:19
+ ❯ TransformPluginContext.transform ../../node_modules/.bun/vite@8.2.2+6f88173440db1efa/node_modules/vite/dist/node/chunks/node.js:4174:26
+ ❯ EnvironmentPluginContainer.transform ../../node_modules/.bun/vite@8.2.2+6f88173440db1efa/node_modules/vite/dist/node/chunks/node.js:30932:51
+ ❯ loadAndTransform ../../node_modules/.bun/vite@8.2.2+6f88173440db1efa/node_modules/vite/dist/node/chunks/node.js:20671:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  61 passed (61)
+   Start at  13:20:05
+   Duration  2.86s (transform 962ms, setup 0ms, import 1.74s, tests 52ms, environment 592ms)
+
+error: script "test" exited with code 1

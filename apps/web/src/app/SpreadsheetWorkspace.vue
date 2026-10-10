@@ -1271,6 +1271,8 @@ watch(
 const controlActions = useFormControlActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
   getAddress: () => activeAddress.value,
   getEvaluator: () => activeSheetEvaluator.value,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
@@ -1278,14 +1280,10 @@ const controlActions = useFormControlActions({
   execute: executeCommand,
   name: (type) => t(`control.${type}`),
 });
-const { editing: editingControl, error: controlError } = controlActions;
+const { dialog: controlDialog, editing: editingControl, error: controlError } = controlActions;
 const controlRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingControlRange, reference: pickedControlReference } = controlRangePicker;
-watch(editingControl, (value) => {
-  if (!value) controlRangePicker.cancel();
-});
-watch(() => activeSheet.value.id, controlActions.close);
-watch(workbookGeneration, controlActions.close);
+watch(controlDialog, () => controlRangePicker.cancel(), { flush: "sync" });
 const attachmentActions = useAttachmentActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1303,20 +1301,18 @@ watch(workbookGeneration, attachmentActions.close);
 const cameraActions = useCameraActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
   getRange: () => activeSelectionRange.value,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   flush: () => cellEditSession.finish(),
   execute: executeCommand,
   name: () => t("camera.title"),
 });
-const { editing: editingCamera, error: cameraError } = cameraActions;
+const { dialog: cameraDialog, editing: editingCamera, error: cameraError } = cameraActions;
 const cameraRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingCameraRange, reference: pickedCameraReference } = cameraRangePicker;
-watch(editingCamera, (value) => {
-  if (!value) cameraRangePicker.cancel();
-});
-watch(() => activeSheet.value.id, cameraActions.close);
-watch(workbookGeneration, cameraActions.close);
+watch(cameraDialog, () => cameraRangePicker.cancel(), { flush: "sync" });
 const sparklineActions = useSparklineActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1464,15 +1460,17 @@ async function insertScreenCapture(): Promise<void> {
   }
 }
 const drawingActions = useDrawingActions({
+  getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
   getAddress: () => activeAddress.value,
   flush: () => cellEditSession.finish(),
   execute: executeCommand,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   name: (kind) => t(`drawing.${kind}`),
 });
-const { editing: editingDrawing } = drawingActions;
-watch(() => activeSheet.value.id, drawingActions.close);
+const { dialog: drawingDialog, editing: editingDrawing } = drawingActions;
 const pictureAnnotation = shallowRef<{
   image: FloatingImage;
   sheetId: string;
@@ -4026,14 +4024,14 @@ const gridInert = computed(
     />
   </section>
   <DrawingEditorDialog
-    v-if="editingDrawing"
-    :key="editingDrawing.id"
-    :drawing="editingDrawing"
+    v-if="drawingDialog"
+    :key="drawingDialog.dialogId"
+    :drawing="drawingDialog.initial"
     :disabled="
       loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
     "
-    @confirm="drawingActions.confirm"
-    @close="drawingActions.close"
+    @confirm="drawingDialog.confirm"
+    @close="drawingDialog.close"
   />
   <SymbolDialog
     v-if="symbolVisible"
@@ -4109,9 +4107,9 @@ const gridInert = computed(
     @cancel="pivotRangePicker.cancel"
   />
   <FormControlDialog
-    v-if="editingControl"
-    :key="editingControl.id"
-    :drawing="editingControl"
+    v-if="controlDialog"
+    :key="controlDialog.dialogId"
+    :drawing="controlDialog.initial"
     :sheet-name="activeSheet.name"
     :disabled="
       loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
@@ -4119,8 +4117,8 @@ const gridInert = computed(
     :error="controlError"
     :suspended="pickingControlRange"
     :select-reference="controlRangePicker.selectReference"
-    @confirm="controlActions.confirm"
-    @close="controlActions.close"
+    @confirm="controlDialog.confirm"
+    @close="controlDialog.close"
   />
   <RangeReferencePicker
     v-if="pickingControlRange"
@@ -4130,9 +4128,9 @@ const gridInert = computed(
     @cancel="controlRangePicker.cancel"
   />
   <CameraEditorDialog
-    v-if="editingCamera"
-    :key="editingCamera.id"
-    :drawing="editingCamera"
+    v-if="cameraDialog"
+    :key="cameraDialog.dialogId"
+    :drawing="cameraDialog.initial"
     :sheet-name="activeSheet.name"
     :disabled="
       loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
@@ -4140,8 +4138,8 @@ const gridInert = computed(
     :error="cameraError"
     :suspended="pickingCameraRange"
     :select-reference="cameraRangePicker.selectReference"
-    @confirm="cameraActions.confirm"
-    @close="cameraActions.close"
+    @confirm="cameraDialog.confirm"
+    @close="cameraDialog.close"
   />
   <RangeReferencePicker
     v-if="pickingCameraRange"

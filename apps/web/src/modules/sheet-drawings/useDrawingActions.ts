@@ -1,4 +1,3 @@
-import { ref, shallowRef } from "vue";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
@@ -7,9 +6,13 @@ import type {
   SheetGraphicDrawing,
   SheetGraphicKind,
 } from "@sheetcraft/core/sheet-drawings";
-import type { Sheet, CellAddress } from "@sheetcraft/core/workbook";
+import { useDrawingDialogTarget } from "../../shared/drawing-dialog/useDrawingDialogTarget";
+import type { Workbook, Sheet, CellAddress } from "@sheetcraft/core/workbook";
 export function useDrawingActions(options: {
+  getWorkbook: () => Workbook;
   getSheet: () => Sheet;
+  getGeneration?: () => number;
+  getRevision?: () => number;
   getAddress: () => CellAddress;
   flush: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
@@ -17,16 +20,14 @@ export function useDrawingActions(options: {
   name: (kind: SheetGraphicKind) => string;
 }) {
   const idFactory = createBrowserIdFactory();
-  const editing = shallowRef<SheetGraphicDrawing>();
-  const editingSheetId = ref("");
-  let existing = false;
+  const targets = useDrawingDialogTarget<SheetGraphicDrawing, []>(options);
+  const { dialog, editing, close } = targets;
   const allowed = () =>
     !options.isBusy() && canUseSheetPermission(options.getSheet(), "editObjects");
   function insert(kind: SheetGraphicKind) {
-    if (!allowed() || !options.flush()) return;
-    existing = false;
-    editingSheetId.value = options.getSheet().id;
-    editing.value = {
+    const target = targets.prepare();
+    if (!target) return;
+    const initial: SheetGraphicDrawing = {
       id: idFactory("drawing"),
       kind,
       name: options.name(kind),
@@ -51,12 +52,11 @@ export function useDrawingActions(options: {
       italic: false,
       rotation: 0,
     };
+    targets.open(target, initial, (current, next) => confirm(next, current));
   }
   function edit(drawing: SheetGraphicDrawing) {
-    if (!allowed() || !options.flush()) return;
-    existing = true;
-    editingSheetId.value = options.getSheet().id;
-    editing.value = drawing;
+    const target = targets.prepare(drawing);
+    if (target) targets.open(target, drawing, (current, next) => confirm(next, current));
   }
   function update(drawing: SheetDrawing) {
     if (!allowed()) return;
@@ -69,21 +69,21 @@ export function useDrawingActions(options: {
       ),
     );
   }
-  function confirm(drawing: SheetDrawing) {
-    const sheet = options.getSheet();
-    if (
-      !allowed() ||
-      editingSheetId.value !== sheet.id ||
-      !editing.value ||
-      editing.value.id !== drawing.id
-    )
-      return;
-    if (existing) update(drawing);
-    else
-      options.execute(
-        createSetSheetDrawingsCommand(sheet.id, [...(sheet.drawings ?? []), drawing]),
+  function confirm(drawing: SheetGraphicDrawing, target = dialog.value) {
+    targets.run(target, (currentTarget) => {
+      if (drawing.id !== currentTarget.initial.id || drawing.kind !== currentTarget.initial.kind)
+        return;
+      const current = currentTarget.sheet.drawings ?? [];
+      targets.commit(
+        currentTarget,
+        createSetSheetDrawingsCommand(
+          currentTarget.sheet.id,
+          currentTarget.existing
+            ? current.map((item) => (item === currentTarget.existing ? drawing : item))
+            : [...current, drawing],
+        ),
       );
-    editing.value = undefined;
+    });
   }
   function remove(id: string) {
     if (!allowed()) return;
@@ -95,15 +95,5 @@ export function useDrawingActions(options: {
       ),
     );
   }
-  return {
-    editing,
-    insert,
-    edit,
-    update,
-    confirm,
-    remove,
-    close: () => {
-      editing.value = undefined;
-    },
-  };
+  return { dialog, editing, insert, edit, update, confirm, remove, close };
 }

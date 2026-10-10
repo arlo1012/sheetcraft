@@ -1,0 +1,10 @@
+$ vitest run src/tests/modules/camera src/tests/modules/form-controls src/tests/modules/sheet-drawings src/tests/modules/charts/useChartActions.test.ts src/tests/modules/pivot-tables/usePivotTableActions.test.ts src/tests/modules/tables/useTableActions.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/apps/web
+
+
+ Test Files  9 passed (9)
+      Tests  108 passed (108)
+   Start at  13:23:29
+   Duration  15.28s (transform 3.00s, setup 0ms, import 11.28s, tests 860ms, environment 1.82s)
+
