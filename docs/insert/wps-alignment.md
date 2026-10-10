@@ -26,8 +26,8 @@ result. Native XLSX support is tracked separately from internal document support
 3. **PivotChart and native chart infrastructure.** PivotChart is an existing
    linked internal chart, created with its pivot atomically. The initial native
    clustered-column export slice now uses the actual emitted PivotTable identity
-   and cached native axis item layouts, with WPS first-open/refresh/save/reopen
-   acceptance. Pictures and charts share a worksheet drawing with collision-free
+   and cached native axis item layouts, with WPS and Excel web
+   first-open/refresh/save/reopen acceptance. Pictures and charts share a worksheet drawing with collision-free
    IDs. Other drawings and unsupported chart/report configurations remain explicit
    omissions. See [the bounded export contract](native-pivotchart-export.md).
 4. **Other charts, images, sparklines, hyperlinks and symbols.** Ordinary chart
@@ -81,12 +81,15 @@ the export-warning product policy.
   chart with `pivotSource` naming its workbook, owning sheet, and native pivot.
   Source 100→110 stays cached until explicit Refresh, then both chart/report update
   and persist after workbook close/reopen. See the [bounded producer evidence](../acceptance/evidence/wps-pivotchart-producer-20261010/README.md).
-  Product native chart export/import remains pending; this observation is not
-  product-file acceptance or whole-Insert parity.
+  The bounded product export subsequently passed first-open, explicit refresh,
+  and save/reopen in both WPS and Excel web. Native chart import and other native
+  chart types remain pending; this is not whole-Insert parity. See the
+  [actual product acceptance record](../acceptance/native-pivotchart-export-20261010.md).
 
 Focused module tests and exported product-path samples establish only their
-bounded behavior. Real WPS checks resume after supported native controls recover;
-do not substitute a mocked visual pass or repeat broad format matrices.
+bounded behavior. Supported native controls have recovered and the chart slice
+has actual app acceptance; other GUI paths remain bound to their own evidence.
+Do not substitute a mocked visual pass or repeat broad format matrices.
 
 ## Compatibility workflow and sources
 
