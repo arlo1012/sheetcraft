@@ -26,7 +26,7 @@ const dialogContent = computed(() => {
       kind: "error" as const,
       theme: "danger" as const,
       header: t("xlsx.feedback.errorTitle"),
-      description: t(props.feedback.key),
+      description: t(props.feedback.key, { locations: props.feedback.locations ?? "" }),
       confirm: t("xlsx.confirm.close"),
     };
   }

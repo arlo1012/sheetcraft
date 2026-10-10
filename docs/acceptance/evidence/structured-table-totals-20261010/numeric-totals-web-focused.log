@@ -1,0 +1,10 @@
+$ vitest run src/tests/modules/workbook-xlsx/useWorkbookXlsxActions.test.ts src/tests/modules/workbook-xlsx/components.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/apps/web
+
+
+ Test Files  2 passed (2)
+      Tests  22 passed (22)
+   Start at  15:17:46
+   Duration  3.73s (transform 1.24s, setup 0ms, import 2.88s, tests 214ms, environment 374ms)
+

@@ -4,8 +4,38 @@ import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import { getCellContent, type Sheet, type SheetTable } from "@sheetcraft/core/workbook";
 import { attr, child, nodes, parseXml, xml, type XmlNode } from "./pivot-xml.js";
 import { xlsxText } from "./native/writer-text.js";
+import type { CompatibilityReportBuilder } from "./report.js";
+import { XlsxCompatibilityError } from "./types.js";
 
 type TotalsCell = { formula?: string; array: boolean };
+
+/** Numeric literal totals caused repair in Excel, including a WPS-produced file. */
+export function assertSupportedXlsxTableTotals(
+  sheets: readonly Sheet[],
+  report: CompatibilityReportBuilder,
+): void {
+  let blocked = false;
+  for (const sheet of sheets)
+    for (const table of sheet.tables ?? []) {
+      if (!table.totalRow) continue;
+      for (const [index, column] of table.columns.entries()) {
+        const address = { row: table.range.end.row, column: table.range.start.column + index };
+        const content = getCellContent(sheet, address);
+        if (content?.kind !== "literal" || typeof content.value !== "number") continue;
+        blocked = true;
+        report.add(
+          "table-totals-numeric-constant",
+          "block",
+          `${sheet.name}!${formatCellAddress(address)} (${table.name}[${column.name}])`,
+        );
+      }
+    }
+  if (blocked)
+    throw new XlsxCompatibilityError(
+      "Numeric constants in table total rows cannot be safely exported to XLSX. The workbook is unchanged.",
+      report.build(),
+    );
+}
 
 /** Inspect only generated worksheet rows, preserving the formula actually written. */
 export function readGeneratedTableTotalsCells(

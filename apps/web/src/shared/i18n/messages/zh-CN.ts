@@ -754,6 +754,8 @@ export const zhCN = {
       finishEditing: "请先完成当前输入法组词，再导入或导出 XLSX。",
       stale: "读取文件期间文档发生了变化，本次导入已取消，请重新选择文件。",
       blocked: "无法处理此文件，请检查文件格式和大小。",
+      numericTableTotals:
+        "表格总计行包含数字常量，已停止 XLSX 导出：{locations}。Excel 可能修复这些单元格并改变表格公式。当前工作簿未被修改，仍可保存 JSON 工作簿备份。",
     },
     confirm: {
       importTitle: "导入 XLSX 工作簿？",

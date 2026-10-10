@@ -20,6 +20,7 @@ import {
 
 export type XlsxFeedbackKey =
   | "xlsx.feedback.blocked"
+  | "xlsx.feedback.numericTableTotals"
   | "xlsx.feedback.exported"
   | "xlsx.feedback.failed"
   | "xlsx.feedback.finishEditing"
@@ -29,7 +30,7 @@ export type XlsxFeedbackKey =
   | "xlsx.feedback.unsupportedEncryption"
   | "xlsx.feedback.invalidEncryptedFile";
 
-export type XlsxFeedback = { key: XlsxFeedbackKey; error: boolean };
+export type XlsxFeedback = { key: XlsxFeedbackKey; error: boolean; locations?: string };
 export type XlsxConfirmation = "import";
 
 type PendingImport = {
@@ -120,8 +121,24 @@ export function useWorkbookXlsxActions(options: {
     return false;
   }
 
+  function setNumericTotalsFailure(report?: XlsxCompatibilityReport): boolean {
+    const totals = report?.issues.find(
+      (issue) => issue.code === "table-totals-numeric-constant" && issue.severity === "block",
+    );
+    if (totals) {
+      feedback.value = {
+        key: "xlsx.feedback.numericTableTotals",
+        error: true,
+        locations: totals.locations.join("; "),
+      };
+      return true;
+    }
+    return false;
+  }
+
   function setFailure(error: unknown): void {
     if (error instanceof XlsxWorkerAbortError || disposed) return;
+    if (error instanceof XlsxWorkerFailure && setNumericTotalsFailure(error.report)) return;
     feedback.value = {
       key:
         error instanceof XlsxWorkerTimeoutError
@@ -248,7 +265,8 @@ export function useWorkbookXlsxActions(options: {
       clearTimeout(timeout);
       if (disposed || response.type !== "encode") return;
       if (hasBlockingIssue(response.report)) {
-        feedback.value = { key: "xlsx.feedback.blocked", error: true };
+        if (!setNumericTotalsFailure(response.report))
+          feedback.value = { key: "xlsx.feedback.blocked", error: true };
         return;
       }
       const bytes = new Uint8Array(response.bytes);

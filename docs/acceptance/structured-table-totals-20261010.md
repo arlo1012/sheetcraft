@@ -44,7 +44,8 @@ the worksheet, cached values, input workbook, or creates/fills formulas.
   names but does not prove unique workbook-wide native identity. This is a
   conservative downgrade; native structured sum-preset fidelity is not claimed.
 - Actual literal text becomes totalsRowLabel using the same OOXML string escaping
-  as the real worksheet cell. Numeric constants and blank cells do not become sum.
+  as the real worksheet cell. Blank cells do not become sum. Numeric literal totals
+  are now explicitly blocked before export, as documented below.
 - Tables without a total row receive no total-column metadata. Snapshot version
   and Core model are unchanged; native import continues preserving actual cells.
 
@@ -61,7 +62,8 @@ Actual Excel opened this formal output editable without repair. Real keyboard
 editing B2 from2 to3 produced D2=30, filtered Net71, and SUM131; cloud save completed.
 Actual WPS opened the same output, retained three tables/filter/style, and the
 same edit produced30/71/131. A distinct WPS save was completed. Save-close-reopen
-and mixed custom target-app checks remain pending in this checkpoint.
+and mixed custom target-app checks were pending at this checkpoint; the
+continuation below records their actual completion.
 
 - Full XLSX suite: **80 files, 1138 tests passed**, one worker, 70.14 seconds.
 - Related totals/table/filter/structured-reference run: 4 files, 86 passed before
@@ -88,3 +90,49 @@ observations remain open. No complete-table or full-Insert acceptance is claimed
 
 All new actual XLSX/JSON/XML/screenshots stay local. This checkpoint publishes only
 source, reproducible code, synthetic regression structures, and textual evidence.
+
+## Continuation: normal totals verified, numeric literal blocked
+
+After checkpoint `0bcb07547c69d0005e6d1d90fb0cb0da87d30496`, single-category
+formal outputs opened editable in Excel: text label, custom SUBTOTAL101, and custom
+SUM+1. A native-source custom-metadata control also opened editable with91.
+The mixed fixture containing numeric literal99 still repaired; an isolated numeric
+constant also repaired and changed a dependent table SUM from121 to182. An actual
+WPS producer set its total dropdown to None and numeric99, then saved, and that
+native file repaired too. Adding only totalsRowLabel99 did not fix the isolated
+constant. These failures remain in the continuation journal; the numeric matrix
+was stopped rather than changing Core values into text or formulas.
+
+The adapter now throws `XlsxCompatibilityError` with a blocking
+`table-totals-numeric-constant` issue for **literal numbers only in active table
+total rows**. Each location includes worksheet, A1 cell, table and column name.
+Formula cells with numeric results, ordinary data-row numbers, tables without
+totals, and unproven nonnumeric types are not included in this new gate. The input
+workbook and version43 snapshots remain unchanged. Web shows localized locations
+and explains that JSON workbook backup remains available; it never downloads a
+repairing XLSX. Public snapshot save/import is unaffected.
+
+A new formal supported-mixed output retained a text label, own-column SUBTOTAL109,
+custom SUBTOTAL101, custom SUM+1 and a blank total. Actual Excel and WPS both
+opened it correctly; real B2 edit2→3 recalculated D2=30, B total13, mean5,
+custom total132 and dependent SUM131. Save, close and reopen retained these values
+in each application. This is API regeneration from the actual UI-exported source,
+not a substitute claim of a new product UI export/import. Output SHA256:
+`b0b5cd3b316a945451227c2b4557b80ecc31791ba5f0f6b4c20dbdc7fc50de3b`.
+
+Current focused checks: totals1file/22tests and Web2files/22tests passed; full XLSX
+test types, package build, full Web types, scoped lint/format/whitespace passed.
+The1138 full-suite result above is historical for0bcb, not a fresh full-suite run
+of the new numeric gate. Earlier125 architecture findings and failed/interrupted
+logs remain. Product numeric-gate GUI verification passed after the actual crashed tab's normal
+Reload and an explicitly forced local package build. The first incremental build
+had exited0 but emitted dist lacked the gate; this stale-build harness failure is
+preserved. Actual ExportXLSX showed Sheet2!B5 (Table1[Column2]) and JSON-backup
+guidance, preserved99 in the grid, and actual ExportJSON succeeded. Public
+snapshot deserialize confirmed version43, totalRowtrue and literal numeric99.
+No denied JSON import was retried, browser restarted or authentication extracted.
+
+Filter visibility single-factor control now shows no Sheet2 arrows in actual WPS;
+its Excel check and formal writer fix remain pending. Other table matrix gaps in
+Remaining acceptance remain open. All new actual files/screenshots remain local;
+only code, synthetic regression structures and text are checkpointed.

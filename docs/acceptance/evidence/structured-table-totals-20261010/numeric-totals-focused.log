@@ -1,0 +1,10 @@
+$ vitest run --config vitest.config.ts src/tests/native/table-totals-metadata.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+   Start at  15:17:35
+   Duration  2.18s (transform 1.24s, setup 0ms, import 1.69s, tests 351ms, environment 0ms)
+

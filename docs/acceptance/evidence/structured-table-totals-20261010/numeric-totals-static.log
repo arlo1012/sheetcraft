@@ -1,0 +1,4 @@
+$ tsc --noEmit -p tsconfig.test.json
+$ tsc -b tsconfig.build.json
+$ vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json
+Scoped lint and whitespace passed (exit0). Scoped format check passed; no full boundary rerun was made for this patch. Full prior boundary failure remains 125 findings. Vitest logs display execution-host time roughly seven hours behind tool UTC; acceptance event times use tool UTC.

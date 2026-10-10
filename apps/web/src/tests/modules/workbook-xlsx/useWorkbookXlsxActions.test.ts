@@ -71,6 +71,7 @@ function mountActions(factory: XlsxWorkerFactory, options: { timeoutMs?: number 
     actions,
     download,
     getRevision: () => revision,
+    getWorkbook: () => workbook,
     replaceDocument,
     scope,
     setRevision: (next: number) => (revision = next),
@@ -78,6 +79,52 @@ function mountActions(factory: XlsxWorkerFactory, options: { timeoutMs?: number 
 }
 
 describe("useWorkbookXlsxActions", () => {
+  test.each([true, false])(
+    "preserves the document and shows numeric-total locations for a blocked export (worker failure=%s)",
+    async (failed) => {
+      const report = {
+        issues: [
+          {
+            code: "table-totals-numeric-constant",
+            severity: "block" as const,
+            count: 2,
+            locations: ["Sheet1!E7 (Sales[Constant])", "Sheet2!B4 (Other[Net])"],
+          },
+        ],
+      };
+      const fixture = mountActions(
+        createWorkerFactory((request, worker) =>
+          response(
+            worker,
+            failed
+              ? {
+                  id: request.id,
+                  ok: false,
+                  error: { message: "Unsupported totals", report },
+                }
+              : { id: request.id, ok: true, type: "encode", bytes: new ArrayBuffer(0), report },
+          ),
+        ),
+      );
+      const workbook = fixture.getWorkbook();
+      const before = serializeWorkbook(workbook);
+      await fixture.actions.exportXlsx();
+      expect(fixture.actions.feedback.value).toEqual({
+        key: "xlsx.feedback.numericTableTotals",
+        error: true,
+        locations: "Sheet1!E7 (Sales[Constant]); Sheet2!B4 (Other[Net])",
+      });
+      expect(fixture.actions.busy.value).toBe(false);
+      expect(fixture.getWorkbook()).toBe(workbook);
+      expect(serializeWorkbook(fixture.getWorkbook())).toEqual(before);
+      expect(fixture.getRevision()).toBe(1);
+      expect(fixture.download).not.toHaveBeenCalled();
+      expect(fixture.replaceDocument).not.toHaveBeenCalled();
+      fixture.actions.dismissFeedback();
+      expect(fixture.actions.feedback.value).toBeUndefined();
+      fixture.scope.stop();
+    },
+  );
   test("always confirms a decoded import and leaves the workbook unchanged when cancelled", async () => {
     const snapshot = serializeWorkbook(createTestWorkbook());
     const fixture = mountActions(

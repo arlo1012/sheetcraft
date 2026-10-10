@@ -1,5 +1,18 @@
 # Sheetcraft continuation after recovery — 2026-10-10
 
+## Numeric total limitation and ordinary mixed totals continuation
+
+The ordinary mixed label/SUM109/custom SUBTOTAL101/custom SUM+1/blank fixture now
+passed actual Excel and WPS editing, save-close-reopen (30/13/5/132/131). Numeric
+literal99 in a total row repaired even from a native WPS producer; the adapter
+now blocks that exact literal-number category with location-bearing
+CompatibilityError and localized JSON-backup guidance. Core values/snapshots are
+not converted. New gate focused tests/types/build passed; full1138 is the prior
+checkpoint result. Product gate GUI passed with exact location and successful JSON backup retaining99;
+first stale incremental dist/harness failure and force-build recovery are recorded.
+Read the totals acceptance continuation and preserved journal. Filter buttons,
+full table UI/import and calculated-column observation scope remain open.
+
 ## Latest totals repair WIP
 
 After `b3db3eed88ecf06d9f13b9678414150390b10778`, actual native positive and

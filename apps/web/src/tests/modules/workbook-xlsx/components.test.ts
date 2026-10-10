@@ -17,6 +17,31 @@ afterEach(() => {
 });
 
 describe("XLSX feedback", () => {
+  test.each(["en-US", "zh-CN"] as const)(
+    "renders a numeric total's location and JSON backup guidance (%s)",
+    async (locale) => {
+      const wrapper = mount(XlsxFileFeedback, {
+        attachTo: createFeedbackHost(),
+        global: { plugins: [createAppI18n(locale)] },
+        props: {
+          busy: false,
+          feedback: {
+            key: "xlsx.feedback.numericTableTotals",
+            error: true,
+            locations: "Sheet1!E7 (Sales[Constant])",
+          },
+        },
+      });
+      mounted.push(wrapper);
+      await flushPromises();
+      const body = new DOMWrapper(document.body);
+      expect(body.get("[data-xlsx-error]").text()).toContain("Sheet1!E7 (Sales[Constant])");
+      expect(body.get("[data-xlsx-error]").text()).toContain("JSON");
+      expect(body.get("[data-xlsx-error]").text()).not.toContain("{locations}");
+      await body.get(".t-dialog__close").trigger("click");
+      expect(wrapper.emitted("dismiss")).toHaveLength(1);
+    },
+  );
   test("only asks to replace the document when importing without compatibility details", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const host = createFeedbackHost();

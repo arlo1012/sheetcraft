@@ -1,0 +1,5 @@
+Initial incremental build exited0 but dist/codec.js lacked the new gate, so force the local package build and verify emitted code before GUI acceptance.
+packages/xlsx-io/dist/table-totals.js:9:export function assertSupportedXlsxTableTotals(sheets, report) {
+packages/xlsx-io/dist/table-totals.js:21:                report.add("table-totals-numeric-constant", "block", `${sheet.name}!${formatCellAddress(address)} (${table.name}[${column.name}])`);
+packages/xlsx-io/dist/codec.js:24:import { assertSupportedXlsxTableTotals } from "./table-totals.js";
+packages/xlsx-io/dist/codec.js:874:    assertSupportedXlsxTableTotals(sheets, report);

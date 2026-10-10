@@ -63,6 +63,7 @@ import {
 } from "@sheetcraft/core/workbook";
 import { CompatibilityReportBuilder } from "./report.js";
 import { finalizeXlsxExport } from "./export-finalizer.js";
+import { assertSupportedXlsxTableTotals } from "./table-totals.js";
 import { readXlsxWorkbookTheme } from "./workbook-theme.js";
 import { collectDefinedNames, readDefinedNames } from "./defined-names.js";
 import {
@@ -1107,6 +1108,7 @@ export async function encodeWithNativeXlsx(
   const report = new CompatibilityReportBuilder();
   const sheets = [...workbook.sheets.values()];
   if (!sheets.length) throw new RangeError("The workbook contains no worksheets.");
+  assertSupportedXlsxTableTotals(sheets, report);
   for (const sheet of sheets) {
     if (typeof sheet.properties.hidden !== "boolean")
       throw new RangeError("Invalid XLSX worksheet hidden state.");

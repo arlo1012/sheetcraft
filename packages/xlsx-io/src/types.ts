@@ -19,6 +19,7 @@ export type XlsxCompatibilityCode =
   | "formula-not-calculated"
   | "filter-omitted"
   | "filter-table-normalized"
+  | "table-totals-numeric-constant"
   | "advanced-filter-criteria-omitted"
   | "image-omitted"
   | "style-omitted"

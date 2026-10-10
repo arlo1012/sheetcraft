@@ -775,6 +775,8 @@ export const enUS = {
       stale:
         "The document changed while the file was being read. Import was cancelled; select the file again.",
       blocked: "This file could not be processed. Check its format and size.",
+      numericTableTotals:
+        "XLSX export was stopped because a table total row contains a numeric constant: {locations}. Excel may repair these cells and change table formulas. Your workbook is unchanged; you can still save a JSON workbook backup.",
     },
     confirm: {
       importTitle: "Import XLSX workbook?",

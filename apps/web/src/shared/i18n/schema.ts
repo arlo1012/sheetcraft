@@ -744,6 +744,7 @@ export type MessageSchema = ToolMessageSchema & {
       finishEditing: string;
       stale: string;
       blocked: string;
+      numericTableTotals: string;
     };
     confirm: {
       importTitle: string;

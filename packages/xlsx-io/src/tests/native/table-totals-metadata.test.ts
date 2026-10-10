@@ -8,7 +8,7 @@ import {
 } from "@sheetcraft/core/workbook";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import { createBuiltinTableStyles } from "@sheetcraft/core/table-styles";
-import { encodeXlsx, decodeXlsx } from "../../index.js";
+import { encodeXlsx, decodeXlsx, XlsxCompatibilityError } from "../../index.js";
 import { readGeneratedTableTotalsCells, xlsxTableTotalsColumn } from "../../table-totals.js";
 
 function fixture(headerRow = true, totalRow = true) {
@@ -57,7 +57,6 @@ function fixture(headerRow = true, totalRow = true) {
     { row: 3, column: 3 },
     { kind: "formula", formula: { source: "=SUM(D2:D3)+1" } },
   );
-  setCellContent(sheet, { row: 3, column: 4 }, { kind: "literal", value: 99 });
   return { workbook, sheet };
 }
 function tableXml(bytes: Uint8Array) {
@@ -65,6 +64,38 @@ function tableXml(bytes: Uint8Array) {
 }
 
 describe("native table totals metadata matches actual cells", () => {
+  test.each([0, 99, -7])(
+    "blocks a numeric literal total without modifying the workbook (%s)",
+    async (value) => {
+      const f = fixture();
+      setCellContent(f.sheet, { row: 3, column: 4 }, { kind: "literal", value });
+      const before = serializeWorkbook(f.workbook);
+      try {
+        await encodeXlsx(f.workbook);
+        expect.fail("Numeric literal totals must not produce a repairing XLSX.");
+      } catch (error) {
+        expect(error).toBeInstanceOf(XlsxCompatibilityError);
+        expect((error as XlsxCompatibilityError).report.issues).toContainEqual({
+          code: "table-totals-numeric-constant",
+          severity: "block",
+          count: 1,
+          locations: [`${f.sheet.name}!E4 (Sales[Constant])`],
+        });
+      }
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+    },
+  );
+  test("does not block a numeric formula result, numeric cells outside totals, or unproven nonnumeric types", async () => {
+    const f = fixture();
+    setCellContent(f.sheet, { row: 3, column: 4 }, { kind: "formula", formula: { source: "=99" } });
+    setCellContent(f.sheet, { row: 3, column: 5 }, { kind: "literal", value: true });
+    expect(tableXml((await encodeXlsx(f.workbook)).bytes)).toContain(
+      "<totalsRowFormula>99</totalsRowFormula>",
+    );
+    f.sheet.tables![0]!.totalRow = false;
+    setCellContent(f.sheet, { row: 3, column: 4 }, { kind: "literal", value: 99 });
+    await expect(encodeXlsx(f.workbook)).resolves.toHaveProperty("bytes");
+  });
   test.each(["SUBTOTAL(109,Sales[Sum])", "SUBTOTAL(109,[Sum])", "SUBTOTAL(109,Sales['#Sum])"])(
     "does not guess identity from unresolved final structured formula: %s",
     (formula) => {
