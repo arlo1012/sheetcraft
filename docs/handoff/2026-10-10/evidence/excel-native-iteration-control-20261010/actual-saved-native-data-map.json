@@ -1,0 +1,54 @@
+{
+  "filename": "excel-actual-saved.xlsx",
+  "bytes": 7413,
+  "sha256": "2864293e96e1a22a72fb7ea009e46724be9d24f631d81dbd4261d1ffcbfbc5aa",
+  "calcPr": {
+    "calcId": "191028",
+    "iterate": "1",
+    "iterateCount": "50",
+    "iterateDelta": "1E-4",
+    "calcCompleted": "0"
+  },
+  "sheets": [
+    {
+      "part": "xl/worksheets/sheet1.xml",
+      "populatedCells": [
+        {
+          "attrs": {
+            "r": "B3"
+          },
+          "f": "(B3+2)/2",
+          "fAttrs": {
+            "ca": "1"
+          },
+          "value": "1.99993896484375"
+        }
+      ]
+    }
+  ],
+  "docProps/app.xml": {
+    "Application": "Microsoft Excel Online",
+    "Manager": {
+      "present": false,
+      "reported": false
+    },
+    "Company": {
+      "present": false,
+      "reported": false
+    },
+    "AppVersion": "16.0300"
+  },
+  "docProps/core.xml": {
+    "creator": {
+      "present": false,
+      "reported": false
+    },
+    "lastModifiedBy": {
+      "present": true,
+      "reported": false
+    },
+    "revision": null,
+    "created": "2026-10-09T22:35:11Z",
+    "modified": "2026-10-10T05:50:56Z"
+  }
+}

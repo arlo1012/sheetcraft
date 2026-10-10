@@ -1,0 +1,281 @@
+{
+  "schemaVersion": 1,
+  "application": "Excel web",
+  "scope": "isolated synthetic diagnostic and actual production exports",
+  "observations": [
+    {
+      "fixture": "ordinary-control.xlsx",
+      "originalSha256": "9a38240028b6e8b36de5db61095302f9f77c75ec76c71692a492e85b6ec707b1",
+      "openedAt": "2026-10-10T01:40:00Z",
+      "repairAccepted": false,
+      "editable": false,
+      "repairMessage": "已修复的记录: /xl/pivotCache/pivotCacheDefinition1.xml 部分的 数据透视表 (数据透视表缓存)",
+      "status": "repair-read-only"
+    },
+    {
+      "fixture": "ordinary-diagnostic-1-omit-nonnumeric-integer.xlsx",
+      "originalSha256": "c7c5b2f22aadecb24649a59af54fb2e0d0e0a0ec751c1d8ea905fcc235fb167d",
+      "openedAt": "2026-10-10T01:40:00Z",
+      "repairAccepted": false,
+      "editable": false,
+      "repairMessage": "已修复的记录: /xl/pivotCache/pivotCacheDefinition1.xml 部分的 数据透视表 (数据透视表缓存)",
+      "status": "repair-read-only"
+    },
+    {
+      "fixture": "ordinary-diagnostic-2-text-semimixed.xlsx",
+      "originalSha256": "c0148cbb65d644ae74006231685647f4e64a75717e63835b555fdbefa409791e",
+      "status": "opened-editable-without-repair",
+      "repairAccepted": false,
+      "openWarnings": [],
+      "pivotObserved": {
+        "West": 40,
+        "East": 60,
+        "GrandTotal": 100
+      },
+      "screenshots": [
+        "evidence/excel-pivot-diagnostic2-editable.png"
+      ],
+      "classification": "XML single-factor diagnostic; not a product export"
+    },
+    {
+      "fixture": "production/ordinary-fixed.xlsx",
+      "originalSha256": "a96f49847fbf635a4b999214a2ddef41efd773b54e4cfd1341009e0ddabecb46",
+      "status": "key-behavior-save-reopen-passed",
+      "openWarnings": [],
+      "editable": true,
+      "repairAccepted": false,
+      "generation": "actual Core commands/public encodeXlsx production writer",
+      "edit": {
+        "cell": "Sales Source!C2",
+        "before": 40,
+        "after": 60
+      },
+      "refresh": "PivotTable AllRefresh clicked",
+      "expectedAndObserved": {
+        "West": 60,
+        "East": 60,
+        "GrandTotal": 120,
+        "Q1Total": 90,
+        "Q2Total": 30
+      },
+      "save": "cloud autosave confirmed",
+      "reopenedFreshTab": true,
+      "reopenedValuesMatched": true,
+      "stableFileIdentitySha256": "8ddd7d3b293591dea23ce941ca2c31ac534e0c4a838ae8cc53897aa9ba6c4497",
+      "identityMatched": true,
+      "savedByteHash": null,
+      "screenshots": [
+        "evidence/excel-pivot-ordinary-fixed-refreshed.png",
+        "evidence/excel-pivot-ordinary-fixed-reopened.png"
+      ],
+      "finding": "Excel refreshed pivot normalizes layout/caption Amount(2); numeric aggregates correct."
+    },
+    {
+      "fixture": "production/duplicate-fixed.xlsx",
+      "originalSha256": "5af908aef1aa025a89e2bd548466e2ca352890655849e22afc5f696fa7fb5618",
+      "status": "opened-edited-refreshed-save-checkpoint",
+      "editable": true,
+      "openWarnings": [],
+      "repairAccepted": false,
+      "initialObserved": {
+        "West": [
+          40,
+          40,
+          1
+        ],
+        "East": [
+          60,
+          20,
+          3
+        ],
+        "GrandTotal": [
+          100,
+          25,
+          4
+        ]
+      },
+      "aggregateOrder": [
+        "sum",
+        "average",
+        "count"
+      ],
+      "edit": {
+        "cell": "Sales Source!C2",
+        "before": 40,
+        "after": 60
+      },
+      "refreshedExpectedAndObserved": {
+        "West": [
+          60,
+          60,
+          1
+        ],
+        "East": [
+          60,
+          20,
+          3
+        ],
+        "GrandTotal": [
+          120,
+          30,
+          4
+        ]
+      },
+      "save": "cloud autosave green cloud confirmed",
+      "reopenedFreshTab": false,
+      "screenshots": [
+        "evidence/excel-pivot-duplicate-fixed-initial.png",
+        "evidence/excel-pivot-duplicate-fixed-refreshed.png"
+      ]
+    },
+    {
+      "fixture": "table-sheet-overlap.xlsx",
+      "originalSha256": "ec91e38824beceb3bc498633e7276f46c89dddd2c3cf98a78879975c5c7e9469",
+      "status": "repair-read-only",
+      "editable": false,
+      "repairAccepted": false,
+      "repairMessage": "已删除的功能: /xl/tables/table1.xml 部分的 表 (表)",
+      "screenshots": [
+        "evidence/excel-table-overlap-repair.png"
+      ]
+    },
+    {
+      "fixture": "table-owned-filter.xlsx",
+      "originalSha256": "b93b08147fb7a86c61ef4889d295672d75e85506f2a5752f60403b1766637022",
+      "status": "repair-free-table-filter-passed",
+      "editable": true,
+      "repairAccepted": false,
+      "openWarnings": [],
+      "initial": "West row2 hidden, three East visible rows3..5,120/60/20. TableDesign ribbon and filter controls present.",
+      "action": "Data Clear filter",
+      "observed": "West row2 reappears. E2:E5=200/120/60/20; table/filter dropdowns preserved.",
+      "screenshots": [
+        "evidence/excel-table-owned-filter-initial.png",
+        "evidence/excel-table-owned-filter-cleared.png"
+      ],
+      "reopenedFreshTab": false
+    },
+    {
+      "fixture": "validation-alerts-fixed.xlsx",
+      "originalSha256": "387af7be1e8752efc64f9fe60445c4a3d459c1724dd59154319d3bf3cd6642bc",
+      "status": "validation-save-reopen-passed",
+      "editable": true,
+      "openWarnings": [],
+      "repairAccepted": false,
+      "initial": 1,
+      "invalidInput": 11,
+      "observedAlert": "Invalid quantity / Choose a whole number; Stop Retry and Cancel",
+      "cancelRestored": 1,
+      "validInput": 10,
+      "validAccepted": true,
+      "reopenedFreshTab": true,
+      "reopenedCellValue": 10,
+      "reopenedInvalid11Rejected": true,
+      "reopenedCancelRestored": 10,
+      "stableFileIdentitySha256": "2a25f121b2bb17ae72e53c76a60cea6b646241bd4dd23a41fabdf9e59410af24",
+      "identityMatched": true,
+      "savedByteHash": null,
+      "screenshots": [
+        "evidence/excel-validation-fixed-reject11.png",
+        "evidence/excel-validation-fixed-pass10.png",
+        "evidence/excel-validation-fixed-reopened-reject11.png"
+      ]
+    },
+    {
+      "fixture": "full-fixed-production/data-pivots-full-fixed.xlsx",
+      "originalSha256": "d6aec64d6c168741b5490ee85659dfd60dbbfa01dd3efc97c26094bb9698877e",
+      "status": "key-table-pivot-save-reopen-passed",
+      "editable": true,
+      "openWarnings": [],
+      "repairAccepted": false,
+      "generation": "actual original 11 Core commands and production native encode; source snapshot unchanged",
+      "initialAfterCalculateWorkbook": {
+        "E2:E5": [
+          200,
+          120,
+          60,
+          20
+        ],
+        "E7": 400
+      },
+      "formulaObserved": "=[@Amount]*[@Units]",
+      "edit": {
+        "cell": "Sales Source!C2",
+        "before": 40,
+        "after": 60
+      },
+      "afterCalculateWorkbook": {
+        "E2:E5": [
+          300,
+          120,
+          60,
+          20
+        ],
+        "E7": 500
+      },
+      "filter": {
+        "initial": "East only plus collapsed inner outline, only row5 visible",
+        "clear": "All four table rows visible; Excel also expands collapsed group",
+        "restored": "Uncheck West and Apply shows three East rows; E7=500 unchanged",
+        "reopened": "East filter persisted; clear reveals C2=60/E2=300"
+      },
+      "ordinaryPivotAfterAllRefresh": {
+        "West": 60,
+        "East": 60,
+        "GrandTotal": 120,
+        "Q1": 90,
+        "Q2": 30
+      },
+      "duplicateAggregateOrder": [
+        "sum",
+        "average",
+        "count"
+      ],
+      "duplicatePivotAfterAllRefresh": {
+        "West": [
+          60,
+          60,
+          1
+        ],
+        "East": [
+          60,
+          20,
+          3
+        ],
+        "GrandTotal": [
+          120,
+          30,
+          4
+        ]
+      },
+      "save": "cloud autosave saved state confirmed",
+      "fullWorkbookTabClosed": true,
+      "reopenedFreshTab": true,
+      "reopenedNoRepair": true,
+      "reopenedFormulaAndValuesMatched": true,
+      "reopenedPivotsMatched": true,
+      "stableFileIdentity": {
+        "host": "excel.cloud.microsoft",
+        "path": "/open/onedrive/",
+        "opaqueComponentSha256": "ea87a031c6a475979b2777bbc7b24e527c9383f803ad82e1c093712dfac5fe3d",
+        "matched": true
+      },
+      "savedByteHash": null,
+      "screenshots": [
+        "evidence/excel-full-fixed-duplicate-refreshed.png",
+        "evidence/excel-full-fixed-duplicate-reopened.png",
+        "evidence/excel-full-fixed-filter-outline-initial.png",
+        "evidence/excel-full-fixed-filter-restored.png",
+        "evidence/excel-full-fixed-ordinary-refreshed.png",
+        "evidence/excel-full-fixed-ordinary-reopened.png",
+        "evidence/excel-full-fixed-source-edited.png",
+        "evidence/excel-full-fixed-source-reopened-cleared.png",
+        "evidence/excel-full-fixed-source-reopened.png"
+      ],
+      "limits": [
+        "Excel-saved bytes not downloaded.",
+        "Header custom style black text behavior remains separate known issue."
+      ]
+    }
+  ]
+}

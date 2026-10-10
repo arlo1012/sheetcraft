@@ -1,0 +1,94 @@
+{
+  "dateUTC": "2026-10-10",
+  "browser": "dot cloud Chromium, signed-in Excel for the web",
+  "scope": "One unchanged Excel-web-native exported synthetic XLSX reuploaded as a new private workbook; one marker edit; full tab close and fresh reopen; one supported OneDrive Download. No additional XML/control experiments.",
+  "input": {
+    "originalFile": "ExcelWeb-authored-floating.saved.xlsx",
+    "uploadCopy": "ExcelWeb-native-reupload-control-20261010.xlsx",
+    "bytes": 8688,
+    "sha256": "62a1fd774f8b206cc81f2ac35b78271d27e26bfa3d4166b8b424aa6fb036d667",
+    "byteForByteVerifiedBeforeUpload": true,
+    "immutableOriginalStillUnchangedAfterRun": true,
+    "uploadRoute": "Excel home Upload file; supported filechooser.setFiles"
+  },
+  "safeFileIdentity": {
+    "componentSHA256": "75268b8c0b7a4768f6fd9ea4de69263ae0df9cb20c08c94fbf13da5c0eedb947",
+    "sameComponentOnFreshReopen": true,
+    "fullURLsNotRetained": true
+  },
+  "initial": {
+    "pictureVisible": true,
+    "picturePosition": "A2, approximately A2:C7",
+    "A1": "FLOATING_PROBE_20261010",
+    "screenshot": "initial.jpg"
+  },
+  "markerEdit": {
+    "route": "Select A1 via Name Box, click formula bar, End, pressSequentially(_REUPLOAD), Enter",
+    "exactA1AfterCommit": "FLOATING_PROBE_20261010_REUPLOAD",
+    "pictureVisibleBeforeClose": true,
+    "savingTransitionObserved": true,
+    "saveStatus": "\u4e0a\u6b21\u4fdd\u5b58\u65f6\u95f4: \u521a\u521a; saving prefix cleared",
+    "saveObservationUTCApprox": "2026-10-10T04:21:48Z",
+    "screenshot": "edited-saved-before-close.jpg",
+    "selectionOnlyAfterEdit": "A1 selected through Name Box; no picture move/resize/delete"
+  },
+  "freshReopen": {
+    "originalWorkbookTab": "49",
+    "completeTabClosed": true,
+    "newWorkbookTab": "50",
+    "route": "New tab navigated to the exact observed workbook URL after original tab close",
+    "navigationUTCApprox": "2026-10-10T04:21:57Z",
+    "gridAndMarkerLoadedUTCApprox": "2026-10-10T04:22:01Z",
+    "fullHeaderSavedStatusUTCApprox": "2026-10-10T04:22:06Z",
+    "saveStatus": "\u5df2\u4fdd\u5b58",
+    "A1": "FLOATING_PROBE_20261010_REUPLOAD",
+    "pictureVisible": false,
+    "firstScreenshot": "fresh-reopen.jpg",
+    "firstCaptureCompletedUTC": "2026-10-10T04:22:11.464315+00:00",
+    "resourceSettlingCheck": {
+      "observableLoadingIndicator": false,
+      "loadingCheckUTCApprox": "2026-10-10T04:22:22Z",
+      "secondScreenshot": "fresh-reopen-settled.jpg",
+      "secondCaptureCompletedUTC": "2026-10-10T04:22:30.411391+00:00",
+      "secondsBetweenScreenshotCompletions": 18.947076,
+      "secondScreenshotByteIdenticalToFirst": true,
+      "pictureVisibleAfterSettling": false,
+      "noReloadOrFurtherWorkbookMutation": true
+    }
+  },
+  "savedDownload": {
+    "route": "Close evidenced workbook; Excel home > Show all workbooks > OneDrive My files > exact synthetic filename > context menu Download",
+    "topLevelDownloadEventStartedBeforeClick": true,
+    "supportedDownloadPathReturned": true,
+    "file": "ExcelWeb-native-reupload-control.saved.xlsx",
+    "bytes": 8670,
+    "sha256": "da00389043e6d843ee8c181c8e722c3662fbd807887ab72701edf9ff5db432b8",
+    "zipCRCOK": true,
+    "partCount": 14,
+    "markerVerifiedInActualSavedBytes": true
+  },
+  "interpretation": "The proven native original survived its earlier native-cloud close/reopen. Uploading the exact same package, editing and saving it reproduced invisibility on fresh reopen in this Excel-web session, even though drawing XML, image bytes and relationship chain remain byte-identical. This is a strong observed native-creation versus upload-path distinction, not proof of a vendor bug, root cause, XML deletion or producer incompatibility.",
+  "obstacles": {
+    "saveTextWait": "Waiting for literal \u5df2\u4fdd\u5b58 inside SaveStatusButton did not match because the post-edit status was \u4e0a\u6b21\u4fdd\u5b58\u65f6\u95f4: \u521a\u521a; the subsequent AX state verified that explicit completion and the exact marker.",
+    "fileRowLocator": "OneDrive row locator reported no_visible_match despite the screenshot showing the exact target. Refreshed screenshots and bounded scrolling preceded the screenshot-grounded right-click, after which the menu and selected filename were verified."
+  },
+  "cleanup": {
+    "taskTabsClosed": [
+      "49",
+      "50",
+      "51",
+      "52"
+    ],
+    "remainingTabIds": [
+      "2",
+      "5",
+      "8",
+      "9"
+    ],
+    "allUnrelatedTabsPreserved": true,
+    "SwissTransferUntouched": true,
+    "oldWPSDocumentUntouched": true,
+    "GUIReleased": true
+  },
+  "privacy": "No account/drive IDs, full URLs, query/auth tokens or raw account screenshots are saved in the report. Exact XLSX byte copies naturally retain ordinary Office creator/last-modifier metadata; those names are not echoed. Safe cropped JPEG screenshots are verified nonblank."
+}

@@ -1,0 +1,70 @@
+[
+  {
+    "filename": "native-pivot.xlsx",
+    "bytes": 15045,
+    "sha256": "6f03fe0846ee7d1e408b185b21fa9e8f2dee68fd2d9d29899168dc9abb83d974",
+    "zip_parts": [
+      "[Content_Types].xml",
+      "_rels/.rels",
+      "docProps/app.xml",
+      "docProps/core.xml",
+      "docProps/custom.xml",
+      "xl/_rels/workbook.xml.rels",
+      "xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels",
+      "xl/pivotCache/pivotCacheDefinition1.xml",
+      "xl/pivotCache/pivotCacheRecords1.xml",
+      "xl/pivotTables/_rels/pivotTable1.xml.rels",
+      "xl/pivotTables/pivotTable1.xml",
+      "xl/sharedStrings.xml",
+      "xl/styles.xml",
+      "xl/tables/table1.xml",
+      "xl/theme/theme1.xml",
+      "xl/workbook.xml",
+      "xl/worksheets/_rels/sheet1.xml.rels",
+      "xl/worksheets/_rels/sheet2.xml.rels",
+      "xl/worksheets/sheet1.xml",
+      "xl/worksheets/sheet2.xml"
+    ],
+    "chart_parts": []
+  },
+  {
+    "filename": "native-source.xlsx",
+    "bytes": 9473,
+    "sha256": "14488b1d77ecb7e7d8c4de181cb4b0d4aea63a8f96d0fe42d2c9e4dbfb0fa29d",
+    "zip_parts": [
+      "[Content_Types].xml",
+      "_rels/.rels",
+      "docProps/app.xml",
+      "docProps/core.xml",
+      "docProps/custom.xml",
+      "xl/_rels/workbook.xml.rels",
+      "xl/sharedStrings.xml",
+      "xl/styles.xml",
+      "xl/theme/theme1.xml",
+      "xl/workbook.xml",
+      "xl/worksheets/sheet1.xml"
+    ],
+    "chart_parts": []
+  },
+  {
+    "filename": "native-table.xlsx",
+    "bytes": 10530,
+    "sha256": "71c6dd5d89cc18d249d39255bd7d77df1592762e17ee541a469f7b3b744c2d8c",
+    "zip_parts": [
+      "[Content_Types].xml",
+      "_rels/.rels",
+      "docProps/app.xml",
+      "docProps/core.xml",
+      "docProps/custom.xml",
+      "xl/_rels/workbook.xml.rels",
+      "xl/sharedStrings.xml",
+      "xl/styles.xml",
+      "xl/tables/table1.xml",
+      "xl/theme/theme1.xml",
+      "xl/workbook.xml",
+      "xl/worksheets/_rels/sheet1.xml.rels",
+      "xl/worksheets/sheet1.xml"
+    ],
+    "chart_parts": []
+  }
+]

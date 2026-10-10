@@ -1,0 +1,382 @@
+{
+  "schemaVersion": 1,
+  "inputSha256": "5dd9ec119f09cdf5b88b8131753e536a0aeec908d087f6f0fc197f136530c27f",
+  "stage1Gate": "open",
+  "observations": [
+    {
+      "caseId": "styles",
+      "adapter": "baseline",
+      "application": "excelWeb",
+      "status": "pending",
+      "applicationVersion": null,
+      "originalSha256": "559a79ef8be2fb2a33be277be324bc676900233c1c0469275cc9173eecd0b342",
+      "openedAt": null,
+      "openWarnings": [],
+      "edits": [],
+      "savedArtifact": null,
+      "reopened": false,
+      "screenshots": [],
+      "findings": [],
+      "checklist": [
+        "Inspect font fallback separately from font-family XML fidelity; compare line breaks, rotated/RTL text, accounting underlines, all border lines, all fill patterns and both gradients after app save/reopen."
+      ]
+    },
+    {
+      "caseId": "styles",
+      "adapter": "native",
+      "application": "excelWeb",
+      "status": "key-render-save-reopen-observed-details-pending",
+      "applicationVersion": null,
+      "originalSha256": "bfdf0bda9996f84b9542f7f44390589aff3cf657f3e6adaac893ca3189b2f3ec",
+      "openedAt": "2026-10-10T01:56:00Z",
+      "openWarnings": [],
+      "edits": [
+        {
+          "cell": "Number Formats!D1",
+          "before": null,
+          "after": 1,
+          "purpose": "save marker in unused blank cell",
+          "persisted": true
+        }
+      ],
+      "savedArtifact": {
+        "type": "cloud-autosaved",
+        "sha256": null,
+        "stableFileIdentitySha256": "634f710597a86c34989ca1c4a0120e80fabd4f972ea589a1ec96e3ef392c29e3",
+        "identityMatched": true
+      },
+      "reopened": true,
+      "screenshots": [
+        "evidence/excel-v2-styles-alignment.png",
+        "evidence/excel-v2-styles-borders-fills.png",
+        "evidence/excel-v2-styles-borders-reopened.png",
+        "evidence/excel-v2-styles-gradient-region.png",
+        "evidence/excel-v2-styles-gradients-reopened.png",
+        "evidence/excel-v2-styles-number-formats.png",
+        "evidence/excel-v2-styles-reopened.png",
+        "evidence/excel-v2-styles-typography.png"
+      ],
+      "findings": [
+        "Opened editable without repair,4 sheets. Typography visible in Liberation Sans18 bolditalic, underline/accounting-underline samples; no OS-level font fallback determination.",
+        "Alignment shows wrapped and rotated/RTL Arabic text, but fixed narrow columns and row heights visibly clip several labels. Exact layout fidelity comparison pending.",
+        "Number formats show red parentheses, currency/accounting,date,time,fraction,special,scientific,custom and text; percent displays###### at fixture width. No original width changed to mask.",
+        "Autosave and fullclose/fresh-tab23 reopen preserve D1 marker and number formatting. Reopened border families and pattern fills visually preserved; linear/path gradient fills both visible. Exhaustive per-border/diagonal and typography/alignment-after-save comparisons remain incomplete."
+      ],
+      "checklist": [
+        "Inspect font fallback separately from font-family XML fidelity; compare line breaks, rotated/RTL text, accounting underlines, all border lines, all fill patterns and both gradients after app save/reopen."
+      ]
+    },
+    {
+      "caseId": "geometry-formulas",
+      "adapter": "baseline",
+      "application": "excelWeb",
+      "status": "pending",
+      "applicationVersion": null,
+      "originalSha256": "2bdaf450cda0b9af95d33f019cf34d61bdc44f32fa0479c796612173e18210de",
+      "openedAt": null,
+      "openWarnings": [],
+      "edits": [],
+      "savedArtifact": null,
+      "reopened": false,
+      "screenshots": [],
+      "findings": [],
+      "checklist": [
+        "Verify custom dimensions, hidden row/column/sheet, merged A1:D1 and frozen first two rows/first four columns. Change Detail's Data!A1 from 7 to 9 in each app, recalculate B3 from 42 to 54, save, close and reopen. Preserve untouched originals."
+      ]
+    },
+    {
+      "caseId": "geometry-formulas",
+      "adapter": "native",
+      "application": "excelWeb",
+      "status": "key-behavior-passed-additional-details-pending",
+      "applicationVersion": "Excel web live build not exposed",
+      "originalSha256": "06a2c4a49b517c4e930c233848dde8494ff1560f3f68df9e32bdb93c903b3444",
+      "openedAt": "2026-10-10T01:29:01Z",
+      "openWarnings": [],
+      "edits": [
+        {
+          "sheet": "Detail's Data",
+          "cell": "A1",
+          "before": 7,
+          "after": 9,
+          "recalculationAction": "Ribbon公式→计算工作簿",
+          "expected": {
+            "Layout!B3": 54,
+            "Layout!B5": 17
+          },
+          "observed": {
+            "Layout!B3": 54,
+            "Layout!B5": 17,
+            "B3Formula": "=A3*'Detail''s Data'!A1"
+          }
+        }
+      ],
+      "savedArtifact": {
+        "kind": "OneDrive hosted synthetic test copy",
+        "name": "Sheetcraft-ExcelWeb-20261010-v2-native-geometry-formulas.xlsx",
+        "autosaveObserved": true,
+        "sameStableFileIdentity": true,
+        "fileComponentSha256": "517c1213883940aee61ae18e67fdebfb8ed3dc67899a94e0f7fed08050570d69",
+        "localPath": null,
+        "sha256": null
+      },
+      "reopened": true,
+      "screenshots": [
+        {
+          "path": "evidence/excel-v2-geometry-initial-20261010.png",
+          "sha256": "535e240f693d0ffb761db4867aa4ab5d0fe47164eb6e4d33f7444aaffd8dcb59"
+        },
+        {
+          "path": "evidence/excel-v2-geometry-edited-20261010.png",
+          "sha256": "e5499830be60ebc7e95caf41f7310bab4305014fbd1d19344f21d706a304f7c5"
+        },
+        {
+          "path": "evidence/excel-v2-geometry-reopened-20261010.png",
+          "sha256": "df22039ed5bd7e89db9a01a000bc3320e77b41bc512628cd464d307ce51189dd"
+        }
+      ],
+      "findings": [
+        "Actual initial42/15; source7→9 recalculated54/17 and persisted after full tab close/reopen through Recent. Stable hosted file component matched.",
+        "Merged title, width/height differences, frozen2rows/4columns, missing row4/columnD render visibly; frozen-region readout confirmed after reopen.",
+        "Hidden Sheet appears in unhide dialog after reopen; dialog cancelled so hidden state stayed unchanged.",
+        "No repair prompt. Hidden-sheet tab color and exact numeric dimension dialog values were not separately checked."
+      ],
+      "checklist": [
+        "Verify custom dimensions, hidden row/column/sheet, merged A1:D1 and frozen first two rows/first four columns. Change Detail's Data!A1 from 7 to 9 in each app, recalculate B3 from 42 to 54, save, close and reopen. Preserve untouched originals."
+      ]
+    },
+    {
+      "caseId": "data-pivots",
+      "adapter": "baseline",
+      "application": "excelWeb",
+      "status": "pending",
+      "applicationVersion": null,
+      "originalSha256": "52c37b97210430e3c911ed8ebb4fa6eeb0ac8ffb3358b64500e350671d280ed7",
+      "openedAt": null,
+      "openWarnings": [],
+      "edits": [],
+      "savedArtifact": null,
+      "reopened": false,
+      "screenshots": [],
+      "findings": [],
+      "checklist": [
+        "Inspect descending order, filter buttons/criteria, table banding, and collapsed nested outline. Refresh both pivot tables. Duplicate Amount fields must retain sum/average/count separately; record known Calc duplicate-field degradation independently for baseline and native. Verify pivot cache/source and refresh after editing Amount.",
+        "The source command formulas in E2:E5 remain =[@Amount]*[@Units]. Excel @ shorthand is valid; expanded SalesTable[[#This Row],[Amount]]*SalesTable[[#This Row],[Units]] storage is a Calc interoperability choice. Observe each app separately: force hard recalculation and require E2:E5 = 200,120,60,20 and E7 = 400. Then change C2 from 40 to 60, force recalculation, require E2 = 300 and E7 = 500, save, close and reopen. Cached numbers or canonical XML alone cannot establish this real-app outcome."
+      ]
+    },
+    {
+      "caseId": "data-pivots",
+      "adapter": "native",
+      "application": "excelWeb",
+      "status": "blocked-by-excel-repair",
+      "applicationVersion": null,
+      "originalSha256": "2b55a2f378bf39aa04dfb4457a76bd7a95c9f40bbeedc6fbe7b1254bd46e3c10",
+      "openedAt": "2026-10-10T01:32:23Z",
+      "openWarnings": [
+        "工作簿已修复 我们暂时修复了此工作簿，以便你可以在“阅读视图”中打开它。",
+        "已删除的功能: /xl/tables/table1.xml 部分的 表 (表)",
+        "已修复的记录: /xl/pivotCache/pivotCacheDefinition1.xml 部分的 数据透视表 (数据透视表缓存)",
+        "已修复的记录: /xl/pivotCache/pivotCacheDefinition2.xml 部分的 数据透视表 (数据透视表缓存)"
+      ],
+      "edits": [],
+      "savedArtifact": null,
+      "reopened": false,
+      "screenshots": [
+        {
+          "path": "evidence/v2-native-data-repair.png",
+          "sha256": "c26aebf1b21d690cc5b293cd1b93bcd9d62ea1e6190641b7b35e96ee3406b192"
+        }
+      ],
+      "findings": [
+        "Read-only repaired state and disabled editing/name box block controlled edit/recalculation/pivot refresh/save/reopen. Repair not accepted; original remains unchanged.",
+        "Ordinary Pivot currently displays cached40/60/100. This is only a view observation, not a recalculation/refresh pass.",
+        "No worksheet row/column included in technical details."
+      ],
+      "checklist": [
+        "Inspect descending order, filter buttons/criteria, table banding, and collapsed nested outline. Refresh both pivot tables. Duplicate Amount fields must retain sum/average/count separately; record known Calc duplicate-field degradation independently for baseline and native. Verify pivot cache/source and refresh after editing Amount.",
+        "The source command formulas in E2:E5 remain =[@Amount]*[@Units]. Excel @ shorthand is valid; expanded SalesTable[[#This Row],[Amount]]*SalesTable[[#This Row],[Units]] storage is a Calc interoperability choice. Observe each app separately: force hard recalculation and require E2:E5 = 200,120,60,20 and E7 = 400. Then change C2 from 40 to 60, force recalculation, require E2 = 300 and E7 = 500, save, close and reopen. Cached numbers or canonical XML alone cannot establish this real-app outcome."
+      ]
+    },
+    {
+      "caseId": "rules-notes-links",
+      "adapter": "baseline",
+      "application": "excelWeb",
+      "status": "pending",
+      "applicationVersion": null,
+      "originalSha256": "3b773cbfeb5dd62019b0555c1d6b255e80a9256ec73c7184fc682f51111da25e",
+      "openedAt": null,
+      "openWarnings": [],
+      "edits": [],
+      "savedArtifact": null,
+      "reopened": false,
+      "screenshots": [],
+      "findings": [],
+      "checklist": [
+        "Check negative/positive bars and RTL direction/axis, strict >25 icon boundary and formula threshold, hidden values, reversed icons, color scale and rule precedence. Test accepted/rejected validation values, dropdown/input/error prompts, note popup/author/box and internal/external link destination. Record any app normalization after save/reopen."
+      ]
+    },
+    {
+      "caseId": "rules-notes-links",
+      "adapter": "native",
+      "application": "excelWeb",
+      "status": "observed-validation-failure",
+      "applicationVersion": null,
+      "originalSha256": "1cd7990e4ee1231cf664ba74ebcb3175a3469b245cd1c7ebea6488b816c675df",
+      "openedAt": "2026-10-10T01:35:00Z",
+      "openWarnings": [],
+      "edits": [
+        {
+          "cell": "Validation!A2",
+          "before": 5,
+          "input": 11,
+          "expected": "Stop alert and rejection (whole number 1..10)",
+          "observed": 11,
+          "alertObserved": false,
+          "persistedAfterReopen": 11
+        }
+      ],
+      "savedArtifact": {
+        "type": "cloud-autosaved",
+        "sha256": null,
+        "stableFileIdentitySha256": "83f5e6f6e753680ae27fe6f007450de297bb18b06b262c7d00d7762b94e1c697",
+        "freshTabReopenIdentityMatched": true
+      },
+      "reopened": true,
+      "screenshots": [
+        "evidence/excel-v2-rules-cf-20261010.png",
+        "evidence/excel-v2-validation-accepted11-20261010.png",
+        "evidence/excel-v2-validation-reopened-20261010.png"
+      ],
+      "findings": [
+        "Opened editable without repair. Conditional Rules visually rendered RTL/negative bars and axis, icon threshold colors with hidden values, color scale and precedence.",
+        "Validation!A2 accepted 11 by ordinary focused-grid entry and Return despite whole1..10 stop rule; persisted after close/fresh-tab reopen.",
+        "Notes and Links rendered external/internal labels and red classic-note indicator; note contents/link destinations not verified. Other validation rules remain untested."
+      ],
+      "checklist": [
+        "Check negative/positive bars and RTL direction/axis, strict >25 icon boundary and formula threshold, hidden values, reversed icons, color scale and rule precedence. Test accepted/rejected validation values, dropdown/input/error prompts, note popup/author/box and internal/external link destination. Record any app normalization after save/reopen."
+      ]
+    },
+    {
+      "caseId": "images-drawings",
+      "adapter": "baseline",
+      "application": "excelWeb",
+      "status": "pending",
+      "applicationVersion": null,
+      "originalSha256": "4fee2886b073f0190e0644e29eed3f21fa026405087b80ea9ff37329e6caefb2",
+      "openedAt": null,
+      "openWarnings": [],
+      "edits": [],
+      "savedArtifact": null,
+      "reopened": false,
+      "screenshots": [],
+      "findings": [],
+      "checklist": [
+        "Inspect cell and floating image placement, dimensions and alternative text/accessibility in each app. The shape omission must be reported. Product image import is currently unsupported; it must not be counted as a native regression or silently counted as successful image roundtrip. App save/reopen image preservation remains a separate check."
+      ]
+    },
+    {
+      "caseId": "images-drawings",
+      "adapter": "native",
+      "application": "excelWeb",
+      "status": "observed-floating-image-persistence-difference",
+      "applicationVersion": null,
+      "originalSha256": "5008924974534fa8513287b36bfb7b178b2e1f6b13ec67d7aac895bf42c8718f",
+      "openedAt": "2026-10-10T01:51:30Z",
+      "openWarnings": [],
+      "edits": [
+        {
+          "cell": "B2",
+          "before": null,
+          "after": 1,
+          "purpose": "synthetic save marker",
+          "persisted": true
+        }
+      ],
+      "savedArtifact": {
+        "type": "cloud-autosaved",
+        "sha256": null,
+        "stableFileIdentitySha256": "3038b661854ede93b8cedc989663c37fc8398ff2b383c3b1b0801d6d42d79235",
+        "identityMatched": true
+      },
+      "reopened": true,
+      "screenshots": [
+        "evidence/excel-v2-images-initial.png",
+        "evidence/excel-v2-images-reopened.png",
+        "evidence/excel-v2-images-reopened-loaded.png"
+      ],
+      "findings": [
+        "Opened without repair and editable. Cell image at A3 and floating checkerboard near C6 initially visible.",
+        "After ordinary B2 save marker, autosave, full tab close and fresh-tab reopen, cell image and B2=1 persist; floating checkerboard not visibly rendered. Same result on one fully loaded second opening. This establishes a real-app visibility/persistence difference; no Excel-saved bytes captured, so underlying XML cause remains unproven.",
+        "Shape deliberately omitted by exporter, as fixture declares. Alternative text/exact dimensions not verified. Product image import unsupported, not counted as passed roundtrip."
+      ],
+      "checklist": [
+        "Inspect cell and floating image placement, dimensions and alternative text/accessibility in each app. The shape omission must be reported. Product image import is currently unsupported; it must not be counted as a native regression or silently counted as successful image roundtrip. App save/reopen image preservation remains a separate check."
+      ]
+    },
+    {
+      "caseId": "protection-print-calculation",
+      "adapter": "baseline",
+      "application": "excelWeb",
+      "status": "pending",
+      "applicationVersion": null,
+      "originalSha256": "ae80bf0ab34102ee6fd5646f66e7a31d578364414798afc23a2164e2a9ba6c0e",
+      "openedAt": null,
+      "openWarnings": [],
+      "edits": [],
+      "savedArtifact": null,
+      "reopened": false,
+      "screenshots": [],
+      "findings": [],
+      "checklist": [
+        "Check protection allows B3/input area and blocks other cells/structure edits. Inspect print preview: landscape A4, titles, area, breaks, headers/footers, scaling and margins. Serial 1 under 1904 system must display 1904-01-02. Confirm iteration settings and convergence near 1 in the target app, save and reopen; XML settings alone do not prove app iteration execution."
+      ]
+    },
+    {
+      "caseId": "protection-print-calculation",
+      "adapter": "native",
+      "application": "excelWeb",
+      "status": "key-protection-date-print-observed-iteration-failure",
+      "applicationVersion": null,
+      "originalSha256": "9d626235440778e0f063b85147f43089379a8c2d6d4fad69987c5eafe1528296",
+      "openedAt": "2026-10-10T01:53:30Z",
+      "openWarnings": [],
+      "edits": [
+        {
+          "cell": "Protected Print!B3",
+          "before": 12,
+          "after": 14,
+          "accepted": true
+        },
+        {
+          "cell": "Protected Print!A3",
+          "input": "Blocked test",
+          "observed": "Input retained; protection toast",
+          "accepted": false
+        }
+      ],
+      "savedArtifact": {
+        "type": "cloud-autosaved",
+        "sha256": null,
+        "stableFileIdentitySha256": "e065fb48cac7d8f06b5751b701b80779421abb0178f6d08a6f992624df4d2b06",
+        "identityMatched": true
+      },
+      "reopened": true,
+      "screenshots": [
+        "evidence/excel-v2-protection-date-edited.png",
+        "evidence/excel-v2-protection-date-initial.png",
+        "evidence/excel-v2-protection-locked.png",
+        "evidence/excel-v2-protection-print-preview.png",
+        "evidence/excel-v2-protection-reopened.png"
+      ],
+      "findings": [
+        "Opened editable without repair. Serial1 displays1904-01-02. Allowed B3 edit14 recalculates Date and Iteration!B2 from24 to28. Locked A3 input blocked; protected sheet indicator and disabled add-sheet button support protection behavior.",
+        "Web print preview opened without submitting print job: A4, landscape, custom margins, all columns fit1page, horizontal center, print area not ignored, gridlines/headings enabled.2 pages rendered, Synthetic report and Protected Print header visible. Exact margins/footer/titles/manual break boundaries remain incompletely checked.",
+        "Iterative self-reference(B3+1)/2 displays#VALUE! on open, after CalculateWorkbook and after autosave/full close/fresh-tab reopen. Expected convergence near1 not observed. Cannot yet distinguish web iteration limit from export/app incompatibility.",
+        "Fresh tab22 reopen preserves date1904-01-02, cross-sheet28, protected indicator, same hosted identity."
+      ],
+      "checklist": [
+        "Check protection allows B3/input area and blocks other cells/structure edits. Inspect print preview: landscape A4, titles, area, breaks, headers/footers, scaling and margins. Serial 1 under 1904 system must display 1904-01-02. Confirm iteration settings and convergence near 1 in the target app, save and reopen; XML settings alone do not prove app iteration execution."
+      ]
+    }
+  ]
+}

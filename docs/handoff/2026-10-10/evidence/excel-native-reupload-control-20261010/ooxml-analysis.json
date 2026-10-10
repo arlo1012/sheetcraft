@@ -1,0 +1,279 @@
+{
+  "dateUTC": "2026-10-10",
+  "source": {
+    "file": "ExcelWeb-native-reupload-control-20261010.xlsx",
+    "bytes": 8688,
+    "sha256": "62a1fd774f8b206cc81f2ac35b78271d27e26bfa3d4166b8b424aa6fb036d667",
+    "parts": 14,
+    "zipCRCOK": true,
+    "A1": "FLOATING_PROBE_20261010"
+  },
+  "saved": {
+    "file": "ExcelWeb-native-reupload-control.saved.xlsx",
+    "bytes": 8670,
+    "sha256": "da00389043e6d843ee8c181c8e722c3662fbd807887ab72701edf9ff5db432b8",
+    "parts": 14,
+    "zipCRCOK": true,
+    "A1": "FLOATING_PROBE_20261010_REUPLOAD"
+  },
+  "partSetIdentical": true,
+  "parts": [
+    {
+      "part": "[Content_Types].xml",
+      "inputBytes": 1338,
+      "savedBytes": 1338,
+      "inputSHA256": "84ba276ca5f0a676d8445374ad4683213c827348042da94abb9b5ad89d366149",
+      "savedSHA256": "84ba276ca5f0a676d8445374ad4683213c827348042da94abb9b5ad89d366149",
+      "byteIdentical": true
+    },
+    {
+      "part": "_rels/.rels",
+      "inputBytes": 588,
+      "savedBytes": 588,
+      "inputSHA256": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497",
+      "savedSHA256": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497",
+      "byteIdentical": true
+    },
+    {
+      "part": "docProps/app.xml",
+      "inputBytes": 394,
+      "savedBytes": 394,
+      "inputSHA256": "1e5ab5ebaa7569440c259e27ad5ccc6fb738b8f2fcf1c302b1b8bf6ff601779b",
+      "savedSHA256": "1e5ab5ebaa7569440c259e27ad5ccc6fb738b8f2fcf1c302b1b8bf6ff601779b",
+      "byteIdentical": true
+    },
+    {
+      "part": "docProps/core.xml",
+      "inputBytes": 800,
+      "savedBytes": 800,
+      "inputSHA256": "ba62853f27ee8ad2a0ce3bfe1ae6d257eb692685bff1d561b17343bf7693311e",
+      "savedSHA256": "732b25d3855cb8c578777d1547fc3d60be010ba5a07f6c99336a6379c715b0eb",
+      "byteIdentical": false
+    },
+    {
+      "part": "xl/_rels/workbook.xml.rels",
+      "inputBytes": 698,
+      "savedBytes": 698,
+      "inputSHA256": "353383fbe90f202be596bdf0a86439c704d7024f4f8c19ebc9d06b42a341dba1",
+      "savedSHA256": "353383fbe90f202be596bdf0a86439c704d7024f4f8c19ebc9d06b42a341dba1",
+      "byteIdentical": true
+    },
+    {
+      "part": "xl/drawings/_rels/drawing1.xml.rels",
+      "inputBytes": 292,
+      "savedBytes": 292,
+      "inputSHA256": "15a140b2ab9e3d49a7b49f824413744cc4959bc34c427cf50f7d6016697293c0",
+      "savedSHA256": "15a140b2ab9e3d49a7b49f824413744cc4959bc34c427cf50f7d6016697293c0",
+      "byteIdentical": true
+    },
+    {
+      "part": "xl/drawings/drawing1.xml",
+      "inputBytes": 1197,
+      "savedBytes": 1197,
+      "inputSHA256": "607cf3c143c747130f74a6433ad8d1eb75179f0db597cfc2c535a2d706cc7a10",
+      "savedSHA256": "607cf3c143c747130f74a6433ad8d1eb75179f0db597cfc2c535a2d706cc7a10",
+      "byteIdentical": true
+    },
+    {
+      "part": "xl/media/image1.png",
+      "inputBytes": 418,
+      "savedBytes": 418,
+      "inputSHA256": "756279b45bee443be2a6d41b0c0a0575ca1e62cc8cebdfd58ce6852a40666983",
+      "savedSHA256": "756279b45bee443be2a6d41b0c0a0575ca1e62cc8cebdfd58ce6852a40666983",
+      "byteIdentical": true
+    },
+    {
+      "part": "xl/sharedStrings.xml",
+      "inputBytes": 199,
+      "savedBytes": 208,
+      "inputSHA256": "878563aaabfbe2fb6d56cdad0ba4d70984516f5f3b5e6acde66d1c6539f73b61",
+      "savedSHA256": "8ac3d496c2218b1c0d7563cecdf46a4f55c3fe430770b61dc315753a07218480",
+      "byteIdentical": false
+    },
+    {
+      "part": "xl/styles.xml",
+      "inputBytes": 1596,
+      "savedBytes": 1596,
+      "inputSHA256": "e60a182866464704fbfceb5e78d68ff8441d5443f46adcfd29575dcecd1a65a3",
+      "savedSHA256": "e60a182866464704fbfceb5e78d68ff8441d5443f46adcfd29575dcecd1a65a3",
+      "byteIdentical": true
+    },
+    {
+      "part": "xl/theme/theme1.xml",
+      "inputBytes": 8390,
+      "savedBytes": 8390,
+      "inputSHA256": "b16106f4229f6ece6d74426b3e73ff6a677df2908d2a06f76ef0329fa27c0282",
+      "savedSHA256": "b16106f4229f6ece6d74426b3e73ff6a677df2908d2a06f76ef0329fa27c0282",
+      "byteIdentical": true
+    },
+    {
+      "part": "xl/workbook.xml",
+      "inputBytes": 2147,
+      "savedBytes": 2147,
+      "inputSHA256": "cf220710aa7b5fdd8eacb78a4f05e12835d9b01f375dde2d55743614022d996a",
+      "savedSHA256": "2b4f104a546b1fc8bff158cefabb8f7c3c4a49e2d2e58e7e3f5d21e1d564f3e1",
+      "byteIdentical": false
+    },
+    {
+      "part": "xl/worksheets/_rels/sheet1.xml.rels",
+      "inputBytes": 299,
+      "savedBytes": 299,
+      "inputSHA256": "ee9fa12d10c5ee0ae23c711aad3be36f1d99d87934a588aac4ecaf1028bdef16",
+      "savedSHA256": "ee9fa12d10c5ee0ae23c711aad3be36f1d99d87934a588aac4ecaf1028bdef16",
+      "byteIdentical": true
+    },
+    {
+      "part": "xl/worksheets/sheet1.xml",
+      "inputBytes": 1051,
+      "savedBytes": 1001,
+      "inputSHA256": "6285e6c57e83d6729c0d0b1cee3ac775187263b87fce576830f33e3701907622",
+      "savedSHA256": "126536ec9e8df522878336404af2d08dad97fdb6b7bf9a352dfb9f8a208912c8",
+      "byteIdentical": false
+    }
+  ],
+  "originalPicture": {
+    "anchorType": "twoCellAnchor",
+    "editAs": "oneCell",
+    "from": {
+      "col": "0",
+      "colOff": "0",
+      "row": "1",
+      "rowOff": "0"
+    },
+    "to": {
+      "col": "2",
+      "colOff": "152400",
+      "row": "6",
+      "rowOff": "57150"
+    },
+    "xfrm": {
+      "tag": "{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm",
+      "attrs": {},
+      "text": null,
+      "children": [
+        {
+          "tag": "{http://schemas.openxmlformats.org/drawingml/2006/main}off",
+          "attrs": {
+            "x": "0",
+            "y": "171450"
+          },
+          "text": null,
+          "children": []
+        },
+        {
+          "tag": "{http://schemas.openxmlformats.org/drawingml/2006/main}ext",
+          "attrs": {
+            "cx": "1524000",
+            "cy": "914400"
+          },
+          "text": null,
+          "children": []
+        }
+      ]
+    },
+    "pictureCount": 1,
+    "creationIdPresent": true,
+    "pngBytes": 418,
+    "pngSHA256": "756279b45bee443be2a6d41b0c0a0575ca1e62cc8cebdfd58ce6852a40666983",
+    "decodedSize": [
+      160,
+      96
+    ],
+    "decodedRGBSHA256": "b7e0f09ce648081eb59a54ad65ddc2caaa2c9020ec41cbf6e1b7e084cea349ac"
+  },
+  "savedPicture": {
+    "anchorType": "twoCellAnchor",
+    "editAs": "oneCell",
+    "from": {
+      "col": "0",
+      "colOff": "0",
+      "row": "1",
+      "rowOff": "0"
+    },
+    "to": {
+      "col": "2",
+      "colOff": "152400",
+      "row": "6",
+      "rowOff": "57150"
+    },
+    "xfrm": {
+      "tag": "{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm",
+      "attrs": {},
+      "text": null,
+      "children": [
+        {
+          "tag": "{http://schemas.openxmlformats.org/drawingml/2006/main}off",
+          "attrs": {
+            "x": "0",
+            "y": "171450"
+          },
+          "text": null,
+          "children": []
+        },
+        {
+          "tag": "{http://schemas.openxmlformats.org/drawingml/2006/main}ext",
+          "attrs": {
+            "cx": "1524000",
+            "cy": "914400"
+          },
+          "text": null,
+          "children": []
+        }
+      ]
+    },
+    "pictureCount": 1,
+    "creationIdPresent": true,
+    "pngBytes": 418,
+    "pngSHA256": "756279b45bee443be2a6d41b0c0a0575ca1e62cc8cebdfd58ce6852a40666983",
+    "decodedSize": [
+      160,
+      96
+    ],
+    "decodedRGBSHA256": "b7e0f09ce648081eb59a54ad65ddc2caaa2c9020ec41cbf6e1b7e084cea349ac"
+  },
+  "criticalPartComparison": {
+    "drawingXMLByteIdentical": true,
+    "pngByteIdentical": true,
+    "worksheetRelationshipsByteIdentical": true,
+    "drawingRelationshipsByteIdentical": true,
+    "worksheetDrawingReferenceIdentical": true,
+    "workbookExceptRevisionPointerIdentical": true,
+    "workbookRevisionFieldsChanged": [
+      "revIDLastSave",
+      "uidLastSave"
+    ],
+    "revisionIDLastSave": {
+      "input": "2",
+      "saved": "3"
+    },
+    "compatibilityExtensionsAndWorkbookPropertiesUnchanged": true,
+    "worksheetExceptSelectionIdentical": true,
+    "removedInputSelection": [
+      {
+        "activeCell": "D9",
+        "sqref": "D9"
+      }
+    ],
+    "coreFieldsChanged": [
+      "modified"
+    ],
+    "creatorAndModifierNameValuesNotEchoed": true
+  },
+  "relationships": {
+    "worksheet": [
+      {
+        "Id": "rId1",
+        "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
+        "Target": "../drawings/drawing1.xml"
+      }
+    ],
+    "drawing": [
+      {
+        "Id": "rId1",
+        "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+        "Target": "../media/image1.png"
+      }
+    ]
+  },
+  "interpretation": "The actual saved upload retains the identical drawing XML, complete drawing/image relationship chain and identical PNG. Only marker text, worksheet selection and save/revision metadata differ. This control distinguishes native creation from upload/conversion in the observed Excel web session; it does not prove the vendor root cause or a corrective production change."
+}

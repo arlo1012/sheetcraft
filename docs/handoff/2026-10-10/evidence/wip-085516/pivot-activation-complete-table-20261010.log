@@ -1,0 +1,10 @@
+
+ RUN  v4.1.11 historical-repository/apps/web
+
+------·-
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 7 skipped (8)
+   Start at  01:52:46
+   Duration  17.20s (transform 9.91s, setup 0ms, import 14.29s, tests 2.43s, environment 336ms)
+

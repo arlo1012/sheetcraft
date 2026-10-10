@@ -1,0 +1,20 @@
+{
+  "immutableInputUnchanged": true,
+  "taskInputCopiesUnchanged": true,
+  "savedPackageAssertions": {
+    "wps-app-saved.xlsx": {
+      "allControlFontSizesRetained": true,
+      "allControlColorIntentsRetained": true,
+      "onlyCellValueChange": "A9 marker suffix",
+      "normalStyleFontSize": 11,
+      "namedLightStyleVerifiedInSavedBytes": "TableStylePreset1_Accent1"
+    },
+    "excel-app-saved.xlsx": {
+      "allControlFontSizesRetained": true,
+      "allControlColorIntentsRetained": true,
+      "onlyCellValueChange": "A9 marker suffix",
+      "normalStyleFontSize": 11,
+      "namedLightStyleVerifiedInSavedBytes": "TableStyleLight2"
+    }
+  }
+}

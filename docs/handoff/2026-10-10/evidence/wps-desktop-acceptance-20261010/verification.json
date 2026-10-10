@@ -1,0 +1,192 @@
+{
+  "application": "WPS Office 12.1.2.29182.AK.preread.sw",
+  "desktop": "dot cloud Linux",
+  "acceptance_date_utc": "2026-10-10",
+  "completed_checkpoint_utc": "02:26",
+  "scope": "Six final native files, critical behaviors and focused key sweep; no full baseline control matrix.",
+  "files": [
+    {
+      "name": "data-pivots.xlsx",
+      "production_source": "historical-artifacts/excel-table-opening-fix-20261010/full-fixed-production/data-pivots-full-fixed.xlsx",
+      "original_sha256": "d6aec64d6c168741b5490ee85659dfd60dbbfa01dd3efc97c26094bb9698877e",
+      "production_source_sha256_now": "d6aec64d6c168741b5490ee85659dfd60dbbfa01dd3efc97c26094bb9698877e",
+      "original_unchanged": true,
+      "wps_saved_path": "historical-artifacts/wps-desktop-acceptance-20261010/data-pivots.xlsx",
+      "wps_saved_sha256": "cf1b40d8396014e5dd004841b9070f327bb1221d1630bc9f1903fac30a832e27",
+      "bytes": 18081,
+      "zip_crc_ok": true,
+      "zip_entries": 39,
+      "native_save_performed": true,
+      "native_close_reopen_performed": true,
+      "native_content_edit": "Sales Source!C2 40→60; clear and reapply East filter; refresh two native pivots"
+    },
+    {
+      "name": "rules-notes-links.xlsx",
+      "production_source": "historical-artifacts/excel-validation-alert-fix-20261010/validation-alerts-fixed.xlsx",
+      "original_sha256": "387af7be1e8752efc64f9fe60445c4a3d459c1724dd59154319d3bf3cd6642bc",
+      "production_source_sha256_now": "387af7be1e8752efc64f9fe60445c4a3d459c1724dd59154319d3bf3cd6642bc",
+      "original_unchanged": true,
+      "wps_saved_path": "historical-artifacts/wps-desktop-acceptance-20261010/rules-notes-links.xlsx",
+      "wps_saved_sha256": "2bf06537cf18df8d8a23d474f5ec949d02318bbad8cb12cbedd46ca1cdd2c0ed",
+      "bytes": 8092,
+      "zip_crc_ok": true,
+      "zip_entries": 17,
+      "native_save_performed": true,
+      "native_close_reopen_performed": true,
+      "native_content_edit": "Validation!A2 1→10, rejected11 before and after reopen"
+    },
+    {
+      "name": "geometry-formulas.xlsx",
+      "production_source": "historical-repository/docs/acceptance/generated-v3-20261010/native/geometry-formulas.xlsx",
+      "original_sha256": "25c96c7ce5911c91812df1290c1f0bb43a98543382f0d01438d044541b6831bc",
+      "production_source_sha256_now": "25c96c7ce5911c91812df1290c1f0bb43a98543382f0d01438d044541b6831bc",
+      "original_unchanged": true,
+      "wps_saved_path": "historical-artifacts/wps-desktop-acceptance-20261010/geometry-formulas.xlsx",
+      "wps_saved_sha256": "4041fdc971b21a4c3470cad728fab4eae6aaa79923a6c32a439822389d90af08",
+      "bytes": 9659,
+      "zip_crc_ok": true,
+      "zip_entries": 19,
+      "native_save_performed": true,
+      "native_close_reopen_performed": false,
+      "native_content_edit": "Layout!A3 6→9, B3 recalculated42→63"
+    },
+    {
+      "name": "images-drawings.xlsx",
+      "production_source": "historical-repository/docs/acceptance/generated-v3-20261010/native/images-drawings.xlsx",
+      "original_sha256": "eaed059c6a57513864663ce4930193bc09eec41c7724fddccb4a34d266d62f8d",
+      "production_source_sha256_now": "eaed059c6a57513864663ce4930193bc09eec41c7724fddccb4a34d266d62f8d",
+      "original_unchanged": true,
+      "wps_saved_path": "historical-artifacts/wps-desktop-acceptance-20261010/images-drawings.xlsx",
+      "wps_saved_sha256": "65fddc95ba053d56eac20f8bb69729d2e644a6d099cd0b3b6a024c805f67f302",
+      "bytes": 12566,
+      "zip_crc_ok": true,
+      "zip_entries": 33,
+      "native_save_performed": true,
+      "native_close_reopen_performed": true,
+      "native_content_edit": "B2 blank→1 synthetic save marker"
+    },
+    {
+      "name": "protection-print-calculation.xlsx",
+      "production_source": "historical-repository/docs/acceptance/generated-v3-20261010/native/protection-print-calculation.xlsx",
+      "original_sha256": "baaa5476c2a58635103643663860de78da6eb2a2257dba08409a4572db72e6c2",
+      "production_source_sha256_now": "baaa5476c2a58635103643663860de78da6eb2a2257dba08409a4572db72e6c2",
+      "original_unchanged": true,
+      "wps_saved_path": "historical-artifacts/wps-desktop-acceptance-20261010/protection-print-calculation.xlsx",
+      "wps_saved_sha256": "bb8da39b9b383778a00c2dfd2b5b6ad804db0422c711f3f33f69148778973e50",
+      "bytes": 10684,
+      "zip_crc_ok": true,
+      "zip_entries": 23,
+      "native_save_performed": true,
+      "native_close_reopen_performed": true,
+      "native_content_edit": "Protected Print!B3 12→14, dependent cross-sheet24→28"
+    },
+    {
+      "name": "styles.xlsx",
+      "production_source": "historical-repository/docs/acceptance/generated-v3-20261010/native/styles.xlsx",
+      "original_sha256": "888c4a1660358f092a7ce47a204da985c2ce77f928a6854d60c7202e69990cee",
+      "production_source_sha256_now": "888c4a1660358f092a7ce47a204da985c2ce77f928a6854d60c7202e69990cee",
+      "original_unchanged": true,
+      "wps_saved_path": "historical-artifacts/wps-desktop-acceptance-20261010/styles.xlsx",
+      "wps_saved_sha256": "54d16cbed77a394b051ff85ae5359dc1334257a265a990d75b07ed1dc606ec4e",
+      "bytes": 12701,
+      "zip_crc_ok": true,
+      "zip_entries": 20,
+      "native_save_performed": true,
+      "native_close_reopen_performed": false,
+      "native_content_edit": "No content edit; visited four style worksheets; clicked native Save toolbar"
+    }
+  ],
+  "evidence_screenshots": [
+    {
+      "name": "data-duplicate-reopened.jpg",
+      "sha256": "179d63b43a8c5b722ef049a9d1e468748983d99c10ba9cdd118bd7732cc2344f",
+      "bytes": 130215
+    },
+    {
+      "name": "data-filter-saved.jpg",
+      "sha256": "a217376de479921adfb9c73cba6e3104e09b3f26f615fbdcd899027eba5d4e0a",
+      "bytes": 126119
+    },
+    {
+      "name": "data-ordinary-reopened.jpg",
+      "sha256": "7449faa49f9a6e339f7202567c278374f4af89ddf3ef30eb437da258ef6154d6",
+      "bytes": 126667
+    },
+    {
+      "name": "geometry-initial.jpg",
+      "sha256": "ead7f400d30fdbb082b8f8a09fbb5aeb1b5ab7a755d42fed90087d814db69925",
+      "bytes": 112148
+    },
+    {
+      "name": "geometry-recalculated.jpg",
+      "sha256": "02af8dee9b7f6b04df6c1ebf36dc2f843afe64a0909fe841d2a643d71b0a3ec8",
+      "bytes": 113426
+    },
+    {
+      "name": "images-initial.jpg",
+      "sha256": "8f2b0ae7a93424e2cbb208b62b85f7d1400b5480b8bc417afa53e69074c10a8c",
+      "bytes": 120037
+    },
+    {
+      "name": "images-reopened.jpg",
+      "sha256": "c14e9ae45f6257b1d7912bfc6c1390c3328160e1a6cb55e6cfdadf1318bc23f3",
+      "bytes": 118882
+    },
+    {
+      "name": "iteration-circular-warning.jpg",
+      "sha256": "0233de498d3221a21bad33a92697b7d438d4d4074bca6b4e6a641cfabefc26ab",
+      "bytes": 17915
+    },
+    {
+      "name": "iteration-initial-zero.jpg",
+      "sha256": "847a1b9d89e105da2bc6d8ed128fdc3c4232b3a66ebf81c14e02d048a8c4e550",
+      "bytes": 118765
+    },
+    {
+      "name": "protection-date-iteration-reopened.jpg",
+      "sha256": "786dd5aca649ad88aefab5f210bc6608019da6c58a7ceccd647198ccd80313d9",
+      "bytes": 118769
+    },
+    {
+      "name": "protection-reject-locked.jpg",
+      "sha256": "23b11bb217d01636007e58d870d2000766ae7d97b82caa7ad85e9c34ee9dff5e",
+      "bytes": 151986
+    },
+    {
+      "name": "styles-alignment.jpg",
+      "sha256": "48de57f12f68aba1886144c22a87f2d16ab07bb5d1f1f1b960a3b412af77ae67",
+      "bytes": 103820
+    },
+    {
+      "name": "styles-borders-fills.jpg",
+      "sha256": "44dd4044f42435af5acdeadf8e59323dfea0a2a7fc080cece2b06097ff792f0a",
+      "bytes": 165068
+    },
+    {
+      "name": "styles-number-formats.jpg",
+      "sha256": "9814e2dccd8bb35a6ed986121ae8e03f3ca80f3163a4dd9130c931231cbb0b94",
+      "bytes": 128444
+    },
+    {
+      "name": "styles-typography.jpg",
+      "sha256": "779d39a5a754392d60ddfe435119d474235501bc76ef944027200cdc40168ae2",
+      "bytes": 120603
+    },
+    {
+      "name": "validation-invalid11.jpg",
+      "sha256": "01900fefe286dc53be028a985ef0138a8eafa0bbb20394030143d95cee9f98a2",
+      "bytes": 147196
+    },
+    {
+      "name": "validation-reopened-reject11.jpg",
+      "sha256": "f809a1d65b2eb2565162017422884f2eb5abb1080cbac307f0264746e23b53c2",
+      "bytes": 147194
+    }
+  ],
+  "screenshot_label_note": "data-filter-saved.jpg shows the reapplied filter just before the toolbar Save click; persistence is established by reopened screenshots and actual saved ZIP.",
+  "open_findings": [
+    "Source-table black header text renders in WPS and Excel web.",
+    "WPS iterative B3 displays0 and removes iterate/count/delta in saved calcPr.",
+    "Print preview is blocked by absence of installed printers."
+  ]
+}

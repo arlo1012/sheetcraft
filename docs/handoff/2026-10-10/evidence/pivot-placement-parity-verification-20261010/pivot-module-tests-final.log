@@ -1,0 +1,10 @@
+@sheetcraft/web test: 
+@sheetcraft/web test:  RUN  v4.1.11 historical-repository/apps/web
+@sheetcraft/web test: 
+@sheetcraft/web test: 
+@sheetcraft/web test:  Test Files  21 passed (21)
+@sheetcraft/web test:       Tests  276 passed (276)
+@sheetcraft/web test:    Start at  01:32:46
+@sheetcraft/web test:    Duration  62.80s (transform 9.65s, setup 0ms, import 36.26s, tests 19.53s, environment 4.04s)
+@sheetcraft/web test: 
+@sheetcraft/web test: Exited with code 0

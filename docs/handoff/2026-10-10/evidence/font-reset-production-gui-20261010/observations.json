@@ -1,0 +1,77 @@
+{
+  "dateUTC": "2026-10-10",
+  "sourceCommit": "90279cf",
+  "scope": "One public-Core production font-reset XLSX, WPS desktop followed by Excel for the web in dot cloud browser. One named-Light change and one marker edit per app, saved/full-close/fresh-reopen. No further controls or attribute matrix.",
+  "input": {
+    "bytes": 4712,
+    "sha256": "f47e9de9f26b0c9d2692f08328ef732b744abb65d94432a2021741e043e95410",
+    "frozenSourceUnchanged": true,
+    "taskInputCopiesUnchanged": true
+  },
+  "expectedAndObservedDark": {
+    "A1": "white, inherited13",
+    "B1": "white, inherited18",
+    "C1": "literal black, dark against black header13",
+    "D1": "live dark1 theme, dark against black header13",
+    "E1": "literal red13",
+    "F1": "white, explicit default RGB acts as reset13"
+  },
+  "wps": {
+    "initialOpenUtcApprox": "05:20",
+    "noRepairWarning": true,
+    "namedLight": "TableStylePreset1_Accent1",
+    "lightAndFreshReopen": "A/B/F blue and bold; C literal black; D live dark1 black; E red. Sizes13/18 retained.",
+    "saveAsDistinctFile": "wps-app-saved.xlsx",
+    "fullCloseBeforeFreshReopen": true,
+    "freshReopenVia": "Native Open File Recent, exact just-saved copy",
+    "marker": "SC-FONT-RESET-20261010-v1-7B93D2-WPS-SAVED",
+    "plainControl": "A6 native Font > Color > More Colors confirms HEX20242C, RGB32/36/44 and size13; both dialogs canceled. B6 Home ribbon18. Actual saved bytes retain all six exact plain control colors and sizes.",
+    "finalTestDocumentClosed": true
+  },
+  "excelWeb": {
+    "initialOpenUtcApprox": "05:25",
+    "noRepairWarning": true,
+    "editable": true,
+    "namedLightUI": "冰蓝, 表样式 浅色 2",
+    "namedLightBytes": "TableStyleLight2",
+    "lightAndFreshReopen": "A/B/F blue and bold; C literal black; D live dark1 black; E red. B1/B6 ribbon18; F1 ribbon13.",
+    "marker": "SC-FONT-RESET-20261010-v1-7B93D2-EXCEL-SAVED",
+    "saveCompleteObserved": "上次保存时间: 刚刚 and cloud check before fullclose; 已保存 after fresh reopen.",
+    "fullClose": "Owned tab53 closed before fresh home tab54 reopened exact recent file",
+    "sameOpaqueIdentityOnFreshReopen": true,
+    "actualSavedDownload": {
+      "file": "excel-app-saved.xlsx",
+      "route": "Close workbook; Excel home > Show all workbooks > OneDrive My Files > exact owned synthetic filename > row selection Download. Event registered before click; supported completed download local path returned.",
+      "attempts": 1,
+      "privateURLsTokensProfilesChromeDownloads": "not used"
+    },
+    "finalOwnedTabsClosed": [
+      "53",
+      "54",
+      "55",
+      "56"
+    ]
+  },
+  "instrumentationNotes": [
+    "Prepared copies inherited0444; only task-local copies were changed to0644 and WPS copy reopened as writable before modifications.",
+    "An early WPS name-box focus attempt changed A1/A2 instead of A9; two immediate Undo actions restored both. Saved-package assertions confirm every cell value is unchanged except intended A9 marker suffix.",
+    "Excel formula-bar setValue plus Enter left A9 unchanged; supported pressSequentially actual keystrokes plus Enter then committed the exact marker, visually and in saved bytes.",
+    "One offscreen AX right-click on the exact OneDrive row was not hittable; semantic exact-filename button click brought the owned row into view. The single supported Download completed."
+  ],
+  "screenshots": "13 actual JPEG captures, checked nonblank by pixel statistics. WPS default RGB dialog and final Excel reset header screenshots visually reviewed as saved. Excel title/account header cropped off; no account/address names included.",
+  "result": "PASS for this bounded production default/reset case under the newly approved rule. This is not blanket workbook or cross-application certification.",
+  "cleanup": {
+    "verifiedUtcApprox": "05:30",
+    "onlyBrowserTabsRemaining": [
+      "2",
+      "5",
+      "8",
+      "9"
+    ],
+    "protectedWpsDocument": "Existing starred protection-print-calculation.xlsx remained open and untouched",
+    "guiReleased": true,
+    "toolsInFlight": 0,
+    "settingsChanged": false
+  },
+  "privacy": "Saved XLSX package bytes stay original including ordinary Office metadata; reports do not reproduce account names, IDs, query or tokens. Only safe opaque component hash retained."
+}

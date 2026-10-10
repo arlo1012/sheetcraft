@@ -1,0 +1,19 @@
+{
+  "verified": true,
+  "baseZipBytesAndSha256Verified": true,
+  "baseV17SourceFilesVerified": 2679,
+  "head": "b06cd293a3f887815a53a2eb23d51cfc445bb389",
+  "restoredHeadExact": true,
+  "sourceFilesExact": 2679,
+  "overlayFiles": 4,
+  "deletedFiles": 0,
+  "restoredDirtyStatusExact": true,
+  "restoredBinaryDiffExact": true,
+  "gitFsckPassed": true,
+  "checkpointStatus": "WIP",
+  "fullTestsRerun": false,
+  "oldHistoryReaudited": false,
+  "guiOrRestartPerformed": false,
+  "finalPendingGuardCasesRun": false,
+  "fullWebTypecheckPassClaim": false
+}

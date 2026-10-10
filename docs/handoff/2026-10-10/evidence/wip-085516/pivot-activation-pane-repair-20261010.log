@@ -1,0 +1,32 @@
+
+ RUN  v4.1.11 historical-repository/apps/web
+
+------x
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > creates an empty report, configures it through the field pane, and leaves its contextual tools
+AssertionError: expected null to be 30 // Object.is equality
+
+- Expected:
+30
+
++ Received:
+null
+
+ ❯ src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts:136:57
+    134|     expect(wrapper.find("[data-pivot-placeholder]").exists()).toBe(fal…
+    135|
+    136|     expect(getCellValue(output, { row: 1, column: 1 })).toBe(30);
+       |                                                         ^
+    137|     expect(getCellValue(output, { row: 2, column: 1 })).toBe(40);
+    138|     expect(getCellValue(output, { row: 3, column: 1 })).toBe(70);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+   Start at  01:51:20
+   Duration  15.03s (transform 9.58s, setup 0ms, import 12.71s, tests 1.99s, environment 191ms)
+

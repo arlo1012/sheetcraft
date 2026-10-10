@@ -1,0 +1,204 @@
+{
+  "phase": "accepted native authoring experiment",
+  "timeWindowUTC": "2026-10-10 05:35\u201305:46",
+  "app": "Official Linux WPS 12.1.2.29182",
+  "authorizationSource": "Sentinel_e10f54abd7448191997019f932c300ba after confirmation Sentinel_3f75ac0482f88191b934941e7f4dfdc8",
+  "originalIterationPreferences": {
+    "enabled": false,
+    "maximumIterations": 100,
+    "maximumChange": "0.001"
+  },
+  "temporaryIterationPreferences": {
+    "enabled": true,
+    "maximumIterations": 50,
+    "maximumChange": "0.0001"
+  },
+  "nativeObservedDisplays": {
+    "originalAfterFormulaEntry": "0.999938965",
+    "originalAfterSave": "0.999969482",
+    "originalFreshReopen": "0.999984741",
+    "editedAfterFormulaChange": "1.999938965",
+    "editedAfterSave": "1.999969482",
+    "editedFreshReopen": "1.999984741"
+  },
+  "nativeReopenUI": {
+    "enabled": true,
+    "maximumIterations": 50,
+    "maximumChange": "0.0001"
+  },
+  "savedStages": [
+    {
+      "filename": "iteration-native-original.xlsx",
+      "byteCount": 9043,
+      "sha256": "31bf0302c4ee3939d95f93ef85ea28295b1bb992f7e879a22bd6d248ca3ee47e",
+      "calcPr": {
+        "calcId": "191029",
+        "iterate": "1",
+        "iterateCount": "50",
+        "iterateDelta": "0.0001"
+      },
+      "absentCalcPrAttributes": [
+        "calcMode",
+        "fullCalcOnLoad",
+        "forceFullCalc",
+        "calcOnSave"
+      ],
+      "sheetNames": [
+        "Iteration"
+      ],
+      "B3": {
+        "typeAttribute": null,
+        "typeInterpretation": "numeric (t absent; v is decimal)",
+        "formula": "(B3+1)/2",
+        "formulaAttributes": {
+          "ca": "1"
+        },
+        "cachedValue": "0.999969482421875"
+      },
+      "calcChainPresent": false,
+      "populatedCells": [
+        "B3"
+      ]
+    },
+    {
+      "filename": "iteration-native-edited.xlsx",
+      "byteCount": 9046,
+      "sha256": "435aad6ec8574ffd459c08dd22332cb689c663982f320a3d69122cec5d5ff0c6",
+      "calcPr": {
+        "calcId": "191029",
+        "iterate": "1",
+        "iterateCount": "50",
+        "iterateDelta": "0.0001"
+      },
+      "absentCalcPrAttributes": [
+        "calcMode",
+        "fullCalcOnLoad",
+        "forceFullCalc",
+        "calcOnSave"
+      ],
+      "sheetNames": [
+        "Iteration"
+      ],
+      "B3": {
+        "typeAttribute": null,
+        "typeInterpretation": "numeric (t absent; v is decimal)",
+        "formula": "(B3+2)/2",
+        "formulaAttributes": {
+          "ca": "1"
+        },
+        "cachedValue": "1.99996948242187"
+      },
+      "calcChainPresent": false,
+      "populatedCells": [
+        "B3"
+      ]
+    }
+  ],
+  "settingsRestoration": {
+    "applied": true,
+    "verifiedAfterTestWorkbookClosed": true,
+    "enabled": false,
+    "maximumIterations": 100,
+    "maximumChange": "0.001",
+    "evidence": "screenshots/06-restored-after-test-close.png"
+  },
+  "cleanup": {
+    "testWorkbooksClosed": true,
+    "oldStarredDocumentPreservedOpen": true,
+    "oldDocumentNotSavedOrManuallyEdited": true,
+    "oldDocumentRuntimeDisplayChangedByAppRecalculation": "B3 changed from displayed 0 to displayed 1 when temporary iteration was enabled; still displayed 1 after restoration. Existing starred document and unsaved work remained open."
+  },
+  "limitations": [
+    "This was document close/fresh reopen in the same WPS process; the WPS process was not restarted because the existing starred document had to remain open.",
+    "The near-two formula edit proves actual native iterative recalculation in the enabled process, not just static cache display.",
+    "Iteration preferences affected the other already-open document's runtime calculation. The inspection does not classify all calculation controls as application-wide.",
+    "The saved native stages retained iterate/count/delta. Neither stage was overwritten after reopen or restoration.",
+    "No exporter/source edits, production changes, LibreOffice operations, browser navigation, new agreements, uploads or external publication occurred."
+  ],
+  "screenshots": [
+    {
+      "file": "screenshots/01-enabled-50-delta.png",
+      "sha256": "78678f3cb4238a001653eaa64e619df392381987e6852dc14a47130d501660a1",
+      "dimensions": [
+        909,
+        613
+      ],
+      "rgbStddev": [
+        30.975075784158964,
+        30.02133723332384,
+        29.02778395429731
+      ],
+      "verifiedNonblank": true
+    },
+    {
+      "file": "screenshots/02-native-near1.png",
+      "sha256": "a1fba9544f57427dc5e7a32f6b27db19362df86c4329e86ba9c339ee809d338e",
+      "dimensions": [
+        1188,
+        808
+      ],
+      "rgbStddev": [
+        24.639323860317017,
+        21.315942377668105,
+        22.119571670540797
+      ],
+      "verifiedNonblank": true
+    },
+    {
+      "file": "screenshots/03-original-fresh-reopen.png",
+      "sha256": "5514f9158a8a0d2992870bae64d7f6b37d940cdd0c693c393a3200298a306dea",
+      "dimensions": [
+        1188,
+        808
+      ],
+      "rgbStddev": [
+        24.57711602856748,
+        21.2434836833995,
+        22.050188892044254
+      ],
+      "verifiedNonblank": true
+    },
+    {
+      "file": "screenshots/04-edited-near2.png",
+      "sha256": "592cf47a8ea9c8ba401634b67d4e0ca7a73442c5e339bc02b5376e69c652b756",
+      "dimensions": [
+        1188,
+        808
+      ],
+      "rgbStddev": [
+        24.61114628367725,
+        21.283037215931458,
+        22.088069240997847
+      ],
+      "verifiedNonblank": true
+    },
+    {
+      "file": "screenshots/05-edited-fresh-reopen.png",
+      "sha256": "694f0cc20b9d1ce289fb6fc851d6f1fc13ab58e9d0a80855665dd0342fe849a0",
+      "dimensions": [
+        1188,
+        808
+      ],
+      "rgbStddev": [
+        24.563442876891784,
+        21.227528713995532,
+        22.034972615483053
+      ],
+      "verifiedNonblank": true
+    },
+    {
+      "file": "screenshots/06-restored-after-test-close.png",
+      "sha256": "2be50843f1e09d7f3c25ce42826aef38dde4af78c5bfbe4c930a5c5630a77cd1",
+      "dimensions": [
+        909,
+        613
+      ],
+      "rgbStddev": [
+        30.967854878853984,
+        30.01629645541765,
+        29.021218669200916
+      ],
+      "verifiedNonblank": true
+    }
+  ]
+}

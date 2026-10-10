@@ -1,0 +1,1519 @@
+{
+  "schemaVersion": 1,
+  "checkpointStatus": "WIP",
+  "purpose": "Selected historical evidence for a Git-only development handoff; not a complete backup archive or a fresh acceptance run.",
+  "sourceArchive": {
+    "name": "sheetcraft-recovery-linked-chart-wip-20261010T084426Z.zip",
+    "bytes": 54101725,
+    "sha256": "db464980b3f93348ae945a72f31128be37ea537b6b379400b345b7206d3443d8"
+  },
+  "overlayArchive": {
+    "name": "sheetcraft-wip-overlay-v17-20261010T085516Z.zip",
+    "bytes": 212745,
+    "sha256": "de56f4cf6a6e8e202f8bcdd0f7bbe8d0098aba06b7ce05a1854d22127e0c31f0"
+  },
+  "pathNotation": "historical-repository, historical-artifacts and historical-isolated-placement identify old origins. They are provenance labels, not guaranteed files in this checkout. Use the files listed here and README.md for actual delivered paths.",
+  "metadataSanitizedFilesHaveNotBeenGuiRetested": true,
+  "entries": [
+    {
+      "path": "evidence/wps-insert-reference-20261010/README.md",
+      "originalBytes": 7002,
+      "originalSha256": "a0eccb9302add03b99d93cf7f32f342dee86c833fb9d51377ffb6bc216ffab27",
+      "publishedBytes": 7002,
+      "publishedSha256": "a0eccb9302add03b99d93cf7f32f342dee86c833fb9d51377ffb6bc216ffab27",
+      "transformations": []
+    },
+    {
+      "path": "evidence/wps-insert-reference-20261010/producer-manifest.json",
+      "originalBytes": 1989,
+      "originalSha256": "d7352a882f930650a05d4e356b0c87e2060e4f06441b43ebbd040b33730ee24e",
+      "publishedBytes": 1989,
+      "publishedSha256": "d7352a882f930650a05d4e356b0c87e2060e4f06441b43ebbd040b33730ee24e",
+      "transformations": []
+    },
+    {
+      "path": "evidence/wps-insert-reference-20261010/native-source.xlsx",
+      "originalBytes": 9473,
+      "originalSha256": "14488b1d77ecb7e7d8c4de181cb4b0d4aea63a8f96d0fe42d2c9e4dbfb0fa29d",
+      "publishedBytes": 8632,
+      "publishedSha256": "fbc5e2f0a2758350d3b76b1ed5c698d1fa2b5dee725682cf976354d751d55dc7",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/custom.xml",
+          "removedPropertyNames": [
+            "ICV"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "5cbe88e823766fa05a5f9d7c16fc21ab2179e1517c6ece7e903d6573c8262895",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "c2a611da6f837057e742cdceed07d6c12e8fb6b8b4aaf2f44a731c15706a6e53",
+        "docProps/core.xml": "be981e8d067f47b358090ddf94015dcb967b68cfe833d562e9d08b2768ed31ac",
+        "docProps/custom.xml": "de4eaa6938c403b16945d87a75e6d4f4f4aca56deb2232fe75a77669c87c705f",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "7ab482ecf88f17db4fa11a60cd3ad81d4a3d0b86471e44f71e1b8ff0d5f80995",
+        "xl/sharedStrings.xml": "3c479bb42ac6b4c99953c0990ab2ad42d65838a0be3c11bdb2c039b4c5722574",
+        "xl/styles.xml": "9f57851b9ace958eeaabd8e71f57e56a39de3316c11817cf084cced7e8233a05",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724",
+        "xl/workbook.xml": "8bd710a29a934d4ff262a6df36d837fefa37e297497f1f8b356de708b705f755",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "be6b75ced6e2febeb01cfca2f6a7706735e9b12663c21e6399beaae3f610eb04"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "5cbe88e823766fa05a5f9d7c16fc21ab2179e1517c6ece7e903d6573c8262895",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "c2a611da6f837057e742cdceed07d6c12e8fb6b8b4aaf2f44a731c15706a6e53",
+        "docProps/core.xml": "be981e8d067f47b358090ddf94015dcb967b68cfe833d562e9d08b2768ed31ac",
+        "docProps/custom.xml": "ea1ada416a51976d6c795d3de20827604d8e871c55667d6aeabbedc14a59bc8b",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "7ab482ecf88f17db4fa11a60cd3ad81d4a3d0b86471e44f71e1b8ff0d5f80995",
+        "xl/sharedStrings.xml": "3c479bb42ac6b4c99953c0990ab2ad42d65838a0be3c11bdb2c039b4c5722574",
+        "xl/styles.xml": "9f57851b9ace958eeaabd8e71f57e56a39de3316c11817cf084cced7e8233a05",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724",
+        "xl/workbook.xml": "8bd710a29a934d4ff262a6df36d837fefa37e297497f1f8b356de708b705f755",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "be6b75ced6e2febeb01cfca2f6a7706735e9b12663c21e6399beaae3f610eb04"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/wps-insert-reference-20261010/native-table.xlsx",
+      "originalBytes": 10530,
+      "originalSha256": "71c6dd5d89cc18d249d39255bd7d77df1592762e17ee541a469f7b3b744c2d8c",
+      "publishedBytes": 9671,
+      "publishedSha256": "2ad72cec7427891d3be4546cac538b32155f8c90dd53c3f1446078b9148c834d",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/custom.xml",
+          "removedPropertyNames": [
+            "ICV"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "749ac5d29b5a86d7cf606b138e56bb891b3a4db9418915241cb93e07bfe5e558",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "c2a611da6f837057e742cdceed07d6c12e8fb6b8b4aaf2f44a731c15706a6e53",
+        "docProps/core.xml": "182fa2ae0eda76c274cb2ce09b1a520a4204ac0326bf85fde9de41807d920274",
+        "docProps/custom.xml": "80febb2b4aa240d3171ff98ee9eb25fc93c103b41a4773f8cb75cee3fe7e17f9",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "7ab482ecf88f17db4fa11a60cd3ad81d4a3d0b86471e44f71e1b8ff0d5f80995",
+        "xl/sharedStrings.xml": "3c479bb42ac6b4c99953c0990ab2ad42d65838a0be3c11bdb2c039b4c5722574",
+        "xl/styles.xml": "9f57851b9ace958eeaabd8e71f57e56a39de3316c11817cf084cced7e8233a05",
+        "xl/tables/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/tables/table1.xml": "71939c9b9a16075f88d1f60d7241bf904c448e83eb49cb13ff3d05b0cbf462c7",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724",
+        "xl/workbook.xml": "8bd710a29a934d4ff262a6df36d837fefa37e297497f1f8b356de708b705f755",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327",
+        "xl/worksheets/sheet1.xml": "2f682b980139115aa93f7909791af8c7861690dacfb38279e1c29a9572f8ffeb"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "749ac5d29b5a86d7cf606b138e56bb891b3a4db9418915241cb93e07bfe5e558",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "c2a611da6f837057e742cdceed07d6c12e8fb6b8b4aaf2f44a731c15706a6e53",
+        "docProps/core.xml": "182fa2ae0eda76c274cb2ce09b1a520a4204ac0326bf85fde9de41807d920274",
+        "docProps/custom.xml": "ea1ada416a51976d6c795d3de20827604d8e871c55667d6aeabbedc14a59bc8b",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "7ab482ecf88f17db4fa11a60cd3ad81d4a3d0b86471e44f71e1b8ff0d5f80995",
+        "xl/sharedStrings.xml": "3c479bb42ac6b4c99953c0990ab2ad42d65838a0be3c11bdb2c039b4c5722574",
+        "xl/styles.xml": "9f57851b9ace958eeaabd8e71f57e56a39de3316c11817cf084cced7e8233a05",
+        "xl/tables/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/tables/table1.xml": "71939c9b9a16075f88d1f60d7241bf904c448e83eb49cb13ff3d05b0cbf462c7",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724",
+        "xl/workbook.xml": "8bd710a29a934d4ff262a6df36d837fefa37e297497f1f8b356de708b705f755",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327",
+        "xl/worksheets/sheet1.xml": "2f682b980139115aa93f7909791af8c7861690dacfb38279e1c29a9572f8ffeb"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/pivot-placement-parity-verification-20261010/README.md",
+      "originalBytes": 3119,
+      "originalSha256": "e46f10da6e7db163f4d19aca1fd833be4b79b234321ed126599a54efab3e0810",
+      "publishedBytes": 3105,
+      "publishedSha256": "69b9f41ee9704602134eee2bb6ce7f67344f58716fc8f4e6aaffb2921d6da418",
+      "transformations": [
+        "Local absolute paths replaced by documented historical relative labels; no test outcomes changed."
+      ]
+    },
+    {
+      "path": "evidence/pivot-placement-parity-verification-20261010/committed-checkpoint.json",
+      "originalBytes": 3727,
+      "originalSha256": "434e4cf1a2f331e7928625dd112e4a12fa97c8fd8b8dd7232634b7f72aa7c399",
+      "publishedBytes": 3713,
+      "publishedSha256": "5a7e21e3eda65074e37d593f9425a35fd2f373b66ba42c7539b61f574026fee9",
+      "transformations": [
+        "Local absolute paths replaced by documented historical relative labels; no test outcomes changed."
+      ]
+    },
+    {
+      "path": "evidence/pivot-placement-parity-verification-20261010/native-placement-evidence.json",
+      "originalBytes": 1993,
+      "originalSha256": "3577cf4dd7740e3c9cbdaee156518952ab076de260f2c6d7c41cd2530fd6b5cc",
+      "publishedBytes": 1999,
+      "publishedSha256": "244bb502317ed678045929a0aff78c415cd3cd055c8066497a3d27ff372389f4",
+      "transformations": [
+        "Local absolute paths replaced by documented historical relative labels; no test outcomes changed."
+      ]
+    },
+    {
+      "path": "evidence/pivot-placement-parity-verification-20261010/isolated-placement-typecheck-input.json",
+      "originalBytes": 2951,
+      "originalSha256": "a0b739774c46a27f8d28c854e4d0e237bf48e53ce7518c791328513167c45c0d",
+      "publishedBytes": 2937,
+      "publishedSha256": "79f350097353393427df0b1cec18b201b50949209d6ffe91d0e3ed909babf6b5",
+      "transformations": [
+        "Local absolute paths replaced by documented historical relative labels; no test outcomes changed."
+      ]
+    },
+    {
+      "path": "evidence/pivot-placement-parity-verification-20261010/pivot-module-tests-final.log",
+      "originalBytes": 482,
+      "originalSha256": "da464a922bdc212cef3fc059c7c6d56cd655468bb6bfe7a0a535b696b510ebcb",
+      "publishedBytes": 465,
+      "publishedSha256": "3f5b220114c084ffb25a2dbdde6ba1b23fd58147d7f33bb9e8c48106df295e14",
+      "transformations": [
+        "Local absolute paths replaced by documented historical relative labels; no test outcomes changed."
+      ]
+    },
+    {
+      "path": "evidence/pivot-placement-parity-verification-20261010/web-typecheck-isolated-final.log",
+      "originalBytes": 46,
+      "originalSha256": "6907745730d6e1c831f743e5f9f8e2cb0b03f32344d8f99d16344dbfc997b450",
+      "publishedBytes": 46,
+      "publishedSha256": "6907745730d6e1c831f743e5f9f8e2cb0b03f32344d8f99d16344dbfc997b450",
+      "transformations": []
+    },
+    {
+      "path": "evidence/pivot-placement-parity-verification-20261010/public-flow/Sheetcraft-table-bound-pivot-refreshed.xlsx",
+      "originalBytes": 9467,
+      "originalSha256": "9a1a487cfa0740ebb2a48892aa818fbc838c2736944536122ab36d4a847bb0fd",
+      "publishedBytes": 9467,
+      "publishedSha256": "9a1a487cfa0740ebb2a48892aa818fbc838c2736944536122ab36d4a847bb0fd",
+      "isMetadataSanitizedCopy": false,
+      "transformations": [],
+      "originalPartSha256": {
+        "xl/worksheets/sheet1.xml": "50e6b713b27846525ebaa8b53d0f06d9f35d9d492060186754c993c5bc56723d",
+        "xl/_rels/workbook.xml.rels": "8e71e88ebce0f3072e7e96167043353856ccccde290c35f74f501f83e0e57a53",
+        "xl/worksheets/sheet2.xml": "9e23d10d90d74c91f055bf8ccb0e7de9905947b29ca34597e53475470a3e3acf",
+        "xl/theme/theme1.xml": "0732b3f0bac3fdd8388441eecc8b4384729132ba84510bc17e293d6548d95ead",
+        "xl/workbook.xml": "f06e61ab78ad12316a4927aa014bdad643514e470eb6554c64f0cc5fd5ebc535",
+        "xl/styles.xml": "d4e65c12784b91045417090d010b1479ccaecbb489a7c585c7041a4647d71a5c",
+        "_rels/.rels": "f2f3948a1b6f661f2a5169a86b7029166acd4b79d7abfd37fa2b646fe302bfd6",
+        "[Content_Types].xml": "fd77048ad8631d1c050af8a1ae8258513dca105f5cd5b946d5d62ad074c13829",
+        "xl/tables/table1.xml": "20b6b6e5cc8f436a6ce082505aa5820a7a7185a89b1420cd34c6cffaee21ea25",
+        "xl/worksheets/_rels/sheet1.xml.rels": "e38baffdf60ddf1af6bdf13f0d3aeb40df67c3591996cc27355abd65f5b129a0",
+        "xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels": "84627a4144f33643e299107af08e4b7b623ecc01884b63dfece6cdd25f7c2d8a",
+        "xl/pivotCache/pivotCacheDefinition1.xml": "7afe5876cbd85f60107a50bc5a23d6ddb1bf9ca339aeee22bdfe724a34830e23",
+        "xl/pivotCache/pivotCacheRecords1.xml": "f4f3d226a3ab86ba81c49802407d5db573b5890b663679a1bde1aa16c0a11899",
+        "xl/pivotTables/pivotTable1.xml": "9bea541e7fb2d50de3c22ef4c985ec2b86855d6d5df5b4944476a72844d00a5a",
+        "xl/pivotTables/_rels/pivotTable1.xml.rels": "d92f37c70eeecd347d0bbb04702547e1725d9d0de31a86d66f6d09a8c2a5debe",
+        "xl/worksheets/_rels/sheet2.xml.rels": "28d4ca1f156ece964324f0fb31ae9cd7795696bec86d407ca7553a131b979b9b"
+      },
+      "publishedPartSha256": {
+        "xl/worksheets/sheet1.xml": "50e6b713b27846525ebaa8b53d0f06d9f35d9d492060186754c993c5bc56723d",
+        "xl/_rels/workbook.xml.rels": "8e71e88ebce0f3072e7e96167043353856ccccde290c35f74f501f83e0e57a53",
+        "xl/worksheets/sheet2.xml": "9e23d10d90d74c91f055bf8ccb0e7de9905947b29ca34597e53475470a3e3acf",
+        "xl/theme/theme1.xml": "0732b3f0bac3fdd8388441eecc8b4384729132ba84510bc17e293d6548d95ead",
+        "xl/workbook.xml": "f06e61ab78ad12316a4927aa014bdad643514e470eb6554c64f0cc5fd5ebc535",
+        "xl/styles.xml": "d4e65c12784b91045417090d010b1479ccaecbb489a7c585c7041a4647d71a5c",
+        "_rels/.rels": "f2f3948a1b6f661f2a5169a86b7029166acd4b79d7abfd37fa2b646fe302bfd6",
+        "[Content_Types].xml": "fd77048ad8631d1c050af8a1ae8258513dca105f5cd5b946d5d62ad074c13829",
+        "xl/tables/table1.xml": "20b6b6e5cc8f436a6ce082505aa5820a7a7185a89b1420cd34c6cffaee21ea25",
+        "xl/worksheets/_rels/sheet1.xml.rels": "e38baffdf60ddf1af6bdf13f0d3aeb40df67c3591996cc27355abd65f5b129a0",
+        "xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels": "84627a4144f33643e299107af08e4b7b623ecc01884b63dfece6cdd25f7c2d8a",
+        "xl/pivotCache/pivotCacheDefinition1.xml": "7afe5876cbd85f60107a50bc5a23d6ddb1bf9ca339aeee22bdfe724a34830e23",
+        "xl/pivotCache/pivotCacheRecords1.xml": "f4f3d226a3ab86ba81c49802407d5db573b5890b663679a1bde1aa16c0a11899",
+        "xl/pivotTables/pivotTable1.xml": "9bea541e7fb2d50de3c22ef4c985ec2b86855d6d5df5b4944476a72844d00a5a",
+        "xl/pivotTables/_rels/pivotTable1.xml.rels": "d92f37c70eeecd347d0bbb04702547e1725d9d0de31a86d66f6d09a8c2a5debe",
+        "xl/worksheets/_rels/sheet2.xml.rels": "28d4ca1f156ece964324f0fb31ae9cd7795696bec86d407ca7553a131b979b9b"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/pivot-placement-parity-verification-20261010/public-flow/Sheetcraft-table-bound-pivot-unrefreshed.xlsx",
+      "originalBytes": 9423,
+      "originalSha256": "a81a863505e259c42d2202a7c3e143715db12f3c260779e41de5fbc42b2a9a67",
+      "publishedBytes": 9423,
+      "publishedSha256": "a81a863505e259c42d2202a7c3e143715db12f3c260779e41de5fbc42b2a9a67",
+      "isMetadataSanitizedCopy": false,
+      "transformations": [],
+      "originalPartSha256": {
+        "xl/worksheets/sheet1.xml": "50e6b713b27846525ebaa8b53d0f06d9f35d9d492060186754c993c5bc56723d",
+        "xl/_rels/workbook.xml.rels": "8e71e88ebce0f3072e7e96167043353856ccccde290c35f74f501f83e0e57a53",
+        "xl/worksheets/sheet2.xml": "9418c2d3dd4468ef6f8b3668ece4a56f48165cc7729c401171b48a32018a485f",
+        "xl/theme/theme1.xml": "0732b3f0bac3fdd8388441eecc8b4384729132ba84510bc17e293d6548d95ead",
+        "xl/workbook.xml": "f06e61ab78ad12316a4927aa014bdad643514e470eb6554c64f0cc5fd5ebc535",
+        "xl/styles.xml": "d4e65c12784b91045417090d010b1479ccaecbb489a7c585c7041a4647d71a5c",
+        "_rels/.rels": "f2f3948a1b6f661f2a5169a86b7029166acd4b79d7abfd37fa2b646fe302bfd6",
+        "[Content_Types].xml": "fd77048ad8631d1c050af8a1ae8258513dca105f5cd5b946d5d62ad074c13829",
+        "xl/tables/table1.xml": "20b6b6e5cc8f436a6ce082505aa5820a7a7185a89b1420cd34c6cffaee21ea25",
+        "xl/worksheets/_rels/sheet1.xml.rels": "e38baffdf60ddf1af6bdf13f0d3aeb40df67c3591996cc27355abd65f5b129a0",
+        "xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels": "84627a4144f33643e299107af08e4b7b623ecc01884b63dfece6cdd25f7c2d8a",
+        "xl/pivotCache/pivotCacheDefinition1.xml": "b60404dad09332018c45a4debf8773d4ef6faa9e49731b016d245ba75a6fb041",
+        "xl/pivotCache/pivotCacheRecords1.xml": "652175077f3fa3daa0e2906b5b18f6bb80df50fa1894454435b11f6730b19c1a",
+        "xl/pivotTables/pivotTable1.xml": "1ad336a44f88da928aa5e3c52475982a6a53737741505ea3e363b1be67bafba2",
+        "xl/pivotTables/_rels/pivotTable1.xml.rels": "d92f37c70eeecd347d0bbb04702547e1725d9d0de31a86d66f6d09a8c2a5debe",
+        "xl/worksheets/_rels/sheet2.xml.rels": "28d4ca1f156ece964324f0fb31ae9cd7795696bec86d407ca7553a131b979b9b"
+      },
+      "publishedPartSha256": {
+        "xl/worksheets/sheet1.xml": "50e6b713b27846525ebaa8b53d0f06d9f35d9d492060186754c993c5bc56723d",
+        "xl/_rels/workbook.xml.rels": "8e71e88ebce0f3072e7e96167043353856ccccde290c35f74f501f83e0e57a53",
+        "xl/worksheets/sheet2.xml": "9418c2d3dd4468ef6f8b3668ece4a56f48165cc7729c401171b48a32018a485f",
+        "xl/theme/theme1.xml": "0732b3f0bac3fdd8388441eecc8b4384729132ba84510bc17e293d6548d95ead",
+        "xl/workbook.xml": "f06e61ab78ad12316a4927aa014bdad643514e470eb6554c64f0cc5fd5ebc535",
+        "xl/styles.xml": "d4e65c12784b91045417090d010b1479ccaecbb489a7c585c7041a4647d71a5c",
+        "_rels/.rels": "f2f3948a1b6f661f2a5169a86b7029166acd4b79d7abfd37fa2b646fe302bfd6",
+        "[Content_Types].xml": "fd77048ad8631d1c050af8a1ae8258513dca105f5cd5b946d5d62ad074c13829",
+        "xl/tables/table1.xml": "20b6b6e5cc8f436a6ce082505aa5820a7a7185a89b1420cd34c6cffaee21ea25",
+        "xl/worksheets/_rels/sheet1.xml.rels": "e38baffdf60ddf1af6bdf13f0d3aeb40df67c3591996cc27355abd65f5b129a0",
+        "xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels": "84627a4144f33643e299107af08e4b7b623ecc01884b63dfece6cdd25f7c2d8a",
+        "xl/pivotCache/pivotCacheDefinition1.xml": "b60404dad09332018c45a4debf8773d4ef6faa9e49731b016d245ba75a6fb041",
+        "xl/pivotCache/pivotCacheRecords1.xml": "652175077f3fa3daa0e2906b5b18f6bb80df50fa1894454435b11f6730b19c1a",
+        "xl/pivotTables/pivotTable1.xml": "1ad336a44f88da928aa5e3c52475982a6a53737741505ea3e363b1be67bafba2",
+        "xl/pivotTables/_rels/pivotTable1.xml.rels": "d92f37c70eeecd347d0bbb04702547e1725d9d0de31a86d66f6d09a8c2a5debe",
+        "xl/worksheets/_rels/sheet2.xml.rels": "28d4ca1f156ece964324f0fb31ae9cd7795696bec86d407ca7553a131b979b9b"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/wps-desktop-acceptance-20261010/OBSERVATIONS.md",
+      "originalBytes": 7218,
+      "originalSha256": "f7971cbe5191f5f13dcf6259f9d5c2cf8b8051693a566e86b9a7eed69e68a5bc",
+      "publishedBytes": 7218,
+      "publishedSha256": "f7971cbe5191f5f13dcf6259f9d5c2cf8b8051693a566e86b9a7eed69e68a5bc",
+      "transformations": []
+    },
+    {
+      "path": "evidence/wps-desktop-acceptance-20261010/verification.json",
+      "originalBytes": 8632,
+      "originalSha256": "aad9175194686f0bd3b540338a99097908f63a075fc68552f14210335029924d",
+      "publishedBytes": 8588,
+      "publishedSha256": "cc720134859d3a1277e9624549fc414dc47bc835d9190e431b04f86ba24e5639",
+      "transformations": [
+        "Local absolute paths replaced by documented historical relative labels; no test outcomes changed."
+      ]
+    },
+    {
+      "path": "evidence/wps-desktop-acceptance-20261010/data-pivots.xlsx",
+      "originalBytes": 18081,
+      "originalSha256": "cf1b40d8396014e5dd004841b9070f327bb1221d1630bc9f1903fac30a832e27",
+      "publishedBytes": 17123,
+      "publishedSha256": "ea4cce6e7f14793022479bbe9a885a7ba79e09552febb99324d5177c56600d9d",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/custom.xml",
+          "removedPropertyNames": [
+            "ICV"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "75362485739b9c45a0a35edd27d6d39caeb00083b761e960eb8da9f90293786f",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "b0b2a9ea9e30c51e91cbc780cca594db4ab11bbb66872e8fa8e192b34a24945a",
+        "docProps/core.xml": "d7d0354d531ed4fc62857307b363b29b8289843de17de44496621071b9a308c6",
+        "docProps/custom.xml": "32ba42237ace6e2286e7b99b561a74f2401841d895bbf03f652579b5a24367d6",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "d3914d62a69cf7035cd8a3a4a1f259f10fddda6ddeaf9dbe8caee6f59e5853a3",
+        "xl/pivotCache/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/pivotCache/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels": "50932fefa05af7d439305a402207d007de878e1e9b81e5caabca45ee5c4a2508",
+        "xl/pivotCache/_rels/pivotCacheDefinition2.xml.rels": "debe4484df52da14ecf76bbc8439e4e167eeb4e3920a723c79158299f8dc9130",
+        "xl/pivotCache/pivotCacheDefinition1.xml": "c17ecfd975c14a2e6d04d4480cd1a26e750f4a0f98a56286437693ddd14675b0",
+        "xl/pivotCache/pivotCacheDefinition2.xml": "7f6bd6898a749b764bd8d72a3acdb5813dbe6960e1f453cc9e02d2429f43bfb3",
+        "xl/pivotCache/pivotCacheRecords1.xml": "8ae9838ed79753fb758ced39c40c5b4c582f80d0409cc42a1d2b336ca45af6d5",
+        "xl/pivotCache/pivotCacheRecords2.xml": "8ae9838ed79753fb758ced39c40c5b4c582f80d0409cc42a1d2b336ca45af6d5",
+        "xl/pivotTables/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/pivotTables/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/pivotTables/_rels/pivotTable1.xml.rels": "55dcc4ac09f0b4828a5e4138ffe799fad22be0c8e8705431b0c6f79144510605",
+        "xl/pivotTables/_rels/pivotTable2.xml.rels": "d071092dde7799ece4dd76f01417a34be0c6c54a7527bef8b57cb45e3893c622",
+        "xl/pivotTables/pivotTable1.xml": "d7e2ced61d4a2a9a3fd26be3efa650849cc12cb2d01ea1a1be2a3c753b74fb51",
+        "xl/pivotTables/pivotTable2.xml": "4b6dca01bf9692f06418e83060ba3d976505fb7279e8ac8f0997a54376108de3",
+        "xl/sharedStrings.xml": "3140387e28647f91e68102d3139d854138ea88e87ee3bd72cbff15ec18dac2e2",
+        "xl/styles.xml": "f33ba8cd1f553fc90342277866f3af2d88b9a2203941cf23b3909e22c8ed4fe9",
+        "xl/tables/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/tables/table1.xml": "a6b46fc535d2a1df8964b55335975da06ec888f27328ab82258718347e4608b7",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "ed89a766197703c3db2b71a133500f9fc76e576ddbf528516fa49d9eeac55d46",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327",
+        "xl/worksheets/_rels/sheet2.xml.rels": "d9ce9dac22a848ed1333d64de9f1b8e804e339906b6d71fe2ba08cc27b7e3928",
+        "xl/worksheets/_rels/sheet3.xml.rels": "fe0eecab5fe685fe1b8d4fecc515d16bfbd5404f5e88ea3ffd6ed65270aa6c1f",
+        "xl/worksheets/sheet1.xml": "cda687fd4af7a9e65588a27f480d1432586d627e62c8ff8e249fe1d0ee431e91",
+        "xl/worksheets/sheet2.xml": "d31cf3dfd0dd7462ed2fb841dd10178cfee7928130b571bd3ee7af356cdff703",
+        "xl/worksheets/sheet3.xml": "70c870e7c13f67984a22f38a65102c0860781da811aa11ddf29b79a89267d0f1"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "75362485739b9c45a0a35edd27d6d39caeb00083b761e960eb8da9f90293786f",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "b0b2a9ea9e30c51e91cbc780cca594db4ab11bbb66872e8fa8e192b34a24945a",
+        "docProps/core.xml": "d7d0354d531ed4fc62857307b363b29b8289843de17de44496621071b9a308c6",
+        "docProps/custom.xml": "45ba72ad94488b3daafe6fe34c4fb4d365e013ac57831d753e2ba8833bec8911",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "d3914d62a69cf7035cd8a3a4a1f259f10fddda6ddeaf9dbe8caee6f59e5853a3",
+        "xl/pivotCache/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/pivotCache/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels": "50932fefa05af7d439305a402207d007de878e1e9b81e5caabca45ee5c4a2508",
+        "xl/pivotCache/_rels/pivotCacheDefinition2.xml.rels": "debe4484df52da14ecf76bbc8439e4e167eeb4e3920a723c79158299f8dc9130",
+        "xl/pivotCache/pivotCacheDefinition1.xml": "c17ecfd975c14a2e6d04d4480cd1a26e750f4a0f98a56286437693ddd14675b0",
+        "xl/pivotCache/pivotCacheDefinition2.xml": "7f6bd6898a749b764bd8d72a3acdb5813dbe6960e1f453cc9e02d2429f43bfb3",
+        "xl/pivotCache/pivotCacheRecords1.xml": "8ae9838ed79753fb758ced39c40c5b4c582f80d0409cc42a1d2b336ca45af6d5",
+        "xl/pivotCache/pivotCacheRecords2.xml": "8ae9838ed79753fb758ced39c40c5b4c582f80d0409cc42a1d2b336ca45af6d5",
+        "xl/pivotTables/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/pivotTables/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/pivotTables/_rels/pivotTable1.xml.rels": "55dcc4ac09f0b4828a5e4138ffe799fad22be0c8e8705431b0c6f79144510605",
+        "xl/pivotTables/_rels/pivotTable2.xml.rels": "d071092dde7799ece4dd76f01417a34be0c6c54a7527bef8b57cb45e3893c622",
+        "xl/pivotTables/pivotTable1.xml": "d7e2ced61d4a2a9a3fd26be3efa650849cc12cb2d01ea1a1be2a3c753b74fb51",
+        "xl/pivotTables/pivotTable2.xml": "4b6dca01bf9692f06418e83060ba3d976505fb7279e8ac8f0997a54376108de3",
+        "xl/sharedStrings.xml": "3140387e28647f91e68102d3139d854138ea88e87ee3bd72cbff15ec18dac2e2",
+        "xl/styles.xml": "f33ba8cd1f553fc90342277866f3af2d88b9a2203941cf23b3909e22c8ed4fe9",
+        "xl/tables/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/tables/table1.xml": "a6b46fc535d2a1df8964b55335975da06ec888f27328ab82258718347e4608b7",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "ed89a766197703c3db2b71a133500f9fc76e576ddbf528516fa49d9eeac55d46",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327",
+        "xl/worksheets/_rels/sheet2.xml.rels": "d9ce9dac22a848ed1333d64de9f1b8e804e339906b6d71fe2ba08cc27b7e3928",
+        "xl/worksheets/_rels/sheet3.xml.rels": "fe0eecab5fe685fe1b8d4fecc515d16bfbd5404f5e88ea3ffd6ed65270aa6c1f",
+        "xl/worksheets/sheet1.xml": "cda687fd4af7a9e65588a27f480d1432586d627e62c8ff8e249fe1d0ee431e91",
+        "xl/worksheets/sheet2.xml": "d31cf3dfd0dd7462ed2fb841dd10178cfee7928130b571bd3ee7af356cdff703",
+        "xl/worksheets/sheet3.xml": "70c870e7c13f67984a22f38a65102c0860781da811aa11ddf29b79a89267d0f1"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/wps-desktop-acceptance-20261010/geometry-formulas.xlsx",
+      "originalBytes": 9659,
+      "originalSha256": "4041fdc971b21a4c3470cad728fab4eae6aaa79923a6c32a439822389d90af08",
+      "publishedBytes": 9029,
+      "publishedSha256": "84f9f91258ba6946fb60fcf4905c1ee117f17d85b6cd702a7ad7c09a9e5bcbae",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/custom.xml",
+          "removedPropertyNames": [
+            "ICV"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "e74bd23ee0f1cd8184910a1dbe96e68745219aa809ef8db880eb8ed7901160af",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "881287c859dc74a5d3f5ccd386ba4ad5ab34f4d2013f56487731810f44372a3f",
+        "docProps/core.xml": "ad46ede0376cdef03d700fba3f4a284e2f8cb9f0ecc841e8e235e1e340a3cdd9",
+        "docProps/custom.xml": "b818004cc452f5000ad848f6b25fc376607963b6ac67edf677cb1a852ced885d",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "08b338aaf4240ee3ef5fd98ed335c8c915365efb9ad55d69534820561e0f9db9",
+        "xl/sharedStrings.xml": "7612de7c8d1c79ca1840d215cd85194b5634b1fcc91b1d0a0ffce34750546aa2",
+        "xl/styles.xml": "4856b791f452f1ea5bc8fe2d6fc51a599b9d84032f657b7035c0c9d43f874441",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "2dbdb0b73b2373748e0dec5ce7c30dd048e5c7b4438caed031dcac22c8c55685",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "820fdaf6d0e4813fda25534c9607cadccfdc4ab7b33cdd625402480d1a02a283",
+        "xl/worksheets/sheet2.xml": "a36e8fda47e49ba9cbf7a2be0a87bf4c6aea2ed9b6cc7a0c30167b3c9eb0123f",
+        "xl/worksheets/sheet3.xml": "82321d0e50db974d0bdd2b6ef2617acf0ad90f861bde6e5f1f48a2adce99ae7f"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "e74bd23ee0f1cd8184910a1dbe96e68745219aa809ef8db880eb8ed7901160af",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "881287c859dc74a5d3f5ccd386ba4ad5ab34f4d2013f56487731810f44372a3f",
+        "docProps/core.xml": "ad46ede0376cdef03d700fba3f4a284e2f8cb9f0ecc841e8e235e1e340a3cdd9",
+        "docProps/custom.xml": "45ba72ad94488b3daafe6fe34c4fb4d365e013ac57831d753e2ba8833bec8911",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "08b338aaf4240ee3ef5fd98ed335c8c915365efb9ad55d69534820561e0f9db9",
+        "xl/sharedStrings.xml": "7612de7c8d1c79ca1840d215cd85194b5634b1fcc91b1d0a0ffce34750546aa2",
+        "xl/styles.xml": "4856b791f452f1ea5bc8fe2d6fc51a599b9d84032f657b7035c0c9d43f874441",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "2dbdb0b73b2373748e0dec5ce7c30dd048e5c7b4438caed031dcac22c8c55685",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "820fdaf6d0e4813fda25534c9607cadccfdc4ab7b33cdd625402480d1a02a283",
+        "xl/worksheets/sheet2.xml": "a36e8fda47e49ba9cbf7a2be0a87bf4c6aea2ed9b6cc7a0c30167b3c9eb0123f",
+        "xl/worksheets/sheet3.xml": "82321d0e50db974d0bdd2b6ef2617acf0ad90f861bde6e5f1f48a2adce99ae7f"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/wps-desktop-acceptance-20261010/images-drawings.xlsx",
+      "originalBytes": 12566,
+      "originalSha256": "65fddc95ba053d56eac20f8bb69729d2e644a6d099cd0b3b6a024c805f67f302",
+      "publishedBytes": 11909,
+      "publishedSha256": "6166b92efe1c69e3d7cd07e3d055a0e764fa78dbe5c1fc6b5b0dfeab0c6da64e",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/custom.xml",
+          "removedPropertyNames": [
+            "ICV"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "ce108d6434d6abba02e1265a8b147ee20f7a4d7ee02333de4608367de69d6556",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "98562d3b592f8491da96342809677c15288eb9bca27691cc52e53b9ddebd0d53",
+        "docProps/core.xml": "0ea686fa786e2a85c5b0a3196bc42f2252cf00ecf4b7a57a0b1f115546c1a730",
+        "docProps/custom.xml": "b313e4c03ffdce3db6771b70539990adecf80088dea85e006d6b910d4e530a54",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "ec08ae55471507f247e9a9907db56ea9c8d3f9d663c9cbeefbf251e85579102b",
+        "xl/cellimages.xml": "f0498d5eb3d6de998cc1fb7a8a2b0a1b4d102b75d46706f04ba11a0233a630e8",
+        "xl/drawings/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/drawings/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/drawings/_rels/drawing1.xml.rels": "15a140b2ab9e3d49a7b49f824413744cc4959bc34c427cf50f7d6016697293c0",
+        "xl/drawings/drawing1.xml": "583df29b4c95db23185c4b10802e11c6e2cc36b2ea265e5cd864bdda9caa4044",
+        "xl/media/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/media/image1.png": "74bb8613286b5cf9c7608703bbe2d9c178a2726f4411bf715c6de1e9efb9585d",
+        "xl/metadata.xml": "e3392d6e3c7829ea8ab500b33e64f166cb3d88ea54069dc0a7a653216ee8267d",
+        "xl/richData/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/richData/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/richData/_rels/richValueRel.xml.rels": "15a140b2ab9e3d49a7b49f824413744cc4959bc34c427cf50f7d6016697293c0",
+        "xl/richData/rdrichvalue.xml": "78f98037780b3407e6bf0b081ea9a44f3919dc27982fc565aa7d6d801bd86fc3",
+        "xl/richData/rdrichvaluestructure.xml": "4654fbf94f60092747809d48df9c26d8cdd5069ec34863f91a3a3714af1ed795",
+        "xl/richData/richValueRel.xml": "3b91a9f9b34f844b7ce246b886e301013d92f8b4945e439fadb6c3054b977e99",
+        "xl/sharedStrings.xml": "2834c9f26708949bb53f3cf3e0bffd29ff963a2f3fd4c42be289ce1eb140dc7f",
+        "xl/styles.xml": "4856b791f452f1ea5bc8fe2d6fc51a599b9d84032f657b7035c0c9d43f874441",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "ee36d7e6102f6f12f39c783b92c93bf65523b02282025f0ea52085e3f2b9867f",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ee9fa12d10c5ee0ae23c711aad3be36f1d99d87934a588aac4ecaf1028bdef16",
+        "xl/worksheets/sheet1.xml": "f560bf90b75e3d8b96894750d7c53a4fedeb550ef24bcad15a899d22dada3e73"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "ce108d6434d6abba02e1265a8b147ee20f7a4d7ee02333de4608367de69d6556",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "98562d3b592f8491da96342809677c15288eb9bca27691cc52e53b9ddebd0d53",
+        "docProps/core.xml": "0ea686fa786e2a85c5b0a3196bc42f2252cf00ecf4b7a57a0b1f115546c1a730",
+        "docProps/custom.xml": "45ba72ad94488b3daafe6fe34c4fb4d365e013ac57831d753e2ba8833bec8911",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "ec08ae55471507f247e9a9907db56ea9c8d3f9d663c9cbeefbf251e85579102b",
+        "xl/cellimages.xml": "f0498d5eb3d6de998cc1fb7a8a2b0a1b4d102b75d46706f04ba11a0233a630e8",
+        "xl/drawings/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/drawings/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/drawings/_rels/drawing1.xml.rels": "15a140b2ab9e3d49a7b49f824413744cc4959bc34c427cf50f7d6016697293c0",
+        "xl/drawings/drawing1.xml": "583df29b4c95db23185c4b10802e11c6e2cc36b2ea265e5cd864bdda9caa4044",
+        "xl/media/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/media/image1.png": "74bb8613286b5cf9c7608703bbe2d9c178a2726f4411bf715c6de1e9efb9585d",
+        "xl/metadata.xml": "e3392d6e3c7829ea8ab500b33e64f166cb3d88ea54069dc0a7a653216ee8267d",
+        "xl/richData/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/richData/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/richData/_rels/richValueRel.xml.rels": "15a140b2ab9e3d49a7b49f824413744cc4959bc34c427cf50f7d6016697293c0",
+        "xl/richData/rdrichvalue.xml": "78f98037780b3407e6bf0b081ea9a44f3919dc27982fc565aa7d6d801bd86fc3",
+        "xl/richData/rdrichvaluestructure.xml": "4654fbf94f60092747809d48df9c26d8cdd5069ec34863f91a3a3714af1ed795",
+        "xl/richData/richValueRel.xml": "3b91a9f9b34f844b7ce246b886e301013d92f8b4945e439fadb6c3054b977e99",
+        "xl/sharedStrings.xml": "2834c9f26708949bb53f3cf3e0bffd29ff963a2f3fd4c42be289ce1eb140dc7f",
+        "xl/styles.xml": "4856b791f452f1ea5bc8fe2d6fc51a599b9d84032f657b7035c0c9d43f874441",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "ee36d7e6102f6f12f39c783b92c93bf65523b02282025f0ea52085e3f2b9867f",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ee9fa12d10c5ee0ae23c711aad3be36f1d99d87934a588aac4ecaf1028bdef16",
+        "xl/worksheets/sheet1.xml": "f560bf90b75e3d8b96894750d7c53a4fedeb550ef24bcad15a899d22dada3e73"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/wps-desktop-acceptance-20261010/protection-print-calculation.xlsx",
+      "originalBytes": 10684,
+      "originalSha256": "bb8da39b9b383778a00c2dfd2b5b6ad804db0422c711f3f33f69148778973e50",
+      "publishedBytes": 10029,
+      "publishedSha256": "c1a608e89499519b21bf66debda5b2a354939109c11620cb20c68e72939d37d5",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/custom.xml",
+          "removedPropertyNames": [
+            "ICV"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "69b52e0c325e778574c13152f67534696b7af0eab9a3e2c1aa48af1ce9a55761",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "customXml/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "customXml/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "customXml/_rels/item1.xml.rels": "80482f86e196171d66001e0e74d1900408a3aaf2463e54005d251b5f2db9a0b0",
+        "customXml/item1.xml": "25c42ce41d4639c8cfe301aeea300297e66f37d700ed7b3c980e425dd8c76c1b",
+        "customXml/itemProps1.xml": "2f64f320c1b7675b589085581a85b5bfd259aa935e29a6741170a6db4af1fe0e",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "149dbe9b8de9629e7eb16893a90e3ed1b0e7a053ddd428aaa49ca9c999124115",
+        "docProps/core.xml": "d0b7da3301884bb4a2005d5f03f0f7a0f69eda867d9512273d7108949f3b409a",
+        "docProps/custom.xml": "9263fc131efa1cb9515363bf5fda30602246b6b83e7aee16239f780171ef395f",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "01eea07fccd479ca9b50a2d590e48f64dbcc035a2c2100faadbb966d9e67acf7",
+        "xl/sharedStrings.xml": "558446273268a2e6726e72c0efe5d9dc3ee334bedfc477af348034c8611d0fbd",
+        "xl/styles.xml": "588b6a9edfffd52be0e96a6b27b325ee05f82160d956398305370a046b18116c",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "9c4ec40d35625f321fe80c33efe9fc38837a9275c2d1547c0d5ed6f6501416ce",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "544f22b9a34c87a1b0d6319a17c158a97db3dacf2df3bee779264aa99f9ba171",
+        "xl/worksheets/sheet2.xml": "4d8cd748f973494c86a5a2eb5e82744d941db327593d863f337fbd6a327ac241"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "69b52e0c325e778574c13152f67534696b7af0eab9a3e2c1aa48af1ce9a55761",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "customXml/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "customXml/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "customXml/_rels/item1.xml.rels": "80482f86e196171d66001e0e74d1900408a3aaf2463e54005d251b5f2db9a0b0",
+        "customXml/item1.xml": "25c42ce41d4639c8cfe301aeea300297e66f37d700ed7b3c980e425dd8c76c1b",
+        "customXml/itemProps1.xml": "2f64f320c1b7675b589085581a85b5bfd259aa935e29a6741170a6db4af1fe0e",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "149dbe9b8de9629e7eb16893a90e3ed1b0e7a053ddd428aaa49ca9c999124115",
+        "docProps/core.xml": "d0b7da3301884bb4a2005d5f03f0f7a0f69eda867d9512273d7108949f3b409a",
+        "docProps/custom.xml": "45ba72ad94488b3daafe6fe34c4fb4d365e013ac57831d753e2ba8833bec8911",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "01eea07fccd479ca9b50a2d590e48f64dbcc035a2c2100faadbb966d9e67acf7",
+        "xl/sharedStrings.xml": "558446273268a2e6726e72c0efe5d9dc3ee334bedfc477af348034c8611d0fbd",
+        "xl/styles.xml": "588b6a9edfffd52be0e96a6b27b325ee05f82160d956398305370a046b18116c",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "9c4ec40d35625f321fe80c33efe9fc38837a9275c2d1547c0d5ed6f6501416ce",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "544f22b9a34c87a1b0d6319a17c158a97db3dacf2df3bee779264aa99f9ba171",
+        "xl/worksheets/sheet2.xml": "4d8cd748f973494c86a5a2eb5e82744d941db327593d863f337fbd6a327ac241"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/wps-desktop-acceptance-20261010/rules-notes-links.xlsx",
+      "originalBytes": 8092,
+      "originalSha256": "2bf06537cf18df8d8a23d474f5ec949d02318bbad8cb12cbedd46ca1cdd2c0ed",
+      "publishedBytes": 7511,
+      "publishedSha256": "38a705e9f04d8e13d7d9005ab84d8c4950be8cb43892238a7b492c509b292ad9",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/custom.xml",
+          "removedPropertyNames": [
+            "ICV"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "5cbe88e823766fa05a5f9d7c16fc21ab2179e1517c6ece7e903d6573c8262895",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "75ba820e1b6cfc0eed4972594f37935f55dd9013b96bfe946ee4921b558ed409",
+        "docProps/core.xml": "7f68a8b4de7c5e667d9f6f846ea8c480aad28aaa85eb7ef3abccf44164624201",
+        "docProps/custom.xml": "872d4f1522f69abe385e8e61abed5b566570434ddf57bcfbd47e3f3e1df8f048",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "7ab482ecf88f17db4fa11a60cd3ad81d4a3d0b86471e44f71e1b8ff0d5f80995",
+        "xl/sharedStrings.xml": "b5510f69ff2b2733f0e7fbdd92e05ab5b80654b143133dd6adebde4c9e870103",
+        "xl/styles.xml": "4856b791f452f1ea5bc8fe2d6fc51a599b9d84032f657b7035c0c9d43f874441",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "67395318513a4a33cb1c2a097578cc04e23cf3867083cf16b2644bb4833b38e9",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "0c4ffe55532d8a667e55c89f624b4abdd3459c7904d53c96d0ec426534325ed6"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "5cbe88e823766fa05a5f9d7c16fc21ab2179e1517c6ece7e903d6573c8262895",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "75ba820e1b6cfc0eed4972594f37935f55dd9013b96bfe946ee4921b558ed409",
+        "docProps/core.xml": "7f68a8b4de7c5e667d9f6f846ea8c480aad28aaa85eb7ef3abccf44164624201",
+        "docProps/custom.xml": "45ba72ad94488b3daafe6fe34c4fb4d365e013ac57831d753e2ba8833bec8911",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "7ab482ecf88f17db4fa11a60cd3ad81d4a3d0b86471e44f71e1b8ff0d5f80995",
+        "xl/sharedStrings.xml": "b5510f69ff2b2733f0e7fbdd92e05ab5b80654b143133dd6adebde4c9e870103",
+        "xl/styles.xml": "4856b791f452f1ea5bc8fe2d6fc51a599b9d84032f657b7035c0c9d43f874441",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "67395318513a4a33cb1c2a097578cc04e23cf3867083cf16b2644bb4833b38e9",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "0c4ffe55532d8a667e55c89f624b4abdd3459c7904d53c96d0ec426534325ed6"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/wps-desktop-acceptance-20261010/styles.xlsx",
+      "originalBytes": 12701,
+      "originalSha256": "54d16cbed77a394b051ff85ae5359dc1334257a265a990d75b07ed1dc606ec4e",
+      "publishedBytes": 11616,
+      "publishedSha256": "1a3529d5d217f64485bc7b7d02f3921999649433ac9a226d50baee9713daaee7",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/custom.xml",
+          "removedPropertyNames": [
+            "ICV"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "9d8e903efee52b1045db1e152868d145342c3b86a6338923920e31f66f6de1c4",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "f1f621c5e1de497fb7b7ab46b6c52b23d465efae7824ebed84e841ba9c8d3ac0",
+        "docProps/core.xml": "a7c5ac755d81db772a0eee6eb26d8c3ddf81a8d29f4a7fa90f1e534a5e21c149",
+        "docProps/custom.xml": "d8240da2754bc6c62524be55a4f8585eaa12a69e206cf8876b7746f8e1d578a7",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "a895642fb8c6e498e2dc9393f2475d947b49ba823a16927f9901e559ba0d2c5f",
+        "xl/sharedStrings.xml": "c80d91e3d3e648fb3b07d4c55745185ebe603d91fc6042f4d97a6a242dc27510",
+        "xl/styles.xml": "49b8901ffdba3d254e631b82ed753e1dde85316cb27e17dcf23aae24c405348e",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "dc87cc2e2e14cf9b85eeb30ea60ecb9dfb9155d7248dc7a859b7da025505779a",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "2892ab737f7abf6ed50922ef295c11d640c031c1666cf0a19481141c229e216d",
+        "xl/worksheets/sheet2.xml": "ed92eebb1f42913f4aae706d0d4fa5977d566ca8946e52daf0666a2573735b57",
+        "xl/worksheets/sheet3.xml": "4e078dda403bafb64f4c6cf4f210b2612bd650db2697ce7fb9fc5d6825e73407",
+        "xl/worksheets/sheet4.xml": "601e0585fa027bde7d4c422a05455ea94b347dfcd1a0f1af2f0f3a8685738a53"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "9d8e903efee52b1045db1e152868d145342c3b86a6338923920e31f66f6de1c4",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "f1f621c5e1de497fb7b7ab46b6c52b23d465efae7824ebed84e841ba9c8d3ac0",
+        "docProps/core.xml": "a7c5ac755d81db772a0eee6eb26d8c3ddf81a8d29f4a7fa90f1e534a5e21c149",
+        "docProps/custom.xml": "45ba72ad94488b3daafe6fe34c4fb4d365e013ac57831d753e2ba8833bec8911",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "a895642fb8c6e498e2dc9393f2475d947b49ba823a16927f9901e559ba0d2c5f",
+        "xl/sharedStrings.xml": "c80d91e3d3e648fb3b07d4c55745185ebe603d91fc6042f4d97a6a242dc27510",
+        "xl/styles.xml": "49b8901ffdba3d254e631b82ed753e1dde85316cb27e17dcf23aae24c405348e",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "dc87cc2e2e14cf9b85eeb30ea60ecb9dfb9155d7248dc7a859b7da025505779a",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "2892ab737f7abf6ed50922ef295c11d640c031c1666cf0a19481141c229e216d",
+        "xl/worksheets/sheet2.xml": "ed92eebb1f42913f4aae706d0d4fa5977d566ca8946e52daf0666a2573735b57",
+        "xl/worksheets/sheet3.xml": "4e078dda403bafb64f4c6cf4f210b2612bd650db2697ce7fb9fc5d6825e73407",
+        "xl/worksheets/sheet4.xml": "601e0585fa027bde7d4c422a05455ea94b347dfcd1a0f1af2f0f3a8685738a53"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/excel-web-acceptance-20261010/README.md",
+      "originalBytes": 4072,
+      "originalSha256": "3717a79f900713f5dfd3bb5596176eea6e03c1954b75fccd9c588ebcbdb8423c",
+      "publishedBytes": 4072,
+      "publishedSha256": "3717a79f900713f5dfd3bb5596176eea6e03c1954b75fccd9c588ebcbdb8423c",
+      "transformations": []
+    },
+    {
+      "path": "evidence/excel-web-acceptance-20261010/observations.json",
+      "originalBytes": 13029,
+      "originalSha256": "904fdf4e43f5a3f3e4dacdb1d1e74342144c2e4d1d8bf3cfe99ce8d7de9af99b",
+      "publishedBytes": 12850,
+      "publishedSha256": "f139276cb4d9a9e42ee87fe34a63502da2d3b56503e896097e2dcebd8e494dd2",
+      "transformations": [
+        "Local absolute paths replaced by documented historical relative labels; no test outcomes changed."
+      ]
+    },
+    {
+      "path": "evidence/excel-web-acceptance-20261010/opening-fix-observations.json",
+      "originalBytes": 9087,
+      "originalSha256": "62e95cc08f1fc956b3478b44fa9788313b2846eca7b4135fbbecb7e854503de7",
+      "publishedBytes": 9087,
+      "publishedSha256": "62e95cc08f1fc956b3478b44fa9788313b2846eca7b4135fbbecb7e854503de7",
+      "transformations": []
+    },
+    {
+      "path": "evidence/excel-web-acceptance-20261010/paired-application-observations.json",
+      "originalBytes": 19575,
+      "originalSha256": "6eadf1101015e596d2e0410d0710f796e2658a211ec20d663e2fc3a76a3e5c6f",
+      "publishedBytes": 19575,
+      "publishedSha256": "6eadf1101015e596d2e0410d0710f796e2658a211ec20d663e2fc3a76a3e5c6f",
+      "transformations": []
+    },
+    {
+      "path": "evidence/wps-authored-iteration-20261010/accepted-run/report.md",
+      "originalBytes": 5540,
+      "originalSha256": "1449d14b07c6b7e2113cea575e47918ae946b699d0bba6cfb4653c77fce82d26",
+      "publishedBytes": 5554,
+      "publishedSha256": "d41678176b4f00d8b8dcfcda6f9f606c796437b903d2b183054859070c5763b7",
+      "transformations": [
+        "Local absolute paths replaced by documented historical relative labels; no test outcomes changed."
+      ]
+    },
+    {
+      "path": "evidence/wps-authored-iteration-20261010/accepted-run/observations.json",
+      "originalBytes": 6134,
+      "originalSha256": "02885db162189a7bf60f524ed266f8dc0c88d79965378fcf7c4066bf7f52cd8f",
+      "publishedBytes": 6134,
+      "publishedSha256": "02885db162189a7bf60f524ed266f8dc0c88d79965378fcf7c4066bf7f52cd8f",
+      "transformations": []
+    },
+    {
+      "path": "evidence/wps-authored-iteration-20261010/accepted-run/iteration-native-original.xlsx",
+      "originalBytes": 9043,
+      "originalSha256": "31bf0302c4ee3939d95f93ef85ea28295b1bb992f7e879a22bd6d248ca3ee47e",
+      "publishedBytes": 8222,
+      "publishedSha256": "bfce82cea8d354fe5972844734198ab24184c4988ab5cf11d332bd41dcce1cb7",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/custom.xml",
+          "removedPropertyNames": [
+            "ICV"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "f788b237f6e4bd752bcb82d1693faabf45c1f0c5e32a72bc7eff6b0d713a6dbb",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "fe842ee8127dc1b8cd8b0201c8302622403269eb5f7cfc4515ece7ea3b7f7703",
+        "docProps/core.xml": "8d70d4adc89a5fb160f95ddca305ca7c2fc42cd7c2ee2f2f0310afe470c75f3a",
+        "docProps/custom.xml": "9987435ce6a662ca2ba998f5bd28c60dd1ae2e283cadc3741b66a9f722920adc",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "e52e2e8bce0cff8ed2d2e80a3d272a53e6f03f6a57b45f93369d323021e25805",
+        "xl/styles.xml": "9f57851b9ace958eeaabd8e71f57e56a39de3316c11817cf084cced7e8233a05",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724",
+        "xl/workbook.xml": "a7ee95df539b394c2f4387c9fd64ac7c616672dd932b6d12f26d2de91365cde7",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "a67cf05c51134f47e57de52584c14af3e0424836c55add2d66f61c2be882190d"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "f788b237f6e4bd752bcb82d1693faabf45c1f0c5e32a72bc7eff6b0d713a6dbb",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "fe842ee8127dc1b8cd8b0201c8302622403269eb5f7cfc4515ece7ea3b7f7703",
+        "docProps/core.xml": "8d70d4adc89a5fb160f95ddca305ca7c2fc42cd7c2ee2f2f0310afe470c75f3a",
+        "docProps/custom.xml": "ea1ada416a51976d6c795d3de20827604d8e871c55667d6aeabbedc14a59bc8b",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "e52e2e8bce0cff8ed2d2e80a3d272a53e6f03f6a57b45f93369d323021e25805",
+        "xl/styles.xml": "9f57851b9ace958eeaabd8e71f57e56a39de3316c11817cf084cced7e8233a05",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724",
+        "xl/workbook.xml": "a7ee95df539b394c2f4387c9fd64ac7c616672dd932b6d12f26d2de91365cde7",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "a67cf05c51134f47e57de52584c14af3e0424836c55add2d66f61c2be882190d"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/wps-authored-iteration-20261010/accepted-run/iteration-native-edited.xlsx",
+      "originalBytes": 9046,
+      "originalSha256": "435aad6ec8574ffd459c08dd22332cb689c663982f320a3d69122cec5d5ff0c6",
+      "publishedBytes": 8222,
+      "publishedSha256": "8e4f0623ecb319f3cf2970f3f4baa273b21c27509a03e9c6df23b6e07e7e1d12",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/custom.xml",
+          "removedPropertyNames": [
+            "ICV"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "f788b237f6e4bd752bcb82d1693faabf45c1f0c5e32a72bc7eff6b0d713a6dbb",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "fe842ee8127dc1b8cd8b0201c8302622403269eb5f7cfc4515ece7ea3b7f7703",
+        "docProps/core.xml": "d2fd304ed7ea97fdcddb4412b68e639ac4826f86e2ad7c2900bfbec614fd4a32",
+        "docProps/custom.xml": "79a835961b5f72b08a45e468230215c83e6f40f02a113d643319f649b1333db5",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "e52e2e8bce0cff8ed2d2e80a3d272a53e6f03f6a57b45f93369d323021e25805",
+        "xl/styles.xml": "9f57851b9ace958eeaabd8e71f57e56a39de3316c11817cf084cced7e8233a05",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724",
+        "xl/workbook.xml": "a7ee95df539b394c2f4387c9fd64ac7c616672dd932b6d12f26d2de91365cde7",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "4818535c33b9d33a876aaa910304aaa2c3dbecaddcfbebdb2a53425c2d8621f8"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "f788b237f6e4bd752bcb82d1693faabf45c1f0c5e32a72bc7eff6b0d713a6dbb",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "fe842ee8127dc1b8cd8b0201c8302622403269eb5f7cfc4515ece7ea3b7f7703",
+        "docProps/core.xml": "d2fd304ed7ea97fdcddb4412b68e639ac4826f86e2ad7c2900bfbec614fd4a32",
+        "docProps/custom.xml": "ea1ada416a51976d6c795d3de20827604d8e871c55667d6aeabbedc14a59bc8b",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "e52e2e8bce0cff8ed2d2e80a3d272a53e6f03f6a57b45f93369d323021e25805",
+        "xl/styles.xml": "9f57851b9ace958eeaabd8e71f57e56a39de3316c11817cf084cced7e8233a05",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724",
+        "xl/workbook.xml": "a7ee95df539b394c2f4387c9fd64ac7c616672dd932b6d12f26d2de91365cde7",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "4818535c33b9d33a876aaa910304aaa2c3dbecaddcfbebdb2a53425c2d8621f8"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/iteration-cache-production-gui-20261010/README.md",
+      "originalBytes": 7923,
+      "originalSha256": "d78f9ef34ef8176b838995dbad5bd56a125ee3cdc9725cf650c168cc14ceed83",
+      "publishedBytes": 7923,
+      "publishedSha256": "d78f9ef34ef8176b838995dbad5bd56a125ee3cdc9725cf650c168cc14ceed83",
+      "transformations": []
+    },
+    {
+      "path": "evidence/iteration-cache-production-gui-20261010/observations.json",
+      "originalBytes": 7004,
+      "originalSha256": "1c6e5d920e39c6beac305ab827ff7e99c857ca3aa0391f6e3ac70f1dcbe3001b",
+      "publishedBytes": 7004,
+      "publishedSha256": "1c6e5d920e39c6beac305ab827ff7e99c857ca3aa0391f6e3ac70f1dcbe3001b",
+      "transformations": []
+    },
+    {
+      "path": "evidence/iteration-cache-production-gui-20261010/input-manifest.json",
+      "originalBytes": 1790,
+      "originalSha256": "1dfb8e61f01ea64679392930b1d53a4ddc9fc80c8553da217fbe7088e291e30f",
+      "publishedBytes": 1790,
+      "publishedSha256": "1dfb8e61f01ea64679392930b1d53a4ddc9fc80c8553da217fbe7088e291e30f",
+      "transformations": []
+    },
+    {
+      "path": "evidence/iteration-cache-production-gui-20261010/saved-export-inspection.json",
+      "originalBytes": 971,
+      "originalSha256": "273abb1292517056d8e5b79a6e940d60e2252dc4757de97a6fcd6bb6066778b1",
+      "publishedBytes": 971,
+      "publishedSha256": "273abb1292517056d8e5b79a6e940d60e2252dc4757de97a6fcd6bb6066778b1",
+      "transformations": []
+    },
+    {
+      "path": "evidence/iteration-cache-production-gui-20261010/wps-saved-plus2.xlsx",
+      "originalBytes": 7649,
+      "originalSha256": "9493985b8bef06e68c30a1e35aa13233079b03b43901cf7caa5c06977220d2a6",
+      "publishedBytes": 7082,
+      "publishedSha256": "d4fce61ef5d39e44d3af513e03fe31ddd5868b5b25dc6f7997932b87f1349d0f",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/custom.xml",
+          "removedPropertyNames": [
+            "ICV"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "f788b237f6e4bd752bcb82d1693faabf45c1f0c5e32a72bc7eff6b0d713a6dbb",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "fe842ee8127dc1b8cd8b0201c8302622403269eb5f7cfc4515ece7ea3b7f7703",
+        "docProps/core.xml": "a990c70d140baff1ce60985f8614dd4cc430ce8a0535f736dfa63bf95a3a8000",
+        "docProps/custom.xml": "b0466fefeaeb7c118f1a3cc20dcedd522feeb913d2fbdf59e54f713278a8fe9d",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "e52e2e8bce0cff8ed2d2e80a3d272a53e6f03f6a57b45f93369d323021e25805",
+        "xl/styles.xml": "492ffaacf67622843d451848d3cd330b6bed107b3022ed5ecfc55e2efbadca8c",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "a7ee95df539b394c2f4387c9fd64ac7c616672dd932b6d12f26d2de91365cde7",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "8a7ca6b9c200de77e89b455df611a804eca9563042ea3c4e9ed59371a8437002"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "f788b237f6e4bd752bcb82d1693faabf45c1f0c5e32a72bc7eff6b0d713a6dbb",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "fe842ee8127dc1b8cd8b0201c8302622403269eb5f7cfc4515ece7ea3b7f7703",
+        "docProps/core.xml": "a990c70d140baff1ce60985f8614dd4cc430ce8a0535f736dfa63bf95a3a8000",
+        "docProps/custom.xml": "45ba72ad94488b3daafe6fe34c4fb4d365e013ac57831d753e2ba8833bec8911",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "e52e2e8bce0cff8ed2d2e80a3d272a53e6f03f6a57b45f93369d323021e25805",
+        "xl/styles.xml": "492ffaacf67622843d451848d3cd330b6bed107b3022ed5ecfc55e2efbadca8c",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "a7ee95df539b394c2f4387c9fd64ac7c616672dd932b6d12f26d2de91365cde7",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/sheet1.xml": "8a7ca6b9c200de77e89b455df611a804eca9563042ea3c4e9ed59371a8437002"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/iteration-cache-production-gui-20261010/excel-saved-plus2.xlsx",
+      "originalBytes": 5661,
+      "originalSha256": "afd224e2306b16e80fc57b67694520b072d768b13a9ef7b923674385cfcc92db",
+      "publishedBytes": 5375,
+      "publishedSha256": "5aea425588f83a1aa7291870159746b7e488a64cbe4723b74e6f493f36ca7a18",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/core.xml",
+          "removedPropertyNames": [
+            "lastModifiedBy"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "xl/worksheets/sheet1.xml": "b06e979a55c202481b706a13ae56776df74023c920eeac8b292d33e9c449caec",
+        "xl/_rels/workbook.xml.rels": "4f1efba4aa3b950708c680e09c734535837d148419c1ec396108366316c7e067",
+        "xl/theme/theme1.xml": "7a5b5760e684253e32c71a318657e50570bfdcd632d52ff9cedb663b185f1766",
+        "xl/workbook.xml": "7a1445dbe78521d30057dd3a587623acd3423eb47409c6b7a8c13060c927ec28",
+        "xl/styles.xml": "7e516466badab7049c976ce0a19575d3a9c281f152631daf7d36186097711d32",
+        "_rels/.rels": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497",
+        "[Content_Types].xml": "4933eb1f2ceba537deb082e7ef45dc8e6ee2083fdf066b5f52bd065f92b8bbc0",
+        "docProps/core.xml": "a1506fdba7df3583e4252bf1495c1ff794c207e365b6f5a16dd621b4f51aa642",
+        "docProps/app.xml": "1e5ab5ebaa7569440c259e27ad5ccc6fb738b8f2fcf1c302b1b8bf6ff601779b",
+        "xl/calcChain.xml": "14a8f2fd1bdd71f94878b84506161ba79e91e710541da9119c9ba008be41b250"
+      },
+      "publishedPartSha256": {
+        "xl/worksheets/sheet1.xml": "b06e979a55c202481b706a13ae56776df74023c920eeac8b292d33e9c449caec",
+        "xl/_rels/workbook.xml.rels": "4f1efba4aa3b950708c680e09c734535837d148419c1ec396108366316c7e067",
+        "xl/theme/theme1.xml": "7a5b5760e684253e32c71a318657e50570bfdcd632d52ff9cedb663b185f1766",
+        "xl/workbook.xml": "7a1445dbe78521d30057dd3a587623acd3423eb47409c6b7a8c13060c927ec28",
+        "xl/styles.xml": "7e516466badab7049c976ce0a19575d3a9c281f152631daf7d36186097711d32",
+        "_rels/.rels": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497",
+        "[Content_Types].xml": "4933eb1f2ceba537deb082e7ef45dc8e6ee2083fdf066b5f52bd065f92b8bbc0",
+        "docProps/core.xml": "cd63ca32938dce17862cb2c0dc18304ace86ca369e1f6390a09b57c6d53f39d4",
+        "docProps/app.xml": "1e5ab5ebaa7569440c259e27ad5ccc6fb738b8f2fcf1c302b1b8bf6ff601779b",
+        "xl/calcChain.xml": "14a8f2fd1bdd71f94878b84506161ba79e91e710541da9119c9ba008be41b250"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/iteration-cache-production-sample-20261010/Sheetcraft-iteration-production.xlsx",
+      "originalBytes": 3354,
+      "originalSha256": "cc6307959fa20f95858b870d702f931f1165e82ee4c90d986fc760afac12029b",
+      "publishedBytes": 3354,
+      "publishedSha256": "cc6307959fa20f95858b870d702f931f1165e82ee4c90d986fc760afac12029b",
+      "isMetadataSanitizedCopy": false,
+      "transformations": [],
+      "originalPartSha256": {
+        "xl/worksheets/sheet1.xml": "a1f13087bd61d67c243ad2c48fd746cfdf168471178726b934b6b056a4fd6651",
+        "xl/_rels/workbook.xml.rels": "c7fb858e88a58a28d28ccd135b4589a82fa0bdc9de0f9d63a646437a2d4cc2cc",
+        "xl/theme/theme1.xml": "9d4a4d5b5231bf40a451dc95c5a39d573eb224e54623fc64d2a3bfe3a0b0c43a",
+        "xl/workbook.xml": "105c642d2c0d86b02cd5242a3acb862d8b15f5638f9906ecc738bd0e08484efc",
+        "xl/styles.xml": "817e1bf021af915659537c6389ca99a83813ec3b220e61102ae46ed7f95d48be",
+        "_rels/.rels": "f2f3948a1b6f661f2a5169a86b7029166acd4b79d7abfd37fa2b646fe302bfd6",
+        "[Content_Types].xml": "f46bbdd5e2f1ebbf6e93333a075dcc8c4aeea14c83f70ebce953b5784bad6b72"
+      },
+      "publishedPartSha256": {
+        "xl/worksheets/sheet1.xml": "a1f13087bd61d67c243ad2c48fd746cfdf168471178726b934b6b056a4fd6651",
+        "xl/_rels/workbook.xml.rels": "c7fb858e88a58a28d28ccd135b4589a82fa0bdc9de0f9d63a646437a2d4cc2cc",
+        "xl/theme/theme1.xml": "9d4a4d5b5231bf40a451dc95c5a39d573eb224e54623fc64d2a3bfe3a0b0c43a",
+        "xl/workbook.xml": "105c642d2c0d86b02cd5242a3acb862d8b15f5638f9906ecc738bd0e08484efc",
+        "xl/styles.xml": "817e1bf021af915659537c6389ca99a83813ec3b220e61102ae46ed7f95d48be",
+        "_rels/.rels": "f2f3948a1b6f661f2a5169a86b7029166acd4b79d7abfd37fa2b646fe302bfd6",
+        "[Content_Types].xml": "f46bbdd5e2f1ebbf6e93333a075dcc8c4aeea14c83f70ebce953b5784bad6b72"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/font-reset-production-gui-20261010/README.md",
+      "originalBytes": 3131,
+      "originalSha256": "b83818858b83e219028facd75c57b772f8c4687ff44ab27d22e45ac514a80909",
+      "publishedBytes": 3131,
+      "publishedSha256": "b83818858b83e219028facd75c57b772f8c4687ff44ab27d22e45ac514a80909",
+      "transformations": []
+    },
+    {
+      "path": "evidence/font-reset-production-gui-20261010/observations.json",
+      "originalBytes": 4310,
+      "originalSha256": "612831db484be7d3864b92e0be9eca60b12820277efa78e5226c6dce9ed59a8e",
+      "publishedBytes": 4310,
+      "publishedSha256": "612831db484be7d3864b92e0be9eca60b12820277efa78e5226c6dce9ed59a8e",
+      "transformations": []
+    },
+    {
+      "path": "evidence/font-reset-production-gui-20261010/assertions.json",
+      "originalBytes": 659,
+      "originalSha256": "c3232dcbcc671fe50d5828d2586ee39426266c5626c06f8d905637b4001e4004",
+      "publishedBytes": 659,
+      "publishedSha256": "c3232dcbcc671fe50d5828d2586ee39426266c5626c06f8d905637b4001e4004",
+      "transformations": []
+    },
+    {
+      "path": "evidence/font-reset-production-gui-20261010/ooxml-proof.json",
+      "originalBytes": 55480,
+      "originalSha256": "3197f1ebd1a9682bf03c0a4c7de1d3714985fcfbaedf2245aa689c6fdf036131",
+      "publishedBytes": 55480,
+      "publishedSha256": "3197f1ebd1a9682bf03c0a4c7de1d3714985fcfbaedf2245aa689c6fdf036131",
+      "transformations": []
+    },
+    {
+      "path": "evidence/font-reset-production-gui-20261010/wps-app-saved.xlsx",
+      "originalBytes": 9792,
+      "originalSha256": "06c409c2e21d1a5ce37b111f19fa403b3e2127e8e2d42be17ae871f761bfe3db",
+      "publishedBytes": 9036,
+      "publishedSha256": "3b2b372feb96d0f0d088407d82a576a2fc030f347327059098bede3bd8e0d468",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/custom.xml",
+          "removedPropertyNames": [
+            "ICV"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "749ac5d29b5a86d7cf606b138e56bb891b3a4db9418915241cb93e07bfe5e558",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "8ae7d4b84e26960dc1a4b888d8a71c04913a807f51fc941ad3dc1de0042c16ca",
+        "docProps/core.xml": "394fe9d353e5455ead8fd8bb503e9aab7ab888faf652f7a409525086c779d48a",
+        "docProps/custom.xml": "1761d42395f69fef0d7b3095d950b2df2de77c61e243bf88b4e06e74421c8c8f",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "7ab482ecf88f17db4fa11a60cd3ad81d4a3d0b86471e44f71e1b8ff0d5f80995",
+        "xl/sharedStrings.xml": "eb9e28e2d7c139335704663dbb39362afcd849ccf084db74f8f0ae8a6e0d014e",
+        "xl/styles.xml": "9ec0e07c25b3e3f8e733798dad54db8e6973e29fb6514fae010caa8e27e311ef",
+        "xl/tables/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/tables/table1.xml": "7e2bd41e090c6d3c789609320ee5738494847b74ad971b9de1e72315621395a7",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "dafa68f6e315b9fdd33292b8e6b966058d900883ad5318d480fa184b9d1501df",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327",
+        "xl/worksheets/sheet1.xml": "1a49821309cf103abe53d614296afaa6c566e44a39df83b17343e950e235f9cd"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "749ac5d29b5a86d7cf606b138e56bb891b3a4db9418915241cb93e07bfe5e558",
+        "_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "_rels/.rels": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+        "docProps/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "docProps/app.xml": "8ae7d4b84e26960dc1a4b888d8a71c04913a807f51fc941ad3dc1de0042c16ca",
+        "docProps/core.xml": "394fe9d353e5455ead8fd8bb503e9aab7ab888faf652f7a409525086c779d48a",
+        "docProps/custom.xml": "45ba72ad94488b3daafe6fe34c4fb4d365e013ac57831d753e2ba8833bec8911",
+        "xl/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/_rels/workbook.xml.rels": "7ab482ecf88f17db4fa11a60cd3ad81d4a3d0b86471e44f71e1b8ff0d5f80995",
+        "xl/sharedStrings.xml": "eb9e28e2d7c139335704663dbb39362afcd849ccf084db74f8f0ae8a6e0d014e",
+        "xl/styles.xml": "9ec0e07c25b3e3f8e733798dad54db8e6973e29fb6514fae010caa8e27e311ef",
+        "xl/tables/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/tables/table1.xml": "7e2bd41e090c6d3c789609320ee5738494847b74ad971b9de1e72315621395a7",
+        "xl/theme/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/theme/theme1.xml": "41634a2c10f9d6aa0b52a4f573f2724e99f4dda70c7b6ae37a80a69ff1913899",
+        "xl/workbook.xml": "dafa68f6e315b9fdd33292b8e6b966058d900883ad5318d480fa184b9d1501df",
+        "xl/worksheets/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327",
+        "xl/worksheets/sheet1.xml": "1a49821309cf103abe53d614296afaa6c566e44a39df83b17343e950e235f9cd"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/font-reset-production-gui-20261010/excel-app-saved.xlsx",
+      "originalBytes": 7202,
+      "originalSha256": "405dd4acb51fb1ab8be9bd3443617c17e341f4c3d6609ef5acff4385f0f6b4bf",
+      "publishedBytes": 6820,
+      "publishedSha256": "1726a984e19d0ebfcf4de44356163fe4d7adf9dc3341a4f461ff7bf0d702addc",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/core.xml",
+          "removedPropertyNames": [
+            "lastModifiedBy"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "xl/worksheets/sheet1.xml": "b4eae56539e1d0209ec58c1e241551048c9d5cf7545be0261e74a7f2f6ccd9e2",
+        "xl/_rels/workbook.xml.rels": "353383fbe90f202be596bdf0a86439c704d7024f4f8c19ebc9d06b42a341dba1",
+        "xl/theme/theme1.xml": "7a5b5760e684253e32c71a318657e50570bfdcd632d52ff9cedb663b185f1766",
+        "xl/workbook.xml": "61463ab945feb4901c6495940a641f9d3ae6a7ae1b942abefb081e16aa8716cd",
+        "xl/styles.xml": "2657c837262a1f121c19d2fa410395b50a4ca3aa2e19ba24dee973c02824edbc",
+        "_rels/.rels": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497",
+        "[Content_Types].xml": "a5f393c98f3cb2fb4a1c39433a649dd842bdc3b287c9838dc224695d42c601dd",
+        "xl/tables/table1.xml": "78eb57acc0c825c63e84a1891063e51dba911a226e792458b2bba173f7b63e5f",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327",
+        "xl/sharedStrings.xml": "58cddf30f52e3d2f12551ca8aaef29b92f17a646b3bf06a4c37bc5cfc7b3273b",
+        "docProps/core.xml": "a81a10ab5d94f5249f836aa0104b5ee92849985bfe5ce1d1a04d012ab47fb33c",
+        "docProps/app.xml": "1e5ab5ebaa7569440c259e27ad5ccc6fb738b8f2fcf1c302b1b8bf6ff601779b"
+      },
+      "publishedPartSha256": {
+        "xl/worksheets/sheet1.xml": "b4eae56539e1d0209ec58c1e241551048c9d5cf7545be0261e74a7f2f6ccd9e2",
+        "xl/_rels/workbook.xml.rels": "353383fbe90f202be596bdf0a86439c704d7024f4f8c19ebc9d06b42a341dba1",
+        "xl/theme/theme1.xml": "7a5b5760e684253e32c71a318657e50570bfdcd632d52ff9cedb663b185f1766",
+        "xl/workbook.xml": "61463ab945feb4901c6495940a641f9d3ae6a7ae1b942abefb081e16aa8716cd",
+        "xl/styles.xml": "2657c837262a1f121c19d2fa410395b50a4ca3aa2e19ba24dee973c02824edbc",
+        "_rels/.rels": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497",
+        "[Content_Types].xml": "a5f393c98f3cb2fb4a1c39433a649dd842bdc3b287c9838dc224695d42c601dd",
+        "xl/tables/table1.xml": "78eb57acc0c825c63e84a1891063e51dba911a226e792458b2bba173f7b63e5f",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327",
+        "xl/sharedStrings.xml": "58cddf30f52e3d2f12551ca8aaef29b92f17a646b3bf06a4c37bc5cfc7b3273b",
+        "docProps/core.xml": "62d49b38c1fc11330934991ea32db9cfad111507dadecdfbc5f03c2085d72312",
+        "docProps/app.xml": "1e5ab5ebaa7569440c259e27ad5ccc6fb738b8f2fcf1c302b1b8bf6ff601779b"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/font-reset-production-gui-20261010/wps-input.xlsx",
+      "originalBytes": 4712,
+      "originalSha256": "f47e9de9f26b0c9d2692f08328ef732b744abb65d94432a2021741e043e95410",
+      "publishedBytes": 4712,
+      "publishedSha256": "f47e9de9f26b0c9d2692f08328ef732b744abb65d94432a2021741e043e95410",
+      "isMetadataSanitizedCopy": false,
+      "transformations": [],
+      "originalPartSha256": {
+        "xl/worksheets/sheet1.xml": "03632aa3f4db04a73cb5c838d727fc7b0fd1aae0629979eb0388bf16fcab71cf",
+        "xl/_rels/workbook.xml.rels": "c7fb858e88a58a28d28ccd135b4589a82fa0bdc9de0f9d63a646437a2d4cc2cc",
+        "xl/theme/theme1.xml": "9d4a4d5b5231bf40a451dc95c5a39d573eb224e54623fc64d2a3bfe3a0b0c43a",
+        "xl/workbook.xml": "035c002816290f9a71716bc3238e4a8af025dd4591e4aecf026e5b0d5b17cbe4",
+        "xl/styles.xml": "47594330c7d56ac87ff2a7c5fc40621c3cc5764dadc9b7a7b6e7eb1be0a57870",
+        "_rels/.rels": "f2f3948a1b6f661f2a5169a86b7029166acd4b79d7abfd37fa2b646fe302bfd6",
+        "[Content_Types].xml": "640e8a7ffba28bc1b301e62e1c4df1363e19fdb7d72d2db75240ecc01cb3ba97",
+        "xl/tables/table1.xml": "5a5a39a3145e0cfcb2484cb444b624aee8bf537d6b5eb3d8ae77511653bc662c",
+        "xl/worksheets/_rels/sheet1.xml.rels": "e38baffdf60ddf1af6bdf13f0d3aeb40df67c3591996cc27355abd65f5b129a0"
+      },
+      "publishedPartSha256": {
+        "xl/worksheets/sheet1.xml": "03632aa3f4db04a73cb5c838d727fc7b0fd1aae0629979eb0388bf16fcab71cf",
+        "xl/_rels/workbook.xml.rels": "c7fb858e88a58a28d28ccd135b4589a82fa0bdc9de0f9d63a646437a2d4cc2cc",
+        "xl/theme/theme1.xml": "9d4a4d5b5231bf40a451dc95c5a39d573eb224e54623fc64d2a3bfe3a0b0c43a",
+        "xl/workbook.xml": "035c002816290f9a71716bc3238e4a8af025dd4591e4aecf026e5b0d5b17cbe4",
+        "xl/styles.xml": "47594330c7d56ac87ff2a7c5fc40621c3cc5764dadc9b7a7b6e7eb1be0a57870",
+        "_rels/.rels": "f2f3948a1b6f661f2a5169a86b7029166acd4b79d7abfd37fa2b646fe302bfd6",
+        "[Content_Types].xml": "640e8a7ffba28bc1b301e62e1c4df1363e19fdb7d72d2db75240ecc01cb3ba97",
+        "xl/tables/table1.xml": "5a5a39a3145e0cfcb2484cb444b624aee8bf537d6b5eb3d8ae77511653bc662c",
+        "xl/worksheets/_rels/sheet1.xml.rels": "e38baffdf60ddf1af6bdf13f0d3aeb40df67c3591996cc27355abd65f5b129a0"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/excel-native-reupload-control-20261010/ANALYSIS.md",
+      "originalBytes": 2972,
+      "originalSha256": "b4d5cd9ccd40e60c1a23ec1870ae168a19b8123055b8994cd909d5e62a9c5c65",
+      "publishedBytes": 2972,
+      "publishedSha256": "b4d5cd9ccd40e60c1a23ec1870ae168a19b8123055b8994cd909d5e62a9c5c65",
+      "transformations": []
+    },
+    {
+      "path": "evidence/excel-native-reupload-control-20261010/observations.json",
+      "originalBytes": 4855,
+      "originalSha256": "05afd1048682c8592b2531dcf241c3c3fbff9755614070d6dcb55baca6c92ff9",
+      "publishedBytes": 4855,
+      "publishedSha256": "05afd1048682c8592b2531dcf241c3c3fbff9755614070d6dcb55baca6c92ff9",
+      "transformations": []
+    },
+    {
+      "path": "evidence/excel-native-reupload-control-20261010/ooxml-analysis.json",
+      "originalBytes": 8960,
+      "originalSha256": "dbcf219582764ac444e3909e582c8b1a024f1b6b839a829d41cb465df0a027e6",
+      "publishedBytes": 8960,
+      "publishedSha256": "dbcf219582764ac444e3909e582c8b1a024f1b6b839a829d41cb465df0a027e6",
+      "transformations": []
+    },
+    {
+      "path": "evidence/excel-native-reupload-control-20261010/ExcelWeb-native-reupload-control-20261010.xlsx",
+      "originalBytes": 8688,
+      "originalSha256": "62a1fd774f8b206cc81f2ac35b78271d27e26bfa3d4166b8b424aa6fb036d667",
+      "publishedBytes": 8243,
+      "publishedSha256": "d00f204de512cde2ec26afdf3aca38879c1d23ec944d2f4452e096f309b5bd1c",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/core.xml",
+          "removedPropertyNames": [
+            "lastModifiedBy"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "84ba276ca5f0a676d8445374ad4683213c827348042da94abb9b5ad89d366149",
+        "_rels/.rels": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497",
+        "docProps/app.xml": "1e5ab5ebaa7569440c259e27ad5ccc6fb738b8f2fcf1c302b1b8bf6ff601779b",
+        "docProps/core.xml": "ba62853f27ee8ad2a0ce3bfe1ae6d257eb692685bff1d561b17343bf7693311e",
+        "xl/_rels/workbook.xml.rels": "353383fbe90f202be596bdf0a86439c704d7024f4f8c19ebc9d06b42a341dba1",
+        "xl/styles.xml": "e60a182866464704fbfceb5e78d68ff8441d5443f46adcfd29575dcecd1a65a3",
+        "xl/theme/theme1.xml": "b16106f4229f6ece6d74426b3e73ff6a677df2908d2a06f76ef0329fa27c0282",
+        "xl/workbook.xml": "cf220710aa7b5fdd8eacb78a4f05e12835d9b01f375dde2d55743614022d996a",
+        "xl/worksheets/sheet1.xml": "6285e6c57e83d6729c0d0b1cee3ac775187263b87fce576830f33e3701907622",
+        "xl/sharedStrings.xml": "878563aaabfbe2fb6d56cdad0ba4d70984516f5f3b5e6acde66d1c6539f73b61",
+        "xl/drawings/drawing1.xml": "607cf3c143c747130f74a6433ad8d1eb75179f0db597cfc2c535a2d706cc7a10",
+        "xl/media/image1.png": "756279b45bee443be2a6d41b0c0a0575ca1e62cc8cebdfd58ce6852a40666983",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ee9fa12d10c5ee0ae23c711aad3be36f1d99d87934a588aac4ecaf1028bdef16",
+        "xl/drawings/_rels/drawing1.xml.rels": "15a140b2ab9e3d49a7b49f824413744cc4959bc34c427cf50f7d6016697293c0"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "84ba276ca5f0a676d8445374ad4683213c827348042da94abb9b5ad89d366149",
+        "_rels/.rels": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497",
+        "docProps/app.xml": "1e5ab5ebaa7569440c259e27ad5ccc6fb738b8f2fcf1c302b1b8bf6ff601779b",
+        "docProps/core.xml": "109393e8cd203a292f32789557f7cc7afc749168bfdcf969449e71f5f71b05a6",
+        "xl/_rels/workbook.xml.rels": "353383fbe90f202be596bdf0a86439c704d7024f4f8c19ebc9d06b42a341dba1",
+        "xl/styles.xml": "e60a182866464704fbfceb5e78d68ff8441d5443f46adcfd29575dcecd1a65a3",
+        "xl/theme/theme1.xml": "b16106f4229f6ece6d74426b3e73ff6a677df2908d2a06f76ef0329fa27c0282",
+        "xl/workbook.xml": "cf220710aa7b5fdd8eacb78a4f05e12835d9b01f375dde2d55743614022d996a",
+        "xl/worksheets/sheet1.xml": "6285e6c57e83d6729c0d0b1cee3ac775187263b87fce576830f33e3701907622",
+        "xl/sharedStrings.xml": "878563aaabfbe2fb6d56cdad0ba4d70984516f5f3b5e6acde66d1c6539f73b61",
+        "xl/drawings/drawing1.xml": "607cf3c143c747130f74a6433ad8d1eb75179f0db597cfc2c535a2d706cc7a10",
+        "xl/media/image1.png": "756279b45bee443be2a6d41b0c0a0575ca1e62cc8cebdfd58ce6852a40666983",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ee9fa12d10c5ee0ae23c711aad3be36f1d99d87934a588aac4ecaf1028bdef16",
+        "xl/drawings/_rels/drawing1.xml.rels": "15a140b2ab9e3d49a7b49f824413744cc4959bc34c427cf50f7d6016697293c0"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/excel-native-reupload-control-20261010/ExcelWeb-native-reupload-control.saved.xlsx",
+      "originalBytes": 8670,
+      "originalSha256": "da00389043e6d843ee8c181c8e722c3662fbd807887ab72701edf9ff5db432b8",
+      "publishedBytes": 8229,
+      "publishedSha256": "d36794ef253c446b601c1635e72558167c123f06cedcb476899d3696cf7f08a0",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/core.xml",
+          "removedPropertyNames": [
+            "lastModifiedBy"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "[Content_Types].xml": "84ba276ca5f0a676d8445374ad4683213c827348042da94abb9b5ad89d366149",
+        "_rels/.rels": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497",
+        "docProps/app.xml": "1e5ab5ebaa7569440c259e27ad5ccc6fb738b8f2fcf1c302b1b8bf6ff601779b",
+        "docProps/core.xml": "732b25d3855cb8c578777d1547fc3d60be010ba5a07f6c99336a6379c715b0eb",
+        "xl/_rels/workbook.xml.rels": "353383fbe90f202be596bdf0a86439c704d7024f4f8c19ebc9d06b42a341dba1",
+        "xl/styles.xml": "e60a182866464704fbfceb5e78d68ff8441d5443f46adcfd29575dcecd1a65a3",
+        "xl/theme/theme1.xml": "b16106f4229f6ece6d74426b3e73ff6a677df2908d2a06f76ef0329fa27c0282",
+        "xl/workbook.xml": "2b4f104a546b1fc8bff158cefabb8f7c3c4a49e2d2e58e7e3f5d21e1d564f3e1",
+        "xl/worksheets/sheet1.xml": "126536ec9e8df522878336404af2d08dad97fdb6b7bf9a352dfb9f8a208912c8",
+        "xl/sharedStrings.xml": "8ac3d496c2218b1c0d7563cecdf46a4f55c3fe430770b61dc315753a07218480",
+        "xl/drawings/drawing1.xml": "607cf3c143c747130f74a6433ad8d1eb75179f0db597cfc2c535a2d706cc7a10",
+        "xl/media/image1.png": "756279b45bee443be2a6d41b0c0a0575ca1e62cc8cebdfd58ce6852a40666983",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ee9fa12d10c5ee0ae23c711aad3be36f1d99d87934a588aac4ecaf1028bdef16",
+        "xl/drawings/_rels/drawing1.xml.rels": "15a140b2ab9e3d49a7b49f824413744cc4959bc34c427cf50f7d6016697293c0"
+      },
+      "publishedPartSha256": {
+        "[Content_Types].xml": "84ba276ca5f0a676d8445374ad4683213c827348042da94abb9b5ad89d366149",
+        "_rels/.rels": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497",
+        "docProps/app.xml": "1e5ab5ebaa7569440c259e27ad5ccc6fb738b8f2fcf1c302b1b8bf6ff601779b",
+        "docProps/core.xml": "054b11d51d8654d16ceef83809d273be506d105691d7c38c58a772ef724d4b10",
+        "xl/_rels/workbook.xml.rels": "353383fbe90f202be596bdf0a86439c704d7024f4f8c19ebc9d06b42a341dba1",
+        "xl/styles.xml": "e60a182866464704fbfceb5e78d68ff8441d5443f46adcfd29575dcecd1a65a3",
+        "xl/theme/theme1.xml": "b16106f4229f6ece6d74426b3e73ff6a677df2908d2a06f76ef0329fa27c0282",
+        "xl/workbook.xml": "2b4f104a546b1fc8bff158cefabb8f7c3c4a49e2d2e58e7e3f5d21e1d564f3e1",
+        "xl/worksheets/sheet1.xml": "126536ec9e8df522878336404af2d08dad97fdb6b7bf9a352dfb9f8a208912c8",
+        "xl/sharedStrings.xml": "8ac3d496c2218b1c0d7563cecdf46a4f55c3fe430770b61dc315753a07218480",
+        "xl/drawings/drawing1.xml": "607cf3c143c747130f74a6433ad8d1eb75179f0db597cfc2c535a2d706cc7a10",
+        "xl/media/image1.png": "756279b45bee443be2a6d41b0c0a0575ca1e62cc8cebdfd58ce6852a40666983",
+        "xl/worksheets/_rels/sheet1.xml.rels": "ee9fa12d10c5ee0ae23c711aad3be36f1d99d87934a588aac4ecaf1028bdef16",
+        "xl/drawings/_rels/drawing1.xml.rels": "15a140b2ab9e3d49a7b49f824413744cc4959bc34c427cf50f7d6016697293c0"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/excel-native-iteration-control-20261010/README.md",
+      "originalBytes": 1900,
+      "originalSha256": "1e5d5279408c1a93f5095ce6741e5828432877432299da7f3b67100b75e34812",
+      "publishedBytes": 1900,
+      "publishedSha256": "1e5d5279408c1a93f5095ce6741e5828432877432299da7f3b67100b75e34812",
+      "transformations": []
+    },
+    {
+      "path": "evidence/excel-native-iteration-control-20261010/observations.json",
+      "originalBytes": 3955,
+      "originalSha256": "da3d8c211a2a8c6fcea54b8409b6a7b3c1edadaa959002fec5457294186c6a26",
+      "publishedBytes": 3958,
+      "publishedSha256": "c5555190b46ba33b20f2a1188a8d30fb835e1b3107cc71b41fecac34ee5a0702",
+      "transformations": [
+        "Local absolute paths replaced by documented historical relative labels; no test outcomes changed."
+      ]
+    },
+    {
+      "path": "evidence/excel-native-iteration-control-20261010/actual-saved-native-data-map.json",
+      "originalBytes": 1113,
+      "originalSha256": "615e58c62ce775e1adbbcf9d0648db90f69f44d3c2daddc15ea9a8b987d3a877",
+      "publishedBytes": 1113,
+      "publishedSha256": "615e58c62ce775e1adbbcf9d0648db90f69f44d3c2daddc15ea9a8b987d3a877",
+      "transformations": []
+    },
+    {
+      "path": "evidence/excel-native-iteration-control-20261010/excel-actual-saved.xlsx",
+      "originalBytes": 7413,
+      "originalSha256": "2864293e96e1a22a72fb7ea009e46724be9d24f631d81dbd4261d1ffcbfbc5aa",
+      "publishedBytes": 6919,
+      "publishedSha256": "f3ee9f4aa1b64805351955eaddd48f24b738c4809730a6507a6cd79c6444c6b2",
+      "isMetadataSanitizedCopy": true,
+      "transformations": [
+        {
+          "part": "docProps/core.xml",
+          "removedPropertyNames": [
+            "lastModifiedBy"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        },
+        {
+          "part": "docProps/custom.xml",
+          "removedPropertyNames": [
+            "ICV"
+          ],
+          "reason": "Remove personal author/company metadata and opaque ICV vendor identifier; property values are not published."
+        }
+      ],
+      "originalPartSha256": {
+        "docProps/app.xml": "1e5ab5ebaa7569440c259e27ad5ccc6fb738b8f2fcf1c302b1b8bf6ff601779b",
+        "docProps/core.xml": "652c8c15f4de94c7c56fa67ef385d637549e1e0159641df8c51500e2cf2fc65a",
+        "docProps/custom.xml": "9987435ce6a662ca2ba998f5bd28c60dd1ae2e283cadc3741b66a9f722920adc",
+        "xl/worksheets/sheet1.xml": "ff48a75004c1bcef96a91899444cceb743eb5c0c854ba050539ec1ecdcec96ae",
+        "xl/theme/theme1.xml": "2f76007802b3280e4f0de927b36972248c52c0b52d4f75c063a785f932af083e",
+        "xl/workbook.xml": "8d051c7170ec055dd69e52e4ed20a6de89dc184f7cda643e57935f5a910adf0c",
+        "xl/styles.xml": "fd79e91ccf0696540afa59bcc2656242e8df114358b8e7855856328ac4eeb619",
+        "_rels/.rels": "ad78dfe44ec71f967f96e95bdf6baf2545c39e1a5e4413e7b8e9413eb95fd922",
+        "xl/_rels/workbook.xml.rels": "4f1efba4aa3b950708c680e09c734535837d148419c1ec396108366316c7e067",
+        "[Content_Types].xml": "05d9a6833b1d9c3dea9d7f2d29073bc0d4304a0b243b699219c51781f214d69b",
+        "xl/calcChain.xml": "14a8f2fd1bdd71f94878b84506161ba79e91e710541da9119c9ba008be41b250"
+      },
+      "publishedPartSha256": {
+        "docProps/app.xml": "1e5ab5ebaa7569440c259e27ad5ccc6fb738b8f2fcf1c302b1b8bf6ff601779b",
+        "docProps/core.xml": "c03e105cf75ce0224623ab0c9c1d4af8a8a749519969e9e99b263b63f6866110",
+        "docProps/custom.xml": "ea1ada416a51976d6c795d3de20827604d8e871c55667d6aeabbedc14a59bc8b",
+        "xl/worksheets/sheet1.xml": "ff48a75004c1bcef96a91899444cceb743eb5c0c854ba050539ec1ecdcec96ae",
+        "xl/theme/theme1.xml": "2f76007802b3280e4f0de927b36972248c52c0b52d4f75c063a785f932af083e",
+        "xl/workbook.xml": "8d051c7170ec055dd69e52e4ed20a6de89dc184f7cda643e57935f5a910adf0c",
+        "xl/styles.xml": "fd79e91ccf0696540afa59bcc2656242e8df114358b8e7855856328ac4eeb619",
+        "_rels/.rels": "ad78dfe44ec71f967f96e95bdf6baf2545c39e1a5e4413e7b8e9413eb95fd922",
+        "xl/_rels/workbook.xml.rels": "4f1efba4aa3b950708c680e09c734535837d148419c1ec396108366316c7e067",
+        "[Content_Types].xml": "05d9a6833b1d9c3dea9d7f2d29073bc0d4304a0b243b699219c51781f214d69b",
+        "xl/calcChain.xml": "14a8f2fd1bdd71f94878b84506161ba79e91e710541da9119c9ba008be41b250"
+      },
+      "allNonDocPropsPartsUnchanged": true,
+      "sanitizedCopyGuiRetested": false
+    },
+    {
+      "path": "evidence/wip-085516/pivot-activation-causal-diagnostic-20261010.log",
+      "originalBytes": 3256,
+      "originalSha256": "9caeb7ce416a20c7185ff127b953f1187dfc3dce6c87dffe6d91eb62e30d71c6",
+      "publishedBytes": 3069,
+      "publishedSha256": "0572e860d86520a630a0346da660a0a574bc1b0ae73e65dcc7bae0ec48aed744",
+      "transformations": [
+        "Local absolute paths replaced by documented historical relative labels; no test outcomes changed."
+      ]
+    },
+    {
+      "path": "evidence/wip-085516/pivot-activation-complete-chart-20261010.log",
+      "originalBytes": 258,
+      "originalSha256": "993caaf93b5877725a669c78b248012044b879d1789c0784336b345d2a323a48",
+      "publishedBytes": 241,
+      "publishedSha256": "f42ae7c303e61a0bc486d8fcecb7baf28ab00f4bb2694c4869e7c0fd63a82f39",
+      "transformations": [
+        "Local absolute paths replaced by documented historical relative labels; no test outcomes changed."
+      ]
+    },
+    {
+      "path": "evidence/wip-085516/pivot-activation-complete-table-20261010.log",
+      "originalBytes": 258,
+      "originalSha256": "af5a23175ae26806236ed949642086c6387314d9bd410d57ca83bc53ca4445e6",
+      "publishedBytes": 241,
+      "publishedSha256": "bc2f4bd8182710680e043aaa135bee861ad33b16fdca3a2264ee9b5511dd6c99",
+      "transformations": [
+        "Local absolute paths replaced by documented historical relative labels; no test outcomes changed."
+      ]
+    },
+    {
+      "path": "evidence/wip-085516/pivot-activation-pane-repair-20261010.log",
+      "originalBytes": 1152,
+      "originalSha256": "301ccfa48fefb5a6b3aaae90791c80e20e9b3ea45a4b1289b0080efbf825266a",
+      "publishedBytes": 1135,
+      "publishedSha256": "2e70b73972b5a85bf70c71caeb901fdda921eef8ba3aaff93b8471f58fd3627b",
+      "transformations": [
+        "Local absolute paths replaced by documented historical relative labels; no test outcomes changed."
+      ]
+    },
+    {
+      "path": "evidence/wip-085516/combined-restoration-validation.json",
+      "originalBytes": 646,
+      "originalSha256": "2f8785f222924eaa06b76f75c61571ce11c02bcdb771c26e3f9a884a88c3b976",
+      "publishedBytes": 549,
+      "publishedSha256": "35a054b4ad3c1d6ad0367407333f3660adc0aefefd308f0aebf093b0bb6cab06",
+      "transformations": [
+        "Removed private Library item identity/version; retained all recovery checks and explicit WIP/test limitations."
+      ]
+    }
+  ]
+}

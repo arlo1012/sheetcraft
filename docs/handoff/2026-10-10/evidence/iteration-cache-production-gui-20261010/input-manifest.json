@@ -1,0 +1,57 @@
+{
+  "productionCommit": "1b498934dc9a58922a08514db8fa29f64780f86b",
+  "sourceRuntimeManifest": "../iteration-cache-production-sample-20261010/source-runtime-manifest.json",
+  "generator": "../iteration-cache-production-sample-20261010/generate-public-sample.mjs",
+  "evaluatorCacheProvider": "absent",
+  "coreComputed": 0.99993896484375,
+  "inputs": [
+    {
+      "filename": "Sheetcraft-iteration-production.xlsx",
+      "purpose": "Single final public-Core production input",
+      "bytes": 3354,
+      "initialSha256": "cc6307959fa20f95858b870d702f931f1165e82ee4c90d986fc760afac12029b",
+      "postGuiSha256": "cc6307959fa20f95858b870d702f931f1165e82ee4c90d986fc760afac12029b",
+      "unchanged": true,
+      "B3": {
+        "cellAttrs": {
+          "r": "B3",
+          "s": "1"
+        },
+        "formula": "(B3+1)/2",
+        "formulaAttrs": {},
+        "cache": "0.99993896484375"
+      },
+      "calcPr": {
+        "calcMode": "auto",
+        "fullCalcOnLoad": "1",
+        "iterate": "1",
+        "iterateCount": "50",
+        "iterateDelta": "0.0001"
+      }
+    },
+    {
+      "filename": "iteration-native-original.xlsx",
+      "purpose": "One narrow pre-existing native WPS plus-one control",
+      "bytes": 9043,
+      "initialSha256": "31bf0302c4ee3939d95f93ef85ea28295b1bb992f7e879a22bd6d248ca3ee47e",
+      "postGuiSha256": "31bf0302c4ee3939d95f93ef85ea28295b1bb992f7e879a22bd6d248ca3ee47e",
+      "unchanged": true,
+      "B3": {
+        "cellAttrs": {
+          "r": "B3"
+        },
+        "formula": "(B3+1)/2",
+        "formulaAttrs": {
+          "ca": "1"
+        },
+        "cache": "0.999969482421875"
+      },
+      "calcPr": {
+        "calcId": "191029",
+        "iterate": "1",
+        "iterateCount": "50",
+        "iterateDelta": "0.0001"
+      }
+    }
+  ]
+}

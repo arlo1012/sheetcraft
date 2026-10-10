@@ -1,0 +1,92 @@
+{
+  "capturedAt": "2026-10-10",
+  "inspection": "Offline XML parse of retained native producer; no new GUI acceptance",
+  "sourceFile": "historical-artifacts/wps-insert-reference-20261010/native-pivot.xlsx",
+  "bytes": 15045,
+  "sha256": "6f03fe0846ee7d1e408b185b21fa9e8f2dee68fd2d9d29899168dc9abb83d974",
+  "producerApplication": "WPS Sheets",
+  "observedBuildFromRetainedREADME": "WPS Sheets 12.1.2.29182",
+  "retainedObservationSource": "historical-artifacts/wps-insert-reference-20261010/README.md",
+  "pivotName": "PivotTable1",
+  "pivotLocation": {
+    "ref": "A3:D8",
+    "firstHeaderRow": "1",
+    "firstDataRow": "2",
+    "firstDataCol": "1"
+  },
+  "cacheSource": {
+    "name": "Table1"
+  },
+  "cacheRecordCount": 6,
+  "sheets": [
+    {
+      "name": "Sheet2",
+      "part": "xl/worksheets/sheet1.xml",
+      "cellAddresses": [
+        "A3",
+        "B3",
+        "C3",
+        "D3",
+        "A4",
+        "B4",
+        "C4",
+        "D4",
+        "A5",
+        "B5",
+        "C5",
+        "D5",
+        "A6",
+        "B6",
+        "C6",
+        "D6",
+        "A7",
+        "B7",
+        "C7",
+        "D7",
+        "A8",
+        "B8",
+        "C8",
+        "D8"
+      ]
+    },
+    {
+      "name": "Sheet1",
+      "part": "xl/worksheets/sheet2.xml",
+      "cellAddresses": [
+        "A1",
+        "B1",
+        "C1",
+        "D1",
+        "A2",
+        "B2",
+        "C2",
+        "D2",
+        "A3",
+        "B3",
+        "C3",
+        "D3",
+        "A4",
+        "B4",
+        "C4",
+        "D4",
+        "A5",
+        "B5",
+        "C5",
+        "D5",
+        "A6",
+        "B6",
+        "C6",
+        "D6",
+        "A7",
+        "B7",
+        "C7",
+        "D7"
+      ]
+    }
+  ],
+  "chartParts": [],
+  "limits": [
+    "A3 new-sheet placement was observed from native Table1 insertion in this specific WPS build, not established as a universal source-state default.",
+    "Native PivotChart producer remained inconclusive after control loss; no chart export or GUI reopen claim."
+  ]
+}

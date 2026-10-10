@@ -1,0 +1,174 @@
+{
+  "dateUtc": "2026-10-10",
+  "guiRunUtc": "06:21–06:33 UTC",
+  "productionInput": {
+    "filename": "Sheetcraft-iteration-production.xlsx",
+    "purpose": "Single final public-Core production input",
+    "bytes": 3354,
+    "initialSha256": "cc6307959fa20f95858b870d702f931f1165e82ee4c90d986fc760afac12029b",
+    "postGuiSha256": "cc6307959fa20f95858b870d702f931f1165e82ee4c90d986fc760afac12029b",
+    "unchanged": true,
+    "B3": {
+      "cellAttrs": {
+        "r": "B3",
+        "s": "1"
+      },
+      "formula": "(B3+1)/2",
+      "formulaAttrs": {},
+      "cache": "0.99993896484375"
+    },
+    "calcPr": {
+      "calcMode": "auto",
+      "fullCalcOnLoad": "1",
+      "iterate": "1",
+      "iterateCount": "50",
+      "iterateDelta": "0.0001"
+    }
+  },
+  "wps": {
+    "browserOrApp": "Official installed Linux WPS desktop 12.1.2.29182",
+    "originalSettings": {
+      "iterative": false,
+      "maxIterations": 100,
+      "maxChange": 0.001
+    },
+    "loadedSettingsUnchanged": true,
+    "initialFormula": "=(B3+1)/2",
+    "initialDisplay": "0.999938965",
+    "initialInterpretation": "Numeric first-load cache display; not yet recalculation proof.",
+    "initialScreenshot": "02-wps-initial-original-setting.png",
+    "editMethod": "One genuine per-character native keyboard replacement of source, Return, selection back to B3.",
+    "intendedPlus2CommitCount": 1,
+    "committedFormula": "=(B3+2)/2",
+    "disabledEditDisplay": "0",
+    "disabledScreenshot": "04-wps-plus2-iteration-disabled.png",
+    "nativeControl": {
+      "filename": "iteration-native-original.xlsx",
+      "sha256": "31bf0302c4ee3939d95f93ef85ea28295b1bb992f7e879a22bd6d248ca3ee47e",
+      "settingsIterative": false,
+      "settingsCount": 100,
+      "settingsDelta": 0.001,
+      "formula": "=(B3+1)/2",
+      "openDisplay": "0.999969482",
+      "f9DisplayUnchanged": "0.999969482",
+      "genuineUnchangedSourceReentry": "F2, Return",
+      "reentryDisplay": "0",
+      "reentryScreenshot": "07-wps-native-control-reentry-disabled.png",
+      "closedWithoutSaving": true,
+      "savedInputUnchanged": true
+    },
+    "approvedTemporarySettings": {
+      "iterative": true,
+      "maxIterations": 50,
+      "maxChange": 0.0001
+    },
+    "noSecondProductionFormulaCommit": true,
+    "enabledRecalcDisplay": "1.999938965",
+    "enabledScreenshot": "09-wps-plus2-enabled.png",
+    "nativeSaveMethod": "F12 native Save As; full path entered with per-character native keyboard; Microsoft Excel Workbook (*.xlsx).",
+    "savedDisplay": "1.999969482",
+    "savedTitle": "wps-saved-plus2.xlsx - WPS Sheets (no star)",
+    "savedScreenshot": "10-wps-saved-plus2.png",
+    "fullDocumentClose": true,
+    "freshReopenMethod": "Exact just-saved wps-saved-plus2.xlsx Recent row after full document close.",
+    "freshReopenFormula": "=(B3+2)/2",
+    "freshReopenDisplay": "1.999984741",
+    "freshReopenAutomaticallyStarred": true,
+    "freshReopenScreenshot": "11-wps-fresh-reopen-plus2.png",
+    "savedExport": {
+      "file": "wps-saved-plus2.xlsx",
+      "bytes": 7649,
+      "sha256": "9493985b8bef06e68c30a1e35aa13233079b03b43901cf7caa5c06977220d2a6",
+      "calcPr": {
+        "calcId": "191029",
+        "iterate": "1",
+        "iterateCount": "50",
+        "iterateDelta": "0.0001"
+      },
+      "B3": {
+        "attrs": {
+          "r": "B3",
+          "s": "1"
+        },
+        "formula": "(B3+2)/2",
+        "formulaAttrs": {
+          "ca": "1"
+        },
+        "cache": "1.99996948242187"
+      }
+    },
+    "originalSettingsRestored": true,
+    "restorationVisiblyConfirmedAfterOwnedDocumentClose": true,
+    "restorationScreenshot": "12-wps-restored-after-owned-document-close.png",
+    "postReopenDocumentClosedWithoutSaving": true,
+    "oldStarredDocumentPreserved": true,
+    "processNotRestarted": true
+  },
+  "excel": {
+    "browserOrApp": "Excel web in dot cloud Chrome (cdp)",
+    "uploadMethod": "Normal 上传文件 picker using exact immutable production input.",
+    "initialFormula": "=(B3+1)/2",
+    "initialDisplay": "0.9999695",
+    "initialReadout": "0.9999695 . B3 . 包含公式 .",
+    "initialScreenshot": "13-excel-initial.jpg",
+    "initialAdvancedBeyondInputCache": true,
+    "hostedIdentitySha256": "62833eb900325bdb4746ba61865579ed7247308b368c9a72c8312aefd3b3c253",
+    "inputControlCaveat": "Formula-bar Control+A did not clear old source. Genuine pressSequentially inserted a prefix and committed =(B3+2)/2=(B3+1)/2, yielding FALSE. Undo restored exact =(B3+1)/2 and 0.9999847. A grid pressSequentially attempt then failed a selector deadline without source change. Home then Shift+End visibly selected the exact original formula; Backspace visibly emptied the edit text; genuine pressSequentially entered exact =(B3+2)/2, checked in Editing state before Enter committed it. This run contains an erroneous edit and Undo before the one intended +2 commit; it is not a clean one-commit history.",
+    "intendedPlus2CommitCount": 1,
+    "erroneousCommitCount": 1,
+    "undoCount": 1,
+    "committedFormula": "=(B3+2)/2",
+    "editDisplay": "1.999939",
+    "editReadout": "1.999939 . B3 . 包含公式 .",
+    "savedStatus": "上次保存时间: 刚刚; 已保存; green saved cloud icon",
+    "editScreenshot": "14-excel-plus2-saved.jpg",
+    "fullTabClose": true,
+    "originalTabId": "68",
+    "freshTabId": "69",
+    "freshReopenFormula": "=(B3+2)/2",
+    "freshReopenDisplay": "1.9999695",
+    "freshReopenSavedStatus": "已保存",
+    "freshReopenScreenshot": "15-excel-fresh-reopen.jpg",
+    "reopenIdentitySha256": "62833eb900325bdb4746ba61865579ed7247308b368c9a72c8312aefd3b3c253",
+    "sameIdentity": true,
+    "actualDownloadMethod": "OneDrive public route → My Files → exact Sheetcraft-iteration-production.xlsx row → visible context Download. Completed returned download.path copied into evidence folder.",
+    "actualSavedCacheNuance": "Downloaded saved XML cache is 1.99993896484375. Fresh-reopen UI runtime result is 1.9999695. Both are near2; report does not equate them.",
+    "savedExport": {
+      "file": "excel-saved-plus2.xlsx",
+      "bytes": 5661,
+      "sha256": "afd224e2306b16e80fc57b67694520b072d768b13a9ef7b923674385cfcc92db",
+      "calcPr": {
+        "calcId": "191028",
+        "iterate": "1",
+        "iterateCount": "50",
+        "iterateDelta": "1E-4",
+        "calcCompleted": "0"
+      },
+      "B3": {
+        "attrs": {
+          "r": "B3",
+          "s": "1"
+        },
+        "formula": "(B3+2)/2",
+        "formulaAttrs": {
+          "ca": "1"
+        },
+        "cache": "1.99993896484375"
+      }
+    },
+    "ownedTabsClosed": true
+  },
+  "cleanup": {
+    "finalProtectedBrowserTabs": [
+      "2",
+      "5",
+      "8",
+      "9"
+    ],
+    "noOwnedBrowserTabsRemain": true,
+    "oldStarredWpsDocument": "protection-print-calculation.xlsx * - WPS Sheets",
+    "oldDocumentNotEditedSavedClosedOrDiscarded": true,
+    "noProductionSourceBuildGitHubOrCredentialOperations": true,
+    "noAdditionalFixtureOrAttributeMatrix": true
+  }
+}

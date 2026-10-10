@@ -1,0 +1,47 @@
+[
+  {
+    "file": "wps-saved-plus2.xlsx",
+    "bytes": 7649,
+    "sha256": "9493985b8bef06e68c30a1e35aa13233079b03b43901cf7caa5c06977220d2a6",
+    "calcPr": {
+      "calcId": "191029",
+      "iterate": "1",
+      "iterateCount": "50",
+      "iterateDelta": "0.0001"
+    },
+    "B3": {
+      "attrs": {
+        "r": "B3",
+        "s": "1"
+      },
+      "formula": "(B3+2)/2",
+      "formulaAttrs": {
+        "ca": "1"
+      },
+      "cache": "1.99996948242187"
+    }
+  },
+  {
+    "file": "excel-saved-plus2.xlsx",
+    "bytes": 5661,
+    "sha256": "afd224e2306b16e80fc57b67694520b072d768b13a9ef7b923674385cfcc92db",
+    "calcPr": {
+      "calcId": "191028",
+      "iterate": "1",
+      "iterateCount": "50",
+      "iterateDelta": "1E-4",
+      "calcCompleted": "0"
+    },
+    "B3": {
+      "attrs": {
+        "r": "B3",
+        "s": "1"
+      },
+      "formula": "(B3+2)/2",
+      "formulaAttrs": {
+        "ca": "1"
+      },
+      "cache": "1.99993896484375"
+    }
+  }
+]

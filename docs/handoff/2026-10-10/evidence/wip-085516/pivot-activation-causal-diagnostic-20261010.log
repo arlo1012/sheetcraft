@@ -1,0 +1,35 @@
+
+ RUN  v4.1.11 historical-repository/apps/web
+
+------stdout | src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > creates an empty report, configures it through the field pane, and leaves its contextual tools
+PIVOT_ACTIVATION_DIAGNOSTIC {"activationCalls":0,"closeStacks":["Error: Pivot close trace\n    at Object.close (historical-repository/apps/web/src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts:58:63)\n    at flush (historical-repository/apps/web/src/app/SpreadsheetWorkspace.vue:1267:48)\n    at callWithErrorHandling (historical-repository/node_modules/.bun/@vue+runtime-core@3.5.41/node_modules/@vue/runtime-core/dist/runtime-core.cjs.js:200:19)\n    at callWithAsyncErrorHandling (historical-repository/node_modules/.bun/@vue+runtime-core@3.5.41/node_modules/@vue/runtime-core/dist/runtime-core.cjs.js:207:17)\n    at baseWatchOptions.call (historical-repository/node_modules/.bun/@vue+runtime-core@3.5.41/node_modules/@vue/runtime-core/dist/runtime-core.cjs.js:890:47)\n    at ReactiveEffect.job [as scheduler] (historical-repository/node_modules/.bun/@vue+reactivity@3.5.41/node_modules/@vue/reactivity/dist/reactivity.cjs.js:1928:18)\n    at ReactiveEffect.trigger (historical-repository/node_modules/.bun/@vue+reactivity@3.5.41/node_modules/@vue/reactivity/dist/reactivity.cjs.js:296:12)\n    at endBatch (historical-repository/node_modules/.bun/@vue+reactivity@3.5.41/node_modules/@vue/reactivity/dist/reactivity.cjs.js:354:13)\n    at trigger (historical-repository/node_modules/.bun/@vue+reactivity@3.5.41/node_modules/@vue/reactivity/dist/reactivity.cjs.js:768:3)\n    at MutableReactiveHandler.set (historical-repository/node_modules/.bun/@vue+reactivity@3.5.41/node_modules/@vue/reactivity/dist/reactivity.cjs.js:1094:9)"],"activeSheetId":"sheet-5fc57096-983b-4417-a8d2-992fd94cf248","selected":{"row":0,"column":0},"anchor":{"row":2,"column":0},"history":["deleteSheet"]}
+
+x
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > creates an empty report, configures it through the field pane, and leaves its contextual tools
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts:153:57
+    151|       history: captured.controller!.session.history.undoStack.map((ent…
+    152|     }));
+    153|     expect(wrapper.find(".pivot-fields-pane").exists()).toBe(true);
+       |                                                         ^
+    154|     expect(wrapper.find('[data-ribbon-category="pivot-analysis"]').exi…
+    155|     expect(wrapper.find('[data-ribbon-category="pivot-design"]').exist…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+   Start at  01:49:56
+   Duration  14.49s (transform 8.71s, setup 0ms, import 12.20s, tests 1.84s, environment 303ms)
+

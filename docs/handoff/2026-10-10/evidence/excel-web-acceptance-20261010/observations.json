@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 1,
+  "syntheticOnly": true,
+  "application": "Microsoft Excel web",
+  "browser": "dot cloud browser (cdp)",
+  "acceptanceStatus": "in-progress",
+  "sourceCommit": "9d5763e9bfe7f427ab432598e7d8ea2fe0679c39",
+  "canonicalV3": {
+    "originalPath": "historical-artifacts/calc-fixtures/sheetcraft-local-table-reference.canonical-v3.xlsx",
+    "originalSha256": "df68599f64b2412aba08415d7e47406b547ba0f257bae7f7887a199a1d3c37df",
+    "testCopy": "historical-artifacts/excel-web-acceptance-20261010/copies/Sheetcraft-ExcelWeb-20261010-canonical-v3-native.xlsx",
+    "expectedInitial": [
+      {
+        "address": "D2",
+        "value": 24
+      },
+      {
+        "address": "D3",
+        "value": 12
+      },
+      {
+        "address": "D4",
+        "value": 21
+      },
+      {
+        "address": "D6",
+        "value": 57
+      }
+    ],
+    "controlledEdit": {
+      "sheet": "TableReferences",
+      "cell": "B2",
+      "from": 2,
+      "to": 5,
+      "expected": {
+        "D2": 60,
+        "D3": 12,
+        "D4": 21,
+        "D6": 93
+      }
+    },
+    "checks": {
+      "open": "passed",
+      "edit": "passed",
+      "recalculate": "passed",
+      "save": "passed-cloud-autosave",
+      "reopen": "passed"
+    },
+    "observedInitial": {
+      "D2": 24,
+      "D3": 12,
+      "D4": 21,
+      "D6": 57
+    },
+    "initialEvidenceBasis": "Actual Excel web screenshot and full AX editing view; screenshot emitted by CUA but safe durable copy not yet saved",
+    "observedFormulaD2": "=[@qty]*[@price]",
+    "observedAfterEdit": {
+      "B2": 5,
+      "D2": 60,
+      "D3": 12,
+      "D4": 21,
+      "D6": 93
+    },
+    "recalculationAction": "Excel web ribbon公式→计算工作簿",
+    "recalculationReadout": "60 . D2 . 包含公式 .",
+    "initialEvidence": "evidence/canonical-v3-initial.png",
+    "inputAttemptNotes": [
+      "Playwright grid locator press timed out without observed input; AX indexed typeText failed preparation and explicitly sent no input.",
+      "Focused tab.typeText(null,5)+Return succeeded; next selected cell B3 and visible recalculated values verified."
+    ],
+    "savedArtifact": {
+      "kind": "OneDrive-hosted isolated synthetic testing copy",
+      "name": "Sheetcraft-ExcelWeb-20261010-canonical-v3-native.xlsx",
+      "saveStatusObserved": "上次保存时间: 刚刚; file menu已联机自动保存到 Documents",
+      "localDownloadPath": null,
+      "sha256": null,
+      "downloadAttempt": {
+        "action": "文件→创建副本→下载副本",
+        "at": "2026-10-10T01:06:21Z",
+        "result": "30s CUA JS timeout; driver automatically reset kernel; no completed browser download path returned",
+        "retry": false,
+        "meaning": "Does not establish whether a server download was initiated or completed; saved-byte hash unclaimed"
+      }
+    },
+    "closedAt": "2026-10-10T01:07:36Z",
+    "reopenedAt": "2026-10-10T01:07:49Z",
+    "reopenMethod": "Closed actual workbook tab11, created fresh Excel home tab13, selected exact named workbook from recent list",
+    "reopenedObserved": {
+      "B2": 5,
+      "D2": 60,
+      "D3": 12,
+      "D4": 21,
+      "D6": 93,
+      "D2Formula": "=[@qty]*[@price]",
+      "mode": "编辑视图",
+      "saveStatus": "已保存",
+      "repairWarnings": []
+    },
+    "postEditEvidence": "evidence/canonical-v3-recalculated.png",
+    "reopenEvidence": "evidence/canonical-v3-reopened.png",
+    "formattingFindings": [
+      {
+        "feature": "Custom table header",
+        "status": "observed-issue-unclassified",
+        "expected": "White header text on black fill from headerRow dxf",
+        "observed": "Black-filled row1 with labels visually unreadable in Excel initial and persisted reopened view; A1 still contains item in formula bar",
+        "notes": "No styling was changed to mask it. Direct XF font1/applyFont precedence is plausible but not proven; separate baseline/v2 comparison remains pending."
+      }
+    ]
+  },
+  "pairedMatrix": {
+    "originalsRoot": "historical-repository/docs/acceptance/generated-v2-20261010",
+    "pairedManifestSha256": "ea740942545a9152ed1db231c9d22bf4ada3218aa90a514da2df4b41a12b63aa",
+    "caseCount": 6,
+    "sheetCountPerAdapter": 16,
+    "assertionCount": 285,
+    "copies": [
+      {
+        "adapter": "baseline",
+        "caseId": "styles",
+        "originalPath": "historical-repository/docs/acceptance/generated-v2-20261010/baseline/styles.xlsx",
+        "originalSha256": "559a79ef8be2fb2a33be277be324bc676900233c1c0469275cc9173eecd0b342",
+        "copyPath": "historical-artifacts/excel-web-acceptance-20261010/copies/Sheetcraft-ExcelWeb-20261010-v2-baseline-styles.xlsx",
+        "copySha256": "559a79ef8be2fb2a33be277be324bc676900233c1c0469275cc9173eecd0b342",
+        "status": "pending"
+      },
+      {
+        "adapter": "baseline",
+        "caseId": "geometry-formulas",
+        "originalPath": "historical-repository/docs/acceptance/generated-v2-20261010/baseline/geometry-formulas.xlsx",
+        "originalSha256": "2bdaf450cda0b9af95d33f019cf34d61bdc44f32fa0479c796612173e18210de",
+        "copyPath": "historical-artifacts/excel-web-acceptance-20261010/copies/Sheetcraft-ExcelWeb-20261010-v2-baseline-geometry-formulas.xlsx",
+        "copySha256": "2bdaf450cda0b9af95d33f019cf34d61bdc44f32fa0479c796612173e18210de",
+        "status": "pending"
+      },
+      {
+        "adapter": "baseline",
+        "caseId": "data-pivots",
+        "originalPath": "historical-repository/docs/acceptance/generated-v2-20261010/baseline/data-pivots.xlsx",
+        "originalSha256": "52c37b97210430e3c911ed8ebb4fa6eeb0ac8ffb3358b64500e350671d280ed7",
+        "copyPath": "historical-artifacts/excel-web-acceptance-20261010/copies/Sheetcraft-ExcelWeb-20261010-v2-baseline-data-pivots.xlsx",
+        "copySha256": "52c37b97210430e3c911ed8ebb4fa6eeb0ac8ffb3358b64500e350671d280ed7",
+        "status": "pending"
+      },
+      {
+        "adapter": "baseline",
+        "caseId": "rules-notes-links",
+        "originalPath": "historical-repository/docs/acceptance/generated-v2-20261010/baseline/rules-notes-links.xlsx",
+        "originalSha256": "3b773cbfeb5dd62019b0555c1d6b255e80a9256ec73c7184fc682f51111da25e",
+        "copyPath": "historical-artifacts/excel-web-acceptance-20261010/copies/Sheetcraft-ExcelWeb-20261010-v2-baseline-rules-notes-links.xlsx",
+        "copySha256": "3b773cbfeb5dd62019b0555c1d6b255e80a9256ec73c7184fc682f51111da25e",
+        "status": "pending"
+      },
+      {
+        "adapter": "baseline",
+        "caseId": "images-drawings",
+        "originalPath": "historical-repository/docs/acceptance/generated-v2-20261010/baseline/images-drawings.xlsx",
+        "originalSha256": "4fee2886b073f0190e0644e29eed3f21fa026405087b80ea9ff37329e6caefb2",
+        "copyPath": "historical-artifacts/excel-web-acceptance-20261010/copies/Sheetcraft-ExcelWeb-20261010-v2-baseline-images-drawings.xlsx",
+        "copySha256": "4fee2886b073f0190e0644e29eed3f21fa026405087b80ea9ff37329e6caefb2",
+        "status": "pending"
+      },
+      {
+        "adapter": "baseline",
+        "caseId": "protection-print-calculation",
+        "originalPath": "historical-repository/docs/acceptance/generated-v2-20261010/baseline/protection-print-calculation.xlsx",
+        "originalSha256": "ae80bf0ab34102ee6fd5646f66e7a31d578364414798afc23a2164e2a9ba6c0e",
+        "copyPath": "historical-artifacts/excel-web-acceptance-20261010/copies/Sheetcraft-ExcelWeb-20261010-v2-baseline-protection-print-calculation.xlsx",
+        "copySha256": "ae80bf0ab34102ee6fd5646f66e7a31d578364414798afc23a2164e2a9ba6c0e",
+        "status": "pending"
+      },
+      {
+        "adapter": "native",
+        "caseId": "styles",
+        "originalPath": "historical-repository/docs/acceptance/generated-v2-20261010/native/styles.xlsx",
+        "originalSha256": "bfdf0bda9996f84b9542f7f44390589aff3cf657f3e6adaac893ca3189b2f3ec",
+        "copyPath": "historical-artifacts/excel-web-acceptance-20261010/copies/Sheetcraft-ExcelWeb-20261010-v2-native-styles.xlsx",
+        "copySha256": "bfdf0bda9996f84b9542f7f44390589aff3cf657f3e6adaac893ca3189b2f3ec",
+        "status": "pending"
+      },
+      {
+        "adapter": "native",
+        "caseId": "geometry-formulas",
+        "originalPath": "historical-repository/docs/acceptance/generated-v2-20261010/native/geometry-formulas.xlsx",
+        "originalSha256": "06a2c4a49b517c4e930c233848dde8494ff1560f3f68df9e32bdb93c903b3444",
+        "copyPath": "historical-artifacts/excel-web-acceptance-20261010/copies/Sheetcraft-ExcelWeb-20261010-v2-native-geometry-formulas.xlsx",
+        "copySha256": "06a2c4a49b517c4e930c233848dde8494ff1560f3f68df9e32bdb93c903b3444",
+        "status": "pending"
+      },
+      {
+        "adapter": "native",
+        "caseId": "data-pivots",
+        "originalPath": "historical-repository/docs/acceptance/generated-v2-20261010/native/data-pivots.xlsx",
+        "originalSha256": "2b55a2f378bf39aa04dfb4457a76bd7a95c9f40bbeedc6fbe7b1254bd46e3c10",
+        "copyPath": "historical-artifacts/excel-web-acceptance-20261010/copies/Sheetcraft-ExcelWeb-20261010-v2-native-data-pivots.xlsx",
+        "copySha256": "2b55a2f378bf39aa04dfb4457a76bd7a95c9f40bbeedc6fbe7b1254bd46e3c10",
+        "status": "pending"
+      },
+      {
+        "adapter": "native",
+        "caseId": "rules-notes-links",
+        "originalPath": "historical-repository/docs/acceptance/generated-v2-20261010/native/rules-notes-links.xlsx",
+        "originalSha256": "1cd7990e4ee1231cf664ba74ebcb3175a3469b245cd1c7ebea6488b816c675df",
+        "copyPath": "historical-artifacts/excel-web-acceptance-20261010/copies/Sheetcraft-ExcelWeb-20261010-v2-native-rules-notes-links.xlsx",
+        "copySha256": "1cd7990e4ee1231cf664ba74ebcb3175a3469b245cd1c7ebea6488b816c675df",
+        "status": "pending"
+      },
+      {
+        "adapter": "native",
+        "caseId": "images-drawings",
+        "originalPath": "historical-repository/docs/acceptance/generated-v2-20261010/native/images-drawings.xlsx",
+        "originalSha256": "5008924974534fa8513287b36bfb7b178b2e1f6b13ec67d7aac895bf42c8718f",
+        "copyPath": "historical-artifacts/excel-web-acceptance-20261010/copies/Sheetcraft-ExcelWeb-20261010-v2-native-images-drawings.xlsx",
+        "copySha256": "5008924974534fa8513287b36bfb7b178b2e1f6b13ec67d7aac895bf42c8718f",
+        "status": "pending"
+      },
+      {
+        "adapter": "native",
+        "caseId": "protection-print-calculation",
+        "originalPath": "historical-repository/docs/acceptance/generated-v2-20261010/native/protection-print-calculation.xlsx",
+        "originalSha256": "9d626235440778e0f063b85147f43089379a8c2d6d4fad69987c5eafe1528296",
+        "copyPath": "historical-artifacts/excel-web-acceptance-20261010/copies/Sheetcraft-ExcelWeb-20261010-v2-native-protection-print-calculation.xlsx",
+        "copySha256": "9d626235440778e0f063b85147f43089379a8c2d6d4fad69987c5eafe1528296",
+        "status": "pending"
+      }
+    ]
+  },
+  "browserCheckpoint": {
+    "observedAt": "2026-10-10T01:08:06Z",
+    "loginVerified": true,
+    "loginBasis": "Official Microsoft Open Excel route reached signed-in Excel home with OneDrive workbook list",
+    "currentTabId": "13",
+    "currentWorkbook": "Sheetcraft-ExcelWeb-20261010-canonical-v3-native.xlsx",
+    "currentMode": "编辑视图",
+    "savedStatus": "已保存",
+    "editingControlsEnabled": true,
+    "uploadConfirmed": true,
+    "currentOpenWarnings": [],
+    "historicalWorkbook": {
+      "name": "Sheetcraft-acceptance-v3-02-layout-formulas.native.xlsx",
+      "mode": "阅读视图",
+      "savedStatus": "仅供查看",
+      "warning": "工作簿已修复 我们暂时修复了此工作簿，以便你可以在“阅读视图”中打开它。",
+      "repairActionNotAccepted": true,
+      "evidence": "evidence/historical-readonly.png"
+    },
+    "blocker": {
+      "at": "2026-10-10T01:00:50Z",
+      "tool": "mcp__cua_repl__js",
+      "action": "Read uploaded workbook DOM snapshot",
+      "result": "JavaScript execution did not receive approval",
+      "paused": false,
+      "resolvedAt": "2026-10-10T01:03:17Z",
+      "retryResult": "Exact denied DOM snapshot retry succeeded with parent transcript evidence"
+    },
+    "pauseReason": "Excel focus released to Calc after current diagnostic; broad paired12-workbook Excel observations remain pending"
+  },
+  "evidenceHashes": {
+    "evidence/canonical-v3-initial.png": "552bf02d1f1290cb95788c46d22ef0cf46f36c63a180b1bba3117755d91e3738",
+    "evidence/canonical-v3-recalculated.png": "234bdd72cd16bbd06dd1b8154ce0215e758574037c880a7134c9b486fed5af37",
+    "evidence/canonical-v3-reopened.png": "bc943a6fa88cc441d9985f3261e0b9304686240dbfd1b41bf1d45b22f0941415",
+    "evidence/historical-readonly.png": "cf0035d4c43b2b8dd934ee8c67a6148638308b0ef24b0cb41344dcd0a3534069"
+  },
+  "originalsReverifiedAt": "2026-10-10T01:08:24Z"
+}

@@ -1,0 +1,87 @@
+{
+  "case": "Native WPS-authored single-cell iterative workbook imported into Excel web",
+  "observedAtUtc": "2026-10-10T05:53:20Z",
+  "browser": "dot cloud Chrome",
+  "input": {
+    "source": "historical-artifacts/wps-authored-iteration-20261010/accepted-run/iteration-native-original.xlsx",
+    "ownedUploadCopy": "native-iteration-control-20261010-054747.xlsx",
+    "bytes": 9043,
+    "sha256": "31bf0302c4ee3939d95f93ef85ea28295b1bb992f7e879a22bd6d248ca3ee47e",
+    "copySha256": "31bf0302c4ee3939d95f93ef85ea28295b1bb992f7e879a22bd6d248ca3ee47e",
+    "sourceRemainedImmutable": true,
+    "nativeWpsProvenance": "Parent supplied accepted native UI convergence, save and fresh reopen evidence; this control independently verifies input bytes and Excel behavior."
+  },
+  "guiStages": [
+    {
+      "stage": "Imported native workbook",
+      "sheet": "Iteration",
+      "cell": "B3",
+      "formula": "=(B3+1)/2",
+      "displayedValue": "0.999984741",
+      "note": "This is different from input cached 0.999969482421875, consistent with a further native iteration; edit test below establishes genuine computation."
+    },
+    {
+      "stage": "Exact accepted edited formula",
+      "sheet": "Iteration",
+      "cell": "B3",
+      "formula": "=(B3+2)/2",
+      "displayedValue": "1.999938965",
+      "saveStatus": "上次保存时间: 刚刚; saved cloud check",
+      "note": "Exact formula was verified in both visible formula bar and grid edit before native commit."
+    },
+    {
+      "stage": "Full close and fresh tab reopen",
+      "sheet": "Iteration",
+      "cell": "B3",
+      "formula": "=(B3+2)/2",
+      "displayedValue": "1.999969482",
+      "saveStatus": "已保存",
+      "sameHostedIdentity": true,
+      "valueEvidence": "evidence/03-fresh-reopen-near2-saved.jpg; reopen AX exposed formula/save state but readout description remained empty."
+    }
+  ],
+  "entryRecovery": {
+    "onlyAffectedCell": "B3",
+    "description": "Initial normal typing/paste attempts produced transient bare = and malformed =(B3+2)/2= entries. The exact expression was corrected in the visible formula bar with documented fill followed by native End, Space and Backspace events, synchronizing both visible editors before commit. No cached value injection, hidden application state, API calls or settings changes were used. The transient entry error is not treated as a workbook compatibility error."
+  },
+  "download": {
+    "source": "OneDrive My Files exact owned filename row, context menu Download",
+    "actualSavedFilename": "excel-actual-saved.xlsx",
+    "bytes": 7413,
+    "sha256": "2864293e96e1a22a72fb7ea009e46724be9d24f631d81dbd4261d1ffcbfbc5aa",
+    "application": "Microsoft Excel Online",
+    "appVersion": "16.0300",
+    "calcPr": {
+      "calcId": "191028",
+      "iterate": "1",
+      "iterateCount": "50",
+      "iterateDelta": "1E-4",
+      "calcCompleted": "0"
+    },
+    "cellB3": {
+      "attrs": {
+        "r": "B3"
+      },
+      "f": "(B3+2)/2",
+      "fAttrs": {
+        "ca": "1"
+      },
+      "value": "1.99993896484375"
+    },
+    "note": "Downloaded saved cache is preclose 1.99993896484375. Fresh reopen rendered a further iterative value 1.999969482, without another formula mutation."
+  },
+  "assertions": {
+    "exactNativeInputUploaded": true,
+    "onlyB3Changed": true,
+    "near2FromChangedFormulaNotStaleNear1": true,
+    "sameHostedIdentityFreshReopen": true,
+    "near2PersistenceVerified": true,
+    "realSavedBytesAcquired": true,
+    "iterateAttributesPreserved": true,
+    "formulaCa1Preserved": true,
+    "accountOrAppPreferencesChanged": false,
+    "productionWriterValidated": false,
+    "sufficiencyOfCacheOrCaAloneProven": false
+  },
+  "scopeConclusion": "Valid native WPS producer is accepted by Excel web and supports native iterative recalculation plus saved/reopened persistence. This does not identify which writer differences are necessary or sufficient. Production writer diagnosis remains separate."
+}

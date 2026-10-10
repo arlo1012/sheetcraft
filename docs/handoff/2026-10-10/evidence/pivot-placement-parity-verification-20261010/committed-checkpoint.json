@@ -1,0 +1,91 @@
+{
+  "sampledAt": "2026-10-10T08:36:35.479664+00:00",
+  "baseHead": "9aa114b4af0a8928732f6baa5016b7f89ee2fcbf",
+  "isolatedRoot": "historical-isolated-placement",
+  "sourceScope": "git archive base plus exactly these owned placement files and compact docs; concurrent chart/Workspace edits excluded",
+  "selected": [
+    {
+      "path": "apps/web/src/modules/pivot-tables/usePivotActions.ts",
+      "bytes": 26241,
+      "sha256": "f753382549a3da94647187511b896743209954ffa90928e6dbc816cf873d178c"
+    },
+    {
+      "path": "apps/web/src/tests/modules/pivot-tables/actions.test.ts",
+      "bytes": 10260,
+      "sha256": "5b4591753334e65fd94a1db63adbbf3e77591894263c84333f88a3398e3797f4"
+    },
+    {
+      "path": "apps/web/src/tests/modules/pivot-tables/details-actions.test.ts",
+      "bytes": 6213,
+      "sha256": "b6119e69cdc2542415385e9031b9a11033c1053071132857172ea3e9286d17a2"
+    },
+    {
+      "path": "apps/web/src/tests/modules/pivot-tables/fields-pane.test.ts",
+      "bytes": 5784,
+      "sha256": "c8c926e7efbbcdeb1089f9c947278587ebb5ed1f8c20bb84fb4e1d256a9a32c5"
+    },
+    {
+      "path": "apps/web/src/tests/modules/pivot-tables/fixture.ts",
+      "bytes": 2039,
+      "sha256": "c9c92efb2b1eabd7f8fa7830ac45d209594e4b3885f65e59fe81d5f0f501be28"
+    },
+    {
+      "path": "apps/web/src/tests/modules/pivot-tables/grouping-actions.test.ts",
+      "bytes": 6384,
+      "sha256": "5f261a9c9651e3186ad93aba131985d60e4c42e3e54bbbebd7f5b735def708c6"
+    },
+    {
+      "path": "apps/web/src/tests/modules/pivot-tables/range-report.test.ts",
+      "bytes": 4512,
+      "sha256": "ca8e0b0f95e54fe490f6ec559a8419d450be3e84cdf7869de42dda16fbd2cba7"
+    },
+    {
+      "path": "apps/web/src/tests/modules/pivot-tables/report-filters.test.ts",
+      "bytes": 7639,
+      "sha256": "2b063f32fa9ec49e31cb325898a768c669c8cd7864879779515899b086687e20"
+    },
+    {
+      "path": "apps/web/src/tests/modules/pivot-tables/source-modes.test.ts",
+      "bytes": 25120,
+      "sha256": "92aea6a8c8c960cf64d831c782de63e86c8e1f591e9d95b31d63e98e7bed38c7"
+    },
+    {
+      "path": "apps/web/src/tests/modules/pivot-tables/table-source.test.ts",
+      "bytes": 25618,
+      "sha256": "d3b1a92a7c983bb900f1fd01393936c411fc15932105b9340c88942f442ab5b7"
+    },
+    {
+      "path": "apps/web/src/tests/modules/pivot-tables/placement-default.test.ts",
+      "bytes": 9973,
+      "sha256": "dad287ce4229b617f3a61ca28eebb6a46510fbc79304f5184569a55f63bf93c7"
+    },
+    {
+      "path": "docs/insert/wps-alignment.md",
+      "bytes": 7363,
+      "sha256": "20d91908e032c3dc3538dabfe51f80d328bf1de82e1cd89445dbb712ee1d9674"
+    },
+    {
+      "path": "docs/insert/table-backed-pivots.md",
+      "bytes": 3958,
+      "sha256": "ac487a5380f5984916ec303c8747ad6d118949788eba1cb0131dda62be82938d"
+    }
+  ],
+  "dependencies": "Existing installed node_modules symlink; Core/native built runtime unchanged from9aa. No source from unfinished chart work.",
+  "sourceCommit": "b06cd293a3f887815a53a2eb23d51cfc445bb389",
+  "verification": {
+    "pivotFiles": 21,
+    "pivotTests": 276,
+    "newPlacementCases": 14,
+    "isolatedWebTypecheck": "passed; immutable9aa archive plus13 selected files only, excludes concurrent chart edits",
+    "staticChecks": "passed",
+    "gui": "not run"
+  },
+  "workingTreeOtherUnfinished": [
+    " M apps/web/src/app/SpreadsheetWorkspace.vue",
+    " M apps/web/src/modules/charts/components/ChartEditorDialog.vue",
+    " M apps/web/src/modules/charts/useChartActions.ts",
+    " M apps/web/src/modules/insert-tools/components/InsertToolbar.vue",
+    " M apps/web/src/modules/pivot-tables/components/PivotInsertTools.vue",
+    "?? apps/web/src/tests/modules/charts/existing-pivot-workspace.test.ts"
+  ]
+}
