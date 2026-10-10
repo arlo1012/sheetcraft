@@ -10,13 +10,38 @@ const EMU_PER_PIXEL = 9525;
 
 export type NativePartType = { part: string; contentType: string };
 
+function drawingDescription(altText: string, issueLocation: string): string {
+  for (const character of altText) {
+    const scalar = character.codePointAt(0)!;
+    if (
+      scalar !== 0x9 &&
+      scalar !== 0xa &&
+      scalar !== 0xd &&
+      !(scalar >= 0x20 && scalar <= 0xd7ff) &&
+      !(scalar >= 0xe000 && scalar <= 0xfffd) &&
+      !(scalar >= 0x10000 && scalar <= 0x10ffff)
+    ) {
+      throw new Error(
+        `Invalid XML character U+${scalar.toString(16).toUpperCase().padStart(4, "0")} in XLSX image altText at ${issueLocation}.`,
+      );
+    }
+  }
+  // DrawingML descr is an XML string attribute, not an OOXML escaped cell string.
+  // Preserve literal _xNNNN_ sequences and attribute whitespace exactly.
+  return xml(altText);
+}
+
 function drawingXml(sheet: NativeSheetData, relationshipIds: string[]): string {
   const anchors = sheet.images
     .map(({ range }, index) => {
       const { tl, ext } = range;
       const width = Math.round(ext.width * EMU_PER_PIXEL);
       const height = Math.round(ext.height * EMU_PER_PIXEL);
-      return `<xdr:oneCellAnchor><xdr:from><xdr:col>${tl.nativeCol}</xdr:col><xdr:colOff>${tl.nativeColOff}</xdr:colOff><xdr:row>${tl.nativeRow}</xdr:row><xdr:rowOff>${tl.nativeRowOff}</xdr:rowOff></xdr:from><xdr:ext cx="${width}" cy="${height}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${index + 1}" name="Picture ${index + 1}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${relationshipIds[index]}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${width}" cy="${height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
+      const description = drawingDescription(
+        range.altText ?? "",
+        range.issueLocation ?? `${sheet.name}.images[${index + 1}].altText`,
+      );
+      return `<xdr:oneCellAnchor><xdr:from><xdr:col>${tl.nativeCol}</xdr:col><xdr:colOff>${tl.nativeColOff}</xdr:colOff><xdr:row>${tl.nativeRow}</xdr:row><xdr:rowOff>${tl.nativeRowOff}</xdr:rowOff></xdr:from><xdr:ext cx="${width}" cy="${height}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${index + 1}" name="Picture ${index + 1}" descr="${description}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${relationshipIds[index]}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${width}" cy="${height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
     })
     .join("");
   return `${HEADER}<xdr:wsDr xmlns:xdr="${DRAWING_NS}" xmlns:a="${ART_NS}" xmlns:r="${REL_NS}">${anchors}</xdr:wsDr>`;

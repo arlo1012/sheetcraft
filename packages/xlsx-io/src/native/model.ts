@@ -20,6 +20,9 @@ export type NativeImage = { buffer: Uint8Array; extension: "png" | "jpeg" | "gif
 export type NativeImageAnchor = {
   tl: { nativeCol: number; nativeColOff: number; nativeRow: number; nativeRowOff: number };
   ext: { width: number; height: number };
+  altText?: string;
+  /** Source placement context for diagnostics; never serialized into the drawing. */
+  issueLocation?: string;
 };
 export type NativeSheetState = "visible" | "hidden" | "veryHidden";
 export type NativeSheetData = {

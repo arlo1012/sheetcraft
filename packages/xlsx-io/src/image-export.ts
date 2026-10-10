@@ -22,6 +22,8 @@ type XlsxImageCellPosition = {
 export type XlsxImageAnchor = {
   tl: XlsxImageCellPosition;
   ext: { width: number; height: number };
+  altText?: string;
+  issueLocation?: string;
 };
 
 export type XlsxImageWorksheet = {
@@ -163,9 +165,8 @@ export function createXlsxImageExporter(
       issueLocation: string,
     ): void {
       const asset = requireAsset(image.assetId, image.transform, issueLocation);
-      output.addImage(
-        addAsset(asset),
-        imageAnchor(
+      output.addImage(addAsset(asset), {
+        ...imageAnchor(
           sheet,
           image.anchor.row,
           image.anchor.column,
@@ -174,7 +175,9 @@ export function createXlsxImageExporter(
           image.width,
           image.height,
         ),
-      );
+        altText: image.altText,
+        issueLocation: `${issueLocation}.floatingImages[${JSON.stringify(image.id)}].altText`,
+      });
     },
   };
 }
