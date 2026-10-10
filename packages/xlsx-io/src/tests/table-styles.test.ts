@@ -461,7 +461,16 @@ describe("XLSX structured tables", () => {
           style: { fillPattern: "darkGrid", fillColor: "#eef0f2", fillPatternColor: "#345678" },
         },
         headerRow: {
-          style: { fillColor: "#123456", textColor: "#ffffff", bold: true },
+          style: {
+            fillColor: "#123456",
+            textColor: "#ffffff",
+            bold: true,
+            borderLeft: { style: "thin", color: "#123456" },
+            borderRight: { style: "thin", color: "#123456" },
+            borderTop: { style: "thin", color: "#123456" },
+            borderBottom: { style: "thin", color: "#123456" },
+            borderDiagonalUp: { style: "thin", color: "#123456" },
+          },
           innerHorizontal: { style: "thin", color: "#456789" },
           innerVertical: { style: "dotted", color: "#abcdef" },
         },
@@ -504,6 +513,14 @@ describe("XLSX structured tables", () => {
     expect(strFromU8(entries["xl/styles.xml"]!)).toContain(
       '<horizontal style="thin"><color rgb="FF456789"/></horizontal>',
     );
+    const customBorder = /<border diagonalUp="1">([\s\S]*?)<\/border>/.exec(
+      strFromU8(entries["xl/styles.xml"]!),
+    )![1]!;
+    expect(
+      [...customBorder.matchAll(/<(left|right|top|bottom|diagonal|vertical|horizontal)\b/g)].map(
+        (entry) => entry[1],
+      ),
+    ).toEqual(["left", "right", "top", "bottom", "diagonal", "vertical", "horizontal"]);
     expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain('hiddenButton="1"');
     expect(
       getActiveSheet((await decodeXlsx(encoded.bytes)).workbook).tables?.[0]?.style.elements

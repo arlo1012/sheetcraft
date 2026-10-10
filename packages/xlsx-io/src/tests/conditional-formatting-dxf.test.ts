@@ -6,6 +6,31 @@ import { decodeXlsx, encodeXlsx } from "../index.js";
 const range = { start: { row: 0, column: 0 }, end: { row: 2, column: 0 } };
 
 describe("XLSX conditional-format differential styles", () => {
+  test("writes differential border children in the native schema sequence", async () => {
+    const workbook = createWorkbook({ id: "conditional-border-sequence", sheetId: "sheet" });
+    const border = { style: "thin", color: "#112233" } as const;
+    getActiveSheet(workbook).conditionalFormats = [
+      {
+        id: "all-borders",
+        ranges: [range],
+        anchor: range.start,
+        condition: { kind: "cellValue", operator: "greaterThan", value: 0 },
+        style: {
+          borderTop: border,
+          borderRight: false,
+          borderBottom: border,
+          borderLeft: null,
+          borderDiagonalUp: border,
+        },
+      },
+    ];
+    const styles = strFromU8(unzipSync((await encodeXlsx(workbook)).bytes)["xl/styles.xml"]!);
+    const dxf = /<dxf>([\s\S]*?)<\/dxf>/.exec(styles)![1]!;
+    expect(
+      [...dxf.matchAll(/<(left|right|top|bottom|diagonal)\b/g)].map((entry) => entry[1]),
+    ).toEqual(["left", "right", "top", "bottom", "diagonal"]);
+  });
+
   test("roundtrips number, font, pattern, and explicit border/font clears", async () => {
     const workbook = createWorkbook({ id: "conditional-dxf", sheetId: "sheet" });
     getActiveSheet(workbook).conditionalFormats = [

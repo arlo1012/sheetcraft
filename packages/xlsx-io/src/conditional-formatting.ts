@@ -1199,10 +1199,11 @@ function dxfBorderXml(style: ConditionalFormatStyle): string {
       string,
     ]
   > = [
-    ["borderTop", "top"],
-    ["borderRight", "right"],
-    ["borderBottom", "bottom"],
+    // CT_Border is an ordered sequence, including inside differential styles.
     ["borderLeft", "left"],
+    ["borderRight", "right"],
+    ["borderTop", "top"],
+    ["borderBottom", "bottom"],
   ];
   const sideXml = sides
     .map(([key, name]) => {

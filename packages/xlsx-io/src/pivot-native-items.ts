@@ -4,6 +4,26 @@ import {
   type SheetPivotTable,
 } from "@sheetcraft/core/pivot-tables";
 import { pivotValueKey, type PivotCache } from "./pivot-cache.js";
+import type { FormulaValue } from "@sheetcraft/core/formula";
+
+/** Native item positions can differ from shared-cache indices under manual order. */
+export function nativePivotFieldItemOrder(
+  table: SheetPivotTable,
+  field: number,
+  values: readonly FormulaValue[],
+): number[] {
+  const rule = table.sortFields?.find((rule) => rule.field === field && rule.order === "manual");
+  const positions = new Map(
+    (rule?.members ?? []).map((value, index) => [pivotValueKey(value), index]),
+  );
+  return values
+    .map((_, index) => index)
+    .sort(
+      (left, right) =>
+        (positions.get(pivotValueKey(values[left]!)) ?? positions.size) -
+          (positions.get(pivotValueKey(values[right]!)) ?? positions.size) || left - right,
+    );
+}
 
 /** Producer-verified leaf axes: indices address pivotField.items, not visible row numbers. */
 export function nativePivotAxisItems(
@@ -24,11 +44,13 @@ export function nativePivotAxisItems(
     return { rowItems: "", colItems: "" };
   const rowField = table.rowFields[0]!;
   const columnField = table.columnFields[0]!;
+  const rowOrder = nativePivotFieldItemOrder(table, rowField, cache.shared[rowField]!);
+  const columnOrder = nativePivotFieldItemOrder(table, columnField, cache.shared[columnField]!);
   const rowIndices = result.dataRows.map((row) => {
     const values = result.rowMembers[row];
     return values?.length === 1
-      ? cache.shared[rowField]!.findIndex(
-          (value) => pivotValueKey(value) === pivotValueKey(values[0]!),
+      ? rowOrder.findIndex(
+          (index) => pivotValueKey(cache.shared[rowField]![index]!) === pivotValueKey(values[0]!),
         )
       : -1;
   });
@@ -38,8 +60,9 @@ export function nativePivotAxisItems(
     .filter((_, index) => index !== totalColumn)
     .map((members) =>
       members.length === 1
-        ? cache.shared[columnField]!.findIndex(
-            (value) => pivotValueKey(value) === pivotValueKey(members[0]!),
+        ? columnOrder.findIndex(
+            (index) =>
+              pivotValueKey(cache.shared[columnField]![index]!) === pivotValueKey(members[0]!),
           )
         : -1,
     );

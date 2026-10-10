@@ -22,7 +22,7 @@ import {
 } from "./pivot-xml.js";
 import { nativePivotSourceFingerprint, pivotValueKey, type PivotCache } from "./pivot-cache.js";
 import { nativePivotFiltersXml } from "./pivot-native-filters.js";
-import { nativePivotAxisItems } from "./pivot-native-items.js";
+import { nativePivotAxisItems, nativePivotFieldItemOrder } from "./pivot-native-items.js";
 
 export function pivotTableXml(
   workbook: Workbook,
@@ -63,7 +63,12 @@ export function pivotTableXml(
         ? getPivotGroupLabels(group, workbook.dateSystem)
         : cache.shared[field]!;
       const items = axis
-        ? `<items count="${members.length}">${members.map((value, index) => `<item x="${index}"${allowed && !allowed.has(pivotValueKey(value)) ? ' h="1"' : ""}/>`).join("")}</items>`
+        ? `<items count="${members.length}">${nativePivotFieldItemOrder(table, field, members)
+            .map(
+              (index) =>
+                `<item x="${index}"${allowed && !allowed.has(pivotValueKey(members[index]!)) ? ' h="1"' : ""}/>`,
+            )
+            .join("")}</items>`
         : "";
       const sortScope =
         sort?.measure === undefined
@@ -135,14 +140,17 @@ export function pivotTableXml(
                 (value.aggregate === "count" || value.aggregate === "countNums"
                   ? 0
                   : (cache.numberFormats[value.field] ?? 0)),
-              cache.headers.map((_, field) =>
-                table.groups?.find((group) => group.field === field)
+              cache.headers.map((_, field) => {
+                const members = table.groups?.find((group) => group.field === field)
                   ? getPivotGroupLabels(
                       table.groups.find((group) => group.field === field)!,
                       workbook.dateSystem,
                     )
-                  : cache.shared[field]!,
-              ),
+                  : cache.shared[field]!;
+                return nativePivotFieldItemOrder(table, field, members).map(
+                  (index) => members[index]!,
+                );
+              }),
             ),
           )
           .join("")}</dataFields>`

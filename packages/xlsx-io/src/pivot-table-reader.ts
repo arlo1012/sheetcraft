@@ -29,6 +29,7 @@ import {
   type XmlNode,
 } from "./pivot-xml.js";
 import { xlsxPivotTableStyleId } from "./table-styles.js";
+import { restoreCachedLeafPivotLayout } from "./pivot-cached-leaf-layout.js";
 
 function requiresBoundTable(root: XmlNode, cacheRoot: XmlNode): boolean {
   const ext = nodes(child(root, "extLst").ext).find((ext) => attr(ext, "uri") === PIVOT_EXT);
@@ -234,7 +235,7 @@ export function readPivotTable(
   recordsBytes?: Uint8Array,
   reportSheetId?: string,
   readNumberFormat?: (id: number) => CellNumberFormat | undefined,
-): SheetPivotTable {
+): { table: SheetPivotTable; cachedLeafLayout: boolean } {
   const root = child(parseXml(definitionBytes), "pivotTableDefinition");
   const cacheRoot = child(parseXml(cacheBytes), "pivotCacheDefinition");
   if (flag(root, "dataOnRows") || "calculatedItems" in cacheRoot || "cacheHierarchies" in cacheRoot)
@@ -429,6 +430,20 @@ export function readPivotTable(
   if (width !== cache.headers.length) throw new Error("Pivot source fields changed.");
   if (!normalized.dataCache) getPivotTableSource(workbook, normalized);
   const restored = restoreMetadata(root, cacheRoot, workbook, normalized);
+  let cachedLeafLayout = false;
+  if (reportSheetId)
+    try {
+      cachedLeafLayout = restoreCachedLeafPivotLayout(
+        workbook,
+        reportSheetId,
+        restored,
+        root,
+        cacheBytes,
+        restored !== normalized,
+      );
+    } catch {
+      // Keep a valid native report/cache when chart-layout proof cannot be rebuilt.
+    }
   if (restored.dataCache && !restored.resultLayout) {
     // Offer drill-through only when our rebuilt layout agrees with the imported displayed cells.
     // External clients may retain manual ordering/layouts that this model cannot reproduce.
@@ -468,5 +483,5 @@ export function readPivotTable(
       /* Keep the native report and cache available for a subsequent explicit refresh. */
     }
   }
-  return restored;
+  return { table: restored, cachedLeafLayout };
 }

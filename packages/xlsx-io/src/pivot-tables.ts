@@ -142,11 +142,20 @@ export function writeXlsxPivotTables(
   }
   return emitted;
 }
+export type ImportedPivotTable = {
+  sheet: Sheet;
+  sheetPart: string;
+  tablePart: string;
+  nativeName: string;
+  table: SheetPivotTable;
+  cachedLeafLayout: boolean;
+};
 export function readXlsxPivotTables(
   bytes: Uint8Array,
   workbook: Workbook,
   report: CompatibilityReportBuilder,
-): void {
+): readonly ImportedPivotTable[] {
+  const imported: ImportedPivotTable[] = [];
   const entries = unzipSync(bytes);
   const styleRoot = entries["xl/styles.xml"]
     ? child(parseXml(entries["xl/styles.xml"]), "styleSheet")
@@ -184,7 +193,7 @@ export function readXlsxPivotTables(
           throw new Error("Missing pivot cache.");
         const cacheRoot = child(parseXml(entries[cachePart]), "pivotCacheDefinition");
         const recordRelation = relationships(entries, cachePart).get(attr(cacheRoot, "id"));
-        const table = readPivotTable(
+        const { table, cachedLeafLayout } = readPivotTable(
           workbook,
           definition,
           entries[cachePart]!,
@@ -198,9 +207,18 @@ export function readXlsxPivotTables(
         if (seen.has(table.id)) table.id = `xlsx-pivot-${index}-${sheet.pivotTables?.length ?? 0}`;
         seen.add(table.id);
         (sheet.pivotTables ??= []).push(table);
+        imported.push({
+          sheet,
+          sheetPart,
+          tablePart: relation.target,
+          nativeName: attr(root, "name"),
+          table,
+          cachedLeafLayout,
+        });
       } catch {
         report.add("feature-omitted", "warning", location);
       }
     }
   }
+  return imported;
 }

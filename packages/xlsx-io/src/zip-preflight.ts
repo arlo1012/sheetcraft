@@ -1,6 +1,10 @@
 import { CompatibilityReportBuilder } from "./report.js";
 import { collectSupportedPivotParts } from "./pivot-package-parts.js";
 import {
+  collectNativePivotChartParts,
+  UnsupportedChartDrawingError,
+} from "./chart-package-parts.js";
+import {
   XlsxAbortError,
   XlsxCompatibilityError,
   type AbortSignalLike,
@@ -233,6 +237,7 @@ export async function preflightXlsxArchive(
     fail("archive-limit", report);
 
   const archiveEntries: ZipEntry[] = [];
+  const entryNames = new Set<string>();
   let cursor = directoryOffset;
   let totalUncompressed = 0;
   for (let index = 0; index < entries; index += 1) {
@@ -260,6 +265,8 @@ export async function preflightXlsxArchive(
       fail("archive-invalid", report);
     const name = readAscii(bytes, cursor + 46, nameLength);
     if (isUnsafePath(name)) fail("archive-unsafe-path", report, name);
+    if (entryNames.has(name.toLowerCase())) fail("archive-invalid", report, name);
+    entryNames.add(name.toLowerCase());
     if ((flags & 1) !== 0) fail("archive-encrypted", report, name);
     if (compression !== 0 && compression !== 8)
       fail("archive-unsupported-compression", report, name);
@@ -325,16 +332,7 @@ export async function preflightXlsxArchive(
   const names = new Set(materialEntries.map((entry) => entry.name.toLowerCase()));
   if ([...names].some((name) => name === "xl/vbaproject.bin" || name.endsWith(".xlsm")))
     fail("macro-content", report);
-  if (
-    [...names].some(
-      (name) =>
-        (!name.endsWith("/") &&
-          name.startsWith("xl/drawings/") &&
-          !/^xl\/drawings\/vmldrawing\d+\.vml$/i.test(name)) ||
-        name.startsWith("xl/media/"),
-    )
-  )
-    fail("drawing-or-media", report);
+  if ([...names].some((name) => name.startsWith("xl/media/"))) fail("drawing-or-media", report);
   if (
     [...names].some(
       (name) => name.startsWith("xl/externallinks/") || name.includes("encryptedpackage"),
@@ -348,8 +346,9 @@ export async function preflightXlsxArchive(
   }
   const archiveParts = new Map(materialEntries.map((entry) => [entry.name, entry]));
   let supportedPivotParts: ReadonlySet<string>;
+  let supportedChartParts: ReadonlySet<string>;
   try {
-    supportedPivotParts = await collectSupportedPivotParts(relationshipEntries, async (part) => {
+    const readPart = async (part: string) => {
       const entry = archiveParts.get(part);
       if (!entry) return undefined;
       const content =
@@ -359,19 +358,33 @@ export async function preflightXlsxArchive(
       const xml = decodeXml(content);
       if (xml === null) fail("archive-invalid", report, part);
       inspectXmlPart(part, xml, report);
+      relationshipEntries[part] = content;
       return content;
-    });
+    };
+    supportedPivotParts = await collectSupportedPivotParts(relationshipEntries, readPart);
+    supportedChartParts = (await collectNativePivotChartParts(relationshipEntries, readPart)).parts;
   } catch (error) {
     if (error instanceof XlsxAbortError || error instanceof XlsxCompatibilityError) throw error;
+    if (error instanceof UnsupportedChartDrawingError) fail("drawing-or-media", report);
     fail("archive-invalid", report);
   }
+  if (
+    [...names].some(
+      (name) =>
+        !name.endsWith("/") &&
+        name.startsWith("xl/drawings/") &&
+        !/^xl\/drawings\/vmldrawing\d+\.vml$/i.test(name) &&
+        !supportedChartParts.has(name),
+    )
+  )
+    fail("drawing-or-media", report);
   for (const entry of materialEntries) {
     const name = entry.name.toLowerCase();
     if (name.startsWith("xl/embeddings/") || name.startsWith("xl/activex/"))
       report.add("macro-content", "block", entry.name);
     if (
       name.startsWith("xl/tables/") ||
-      name.startsWith("xl/charts") ||
+      (name.startsWith("xl/charts") && !supportedChartParts.has(name)) ||
       name.startsWith("customxml/") ||
       name.startsWith("xl/connections")
     )
@@ -394,7 +407,8 @@ export async function preflightXlsxArchive(
       name.startsWith("xl/charts") ||
       name.startsWith("xl/connections") ||
       name.startsWith("customxml/") ||
-      supportedPivotParts.has(name);
+      supportedPivotParts.has(name) ||
+      supportedChartParts.has(name);
     if (!knownPart) report.add("feature-omitted", "warning", entry.name);
   }
   if (report.hasBlocks())

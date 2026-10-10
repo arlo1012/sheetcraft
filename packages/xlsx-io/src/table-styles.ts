@@ -448,8 +448,8 @@ function xlsxStyleName(style: TableStyleDefinition): string {
 function tableDxfXml(element: TableStyleElementFormat): string {
   const sides = (
     [
-      ["horizontal", element.innerHorizontal],
       ["vertical", element.innerVertical],
+      ["horizontal", element.innerHorizontal],
     ] as const
   )
     .flatMap(([name, border]) =>

@@ -1,0 +1,29 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+ ❯ src/tests/xlsx-io.test.ts (24 tests | 1 failed) 701ms
+     × imports classic notes with their multiline text and author 36ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/xlsx-io.test.ts > XLSX IO > imports classic notes with their multiline text and author
+XlsxCompatibilityError: The XLSX archive is not supported.
+ ❯ fail src/zip-preflight.ts:47:9
+     45| ): never {
+     46|   report.add(code, "block", issueLocation);
+     47|   throw new XlsxCompatibilityError("The XLSX archive is not supported.…
+       |         ^
+     48| }
+     49|
+ ❯ preflightXlsxArchive src/zip-preflight.ts:379:5
+ ❯ decodeXlsx src/index.ts:37:21
+ ❯ src/tests/xlsx-io.test.ts:69:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 74 passed (75)
+      Tests  1 failed | 925 passed (926)
+   Start at  10:35:33
+   Duration  65.76s (transform 2.15s, setup 0ms, import 31.30s, tests 24.14s, environment 6ms)
+
