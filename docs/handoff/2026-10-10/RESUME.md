@@ -45,6 +45,13 @@ The bounded exact-empty-string follow-up reached 77 files / 1,040 XLSX tests and
 and verified their formal reexport in both apps. Its public source-identity proof,
 warnings and remaining boundaries are in
 `docs/acceptance/native-column-empty-source-20261010.md`.
+That exact-empty follow-up was published as
+`17dae1ca443207080adc82170aea312b341595aa`. The current bounded straight-marker
+line continuation reached **78 files / 1,083 XLSX tests**, focused 5 files / 211,
+with owned package types/build/static checks passed and the same 125 architecture
+failures. Read `docs/insert/native-line-charts.md` and
+`docs/acceptance/native-line-chart-20261010.md` for actual producer/save discrepancy,
+numeric/genuine-blank source limits, initial failures and exact GUI scope.
 Read `docs/acceptance/native-column-chart-20261010.md` and its evidence directory
 for initial failures and exact final logs. The architecture aggregate remains
 failed with 125 prior diagnostics and no additions relative to the earlier 126;
@@ -76,6 +83,11 @@ PivotTable Refresh. Cache/formula proof is mandatory on import; no native identi
 is guessed. Zero/negative values and missing numeric points are retained. Hidden
 source cells require showHidden=true; other types/layouts remain omissions. No
 snapshot model/version changed for this ordinary I/O slice.
+
+Ordinary native lines now use the same exact rectangle/name/category/value proof,
+but only unstacked straight visible-circle-marker lines with genuine numeric/blank
+points and explicit gaps. Text/cache-zero normalization stays column-only. Unknown
+marker/smooth/axes/linked-line variants are not guessed. No bar support is inferred.
 
 The native package admission is explicit and bounded. Media/pictures, unknown
 chart families, unexpected namespaces/payloads and unconsumed drawing relations

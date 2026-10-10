@@ -53,6 +53,14 @@ export function columnChartXml(
   source: ColumnChartSource,
   pivotIdentity?: string,
 ): Uint8Array {
+  const line = drawing.chart.type === "line" && pivotIdentity === undefined;
+  const family = line ? "lineChart" : "barChart";
+  const familyStart = line
+    ? `<c:grouping val="standard"/><c:varyColors val="0"/>`
+    : `<c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>`;
+  const familyEnd = line
+    ? `<c:marker val="1"/><c:smooth val="0"/>`
+    : `<c:gapWidth val="150"/><c:overlap val="0"/>`;
   const category = source.categoryRange
     ? `<c:cat><c:strRef><c:f>${xml(columnChartReference(sheetName, source.categoryRange))}</c:f><c:strCache>${stringCache(source.data.categories)}</c:strCache></c:strRef></c:cat>`
     : "";
@@ -73,7 +81,7 @@ export function columnChartXml(
           value === null ? [] : [`<c:pt idx="${point}"><c:v>${value}</c:v></c:pt>`],
         )
         .join("");
-      return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/><c:tx><c:strRef><c:f>${xml(nameReference)}</c:f><c:strCache>${stringCache([name])}</c:strCache></c:strRef></c:tx><c:spPr><a:solidFill><a:schemeClr val="accent${(index % 6) + 1}"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr><c:invertIfNegative val="0"/>${category}<c:val><c:numRef><c:f>${xml(columnChartReference(sheetName, source.valueRanges[index]!))}</c:f><c:numCache><c:formatCode>${xml(numberFormat)}</c:formatCode><c:ptCount val="${source.data.categories.length}"/>${points}</c:numCache></c:numRef></c:val></c:ser>`;
+      return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/><c:tx><c:strRef><c:f>${xml(nameReference)}</c:f><c:strCache>${stringCache([name])}</c:strCache></c:strRef></c:tx>${line ? `<c:spPr><a:ln w="28575" cap="rnd"><a:solidFill><a:schemeClr val="accent${(index % 6) + 1}"/></a:solidFill><a:round/></a:ln></c:spPr><c:marker><c:symbol val="circle"/><c:size val="5"/></c:marker>` : `<c:spPr><a:solidFill><a:schemeClr val="accent${(index % 6) + 1}"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr><c:invertIfNegative val="0"/>`}${category}<c:val><c:numRef><c:f>${xml(columnChartReference(sheetName, source.valueRanges[index]!))}</c:f><c:numCache><c:formatCode>${xml(numberFormat)}</c:formatCode><c:ptCount val="${source.data.categories.length}"/>${points}</c:numCache></c:numRef></c:val>${line ? `<c:smooth val="0"/>` : ""}</c:ser>`;
     })
     .join("");
   const title = drawing.chart.title
@@ -81,9 +89,9 @@ export function columnChartXml(
     : `<c:autoTitleDeleted val="1"/>`;
   const labels = `<c:dLbls><c:showLegendKey val="0"/><c:showVal val="${Number(drawing.chart.labels)}"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>`;
   const legend = drawing.chart.legend
-    ? `<c:legend><c:legendPos val="r"/><c:layout/><c:overlay val="0"/></c:legend>`
+    ? `<c:legend><c:legendPos val="${line ? "b" : "r"}"/><c:layout/><c:overlay val="0"/></c:legend>`
     : "";
   return strToU8(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="${ART_NS}" xmlns:r="${REL_NS}"><c:date1904 val="${Number(workbook.dateSystem === "1904")}"/><c:style val="2"/>${pivotIdentity ? `<c:pivotSource><c:name>${xml(pivotIdentity)}</c:name><c:fmtId val="0"/></c:pivotSource>` : ""}<c:chart>${title}<c:plotArea><c:layout/><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${series}${labels}<c:gapWidth val="150"/><c:overlap val="0"/><c:axId val="1"/><c:axId val="2"/></c:barChart><c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="2"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/></c:catAx><c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="1"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea>${legend}<c:plotVisOnly val="${Number(!drawing.chart.showHidden)}"/><c:dispBlanksAs val="gap"/><c:showDLblsOverMax val="0"/></c:chart>${pivotIdentity ? `<c:extLst><c:ext uri="{781A3756-C4B2-4CAC-9D66-4F8BD8637D16}" xmlns:c14="http://schemas.microsoft.com/office/drawing/2007/8/2/chart"><c14:pivotOptions><c14:dropZoneFilter val="1"/><c14:dropZoneCategories val="1"/><c14:dropZoneData val="1"/><c14:dropZoneSeries val="1"/><c14:dropZonesVisible val="1"/></c14:pivotOptions></c:ext></c:extLst>` : ""}</c:chartSpace>`,
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="${ART_NS}" xmlns:r="${REL_NS}"><c:date1904 val="${Number(workbook.dateSystem === "1904")}"/><c:style val="2"/>${pivotIdentity ? `<c:pivotSource><c:name>${xml(pivotIdentity)}</c:name><c:fmtId val="0"/></c:pivotSource>` : ""}<c:chart>${title}<c:plotArea><c:layout/><c:${family}>${familyStart}${series}${labels}${familyEnd}<c:axId val="1"/><c:axId val="2"/></c:${family}><c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="2"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/></c:catAx><c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="1"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea>${legend}<c:plotVisOnly val="${Number(!drawing.chart.showHidden)}"/><c:dispBlanksAs val="gap"/><c:showDLblsOverMax val="0"/></c:chart>${pivotIdentity ? `<c:extLst><c:ext uri="{781A3756-C4B2-4CAC-9D66-4F8BD8637D16}" xmlns:c14="http://schemas.microsoft.com/office/drawing/2007/8/2/chart"><c14:pivotOptions><c14:dropZoneFilter val="1"/><c14:dropZoneCategories val="1"/><c14:dropZoneData val="1"/><c14:dropZoneSeries val="1"/><c14:dropZonesVisible val="1"/></c14:pivotOptions></c:ext></c:extLst>` : ""}</c:chartSpace>`,
   );
 }

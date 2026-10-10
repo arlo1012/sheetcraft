@@ -67,6 +67,11 @@ function strictRoot(
     "chart",
     "plotArea",
     "barChart",
+    "lineChart",
+    "marker",
+    "symbol",
+    "size",
+    "smooth",
     "barDir",
     "grouping",
     "ser",
@@ -140,6 +145,7 @@ function strictRoot(
     "formatCode",
   ]);
   const artElements = new Set([
+    "prstDash",
     "solidFill",
     "schemeClr",
     "srgbClr",
@@ -250,6 +256,21 @@ function strictRoot(
       }
       const [prefix, localName] = key.includes(":") ? key.split(":") : ["", key];
       const ns = bindings.get(prefix!) ?? "";
+      // Observed WPS post-save straight lines add this inert solid-dash leaf.
+      // Admit only its exact series line-style location/value, not general dash
+      // payloads or a new drawing/column/style extension escape hatch.
+      if (
+        namespace === CHART_NS &&
+        localName === "prstDash" &&
+        (ns !== ART_NS ||
+          ancestors.join("/") !== "chartSpace/chart/plotArea/lineChart/ser/spPr/ln" ||
+          node["@_val"] !== "solid" ||
+          Object.keys(node).some(
+            (key) => key !== "@_val" && key !== "#text" && !key.startsWith("@_xmlns"),
+          ) ||
+          (node["#text"] !== undefined && String(node["#text"]).trim() !== ""))
+      )
+        reject();
       if (
         !allowedNamespaces.includes(ns) ||
         (root && (localName !== name || ns !== namespace)) ||
@@ -624,21 +645,19 @@ export async function collectNativeChartParts(
           reject();
       }
       const plot = single(nativeChart, "plotArea");
-      only(plot, ["layout", "barChart", "catAx", "valAx", "spPr"]);
-      const bar = single(plot, "barChart");
-      only(bar, [
-        "barDir",
-        "grouping",
-        "varyColors",
-        "ser",
-        "dLbls",
-        "gapWidth",
-        "overlap",
-        "axId",
-      ]);
+      only(plot, ["layout", "barChart", "lineChart", "catAx", "valAx", "spPr"]);
+      const line = plot.lineChart !== undefined;
+      if (line && (plot.barChart !== undefined || kind !== "ordinary")) reject();
+      const bar = single(plot, line ? "lineChart" : "barChart");
+      only(
+        bar,
+        line
+          ? ["grouping", "varyColors", "ser", "dLbls", "marker", "smooth", "axId"]
+          : ["barDir", "grouping", "varyColors", "ser", "dLbls", "gapWidth", "overlap", "axId"],
+      );
       if (
-        attr(single(bar, "barDir"), "val") !== "col" ||
-        attr(single(bar, "grouping"), "val") !== "clustered"
+        (!line && attr(single(bar, "barDir"), "val") !== "col") ||
+        attr(single(bar, "grouping"), "val") !== (line ? "standard" : "clustered")
       )
         reject();
       const categoryAxis = single(plot, "catAx");
@@ -662,7 +681,12 @@ export async function collectNativeChartParts(
       if (values(bar.ser).length !== series.length) reject();
       if (!series.length || series.length > 10000) reject();
       for (const [index, seriesNode] of series.entries()) {
-        only(seriesNode, ["idx", "order", "tx", "spPr", "invertIfNegative", "dLbls", "cat", "val"]);
+        only(
+          seriesNode,
+          line
+            ? ["idx", "order", "tx", "spPr", "marker", "dLbls", "cat", "val", "smooth"]
+            : ["idx", "order", "tx", "spPr", "invertIfNegative", "dLbls", "cat", "val"],
+        );
         if (
           attr(single(seriesNode, "idx"), "val") !== String(index) ||
           attr(single(seriesNode, "order"), "val") !== String(index)

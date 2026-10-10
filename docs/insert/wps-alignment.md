@@ -101,6 +101,12 @@ Do not substitute a mocked visual pass or repeat broad format matrices.
 
 ## Compatibility workflow and sources
 
+The ordinary line continuation is based on an actual WPS line-with-markers
+producer, including a missing middle point that stays a gap. It reuses exact
+ordinary rectangle proof while keeping text/cache-zero adaptation column-only.
+An actual WPS post-save solid line-style leaf was isolated and admitted only at its
+proven path/value. See the [bounded line acceptance](../acceptance/native-line-chart-20261010.md).
+
 The ordinary clustered-column continuation now carries the existing two series
 directions and independent header flags. Actual WPS and Excel formal product
 eight-sheet matrices passed live edit and save/reopen. Row-oriented header

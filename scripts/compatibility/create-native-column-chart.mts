@@ -21,11 +21,19 @@ import {
 const [mode, firstPath, secondPath] = process.argv.slice(2);
 if (
   !firstPath ||
-  !["seed", "product", "options", "options-blanks", "roundtrip"].includes(mode!) ||
+  ![
+    "seed",
+    "product",
+    "options",
+    "options-blanks",
+    "line-product",
+    "line-options",
+    "roundtrip",
+  ].includes(mode!) ||
   (mode === "roundtrip" ? !secondPath : secondPath !== undefined)
 )
   throw new Error(
-    "Usage: bun scripts/compatibility/create-native-column-chart.mts seed|product|options|options-blanks output.xlsx OR roundtrip input.xlsx output.xlsx",
+    "Usage: bun scripts/compatibility/create-native-column-chart.mts seed|product|options|options-blanks|line-product|line-options output.xlsx OR roundtrip input.xlsx output.xlsx",
   );
 const output = resolve(mode === "roundtrip" ? secondPath! : firstPath);
 let workbook: Workbook;
@@ -49,7 +57,9 @@ if (mode === "roundtrip") {
 } else {
   const idFactory = createSequentialIdFactory();
   workbook = createWorkbook({ idFactory });
-  const options = mode.startsWith("options")
+  const matrix = mode.startsWith("options") || mode === "line-options";
+  const line = mode.startsWith("line-");
+  const options = matrix
     ? (["columns", "rows"] as const).flatMap((seriesBy) =>
         [true, false].flatMap((headerRow) =>
           [true, false].map((headerColumn) => ({ seriesBy, headerRow, headerColumn })),
@@ -57,26 +67,34 @@ if (mode === "roundtrip") {
       )
     : [{ seriesBy: "columns" as const, headerRow: true, headerColumn: true }];
   for (const [index, option] of options.entries()) {
-    const optionName = mode.startsWith("options")
+    const optionName = matrix
       ? `${option.seriesBy === "columns" ? "C" : "R"}-${Number(option.headerRow)}${Number(option.headerColumn)}`
       : "Sales";
     const sheet =
       index === 0 ? getActiveSheet(workbook) : createSheet(optionName, undefined, idFactory);
-    sheet.name = mode.startsWith("options") ? optionName : "Data";
+    sheet.name = matrix ? optionName : "Data";
     if (index > 0) insertSheet(workbook, sheet);
     [
       ["region", mode === "options-blanks" ? "" : "apple", "pear"],
       [mode === "options-blanks" ? "" : "east", 60, 70],
-      ["north", 100, mode === "options-blanks" ? null : 80],
+      ["north", 100, mode === "options-blanks" || line ? null : 80],
       ["south", 120, 90],
     ].forEach((row, r) =>
-      row.forEach((value, column) =>
+      row.forEach((initialValue, column) => {
+        const resolved =
+          mode === "line-options" &&
+          !(option.headerRow && r === 0) &&
+          !(option.headerColumn && column === 0)
+            ? r === 2 && column === 2
+              ? null
+              : r * 10 + column
+            : initialValue;
         setCellContent(
           sheet,
           { row: r, column },
-          value === null ? null : { kind: "literal", value: value! },
-        ),
-      ),
+          resolved === null ? null : { kind: "literal", value: resolved! },
+        );
+      }),
     );
     if (mode !== "seed")
       sheet.drawings = [
@@ -100,7 +118,7 @@ if (mode === "roundtrip") {
           italic: false,
           rotation: 0,
           chart: {
-            type: "column",
+            type: line ? "line" : "column",
             range: { start: { row: 0, column: 0 }, end: { row: 3, column: 2 } },
             title: optionName,
             headerRow: option.headerRow,

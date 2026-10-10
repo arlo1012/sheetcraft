@@ -45,6 +45,7 @@ function numericCacheMatches(
   span: CellRange,
   sheet: Sheet,
   labels: boolean,
+  allowTextZero: boolean,
 ): { matches: boolean; normalized: boolean } {
   const cache = readChartCache(reference, true);
   let normalized = false;
@@ -63,6 +64,7 @@ function numericCacheMatches(
         column: span.start.column + (span.start.row === span.end.row ? index : 0),
       });
       if (
+        allowTextZero &&
         !labels &&
         expected[index] === null &&
         value === 0 &&
@@ -132,6 +134,7 @@ function recoverSource(
               source.valueRanges[index]!,
               sheet,
               chart.labels,
+              chart.type === "column",
             );
             if (!numeric.matches) {
               matches = false;
@@ -177,7 +180,7 @@ function recoverSource(
   return candidates[0]!;
 }
 
-/** Recover one live rectangular column source, never a guessed PivotTable owner. */
+/** Recover a proven ordinary column/straight marker line, never guessed pivot ownership. */
 export function readXlsxColumnCharts(
   workbook: Workbook,
   parts: readonly NativeChartPart[],
@@ -191,7 +194,15 @@ export function readXlsxColumnCharts(
       if (!sheet) throw new Error("Missing chart sheet.");
       const native = single(part.chartSpace, "chart");
       const plot = single(native, "plotArea");
-      const bar = single(plot, "barChart");
+      const line = plot.lineChart !== undefined;
+      const bar = single(plot, line ? "lineChart" : "barChart");
+      if (line && (!chartBoolean(bar, "marker", false) || chartBoolean(bar, "smooth", false)))
+        throw new Error("Unsupported line markers or smoothing.");
+      if (
+        line &&
+        (native.dispBlanksAs === undefined || attr(single(native, "dispBlanksAs"), "val") !== "gap")
+      )
+        throw new Error("Unproven line missing-point behavior.");
       if (
         chartBoolean(bar, "varyColors", false) ||
         (native.dispBlanksAs !== undefined && attr(single(native, "dispBlanksAs"), "val") !== "gap")
@@ -206,10 +217,12 @@ export function readXlsxColumnCharts(
           chartBoolean(axis, "delete", false)
         )
           throw new Error("Unsupported chart axis.");
+        if (line && attr(single(axis, "axPos"), "val") !== (name === "catAx" ? "b" : "l"))
+          throw new Error("Unproven line axis position.");
       }
       const series = nodes(bar.ser);
       const base = {
-        type: "column" as const,
+        type: line ? ("line" as const) : ("column" as const),
         title: readChartTitle(native, true),
         legend: native.legend !== undefined,
         labels: chartBoolean(child(bar, "dLbls"), "showVal", false),
@@ -225,6 +238,19 @@ export function readXlsxColumnCharts(
       if (nodes(bar.dLbls).length > 1 || nodes(native.legend).length > 1)
         throw new Error("Ambiguous chart presentation.");
       for (const item of series) {
+        if (line) {
+          const marker = single(item, "marker");
+          only(marker, ["symbol", "size", "spPr"]);
+          const size = Number(attr(single(marker, "size"), "val"));
+          if (
+            attr(single(marker, "symbol"), "val") !== "circle" ||
+            !Number.isSafeInteger(size) ||
+            size < 2 ||
+            size > 72 ||
+            chartBoolean(item, "smooth", false)
+          )
+            throw new Error("Unsupported straight marker line.");
+        }
         // Observed WPS default per-series labels are explicitly disabled.
         if (item.dLbls !== undefined) {
           const labels = single(item, "dLbls");

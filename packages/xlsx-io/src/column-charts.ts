@@ -4,7 +4,12 @@ import {
   type SheetChart,
 } from "@sheetcraft/core/sheet-charts";
 import { normalizeSheetDrawing, type SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
-import { createWorkbookEvaluator, type Sheet, type Workbook } from "@sheetcraft/core/workbook";
+import {
+  createWorkbookEvaluator,
+  getCellContent,
+  type Sheet,
+  type Workbook,
+} from "@sheetcraft/core/workbook";
 import { columnChartXml, validXmlText, type ColumnChartSource } from "./column-chart-xml.js";
 import {
   addDrawingContentType,
@@ -70,7 +75,7 @@ export function ordinaryColumnChartSource(
     !range ||
     chart.pivotTableId !== undefined ||
     chart.dataCache !== undefined ||
-    chart.type !== "column" ||
+    (chart.type !== "column" && chart.type !== "line") ||
     chart.stacked ||
     (range.end.row - range.start.row + 1) * (range.end.column - range.start.column + 1) > 10000 ||
     ![sheet.name, chart.title].every(validXmlText)
@@ -141,6 +146,26 @@ export function ordinaryColumnChartSource(
         }
       : null;
   const evaluator = createWorkbookEvaluator(workbook, sheet.id);
+  // The actual straight-line producer proves numeric points and genuinely blank
+  // gaps. Text/boolean/error points may create native zero segments and have no
+  // proven line-family normalization contract yet. Keep those exports bounded.
+  if (
+    chart.type === "line" &&
+    valueRanges.some((span) => {
+      for (let row = span.start.row; row <= span.end.row; row++)
+        for (let column = span.start.column; column <= span.end.column; column++) {
+          const cell = { row, column };
+          const value = evaluator.getComputedValue(cell);
+          if (
+            !(typeof value === "number" && Number.isFinite(value)) &&
+            !(value === null && getCellContent(sheet, cell) === null)
+          )
+            return true;
+        }
+      return false;
+    })
+  )
+    return;
   // This slice proves text/blank labels, not native date/numeric category axes.
   const labelCells = nameRanges.flatMap((span) => (span ? [span.start] : []));
   if (categoryRange) {
@@ -174,7 +199,7 @@ export function ordinaryColumnChartSource(
   };
 }
 
-/** Ordinary clustered-column charts, retaining their live worksheet dependency. */
+/** Proven ordinary columns/straight marker lines with live worksheet dependency. */
 export function writeXlsxColumnCharts(
   entries: Record<string, Uint8Array>,
   workbook: Workbook,

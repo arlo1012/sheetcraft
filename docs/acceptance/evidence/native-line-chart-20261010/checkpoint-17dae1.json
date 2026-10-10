@@ -1,0 +1,55 @@
+{
+  "repository": "arlo1012/sheetcraft",
+  "branch": "refactor/native-xlsx-20261009",
+  "head": "17dae1ca443207080adc82170aea312b341595aa",
+  "parent": "9d3020e92e3b4a7d9e5f0a5b35bb69489d3b0da7",
+  "tree": "52922ffcd1b4f3a0f679055cafa1a903b4be084a",
+  "paths": 15,
+  "remoteVerified": true,
+  "force": false,
+  "localIndexMatchesRemoteTree": true,
+  "author": {
+    "name": "arlo.wang",
+    "email": "75329932+arlo1012@users.noreply.github.com",
+    "date": "2026-10-10T19:40:54Z"
+  },
+  "committer": {
+    "name": "arlo.wang",
+    "email": "75329932+arlo1012@users.noreply.github.com",
+    "date": "2026-10-10T19:40:54Z"
+  },
+  "tests": {
+    "xlsxFull": {
+      "files": 77,
+      "tests": 1040,
+      "pass": true
+    },
+    "xlsxFocused": {
+      "files": 4,
+      "tests": 168,
+      "pass": true
+    },
+    "types": true,
+    "build": true,
+    "scopedLint": true,
+    "scopedFormat": true,
+    "architecture": {
+      "pass": false,
+      "count": 125,
+      "added": 0,
+      "removed": 0
+    },
+    "coreWebRerun": false
+  },
+  "gui": {
+    "actualWpsBlankSavePublicRecovery": 8,
+    "actualFormalReexportAllEightWpsExcelFirstOpen": true,
+    "representativeR00WpsExcelB3EditSaveCloseReopen": "100->112; correct options/gaps/names",
+    "actualWpsResavePublicRecovery": 8,
+    "excelSavedBytesDownloaded": false
+  },
+  "newGuiArtifactsPublished": false,
+  "authenticationBackedUp": false,
+  "remoteChecks": [],
+  "remoteStatuses": []
+}
