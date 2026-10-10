@@ -1,0 +1,199 @@
+$ vitest run --config vitest.config.ts src/tests/tables/rename-filter-lifecycle.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/core
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts (10 tests | 9 failed) 45ms
+     × renames the owning table's implicit selector: =[@Qty]*10 21ms
+     × renames the owning table's implicit selector: =SUM([Qty]) 3ms
+     × renames the owning table's implicit selector: =SUM([[#Data],[Qty]]) 2ms
+     × renames the owning table's implicit selector: ="[@Qty]"&[@Qty] 2ms
+     × updates implicit references only inside the edited table and named references across sheets 2ms
+     × filtered row shrink stays serializable and reversible (settings=false) 4ms
+     × filtered row shrink stays serializable and reversible (settings=true) 1ms
+     × horizontal shrink drops only excluded filter criteria 1ms
+     × expansion keeps selected values and covers new rows, excluding totals 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > renames the owning table's implicit selector: =[@Qty]*10
+AssertionError: expected { kind: 'formula', …(1) } to match object { formula: { source: '=[@Units]*10' } }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "formula": {
+-     "source": "=[@Units]*10",
++     "source": "=[@Qty]*10",
+    },
+  }
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:101:60
+     99|       createSetCellContentCommand(f.sheet.id, { row: 0, column: 1 }, {…
+    100|     );
+    101|     expect(getCellContent(f.sheet, { row: 1, column: 2 })).toMatchObje…
+       |                                                            ^
+    102|     expect(getCellContent(f.sheet, { row: 2, column: 2 })).toEqual({ k…
+    103|     const after = serializeWorkbook(f.workbook);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > renames the owning table's implicit selector: =SUM([Qty])
+AssertionError: expected { kind: 'formula', …(1) } to match object { Object (formula) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "formula": {
+-     "source": "=SUM([Units])",
++     "source": "=SUM([Qty])",
+    },
+  }
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:101:60
+     99|       createSetCellContentCommand(f.sheet.id, { row: 0, column: 1 }, {…
+    100|     );
+    101|     expect(getCellContent(f.sheet, { row: 1, column: 2 })).toMatchObje…
+       |                                                            ^
+    102|     expect(getCellContent(f.sheet, { row: 2, column: 2 })).toEqual({ k…
+    103|     const after = serializeWorkbook(f.workbook);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > renames the owning table's implicit selector: =SUM([[#Data],[Qty]])
+AssertionError: expected { kind: 'formula', …(1) } to match object { Object (formula) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "formula": {
+-     "source": "=SUM([[#Data],[Units]])",
++     "source": "=SUM([[#Data],[Qty]])",
+    },
+  }
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:101:60
+     99|       createSetCellContentCommand(f.sheet.id, { row: 0, column: 1 }, {…
+    100|     );
+    101|     expect(getCellContent(f.sheet, { row: 1, column: 2 })).toMatchObje…
+       |                                                            ^
+    102|     expect(getCellContent(f.sheet, { row: 2, column: 2 })).toEqual({ k…
+    103|     const after = serializeWorkbook(f.workbook);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > renames the owning table's implicit selector: ="[@Qty]"&[@Qty]
+AssertionError: expected { kind: 'formula', …(1) } to match object { Object (formula) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "formula": {
+-     "source": "=\"[@Qty]\"&[@Units]",
++     "source": "=\"[@Qty]\"&[@Qty]",
+    },
+  }
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:101:60
+     99|       createSetCellContentCommand(f.sheet.id, { row: 0, column: 1 }, {…
+    100|     );
+    101|     expect(getCellContent(f.sheet, { row: 1, column: 2 })).toMatchObje…
+       |                                                            ^
+    102|     expect(getCellContent(f.sheet, { row: 2, column: 2 })).toEqual({ k…
+    103|     const after = serializeWorkbook(f.workbook);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > updates implicit references only inside the edited table and named references across sheets
+AssertionError: expected { kind: 'formula', …(1) } to match object { Object (formula) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "formula": {
+-     "source": "=[@Units]+Other[Qty]",
++     "source": "=[@Qty]+Other[Qty]",
+    },
+  }
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:129:60
+    127|       createSetCellContentCommand(f.sheet.id, { row: 0, column: 1 }, {…
+    128|     );
+    129|     expect(getCellContent(f.sheet, { row: 1, column: 2 })).toMatchObje…
+       |                                                            ^
+    130|       formula: { source: "=[@Units]+Other[Qty]" },
+    131|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > filtered row shrink stays serializable and reversible (settings=false)
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > filtered row shrink stays serializable and reversible (settings=true)
+WorkbookDomainError: Invalid filter value.
+ ❯ invalidCommandPayload src/commands/helpers.ts:29:10
+     27|   message = `Invalid workbook command payload for ${field}.`,
+     28| ): WorkbookDomainError {
+     29|   return new WorkbookDomainError(
+       |          ^
+     30|     {
+     31|       code: "invalid_command_payload",
+ ❯ validateCommandPayload src/commands/helpers.ts:48:13
+ ❯ applySetSheetFilterCommand src/commands/filter.ts:500:10
+ ❯ applyWorkbookCommand src/commands/apply.ts:395:16
+ ❯ executeWorkbookCommand src/history.ts:92:19
+ ❯ fixture src/tests/tables/rename-filter-lifecycle.test.ts:62:5
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:140:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > horizontal shrink drops only excluded filter criteria
+WorkbookDomainError: Invalid filter value.
+ ❯ invalidCommandPayload src/commands/helpers.ts:29:10
+     27|   message = `Invalid workbook command payload for ${field}.`,
+     28| ): WorkbookDomainError {
+     29|   return new WorkbookDomainError(
+       |          ^
+     30|     {
+     31|       code: "invalid_command_payload",
+ ❯ validateCommandPayload src/commands/helpers.ts:48:13
+ ❯ applySetSheetFilterCommand src/commands/filter.ts:500:10
+ ❯ applyWorkbookCommand src/commands/apply.ts:395:16
+ ❯ executeWorkbookCommand src/history.ts:92:19
+ ❯ fixture src/tests/tables/rename-filter-lifecycle.test.ts:62:5
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:161:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > expansion keeps selected values and covers new rows, excluding totals
+WorkbookDomainError: Invalid filter value.
+ ❯ invalidCommandPayload src/commands/helpers.ts:29:10
+     27|   message = `Invalid workbook command payload for ${field}.`,
+     28| ): WorkbookDomainError {
+     29|   return new WorkbookDomainError(
+       |          ^
+     30|     {
+     31|       code: "invalid_command_payload",
+ ❯ validateCommandPayload src/commands/helpers.ts:48:13
+ ❯ applySetSheetFilterCommand src/commands/filter.ts:500:10
+ ❯ applyWorkbookCommand src/commands/apply.ts:395:16
+ ❯ executeWorkbookCommand src/history.ts:92:19
+ ❯ fixture src/tests/tables/rename-filter-lifecycle.test.ts:62:5
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:172:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  9 failed | 1 passed (10)
+   Start at  13:47:26
+   Duration  1.33s (transform 782ms, setup 0ms, import 1.11s, tests 45ms, environment 0ms)
+
+error: script "test" exited with code 1

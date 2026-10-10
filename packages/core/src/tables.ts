@@ -624,10 +624,35 @@ export function applyUpdateTableCommand(
   if (headerRowChange !== undefined) next = applyHeaderRow(workbook, sheet, next, headerRowChange);
   if (command.changes.totalRow !== undefined)
     next = applyTotals(workbook, sheet, next, command.changes.totalRow);
+  if (rangeChanged)
+    next = { ...next, filter: resizeTableFilter(current.filter, next.range, next.totalRow) };
   next = normalizeTable(workbook, command.sheetId, next);
   rewriteTableName(workbook, current.name, next.name);
   sheet.tables = (sheet.tables ?? []).map((table) => (table.id === next.id ? next : table));
   return previous;
+}
+
+function resizeTableFilter(
+  filter: SheetTable["filter"],
+  range: CellRange,
+  totalRow: boolean,
+): SheetTable["filter"] {
+  if (!filter) return null;
+  const result = clone(filter);
+  const endRow = range.end.row - (totalRow ? 1 : 0);
+  // The filter model requires a header and a data row, even for headerless tables.
+  if (endRow <= range.start.row) return null;
+  result.range = { start: { ...range.start }, end: { ...range.end, row: endRow } };
+  result.columns = result.columns.filter(
+    (column) => column.column >= range.start.column && column.column <= range.end.column,
+  );
+  if (result.advanced)
+    result.advanced.hiddenRows = result.advanced.hiddenRows.flatMap((interval) => {
+      const start = Math.max(interval.start, range.start.row + 1);
+      const end = Math.min(interval.end, endRow);
+      return start <= end ? [{ start, end }] : [];
+    });
+  return result;
 }
 
 function resizeTableTotals(
@@ -679,7 +704,12 @@ export function applyResizeTableCommand(
   const range = normalizeRange(command.range);
   // Validate the target range before a total-row expansion shifts any cells.
   // A rejected overlap must leave the workbook untouched.
-  const next = normalizeTable(workbook, command.sheetId, { ...current, range, columns: [] });
+  const next = normalizeTable(workbook, command.sheetId, {
+    ...current,
+    range,
+    columns: [],
+    filter: resizeTableFilter(current.filter, range, current.totalRow),
+  });
   const previous = createRestoreTableTransactionCommand(workbook);
   resizeTableTotals(workbook, sheet, current, range);
   sheet.tables = (sheet.tables ?? []).map((table) => (table.id === next.id ? next : table));

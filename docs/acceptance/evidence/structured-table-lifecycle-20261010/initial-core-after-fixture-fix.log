@@ -1,0 +1,247 @@
+$ vitest run --config vitest.config.ts src/tests/tables/rename-filter-lifecycle.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/core
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts (10 tests | 9 failed) 55ms
+     × renames the owning table's implicit selector: =[@Qty]*10 20ms
+     × renames the owning table's implicit selector: =SUM([Qty]) 4ms
+     × renames the owning table's implicit selector: =SUM([[#Data],[Qty]]) 3ms
+     × renames the owning table's implicit selector: ="[@Qty]"&[@Qty] 3ms
+     × updates implicit references only inside the edited table and named references across sheets 2ms
+     × filtered row shrink stays serializable and reversible (settings=false) 6ms
+     × filtered row shrink stays serializable and reversible (settings=true) 3ms
+     × horizontal shrink drops only excluded filter criteria 3ms
+     × expansion keeps selected values and covers new rows, excluding totals 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > renames the owning table's implicit selector: =[@Qty]*10
+AssertionError: expected { kind: 'formula', …(1) } to match object { formula: { source: '=[@Units]*10' } }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "formula": {
+-     "source": "=[@Units]*10",
++     "source": "=[@Qty]*10",
+    },
+  }
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:101:60
+     99|       createSetCellContentCommand(f.sheet.id, { row: 0, column: 1 }, {…
+    100|     );
+    101|     expect(getCellContent(f.sheet, { row: 1, column: 2 })).toMatchObje…
+       |                                                            ^
+    102|     expect(getCellContent(f.sheet, { row: 2, column: 2 })).toEqual({ k…
+    103|     const after = serializeWorkbook(f.workbook);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > renames the owning table's implicit selector: =SUM([Qty])
+AssertionError: expected { kind: 'formula', …(1) } to match object { Object (formula) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "formula": {
+-     "source": "=SUM([Units])",
++     "source": "=SUM([Qty])",
+    },
+  }
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:101:60
+     99|       createSetCellContentCommand(f.sheet.id, { row: 0, column: 1 }, {…
+    100|     );
+    101|     expect(getCellContent(f.sheet, { row: 1, column: 2 })).toMatchObje…
+       |                                                            ^
+    102|     expect(getCellContent(f.sheet, { row: 2, column: 2 })).toEqual({ k…
+    103|     const after = serializeWorkbook(f.workbook);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > renames the owning table's implicit selector: =SUM([[#Data],[Qty]])
+AssertionError: expected { kind: 'formula', …(1) } to match object { Object (formula) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "formula": {
+-     "source": "=SUM([[#Data],[Units]])",
++     "source": "=SUM([[#Data],[Qty]])",
+    },
+  }
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:101:60
+     99|       createSetCellContentCommand(f.sheet.id, { row: 0, column: 1 }, {…
+    100|     );
+    101|     expect(getCellContent(f.sheet, { row: 1, column: 2 })).toMatchObje…
+       |                                                            ^
+    102|     expect(getCellContent(f.sheet, { row: 2, column: 2 })).toEqual({ k…
+    103|     const after = serializeWorkbook(f.workbook);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > renames the owning table's implicit selector: ="[@Qty]"&[@Qty]
+AssertionError: expected { kind: 'formula', …(1) } to match object { Object (formula) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "formula": {
+-     "source": "=\"[@Qty]\"&[@Units]",
++     "source": "=\"[@Qty]\"&[@Qty]",
+    },
+  }
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:101:60
+     99|       createSetCellContentCommand(f.sheet.id, { row: 0, column: 1 }, {…
+    100|     );
+    101|     expect(getCellContent(f.sheet, { row: 1, column: 2 })).toMatchObje…
+       |                                                            ^
+    102|     expect(getCellContent(f.sheet, { row: 2, column: 2 })).toEqual({ k…
+    103|     const after = serializeWorkbook(f.workbook);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > updates implicit references only inside the edited table and named references across sheets
+AssertionError: expected { kind: 'formula', …(1) } to match object { Object (formula) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "formula": {
+-     "source": "=[@Units]+Other[Qty]",
++     "source": "=[@Qty]+Other[Qty]",
+    },
+  }
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:129:60
+    127|       createSetCellContentCommand(f.sheet.id, { row: 0, column: 1 }, {…
+    128|     );
+    129|     expect(getCellContent(f.sheet, { row: 1, column: 2 })).toMatchObje…
+       |                                                            ^
+    130|       formula: { source: "=[@Units]+Other[Qty]" },
+    131|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > filtered row shrink stays serializable and reversible (settings=false)
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > filtered row shrink stays serializable and reversible (settings=true)
+AssertionError: expected { Object (start, end) } to deeply equal { Object (start, end) }
+
+- Expected
++ Received
+
+@@ -1,9 +1,9 @@
+  {
+    "end": {
+      "column": 2,
+-     "row": 2,
++     "row": 3,
+    },
+    "start": {
+      "column": 0,
+      "row": 0,
+    },
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:151:35
+    149|     );
+    150|     const resized = f.sheet.tables![0]!;
+    151|     expect(resized.filter!.range).toEqual(range);
+       |                                   ^
+    152|     expect(resized.filter!.columns).toEqual(criteria);
+    153|     const after = serializeWorkbook(f.workbook);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > horizontal shrink drops only excluded filter criteria
+AssertionError: expected { …(2) } to match object { …(2) }
+
+- Expected
++ Received
+
+@@ -7,14 +7,27 @@
+            "value": "North",
+          },
+        ],
+        "column": 0,
+      },
++     {
++       "allowedValues": [
++         {
++           "kind": "number",
++           "value": 10,
++         },
++         {
++           "kind": "number",
++           "value": 30,
++         },
+        ],
++       "column": 2,
++     },
++   ],
+    "range": {
+      "end": {
+-       "column": 1,
++       "column": 2,
+        "row": 3,
+      },
+      "start": {
+        "column": 0,
+        "row": 0,
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:165:40
+    163|     const range = { start: { row: 0, column: 0 }, end: { row: 3, colum…
+    164|     executeWorkbookCommand(f.session, createResizeTableCommand(f.sheet…
+    165|     expect(f.sheet.tables![0]!.filter).toMatchObject({
+       |                                        ^
+    166|       range,
+    167|       columns: [{ column: 0, allowedValues: [{ kind: "string", value: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
+
+ FAIL  src/tests/tables/rename-filter-lifecycle.test.ts > observed table rename and filtered-resize lifecycle > expansion keeps selected values and covers new rows, excluding totals
+AssertionError: expected { Object (start, end) } to deeply equal { Object (start, end) }
+
+- Expected
++ Received
+
+@@ -1,9 +1,9 @@
+  {
+    "end": {
+      "column": 2,
+-     "row": 5,
++     "row": 3,
+    },
+    "start": {
+      "column": 0,
+      "row": 0,
+    },
+
+ ❯ src/tests/tables/rename-filter-lifecycle.test.ts:176:47
+    174|     const range = { start: { row: 0, column: 0 }, end: { row: 6, colum…
+    175|     executeWorkbookCommand(f.session, createResizeTableCommand(f.sheet…
+    176|     expect(f.sheet.tables![0]!.filter!.range).toEqual({ ...range, end:…
+       |                                               ^
+    177|     expect(f.sheet.tables![0]!.filter!.columns[0]).toEqual({
+    178|       column: 0,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  9 failed | 1 passed (10)
+   Start at  13:48:18
+   Duration  1.31s (transform 765ms, setup 0ms, import 1.09s, tests 55ms, environment 0ms)
+
+error: script "test" exited with code 1

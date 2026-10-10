@@ -1,0 +1,10 @@
+$ vitest run --config vitest.config.ts src/tests/table-styles.test.ts src/tests/table-styles "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+
+ Test Files  3 passed (3)
+      Tests  30 passed (30)
+   Start at  13:55:37
+   Duration  3.85s (transform 1.48s, setup 0ms, import 2.78s, tests 681ms, environment 0ms)
+

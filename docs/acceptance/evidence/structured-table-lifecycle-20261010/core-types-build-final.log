@@ -1,0 +1,4 @@
+$ bun run --filter @sheetcraft/core typecheck
+@sheetcraft/core typecheck: Exited with code 0
+$ bun run --filter @sheetcraft/core build
+@sheetcraft/core build: Exited with code 0

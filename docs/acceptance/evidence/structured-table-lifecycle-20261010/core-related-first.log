@@ -1,0 +1,10 @@
+$ vitest run --config vitest.config.ts src/tests/tables src/tests/formula/structured-tables.test.ts src/tests/formula/parser.test.ts src/tests/commands/filter "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/core
+
+
+ Test Files  7 passed (7)
+      Tests  95 passed (95)
+   Start at  13:49:49
+   Duration  4.51s (transform 868ms, setup 0ms, import 2.93s, tests 651ms, environment 1ms)
+

@@ -1,0 +1,10 @@
+$ vitest run src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts -t "keeps reentrant .* authoritative" "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/apps/web
+
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 8 skipped (10)
+   Start at  13:58:54
+   Duration  14.76s (transform 8.70s, setup 0ms, import 11.39s, tests 3.05s, environment 194ms)
+

@@ -219,12 +219,13 @@ export function renameTableReferences(
   return applyReplacements(source, replacements);
 }
 
-/** Rewrites parser-confirmed column selectors for one named table. */
+/** Rewrites parsed selectors; implicit selectors require a proven owning table. */
 export function renameTableColumnReferences(
   source: string,
   tableName: string,
   previousName: string,
   nextName: string,
+  owningTableName?: string,
 ): string {
   const ast = getFormulaAst(source);
   if (!ast) return source;
@@ -232,7 +233,7 @@ export function renameTableColumnReferences(
   walkExpression(ast.expression, (expression) => {
     if (
       expression.kind !== "structured-reference" ||
-      expression.reference.tableName?.toLocaleLowerCase("en-US") !==
+      (expression.reference.tableName ?? owningTableName)?.toLocaleLowerCase("en-US") !==
         tableName.toLocaleLowerCase("en-US")
     )
       return;

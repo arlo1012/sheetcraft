@@ -1,0 +1,10 @@
+$ vitest run --config vitest.config.ts src/tests/tables/rename-filter-lifecycle.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/core
+
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  13:49:09
+   Duration  2.10s (transform 1.25s, setup 0ms, import 1.81s, tests 127ms, environment 0ms)
+

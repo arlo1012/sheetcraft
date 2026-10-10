@@ -154,6 +154,15 @@ describe("formula parser", () => {
     );
   });
 
+  test("implicit column rewrites require explicit owner context and preserve other tables and strings", () => {
+    const source = '=SUM([@Qty],Other[Qty],"[@Qty]")';
+    expect(renameTableColumnReferences(source, "Sales", "Qty", "Units")).toBe(source);
+    expect(renameTableColumnReferences(source, "Sales", "Qty", "Units", "Other")).toBe(source);
+    expect(renameTableColumnReferences(source, "Sales", "Qty", "Units", "Sales")).toBe(
+      '=SUM([@Units],Other[Qty],"[@Qty]")',
+    );
+  });
+
   test("converts only parsed structured references to their resolved A1 bounds", () => {
     const source = '=SUM(Table1[Amount],[@Amount],"Table1[Amount]")';
     expect(

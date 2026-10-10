@@ -1,5 +1,28 @@
 # Sheetcraft continuation after recovery — 2026-10-10
 
+## Latest in-progress table acceptance
+
+The checkpoint after `da661700c08654acfaf77985da10cea47cf92390` repairs two
+actual Sheetcraft UI defects: implicit own-table column references were not
+rewritten on header rename, and explicit resizing retained invalid old filter
+bounds, preventing export/autosave. The formal UI recheck now retains a renamed
+current-row formula/value, exports the shrunk filtered table, and supports
+undo/redo plus browser-local reload. Core table/filter/formula tests and focused
+XLSX table tests pass. The expanded Web run retains two unchanged 5-second
+reentrant close/navigation timeouts; read the current log and its isolated
+diagnostic rerun, not older pass counts. This is a WIP checkpoint, not complete
+structured-table/dual-application acceptance.
+
+Read `docs/acceptance/structured-table-lifecycle-20261010.md` and its text-only
+evidence directory for the bounded matrix, initial failures, implemented fix,
+remaining GUI work and inherited total-row/selector-caption limitations.
+Continue no-header/empty creation, style/display, table growth/Tab, conversion,
+formal XLSX WPS/Excel lifecycle and WPS-only calculated-column observations.
+Do not implement automatic overwrite/fill before its contract is chosen. Further
+native chart types are paused. Separate online Insert menu DOM research is
+read-only reference; it does not authorize copying proprietary SVGs or expanding
+shape geometry. Preserve the user's current browser sessions and few tabs.
+
 ## Authoritative repository
 
 - Private repository: `https://github.com/arlo1012/sheetcraft.git`.

@@ -1,0 +1,5 @@
+previous_diagnostics=125
+current_diagnostics=125
+added=0
+removed=0
+exact_diagnostic_lines_equal=True

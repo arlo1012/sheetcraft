@@ -1,0 +1,7 @@
+Checking formatting...
+
+packages/core/src/commands/values.ts (3ms)
+packages/core/src/tests/tables/rename-filter-lifecycle.test.ts (1ms)
+
+Format issues found in above 2 files. Run without `--check` to fix.
+Finished in 4ms on 5 files using 9 threads.

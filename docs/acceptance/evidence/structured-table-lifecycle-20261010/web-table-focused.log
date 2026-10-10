@@ -1,0 +1,31 @@
+$ vitest run src/tests/modules/table-styles src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/apps/web
+
+ ❯ src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts (10 tests | 2 failed) 23129ms
+     × keeps reentrant close authoritative during new-sheet confirmation 6206ms
+     × keeps reentrant navigation authoritative during new-sheet confirmation 5331ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > keeps reentrant close authoritative during new-sheet confirmation
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > keeps reentrant navigation authoritative during new-sheet confirmation
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts:189:46
+    187|     },
+    188|   );
+    189|   test.each(["close", "navigation"] as const)(
+       |                                              ^
+    190|     "keeps reentrant %s authoritative during new-sheet confirmation",
+    191|     async (action) => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed | 8 passed (9)
+      Tests  2 failed | 119 passed (121)
+   Start at  13:54:22
+   Duration  62.65s (transform 10.27s, setup 0ms, import 25.34s, tests 34.00s, environment 1.97s)
+
+error: script "test" exited with code 1

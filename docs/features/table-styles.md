@@ -73,6 +73,10 @@ for multiple tables on one sheet and exclude total rows. Total formulas use
 below or to the right expands the table; Tab from its final data cell adds a
 data row. Explicit range changes and row/column insertion/deletion also update
 table metadata. Automatic calculated-column formula fill is not implemented.
+An explicit table resize also resizes the stored filter to the new data range,
+excluding totals. Criteria for columns remaining inside the range are retained;
+criteria for removed columns are dropped. Existing advanced hidden-row intervals
+are clipped to the new data range without moving their external criteria source.
 Column-panel settings and merged-cell behavior for ordinary ranges are described
 in [Column filter panel](filter-panel.md).
 
@@ -93,6 +97,10 @@ Structured references support a named column (`=SUM(Table1[Amount])`), column
 ranges, `#Data`, `#All`, `#Headers`, `#Totals`, and the current row
 (`=[@Amount]`). Named references resolve across sheets. Table and column renames
 rewrite formula sources, while range changes invalidate calculation dependencies.
+Column renames rewrite implicit selectors such as `[@Amount]` only in formulas
+whose cell is inside that owning table. Explicitly named references still rewrite
+across sheets; strings, another table's selectors and implicit references outside
+the table are not guessed. Entering one formula still edits just that cell.
 These selectors do not add general Excel implicit-intersection `@` support.
 
 Canvas resolves structured-table formatting first, followed by direct cell formatting,
@@ -103,7 +111,9 @@ Custom styles with the same ID update tables using that definition.
 
 ## Persistence and XLSX
 
-JSON snapshots use version 13 and migrate older versions to an empty table model.
+Tables were introduced in snapshot version 13. Current snapshots use version 43,
+or version 44 when explicit manual PivotTable ordering is present; older table
+snapshots remain readable. Pre-table versions migrate to an empty table model.
 Table metadata and both custom/default style libraries survive local autosave and
 JSON reload; runtime calculation caches and editor drafts remain transient.
 Snapshots contain plain objects suitable for IndexedDB structured cloning.

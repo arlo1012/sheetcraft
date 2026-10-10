@@ -755,19 +755,23 @@ export function applySetCellContentsCommand(
       for (const formulaSheet of workbook.sheets.values())
         for (const [key, cell] of formulaSheet.cells) {
           if (cell.content?.kind !== "formula") continue;
+          const address = parseCellKey(key);
+          const owningTable = (formulaSheet.tables ?? []).find(
+            (entry) =>
+              address.row >= entry.range.start.row &&
+              address.row <= entry.range.end.row &&
+              address.column >= entry.range.start.column &&
+              address.column <= entry.range.end.column,
+          );
           const source = renameTableColumnReferences(
             cell.content.formula.source,
             rename.tableName,
             rename.previousName,
             rename.nextName,
+            owningTable?.name,
           );
           if (source === cell.content.formula.source) continue;
-          const separator = key.indexOf(":");
-          setCellContent(
-            formulaSheet,
-            { row: Number(key.slice(0, separator)), column: Number(key.slice(separator + 1)) },
-            { kind: "formula", formula: { source } },
-          );
+          setCellContent(formulaSheet, address, { kind: "formula", formula: { source } });
         }
     return { type: "restoreTableTransaction", ...tableTransactionState! };
   }
