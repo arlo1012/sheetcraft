@@ -5,6 +5,7 @@ import { NativeWorkbook } from "./native/workbook.js";
 import { unzipSync } from "fflate/browser";
 import { readExcelBorder, writeExcelBorder } from "./border.js";
 import { createFormulaCacheEligibility, formulaCacheValue } from "./formula-cache.js";
+import { qualifyXlsxStructuredReferences } from "./structured-reference-export.js";
 import { fromExcelNumberFormat, toExcelNumberFormat } from "./number-format.js";
 import { excelColumnWidthToPixels, pixelsToExcelColumnWidth } from "./column-width.js";
 import { getAutoFitRowNumbers } from "./auto-fit-rows.js";
@@ -1237,7 +1238,12 @@ export async function encodeWithNativeXlsx(
             ? formulaCacheValue(evaluator.getComputedValue({ row, column }))
             : undefined;
           outputCell.value = {
-            formula: cell.content.formula.source.slice(1),
+            formula: qualifyXlsxStructuredReferences(
+              cell.content.formula.source,
+              workbook,
+              sheet.id,
+              { row, column },
+            ).slice(1),
             ...(result !== undefined ? { result } : {}),
           };
           if (result === undefined) add(report, "formula-not-calculated", issueLocation);
