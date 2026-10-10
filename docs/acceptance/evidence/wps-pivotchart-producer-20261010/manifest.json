@@ -1,0 +1,396 @@
+{
+  "producer": "WPS Office Linux 12.1.2.29182.AK.preread.sw",
+  "input_sha256": "6f03fe0846ee7d1e408b185b21fa9e8f2dee68fd2d9d29899168dc9abb83d974",
+  "original_filename": "sc-pivot.xlsx",
+  "files": [
+    {
+      "path": "native-created.xlsx",
+      "original_sha256": "b3e91f240adc02b746ff43a102e4ce1775fe6b5078e816b16cb12f3464d9989c",
+      "published_sha256": "72762dc4d072c0ffe0a61532a46b1ae09be78d1e2b96772ad27d233257c9bd9f",
+      "original_bytes": 20583,
+      "published_bytes": 17316,
+      "metadata_changes": [
+        {
+          "part": "docProps/custom.xml",
+          "field": "ICV"
+        }
+      ],
+      "gui_tested_original": true,
+      "gui_retested_published": false,
+      "parts": {
+        "[Content_Types].xml": {
+          "original_sha256": "94bec9f37503c2f959e5b2d25637880cbc0d0c065a70ff399adc2d3bd42e06bb",
+          "published_sha256": "94bec9f37503c2f959e5b2d25637880cbc0d0c065a70ff399adc2d3bd42e06bb"
+        },
+        "_rels/.rels": {
+          "original_sha256": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+          "published_sha256": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68"
+        },
+        "docProps/app.xml": {
+          "original_sha256": "25061eecde219b0fa658cb1ebc4a4d66d9874cd9cebe7dfd4603f67765be8592",
+          "published_sha256": "25061eecde219b0fa658cb1ebc4a4d66d9874cd9cebe7dfd4603f67765be8592"
+        },
+        "docProps/core.xml": {
+          "original_sha256": "441521b3f2e1b5f04adb4c8382d0b9ff0dfcfeaed6307fb559ecdb4b76eb9c64",
+          "published_sha256": "441521b3f2e1b5f04adb4c8382d0b9ff0dfcfeaed6307fb559ecdb4b76eb9c64"
+        },
+        "docProps/custom.xml": {
+          "original_sha256": "56fb81ccba307ca25b5de95cb7c6fce94b9f560896125f166f67a7014eb3355b",
+          "published_sha256": "643b728358547d748ad8a17188bb2e8ce32aa871cd59263b44a632c8b278c30c"
+        },
+        "xl/_rels/workbook.xml.rels": {
+          "original_sha256": "792bbf5669fb8e7c5a59ebc051cfc5262ce018967e73be9f007f4962d52034b0",
+          "published_sha256": "792bbf5669fb8e7c5a59ebc051cfc5262ce018967e73be9f007f4962d52034b0"
+        },
+        "xl/charts/_rels/chart1.xml.rels": {
+          "original_sha256": "1509ddaf2f7bc5d13e7a44c19ba59d526c7baf3549f284ddd3753758fbe3de6c",
+          "published_sha256": "1509ddaf2f7bc5d13e7a44c19ba59d526c7baf3549f284ddd3753758fbe3de6c"
+        },
+        "xl/charts/chart1.xml": {
+          "original_sha256": "85ae4b1900d5c37e4288f651ff08b94ec984c4426a739698c74f7845540023a5",
+          "published_sha256": "85ae4b1900d5c37e4288f651ff08b94ec984c4426a739698c74f7845540023a5"
+        },
+        "xl/charts/colors1.xml": {
+          "original_sha256": "04fefba7d31853fa0aa636e5c8b8e308fc3126a9b48a1f4490947fff91d5a92f",
+          "published_sha256": "04fefba7d31853fa0aa636e5c8b8e308fc3126a9b48a1f4490947fff91d5a92f"
+        },
+        "xl/charts/style1.xml": {
+          "original_sha256": "98e26bc5f4923d9959e2eb17101aa2bdac2ceaf35b91558ec216efa4dde94bee",
+          "published_sha256": "98e26bc5f4923d9959e2eb17101aa2bdac2ceaf35b91558ec216efa4dde94bee"
+        },
+        "xl/drawings/_rels/drawing1.xml.rels": {
+          "original_sha256": "b81851df8558c606f8f94bc8454fe26b5c88c6d0c0b0ae0ae4ba02e650793dc8",
+          "published_sha256": "b81851df8558c606f8f94bc8454fe26b5c88c6d0c0b0ae0ae4ba02e650793dc8"
+        },
+        "xl/drawings/drawing1.xml": {
+          "original_sha256": "da6fffc4086dfb44b9a2119de834366408620de83993f98c90887f30a0d49da3",
+          "published_sha256": "da6fffc4086dfb44b9a2119de834366408620de83993f98c90887f30a0d49da3"
+        },
+        "xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels": {
+          "original_sha256": "50932fefa05af7d439305a402207d007de878e1e9b81e5caabca45ee5c4a2508",
+          "published_sha256": "50932fefa05af7d439305a402207d007de878e1e9b81e5caabca45ee5c4a2508"
+        },
+        "xl/pivotCache/pivotCacheDefinition1.xml": {
+          "original_sha256": "4c0d81ecaa64213d122bf3ca85845ced30deb4837577ff0bd3ce74213dfbe932",
+          "published_sha256": "4c0d81ecaa64213d122bf3ca85845ced30deb4837577ff0bd3ce74213dfbe932"
+        },
+        "xl/pivotCache/pivotCacheRecords1.xml": {
+          "original_sha256": "809054c12fd7d6ca47ccb067986b45c8f767db6a31fa1c64bae3b38b50f958a9",
+          "published_sha256": "809054c12fd7d6ca47ccb067986b45c8f767db6a31fa1c64bae3b38b50f958a9"
+        },
+        "xl/pivotTables/_rels/pivotTable1.xml.rels": {
+          "original_sha256": "55dcc4ac09f0b4828a5e4138ffe799fad22be0c8e8705431b0c6f79144510605",
+          "published_sha256": "55dcc4ac09f0b4828a5e4138ffe799fad22be0c8e8705431b0c6f79144510605"
+        },
+        "xl/pivotTables/pivotTable1.xml": {
+          "original_sha256": "d41e56d589d1d3f6285cfd036bef4f30ba3c8a264c97cc0b0d929ab4eff54b1e",
+          "published_sha256": "d41e56d589d1d3f6285cfd036bef4f30ba3c8a264c97cc0b0d929ab4eff54b1e"
+        },
+        "xl/sharedStrings.xml": {
+          "original_sha256": "76ea3611c732c0586dc6d2aaf4477f16217263f0472c662744f95aaff9401bd9",
+          "published_sha256": "76ea3611c732c0586dc6d2aaf4477f16217263f0472c662744f95aaff9401bd9"
+        },
+        "xl/styles.xml": {
+          "original_sha256": "99d4e75c52b82ff3440644031b67ee5c1a035191a546abecf85ec30bb162a194",
+          "published_sha256": "99d4e75c52b82ff3440644031b67ee5c1a035191a546abecf85ec30bb162a194"
+        },
+        "xl/tables/table1.xml": {
+          "original_sha256": "71939c9b9a16075f88d1f60d7241bf904c448e83eb49cb13ff3d05b0cbf462c7",
+          "published_sha256": "71939c9b9a16075f88d1f60d7241bf904c448e83eb49cb13ff3d05b0cbf462c7"
+        },
+        "xl/theme/theme1.xml": {
+          "original_sha256": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724",
+          "published_sha256": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724"
+        },
+        "xl/workbook.xml": {
+          "original_sha256": "f228117130d85d7cb76cf2594573b80a933e65a70179e31f37e2e6b5e4956348",
+          "published_sha256": "f228117130d85d7cb76cf2594573b80a933e65a70179e31f37e2e6b5e4956348"
+        },
+        "xl/worksheets/_rels/sheet1.xml.rels": {
+          "original_sha256": "27936198cae28392e0da9ce7814de774a1ceb9a0bb72efe48a78ff4ee62f95e9",
+          "published_sha256": "27936198cae28392e0da9ce7814de774a1ceb9a0bb72efe48a78ff4ee62f95e9"
+        },
+        "xl/worksheets/_rels/sheet2.xml.rels": {
+          "original_sha256": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327",
+          "published_sha256": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327"
+        },
+        "xl/worksheets/sheet1.xml": {
+          "original_sha256": "dbf17e40c29933974640156f86184878667ab47473c6200950048e0443ebf47e",
+          "published_sha256": "dbf17e40c29933974640156f86184878667ab47473c6200950048e0443ebf47e"
+        },
+        "xl/worksheets/sheet2.xml": {
+          "original_sha256": "a4a0d5242bceafff977a4067427da5afeb5799d0ca7f905ea75628e37d11ae2d",
+          "published_sha256": "a4a0d5242bceafff977a4067427da5afeb5799d0ca7f905ea75628e37d11ae2d"
+        }
+      }
+    },
+    {
+      "path": "native-source-edited-stale.xlsx",
+      "original_sha256": "96f4680406b7b5af3c272d6f51717cd5a40ddb6ac50201e7ad871f336031b3d9",
+      "published_sha256": "161b5a38cf0e3ac93e93402b3c727c7217603c76e78677202ec5c06e3f54a339",
+      "original_bytes": 20594,
+      "published_bytes": 17331,
+      "metadata_changes": [
+        {
+          "part": "docProps/custom.xml",
+          "field": "ICV"
+        }
+      ],
+      "gui_tested_original": true,
+      "gui_retested_published": false,
+      "parts": {
+        "[Content_Types].xml": {
+          "original_sha256": "94bec9f37503c2f959e5b2d25637880cbc0d0c065a70ff399adc2d3bd42e06bb",
+          "published_sha256": "94bec9f37503c2f959e5b2d25637880cbc0d0c065a70ff399adc2d3bd42e06bb"
+        },
+        "_rels/.rels": {
+          "original_sha256": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+          "published_sha256": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68"
+        },
+        "docProps/app.xml": {
+          "original_sha256": "25061eecde219b0fa658cb1ebc4a4d66d9874cd9cebe7dfd4603f67765be8592",
+          "published_sha256": "25061eecde219b0fa658cb1ebc4a4d66d9874cd9cebe7dfd4603f67765be8592"
+        },
+        "docProps/core.xml": {
+          "original_sha256": "cfefdc9e8620ec3d6e6ea52d5bf4a10a5407d0a634aa5017cc14f2a1032ff781",
+          "published_sha256": "cfefdc9e8620ec3d6e6ea52d5bf4a10a5407d0a634aa5017cc14f2a1032ff781"
+        },
+        "docProps/custom.xml": {
+          "original_sha256": "56fb81ccba307ca25b5de95cb7c6fce94b9f560896125f166f67a7014eb3355b",
+          "published_sha256": "643b728358547d748ad8a17188bb2e8ce32aa871cd59263b44a632c8b278c30c"
+        },
+        "xl/_rels/workbook.xml.rels": {
+          "original_sha256": "792bbf5669fb8e7c5a59ebc051cfc5262ce018967e73be9f007f4962d52034b0",
+          "published_sha256": "792bbf5669fb8e7c5a59ebc051cfc5262ce018967e73be9f007f4962d52034b0"
+        },
+        "xl/charts/_rels/chart1.xml.rels": {
+          "original_sha256": "1509ddaf2f7bc5d13e7a44c19ba59d526c7baf3549f284ddd3753758fbe3de6c",
+          "published_sha256": "1509ddaf2f7bc5d13e7a44c19ba59d526c7baf3549f284ddd3753758fbe3de6c"
+        },
+        "xl/charts/chart1.xml": {
+          "original_sha256": "85ae4b1900d5c37e4288f651ff08b94ec984c4426a739698c74f7845540023a5",
+          "published_sha256": "85ae4b1900d5c37e4288f651ff08b94ec984c4426a739698c74f7845540023a5"
+        },
+        "xl/charts/colors1.xml": {
+          "original_sha256": "04fefba7d31853fa0aa636e5c8b8e308fc3126a9b48a1f4490947fff91d5a92f",
+          "published_sha256": "04fefba7d31853fa0aa636e5c8b8e308fc3126a9b48a1f4490947fff91d5a92f"
+        },
+        "xl/charts/style1.xml": {
+          "original_sha256": "98e26bc5f4923d9959e2eb17101aa2bdac2ceaf35b91558ec216efa4dde94bee",
+          "published_sha256": "98e26bc5f4923d9959e2eb17101aa2bdac2ceaf35b91558ec216efa4dde94bee"
+        },
+        "xl/drawings/_rels/drawing1.xml.rels": {
+          "original_sha256": "b81851df8558c606f8f94bc8454fe26b5c88c6d0c0b0ae0ae4ba02e650793dc8",
+          "published_sha256": "b81851df8558c606f8f94bc8454fe26b5c88c6d0c0b0ae0ae4ba02e650793dc8"
+        },
+        "xl/drawings/drawing1.xml": {
+          "original_sha256": "da6fffc4086dfb44b9a2119de834366408620de83993f98c90887f30a0d49da3",
+          "published_sha256": "da6fffc4086dfb44b9a2119de834366408620de83993f98c90887f30a0d49da3"
+        },
+        "xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels": {
+          "original_sha256": "50932fefa05af7d439305a402207d007de878e1e9b81e5caabca45ee5c4a2508",
+          "published_sha256": "50932fefa05af7d439305a402207d007de878e1e9b81e5caabca45ee5c4a2508"
+        },
+        "xl/pivotCache/pivotCacheDefinition1.xml": {
+          "original_sha256": "4c0d81ecaa64213d122bf3ca85845ced30deb4837577ff0bd3ce74213dfbe932",
+          "published_sha256": "4c0d81ecaa64213d122bf3ca85845ced30deb4837577ff0bd3ce74213dfbe932"
+        },
+        "xl/pivotCache/pivotCacheRecords1.xml": {
+          "original_sha256": "809054c12fd7d6ca47ccb067986b45c8f767db6a31fa1c64bae3b38b50f958a9",
+          "published_sha256": "809054c12fd7d6ca47ccb067986b45c8f767db6a31fa1c64bae3b38b50f958a9"
+        },
+        "xl/pivotTables/_rels/pivotTable1.xml.rels": {
+          "original_sha256": "55dcc4ac09f0b4828a5e4138ffe799fad22be0c8e8705431b0c6f79144510605",
+          "published_sha256": "55dcc4ac09f0b4828a5e4138ffe799fad22be0c8e8705431b0c6f79144510605"
+        },
+        "xl/pivotTables/pivotTable1.xml": {
+          "original_sha256": "d41e56d589d1d3f6285cfd036bef4f30ba3c8a264c97cc0b0d929ab4eff54b1e",
+          "published_sha256": "d41e56d589d1d3f6285cfd036bef4f30ba3c8a264c97cc0b0d929ab4eff54b1e"
+        },
+        "xl/sharedStrings.xml": {
+          "original_sha256": "76ea3611c732c0586dc6d2aaf4477f16217263f0472c662744f95aaff9401bd9",
+          "published_sha256": "76ea3611c732c0586dc6d2aaf4477f16217263f0472c662744f95aaff9401bd9"
+        },
+        "xl/styles.xml": {
+          "original_sha256": "99d4e75c52b82ff3440644031b67ee5c1a035191a546abecf85ec30bb162a194",
+          "published_sha256": "99d4e75c52b82ff3440644031b67ee5c1a035191a546abecf85ec30bb162a194"
+        },
+        "xl/tables/table1.xml": {
+          "original_sha256": "71939c9b9a16075f88d1f60d7241bf904c448e83eb49cb13ff3d05b0cbf462c7",
+          "published_sha256": "71939c9b9a16075f88d1f60d7241bf904c448e83eb49cb13ff3d05b0cbf462c7"
+        },
+        "xl/theme/theme1.xml": {
+          "original_sha256": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724",
+          "published_sha256": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724"
+        },
+        "xl/workbook.xml": {
+          "original_sha256": "1e943293bd3deaeb50142acdf53f9cfae1d5db57b5cd2e3716772214eff17d8a",
+          "published_sha256": "1e943293bd3deaeb50142acdf53f9cfae1d5db57b5cd2e3716772214eff17d8a"
+        },
+        "xl/worksheets/_rels/sheet1.xml.rels": {
+          "original_sha256": "27936198cae28392e0da9ce7814de774a1ceb9a0bb72efe48a78ff4ee62f95e9",
+          "published_sha256": "27936198cae28392e0da9ce7814de774a1ceb9a0bb72efe48a78ff4ee62f95e9"
+        },
+        "xl/worksheets/_rels/sheet2.xml.rels": {
+          "original_sha256": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327",
+          "published_sha256": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327"
+        },
+        "xl/worksheets/sheet1.xml": {
+          "original_sha256": "6880652a2867908f66774735fffbf29a36829d09a157e375ac929a0bf1396d85",
+          "published_sha256": "6880652a2867908f66774735fffbf29a36829d09a157e375ac929a0bf1396d85"
+        },
+        "xl/worksheets/sheet2.xml": {
+          "original_sha256": "0c13a8e70cd73cd501fd940d9b9babdc38cf2ce86b8a40703cabc9038737ad5b",
+          "published_sha256": "0c13a8e70cd73cd501fd940d9b9babdc38cf2ce86b8a40703cabc9038737ad5b"
+        }
+      }
+    },
+    {
+      "path": "native-refreshed.xlsx",
+      "original_sha256": "300c55073782d3058dd70f58b23d6028dee972c5904f3b6595ebf96467a2592a",
+      "published_sha256": "27606408f74125cc973f9efe4087ce46f0b6e71d81eb965e0c67116651ad4a66",
+      "original_bytes": 20601,
+      "published_bytes": 17328,
+      "metadata_changes": [
+        {
+          "part": "docProps/custom.xml",
+          "field": "ICV"
+        }
+      ],
+      "gui_tested_original": true,
+      "gui_retested_published": false,
+      "parts": {
+        "[Content_Types].xml": {
+          "original_sha256": "94bec9f37503c2f959e5b2d25637880cbc0d0c065a70ff399adc2d3bd42e06bb",
+          "published_sha256": "94bec9f37503c2f959e5b2d25637880cbc0d0c065a70ff399adc2d3bd42e06bb"
+        },
+        "_rels/.rels": {
+          "original_sha256": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68",
+          "published_sha256": "9f3d3fa493e6b805e946eabc8dc04efdbaf9a923921285d01679082eb0f2cf68"
+        },
+        "docProps/app.xml": {
+          "original_sha256": "25061eecde219b0fa658cb1ebc4a4d66d9874cd9cebe7dfd4603f67765be8592",
+          "published_sha256": "25061eecde219b0fa658cb1ebc4a4d66d9874cd9cebe7dfd4603f67765be8592"
+        },
+        "docProps/core.xml": {
+          "original_sha256": "eeab7ed97d0b2f4b0e2ef0afd905a6e5e43445ce35396e96e59569f3fd0380c6",
+          "published_sha256": "eeab7ed97d0b2f4b0e2ef0afd905a6e5e43445ce35396e96e59569f3fd0380c6"
+        },
+        "docProps/custom.xml": {
+          "original_sha256": "56fb81ccba307ca25b5de95cb7c6fce94b9f560896125f166f67a7014eb3355b",
+          "published_sha256": "643b728358547d748ad8a17188bb2e8ce32aa871cd59263b44a632c8b278c30c"
+        },
+        "xl/_rels/workbook.xml.rels": {
+          "original_sha256": "792bbf5669fb8e7c5a59ebc051cfc5262ce018967e73be9f007f4962d52034b0",
+          "published_sha256": "792bbf5669fb8e7c5a59ebc051cfc5262ce018967e73be9f007f4962d52034b0"
+        },
+        "xl/charts/_rels/chart1.xml.rels": {
+          "original_sha256": "1509ddaf2f7bc5d13e7a44c19ba59d526c7baf3549f284ddd3753758fbe3de6c",
+          "published_sha256": "1509ddaf2f7bc5d13e7a44c19ba59d526c7baf3549f284ddd3753758fbe3de6c"
+        },
+        "xl/charts/chart1.xml": {
+          "original_sha256": "4fb8ed09813e4ea02b48207ce28be983e42a571a4be8f09b6bd32f1a5274178c",
+          "published_sha256": "4fb8ed09813e4ea02b48207ce28be983e42a571a4be8f09b6bd32f1a5274178c"
+        },
+        "xl/charts/colors1.xml": {
+          "original_sha256": "04fefba7d31853fa0aa636e5c8b8e308fc3126a9b48a1f4490947fff91d5a92f",
+          "published_sha256": "04fefba7d31853fa0aa636e5c8b8e308fc3126a9b48a1f4490947fff91d5a92f"
+        },
+        "xl/charts/style1.xml": {
+          "original_sha256": "98e26bc5f4923d9959e2eb17101aa2bdac2ceaf35b91558ec216efa4dde94bee",
+          "published_sha256": "98e26bc5f4923d9959e2eb17101aa2bdac2ceaf35b91558ec216efa4dde94bee"
+        },
+        "xl/drawings/_rels/drawing1.xml.rels": {
+          "original_sha256": "b81851df8558c606f8f94bc8454fe26b5c88c6d0c0b0ae0ae4ba02e650793dc8",
+          "published_sha256": "b81851df8558c606f8f94bc8454fe26b5c88c6d0c0b0ae0ae4ba02e650793dc8"
+        },
+        "xl/drawings/drawing1.xml": {
+          "original_sha256": "da6fffc4086dfb44b9a2119de834366408620de83993f98c90887f30a0d49da3",
+          "published_sha256": "da6fffc4086dfb44b9a2119de834366408620de83993f98c90887f30a0d49da3"
+        },
+        "xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels": {
+          "original_sha256": "50932fefa05af7d439305a402207d007de878e1e9b81e5caabca45ee5c4a2508",
+          "published_sha256": "50932fefa05af7d439305a402207d007de878e1e9b81e5caabca45ee5c4a2508"
+        },
+        "xl/pivotCache/pivotCacheDefinition1.xml": {
+          "original_sha256": "fa2f5df72dcbb1af59fa4f6c835ffdc564aaf8039be68a641346f8363bb036f9",
+          "published_sha256": "fa2f5df72dcbb1af59fa4f6c835ffdc564aaf8039be68a641346f8363bb036f9"
+        },
+        "xl/pivotCache/pivotCacheRecords1.xml": {
+          "original_sha256": "809054c12fd7d6ca47ccb067986b45c8f767db6a31fa1c64bae3b38b50f958a9",
+          "published_sha256": "809054c12fd7d6ca47ccb067986b45c8f767db6a31fa1c64bae3b38b50f958a9"
+        },
+        "xl/pivotTables/_rels/pivotTable1.xml.rels": {
+          "original_sha256": "55dcc4ac09f0b4828a5e4138ffe799fad22be0c8e8705431b0c6f79144510605",
+          "published_sha256": "55dcc4ac09f0b4828a5e4138ffe799fad22be0c8e8705431b0c6f79144510605"
+        },
+        "xl/pivotTables/pivotTable1.xml": {
+          "original_sha256": "191e300537720a93feb94d80f14e55dbd28cf373a0952141198299ec12e1ea30",
+          "published_sha256": "191e300537720a93feb94d80f14e55dbd28cf373a0952141198299ec12e1ea30"
+        },
+        "xl/sharedStrings.xml": {
+          "original_sha256": "76ea3611c732c0586dc6d2aaf4477f16217263f0472c662744f95aaff9401bd9",
+          "published_sha256": "76ea3611c732c0586dc6d2aaf4477f16217263f0472c662744f95aaff9401bd9"
+        },
+        "xl/styles.xml": {
+          "original_sha256": "eeeae992dc654203d8fc91006b6549f0cd542f784ac3b708278435d859239364",
+          "published_sha256": "eeeae992dc654203d8fc91006b6549f0cd542f784ac3b708278435d859239364"
+        },
+        "xl/tables/table1.xml": {
+          "original_sha256": "71939c9b9a16075f88d1f60d7241bf904c448e83eb49cb13ff3d05b0cbf462c7",
+          "published_sha256": "71939c9b9a16075f88d1f60d7241bf904c448e83eb49cb13ff3d05b0cbf462c7"
+        },
+        "xl/theme/theme1.xml": {
+          "original_sha256": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724",
+          "published_sha256": "4041da48be0a3ac0fe1dbaf7ae5821f161116ff80221a53169e39b237f98a724"
+        },
+        "xl/workbook.xml": {
+          "original_sha256": "f228117130d85d7cb76cf2594573b80a933e65a70179e31f37e2e6b5e4956348",
+          "published_sha256": "f228117130d85d7cb76cf2594573b80a933e65a70179e31f37e2e6b5e4956348"
+        },
+        "xl/worksheets/_rels/sheet1.xml.rels": {
+          "original_sha256": "27936198cae28392e0da9ce7814de774a1ceb9a0bb72efe48a78ff4ee62f95e9",
+          "published_sha256": "27936198cae28392e0da9ce7814de774a1ceb9a0bb72efe48a78ff4ee62f95e9"
+        },
+        "xl/worksheets/_rels/sheet2.xml.rels": {
+          "original_sha256": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327",
+          "published_sha256": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327"
+        },
+        "xl/worksheets/sheet1.xml": {
+          "original_sha256": "fd548b237faa330424ae5a742131f1ca8817e66625b4bab5acdcb721472293f4",
+          "published_sha256": "fd548b237faa330424ae5a742131f1ca8817e66625b4bab5acdcb721472293f4"
+        },
+        "xl/worksheets/sheet2.xml": {
+          "original_sha256": "7cc6188683d7110b9f10ce49736f134110c2d7a7ba6c699ad7a50540a89180aa",
+          "published_sha256": "7cc6188683d7110b9f10ce49736f134110c2d7a7ba6c699ad7a50540a89180aa"
+        }
+      }
+    }
+  ],
+  "unpublished_gui_screenshots": [
+    {
+      "name": "native-created.jpeg",
+      "sha256": "19bfba0aaf060071f57b03da5057abe162d5dec03cc3e81673e03b2f3f42c69e",
+      "bytes": 139441,
+      "published": false
+    },
+    {
+      "name": "native-source-edited-stale.jpeg",
+      "sha256": "6a9f1cab98f61b71622511b0e75851aea9faead27858193edf5e19ed5117472d",
+      "bytes": 137169,
+      "published": false
+    },
+    {
+      "name": "native-refreshed.jpeg",
+      "sha256": "9cf4c5e0160679d451773d57613e678ca1c06a539e9992cef2e9f372a2bbb5f1",
+      "bytes": 135077,
+      "published": false
+    },
+    {
+      "name": "native-reopened.jpeg",
+      "sha256": "b36df443a5245fefc852f15c04a4233362f2cd5be63c931b2c3f6103c920d701",
+      "bytes": 139208,
+      "published": false
+    }
+  ]
+}

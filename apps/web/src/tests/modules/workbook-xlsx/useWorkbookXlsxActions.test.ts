@@ -432,6 +432,7 @@ describe("encrypted XLSX actions", () => {
         expect(request.password).toBe("private");
         if (request.type === "encode")
           expect(JSON.stringify(request.snapshot)).not.toContain("private");
+        expect(request.type === "encode" && request.filename).toBe("workbook-encrypted.xlsx");
         response(worker, {
           id: request.id,
           ok: true,

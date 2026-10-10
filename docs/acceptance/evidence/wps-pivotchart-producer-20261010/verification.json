@@ -1,0 +1,28 @@
+{
+  "verified_files": 3,
+  "producer_cases": [
+    {
+      "file": "native-created.xlsx",
+      "source_value": 100,
+      "north_apple": 100,
+      "grand_total": 520,
+      "pivot_source": "[sc-pivot.xlsx]Sheet2!PivotTable1"
+    },
+    {
+      "file": "native-source-edited-stale.xlsx",
+      "source_value": 110,
+      "north_apple": 100,
+      "grand_total": 520,
+      "pivot_source": "[sc-pivot.xlsx]Sheet2!PivotTable1"
+    },
+    {
+      "file": "native-refreshed.xlsx",
+      "source_value": 110,
+      "north_apple": 110,
+      "grand_total": 530,
+      "pivot_source": "[sc-pivot.xlsx]Sheet2!PivotTable1"
+    }
+  ],
+  "non_docProps_bytes_preserved": true,
+  "published_copies_gui_retested": false
+}

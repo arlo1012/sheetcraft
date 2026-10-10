@@ -219,6 +219,7 @@ export function useWorkbookXlsxActions(options: {
     if (!prepare()) return;
     const snapshot: WorkbookSnapshot = serializeWorkbook(options.getWorkbook());
     const requestId = `xlsx-export-${++requestNumber}`;
+    const filename = password ? "workbook-encrypted.xlsx" : "workbook.xlsx";
     busy.value = true;
     feedback.value = undefined;
     const controller = new AbortController();
@@ -234,7 +235,14 @@ export function useWorkbookXlsxActions(options: {
       if (controller.signal.aborted) throw new XlsxWorkerAbortError();
       const response = await runXlsxWorker(
         workerFactory,
-        { id: requestId, type: "encode", snapshot, images, ...(password ? { password } : {}) },
+        {
+          id: requestId,
+          type: "encode",
+          snapshot,
+          images,
+          filename,
+          ...(password ? { password } : {}),
+        },
         { timeoutMs: Math.max(1, timeoutMs - (Date.now() - startedAt)), signal: controller.signal },
       );
       clearTimeout(timeout);
@@ -244,7 +252,7 @@ export function useWorkbookXlsxActions(options: {
         return;
       }
       const bytes = new Uint8Array(response.bytes);
-      await download(bytes, password ? "workbook-encrypted.xlsx" : "workbook.xlsx");
+      await download(bytes, filename);
       if (!disposed) feedback.value = { key: "xlsx.feedback.exported", error: false };
     } catch (error) {
       if (timedOut) setFailure(new XlsxWorkerTimeoutError());

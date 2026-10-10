@@ -1,0 +1,26 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/apps/web
+
+ ❯ src/tests/modules/workbook-xlsx/components.test.ts (3 tests | 1 failed) 99ms
+     × shows failures in a dismissible dialog without rendering a workspace banner 16ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/modules/workbook-xlsx/components.test.ts > XLSX feedback > shows failures in a dismissible dialog without rendering a workspace banner
+AssertionError: expected undefined to be defined
+ ❯ src/tests/modules/workbook-xlsx/components.test.ts:91:19
+     89|     expect(body.find("[data-xlsx-feedback]").exists()).toBe(false);
+     90|     const close = body.findAll("button").find((button) => button.text(…
+     91|     expect(close).toBeDefined();
+       |                   ^
+     92|     await close!.trigger("click");
+     93|     expect(wrapper.emitted("dismiss")).toHaveLength(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 5 passed (6)
+      Tests  1 failed | 37 passed (38)
+   Start at  09:22:40
+   Duration  7.33s (transform 1.63s, setup 0ms, import 4.87s, tests 382ms, environment 1.24s)
+

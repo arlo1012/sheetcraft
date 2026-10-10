@@ -66,6 +66,8 @@ export type XlsxImageAsset = Readonly<{
 
 export type XlsxEncodeOptions = Readonly<{
   images?: readonly XlsxImageAsset[];
+  /** Actual output basename used by native PivotChart identities; defaults to workbook.xlsx. */
+  filename?: string;
 }>;
 
 export class XlsxCompatibilityError extends Error {

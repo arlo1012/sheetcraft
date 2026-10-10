@@ -87,9 +87,9 @@ describe("XLSX feedback", () => {
     expect(body.find("[data-xlsx-error-report]").exists()).toBe(false);
     expect(host.textContent).toBe("");
     expect(body.find("[data-xlsx-feedback]").exists()).toBe(false);
-    const close = body.findAll("button").find((button) => button.text() === "Close");
-    expect(close).toBeDefined();
-    await close!.trigger("click");
+    // Error dialogs intentionally have no footer. Exercise their actual titlebar close affordance.
+    expect(body.find(".t-dialog__footer").exists()).toBe(false);
+    await body.get(".t-dialog__close").trigger("click");
     expect(wrapper.emitted("dismiss")).toHaveLength(1);
     expect(wrapper.emitted("confirm")).toBeUndefined();
     expect(wrapper.emitted("cancel")).toBeUndefined();

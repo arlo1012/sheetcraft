@@ -33,6 +33,7 @@ async function handleRequest(request: XlsxWorkerRequest): Promise<void> {
       return;
     }
     const result = await codec.encodeXlsx(deserializeWorkbook(request.snapshot), {
+      filename: request.filename,
       images: request.images?.map((image) => ({
         ...image,
         bytes: new Uint8Array(image.bytes),

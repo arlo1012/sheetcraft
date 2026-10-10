@@ -22,6 +22,7 @@ import {
 } from "./pivot-xml.js";
 import { nativePivotSourceFingerprint, pivotValueKey, type PivotCache } from "./pivot-cache.js";
 import { nativePivotFiltersXml } from "./pivot-native-filters.js";
+import { nativePivotAxisItems } from "./pivot-native-items.js";
 
 export function pivotTableXml(
   workbook: Workbook,
@@ -33,6 +34,7 @@ export function pivotTableXml(
   nativeStyleName?: string,
 ): Uint8Array {
   const result = buildPivotResult(workbook, table, { useCache: true });
+  const axisItems = nativePivotAxisItems(table, cache, result);
   const presentation = getPivotPresentation(table);
   const range = getPivotTableRange(table);
   const location = {
@@ -122,7 +124,7 @@ export function pivotTableXml(
     (rowHeaderCaption === undefined ? "" : ` rowHeaderCaption="${xml(rowHeaderCaption)}"`) +
     (columnHeaderCaption === undefined ? "" : ` colHeaderCaption="${xml(columnHeaderCaption)}"`);
   // missingCaption fills empty data intersections; emptyLabel names blank axis members.
-  const native = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><pivotTableDefinition xmlns="${MAIN_NS}" xmlns:r="${REL_NS}" name="${xml(nativeName)}" cacheId="${cacheId}" dataCaption="Values" grandTotalCaption="${xml(table.totalLabel)}" missingCaption="" showMissing="1" rowGrandTotals="${table.columnTotals ? 1 : 0}" colGrandTotals="${table.rowTotals ? 1 : 0}" compact="${presentation.layout === "compact" ? 1 : 0}" compactData="${presentation.layout === "compact" ? 1 : 0}" outline="${presentation.layout === "tabular" ? 0 : 1}" showHeaders="${presentation.rowHeaders || presentation.columnHeaders ? 1 : 0}"${headerCaptions} multipleFieldFilters="1" preserveFormatting="1" useAutoFormatting="1" createdVersion="6" updatedVersion="6" minRefreshableVersion="3"${table.values.length > 1 ? ` dataPosition="${table.columnFields.length}"` : ""}><location ref="${rangeRef(location)}" firstHeaderRow="${Math.max(0, result.headerRows - result.headerStart - 1)}" firstDataRow="${Math.max(1, result.headerRows - result.headerStart)}" firstDataCol="${result.rowLabelColumns}"${table.filters.length ? ` rowPageCount="${table.filters.length}" colPageCount="1"` : ""}/><pivotFields count="${cache.headers.length}">${fields}</pivotFields>${list("rowFields", rowFields)}${list("colFields", columnFields)}${pageFields ? `<pageFields count="${table.filters.length}">${pageFields}</pageFields>` : ""}${
+  const native = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><pivotTableDefinition xmlns="${MAIN_NS}" xmlns:r="${REL_NS}" name="${xml(nativeName)}" cacheId="${cacheId}" dataCaption="Values" grandTotalCaption="${xml(table.totalLabel)}" missingCaption="" showMissing="1" rowGrandTotals="${table.columnTotals ? 1 : 0}" colGrandTotals="${table.rowTotals ? 1 : 0}" compact="${presentation.layout === "compact" ? 1 : 0}" compactData="${presentation.layout === "compact" ? 1 : 0}" outline="${presentation.layout === "tabular" ? 0 : 1}" showHeaders="${presentation.rowHeaders || presentation.columnHeaders ? 1 : 0}"${headerCaptions} multipleFieldFilters="1" preserveFormatting="1" useAutoFormatting="1" createdVersion="6" updatedVersion="6" minRefreshableVersion="3"${table.values.length > 1 ? ` dataPosition="${table.columnFields.length}"` : ""}><location ref="${rangeRef(location)}" firstHeaderRow="${Math.max(0, result.headerRows - result.headerStart - 1)}" firstDataRow="${Math.max(1, result.headerRows - result.headerStart)}" firstDataCol="${result.rowLabelColumns}"${table.filters.length ? ` rowPageCount="${table.filters.length}" colPageCount="1"` : ""}/><pivotFields count="${cache.headers.length}">${fields}</pivotFields>${list("rowFields", rowFields)}${axisItems.rowItems}${list("colFields", columnFields)}${axisItems.colItems}${pageFields ? `<pageFields count="${table.filters.length}">${pageFields}</pageFields>` : ""}${
     table.values.length
       ? `<dataFields count="${table.values.length}">${table.values
           .map((value, index) =>

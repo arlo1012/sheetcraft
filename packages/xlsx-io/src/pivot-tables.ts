@@ -4,7 +4,7 @@ import { nativePivotGroupXml, nativePivotDateTime } from "./pivot-native-groups.
 import { createPivotNumberFormatReader } from "./pivot-number-formats.js";
 import { resolvePivotTableSource, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import { strFromU8, strToU8, unzipSync } from "fflate/browser";
-import type { Workbook } from "@sheetcraft/core/workbook";
+import type { Sheet, Workbook } from "@sheetcraft/core/workbook";
 import { createPivotCache, cacheDefinitionXml, cacheRecordsXml } from "./pivot-cache.js";
 import { pivotTableXml } from "./pivot-table-writer.js";
 import { readPivotTable } from "./pivot-table-reader.js";
@@ -20,13 +20,24 @@ import {
 import { readXlsxWorksheetPartTargets } from "./raw-cell-values.js";
 import type { CompatibilityReportBuilder } from "./report.js";
 
+export type EmittedPivotTable = {
+  sheet: Sheet;
+  sheetPart: string;
+  tablePart: string;
+  cachePart: string;
+  cacheId: number;
+  name: string;
+  axisItems: boolean;
+};
+
 export function writeXlsxPivotTables(
   entries: Record<string, Uint8Array>,
   workbook: Workbook,
   report?: CompatibilityReportBuilder,
   styleNames?: ReadonlyMap<SheetPivotTable, string>,
-): void {
-  if (![...workbook.sheets.values()].some((sheet) => sheet.pivotTables?.length)) return;
+): ReadonlyMap<SheetPivotTable, EmittedPivotTable> {
+  const emitted = new Map<SheetPivotTable, EmittedPivotTable>();
+  if (![...workbook.sheets.values()].some((sheet) => sheet.pivotTables?.length)) return emitted;
   const readNumberFormats = createPivotNumberFormatReader(entries, workbook);
   const caches: string[] = [];
   const names = new Set<string>();
@@ -106,6 +117,18 @@ export function writeXlsxPivotTables(
       addContentType(entries, cachePart, "pivotCacheDefinition");
       addContentType(entries, recordsPart, "pivotCacheRecords");
       addContentType(entries, tablePart, "pivotTable");
+      const definition = child(parseXml(entries[tablePart]), "pivotTableDefinition");
+      emitted.set(table, {
+        sheet,
+        sheetPart,
+        tablePart,
+        cachePart,
+        cacheId: index - 1,
+        name,
+        axisItems:
+          !!nodes(child(definition, "rowItems").i).length &&
+          !!nodes(child(definition, "colItems").i).length,
+      });
     }
   }
   if (caches.length) {
@@ -117,6 +140,7 @@ export function writeXlsxPivotTables(
       ),
     );
   }
+  return emitted;
 }
 export function readXlsxPivotTables(
   bytes: Uint8Array,

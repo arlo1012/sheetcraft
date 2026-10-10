@@ -32,6 +32,7 @@ export type XlsxWorkerRequest =
       snapshot: WorkbookSnapshot;
       password?: string;
       images?: readonly XlsxWorkerImage[];
+      filename?: string;
     };
 
 export type XlsxWorkerResponse =

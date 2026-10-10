@@ -1,5 +1,6 @@
 import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import { writeXlsxPivotTables } from "./pivot-tables.js";
+import { writeXlsxPivotCharts } from "./pivot-charts.js";
 import { writeXlsxSparklines } from "./sparklines.js";
 import type { ProtectionPassword } from "@sheetcraft/core";
 import { writeXlsxProtection } from "./protection.js";
@@ -61,6 +62,7 @@ export function finalizeXlsxExport(
   structureProtected = false,
   structurePassword?: ProtectionPassword,
   workbook?: Workbook,
+  filename = "workbook.xlsx",
 ): Uint8Array {
   const entries = unzipSync(bytes);
   const styles = entries["xl/styles.xml"];
@@ -174,8 +176,8 @@ export function finalizeXlsxExport(
   }
   if (calculation) writeWorkbookCalculationSettings(entries, calculation);
   if (theme) writeXlsxWorkbookTheme(entries, theme);
-  if (workbook)
-    writeXlsxPivotTables(
+  if (workbook) {
+    const nativePivots = writeXlsxPivotTables(
       entries,
       workbook,
       report,
@@ -189,6 +191,8 @@ export function finalizeXlsxExport(
         ]),
       ),
     );
+    writeXlsxPivotCharts(entries, workbook, nativePivots, filename, report);
+  }
   const files: Zippable = {};
   for (const [name, content] of Object.entries(entries)) {
     if (name.endsWith("/")) continue;

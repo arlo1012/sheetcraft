@@ -24,11 +24,12 @@ result. Native XLSX support is tracked separately from internal document support
    See [the bounded source contract](table-backed-pivots.md) for repair, cache,
    snapshot and native-source precedence rules.
 3. **PivotChart and native chart infrastructure.** PivotChart is an existing
-   linked internal chart, created with its pivot atomically. Native XLSX currently
-   omits it and all other `sheet.drawings`. Start with a genuinely linked clustered
-   column PivotChart, using an actual WPS-authored producer and native pivotSource
-   metadata; an ordinary chart over report cells is insufficient. Images and
-   charts must share one worksheet drawing part with collision-free IDs.
+   linked internal chart, created with its pivot atomically. The initial native
+   clustered-column export slice now uses the actual emitted PivotTable identity
+   and cached native axis item layouts, with WPS first-open/refresh/save/reopen
+   acceptance. Pictures and charts share a worksheet drawing with collision-free
+   IDs. Other drawings and unsupported chart/report configurations remain explicit
+   omissions. See [the bounded export contract](native-pivotchart-export.md).
 4. **Other charts, images, sparklines, hyperlinks and symbols.** Ordinary chart
    types and dashboards have real editors and Core-backed persistence, but native
    chart export is omitted. Cell/floating images have a prepared-raster export
@@ -75,10 +76,13 @@ the export-warning product policy.
   Explicit existing-sheet destinations and already-saved A1 reports keep their
   anchors. Placement is covered by 14 focused cases, including real destination
   switching, cancellation and atomic undo/redo; fresh product GUI remains pending.
-- A native PivotChart chooser was observed from the configured pivot. The first
-  OK attempt was inconclusive, then native controls failed with `native pipe path
-unavailable`. No chart producer or chart linkage has been obtained. This is an
-  infrastructure acceptance blocker, not evidence of unsupported WPS capability.
+- The native PivotChart producer was obtained after restoring WPS on 2026-10-10.
+  Insert → PivotChart from the configured report saves a genuine clustered-column
+  chart with `pivotSource` naming its workbook, owning sheet, and native pivot.
+  Source 100→110 stays cached until explicit Refresh, then both chart/report update
+  and persist after workbook close/reopen. See the [bounded producer evidence](../acceptance/evidence/wps-pivotchart-producer-20261010/README.md).
+  Product native chart export/import remains pending; this observation is not
+  product-file acceptance or whole-Insert parity.
 
 Focused module tests and exported product-path samples establish only their
 bounded behavior. Real WPS checks resume after supported native controls recover;
