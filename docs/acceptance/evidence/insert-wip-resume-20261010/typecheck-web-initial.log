@@ -1,0 +1,3 @@
+$ bun run --filter @sheetcraft/web typecheck
+@sheetcraft/web typecheck: src/tests/modules/charts/existing-pivot-actions.test.ts(308,22): error TS2339: Property 'protection' does not exist on type 'Workbook'.
+@sheetcraft/web typecheck: Exited with code 2

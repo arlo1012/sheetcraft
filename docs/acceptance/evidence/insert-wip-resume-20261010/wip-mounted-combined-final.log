@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 recovered-repository/apps/web
+
+
+ Test Files  3 passed (3)
+      Tests  59 passed (59)
+   Start at  08:31:41
+   Duration  62.44s (transform 14.50s, setup 0ms, import 22.25s, tests 39.01s, environment 709ms)
+

@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 recovered-repository
+
+No test files found, exiting with code 1
+
+filter: apps/web/src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts
+include: src/**/*.test.ts
+exclude:  **/node_modules/**, **/.git/**
+

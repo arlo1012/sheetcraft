@@ -305,7 +305,7 @@ describe("existing report PivotChart actions", () => {
     const f = fixture();
     f.output.properties.protected = true;
     f.output.protection = { editableRanges: [], editObjects: true };
-    f.workbook.value.protection = { structure: true };
+    f.workbook.value.structureProtected = true;
     f.actions.insertPivot(f.report.id);
     expect(f.actions.dialog.value).toBeDefined();
     const dialog = f.actions.dialog.value!;
