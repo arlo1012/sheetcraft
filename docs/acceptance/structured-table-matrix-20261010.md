@@ -96,8 +96,10 @@ paused. Important retained limits:
 - The product's filtered Tab focus behavior differs from the unfiltered path;
   WPS in this observation did not add a row on final-cell Tab at all.
 - Calculated-column template/exception persistence, native I/O and autofill await
-  an explicit product decision. A wholly empty column's default propagation and
-  other native-app variants were not established by the mixed-value observation.
+  an explicit product decision. The original mixed-value observation did not
+  establish the empty-column branch; the later independent supplement in the
+  candidate-contract record now proves automatic fill and two-step Undo in this
+  WPS build. Other native-app variants and empty-string equivalence remain untested.
 
 No new tests/builds were needed for this text/GUI-only continuation. Latest code
 checks remain the exact659aa results: full XLSX81files/1158tests passed, scoped
