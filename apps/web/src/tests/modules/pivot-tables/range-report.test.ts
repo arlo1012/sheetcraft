@@ -66,8 +66,8 @@ describe("single-range pivot report actions", () => {
     const updated = f.sheet.pivotTables![0]!;
     expect(updated.reportLayout).toBeDefined();
     expect(updated.values[0]!.caption).toBe(expected);
-    expect(getCellValue(f.sheet, { row: 0, column: 1 })).toBe(expected);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(30);
+    expect(getCellValue(f.sheet, { row: 2, column: 1 })).toBe(expected);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(30);
   });
 
   test("creates the supplied title1-title4 range as a sparse WPS report with total 275", () => {
@@ -97,7 +97,7 @@ describe("single-range pivot report actions", () => {
         values: [{ field: 3, aggregate: "sum", caption: "Sum of title4" }],
       }),
     ).toBe(true);
-    const cell = (row: number, column: number) => getCellValue(f.sheet, { row, column });
+    const cell = (row: number, column: number) => getCellValue(f.sheet, { row: row + 2, column });
     expect([cell(0, 0), cell(0, 1)]).toEqual(["title1", "(All)"]);
     expect(cell(1, 0)).toBeNull();
     expect([cell(2, 0), cell(2, 1)]).toEqual(["Sum of title4", "title2"]);
@@ -115,8 +115,8 @@ describe("single-range pivot report actions", () => {
       275,
     ]);
     expect(f.sheet.pivotTables![0]!.outputRange).toEqual({
-      start: { row: 0, column: 0 },
-      end: { row: 15, column: 12 },
+      start: { row: 2, column: 0 },
+      end: { row: 17, column: 12 },
     });
     expect(f.onError).not.toHaveBeenCalled();
   });

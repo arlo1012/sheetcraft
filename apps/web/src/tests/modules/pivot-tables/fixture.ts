@@ -58,7 +58,8 @@ export function fixture() {
       workbook = createWorkbook({ id: "replacement", sheetId: "source" });
     },
     selectOutput() {
-      range = { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } };
+      const anchor = getActiveSheet(workbook).pivotTables![0]!.anchor;
+      range = { start: { ...anchor }, end: { ...anchor } };
     },
   };
 }

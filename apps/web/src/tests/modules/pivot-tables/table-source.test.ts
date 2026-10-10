@@ -97,7 +97,8 @@ function configuredTableReport(options: { totalRow?: boolean } = {}) {
   const f = tableFixture(options);
   f.actions.open();
   f.actions.confirm(f.actions.editing.value!);
-  f.select({ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } });
+  const anchor = f.sheet.pivotTables![0]!.anchor;
+  f.select({ start: { ...anchor }, end: { ...anchor } });
   expect(
     f.actions.update({
       ...f.sheet.pivotTables![0]!,
@@ -145,12 +146,12 @@ describe("table-first pivot insertion source", () => {
           values: [{ field: 1, aggregate: "sum", caption: "Sum Amount" }],
         }),
       ).toBe(true);
-      expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(30);
-      expect(getCellValue(f.sheet, { row: 2, column: 1 })).toBe(30);
+      expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(30);
+      expect(getCellValue(f.sheet, { row: 4, column: 1 })).toBe(30);
       const snapshot = serializeWorkbook(f.workbook);
       const restored = deserializeWorkbook(snapshot);
       expect(serializeWorkbook(restored)).toEqual(snapshot);
-      expect(getCellValue(getActiveSheet(restored), { row: 2, column: 1 })).toBe(30);
+      expect(getCellValue(getActiveSheet(restored), { row: 4, column: 1 })).toBe(30);
       expect(getActiveSheet(restored).drawings).toHaveLength(chart ? 1 : 0);
       expect(getActiveSheet(restored).pivotTables![0]!.sourceTableId).toBe("table");
       undoWorkbookCommand(f.session);
@@ -201,17 +202,17 @@ describe("table-first pivot insertion source", () => {
     ).toBe(true);
     expect(f.sheet.pivotTables![0]!.source!.end.row).toBe(2);
     expect(f.sheet.pivotTables![0]!.dataCache).toEqual(cache);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(30);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(30);
     const beforeRefresh = serializeWorkbook(f.workbook);
     f.actions.refresh();
     expect(f.sheet.pivotTables![0]!.source!.end.row).toBe(3);
     expect(f.sheet.pivotTables![0]!.dataCache!.records).toHaveLength(3);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(70);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(70);
     expect(f.execute.mock.calls.at(-1)![0]).not.toHaveProperty("repairSource");
     undoWorkbookCommand(f.session);
     expect(serializeWorkbook(f.workbook)).toEqual(beforeRefresh);
     redoWorkbookCommand(f.session);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(70);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(70);
     expect(serializeWorkbook(f.workbook)).not.toEqual(original);
   });
 
@@ -361,7 +362,7 @@ describe("table-first pivot insertion source", () => {
     );
     f.actions.refresh();
     expect(f.sheet.pivotTables![0]!.source!.end.row).toBe(2);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(30);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(30);
   });
 
   test.each(["delete", "reorder"] as const)(

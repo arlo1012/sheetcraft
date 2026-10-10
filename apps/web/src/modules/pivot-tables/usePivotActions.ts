@@ -37,6 +37,8 @@ import {
 import { reconcilePivotAxisFilters } from "./pivot-field-edits";
 import { getPivotReportColors } from "./pivot-report-colors";
 import { resolvePivotDraftSource } from "./pivot-draft-source";
+// WPS places a new-worksheet report at A3; existing-sheet addresses remain explicit.
+const newSheetPivotAnchor: CellAddress = { row: 2, column: 0 };
 export type PivotDraft = {
   table: SheetPivotTable;
   source: string;
@@ -106,6 +108,7 @@ export function usePivotActions(options: {
   const idFactory = createBrowserIdFactory();
   let dialogId = 0;
   let confirming = false;
+  let confirmingSheetId: string | undefined;
   let disposed = false;
   function hasTargetIdentity(target: PivotDialogTarget, includeReport = true): boolean {
     return (
@@ -191,7 +194,7 @@ export function usePivotActions(options: {
           sourceSheetId: sheet.id,
           ...(sourceTable && !sourceNeedsHeaders ? { sourceTableId: sourceTable.id } : {}),
           source: sourceNeedsHeaders ? null : sourceRange,
-          anchor: { row: 0, column: 0 },
+          anchor: { ...newSheetPivotAnchor },
           outputRange: null,
           rowFields: [],
           columnFields: [],
@@ -480,7 +483,7 @@ export function usePivotActions(options: {
         },
         ...source,
         dataCache: undefined,
-        anchor: draft.newSheet ? { row: 0, column: 0 } : destination!.range.start,
+        anchor: draft.newSheet ? { ...newSheetPivotAnchor } : destination!.range.start,
       });
       const chartId = draft.chart ? idFactory("pivot-chart") : undefined;
       const command = draft.newSheet
@@ -509,6 +512,7 @@ export function usePivotActions(options: {
         errorReason.value = "protected";
         return;
       }
+      confirmingSheetId = command.type === "addSheet" ? command.sheet.id : undefined;
       if (!options.execute(command)) {
         if (dialog.value !== target || disposed) return;
         error.value = true;
@@ -551,6 +555,7 @@ export function usePivotActions(options: {
       )
         errorReason.value = field;
     } finally {
+      confirmingSheetId = undefined;
       confirming = false;
       if (dialog.value === target && !hasTargetIdentity(target)) close(target);
     }
@@ -720,6 +725,12 @@ export function usePivotActions(options: {
     const table = selected();
     if (table) update(table, true);
   }
+  function closeOnSheetChange() {
+    // A new-sheet command activates its own destination before confirm can finish.
+    // Other navigation and explicit close/cancel still invalidate the dialog.
+    if (confirming && confirmingSheetId === options.getSheet().id) return;
+    close();
+  }
   function close(target = dialog.value) {
     if (target !== dialog.value) return;
     dialog.value = undefined;
@@ -738,6 +749,7 @@ export function usePivotActions(options: {
     remove,
     selected,
     close,
+    closeOnSheetChange,
     update,
     clear,
     source,

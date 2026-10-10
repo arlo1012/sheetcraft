@@ -127,8 +127,8 @@ describe("pivot actions", () => {
         values: [{ field: 2, aggregate: "sum", caption: "Amount" }],
       }),
     ).toBe(true);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(30);
-    expect(getCellValue(f.sheet, { row: 2, column: 1 })).toBe(40);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(30);
+    expect(getCellValue(f.sheet, { row: 4, column: 1 })).toBe(40);
     undoWorkbookCommand(f.session);
     expect(f.sheet.pivotTables![0]!.outputRange).toBeNull();
     undoWorkbookCommand(f.session);
@@ -147,7 +147,7 @@ describe("pivot actions", () => {
     setCellContent(f.source, { row: 1, column: 2 }, { kind: "literal", value: 15 });
     const before = serializeWorkbook(f.workbook);
     f.actions.refresh();
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(35);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(35);
     expect(f.onError).not.toHaveBeenCalled();
     undoWorkbookCommand(f.session);
     expect(serializeWorkbook(f.workbook)).toEqual(before);
@@ -168,7 +168,7 @@ describe("pivot actions", () => {
     ["North", "Q1", 50].forEach((value, column) =>
       setCellContent(f.source, { row: 4, column }, { kind: "literal", value }),
     );
-    setCellContent(f.sheet, { row: 4, column: 0 }, { kind: "literal", value: "Blocker" });
+    setCellContent(f.sheet, { row: 6, column: 0 }, { kind: "literal", value: "Blocker" });
     f.actions.source();
     const draft = { ...f.actions.editing.value!, source: "'Source Data'!A1:C5" };
     const before = serializeWorkbook(f.workbook);
@@ -177,7 +177,7 @@ describe("pivot actions", () => {
     expect(f.actions.error.value).toBe(true);
     f.actions.confirm({ ...draft, overwrite: true });
     expect(f.actions.editing.value).toBeUndefined();
-    expect(getCellValue(f.sheet, { row: 4, column: 1 })).toBe(120);
+    expect(getCellValue(f.sheet, { row: 6, column: 1 })).toBe(120);
   });
   test("retains source field identity when headers are reordered or removed", () => {
     const f = configured();
@@ -199,7 +199,7 @@ describe("pivot actions", () => {
       rowFields: [1],
       values: [{ field: 0 }],
     });
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(10);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(10);
   });
   test("moves a selected existing report with a dedicated location draft", () => {
     const f = configured();
@@ -208,7 +208,7 @@ describe("pivot actions", () => {
     f.actions.confirm({ ...f.actions.editing.value!, destination: `${f.sheet.name}!E1` });
     expect(f.sheet.pivotTables![0]!.anchor).toEqual({ row: 0, column: 4 });
     expect(getCellValue(f.sheet, { row: 1, column: 5 })).toBe(30);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBeNull();
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBeNull();
   });
   test("clears fields into an empty report and removes it with or without clearing output", () => {
     const f = configured();
@@ -224,11 +224,11 @@ describe("pivot actions", () => {
     undoWorkbookCommand(f.session);
     f.actions.remove(false);
     expect(f.sheet.pivotTables).toEqual([]);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(30);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(30);
     undoWorkbookCommand(f.session);
     f.actions.remove(true);
     expect(f.sheet.pivotTables).toEqual([]);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBeNull();
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBeNull();
   });
   test("rejects stale workbook and structure-protected creation drafts", () => {
     const f = fixture();

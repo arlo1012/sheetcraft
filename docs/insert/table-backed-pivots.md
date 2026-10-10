@@ -56,7 +56,8 @@ are retained with the final successful runs.
 
 Actual WPS product-file open/save/reopen is pending recovery of native controls.
 Header-disabled metadata headers, automatic column identity migration and whole
-table cut-follow remain follow-up capabilities. WPS's observed new-sheet report
-starts at A3; product creation still starts at A1, a separate placement-default
-parity item. Native PivotChart export still requires a genuine chart producer;
+table cut-follow remain follow-up capabilities. New-sheet Web creation now starts
+at A3, matching the retained WPS build's observed placement. Explicit existing-sheet
+destinations and older A1 reports retain their anchors; Core command defaults are
+unchanged. Native PivotChart export still requires a genuine chart producer;
 current drawing omission is unchanged.

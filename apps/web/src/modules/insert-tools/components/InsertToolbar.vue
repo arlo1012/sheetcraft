@@ -27,6 +27,7 @@ import ImageInsertMenu from "../../home-tools/components/ImageInsertMenu.vue";
 defineProps<{
   disabled: boolean;
   pivotDisabled: boolean;
+  pivotChartDisabled?: boolean;
   pivotManageDisabled: boolean;
   hasPivot: boolean;
   imageDisabled: boolean;
@@ -61,7 +62,8 @@ const { t } = useAppI18n();
 <template>
   <RibbonToolbar :label="t('ribbon.insertTools')" :data-cell-edit-session="editSessionId">
     <PivotInsertTools
-      :disabled="pivotDisabled"
+      :disabled="pivotDisabled || hasPivot"
+      :chart-disabled="pivotChartDisabled ?? pivotDisabled"
       :manage-disabled="pivotManageDisabled"
       :has-pivot="hasPivot"
       @insert="emit('insertPivot', $event)"
@@ -79,7 +81,7 @@ const { t } = useAppI18n();
         variant="tall"
         :label="t('tables.tools')"
         :text="t('tables.create')"
-        :disabled="disabled"
+        :disabled="disabled || hasPivot"
         data-insert-tool="table"
         @activate="hasTable ? emit('manageTable') : emit('insertTable')"
         ><Table2

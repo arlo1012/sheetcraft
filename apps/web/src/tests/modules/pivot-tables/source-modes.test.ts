@@ -464,7 +464,7 @@ describe("PivotTable source modes", () => {
         values: [{ field: 2, aggregate: "count", caption: "Records" }],
       }),
     ).toBe(true);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(2);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(2);
   });
   test("rejects a deleted report reference without creating a sheet or changing history", () => {
     const f = configuredReport();
@@ -489,11 +489,11 @@ describe("PivotTable source modes", () => {
       "Value",
       "Page1",
     ]);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(40);
-    expect(getCellValue(f.sheet, { row: 2, column: 1 })).toBe(40);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(40);
+    expect(getCellValue(f.sheet, { row: 4, column: 1 })).toBe(40);
     setCellContent(second, { row: 1, column: 1 }, { kind: "literal", value: 17 });
     f.actions.refresh();
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(50);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(50);
     expect(f.onError).not.toHaveBeenCalled();
   });
   test("another report retains all consolidated ranges instead of only the primary range", () => {
@@ -514,7 +514,7 @@ describe("PivotTable source modes", () => {
         filters: [],
       }),
     ).toBe(true);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(40);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(40);
   });
   test("repairs a combined source using a shorter replacement list without retaining stale areas", () => {
     const { f } = matrixFixture();
@@ -523,8 +523,8 @@ describe("PivotTable source modes", () => {
     expect(f.actions.error.value).toBe(false);
     expect(f.sheet.pivotTables![0]!.consolidation!.ranges).toHaveLength(1);
     expect(f.sheet.pivotTables![0]!.consolidation!.ranges[0]!.sheetId).toBe("second");
-    expect(getCellValue(f.sheet, { row: 1, column: 0 })).toBe("East");
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(10);
+    expect(getCellValue(f.sheet, { row: 3, column: 0 })).toBe("East");
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(10);
   });
   test("the fields pane offers combined headers and page items from both worksheet ranges as filter choices", async () => {
     const { f } = matrixFixture();

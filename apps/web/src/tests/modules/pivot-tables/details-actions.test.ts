@@ -17,7 +17,7 @@ function setup() {
   const reportSheet = f.sheet;
   const table = reportSheet.pivotTables![0]!;
   let busy = false;
-  let address: CellAddress = { row: 1, column: 1 };
+  let address: CellAddress = { row: table.anchor.row + 1, column: table.anchor.column + 1 };
   const execute = vi.fn((command: WorkbookCommand) => f.execute(command));
   const flush = vi.fn(() => true);
   const activateDetails = vi.fn();
@@ -94,7 +94,7 @@ describe("pivot Show Details actions", () => {
   test("explicit report id and address override the selected cell", () => {
     const f = setup();
     f.select({ row: 0, column: 0 });
-    expect(f.actions.showDetails(f.table.id, { row: 2, column: 1 })).toBe(true);
+    expect(f.actions.showDetails(f.table.id, { row: 4, column: 1 })).toBe(true);
     const details = f.workbook.sheets.get(f.activateDetails.mock.calls[0]![0] as string)!;
     expect(getCellValue(details, { row: 1, column: 0 })).toBe("West");
     expect(getCellValue(details, { row: 1, column: 2 })).toBe(40);
@@ -148,8 +148,8 @@ describe("pivot Show Details actions", () => {
   });
   test("row labels and report headers are not drill-through targets", () => {
     const f = setup();
-    expect(f.actions.showDetails(f.table.id, { row: 1, column: 0 })).toBe(false);
-    expect(f.actions.showDetails(f.table.id, { row: 0, column: 1 })).toBe(false);
+    expect(f.actions.showDetails(f.table.id, { row: 3, column: 0 })).toBe(false);
+    expect(f.actions.showDetails(f.table.id, { row: 2, column: 1 })).toBe(false);
     expect(f.onDetailsError).toHaveBeenCalledWith("invalid");
     expect(f.execute).not.toHaveBeenCalled();
   });

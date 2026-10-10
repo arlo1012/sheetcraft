@@ -68,7 +68,7 @@ describe("pivot fields pane", () => {
     expect(f.table.value.values).toEqual([]);
     await f.wrapper.get('[data-pivot-source-field="2"] input[type="checkbox"]').setValue(true);
     expect(f.table.value.values).toMatchObject([{ field: 2, aggregate: "sum" }]);
-    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBe(30);
+    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(30);
     await f.wrapper.get('[data-pivot-source-field="2"] input[type="checkbox"]').setValue(false);
     expect(f.table.value.values).toEqual([]);
   });
@@ -101,8 +101,8 @@ describe("pivot fields pane", () => {
     ).trigger("click");
     await flushPromises();
     expect(f.table.value.filters).toEqual([{ field: 1, values: ["Q1"], all: false }]);
-    expect(getCellValue(f.sheet, { row: 3, column: 1 })).toBe(10);
-    expect(getCellValue(f.sheet, { row: 4, column: 1 })).toBe(40);
+    expect(getCellValue(f.sheet, { row: 5, column: 1 })).toBe(10);
+    expect(getCellValue(f.sheet, { row: 6, column: 1 })).toBe(40);
   });
   test("disables field edits and drag targets when editing is unavailable", async () => {
     const f = paneFixture(true);

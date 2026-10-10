@@ -1264,14 +1264,10 @@ watch(editingPivot, () => pivotRangePicker.cancel(), { flush: "sync" });
 watch(
   () => activeSheet.value.id,
   () => {
-    if (!pickingPivotRange.value) pivotActions.close();
+    if (!pickingPivotRange.value) pivotActions.closeOnSheetChange();
   },
   { flush: "sync" },
 );
-function editLinkedPivot(id: string) {
-  chartActions.close();
-  openPivotFields(id);
-}
 const controlActions = useFormControlActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1342,23 +1338,55 @@ const chartActions = useChartActions({
   getSheet: () => activeSheet.value,
   getRange: () => activeSelectionRange.value,
   getEvaluator: () => activeSheetEvaluator.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   flush: () => cellEditSession.finish(),
   execute: executeCommand,
   name: () => t("chart.tools"),
+  onEditPivot: openPivotFields,
 });
-const { editing: editingChart, error: chartError } = chartActions;
+const { dialog: chartDialog, editing: editingChart, error: chartError } = chartActions;
 const chartRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingChartRange, reference: pickedChartReference } = chartRangePicker;
-watch(editingChart, (value) => {
-  if (!value) chartRangePicker.cancel();
+let chartPickerId = 0;
+const chartPicker = shallowRef<{ id: number; confirm: () => void; cancel: () => void }>();
+const selectChartReference = computed(() => {
+  const dialog = chartDialog.value;
+  return async (current: string): Promise<string | undefined> => {
+    if (!dialog?.isCurrent() || dialog.initial.chart.pivotTableId) return undefined;
+    const selected = chartRangePicker.selectReference(current);
+    const picker = {
+      id: ++chartPickerId,
+      confirm: () => {
+        if (chartPicker.value === picker && dialog.isCurrent()) chartRangePicker.confirm();
+      },
+      cancel: () => {
+        if (chartPicker.value === picker && dialog.isCurrent()) chartRangePicker.cancel();
+      },
+    };
+    chartPicker.value = picker;
+    const result = await selected;
+    if (chartPicker.value === picker) chartPicker.value = undefined;
+    return dialog.isCurrent() ? result : undefined;
+  };
 });
-watch(() => activeSheet.value.id, chartActions.close);
+watch(
+  chartDialog,
+  () => {
+    chartRangePicker.cancel();
+    chartPicker.value = undefined;
+  },
+  { flush: "sync" },
+);
 watch(workbookGeneration, () => {
-  chartActions.close();
   drawingActions.close();
   symbolVisible.value = false;
 });
+function insertPivot(chart: boolean): void {
+  if (chart && activePivot.value) chartActions.insertPivot(activePivot.value.id);
+  else if (!activePivot.value) pivotActions.open(chart);
+}
 function editSheetDrawing(drawing: SheetDrawing): void {
   if (drawing.kind === "chart") chartActions.edit(drawing);
   else if (drawing.kind === "control") controlActions.open(drawing);
@@ -2578,11 +2606,17 @@ const gridInert = computed(
       <template #insert-tools>
         <InsertToolbar
           :pivot-disabled="loading || fileBusy || xlsxBusy"
+          :pivot-chart-disabled="
+            loading ||
+            fileBusy ||
+            xlsxBusy ||
+            (!!activePivot && !canUseSheetPermission(activeSheet, 'editObjects'))
+          "
           :pivot-manage-disabled="
             loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'pivotTables')
           "
           :has-pivot="!!activePivot"
-          @insert-pivot="pivotActions.open"
+          @insert-pivot="insertPivot"
           @edit-pivot="openPivotFields()"
           @refresh-pivot="pivotActions.refresh"
           @remove-pivot="pivotActions.remove"
@@ -4008,11 +4042,11 @@ const gridInert = computed(
     @close="symbolVisible = false"
   />
   <ChartEditorDialog
-    v-if="editingChart"
-    :key="editingChart.id"
-    :drawing="editingChart"
-    :workbook="session.workbook"
-    :sheet="activeSheet"
+    v-if="chartDialog"
+    :key="chartDialog.dialogId"
+    :drawing="chartDialog.initial"
+    :workbook="chartDialog.workbook"
+    :sheet="chartDialog.sheet"
     :evaluator="activeSheetEvaluator"
     :revision="workbookRevision"
     :disabled="
@@ -4020,17 +4054,18 @@ const gridInert = computed(
     "
     :error="chartError"
     :suspended="pickingChartRange"
-    :select-reference="chartRangePicker.selectReference"
-    @edit-pivot="editLinkedPivot"
-    @confirm="chartActions.confirm"
-    @close="chartActions.close"
+    :select-reference="selectChartReference"
+    @edit-pivot="chartDialog.editPivot"
+    @confirm="chartDialog.confirm"
+    @close="chartDialog.close"
   />
   <RangeReferencePicker
-    v-if="pickingChartRange"
+    v-if="pickingChartRange && chartPicker"
+    :key="chartPicker.id"
     :reference="pickedChartReference"
     :edit-session-id="cellEditSession.id"
-    @confirm="chartRangePicker.confirm"
-    @cancel="chartRangePicker.cancel"
+    @confirm="chartPicker.confirm"
+    @cancel="chartPicker.cancel"
   />
   <input
     :ref="attachmentActions.fileInput"

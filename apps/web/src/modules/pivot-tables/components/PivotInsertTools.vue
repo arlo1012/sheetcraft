@@ -8,7 +8,12 @@ import {
 } from "lucide-vue-next";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import { useAppI18n } from "../../../shared/i18n";
-defineProps<{ disabled: boolean; hasPivot: boolean; manageDisabled: boolean }>();
+defineProps<{
+  disabled: boolean;
+  chartDisabled?: boolean;
+  hasPivot: boolean;
+  manageDisabled: boolean;
+}>();
 const emit = defineEmits<{ insert: [chart: boolean]; refresh: []; edit: []; remove: [] }>();
 const { t } = useAppI18n();
 </script>
@@ -26,7 +31,7 @@ const { t } = useAppI18n();
       variant="tall"
       :label="t('pivot.chart')"
       :text="t('pivot.chart')"
-      :disabled="disabled"
+      :disabled="chartDisabled ?? disabled"
       data-insert-tool="pivot-chart"
       @activate="emit('insert', true)"
       ><ChartColumnIncreasing

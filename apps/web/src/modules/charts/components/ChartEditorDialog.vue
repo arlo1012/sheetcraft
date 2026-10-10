@@ -46,7 +46,11 @@ const previewDrawing = computed(() => {
     height: 260,
     chart: {
       ...draft.value.chart,
-      range: resolved?.sheetId === props.sheet.id ? resolved.range : null,
+      range: draft.value.chart.pivotTableId
+        ? draft.value.chart.range
+        : resolved?.sheetId === props.sheet.id
+          ? resolved.range
+          : null,
     },
   };
 });

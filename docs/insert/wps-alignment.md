@@ -71,6 +71,10 @@ the export-warning product policy.
   parsed. The synthetic native pivot has region rows, product columns, sum(amount)
   and total 520. Table source is `Table1`, and new-sheet output starts at A3 in this
   observed build. These are concrete observations, not universal default claims.
+- New-sheet Web PivotTable/PivotChart creation now uses that observed A3 placement.
+  Explicit existing-sheet destinations and already-saved A1 reports keep their
+  anchors. Placement is covered by 14 focused cases, including real destination
+  switching, cancellation and atomic undo/redo; fresh product GUI remains pending.
 - A native PivotChart chooser was observed from the configured pivot. The first
   OK attempt was inconclusive, then native controls failed with `native pipe path
 unavailable`. No chart producer or chart linkage has been obtained. This is an

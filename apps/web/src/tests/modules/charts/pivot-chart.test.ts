@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Select } from "tdesign-vue-next/es/select";
 import { createWorkbook, getActiveSheet, createSheetEvaluator } from "@sheetcraft/core/workbook";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
@@ -102,6 +103,27 @@ describe("pivot charts", () => {
       expect(f.drawing.chart.showHidden).toBe(false);
     },
   );
+  test("linked type changes keep the report link and preview range despite stale locked source text", async () => {
+    const f = setup(true);
+    f.wrapper.findComponent(RangeReferenceInput).vm.$emit("update:modelValue", "Missing!A1:C4");
+    f.wrapper.findComponent(Select).vm.$emit("update:modelValue", "line");
+    await flushPromises();
+    const preview = f.wrapper
+      .findComponent({ name: "ChartContent" })
+      .props("drawing") as SheetChartDrawing;
+    expect(preview.chart.range).toEqual(f.drawing.chart.range);
+    expect(preview.chart.pivotTableId).toBe("pivot");
+    expect(preview.chart.type).toBe("line");
+    f.wrapper.findComponent(Dialog).vm.$emit("confirm");
+    const result = f.wrapper.emitted("confirm")![0]![0] as SheetChartDrawing;
+    expect(result.id).toBe(f.drawing.id);
+    expect(result.chart).toMatchObject({
+      pivotTableId: "pivot",
+      type: "line",
+      range: f.drawing.chart.range,
+    });
+    expect(f.drawing.chart.type).toBe("column");
+  });
   test.each([
     {
       format: { kind: "percent" as const, fractionDigits: 1 },

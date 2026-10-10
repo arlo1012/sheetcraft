@@ -135,9 +135,9 @@ describe("report page filter overlay", () => {
     expect(column.attributes("aria-label")).toContain("title2");
     expect(row.attributes("aria-label")).toContain("title3");
     for (const [control, left, top] of [
-      [filter, "182px", "27px"],
-      [column, "182px", "67px"],
-      [row, "102px", "87px"],
+      [filter, "182px", "67px"],
+      [column, "182px", "107px"],
+      [row, "102px", "127px"],
     ] as const) {
       expect((control.element as HTMLElement).style.left).toBe(left);
       expect((control.element as HTMLElement).style.top).toBe(top);

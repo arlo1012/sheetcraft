@@ -74,7 +74,7 @@ describe("pivot grouping actions", () => {
     expect(f.grouping.apply(group)).toBe(true);
     expect(f.grouping.draft.value).toBeUndefined();
     expect(f.current().groups).toEqual([group]);
-    expect([1, 2, 3].map((row) => getCellValue(f.report, { row, column: 1 }))).toEqual([
+    expect([3, 4, 5].map((row) => getCellValue(f.report, { row, column: 1 }))).toEqual([
       30, 40, 70,
     ]);
     expect(f.session.history.undoStack).toHaveLength(before + 1);
