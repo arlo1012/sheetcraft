@@ -1,0 +1,9 @@
+{
+  "freshFinalPublicExportBytes": 5580,
+  "sha256": "0fcf621819809cf2e52e1a118008ce81f925ae526e560e98e4d97a3e99215ed9",
+  "samePartNames": true,
+  "allUncompressedPartsByteIdenticalToGuiTestedExport": true,
+  "changedParts": [],
+  "zipEnvelopeByteIdentical": false,
+  "note": "ZIP entry timestamps differ; compare each uncompressed generated part rather than falsely claiming identical archive hashes."
+}

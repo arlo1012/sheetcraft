@@ -177,7 +177,7 @@ describe("native linked PivotChart export", () => {
   });
 
   test.each([
-    "ordinary",
+    "ordinary-without-category-header",
     "missing",
     "stacked",
     "rotated",
@@ -188,7 +188,10 @@ describe("native linked PivotChart export", () => {
   ])("omits unsupported %s without dangling chart parts", async (mode) => {
     const f = nativeChartFixture();
     if (f.chart.kind !== "chart") throw new Error("Expected chart.");
-    if (mode === "ordinary") delete f.chart.chart.pivotTableId;
+    if (mode === "ordinary-without-category-header") {
+      delete f.chart.chart.pivotTableId;
+      f.chart.chart.headerColumn = false;
+    }
     if (mode === "missing") f.chart.chart.pivotTableId = "missing";
     if (mode === "stacked") f.chart.chart.stacked = true;
     if (mode === "rotated") f.chart.rotation = 30;

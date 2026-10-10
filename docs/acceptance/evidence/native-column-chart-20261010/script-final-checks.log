@@ -1,0 +1,116 @@
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 1ms on 1 files using 9 threads.
+{
+  "mode": "seed",
+  "bytes": 3458,
+  "export": {
+    "issues": []
+  },
+  "charts": []
+}
+{
+  "mode": "roundtrip",
+  "bytes": 5791,
+  "import": {
+    "issues": [
+      {
+        "code": "dimension-approximated",
+        "severity": "warning",
+        "count": 1,
+        "locations": [
+          "xl/drawings/drawing1.xml"
+        ]
+      },
+      {
+        "code": "style-omitted",
+        "severity": "warning",
+        "count": 1,
+        "locations": [
+          "xl/charts/chart1.xml.nativePresentation"
+        ]
+      }
+    ]
+  },
+  "export": {
+    "issues": [
+      {
+        "code": "style-omitted",
+        "severity": "warning",
+        "count": 1,
+        "locations": [
+          "Data.drawings[\"xlsx-column-chart-0-0\"].style"
+        ]
+      }
+    ]
+  },
+  "charts": [
+    {
+      "sheet": "Data",
+      "chart": {
+        "type": "column",
+        "range": {
+          "start": {
+            "row": 0,
+            "column": 0
+          },
+          "end": {
+            "row": 3,
+            "column": 2
+          }
+        },
+        "title": "Sales",
+        "headerRow": true,
+        "headerColumn": true,
+        "seriesBy": "columns",
+        "legend": true,
+        "labels": false,
+        "stacked": false,
+        "showHidden": false
+      },
+      "data": {
+        "categories": [
+          "east",
+          "north",
+          "south"
+        ],
+        "series": [
+          {
+            "name": "apple",
+            "values": [
+              60,
+              110,
+              120
+            ]
+          },
+          {
+            "name": "pear",
+            "values": [
+              70,
+              80,
+              90
+            ]
+          }
+        ],
+        "records": [
+          [
+            "east",
+            60,
+            70
+          ],
+          [
+            "north",
+            110,
+            80
+          ],
+          [
+            "south",
+            120,
+            90
+          ]
+        ]
+      }
+    }
+  ]
+}

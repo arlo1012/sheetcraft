@@ -1,0 +1,8 @@
+Compiled public API generated two fresh ordinary products: 5580 bytes each.
+Actual WPS-native producer decode: ordinary Data!A1:C4, apple60/100/120, pear70/80/90.
+Actual WPS-edited native producer decode: ordinary Data!A1:C4, apple60/110/120, pear70/80/90.
+Original native producer reexport: 5742 bytes; WPS real first-open validated both series/categories.
+Actual WPS-saved product decoded/reencoded: ordinary live Data!A1:C4, titleSales, apple60/110/120, pear70/80/90; reexport5791 bytes and Excel real first-open validated110.
+Reproducing product with final compiled code: all uncompressed archive parts byte-identical to GUI-tested fresh product. ZIP-envelope timestamps differ.
+A repeated existing output request failed EEXIST, exit1, as intended; input/output aliasing is rejected by the script before reads/writes.
+No new GUI binary, raw XML or screenshot is included here. See the acceptance record for hashes, exact GUI coverage and privacy limits.

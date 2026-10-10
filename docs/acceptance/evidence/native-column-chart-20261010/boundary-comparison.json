@@ -1,0 +1,15 @@
+{
+  "previous": 126,
+  "current": 130,
+  "unchangedDiagnostics": false,
+  "newDiagnostics": [
+    "packages/xlsx-io/src/column-charts.ts:28 runtime-neutral packages cannot reference browser global location",
+    "packages/xlsx-io/src/column-charts.ts:42 runtime-neutral packages cannot reference browser global location",
+    "packages/xlsx-io/src/column-charts.ts:53 runtime-neutral packages cannot reference browser global location",
+    "packages/xlsx-io/src/pivot-charts.ts:77 runtime-neutral packages cannot reference browser global location",
+    "packages/xlsx-io/src/pivot-charts.ts:98 runtime-neutral packages cannot reference browser global location"
+  ],
+  "removedDiagnostics": [
+    "packages/xlsx-io/src/pivot-charts.ts:212 runtime-neutral packages cannot reference browser global location"
+  ]
+}

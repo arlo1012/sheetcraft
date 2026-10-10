@@ -1,0 +1,6 @@
+$ bun run --filter @sheetcraft/web typecheck
+@sheetcraft/web typecheck: Exited with code 0
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 192ms on 18 files using 9 threads.

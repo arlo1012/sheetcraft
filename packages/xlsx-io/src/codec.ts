@@ -1,5 +1,6 @@
 import { readXlsxPivotTables } from "./pivot-tables.js";
-import { collectNativePivotChartParts } from "./chart-package-parts.js";
+import { collectNativeChartParts } from "./chart-package-parts.js";
+import { readXlsxColumnCharts } from "./column-chart-reader.js";
 import { readXlsxPivotCharts } from "./pivot-chart-reader.js";
 import { readXlsxSparklines } from "./sparklines.js";
 import { readXlsxProtection } from "./protection.js";
@@ -969,8 +970,9 @@ export async function decodeWithNativeXlsx(
       : {}),
   };
   const pivots = readXlsxPivotTables(bytes, workbook, report);
-  const nativeCharts = await collectNativePivotChartParts(archive, async (part) => archive[part]);
+  const nativeCharts = await collectNativeChartParts(archive, async (part) => archive[part]);
   readXlsxPivotCharts(workbook, nativeCharts.charts, pivots, report);
+  readXlsxColumnCharts(workbook, nativeCharts.charts, report);
   return { workbook, report: report.build() };
 }
 

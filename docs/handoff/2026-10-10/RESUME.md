@@ -8,8 +8,9 @@
 - Published checkpoints: `7ccd` native linked PivotChart export / original three
   producer files; `72bd` exact Excel export acceptance; `32f0` explicit Core manual
   pivot-member ordering; `50ef1ad61e0e29b1d693252de21f79d540a8d25a` bounded import
-  WIP and DXF fix. This continuation also records the subsequent WPS post-save
-  variant correction and final acceptance. The original README/source-checkpoint
+  WIP and DXF fix; `e513272666288f9bdbf52c08a5fe6aa38d94411a` verified WPS
+  post-save PivotChart import. This continuation adds bounded ordinary native
+  clustered-column export/import and its actual double-app acceptance. The original README/source-checkpoint
   in this directory describes the earlier recovery, not the latest remote head.
 - Preserve existing history. No force update, PR, UI merge or website publication
   is part of these checkpoints. API publication must use the freshly verified
@@ -29,22 +30,33 @@ Use the repository's frozen Bun lockfile and read AGENTS.md / any relevant local
 skills first. Bun 1.3.11 was used. Build Core before the XLSX package, then run the
 owned feature tests and package types/build. See the exact check logs under
 `docs/acceptance/evidence/native-pivotchart-import-20261010/`; full XLSX package
-reached 75 files / 965 passing tests, and the final cosmetic local-identifier rename
-was followed by types/build, scoped lint/format and 88 feature tests. Full Web
-typecheck passed. The architecture aggregate remains failed with 126 pre-existing
-code-line diagnostics; evidence is retained rather than presenting all-repo CI as
-passing. Final independent import review was incomplete.
+reached 75 files / 965 passing tests in the prior PivotChart phase. Latest ordinary
+column phase reached **76 files / 996 passing tests** after final shared drawing
+validation, with XLSX types/build/scoped lint/format and full Web typecheck passed.
+Read `docs/acceptance/native-column-chart-20261010.md` and its evidence directory
+for initial failures and exact final logs. The architecture aggregate remains
+failed with 125 prior diagnostics and no additions relative to the earlier 126;
+owned chart-local lexical symbols were renamed. This is not all-repo CI green.
+The prior independent PivotChart import review was incomplete and not repeated.
 
 ## Current bounded contract
 
-Read `docs/insert/native-pivotchart-import.md`,
-`docs/insert/pivot-manual-member-order.md`, and the two acceptance records. Current
-chart support is linked clustered columns with one row field, one column field,
-one measure and proven contiguous cached leaf layout. Import/export remain stale
+Read `docs/insert/native-pivotchart-import.md`, `docs/insert/native-column-charts.md`,
+`docs/insert/pivot-manual-member-order.md`, and their acceptance records. Linked
+clustered columns support one row field, one column field, one measure and proven
+contiguous cached leaf layout. Import/export remain stale
 until explicit refresh. Native identity maps to the actual imported PivotTable;
 manual display order survives saved layout, snapshots and refresh. Legacy snapshots
 1–43 remain readable; manual ordering requires version 44, ordinary writing remains
 version 43. Unknown members append in source encounter order within each parent.
+
+Ordinary clustered columns now also support a same-sheet contiguous rectangular
+source, both headers, column-oriented series and text/blank categories/headers.
+They keep a live evaluator dependency: source changes update immediately without
+PivotTable Refresh. Cache/formula proof is mandatory on import; no native identity
+is guessed. Zero/negative values and missing numeric points are retained. Hidden
+source cells require showHidden=true; other types/layouts remain omissions. No
+snapshot model/version changed for this ordinary I/O slice.
 
 The native package admission is explicit and bounded. Media/pictures, unknown
 chart families, unexpected namespaces/payloads and unconsumed drawing relations
@@ -73,6 +85,24 @@ product was then decoded/reencoded/decoded through the public APIs, retained
 120/540 and refreshed 130-source edits to 130/550. Its reexport additionally opened
 correctly in Excel. Saved Excel download bytes were not obtained; GUI reopening is
 the evidence, not a supposed downloaded producer file.
+
+For the ordinary slice, the public-entry reproduction script supports:
+
+    bun scripts/compatibility/create-native-column-chart.mts seed output.xlsx
+    bun scripts/compatibility/create-native-column-chart.mts product output.xlsx
+    bun scripts/compatibility/create-native-column-chart.mts roundtrip input.xlsx output.xlsx
+
+The data-only seed is Data!A1:C4 with region/apple/pear; east 60/70;
+north 100/80; south 120/90. Create its real native chart in WPS via Insert → Column
+→ first clustered option. Both WPS and Excel passed product first-open, B3
+100→110 immediate update, save/close/reopen. The actual WPS-saved file's public
+reimport/reexport opened correctly in Excel at 110. The WPS-created producer's
+public reexport also opened correctly in WPS at 100; its implicit default title
+placeholder is deliberately not recreated. Native style/geometry warnings remain.
+New ordinary GUI files/raw XML/screenshots are local only; no new binary is a
+cross-reset dependency. Preserve the committed code, synthetic structure and
+recipe, and recreate after reset. Do not upload additional GUI artifacts without
+specific authority. Both test views were closed back to app Home.
 
 ## Applications after an environment reset
 

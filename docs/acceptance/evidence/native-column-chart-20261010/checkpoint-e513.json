@@ -1,0 +1,49 @@
+{
+  "repository": "arlo1012/sheetcraft",
+  "branch": "refactor/native-xlsx-20261009",
+  "head": "e513272666288f9bdbf52c08a5fe6aa38d94411a",
+  "parent": "50ef1ad61e0e29b1d693252de21f79d540a8d25a",
+  "tree": "c32345daa37fa5e61331e75d10a984e83bc06ffa",
+  "paths": 21,
+  "remoteVerified": true,
+  "force": false,
+  "localIndexMatchesRemoteTree": true,
+  "unpreservedDiff": false,
+  "author": {
+    "name": "arlo.wang",
+    "email": "75329932+arlo1012@users.noreply.github.com"
+  },
+  "checks": {
+    "xlsxFullSemanticCode": {
+      "files": 75,
+      "tests": 965,
+      "pass": true
+    },
+    "afterCosmeticRename": {
+      "files": 2,
+      "tests": 88,
+      "pass": true
+    },
+    "types": true,
+    "build": true,
+    "scopedLint": true,
+    "scopedFormat": true,
+    "webTypes": true,
+    "architectureAggregate": {
+      "pass": false,
+      "diagnostics": 126,
+      "diagnosticCodeLinesIn32f0Baseline": 126
+    },
+    "remoteStatuses": [],
+    "remoteCheckRuns": []
+  },
+  "gui": {
+    "excelWpsFirstOpenEditExplicitRefreshSaveCloseReopen": "pass; 110/530 stale to 120/540 refreshed",
+    "actualWpsSavedReimportReexportReadback": "pass; 120/540 then Core explicit refresh to 130/550",
+    "postWpsReexportExcelFirstOpen": "pass; no repair, 120/540",
+    "excelSavedFileDownloaded": false
+  },
+  "newGuiBinaryOrScreenshotPublished": false,
+  "review": "final independent import review incomplete",
+  "recoveryEntry": "docs/handoff/2026-10-10/RESUME.md"
+}

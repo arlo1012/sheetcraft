@@ -1,9 +1,6 @@
 import { CompatibilityReportBuilder } from "./report.js";
 import { collectSupportedPivotParts } from "./pivot-package-parts.js";
-import {
-  collectNativePivotChartParts,
-  UnsupportedChartDrawingError,
-} from "./chart-package-parts.js";
+import { collectNativeChartParts, UnsupportedChartDrawingError } from "./chart-package-parts.js";
 import {
   XlsxAbortError,
   XlsxCompatibilityError,
@@ -362,7 +359,7 @@ export async function preflightXlsxArchive(
       return content;
     };
     supportedPivotParts = await collectSupportedPivotParts(relationshipEntries, readPart);
-    supportedChartParts = (await collectNativePivotChartParts(relationshipEntries, readPart)).parts;
+    supportedChartParts = (await collectNativeChartParts(relationshipEntries, readPart)).parts;
   } catch (error) {
     if (error instanceof XlsxAbortError || error instanceof XlsxCompatibilityError) throw error;
     if (error instanceof UnsupportedChartDrawingError) fail("drawing-or-media", report);

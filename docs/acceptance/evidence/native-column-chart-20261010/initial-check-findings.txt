@@ -1,0 +1,3 @@
+Initial XLSX typecheck failed: native-columns.test.ts used formula.source instead of formula:{source}.
+Initial focused 4-file run: 125 passed, 1 failed (126 total). Failure: TypeError Invalid cell content or formula source, native-columns.test.ts:105. Three existing native PivotChart files passed. The attempted tee path did not exist because mkdir was package-relative; terminal result retained here. Correct the test setup, then rerun.
+Initial public-entry build passed; the chained check script did not exist yet and exited Module not found. The subsequent standalone check script successfully imported both local WPS ordinary producer files.

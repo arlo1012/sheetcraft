@@ -1,0 +1,8 @@
+{
+  "previous": 126,
+  "finalCurrent": 125,
+  "newDiagnostics": [],
+  "removedDiagnostics": [
+    "packages/xlsx-io/src/pivot-charts.ts:212 runtime-neutral packages cannot reference browser global location"
+  ]
+}

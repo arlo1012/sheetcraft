@@ -31,8 +31,12 @@ result. Native XLSX support is tracked separately from internal document support
    IDs. Other drawings and unsupported chart/report configurations remain explicit
    omissions. See [the bounded export contract](native-pivotchart-export.md).
 4. **Other charts, images, sparklines, hyperlinks and symbols.** Ordinary chart
-   types and dashboards have real editors and Core-backed persistence, but native
-   chart export is omitted. Cell/floating images have a prepared-raster export
+   types and dashboards have real editors and Core-backed persistence. Ordinary
+   clustered-column charts now have bounded native export/import for a contiguous
+   same-sheet rectangular source with both headers and column series; real WPS
+   and Excel source-edit/save/reopen acceptance passed. Other ordinary chart
+   configurations remain omissions. See [the ordinary column contract](native-column-charts.md).
+   Cell/floating images have a prepared-raster export
    path; image import remains blocked. Sparklines and hyperlinks have native
    export; symbols commit as cell text. Extend WPS parity in small usable slices.
 5. **Drawing and advanced insertion.** Shapes, icons, WordArt, text boxes and

@@ -1,0 +1,10 @@
+$ vitest run --config vitest.config.ts "--maxWorkers=1"
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/xlsx-io
+
+
+ Test Files  76 passed (76)
+      Tests  996 passed (996)
+   Start at  11:43:08
+   Duration  67.16s (transform 2.30s, setup 0ms, import 31.13s, tests 25.92s, environment 6ms)
+

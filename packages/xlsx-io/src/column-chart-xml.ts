@@ -1,0 +1,84 @@
+import { strToU8 } from "fflate/browser";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
+import type { ChartData } from "@sheetcraft/core/sheet-charts";
+import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { Workbook } from "@sheetcraft/core/workbook";
+import { toExcelNumberFormat } from "./number-format.js";
+import { xml } from "./pivot-xml.js";
+
+const CHART_NS = "http://schemas.openxmlformats.org/drawingml/2006/chart";
+const ART_NS = "http://schemas.openxmlformats.org/drawingml/2006/main";
+const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+export type ColumnChartSource = {
+  data: ChartData;
+  rows: number[];
+  columns: number[];
+  headerRow: number;
+  categoryColumn: number;
+  names: string[];
+};
+
+export function validXmlText(value: string): boolean {
+  return [...value].every((character) => {
+    const scalar = character.codePointAt(0)!;
+    return (
+      scalar === 9 ||
+      scalar === 10 ||
+      scalar === 13 ||
+      (scalar >= 0x20 && scalar <= 0xd7ff) ||
+      (scalar >= 0xe000 && scalar <= 0xfffd) ||
+      (scalar >= 0x10000 && scalar <= 0x10ffff)
+    );
+  });
+}
+
+function reference(sheet: string, startRow: number, endRow: number, column: number): string {
+  const prefix = `'${sheet.replace(/'/g, "''")}'!`;
+  const absolute = (row: number) =>
+    formatCellAddress({ row, column }).replace(/^([A-Z]+)(\d+)$/, "$$$1$$$2");
+  const first = absolute(startRow);
+  return `${prefix}${first}${startRow === endRow ? "" : `:${absolute(endRow)}`}`;
+}
+
+function stringCache(values: readonly string[]): string {
+  return `<c:ptCount val="${values.length}"/>${values
+    .map((value, index) => `<c:pt idx="${index}"><c:v>${xml(value)}</c:v></c:pt>`)
+    .join("")}`;
+}
+
+export function columnChartXml(
+  workbook: Workbook,
+  sheetName: string,
+  drawing: SheetChartDrawing,
+  source: ColumnChartSource,
+  pivotIdentity?: string,
+): Uint8Array {
+  const firstRow = source.rows[0]!;
+  const lastRow = source.rows.at(-1)!;
+  const categoryReference = reference(sheetName, firstRow, lastRow, source.categoryColumn);
+  const series = source.data.series
+    .map((series, index) => {
+      const column = source.columns[index]!;
+      const name = source.names[index]!;
+      const numberFormat = series.numberFormat
+        ? toExcelNumberFormat(series.numberFormat)
+        : "General";
+      const points = series.values
+        .flatMap((value, point) =>
+          value === null ? [] : [`<c:pt idx="${point}"><c:v>${value}</c:v></c:pt>`],
+        )
+        .join("");
+      return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/><c:tx><c:strRef><c:f>${xml(reference(sheetName, source.headerRow, source.headerRow, column))}</c:f><c:strCache>${stringCache([name])}</c:strCache></c:strRef></c:tx><c:spPr><a:solidFill><a:schemeClr val="accent${(index % 6) + 1}"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr><c:invertIfNegative val="0"/><c:cat><c:strRef><c:f>${xml(categoryReference)}</c:f><c:strCache>${stringCache(source.data.categories)}</c:strCache></c:strRef></c:cat><c:val><c:numRef><c:f>${xml(reference(sheetName, firstRow, lastRow, column))}</c:f><c:numCache><c:formatCode>${xml(numberFormat)}</c:formatCode><c:ptCount val="${source.rows.length}"/>${points}</c:numCache></c:numRef></c:val></c:ser>`;
+    })
+    .join("");
+  const title = drawing.chart.title
+    ? `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>${xml(drawing.chart.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>`
+    : `<c:autoTitleDeleted val="1"/>`;
+  const labels = `<c:dLbls><c:showLegendKey val="0"/><c:showVal val="${Number(drawing.chart.labels)}"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>`;
+  const legend = drawing.chart.legend
+    ? `<c:legend><c:legendPos val="r"/><c:layout/><c:overlay val="0"/></c:legend>`
+    : "";
+  return strToU8(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="${ART_NS}" xmlns:r="${REL_NS}"><c:date1904 val="${Number(workbook.dateSystem === "1904")}"/><c:style val="2"/>${pivotIdentity ? `<c:pivotSource><c:name>${xml(pivotIdentity)}</c:name><c:fmtId val="0"/></c:pivotSource>` : ""}<c:chart>${title}<c:plotArea><c:layout/><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${series}${labels}<c:gapWidth val="150"/><c:overlap val="0"/><c:axId val="1"/><c:axId val="2"/></c:barChart><c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="2"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/></c:catAx><c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="1"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea>${legend}<c:plotVisOnly val="${Number(!drawing.chart.showHidden)}"/><c:dispBlanksAs val="gap"/><c:showDLblsOverMax val="0"/></c:chart>${pivotIdentity ? `<c:extLst><c:ext uri="{781A3756-C4B2-4CAC-9D66-4F8BD8637D16}" xmlns:c14="http://schemas.microsoft.com/office/drawing/2007/8/2/chart"><c14:pivotOptions><c14:dropZoneFilter val="1"/><c14:dropZoneCategories val="1"/><c14:dropZoneData val="1"/><c14:dropZoneSeries val="1"/><c14:dropZonesVisible val="1"/></c14:pivotOptions></c:ext></c:extLst>` : ""}</c:chartSpace>`,
+  );
+}

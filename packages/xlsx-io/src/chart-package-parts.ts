@@ -359,7 +359,8 @@ function worksheetDrawingId(bytes: Uint8Array): string {
 }
 
 type Relation = { target: string; type: string };
-export type NativePivotChartPart = {
+export type NativeChartPart = {
+  kind: "pivot" | "ordinary";
   sheetPart: string;
   sheetIndex: number;
   drawingPart: string;
@@ -372,16 +373,16 @@ export type NativePivotChartPart = {
 };
 export type NativeChartPackage = {
   parts: ReadonlySet<string>;
-  charts: readonly NativePivotChartPart[];
+  charts: readonly NativeChartPart[];
 };
 
 /** Admit a chart-only relationship graph; unrelated drawing/media parts never inherit admission. */
-export async function collectNativePivotChartParts(
+export async function collectNativeChartParts(
   entries: Record<string, Uint8Array>,
   readPart: (part: string) => Promise<Uint8Array | undefined>,
 ): Promise<NativeChartPackage> {
   const parts = new Set<string>();
-  const charts: NativePivotChartPart[] = [];
+  const charts: NativeChartPart[] = [];
   const hasDrawing = Object.entries(entries).some(
     ([part, bytes]) =>
       (/^xl\/worksheets\/[^/]+\.xml$/i.test(part) &&
@@ -572,14 +573,20 @@ export async function collectNativePivotChartParts(
         single(choice, "style");
         single(fallback, "style");
       }
-      const source = single(chartSpace, "pivotSource");
-      only(source, ["name", "fmtId"]);
-      if (
-        typeof source.name !== "string" ||
-        values(source.name).length !== 1 ||
-        attr(single(source, "fmtId"), "val") !== "0"
-      )
+      const kind = chartSpace.pivotSource === undefined ? "ordinary" : "pivot";
+      if (kind === "pivot") {
+        const source = single(chartSpace, "pivotSource");
+        only(source, ["name", "fmtId"]);
+        if (
+          typeof source.name !== "string" ||
+          values(source.name).length !== 1 ||
+          attr(single(source, "fmtId"), "val") !== "0"
+        )
+          reject();
+      } else if (chartSpace.extLst !== undefined) {
+        // No detached PivotChart field-button options or other unproven extensions.
         reject();
+      }
       const nativeChart = single(chartSpace, "chart");
       only(nativeChart, [
         "title",
@@ -696,6 +703,7 @@ export async function collectNativePivotChartParts(
       if (entries[relationshipPath(chartPart)])
         parts.add(relationshipPath(chartPart).toLowerCase());
       charts.push({
+        kind,
         sheetPart,
         sheetIndex,
         drawingPart,
