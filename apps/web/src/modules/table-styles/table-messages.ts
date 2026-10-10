@@ -30,6 +30,7 @@ export type TableMessageSchema = {
     invalidName: string;
     overlap: string;
     failed: string;
+    advancedFilterRowChange: string;
     confirm: string;
     cancel: string;
   };

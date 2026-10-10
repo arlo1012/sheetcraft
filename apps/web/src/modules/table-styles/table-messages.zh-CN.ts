@@ -32,6 +32,7 @@ export const tablesZhCN: TableMessageSchema = {
     invalidName: "表格名称须以字母或下划线开头，不能与单元格地址或已有名称重复。",
     overlap: "表格区域不能与其他表格或合并单元格重叠。",
     failed: "无法应用表格设置，请检查名称和区域。",
+    advancedFilterRowChange: "当前高级筛选无法安全保留此次行变更。请先清除高级筛选；数据尚未改变。",
     confirm: "确定",
     cancel: "取消",
   },

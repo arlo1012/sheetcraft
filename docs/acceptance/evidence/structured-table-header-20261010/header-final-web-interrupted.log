@@ -1,0 +1,5 @@
+@sheetcraft/web test: 
+@sheetcraft/web test:  RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/apps/web
+@sheetcraft/web test: 
+
+Assistant interrupted only this check at 21:28 UTC after output stall; tool exit_code=130. No passing claim.

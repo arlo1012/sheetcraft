@@ -1,5 +1,19 @@
 # Sheetcraft continuation after recovery — 2026-10-10
 
+## New header/filter continuation
+
+After `5e823043b80d4aa7b84456322b68562e79bbdcfb`, the actual no-header/empty,
+growth/Tab and convert-to-range product UI paths were exercised. A third actual
+header-visibility/filter bounds defect is repaired, with explicit advanced-filter
+atomic rejection and localized settings feedback. Read
+`docs/acceptance/structured-table-header-20261010.md` for exact final evidence.
+WPS formal table editing/save/close/reopen retained 30/71/131, but filter-buttons
+visibility differs and both formal product and WPS-saved files trigger Excel
+web repair of table1. Keep these failed native results; isolate their causes next.
+Do not claim dual-app table acceptance, calculate-column fill, or Medium5
+persistence: the downloaded final source proves Medium2 after watcher reload.
+New actual artifacts remain local; this checkpoint is source/text only.
+
 ## Latest in-progress table acceptance
 
 The checkpoint after `da661700c08654acfaf77985da10cea47cf92390` repairs two

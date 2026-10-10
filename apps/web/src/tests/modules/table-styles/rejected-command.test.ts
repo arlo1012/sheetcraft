@@ -1,7 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { WorkbookCommand } from "@sheetcraft/core/commands";
+import { createSetSheetFilterCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import { setCellContent } from "@sheetcraft/core/workbook";
@@ -117,5 +117,35 @@ describe("rejected table commands", () => {
       bandedColumns: true,
     });
     expect(f.workspace.session.history.undoStack).toHaveLength(history + 1);
+  });
+  test("actual advanced-filter row rejection retains settings target, draft, snapshot and history with a clear message", () => {
+    const f = fixture();
+    f.setReject(false);
+    f.tables.requestCreate();
+    f.tables.confirmCreate({ ...f.tables.createInitial.value!, range: "A1:B3", hasHeaders: true });
+    f.workspace.executeCommand(
+      createSetSheetFilterCommand(f.sheet.id, {
+        range: f.sheet.tables![0]!.range,
+        columns: [],
+        advanced: { uniqueOnly: false, hiddenRows: [{ start: 1, end: 1 }] },
+      }),
+    );
+    f.tables.openSettings();
+    const target = f.tables.settingsTarget.value!;
+    const draft = { ...target.initial, headerRow: false, name: "DraftSales" };
+    const before = f.snapshot();
+    const history = f.workspace.session.history.undoStack.length;
+    f.tables.confirmSettings(draft);
+    expect(f.tables.modalOpen.value).toBe(true);
+    expect(f.tables.settingsTarget.value).toBe(target);
+    expect(draft).toMatchObject({ headerRow: false, name: "DraftSales" });
+    expect(f.tables.error.value).toBe(
+      "This row change cannot preserve the active advanced filter. Clear that filter first. Your data is unchanged.",
+    );
+    expect(f.snapshot()).toEqual(before);
+    expect(f.workspace.session.history.undoStack).toHaveLength(history);
+    f.tables.confirmSettings({ ...draft, headerRow: true });
+    expect(f.tables.modalOpen.value).toBe(false);
+    expect(f.sheet.tables![0]!.name).toBe("DraftSales");
   });
 });

@@ -307,4 +307,160 @@ describe("observed table rename and filtered-resize lifecycle", () => {
     expect(f.sheet.tables![0]!.filter).toBeNull();
     expect(() => serializeWorkbook(f.workbook)).not.toThrow();
   });
+
+  test("header toggles move advanced hidden rows with data and retain their external source", () => {
+    const f = fixture(true);
+    const source = createSheet("Criteria", "criteria");
+    f.workbook.sheets.set(source.id, source);
+    setCellContent(source, { row: 6, column: 0 }, { kind: "literal", value: "Region" });
+    setCellContent(source, { row: 7, column: 0 }, { kind: "literal", value: "North" });
+    const criteria = {
+      sheetId: source.id,
+      range: { start: { row: 6, column: 0 }, end: { row: 7, column: 0 } },
+    };
+    executeWorkbookCommand(
+      f.session,
+      createSetSheetFilterCommand(f.sheet.id, {
+        ...f.sheet.tables![0]!.filter!,
+        advanced: { criteria, uniqueOnly: false, hiddenRows: [{ start: 2, end: 3 }] },
+      }),
+    );
+    const before = serializeWorkbook(f.workbook);
+    executeWorkbookCommand(
+      f.session,
+      createUpdateTableCommand(f.sheet.id, f.table.id, { headerRow: false }),
+    );
+    expect(f.sheet.tables![0]!.filter!.advanced).toEqual({
+      criteria,
+      uniqueOnly: false,
+      hiddenRows: [{ start: 1, end: 2 }],
+    });
+    expect(() => deserializeWorkbook(serializeWorkbook(f.workbook))).not.toThrow();
+    executeWorkbookCommand(
+      f.session,
+      createUpdateTableCommand(f.sheet.id, f.table.id, { headerRow: true }),
+    );
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    undoWorkbookCommand(f.session);
+    expect(f.sheet.tables![0]!.filter!.advanced!.hiddenRows).toEqual([{ start: 1, end: 2 }]);
+    redoWorkbookCommand(f.session);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
+
+  test.each([false, true])(
+    "header visibility change keeps an existing filter serializable and undoable (criteria=%s)",
+    (criteria) => {
+      const f = fixture(true);
+      if (!criteria)
+        executeWorkbookCommand(
+          f.session,
+          createSetSheetFilterCommand(f.sheet.id, {
+            range: f.table.range,
+            columns: [],
+          }),
+        );
+      const before = serializeWorkbook(f.workbook);
+      executeWorkbookCommand(
+        f.session,
+        createUpdateTableCommand(f.sheet.id, f.table.id, { headerRow: false }),
+      );
+      expect(f.sheet.tables![0]!.filter!.range.end.row).toBe(2);
+      const after = serializeWorkbook(f.workbook);
+      expect(() => deserializeWorkbook(after)).not.toThrow();
+      undoWorkbookCommand(f.session);
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+      redoWorkbookCommand(f.session);
+      expect(serializeWorkbook(f.workbook)).toEqual(after);
+    },
+  );
+  test.each([
+    [false, 0],
+    [true, 0],
+    [false, 3],
+    [true, 3],
+  ] as const)(
+    "rejects losing the first advanced-hidden data row before any header/totals mutation (totals=%s,start=%s)",
+    (totals, start) => {
+      const f = fixture(true, totals);
+      if (start)
+        executeWorkbookCommand(
+          f.session,
+          createResizeTableCommand(f.sheet.id, f.table.id, {
+            start: { row: start, column: 0 },
+            end: { row: f.sheet.tables![0]!.range.end.row + start, column: 2 },
+          }),
+        );
+      executeWorkbookCommand(
+        f.session,
+        createSetSheetFilterCommand(f.sheet.id, {
+          ...f.sheet.tables![0]!.filter!,
+          advanced: { uniqueOnly: false, hiddenRows: [{ start: start + 1, end: start + 2 }] },
+        }),
+      );
+      const before = serializeWorkbook(f.workbook);
+      expect(() =>
+        executeWorkbookCommand(
+          f.session,
+          createUpdateTableCommand(f.sheet.id, f.table.id, {
+            headerRow: false,
+            totalRow: !totals,
+          }),
+        ),
+      ).toThrow(/first data row/);
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+      undoWorkbookCommand(f.session);
+      expect(f.sheet.tables![0]!.headerRow).toBe(true);
+      redoWorkbookCommand(f.session);
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+    },
+  );
+
+  test("rejects header shifts on a sheet used by table-owned advanced criteria without moving its source", () => {
+    const f = fixture(true);
+    const criteria = {
+      sheetId: f.sheet.id,
+      range: { start: { row: 6, column: 0 }, end: { row: 7, column: 0 } },
+    };
+    setCellContent(f.sheet, { row: 6, column: 0 }, { kind: "literal", value: "Region" });
+    setCellContent(f.sheet, { row: 7, column: 0 }, { kind: "literal", value: "North" });
+    executeWorkbookCommand(
+      f.session,
+      createSetSheetFilterCommand(f.sheet.id, {
+        ...f.sheet.tables![0]!.filter!,
+        advanced: { criteria, uniqueOnly: false, hiddenRows: [{ start: 2, end: 3 }] },
+      }),
+    );
+    const before = serializeWorkbook(f.workbook);
+    expect(() =>
+      executeWorkbookCommand(
+        f.session,
+        createUpdateTableCommand(f.sheet.id, f.table.id, { headerRow: false }),
+      ),
+    ).toThrow(/advanced filter criteria/);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
+
+  test("totals-only update normalizes a readable legacy filter that included the total row", () => {
+    const f = fixture(true, true);
+    executeWorkbookCommand(
+      f.session,
+      createSetSheetFilterCommand(f.sheet.id, {
+        ...f.sheet.tables![0]!.filter!,
+        range: f.sheet.tables![0]!.range,
+      }),
+    );
+    const before = serializeWorkbook(f.workbook);
+    expect(() => deserializeWorkbook(before)).not.toThrow();
+    executeWorkbookCommand(
+      f.session,
+      createUpdateTableCommand(f.sheet.id, f.table.id, { totalRow: false }),
+    );
+    expect(f.sheet.tables![0]!.filter!.range.end.row).toBe(f.sheet.tables![0]!.range.end.row);
+    const after = serializeWorkbook(f.workbook);
+    expect(() => deserializeWorkbook(after)).not.toThrow();
+    undoWorkbookCommand(f.session);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    redoWorkbookCommand(f.session);
+    expect(serializeWorkbook(f.workbook)).toEqual(after);
+  });
 });

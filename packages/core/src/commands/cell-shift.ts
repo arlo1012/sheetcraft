@@ -308,7 +308,11 @@ export function applyCellShiftCommand(
   const range = validate(command);
   if (
     [...workbook.sheets.values()].some(
-      (entry) => entry.filter?.advanced?.criteria?.sheetId === command.sheetId,
+      (entry) =>
+        entry.filter?.advanced?.criteria?.sheetId === command.sheetId ||
+        (entry.tables ?? []).some(
+          (table) => table.filter?.advanced?.criteria?.sheetId === command.sheetId,
+        ),
     )
   )
     throw invalidCommandPayload(

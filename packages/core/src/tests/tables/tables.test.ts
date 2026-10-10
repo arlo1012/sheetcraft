@@ -444,9 +444,11 @@ describe("tables", () => {
       headerRow: false,
       totalRow: true,
       range: { end: { row: 2, column: 1 } },
-      filter: { range: { end: { row: 2, column: 1 } } },
+      // The shifted filter covers data only; the last table row is totals.
+      filter: { range: { end: { row: 1, column: 1 } } },
     });
     expect(getCellContent(sheet, { row: 0, column: 0 })).toMatchObject({ value: 10 });
+    expect(() => deserializeWorkbook(serializeWorkbook(workbook))).not.toThrow();
     undoWorkbookCommand(session);
     expect(sheet.tables?.[0]).toMatchObject({
       headerRow: true,

@@ -34,6 +34,8 @@ export const tablesEnUS: TableMessageSchema = {
       "Start with a letter or underscore. Do not use a cell address or an existing name.",
     overlap: "Tables cannot overlap other tables or merged cells.",
     failed: "Unable to apply the table settings. Check the name and range.",
+    advancedFilterRowChange:
+      "This row change cannot preserve the active advanced filter. Clear that filter first. Your data is unchanged.",
     confirm: "OK",
     cancel: "Cancel",
   },

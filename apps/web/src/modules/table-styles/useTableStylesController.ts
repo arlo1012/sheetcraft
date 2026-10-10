@@ -208,11 +208,18 @@ export function useTableStylesController(options: {
     } catch (cause) {
       const field = cause instanceof WorkbookDomainError ? cause.data.details?.field : undefined;
       error.value = t(
-        field === "name"
-          ? "tables.invalidName"
-          : field === "tableOverlap"
-            ? "tables.overlap"
-            : "tables.failed",
+        command.type === "updateTable" &&
+          (field === "headerRow" || field === "sheetId") &&
+          [...options.getWorkbook().sheets.values()].some(
+            (sheet) =>
+              sheet.filter?.advanced || sheet.tables?.some((table) => table.filter?.advanced),
+          )
+          ? "tables.advancedFilterRowChange"
+          : field === "name"
+            ? "tables.invalidName"
+            : field === "tableOverlap"
+              ? "tables.overlap"
+              : "tables.failed",
       );
       if (!modalOpen.value) void MessagePlugin.warning(error.value);
       return false;

@@ -118,6 +118,9 @@ screenshots are excluded from Git publication.
 
 ## Remaining matrix and existing limitations
 
+Later continuation is recorded in `structured-table-header-20261010.md`. The
+pending list below describes this original checkpoint, not the later GUI state.
+
 No-header/empty creation, style/display controls, all growth paths, conversion,
 formal target-app lifecycle and WPS calculated-column observations are pending
 after this WIP checkpoint. Existing source/DOM tests are not substituted for them.

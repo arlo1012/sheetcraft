@@ -1,0 +1,7 @@
+$ bun run --filter @sheetcraft/core typecheck
+@sheetcraft/core typecheck: Exited with code 0
+$ bun run --filter @sheetcraft/core build
+@sheetcraft/core build: Exited with code 0
+$ bun run --filter @sheetcraft/web typecheck
+
+Assistant interrupted only this check at 21:28 UTC after output stall; tool exit_code=130. No passing claim.

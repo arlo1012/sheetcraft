@@ -1,0 +1,46 @@
+@sheetcraft/core test: 
+@sheetcraft/core test:  RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261010/packages/core
+@sheetcraft/core test: 
+@sheetcraft/core test:  ❯ src/tests/tables/tables.test.ts (30 tests | 1 failed) 112ms
+@sheetcraft/core test:      × accepts an unchanged range while toggling headers with totals and filters 14ms
+@sheetcraft/core test: 
+@sheetcraft/core test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+@sheetcraft/core test: 
+@sheetcraft/core test:  FAIL  src/tests/tables/tables.test.ts > tables > accepts an unchanged range while toggling headers with totals and filters
+@sheetcraft/core test: AssertionError: expected { id: 'table-1', name: 'Sales', …(11) } to match object { headerRow: false, …(3) }
+@sheetcraft/core test: (18 matching properties omitted from actual)
+@sheetcraft/core test: 
+@sheetcraft/core test: - Expected
+@sheetcraft/core test: + Received
+@sheetcraft/core test: 
+@sheetcraft/core test: @@ -1,11 +1,11 @@
+@sheetcraft/core test:   {
+@sheetcraft/core test:     "filter": {
+@sheetcraft/core test:       "range": {
+@sheetcraft/core test:         "end": {
+@sheetcraft/core test:           "column": 1,
+@sheetcraft/core test: -         "row": 2,
+@sheetcraft/core test: +         "row": 1,
+@sheetcraft/core test:         },
+@sheetcraft/core test:       },
+@sheetcraft/core test:     },
+@sheetcraft/core test:     "headerRow": false,
+@sheetcraft/core test:     "range": {
+@sheetcraft/core test: 
+@sheetcraft/core test:  ❯ src/tests/tables/tables.test.ts:443:31
+@sheetcraft/core test:     441|       createUpdateTableCommand(sheet.id, table.id, { headerRow: false,…
+@sheetcraft/core test:     442|     );
+@sheetcraft/core test:     443|     expect(sheet.tables?.[0]).toMatchObject({
+@sheetcraft/core test:        |                               ^
+@sheetcraft/core test:     444|       headerRow: false,
+@sheetcraft/core test:     445|       totalRow: true,
+@sheetcraft/core test: 
+@sheetcraft/core test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+@sheetcraft/core test: 
+@sheetcraft/core test: 
+@sheetcraft/core test:  Test Files  1 failed | 6 passed (7)
+@sheetcraft/core test:       Tests  1 failed | 102 passed (103)
+@sheetcraft/core test:    Start at  14:16:21
+@sheetcraft/core test:    Duration  4.56s (transform 960ms, setup 0ms, import 3.02s, tests 613ms, environment 1ms)
+@sheetcraft/core test: 
+@sheetcraft/core test: Exited with code 1

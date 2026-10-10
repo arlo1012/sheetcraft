@@ -574,6 +574,19 @@ export function applyUpdateTableCommand(
       command.changes.range,
       "Changing a table header row cannot be combined with resizing the table.",
     );
+  if (
+    headerRowChange === false &&
+    current.filter?.advanced?.hiddenRows.some(
+      (interval) =>
+        interval.start <= current.range.start.row + 1 &&
+        interval.end >= current.range.start.row + 1,
+    )
+  )
+    throw invalidCommandPayload(
+      "headerRow",
+      false,
+      "Hiding table headers cannot preserve an advanced filter that hides the first data row.",
+    );
   const targetRange =
     headerRowChange === undefined
       ? (command.changes.range ?? current.range)
@@ -624,8 +637,20 @@ export function applyUpdateTableCommand(
   if (headerRowChange !== undefined) next = applyHeaderRow(workbook, sheet, next, headerRowChange);
   if (command.changes.totalRow !== undefined)
     next = applyTotals(workbook, sheet, next, command.changes.totalRow);
-  if (rangeChanged)
-    next = { ...next, filter: resizeTableFilter(current.filter, next.range, next.totalRow) };
+  if (
+    rangeChanged ||
+    headerRowChange !== undefined ||
+    (command.changes.totalRow !== undefined && command.changes.totalRow !== current.totalRow)
+  )
+    next = {
+      ...next,
+      filter: resizeTableFilter(
+        current.filter,
+        next.range,
+        next.totalRow,
+        headerRowChange === undefined ? 0 : headerRowChange ? 1 : -1,
+      ),
+    };
   next = normalizeTable(workbook, command.sheetId, next);
   rewriteTableName(workbook, current.name, next.name);
   sheet.tables = (sheet.tables ?? []).map((table) => (table.id === next.id ? next : table));
@@ -636,6 +661,7 @@ function resizeTableFilter(
   filter: SheetTable["filter"],
   range: CellRange,
   totalRow: boolean,
+  rowOffset = 0,
 ): SheetTable["filter"] {
   if (!filter) return null;
   const result = clone(filter);
@@ -648,8 +674,8 @@ function resizeTableFilter(
   );
   if (result.advanced)
     result.advanced.hiddenRows = result.advanced.hiddenRows.flatMap((interval) => {
-      const start = Math.max(interval.start, range.start.row + 1);
-      const end = Math.min(interval.end, endRow);
+      const start = Math.max(interval.start + rowOffset, range.start.row + 1);
+      const end = Math.min(interval.end + rowOffset, endRow);
       return start <= end ? [{ start, end }] : [];
     });
   return result;

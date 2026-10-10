@@ -1,0 +1,26 @@
+2026-10-10 actual Sheetcraft HTTP UI, source da661700 tree f74c1678.
+Desktop loopback Vite 7200; exec shell server could not be reached by GUI, stopped. Desktop terminal shared filesystem/Bun verified; desktop loopback service ready; normal HTTP navigation successful. Browser internal-error page is not read.
+Product dataset entered through real clipboard paste. Plain pasted =B2*C2 was literal (formula bar apostrophe shown), so three formulas were committed through real formula bar; this is recorded setup, not claimed defect.
+Create table A1:D4 with populated source: headers/filter checked. Cancel then reopen/OK creates table and contextual tab. Ctrl+Z removes table tab; Ctrl+Y restores.
+F1 =SUM(Table1[Amount]) gives 100. Renaming Table1 to Sales in actual context input rewrites F1 to =SUM(Sales[Amount]), still 100. Renaming D1 Amount to Net rewrites F1 =SUM(Sales[Net]), still 100.
+BUG 1: D2 entered =[@Qty]*[@Price] yields20. Edit B1 Qty→Units; D2 unchanged source and displayed #REF!. Undo header change recovers valid source. Existing product rename contract, no calculated-column autofill involved.
+Filter A Region: uncheck South(1), Apply. Enable Total row: D5 =SUBTOTAL(109,D2:D4) displays40. Export JSON actually downloads 10,712 bytes, snapshot version43, one Sales table; local recovery copy only.
+Disable Total row: command executes and active D5 becomesblank; Playwright checkbox-postcondition reports no-match because leaving table removes context control. Observed final state proves effect; not treated as product failure/retried.
+BUG 2: Filtered table A1:D4 resize via actual modal to A1:D3 accepts/ closes. Export JSON produces no download (15sec event timeout), then status: File operation failed; The file could not be exported. Your workbook is still here. Same source-level old filter range beyond new table bounds predicts validation failure. Undo resize attempted, next export verifies recovery.
+Harness selector error getByRole(textbox) matched4 background/modal inputs; corrected to scope dialog Resize table. No product conclusions from selector issue.
+Target Excel/WPS lifecycle acceptance and no-header/empty/expansion/conversion still pending.
+Formal post-fix UI 20:56–20:58 UTC: actual prior browser-saved table A1:D4, Sales, header Net, Qty, filterNorth, totalsfalse re-inspected after watcher/HMR. Rejected final ImportJSON was never retried/executed.
+Qty→Units now rewrites real D2 source=[@Units]*[@Price], display20. Same filtered shrink A1:D3 actually downloads JSON; formal snapshot has both table/filter endrow2 endcol3 and North criterion; F1=80.
+Actual Undo→F1=100, Redo→80. Explicit Save locally, normal browser reload, stable rendered page then F1=80 andD2 renamedsource/value20 retained. Batched helper too early afterreload wrote F1 intoA1; detected via AX and undone, then stablepage checks done. This was harness input timing, not counted as product pass/defect.
+Matrix noheaders/empty/style/growth/convert and realWPS/Excel table cycle remains pending. New Core fixtures not GUI substitutes.
+
+21:08–21:19 UTC continuation (actual UI; files/screenshots local only)
+- Product no-header creation: Alpha/10, Beta/20; checkbox My table has headers off generated Column1/Column2, retained first numeric10, rangeA1:B3. Empty Sheet3A1 created Table2A1:A2 with Column1.
+- Product style gallery Medium5 clicked earlier; final downloaded source after watcher reload proves Medium2. FirstColumn on, below A5 edit expands A1:D5 with undo/redo; E2 edit expands right toE5 with generatedColumn5. Existing no calculated-column fill: added D5 empty until explicit formula.
+- Product filtered last-cell Tab adds row6 but activeA7 because blank new row is excluded by North filter; unfiltered Sheet2 last B3 Tab adds row4 and activeA4.
+- Product header visibility off caused Save locally/Undo failure with empty filter metadata. New formal fix header-off/on supports save, exportJSON, undo/redo.
+- Product filtered Sales totalD7=61, SUMF1=121; conversion removes Sales only, rewrites D2 local selectors to=B2*C2, F1=SUM(D2:D6), exposes former filtered South row. Undo restores structured reference+filter, redo removes.
+- Formal real product ExportJSON3table snapshot43, formal ExportXLSX7,629B and converted ExportXLSX downloaded. First15sec download observer timeout retained as harness failure; fresh45sec event succeeded.
+- WPS actual formal product opens3native tables; North filter hides row3; Medium2 bands/first column visible; Sheet2 generatedheaders numeric10/20 and appendedblankrow4; Sheet3Column1+blankrow2. B2 2→3 updates D2=30, subtotalD7=71, SUMF1=131. SaveAs localWPSresult, close/reopen retains all numbers/formula behavior.
+- Observed new native I/O defect: product Sheet2Filter buttons off still shows arrows in WPS. Product writer puts hiddenButton=1 on tableColumn (not filterColumn); WPS saves it absent. Native WPS DataFilter off removes autoFilter entirely, arrows disappear. Single-factor local control saved, no rawXML external publication.
+- Excel formal product actualupload opens with Workbook repaired/read-only notice; not accepted as passed. Reading exact repair details next.
