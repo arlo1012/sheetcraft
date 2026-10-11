@@ -21,7 +21,7 @@ export function useFloatingImageEditing(options: {
   getScale: () => number;
   isDragging: () => boolean;
   closeContextMenu: () => void;
-  update: (image: FloatingImage) => void;
+  update: (image: FloatingImage) => unknown;
 }) {
   const crop = shallowRef<{ image: FloatingImage; selection: ImageCrop }>();
   const cropGesture = shallowRef<{
@@ -67,15 +67,16 @@ export function useFloatingImageEditing(options: {
     crop.value = undefined;
     if (restoreFocus) focusSelectedImage();
   }
-  function applyCrop(): void {
+  function applyCrop(): boolean {
     const active = crop.value;
-    if (!active) return;
+    if (!active) return false;
     const { selection } = active;
     if (selection.x !== 0 || selection.y !== 0 || selection.width !== 1 || selection.height !== 1) {
       const next = cropFloatingImage(active.image, selection, options.getLayout());
-      if (next) options.update(next);
+      if (!next || options.update(next) === false) return false;
     }
     cancelCrop();
+    return true;
   }
   function rotateImage(turns: -1 | 1 | 2): void {
     const image = options.getImage();

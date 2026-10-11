@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import {
+  createPictureViewMetrics,
+  type PictureFrameLayoutContext,
+} from "@sheetcraft/sheet-engine/picture-frame-layout";
 import { getPictureObjectOriginCell } from "@sheetcraft/core/picture-object-sheet";
 import { getPivotActiveField } from "../../pivot-tables/pivot-active-field";
 import PivotReportFilters from "../../pivot-tables/components/PivotReportFilters.vue";
@@ -1139,9 +1144,21 @@ const imagePaintState = shallowRef<FloatingImagePaintState>({
 });
 const floatingImageCache = createFloatingImageCanvasCache(() => surfaceRef.value?.invalidate());
 const drawingThemeEffects = computed(() => getDrawingThemeEffects(props.theme));
+const pictureFrameContext = computed<PictureFrameLayoutContext | undefined>(() => {
+  if (!props.sheet.floatingImages.some(isFramedPictureObject)) return undefined;
+  // Paper gaps require a distinct projection; never feed them into continuous metrics.
+  if (props.viewMode === "page-layout") return undefined;
+  return {
+    layout: layout.value,
+    metrics: createPictureViewMetrics(props.sheet, baseGeometry.value, baseRows.value, {
+      effectiveRowHeights: effectiveRowHeights.value,
+    }),
+  };
+});
 const paintSurfaceImages = computed(() => {
   const state = imagePaintState.value;
   const currentLayout = layout.value;
+  const frameContext = pictureFrameContext.value;
   const assetUrls = resolvedImageUrls.value;
   const loadingAssetIds = props.loadingImageAssetIds;
   const palette = environment.value;
@@ -1151,6 +1168,7 @@ const paintSurfaceImages = computed(() => {
     paintFloatingImages(context, {
       state,
       layout: currentLayout,
+      frameContext,
       assetUrls,
       loadingAssetIds,
       cache: floatingImageCache,
@@ -3506,6 +3524,7 @@ defineExpose({
         :apply-update-many="applyFloatingImageMove"
         :effects="drawingThemeEffects"
         :layout="layout"
+        :frame-context="pictureFrameContext"
         :asset-urls="resolvedImageUrls"
         :loading-asset-ids="loadingImageAssetIds"
         :missing-asset-ids="missingImageAssetIds"

@@ -320,3 +320,26 @@ export function rotateFramedPictureBy(
   resolvePictureFrame(frame, metrics);
   return { ...original, frame };
 }
+
+/** Reflect the complete picture in a sheet-space axis without introducing shear. */
+export function flipFramedPicture(
+  image: FramedFloatingImage,
+  axis: "horizontal" | "vertical",
+  metrics: PictureSheetMetrics,
+): FramedFloatingImage {
+  if (axis !== "horizontal" && axis !== "vertical")
+    throw new TypeError("Invalid picture flip axis.");
+  const original = clonePictureObject(image);
+  const frame = clonePictureFrame(original.frame);
+  frame.angleDeg = -frame.angleDeg;
+  if (axis === "horizontal") {
+    frame.flipHorizontal = !frame.flipHorizontal;
+    frame.source.offsetXRatio = -frame.source.offsetXRatio;
+  } else {
+    frame.flipVertical = !frame.flipVertical;
+    frame.source.offsetYRatio = -frame.source.offsetYRatio;
+  }
+  const normalized = clonePictureFrame(frame);
+  resolvePictureFrame(normalized, metrics);
+  return { ...original, frame: normalized };
+}

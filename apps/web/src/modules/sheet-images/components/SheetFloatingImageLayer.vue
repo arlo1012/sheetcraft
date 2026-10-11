@@ -25,10 +25,8 @@ import {
   type LegacyFloatingImage,
 } from "@sheetcraft/core/workbook";
 import {
-  moveFloatingImageBy,
   getFloatingImageSheetRect,
   reanchorFloatingImageAtSheetRect,
-  resizeFloatingImageBy,
   type FloatingImageResizeDirection,
   type FloatingImageViewportFragment,
 } from "@sheetcraft/sheet-engine/floating-image-layout";
@@ -44,7 +42,21 @@ import type { PictureAlignment, PictureAlignmentReference } from "../usePictureT
 import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import SheetFloatingImageContextMenu from "./SheetFloatingImageContextMenu.vue";
 import SheetFloatingImageSelection from "../../../shared/sheet-objects/SheetObjectSelection.vue";
-import { requireLegacyPictures } from "../picture-document-support";
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { pictureFrameContainsPoint } from "@sheetcraft/core/picture-frame";
+import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
+import {
+  getPictureViewportFragments,
+  type PictureViewportFragment,
+} from "../picture-viewport-fragments";
+import {
+  getPictureViewRect,
+  movePictureViewBy,
+  resizePictureViewBy,
+  rotatePictureViewBy,
+  flipPictureView,
+} from "../picture-view-operations";
+import SheetFramedPictureSelection from "./SheetFramedPictureSelection.vue";
 import type { DrawingThemeEffects } from "../drawing-theme-effects";
 
 import { useFloatingImageEditing } from "../useFloatingImageEditing";
@@ -76,6 +88,7 @@ const props = withDefaults(
     /** Canvas renders image effects; the DOM layer retains this for overlays and future object handles. */
     effects?: DrawingThemeEffects;
     layout: SheetViewportLayout;
+    frameContext?: PictureFrameLayoutContext;
     assetUrls: ReadonlyMap<string, string>;
     loadingAssetIds?: ReadonlySet<string>;
     missingAssetIds?: ReadonlySet<string>;
@@ -88,12 +101,12 @@ const props = withDefaults(
   { readOnly: false, scale: 1, previewOnDoubleClick: true },
 );
 
-const legacyImages = computed(() => requireLegacyPictures(props.images));
+const currentImages = computed(() => props.images);
 
 const emit = defineEmits<{
   select: [id: string | null, additive?: boolean];
-  updateMany: [images: LegacyFloatingImage[]];
-  update: [image: LegacyFloatingImage];
+  updateMany: [images: FloatingImage[]];
+  update: [image: FloatingImage];
   group: [ids: string[]];
   feedback: [key: MessageKey];
   delete: [id: string];
@@ -106,28 +119,42 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-function commitImages(images: LegacyFloatingImage[]): void {
-  const current = images.map((image) => legacyImages.value.find((entry) => entry.id === image.id));
+function commitImages(nextImages: FloatingImage[]): boolean {
+  const current = nextImages.map((image) =>
+    currentImages.value.find((entry) => entry.id === image.id),
+  );
   if (
     current.every((image) => image !== undefined) &&
-    areFloatingImageCollectionsEqual(current as FloatingImage[], images)
+    areFloatingImageCollectionsEqual(current as FloatingImage[], nextImages)
   )
-    return;
+    return true;
   if (!props.applyUpdateMany) {
-    emit("updateMany", images);
-    return;
+    if (nextImages.length === 1) emit("update", nextImages[0]!);
+    else emit("updateMany", nextImages);
+    return true;
   }
   try {
-    if (!props.applyUpdateMany(images)) emit("feedback", "picture.operationFailed");
+    if (!props.applyUpdateMany(nextImages)) {
+      emit("feedback", "picture.operationFailed");
+      return false;
+    }
+    return true;
   } catch {
     emit("feedback", "picture.operationFailed");
+    return false;
   }
 }
 
-type ImageFragment = FloatingImageViewportFragment & { image: LegacyFloatingImage };
-type Gesture = {
+type ImageFragment = PictureViewportFragment;
+type LegacyImageFragment = FloatingImageViewportFragment & {
   image: LegacyFloatingImage;
-  images: LegacyFloatingImage[];
+  kind: "legacy";
+};
+const fragmentBounds = (fragment: ImageFragment) =>
+  fragment.kind === "legacy" ? fragment.clippedRect : fragment.clippedBounds;
+type Gesture = {
+  image: FloatingImage;
+  images: FloatingImage[];
   mode: "move" | FloatingImageResizeDirection;
   pointerId: number;
   focusTarget: HTMLElement;
@@ -135,6 +162,7 @@ type Gesture = {
   grouped: boolean;
   owner: object | undefined;
   layout: SheetViewportLayout;
+  frameContext: PictureFrameLayoutContext | undefined;
   scale: number;
   selectionAtStart: string[];
   selectionSettled: boolean;
@@ -148,8 +176,8 @@ type ContextMenuState = {
 };
 
 const gesture = shallowRef<Gesture>();
-const previewImage = shallowRef<LegacyFloatingImage>();
-const previewImages = shallowRef<LegacyFloatingImage[]>([]);
+const previewImage = shallowRef<FloatingImage>();
+const previewImages = shallowRef<FloatingImage[]>([]);
 const selectedIds = computed(
   () =>
     new Set([
@@ -162,7 +190,7 @@ const contextMenu = shallowRef<ContextMenuState>();
 const paintRevision = ref(0);
 let pointerSession: PointerSession | undefined;
 const selectedImage = computed(() =>
-  legacyImages.value.find((image) => image.id === props.selectedImageId),
+  currentImages.value.find((image) => image.id === props.selectedImageId),
 );
 const owners = new WeakMap<object, number>();
 const defaultOwner = {};
@@ -181,15 +209,22 @@ const selectionKey = computed(() =>
     ownerKey(),
     props.selectedImageId,
     [...selectedIds.value].map((id) => {
-      const image = legacyImages.value.find((entry) => entry.id === id);
+      const image = currentImages.value.find((entry) => entry.id === id);
       return [id, image?.assetId, image?.groupId];
     }),
   ]),
 );
 const selectedGroup = computed(() => {
   const groupId = selectedImage.value?.groupId;
-  if (!groupId || selectedIds.value.size < 2) return false;
-  const members = legacyImages.value.filter((image) => image.groupId === groupId);
+  if (
+    !groupId ||
+    selectedIds.value.size < 2 ||
+    currentImages.value.some(
+      (image) => selectedIds.value.has(image.id) && isFramedPictureObject(image),
+    )
+  )
+    return false;
+  const members = currentImages.value.filter((image) => image.groupId === groupId);
   return (
     members.length === selectedIds.value.size &&
     members.every((image) => selectedIds.value.has(image.id))
@@ -199,11 +234,13 @@ const selectionToolbarAnchor = computed<FloatingReference | null>(() => {
   const visible = fragments.value.filter((entry) => selectedIds.value.has(entry.image.id));
   const layer = layerRef.value;
   if (selectedIds.value.size < 2 || !visible.length || !layer) return null;
-  const x = Math.min(...visible.map((entry) => entry.clippedRect.x));
-  const y = Math.min(...visible.map((entry) => entry.clippedRect.y));
-  const right = Math.max(...visible.map((entry) => entry.clippedRect.x + entry.clippedRect.width));
+  const x = Math.min(...visible.map((entry) => fragmentBounds(entry).x));
+  const y = Math.min(...visible.map((entry) => fragmentBounds(entry).y));
+  const right = Math.max(
+    ...visible.map((entry) => fragmentBounds(entry).x + fragmentBounds(entry).width),
+  );
   const bottom = Math.max(
-    ...visible.map((entry) => entry.clippedRect.y + entry.clippedRect.height),
+    ...visible.map((entry) => fragmentBounds(entry).y + fragmentBounds(entry).height),
   );
   return markRaw({
     contextElement: layer,
@@ -222,7 +259,7 @@ const toolbarAnchor = computed<FloatingReference | null>(() => {
   const fragment = fragments.value.find((entry) => entry.image.id === props.selectedImageId);
   if (!fragment || !layerRef.value) return null;
   const layer = layerRef.value;
-  const rect = fragment.clippedRect;
+  const rect = fragmentBounds(fragment);
   return markRaw({
     contextElement: layer,
     getBoundingClientRect: () => {
@@ -245,60 +282,68 @@ const {
   endCropGesture,
   cancelCrop: cancelCropEdit,
   applyCrop: applyCropEdit,
-  rotateImage: rotateImageEdit,
-  flipImage: flipImageEdit,
+
   restoreImage: restoreImageEdit,
   startCropGesture: startCropGestureEdit,
   moveCropGesture,
 } = useFloatingImageEditing({
   layer: layerRef,
-  getImage: () => selectedImage.value,
+  getImage: () =>
+    selectedImage.value && !isFramedPictureObject(selectedImage.value)
+      ? selectedImage.value
+      : undefined,
   getLayout: () => props.layout,
   getScale: () => props.scale,
   isDragging: () => Boolean(gesture.value),
   closeContextMenu: () => closeContextMenu(false),
-  update: (image) => emit("update", image),
+  update: (image) => commitImages([image]),
 });
 let lastGestureMode: Gesture["mode"] = "move";
 
 const fragments = computed<ImageFragment[]>(() =>
-  getFloatingImageViewportFragmentsForPaint(displayImages(), props.layout),
+  getPictureViewportFragments(displayImages(), props.layout, props.frameContext),
 );
-const groupFragments = computed<ImageFragment[]>(() => {
+const groupFragments = computed<LegacyImageFragment[]>(() => {
   if (!selectedGroup.value) return [];
   const images = displayImages().filter((image) => selectedIds.value.has(image.id));
-  if (images.length < 2) return [];
-  const rects = images.map((image) => getFloatingImageSheetRect(image, props.layout));
+  if (images.length < 2 || images.some(isFramedPictureObject)) return [];
+  const legacy = images as LegacyFloatingImage[];
+  const rects = legacy.map((image) => getFloatingImageSheetRect(image, props.layout));
   if (rects.some((rect) => !rect)) return [];
   const x = Math.min(...rects.map((rect) => rect!.x));
   const y = Math.min(...rects.map((rect) => rect!.y));
   const width = Math.max(...rects.map((rect) => rect!.x + rect!.width)) - x;
   const height = Math.max(...rects.map((rect) => rect!.y + rect!.height)) - y;
   const proxy = reanchorFloatingImageAtSheetRect(
-    { ...images[0]!, hidden: false },
+    { ...legacy[0]!, hidden: false },
     { x, y, width, height },
     props.layout,
   );
-  return proxy ? getFloatingImageViewportFragmentsForPaint([proxy], props.layout) : [];
+  return proxy
+    ? getFloatingImageViewportFragmentsForPaint([proxy], props.layout).map((fragment) => ({
+        ...fragment,
+        kind: "legacy" as const,
+      }))
+    : [];
 });
 
-function displayImages(): readonly LegacyFloatingImage[] {
-  return legacyImages.value.map(displayImage);
+function displayImages(): readonly FloatingImage[] {
+  return currentImages.value.map(displayImage);
 }
 
-function displayImage(image: LegacyFloatingImage): LegacyFloatingImage {
+function displayImage(image: FloatingImage): FloatingImage {
   return (
     previewImages.value.find((entry) => entry.id === image.id) ??
     (previewImage.value?.id === image.id ? previewImage.value : image)
   );
 }
 
-function cloneImage(image: LegacyFloatingImage): LegacyFloatingImage {
+function cloneImage(image: FloatingImage): FloatingImage {
   return cloneFloatingImage(image);
 }
 
 function getFragmentStyle(fragment: ImageFragment): CSSProperties {
-  const clippedRect = fragment.clippedRect;
+  const clippedRect = fragmentBounds(fragment);
   return {
     left: `${clippedRect.x}px`,
     top: `${clippedRect.y}px`,
@@ -311,7 +356,7 @@ function getFragmentKey(fragment: ImageFragment): string {
   return `${fragment.image.id}:${fragment.paneId}`;
 }
 
-function getAccessibleLabel(image: LegacyFloatingImage): string {
+function getAccessibleLabel(image: FloatingImage): string {
   if (props.assetUrls.has(image.assetId)) return image.altText || t("image.floatingAlt");
   return props.loadingAssetIds?.has(image.assetId)
     ? t("image.loading")
@@ -339,12 +384,25 @@ function cancelPointerSession(): void {
 }
 
 function startGesture(
-  image: LegacyFloatingImage,
+  image: FloatingImage,
   mode: Gesture["mode"],
   event: PointerEvent,
   startPoint = getLayerPoint(event),
 ): void {
   if (event.button !== 0 || crop.value) return;
+  try {
+    planStartGesture(image, mode, event, startPoint);
+  } catch {
+    finishGesture(false);
+    emit("feedback", "picture.operationFailed");
+  }
+}
+function planStartGesture(
+  image: FloatingImage,
+  mode: Gesture["mode"],
+  event: PointerEvent,
+  startPoint: Point,
+): void {
   cancelPointerSession();
   const focusTarget =
     (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-floating-image-id]") ??
@@ -356,14 +414,22 @@ function startGesture(
     return;
   }
   const group = selectedIds.value.has(image.id)
-    ? legacyImages.value.filter((entry) => selectedIds.value.has(entry.id))
+    ? currentImages.value.filter((entry) => selectedIds.value.has(entry.id))
     : image.groupId
-      ? legacyImages.value.filter((entry) => entry.groupId === image.groupId)
+      ? currentImages.value.filter((entry) => entry.groupId === image.groupId)
       : [image];
+  if (selectedIds.value.has(image.id) && group.length !== selectedIds.value.size) {
+    emit("feedback", "picture.operationFailed");
+    return;
+  }
   emit("select", image.id);
   focusSelectedImageProxy(focusTarget);
   if (props.readOnly) return;
-  if (!group.length || group.some((entry) => !getFloatingImageSheetRect(entry, props.layout))) {
+  if (
+    !group.length ||
+    group.some((entry) => !getPictureViewRect(entry, props.layout, props.frameContext)) ||
+    (mode !== "move" && group.length > 1 && group.some(isFramedPictureObject))
+  ) {
     emit("feedback", "picture.operationFailed");
     return;
   }
@@ -380,10 +446,12 @@ function startGesture(
       image.groupId &&
       group.length > 1 &&
       group.every((entry) => entry.groupId === image.groupId) &&
-      group.length === legacyImages.value.filter((entry) => entry.groupId === image.groupId).length,
+      group.length ===
+        currentImages.value.filter((entry) => entry.groupId === image.groupId).length,
     ),
     owner: props.owner,
     layout: props.layout,
+    frameContext: props.frameContext,
     scale: props.scale,
     selectionAtStart: [...selectedIds.value],
     selectionSettled:
@@ -394,7 +462,7 @@ function startGesture(
         .filter((entry) => entry.groupId)
         .map((entry) => [
           entry.groupId!,
-          legacyImages.value
+          currentImages.value
             .filter((member) => member.groupId === entry.groupId)
             .map((member) => member.id),
         ]),
@@ -430,6 +498,14 @@ function onPointerMove(event: PointerEvent): void {
 }
 
 function moveGestureAt(activeGesture: Gesture, point: Point): void {
+  try {
+    planGestureAt(activeGesture, point);
+  } catch {
+    finishGesture(false);
+    emit("feedback", "picture.operationFailed");
+  }
+}
+function planGestureAt(activeGesture: Gesture, point: Point): void {
   if (!isCurrentGesture(activeGesture)) {
     finishGesture(false);
     return;
@@ -443,18 +519,25 @@ function moveGestureAt(activeGesture: Gesture, point: Point): void {
   }
   if (activeGesture.mode === "move") {
     const rects = activeGesture.images
-      .map((entry) => getFloatingImageSheetRect(entry, props.layout))
+      .filter((entry) => !isFramedPictureObject(entry))
+      .map((entry) => getPictureViewRect(entry, props.layout, props.frameContext))
       .filter((entry) => entry !== null);
     const delta = {
       x: Math.max(deltaX, -Math.min(...rects.map((rect) => rect.x))),
       y: Math.max(deltaY, -Math.min(...rects.map((rect) => rect.y))),
     };
-    previewImages.value =
+    const planned =
       delta.x === 0 && delta.y === 0
         ? activeGesture.images
-        : activeGesture.images.map(
-            (entry) => moveFloatingImageBy(entry, delta, props.layout) ?? entry,
+        : activeGesture.images.map((entry) =>
+            movePictureViewBy(entry, delta, props.layout, props.frameContext),
           );
+    if (planned.some((image) => image === null)) {
+      finishGesture(false);
+      emit("feedback", "picture.operationFailed");
+      return;
+    }
+    previewImages.value = planned as FloatingImage[];
     previewImage.value = previewImages.value.find((entry) => entry.id === activeGesture.image.id);
     return;
   }
@@ -462,13 +545,13 @@ function moveGestureAt(activeGesture: Gesture, point: Point): void {
     previewImages.value =
       (activeGesture.grouped
         ? resizeFloatingImagesBy(
-            activeGesture.images,
+            activeGesture.images as LegacyFloatingImage[],
             activeGesture.mode,
             { x: deltaX, y: deltaY },
             props.layout,
           )
         : resizeFloatingImageSelectionBy(
-            activeGesture.images,
+            activeGesture.images as LegacyFloatingImage[],
             activeGesture.image.id,
             activeGesture.mode,
             { x: deltaX, y: deltaY },
@@ -478,23 +561,30 @@ function moveGestureAt(activeGesture: Gesture, point: Point): void {
     previewImage.value = previewImages.value.find((entry) => entry.id === activeGesture.image.id);
     return;
   }
-  previewImage.value =
-    resizeFloatingImageBy(
-      activeGesture.image,
-      activeGesture.mode,
-      { x: deltaX, y: deltaY },
-      props.layout,
-      {
-        minSize: MINIMUM_IMAGE_SIZE,
-        maxSize: MAX_FLOATING_IMAGE_SIZE,
-        preserveAspectRatio:
-          activeGesture.mode.length === 2 && (activeGesture.image.lockAspectRatio ?? true),
-      },
-    ) ?? activeGesture.image;
+  const next = resizePictureViewBy(
+    activeGesture.image,
+    activeGesture.mode,
+    { x: deltaX, y: deltaY },
+    props.layout,
+    MINIMUM_IMAGE_SIZE,
+    MAX_FLOATING_IMAGE_SIZE,
+    props.frameContext,
+  );
+  if (!next) {
+    finishGesture(false);
+    emit("feedback", "picture.operationFailed");
+    return;
+  }
+  previewImages.value = [next];
+  previewImage.value = next;
 }
 
 function startCrop(): void {
-  if (!props.readOnly) startCropEdit();
+  if (!props.readOnly) {
+    if (selectedImage.value && isFramedPictureObject(selectedImage.value))
+      emit("feedback", "picture.operationFailed");
+    else startCropEdit();
+  }
 }
 
 function cancelCrop(restoreFocus = true): void {
@@ -504,16 +594,33 @@ function cancelCrop(restoreFocus = true): void {
 
 function applyCrop(): void {
   if (!props.readOnly) {
-    applyCropEdit();
-    cancelPointerSession();
+    if (applyCropEdit()) cancelPointerSession();
   }
 }
 
 function rotateImage(turns: -1 | 1 | 2): void {
+  try {
+    planRotateImage(turns);
+  } catch {
+    emit("feedback", "picture.operationFailed");
+  }
+}
+function planRotateImage(turns: -1 | 1 | 2): void {
   if (props.readOnly) return;
-  const images = legacyImages.value.filter((image) => selectedIds.value.has(image.id));
-  if (images.length < 2) rotateImageEdit(turns);
-  else {
+  const images = currentImages.value.filter((image) => selectedIds.value.has(image.id));
+  if (images.length !== selectedIds.value.size) {
+    emit("feedback", "picture.operationFailed");
+    return;
+  }
+  if (images.length < 2) {
+    const image = selectedImage.value;
+    if (image) {
+      const next = rotatePictureViewBy(image, turns, props.layout, props.frameContext);
+      if (next) commitImages([next]);
+      else emit("feedback", "picture.operationFailed");
+      focusSelectedImageProxy();
+    }
+  } else {
     const next = rotateFloatingImages(images, turns, props.layout);
     if (next) commitImages(next);
     else emit("feedback", "picture.operationFailed");
@@ -521,10 +628,26 @@ function rotateImage(turns: -1 | 1 | 2): void {
 }
 
 function flipImage(axis: "horizontal" | "vertical"): void {
+  try {
+    planFlipImage(axis);
+  } catch {
+    emit("feedback", "picture.operationFailed");
+  }
+}
+function planFlipImage(axis: "horizontal" | "vertical"): void {
   if (props.readOnly) return;
-  const images = legacyImages.value.filter((image) => selectedIds.value.has(image.id));
-  if (images.length < 2) flipImageEdit(axis);
-  else {
+  const images = currentImages.value.filter((image) => selectedIds.value.has(image.id));
+  if (images.length !== selectedIds.value.size) {
+    emit("feedback", "picture.operationFailed");
+    return;
+  }
+  if (images.length < 2) {
+    const image = selectedImage.value;
+    if (image) {
+      commitImages([flipPictureView(image, axis, props.layout, props.frameContext)]);
+      focusSelectedImageProxy();
+    }
+  } else {
     const next = flipFloatingImages(images, axis, props.layout);
     if (next) commitImages(next);
     else emit("feedback", "picture.operationFailed");
@@ -532,7 +655,11 @@ function flipImage(axis: "horizontal" | "vertical"): void {
 }
 
 function restoreImage(): void {
-  if (!props.readOnly) restoreImageEdit();
+  if (!props.readOnly) {
+    if (selectedImage.value && isFramedPictureObject(selectedImage.value))
+      emit("feedback", "picture.operationFailed");
+    else restoreImageEdit();
+  }
 }
 
 function startCropGesture(direction: ImageCropGesture, event: PointerEvent): void {
@@ -561,7 +688,7 @@ function startCropGesture(direction: ImageCropGesture, event: PointerEvent): voi
 
 function isCurrentGesture(active: Gesture): boolean {
   const current = active.images.map((image) =>
-    legacyImages.value.find((entry) => entry.id === image.id),
+    currentImages.value.find((entry) => entry.id === image.id),
   );
   const expected = active.images.map((image) => image.id);
   const matches = (ids: readonly string[]) =>
@@ -570,7 +697,7 @@ function isCurrentGesture(active: Gesture): boolean {
   else if (active.selectionSettled || !matches(active.selectionAtStart)) return false;
   if (
     [...active.groups].some(([groupId, ids]) => {
-      const members = legacyImages.value.filter((image) => image.groupId === groupId);
+      const members = currentImages.value.filter((image) => image.groupId === groupId);
       return members.length !== ids.length || members.some((image) => !ids.includes(image.id));
     })
   )
@@ -578,6 +705,7 @@ function isCurrentGesture(active: Gesture): boolean {
   return (
     active.owner === props.owner &&
     active.layout === props.layout &&
+    active.frameContext === props.frameContext &&
     active.scale === props.scale &&
     !props.readOnly &&
     current.every((image) => image !== undefined) &&
@@ -600,8 +728,7 @@ function finishGesture(commit: boolean): void {
     isCurrentGesture(activeGesture) &&
     !areFloatingImageCollectionsEqual(previews.length ? previews : [preview], activeGesture.images)
   )
-    if (previews.length > 1) commitImages(previews);
-    else emit("update", preview);
+    commitImages(previews.length ? previews : [preview]);
 }
 
 function onPointerUp(event: PointerEvent): void {
@@ -642,7 +769,7 @@ function closeContextMenu(restoreFocus: boolean): void {
 }
 
 function openContextMenu(
-  image: LegacyFloatingImage,
+  image: FloatingImage,
   trigger: HTMLElement,
   anchor: FloatingReference = trigger,
 ): void {
@@ -656,14 +783,14 @@ function openContextMenu(
   };
 }
 
-function onImageContextMenu(image: LegacyFloatingImage, event: MouseEvent): void {
+function onImageContextMenu(image: FloatingImage, event: MouseEvent): void {
   event.preventDefault();
   event.stopPropagation();
   const trigger = event.currentTarget as HTMLElement;
   openContextMenu(image, trigger, createContextMenuPoint(event, layerRef.value ?? trigger));
 }
 
-function openImageKeyboardContextMenu(image: LegacyFloatingImage, event: KeyboardEvent): boolean {
+function openImageKeyboardContextMenu(image: FloatingImage, event: KeyboardEvent): boolean {
   if (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey)) return false;
   event.preventDefault();
   event.stopPropagation();
@@ -679,10 +806,11 @@ function requestConvertToCell(): void {
 }
 
 function requestPreview(): void {
-  const image = legacyImages.value.find((entry) => entry.id === contextMenu.value?.imageId);
+  const image = currentImages.value.find((entry) => entry.id === contextMenu.value?.imageId);
   const trigger = contextMenu.value?.trigger;
   closeContextMenu(false);
-  if (image) emit("preview", image, trigger);
+  if (image && !isFramedPictureObject(image)) emit("preview", image, trigger);
+  else if (image) emit("feedback", "picture.operationFailed");
 }
 
 function requestClipboard(mode: "copy" | "cut" | "paste"): void {
@@ -694,12 +822,13 @@ function requestClipboard(mode: "copy" | "cut" | "paste"): void {
   else if (mode === "paste" && !props.readOnly) emit("paste", imageId);
 }
 
-function onImageDoubleClick(image: LegacyFloatingImage, event: MouseEvent): void {
+function onImageDoubleClick(image: FloatingImage, event: MouseEvent): void {
   if (crop.value) {
     applyCrop();
     return;
   }
-  if (props.previewOnDoubleClick) emit("preview", image, event.currentTarget as HTMLElement);
+  if (props.previewOnDoubleClick && !isFramedPictureObject(image))
+    emit("preview", image, event.currentTarget as HTMLElement);
 }
 
 function onLayerDoubleClick(event: MouseEvent): void {
@@ -712,8 +841,8 @@ function onLayerDoubleClick(event: MouseEvent): void {
     !props.previewOnDoubleClick
   )
     return;
-  const image = legacyImages.value.find((entry) => entry.id === props.selectedImageId);
-  if (image)
+  const image = currentImages.value.find((entry) => entry.id === props.selectedImageId);
+  if (image && !isFramedPictureObject(image))
     emit("preview", image, layerRef.value?.querySelector<HTMLElement>(".is-selected") ?? undefined);
 }
 
@@ -732,16 +861,17 @@ function emitPaintState(): void {
   emit("paintStateChange", getPaintState());
 }
 
-function hitTestFloatingImage(point: Point): LegacyFloatingImage | undefined {
+function hitTestFloatingImage(point: Point): FloatingImage | undefined {
   for (let index = fragments.value.length - 1; index >= 0; index -= 1) {
     const fragment = fragments.value[index];
     if (!fragment) continue;
-    const rect = fragment.clippedRect;
+    const rect = fragmentBounds(fragment);
     if (
       point.x >= rect.x &&
       point.x < rect.x + rect.width &&
       point.y >= rect.y &&
-      point.y < rect.y + rect.height
+      point.y < rect.y + rect.height &&
+      (fragment.kind === "legacy" || pictureFrameContainsPoint(fragment.geometry, point))
     )
       return fragment.image;
   }
@@ -784,7 +914,8 @@ function handleSurfaceDoubleClick(event: MouseEvent, point: Point): boolean {
   if (isSelectedOverlayTarget(event.target) || crop.value) return false;
   const image = hitTestFloatingImage(point);
   if (!image) return false;
-  if (props.previewOnDoubleClick) emit("preview", image, layerRef.value ?? undefined);
+  if (props.previewOnDoubleClick && !isFramedPictureObject(image))
+    emit("preview", image, layerRef.value ?? undefined);
   return true;
 }
 
@@ -799,11 +930,11 @@ function handleSurfaceContextMenu(event: MouseEvent, point: Point): boolean {
 }
 
 function getSurfaceCursor(point: Point): "move" | undefined {
-  return !crop.value && hitTestFloatingImage(point) ? "move" : undefined;
+  return !props.readOnly && !crop.value && hitTestFloatingImage(point) ? "move" : undefined;
 }
 
 watch(
-  () => legacyImages.value.map((image) => image.id),
+  () => currentImages.value.map((image) => image.id),
   (ids) => {
     if (gesture.value && !ids.includes(gesture.value.image.id)) finishGesture(false);
     if (crop.value && !ids.includes(crop.value.image.id)) cancelCrop(false);
@@ -813,11 +944,12 @@ watch(
 
 watch(
   [
-    () => legacyImages.value,
+    () => currentImages.value,
     previewImage,
     previewImages,
     crop,
     () => props.layout,
+    () => props.frameContext,
     () => props.assetUrls,
     () => props.effects,
   ],
@@ -868,6 +1000,15 @@ watch(
   },
 );
 watch(
+  () => [props.layout, props.frameContext, props.scale],
+  () => {
+    finishGesture(false);
+    cancelCrop(false);
+  },
+  { flush: "sync" },
+);
+
+watch(
   () => props.readOnly,
   (readOnly) => {
     if (!readOnly) return;
@@ -897,16 +1038,21 @@ function arrangeImages(
   reference: PictureAlignmentReference = "selection",
 ): void {
   if (props.readOnly) return;
+  if (currentImages.value.some((image) => ids.includes(image.id) && isFramedPictureObject(image))) {
+    emit("feedback", "picture.operationFailed");
+    return;
+  }
   if (
     new Set(ids).size !== ids.length ||
-    ids.some((id) => !legacyImages.value.some((image) => image.id === id))
+    ids.some((id) => !currentImages.value.some((image) => image.id === id))
   ) {
     emit("feedback", "picture.operationFailed");
     return;
   }
-  const members = legacyImages.value
+  const members = currentImages.value
     .filter((image) => ids.includes(image.id))
     .flatMap((image) => {
+      if (isFramedPictureObject(image)) return [];
       const rect = getFloatingImageSheetRect(image, props.layout);
       return rect ? [{ image, rect }] : [];
     });
@@ -1002,7 +1148,15 @@ defineExpose({
   getSurfaceCursor,
 });
 
-function onImageKeydown(image: LegacyFloatingImage, event: KeyboardEvent): void {
+function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
+  try {
+    planImageKeydown(image, event);
+  } catch {
+    event.preventDefault();
+    emit("feedback", "picture.operationFailed");
+  }
+}
+function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
   if (crop.value) {
     event.stopPropagation();
     if (event.key === "Escape") {
@@ -1027,7 +1181,7 @@ function onImageKeydown(image: LegacyFloatingImage, event: KeyboardEvent): void 
           selection: adjustImageCropSelection(
             current.selection,
             "move",
-            { x: delta.x / image.width, y: delta.y / image.height },
+            { x: delta.x / current.image.width, y: delta.y / current.image.height },
             { width: 0, height: 0 },
           ),
         };
@@ -1056,9 +1210,9 @@ function onImageKeydown(image: LegacyFloatingImage, event: KeyboardEvent): void 
     ArrowDown: { x: 0, y: distance },
   }[event.key];
   if (!offset) return;
-  const members = legacyImages.value.filter((entry) => selectedIds.value.has(entry.id));
+  const members = currentImages.value.filter((entry) => selectedIds.value.has(entry.id));
   const rects = members
-    .map((entry) => getFloatingImageSheetRect(entry, props.layout))
+    .map((entry) => getPictureViewRect(entry, props.layout, props.frameContext))
     .filter((entry) => entry !== null);
   if (members.length !== selectedIds.value.size || rects.length !== members.length) {
     emit("feedback", "picture.operationFailed");
@@ -1066,16 +1220,36 @@ function onImageKeydown(image: LegacyFloatingImage, event: KeyboardEvent): void 
     return;
   }
   const delta = {
-    x: Math.max(offset.x, -Math.min(...rects.map((rect) => rect.x))),
-    y: Math.max(offset.y, -Math.min(...rects.map((rect) => rect.y))),
+    x: Math.max(
+      offset.x,
+      -Math.min(
+        ...members.flatMap((entry) =>
+          isFramedPictureObject(entry)
+            ? []
+            : [getPictureViewRect(entry, props.layout, props.frameContext)!.x],
+        ),
+      ),
+    ),
+    y: Math.max(
+      offset.y,
+      -Math.min(
+        ...members.flatMap((entry) =>
+          isFramedPictureObject(entry)
+            ? []
+            : [getPictureViewRect(entry, props.layout, props.frameContext)!.y],
+        ),
+      ),
+    ),
   };
   if (delta.x === 0 && delta.y === 0) {
     event.preventDefault();
     return;
   }
-  const next = members.map((entry) => moveFloatingImageBy(entry, delta, props.layout) ?? entry);
-  if (next.length > 1) commitImages(next);
-  else if (next[0]) emit("update", next[0]);
+  const next = members.map((entry) =>
+    movePictureViewBy(entry, delta, props.layout, props.frameContext),
+  );
+  if (next.some((image) => image === null)) emit("feedback", "picture.operationFailed");
+  else commitImages(next as FloatingImage[]);
   event.preventDefault();
 }
 </script>
@@ -1095,7 +1269,11 @@ function onImageKeydown(image: LegacyFloatingImage, event: KeyboardEvent): void 
       v-for="fragment in fragments.filter((entry) => selectedIds.has(entry.image.id))"
       :key="getFragmentKey(fragment)"
       class="sheet-floating-image-layer__selected"
-      :class="{ 'is-selected': !crop }"
+      :class="{
+        'is-selected': !crop,
+        'is-framed': fragment.kind === 'framed',
+        'is-read-only': readOnly,
+      }"
       :style="getFragmentStyle(fragment)"
       :data-floating-image-id="fragment.image.id"
       :data-floating-image-pane="fragment.paneId"
@@ -1103,20 +1281,28 @@ function onImageKeydown(image: LegacyFloatingImage, event: KeyboardEvent): void 
       tabindex="0"
       role="group"
       :aria-label="getAccessibleLabel(fragment.image)"
-      @pointerdown.stop="startGesture(fragment.image, 'move', $event)"
+      @pointerdown.stop="fragment.kind === 'legacy' && startGesture(fragment.image, 'move', $event)"
       @contextmenu="onImageContextMenu(fragment.image, $event)"
       @dblclick.prevent.stop="onImageDoubleClick(fragment.image, $event)"
       @keydown="onImageKeydown(fragment.image, $event)"
     >
       <SheetFloatingImageCropOverlay
-        v-if="crop?.image.id === fragment.image.id"
+        v-if="fragment.kind === 'legacy' && crop?.image.id === fragment.image.id"
         :fragment="fragment"
         :selection="crop.selection"
         @start="startCropGesture"
       />
       <SheetFloatingImageSelection
-        v-if="!selectedGroup && !crop && !readOnly"
+        v-if="fragment.kind === 'legacy' && !selectedGroup && !crop && !readOnly"
         :fragment="fragment"
+        @resize="(direction, event) => startGesture(fragment.image, direction, event)"
+      />
+      <SheetFramedPictureSelection
+        v-if="fragment.kind === 'framed' && !crop"
+        :fragment="fragment"
+        :layout="layout"
+        :read-only="readOnly"
+        @move="startGesture(fragment.image, 'move', $event)"
         @resize="(direction, event) => startGesture(fragment.image, direction, event)"
       />
     </div>
@@ -1188,6 +1374,13 @@ function onImageKeydown(image: LegacyFloatingImage, event: KeyboardEvent): void 
     cursor: move;
     outline: 1px solid var(--sheetcraft-action-primary);
 
+    &.is-framed {
+      pointer-events: none;
+      outline: none;
+    }
+    &.is-read-only {
+      cursor: default;
+    }
     &[data-floating-image-group] {
       pointer-events: none;
       outline: none;
@@ -1195,6 +1388,7 @@ function onImageKeydown(image: LegacyFloatingImage, event: KeyboardEvent): void 
 
     &:focus-visible {
       --image-selection-style: dashed;
+      --picture-frame-focus-dash: 4 3;
     }
   }
 }

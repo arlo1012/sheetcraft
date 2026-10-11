@@ -1,6 +1,9 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { LegacyFloatingImage as FloatingImage } from "@sheetcraft/core/workbook";
+import type {
+  FloatingImage as Picture,
+  LegacyFloatingImage as FloatingImage,
+} from "@sheetcraft/core/workbook";
 import { getFloatingImageSheetRect } from "@sheetcraft/sheet-engine/floating-image-layout";
 import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
 import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
@@ -96,6 +99,22 @@ describe("floating image editing", () => {
       width: 60,
       height: 60,
     });
+    expect(wrapper.find("[data-image-crop-overlay]").exists()).toBe(false);
+  });
+  test("a rejected owner preserves the crop draft and can accept the same correction later", async () => {
+    const { wrapper } = await fixture();
+    const apply = vi.fn((_images: readonly Picture[]) => false);
+    await wrapper.setProps({ applyUpdateMany: apply });
+    await cropFromRight(wrapper, -60);
+    await toolbarAction("apply-crop");
+    expect(apply).toHaveBeenCalledOnce();
+    expect(wrapper.find("[data-image-crop-overlay]").exists()).toBe(true);
+    expect(wrapper.emitted("update")).toBeUndefined();
+    expect(wrapper.emitted("feedback")).toEqual([["picture.operationFailed"]]);
+    const rejected = apply.mock.calls[0]![0];
+    apply.mockReturnValue(true);
+    await toolbarAction("apply-crop");
+    expect(apply.mock.calls[1]![0]).toEqual(rejected);
     expect(wrapper.find("[data-image-crop-overlay]").exists()).toBe(false);
   });
   test("maps a crop after a clockwise turn back to the original source", async () => {
