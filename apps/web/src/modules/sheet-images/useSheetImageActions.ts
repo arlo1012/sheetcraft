@@ -14,14 +14,33 @@ import {
   createBatchSetCellContentsCommand,
   type WorkbookCommand,
 } from "@sheetcraft/core/commands";
-import { getMergedCellAnchor, canUseSheetPermission, canEditCell } from "@sheetcraft/core";
+import {
+  getMergedCellAnchor,
+  canUseSheetPermission,
+  canEditCell,
+  areImageTransformsEqual,
+} from "@sheetcraft/core";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import type { MessageKey } from "../../shared/i18n";
 import type { ImageAssetStore } from "../image-assets/imageAssetStore";
 import { ImageAssetError, prepareImageAsset } from "../image-assets/prepareImageAsset";
 
 export type ImageInsertMode = "cell" | "floating";
-type ImageTarget = { workbook: Workbook; sheetId: string; address: CellAddress };
+type ImageTarget = { workbook: Workbook; sheet: Sheet; sheetId: string; address: CellAddress };
+
+function cellImageMatches(
+  sheet: Sheet,
+  address: CellAddress,
+  image: { assetId: string; altText: string; transform?: ImageTransform },
+): boolean {
+  const content = getCellContent(sheet, address);
+  return (
+    content?.kind === "image" &&
+    content.image.assetId === image.assetId &&
+    content.image.altText === image.altText &&
+    areImageTransformsEqual(content.image.transform, image.transform)
+  );
+}
 
 export function useSheetImageActions(options: {
   assetStore: ImageAssetStore;
@@ -36,20 +55,22 @@ export function useSheetImageActions(options: {
     assetId: string;
     altText: string;
     transform?: ImageTransform;
-  }) => void;
-  setFloatingImage: (image: FloatingImage, sheetId: string) => void;
+  }) => unknown;
+  setFloatingImage: (image: FloatingImage, sheetId: string) => unknown;
   convertCellImageToFloating: (payload: {
     sheetId: string;
     address: CellAddress;
     imageId: string;
     size: { width: number; height: number };
-  }) => void;
+  }) => unknown;
 }) {
   const busy = ref(false);
   const feedback = ref<MessageKey>();
   const idFactory = createBrowserIdFactory();
   const fileInput = ref<HTMLInputElement | null>(null);
-  let pending: { mode: ImageInsertMode; target: ImageTarget; replaceId?: string } | undefined;
+  let pending:
+    | { mode: ImageInsertMode; target: ImageTarget; replaceId?: string; replaceAssetId?: string }
+    | undefined;
 
   function captureTarget(
     address = options.getAddress(),
@@ -65,6 +86,7 @@ export function useSheetImageActions(options: {
     const sheet = options.getSheet();
     return {
       workbook: options.getWorkbook(),
+      sheet,
       sheetId: sheet.id,
       address: {
         ...(getMergedCellAnchor(sheet.mergedCells, address) ?? address),
@@ -76,7 +98,7 @@ export function useSheetImageActions(options: {
     const sheet = target.workbook.sheets.get(target.sheetId);
     return (
       options.getWorkbook() === target.workbook &&
-      !!sheet &&
+      sheet === target.sheet &&
       (mode === "floating"
         ? canUseSheetPermission(sheet, "editObjects")
         : canEditCell(sheet, target.address))
@@ -101,7 +123,7 @@ export function useSheetImageActions(options: {
     if (!image) return;
     const target = captureTarget(image.anchor);
     if (!target) return;
-    pending = { mode: "floating", target, replaceId: imageId };
+    pending = { mode: "floating", target, replaceId: imageId, replaceAssetId: image.assetId };
     if (fileInput.value) {
       fileInput.value.multiple = false;
       fileInput.value.value = "";
@@ -114,35 +136,57 @@ export function useSheetImageActions(options: {
     mode: ImageInsertMode = "floating",
     target = captureTarget(options.getAddress(), mode),
     replaceId?: string,
+    replaceAssetId = replaceId
+      ? target?.sheet.floatingImages.find((image) => image.id === replaceId)?.assetId
+      : undefined,
   ): Promise<void> {
     if (!target || !isCurrent(target, mode) || busy.value) return;
+    const replacement = () =>
+      target.sheet.floatingImages.find(
+        (image) => image.id === replaceId && image.assetId === replaceAssetId,
+      );
+    const valid = () => isCurrent(target, mode) && (!replaceId || !!replacement());
+    if (!valid()) return;
     busy.value = true;
     feedback.value = undefined;
     try {
       const asset = await prepareImageAsset(file);
-      if (!isCurrent(target, mode)) return;
+      if (!valid()) return;
       await options.assetStore.put(asset);
-      if (!isCurrent(target, mode)) return;
+      if (!valid()) return;
       const altText = file.name || "";
       if (replaceId) {
-        const current = target.workbook.sheets
-          .get(target.sheetId)
-          ?.floatingImages.find((entry) => entry.id === replaceId);
+        const current = replacement();
         if (!current) return;
-        options.setFloatingImage({ ...current, assetId: asset.id, altText }, target.sheetId);
+        if (current.assetId === asset.id && current.altText === altText) {
+          feedback.value = "image.unchanged";
+          return;
+        }
+        if (
+          (await options.setFloatingImage(
+            { ...current, assetId: asset.id, altText },
+            target.sheetId,
+          )) === false
+        )
+          throw new Error("Picture replacement was refused.");
       } else if (mode === "cell") {
-        options.setCellImage({
+        if (cellImageMatches(target.sheet, target.address, { assetId: asset.id, altText })) {
+          feedback.value = "image.unchanged";
+          return;
+        }
+        const accepted = await options.setCellImage({
           sheetId: target.sheetId,
           address: target.address,
           assetId: asset.id,
           altText,
         });
+        if (accepted === false) throw new Error("Cell image insertion was refused.");
       } else {
         const scale = Math.max(
           MIN_FLOATING_IMAGE_SIZE / Math.min(asset.width, asset.height),
           Math.min(1, 400 / asset.width, 300 / asset.height),
         );
-        options.setFloatingImage(
+        const accepted = await options.setFloatingImage(
           {
             id: idFactory("image"),
             assetId: asset.id,
@@ -155,6 +199,7 @@ export function useSheetImageActions(options: {
           },
           target.sheetId,
         );
+        if (accepted === false) throw new Error("Picture insertion was refused.");
       }
       feedback.value = "image.inserted";
     } catch (error) {
@@ -182,6 +227,7 @@ export function useSheetImageActions(options: {
     if (files.length === 1) return insertFile(files[0]!, mode, target);
     if (!files.length || !target || busy.value || !options.execute || !isCurrent(target, mode))
       return;
+    feedback.value = undefined;
     if (files.length > 100) {
       feedback.value = "picture.tooMany";
       return;
@@ -218,8 +264,20 @@ export function useSheetImageActions(options: {
         await options.assetStore.put(asset);
         if (!valid()) return;
       }
-      if (mode === "cell")
-        options.execute(
+      let accepted: unknown;
+      if (mode === "cell") {
+        if (
+          assets.every((asset, index) =>
+            cellImageMatches(sheet, addresses[index]!, {
+              assetId: asset.id,
+              altText: files[index]!.name,
+            }),
+          )
+        ) {
+          feedback.value = "image.unchanged";
+          return;
+        }
+        accepted = await options.execute(
           createBatchSetCellContentsCommand(
             assets.map((asset, index) => ({
               sheetId: target.sheetId,
@@ -228,8 +286,8 @@ export function useSheetImageActions(options: {
             })),
           ),
         );
-      else
-        options.execute(
+      } else
+        accepted = await options.execute(
           createSetSheetFloatingImagesCommand(target.sheetId, [
             ...sheet.floatingImages,
             ...assets.map((asset, index) => {
@@ -250,6 +308,7 @@ export function useSheetImageActions(options: {
             }),
           ]),
         );
+      if (accepted === false) throw new Error("Picture batch insertion was refused.");
       feedback.value = "image.inserted";
     } catch {
       feedback.value = "image.insertionFailed";
@@ -266,7 +325,14 @@ export function useSheetImageActions(options: {
     pending = undefined;
     input.value = "";
     if (file && request) {
-      if (request.replaceId) void insertFile(file, request.mode, request.target, request.replaceId);
+      if (request.replaceId)
+        void insertFile(
+          file,
+          request.mode,
+          request.target,
+          request.replaceId,
+          request.replaceAssetId,
+        );
       else void insertFiles(files, request.mode, request.target);
     }
   }
@@ -279,6 +345,7 @@ export function useSheetImageActions(options: {
     const target = captureTarget(address, mode);
     if (!target || busy.value) return;
     busy.value = true;
+    feedback.value = undefined;
     try {
       if (!(await options.assetStore.get(image.assetId))) {
         feedback.value = "image.assetUnavailable";
@@ -286,15 +353,20 @@ export function useSheetImageActions(options: {
       }
       if (!isCurrent(target, mode)) return;
       if (mode === "cell") {
-        options.setCellImage({
+        if (cellImageMatches(target.sheet, target.address, image)) {
+          feedback.value = "image.unchanged";
+          return;
+        }
+        const accepted = await options.setCellImage({
           sheetId: target.sheetId,
           address: target.address,
           assetId: image.assetId,
           altText: image.altText,
           ...(image.transform ? { transform: image.transform } : {}),
         });
+        if (accepted === false) throw new Error("Cell image paste was refused.");
       } else {
-        options.setFloatingImage(
+        const accepted = await options.setFloatingImage(
           {
             ...image,
             groupId: undefined,
@@ -305,6 +377,7 @@ export function useSheetImageActions(options: {
           },
           target.sheetId,
         );
+        if (accepted === false) throw new Error("Picture paste was refused.");
       }
       feedback.value = "image.inserted";
     } catch {
@@ -322,6 +395,7 @@ export function useSheetImageActions(options: {
     if (!target || busy.value || !options.execute || images.length < 2 || images.length > 100)
       return;
     busy.value = true;
+    feedback.value = undefined;
     try {
       for (const image of images)
         if (!(await options.assetStore.get(image.assetId)))
@@ -340,12 +414,13 @@ export function useSheetImageActions(options: {
           offsetY: image.offsetY + 12,
         };
       });
-      options.execute(
+      const accepted = await options.execute(
         createSetSheetFloatingImagesCommand(target.sheetId, [
           ...target.workbook.sheets.get(target.sheetId)!.floatingImages,
           ...next,
         ]),
       );
+      if (accepted === false) throw new Error("Picture group paste was refused.");
       feedback.value = "image.inserted";
     } catch {
       feedback.value = "image.insertionFailed";
@@ -382,12 +457,13 @@ export function useSheetImageActions(options: {
         MIN_FLOATING_IMAGE_SIZE / Math.min(width, height),
         Math.min(1, 400 / width, 300 / height),
       );
-      options.convertCellImageToFloating({
+      const accepted = await options.convertCellImageToFloating({
         sheetId: target.sheetId,
         address: target.address,
         imageId: idFactory("image"),
         size: { width: width * scale, height: height * scale },
       });
+      if (accepted === false) throw new Error("Picture conversion was refused.");
       feedback.value = "image.convertedToFloating";
     } catch {
       feedback.value = "image.convertFailed";

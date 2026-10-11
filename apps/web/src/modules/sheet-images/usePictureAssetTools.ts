@@ -116,7 +116,13 @@ export function usePictureAssetTools(options: {
       const changed = next.some(
         (image, index) => image.assetId !== sheet.floatingImages[index]?.assetId,
       );
-      if (changed) options.execute(createSetSheetFloatingImagesCommand(sheet.id, next));
+      if (
+        changed &&
+        (await options.execute(createSetSheetFloatingImagesCommand(sheet.id, next))) === false
+      ) {
+        options.feedback("picture.assetFailed", true);
+        return false;
+      }
       options.feedback(changed ? "picture.compressed" : "picture.noSmaller");
       return true;
     } catch {

@@ -1653,6 +1653,7 @@ export type MessageSchema = ToolMessageSchema & {
     confirm: string;
     keepEachRatio: string;
     invalidSize: string;
+    operationFailed: string;
     exported: string;
     compressed: string;
     noSmaller: string;
@@ -1727,6 +1728,7 @@ export type MessageSchema = ToolMessageSchema & {
     copied: string;
     copyFailed: string;
     inserted: string;
+    unchanged: string;
     loading: string;
     invalidType: string;
     tooLarge: string;

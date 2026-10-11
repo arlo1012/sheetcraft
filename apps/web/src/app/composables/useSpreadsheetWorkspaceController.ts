@@ -724,8 +724,8 @@ export function useSpreadsheetWorkspaceController(
     assetId: string;
     altText: string;
     transform?: ImageTransform;
-  }): void {
-    execute(
+  }): boolean {
+    return execute(
       createSetCellContentCommand(payload.sheetId, payload.address, {
         kind: "image",
         image: {
@@ -738,8 +738,8 @@ export function useSpreadsheetWorkspaceController(
     );
   }
 
-  function setFloatingImage(image: FloatingImage, sheetId = activeSheet.value.id): void {
-    execute(createSetFloatingImageCommand(sheetId, image));
+  function setFloatingImage(image: FloatingImage, sheetId = activeSheet.value.id): boolean {
+    return execute(createSetFloatingImageCommand(sheetId, image));
   }
 
   function deleteFloatingImage(id: string): void {
@@ -761,8 +761,8 @@ export function useSpreadsheetWorkspaceController(
     address: CellAddress;
     imageId: string;
     size: { width: number; height: number };
-  }): void {
-    execute(
+  }): boolean {
+    return execute(
       createConvertCellImageToFloatingCommand(
         payload.sheetId,
         payload.address,

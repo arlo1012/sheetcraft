@@ -195,7 +195,7 @@ import { createAxisToolActions } from "../modules/sheet-grid/axis-tool-actions";
 import { createCellFillActions } from "../modules/sheet-grid/cell-fill-actions";
 import { createCellOperationActions } from "../modules/sheet-grid/cell-operation-actions";
 import { browserCellTextMeasurer } from "../shared/cell-text/text-metrics";
-import { useAppI18n } from "../shared/i18n";
+import { useAppI18n, type MessageKey } from "../shared/i18n";
 import RowColumnOperationsMenu from "../modules/sheet-grid/components/RowColumnOperationsMenu.vue";
 import WorksheetOperationsMenu from "../modules/workbook/components/WorksheetOperationsMenu.vue";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
@@ -1131,12 +1131,33 @@ const imageActions = useSheetImageActions({
   flushPendingEdits: () => cellEditSession.finish(),
   setCellImage,
   setFloatingImage: (image, sheetId) => {
-    setFloatingImage(image, sheetId);
-    if (activeSheet.value.id === sheetId)
+    const changed = setFloatingImage(image, sheetId);
+    if (changed && activeSheet.value.id === sheetId)
       void nextTick(() => sheetGridRef.value?.selectFloatingImage(image.id));
+    return changed;
   },
   convertCellImageToFloating,
 });
+function showImageFeedback(key: MessageKey): void {
+  if (key === "image.unchanged" || key === "clipboard.readyToMove") {
+    void MessagePlugin.info(t(key));
+  } else if (
+    key === "image.inserted" ||
+    key === "image.copied" ||
+    key === "image.convertedToFloating"
+  ) {
+    void MessagePlugin.success(t(key));
+  } else {
+    void MessagePlugin.error(t(key));
+  }
+}
+watch(
+  imageActions.feedback,
+  (key) => {
+    if (key) showImageFeedback(key);
+  },
+  { flush: "sync" },
+);
 const pivotActions = usePivotActions({
   getWorkbook: () => session.workbook,
   getGeneration: () => workbookGeneration.value,
@@ -3954,6 +3975,7 @@ const gridInert = computed(
           @convert-cell-image-to-floating="imageActions.convertCellImageToFloating"
           @paste-floating-image="imageActions.pasteFloatingImage"
           @paste-floating-images="imageActions.pasteFloatingImages"
+          @image-feedback="showImageFeedback"
           :workbook-revision="workbookRevision"
           :apply-paste="pasteCells"
           :apply-axis-move="moveAxis"
@@ -4071,7 +4093,8 @@ const gridInert = computed(
       @confirm="
         (value) => {
           if (pictureTools.resizeMany(value)) pictureBatchSizeVisible = false;
-          else MessagePlugin.warning(t('picture.invalidSize'));
+          else
+            MessagePlugin.warning(t(pictureTools.sizeFeedback.value ?? 'picture.operationFailed'));
         }
       "
       @close="pictureBatchSizeVisible = false"

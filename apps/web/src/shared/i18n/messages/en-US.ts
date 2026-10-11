@@ -1708,6 +1708,8 @@ export const enUS = {
     confirm: "OK",
     keepEachRatio: "Use one width and preserve each picture’s aspect ratio",
     invalidSize: "Picture dimensions must be between 1 and 10000 pixels.",
+    operationFailed:
+      "The picture could not be changed. Check that it is still available and editable, then try again.",
     exported: "Pictures exported.",
     compressed: "Pictures compressed. Undo restores the originals.",
     noSmaller: "These settings do not reduce file size. The originals were kept.",
@@ -1782,6 +1784,7 @@ export const enUS = {
     copied: "Image copied.",
     copyFailed: "The image could not be copied.",
     inserted: "Image inserted.",
+    unchanged: "The image already has these settings. No changes were made.",
     loading: "Preparing image…",
     invalidType: "Choose a PNG, JPEG, WebP, or GIF image.",
     tooLarge: "This image is too large to insert.",

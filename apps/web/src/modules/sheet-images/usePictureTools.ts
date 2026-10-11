@@ -11,6 +11,7 @@ import {
   type Sheet,
 } from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
+import type { MessageKey } from "../../shared/i18n";
 export type PictureLayerAction = "front" | "forward" | "backward" | "back";
 export type PictureAlignment =
   | "left"
@@ -30,14 +31,20 @@ export function usePictureTools(options: {
   execute: (command: WorkbookCommand) => unknown;
 }) {
   const paneVisible = ref(false);
+  const sizeFeedback = ref<MessageKey>();
   const idFactory = createBrowserIdFactory();
-  function replace(images: readonly FloatingImage[]): void {
-    if (options.isBusy() || !canUseSheetPermission(options.getSheet(), "editObjects")) return;
-    options.execute(createSetSheetFloatingImagesCommand(options.getSheet().id, images));
+  function replace(images: readonly FloatingImage[]): boolean {
+    const sheet = options.getSheet();
+    if (options.isBusy() || !canUseSheetPermission(sheet, "editObjects")) return false;
+    const command = createSetSheetFloatingImagesCommand(sheet.id, images);
+    if (JSON.stringify(sheet.floatingImages) === JSON.stringify(command.images)) return true;
+    return options.execute(command) !== false;
   }
-  function updateMany(images: readonly FloatingImage[]): void {
+  function updateMany(images: readonly FloatingImage[]): boolean {
     const changes = new Map(images.map((image) => [image.id, image]));
-    replace(options.getSheet().floatingImages.map((image) => changes.get(image.id) ?? image));
+    return replace(
+      options.getSheet().floatingImages.map((image) => changes.get(image.id) ?? image),
+    );
   }
   function remove(ids = options.selectedIds.value): void {
     replace(options.getSheet().floatingImages.filter((image) => !ids.includes(image.id)));
@@ -95,7 +102,11 @@ export function usePictureTools(options: {
     locked: boolean;
     all: boolean;
   }): boolean {
-    if (options.isBusy() || !canUseSheetPermission(options.getSheet(), "editObjects")) return false;
+    sizeFeedback.value = undefined;
+    if (options.isBusy() || !canUseSheetPermission(options.getSheet(), "editObjects")) {
+      sizeFeedback.value = "picture.operationFailed";
+      return false;
+    }
     const images = options
       .getSheet()
       .floatingImages.filter((image) => value.all || options.selectedIds.value.includes(image.id))
@@ -115,9 +126,14 @@ export function usePictureTools(options: {
           image.height < 1 ||
           image.height > 10000,
       )
-    )
+    ) {
+      sizeFeedback.value = "picture.invalidSize";
       return false;
-    updateMany(images);
+    }
+    if (!updateMany(images)) {
+      sizeFeedback.value = "picture.operationFailed";
+      return false;
+    }
     return true;
   }
   function applyAppearance(patch: Partial<ImageAppearance> | undefined): void {
@@ -150,5 +166,6 @@ export function usePictureTools(options: {
     toggleVisibility,
     rename,
     resizeMany,
+    sizeFeedback,
   };
 }

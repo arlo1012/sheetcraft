@@ -1,6 +1,9 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { watch } from "vue";
+import { MessagePlugin } from "tdesign-vue-next/es/message";
+import ImageInsertMenu from "../../../modules/home-tools/components/ImageInsertMenu.vue";
+import * as imagePreparation from "../../../modules/image-assets/prepareImageAsset";
 import {
   createWorkbook,
   getActiveSheet,
@@ -125,6 +128,59 @@ async function openFullSymbolDialog(wrapper: VueWrapper): Promise<void> {
 }
 
 describe("workspace insert entry points", () => {
+  test("repeated synchronous picture batch failures remain visible each time", async () => {
+    const error = vi.spyOn(MessagePlugin, "error").mockResolvedValue({ close: vi.fn() });
+    const wrapper = await fixture();
+    const input = wrapper.get<HTMLInputElement>(".spreadsheet-workspace__image-input");
+    vi.spyOn(input.element, "click").mockImplementation(() => undefined);
+    Object.defineProperty(input.element, "files", {
+      value: Array.from({ length: 101 }, () => new File(["x"], "test.png", { type: "image/png" })),
+    });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      wrapper.getComponent(ImageInsertMenu).vm.$emit("insertImage", "floating");
+      await input.trigger("change");
+      await flushPromises();
+    }
+    expect(
+      error.mock.calls.filter(([text]) => text === "Insert up to 100 pictures at a time."),
+    ).toHaveLength(2);
+    expect(captured.controller!.session.history.undoStack).toHaveLength(0);
+  });
+  test("picture feedback from the actual insertion action is presented as an error", async () => {
+    const error = vi.spyOn(MessagePlugin, "error").mockResolvedValue({ close: vi.fn() });
+    const success = vi.spyOn(MessagePlugin, "success").mockResolvedValue({ close: vi.fn() });
+    vi.spyOn(imagePreparation, "prepareImageAsset").mockRejectedValue(
+      new imagePreparation.ImageAssetError("decode-failed"),
+    );
+    const wrapper = await fixture();
+    const input = wrapper.get<HTMLInputElement>(".spreadsheet-workspace__image-input");
+    vi.spyOn(input.element, "click").mockImplementation(() => undefined);
+    wrapper.getComponent(ImageInsertMenu).vm.$emit("insertImage", "floating");
+    Object.defineProperty(input.element, "files", {
+      value: [new File(["invalid"], "test.png", { type: "image/png" })],
+    });
+    await input.trigger("change");
+    await flushPromises();
+    expect(error).toHaveBeenCalledWith("This image could not be read.");
+    expect(success).not.toHaveBeenCalled();
+    expect(captured.controller!.session.history.undoStack).toHaveLength(0);
+  });
+  test("picture feedback from Grid is visible and unchanged results are informational", async () => {
+    const error = vi.spyOn(MessagePlugin, "error").mockResolvedValue({ close: vi.fn() });
+    const info = vi.spyOn(MessagePlugin, "info").mockResolvedValue({ close: vi.fn() });
+    const success = vi.spyOn(MessagePlugin, "success").mockResolvedValue({ close: vi.fn() });
+    const wrapper = await fixture();
+    const grid = wrapper.getComponent(SheetGrid);
+    grid.vm.$emit("imageFeedback", "image.copyFailed");
+    expect(error).toHaveBeenCalledWith("The image could not be copied.");
+    grid.vm.$emit("imageFeedback", "image.unchanged");
+    expect(info).toHaveBeenCalledWith(
+      "The image already has these settings. No changes were made.",
+    );
+    expect(success).not.toHaveBeenCalled();
+    grid.vm.$emit("imageFeedback", "image.inserted");
+    expect(success).toHaveBeenCalledWith("Image inserted.");
+  });
   test.each(["confirm", "cancel"] as const)(
     "Sparkline replaces and detaches an old range-picker %s",
     async (action) => {
