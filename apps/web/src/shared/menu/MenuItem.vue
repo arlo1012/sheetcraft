@@ -180,6 +180,10 @@ function onKeydown(event: KeyboardEvent): void {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+
+    // Center the font's text bounds instead of the asymmetric line-box leading.
+    text-box-trim: trim-both;
+    text-box-edge: text;
   }
 
   &__trailing {
