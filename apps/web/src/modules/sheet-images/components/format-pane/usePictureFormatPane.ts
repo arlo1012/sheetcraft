@@ -312,7 +312,8 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
         select: (next) => {
           if (typeof next !== "string" || !optionsAvailable) return;
           if (field === "anchor" && !["move-size", "move", "fixed"].includes(next)) return;
-          if (field === "lineMode" && !["none", "solid", "gradient"].includes(next)) return;
+          if (field === "lineMode" && !["inherit", "none", "solid", "gradient"].includes(next))
+            return;
           const options = props.options?.[field];
           if (options && !options.some((option) => option.value === next && !option.disabled))
             return;

@@ -11,20 +11,42 @@ import {
 import type { XlsxEncodeOptions, XlsxImageAsset } from "./types.js";
 import { nativeDrawingAnchor, type NativeDrawingAnchor } from "./drawing-geometry.js";
 
+/** Reject unencodable appearance intent before normalization or resource registration. */
+export function assertSupportedXlsxImageAppearance(
+  image: Pick<CellImage, "transform">,
+  issueLocation: string,
+): void {
+  const appearance = image.transform?.appearance;
+  if (
+    appearance !== null &&
+    appearance !== undefined &&
+    Object.hasOwn(appearance, "suppressThemeEffects")
+  ) {
+    const location = `${issueLocation}.transform.appearance.suppressThemeEffects`;
+    throw new XlsxCompatibilityError(
+      `Picture theme-effect suppression is not yet supported by XLSX export at ${location}.`,
+      {
+        issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [location] }],
+      },
+    );
+  }
+}
+
 /** The existing native writer cannot encode object-frame geometry. Reject before resources. */
 export function assertSupportedXlsxPicture(
   image: FloatingImage,
   issueLocation: string,
 ): asserts image is LegacyFloatingImage {
-  if (isFramedPictureObject(image) || isPictureGroup(image))
+  if (isFramedPictureObject(image) || isPictureGroup(image)) {
+    const location = `${issueLocation}.frame`;
     throw new XlsxCompatibilityError(
-      `Frame-aware pictures and owned groups are not yet supported by XLSX export at ${issueLocation}.`,
+      `Frame-aware pictures and owned groups are not yet supported by XLSX export at ${location}.`,
       {
-        issues: [
-          { code: "feature-omitted", severity: "block", count: 1, locations: [issueLocation] },
-        ],
+        issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [location] }],
       },
     );
+  }
+  assertSupportedXlsxImageAppearance(image, issueLocation);
 }
 
 export type XlsxImageAnchor = NativeDrawingAnchor & {
@@ -97,6 +119,7 @@ export function createXlsxImageExporter(
       image: CellImage,
       issueLocation: string,
     ): { mediaFilename: string; altText: string } {
+      assertSupportedXlsxImageAppearance(image, issueLocation);
       const asset = requireAsset(image.assetId, image.transform, issueLocation);
       return {
         mediaFilename: `xl/media/image${addAsset(asset) + 1}.${asset.extension}`,
@@ -112,7 +135,7 @@ export function createXlsxImageExporter(
     ): void {
       assertSupportedXlsxPicture(
         image,
-        `${issueLocation}.floatingImages[${JSON.stringify(image.id)}].frame`,
+        `${issueLocation}.floatingImages[${JSON.stringify(image.id)}]`,
       );
       const asset = requireAsset(image.assetId, image.transform, issueLocation);
       output.addImage(addAsset(asset), {

@@ -88,6 +88,7 @@ import { readXlsxCellNoteVmlBoxes, readXlsxCellNotes } from "./cell-notes.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
   createXlsxImageExporter,
+  assertSupportedXlsxImageAppearance,
   assertSupportedXlsxPicture,
   type XlsxImageWorkbook,
   type XlsxImageWorksheet,
@@ -1111,12 +1112,22 @@ export async function encodeWithNativeXlsx(
   const report = new CompatibilityReportBuilder();
   const sheets = [...workbook.sheets.values()];
   if (!sheets.length) throw new RangeError("The workbook contains no worksheets.");
-  for (const sheet of sheets)
+  for (const sheet of sheets) {
     for (const image of sheet.floatingImages)
       assertSupportedXlsxPicture(
         image,
-        `${sheet.name}.floatingImages[${JSON.stringify(image.id)}].frame`,
+        `${sheet.name}.floatingImages[${JSON.stringify(image.id)}]`,
       );
+    for (const [key, cell] of sheet.cells) {
+      if (cell.content?.kind !== "image") continue;
+      const [row, column] = key.split(":").map(Number);
+      if (row === undefined || column === undefined) continue;
+      assertSupportedXlsxImageAppearance(
+        cell.content.image,
+        `${sheet.name}!${address(row, column)}`,
+      );
+    }
+  }
   assertSupportedXlsxTableTotals(sheets, report);
   for (const sheet of sheets) {
     if (typeof sheet.properties.hidden !== "boolean")
@@ -1329,7 +1340,7 @@ export async function encodeWithNativeXlsx(
     for (const image of sheet.floatingImages) {
       assertSupportedXlsxPicture(
         image,
-        `${sheet.name}.floatingImages[${JSON.stringify(image.id)}].frame`,
+        `${sheet.name}.floatingImages[${JSON.stringify(image.id)}]`,
       );
       if (image.hidden) continue;
       const issueLocation = `${sheet.name}!${address(image.anchor.row, image.anchor.column)}`;

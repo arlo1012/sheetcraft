@@ -7,6 +7,7 @@ import type { FramedFloatingImage } from "@sheetcraft/core/picture-object";
 import { paintFramedPictureContent } from "../../../modules/sheet-images/framed-picture-painter";
 import * as imageAppearance from "../../../shared/images/imageAppearance";
 import type { DrawingThemeEffects } from "../../../modules/sheet-images/drawing-theme-effects";
+import { resetPictureAppearance } from "../../../modules/sheet-images/picture-appearance-edit";
 
 function fixture() {
   const picture: FramedFloatingImage = {
@@ -53,6 +54,54 @@ function fixture() {
 afterEach(() => vi.restoreAllMocks());
 
 describe("prepared framed picture content painter", () => {
+  test("explicit reset suppresses all inherited effects while keeping source geometry intact", () => {
+    const f = fixture();
+    f.picture.transform = { appearance: resetPictureAppearance() };
+    const before = structuredClone(f.picture);
+    f.draw({ ...DEFAULT_WORKBOOK_THEME.effects, reflection: true, bevel: true });
+    expect(f.context.drawImage).toHaveBeenCalledExactlyOnceWith(
+      f.source,
+      100,
+      50,
+      200,
+      100,
+      0,
+      0,
+      200,
+      100,
+    );
+    expect(f.context.strokeRect).not.toHaveBeenCalled();
+    expect(f.context.stroke).not.toHaveBeenCalled();
+    expect(f.context).not.toHaveProperty("shadowBlur");
+    expect(f.context.rotate).toHaveBeenCalledExactlyOnceWith((37 * Math.PI) / 180);
+    expect(f.picture).toEqual(before);
+  });
+  test("suppression flags affect inheritance only and preserve explicit local border and shadow", () => {
+    const f = fixture();
+    f.picture.transform = {
+      appearance: {
+        ...resetPictureAppearance(),
+        border: { color: "#123456", width: 4 },
+        shadow: "hard",
+      },
+    };
+    f.draw({ ...DEFAULT_WORKBOOK_THEME.effects, reflection: true, bevel: true });
+    expect(f.context.drawImage).toHaveBeenCalledOnce();
+    expect(f.context.strokeRect).toHaveBeenCalledExactlyOnceWith(2, 2, 196, 96);
+    expect(f.context.stroke).not.toHaveBeenCalled();
+    expect(f.context).toHaveProperty("shadowBlur", 1);
+  });
+  test("suppressed flags cannot hide invalid inherited theme fields or unsupported own reflection", () => {
+    const f = fixture();
+    f.picture.transform = { appearance: resetPictureAppearance() };
+    expect(() => f.draw({ ...DEFAULT_WORKBOOK_THEME.effects, outlineWidth: NaN })).toThrow();
+    expect(f.context.save).not.toHaveBeenCalled();
+    f.picture.transform.appearance!.reflection = true;
+    expect(() => f.draw({ ...DEFAULT_WORKBOOK_THEME.effects, reflection: true })).toThrow(
+      "reflection",
+    );
+    expect(f.context.save).not.toHaveBeenCalled();
+  });
   test("draws a local crop once through the arbitrary-angle frame matrix", () => {
     const { draw, context, source } = fixture();
     draw();

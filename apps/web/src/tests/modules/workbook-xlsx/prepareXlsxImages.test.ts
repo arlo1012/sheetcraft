@@ -70,6 +70,64 @@ afterEach(() => {
 });
 
 describe("prepareXlsxImages", () => {
+  test.each(["cell", "floating"] as const)(
+    "%s suppression blocks before asset reads or any browser image preparation",
+    async (kind) => {
+      const { workbook, sheet } = imageSnapshot();
+      const transform = { appearance: { suppressThemeEffects: { outline: true as const } } };
+      if (kind === "cell")
+        setCellContent(
+          sheet,
+          { row: 1, column: 2 },
+          { kind: "image", image: { assetId: "logo", altText: "Synthetic", transform } },
+        );
+      else
+        sheet.floatingImages = [
+          {
+            id: "floating",
+            assetId: "logo",
+            altText: "Synthetic",
+            anchor: { row: 0, column: 0 },
+            offsetX: 0,
+            offsetY: 0,
+            width: 80,
+            height: 40,
+            transform,
+          },
+        ];
+      const snapshot = serializeWorkbook(workbook),
+        before = structuredClone(snapshot);
+      const assets = store(imageAsset("logo")),
+        urls = { createObjectURL: vi.fn(), revokeObjectURL: vi.fn() };
+      const decode = vi.fn();
+      vi.stubGlobal("URL", urls);
+      vi.stubGlobal("Image", decode);
+      const create = vi.spyOn(document, "createElement");
+      await expect(prepareXlsxImages(snapshot, assets)).rejects.toMatchObject({
+        name: "XlsxWorkerFailure",
+        report: {
+          issues: [
+            {
+              code: "feature-omitted",
+              severity: "block",
+              count: 1,
+              locations: [
+                kind === "cell"
+                  ? "Images!C2.transform.appearance.suppressThemeEffects"
+                  : 'Images.floatingImages["floating"].transform.appearance.suppressThemeEffects',
+              ],
+            },
+          ],
+        },
+      });
+      expect(assets.get).not.toHaveBeenCalled();
+      expect(urls.createObjectURL).not.toHaveBeenCalled();
+      expect(decode).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+      expect(snapshot).toEqual(before);
+      expect(serializeWorkbook(workbook)).toEqual(before);
+    },
+  );
   test("frame geometry is blocked before asset reads, decoding, URLs or raster preparation", async () => {
     const { workbook, sheet } = imageSnapshot();
     sheet.floatingImages = [framedPicture()];

@@ -1,3 +1,11 @@
+/** Explicitly disables selected inherited theme effects; omitted flags still inherit. */
+export type ImageThemeEffectSuppression = {
+  shadow?: true;
+  outline?: true;
+  reflection?: true;
+  bevel?: true;
+};
+
 /** Non-destructive picture styling shared by cell and floating images. */
 export type ImageAppearance = {
   opacity?: number;
@@ -11,7 +19,42 @@ export type ImageAppearance = {
   border?: { color: string; width: number };
   shadow?: "soft" | "hard";
   reflection?: boolean;
+  suppressThemeEffects?: ImageThemeEffectSuppression;
 };
+
+function normalizeThemeEffectSuppression(
+  appearance: ImageAppearance,
+): ImageThemeEffectSuppression | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(appearance, "suppressThemeEffects");
+  if (!descriptor) {
+    if ("suppressThemeEffects" in appearance)
+      throw new TypeError("Image theme effect suppression must be an own data field.");
+    return undefined;
+  }
+  if (!("value" in descriptor))
+    throw new TypeError("Image theme effect suppression must be a data field, not an accessor.");
+  const value: unknown = descriptor.value;
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new TypeError("Invalid image theme effect suppression.");
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== null && prototype !== Object.prototype)
+    throw new TypeError("Image theme effect suppression must be an ordinary data record.");
+  const keys = ["shadow", "outline", "reflection", "bevel"] as const;
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== "string" || !keys.includes(key as (typeof keys)[number]))
+      throw new TypeError("Unknown image theme effect suppression field.");
+    const flag = Object.getOwnPropertyDescriptor(value, key)!;
+    if (!("value" in flag))
+      throw new TypeError("Image theme effect suppression flags must be data fields.");
+    if (flag.value !== true)
+      throw new TypeError("Image theme effect suppression flags must be explicitly true.");
+  }
+  const result: ImageThemeEffectSuppression = {};
+  // A fixed order keeps transform equality independent of caller property order.
+  for (const key of keys) if (Object.hasOwn(value, key)) result[key] = true;
+  return Object.keys(result).length ? result : undefined;
+}
 
 export function normalizeImageAppearance(
   value: ImageAppearance | undefined,
@@ -19,6 +62,7 @@ export function normalizeImageAppearance(
   if (value === undefined) return undefined;
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new TypeError("Invalid image appearance.");
+  const suppressThemeEffects = normalizeThemeEffectSuppression(value);
   const result: ImageAppearance = {};
   const bounds = {
     opacity: [0, 1, 1],
@@ -68,5 +112,6 @@ export function normalizeImageAppearance(
   if (value.reflection !== undefined && typeof value.reflection !== "boolean")
     throw new TypeError("Invalid image reflection.");
   if (value.reflection) result.reflection = true;
+  if (suppressThemeEffects) result.suppressThemeEffects = suppressThemeEffects;
   return Object.keys(result).length ? result : undefined;
 }

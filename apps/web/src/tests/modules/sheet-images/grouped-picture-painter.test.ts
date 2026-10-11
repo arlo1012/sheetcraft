@@ -18,6 +18,8 @@ import {
   paintFramedPictureContent,
   paintGroupedPictureContent,
 } from "../../../modules/sheet-images/framed-picture-painter";
+import { resetPictureAppearance } from "../../../modules/sheet-images/picture-appearance-edit";
+import { assertPicturePaintSupport } from "../../../modules/sheet-images/picture-paint-effects";
 
 function canvas() {
   return {
@@ -102,6 +104,40 @@ function calls(context: ReturnType<typeof canvas>) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("genuine grouped leaf content kernel", () => {
+  test("each owned leaf resolves its suppression without changing source-free owners or siblings", () => {
+    const f = fixture();
+    f.picture.transform = { appearance: resetPictureAppearance() };
+    const sibling = { ...f.picture, id: "inherited-sibling", transform: undefined };
+    f.group.members.push(sibling);
+    const before = structuredClone(f.group);
+    const effects = { ...DEFAULT_WORKBOOK_THEME.effects, reflection: true, bevel: true };
+    expect(() => assertPicturePaintSupport([f.group], effects, f.metrics)).not.toThrow();
+    f.draw(undefined, effects);
+    expect(f.context.drawImage).toHaveBeenCalledOnce();
+    expect(f.context.strokeRect).not.toHaveBeenCalled();
+    expect(f.context.stroke).not.toHaveBeenCalled();
+    const inheritedContext = canvas();
+    paintGroupedPictureContent(
+      inheritedContext as unknown as CanvasRenderingContext2D,
+      f.source,
+      sibling,
+      f.geometry(),
+      effects,
+    );
+    expect(inheritedContext.drawImage).toHaveBeenCalledTimes(2);
+    expect(inheritedContext.strokeRect).toHaveBeenCalledOnce();
+    expect(inheritedContext.stroke).toHaveBeenCalledTimes(2);
+    expect(f.group).toEqual(before);
+  });
+  test("owned preflight validates the original theme even when every effect is suppressed", () => {
+    const f = fixture();
+    f.picture.transform = { appearance: resetPictureAppearance() };
+    const getter = vi.fn(() => false);
+    const effects = { ...DEFAULT_WORKBOOK_THEME.effects };
+    Object.defineProperty(effects, "reflection", { get: getter, enumerable: true });
+    expect(() => assertPicturePaintSupport([f.group], effects, f.metrics)).toThrow("data fields");
+    expect(getter).not.toHaveBeenCalled();
+  });
   test.each([false, true].flatMap((flipX) => [false, true].map((flipY) => ({ flipX, flipY }))))(
     "matches standalone crop, arbitrary rotation, annotations and appearance for flips $flipX/$flipY",
     ({ flipX, flipY }) => {

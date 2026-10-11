@@ -130,6 +130,29 @@ function reveal(wrapper: VueWrapper, label: string) {
   return button.trigger("click");
 }
 describe("picture format pane concrete four-page form", () => {
+  test("the supplied theme-inheritance line choice reaches the owner exactly once while disabled or unknown modes do not", async () => {
+    const { wrapper, onIntent } = fixture({
+      options: {
+        lineMode: [
+          { value: "inherit", label: "Theme outline" },
+          { value: "none", label: "No line" },
+          { value: "solid", label: "Local solid" },
+          { value: "gradient", label: "Gradient", disabled: true },
+        ],
+      },
+    });
+    const choice = wrapper
+      .findAllComponents(Select)
+      .find((item) => item.attributes("data-picture-format-field") === "lineMode")!;
+    choice.vm.$emit("change", "gradient");
+    choice.vm.$emit("change", "unknown");
+    expect(onIntent).not.toHaveBeenCalled();
+    choice.vm.$emit("change", "inherit");
+    await flushPromises();
+    expect(onIntent).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ type: "set-field", field: "lineMode", value: "inherit" }),
+    );
+  });
   test("renders the four actual tabs and all crop/effect/property fields with distinct reset controls", () => {
     const { wrapper } = fixture();
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([

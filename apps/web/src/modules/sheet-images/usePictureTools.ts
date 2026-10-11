@@ -1,3 +1,4 @@
+import { patchPictureAppearance, resetPictureAppearance } from "./picture-appearance-edit";
 import {
   arePictureObjectsEqual,
   isFramedPictureObject,
@@ -421,7 +422,9 @@ export function usePictureTools(options: {
       const accepted = updateMany(
         requireStandalonePictures(targets).map((image): FloatingImage => {
           const appearance = normalizeImageTransform({
-            appearance: patch ? { ...image.transform?.appearance, ...patch } : undefined,
+            appearance: patch
+              ? patchPictureAppearance(image.transform?.appearance, patch)
+              : resetPictureAppearance(),
           })?.appearance;
           if (isFramedPictureObject(image))
             return {

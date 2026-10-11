@@ -5,7 +5,11 @@ export {
   type ImageAnnotationPoint,
 } from "./image-annotations.js";
 import { normalizeImageAppearance, type ImageAppearance } from "./image-appearance.js";
-export { normalizeImageAppearance, type ImageAppearance } from "./image-appearance.js";
+export {
+  normalizeImageAppearance,
+  type ImageAppearance,
+  type ImageThemeEffectSuppression,
+} from "./image-appearance.js";
 export type ImageCrop = { x: number; y: number; width: number; height: number };
 export type ImageTransform = {
   annotations?: ImageAnnotation[];

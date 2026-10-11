@@ -124,6 +124,8 @@ export const pictureFormatZhCN = {
     perspectiveDeg: "透视角度",
     distanceFromGroundPt: "距地面距离",
     capabilityReasons: {
+      inheritedLine: "当前描边继承工作簿主题。选择“本地实线”后可独立设置颜色和宽度。",
+      compositeLine: "这些控件只修改本地描边；另有一层主题描边，修改时会保留。",
       unsupportedFeature: "暂不支持此项设置。",
       missingSelection: "请选择单张图片以编辑此项设置。",
       missingMetrics: "此项设置所需的尺寸信息不可用。",
@@ -133,6 +135,9 @@ export const pictureFormatZhCN = {
       protectedObject: "此图片受保护，无法编辑。",
     },
     options: {
+      inheritShadow: "使用主题阴影",
+      inheritLine: "使用主题描边",
+      localLine: "本地实线",
       noShadow: "无阴影",
       softShadow: "柔和阴影",
       hardShadow: "硬边阴影",

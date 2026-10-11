@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { resetPictureAppearance } from "../../../modules/sheet-images/picture-appearance-edit";
 import { describe, expect, test, vi } from "vitest";
 import {
   createWorkbook,
@@ -101,9 +102,21 @@ describe("picture tools", () => {
     expect(f.sheet.floatingImages).toEqual([
       {
         ...a,
-        transform: { crop: a.transform!.crop, rotation: 90, annotations: a.transform!.annotations },
+        transform: {
+          crop: a.transform!.crop,
+          rotation: 90,
+          annotations: a.transform!.annotations,
+          appearance: resetPictureAppearance(),
+        },
       },
-      { ...b, transform: { flipHorizontal: true, annotations: b.transform!.annotations } },
+      {
+        ...b,
+        transform: {
+          flipHorizontal: true,
+          annotations: b.transform!.annotations,
+          appearance: resetPictureAppearance(),
+        },
+      },
       untouched,
     ]);
     expect(a.transform!.appearance).toEqual({ opacity: 0.5 });

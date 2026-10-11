@@ -7,7 +7,7 @@
 export type PictureFormatTab = "fill-line" | "effects" | "size-properties" | "picture";
 export type PictureFormatLengthUnit = "in" | "cm" | "pt";
 export type PictureFormatAnchor = "move-size" | "move" | "fixed";
-export type PictureFormatLineMode = "none" | "solid" | "gradient";
+export type PictureFormatLineMode = "inherit" | "none" | "solid" | "gradient";
 export interface PictureFormatOwner {
   workbookId: string;
   sheetId: string;

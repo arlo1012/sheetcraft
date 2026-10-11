@@ -10,7 +10,11 @@ import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import { paintImagePresentation } from "../../shared/images/imageAppearance";
-import { hasVisibleDrawingThemeEffects, type DrawingThemeEffects } from "./drawing-theme-effects";
+import {
+  hasVisibleDrawingThemeEffects,
+  resolvePictureThemeEffects,
+  type DrawingThemeEffects,
+} from "./drawing-theme-effects";
 import { paintFramedPictureContent, paintGroupedPictureContent } from "./framed-picture-painter";
 import { getPictureViewportFragments } from "./picture-viewport-fragments";
 import {
@@ -54,6 +58,7 @@ function paintImage(
   transform: ImageTransform | undefined,
   effects: DrawingThemeEffects | undefined,
 ): void {
+  effects = resolvePictureThemeEffects(transform?.appearance, effects);
   context.save();
   try {
     applyDrawingThemeShadow(context, effects);

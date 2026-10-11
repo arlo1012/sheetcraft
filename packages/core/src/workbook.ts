@@ -119,6 +119,7 @@ export {
   type ImageCrop,
   type ImageTransform,
   type ImageAppearance,
+  type ImageThemeEffectSuppression,
   type ImageAnnotation,
   type ImageAnnotationPoint,
   normalizeImageAnnotations,

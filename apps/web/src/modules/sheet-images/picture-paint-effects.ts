@@ -20,7 +20,7 @@ import {
   type ResolvedPictureGroupChild,
 } from "@sheetcraft/core/picture-group-layout";
 import type { Rect } from "@sheetcraft/sheet-engine/geometry";
-import type { DrawingThemeEffects } from "./drawing-theme-effects";
+import { resolvePictureThemeEffects, type DrawingThemeEffects } from "./drawing-theme-effects";
 
 /** A known appearance/layout mismatch that live actions can report explicitly. */
 export class UnsupportedPicturePaintError extends Error {
@@ -37,11 +37,12 @@ export function assertPicturePaintSupport(
   effects?: DrawingThemeEffects,
   metrics?: PictureSheetMetrics,
 ): void {
+  assertDrawingThemeEffects(effects);
   const canonical = normalizePictureObjectCollection(images);
   for (const image of canonical) {
     if (isFramedPictureObject(image)) {
       assertSourceBearingPicturePaintSupport(image, effects);
-      if (effects?.reflection && metrics)
+      if (resolvePictureThemeEffects(image.transform?.appearance, effects)?.reflection && metrics)
         assertPictureReflectionGeometry(resolvePictureFrame(image.frame, metrics));
     } else if (isPictureGroup(image)) {
       // Hidden roots and descendants still belong to the persisted paint contract.
@@ -52,7 +53,11 @@ export function assertPicturePaintSupport(
         const visit = (children: readonly ResolvedPictureGroupChild[]): void => {
           for (const child of children) {
             if ("members" in child) visit(child.members);
-            else if (child.layout) assertPictureReflectionGeometry(child.layout);
+            else if (
+              child.layout &&
+              resolvePictureThemeEffects(child.node.transform?.appearance, effects)?.reflection
+            )
+              assertPictureReflectionGeometry(child.layout);
           }
         };
         visit(resolvePictureGroup(image, metrics).members);
@@ -67,6 +72,11 @@ export function assertSourceBearingPicturePaintSupport(
   effects?: DrawingThemeEffects,
 ): void {
   if (picture.transform?.appearance?.reflection) throw new UnsupportedPicturePaintError();
+  assertDrawingThemeEffects(effects);
+}
+
+/** Validate inherited data before a per-picture override can suppress its values. */
+function assertDrawingThemeEffects(effects: DrawingThemeEffects | undefined): void {
   if (!effects) return;
   const descriptors = Object.getOwnPropertyDescriptors(effects);
   const allowed = new Set([

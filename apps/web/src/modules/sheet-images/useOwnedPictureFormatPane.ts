@@ -1,5 +1,15 @@
 import { computed, getCurrentScope, onScopeDispose, ref, watch } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
+import {
+  getDrawingThemeEffects,
+  resolvePictureThemeEffects,
+  type DrawingThemeEffects,
+} from "./drawing-theme-effects";
+import {
+  editPictureOwnAppearance,
+  resetPictureAppearance,
+  type PictureOwnAppearanceEdit,
+} from "./picture-appearance-edit";
 import { assertImagePixelBudget } from "../image-assets/imageAssetValidation";
 import type { PictureIntrinsicSize } from "./usePictureIntrinsicSize";
 import {
@@ -25,6 +35,8 @@ import {
   isGroupedPicture,
   isGroupedGroup,
   isPictureGroup,
+  normalizePictureGroup,
+  findPictureGroupNode,
   type PictureGroupNode,
   type PictureGroupPath,
 } from "@sheetcraft/core/picture-group";
@@ -44,6 +56,7 @@ import {
 } from "@sheetcraft/core/picture-frame";
 import {
   areFloatingImageCollectionsEqual,
+  normalizeImageTransform,
   MAX_FLOATING_IMAGE_SIZE,
   MIN_FLOATING_IMAGE_SIZE,
   type FloatingImage,
@@ -160,6 +173,8 @@ export interface OwnedPictureFormatPaneOptions {
   getIntrinsicSize?: (assetId: string) => PictureIntrinsicSize | undefined;
   getMissingIntrinsicReason?: () => string;
   getOriginalSizeLimitReason?: () => string;
+  getInheritedLineReason?: () => string;
+  getCompositeLineReason?: () => string;
 }
 type Lease = {
   workbook: Workbook;
@@ -177,6 +192,8 @@ type Lease = {
   root: FloatingImage;
   node: FloatingImage | PictureGroupNode;
   world: ResolvedPictureLayout | undefined;
+  themeEffects: DrawingThemeEffects | undefined;
+  themeSignature: string;
   intrinsic: PictureIntrinsicSize | undefined;
   intrinsicDimensions: Readonly<{ width: number; height: number; url: string }> | undefined;
 };
@@ -224,6 +241,12 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       return;
     }
   }
+  function currentThemeEffects() {
+    return getDrawingThemeEffects(options.getWorkbook().theme);
+  }
+  function themeSignature(): string {
+    return JSON.stringify(currentThemeEffects()) ?? "no-theme-effects";
+  }
   function forestSignature(): string {
     if (options.isOpen?.() === false) return "closed-picture-format-pane";
     try {
@@ -247,13 +270,17 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       forestSignature,
       () => options.isOpen?.() ?? true,
       selectedIntrinsic,
+      currentThemeEffects,
+      themeSignature,
     ],
     (next, previous) => {
       if (mutation) {
         if (
           next.slice(0, 8).some((value, index) => value !== previous[index]) ||
           next[11] !== previous[11] ||
-          next[12] !== previous[12]
+          next[12] !== previous[12] ||
+          next[13] !== previous[13] ||
+          next[14] !== previous[14]
         )
           mutation.boundaryChanged = true;
       } else clear();
@@ -347,6 +374,8 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       root,
       node,
       world,
+      themeEffects: currentThemeEffects(),
+      themeSignature: themeSignature(),
       intrinsic,
       intrinsicDimensions: intrinsic
         ? { width: intrinsic.width, height: intrinsic.height, url: intrinsic.url }
@@ -369,7 +398,9 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         : lease.selectedPath !== null && sameIds(path, lease.selectedPath)) &&
       context === lease.context &&
       context?.metrics === lease.metrics &&
-      context?.layout === lease.layout
+      context?.layout === lease.layout &&
+      currentThemeEffects() === lease.themeEffects &&
+      themeSignature() === lease.themeSignature
     );
   }
   function sameIntrinsic(lease: Lease): boolean {
@@ -427,7 +458,29 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       !isPictureGroup(node) && !isGroupedGroup(node)
         ? getPictureFormatCropState(node, world, context?.metrics)
         : undefined;
-    if (sourceBearing) values.altDescription = node.altText;
+    const appearance = sourceBearing ? node.transform?.appearance : undefined;
+    const effectiveTheme = resolvePictureThemeEffects(appearance, lease.themeEffects);
+    const ownLine = appearance?.border;
+    const inheritedLine = (effectiveTheme?.outlineWidth ?? 0) > 0;
+    if (sourceBearing) {
+      values.altDescription = node.altText;
+      values.lineMode = ownLine
+        ? "solid"
+        : appearance?.suppressThemeEffects?.outline
+          ? "none"
+          : "inherit";
+      values.shadowPreset =
+        appearance?.shadow ?? (appearance?.suppressThemeEffects?.shadow ? "none" : "inherit");
+      if (ownLine) {
+        values.lineColor = ownLine.color;
+        values.lineWidthPt = ownLine.width * POINTS_PER_PIXEL;
+        values.lineTransparencyPercent = 0;
+      } else if (inheritedLine) {
+        values.lineColor = "#364E6E";
+        values.lineWidthPt = effectiveTheme!.outlineWidth * POINTS_PER_PIXEL;
+        values.lineTransparencyPercent = 28;
+      }
+    }
     if (cropState) {
       Object.assign(values, pictureFormatCropValues(cropState));
       values.relativeToOriginalSize = relativeToOriginalSize.value;
@@ -447,6 +500,28 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       values.anchor = anchorValue(root.frame.anchor.mode);
     else if (!inner) values.anchor = "move";
     if (!options.isBusy() && canUseSheetPermission(lease.sheet, "editObjects")) {
+      if (sourceBearing) {
+        capabilities.fields.lineMode = { enabled: true };
+        capabilities.fields.shadowPreset = { enabled: true };
+        capabilities.resets!["reset-picture"] = { enabled: true };
+        const inheritedReason =
+          options.getInheritedLineReason?.() ??
+          "This line is inherited. Choose a local solid line to edit it independently.";
+        const compositeReason =
+          options.getCompositeLineReason?.() ??
+          "These controls edit the local line; the separate theme outline remains visible.";
+        capabilities.fields.lineColor = ownLine
+          ? { enabled: true, ...(inheritedLine ? { reason: compositeReason } : {}) }
+          : { enabled: false, reason: inheritedReason };
+        capabilities.fields.lineWidthPt = ownLine
+          ? {
+              enabled: true,
+              min: 0,
+              max: 15,
+              ...(inheritedLine ? { reason: compositeReason } : {}),
+            }
+          : { enabled: false, reason: inheritedReason };
+      }
       if (geometry) {
         const size = {
           enabled: true,
@@ -574,6 +649,8 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
   ): FloatingImage[] {
     const { root, node, path, context, world } = lease;
     const inner = path.length > 1;
+    if (["lineMode", "lineColor", "lineWidthPt", "shadowPreset"].includes(intent.field))
+      return planAppearance(lease, intent);
     if (isPictureFormatCropField(intent.field)) return planCrop(lease, intent);
     if (intent.field === "scaleWidthPercent" || intent.field === "scaleHeightPercent")
       return planScale(lease, intent);
@@ -673,6 +750,51 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         },
       } as FloatingImage;
     } else throw new TypeError("Unsupported root field.");
+    const forest = normalizePictureObjectCollection(
+      lease.forest.map((image) => (image.id === root.id ? next : image)),
+    );
+    validateForest(forest, context);
+    return forest;
+  }
+  function planAppearance(lease: Lease, intent: PictureFormatIntent): FloatingImage[] {
+    const { node, root, path, context } = lease;
+    if (isPictureGroup(node) || isGroupedGroup(node))
+      throw new TypeError("Appearance belongs to a source-bearing picture.");
+    const appearance =
+      intent.type === "reset-picture"
+        ? resetPictureAppearance()
+        : intent.type === "set-field"
+          ? editPictureOwnAppearance(node.transform?.appearance, {
+              field: intent.field,
+              value: intent.value,
+            } as PictureOwnAppearanceEdit)
+          : undefined;
+    let next: FloatingImage;
+    if (path.length > 1) {
+      if (!isPictureGroup(root)) throw new TypeError("Missing appearance owner tree.");
+      const copy = normalizePictureGroup(root),
+        target = findPictureGroupNode(copy, path)?.node;
+      if (!target || !isGroupedPicture(target)) throw new TypeError("Missing appearance leaf.");
+      const normalized = normalizeImageTransform({
+        annotations: target.transform?.annotations,
+        appearance,
+      });
+      target.transform = normalized
+        ? { appearance: normalized.appearance, annotations: normalized.annotations }
+        : undefined;
+      next = copy;
+    } else {
+      if (isPictureGroup(root)) throw new TypeError("A group has no own image appearance.");
+      const normalized = normalizeImageTransform({ ...root.transform, appearance });
+      next = isFramedPictureObject(root)
+        ? {
+            ...root,
+            transform: normalized
+              ? { appearance: normalized.appearance, annotations: normalized.annotations }
+              : undefined,
+          }
+        : { ...root, transform: normalized };
+    }
     const forest = normalizePictureObjectCollection(
       lease.forest.map((image) => (image.id === root.id ? next : image)),
     );
@@ -808,7 +930,8 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       mutation ||
       (intent.type !== "set-field" &&
         intent.type !== "reset-crop" &&
-        intent.type !== "reset-size") ||
+        intent.type !== "reset-size" &&
+        intent.type !== "reset-picture") ||
       !samePictureFormatOwner(intent.owner, snapshot.owner) ||
       intent.baseRevision !== snapshot.revision ||
       typeof intent.intentId !== "string" ||
@@ -861,7 +984,12 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         acceptedIntentId.value = intent.intentId;
         return true;
       }
-      const next = intent.type === "set-field" ? plan(lease, intent) : planCrop(lease, intent);
+      const next =
+        intent.type === "set-field"
+          ? plan(lease, intent)
+          : intent.type === "reset-picture"
+            ? planAppearance(lease, intent)
+            : planCrop(lease, intent);
       if (!current(lease)) {
         clear();
         return false;

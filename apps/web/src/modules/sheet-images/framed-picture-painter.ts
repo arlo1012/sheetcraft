@@ -15,7 +15,11 @@ import {
 } from "@sheetcraft/core/picture-frame";
 import { imageAppearanceFilter, imageAppearanceSource } from "../../shared/images/imageAppearance";
 import { paintImageAnnotations } from "../../shared/images/imageAnnotations";
-import { hasVisibleDrawingThemeEffects, type DrawingThemeEffects } from "./drawing-theme-effects";
+import {
+  hasVisibleDrawingThemeEffects,
+  resolvePictureThemeEffects,
+  type DrawingThemeEffects,
+} from "./drawing-theme-effects";
 import {
   applyDrawingThemeShadow,
   assertSourceBearingPicturePaintSupport,
@@ -133,6 +137,7 @@ function paintSourceBearingPictureContent(
   // Appearance reflection changes legacy layout, unlike the theme's full local
   // mirrored clone. Reject it even for hidden leaves before preparation.
   assertSourceBearingPicturePaintSupport(normalized, effects);
+  effects = resolvePictureThemeEffects(normalized.transform?.appearance, effects);
   if (normalized.hidden || geometry.collapsed || !geometry.sourceRect) return;
   const appearance = normalized.transform?.appearance;
   if (effects?.reflection) assertPictureReflectionGeometry(geometry);

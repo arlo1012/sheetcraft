@@ -1,4 +1,5 @@
 import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import { formatFormulaAddress } from "@sheetcraft/core/formula";
 import { requireLegacyPicture } from "../sheet-images/picture-document-support";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { XlsxWorkerFailure } from "./workbookXlsxWorker";
@@ -65,7 +66,18 @@ function extensionFor(mimeType: string): EncodedImage | undefined {
 }
 
 export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
-  for (const sheet of getWorkbookSheets(workbook))
+  const assertAppearance = (transform: ImageTransform | undefined, ownerLocation: string): void => {
+    if (!transform?.appearance || !Object.hasOwn(transform.appearance, "suppressThemeEffects"))
+      return;
+    const location = `${ownerLocation}.transform.appearance.suppressThemeEffects`;
+    throw new XlsxWorkerFailure(
+      `Picture theme-effect suppression is not yet supported by XLSX export at ${location}.`,
+      {
+        issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [location] }],
+      },
+    );
+  };
+  for (const sheet of getWorkbookSheets(workbook)) {
     for (const image of sheet.floatingImages) {
       if (isFramedPictureObject(image) || isPictureGroup(image)) {
         const location = `${sheet.name}.floatingImages[${JSON.stringify(image.id)}].frame`;
@@ -78,7 +90,21 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
           },
         );
       }
+      assertAppearance(
+        image.transform,
+        `${sheet.name}.floatingImages[${JSON.stringify(image.id)}]`,
+      );
     }
+    for (const [key, cell] of sheet.cells) {
+      if (cell.content?.kind !== "image") continue;
+      const [row, column] = key.split(":").map(Number);
+      if (row === undefined || column === undefined) continue;
+      assertAppearance(
+        cell.content.image.transform,
+        `${sheet.name}!${formatFormulaAddress({ row, column })}`,
+      );
+    }
+  }
 }
 
 function collectImageReferences(snapshot: WorkbookSnapshot): readonly ImageReference[] {

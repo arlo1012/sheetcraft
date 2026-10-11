@@ -92,7 +92,9 @@ describe("picture format message coverage", () => {
           ? /未旋转布局框在工作表中的坐标/
           : /worksheet coordinates of the unrotated layout box/,
       );
-      expect(labels.sizeHelp).toMatch(locale === "zh-CN" ? /图片自身轴线/ : /picture's own axes/);
+      expect(labels.sizeHelp).toMatch(
+        locale === "zh-CN" ? /图片自身轴线/ : /picture[’']s own axes/,
+      );
     });
 
     test(`${locale} has distinct scopes for all five reset actions`, () => {
@@ -125,11 +127,16 @@ describe("picture format message coverage", () => {
       expect(messages.pictureFormat.keepTextFlatUnavailable).toMatch(
         locale === "zh-CN" ? /图片不适用/ : /not applicable to pictures/,
       );
-      expect(Object.keys(messages.pictureFormat.options)).toEqual([
-        "noShadow",
-        "softShadow",
-        "hardShadow",
-      ]);
+      expect(Object.keys(messages.pictureFormat.options).sort()).toEqual(
+        [
+          "noShadow",
+          "softShadow",
+          "hardShadow",
+          "inheritShadow",
+          "inheritLine",
+          "localLine",
+        ].sort(),
+      );
     });
   }
 

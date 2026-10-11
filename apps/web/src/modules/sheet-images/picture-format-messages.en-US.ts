@@ -126,6 +126,10 @@ export const pictureFormatEnUS = {
     perspectiveDeg: "Perspective",
     distanceFromGroundPt: "Distance from ground",
     capabilityReasons: {
+      inheritedLine:
+        "This line follows the workbook theme. Choose Local solid line to set an independent color and width.",
+      compositeLine:
+        "These controls edit the local line. A separate theme outline is also visible and is retained.",
       unsupportedFeature: "This setting isn't supported yet.",
       missingSelection: "Select a single picture to edit this setting.",
       missingMetrics: "The dimensions needed for this setting aren't available.",
@@ -135,6 +139,9 @@ export const pictureFormatEnUS = {
       protectedObject: "This picture is protected from editing.",
     },
     options: {
+      inheritShadow: "Use theme shadow",
+      inheritLine: "Use theme outline",
+      localLine: "Local solid line",
       noShadow: "No shadow",
       softShadow: "Soft shadow",
       hardShadow: "Hard shadow",

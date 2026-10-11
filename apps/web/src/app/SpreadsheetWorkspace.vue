@@ -1879,6 +1879,8 @@ const pictureFormatPane = useOwnedPictureFormatPane({
         : "pictureFormat.originalSizeUnavailable",
     ),
   getOriginalSizeLimitReason: () => t("pictureFormat.originalSizeTooLarge"),
+  getInheritedLineReason: () => t("pictureFormat.capabilityReasons.inheritedLine"),
+  getCompositeLineReason: () => t("pictureFormat.capabilityReasons.compositeLine"),
 });
 function pictureFormatLabel(key: PictureFormatLabelKey): string {
   return t(`pictureFormat.${key}`);
@@ -4363,6 +4365,20 @@ const gridInert = computed(
         :snapshot="pictureFormatPane.snapshot.value"
         :capabilities="pictureFormatPane.capabilities.value"
         :on-intent="pictureFormatPane.onIntent"
+        :options="{
+          lineMode: [
+            { value: 'inherit', label: t('pictureFormat.options.inheritLine') },
+            { value: 'none', label: t('pictureFormat.none') },
+            { value: 'solid', label: t('pictureFormat.options.localLine') },
+            { value: 'gradient', label: t('pictureFormat.gradient'), disabled: true },
+          ],
+          shadowPreset: [
+            { value: 'inherit', label: t('pictureFormat.options.inheritShadow') },
+            { value: 'none', label: t('pictureFormat.options.noShadow') },
+            { value: 'soft', label: t('pictureFormat.options.softShadow') },
+            { value: 'hard', label: t('pictureFormat.options.hardShadow') },
+          ],
+        }"
         :t="pictureFormatLabel"
         @close="closeOwnedPictureFormat"
       />
