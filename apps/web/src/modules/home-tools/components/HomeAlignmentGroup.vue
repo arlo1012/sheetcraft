@@ -46,47 +46,49 @@ function toggleWrapText(state: ToggleStyleState): void {
     :aria-disabled="disabled"
     :title="disabled ? t('format.selectionTooLarge') : undefined"
   >
-    <div class="home-alignment-group__row" data-ribbon-row="1">
-      <div class="home-alignment-group__leading">
-        <VerticalAlignmentControls
-          :state="state.verticalAlign"
+    <div class="home-alignment-group__controls">
+      <div class="home-alignment-group__row" data-ribbon-row="1">
+        <div class="home-alignment-group__leading">
+          <VerticalAlignmentControls
+            :state="state.verticalAlign"
+            :disabled="disabled"
+            @apply-style="emit('applyStyle', $event)"
+          />
+          <IndentationControls
+            :state="state.indent"
+            :disabled="disabled"
+            @adjust-indent="emit('adjustIndent', $event)"
+          />
+        </div>
+        <div class="home-alignment-group__action">
+          <RibbonButton
+            full-width
+            :label="t('ribbon.wrapText')"
+            :text="t('ribbon.wrap')"
+            :disabled="disabled"
+            :pressed="ariaPressed(state.wrapText)"
+            data-ribbon-action="wrap-text"
+            @activate="toggleWrapText(state.wrapText)"
+          >
+            <TextWrap aria-hidden="true" />
+          </RibbonButton>
+        </div>
+      </div>
+      <div class="home-alignment-group__row" data-ribbon-row="2">
+        <HorizontalAlignmentControls
+          :state="state"
           :disabled="disabled"
           @apply-style="emit('applyStyle', $event)"
         />
-        <IndentationControls
-          :state="state.indent"
-          :disabled="disabled"
-          @adjust-indent="emit('adjustIndent', $event)"
-        />
-      </div>
-      <div class="home-alignment-group__action">
-        <RibbonButton
-          full-width
-          :label="t('ribbon.wrapText')"
-          :text="t('ribbon.wrap')"
-          :disabled="disabled"
-          :pressed="ariaPressed(state.wrapText)"
-          data-ribbon-action="wrap-text"
-          @activate="toggleWrapText(state.wrapText)"
-        >
-          <TextWrap aria-hidden="true" />
-        </RibbonButton>
       </div>
     </div>
-    <div class="home-alignment-group__row" data-ribbon-row="2">
-      <HorizontalAlignmentControls
-        :state="state"
+    <div class="home-alignment-group__merge">
+      <MergeCellsMenu
+        :state="props.mergeState"
         :disabled="disabled"
-        @apply-style="emit('applyStyle', $event)"
+        @merge="emit('merge', $event)"
+        @unmerge="emit('unmerge')"
       />
-      <div class="home-alignment-group__action">
-        <MergeCellsMenu
-          :state="props.mergeState"
-          :disabled="disabled"
-          @merge="emit('merge', $event)"
-          @unmerge="emit('unmerge')"
-        />
-      </div>
     </div>
     <RibbonDialogLauncher
       :label="`${t('cellFormat.title')} · ${t('cellFormat.alignment')}`"
@@ -101,16 +103,16 @@ function toggleWrapText(state: ToggleStyleState): void {
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
 
 .home-alignment-group {
-  @include ribbon.compact;
+  @include ribbon.columns;
   @include ribbon.dialog-launcher-anchor;
-  grid-template-columns: max-content max-content;
-  column-gap: 4px;
+  gap: 4px;
+
+  &__controls {
+    @include ribbon.two-rows;
+  }
 
   &__row {
     @include ribbon.row;
-    display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: subgrid;
     gap: 4px;
   }
 
@@ -122,6 +124,12 @@ function toggleWrapText(state: ToggleStyleState): void {
   &__action {
     display: grid;
     min-width: 72px;
+  }
+
+  &__merge {
+    display: flex;
+    align-self: stretch;
+    min-width: 48px;
   }
 }
 </style>

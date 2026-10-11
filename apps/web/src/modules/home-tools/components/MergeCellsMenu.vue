@@ -52,7 +52,9 @@ const menuDisabled = computed(
       !isModeAvailable("across") &&
       !props.state.canUnmerge),
 );
-const mainDisabled = computed(() => props.disabled || !isModeAvailable("all"));
+const mainDisabled = computed(
+  () => props.disabled || (!props.state.canUnmerge && !isModeAvailable("all")),
+);
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef,
@@ -100,6 +102,11 @@ function unmerge(): void {
   closeAll(true);
 }
 
+function activateMain(): void {
+  if (props.state.canUnmerge) unmerge();
+  else merge("all", false);
+}
+
 function onMenuKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
     event.preventDefault();
@@ -122,16 +129,18 @@ function onMenuFocusin(event: FocusEvent): void {
   <span v-bind="$attrs" class="ribbon-menu-tool ribbon-menu-tool--full-width">
     <RibbonSplitButton
       ref="splitActionRef"
-      :label="t('ribbon.mergeCells')"
+      variant="tall"
+      :label="state.canUnmerge ? t('ribbon.unmergeCells') : t('ribbon.mergeCells')"
       :menu-label="t('ribbon.moreOptions', { tool: t('ribbon.mergeCells') })"
       :text="t('ribbon.merge')"
       :disabled="mainDisabled"
+      :pressed="state.canUnmerge"
       :menu-disabled="menuDisabled"
       :expanded="open"
       :menu-id="menuId"
       data-ribbon-action="merge-cells"
       full-width
-      @activate="merge('all', false)"
+      @activate="activateMain"
       @toggle-menu="toggleMenu"
       @menu-keydown="onTriggerKeydown"
     >

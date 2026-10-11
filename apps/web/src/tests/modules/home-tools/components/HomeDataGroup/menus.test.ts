@@ -134,11 +134,9 @@ describe("Home data tool menus", () => {
     await sortTrigger.trigger("click");
     await menu().get('[data-sort-direction="descending"]').trigger("keydown", { key: "Enter" });
     expect(sort.emitted("sort")).toEqual([["descending"]]);
-
-
   });
 
-  test("uses a fixed all-merge main action and exposes every merge mode", async () => {
+  test("toggles merged selections from the main action and exposes every merge mode", async () => {
     const wrapper = mountMenu(MergeCellsMenu, {
       disabled: false,
       state: {
@@ -157,6 +155,7 @@ describe("Home data tool menus", () => {
     const control = wrapper.get('[data-ribbon-action="merge-cells"]');
     const main = control.get("[data-ribbon-split-main]");
     const menuTrigger = control.get("[data-ribbon-split-menu]");
+    expect(main.attributes("aria-pressed")).toBe("false");
     await main.trigger("click");
     expect(wrapper.emitted("merge")).toEqual([["all"]]);
     await menuTrigger.trigger("click");
@@ -197,10 +196,14 @@ describe("Home data tool menus", () => {
     expect(menuTrigger.attributes("aria-expanded")).toBe("false");
 
     await wrapper.setProps({ state: { canMerge: false, canUnmerge: true } });
-    expect((main.element as HTMLButtonElement).disabled).toBe(true);
-    expect((menuTrigger.element as HTMLButtonElement).disabled).toBe(false);
+    expect(main.attributes("aria-pressed")).toBe("true");
+    expect(main.attributes("aria-disabled")).toBe("false");
+    expect(menuTrigger.attributes("aria-disabled")).toBe("false");
+    await main.trigger("click");
+    expect(wrapper.emitted("unmerge")).toEqual([[]]);
+    expect(wrapper.emitted("merge")).toEqual([["all"], ["center"], ["same-rows"]]);
     await menuTrigger.trigger("keydown", { key: "ArrowDown" });
     await menu().get('[data-merge-action="unmerge"]').trigger("keydown", { key: " " });
-    expect(wrapper.emitted("unmerge")).toEqual([[]]);
+    expect(wrapper.emitted("unmerge")).toEqual([[], []]);
   });
 });
