@@ -15,7 +15,13 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import type { PictureAlignment, PictureLayerAction } from "../usePictureTools";
-const props = defineProps<{ disabled: boolean; count: number; grouped: boolean }>();
+const props = defineProps<{
+  disabled: boolean;
+  count: number;
+  grouped: boolean;
+  groupDisabled?: boolean;
+  alignmentDisabled?: boolean;
+}>();
 const emit = defineEmits<{
   group: [];
   ungroup: [];
@@ -31,9 +37,10 @@ const menuId = `picture-align-${useId()}`;
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef,
-  disabled: computed(() => props.disabled),
+  disabled: computed(() => props.disabled || !!props.alignmentDisabled),
 });
 function align(action: PictureAlignment): void {
+  if (props.disabled || props.alignmentDisabled) return;
   emit("align", action);
   dismiss("programmatic", true);
 }
@@ -44,14 +51,14 @@ function align(action: PictureAlignment): void {
       <RibbonButton
         :label="t('picture.group')"
         :text="t('picture.group')"
-        :disabled="disabled || count < 2"
+        :disabled="disabled || groupDisabled || count < 2"
         @activate="emit('group')"
         ><Group
       /></RibbonButton>
       <RibbonButton
         :label="t('picture.ungroup')"
         :text="t('picture.ungroup')"
-        :disabled="disabled || !grouped"
+        :disabled="disabled || groupDisabled || !grouped"
         @activate="emit('ungroup')"
         ><Ungroup
       /></RibbonButton>
@@ -61,7 +68,7 @@ function align(action: PictureAlignment): void {
       variant="tall"
       :label="t('picture.align')"
       :text="t('picture.align')"
-      :disabled="disabled"
+      :disabled="disabled || alignmentDisabled"
       :expanded="open"
       :menu-id="menuId"
       @activate="toggleMenu"

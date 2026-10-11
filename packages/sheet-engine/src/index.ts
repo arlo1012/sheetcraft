@@ -4,6 +4,7 @@ export * from "./extent.js";
 export * from "./floating-image-layout.js";
 export * from "./floating-image-transform.js";
 export * from "./picture-frame-layout.js";
+export * from "./picture-frame-numeric.js";
 export * from "./floating-image-selection.js";
 export * from "./fill-selection.js";
 export * from "./frozen-layout.js";

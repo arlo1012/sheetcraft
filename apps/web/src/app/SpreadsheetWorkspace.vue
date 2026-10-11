@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { getCellContent, getCellStyle } from "@sheetcraft/core/workbook";
 import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
 import { useWordProofreading } from "../modules/text-proofreading/useWordProofreading";
@@ -86,6 +85,7 @@ import { usePictureTools } from "../modules/sheet-images/usePictureTools";
 import PictureSelectionPane from "../modules/sheet-images/components/PictureSelectionPane.vue";
 import PictureAnnotationDialog from "../modules/sheet-images/components/PictureAnnotationDialog.vue";
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
+import { usePictureToolbarOwner } from "../modules/sheet-images/usePictureToolbarOwner";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
 import PivotGroupingDialog from "../modules/pivot-tables/components/PivotGroupingDialog.vue";
@@ -572,7 +572,7 @@ const selectedPicture = computed(() => {
   const image = activeSheet.value.floatingImages.find(
     (image) => image.id === selectedPictureId.value,
   );
-  return image && !isFramedPictureObject(image) ? image : undefined;
+  return image;
 });
 watch(
   () => activeSheet.value.id,
@@ -1691,7 +1691,21 @@ const pictureTools = usePictureTools({
   selectedIds: selectedPictureIds,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
   execute: executeCommand,
+  getFrameContext: () => sheetGridRef.value?.getPictureFrameContext?.(activeSheet.value),
 });
+const pictureToolbarOwner = usePictureToolbarOwner({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => pictureOwnerGeneration.value,
+  getImage: () => selectedPicture.value,
+  getSelectedIds: () => selectedPictureIds.value,
+  getFrameContext: () => sheetGridRef.value?.getPictureFrameContext?.(activeSheet.value),
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
+  resize: pictureTools.resizeOne,
+  aspectRatio: pictureTools.setAspectRatio,
+  appearance: pictureTools.applyAppearance,
+});
+watch([pictureOwnerGeneration, selectedPictureId], pictureTools.clearFeedback, { flush: "sync" });
 const pictureDialogs = usePictureDialogSessions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -2806,7 +2820,18 @@ const gridInert = computed(
       <template #image-tools>
         <PictureToolbar
           v-if="selectedPicture"
+          :key="pictureToolbarOwner?.key"
           :image="selectedPicture"
+          :geometry="pictureToolbarOwner?.geometry"
+          :draft-owner-key="pictureToolbarOwner?.draftKey"
+          :appearance-draft-key="pictureToolbarOwner?.appearanceDraftKey"
+          :error="
+            pictureTools.sizeFeedback.value
+              ? t(pictureTools.sizeFeedback.value)
+              : pictureTools.operationFeedback.value
+                ? t(pictureTools.operationFeedback.value)
+                : undefined
+          "
           :selection-count="selectedPictureIds.length"
           :preview-on-double-click="picturePreviewOnDoubleClick"
           @view-settings="picturePreviewOnDoubleClick = $event"
@@ -2820,8 +2845,9 @@ const gridInert = computed(
             captureBusy ||
             !canUseSheetPermission(activeSheet, 'editObjects')
           "
-          @update="setFloatingImage"
-          @appearance="pictureTools.applyAppearance"
+          :resize-handler="pictureToolbarOwner?.resize"
+          :aspect-ratio-handler="pictureToolbarOwner?.aspectRatio"
+          :appearance-handler="pictureToolbarOwner?.appearance"
           @insert-image="imageActions.requestInsert"
           @crop="sheetGridRef?.cropImage()"
           @rotate="sheetGridRef?.rotateImage($event)"

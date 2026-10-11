@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useId } from "vue";
+import { computed, nextTick, ref, useId, watch } from "vue";
 import {
   Palette,
   Square,
@@ -12,11 +12,8 @@ import {
 } from "lucide-vue-next";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
-import {
-  normalizeImageTransform,
-  type LegacyFloatingImage as FloatingImage,
-  type ImageAppearance,
-} from "@sheetcraft/core/workbook";
+import { type FloatingImage, type ImageAppearance } from "@sheetcraft/core/workbook";
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
@@ -27,7 +24,6 @@ import ColorPalette from "../../../shared/color/ColorPalette.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 const props = defineProps<{ image: FloatingImage; disabled: boolean }>();
 const emit = defineEmits<{
-  update: [image: FloatingImage];
   change: [patch: Partial<ImageAppearance> | undefined];
 }>();
 const { t } = useAppI18n();
@@ -73,14 +69,21 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   disabled: computed(() => props.disabled),
 });
 const appearance = computed(() => props.image.transform?.appearance ?? {});
+const isFramed = computed(() => isFramedPictureObject(props.image));
 const label = computed(() => t(`picture.${mode.value}`));
+watch([() => props.image.id, () => props.image.assetId], () => dismiss("programmatic", false), {
+  flush: "sync",
+});
 async function toggle(next: Mode): Promise<void> {
   if (props.disabled) return;
+  const id = props.image.id;
+  const assetId = props.image.assetId;
   if (mode.value !== next) {
     dismiss("programmatic", false);
     mode.value = next;
     await nextTick();
   }
+  if (props.disabled || props.image.id !== id || props.image.assetId !== assetId) return;
   toggleMenu();
 }
 function keydown(next: Mode, event: KeyboardEvent): void {
@@ -88,30 +91,25 @@ function keydown(next: Mode, event: KeyboardEvent): void {
   mode.value = next;
   onTriggerKeydown(event);
 }
-function change(patch: Partial<ImageAppearance>): void {
-  if (props.disabled) return;
-  const transform = normalizeImageTransform({
-    ...props.image.transform,
-    appearance: { ...appearance.value, ...patch },
-  });
-  emit("update", { ...props.image, transform });
+function change(patch: Partial<ImageAppearance>): boolean {
+  if (props.disabled || (isFramed.value && patch.reflection === true)) return false;
   emit("change", patch);
+  return true;
 }
 function number(key: "brightness" | "contrast" | "saturation" | "opacity", value: unknown): void {
   if (typeof value !== "number" || !Number.isFinite(value)) return;
   change({ [key]: key === "opacity" ? 1 - value / 100 : value / 100 });
 }
 function preset(patch: Partial<ImageAppearance>): void {
-  change(patch);
-  dismiss("programmatic", true);
+  if (change(patch)) dismiss("programmatic", true);
+}
+function borderWidth(value: unknown): void {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 20) return;
+  change({ border: { color: appearance.value.border?.color ?? "#000000", width: value } });
 }
 function reset(): void {
   if (props.disabled) return;
   emit("change", undefined);
-  emit("update", {
-    ...props.image,
-    transform: normalizeImageTransform({ ...props.image.transform, appearance: undefined }),
-  });
 }
 </script>
 <template>
@@ -292,12 +290,7 @@ function reset(): void {
                 theme="column"
                 class="sheetcraft-input-number--persistent-controls"
                 size="small"
-                @change="
-                  typeof $event === 'number' &&
-                  change({
-                    border: { color: appearance.border?.color ?? '#000000', width: $event },
-                  })
-                "
+                @change="borderWidth"
               />
             </div>
           </GallerySection>
@@ -333,12 +326,13 @@ function reset(): void {
           <GallerySection v-else-if="mode === 'effects'" :title="t('picture.effects')">
             <TCheckbox
               :model-value="!!appearance.reflection"
+              :disabled="isFramed || disabled"
               @update:model-value="change({ reflection: Boolean($event) })"
               >{{ t("picture.reflection") }}</TCheckbox
             >
           </GallerySection>
         </template>
-        <template #items>
+        <template #footer>
           <template v-if="mode === 'design'">
             <MenuItem
               @select="
@@ -355,6 +349,7 @@ function reset(): void {
               >{{ t("picture.designShadow") }}</MenuItem
             >
             <MenuItem
+              :disabled="isFramed"
               @select="
                 preset({
                   border: { color: '#D9E2F3', width: 2 },

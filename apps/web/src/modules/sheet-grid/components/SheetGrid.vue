@@ -1144,8 +1144,9 @@ const imagePaintState = shallowRef<FloatingImagePaintState>({
 });
 const floatingImageCache = createFloatingImageCanvasCache(() => surfaceRef.value?.invalidate());
 const drawingThemeEffects = computed(() => getDrawingThemeEffects(props.theme));
+const hasFramedPictures = computed(() => props.sheet.floatingImages.some(isFramedPictureObject));
 const pictureFrameContext = computed<PictureFrameLayoutContext | undefined>(() => {
-  if (!props.sheet.floatingImages.some(isFramedPictureObject)) return undefined;
+  if (!hasFramedPictures.value) return undefined;
   // Paper gaps require a distinct projection; never feed them into continuous metrics.
   if (props.viewMode === "page-layout") return undefined;
   return {
@@ -3186,6 +3187,8 @@ onBeforeUnmount(() => {
 });
 
 defineExpose({
+  getPictureFrameContext: (sheet: Sheet) =>
+    props.sheet === sheet ? pictureFrameContext.value : undefined,
   previewSelectedPicture: () => {
     const image = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
     if (image) openImagePreview(image);

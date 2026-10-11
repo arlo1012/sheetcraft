@@ -1,4 +1,7 @@
-import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { arePictureObjectsEqual, isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { resolvePictureFrame } from "@sheetcraft/core/picture-frame";
+import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
+import { resizePictureTo, type PictureSizeEdit } from "./picture-tool-geometry";
 import { requireLegacyPictures } from "./picture-document-support";
 import { ref, type Ref } from "vue";
 import {
@@ -8,6 +11,7 @@ import {
 import { canUseSheetPermission } from "@sheetcraft/core";
 import {
   normalizeImageTransform,
+  areFloatingImageCollectionsEqual,
   type ImageAppearance,
   type FloatingImage,
   type Sheet,
@@ -33,23 +37,81 @@ export function usePictureTools(options: {
   selectedIds: Ref<string[]>;
   isBusy: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
+  getFrameContext?: () => PictureFrameLayoutContext | undefined;
 }) {
   const paneVisible = ref(false);
   const sizeFeedback = ref<MessageKey>();
+  const operationFeedback = ref<MessageKey>();
   const idFactory = createBrowserIdFactory();
   function replace(images: readonly FloatingImage[]): boolean {
     const sheet = options.getSheet();
     if (options.isBusy() || !canUseSheetPermission(sheet, "editObjects")) return false;
-    if (images.some(isFramedPictureObject)) return false;
-    const command = createSetSheetFloatingImagesCommand(sheet.id, images);
-    if (JSON.stringify(sheet.floatingImages) === JSON.stringify(command.images)) return true;
-    return options.execute(command) !== false;
+    try {
+      const framed = images.filter(isFramedPictureObject);
+      if (framed.length) {
+        const context = options.getFrameContext?.();
+        if (!context) return false;
+        for (const image of framed) resolvePictureFrame(image.frame, context.metrics);
+      }
+      const command = createSetSheetFloatingImagesCommand(sheet.id, images);
+      if (areFloatingImageCollectionsEqual(sheet.floatingImages, command.images)) return true;
+      return options.execute(command) !== false;
+    } catch {
+      return false;
+    }
   }
   function updateMany(images: readonly FloatingImage[]): boolean {
     const changes = new Map(images.map((image) => [image.id, image]));
     return replace(
       options.getSheet().floatingImages.map((image) => changes.get(image.id) ?? image),
     );
+  }
+  function currentSingle(source: FloatingImage): FloatingImage | undefined {
+    const ids = options.selectedIds.value;
+    if (ids.length !== 1 || ids[0] !== source.id) return undefined;
+    const target = options.getSheet().floatingImages.find((image) => image.id === source.id);
+    return target && arePictureObjectsEqual(source, target) ? target : undefined;
+  }
+  function resizeOne(source: FloatingImage, edit: PictureSizeEdit): boolean {
+    sizeFeedback.value = undefined;
+    operationFeedback.value = undefined;
+    const target = currentSingle(source);
+    if (!target || options.isBusy() || !canUseSheetPermission(options.getSheet(), "editObjects")) {
+      sizeFeedback.value = "picture.operationFailed";
+      return false;
+    }
+    const context = options.getFrameContext?.();
+    let next: FloatingImage | null;
+    try {
+      next = resizePictureTo(target, edit, context);
+    } catch (error) {
+      sizeFeedback.value =
+        error instanceof RangeError ? "picture.invalidSize" : "picture.operationFailed";
+      return false;
+    }
+    if (
+      !next ||
+      (isFramedPictureObject(target) && options.getFrameContext?.() !== context) ||
+      !updateMany([next])
+    ) {
+      sizeFeedback.value = "picture.operationFailed";
+      return false;
+    }
+    return true;
+  }
+  function setAspectRatio(source: FloatingImage, locked: boolean): boolean {
+    operationFeedback.value = undefined;
+    sizeFeedback.value = undefined;
+    const target = currentSingle(source);
+    if (
+      !target ||
+      typeof locked !== "boolean" ||
+      !updateMany([{ ...target, lockAspectRatio: locked }])
+    ) {
+      operationFeedback.value = "picture.operationFailed";
+      return false;
+    }
+    return true;
   }
   function remove(ids = options.selectedIds.value): void {
     replace(options.getSheet().floatingImages.filter((image) => !ids.includes(image.id)));
@@ -160,12 +222,23 @@ export function usePictureTools(options: {
     }
     return true;
   }
-  function applyAppearance(patch: Partial<ImageAppearance> | undefined): void {
-    updateMany(
-      options
-        .getSheet()
-        .floatingImages.filter((image) => options.selectedIds.value.includes(image.id))
-        .map((image): FloatingImage => {
+  function applyAppearance(patch: Partial<ImageAppearance> | undefined): boolean {
+    operationFeedback.value = undefined;
+    sizeFeedback.value = undefined;
+    const ids = options.selectedIds.value;
+    const targets = options.getSheet().floatingImages.filter((image) => ids.includes(image.id));
+    if (
+      !ids.length ||
+      new Set(ids).size !== ids.length ||
+      targets.length !== ids.length ||
+      (patch?.reflection === true && targets.some(isFramedPictureObject))
+    ) {
+      operationFeedback.value = "picture.operationFailed";
+      return false;
+    }
+    try {
+      const accepted = updateMany(
+        targets.map((image): FloatingImage => {
           const appearance = normalizeImageTransform({
             appearance: patch ? { ...image.transform?.appearance, ...patch } : undefined,
           })?.appearance;
@@ -179,7 +252,13 @@ export function usePictureTools(options: {
             transform: normalizeImageTransform({ ...image.transform, appearance }),
           };
         }),
-    );
+      );
+      if (!accepted) operationFeedback.value = "picture.operationFailed";
+      return accepted;
+    } catch {
+      operationFeedback.value = "picture.operationFailed";
+      return false;
+    }
   }
   function toggleVisibility(image: FloatingImage): void {
     updateMany([{ ...image, hidden: !image.hidden }]);
@@ -187,7 +266,12 @@ export function usePictureTools(options: {
   function rename(image: FloatingImage, name: string): void {
     updateMany([{ ...image, altText: name }]);
   }
+  function clearFeedback(): void {
+    sizeFeedback.value = undefined;
+    operationFeedback.value = undefined;
+  }
   return {
+    clearFeedback,
     applyAppearance,
     paneVisible,
     updateMany,
@@ -197,6 +281,9 @@ export function usePictureTools(options: {
     toggleVisibility,
     rename,
     resizeMany,
+    resizeOne,
+    setAspectRatio,
     sizeFeedback,
+    operationFeedback,
   };
 }
