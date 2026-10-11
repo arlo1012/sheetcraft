@@ -1,0 +1,11 @@
+Unicode character metadata
+
+Copyright 2025 Unicode, Inc. Unicode and the Unicode Logo are registered
+trademarks of Unicode, Inc. in the United States and other countries.
+
+The generated character metadata is derived from the official Unicode Character
+Database 17.0.0: Blocks.txt, UnicodeData.txt, NameAliases.txt and
+extracted/DerivedName.txt. The complete Unicode License v3 is retained in
+Unicode-LICENSE-v3.txt. Fixed source URLs and SHA-256 hashes are recorded in
+resource-sources.json. The metadata does not constitute a promise that any
+particular font supports or correctly shapes every Unicode character.
