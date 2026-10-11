@@ -1,4 +1,6 @@
 import { describe, expect, test } from "vitest";
+import { isLegacyPictureObject, type StandalonePictureObject } from "../../picture-object.js";
+import { isPictureGroup } from "../../picture-group.js";
 import { createTestWorkbookSession } from "../helpers.js";
 import { getActiveSheet, cloneFloatingImage, type FloatingImage } from "../../workbook.js";
 import { MAX_SHEET_ROWS, MAX_SHEET_COLUMNS } from "../../sheet-limits.js";
@@ -13,6 +15,11 @@ import {
   type RestoreSheetDimensionStateCommand,
   type RestoreSheetAxisSliceCommand,
 } from "../../commands/index.js";
+function requireStandalone(image: FloatingImage): StandalonePictureObject {
+  if (isPictureGroup(image)) throw new Error("Expected a standalone picture.");
+  return image;
+}
+
 function picture(id: string, row: number): FloatingImage {
   return {
     id,
@@ -48,7 +55,7 @@ describe("exact ordered picture state in dimension inverses", () => {
           : createSetSheetDefaultColumnWidthCommand(sheet.id, 88);
       expect(executeWorkbookCommand(session, command)).toBe(true);
       sheet.floatingImages.reverse();
-      sheet.floatingImages[0]!.offsetX = 8;
+      requireStandalone(sheet.floatingImages[0]!).offsetX = 8;
       const edited = serializeWorkbook(session.workbook);
       expect(undoWorkbookCommand(session)).toBe(true);
       expect(serializeWorkbook(session.workbook)).toEqual(before);
@@ -67,11 +74,13 @@ describe("exact ordered picture state in dimension inverses", () => {
       "back",
     ]);
     sheet.floatingImages.reverse();
-    sheet.floatingImages[0]!.width = 180;
-    sheet.floatingImages[0]!.assetId = "changed-source";
-    sheet.floatingImages[0]!.transform!.annotations![0]!.points[0]!.x = 0.9;
-    expect(inverse.floatingImageState![2]!.width).toBe(360);
-    expect(inverse.floatingImageState![2]!.transform!.annotations![0]!.points[0]!.x).toBe(0.2);
+    requireStandalone(sheet.floatingImages[0]!).width = 180;
+    requireStandalone(sheet.floatingImages[0]!).assetId = "changed-source";
+    requireStandalone(sheet.floatingImages[0]!).transform!.annotations![0]!.points[0]!.x = 0.9;
+    expect(requireStandalone(inverse.floatingImageState![2]!).width).toBe(360);
+    expect(
+      requireStandalone(inverse.floatingImageState![2]!).transform!.annotations![0]!.points[0]!.x,
+    ).toBe(0.2);
     const edited = serializeWorkbook(session.workbook);
     expect(undoWorkbookCommand(session)).toBe(true);
     expect(serializeWorkbook(session.workbook)).toEqual(before);
@@ -108,7 +117,7 @@ describe("exact ordered picture state in dimension inverses", () => {
       const before = serializeWorkbook(session.workbook);
       const images = sheet.floatingImages.map(cloneFloatingImage);
       if (kind === "duplicate") images[1]!.id = images[0]!.id;
-      else images[1]!.width = 0;
+      else requireStandalone(images[1]!).width = 0;
       const command: RestoreSheetDimensionStateCommand = {
         type: "restoreSheetDimensionState",
         sheetId: sheet.id,
@@ -143,7 +152,7 @@ describe("exact ordered picture state in dimension inverses", () => {
     sheet.properties.protected = true;
     sheet.protection = { editableRanges: [], formatRows: true };
     const images = sheet.floatingImages.map(cloneFloatingImage);
-    images[1]!.width = 180;
+    requireStandalone(images[1]!).width = 180;
     const before = serializeWorkbook(session.workbook);
     const command: RestoreSheetDimensionStateCommand = {
       type: "restoreSheetDimensionState",
@@ -179,8 +188,9 @@ describe("exact ordered picture state in axis inverses", () => {
     (axis) => {
       const { session, sheet } = fixture();
       const maximum = axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
-      (sheet.floatingImages[0]! as import("../../workbook.js").LegacyFloatingImage).anchor[axis] =
-        maximum - 1;
+      const image = sheet.floatingImages[0]!;
+      if (!isLegacyPictureObject(image)) throw new Error("Expected a legacy picture.");
+      image.anchor[axis] = maximum - 1;
       const before = serializeWorkbook(session.workbook);
       expect(
         executeWorkbookCommand(session, createInsertSheetAxisCommand(sheet.id, axis, 4, 1)),
@@ -209,7 +219,7 @@ describe("exact ordered picture state in axis inverses", () => {
       ]);
       expect(inverse.slice.floatingImages).toHaveLength(operation === "delete" ? 1 : 0);
       const detached = structuredClone(inverse.slice.floatingImageState);
-      sheet.floatingImages[0]!.transform!.annotations![0]!.points[0]!.x = 0.8;
+      requireStandalone(sheet.floatingImages[0]!).transform!.annotations![0]!.points[0]!.x = 0.8;
       sheet.floatingImages.reverse();
       expect(inverse.slice.floatingImageState).toEqual(detached);
       expect(undoWorkbookCommand(session)).toBe(true);
@@ -234,7 +244,7 @@ describe("exact ordered picture state in axis inverses", () => {
     const inverse = structuredClone(
       session.history.undoStack[0]!.command,
     ) as RestoreSheetAxisSliceCommand;
-    inverse.slice.floatingImageState![1]!.width = 0;
+    requireStandalone(inverse.slice.floatingImageState![1]!).width = 0;
     expect(() => applyWorkbookCommand(session.workbook, inverse, { fromHistory: true })).toThrow();
     expect(serializeWorkbook(session.workbook)).toEqual(before);
     expect(session.history.undoStack).toHaveLength(1);

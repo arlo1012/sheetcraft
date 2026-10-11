@@ -5,6 +5,8 @@ import {
   setCellContent,
   type FloatingImage,
 } from "@sheetcraft/core/workbook";
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import type { PictureObject, StandalonePictureObject } from "@sheetcraft/core/picture-object";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { useSheetImageActions } from "../../../../modules/sheet-images/useSheetImageActions";
 import { prepareImageAsset } from "../../../../modules/image-assets/prepareImageAsset";
@@ -16,6 +18,10 @@ vi.mock("../../../../modules/image-assets/prepareImageAsset", async (original) =
 }));
 const file = new File(["PNG"], "diagram.png", { type: "image/png" });
 const asset = { id: "asset", mimeType: "image/png", width: 800, height: 400, blob: file };
+function requireStandalone(image: PictureObject): StandalonePictureObject {
+  if (isPictureGroup(image)) throw new Error("Expected a standalone picture.");
+  return image;
+}
 function existingImage(): FloatingImage {
   return {
     id: "existing-image",
@@ -114,7 +120,7 @@ describe("sheet image insertion", () => {
       await f.actions.insertFile(file, "floating", undefined, image.id);
       expect(f.setFloatingImage).not.toHaveBeenCalled();
       expect(sheet.floatingImages).toEqual([image]);
-      expect(image.assetId).toBe("original-asset");
+      expect(requireStandalone(image).assetId).toBe("original-asset");
       expect(f.actions.feedback.value).toBe("image.insertionFailed");
       expect(f.actions.busy.value).toBe(false);
     },

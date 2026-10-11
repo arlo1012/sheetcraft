@@ -1,4 +1,6 @@
 import { describe, expect, test } from "vitest";
+import type { StandalonePictureObject } from "../../picture-object.js";
+import { isPictureGroup } from "../../picture-group.js";
 import {
   createAddSheetCommand,
   createDeleteCellsCommand,
@@ -17,7 +19,13 @@ import {
   setCellStyle,
   setCellValue,
   setSheetMetadata,
+  type FloatingImage,
 } from "../../workbook.js";
+
+function requireStandalone(image: FloatingImage | undefined): StandalonePictureObject | undefined {
+  if (isPictureGroup(image)) throw new Error("Expected a standalone picture.");
+  return image;
+}
 
 describe("rectangular cell shift commands", () => {
   test("inserts cells to the right, adjusts formulas, and restores exactly through history", () => {
@@ -218,7 +226,10 @@ describe("rectangular cell shift commands", () => {
         ),
       ),
     ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
-    expect(imageSheet.floatingImages[0]?.anchor).toEqual({ row: 0, column: MAX_SHEET_COLUMNS - 1 });
+    expect(requireStandalone(imageSheet.floatingImages[0])?.anchor).toEqual({
+      row: 0,
+      column: MAX_SHEET_COLUMNS - 1,
+    });
   });
 
   test("moves floating image anchors with cells and restores them through undo", () => {
@@ -244,9 +255,9 @@ describe("rectangular cell shift commands", () => {
         ),
       ),
     ).toBe(true);
-    expect(sheet.floatingImages[0]?.anchor).toEqual({ row: 0, column: 2 });
+    expect(requireStandalone(sheet.floatingImages[0])?.anchor).toEqual({ row: 0, column: 2 });
     expect(undoWorkbookCommand(session)).toBe(true);
-    expect(sheet.floatingImages[0]?.anchor).toEqual({ row: 0, column: 1 });
+    expect(requireStandalone(sheet.floatingImages[0])?.anchor).toEqual({ row: 0, column: 1 });
   });
 
   test("rejects cross-stripe formula and defined-name ranges before mutation", () => {

@@ -4,6 +4,7 @@ import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import type { FloatingImage } from "@sheetcraft/core/workbook";
+import { isPictureGroup } from "@sheetcraft/core";
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{
   images: readonly FloatingImage[];
@@ -19,14 +20,21 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 function toggle(id: string): void {
   const image = props.images.find((entry) => entry.id === id);
-  const members = image?.groupId
-    ? props.images.filter((entry) => entry.groupId === image.groupId).map((entry) => entry.id)
-    : [id];
+  if (!image) return;
+  // Owned groups are root selections; groupId only relates standalone pictures.
+  const groupId = isPictureGroup(image) ? undefined : image.groupId;
+  const members = groupId
+    ? props.images
+        .filter((entry) => !isPictureGroup(entry) && entry.groupId === groupId)
+        .map((entry) => entry.id)
+    : [image.id];
+  const rootIds = new Set(props.images.map((entry) => entry.id));
+  const selectedIds = props.selectedIds.filter((value) => rootIds.has(value));
   emit(
     "select",
-    props.selectedIds.includes(id)
-      ? props.selectedIds.filter((value) => !members.includes(value))
-      : [...new Set([...props.selectedIds, ...members])],
+    selectedIds.includes(id)
+      ? selectedIds.filter((value) => !members.includes(value))
+      : [...new Set([...selectedIds, ...members])],
   );
 }
 </script>

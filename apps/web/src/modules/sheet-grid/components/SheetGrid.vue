@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import {
   createPictureViewMetrics,
@@ -1805,9 +1806,9 @@ function expandFloatingImageSelection(ids: readonly string[]): string[] {
   for (const id of ids) {
     const image = props.sheet.floatingImages.find((entry) => entry.id === id);
     if (!image) continue;
-    if (image.groupId)
+    if (!isPictureGroup(image) && image.groupId)
       for (const member of props.sheet.floatingImages) {
-        if (member.groupId === image.groupId) result.add(member.id);
+        if (!isPictureGroup(member) && member.groupId === image.groupId) result.add(member.id);
       }
     else result.add(id);
   }
@@ -1820,13 +1821,14 @@ function selectFloatingImage(id: string | null, additive = false): void {
   axisContextMenu.value = undefined;
   cellContextMenu.value = undefined;
   const image = props.sheet.floatingImages.find((entry) => entry.id === id);
-  const group = image?.groupId
-    ? props.sheet.floatingImages
-        .filter((entry) => entry.groupId === image.groupId)
-        .map((entry) => entry.id)
-    : id
-      ? [id]
-      : [];
+  const group =
+    image && !isPictureGroup(image) && image.groupId
+      ? props.sheet.floatingImages
+          .filter((entry) => !isPictureGroup(entry) && entry.groupId === image.groupId)
+          .map((entry) => entry.id)
+      : id
+        ? [id]
+        : [];
   if (additive && id) {
     selectedImageIds.value = selectedImageIds.value.includes(id)
       ? selectedImageIds.value.filter((entry) => !group.includes(entry))
@@ -2023,7 +2025,12 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
 watch(
   () => ({
     sheet: props.sheet,
-    signature: JSON.stringify(props.sheet.floatingImages.map((image) => [image.id, image.groupId])),
+    signature: JSON.stringify(
+      props.sheet.floatingImages.map((image) => [
+        image.id,
+        isPictureGroup(image) ? image.kind : image.groupId,
+      ]),
+    ),
   }),
   (current, previous) => {
     if (current.sheet !== previous.sheet) {
@@ -3191,7 +3198,8 @@ defineExpose({
     props.sheet === sheet ? pictureFrameContext.value : undefined,
   previewSelectedPicture: () => {
     const image = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
-    if (image) openImagePreview(image);
+    if (image && !isPictureGroup(image)) openImagePreview(image);
+    else if (image) emit("imageFeedback", "picture.operationFailed");
   },
   selectFloatingImages: (ids: string[]) => {
     selectedImageIds.value = expandFloatingImageSelection(ids);

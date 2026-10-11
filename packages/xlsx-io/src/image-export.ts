@@ -1,3 +1,4 @@
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { XlsxCompatibilityError } from "./types.js";
 import type { CellImage } from "@sheetcraft/core/formula";
@@ -15,9 +16,9 @@ export function assertSupportedXlsxPicture(
   image: FloatingImage,
   issueLocation: string,
 ): asserts image is LegacyFloatingImage {
-  if (isFramedPictureObject(image))
+  if (isFramedPictureObject(image) || isPictureGroup(image))
     throw new XlsxCompatibilityError(
-      `Frame-aware pictures are not yet supported by XLSX export at ${issueLocation}.`,
+      `Frame-aware pictures and owned groups are not yet supported by XLSX export at ${issueLocation}.`,
       {
         issues: [
           { code: "feature-omitted", severity: "block", count: 1, locations: [issueLocation] },

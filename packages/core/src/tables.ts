@@ -6,6 +6,7 @@ import {
   createSheetSparseState,
   createWorkbookEvaluator,
   replaceSheetSparseState,
+  normalizeSheetSparseState,
   getCellContent,
   getTableDataRows,
   getCellStyle,
@@ -260,11 +261,15 @@ export function applyRestoreTableTransactionCommand(
   workbook: Workbook,
   command: RestoreTableTransactionCommand,
 ): RestoreTableTransactionCommand | null {
+  // Validate every owning sheet before the first mutation, including complete picture trees.
+  const states = command.states.map((entry) => ({
+    sheet: getSheetOrThrow(workbook, entry.sheetId),
+    state: normalizeSheetSparseState(entry.state),
+  }));
   const inverse = createRestoreTableTransactionCommand(workbook);
   let changed = false;
-  for (const entry of command.states)
-    changed =
-      replaceSheetSparseState(getSheetOrThrow(workbook, entry.sheetId), entry.state) || changed;
+  for (const entry of states)
+    changed = replaceSheetSparseState(entry.sheet, entry.state) || changed;
   if (JSON.stringify(workbook.tableStyles ?? []) !== JSON.stringify(command.tableStyles)) {
     workbook.tableStyles = clone(command.tableStyles);
     changed = true;

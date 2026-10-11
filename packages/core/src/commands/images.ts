@@ -1,3 +1,5 @@
+import { isPictureGroup } from "../picture-group.js";
+import { normalizePictureObjectCollection } from "../picture-object.js";
 import { isFramedPictureObject } from "../picture-object.js";
 import { assertPictureObjectsForSheet } from "../picture-object-sheet.js";
 import {
@@ -117,20 +119,17 @@ export function applySetFloatingImageCommand(
     (command.index === undefined || command.index === index)
   )
     return null;
-  if (index < 0) {
-    if (
-      command.index !== undefined &&
-      (!Number.isInteger(command.index) ||
-        command.index < 0 ||
-        command.index > sheet.floatingImages.length)
-    ) {
-      throw invalidCommandPayload("index", command.index);
-    }
-    sheet.floatingImages.splice(command.index ?? sheet.floatingImages.length, 0, image);
-  } else if (command.index !== undefined && command.index !== index) {
-    sheet.floatingImages.splice(index, 1);
-    sheet.floatingImages.splice(command.index, 0, image);
-  } else sheet.floatingImages[index] = image;
+  const planned = sheet.floatingImages.slice();
+  if (index < 0) planned.splice(command.index ?? planned.length, 0, image);
+  else if (command.index !== undefined && command.index !== index) {
+    planned.splice(index, 1);
+    planned.splice(command.index, 0, image);
+  } else planned[index] = image;
+  const normalized = validateCommandPayload("images", planned, () =>
+    normalizePictureObjectCollection(planned),
+  );
+  assertPictureObjectsForSheet(normalized, sheet);
+  sheet.floatingImages = normalized;
   return previous
     ? createSetFloatingImageCommand(command.sheetId, previous, index)
     : createDeleteFloatingImageCommand(command.sheetId, image.id);
@@ -161,7 +160,7 @@ export function applyConvertFloatingImageToCellCommand(
   if (index < 0) return null;
   const image = sheet.floatingImages[index];
   if (!image) return null;
-  if (isFramedPictureObject(image))
+  if (isFramedPictureObject(image) || isPictureGroup(image))
     throw invalidCommandPayload(
       "image.frame",
       image.frame,
@@ -213,8 +212,12 @@ export function applyConvertCellImageToFloatingCommand(
     offsetY: 0,
     ...size,
   });
+  const nextImages = validateCommandPayload("images", [...sheet.floatingImages, image], () =>
+    normalizePictureObjectCollection([...sheet.floatingImages, image]),
+  );
+  assertPictureObjectsForSheet(nextImages, sheet);
   setCellContent(sheet, address, null);
-  sheet.floatingImages.push(image);
+  sheet.floatingImages = nextImages;
   return createConvertFloatingImageToCellCommand(command.sheetId, image.id);
 }
 
@@ -224,7 +227,7 @@ export function applyRestoreFloatingImageToCellCommand(
 ): ConvertFloatingImageToCellCommand {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const image = normalizeCommandFloatingImage(command.image);
-  if (isFramedPictureObject(image))
+  if (isFramedPictureObject(image) || isPictureGroup(image))
     throw invalidCommandPayload(
       "image.frame",
       image.frame,
@@ -241,8 +244,14 @@ export function applyRestoreFloatingImageToCellCommand(
   if (sheet.floatingImages.some((candidate) => candidate.id === image.id)) {
     throw invalidCommandPayload("image.id", image.id, "Floating image id already exists.");
   }
+  const planned = sheet.floatingImages.slice();
+  planned.splice(command.index, 0, image);
+  const nextImages = validateCommandPayload("images", planned, () =>
+    normalizePictureObjectCollection(planned),
+  );
+  assertPictureObjectsForSheet(nextImages, sheet);
   setCellContent(sheet, command.address, command.content);
-  sheet.floatingImages.splice(command.index, 0, image);
+  sheet.floatingImages = nextImages;
   return createConvertFloatingImageToCellCommand(command.sheetId, image.id);
 }
 
@@ -252,9 +261,9 @@ export function createSetSheetFloatingImagesCommand(
   images: readonly FloatingImage[],
 ): SetSheetFloatingImagesCommand {
   if (!Array.isArray(images)) throw invalidCommandPayload("images", images);
-  const normalized = images.map(normalizeCommandFloatingImage);
-  if (new Set(normalized.map((image) => image.id)).size !== normalized.length)
-    throw invalidCommandPayload("images", images, "Duplicate picture IDs.");
+  const normalized = validateCommandPayload("images", images, () =>
+    normalizePictureObjectCollection(images),
+  );
   return { type: "setSheetFloatingImages", sheetId, images: normalized };
 }
 export function applySetSheetFloatingImagesCommand(

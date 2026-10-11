@@ -1,4 +1,6 @@
 import { describe, expect, test } from "vitest";
+import type { StandalonePictureObject } from "../../picture-object.js";
+import { isPictureGroup } from "../../picture-group.js";
 import {
   normalizeImageAnnotations,
   normalizeImageTransform,
@@ -23,6 +25,11 @@ import {
 } from "../../serialization.js";
 import { translateCellContentForCopy } from "../../clipboard.js";
 import { createTestWorkbookSession } from "../helpers.js";
+
+function requireStandalone(image: FloatingImage): StandalonePictureObject {
+  if (isPictureGroup(image)) throw new Error("Expected a standalone picture.");
+  return image;
+}
 
 function annotation(): ImageAnnotation {
   return {
@@ -173,10 +180,10 @@ describe("picture annotations", () => {
       createSetFloatingImageCommand(sheet.id, { ...floating(), transform: undefined }),
     );
     executeWorkbookCommand(session, createSetFloatingImageCommand(sheet.id, floating()));
-    expect(sheet.floatingImages[0]!.transform!.annotations).toHaveLength(1);
+    expect(requireStandalone(sheet.floatingImages[0]!).transform!.annotations).toHaveLength(1);
     undoWorkbookCommand(session);
-    expect(sheet.floatingImages[0]!.transform).toBeUndefined();
+    expect(requireStandalone(sheet.floatingImages[0]!).transform).toBeUndefined();
     redoWorkbookCommand(session);
-    expect(sheet.floatingImages[0]!.transform!.annotations).toHaveLength(1);
+    expect(requireStandalone(sheet.floatingImages[0]!).transform!.annotations).toHaveLength(1);
   });
 });

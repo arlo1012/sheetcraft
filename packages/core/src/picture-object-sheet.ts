@@ -1,3 +1,5 @@
+import { isPictureGroup } from "./picture-group.js";
+import { resolvePictureGroup } from "./picture-group-layout.js";
 import { isFramedPictureObject } from "./picture-object.js";
 import { createPictureSheetMetrics, locatePictureAxisPoint } from "./picture-axis-metrics.js";
 import { resolvePictureFrame } from "./picture-frame.js";
@@ -6,16 +8,17 @@ import type { CellAddress, FloatingImage, Sheet } from "./workbook.js";
 
 /** Validate derived geometry before any owning command changes worksheet state. */
 export function assertPictureObjectsForSheet(images: readonly FloatingImage[], sheet: Sheet): void {
-  if (!images.some(isFramedPictureObject)) return;
+  if (!images.some((image) => isFramedPictureObject(image) || isPictureGroup(image))) return;
   const metrics = createPictureSheetMetrics(sheet);
   for (const image of images) {
-    if (isFramedPictureObject(image)) resolvePictureFrame(image.frame, metrics);
+    if (isPictureGroup(image)) resolvePictureGroup(image, metrics);
+    else if (isFramedPictureObject(image)) resolvePictureFrame(image.frame, metrics);
   }
 }
 
 /** Navigation only: never use this projection as persisted object geometry. */
 export function getPictureObjectOriginCell(image: FloatingImage, sheet: Sheet): CellAddress {
-  if (!isFramedPictureObject(image)) return { ...image.anchor };
+  if (!isFramedPictureObject(image) && !isPictureGroup(image)) return { ...image.anchor };
   const anchor = image.frame.anchor;
   if (anchor.mode !== "fixed") {
     const point = anchor.mode === "move-only" ? anchor.origin : anchor.start;

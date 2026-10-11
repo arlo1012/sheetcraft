@@ -3,6 +3,9 @@ import {
   clonePictureFrame,
   normalizePictureFrame,
   resolvePictureFrame,
+  normalizePictureFrameAnchor,
+  resolvePictureAnchorRect,
+  type PictureFrameAnchor,
   type PictureFrame,
 } from "./picture-frame.js";
 import {
@@ -31,6 +34,19 @@ export function transformPictureFrameAxis(
   edit: PictureFrameAxisEdit,
   nextMetrics: PictureSheetMetrics,
 ): PictureFrame | null {
+  const frame = clonePictureFrame(original);
+  const anchor = transformPictureAnchorAxis(frame.anchor, edit, nextMetrics);
+  if (!anchor) return null;
+  const result = normalizePictureFrame({ ...frame, anchor });
+  resolvePictureFrame(result, nextMetrics);
+  return result;
+}
+/** Plans a source-free root anchor edit, preserving the same structural policy. */
+export function transformPictureAnchorAxis(
+  original: PictureFrameAnchor,
+  edit: PictureFrameAxisEdit,
+  nextMetrics: PictureSheetMetrics,
+): PictureFrameAnchor | null {
   if (
     !edit ||
     (edit.axis !== "row" && edit.axis !== "column") ||
@@ -49,10 +65,10 @@ export function transformPictureFrameAxis(
   const metrics = edit.axis === "row" ? nextMetrics.rows : nextMetrics.columns;
   if (metrics.count !== maximum)
     throw new RangeError("Picture axis metrics must cover the worksheet.");
-  const frame = clonePictureFrame(original);
-  if (frame.anchor.mode === "fixed") {
-    resolvePictureFrame(frame, nextMetrics);
-    return frame;
+  const anchor = normalizePictureFrameAnchor(original);
+  if (anchor.mode === "fixed") {
+    resolvePictureAnchorRect(anchor, nextMetrics);
+    return anchor;
   }
   const field = edit.axis === "row" ? "row" : "column";
   function mapPoint(point: PictureAxisPoint, endBoundary: boolean): PictureAxisPoint {
@@ -75,17 +91,17 @@ export function transformPictureFrameAxis(
       return { index: point.index - edit.count, offset: point.offset };
     return { index: edit.index, offset: 0 };
   }
-  if (frame.anchor.mode === "move-only") {
-    frame.anchor.origin[field] = mapPoint(frame.anchor.origin[field], false);
+  if (anchor.mode === "move-only") {
+    anchor.origin[field] = mapPoint(anchor.origin[field], false);
   } else {
-    const start = mapPoint(frame.anchor.start[field], false);
-    const end = mapPoint(frame.anchor.end[field], true);
+    const start = mapPoint(anchor.start[field], false);
+    const end = mapPoint(anchor.end[field], true);
     if (comparePictureAxisPoints(start, end) >= 0) return null;
-    frame.anchor.start[field] = start;
-    frame.anchor.end[field] = end;
+    anchor.start[field] = start;
+    anchor.end[field] = end;
   }
-  const result = normalizePictureFrame(frame);
-  resolvePictureFrame(result, nextMetrics);
+  const result = normalizePictureFrameAnchor(anchor);
+  resolvePictureAnchorRect(result, nextMetrics);
   return result;
 }
 

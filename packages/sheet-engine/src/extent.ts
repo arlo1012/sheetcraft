@@ -1,3 +1,8 @@
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import {
+  resolvePictureGroup,
+  type ResolvedPictureGroupChild,
+} from "@sheetcraft/core/picture-group-layout";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { getPictureObjectOriginCell } from "@sheetcraft/core/picture-object-sheet";
 import { resolvePictureFrame } from "@sheetcraft/core/picture-frame";
@@ -72,23 +77,48 @@ export function getSheetContentExtent(sheet: Sheet): GridExtent {
       hiddenColumns: sheet.hiddenColumns,
     });
     const total = geometry.getTotalSize();
-    const pictureMetrics = sheet.floatingImages.some(isFramedPictureObject)
+    const pictureMetrics = sheet.floatingImages.some(
+      (image) => isFramedPictureObject(image) || isPictureGroup(image),
+    )
       ? createPictureSheetMetrics(sheet)
       : undefined;
+    const includePictureBounds = (bounds: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }): void => {
+      include({
+        row: Math.min(
+          MAX_SHEET_ROWS - 1,
+          locatePictureAxisPoint(bounds.y + bounds.height, pictureMetrics!.rows).index,
+        ),
+        column: Math.min(
+          MAX_SHEET_COLUMNS - 1,
+          locatePictureAxisPoint(bounds.x + bounds.width, pictureMetrics!.columns).index,
+        ),
+      });
+    };
+    const includeGroupChildren = (children: readonly ResolvedPictureGroupChild[]): void => {
+      for (const child of children) {
+        // Visibility never releases document reachability, including hidden ancestors/leaves.
+        if (child.layout) includePictureBounds(child.layout.bounds);
+        if (child.node.kind === "grouped-group-v1" && "members" in child)
+          includeGroupChildren(child.members);
+      }
+    };
     for (const image of sheet.floatingImages) {
+      if (isPictureGroup(image)) {
+        include(getPictureObjectOriginCell(image, sheet));
+        const resolved = resolvePictureGroup(image, pictureMetrics!);
+        includePictureBounds(resolved.layout.bounds);
+        includeGroupChildren(resolved.members);
+        continue;
+      }
       if (isFramedPictureObject(image)) {
         include(getPictureObjectOriginCell(image, sheet));
         const bounds = resolvePictureFrame(image.frame, pictureMetrics!).bounds;
-        include({
-          row: Math.min(
-            MAX_SHEET_ROWS - 1,
-            locatePictureAxisPoint(bounds.y + bounds.height, pictureMetrics!.rows).index,
-          ),
-          column: Math.min(
-            MAX_SHEET_COLUMNS - 1,
-            locatePictureAxisPoint(bounds.x + bounds.width, pictureMetrics!.columns).index,
-          ),
-        });
+        includePictureBounds(bounds);
         continue;
       }
       include(image.anchor);

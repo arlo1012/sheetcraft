@@ -1,4 +1,4 @@
-import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import { requireLegacyPictures } from "./picture-document-support";
 import { getCurrentScope, onScopeDispose, readonly, ref } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
@@ -6,7 +6,13 @@ import {
   createSetSheetFloatingImagesCommand,
   type WorkbookCommand,
 } from "@sheetcraft/core/commands";
-import type { FloatingImage, Sheet, Workbook } from "@sheetcraft/core/workbook";
+import {
+  cloneFloatingImage,
+  type FloatingImage,
+  type LegacyFloatingImage,
+  type Sheet,
+  type Workbook,
+} from "@sheetcraft/core/workbook";
 import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStore";
 import { imageAssetFeedback } from "../image-assets/imageAssetFeedback";
 import { prepareImageAsset } from "../image-assets/prepareImageAsset";
@@ -41,31 +47,57 @@ export function usePictureAssetTools(options: {
   }
   function legacyPictures(all = false) {
     try {
-      return requireLegacyPictures(pictures(all));
+      const selected = pictures(all);
+      const ids = options.getSelectedIds();
+      if (!all && (new Set(ids).size !== ids.length || selected.length !== ids.length))
+        throw new Error("Incomplete picture selection.");
+      return requireLegacyPictures(selected).map((image) => cloneFloatingImage(image));
     } catch {
       options.feedback("picture.assetFailed", true);
       return null;
     }
   }
+  function sourcesCurrent(
+    sheet: Sheet,
+    selected: readonly LegacyFloatingImage[],
+    all: boolean,
+  ): boolean {
+    const current = pictures(all);
+    return (
+      options.getSheet() === sheet &&
+      current.length === selected.length &&
+      current.every(
+        (image) =>
+          isLegacyPictureObject(image) &&
+          selected.some((source) => source.id === image.id && source.assetId === image.assetId),
+      )
+    );
+  }
   async function exportPictures(format: PictureFileFormat, all = false): Promise<void> {
     if (busy.value || options.isBusy()) return;
     const selected = legacyPictures(all);
     if (!selected?.length) return;
+    const sheet = options.getSheet();
+    const valid = () => !disposed && sourcesCurrent(sheet, selected, all);
     busy.value = true;
     try {
       const files: Record<string, Uint8Array> = {};
       for (const [index, image] of selected.entries()) {
         const source = await options.assetStore.get(image.assetId);
+        if (!valid()) return;
         if (!source) throw new Error("Missing picture asset.");
         const blob = await convertPictureBlob(source.blob, image.transform, format);
+        if (!valid()) return;
         const name = `${index + 1}-${(image.altText || "picture").replace(/\.[^.]+$/, "").replace(/[\\/:*?"<>|]/g, "_")}.${format}`;
         files[name] = new Uint8Array(await blob.arrayBuffer());
       }
+      if (!valid()) return;
       if (selected.length === 1) {
         const [name, bytes] = Object.entries(files)[0]!;
         downloadBlob(new Blob([new Uint8Array(bytes)], { type: `image/${format}` }), name);
       } else {
         const { zipSync } = await import("fflate");
+        if (!valid()) return;
         downloadBlob(
           new Blob([new Uint8Array(zipSync(files, { level: 0 }))], { type: "application/zip" }),
           "pictures.zip",
@@ -110,14 +142,7 @@ export function usePictureAssetTools(options: {
       (options.getGeneration?.() ?? 0) === generation &&
       workbook.sheets.get(sheet.id) === sheet &&
       canUseSheetPermission(sheet, "editObjects") &&
-      selected.every((image) =>
-        sheet.floatingImages.some(
-          (current) =>
-            current.id === image.id &&
-            current.assetId === image.assetId &&
-            !isFramedPictureObject(current),
-        ),
-      );
+      sourcesCurrent(sheet, selected, settings.all);
     try {
       const converted = new Map<string, ImageAsset>();
       for (const image of selected) {
@@ -145,11 +170,11 @@ export function usePictureAssetTools(options: {
       if (!valid()) return false;
       const ids = new Set(selected.map((image) => image.id));
       const next = sheet.floatingImages.map((image) =>
-        ids.has(image.id) ? { ...image, assetId: converted.get(image.assetId)!.id } : image,
+        ids.has(image.id) && isLegacyPictureObject(image)
+          ? { ...image, assetId: converted.get(image.assetId)!.id }
+          : image,
       );
-      const changed = next.some(
-        (image, index) => image.assetId !== sheet.floatingImages[index]?.assetId,
-      );
+      const changed = selected.some((image) => converted.get(image.assetId)!.id !== image.assetId);
       if (
         changed &&
         (await options.execute(createSetSheetFloatingImagesCommand(sheet.id, next))) === false
@@ -170,6 +195,8 @@ export function usePictureAssetTools(options: {
     if (busy.value || options.isBusy()) return;
     const selected = legacyPictures();
     if (!selected?.length) return;
+    const sheet = options.getSheet();
+    const valid = () => !disposed && sourcesCurrent(sheet, selected, false);
     const popup = window.open("", "_blank");
     if (!popup) {
       options.feedback("picture.assetFailed", true);
@@ -186,8 +213,18 @@ export function usePictureAssetTools(options: {
       popup.document.head.append(style);
       for (const picture of selected) {
         const source = await options.assetStore.get(picture.assetId);
+        if (!valid()) {
+          for (const url of urls) URL.revokeObjectURL(url);
+          popup.close();
+          return;
+        }
         if (!source || popup.closed) throw new Error("Missing picture.");
         const blob = await convertPictureBlob(source.blob, picture.transform, "png");
+        if (!valid()) {
+          for (const url of urls) URL.revokeObjectURL(url);
+          popup.close();
+          return;
+        }
         const url = URL.createObjectURL(blob);
         urls.push(url);
         const image = popup.document.createElement("img");
@@ -198,6 +235,11 @@ export function usePictureAssetTools(options: {
           image.src = url;
           popup.document.body.append(image);
         });
+      }
+      if (!valid()) {
+        for (const url of urls) URL.revokeObjectURL(url);
+        popup.close();
+        return;
       }
       popup.addEventListener(
         "afterprint",

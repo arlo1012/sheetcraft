@@ -190,6 +190,18 @@
     "./picture-object-sheet": {
       "types": "./dist/picture-object-sheet.d.ts",
       "import": "./dist/picture-object-sheet.js"
+    },
+    "./picture-group": {
+      "types": "./dist/picture-group.d.ts",
+      "import": "./dist/picture-group.js"
+    },
+    "./picture-group-layout": {
+      "types": "./dist/picture-group-layout.d.ts",
+      "import": "./dist/picture-group-layout.js"
+    },
+    "./picture-group-planning": {
+      "types": "./dist/picture-group-planning.d.ts",
+      "import": "./dist/picture-group-planning.js"
     }
   },
   "scripts": {

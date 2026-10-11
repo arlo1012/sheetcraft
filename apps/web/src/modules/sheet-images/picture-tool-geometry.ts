@@ -1,4 +1,6 @@
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { isPictureGroup } from "@sheetcraft/core";
+import { requireStandalonePicture } from "./picture-document-support";
 import { resolvePictureFrame } from "@sheetcraft/core/picture-frame";
 import {
   cloneFloatingImage,
@@ -17,6 +19,7 @@ export function getPictureToolGeometry(
   image: FloatingImage,
   context?: PictureFrameLayoutContext,
 ): PictureToolGeometry | undefined {
+  if (isPictureGroup(image)) return undefined;
   if (!isFramedPictureObject(image))
     return { width: image.width, height: image.height, angleDeg: image.transform?.rotation ?? 0 };
   if (!context) return undefined;
@@ -31,6 +34,7 @@ export function resizePictureTo(
   edit: PictureSizeEdit,
   context?: PictureFrameLayoutContext,
 ): FloatingImage | null {
+  image = requireStandalonePicture(image);
   if (
     (edit.axis !== "width" && edit.axis !== "height") ||
     !Number.isFinite(edit.value) ||

@@ -1,3 +1,5 @@
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import type { FloatingImage } from "@sheetcraft/core/workbook";
 import type { CellAddress } from "@sheetcraft/core/workbook";
 import type { FrozenPaneId } from "./frozen-layout.js";
 import type { Rect } from "./geometry.js";
@@ -30,6 +32,13 @@ export type FloatingImageViewportFragment = {
   clippedRect: Rect;
 };
 
+/** Placement previews are supported; source-bearing frames and containers are not. */
+function isLegacyPlacement(
+  image: FloatingImagePlacement | FloatingImage,
+): image is FloatingImagePlacement {
+  return !isPictureGroup(image) && !Object.hasOwn(image, "frame");
+}
+
 function intersectRect(left: Rect, right: Rect): Rect | null {
   const x = Math.max(left.x, right.x);
   const y = Math.max(left.y, right.y);
@@ -45,9 +54,10 @@ function intersectRect(left: Rect, right: Rect): Rect | null {
  * A hidden anchor row has no coordinate in the viewport layout and is omitted.
  */
 export function getFloatingImageSheetRect(
-  image: FloatingImagePlacement,
+  image: FloatingImagePlacement | FloatingImage,
   layout: SheetViewportLayout,
 ): Rect | null {
+  if (!isLegacyPlacement(image)) return null;
   const anchor = layout.getCellRect(image.anchor);
   if (!anchor) return null;
   return {
@@ -63,7 +73,7 @@ export function getFloatingImageSheetRect(
  * cell range, an image may cross a frozen boundary, so every pane is evaluated.
  */
 export function getFloatingImageViewportFragments(
-  image: FloatingImagePlacement,
+  image: FloatingImagePlacement | FloatingImage,
   layout: SheetViewportLayout,
 ): FloatingImageViewportFragment[] {
   const sheetRect = getFloatingImageSheetRect(image, layout);
@@ -95,11 +105,12 @@ export function getFloatingImageViewportFragments(
  * Reanchors a sheet rect to its containing cell. Persisted offsets are always
  * non-negative, so moving above or left of the sheet is clamped at its origin.
  */
-export function reanchorFloatingImageAtSheetRect<T extends FloatingImagePlacement>(
+export function reanchorFloatingImageAtSheetRect<T extends FloatingImagePlacement | FloatingImage>(
   image: T,
   sheetRect: Rect,
   layout: SheetViewportLayout,
 ): T | null {
+  if (!isLegacyPlacement(image)) return null;
   const x = Math.max(0, sheetRect.x);
   const y = Math.max(0, sheetRect.y);
   const anchor = layout.getCellAtSheetPoint({ x, y });
@@ -117,7 +128,7 @@ export function reanchorFloatingImageAtSheetRect<T extends FloatingImagePlacemen
 }
 
 /** Moves an image in continuous sheet coordinates and normalizes its anchor. */
-export function moveFloatingImageBy<T extends FloatingImagePlacement>(
+export function moveFloatingImageBy<T extends FloatingImagePlacement | FloatingImage>(
   image: T,
   delta: { x: number; y: number },
   layout: SheetViewportLayout,
@@ -140,7 +151,7 @@ function clamp(value: number, minimum: number, maximum: number): number {
  * opposite image edge fixed, then normalize the resulting rect to a cell
  * anchor. Corner handles keep the image's original aspect ratio.
  */
-export function resizeFloatingImageBy<T extends FloatingImagePlacement>(
+export function resizeFloatingImageBy<T extends FloatingImagePlacement | FloatingImage>(
   image: T,
   direction: FloatingImageResizeDirection,
   delta: { x: number; y: number },

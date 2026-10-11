@@ -1,5 +1,6 @@
 import { onBeforeUnmount, readonly, ref, watch } from "vue";
 import type { Workbook } from "@sheetcraft/core/workbook";
+import { collectPictureGroupAssetIds, isPictureGroup } from "@sheetcraft/core/picture-group";
 import { readEncodedImageSource } from "./readEncodedImageSource";
 import { assertImagePixelBudget } from "./imageAssetValidation";
 import type { ImageAsset, ImageAssetStore } from "./imageAssetStore";
@@ -17,7 +18,11 @@ export function collectWorkbookImageAssetIds(workbook: Workbook): Set<string> {
       const content = cell.content;
       if (content?.kind === "image") ids.add(content.image.assetId);
     }
-    for (const image of sheet.floatingImages) ids.add(image.assetId);
+    for (const image of sheet.floatingImages) {
+      if (isPictureGroup(image)) {
+        for (const id of collectPictureGroupAssetIds(image)) ids.add(id);
+      } else ids.add(image.assetId);
+    }
   }
   return ids;
 }

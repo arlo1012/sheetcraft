@@ -1,3 +1,5 @@
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import { requireLegacyPicture } from "../sheet-images/picture-document-support";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { XlsxWorkerFailure } from "./workbookXlsxWorker";
 import { deserializeWorkbook, type WorkbookSnapshot } from "@sheetcraft/core/serialization";
@@ -65,10 +67,10 @@ function extensionFor(mimeType: string): EncodedImage | undefined {
 export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
   for (const sheet of getWorkbookSheets(workbook))
     for (const image of sheet.floatingImages) {
-      if (isFramedPictureObject(image)) {
+      if (isFramedPictureObject(image) || isPictureGroup(image)) {
         const location = `${sheet.name}.floatingImages[${JSON.stringify(image.id)}].frame`;
         throw new XlsxWorkerFailure(
-          `Frame-aware pictures are not yet supported by XLSX export at ${location}.`,
+          `Frame-aware pictures and owned groups are not yet supported by XLSX export at ${location}.`,
           {
             issues: [
               { code: "feature-omitted", severity: "block", count: 1, locations: [location] },
@@ -93,11 +95,13 @@ function collectImageReferences(snapshot: WorkbookSnapshot): readonly ImageRefer
         transform: normalizeImageTransform(cell.content.image.transform),
       });
     }
-    for (const image of sheet.floatingImages)
+    for (const root of sheet.floatingImages) {
+      const image = requireLegacyPicture(root);
       references.push({
         assetId: image.assetId,
         transform: normalizeImageTransform(image.transform),
       });
+    }
   }
   return references;
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { requireStandalonePictures } from "../../sheet-images/picture-document-support";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
@@ -121,7 +122,9 @@ async function print(): Promise<void> {
   try {
     printWindow.opener = null;
     const document = documentPreview.value;
-    const assetIds = new Set(document.sheet.floatingImages.map((image) => image.assetId));
+    const assetIds = new Set(
+      requireStandalonePictures(document.sheet.floatingImages).map((image) => image.assetId),
+    );
     for (const cell of document.sheet.cells.values())
       if (cell.content?.kind === "image") assetIds.add(cell.content.image.assetId);
     const watermarkAssetId = document.sheet.pageDecoration?.watermark?.image?.assetId;

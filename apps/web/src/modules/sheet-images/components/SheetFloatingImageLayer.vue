@@ -21,7 +21,7 @@ import {
   MAX_FLOATING_IMAGE_SIZE,
   cloneFloatingImage,
   areFloatingImageCollectionsEqual,
-  type FloatingImage,
+  type FloatingImage as PictureObject,
   type LegacyFloatingImage,
 } from "@sheetcraft/core/workbook";
 import {
@@ -42,7 +42,11 @@ import type { PictureAlignment, PictureAlignmentReference } from "../usePictureT
 import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import SheetFloatingImageContextMenu from "./SheetFloatingImageContextMenu.vue";
 import SheetFloatingImageSelection from "../../../shared/sheet-objects/SheetObjectSelection.vue";
-import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import {
+  isFramedPictureObject,
+  type StandalonePictureObject as FloatingImage,
+} from "@sheetcraft/core/picture-object";
+import { requireStandalonePicture, requireStandalonePictures } from "../picture-document-support";
 import { pictureFrameContainsPoint } from "@sheetcraft/core/picture-frame";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import {
@@ -82,7 +86,7 @@ const MINIMUM_IMAGE_SIZE = 24;
 
 const props = withDefaults(
   defineProps<{
-    images: readonly FloatingImage[];
+    images: readonly PictureObject[];
     owner?: object;
     applyUpdateMany?: (images: readonly FloatingImage[]) => boolean;
     /** Canvas renders image effects; the DOM layer retains this for overlays and future object handles. */
@@ -101,7 +105,8 @@ const props = withDefaults(
   { readOnly: false, scale: 1, previewOnDoubleClick: true },
 );
 
-const currentImages = computed(() => props.images);
+// The prepared standalone layer refuses the whole container collection before paint or gestures.
+const currentImages = computed(() => requireStandalonePictures(props.images));
 
 const emit = defineEmits<{
   select: [id: string | null, additive?: boolean];
@@ -120,6 +125,12 @@ const emit = defineEmits<{
 
 const { t } = useAppI18n();
 function commitImages(nextImages: FloatingImage[]): boolean {
+  try {
+    requireStandalonePictures(props.images);
+  } catch {
+    emit("feedback", "picture.operationFailed");
+    return false;
+  }
   const current = nextImages.map((image) =>
     currentImages.value.find((entry) => entry.id === image.id),
   );
@@ -328,7 +339,7 @@ const groupFragments = computed<LegacyImageFragment[]>(() => {
 });
 
 function displayImages(): readonly FloatingImage[] {
-  return currentImages.value.map(displayImage);
+  return requireStandalonePictures(props.images).map(displayImage);
 }
 
 function displayImage(image: FloatingImage): FloatingImage {
@@ -339,7 +350,7 @@ function displayImage(image: FloatingImage): FloatingImage {
 }
 
 function cloneImage(image: FloatingImage): FloatingImage {
-  return cloneFloatingImage(image);
+  return requireStandalonePicture(cloneFloatingImage(image));
 }
 
 function getFragmentStyle(fragment: ImageFragment): CSSProperties {
@@ -403,6 +414,7 @@ function planStartGesture(
   event: PointerEvent,
   startPoint: Point,
 ): void {
+  requireStandalonePictures(props.images);
   cancelPointerSession();
   const focusTarget =
     (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-floating-image-id]") ??

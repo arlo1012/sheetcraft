@@ -1,4 +1,4 @@
-import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import {
   MAX_FLOATING_IMAGE_SIZE,
   MIN_FLOATING_IMAGE_SIZE,
@@ -115,7 +115,7 @@ export function cropFloatingImage(
   selection: FloatingImageCropSelection,
   layout: SheetViewportLayout,
 ): LegacyFloatingImage | null {
-  if (isFramedPictureObject(image)) return null;
+  if (!isLegacyPictureObject(image)) return null;
   const rect = getFloatingImageSheetRect(image, layout);
   if (!rect) return null;
   const displayed = normalizeSelection(selection);
@@ -149,7 +149,7 @@ export function rotateFloatingImage(
   quarterTurns: -1 | 1 | 2,
   layout: SheetViewportLayout,
 ): LegacyFloatingImage | null {
-  if (isFramedPictureObject(image)) return null;
+  if (!isLegacyPictureObject(image)) return null;
   const rect = getFloatingImageSheetRect(image, layout);
   if (!rect) return null;
   const rotation = ((((image.transform?.rotation ?? 0) + quarterTurns * 90) % 360) + 360) % 360;
@@ -172,8 +172,8 @@ export type ImageFlipAxis = "horizontal" | "vertical";
 
 /** Mirrors the current displayed image while preserving its frame and original source. */
 export function flipFloatingImage(image: FloatingImage, axis: ImageFlipAxis): LegacyFloatingImage {
-  if (isFramedPictureObject(image))
-    throw new TypeError("Use the frame-aware picture transform for framed images.");
+  if (!isLegacyPictureObject(image))
+    throw new TypeError("Legacy picture transforms do not support framed pictures or groups.");
   // Metadata describes source axes before rotation. A quarter-turn exchanges
   // those axes relative to the horizontal and vertical directions on screen.
   const horizontalSourceAxis = (axis === "horizontal") !== isQuarterTurn(image.transform?.rotation);
@@ -186,7 +186,7 @@ export function restoreFloatingImage(
   layout: SheetViewportLayout,
   originalSize?: FloatingImageOriginalSize,
 ): LegacyFloatingImage | null {
-  if (isFramedPictureObject(image)) return null;
+  if (!isLegacyPictureObject(image)) return null;
   const rect = getFloatingImageSheetRect(image, layout);
   if (!rect) return null;
   const crop = image.transform?.crop ?? fullCrop();

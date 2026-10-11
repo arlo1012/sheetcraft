@@ -1,12 +1,14 @@
-import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import { getCurrentScope, nextTick, onScopeDispose, readonly, ref } from "vue";
 import {
   MIN_FLOATING_IMAGE_SIZE,
   MAX_FLOATING_IMAGE_SIZE,
   MAX_SHEET_ROWS,
   getCellContent,
+  cloneFloatingImage,
   type CellAddress,
   type FloatingImage,
+  type LegacyFloatingImage,
   type ImageTransform,
   type Sheet,
   type Workbook,
@@ -181,17 +183,26 @@ export function useSheetImageActions(options: {
     if (busy.value || disposed) return;
     const image = options.getSheet().floatingImages.find((entry) => entry.id === imageId);
     if (!image) return;
-    if (isFramedPictureObject(image)) {
+    if (!isLegacyPictureObject(image)) {
       feedback.value = "picture.operationFailed";
       return;
     }
     cancelPending();
     const target = captureTarget(image.anchor);
     if (!target) return;
-    pending = { mode: "floating", target, replaceId: imageId, replaceAssetId: image.assetId };
+    const replaceAssetId = image.assetId;
+    pending = { mode: "floating", target, replaceId: imageId, replaceAssetId };
     pickerKey.value += 1;
     await nextTick();
-    if (!isCurrent(target) || pending?.target !== target) return;
+    if (
+      !isCurrent(target) ||
+      pending?.target !== target ||
+      !target.sheet.floatingImages.some(
+        (entry) =>
+          isLegacyPictureObject(entry) && entry.id === image.id && entry.assetId === replaceAssetId,
+      )
+    )
+      return;
     openPicker(target, false);
   }
 
@@ -218,7 +229,7 @@ export function useSheetImageActions(options: {
   ): Promise<void> {
     if (replaceId) {
       const current = options.getSheet().floatingImages.find((image) => image.id === replaceId);
-      if (current && isFramedPictureObject(current)) {
+      if (current && !isLegacyPictureObject(current)) {
         feedback.value = "picture.operationFailed";
         return;
       }
@@ -226,15 +237,20 @@ export function useSheetImageActions(options: {
     target ??= captureTarget(options.getAddress(), mode);
     if (!target || !isCurrent(target, mode) || busy.value) return;
     const owner = target;
-    replaceAssetId ??= replaceId
-      ? owner.sheet.floatingImages.find((image) => image.id === replaceId)?.assetId
+    const original = replaceId
+      ? owner.sheet.floatingImages.find((image) => image.id === replaceId)
       : undefined;
+    if (original && !isLegacyPictureObject(original)) {
+      feedback.value = "picture.operationFailed";
+      return;
+    }
+    replaceAssetId ??= original?.assetId;
     const replacement = () =>
       owner.sheet.floatingImages.find(
-        (image) =>
+        (image): image is LegacyFloatingImage =>
+          isLegacyPictureObject(image) &&
           image.id === replaceId &&
-          image.assetId === replaceAssetId &&
-          !isFramedPictureObject(image),
+          image.assetId === replaceAssetId,
       );
     const valid = () => isCurrent(owner, mode) && (!replaceId || !!replacement());
     if (!valid()) return;
@@ -402,6 +418,15 @@ export function useSheetImageActions(options: {
     const files = Array.from(input.files ?? []);
     const file = files[0];
     const request = pending;
+    if (request?.replaceId) {
+      const image = request.target.sheet.floatingImages.find(
+        (entry) => entry.id === request.replaceId,
+      );
+      if (image && !isLegacyPictureObject(image)) {
+        feedback.value = "picture.operationFailed";
+        return;
+      }
+    }
     pending = undefined;
     input.value = "";
     if (file && request) {
@@ -422,10 +447,11 @@ export function useSheetImageActions(options: {
     mode: ImageInsertMode = "floating",
     address = options.getAddress(),
   ): Promise<void> {
-    if (isFramedPictureObject(image)) {
+    if (!isLegacyPictureObject(image)) {
       feedback.value = "clipboard.pasteRejected";
       return;
     }
+    image = cloneFloatingImage(image);
     const target = captureTarget(address, mode);
     if (!target || busy.value) return;
     busy.value = true;
@@ -476,7 +502,7 @@ export function useSheetImageActions(options: {
     images: readonly FloatingImage[],
     address: CellAddress,
   ): Promise<void> {
-    if (images.some(isFramedPictureObject)) {
+    if (images.some((image) => !isLegacyPictureObject(image))) {
       feedback.value = "clipboard.pasteRejected";
       return;
     }

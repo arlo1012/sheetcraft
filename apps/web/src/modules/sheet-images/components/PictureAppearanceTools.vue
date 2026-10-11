@@ -13,6 +13,7 @@ import {
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { type FloatingImage, type ImageAppearance } from "@sheetcraft/core/workbook";
+import { isPictureGroup } from "@sheetcraft/core";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
@@ -22,7 +23,11 @@ import MenuItem from "../../../shared/menu/MenuItem.vue";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
+import { requireStandalonePicture } from "../picture-document-support";
 const props = defineProps<{ image: FloatingImage; disabled: boolean }>();
+// A container has no appearance source. Reject it before creating menu drafts.
+requireStandalonePicture(props.image);
+const standaloneImage = computed(() => requireStandalonePicture(props.image));
 const emit = defineEmits<{
   change: [patch: Partial<ImageAppearance> | undefined];
 }>();
@@ -68,30 +73,36 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   menuSurfaceRef,
   disabled: computed(() => props.disabled),
 });
-const appearance = computed(() => props.image.transform?.appearance ?? {});
-const isFramed = computed(() => isFramedPictureObject(props.image));
+const appearance = computed(() => standaloneImage.value.transform?.appearance ?? {});
+const isFramed = computed(() => isFramedPictureObject(standaloneImage.value));
 const label = computed(() => t(`picture.${mode.value}`));
-watch([() => props.image.id, () => props.image.assetId], () => dismiss("programmatic", false), {
-  flush: "sync",
-});
+watch(
+  [() => props.image.id, () => (isPictureGroup(props.image) ? undefined : props.image.assetId)],
+  () => dismiss("programmatic", false),
+  { flush: "sync" },
+);
 async function toggle(next: Mode): Promise<void> {
+  const image = requireStandalonePicture(props.image);
   if (props.disabled) return;
-  const id = props.image.id;
-  const assetId = props.image.assetId;
+  const id = image.id;
+  const assetId = image.assetId;
   if (mode.value !== next) {
     dismiss("programmatic", false);
     mode.value = next;
     await nextTick();
   }
-  if (props.disabled || props.image.id !== id || props.image.assetId !== assetId) return;
+  const current = requireStandalonePicture(props.image);
+  if (props.disabled || current.id !== id || current.assetId !== assetId) return;
   toggleMenu();
 }
 function keydown(next: Mode, event: KeyboardEvent): void {
+  requireStandalonePicture(props.image);
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
   mode.value = next;
   onTriggerKeydown(event);
 }
 function change(patch: Partial<ImageAppearance>): boolean {
+  requireStandalonePicture(props.image);
   if (props.disabled || (isFramed.value && patch.reflection === true)) return false;
   emit("change", patch);
   return true;
@@ -108,12 +119,18 @@ function borderWidth(value: unknown): void {
   change({ border: { color: appearance.value.border?.color ?? "#000000", width: value } });
 }
 function reset(): void {
+  requireStandalonePicture(props.image);
   if (props.disabled) return;
   emit("change", undefined);
 }
 </script>
 <template>
-  <section class="picture-appearance" role="group" :aria-label="t('picture.style')">
+  <section
+    v-if="!isPictureGroup(image)"
+    class="picture-appearance"
+    role="group"
+    :aria-label="t('picture.style')"
+  >
     <RibbonMenuButton
       ref="colorButton"
       variant="tall"

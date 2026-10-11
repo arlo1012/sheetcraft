@@ -5,8 +5,16 @@ import {
   createWorkbook,
   getActiveSheet,
   setCellContent,
+  type LegacyFloatingImage,
   type Workbook,
 } from "@sheetcraft/core/workbook";
+import type {
+  GroupedGroup,
+  GroupedPicture,
+  PictureGroup,
+  PictureGroupChild,
+} from "@sheetcraft/core/picture-group";
+import type { FramedFloatingImage } from "@sheetcraft/core/picture-object";
 import type { ImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import {
   collectWorkbookImageAssetIds,
@@ -21,6 +29,58 @@ function imageWorkbook(id: string): Workbook {
     { kind: "image", image: { assetId: id, altText: "" } },
   );
   return workbook;
+}
+function floatingImage(id: string, assetId: string): LegacyFloatingImage {
+  return {
+    id,
+    assetId,
+    altText: "",
+    anchor: { row: 0, column: 0 },
+    offsetX: 0,
+    offsetY: 0,
+    width: 100,
+    height: 100,
+  };
+}
+function groupedPicture(id: string, assetId: string): GroupedPicture {
+  return {
+    kind: "grouped-picture-v1",
+    id,
+    assetId,
+    altText: "",
+    frame: {
+      kind: "group-member-frame-v1",
+      rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
+      angleDeg: 0,
+      source: { widthRatio: 1, heightRatio: 1, offsetXRatio: 0, offsetYRatio: 0 },
+    },
+  };
+}
+function groupedGroup(id: string, members: PictureGroupChild[]): GroupedGroup {
+  return {
+    kind: "grouped-group-v1",
+    id,
+    altText: "",
+    frame: {
+      kind: "group-local-frame-v1",
+      rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
+      angleDeg: 0,
+    },
+    members,
+  };
+}
+function pictureGroup(id: string, members: PictureGroupChild[]): PictureGroup {
+  return {
+    kind: "picture-group-v1",
+    id,
+    altText: "",
+    frame: {
+      kind: "group-frame-v1",
+      anchor: { mode: "fixed", x: 0, y: 0, size: { width: 100, height: 100 } },
+      angleDeg: 0,
+    },
+    members,
+  };
 }
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -49,6 +109,193 @@ const asset = (id: string) => ({
 });
 afterEach(() => vi.unstubAllGlobals());
 describe("useImageAssetUrls", () => {
+  test("collects nested hidden group leaves alongside all existing image references", () => {
+    const workbook = imageWorkbook("shared");
+    workbook.watermarkPresets = [
+      {
+        id: "saved-preset",
+        name: "Saved",
+        watermark: {
+          ...DEFAULT_SHEET_WATERMARK,
+          image: { assetId: "saved", scale: null, washout: true, angle: 0 },
+        },
+      },
+    ];
+    const sheet = getActiveSheet(workbook);
+    sheet.pageDecoration = {
+      backgroundAssetId: "background",
+      watermark: {
+        ...DEFAULT_SHEET_WATERMARK,
+        image: { assetId: "watermark", scale: null, washout: true, angle: 0 },
+      },
+    };
+    const hiddenLeaf = { ...groupedPicture("hidden-leaf", "hidden"), hidden: true };
+    const nested = { ...groupedGroup("nested", [hiddenLeaf]), hidden: true };
+    const group = {
+      ...pictureGroup("root", [
+        groupedPicture("shared-leaf", "shared"),
+        groupedPicture("reused-leaf", "shared"),
+        nested,
+      ]),
+      hidden: true,
+    };
+    const framed: FramedFloatingImage = {
+      id: "framed",
+      assetId: "framed-asset",
+      altText: "",
+      frame: {
+        kind: "object-frame-v1",
+        anchor: { mode: "fixed", x: 0, y: 0, size: { width: 100, height: 100 } },
+        source: { widthRatio: 1, heightRatio: 1, offsetXRatio: 0, offsetYRatio: 0 },
+        angleDeg: 0,
+      },
+    };
+    sheet.floatingImages = [floatingImage("legacy", "legacy-asset"), framed, group];
+    const second = createWorkbook({ id: "second-book", sheetId: "second-sheet" });
+    const secondSheet = getActiveSheet(second);
+    secondSheet.floatingImages = [
+      pictureGroup("second-root", [groupedPicture("second-leaf", "second-asset")]),
+    ];
+    workbook.sheets.set(secondSheet.id, secondSheet);
+
+    expect(collectWorkbookImageAssetIds(workbook)).toEqual(
+      new Set([
+        "shared",
+        "saved",
+        "background",
+        "watermark",
+        "legacy-asset",
+        "framed-asset",
+        "hidden",
+        "second-asset",
+      ]),
+    );
+    expect(sheet.floatingImages[2]).toBe(group);
+    expect(group.members[2]).toBe(nested);
+    expect(nested.members[0]).toBe(hiddenLeaf);
+  });
+  test("keeps existing URLs through grouping, hidden nesting, and ungrouping", async () => {
+    const workbook = ref(createWorkbook({ id: "grouping-book", sheetId: "sheet" }));
+    const sheet = getActiveSheet(workbook.value);
+    sheet.floatingImages = [floatingImage("first", "first"), floatingImage("second", "second")];
+    const get = vi.fn(async (id: string) => asset(id));
+    const create = vi.fn().mockReturnValueOnce("blob:first").mockReturnValueOnce("blob:second");
+    const revoke = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL: create, revokeObjectURL: revoke });
+    const fixture = mount(workbook, { get, put: async () => {} });
+    await fixture.value.refresh();
+    const original = new Map(fixture.value.urls.value);
+
+    sheet.floatingImages = [
+      pictureGroup("root", [
+        groupedPicture("first", "first"),
+        {
+          ...groupedGroup("nested", [{ ...groupedPicture("second", "second"), hidden: true }]),
+          hidden: true,
+        },
+      ]),
+    ];
+    await nextTick();
+    await fixture.value.refresh();
+    expect(fixture.value.urls.value).toEqual(original);
+    expect(revoke).not.toHaveBeenCalled();
+
+    sheet.floatingImages = [floatingImage("second", "second"), floatingImage("first", "first")];
+    await nextTick();
+    await fixture.value.refresh();
+    expect(fixture.value.urls.value).toEqual(original);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(revoke).not.toHaveBeenCalled();
+    fixture.unmount();
+    expect(revoke).toHaveBeenCalledTimes(2);
+    expect(revoke).toHaveBeenCalledWith("blob:first");
+    expect(revoke).toHaveBeenCalledWith("blob:second");
+  });
+  test("releases a removed group leaf while retaining an asset shared with cell content", async () => {
+    const workbook = ref(imageWorkbook("shared"));
+    const sheet = getActiveSheet(workbook.value);
+    sheet.floatingImages = [
+      pictureGroup("root", [
+        groupedPicture("shared-leaf", "shared"),
+        groupedPicture("removed-leaf", "removed"),
+      ]),
+    ];
+    const get = vi.fn(async (id: string) => asset(id));
+    const create = vi.fn().mockReturnValueOnce("blob:shared").mockReturnValueOnce("blob:removed");
+    const revoke = vi.fn();
+    const put = vi.fn(async () => {});
+    vi.stubGlobal("URL", { createObjectURL: create, revokeObjectURL: revoke });
+    const fixture = mount(workbook, { get, put });
+    await fixture.value.refresh();
+
+    sheet.floatingImages = [];
+    await nextTick();
+    await fixture.value.refresh();
+    expect(fixture.value.urls.value).toEqual(new Map([["shared", "blob:shared"]]));
+    expect(revoke).toHaveBeenCalledWith("blob:removed");
+    expect(revoke).not.toHaveBeenCalledWith("blob:shared");
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(get.mock.calls).toEqual([["shared"], ["removed"]]);
+    expect(put).not.toHaveBeenCalled();
+    fixture.unmount();
+  });
+  test("does not publish a delayed group leaf from an older workbook generation", async () => {
+    const pending = deferred<ReturnType<typeof asset> | undefined>();
+    const oldBook = createWorkbook({ id: "old-group-book", sheetId: "sheet" });
+    getActiveSheet(oldBook).floatingImages = [
+      pictureGroup("old-root", [groupedPicture("old-leaf", "old")]),
+    ];
+    const workbook = ref(oldBook);
+    const get = vi.fn((id: string) =>
+      id === "old" ? pending.promise : Promise.resolve(asset(id)),
+    );
+    const create = vi.fn(() => "blob:new");
+    const revoke = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL: create, revokeObjectURL: revoke });
+    const fixture = mount(workbook, { get, put: async () => {} });
+    const stale = fixture.value.refresh();
+
+    workbook.value = imageWorkbook("new");
+    await nextTick();
+    await fixture.value.refresh();
+    pending.resolve(asset("old"));
+    await stale;
+    expect(fixture.value.urls.value).toEqual(new Map([["new", "blob:new"]]));
+    expect(fixture.value.loading.value).toEqual(new Set());
+    expect(fixture.value.missing.value).toEqual(new Set());
+    expect(get.mock.calls).toEqual([["old"], ["new"]]);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(revoke).not.toHaveBeenCalled();
+    fixture.unmount();
+  });
+  test("reuses an in-flight shared asset read when a group is replaced by cell content", async () => {
+    const pending = deferred<ReturnType<typeof asset> | undefined>();
+    const grouped = createWorkbook({ id: "pending-group-book", sheetId: "sheet" });
+    getActiveSheet(grouped).floatingImages = [
+      pictureGroup("root", [groupedPicture("first", "shared"), groupedPicture("second", "shared")]),
+    ];
+    const workbook = ref(grouped);
+    const get = vi.fn(() => pending.promise);
+    const create = vi.fn(() => "blob:shared");
+    const revoke = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL: create, revokeObjectURL: revoke });
+    const fixture = mount(workbook, { get, put: async () => {} });
+    const stale = fixture.value.refresh();
+
+    workbook.value = imageWorkbook("shared");
+    await nextTick();
+    const latest = fixture.value.refresh();
+    pending.resolve(asset("shared"));
+    await Promise.all([stale, latest]);
+    expect(fixture.value.urls.value).toEqual(new Map([["shared", "blob:shared"]]));
+    expect(fixture.value.loading.value).toEqual(new Set());
+    expect(fixture.value.missing.value).toEqual(new Set());
+    expect(get.mock.calls).toEqual([["shared"]]);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(revoke).not.toHaveBeenCalled();
+    fixture.unmount();
+  });
   test("retains pictures used only by saved watermark presets", () => {
     const workbook = createWorkbook({ id: "preset-book", sheetId: "sheet" });
     workbook.watermarkPresets = [

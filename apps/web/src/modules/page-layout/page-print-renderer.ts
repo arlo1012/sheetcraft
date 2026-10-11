@@ -1,3 +1,4 @@
+import { requireStandalonePictures } from "../sheet-images/picture-document-support";
 import { isFormulaError, type FormulaValue } from "@sheetcraft/core/formula";
 import {
   DEFAULT_ROW_HEIGHT,
@@ -196,6 +197,7 @@ export function createPrintPreviewDocument(options: {
   dateSystem?: "1900" | "1904";
   revision?: number;
 }): PrintPreviewDocument {
+  requireStandalonePictures(options.sheet.floatingImages);
   const requested = pageSetupForPrint(
     options.sheet,
     cloneSheetPageSetup(options.setup ?? options.sheet.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
@@ -521,6 +523,7 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
     scale?: number;
     density?: number;
   }): void {
+    requireStandalonePictures(options.document.sheet.floatingImages);
     const previewScale = options.scale ?? 1;
     const density = options.density ?? window.devicePixelRatio ?? 1;
     const { document, page, canvas } = options;

@@ -1,4 +1,4 @@
-import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import { getCurrentScope, onScopeDispose, ref, shallowRef, watch, type Ref } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import {
@@ -20,7 +20,7 @@ type Owner = {
   generation: number;
   image: LegacyFloatingImage;
   selectedIds: string[];
-  sources: Array<{ id: string; assetId: string }>;
+  sources: FloatingImage[];
 };
 type Dialog = { dialogId: string; error: Ref<MessageKey | undefined>; close: () => void };
 type AnnotationDialog = Dialog & {
@@ -32,6 +32,15 @@ type BatchDialog = Dialog & {
   image: LegacyFloatingImage;
   confirm: (settings: ResizeSettings) => boolean;
 };
+
+function sameLegacySource(left: FloatingImage, right: FloatingImage): boolean {
+  return (
+    isLegacyPictureObject(left) &&
+    isLegacyPictureObject(right) &&
+    left.id === right.id &&
+    left.assetId === right.assetId
+  );
+}
 
 export function usePictureDialogSessions(options: {
   getWorkbook: () => Workbook;
@@ -59,10 +68,15 @@ export function usePictureDialogSessions(options: {
   function capture(): Owner | undefined {
     const image = options.getSelectedImage();
     const sheet = options.getSheet();
+    const selectedIds = [...options.getSelectedIds()];
+    const selected = sheet.floatingImages.filter((entry) => selectedIds.includes(entry.id));
     if (
       disposed ||
       !image ||
-      isFramedPictureObject(image) ||
+      !isLegacyPictureObject(image) ||
+      new Set(selectedIds).size !== selectedIds.length ||
+      selected.length !== selectedIds.length ||
+      selected.some((entry) => !isLegacyPictureObject(entry)) ||
       options.isBusy() ||
       !canUseSheetPermission(sheet, "editObjects")
     )
@@ -72,8 +86,8 @@ export function usePictureDialogSessions(options: {
       sheet,
       generation: options.getGeneration(),
       image: cloneFloatingImage(image),
-      selectedIds: [...options.getSelectedIds()],
-      sources: sheet.floatingImages.map(({ id, assetId }) => ({ id, assetId })),
+      selectedIds,
+      sources: sheet.floatingImages.map((entry) => cloneFloatingImage(entry)),
     };
   }
   function current(owner: Owner, all = false): boolean {
@@ -85,19 +99,19 @@ export function usePictureDialogSessions(options: {
       owner.workbook.sheets.get(owner.sheet.id) === owner.sheet &&
       options.getGeneration() === owner.generation &&
       canUseSheetPermission(owner.sheet, "editObjects") &&
-      selected?.id === owner.image.id &&
-      selected.assetId === owner.image.assetId &&
+      selected !== undefined &&
+      sameLegacySource(selected, owner.image) &&
       JSON.stringify(options.getSelectedIds()) === JSON.stringify(owner.selectedIds) &&
       (all
-        ? JSON.stringify(owner.sheet.floatingImages.map(({ id, assetId }) => ({ id, assetId }))) ===
-          JSON.stringify(owner.sources)
+        ? owner.sheet.floatingImages.length === owner.sources.length &&
+          owner.sources.every((source, index) => {
+            const target = owner.sheet.floatingImages[index];
+            return target !== undefined && sameLegacySource(source, target);
+          })
         : owner.selectedIds.every((id) => {
             const source = owner.sources.find((entry) => entry.id === id);
             return (
-              source &&
-              owner.sheet.floatingImages.some(
-                (image) => image.id === id && image.assetId === source.assetId,
-              )
+              source && owner.sheet.floatingImages.some((image) => sameLegacySource(image, source))
             );
           }))
     );
@@ -121,7 +135,8 @@ export function usePictureDialogSessions(options: {
           !current(owner) ||
           options.isBusy() ||
           !target ||
-          isFramedPictureObject(target) ||
+          !isLegacyPictureObject(target) ||
+          !isLegacyPictureObject(image) ||
           target.assetId !== owner.image.assetId ||
           image.id !== owner.image.id ||
           image.assetId !== owner.image.assetId ||

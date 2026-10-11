@@ -7,6 +7,8 @@ import {
   redoWorkbookCommand,
 } from "@sheetcraft/core/history";
 import { createSetFloatingImageCommand } from "@sheetcraft/core/commands";
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import type { PictureObject, StandalonePictureObject } from "@sheetcraft/core/picture-object";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   getActiveSheet,
@@ -22,6 +24,10 @@ const settings = { maxSide: 1920, quality: 0.8, format: "webp" as const, all: fa
 const annotations = [
   { kind: "pen" as const, width: 0.01, color: "#FF0000", points: [{ x: 0.1, y: 0.2 }] },
 ];
+function requireStandalone(image: PictureObject): StandalonePictureObject {
+  if (isPictureGroup(image)) throw new Error("Expected a standalone picture.");
+  return image;
+}
 function fixture() {
   const session = createWorkbookSession({ idFactory: createSequentialIdFactory() });
   const sheet = getActiveSheet(session.workbook);
@@ -104,7 +110,7 @@ describe("picture dialog owner sessions", () => {
     expect(draft.confirm(f.annotated())).toBe(false);
     expect(f.dialogs.annotation.value).toBe(draft);
     expect(draft.error.value).toBe("picture.operationFailed");
-    expect(f.sheet.floatingImages[0]!.transform).toBeUndefined();
+    expect(requireStandalone(f.sheet.floatingImages[0]!).transform).toBeUndefined();
     expect(f.session.history.undoStack).toHaveLength(0);
     f.allow();
     const before = serializeWorkbook(f.session.workbook);
@@ -182,7 +188,8 @@ describe("picture dialog owner sessions", () => {
       const draft = f.dialogs.batch.value!;
       if (change === "generation") f.setGeneration();
       else if (change === "selection") f.selectOther();
-      else if (change === "source") f.sheet.floatingImages[0]!.assetId = "new-source";
+      else if (change === "source")
+        requireStandalone(f.sheet.floatingImages[0]!).assetId = "new-source";
       else if (change === "permission") f.sheet.properties.protected = true;
       else f.setBusy();
       expect(draft.confirm(resize)).toBe(false);
@@ -253,7 +260,7 @@ describe("full picture dialog selection identity", () => {
       if (kind === "batch") f.dialogs.openBatchSize();
       else f.dialogs.openCompression();
       const draft = kind === "batch" ? f.dialogs.batch.value! : f.dialogs.compression.value!;
-      f.sheet.floatingImages[1]!.assetId = "new-secondary-source";
+      requireStandalone(f.sheet.floatingImages[1]!).assetId = "new-secondary-source";
       expect(await draft.confirm({ ...resize, ...settings })).toBe(false);
       expect(draft.error.value).toBe("picture.operationFailed");
       expect(f.compress).not.toHaveBeenCalled();

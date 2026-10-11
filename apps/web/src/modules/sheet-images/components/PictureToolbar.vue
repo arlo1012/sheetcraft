@@ -11,6 +11,7 @@ import {
   type ImageAppearance,
 } from "@sheetcraft/core/workbook";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { isPictureGroup } from "@sheetcraft/core";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
@@ -23,6 +24,7 @@ import type { PictureAlignment, PictureLayerAction } from "../usePictureTools";
 import type { PictureSizeEdit, PictureToolGeometry } from "../picture-tool-geometry";
 import PictureAppearanceTools from "./PictureAppearanceTools.vue";
 import ImageInsertMenu from "../../home-tools/components/ImageInsertMenu.vue";
+import { requireStandalonePicture } from "../picture-document-support";
 const props = defineProps<{
   image: FloatingImage;
   geometry?: PictureToolGeometry;
@@ -37,6 +39,9 @@ const props = defineProps<{
   selectionCount: number;
   previewOnDoubleClick: boolean;
 }>();
+// Standalone source tools cannot establish a draft for an owned container.
+requireStandalonePicture(props.image);
+const standaloneImage = computed(() => requireStandalonePicture(props.image));
 const emit = defineEmits<{
   resize: [intent: PictureSizeEdit];
   aspectRatio: [value: boolean];
@@ -62,11 +67,11 @@ const emit = defineEmits<{
   convertToCell: [];
 }>();
 const { t } = useAppI18n();
-const isFramed = computed(() => isFramedPictureObject(props.image));
-const locked = computed(() => props.image.lockAspectRatio ?? true);
+const isFramed = computed(() => isFramedPictureObject(standaloneImage.value));
+const locked = computed(() => standaloneImage.value.lockAspectRatio ?? true);
 const size = computed(() => {
+  const image = standaloneImage.value;
   if (props.geometry) return props.geometry;
-  const image = props.image;
   if (isFramedPictureObject(image)) return undefined;
   return { width: image.width, height: image.height };
 });
@@ -82,9 +87,11 @@ function points(axis: "width" | "height"): number | undefined {
   return sizeAvailable.value ? Math.round(size.value![axis] * 75) / 100 : undefined;
 }
 const numericCallbacks = computed(() => {
+  requireStandalonePicture(props.image);
   const draftOwnerKey = props.draftOwnerKey;
   const handler = props.resizeHandler;
   function commit(axis: "width" | "height", points: unknown): void {
+    requireStandalonePicture(props.image);
     if (draftOwnerKey !== props.draftOwnerKey || handler !== props.resizeHandler) return;
     resize(axis, points, handler);
   }
@@ -112,15 +119,18 @@ function resize(
   else emit("resize", edit);
 }
 function aspectRatio(value: unknown): void {
+  requireStandalonePicture(props.image);
   if (props.disabled || props.selectionCount > 1 || typeof value !== "boolean") return;
   const locked = value;
   if (props.aspectRatioHandler) props.aspectRatioHandler(locked);
   else emit("aspectRatio", locked);
 }
 const appearanceCallback = computed(() => {
+  requireStandalonePicture(props.image);
   const draftKey = props.appearanceDraftKey;
   const handler = props.appearanceHandler;
   return (patch: Partial<ImageAppearance> | undefined): void => {
+    requireStandalonePicture(props.image);
     if (
       props.disabled ||
       draftKey !== props.appearanceDraftKey ||
@@ -131,9 +141,13 @@ const appearanceCallback = computed(() => {
     else emit("appearance", patch);
   };
 });
+function sourceAction(action: () => void): void {
+  requireStandalonePicture(props.image);
+  action();
+}
 </script>
 <template>
-  <RibbonToolbar :label="t('image.tools')">
+  <RibbonToolbar v-if="!isPictureGroup(image)" :label="t('image.tools')">
     <section class="picture-toolbar__group" role="group" :aria-label="t('image.insertMenu')">
       <div class="picture-toolbar__stack">
         <ImageInsertMenu
@@ -147,7 +161,7 @@ const appearanceCallback = computed(() => {
           :text="t('image.replace')"
           :disabled="disabled || selectionCount > 1 || isFramed"
           data-picture-tool="replace"
-          @activate="emit('replace')"
+          @activate="sourceAction(() => emit('replace'))"
           ><ImagePlus
         /></RibbonButton>
       </div>
@@ -158,14 +172,14 @@ const appearanceCallback = computed(() => {
         :text="t('image.convertToCell')"
         :disabled="disabled || selectionCount > 1 || isFramed"
         data-picture-tool="convert-to-cell"
-        @activate="emit('convertToCell')"
+        @activate="sourceAction(() => emit('convertToCell'))"
         ><ImageDown
       /></RibbonButton>
     </section>
     <PictureViewMenu
       :disabled="!!busy || isFramed"
       :preview-on-double-click="previewOnDoubleClick"
-      @preview="emit('preview')"
+      @preview="sourceAction(() => emit('preview'))"
       @change="emit('viewSettings', $event)"
     />
     <section class="picture-toolbar__group" role="group" :aria-label="t('image.crop')">
@@ -175,7 +189,7 @@ const appearanceCallback = computed(() => {
         :text="t('image.crop')"
         :disabled="disabled || selectionCount > 1 || isFramed"
         data-picture-tool="crop"
-        @activate="emit('crop')"
+        @activate="sourceAction(() => emit('crop'))"
         ><Crop
       /></RibbonButton>
       <div class="picture-toolbar__stack">
@@ -227,31 +241,31 @@ const appearanceCallback = computed(() => {
           :text="t('image.restoreOriginal')"
           :disabled="disabled || selectionCount > 1 || isFramed"
           data-picture-tool="restore"
-          @activate="emit('restore')"
+          @activate="sourceAction(() => emit('restore'))"
           ><RotateCcw
         /></RibbonButton>
       </div>
     </section>
     <PictureRotationMenu
       :disabled="disabled"
-      @rotate="emit('rotate', $event)"
-      @flip="emit('flip', $event)"
+      @rotate="(turns) => sourceAction(() => emit('rotate', turns))"
+      @flip="(axis) => sourceAction(() => emit('flip', axis))"
     />
     <PictureArrangeTools
       :disabled="disabled"
       :group-disabled="isFramed"
       :alignment-disabled="isFramed"
       :count="selectionCount"
-      :grouped="!!image.groupId"
-      @group="emit('group')"
-      @ungroup="emit('ungroup')"
-      @align="emit('align', $event)"
-      @layer="emit('layer', $event)"
+      :grouped="!!standaloneImage.groupId"
+      @group="sourceAction(() => emit('group'))"
+      @ungroup="sourceAction(() => emit('ungroup'))"
+      @align="(action) => sourceAction(() => emit('align', action))"
+      @layer="(action) => sourceAction(() => emit('layer', action))"
       @selection-pane="emit('selectionPane')"
     />
     <PictureAppearanceTools
       :key="appearanceDraftKey"
-      :image="image"
+      :image="standaloneImage"
       :disabled="disabled"
       @change="appearanceCallback"
     />
@@ -261,17 +275,17 @@ const appearanceCallback = computed(() => {
       :text="t('picture.annotate')"
       :disabled="disabled || selectionCount > 1 || isFramed"
       data-picture-tool="annotate"
-      @activate="emit('annotate')"
+      @activate="sourceAction(() => emit('annotate'))"
       ><PencilLine
     /></RibbonButton>
     <PictureAssetTools
       :disabled="disabled || isFramed"
       :busy="!!busy || isFramed"
-      @compress="emit('compress')"
-      @batch-size="emit('batchSize')"
-      @export="(format, all) => emit('export', format, all)"
-      @preview="emit('preview')"
-      @print="emit('print')"
+      @compress="sourceAction(() => emit('compress'))"
+      @batch-size="sourceAction(() => emit('batchSize'))"
+      @export="(format, all) => sourceAction(() => emit('export', format, all))"
+      @preview="sourceAction(() => emit('preview'))"
+      @print="sourceAction(() => emit('print'))"
     />
   </RibbonToolbar>
 </template>

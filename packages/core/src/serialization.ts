@@ -1,3 +1,5 @@
+import { readPictureDataArray } from "./picture-data-array.js";
+import { isPictureGroup } from "./picture-group.js";
 import {
   normalizePictureObject,
   isFramedPictureObject,
@@ -240,12 +242,14 @@ export type WorkbookSnapshotV44 = Omit<WorkbookSnapshotV43, "version"> & { versi
 export type WorkbookSnapshotV45 = Omit<WorkbookSnapshotV44, "version"> & { version: 45 };
 export type WorkbookSnapshotV46 = Omit<WorkbookSnapshotV45, "version"> & { version: 46 };
 export type WorkbookSnapshotV47 = Omit<WorkbookSnapshotV46, "version"> & { version: 47 };
+export type WorkbookSnapshotV48 = Omit<WorkbookSnapshotV47, "version"> & { version: 48 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
   | WorkbookSnapshotV45
   | WorkbookSnapshotV46
-  | WorkbookSnapshotV47;
+  | WorkbookSnapshotV47
+  | WorkbookSnapshotV48;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -309,7 +313,8 @@ type SnapshotVersion =
   | 44
   | 45
   | 46
-  | 47;
+  | 47
+  | 48;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -663,6 +668,14 @@ function parseFilter(value: unknown, path: string, version: SnapshotVersion): Sh
 
 function parseFloatingImage(value: unknown, path: string, version: SnapshotVersion): FloatingImage {
   const record = asRecord(value, path);
+  if (isPictureGroup(record)) {
+    if (version < 48) return fail(path, "Owned picture groups require snapshot version 48.");
+    try {
+      return normalizePictureObject(record);
+    } catch (error) {
+      return fail(path, error instanceof Error ? error.message : "Invalid owned picture group.");
+    }
+  }
   if (Object.hasOwn(record, "frame")) {
     if (version < 47) return fail(`${path}.frame`, "Framed pictures require snapshot version 47.");
     try {
@@ -1051,7 +1064,36 @@ function parseSparseState(
 }
 
 function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sheet {
-  const record = asRecord(value, path);
+  const source = asRecord(value, path);
+  const record: UnknownRecord = Object.create(null) as UnknownRecord;
+  const pictureDescriptor = Object.getOwnPropertyDescriptor(source, "floatingImages");
+  if (pictureDescriptor && !("value" in pictureDescriptor))
+    return fail(`${path}.floatingImages`, "Pictures must be data fields.");
+  Object.assign(record, source);
+  if (pictureDescriptor) {
+    const descriptor = pictureDescriptor;
+    if (!("value" in descriptor))
+      return fail(`${path}.floatingImages`, "Pictures must be data fields.");
+    try {
+      record.floatingImages = readPictureDataArray(
+        asArray(descriptor.value, `${path}.floatingImages`),
+        "snapshot floatingImages",
+        10000,
+      );
+    } catch (error) {
+      return fail(
+        `${path}.floatingImages`,
+        error instanceof Error ? error.message : "Invalid picture collection.",
+      );
+    }
+  }
+  if (
+    version !== undefined &&
+    version < 48 &&
+    Array.isArray(record.floatingImages) &&
+    record.floatingImages.some(isPictureGroup)
+  )
+    return fail(`${path}.floatingImages`, "Owned picture groups require snapshot version 48.");
   if (
     version !== undefined &&
     version < 47 &&
@@ -1187,6 +1229,8 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       record.floatingImages.some((image) => Object.hasOwn(asRecord(image, path), "frame"))
     )
       version = 47;
+    if (Array.isArray(record.floatingImages) && record.floatingImages.some(isPictureGroup))
+      version = 48;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -1287,19 +1331,22 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   );
   return {
     // Preserve the existing protocol for documents that do not use the new feature.
-    version: sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
-      ? 47
-      : sheets.some((sheet) =>
-            sheet.cells.some(
-              (cell) => cell.content?.kind === "literal" && Boolean(cell.content.fontRuns?.length),
-            ),
-          )
-        ? 46
-        : calculatedColumns
-          ? 45
-          : manualOrder
-            ? 44
-            : 43,
+    version: sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
+      ? 48
+      : sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
+        ? 47
+        : sheets.some((sheet) =>
+              sheet.cells.some(
+                (cell) =>
+                  cell.content?.kind === "literal" && Boolean(cell.content.fontRuns?.length),
+              ),
+            )
+          ? 46
+          : calculatedColumns
+            ? 45
+            : manualOrder
+              ? 44
+              : 43,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1378,7 +1425,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 44 &&
     record.version !== 45 &&
     record.version !== 46 &&
-    record.version !== 47
+    record.version !== 47 &&
+    record.version !== 48
   ) {
     throw new WorkbookDomainError(
       {

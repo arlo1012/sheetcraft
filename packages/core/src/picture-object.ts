@@ -1,3 +1,14 @@
+import { readPictureDataArray } from "./picture-data-array.js";
+import {
+  isPictureGroup,
+  normalizePictureGroup,
+  normalizePictureGroupCollection,
+  clonePictureGroup,
+  arePictureGroupsEqual,
+  traversePictureGroup,
+  MAX_PICTURE_GROUP_NODES,
+  type PictureGroup,
+} from "./picture-group.js";
 import {
   normalizeLegacyFloatingImageForSheet,
   cloneLegacyFloatingImage,
@@ -36,15 +47,21 @@ export type FramedFloatingImage = Pick<
   transform?: PictureObjectAppearance;
 };
 /** Internal picture union; view consumers must declare framed-picture support. */
-export type PictureObject = LegacyFloatingImage | FramedFloatingImage;
+export type StandalonePictureObject = LegacyFloatingImage | FramedFloatingImage;
+export type PictureObject = StandalonePictureObject | PictureGroup;
 
 export function isFramedPictureObject(image: PictureObject): image is FramedFloatingImage {
-  return Object.hasOwn(image, "frame");
+  return !isPictureGroup(image) && Object.hasOwn(image, "frame");
+}
+
+export function isLegacyPictureObject(image: PictureObject): image is LegacyFloatingImage {
+  return !isPictureGroup(image) && !isFramedPictureObject(image);
 }
 
 export function normalizePictureObject(image: PictureObject): PictureObject {
   if (!image || typeof image !== "object" || Array.isArray(image))
     throw new TypeError("Invalid picture object.");
+  if (isPictureGroup(image)) return normalizePictureGroup(image);
   if (!isFramedPictureObject(image)) return normalizeLegacyFloatingImageForSheet(image);
   const allowed = new Set([
     "id",
@@ -97,12 +114,15 @@ export function normalizePictureObject(image: PictureObject): PictureObject {
 }
 
 export function clonePictureObject<T extends PictureObject>(image: T): T {
+  if (isPictureGroup(image)) return clonePictureGroup(image) as T;
   if (!isFramedPictureObject(image)) return cloneLegacyFloatingImage(image) as T;
   const normalized = normalizePictureObject(image) as FramedFloatingImage;
   return { ...normalized, frame: clonePictureFrame(normalized.frame) } as T;
 }
 
 export function arePictureObjectsEqual(left: PictureObject, right: PictureObject): boolean {
+  if (isPictureGroup(left) || isPictureGroup(right))
+    return isPictureGroup(left) && isPictureGroup(right) && arePictureGroupsEqual(left, right);
   if (!isFramedPictureObject(left) || !isFramedPictureObject(right))
     return (
       !isFramedPictureObject(left) &&
@@ -124,9 +144,24 @@ export function arePictureObjectsEqual(left: PictureObject, right: PictureObject
 export function normalizePictureObjectCollection(
   images: readonly PictureObject[],
 ): PictureObject[] {
-  if (!Array.isArray(images)) throw new TypeError("Invalid picture collection.");
-  const result = images.map(normalizePictureObject);
-  if (new Set(result.map((image) => image.id)).size !== result.length)
-    throw new TypeError("Duplicate picture IDs.");
+  const roots = readPictureDataArray(images, "picture collection", MAX_PICTURE_GROUP_NODES);
+  // A forest-wide preflight bounds group ownership before any recursive clone.
+  const groups = normalizePictureGroupCollection(roots.filter(isPictureGroup));
+  let groupIndex = 0;
+  const result = roots.map((image) =>
+    isPictureGroup(image) ? groups[groupIndex++]! : normalizePictureObject(image),
+  );
+  const ids = new Set<string>();
+  for (const image of result) {
+    const nodes = isPictureGroup(image)
+      ? traversePictureGroup(image).map((entry) => entry.node)
+      : [image];
+    for (const node of nodes) {
+      if (ids.has(node.id))
+        throw new TypeError("Duplicate picture IDs across the ownership forest.");
+      ids.add(node.id);
+      if (ids.size > MAX_PICTURE_GROUP_NODES) throw new RangeError("Picture node budget exceeded.");
+    }
+  }
   return result;
 }

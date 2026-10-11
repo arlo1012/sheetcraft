@@ -1,3 +1,4 @@
+import { requireStandalonePictures } from "./picture-document-support";
 import { isFramedPictureObject, type FramedFloatingImage } from "@sheetcraft/core/picture-object";
 import type { FloatingImage, LegacyFloatingImage } from "@sheetcraft/core/workbook";
 import {
@@ -29,8 +30,9 @@ export function getPictureViewportFragments(
   if (!frameContext && images.some(isFramedPictureObject))
     throw new TypeError("Framed picture viewport fragments require a frame context.");
 
+  const standalone = requireStandalonePictures(images);
   const fragments: PictureViewportFragment[] = [];
-  for (const image of images) {
+  for (const image of standalone) {
     if (isFramedPictureObject(image)) {
       for (const fragment of getFramedPictureViewportFragments(image, frameContext!))
         fragments.push({ ...fragment, kind: "framed", image });

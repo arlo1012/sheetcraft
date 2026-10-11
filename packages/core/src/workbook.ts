@@ -1,10 +1,11 @@
 import { assertPictureObjectsForSheet } from "./picture-object-sheet.js";
 import {
   normalizePictureObject,
+  normalizePictureObjectCollection,
   clonePictureObject,
   arePictureObjectsEqual,
-  isFramedPictureObject,
-  type FramedFloatingImage,
+  isLegacyPictureObject,
+  type PictureObject,
 } from "./picture-object.js";
 import {
   normalizeCellTextFontRuns,
@@ -348,7 +349,7 @@ export type LegacyFloatingImage = {
   lockAspectRatio?: boolean;
 };
 /** Versioned internal picture contract; runtime adapters declare which geometry they consume. */
-export type FloatingImage = LegacyFloatingImage | FramedFloatingImage;
+export type FloatingImage = PictureObject;
 
 export type Cell = {
   content?: CellContent;
@@ -2997,11 +2998,10 @@ function areSheetMetadataEqual(left: SheetMetadata, right: SheetMetadata): boole
   );
 }
 
-function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
+export function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
   const cellKeys = new Set<string>();
   const rowIndexes = new Set<number>();
   const columnIndexes = new Set<number>();
-  const floatingImageIds = new Set<string>();
 
   const cells = state.cells.flatMap((cell) => {
     if (!isCellAddressInBounds(cell.address)) {
@@ -3106,10 +3106,8 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
   rowHeights.sort((left, right) => left.index - right.index);
   columnWidths.sort((left, right) => left.index - right.index);
   const metadata = normalizeSheetMetadata(state);
-  const floatingImages = state.floatingImages.map((image) =>
-    normalizeFloatingImage(image, floatingImageIds),
-  );
-  if (floatingImages.some(isFramedPictureObject))
+  const floatingImages = normalizePictureObjectCollection(state.floatingImages);
+  if (floatingImages.some((image) => !isLegacyPictureObject(image)))
     assertPictureObjectsForSheet(floatingImages, {
       ...createSheet("Picture geometry validation", "picture-geometry-validation"),
       rowHeights: new Map(rowHeights.map((entry) => [entry.index, entry.size])),

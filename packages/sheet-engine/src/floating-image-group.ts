@@ -1,4 +1,4 @@
-import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import {
   MAX_FLOATING_IMAGE_SIZE,
   MIN_FLOATING_IMAGE_SIZE,
@@ -18,7 +18,7 @@ import type { SheetViewportLayout } from "./viewport-layout.js";
 import type { Rect } from "./geometry.js";
 
 function members(images: readonly FloatingImage[], layout: SheetViewportLayout) {
-  if (images.some(isFramedPictureObject)) return null;
+  if (images.some((image) => !isLegacyPictureObject(image))) return null;
   const entries = (images as readonly LegacyFloatingImage[]).map((image) => ({
     image,
     rect: getFloatingImageSheetRect(image, layout),

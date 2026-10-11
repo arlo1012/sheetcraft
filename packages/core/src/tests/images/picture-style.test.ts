@@ -1,4 +1,6 @@
 import { describe, expect, test } from "vitest";
+import type { StandalonePictureObject } from "../../picture-object.js";
+import { isPictureGroup } from "../../picture-group.js";
 import { normalizeImageAppearance, type ImageAppearance } from "../../image-appearance.js";
 import { cloneImageTransform } from "../../image-transform.js";
 import {
@@ -13,8 +15,14 @@ import {
   getActiveSheet,
   setCellContent,
   type LegacyFloatingImage,
+  type FloatingImage,
 } from "../../workbook.js";
 import { createTestWorkbookSession } from "../helpers.js";
+
+function requireStandalone(image: FloatingImage | undefined): StandalonePictureObject | undefined {
+  if (isPictureGroup(image)) throw new Error("Expected a standalone picture.");
+  return image;
+}
 
 function picture(id = "picture"): LegacyFloatingImage {
   return {
@@ -168,12 +176,12 @@ describe("picture styling", () => {
       createSetFloatingImageCommand(sheet.id, { ...picture("rear"), width: 240 }, 2),
     );
     expect(sheet.floatingImages.map((image) => image.id)).toEqual(["middle", "front", "rear"]);
-    expect(sheet.floatingImages[2]?.width).toBe(240);
+    expect(requireStandalone(sheet.floatingImages[2])?.width).toBe(240);
     const redo = applyWorkbookCommand(workbook, undo!);
     expect(sheet.floatingImages).toEqual(before);
     applyWorkbookCommand(workbook, redo!);
     expect(sheet.floatingImages.map((image) => image.id)).toEqual(["middle", "front", "rear"]);
-    expect(sheet.floatingImages[2]?.width).toBe(240);
+    expect(requireStandalone(sheet.floatingImages[2])?.width).toBe(240);
   });
 
   test("round trips V24 visibility, grouping, aspect lock and picture styling", () => {

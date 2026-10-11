@@ -2,13 +2,13 @@ import { arePictureObjectsEqual, isFramedPictureObject } from "@sheetcraft/core/
 import { resolvePictureFrame } from "@sheetcraft/core/picture-frame";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import { resizePictureTo, type PictureSizeEdit } from "./picture-tool-geometry";
-import { requireLegacyPictures } from "./picture-document-support";
+import { requireLegacyPictures, requireStandalonePictures } from "./picture-document-support";
 import { ref, type Ref } from "vue";
 import {
   createSetSheetFloatingImagesCommand,
   type WorkbookCommand,
 } from "@sheetcraft/core/commands";
-import { canUseSheetPermission } from "@sheetcraft/core";
+import { canUseSheetPermission, isPictureGroup } from "@sheetcraft/core";
 import {
   normalizeImageTransform,
   areFloatingImageCollectionsEqual,
@@ -105,6 +105,7 @@ export function usePictureTools(options: {
     const target = currentSingle(source);
     if (
       !target ||
+      isPictureGroup(target) ||
       typeof locked !== "boolean" ||
       !updateMany([{ ...target, lockAspectRatio: locked }])
     ) {
@@ -124,10 +125,13 @@ export function usePictureTools(options: {
     )
       return false;
     if (!ungroup && ids.size < 2) return false;
+    const targets = options.getSheet().floatingImages.filter((image) => ids.has(image.id));
+    if (targets.some(isPictureGroup)) {
+      operationFeedback.value = "picture.operationFailed";
+      return false;
+    }
     const groups = new Set(
-      options
-        .getSheet()
-        .floatingImages.filter((image) => ids.has(image.id))
+      requireStandalonePictures(targets)
         .map((image) => image.groupId)
         .filter(Boolean),
     );
@@ -136,6 +140,7 @@ export function usePictureTools(options: {
         .getSheet()
         .floatingImages.some(
           (image) =>
+            !isPictureGroup(image) &&
             isFramedPictureObject(image) &&
             (ids.has(image.id) || Boolean(image.groupId && groups.has(image.groupId))),
         )
@@ -146,7 +151,8 @@ export function usePictureTools(options: {
       options
         .getSheet()
         .floatingImages.map((image) =>
-          ids.has(image.id) || (image.groupId && groups.has(image.groupId))
+          !isPictureGroup(image) &&
+          (ids.has(image.id) || (image.groupId && groups.has(image.groupId)))
             ? { ...image, groupId }
             : image,
         ),
@@ -192,7 +198,11 @@ export function usePictureTools(options: {
     const targets = options
       .getSheet()
       .floatingImages.filter((image) => value.all || options.selectedIds.value.includes(image.id));
-    if (targets.some(isFramedPictureObject)) {
+    const ids = options.selectedIds.value;
+    if (
+      (!value.all && (new Set(ids).size !== ids.length || targets.length !== ids.length)) ||
+      targets.some((image) => isFramedPictureObject(image) || isPictureGroup(image))
+    ) {
       sizeFeedback.value = "picture.operationFailed";
       return false;
     }
@@ -231,6 +241,7 @@ export function usePictureTools(options: {
       !ids.length ||
       new Set(ids).size !== ids.length ||
       targets.length !== ids.length ||
+      targets.some(isPictureGroup) ||
       (patch?.reflection === true && targets.some(isFramedPictureObject))
     ) {
       operationFeedback.value = "picture.operationFailed";
@@ -238,7 +249,7 @@ export function usePictureTools(options: {
     }
     try {
       const accepted = updateMany(
-        targets.map((image): FloatingImage => {
+        requireStandalonePictures(targets).map((image): FloatingImage => {
           const appearance = normalizeImageTransform({
             appearance: patch ? { ...image.transform?.appearance, ...patch } : undefined,
           })?.appearance;

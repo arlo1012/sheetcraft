@@ -38,21 +38,30 @@ export type PictureFrame = {
   flipHorizontal?: boolean;
   flipVertical?: boolean;
 };
-export type ResolvedPictureFrame = {
+export type ResolvedPictureLayout = {
   rect: PictureFrameRect;
   angleDeg: number;
   collapsed: boolean;
-  /** Null on a collapsed move-size frame: consumers must not divide by zero. */
-  sourceRect: PictureFrameRect | null;
   corners: [PicturePoint, PicturePoint, PicturePoint, PicturePoint];
   bounds: PictureFrameRect;
+};
+export type ResolvedPictureFrame = ResolvedPictureLayout & {
+  /** Null on a collapsed move-size frame: consumers must not divide by zero. */
+  sourceRect: PictureFrameRect | null;
 };
 function record(value: unknown, keys: readonly string[], name: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new TypeError(`Invalid ${name}.`);
-  if (Object.keys(value).some((key) => !keys.includes(key)))
+  if (Reflect.ownKeys(value).some((key) => typeof key !== "string" || !keys.includes(key)))
     throw new TypeError(`Unknown ${name} field.`);
-  return value as Record<string, unknown>;
+  if (
+    Object.values(Object.getOwnPropertyDescriptors(value)).some((entry) => entry.get || entry.set)
+  )
+    throw new TypeError(`${name} must contain data fields, not accessors.`);
+  const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+  for (const key of Object.keys(value))
+    result[key] = Object.getOwnPropertyDescriptor(value, key)!.value as unknown;
+  return result;
 }
 function finite(value: unknown, name: string): number {
   if (typeof value !== "number" || !Number.isFinite(value))
@@ -84,15 +93,10 @@ function normalizeCellPoint(value: unknown): PictureCellPoint {
     row: normalizePictureAxisPoint(point.row as PictureCellPoint["row"], MAX_SHEET_ROWS),
   };
 }
-export function normalizePictureFrame(frame: PictureFrame): PictureFrame {
-  const v = record(
-    frame,
-    ["kind", "anchor", "source", "angleDeg", "flipHorizontal", "flipVertical"],
-    "picture frame",
-  );
-  if (v.kind !== "object-frame-v1") throw new TypeError("Unknown picture frame kind.");
+/** Shared worksheet anchor validation for pictures and source-free groups. */
+export function normalizePictureFrameAnchor(value: PictureFrameAnchor): PictureFrameAnchor {
   const a = record(
-    v.anchor,
+    value,
     ["mode", "origin", "size", "x", "y", "start", "end"],
     "picture frame anchor",
   );
@@ -123,8 +127,11 @@ export function normalizePictureFrame(frame: PictureFrame): PictureFrame {
       throw new RangeError("Picture logical endpoints must have positive spans on both axes.");
     anchor = { mode: "move-and-size", start, end };
   } else throw new TypeError("Unknown picture anchor mode.");
+  return anchor;
+}
+export function normalizePictureSourceFrame(value: PictureSourceFrame): PictureSourceFrame {
   const s = record(
-    v.source,
+    value,
     ["widthRatio", "heightRatio", "offsetXRatio", "offsetYRatio"],
     "picture source frame",
   );
@@ -136,9 +143,24 @@ export function normalizePictureFrame(frame: PictureFrame): PictureFrame {
   };
   if (source.widthRatio <= 0 || source.heightRatio <= 0)
     throw new RangeError("Picture source ratios must be positive.");
-  const angle = finite(v.angleDeg, "Picture angle");
+  return source;
+}
+export function normalizePictureAngle(value: number): number {
+  const angle = finite(value, "Picture angle");
   const remainder = angle % 360;
   const angleDeg = remainder < 0 ? (remainder + 360) % 360 : remainder === 0 ? 0 : remainder;
+  return angleDeg;
+}
+export function normalizePictureFrame(frame: PictureFrame): PictureFrame {
+  const v = record(
+    frame,
+    ["kind", "anchor", "source", "angleDeg", "flipHorizontal", "flipVertical"],
+    "picture frame",
+  );
+  if (v.kind !== "object-frame-v1") throw new TypeError("Unknown picture frame kind.");
+  const anchor = normalizePictureFrameAnchor(v.anchor as PictureFrameAnchor);
+  const source = normalizePictureSourceFrame(v.source as PictureSourceFrame);
+  const angleDeg = normalizePictureAngle(v.angleDeg as number);
   for (const key of ["flipHorizontal", "flipVertical"] as const)
     if (v[key] !== undefined && typeof v[key] !== "boolean") throw new TypeError(`Invalid ${key}.`);
   return {
@@ -167,8 +189,11 @@ function assertRect(rect: PictureFrameRect): PictureFrameRect {
     throw new RangeError("Picture extent cannot be represented at this coordinate.");
   return rect;
 }
-function resolveRect(frame: PictureFrame, metrics: PictureSheetMetrics): PictureFrameRect {
-  const anchor = frame.anchor;
+export function resolvePictureAnchorRect(
+  value: PictureFrameAnchor,
+  metrics: PictureSheetMetrics,
+): PictureFrameRect {
+  const anchor = normalizePictureFrameAnchor(value);
   if (anchor.mode === "fixed") return assertRect({ x: anchor.x, y: anchor.y, ...anchor.size });
   const start = anchor.mode === "move-only" ? anchor.origin : anchor.start;
   const x = projectPictureAxisPoint(start.column, metrics.columns);
@@ -217,32 +242,21 @@ export function pictureFrameWorldToLocal(
     y: finite(rect.height / 2 - sin * dx + cos * dy, "Local y"),
   };
 }
-export function resolvePictureFrame(
-  frame: PictureFrame,
-  metrics: PictureSheetMetrics,
-): ResolvedPictureFrame {
-  const normalized = normalizePictureFrame(frame);
-  const rect = resolveRect(normalized, metrics);
+/** Source-free layout evaluation shared by standalone pictures and group containers. */
+export function resolvePictureLayout(
+  value: PictureFrameRect,
+  angle: number,
+): ResolvedPictureLayout {
+  const rect = assertRect({ ...value });
+  const angleDeg = normalizePictureAngle(angle);
   const collapsed = rect.width === 0 || rect.height === 0;
-  const width = rect.width * normalized.source.widthRatio;
-  const height = rect.height * normalized.source.heightRatio;
-  if (!collapsed && (width <= 0 || height <= 0))
-    throw new RangeError("Picture source dimensions underflow.");
-  const sourceRect = collapsed
-    ? null
-    : assertRect({
-        x: rect.x + rect.width / 2 + rect.width * normalized.source.offsetXRatio - width / 2,
-        y: rect.y + rect.height / 2 + rect.height * normalized.source.offsetYRatio - height / 2,
-        width,
-        height,
-      });
   const corners = [
     { x: 0, y: 0 },
     { x: rect.width, y: 0 },
     { x: rect.width, y: rect.height },
     { x: 0, y: rect.height },
   ].map((point) =>
-    pictureFrameLocalToWorld(rect, normalized.angleDeg, point),
+    pictureFrameLocalToWorld(rect, angleDeg, point),
   ) as ResolvedPictureFrame["corners"];
   const x = Math.min(...corners.map((point) => point.x));
   const y = Math.min(...corners.map((point) => point.y));
@@ -252,11 +266,45 @@ export function resolvePictureFrame(
     width: Math.max(...corners.map((point) => point.x)) - x,
     height: Math.max(...corners.map((point) => point.y)) - y,
   });
-  return { rect, angleDeg: normalized.angleDeg, collapsed, sourceRect, corners, bounds };
+  return { rect, angleDeg, collapsed, corners, bounds };
+}
+/** Evaluate a source-bearing leaf after its parent has resolved its orthogonal layout. */
+export function resolvePictureSourceLayout(
+  value: PictureFrameRect,
+  angle: number,
+  sourceValue: PictureSourceFrame,
+): ResolvedPictureFrame {
+  const layout = resolvePictureLayout(value, angle);
+  const { rect, collapsed } = layout;
+  const source = normalizePictureSourceFrame(sourceValue);
+  const width = rect.width * source.widthRatio;
+  const height = rect.height * source.heightRatio;
+  if (!collapsed && (width <= 0 || height <= 0))
+    throw new RangeError("Picture source dimensions underflow.");
+  const sourceRect = collapsed
+    ? null
+    : assertRect({
+        x: rect.x + rect.width / 2 + rect.width * source.offsetXRatio - width / 2,
+        y: rect.y + rect.height / 2 + rect.height * source.offsetYRatio - height / 2,
+        width,
+        height,
+      });
+  return { ...layout, sourceRect };
+}
+export function resolvePictureFrame(
+  frame: PictureFrame,
+  metrics: PictureSheetMetrics,
+): ResolvedPictureFrame {
+  const normalized = normalizePictureFrame(frame);
+  return resolvePictureSourceLayout(
+    resolvePictureAnchorRect(normalized.anchor, metrics),
+    normalized.angleDeg,
+    normalized.source,
+  );
 }
 /** Hit the returned projected polygon so floating-coordinate rounding is shared with rendering. */
 export function pictureFrameContainsPoint(
-  resolved: ResolvedPictureFrame,
+  resolved: ResolvedPictureLayout,
   point: PicturePoint,
 ): boolean {
   if (resolved.collapsed) return false;

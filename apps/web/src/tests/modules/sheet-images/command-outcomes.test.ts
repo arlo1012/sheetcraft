@@ -11,6 +11,7 @@ import {
   createSetFloatingImageCommand,
   type WorkbookCommand,
 } from "@sheetcraft/core/commands";
+import { isLegacyPictureObject, type PictureObject } from "@sheetcraft/core/picture-object";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   getActiveSheet,
@@ -40,6 +41,10 @@ const file = new File(["source bytes"], "new.png", { type: "image/png" });
 const source = { id: "original", blob: file, mimeType: "image/png", width: 400, height: 200 };
 const smaller = new Blob(["x"], { type: "image/jpeg" });
 const asset = { ...source, id: "replacement", blob: smaller, mimeType: "image/jpeg" };
+function requireLegacy(image: PictureObject): FloatingImage {
+  if (!isLegacyPictureObject(image)) throw new Error("Expected a legacy picture.");
+  return image;
+}
 function image(): FloatingImage {
   return {
     id: "picture",
@@ -116,7 +121,7 @@ describe("authoritative picture command outcomes", () => {
     }));
     const before = serializeWorkbook(f.session.workbook);
     await f.actions.pasteFloatingImages(copied, { row: 3, column: 4 });
-    const pasted = f.sheet.floatingImages;
+    const pasted = f.sheet.floatingImages.map(requireLegacy);
     expect(pasted).toHaveLength(4);
     expect(new Set(pasted.map((entry) => entry.id)).size).toBe(4);
     expect(pasted.every((entry) => !copied.some((old) => old.id === entry.id))).toBe(true);

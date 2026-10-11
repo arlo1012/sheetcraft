@@ -86,6 +86,10 @@
     "./floating-image-selection": {
       "types": "./dist/floating-image-selection.d.ts",
       "import": "./dist/floating-image-selection.js"
+    },
+    "./picture-group-geometry": {
+      "types": "./dist/picture-group-geometry.d.ts",
+      "import": "./dist/picture-group-geometry.js"
     }
   },
   "scripts": {

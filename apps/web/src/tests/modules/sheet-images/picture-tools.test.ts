@@ -6,12 +6,20 @@ import {
   type LegacyFloatingImage as FloatingImage,
 } from "@sheetcraft/core/workbook";
 import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import type { PictureObject, StandalonePictureObject } from "@sheetcraft/core/picture-object";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   usePictureTools,
   type PictureLayerAction,
 } from "../../../modules/sheet-images/usePictureTools";
 
+function requireStandalone(image: PictureObject): StandalonePictureObject;
+function requireStandalone(image: PictureObject | undefined): StandalonePictureObject | undefined;
+function requireStandalone(image: PictureObject | undefined): StandalonePictureObject | undefined {
+  if (image && isPictureGroup(image)) throw new Error("Expected a standalone picture.");
+  return image;
+}
 function picture(id: string, groupId?: string): FloatingImage {
   return {
     id,
@@ -123,30 +131,31 @@ describe("picture tools", () => {
       picture("e", "untouched"),
     ]);
     f.tools.group();
-    const group = f.sheet.floatingImages[0]!.groupId;
+    const group = requireStandalone(f.sheet.floatingImages[0]!).groupId;
     expect(group).toBeTruthy();
     expect(group).not.toBe("old-1");
-    expect(f.sheet.floatingImages.slice(0, 4).map((image) => image.groupId)).toEqual([
-      group,
-      group,
-      group,
-      group,
-    ]);
-    expect(f.sheet.floatingImages[4]?.groupId).toBe("untouched");
+    expect(
+      f.sheet.floatingImages.slice(0, 4).map((image) => requireStandalone(image).groupId),
+    ).toEqual([group, group, group, group]);
+    expect(requireStandalone(f.sheet.floatingImages[4])?.groupId).toBe("untouched");
     f.selectedIds.value = ["a"];
     f.tools.group(true);
-    expect(f.sheet.floatingImages.slice(0, 4).every((image) => image.groupId === undefined)).toBe(
-      true,
-    );
-    expect(f.sheet.floatingImages[4]?.groupId).toBe("untouched");
+    expect(
+      f.sheet.floatingImages
+        .slice(0, 4)
+        .every((image) => requireStandalone(image).groupId === undefined),
+    ).toBe(true);
+    expect(requireStandalone(f.sheet.floatingImages[4])?.groupId).toBe("untouched");
   });
   test("one-click group uses its captured IDs and rejects missing targets atomically", () => {
     const f = fixture();
     f.selectedIds.value = ["e"];
     expect(f.tools.group(false, ["a", "b"])).toBe(true);
-    expect(f.sheet.floatingImages[0]!.groupId).toBeTruthy();
-    expect(f.sheet.floatingImages[0]!.groupId).toBe(f.sheet.floatingImages[1]!.groupId);
-    expect(f.sheet.floatingImages[4]!.groupId).toBeUndefined();
+    expect(requireStandalone(f.sheet.floatingImages[0]!).groupId).toBeTruthy();
+    expect(requireStandalone(f.sheet.floatingImages[0]!).groupId).toBe(
+      requireStandalone(f.sheet.floatingImages[1]!).groupId,
+    );
+    expect(requireStandalone(f.sheet.floatingImages[4]!).groupId).toBeUndefined();
     const before = structuredClone(f.sheet.floatingImages);
     expect(f.tools.group(false, ["a", "missing"])).toBe(false);
     expect(f.tools.group(false, ["a", "a"])).toBe(false);

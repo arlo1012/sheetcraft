@@ -5,6 +5,12 @@ import {
   getCellContent,
   type LegacyFloatingImage as FloatingImage,
 } from "@sheetcraft/core/workbook";
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import {
+  isLegacyPictureObject,
+  type PictureObject,
+  type StandalonePictureObject,
+} from "@sheetcraft/core/picture-object";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import { useSheetImageActions } from "../../../../modules/sheet-images/useSheetImageActions";
@@ -29,6 +35,14 @@ const assets = files.map((blob, index) => ({
   width: 800,
   height: 400,
 }));
+function requireStandalone(image: PictureObject): StandalonePictureObject {
+  if (isPictureGroup(image)) throw new Error("Expected a standalone picture.");
+  return image;
+}
+function requireLegacy(image: PictureObject): FloatingImage {
+  if (!isLegacyPictureObject(image)) throw new Error("Expected a legacy picture.");
+  return image;
+}
 function fixture() {
   const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
   const sheet = getActiveSheet(workbook);
@@ -63,11 +77,13 @@ describe("batch picture insertion", () => {
       expect(f.execute).toHaveBeenCalledTimes(1);
       for (const asset of assets) expect(await f.store.get(asset.id)).toEqual(asset);
       if (mode === "floating") {
-        expect(f.sheet.floatingImages.map((image) => image.assetId)).toEqual([
+        expect(f.sheet.floatingImages.map((image) => requireStandalone(image).assetId)).toEqual([
           "asset-0",
           "asset-1",
         ]);
-        expect(f.sheet.floatingImages.map((image) => [image.offsetX, image.offsetY])).toEqual([
+        expect(
+          f.sheet.floatingImages.map(requireLegacy).map((image) => [image.offsetX, image.offsetY]),
+        ).toEqual([
           [0, 0],
           [24, 24],
         ]);
@@ -148,7 +164,7 @@ describe("batch picture insertion", () => {
     }));
     await f.actions.pasteFloatingImages(images, { row: 8, column: 9 });
     expect(f.execute).toHaveBeenCalledTimes(1);
-    const pasted = f.sheet.floatingImages;
+    const pasted = f.sheet.floatingImages.map(requireStandalone);
     expect(new Set(pasted.map((image) => image.id)).size).toBe(2);
     expect(pasted.every((image) => !images.some((source) => source.id === image.id))).toBe(true);
     expect(pasted[0]!.groupId).toBeTruthy();

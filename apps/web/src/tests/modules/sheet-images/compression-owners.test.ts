@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { effectScope } from "vue";
 import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import type { PictureObject, StandalonePictureObject } from "@sheetcraft/core/picture-object";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createSheet,
@@ -28,6 +30,10 @@ const smaller = new Blob(["x"], { type: "image/jpeg" });
 const converted = { ...source, id: "compressed", blob: smaller, mimeType: "image/jpeg" };
 const settings = { maxSide: 1920, quality: 0.8, format: "jpeg" as const, all: false };
 const cleanups: Array<() => void> = [];
+function requireStandalone(image: PictureObject): StandalonePictureObject {
+  if (isPictureGroup(image)) throw new Error("Expected a standalone picture.");
+  return image;
+}
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (error: unknown) => void;
@@ -176,7 +182,10 @@ describe("picture compression owner cancellation", () => {
     expect(await working).toBe(false);
     expect(f.put).toHaveBeenCalledTimes(1);
     expect(f.execute).not.toHaveBeenCalled();
-    expect(f.sheet.floatingImages.map((image) => image.assetId)).toEqual([source.id, second.id]);
+    expect(f.sheet.floatingImages.map((image) => requireStandalone(image).assetId)).toEqual([
+      source.id,
+      second.id,
+    ]);
     expect(f.feedback).not.toHaveBeenCalled();
   });
 });

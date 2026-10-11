@@ -47,8 +47,10 @@ export function readFloatingImageTransfer(
   if (value.length > 2_000_000) return { invalidFloatingImage: true };
   try {
     const { clipboardImages, clipboardCoordinateSpace, ...image } = JSON.parse(value);
-    const primary = normalizeFloatingImageForSheet(image as FloatingImage);
-    if (clipboardImages === undefined) return { floatingImage: requireLegacyPicture(primary) };
+    const primary = requireLegacyPicture(
+      normalizeFloatingImageForSheet(requireLegacyPicture(image as FloatingImage)),
+    );
+    if (clipboardImages === undefined) return { floatingImage: primary };
     if (
       !Array.isArray(clipboardImages) ||
       clipboardImages.length < 2 ||
@@ -57,8 +59,10 @@ export function readFloatingImageTransfer(
         clipboardCoordinateSpace !== GROUP_COORDINATE_SPACE)
     )
       throw new Error("Invalid group payload.");
-    const normalized = clipboardImages.map((member) =>
-      normalizeFloatingImageForSheet(member as FloatingImage),
+    const normalized = requireLegacyPictures(
+      requireLegacyPictures(clipboardImages as FloatingImage[]).map((member) =>
+        normalizeFloatingImageForSheet(member),
+      ),
     );
     if (
       new Set(normalized.map((member) => member.id)).size !== normalized.length ||
@@ -66,8 +70,7 @@ export function readFloatingImageTransfer(
     )
       throw new Error("Invalid group identities.");
     const floatingImages = normalizeClipboardImageGroup(normalized);
-    const floatingImage = requireLegacyPicture(primary);
-    return { floatingImage, floatingImages };
+    return { floatingImage: primary, floatingImages };
   } catch (error) {
     return {
       invalidFloatingImage: true,

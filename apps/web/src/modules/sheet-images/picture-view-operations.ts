@@ -1,4 +1,8 @@
-import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { requireStandalonePicture } from "./picture-document-support";
+import {
+  isFramedPictureObject,
+  type StandalonePictureObject,
+} from "@sheetcraft/core/picture-object";
 import { resolvePictureFrame } from "@sheetcraft/core/picture-frame";
 import type { FloatingImage } from "@sheetcraft/core/workbook";
 import {
@@ -27,33 +31,36 @@ function frameContext(layout: SheetViewportLayout, context?: PictureFrameLayoutC
   return context;
 }
 export function getPictureViewRect(
-  image: FloatingImage,
+  root: FloatingImage,
   layout: SheetViewportLayout,
   context?: PictureFrameLayoutContext,
 ): Rect | null {
+  const image = requireStandalonePicture(root);
   if (!isFramedPictureObject(image)) return getFloatingImageSheetRect(image, layout);
   const geometry = resolvePictureFrame(image.frame, frameContext(layout, context).metrics);
   return geometry.collapsed ? null : geometry.rect;
 }
 export function movePictureViewBy(
-  image: FloatingImage,
+  root: FloatingImage,
   delta: Point,
   layout: SheetViewportLayout,
   context?: PictureFrameLayoutContext,
-): FloatingImage | null {
+): StandalonePictureObject | null {
+  const image = requireStandalonePicture(root);
   return isFramedPictureObject(image)
     ? moveFramedPictureBy(image, delta, frameContext(layout, context).metrics)
     : moveFloatingImageBy(image, delta, layout);
 }
 export function resizePictureViewBy(
-  image: FloatingImage,
+  root: FloatingImage,
   direction: FloatingImageResizeDirection,
   delta: Point,
   layout: SheetViewportLayout,
   minSize: number,
   maxSize: number,
   context?: PictureFrameLayoutContext,
-): FloatingImage | null {
+): StandalonePictureObject | null {
+  const image = requireStandalonePicture(root);
   return isFramedPictureObject(image)
     ? resizeFramedPictureBy(image, direction, delta, frameContext(layout, context).metrics, {
         minSize,
@@ -67,21 +74,23 @@ export function resizePictureViewBy(
       });
 }
 export function rotatePictureViewBy(
-  image: FloatingImage,
+  root: FloatingImage,
   turns: -1 | 1 | 2,
   layout: SheetViewportLayout,
   context?: PictureFrameLayoutContext,
-): FloatingImage | null {
+): StandalonePictureObject | null {
+  const image = requireStandalonePicture(root);
   return isFramedPictureObject(image)
     ? rotateFramedPictureBy(image, turns * 90, frameContext(layout, context).metrics)
     : rotateFloatingImage(image, turns, layout);
 }
 export function flipPictureView(
-  image: FloatingImage,
+  root: FloatingImage,
   axis: "horizontal" | "vertical",
   layout: SheetViewportLayout,
   context?: PictureFrameLayoutContext,
-): FloatingImage {
+): StandalonePictureObject {
+  const image = requireStandalonePicture(root);
   return isFramedPictureObject(image)
     ? flipFramedPicture(image, axis, frameContext(layout, context).metrics)
     : flipFloatingImage(image, axis);

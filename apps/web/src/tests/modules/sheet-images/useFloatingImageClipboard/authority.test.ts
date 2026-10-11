@@ -7,11 +7,22 @@ import {
   redoWorkbookCommand,
 } from "@sheetcraft/core/history";
 import { type WorkbookCommand } from "@sheetcraft/core/commands";
-import { createWorkbook, getActiveSheet, type FloatingImage } from "@sheetcraft/core/workbook";
+import {
+  createWorkbook,
+  getActiveSheet,
+  type FloatingImage,
+  type LegacyFloatingImage,
+} from "@sheetcraft/core/workbook";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { isLegacyPictureObject, type PictureObject } from "@sheetcraft/core/picture-object";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { usePictureTools } from "../../../../modules/sheet-images/usePictureTools";
 import { useFloatingImageClipboard } from "../../../../modules/sheet-images/useFloatingImageClipboard";
+
+function requireLegacy(image: PictureObject): LegacyFloatingImage {
+  if (!isLegacyPictureObject(image)) throw new Error("Expected a legacy picture.");
+  return image;
+}
 
 function fixture() {
   const session = createWorkbookSession({ idFactory: createSequentialIdFactory() });
@@ -168,7 +179,9 @@ describe("picture clipboard authority", () => {
     f.clipboard.pastePending({ row: 7, column: 8 });
     expect(f.clipboard.hasPending()).toBe(false);
     expect(f.session.history.undoStack).toHaveLength(1);
-    expect(f.sheet.floatingImages.map((image) => [image.offsetX, image.offsetY])).toEqual([
+    expect(
+      f.sheet.floatingImages.map(requireLegacy).map((image) => [image.offsetX, image.offsetY]),
+    ).toEqual([
       [12, 12],
       [202, 112],
     ]);
@@ -192,7 +205,7 @@ describe("picture clipboard authority", () => {
     const f = fixture();
     await f.clipboard.copy(f.images[0]!, "copy");
     const captured = structuredClone(f.images);
-    f.images[1]!.offsetX = 999;
+    requireLegacy(f.images[1]!).offsetX = 999;
     f.setSheet(getActiveSheet(createWorkbook({ idFactory: createSequentialIdFactory() })));
     expect(f.clipboard.pastePending({ row: 4, column: 5 })).toBe(true);
     expect(f.onPasteMany).toHaveBeenCalledExactlyOnceWith(captured, { row: 4, column: 5 });

@@ -1,4 +1,5 @@
 import { requireLegacyPicture, requireLegacyPictures } from "./picture-document-support";
+import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import {
   cloneFloatingImage,
   type CellAddress,
@@ -27,7 +28,12 @@ type PendingFloatingImageClipboard = {
 };
 
 function matchesImage(left: FloatingImage, right: FloatingImage): boolean {
-  return left.id === right.id && left.assetId === right.assetId;
+  return (
+    isLegacyPictureObject(left) &&
+    isLegacyPictureObject(right) &&
+    left.id === right.id &&
+    left.assetId === right.assetId
+  );
 }
 
 function isSameSheet(pending: PendingFloatingImageClipboard, sheet: Sheet): boolean {
@@ -64,6 +70,13 @@ export function useFloatingImageClipboard(options: {
 
   function observeTransfer(transfer: GridClipboardTransfer): void {
     if (transfer.invalidFloatingImage && transfer.unsupportedFloatingImage) return;
+    try {
+      if (transfer.floatingImage) requireLegacyPicture(transfer.floatingImage);
+      if (transfer.floatingImages) requireLegacyPictures(transfer.floatingImages);
+    } catch {
+      options.onFeedback("clipboard.pasteRejected");
+      return;
+    }
     const current = getPendingForCurrentSheet();
     if (
       current &&
@@ -111,7 +124,7 @@ export function useFloatingImageClipboard(options: {
       return;
     }
     const selected = options.getSelectedImages?.();
-    if (selected === null || (selected && !selected.some((entry) => entry.id === image.id))) {
+    if (selected === null || (selected && !selected.some((entry) => matchesImage(entry, image)))) {
       options.onFeedback("image.copyFailed");
       event?.preventDefault();
       event?.stopPropagation();
@@ -119,6 +132,7 @@ export function useFloatingImageClipboard(options: {
     }
     let images: LegacyFloatingImage[] | undefined;
     try {
+      if (selected) requireLegacyPictures(selected);
       if (selected && selected.length > 1) images = normalizeClipboardImageGroup(selected);
     } catch {
       options.onFeedback("image.copyFailed");
@@ -196,9 +210,21 @@ export function useFloatingImageClipboard(options: {
         .getSheet()
         .floatingImages.find((candidate) => candidate.id === pendingCut.image.id);
       if (
+        (pendingCut.images ?? [pendingCut.image]).some((member) =>
+          options
+            .getSheet()
+            .floatingImages.some(
+              (entry) => entry.id === member.id && !isLegacyPictureObject(entry),
+            ),
+        )
+      ) {
+        options.onFeedback("clipboard.pasteRejected");
+        return;
+      }
+      if (
         pendingCut.revision !== options.getRevision() ||
         !currentImage ||
-        currentImage.assetId !== pendingCut.image.assetId
+        !matchesImage(currentImage, pendingCut.image)
       ) {
         clear();
         options.onFeedback("clipboard.documentChanged");

@@ -1,4 +1,6 @@
 import { describe, expect, test } from "vitest";
+import type { StandalonePictureObject } from "../../picture-object.js";
+import { isPictureGroup } from "../../picture-group.js";
 import {
   applyWorkbookCommand,
   createDeleteFloatingImageCommand,
@@ -27,8 +29,14 @@ import {
   getCellStyle,
   setCellContent,
   setCellStyle,
+  type FloatingImage,
 } from "../../workbook.js";
 import { createTestWorkbookSession } from "../helpers.js";
+
+function requireStandalone(image: FloatingImage | undefined): StandalonePictureObject | undefined {
+  if (isPictureGroup(image)) throw new Error("Expected a standalone picture.");
+  return image;
+}
 
 const image = {
   id: "floating-image-1",
@@ -183,14 +191,16 @@ describe("sheet images", () => {
     );
     const legacyV4 = structuredClone(serializeWorkbook(session.workbook));
     legacyV4.version = 4 as never;
-    delete legacyV4.sheets[0]?.floatingImages[0]?.transform;
+    delete requireStandalone(legacyV4.sheets[0]?.floatingImages[0])?.transform;
     const migrated = serializeWorkbook(deserializeWorkbook(legacyV4));
     expect(migrated.version).toBe(43);
-    expect(migrated.sheets[0]?.floatingImages[0]?.transform).toBeUndefined();
+    expect(requireStandalone(migrated.sheets[0]?.floatingImages[0])?.transform).toBeUndefined();
     const v5WithFlips = structuredClone(serializeWorkbook(session.workbook));
     v5WithFlips.version = 5 as never;
     expect(
-      serializeWorkbook(deserializeWorkbook(v5WithFlips)).sheets[0]?.floatingImages[0]?.transform,
+      requireStandalone(
+        serializeWorkbook(deserializeWorkbook(v5WithFlips)).sheets[0]?.floatingImages[0],
+      )?.transform,
     ).toEqual(transform);
     expect(() =>
       createSetFloatingImageCommand(sheet.id, {
@@ -362,7 +372,7 @@ describe("sheet images", () => {
       session.workbook,
       createInsertSheetAxisCommand(sheet.id, "row", 2),
     );
-    expect(sheet.floatingImages[0]?.anchor).toEqual({ row: 4, column: 2 });
+    expect(requireStandalone(sheet.floatingImages[0])?.anchor).toEqual({ row: 4, column: 2 });
     applyWorkbookCommand(session.workbook, insertInverse!);
     expect(createSheetSparseState(sheet)).toEqual(before);
 

@@ -1,4 +1,4 @@
-import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import {
   cloneFloatingImage,
   MAX_FLOATING_IMAGE_SIZE,
@@ -34,7 +34,7 @@ export function resizeFloatingImageSelectionBy(
     throw new RangeError("Invalid image selection resize minimum.");
   if (!images.length || new Set(images.map((image) => image.id)).size !== images.length)
     return null;
-  if (images.some(isFramedPictureObject)) return null;
+  if (images.some((image) => !isLegacyPictureObject(image))) return null;
   const legacy = images as readonly LegacyFloatingImage[];
   const active = legacy.find((image) => image.id === activeId);
   if (!active) return null;

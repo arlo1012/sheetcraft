@@ -1,5 +1,9 @@
+import { isPictureGroup } from "@sheetcraft/core";
 import type { WorkbookCommand } from "@sheetcraft/core/commands";
-import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import {
+  isFramedPictureObject,
+  type StandalonePictureObject,
+} from "@sheetcraft/core/picture-object";
 import type { FloatingImage, LegacyFloatingImage, Workbook } from "@sheetcraft/core/workbook";
 
 export class UnsupportedPictureDocumentError extends Error {
@@ -9,7 +13,7 @@ export class UnsupportedPictureDocumentError extends Error {
     readonly imageIds: readonly string[],
   ) {
     super(
-      `Frame-aware picture editing is not yet enabled (sheet ${sheetId}, pictures ${imageIds.join(", ")}).`,
+      `Frame-aware picture and owned group editing is not yet enabled (sheet ${sheetId}, pictures ${imageIds.join(", ")}).`,
     );
     this.name = "UnsupportedPictureDocumentError";
   }
@@ -18,7 +22,9 @@ export class UnsupportedPictureDocumentError extends Error {
 /** Temporary live-document boundary while model and view consumers are integrated. */
 export function assertWorkbookPictureSupport(workbook: Workbook): void {
   for (const sheet of workbook.sheets.values()) {
-    const ids = sheet.floatingImages.filter(isFramedPictureObject).map((image) => image.id);
+    const ids = sheet.floatingImages
+      .filter((image) => isFramedPictureObject(image) || isPictureGroup(image))
+      .map((image) => image.id);
     if (ids.length) throw new UnsupportedPictureDocumentError(sheet.id, ids);
   }
 }
@@ -27,10 +33,12 @@ export function assertWorkbookPictureSupport(workbook: Workbook): void {
 export function requireLegacyPictures(
   images: readonly FloatingImage[],
 ): readonly LegacyFloatingImage[] {
-  if (images.some(isFramedPictureObject))
+  if (images.some((image) => isFramedPictureObject(image) || isPictureGroup(image)))
     throw new UnsupportedPictureDocumentError(
       "picture-consumer",
-      images.filter(isFramedPictureObject).map((image) => image.id),
+      images
+        .filter((image) => isFramedPictureObject(image) || isPictureGroup(image))
+        .map((image) => image.id),
     );
   return images as readonly LegacyFloatingImage[];
 }
@@ -71,4 +79,24 @@ export function assertPictureCommandSupport(command: WorkbookCommand): void {
       for (const nested of command.commands) assertPictureCommandSupport(nested);
       break;
   }
+}
+
+/** Internal snapshots do not implicitly enable paused external group packaging. */
+export function assertExternalPictureGroupSupport(workbook: Workbook): void {
+  for (const sheet of workbook.sheets.values()) {
+    const ids = sheet.floatingImages.filter(isPictureGroup).map((group) => group.id);
+    if (ids.length) throw new UnsupportedPictureDocumentError(sheet.id, ids);
+  }
+}
+
+/** Prepared single-picture consumers have no source/asset contract for containers. */
+export function requireStandalonePictures(
+  images: readonly FloatingImage[],
+): readonly StandalonePictureObject[] {
+  const ids = images.filter(isPictureGroup).map((group) => group.id);
+  if (ids.length) throw new UnsupportedPictureDocumentError("picture-container-consumer", ids);
+  return images as readonly StandalonePictureObject[];
+}
+export function requireStandalonePicture(image: FloatingImage): StandalonePictureObject {
+  return requireStandalonePictures([image])[0]!;
 }

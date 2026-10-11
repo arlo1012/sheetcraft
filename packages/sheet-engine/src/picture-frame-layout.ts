@@ -15,7 +15,11 @@ import {
   pictureFrameContainsPoint,
   type ResolvedPictureFrame,
 } from "@sheetcraft/core/picture-frame";
-import { clonePictureObject, type FramedFloatingImage } from "@sheetcraft/core/picture-object";
+import {
+  clonePictureObject,
+  isFramedPictureObject,
+  type FramedFloatingImage,
+} from "@sheetcraft/core/picture-object";
 import type { Point, Rect, SheetGeometry } from "./geometry.js";
 import type { RowVisibilityIndex } from "./visibility.js";
 import type { FrozenPaneId } from "./frozen-layout.js";
@@ -154,10 +158,16 @@ function intersection(left: Rect, right: Rect): Rect | null {
   return endX > x && endY > y ? { x, y, width: endX - x, height: endY - y } : null;
 }
 
+function assertFramedPicture(image: FramedFloatingImage): void {
+  if (!image || typeof image !== "object" || !isFramedPictureObject(image))
+    throw new TypeError("Framed picture geometry requires a standalone framed picture.");
+}
+
 export function getFramedPictureViewportFragments(
   image: FramedFloatingImage,
   context: PictureFrameLayoutContext,
 ): FramedPictureViewportFragment[] {
+  assertFramedPicture(image);
   if (image.hidden) return [];
   const geometry = resolvePictureFrame(image.frame, context.metrics);
   if (geometry.collapsed) return [];
@@ -193,6 +203,7 @@ export function moveFramedPictureBy(
 ): FramedFloatingImage | null {
   if (!Number.isFinite(delta.x) || !Number.isFinite(delta.y))
     throw new RangeError("Picture movement must be finite.");
+  assertFramedPicture(image);
   const original = clonePictureObject(image);
   const geometry = resolvePictureFrame(original.frame, metrics);
   if (geometry.collapsed) return null;
@@ -247,6 +258,7 @@ export function resizeFramedPictureBy(
     throw new RangeError("Invalid picture resize budget.");
   if (options.preserveCornerRatio !== undefined && typeof options.preserveCornerRatio !== "boolean")
     throw new TypeError("Invalid picture corner ratio option.");
+  assertFramedPicture(image);
   const original = clonePictureObject(image);
   const geometry = resolvePictureFrame(original.frame, metrics);
   if (geometry.collapsed) return null;
@@ -312,6 +324,7 @@ export function rotateFramedPictureBy(
   metrics: PictureSheetMetrics,
 ): FramedFloatingImage {
   if (!Number.isFinite(angleDelta)) throw new RangeError("Picture rotation must be finite.");
+  assertFramedPicture(image);
   const original = clonePictureObject(image);
   const frame = clonePictureFrame({
     ...original.frame,
@@ -329,6 +342,7 @@ export function flipFramedPicture(
 ): FramedFloatingImage {
   if (axis !== "horizontal" && axis !== "vertical")
     throw new TypeError("Invalid picture flip axis.");
+  assertFramedPicture(image);
   const original = clonePictureObject(image);
   const frame = clonePictureFrame(original.frame);
   frame.angleDeg = -frame.angleDeg;

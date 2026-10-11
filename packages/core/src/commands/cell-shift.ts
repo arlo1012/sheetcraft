@@ -1,3 +1,5 @@
+import { isPictureGroup } from "../picture-group.js";
+import { isLegacyPictureObject } from "../picture-object.js";
 import { isFramedPictureObject } from "../picture-object.js";
 import {
   capturePivotTables,
@@ -423,7 +425,9 @@ export function applyCellShiftCommand(
 
   if (
     sheet.floatingImages.some(
-      (image) => isFramedPictureObject(image) && image.frame.anchor.mode !== "fixed",
+      (image) =>
+        (isFramedPictureObject(image) || isPictureGroup(image)) &&
+        image.frame.anchor.mode !== "fixed",
     )
   )
     throw invalidCommandPayload(
@@ -436,7 +440,7 @@ export function applyCellShiftCommand(
   if (command.type === "insertCells") {
     const overflow =
       previousState.cells.some((cell) => !map(cell.address)) ||
-      sheet.floatingImages.some((image) => !isFramedPictureObject(image) && !map(image.anchor)) ||
+      sheet.floatingImages.some((image) => isLegacyPictureObject(image) && !map(image.anchor)) ||
       (sheet.drawings ?? []).some((drawing) => !map(drawing.anchor));
     if (overflow)
       throw invalidCommandPayload(
@@ -527,7 +531,7 @@ export function applyCellShiftCommand(
   nextState.floatingImages = previousState.floatingImages.flatMap<
     import("../workbook.js").FloatingImage
   >((image) => {
-    if (isFramedPictureObject(image)) return [image];
+    if (isFramedPictureObject(image) || isPictureGroup(image)) return [image];
     const anchor = map(image.anchor);
     return anchor ? [{ ...image, anchor }] : [];
   });

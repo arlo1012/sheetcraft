@@ -5,6 +5,7 @@ import {
   redoWorkbookCommand,
   undoWorkbookCommand,
 } from "@sheetcraft/core/history";
+import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   getActiveSheet,
@@ -12,8 +13,15 @@ import {
   getCellValue,
   setCellContent,
   setCellValue,
+  type FloatingImage,
+  type LegacyFloatingImage,
 } from "@sheetcraft/core/workbook";
 import { createCellOperationActions } from "../../../../modules/sheet-grid/cell-operation-actions";
+
+function requireLegacy(image: FloatingImage | undefined): LegacyFloatingImage | undefined {
+  if (image && !isLegacyPictureObject(image)) throw new Error("Expected a legacy picture.");
+  return image;
+}
 
 function fixture() {
   const session = createWorkbookSession({
@@ -91,7 +99,7 @@ describe("cell operation actions", () => {
       kind: "formula",
       formula: { source: "=1" },
     });
-    expect(sheet.floatingImages[0]?.anchor?.row).toBe(2);
+    expect(requireLegacy(sheet.floatingImages[0])?.anchor?.row).toBe(2);
     expect(getCellContent(sheet, { row: 3, column: 0 })).toEqual({
       kind: "image",
       image: { assetId: "embedded-asset", altText: "embedded image" },
@@ -102,7 +110,7 @@ describe("cell operation actions", () => {
 
     expect(undoWorkbookCommand(session)).toBe(true);
     expect(getCellValue(sheet, { row: 1, column: 200 })).toBe("kept");
-    expect(sheet.floatingImages[0]?.anchor?.row).toBe(4);
+    expect(requireLegacy(sheet.floatingImages[0])?.anchor?.row).toBe(4);
     expect(redoWorkbookCommand(session)).toBe(true);
     expect(sheet.mergedCells).toEqual([
       { start: { row: 4, column: 0 }, end: { row: 5, column: 1 } },

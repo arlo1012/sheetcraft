@@ -1,4 +1,6 @@
 import { describe, expect, test } from "vitest";
+import type { StandalonePictureObject } from "../../picture-object.js";
+import { isPictureGroup } from "../../picture-group.js";
 import { createTestWorkbookSession } from "../helpers.js";
 import {
   applyWorkbookCommand,
@@ -30,7 +32,13 @@ import {
   setSheetMetadata,
   setSheetDimensionHidden,
   setRowHeight,
+  type FloatingImage,
 } from "../../workbook.js";
+
+function requireStandalone(image: FloatingImage | undefined): StandalonePictureObject | undefined {
+  if (isPictureGroup(image)) throw new Error("Expected a standalone picture.");
+  return image;
+}
 
 describe("sheet axis structure commands", () => {
   test("moves and restores hidden dimensions with their manual sizes", () => {
@@ -81,7 +89,7 @@ describe("sheet axis structure commands", () => {
     expect(getCellValue(sheet, { row: 3, column: 0 })).toBe("move");
     expect(getCellStyle(sheet, { row: 3, column: 0 })).toEqual({ bold: true });
     expect(getRowHeight(sheet, 3)).toBe(44);
-    expect(sheet.floatingImages[0]?.anchor).toEqual({ row: 3, column: 3 });
+    expect(requireStandalone(sheet.floatingImages[0])?.anchor).toEqual({ row: 3, column: 3 });
     expect(sheet.mergedCells).toEqual([
       { start: { row: 3, column: 4 }, end: { row: 3, column: 5 } },
     ]);

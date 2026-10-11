@@ -1,5 +1,7 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, expect, test, vi } from "vitest";
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import type { PictureObject, StandalonePictureObject } from "@sheetcraft/core/picture-object";
 import type { FloatingImage } from "@sheetcraft/core/workbook";
 import PictureAnnotationDialog from "../../../modules/sheet-images/components/PictureAnnotationDialog.vue";
 import { createAppI18n } from "../../../shared/i18n";
@@ -56,6 +58,10 @@ async function fixture() {
   } as DOMRect);
   return { wrapper, image, canvas };
 }
+function requireStandalone(image: PictureObject): StandalonePictureObject {
+  if (isPictureGroup(image)) throw new Error("Expected a standalone picture.");
+  return image;
+}
 function button(text: string) {
   return new DOMWrapper(
     [...document.querySelectorAll(".picture-annotation button")].find(
@@ -79,7 +85,7 @@ test("draft drawing confirms a single transformed image without mutating its sou
   pointer(window, "pointermove", 80, 60);
   pointer(window, "pointerup", 100, 70);
   await confirm();
-  const result = f.wrapper.emitted("confirm")![0]![0] as FloatingImage;
+  const result = requireStandalone(f.wrapper.emitted("confirm")![0]![0] as FloatingImage);
   expect(result.transform?.annotations).toHaveLength(2);
   expect(result.transform?.annotations?.[1]?.points[0]).toEqual({ x: 0.2, y: 0.8 });
   expect(result.transform?.rotation).toBe(90);
@@ -94,9 +100,9 @@ test("pointer cancellation discards the unfinished stroke, and clear can be undo
   await button("Clear annotations").trigger("click");
   await button("Undo annotation").trigger("click");
   await confirm();
-  expect((f.wrapper.emitted("confirm")![0]![0] as FloatingImage).transform?.annotations).toEqual(
-    f.image.transform?.annotations,
-  );
+  expect(
+    requireStandalone(f.wrapper.emitted("confirm")![0]![0] as FloatingImage).transform?.annotations,
+  ).toEqual(f.image.transform?.annotations);
 });
 test("command failure shows an alert while preserving the loaded annotation draft", async () => {
   const f = await fixture();
@@ -110,6 +116,6 @@ test("command failure shows an alert while preserving the loaded annotation draf
   expect(document.querySelector(".picture-annotation canvas")).toBe(f.canvas);
   await confirm();
   expect(
-    (f.wrapper.emitted("confirm")![0]![0] as FloatingImage).transform?.annotations,
+    requireStandalone(f.wrapper.emitted("confirm")![0]![0] as FloatingImage).transform?.annotations,
   ).toHaveLength(2);
 });

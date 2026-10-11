@@ -1,4 +1,8 @@
 import {
+  assertExternalPictureGroupSupport,
+  requireStandalonePicture,
+} from "../sheet-images/picture-document-support";
+import {
   assertWorkbookPictureSupport,
   UnsupportedPictureDocumentError,
 } from "../sheet-images/picture-document-support";
@@ -110,8 +114,10 @@ function rewriteImageReferences(workbook: Workbook, ids: ReadonlyMap<string, str
         cell.content.image.assetId =
           ids.get(cell.content.image.assetId) ?? cell.content.image.assetId;
     }
-    for (const image of sheet.floatingImages)
+    for (const root of sheet.floatingImages) {
+      const image = requireStandalonePicture(root);
       image.assetId = ids.get(image.assetId) ?? image.assetId;
+    }
   }
 }
 
@@ -203,6 +209,7 @@ export async function readWorkbookBundleFile(
 }
 
 export function downloadWorkbookJson(workbook: Workbook): void {
+  assertExternalPictureGroupSupport(workbook);
   const blob = new Blob([JSON.stringify(serializeWorkbook(workbook), null, 2)], {
     type: "application/json",
   });
@@ -221,6 +228,7 @@ export async function downloadWorkbookBundle(
   workbook: Workbook,
   assetStore: ImageAssetStore,
 ): Promise<void> {
+  assertExternalPictureGroupSupport(workbook);
   // Snapshot first so async asset reads cannot combine a later document with earlier image IDs.
   const snapshot = serializeWorkbook(workbook);
   const ids = collectWorkbookImageAssetIds(deserializeWorkbook(snapshot));

@@ -1,5 +1,6 @@
 import { computed, getCurrentScope, onScopeDispose, watch } from "vue";
 import { arePictureObjectsEqual } from "@sheetcraft/core/picture-object";
+import { isPictureGroup } from "@sheetcraft/core";
 import {
   cloneFloatingImage,
   normalizeImageTransform,
@@ -85,6 +86,7 @@ export function usePictureToolbarOwner(options: {
         const original = sheet.floatingImages.find((entry) => entry.id === id);
         if (!original) return null;
         const source = cloneFloatingImage(original);
+        if (isPictureGroup(source)) return source;
         return {
           ...source,
           transform: normalizeImageTransform({ ...source.transform, appearance: undefined }),
@@ -109,7 +111,7 @@ export function usePictureToolbarOwner(options: {
   );
   return computed(() => {
     const displayed = options.getImage();
-    if (!displayed) return undefined;
+    if (!displayed || isPictureGroup(displayed)) return undefined;
     const lease = leaseEpoch;
     const image = cloneFloatingImage(displayed);
     const workbook = options.getWorkbook(),
@@ -119,6 +121,7 @@ export function usePictureToolbarOwner(options: {
     const sources = ids
       .map((id) => sheet.floatingImages.find((entry) => entry.id === id))
       .map((source) => (source ? cloneFloatingImage(source) : undefined));
+    if (sources.some((source) => source && isPictureGroup(source))) return undefined;
     const context = options.getFrameContext();
     let geometry: ReturnType<typeof getPictureToolGeometry>;
     try {
