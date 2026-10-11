@@ -44,3 +44,5 @@ export * from "./picture-object-sheet.js";
 export * from "./picture-group.js";
 export * from "./picture-group-layout.js";
 export * from "./picture-group-planning.js";
+export * from "./picture-group-edit.js";
+export * from "./picture-group-copy.js";

@@ -21,6 +21,7 @@ import { formulaToolsZhCN } from "../../../modules/formula-tools/formula-tools-m
 import { conditionalFormattingZhCN } from "../../../modules/conditional-formatting/conditional-formatting-messages.zh-CN";
 import { tableStylesZhCN } from "../../../modules/table-styles/table-style-messages.zh-CN";
 import { tablesZhCN } from "../../../modules/table-styles/table-messages.zh-CN";
+import { pictureFormatZhCN } from "../../../modules/sheet-images/picture-format-messages.zh-CN";
 
 export const zhCN = {
   ...symbolsZhCN,
@@ -45,6 +46,7 @@ export const zhCN = {
   ...simulationZhCN,
   ...dataTableZhCN,
   ...proofreadingZhCN,
+  ...pictureFormatZhCN,
   dataTools: {
     dropdownList: "下拉列表",
     dropdown: {

@@ -20,6 +20,7 @@ import type { FormulaToolsMessageSchema } from "../../modules/formula-tools/form
 import type { ConditionalFormattingMessageSchema } from "../../modules/conditional-formatting/conditional-formatting-messages";
 import type { TableStylesMessageSchema } from "../../modules/table-styles/table-style-messages";
 import type { TableMessageSchema } from "../../modules/table-styles/table-messages";
+import type { PictureFormatMessageSchema } from "../../modules/sheet-images/picture-format-messages";
 
 export type AppLocale = "zh-CN" | "en-US";
 
@@ -44,7 +45,8 @@ type ToolMessageSchema = typeof symbolsEnUS &
   TableMessageSchema &
   SimulationMessageSchema &
   DataTableMessageSchema &
-  ProofreadingMessageSchema;
+  ProofreadingMessageSchema &
+  PictureFormatMessageSchema;
 
 export type MessageSchema = ToolMessageSchema & {
   dataTools: {

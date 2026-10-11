@@ -90,6 +90,10 @@
     "./picture-group-geometry": {
       "types": "./dist/picture-group-geometry.d.ts",
       "import": "./dist/picture-group-geometry.js"
+    },
+    "./picture-layout-edit": {
+      "types": "./dist/picture-layout-edit.d.ts",
+      "import": "./dist/picture-layout-edit.js"
     }
   },
   "scripts": {

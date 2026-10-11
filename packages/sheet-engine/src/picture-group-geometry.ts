@@ -7,7 +7,11 @@ import {
   type PictureFrameRect,
   type ResolvedPictureLayout,
 } from "@sheetcraft/core/picture-frame";
-import type { PictureGroup, PictureGroupPath } from "@sheetcraft/core/picture-group";
+import type {
+  PictureGroup,
+  PictureGroupChild,
+  PictureGroupPath,
+} from "@sheetcraft/core/picture-group";
 import { resolvePictureGroup } from "@sheetcraft/core/picture-group-layout";
 import type { Point, Rect } from "./geometry.js";
 import type { FrozenPaneId } from "./frozen-layout.js";
@@ -315,6 +319,41 @@ export function rotatePictureGroupTo(
   if (layout.collapsed) return null;
   if (normalized === layout.angleDeg) return original;
   const next = { ...original, frame: { ...original.frame, angleDeg: normalized } };
+  resolvePictureGroup(next, metrics);
+  return next;
+}
+
+/** Mirror an orthogonal ownership tree about its unchanged world layout center. */
+export function flipPictureGroup(
+  group: PictureGroup,
+  axis: "horizontal" | "vertical",
+  metrics: PictureSheetMetrics,
+): PictureGroup {
+  if (axis !== "horizontal" && axis !== "vertical")
+    throw new TypeError("Invalid picture group flip axis.");
+  // Resolution returns a detached canonical tree and validates hidden content.
+  const { node: next } = resolvePictureGroup(group, metrics);
+  next.frame.angleDeg = normalizePictureAngle(-next.frame.angleDeg);
+  function reflect(child: PictureGroupChild): void {
+    const rect = child.frame.rect;
+    child.frame.rect = {
+      ...rect,
+      ...(axis === "horizontal"
+        ? { xRatio: 1 - rect.xRatio - rect.widthRatio }
+        : { yRatio: 1 - rect.yRatio - rect.heightRatio }),
+    };
+    child.frame.angleDeg = normalizePictureAngle(-child.frame.angleDeg);
+    if (child.kind === "grouped-group-v1") {
+      for (const member of child.members) reflect(member);
+    } else if (axis === "horizontal") {
+      child.frame.flipHorizontal = !child.frame.flipHorizontal;
+      child.frame.source.offsetXRatio = -child.frame.source.offsetXRatio;
+    } else {
+      child.frame.flipVertical = !child.frame.flipVertical;
+      child.frame.source.offsetYRatio = -child.frame.source.offsetYRatio;
+    }
+  }
+  for (const member of next.members) reflect(member);
   resolvePictureGroup(next, metrics);
   return next;
 }

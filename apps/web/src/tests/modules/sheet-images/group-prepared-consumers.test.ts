@@ -49,11 +49,11 @@ describe("owned group prepared-consumer safety", () => {
     expect(() => assertExternalPictureGroupSupport(workbook)).toThrow(/not yet enabled/);
     expect(serializeWorkbook(workbook)).toEqual(before);
   });
-  test("the standalone view cannot treat a container frame as a leaf source or legacy placement", () => {
+  test("prepared projection and root operations require actual worksheet frame context", () => {
     const { sheet, layout } = fixture();
     const group = sheet.floatingImages[0]!;
     expect(() => getPictureViewportFragments(sheet.floatingImages, layout)).toThrow(
-      /not yet enabled/,
+      /require a frame context/,
     );
     for (const operation of [
       () => getPictureViewRect(group, layout),
@@ -62,7 +62,7 @@ describe("owned group prepared-consumer safety", () => {
       () => rotatePictureViewBy(group, 1, layout),
       () => flipPictureView(group, "horizontal", layout),
     ])
-      expect(operation).toThrow(/not yet enabled/);
+      expect(operation).toThrow(/current worksheet frame geometry/);
   });
   test("paused external packaging and print refuse before fetching or opening a download target", async () => {
     const { workbook, sheet } = fixture();

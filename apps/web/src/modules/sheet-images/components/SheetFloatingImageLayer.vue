@@ -16,7 +16,6 @@ import {
   flipFloatingImages,
   resizeFloatingImagesBy,
 } from "@sheetcraft/sheet-engine/floating-image-group";
-import { resizeFloatingImageSelectionBy } from "@sheetcraft/sheet-engine/floating-image-selection";
 import {
   MAX_FLOATING_IMAGE_SIZE,
   cloneFloatingImage,
@@ -48,6 +47,12 @@ import {
 } from "@sheetcraft/core/picture-object";
 import { requireStandalonePicture, requireStandalonePictures } from "../picture-document-support";
 import { pictureFrameContainsPoint } from "@sheetcraft/core/picture-frame";
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import { hitPictureViewportPoint, pictureFragmentRootId } from "../picture-hit-testing";
+import {
+  movePictureRootSelectionBy,
+  resizePictureRootSelectionBy,
+} from "../picture-root-selection-planning";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import {
   getPictureViewportFragments,
@@ -55,7 +60,6 @@ import {
 } from "../picture-viewport-fragments";
 import {
   getPictureViewRect,
-  movePictureViewBy,
   resizePictureViewBy,
   rotatePictureViewBy,
   flipPictureView,
@@ -87,8 +91,10 @@ const MINIMUM_IMAGE_SIZE = 24;
 const props = withDefaults(
   defineProps<{
     images: readonly PictureObject[];
+    /** Complete forest when the host separately renders owned groups. */
+    selectionRoots?: readonly PictureObject[];
     owner?: object;
-    applyUpdateMany?: (images: readonly FloatingImage[]) => boolean;
+    applyUpdateMany?: (images: readonly PictureObject[]) => boolean;
     /** Canvas renders image effects; the DOM layer retains this for overlays and future object handles. */
     effects?: DrawingThemeEffects;
     layout: SheetViewportLayout;
@@ -110,8 +116,8 @@ const currentImages = computed(() => requireStandalonePictures(props.images));
 
 const emit = defineEmits<{
   select: [id: string | null, additive?: boolean];
-  updateMany: [images: FloatingImage[]];
-  update: [image: FloatingImage];
+  updateMany: [images: PictureObject[]];
+  update: [image: PictureObject];
   group: [ids: string[]];
   feedback: [key: MessageKey];
   delete: [id: string];
@@ -124,19 +130,20 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-function commitImages(nextImages: FloatingImage[]): boolean {
+function commitImages(nextImages: PictureObject[]): boolean {
   try {
     requireStandalonePictures(props.images);
+    selectionImages();
   } catch {
     emit("feedback", "picture.operationFailed");
     return false;
   }
   const current = nextImages.map((image) =>
-    currentImages.value.find((entry) => entry.id === image.id),
+    selectionImages().find((entry) => entry.id === image.id),
   );
   if (
     current.every((image) => image !== undefined) &&
-    areFloatingImageCollectionsEqual(current as FloatingImage[], nextImages)
+    areFloatingImageCollectionsEqual(current as PictureObject[], nextImages)
   )
     return true;
   if (!props.applyUpdateMany) {
@@ -156,7 +163,7 @@ function commitImages(nextImages: FloatingImage[]): boolean {
   }
 }
 
-type ImageFragment = PictureViewportFragment;
+type ImageFragment = Exclude<PictureViewportFragment, { kind: "group-leaf" }>;
 type LegacyImageFragment = FloatingImageViewportFragment & {
   image: LegacyFloatingImage;
   kind: "legacy";
@@ -165,7 +172,7 @@ const fragmentBounds = (fragment: ImageFragment) =>
   fragment.kind === "legacy" ? fragment.clippedRect : fragment.clippedBounds;
 type Gesture = {
   image: FloatingImage;
-  images: FloatingImage[];
+  images: PictureObject[];
   mode: "move" | FloatingImageResizeDirection;
   pointerId: number;
   focusTarget: HTMLElement;
@@ -188,7 +195,7 @@ type ContextMenuState = {
 
 const gesture = shallowRef<Gesture>();
 const previewImage = shallowRef<FloatingImage>();
-const previewImages = shallowRef<FloatingImage[]>([]);
+const previewImages = shallowRef<PictureObject[]>([]);
 const selectedIds = computed(
   () =>
     new Set([
@@ -338,14 +345,25 @@ const groupFragments = computed<LegacyImageFragment[]>(() => {
     : [];
 });
 
+function selectionImages(): readonly PictureObject[] {
+  const roots = props.selectionRoots ?? props.images;
+  // Whole-forest projection validates even hidden ownership before any gesture.
+  getPictureViewportFragments(roots, props.layout, props.frameContext);
+  return roots;
+}
+function selectedPreview(id: string): FloatingImage | undefined {
+  const image = previewImages.value.find((entry) => entry.id === id);
+  return image ? requireStandalonePicture(image) : undefined;
+}
+
 function displayImages(): readonly FloatingImage[] {
   return requireStandalonePictures(props.images).map(displayImage);
 }
 
 function displayImage(image: FloatingImage): FloatingImage {
-  return (
+  return requireStandalonePicture(
     previewImages.value.find((entry) => entry.id === image.id) ??
-    (previewImage.value?.id === image.id ? previewImage.value : image)
+      (previewImage.value?.id === image.id ? previewImage.value : image),
   );
 }
 
@@ -380,9 +398,25 @@ function getLayerPoint(event: MouseEvent): Point {
   return clientPointToElementSurface({ x: event.clientX, y: event.clientY }, layer, props.scale);
 }
 
-function focusSelectedImageProxy(fallback?: HTMLElement): void {
+function focusSelectedImageProxy(fallback?: HTMLElement, expectedId = props.selectedImageId): void {
+  const owner = props.owner,
+    layout = props.layout,
+    frameContext = props.frameContext,
+    scale = props.scale,
+    source = selectionImages().map(cloneFloatingImage);
   void nextTick(() => {
-    const selected = layerRef.value?.querySelector<HTMLElement>(".is-selected");
+    if (
+      owner !== props.owner ||
+      layout !== props.layout ||
+      frameContext !== props.frameContext ||
+      scale !== props.scale ||
+      expectedId !== props.selectedImageId ||
+      !areFloatingImageCollectionsEqual(source, selectionImages())
+    )
+      return;
+    const selected = [
+      ...(layerRef.value?.querySelectorAll<HTMLElement>(".is-selected") ?? []),
+    ].find((element) => element.dataset.floatingImageId === expectedId);
     if (selected?.isConnected) selected.focus({ preventScroll: true });
     else if (fallback?.isConnected) fallback.focus({ preventScroll: true });
   });
@@ -426,7 +460,7 @@ function planStartGesture(
     return;
   }
   const group = selectedIds.value.has(image.id)
-    ? currentImages.value.filter((entry) => selectedIds.value.has(entry.id))
+    ? selectionImages().filter((entry) => selectedIds.value.has(entry.id))
     : image.groupId
       ? currentImages.value.filter((entry) => entry.groupId === image.groupId)
       : [image];
@@ -435,12 +469,11 @@ function planStartGesture(
     return;
   }
   emit("select", image.id);
-  focusSelectedImageProxy(focusTarget);
+  focusSelectedImageProxy(focusTarget, image.id);
   if (props.readOnly) return;
   if (
     !group.length ||
-    group.some((entry) => !getPictureViewRect(entry, props.layout, props.frameContext)) ||
-    (mode !== "move" && group.length > 1 && group.some(isFramedPictureObject))
+    group.some((entry) => !getPictureViewRect(entry, props.layout, props.frameContext))
   ) {
     emit("feedback", "picture.operationFailed");
     return;
@@ -449,7 +482,7 @@ function planStartGesture(
   previewImage.value = cloneImage(image);
   gesture.value = {
     image: cloneImage(image),
-    images: group.map(cloneImage),
+    images: group.map(cloneFloatingImage),
     mode,
     pointerId: event.pointerId,
     focusTarget,
@@ -457,7 +490,7 @@ function planStartGesture(
     grouped: Boolean(
       image.groupId &&
       group.length > 1 &&
-      group.every((entry) => entry.groupId === image.groupId) &&
+      group.every((entry) => !isPictureGroup(entry) && entry.groupId === image.groupId) &&
       group.length ===
         currentImages.value.filter((entry) => entry.groupId === image.groupId).length,
     ),
@@ -471,7 +504,7 @@ function planStartGesture(
       group.every((entry) => selectedIds.value.has(entry.id)),
     groups: new Map(
       group
-        .filter((entry) => entry.groupId)
+        .flatMap((entry) => (isPictureGroup(entry) || !entry.groupId ? [] : [entry]))
         .map((entry) => [
           entry.groupId!,
           currentImages.value
@@ -526,51 +559,49 @@ function planGestureAt(activeGesture: Gesture, point: Point): void {
   const deltaY = point.y - activeGesture.startPoint.y;
   if (deltaX === 0 && deltaY === 0) {
     previewImages.value = activeGesture.images;
-    previewImage.value = activeGesture.images.find((entry) => entry.id === activeGesture.image.id);
+    previewImage.value = selectedPreview(activeGesture.image.id);
     return;
   }
   if (activeGesture.mode === "move") {
-    const rects = activeGesture.images
-      .filter((entry) => !isFramedPictureObject(entry))
-      .map((entry) => getPictureViewRect(entry, props.layout, props.frameContext))
-      .filter((entry) => entry !== null);
-    const delta = {
-      x: Math.max(deltaX, -Math.min(...rects.map((rect) => rect.x))),
-      y: Math.max(deltaY, -Math.min(...rects.map((rect) => rect.y))),
-    };
-    const planned =
-      delta.x === 0 && delta.y === 0
-        ? activeGesture.images
-        : activeGesture.images.map((entry) =>
-            movePictureViewBy(entry, delta, props.layout, props.frameContext),
-          );
-    if (planned.some((image) => image === null)) {
+    const planned = movePictureRootSelectionBy(
+      activeGesture.images,
+      { x: deltaX, y: deltaY },
+      props.layout,
+      props.frameContext,
+    );
+    if (!planned) {
       finishGesture(false);
       emit("feedback", "picture.operationFailed");
       return;
     }
-    previewImages.value = planned as FloatingImage[];
-    previewImage.value = previewImages.value.find((entry) => entry.id === activeGesture.image.id);
+    previewImages.value = planned;
+    previewImage.value = selectedPreview(activeGesture.image.id);
     return;
   }
   if (activeGesture.images.length > 1) {
-    previewImages.value =
-      (activeGesture.grouped
-        ? resizeFloatingImagesBy(
-            activeGesture.images as LegacyFloatingImage[],
-            activeGesture.mode,
-            { x: deltaX, y: deltaY },
-            props.layout,
-          )
-        : resizeFloatingImageSelectionBy(
-            activeGesture.images as LegacyFloatingImage[],
-            activeGesture.image.id,
-            activeGesture.mode,
-            { x: deltaX, y: deltaY },
-            props.layout,
-            MINIMUM_IMAGE_SIZE,
-          )) ?? activeGesture.images;
-    previewImage.value = previewImages.value.find((entry) => entry.id === activeGesture.image.id);
+    const planned = activeGesture.grouped
+      ? resizeFloatingImagesBy(
+          activeGesture.images as LegacyFloatingImage[],
+          activeGesture.mode,
+          { x: deltaX, y: deltaY },
+          props.layout,
+        )
+      : resizePictureRootSelectionBy(
+          activeGesture.images,
+          activeGesture.image.id,
+          activeGesture.mode,
+          { x: deltaX, y: deltaY },
+          props.layout,
+          props.frameContext,
+          MINIMUM_IMAGE_SIZE,
+        );
+    if (!planned) {
+      finishGesture(false);
+      emit("feedback", "picture.operationFailed");
+      return;
+    }
+    previewImages.value = planned;
+    previewImage.value = selectedPreview(activeGesture.image.id);
     return;
   }
   const next = resizePictureViewBy(
@@ -700,7 +731,7 @@ function startCropGesture(direction: ImageCropGesture, event: PointerEvent): voi
 
 function isCurrentGesture(active: Gesture): boolean {
   const current = active.images.map((image) =>
-    currentImages.value.find((entry) => entry.id === image.id),
+    selectionImages().find((entry) => entry.id === image.id),
   );
   const expected = active.images.map((image) => image.id);
   const matches = (ids: readonly string[]) =>
@@ -721,7 +752,7 @@ function isCurrentGesture(active: Gesture): boolean {
     active.scale === props.scale &&
     !props.readOnly &&
     current.every((image) => image !== undefined) &&
-    areFloatingImageCollectionsEqual(current as FloatingImage[], active.images)
+    areFloatingImageCollectionsEqual(current as PictureObject[], active.images)
   );
 }
 function finishGesture(commit: boolean): void {
@@ -865,7 +896,15 @@ function requestDelete(): void {
 }
 
 function getPaintState(): FloatingImagePaintState {
-  return { images: displayImages(), revision: paintRevision.value, effects: props.effects };
+  return {
+    images: selectionImages().map(
+      (root) =>
+        previewImages.value.find((next) => next.id === root.id) ??
+        (previewImage.value?.id === root.id ? previewImage.value : root),
+    ),
+    revision: paintRevision.value,
+    effects: props.effects,
+  };
 }
 
 function emitPaintState(): void {
@@ -874,6 +913,11 @@ function emitPaintState(): void {
 }
 
 function hitTestFloatingImage(point: Point): FloatingImage | undefined {
+  if (props.selectionRoots) {
+    const hit = hitPictureViewportPoint(selectionImages(), point, props.layout, props.frameContext);
+    if (!hit || hit.kind === "group-leaf") return undefined;
+    return currentImages.value.find((image) => image.id === pictureFragmentRootId(hit));
+  }
   for (let index = fragments.value.length - 1; index >= 0; index -= 1) {
     const fragment = fragments.value[index];
     if (!fragment) continue;
@@ -1016,6 +1060,13 @@ watch(
   () => {
     finishGesture(false);
     cancelCrop(false);
+  },
+  { flush: "sync" },
+);
+watch(
+  () => props.selectionRoots,
+  () => {
+    if (gesture.value && !isCurrentGesture(gesture.value)) finishGesture(false);
   },
   { flush: "sync" },
 );
@@ -1222,46 +1273,15 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     ArrowDown: { x: 0, y: distance },
   }[event.key];
   if (!offset) return;
-  const members = currentImages.value.filter((entry) => selectedIds.value.has(entry.id));
-  const rects = members
-    .map((entry) => getPictureViewRect(entry, props.layout, props.frameContext))
-    .filter((entry) => entry !== null);
-  if (members.length !== selectedIds.value.size || rects.length !== members.length) {
+  const members = selectionImages().filter((entry) => selectedIds.value.has(entry.id));
+  if (members.length !== selectedIds.value.size) {
     emit("feedback", "picture.operationFailed");
     event.preventDefault();
     return;
   }
-  const delta = {
-    x: Math.max(
-      offset.x,
-      -Math.min(
-        ...members.flatMap((entry) =>
-          isFramedPictureObject(entry)
-            ? []
-            : [getPictureViewRect(entry, props.layout, props.frameContext)!.x],
-        ),
-      ),
-    ),
-    y: Math.max(
-      offset.y,
-      -Math.min(
-        ...members.flatMap((entry) =>
-          isFramedPictureObject(entry)
-            ? []
-            : [getPictureViewRect(entry, props.layout, props.frameContext)!.y],
-        ),
-      ),
-    ),
-  };
-  if (delta.x === 0 && delta.y === 0) {
-    event.preventDefault();
-    return;
-  }
-  const next = members.map((entry) =>
-    movePictureViewBy(entry, delta, props.layout, props.frameContext),
-  );
-  if (next.some((image) => image === null)) emit("feedback", "picture.operationFailed");
-  else commitImages(next as FloatingImage[]);
+  const next = movePictureRootSelectionBy(members, offset, props.layout, props.frameContext);
+  if (!next) emit("feedback", "picture.operationFailed");
+  else commitImages(next);
   event.preventDefault();
 }
 </script>

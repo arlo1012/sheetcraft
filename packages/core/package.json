@@ -202,6 +202,14 @@
     "./picture-group-planning": {
       "types": "./dist/picture-group-planning.d.ts",
       "import": "./dist/picture-group-planning.js"
+    },
+    "./picture-group-edit": {
+      "types": "./dist/picture-group-edit.d.ts",
+      "import": "./dist/picture-group-edit.js"
+    },
+    "./picture-group-copy": {
+      "types": "./dist/picture-group-copy.d.ts",
+      "import": "./dist/picture-group-copy.js"
     }
   },
   "scripts": {

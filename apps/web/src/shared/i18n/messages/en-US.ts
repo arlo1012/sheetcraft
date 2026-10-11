@@ -21,6 +21,7 @@ import { formulaToolsEnUS } from "../../../modules/formula-tools/formula-tools-m
 import { conditionalFormattingEnUS } from "../../../modules/conditional-formatting/conditional-formatting-messages.en-US";
 import { tableStylesEnUS } from "../../../modules/table-styles/table-style-messages.en-US";
 import { tablesEnUS } from "../../../modules/table-styles/table-messages.en-US";
+import { pictureFormatEnUS } from "../../../modules/sheet-images/picture-format-messages.en-US";
 
 export const enUS = {
   ...symbolsEnUS,
@@ -45,6 +46,7 @@ export const enUS = {
   ...simulationEnUS,
   ...dataTableEnUS,
   ...proofreadingEnUS,
+  ...pictureFormatEnUS,
   dataTools: {
     dropdownList: "Dropdown list",
     dropdown: {

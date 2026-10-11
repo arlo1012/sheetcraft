@@ -18,3 +18,4 @@ export * from "./view-state.js";
 export * from "./viewport-layout.js";
 export * from "./visibility.js";
 export * from "./picture-group-geometry.js";
+export * from "./picture-layout-edit.js";

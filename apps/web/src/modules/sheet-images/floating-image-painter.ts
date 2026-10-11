@@ -1,7 +1,11 @@
 import { requireLegacyPictures } from "./picture-document-support";
 import { createCanvasImageCache } from "../sheet-grid/canvas/image-painter";
 import type { FloatingImage, LegacyFloatingImage, ImageTransform } from "@sheetcraft/core/workbook";
-import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import {
+  isFramedPictureObject,
+  normalizePictureObjectCollection,
+} from "@sheetcraft/core/picture-object";
+import { isPictureGroup, traversePictureGroup } from "@sheetcraft/core/picture-group";
 import type { ResolvedPictureFrame } from "@sheetcraft/core/picture-frame";
 import {
   getFloatingImageViewportFragments,
@@ -12,7 +16,7 @@ import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layo
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import { paintImagePresentation } from "../../shared/images/imageAppearance";
 import { hasVisibleDrawingThemeEffects, type DrawingThemeEffects } from "./drawing-theme-effects";
-import { paintFramedPictureContent } from "./framed-picture-painter";
+import { paintFramedPictureContent, paintGroupedPictureContent } from "./framed-picture-painter";
 import { getPictureViewportFragments } from "./picture-viewport-fragments";
 
 export type FloatingImagePaintState = Readonly<{
@@ -185,13 +189,18 @@ function paintFramedPlaceholder(
 }
 
 /** Prepared frame content cannot yet represent every inherited drawing effect. */
-function assertFramedPicturePaintSupport(
+function assertPreparedPicturePaintSupport(
   images: readonly FloatingImage[],
   effects: DrawingThemeEffects | undefined,
 ): void {
-  for (const image of images) {
-    if (!isFramedPictureObject(image)) continue;
-    if (image.transform?.appearance?.reflection)
+  for (const image of normalizePictureObjectCollection(images)) {
+    if (!isFramedPictureObject(image) && !isPictureGroup(image)) continue;
+    const leaves = isPictureGroup(image)
+      ? traversePictureGroup(image)
+          .map(({ node }) => node)
+          .filter((node) => node.kind === "grouped-picture-v1")
+      : [image];
+    if (leaves.some((leaf) => leaf.transform?.appearance?.reflection))
       throw new Error("Framed picture reflection is not supported by this prepared painter.");
     if (hasVisibleDrawingThemeEffects(effects))
       throw new Error(
@@ -240,7 +249,7 @@ export function paintFloatingImages(
     options.frameContext,
   );
   const effects = options.effects ?? options.state.effects;
-  assertFramedPicturePaintSupport(options.state.images, effects);
+  assertPreparedPicturePaintSupport(options.state.images, effects);
   const visibleUrls = new Set<string>();
   // Retain the complete visible collection even when a later cache/draw fails.
   for (const fragment of fragments) {
@@ -258,6 +267,8 @@ export function paintFloatingImages(
         const image = url ? options.cache.get(url) : undefined;
         if (image && fragment.kind === "framed")
           paintFramedPictureContent(context, image, fragment.image, fragment.geometry);
+        else if (image && fragment.kind === "group-leaf")
+          paintGroupedPictureContent(context, image, fragment.image, fragment.geometry);
         else if (image && fragment.kind === "legacy")
           paintImage(
             context,
@@ -269,7 +280,7 @@ export function paintFloatingImages(
         else {
           const loading = Boolean(options.loadingAssetIds?.has(fragment.image.assetId));
           const label = loading ? options.loadingLabel : options.unavailableLabel;
-          if (fragment.kind === "framed")
+          if (fragment.kind === "framed" || fragment.kind === "group-leaf")
             paintFramedPlaceholder(context, fragment.geometry, label, loading, options.palette);
           else paintPlaceholder(context, fragment.rect, label, loading, options.palette);
         }
