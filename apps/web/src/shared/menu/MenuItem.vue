@@ -186,10 +186,15 @@ function onKeydown(event: KeyboardEvent): void {
     display: inline-flex;
     align-items: center;
     justify-content: flex-end;
+    min-height: var(--sheetcraft-line-height-body-medium);
     gap: 5px;
     color: var(--sheetcraft-text-secondary);
     font-size: var(--sheetcraft-font-size-body-small);
-    line-height: var(--sheetcraft-line-height-body-small);
+    line-height: inherit;
+
+    .sheetcraft-menu-item--disabled & {
+      color: inherit;
+    }
 
     :deep(svg.lucide) {
       width: var(--sheetcraft-menu-icon-size);
