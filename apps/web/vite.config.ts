@@ -56,6 +56,7 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0",
+    allowedHosts: ["liveoffice.whimsy.uno"],
     port: 7200,
     strictPort: true,
   },
