@@ -18,6 +18,12 @@ import {
 } from "../formula/workbook-references.js";
 import { renameTableReferences } from "../formula/references.js";
 import {
+  getTableCalculatedColumnFormulaSources,
+  restoreTableCalculatedColumnFormulaSources,
+  renameTableCalculatedColumnSheetReferences,
+  rewriteTableCalculatedColumnSheetReferences,
+} from "../table-calculated-column-references.js";
+import {
   createSheet,
   getNextDuplicateSheetName,
   getNextSheetName,
@@ -203,6 +209,16 @@ export function createDuplicateSheetCommand(
     copiedTableIds.set(table.id, id);
     return { ...table, id, name };
   });
+  for (const table of sheet.tables)
+    for (const column of table.columns) {
+      if (column.calculatedColumnFormula === undefined) continue;
+      for (const [previousName, nextName] of renamedTables)
+        column.calculatedColumnFormula = renameTableReferences(
+          column.calculatedColumnFormula,
+          previousName,
+          nextName,
+        );
+    }
   for (const cell of sheet.cells) {
     if (cell.content?.kind !== "formula") continue;
     let source = cell.content.formula.source;
@@ -366,6 +382,10 @@ export function applyAddSheetCommand(
     }
   }
   restoreConditionalFormatFormulaSources(workbook, command.conditionalFormatFormulaSources ?? []);
+  restoreTableCalculatedColumnFormulaSources(
+    workbook,
+    command.tableCalculatedColumnFormulaSources ?? [],
+  );
   restorePivotTables(workbook, command.pivotTables);
   return {
     type: "deleteSheet",
@@ -437,10 +457,16 @@ export function applyDeleteSheetCommand(
     workbook,
     command.sheetId,
   );
+  const tableCalculatedColumnFormulaSources = getTableCalculatedColumnFormulaSources(
+    workbook,
+    command.sheetId,
+  );
+  const removedSheetSnapshot = serializeSheet(workbook.sheets.get(command.sheetId)!);
   rewriteQualifiedReferencesForSheet(workbook, command.sheetId, null);
   rewriteConditionalFormatQualifiedReferencesForSheet(workbook, command.sheetId, null);
+  rewriteTableCalculatedColumnSheetReferences(workbook, command.sheetId, null);
   for (const definition of definedNames) workbook.definedNames.delete(definition.id);
-  const { sheet, index } = removeSheet(workbook, command.sheetId);
+  const { index } = removeSheet(workbook, command.sheetId);
   setActiveSheet(workbook, command.activeSheetId);
   restorePivotTables(
     workbook,
@@ -454,11 +480,12 @@ export function applyDeleteSheetCommand(
   return {
     type: "addSheet",
     pivotTables,
-    sheet: serializeSheet(sheet),
+    sheet: removedSheetSnapshot,
     index,
     activeSheetId: previousActiveSheetId,
     formulaSources,
     conditionalFormatFormulaSources,
+    tableCalculatedColumnFormulaSources,
     definedNames,
   };
 }
@@ -530,6 +557,10 @@ export function applyRenameSheetCommand(
   if (command.formulaSources) {
     restoreFormulaSources(workbook, command.formulaSources);
     restoreConditionalFormatFormulaSources(workbook, command.conditionalFormatFormulaSources ?? []);
+    restoreTableCalculatedColumnFormulaSources(
+      workbook,
+      command.tableCalculatedColumnFormulaSources ?? [],
+    );
     return createRenameSheetCommand(command.sheetId, previousName);
   }
   const formulaSources = renameQualifiedReferencesForSheet(workbook, previousName, name);
@@ -538,10 +569,16 @@ export function applyRenameSheetCommand(
     previousName,
     name,
   );
+  const tableCalculatedColumnFormulaSources = renameTableCalculatedColumnSheetReferences(
+    workbook,
+    previousName,
+    name,
+  );
   return {
     ...createRenameSheetCommand(command.sheetId, previousName),
     formulaSources,
     conditionalFormatFormulaSources,
+    tableCalculatedColumnFormulaSources,
   };
 }
 

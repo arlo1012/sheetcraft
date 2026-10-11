@@ -3,10 +3,10 @@ import type { PivotTableStyleDefinition } from "./pivot-table-styles.js";
 import type { StructuredFormulaReference } from "./formula/types.js";
 import {
   createSheetSparseState,
-  createSheet,
   createWorkbookEvaluator,
   replaceSheetSparseState,
   getCellContent,
+  getTableDataRows,
   getCellStyle,
   setCellContent,
   setCellStyle,
@@ -32,14 +32,16 @@ import type {
 import { assertCellRange, getSheetOrThrow, normalizeRange } from "./commands/helpers.js";
 import { applyCellShiftCommand } from "./commands/cell-shift.js";
 import { parseA1FormulaReference } from "./formula/reference-model.js";
+import { getFormulaAst } from "./formula/parser.js";
 import { doMergedCellRangesIntersect } from "./merged-cells.js";
 import { invalidCommandPayload } from "./commands/helpers.js";
 import {
   assertCalculatedColumnChanges,
   createCalculatedColumnNewMemberChanges,
-  getTableDataRows,
   translateCalculatedColumnFormula,
+  createCalculatedColumnPlanningWorkbook,
 } from "./table-calculated-columns.js";
+import { mapTableCalculatedColumnFormulas } from "./table-calculated-column-references.js";
 
 function cloneTable(table: SheetTable): SheetTable {
   return JSON.parse(JSON.stringify(table)) as SheetTable;
@@ -136,12 +138,21 @@ function normalizeTable(workbook: Workbook, sheetId: string, source: SheetTable)
     if (!column.id || !column.name.trim() || names.has(column.name.toLowerCase()))
       throw invalidCommandPayload("name", column.name, "Table columns require unique names.");
     names.add(column.name.toLowerCase());
+    if (
+      column.calculatedColumnFormula !== undefined &&
+      (typeof column.calculatedColumnFormula !== "string" ||
+        !getFormulaAst(column.calculatedColumnFormula))
+    )
+      throw invalidCommandPayload("calculatedColumnFormula", column.calculatedColumnFormula);
   }
   return {
     ...cloneTable(source),
     name: validateTableName(workbook, source.name, source.id),
     range,
-    columns: columns.map((column) => ({ ...column })),
+    columns: columns.map(({ calculatedColumnFormula, ...column }) => ({
+      ...column,
+      ...(calculatedColumnFormula === undefined ? {} : { calculatedColumnFormula }),
+    })),
     style: clone(source.style),
     filter: source.filter ? clone(source.filter) : null,
   };
@@ -240,6 +251,7 @@ export function createRestoreTableTransactionCommand(
     ...(workbook.defaultPivotTableStyleId
       ? { defaultPivotTableStyleId: workbook.defaultPivotTableStyleId }
       : {}),
+    definedNames: clone([...workbook.definedNames.values()]),
   };
 }
 
@@ -271,6 +283,13 @@ export function applyRestoreTableTransactionCommand(
     workbook.defaultPivotTableStyleId = command.defaultPivotTableStyleId;
     changed = true;
   }
+  if (
+    command.definedNames !== undefined &&
+    JSON.stringify([...workbook.definedNames.values()]) !== JSON.stringify(command.definedNames)
+  ) {
+    workbook.definedNames = new Map(clone(command.definedNames).map((name) => [name.id, name]));
+    changed = true;
+  }
   return changed ? inverse : null;
 }
 
@@ -288,6 +307,9 @@ function rewriteTableName(workbook: Workbook, previousName: string, nextName: st
         { kind: "formula", formula: { source } },
       );
     }
+  mapTableCalculatedColumnFormulas(workbook, (source) =>
+    renameTableReferences(source, previousName, nextName),
+  );
 }
 
 export function createApplyTableStyleToRangeCommand(
@@ -424,6 +446,10 @@ function applyTotals(
     },
     direction: "down",
   });
+  table = {
+    ...table,
+    columns: sheet.tables?.find((entry) => entry.id === table.id)?.columns ?? table.columns,
+  };
   for (let column = table.range.start.column; column <= table.range.end.column; column += 1) {
     const label = columnLabel(column);
     const dataStart = table.range.start.row + (table.headerRow ? 2 : 1);
@@ -517,19 +543,31 @@ function applyHeaderRow(
     end: { ...table.range.start, column: table.range.end.column },
   };
   if (enabled)
-    applyCellShiftCommand(workbook, {
-      type: "insertCells",
-      sheetId: sheet.id,
-      range,
-      direction: "down",
-    });
+    applyCellShiftCommand(
+      workbook,
+      {
+        type: "insertCells",
+        sheetId: sheet.id,
+        range,
+        direction: "down",
+      },
+      { tableHeaderAdjustmentId: table.id },
+    );
   else
-    applyCellShiftCommand(workbook, {
-      type: "deleteCells",
-      sheetId: sheet.id,
-      range,
-      direction: "up",
-    });
+    applyCellShiftCommand(
+      workbook,
+      {
+        type: "deleteCells",
+        sheetId: sheet.id,
+        range,
+        direction: "up",
+      },
+      { tableHeaderAdjustmentId: table.id },
+    );
+  table = {
+    ...table,
+    columns: sheet.tables?.find((entry) => entry.id === table.id)?.columns ?? table.columns,
+  };
   if (enabled) {
     for (const [index, column] of table.columns.entries())
       setCellContent(
@@ -559,6 +597,7 @@ function applyHeaderRow(
 export function applyUpdateTableCommand(
   workbook: Workbook,
   command: UpdateTableCommand,
+  options: { calculatedColumnPlan?: boolean } = {},
 ): RestoreTableTransactionCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const current = (sheet.tables ?? []).find((table) => table.id === command.tableId);
@@ -630,6 +669,35 @@ export function applyUpdateTableCommand(
     columns: current.columns,
     filter: current.filter,
   });
+  if (
+    !options.calculatedColumnPlan &&
+    (rangeChanged ||
+      headerRowChange !== undefined ||
+      (command.changes.totalRow !== undefined && command.changes.totalRow !== current.totalRow)) &&
+    [...workbook.sheets.values()].some((entry) =>
+      entry.tables?.some((table) =>
+        table.columns.some((column) => column.calculatedColumnFormula !== undefined),
+      ),
+    )
+  ) {
+    const shadow = createCalculatedColumnPlanningWorkbook(workbook);
+    if (rangeChanged) {
+      applyResizeTableCommand(shadow, {
+        type: "resizeTable",
+        sheetId: sheet.id,
+        tableId: current.id,
+        range: planned.range,
+      });
+      const { range: _range, ...changes } = command.changes;
+      applyUpdateTableCommand(shadow, { ...command, changes }, { calculatedColumnPlan: true });
+    } else {
+      applyUpdateTableCommand(shadow, command, { calculatedColumnPlan: true });
+    }
+    return applyRestoreTableTransactionCommand(
+      workbook,
+      createRestoreTableTransactionCommand(shadow),
+    );
+  }
   const previous = createRestoreTableTransactionCommand(workbook);
   if (rangeChanged) resizeTableTotals(workbook, sheet, current, planned.range);
   let next =
@@ -642,6 +710,11 @@ export function applyUpdateTableCommand(
           totalRow: current.totalRow,
         };
   if (headerRowChange !== undefined) next = applyHeaderRow(workbook, sheet, next, headerRowChange);
+  // A second nested shift must see the first shift's new member geometry.
+  if (headerRowChange !== undefined)
+    sheet.tables = (sheet.tables ?? []).map((table) =>
+      table.id === next.id ? { ...next, name: current.name } : table,
+    );
   if (command.changes.totalRow !== undefined)
     next = applyTotals(workbook, sheet, next, command.changes.totalRow);
   if (
@@ -659,8 +732,8 @@ export function applyUpdateTableCommand(
       ),
     };
   next = normalizeTable(workbook, command.sheetId, next);
-  rewriteTableName(workbook, current.name, next.name);
   sheet.tables = (sheet.tables ?? []).map((table) => (table.id === next.id ? next : table));
+  rewriteTableName(workbook, current.name, next.name);
   return previous;
 }
 
@@ -788,20 +861,23 @@ export function applyResizeTableCommand(
   let inherited: import("./commands/contracts.js").CellContentChange[] = [];
   if (next.columns.some((column) => column.calculatedColumnFormula !== undefined)) {
     // Simulate the existing totals-row shifts before validating any generated cell.
-    const shadow: Workbook = {
-      ...workbook,
-      definedNames: new Map([...workbook.definedNames].map(([id, value]) => [id, clone(value)])),
-      sheets: new Map(
-        [...workbook.sheets].map(([id, source]) => {
-          const copy = createSheet(source.name, source.id);
-          copy.properties = { ...source.properties };
-          replaceSheetSparseState(copy, createSheetSparseState(source));
-          return [id, copy];
-        }),
-      ),
-    };
+    const shadow = createCalculatedColumnPlanningWorkbook(workbook);
     const shadowSheet = shadow.sheets.get(sheet.id)!;
     resizeTableTotals(shadow, shadowSheet, current, range);
+    const shifted = shadowSheet.tables!.find((table) => table.id === current.id)!;
+    next.columns = next.columns.map((column, index) => {
+      const previous = shifted.columns.find((entry) => entry.id === column.id);
+      if (previous?.calculatedColumnFormula === undefined) return column;
+      const physical = next.range.start.column + index;
+      return {
+        ...column,
+        calculatedColumnFormula: translateCalculatedColumnFormula(
+          previous.calculatedColumnFormula,
+          { row: oldAnchorRow, column: physical },
+          { row: nextAnchorRow, column: physical },
+        ),
+      };
+    });
     shadowSheet.tables = shadowSheet.tables!.map((table) => (table.id === next.id ? next : table));
     inherited = createCalculatedColumnNewMemberChanges(shadow, sheet.id, current, next);
     assertCalculatedColumnChanges(shadow, { type: "setCellContents", changes: inherited });
@@ -874,6 +950,39 @@ export function applyRemoveTableCommand(
         setCellContent(formulaSheet, address, { kind: "formula", formula: { source } });
     }
   }
+  mapTableCalculatedColumnFormulas(workbook, (source, sourceSheet, sourceTable, index) => {
+    if (sourceTable.id === table.id) return source;
+    const address = {
+      row: getTableDataRows(sourceTable).start,
+      column: sourceTable.range.start.column + index,
+    };
+    return convertStructuredReferencesToA1(
+      source,
+      (reference, formulaAddress) => {
+        const bounds = resolveTableReferenceBounds(
+          workbook,
+          sourceSheet.id,
+          reference,
+          formulaAddress,
+        );
+        return bounds
+          ? {
+              start: bounds.start,
+              end: bounds.end,
+              absolute: reference.scope !== "this-row",
+              ...(bounds.sheetId === sourceSheet.id
+                ? {}
+                : { sheetName: workbook.sheets.get(bounds.sheetId)?.name }),
+            }
+          : null;
+      },
+      address,
+      {
+        shouldConvert: (reference) =>
+          reference.tableName?.toLowerCase() === table.name.toLowerCase(),
+      },
+    );
+  });
   sheet.tables = (sheet.tables ?? []).filter((table) => table.id !== command.tableId);
   return previous;
 }

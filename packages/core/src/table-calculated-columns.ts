@@ -4,6 +4,10 @@ import {
   createCellKey,
   createWorkbookEvaluator,
   getCellContent,
+  getTableDataRows,
+  createSheet,
+  createSheetSparseState,
+  replaceSheetSparseState,
   type CellAddress,
   type Sheet,
   type SheetTable,
@@ -24,10 +28,30 @@ export type CalculatedColumnUpdate = {
   source: string;
 };
 
-export function getTableDataRows(table: SheetTable): { start: number; end: number } {
+export function createCalculatedColumnPlanningWorkbook(workbook: Workbook): Workbook {
   return {
-    start: table.range.start.row + Number(table.headerRow),
-    end: table.range.end.row - Number(table.totalRow),
+    ...workbook,
+    definedNames: new Map(
+      [...workbook.definedNames].map(([id, value]) => [
+        id,
+        {
+          ...value,
+          reference: {
+            ...value.reference,
+            start: { ...value.reference.start },
+            end: { ...value.reference.end },
+          },
+        },
+      ]),
+    ),
+    sheets: new Map(
+      [...workbook.sheets].map(([id, source]) => {
+        const copy = createSheet(source.name, source.id);
+        copy.properties = { ...source.properties };
+        replaceSheetSparseState(copy, createSheetSparseState(source));
+        return [id, copy];
+      }),
+    ),
   };
 }
 
@@ -109,7 +133,8 @@ function assertScalarResults(workbook: Workbook, command: SetCellContentsCommand
     if (
       result &&
       typeof result === "object" &&
-      (result.kind === "formula-array" ||
+      ((result.kind === "formula-array" &&
+        (result.rows.length !== 1 || result.rows[0]!.length !== 1)) ||
         (result.kind === "formula-error" && result.code === "SPILL"))
     )
       throw new DataFillError(
@@ -125,6 +150,7 @@ export function createCalculatedColumnNewMemberChanges(
   previous: SheetTable,
   next: SheetTable,
   excludedAddress?: CellAddress,
+  insertedRows?: { start: number; end: number },
 ): CellContentChange[] {
   const sheet = getSheetOrThrow(workbook, sheetId);
   const oldRows = getTableDataRows(previous);
@@ -134,8 +160,10 @@ export function createCalculatedColumnNewMemberChanges(
     if (column.calculatedColumnFormula === undefined) continue;
     const physicalColumn = next.range.start.column + index;
     const firstChange = changes.length;
-    for (let row = rows.start; row <= rows.end; row++) {
-      if (row >= oldRows.start && row <= oldRows.end) continue;
+    const start = insertedRows ? Math.max(rows.start, insertedRows.start) : rows.start;
+    const end = insertedRows ? Math.min(rows.end, insertedRows.end) : rows.end;
+    for (let row = start; row <= end; row++) {
+      if (!insertedRows && row >= oldRows.start && row <= oldRows.end) continue;
       const address = { row, column: physicalColumn };
       if (excludedAddress?.row === row && excludedAddress.column === physicalColumn) continue;
       if (getCellContent(sheet, address) !== null) continue;

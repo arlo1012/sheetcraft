@@ -1,6 +1,6 @@
 # Calculated columns: implementation checkpoint (2026-10-11)
 
-Status: **WIP Core foundation**, not completion of the approved feature or GUI/native acceptance.
+Status: **WIP Core foundation and structural lifecycle**, not completion of the approved feature or GUI/native acceptance.
 
 ## Approved behavior
 
@@ -35,10 +35,36 @@ Status: **WIP Core foundation**, not completion of the approved feature or GUI/n
 
 ## Remaining work before completion
 
-1. Template reference/anchor handling for structural row/column edits, moves, table/column/sheet renames, header toggles, sheet copy/delete, convert-to-range and all inverses. Non-uniform external reference transformations require proof or an explicit atomic refusal.
-2. Web manual-input origin, native textarea/formula-bar paste tracking, validation warning continuation and an explicit whole-column apply UI with draft/failure retention.
-3. Native XLSX `calculatedColumnFormula` read/write, bounded unsupported-formula diagnostics and producer-based checks.
-4. Real Sheetcraft UI and WPS/Excel acceptance. No claim of native compatibility or automatic feature availability at this checkpoint.
+1. Web manual-input origin, native textarea/formula-bar paste tracking, validation warning continuation and an explicit whole-column apply UI with draft/failure retention.
+2. Native XLSX `calculatedColumnFormula` read/write, bounded unsupported-formula diagnostics and producer-based checks.
+3. Real Sheetcraft UI and WPS/Excel acceptance. No claim of native compatibility or automatic feature availability at this checkpoint.
+
+## Structural lifecycle checkpoint
+
+- Template identity follows sheet/table/column rename, sheet copy/delete and retained physical columns on resize. Deleted anchors rebase from the first surviving data member before references transform. Existing member exceptions are never regenerated during these operations.
+- Header/totals shifts, resize, whole-axis insert/delete and supported contiguous row/column moves transform both the canonical source and materialized cell formulas. A bounded per-surviving-member comparison proves that one canonical family can still represent the transformed members.
+- Inserted data rows inherit empty new calculated members only, with final scalar/data-validation/duplicate/protection/Pivot checks on detached state before committing. Accepted commands have exact Undo/Redo.
+- Structured this-row arithmetic produces a runtime 1×1 projection; that is admitted as a scalar cell. Larger arrays remain rejected. Conversion of a referenced table fixes full-region A1 bounds in surviving templates while this-row references remain relative.
+- Compound structural table changes are planned together and committed once. A second nested shift sees updated header/member geometry. Table transactions include defined names and both ordinary/Pivot style libraries, including their defaults.
+- Nested table shifts enforce the existing PivotTable full-band guard. Qualified spill references rewrite the A1 anchor and retain the `#` suffix, including in scalar aggregate templates.
+- A missing/undefined template does not force snapshot 45. Empty, malformed or non-string supplied template sources reject; the older version gate remains explicit.
+
+### Deliberate Core bounds
+
+- Direct cell shifts through calculated table data refuse; use a table operation or whole-axis edit. Existing split-table move guards remain in place.
+- A transformation whose surviving member formulas cease to form one affine family refuses before workbook/history changes.
+- External multi-row relative row references during row-axis changes, and external qualified calculated-column references during axis moves, conservatively refuse. Absolute references and tested column-axis transformations remain supported. No arbitrary cross-sheet move support is inferred.
+- Planning is bounded by the existing 100,000-cell/member budget. This checkpoint does not add sorting UI, general array calculated columns or native formula admission rules.
+
+### Structural evidence and retained failures
+
+- Lifecycle first run: 3 pass/3 fail. Two structured 1×1 projections were incorrectly rejected; header changes also retained a stale canonical source. The projection fix exposed the remaining header failure, which was then fixed without changing ordinary fill semantics.
+- Structural first run: 5 pass/6 fail. Missing insertion inheritance, self-qualified inverse validation and fixtures violating the pre-existing table-edge move guard were distinguished. Corrected contiguous fixtures preserve that guard; the first structural rerun passed 11/11.
+- Expanded Core lifecycle: 43 calculated-column tests passed. A wider 19-file group passed 246 tests; four subsequent protocol boundary cases brought the then-current calculated-column count to 47.
+- Independent static review identified five safety issues. Synthetic regressions reproduced all five: **24 pass/5 fail** across two files. The fixes cover compound rejection atomicity, Pivot style inverse retention, defined-name forward/inverse retention, nested Pivot guards and qualified spill-anchor rewriting.
+- Final calculated-column rerun: **3 files, 53/53 pass**. Final wider related group: **21 files, 281/281 pass**, run with one worker. Core typecheck passes; scoped lint and diff whitespace checks pass. Core, sheet-engine and XLSX I/O package builds pass.
+- Architecture check remains failed with the same **125 pre-existing diagnostic signatures** as the previous structured-table checkpoint, with zero added/removed after ignoring shifted line numbers. It is not a green architecture check.
+- Reproduction/final-check text logs are retained with this checkpoint. They do not imply full repository/XLSX suites, GUI/native compatibility or successful CI.
 
 ## Recovery
 

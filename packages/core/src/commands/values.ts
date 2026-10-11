@@ -51,6 +51,7 @@ import { cloneCellContent } from "../workbook.js";
 import type { CellContent } from "../formula/types.js";
 import { transformFormulaForMove } from "../formula/references.js";
 import { renameTableColumnReferences } from "../formula/references.js";
+import { mapTableCalculatedColumnFormulas } from "../table-calculated-column-references.js";
 import {
   doMergedCellRangesIntersect,
   expandSelectionToMergedCellRanges,
@@ -389,6 +390,15 @@ function createTableTransactionState(workbook: Workbook) {
       JSON.stringify(workbook.tableStyles ?? []),
     ) as import("../table-styles.js").TableStyleDefinition[],
     ...(workbook.defaultTableStyleId ? { defaultTableStyleId: workbook.defaultTableStyleId } : {}),
+    pivotTableStyles: JSON.parse(
+      JSON.stringify(workbook.pivotTableStyles ?? []),
+    ) as import("../pivot-table-styles.js").PivotTableStyleDefinition[],
+    ...(workbook.defaultPivotTableStyleId
+      ? { defaultPivotTableStyleId: workbook.defaultPivotTableStyleId }
+      : {}),
+    definedNames: JSON.parse(
+      JSON.stringify([...workbook.definedNames.values()]),
+    ) as import("../workbook.js").DefinedName[],
   };
 }
 
@@ -753,7 +763,7 @@ export function applySetCellContentsCommand(
         { row: table.range.start.row, column: change.address.column },
         { kind: "literal", value: tableMetadataEdit.caption },
       );
-    for (const rename of columnRenames)
+    for (const rename of columnRenames) {
       for (const formulaSheet of workbook.sheets.values())
         for (const [key, cell] of formulaSheet.cells) {
           if (cell.content?.kind !== "formula") continue;
@@ -775,6 +785,16 @@ export function applySetCellContentsCommand(
           if (source === cell.content.formula.source) continue;
           setCellContent(formulaSheet, address, { kind: "formula", formula: { source } });
         }
+      mapTableCalculatedColumnFormulas(workbook, (source, _sheet, table) =>
+        renameTableColumnReferences(
+          source,
+          rename.tableName,
+          rename.previousName,
+          rename.nextName,
+          table.name,
+        ),
+      );
+    }
     return { type: "restoreTableTransaction", ...tableTransactionState! };
   }
 

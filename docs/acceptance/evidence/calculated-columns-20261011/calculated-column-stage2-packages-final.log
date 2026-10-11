@@ -1,0 +1,7 @@
+$ bun run build:core && bun run build:sheet-engine && bun run build:xlsx-io
+$ bun run --filter @sheetcraft/core build
+@sheetcraft/core build: Exited with code 0
+$ bun run --filter @sheetcraft/sheet-engine build
+@sheetcraft/sheet-engine build: Exited with code 0
+$ bun run --filter @sheetcraft/xlsx-io build
+@sheetcraft/xlsx-io build: Exited with code 0

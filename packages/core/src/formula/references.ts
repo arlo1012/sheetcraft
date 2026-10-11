@@ -20,6 +20,8 @@ export type StructuredReferenceA1Bounds = {
   end: FormulaAddress;
   /** Include this sheet qualifier in the generated A1 reference when provided. */
   sheetName?: string;
+  /** Fixed table regions must remain fixed when retained as a column template. */
+  absolute?: boolean;
 };
 
 /**
@@ -113,8 +115,9 @@ function formatReference(reference: FormulaReference, address: FormulaAddress): 
 }
 
 function formatStructuredReferenceA1(bounds: StructuredReferenceA1Bounds): string {
-  const start = `${columnIndexToLabel(bounds.start.column)}${bounds.start.row + 1}`;
-  const end = `${columnIndexToLabel(bounds.end.column)}${bounds.end.row + 1}`;
+  const absolute = bounds.absolute ? "$" : "";
+  const start = `${absolute}${columnIndexToLabel(bounds.start.column)}${absolute}${bounds.start.row + 1}`;
+  const end = `${absolute}${columnIndexToLabel(bounds.end.column)}${absolute}${bounds.end.row + 1}`;
   const qualifier = bounds.sheetName
     ? `${formatStructuredReferenceSheetName(bounds.sheetName)}!`
     : "";

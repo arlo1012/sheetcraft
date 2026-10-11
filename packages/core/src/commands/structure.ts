@@ -24,6 +24,7 @@ import {
   setSheetMetadata,
   type Sheet,
   type CellRange,
+  type CellAddress,
   type FloatingImage,
   type SheetDimensionAxis,
   type SheetFilter,
@@ -32,6 +33,8 @@ import {
   type SheetSparseCell,
   type SheetSparseState,
   type Workbook,
+  getTableDataRows,
+  setCellContent,
 } from "../workbook.js";
 import {
   collectFormulaReferences,
@@ -45,7 +48,22 @@ import {
   rewriteConditionalFormatQualifiedReferencesForSheet,
   restoreConditionalFormatFormulaSources,
   rewriteQualifiedReferencesForSheet,
+  rewriteQualifiedFormulaSource,
 } from "../formula/workbook-references.js";
+import {
+  getTableCalculatedColumnFormulaSources,
+  restoreTableCalculatedColumnFormulaSources,
+  rewriteTableCalculatedColumnSheetReferences,
+  assertExternalCalculatedColumnReferencesCanTransform,
+  transformTableCalculatedColumnFormulas,
+  assertExternalCalculatedColumnReferencesCanMove,
+} from "../table-calculated-column-references.js";
+import {
+  createCalculatedColumnPlanningWorkbook,
+  createCalculatedColumnNewMemberChanges,
+  assertCalculatedColumnChanges,
+} from "../table-calculated-columns.js";
+import { assertPivotResultsAreWritable } from "./pivot-result-guard.js";
 import {
   cloneConditionalFormatRule,
   conditionalFormatFormulaSources,
@@ -188,6 +206,13 @@ function setAxisIndex(
 
 function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
   return {
+    ...(slice.tableCalculatedColumnFormulaSources
+      ? {
+          tableCalculatedColumnFormulaSources: slice.tableCalculatedColumnFormulaSources.map(
+            (entry) => ({ ...entry }),
+          ),
+        }
+      : {}),
     ...(slice.pivotTables
       ? {
           pivotTables: slice.pivotTables.map((entry) => ({
@@ -598,6 +623,7 @@ function transformSheetMetadataForAxis(
   count: number,
   maximum: number,
   operation: "insert" | "delete",
+  sheetName: string,
 ): SheetMetadata {
   const transformTableColumns = (table: SheetTable) => {
     if (axis !== "column") return table.columns.map((column) => ({ ...column }));
@@ -757,7 +783,24 @@ function transformSheetMetadataForAxis(
       const range = transformRangeForAxis(table.range, axis, index, count, maximum, operation);
       if (!range) return [];
       const filter = transformFilterForAxis(table.filter, axis, index, count, maximum, operation);
-      return [{ ...cloneSheetTable(table), range, columns: transformTableColumns(table), filter }];
+      const next = {
+        ...cloneSheetTable(table),
+        range,
+        columns: transformTableColumns(table),
+        filter,
+      };
+      const map = (address: CellAddress) => {
+        const target = transformAxisIndex(address[axis], index, count, maximum, operation);
+        return target === null ? null : { ...address, [axis]: target };
+      };
+      next.columns = transformTableCalculatedColumnFormulas(table, next, map, (source) =>
+        rewriteQualifiedFormulaSource(
+          transformFormulaForAxis(source, { axis, index, count, operation }),
+          sheetName,
+          map,
+        ),
+      );
+      return [next];
     }),
     pageSetup,
     pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
@@ -1246,12 +1289,25 @@ function validateSheetAxisSlice(
     }
     const currentAddress = setAxisIndex(formula.address, command.axis, expectedAddress);
     const current = sheet.cells.get(createCellKey(currentAddress))?.content;
-    const expectedSource = transformFormulaForAxis(formula.source, {
-      axis: command.axis,
-      operation: command.operation,
-      index: command.index,
-      count: command.count,
-    });
+    const expectedSource = rewriteQualifiedFormulaSource(
+      transformFormulaForAxis(formula.source, {
+        axis: command.axis,
+        operation: command.operation,
+        index: command.index,
+        count: command.count,
+      }),
+      sheet.name,
+      (address) => {
+        const target = transformAxisIndex(
+          address[command.axis],
+          command.index,
+          command.count,
+          maximum,
+          command.operation,
+        );
+        return target === null ? null : { ...address, [command.axis]: target };
+      },
+    );
     if (current?.kind !== "formula" || current.formula.source !== expectedSource) {
       throw invalidCommandPayload(
         "slice.formulaSources",
@@ -1295,6 +1351,7 @@ function validateSheetAxisSlice(
     command.count,
     maximum,
     command.operation,
+    sheet.name,
   );
   if (command.slice.pivotTables)
     expectedMetadata.pivotTables =
@@ -1351,6 +1408,7 @@ export function applyRestoreSheetStateCommand(
       command.count,
       maximum,
       inverseOperation,
+      sheet.name,
     );
     const transformed = transformSheetAxis(
       sheet,
@@ -1375,6 +1433,10 @@ export function applyRestoreSheetStateCommand(
       workbook,
       command.slice.conditionalFormatFormulaSources ?? [],
     );
+    const templatesRestored = restoreTableCalculatedColumnFormulaSources(
+      workbook,
+      command.slice.tableCalculatedColumnFormulaSources ?? [],
+    );
     if (command.slice.definedNames) {
       workbook.definedNames.clear();
       for (const definition of command.slice.definedNames)
@@ -1388,7 +1450,8 @@ export function applyRestoreSheetStateCommand(
         });
     }
     const pivotsRestored = restorePivotTables(workbook, command.slice.pivotTables);
-    if (!transformed && !metadataTransformed && !restored && !pivotsRestored) return null;
+    if (!transformed && !metadataTransformed && !restored && !pivotsRestored && !templatesRestored)
+      return null;
     return command.operation === "insert"
       ? createInsertSheetAxisCommand(command.sheetId, command.axis, command.index, command.count)
       : createDeleteSheetAxisCommand(command.sheetId, command.axis, command.index, command.count);
@@ -1414,6 +1477,9 @@ export function applyRestoreSheetStateCommand(
   const conditionalFormatFormulaSources = command.conditionalFormatFormulaSources
     ? getConditionalFormatFormulaSources(workbook, command.sheetId)
     : undefined;
+  const tableCalculatedColumnFormulaSources = command.tableCalculatedColumnFormulaSources
+    ? getTableCalculatedColumnFormulaSources(workbook, command.sheetId)
+    : undefined;
   const definedNames = command.definedNames
     ? [...workbook.definedNames.values()].map((definition) => ({
         ...definition,
@@ -1431,6 +1497,7 @@ export function applyRestoreSheetStateCommand(
     !changed &&
     !command.workbookFormulaSources &&
     !command.conditionalFormatFormulaSources &&
+    !command.tableCalculatedColumnFormulaSources &&
     !command.definedNames &&
     !command.pivotTables
   )
@@ -1445,6 +1512,10 @@ export function applyRestoreSheetStateCommand(
       });
   }
   restoreConditionalFormatFormulaSources(workbook, command.conditionalFormatFormulaSources ?? []);
+  restoreTableCalculatedColumnFormulaSources(
+    workbook,
+    command.tableCalculatedColumnFormulaSources ?? [],
+  );
   if (command.definedNames) {
     workbook.definedNames.clear();
     for (const definition of command.definedNames)
@@ -1465,6 +1536,7 @@ export function applyRestoreSheetStateCommand(
     state: previousState,
     ...(workbookFormulaSources ? { workbookFormulaSources } : {}),
     ...(conditionalFormatFormulaSources ? { conditionalFormatFormulaSources } : {}),
+    ...(tableCalculatedColumnFormulaSources ? { tableCalculatedColumnFormulaSources } : {}),
     ...(definedNames ? { definedNames } : {}),
   };
 }
@@ -1477,6 +1549,7 @@ export function applySheetAxisCommand(
   const maximum = assertSheetAxisRange(command.axis, command.index, command.count);
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   assertConditionalFormatReferencesCanTransform(workbook, command.sheetId, command.axis);
+  assertExternalCalculatedColumnReferencesCanTransform(workbook, command.sheetId, command.axis);
   const operation = command.type === "insertSheetAxis" ? "insert" : "delete";
   const slice = captureSheetAxisSlice(
     sheet,
@@ -1498,6 +1571,10 @@ export function applySheetAxisCommand(
     ),
   );
   slice.conditionalFormatFormulaSources = getConditionalFormatFormulaSources(
+    workbook,
+    command.sheetId,
+  );
+  slice.tableCalculatedColumnFormulaSources = getTableCalculatedColumnFormulaSources(
     workbook,
     command.sheetId,
   );
@@ -1533,7 +1610,50 @@ export function applySheetAxisCommand(
     command.count,
     maximum,
     operation,
+    sheet.name,
   );
+  let inherited: import("./contracts.js").CellContentChange[] = [];
+  if (
+    operation === "insert" &&
+    command.axis === "row" &&
+    nextMetadata.tables?.some((table) => {
+      const rows = getTableDataRows(table);
+      return (
+        rows.start <= command.index + command.count - 1 &&
+        rows.end >= command.index &&
+        table.columns.some((column) => column.calculatedColumnFormula !== undefined)
+      );
+    })
+  ) {
+    const shadow = createCalculatedColumnPlanningWorkbook(workbook);
+    const target = shadow.sheets.get(sheet.id)!;
+    transformSheetAxis(target, command.axis, command.index, command.count, maximum, operation);
+    setSheetMetadata(target, nextMetadata);
+    rewriteQualifiedReferencesForSheet(shadow, sheet.id, (address) => {
+      const value = transformAxisIndex(
+        address.row,
+        command.index,
+        command.count,
+        maximum,
+        operation,
+      );
+      return value === null ? null : { ...address, row: value };
+    });
+    restorePivotTables(shadow, nextPivots);
+    for (const table of target.tables ?? []) {
+      const previous = sheet.tables?.find((entry) => entry.id === table.id);
+      if (previous)
+        inherited.push(
+          ...createCalculatedColumnNewMemberChanges(shadow, sheet.id, previous, table, undefined, {
+            start: command.index,
+            end: command.index + command.count - 1,
+          }),
+        );
+    }
+    const changes = { type: "setCellContents" as const, changes: inherited };
+    assertCalculatedColumnChanges(shadow, changes);
+    assertPivotResultsAreWritable(shadow, changes);
+  }
   const changed = transformSheetAxis(
     sheet,
     command.axis,
@@ -1563,6 +1683,21 @@ export function applySheetAxisCommand(
       ? { row: next, column: address.column }
       : { row: address.row, column: next };
   });
+  const templatesChanged = rewriteTableCalculatedColumnSheetReferences(
+    workbook,
+    command.sheetId,
+    (address) => {
+      const target = transformAxisIndex(
+        address[command.axis],
+        command.index,
+        command.count,
+        maximum,
+        operation,
+      );
+      return target === null ? null : { ...address, [command.axis]: target };
+    },
+    command.sheetId,
+  );
   for (const [id, definition] of workbook.definedNames) {
     if (definition.reference.sheetId !== command.sheetId) continue;
     const reference = transformRangeForAxis(
@@ -1583,7 +1718,9 @@ export function applySheetAxisCommand(
     });
   }
   const pivotsChanged = restorePivotTables(workbook, nextPivots);
+  for (const change of inherited) setCellContent(sheet, change.address, change.content);
   const externalChanged =
+    templatesChanged ||
     (slice.workbookFormulaSources ?? []).some((formula) => {
       const current = workbook.sheets
         .get(formula.sheetId)
@@ -1618,6 +1755,7 @@ function transformSheetMetadataForAxisMove(
   index: number,
   count: number,
   toIndex: number,
+  sheetName: string,
 ): SheetMetadata {
   const transformValidationFormula = (source: string | undefined) =>
     source === undefined
@@ -1792,7 +1930,27 @@ function transformSheetMetadataForAxisMove(
           axis,
           "Moving this row or column band would split a table.",
         );
-      return { ...cloneSheetTable(table), range };
+      const map = (address: CellAddress): CellAddress => ({
+        ...address,
+        [axis]: transformAxisIndexForMove(address[axis], index, count, toIndex),
+      });
+      const columns = table.columns
+        .map((column, oldIndex) => ({
+          column,
+          physical: map({ row: table.range.start.row, column: table.range.start.column + oldIndex })
+            .column,
+        }))
+        .sort((left, right) => left.physical - right.physical)
+        .map((entry) => ({ ...entry.column }));
+      const next = { ...cloneSheetTable(table), range, columns };
+      next.columns = transformTableCalculatedColumnFormulas(table, next, map, (source) =>
+        rewriteQualifiedFormulaSource(
+          transformFormulaForAxisMove(source, { axis, index, count, toIndex }),
+          sheetName,
+          map,
+        ),
+      );
+      return next;
     }),
     pageSetup,
     pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
@@ -1904,6 +2062,7 @@ export function applyMoveSheetAxisCommand(
   assertNoAdvancedCriteriaReferencesSheet(workbook, command.sheetId);
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   assertConditionalFormatReferencesCanTransform(workbook, command.sheetId, command.axis);
+  assertExternalCalculatedColumnReferencesCanMove(workbook, command.sheetId);
   if (command.index === command.toIndex) return null;
 
   // Validate every non-cell resource before changing the sheet, so an unsupported
@@ -1914,6 +2073,7 @@ export function applyMoveSheetAxisCommand(
     command.index,
     command.count,
     command.toIndex,
+    sheet.name,
   );
   assertFormulaRangesCanMove(sheet, command.axis, command.index, command.count, command.toIndex);
   const previousState = createSheetSparseState(sheet);
@@ -1958,12 +2118,16 @@ export function applyMoveSheetAxisCommand(
               content: {
                 kind: "formula" as const,
                 formula: {
-                  source: transformFormulaForAxisMove(content.formula.source, {
-                    axis: command.axis,
-                    index: command.index,
-                    count: command.count,
-                    toIndex: command.toIndex,
-                  }),
+                  source: rewriteQualifiedFormulaSource(
+                    transformFormulaForAxisMove(content.formula.source, {
+                      axis: command.axis,
+                      index: command.index,
+                      count: command.count,
+                      toIndex: command.toIndex,
+                    }),
+                    sheet.name,
+                    mapAddress,
+                  ),
                 },
               },
             }

@@ -1,73 +1,42 @@
+import { calculatedColumnFixture } from "./calculated-column-fixture.js";
 import { describe, expect, test } from "vitest";
 import {
   createSetCellContentCommand,
   createBatchSetCellContentsCommand,
 } from "../../commands/values.js";
 import { applyWorkbookCommand } from "../../commands/apply.js";
-import {
-  createCreateTableCommand,
-  createResizeTableCommand,
-  createUpdateTableCommand,
-} from "../../tables.js";
-import { createBuiltinTableStyles } from "../../table-styles.js";
-import {
-  createWorkbook,
-  createSheet,
-  getCellContent,
-  setCellContent,
-  setCellStyle,
-} from "../../workbook.js";
+import { createResizeTableCommand, createUpdateTableCommand } from "../../tables.js";
+import { createSheet, getCellContent, setCellContent, setCellStyle } from "../../workbook.js";
 import { createSetSheetProtectionCommand } from "../../commands/protection.js";
 import { createApplyTableCalculatedColumnCommand } from "../../table-calculated-columns.js";
 import { prepareFillTarget } from "../../commands/fill-common.js";
-import {
-  createWorkbookSession,
-  executeWorkbookCommand,
-  undoWorkbookCommand,
-  redoWorkbookCommand,
-} from "../../history.js";
+import { executeWorkbookCommand, undoWorkbookCommand, redoWorkbookCommand } from "../../history.js";
 import { serializeWorkbook, deserializeWorkbook } from "../../serialization.js";
 
-function fixture() {
-  const workbook = createWorkbook({ id: "book", sheetId: "sheet" });
-  const sheet = workbook.sheets.get("sheet")!;
-  for (const [column, value] of ["Item", "Qty", "Result"].entries())
-    setCellContent(sheet, { row: 0, column }, { kind: "literal", value });
-  for (let row = 1; row <= 3; row++)
-    setCellContent(sheet, { row, column: 1 }, { kind: "literal", value: row + 1 });
-  applyWorkbookCommand(
-    workbook,
-    createCreateTableCommand(sheet.id, {
-      id: "sales",
-      name: "Sales",
-      range: { start: { row: 0, column: 0 }, end: { row: 3, column: 2 } },
-      columns: ["Item", "Qty", "Result"].map((name, index) => ({ id: `col-${index}`, name })),
-      style: createBuiltinTableStyles("#4f81bd")[1]!,
-      headerRow: true,
-      totalRow: false,
-      firstColumn: false,
-      lastColumn: false,
-      bandedRows: true,
-      bandedColumns: false,
-      filterButton: true,
-      filter: null,
-    }),
-  );
-  const session = createWorkbookSession({ workbook, idFactory: () => "id" });
-  const formula = (row: number, source = `=B${row + 1}*2`) =>
-    createSetCellContentCommand(
-      sheet.id,
-      { row, column: 2 },
-      { kind: "formula", formula: { source } },
-      { inputIntent: "manual" },
-    );
-  const sources = () => [1, 2, 3].map((row) => getCellContent(sheet, { row, column: 2 }));
-  return { workbook, sheet, session, formula, sources };
-}
-
 describe("table calculated columns", () => {
+  test("absent/undefined template keeps the old snapshot protocol and round-trip", () => {
+    const { workbook, sheet } = calculatedColumnFixture();
+    sheet.tables![0]!.columns[2]!.calculatedColumnFormula = undefined;
+    const snapshot = serializeWorkbook(workbook);
+    expect(snapshot.version).toBe(43);
+    expect(
+      Object.hasOwn(snapshot.sheets[0]!.tables![0]!.columns[2]!, "calculatedColumnFormula"),
+    ).toBe(false);
+    expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
+  });
+
+  test.each(["", "=B2[", 99])(
+    "malformed template %j is rejected by snapshot45 model validation",
+    (source) => {
+      const { workbook, session, formula } = calculatedColumnFixture();
+      executeWorkbookCommand(session, formula(1));
+      const snapshot = structuredClone(serializeWorkbook(workbook));
+      snapshot.sheets[0]!.tables![0]!.columns[2]!.calculatedColumnFormula = source as string;
+      expect(() => deserializeWorkbook(snapshot)).toThrow(/calculated column formula/);
+    },
+  );
   test("a manual first formula in a truly empty column fills all rows in one undoable transaction", () => {
-    const { workbook, sheet, session, formula, sources } = fixture();
+    const { workbook, sheet, session, formula, sources } = calculatedColumnFixture();
     const before = serializeWorkbook(workbook);
     executeWorkbookCommand(session, formula(2));
     expect(sources()).toEqual(
@@ -82,7 +51,7 @@ describe("table calculated columns", () => {
   });
 
   test.each([99, "", "existing"])("a mixed column preserves an existing literal %j", (value) => {
-    const { sheet, session, formula, sources } = fixture();
+    const { sheet, session, formula, sources } = calculatedColumnFixture();
     setCellContent(sheet, { row: 2, column: 2 }, { kind: "literal", value });
     executeWorkbookCommand(session, formula(1));
     expect(sources()).toEqual([
@@ -94,7 +63,7 @@ describe("table calculated columns", () => {
   });
 
   test("single-cell and rectangular clipboard/programmatic writes never establish or fill a template", () => {
-    const { sheet, session, sources } = fixture();
+    const { sheet, session, sources } = calculatedColumnFixture();
     executeWorkbookCommand(
       session,
       createSetCellContentCommand(
@@ -119,7 +88,7 @@ describe("table calculated columns", () => {
   });
 
   test("manual exceptions keep the template and versioned snapshots preserve both", () => {
-    const { workbook, sheet, session, formula } = fixture();
+    const { workbook, sheet, session, formula } = calculatedColumnFixture();
     executeWorkbookCommand(session, formula(1));
     executeWorkbookCommand(
       session,
@@ -138,7 +107,7 @@ describe("table calculated columns", () => {
   });
 
   test("explicit column application is the only way to overwrite mixed values and is atomic through history", () => {
-    const { workbook, sheet, session, formula, sources } = fixture();
+    const { workbook, sheet, session, formula, sources } = calculatedColumnFixture();
     setCellContent(sheet, { row: 2, column: 2 }, { kind: "literal", value: 99 });
     executeWorkbookCommand(session, formula(1));
     const before = serializeWorkbook(workbook);
@@ -161,7 +130,7 @@ describe("table calculated columns", () => {
   });
 
   test("cleared and differently formulated cells are exceptions, even when the whole column is empty again", () => {
-    const { sheet, session, formula, sources } = fixture();
+    const { sheet, session, formula, sources } = calculatedColumnFixture();
     executeWorkbookCommand(session, formula(1));
     executeWorkbookCommand(session, formula(2, "=100"));
     expect(sources()[0]).toEqual({ kind: "formula", formula: { source: "=B2*2" } });
@@ -176,7 +145,7 @@ describe("table calculated columns", () => {
   });
 
   test("relative qualified references rebase while absolute references and qualifiers are retained", () => {
-    const { workbook, session, formula, sources } = fixture();
+    const { workbook, session, formula, sources } = calculatedColumnFixture();
     workbook.sheets.set("other", createSheet("Other Data", "other"));
     executeWorkbookCommand(session, formula(2, "=B3+'Other Data'!C3+$B$1+SUM('Other Data'!D3:E3)"));
     expect(sources()).toEqual(
@@ -188,7 +157,7 @@ describe("table calculated columns", () => {
   });
 
   test("table-wide application includes hidden members without changing ordinary fill's hidden-cell guard", () => {
-    const { workbook, sheet, session, formula, sources } = fixture();
+    const { workbook, sheet, session, formula, sources } = calculatedColumnFixture();
     sheet.hiddenRows = new Set([2]);
     executeWorkbookCommand(session, formula(1));
     expect(sources().every((content) => content?.kind === "formula")).toBe(true);
@@ -204,7 +173,7 @@ describe("table calculated columns", () => {
   test.each(["validation", "duplicate", "protected", "spill", "array"] as const)(
     "%s at a generated target rejects the entire operation without a history entry",
     (kind) => {
-      const { workbook, sheet, session, formula } = fixture();
+      const { workbook, sheet, session, formula } = calculatedColumnFixture();
       if (kind === "validation")
         sheet.dataValidations = [
           {
@@ -248,7 +217,7 @@ describe("table calculated columns", () => {
   );
 
   test("manual input below a table inherits formulas only in empty new members and is one undoable growth", () => {
-    const { workbook, sheet, session, formula } = fixture();
+    const { workbook, sheet, session, formula } = calculatedColumnFixture();
     executeWorkbookCommand(session, formula(1));
     const before = serializeWorkbook(workbook);
     executeWorkbookCommand(
@@ -272,7 +241,7 @@ describe("table calculated columns", () => {
   });
 
   test("single-cell paste below may keep existing table expansion but changes only the pasted target", () => {
-    const { sheet, session, formula } = fixture();
+    const { sheet, session, formula } = calculatedColumnFixture();
     executeWorkbookCommand(session, formula(1));
     executeWorkbookCommand(
       session,
@@ -285,7 +254,7 @@ describe("table calculated columns", () => {
   test.each([false, true])(
     "explicit resize with totals=%s retains column identity, template and occupied new cells",
     (totalRow) => {
-      const { workbook, sheet, session, formula } = fixture();
+      const { workbook, sheet, session, formula } = calculatedColumnFixture();
       executeWorkbookCommand(session, formula(1));
       if (totalRow)
         executeWorkbookCommand(
@@ -324,7 +293,7 @@ describe("table calculated columns", () => {
   );
 
   test("a rejected totals-row growth simulation never mutates original cells or metadata", () => {
-    const { workbook, sheet, session, formula } = fixture();
+    const { workbook, sheet, session, formula } = calculatedColumnFixture();
     executeWorkbookCommand(session, formula(1));
     executeWorkbookCommand(
       session,

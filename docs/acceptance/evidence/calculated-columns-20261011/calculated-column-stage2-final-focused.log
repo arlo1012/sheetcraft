@@ -1,0 +1,10 @@
+@sheetcraft/core test: 
+@sheetcraft/core test:  RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261011/packages/core
+@sheetcraft/core test: 
+@sheetcraft/core test: 
+@sheetcraft/core test:  Test Files  21 passed (21)
+@sheetcraft/core test:       Tests  281 passed (281)
+@sheetcraft/core test:    Start at  19:10:21
+@sheetcraft/core test:    Duration  10.32s (transform 1.05s, setup 0ms, import 6.70s, tests 1.02s, environment 2ms)
+@sheetcraft/core test: 
+@sheetcraft/core test: Exited with code 0

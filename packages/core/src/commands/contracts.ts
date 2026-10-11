@@ -144,6 +144,8 @@ export type RestoreTableTransactionCommand = {
   defaultTableStyleId?: string;
   pivotTableStyles?: PivotTableStyleDefinition[];
   defaultPivotTableStyleId?: string;
+  /** Captured for nested table shifts; absent legacy inverses leave names unchanged. */
+  definedNames?: DefinedName[];
 };
 
 export type MoveCellRangeCommand = {
@@ -177,6 +179,7 @@ export type RestoreCellShiftCommand = {
   range: CellRange;
   operation: "insert" | "delete";
   workbookFormulaSources: FormulaSourceRestore[];
+  tableCalculatedColumnFormulaSources?: import("../table-calculated-column-references.js").TableCalculatedColumnFormulaSource[];
   definedNames: DefinedName[];
 };
 
@@ -533,6 +536,7 @@ export type AddSheetCommand = {
   formulaSources?: FormulaSourceRestore[];
   /** Conditional-format formula text on surviving sheets restored by a delete-sheet inverse. */
   conditionalFormatFormulaSources?: ConditionalFormatFormulaSourceRestore[];
+  tableCalculatedColumnFormulaSources?: import("../table-calculated-column-references.js").TableCalculatedColumnFormulaSource[];
   definedNames?: DefinedName[];
 };
 
@@ -613,6 +617,7 @@ export type RenameSheetCommand = {
   formulaSources?: FormulaSourceRestore[];
   /** Exact conditional-format formula sources restored by a rename inverse. */
   conditionalFormatFormulaSources?: ConditionalFormatFormulaSourceRestore[];
+  tableCalculatedColumnFormulaSources?: import("../table-calculated-column-references.js").TableCalculatedColumnFormulaSource[];
 };
 
 /** Exact formula source associated with a command inverse. */
@@ -699,6 +704,7 @@ export type RestoreFullSheetStateCommand = {
   state: SheetSparseState;
   workbookFormulaSources?: FormulaSourceRestore[];
   conditionalFormatFormulaSources?: ConditionalFormatFormulaSourceRestore[];
+  tableCalculatedColumnFormulaSources?: import("../table-calculated-column-references.js").TableCalculatedColumnFormulaSource[];
   definedNames?: DefinedName[];
 };
 export type SetSheetDuplicateRulesCommand = {
@@ -762,6 +768,7 @@ export type SheetAxisSparseSlice = {
   sparklineSources?: Array<{ address: CellAddress; sparkline: CellSparkline }>;
   workbookFormulaSources?: FormulaSourceRestore[];
   conditionalFormatFormulaSources?: ConditionalFormatFormulaSourceRestore[];
+  tableCalculatedColumnFormulaSources?: import("../table-calculated-column-references.js").TableCalculatedColumnFormulaSource[];
   definedNames?: DefinedName[];
   /** Exact sheet metadata before the structural change. */
   metadata: SheetMetadata;

@@ -1,0 +1,265 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261011/packages/core
+
+ ❯ src/tests/tables/calculated-column-structure.test.ts (14 tests | 1 failed) 109ms
+     × qualified absolute spill references follow their anchor in scalar formulas and templates 31ms
+ ❯ src/tests/tables/calculated-column-lifecycle.test.ts (15 tests | 4 failed) 134ms
+     × compound header and totals rejection leaves the entire workbook and history intact 38ms
+     × manual template creation and row inheritance retain pivot style libraries through history 7ms
+     × nested shifts and shadow commits preserve defined names in both directions 7ms
+     × nested totals insertion cannot move only part of a downstream PivotTable report 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/tables/calculated-column-lifecycle.test.ts > calculated-column identity and reference lifecycle > compound header and totals rejection leaves the entire workbook and history intact
+AssertionError: expected { version: 45, …(11) } to deeply equal { version: 45, …(11) }
+
+- Expected
++ Received
+
+@@ -14,38 +14,46 @@
+    "sheets": [
+      {
+        "cells": [
+          {
+            "address": {
++             "column": 0,
++             "row": 0,
++           },
++           "content": {
++             "kind": "literal",
++             "value": "Item",
++           },
++         },
++         {
++           "address": {
+              "column": 1,
+              "row": 0,
+            },
+            "content": {
+              "kind": "literal",
+-             "value": 2,
++             "value": "Qty",
+            },
+          },
+          {
+            "address": {
+              "column": 2,
+              "row": 0,
+            },
+            "content": {
+-             "formula": {
+-               "source": "=B3",
++             "kind": "literal",
++             "value": "Result",
+            },
+-             "kind": "formula",
+          },
+-         },
+          {
+            "address": {
+              "column": 1,
+              "row": 1,
+            },
+            "content": {
+              "kind": "literal",
+-             "value": 3,
++             "value": 2,
+            },
+          },
+          {
+            "address": {
+              "column": 2,
+@@ -63,22 +71,44 @@
+              "column": 1,
+              "row": 2,
+            },
+            "content": {
+              "kind": "literal",
+-             "value": 4,
++             "value": 3,
+            },
+          },
+          {
+            "address": {
+              "column": 2,
+              "row": 2,
+            },
+            "content": {
+              "formula": {
+                "source": "=B5",
++             },
++             "kind": "formula",
+            },
++         },
++         {
++           "address": {
++             "column": 1,
++             "row": 3,
++           },
++           "content": {
++             "kind": "literal",
++             "value": 4,
++           },
++         },
++         {
++           "address": {
++             "column": 2,
++             "row": 3,
++           },
++           "content": {
++             "formula": {
++               "source": "=B6",
++             },
+              "kind": "formula",
+            },
+          },
+        ],
+        "columnWidths": [],
+@@ -189,11 +219,11 @@
+              {
+                "id": "col-1",
+                "name": "Qty",
+              },
+              {
+-               "calculatedColumnFormula": "=B3",
++               "calculatedColumnFormula": "=B4",
+                "id": "col-2",
+                "name": "Result",
+              },
+            ],
+            "filter": null,
+
+ ❯ src/tests/tables/calculated-column-lifecycle.test.ts:31:41
+     29|       headerRow: true, totalRow: true,
+     30|     }))).toThrow(/calculated.column|formula family/i);
+     31|     expect(serializeWorkbook(workbook)).toEqual(before);
+       |                                         ^
+     32|     expect(session.history.revision).toBe(revision);
+     33|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/tests/tables/calculated-column-lifecycle.test.ts > calculated-column identity and reference lifecycle > manual template creation and row inheritance retain pivot style libraries through history
+AssertionError: expected { version: 43, …(11) } to deeply equal { version: 43, …(12) }
+
+- Expected
++ Received
+
+@@ -6,27 +6,13 @@
+      "maxIterations": 100,
+      "mode": "automatic",
+    },
+    "cellStyles": [],
+    "dateSystem": "1900",
+-   "defaultPivotTableStyleId": "custom-pivot",
+    "definedNames": [],
+    "id": "book",
+-   "pivotTableStyles": [
+-     {
+-       "category": "custom",
+-       "elements": {
+-         "wholeTable": {
+-           "style": {
+-             "bold": true,
+-           },
+-         },
+-       },
+-       "id": "custom-pivot",
+-       "name": "Custom",
+-     },
+-   ],
++   "pivotTableStyles": [],
+    "sheets": [
+      {
+        "cells": [
+          {
+            "address": {
+
+ ❯ src/tests/tables/calculated-column-lifecycle.test.ts:66:41
+     64|     const first = serializeWorkbook(workbook);
+     65|     undoWorkbookCommand(session);
+     66|     expect(serializeWorkbook(workbook)).toEqual(before);
+       |                                         ^
+     67|     redoWorkbookCommand(session);
+     68|     expect(serializeWorkbook(workbook)).toEqual(first);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/tests/tables/calculated-column-lifecycle.test.ts > calculated-column identity and reference lifecycle > nested shifts and shadow commits preserve defined names in both directions
+AssertionError: expected { version: 45, …(11) } to deeply equal { version: 45, …(11) }
+
+- Expected
++ Received
+
+@@ -13,16 +13,16 @@
+        "id": "name",
+        "name": "NamedCell",
+        "reference": {
+          "end": {
+            "column": 1,
+-           "row": 9,
++           "row": 8,
+          },
+          "sheetId": "sheet",
+          "start": {
+            "column": 1,
+-           "row": 9,
++           "row": 8,
+          },
+        },
+      },
+    ],
+    "id": "book",
+
+ ❯ src/tests/tables/calculated-column-lifecycle.test.ts:92:43
+     90|       const after = serializeWorkbook(workbook);
+     91|       undoWorkbookCommand(session);
+     92|       expect(serializeWorkbook(workbook)).toEqual(before);
+       |                                           ^
+     93|       redoWorkbookCommand(session);
+     94|       expect(serializeWorkbook(workbook)).toEqual(after);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/tests/tables/calculated-column-lifecycle.test.ts > calculated-column identity and reference lifecycle > nested totals insertion cannot move only part of a downstream PivotTable report
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ src/tests/tables/calculated-column-lifecycle.test.ts:110:8
+    108|     const revision = session.history.revision;
+    109|     expect(() => executeWorkbookCommand(session, createUpdateTableComm…
+    110|       .toThrow(/PivotTable report/);
+       |        ^
+    111|     expect(serializeWorkbook(workbook)).toEqual(before);
+    112|     expect(session.history.revision).toBe(revision);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/tests/tables/calculated-column-structure.test.ts > calculated-column structural references and history > qualified absolute spill references follow their anchor in scalar formulas and templates
+AssertionError: expected '=SUM(Other!$B$1#)' to be '=SUM(Other!$B$2#)' // Object.is equality
+
+Expected: "=SUM(Other!$B$2#)"
+Received: "=SUM(Other!$B$1#)"
+
+ ❯ src/tests/tables/calculated-column-structure.test.ts:23:67
+     21|     const before = serializeWorkbook(workbook);
+     22|     executeWorkbookCommand(session, createInsertSheetAxisCommand(other…
+     23|     expect(sheet.tables![0]!.columns[2]!.calculatedColumnFormula).toBe…
+       |                                                                   ^
+     24|     expect(getCellContent(sheet, { row: 1, column: 2 })).toEqual({ kin…
+     25|     const after = serializeWorkbook(workbook);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  5 failed | 24 passed (29)
+   Start at  19:08:27
+   Duration  1.36s (transform 1.45s, setup 0ms, import 2.14s, tests 243ms, environment 0ms)
+

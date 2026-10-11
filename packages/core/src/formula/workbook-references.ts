@@ -74,76 +74,120 @@ export function restoreConditionalFormatFormulaSources(
   }
 }
 
+/** Pure formula-source rewrite shared by cells and calculated-column metadata. */
+export function rewriteQualifiedFormulaSource(
+  source: string,
+  targetSheetName: string,
+  transform: ((address: FormulaAddress) => FormulaAddress | null) | null,
+): string {
+  const targetSheetId = "qualified-target";
+  const replacements: Array<{ start: number; end: number; value: string }> = [];
+  for (const candidate of qualifiedReferenceCandidates(source)) {
+    if (candidate.kind === "axis") {
+      if (candidate.sheetName.toLowerCase() !== targetSheetName.toLowerCase()) continue;
+      if (!transform) {
+        replacements.push({ start: candidate.start, end: candidate.end, value: "#REF!" });
+        continue;
+      }
+      const addressFor = (value: number): FormulaAddress =>
+        candidate.axis === "row" ? { row: value, column: 0 } : { row: 0, column: value };
+      const start = transform(addressFor(candidate.rangeStart));
+      const end = transform(addressFor(candidate.rangeEnd));
+      if (!start && !end) {
+        replacements.push({ start: candidate.start, end: candidate.end, value: "#REF!" });
+        continue;
+      }
+      const startValue = candidate.axis === "row" ? (start ?? end)!.row : (start ?? end)!.column;
+      const endValue = candidate.axis === "row" ? (end ?? start)!.row : (end ?? start)!.column;
+      const format = (value: number, absolute: boolean) =>
+        `${absolute ? "$" : ""}${candidate.axis === "column" ? columnIndexToLabel(value) : value + 1}`;
+      const sheetName = targetSheetName;
+      replacements.push({
+        start: candidate.start,
+        end: candidate.end,
+        value: `${formatSheetName(sheetName)}!${format(startValue, candidate.startAbsolute)}:${format(endValue, candidate.endAbsolute)}`,
+      });
+      continue;
+    }
+    const spill = source[candidate.end - 1] === "#";
+    const reference = parseFormulaReference(
+      source.slice(candidate.start, candidate.end - (spill ? 1 : 0)),
+      {
+        currentSheetId: targetSheetId,
+        resolveSheetId: (name) =>
+          name.toLowerCase() === targetSheetName.toLowerCase() ? targetSheetId : undefined,
+        startOffset: candidate.start,
+      },
+    );
+    if (!reference || reference.target.sheetId !== targetSheetId) continue;
+    if (!transform) {
+      replacements.push({ start: candidate.start, end: candidate.end, value: "#REF!" });
+      continue;
+    }
+    const start = transform(reference.target.range.start);
+    const end = transform(reference.target.range.end);
+    if (!start || !end) {
+      replacements.push({ start: candidate.start, end: candidate.end, value: "#REF!" });
+      continue;
+    }
+    const value = formatFormulaReference(
+      { ...reference, target: { sheetId: targetSheetId, range: { start, end } } },
+      (id) => (id === targetSheetId ? targetSheetName : undefined),
+    );
+    if (value)
+      replacements.push({
+        start: candidate.start,
+        end: candidate.end,
+        value: `${value}${spill ? "#" : ""}`,
+      });
+  }
+
+  return applySourceReplacements(source, replacements);
+}
+
+function applySourceReplacements(
+  source: string,
+  replacements: readonly { start: number; end: number; value: string }[],
+): string {
+  let next = source;
+  for (const replacement of [...replacements].sort((left, right) => right.start - left.start))
+    next = `${next.slice(0, replacement.start)}${replacement.value}${next.slice(replacement.end)}`;
+  return next;
+}
+
+export function renameQualifiedFormulaSource(
+  source: string,
+  previousName: string,
+  nextName: string,
+): string {
+  return applySourceReplacements(
+    source,
+    qualifiedReferenceCandidates(source)
+      .filter((candidate) => candidate.sheetName.toLowerCase() === previousName.toLowerCase())
+      .map((candidate) => ({
+        start: candidate.start,
+        end: candidate.end,
+        value: `${formatSheetName(nextName)}!${source.slice(candidate.referenceStart, candidate.end)}`,
+      })),
+  );
+}
+
 /** Rewrites qualified references to one sheet while retaining sparse cell storage. */
 export function rewriteQualifiedReferencesForSheet(
   workbook: Workbook,
   targetSheetId: string,
   transform: ((address: FormulaAddress) => FormulaAddress | null) | null,
 ): void {
-  const sheetsByName = () =>
-    [...workbook.sheets.values()].reduce(
-      (result, sheet) => result.set(sheet.name.toLowerCase(), sheet.id),
-      new Map<string, string>(),
-    );
-  for (const sheet of workbook.sheets.values()) {
+  const targetName = workbook.sheets.get(targetSheetId)?.name;
+  if (!targetName) return;
+  for (const sheet of workbook.sheets.values())
     for (const [key, cell] of sheet.cells) {
       if (cell.content?.kind !== "formula") continue;
       const source = cell.content.formula.source;
-      const replacements: Array<{ start: number; end: number; value: string }> = [];
-      for (const candidate of qualifiedReferenceCandidates(source)) {
-        if (candidate.kind === "axis") {
-          if (sheetsByName().get(candidate.sheetName.toLowerCase()) !== targetSheetId) continue;
-          if (!transform) {
-            replacements.push({ start: candidate.start, end: candidate.end, value: "#REF!" });
-            continue;
-          }
-          const addressFor = (value: number): FormulaAddress =>
-            candidate.axis === "row" ? { row: value, column: 0 } : { row: 0, column: value };
-          const start = transform(addressFor(candidate.rangeStart));
-          const end = transform(addressFor(candidate.rangeEnd));
-          if (!start && !end) {
-            replacements.push({ start: candidate.start, end: candidate.end, value: "#REF!" });
-            continue;
-          }
-          const startValue =
-            candidate.axis === "row" ? (start ?? end)!.row : (start ?? end)!.column;
-          const endValue = candidate.axis === "row" ? (end ?? start)!.row : (end ?? start)!.column;
-          const format = (value: number, absolute: boolean) =>
-            `${absolute ? "$" : ""}${candidate.axis === "column" ? columnIndexToLabel(value) : value + 1}`;
-          const sheetName = workbook.sheets.get(targetSheetId)?.name;
-          if (!sheetName) continue;
-          replacements.push({
-            start: candidate.start,
-            end: candidate.end,
-            value: `${formatSheetName(sheetName)}!${format(startValue, candidate.startAbsolute)}:${format(endValue, candidate.endAbsolute)}`,
-          });
-          continue;
-        }
-        const reference = parseFormulaReference(source.slice(candidate.start, candidate.end), {
-          currentSheetId: sheet.id,
-          resolveSheetId: (name) => sheetsByName().get(name.toLowerCase()),
-          startOffset: candidate.start,
-        });
-        if (!reference || reference.target.sheetId !== targetSheetId) continue;
-        if (!transform) {
-          replacements.push({ start: candidate.start, end: candidate.end, value: "#REF!" });
-          continue;
-        }
-        const start = transform(reference.target.range.start);
-        const end = transform(reference.target.range.end);
-        if (!start || !end) {
-          replacements.push({ start: candidate.start, end: candidate.end, value: "#REF!" });
-          continue;
-        }
-        const value = formatFormulaReference(
-          { ...reference, target: { sheetId: targetSheetId, range: { start, end } } },
-          (id) => workbook.sheets.get(id)?.name,
-        );
-        if (value) replacements.push({ start: candidate.start, end: candidate.end, value });
-      }
-      replaceFormulaReferences(sheet, key, source, replacements);
+      const next = rewriteQualifiedFormulaSource(source, targetName, transform);
+      if (next !== source)
+        sheet.cells.set(key, { ...cell, content: { kind: "formula", formula: { source: next } } });
     }
-  }
 }
 
 /** Rewrites qualified sheet references in conditional-format formula conditions. */

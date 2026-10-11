@@ -235,6 +235,12 @@ export type SheetTableColumn = {
   /** Formula anchored at this column's first data row; cell contents retain exceptions. */
   calculatedColumnFormula?: string;
 };
+export function getTableDataRows(table: SheetTable): { start: number; end: number } {
+  return {
+    start: table.range.start.row + Number(table.headerRow),
+    end: table.range.end.row - Number(table.totalRow),
+  };
+}
 /** A structured table, with an inclusive worksheet range. */
 export type SheetTable = {
   id: string;
@@ -2685,7 +2691,9 @@ function normalizeSheetTable(table: SheetTable): SheetTable {
     columnNames.add(name.toLocaleLowerCase("en-US"));
     if (
       column.calculatedColumnFormula !== undefined &&
-      (typeof column.calculatedColumnFormula !== "string" || !column.calculatedColumnFormula.trim())
+      (typeof column.calculatedColumnFormula !== "string" ||
+        !column.calculatedColumnFormula.trim() ||
+        !getFormulaAst(column.calculatedColumnFormula))
     )
       throw new TypeError("Invalid calculated column formula.");
     return {
@@ -3277,7 +3285,10 @@ export function cloneSheetTable(table: SheetTable): SheetTable {
   return {
     ...table,
     range: { start: { ...table.range.start }, end: { ...table.range.end } },
-    columns: table.columns.map((column) => ({ ...column })),
+    columns: table.columns.map(({ calculatedColumnFormula, ...column }) => ({
+      ...column,
+      ...(calculatedColumnFormula === undefined ? {} : { calculatedColumnFormula }),
+    })),
     style: {
       ...table.style,
       elements: Object.fromEntries(

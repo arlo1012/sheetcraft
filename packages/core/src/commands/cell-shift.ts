@@ -6,7 +6,17 @@ import {
 import { mapDrawingSource } from "../sheet-drawings.js";
 import { collectFormulaRanges, transformFormulaReferences } from "../formula/references.js";
 import { conditionalFormatFormulaSources } from "../conditional-formatting.js";
-import { rewriteQualifiedReferencesForSheet } from "../formula/workbook-references.js";
+import {
+  rewriteQualifiedReferencesForSheet,
+  rewriteQualifiedFormulaSource,
+} from "../formula/workbook-references.js";
+import {
+  getTableCalculatedColumnFormulaSources,
+  restoreTableCalculatedColumnFormulaSources,
+  rewriteTableCalculatedColumnSheetReferences,
+  assertExternalCalculatedColumnReferencesCanTransform,
+  transformTableCalculatedColumnFormulas,
+} from "../table-calculated-column-references.js";
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
@@ -15,6 +25,7 @@ import {
   createSheetSparseState,
   replaceSheetSparseState,
   type Workbook,
+  getTableDataRows,
 } from "../workbook.js";
 import type {
   DeleteCellsCommand,
@@ -29,6 +40,7 @@ import {
   parseCellKey,
   validateCommandPayload,
 } from "./helpers.js";
+import { assertPivotResultsAreWritable } from "./pivot-result-guard.js";
 
 type CellShiftCommand = InsertCellsCommand | DeleteCellsCommand;
 type Range = { start: { row: number; column: number }; end: { row: number; column: number } };
@@ -257,9 +269,18 @@ function assertFormulaRangesAreSafe(
   const targetName = workbook.sheets.get(sheetId)?.name.toLowerCase();
   const horizontal = direction === "right" || direction === "left";
   for (const sourceSheet of workbook.sheets.values()) {
-    for (const cell of sourceSheet.cells.values()) {
-      if (cell.content?.kind !== "formula") continue;
-      for (const formulaRange of collectFormulaRanges(cell.content.formula.source)) {
+    const sources = [
+      ...[...sourceSheet.cells.values()].flatMap((cell) =>
+        cell.content?.kind === "formula" ? [cell.content.formula.source] : [],
+      ),
+      ...(sourceSheet.tables ?? []).flatMap((table) =>
+        table.columns.flatMap((column) =>
+          column.calculatedColumnFormula === undefined ? [] : [column.calculatedColumnFormula],
+        ),
+      ),
+    ];
+    for (const source of sources) {
+      for (const formulaRange of collectFormulaRanges(source)) {
         const qualified = formulaRange.start.sheetName;
         const targetsSheet = qualified
           ? qualified.toLowerCase() === targetName
@@ -304,8 +325,10 @@ function assertFormulaRangesAreSafe(
 export function applyCellShiftCommand(
   workbook: Workbook,
   command: CellShiftCommand,
+  options: { tableHeaderAdjustmentId?: string } = {},
 ): RestoreCellShiftCommand | null {
   const range = validate(command);
+  assertPivotResultsAreWritable(workbook, command);
   if (
     [...workbook.sheets.values()].some(
       (entry) =>
@@ -373,6 +396,29 @@ export function applyCellShiftCommand(
       "Cell shifts intersecting outline groups are not supported.",
     );
   assertFormulaRangesAreSafe(workbook, sheet.id, range, movement, command.direction);
+  assertExternalCalculatedColumnReferencesCanTransform(workbook, sheet.id, outlineAxis);
+  for (const table of sheet.tables ?? []) {
+    if (
+      !table.columns.some((column) => column.calculatedColumnFormula !== undefined) ||
+      table.id === options.tableHeaderAdjustmentId
+    )
+      continue;
+    const rows = getTableDataRows(table);
+    if (
+      intersects(
+        {
+          start: { row: rows.start, column: table.range.start.column },
+          end: { row: rows.end, column: table.range.end.column },
+        },
+        movement,
+      )
+    )
+      throw invalidCommandPayload(
+        "calculatedColumnFormula",
+        table.id,
+        "Cell shifts through calculated table data require a table or whole-axis operation.",
+      );
+  }
 
   const map = createMap(range, command.direction);
   const previousState = createSheetSparseState(sheet);
@@ -389,6 +435,38 @@ export function applyCellShiftCommand(
       );
   }
   const nextState = cloneSparseState(previousState);
+  const tableCalculatedColumnFormulaSources = getTableCalculatedColumnFormulaSources(
+    workbook,
+    sheet.id,
+  );
+  nextState.tables = (nextState.tables ?? []).map((table) => {
+    const adjusted =
+      table.id === options.tableHeaderAdjustmentId
+        ? {
+            ...table,
+            headerRow: command.type === "insertCells",
+            range: {
+              start: { ...table.range.start },
+              end: {
+                ...table.range.end,
+                row: table.range.end.row + (command.type === "insertCells" ? 1 : -1),
+              },
+            },
+          }
+        : table;
+    return {
+      ...table,
+      columns: transformTableCalculatedColumnFormulas(table, adjusted, map, (source) =>
+        rewriteQualifiedFormulaSource(
+          transformFormulaReferences(source, map, (formulaRange) =>
+            transformFormulaRange(formulaRange, map, range, command.direction),
+          ),
+          sheet.name,
+          map,
+        ),
+      ),
+    };
+  });
   nextState.cells = previousState.cells.flatMap((cell) => {
     const address = map(cell.address);
     if (!address) return [];
@@ -473,6 +551,12 @@ export function applyCellShiftCommand(
     replaceSheetSparseState(sheet, nextState),
   );
   rewriteQualifiedReferencesForSheet(workbook, sheet.id, map);
+  const templatesChanged = rewriteTableCalculatedColumnSheetReferences(
+    workbook,
+    sheet.id,
+    map,
+    sheet.id,
+  );
   workbook.definedNames.clear();
   for (const definition of transformedNames) workbook.definedNames.set(definition.id, definition);
   const pivotsChanged = restorePivotTables(workbook, nextPivots);
@@ -483,7 +567,7 @@ export function applyCellShiftCommand(
         ?.cells.get(createCellKey(formula.address))?.content;
       return current?.kind === "formula" && current.formula.source !== formula.source;
     }) || JSON.stringify(definedNames) !== JSON.stringify(transformedNames);
-  return stateChanged || externalChanged || pivotsChanged
+  return stateChanged || externalChanged || pivotsChanged || templatesChanged
     ? {
         type: "restoreCellShift",
         pivotTables,
@@ -493,6 +577,7 @@ export function applyCellShiftCommand(
         range,
         operation: command.type === "insertCells" ? "insert" : "delete",
         workbookFormulaSources,
+        tableCalculatedColumnFormulaSources,
         definedNames,
       }
     : null;
@@ -540,5 +625,11 @@ export function applyRestoreCellShiftCommand(
   for (const definition of command.definedNames)
     workbook.definedNames.set(definition.id, definition);
   const pivotsChanged = restorePivotTables(workbook, command.pivotTables);
-  return changed || formulaChanged || namesChanged || pivotsChanged ? original : null;
+  const templatesChanged = restoreTableCalculatedColumnFormulaSources(
+    workbook,
+    command.tableCalculatedColumnFormulaSources ?? [],
+  );
+  return changed || formulaChanged || namesChanged || pivotsChanged || templatesChanged
+    ? original
+    : null;
 }
