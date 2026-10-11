@@ -18,7 +18,7 @@ const props = defineProps<{
   searchLabel?: string;
   emptyLabel?: string;
 }>();
-defineSlots<{ footer?: () => unknown }>();
+defineSlots<{ searchAction?: (props: { close: () => void }) => unknown }>();
 const emit = defineEmits<{ change: [value: string | number] }>();
 const displayValue = computed(
   () =>
@@ -86,8 +86,11 @@ function clickInput(event: MouseEvent): void {
     selectOnClick = false;
   }
 }
-function dismiss(): void {
+function closeMenu(): void {
   open.value = false;
+}
+function dismiss(): void {
+  closeMenu();
   void nextTick(() => triggerRef.value?.focus());
 }
 function toggleMenu(): void {
@@ -212,7 +215,11 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
                     }
                   }
                 "
-              />
+              >
+                <template v-if="$slots.searchAction" #action>
+                  <slot name="searchAction" :close="closeMenu" />
+                </template>
+              </MenuSearch>
             </ul>
           </template>
           <template #items>
@@ -233,9 +240,6 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
             >
               {{ emptyLabel }}
             </li>
-          </template>
-          <template v-if="$slots.footer" #footer>
-            <li role="none"><slot name="footer" /></li>
           </template>
         </MenuSurface>
       </template>

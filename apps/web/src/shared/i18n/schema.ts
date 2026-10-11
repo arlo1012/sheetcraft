@@ -1369,6 +1369,8 @@ export type MessageSchema = ToolMessageSchema & {
     searchFonts: string;
     noMatchingFonts: string;
     localFontsAction: string;
+    fontSettings: string;
+    localFonts: string;
     localFontsRefresh: string;
     localFontsHint: string;
     localFontsInsecure: string;

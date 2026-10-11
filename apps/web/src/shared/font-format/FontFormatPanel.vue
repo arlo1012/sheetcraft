@@ -19,7 +19,7 @@ import {
 } from "./useFontFormatPanel";
 import OptionList from "../option-list/OptionList.vue";
 import ColorPaletteSelect from "../color/ColorPaletteSelect.vue";
-import LocalFontAccess from "../cell-text/LocalFontAccess.vue";
+import FontSettingsAction from "../cell-text/FontSettingsAction.vue";
 
 const props = defineProps<{
   state: FontFormatState;
@@ -85,17 +85,20 @@ const previewText = computed(() =>
     <div class="font-format__lists">
       <div class="font-format__field" role="group" :aria-label="t('format.fontFamily')">
         <span>{{ t("format.fontFamily") }}</span>
-        <TInput
-          :model-value="familyInput"
-          :aria-label="t('format.fontFamily')"
-          :placeholder="familyMixed ? t('format.mixed') : undefined"
-          :maxlength="80"
-          clearable
-          data-cell-format-font-family
-          @change="updateFamilyInput"
-          @blur="commitFamilyInput"
-          @enter="commitFamilyInput"
-        />
+        <div class="font-format__family-search">
+          <TInput
+            :model-value="familyInput"
+            :aria-label="t('format.fontFamily')"
+            :placeholder="familyMixed ? t('format.mixed') : undefined"
+            :maxlength="80"
+            clearable
+            data-cell-format-font-family
+            @change="updateFamilyInput"
+            @blur="commitFamilyInput"
+            @enter="commitFamilyInput"
+          />
+          <FontSettingsAction />
+        </div>
         <OptionList
           class="font-format__list"
           :model-value="family"
@@ -109,7 +112,6 @@ const previewText = computed(() =>
             ><span :style="{ fontFamily: option.value }">{{ option.label }}</span></template
           >
         </OptionList>
-        <LocalFontAccess />
       </div>
       <div class="font-format__field" role="group" :aria-label="t('cellFormat.fontStyle')">
         <span>{{ t("cellFormat.fontStyle") }}</span>
@@ -272,6 +274,16 @@ const previewText = computed(() =>
   }
   &__list {
     height: 160px;
+  }
+  &__family-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    > :first-child {
+      flex: 1;
+      min-width: 0;
+    }
   }
   &__bottom {
     display: grid;

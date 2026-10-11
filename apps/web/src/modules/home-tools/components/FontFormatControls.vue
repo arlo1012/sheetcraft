@@ -17,7 +17,7 @@ import {
   resolveFontFamilyName,
 } from "../../../shared/cell-text/font-catalog";
 import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
-import LocalFontAccess from "../../../shared/cell-text/LocalFontAccess.vue";
+import FontSettingsAction from "../../../shared/cell-text/FontSettingsAction.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -156,7 +156,7 @@ function setFontSize(value: string | number): void {
         :disabled="disabled"
         @change="setFontFamily"
       >
-        <template #footer><LocalFontAccess /></template>
+        <template #searchAction="{ close }"><FontSettingsAction @open="close" /></template>
       </FontFormatField>
     </div>
     <div

@@ -1,8 +1,10 @@
-import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
+import { DOMWrapper, flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import FontFormatControls from "../../../../../modules/home-tools/components/FontFormatControls.vue";
 import { createDefaultSelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { createAppI18n } from "../../../../../shared/i18n";
+import FontSettingsDialog from "../../../../../shared/cell-text/FontSettingsDialog.vue";
+import { fontSettingsVisible } from "../../../../../shared/cell-text/font-settings";
 
 const { query } = vi.hoisted(() => ({ query: vi.fn() }));
 vi.mock("../../../../../shared/cell-text/local-fonts", async (importOriginal) => {
@@ -14,7 +16,7 @@ vi.mock("../../../../../shared/cell-text/local-fonts", async (importOriginal) =>
   };
 });
 
-const wrappers: Array<ReturnType<typeof mountControls>> = [];
+const wrappers: VueWrapper[] = [];
 function mountControls() {
   const wrapper = mount(FontFormatControls, {
     attachTo: document.body,
@@ -31,6 +33,7 @@ async function openFonts(wrapper: ReturnType<typeof mountControls>) {
   await wrapper.get(".font-format-controls__family .font-format-field__arrow").trigger("click");
 }
 afterEach(() => {
+  fontSettingsVisible.value = false;
   for (const wrapper of wrappers.splice(0)) wrapper.unmount();
   document.body.innerHTML = "";
   query.mockReset();
@@ -79,18 +82,30 @@ describe("font catalog in formatting controls", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  test("loads local families on request and shares choices with another formatting control", async () => {
+  test("syncs from settings after closing the menu and shares choices with another control", async () => {
     query.mockResolvedValue([{ family: "Team Font" }, { family: "Team Font" }]);
+    const settings = mount(FontSettingsDialog, {
+      attachTo: document.body,
+      global: { plugins: [createAppI18n("zh-CN")] },
+    });
+    wrappers.push(settings);
     const first = mountControls();
     const second = mountControls();
     await openFonts(first);
     expect(query).not.toHaveBeenCalled();
-    await menu().get("[data-local-font-access] button").trigger("click");
+    await menu().get('[aria-label="字体设置"]').trigger("click");
+    await flushPromises();
+    expect(document.body.querySelector(".font-format-field__menu")).toBeNull();
+    expect(fontSettingsVisible.value).toBe(true);
+    expect(query).not.toHaveBeenCalled();
+    await new DOMWrapper(document.body).get("[data-local-font-access] button").trigger("click");
     await flushPromises();
     expect(query).toHaveBeenCalledTimes(1);
-    expect(menu().text()).toContain("已读取 1 个本机字体");
+    expect(document.body.textContent).toContain("已同步 1 个本机字体");
     expect(first.emitted("applyStyle")).toBeUndefined();
-    await menu().trigger("keydown", { key: "Escape" });
+    await new DOMWrapper(document.body).get(".t-dialog__close").trigger("click");
+    await flushPromises();
+    expect(fontSettingsVisible.value).toBe(false);
     await openFonts(second);
     const choice = menu()
       .findAll('[role="menuitemradio"]')

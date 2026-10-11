@@ -5,6 +5,7 @@ import enUS from "tdesign-vue-next/es/locale/en_US";
 import zhCN from "tdesign-vue-next/es/locale/zh_CN";
 import { computed } from "vue";
 import { useAppI18n } from "../shared/i18n";
+import FontSettingsDialog from "../shared/cell-text/FontSettingsDialog.vue";
 import SpreadsheetWorkspace from "./SpreadsheetWorkspace.vue";
 
 const { locale, t } = useAppI18n();
@@ -17,6 +18,7 @@ const tdesignLocale = computed<GlobalConfigProvider>(
   <ConfigProvider :global-config="tdesignLocale">
     <main data-app-root :aria-label="t('app.workspace')" class="app-workspace">
       <SpreadsheetWorkspace />
+      <FontSettingsDialog />
     </main>
   </ConfigProvider>
 </template>

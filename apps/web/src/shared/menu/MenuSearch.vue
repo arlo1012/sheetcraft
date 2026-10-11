@@ -23,6 +23,7 @@ defineExpose({ focus: () => inputRef.value?.focus() });
         :placeholder="label"
         @keydown="(_value, { e }) => emit('keydown', e)"
       />
+      <slot name="action" />
     </div>
   </li>
 </template>
@@ -49,7 +50,15 @@ defineExpose({ focus: () => inputRef.value?.focus() });
   }
 
   &__field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     padding: 0 8px 6px;
+
+    > :first-child {
+      flex: 1;
+      min-width: 0;
+    }
   }
 }
 </style>
