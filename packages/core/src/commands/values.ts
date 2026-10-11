@@ -1,3 +1,4 @@
+import { normalizeCellTextCaption } from "../text-font-runs.js";
 import {
   capturePivotTables,
   restorePivotTables,
@@ -81,7 +82,7 @@ import {
   validateCommandPayload,
 } from "./helpers.js";
 
-function normalizeCommandCellContent(value: unknown, field: string): CellContent | null {
+export function normalizeCommandCellContent(value: unknown, field: string): CellContent | null {
   if (value === null) return null;
   try {
     // Validates and deep-clones through the sheet model's public contract.
@@ -317,6 +318,21 @@ function canExpandTable(sheet: Sheet, table: SheetTable, range: CellRange): bool
   );
 }
 
+/** Header normalization consists only of trimming and an inherited uniqueness suffix. */
+function normalizeHeaderContent(content: CellContent | null, caption: string): CellContent {
+  if (content?.kind !== "literal" || typeof content.value !== "string" || !content.fontRuns?.length)
+    return { kind: "literal", value: caption };
+  const document = normalizeCellTextCaption(
+    { text: content.value, fontRuns: content.fontRuns },
+    caption,
+  );
+  return {
+    kind: "literal",
+    value: document.text,
+    ...(document.fontRuns ? { fontRuns: document.fontRuns } : {}),
+  };
+}
+
 function getUniqueTableCaption(table: SheetTable, columnIndex: number, source: string): string {
   const base = source || `Column${columnIndex + 1}`;
   const used = new Set(
@@ -530,7 +546,10 @@ export function applySetCellContentsCommand(
           (table) => table.id === tableMetadataEdit.tableId,
         )?.range.start.row)
   )
-    normalizedChanges[0]!.content = { kind: "literal", value: tableMetadataEdit.caption };
+    normalizedChanges[0]!.content = normalizeHeaderContent(
+      normalizedChanges[0]!.content,
+      tableMetadataEdit.caption,
+    );
   const tableTransactionState =
     tableMetadataEdit || calculatedColumnUpdate ? createTableTransactionState(workbook) : undefined;
 

@@ -1,3 +1,8 @@
+import {
+  isCellTextBoundary,
+  replaceCellTextRange,
+  type CellTextDocument,
+} from "./text-font-runs.js";
 import { formatCellContentForInput, formatComputedValueForDisplay } from "./input.js";
 import type { CellContent } from "./formula/types.js";
 import type { CellStyle } from "./style.js";
@@ -30,6 +35,8 @@ export type SheetTextReplacement = {
   address: CellAddress;
   /** The replacement-ready cell input, preserving a formula's leading `=`. */
   input: string;
+  /** Exact replacement for rich text; callers must prefer this over reparsing input. */
+  content?: CellContent;
 };
 
 function parseCellKey(key: string): CellAddress | null {
@@ -382,7 +389,34 @@ export function buildSheetTextReplacements(
     if (content.kind === "formula" && options.lookIn === "values") {
       continue;
     }
-    replacements.push({ address, input: replaced });
+    let replacementContent: CellContent | undefined;
+    if (
+      content.kind === "literal" &&
+      typeof content.value === "string" &&
+      content.fontRuns?.length
+    ) {
+      let document: CellTextDocument = { text: content.value, fontRuns: content.fontRuns };
+      const ranges = findGlobMatchRanges(input, query, options);
+      // Do not split a supplementary character through a one-code-unit wildcard.
+      if (
+        ranges.some(
+          ([start, end]) => !isCellTextBoundary(input, start) || !isCellTextBoundary(input, end),
+        )
+      )
+        continue;
+      for (const [start, end] of [...ranges].reverse())
+        document = replaceCellTextRange(document, start, end, replacement);
+      replacementContent = {
+        kind: "literal",
+        value: document.text,
+        ...(document.fontRuns ? { fontRuns: document.fontRuns } : {}),
+      };
+    }
+    replacements.push({
+      address,
+      input: replaced,
+      ...(replacementContent ? { content: replacementContent } : {}),
+    });
   }
   return replacements.sort((left, right) =>
     compareAddresses(left.address, right.address, options.order),

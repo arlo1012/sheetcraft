@@ -47,6 +47,10 @@
       "types": "./dist/commands/index.d.ts",
       "import": "./dist/commands/index.js"
     },
+    "./text-font-runs": {
+      "types": "./dist/text-font-runs.d.ts",
+      "import": "./dist/text-font-runs.js"
+    },
     "./input": {
       "types": "./dist/input.d.ts",
       "import": "./dist/input.js"

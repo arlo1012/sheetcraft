@@ -1,3 +1,4 @@
+import { normalizeCellTextCaption } from "./text-font-runs.js";
 import type { TableStyleDefinition } from "./table-styles.js";
 import type { PivotTableStyleDefinition } from "./pivot-table-styles.js";
 import type { StructuredFormulaReference } from "./formula/types.js";
@@ -521,12 +522,19 @@ export function applyCreateTableCommand(
   }
   sheet.tables = [...(sheet.tables ?? []), table];
   if (table.headerRow)
-    for (const [index, column] of table.columns.entries())
-      setCellContent(
-        sheet,
-        { row: table.range.start.row, column: table.range.start.column + index },
-        { kind: "literal", value: column.name },
-      );
+    for (const [index, column] of table.columns.entries()) {
+      const address = { row: table.range.start.row, column: table.range.start.column + index };
+      const source = getCellContent(sheet, address);
+      const document =
+        source?.kind === "literal" && typeof source.value === "string"
+          ? normalizeCellTextCaption({ text: source.value, fontRuns: source.fontRuns }, column.name)
+          : { text: column.name };
+      setCellContent(sheet, address, {
+        kind: "literal",
+        value: document.text,
+        ...(document.fontRuns ? { fontRuns: document.fontRuns } : {}),
+      });
+    }
   if (command.hasHeaders === false) return previous as RestoreTableTransactionCommand;
   return restore(command.sheetId, previous as ReturnType<typeof createSheetSparseState>);
 }

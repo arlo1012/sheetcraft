@@ -471,7 +471,7 @@ function normalizeNumberFormatCode(value: unknown): string {
   return canonicalCode;
 }
 
-function normalizeFontFamily(value: unknown): string {
+export function normalizeFontFamily(value: unknown): string {
   if (typeof value !== "string") {
     throw new TypeError("Cell font family must be a string.");
   }

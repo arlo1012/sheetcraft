@@ -58,8 +58,17 @@ export type CellImage = {
   transform?: ImageTransform;
 };
 
+export type CellTextFontRun = Readonly<{ start: number; end: number; fontFamily: string }>;
+
+export type CellTextLiteralContent = {
+  kind: "literal";
+  value: string;
+  fontRuns?: readonly CellTextFontRun[];
+};
+
 export type CellContent =
-  | { kind: "literal"; value: Exclude<FormulaScalar, null> }
+  | CellTextLiteralContent
+  | { kind: "literal"; value: Exclude<FormulaScalar, null>; fontRuns?: never }
   | { kind: "error"; error: FormulaError }
   | { kind: "formula"; formula: CellFormula }
   | { kind: "image"; image: CellImage };

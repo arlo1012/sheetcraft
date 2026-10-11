@@ -1,3 +1,4 @@
+import { replaceCellTextByDiff, replaceCellTextRange } from "./text-font-runs.js";
 import { cloneCellSparkline, translateCellSparkline, type CellSparkline } from "./sparklines.js";
 import { getCellSparkline } from "./workbook.js";
 import { translateCellContentForCopy } from "./clipboard.js";
@@ -372,10 +373,25 @@ function seriesContent(plan: CellFillPlan, a: CellAddress): CellContent | null {
     return { kind: "literal", value: generator.first + generator.step * n };
   if (generator.kind === "text") {
     const value = generator.first + generator.step * n;
-    return {
-      kind: "literal",
-      value: `${generator.prefix}${value < 0 ? `-${String(Math.abs(value)).padStart(generator.width, "0")}` : String(value).padStart(generator.width, "0")}`,
-    };
+    const suffix =
+      value < 0
+        ? `-${String(Math.abs(value)).padStart(generator.width, "0")}`
+        : String(value).padStart(generator.width, "0");
+    const source = sourceFor(plan, a).content;
+    if (source?.kind === "literal" && typeof source.value === "string") {
+      const document = replaceCellTextRange(
+        { text: source.value, fontRuns: source.fontRuns },
+        generator.prefix.length,
+        source.value.length,
+        suffix,
+      );
+      return {
+        kind: "literal",
+        value: document.text,
+        ...(document.fontRuns ? { fontRuns: document.fontRuns } : {}),
+      };
+    }
+    return { kind: "literal", value: generator.prefix + suffix };
   }
   const source = sourceFor(plan, a);
   return source.content ? translateCellContentForCopy(source.content, source.address, a) : null;
@@ -497,6 +513,33 @@ function dateContent(
         value: addDate(cached.first, workbook.dateSystem, mode, cached.step * offset(plan, a)),
       };
 }
+function withoutFontRuns(content: CellContent | null): CellContent | null {
+  return content?.kind === "literal" && typeof content.value === "string"
+    ? { kind: "literal", value: content.value }
+    : content
+      ? cloneCellContent(content)
+      : null;
+}
+
+function preserveDestinationFontRuns(
+  content: CellContent | null,
+  destination: CellContent | null,
+): CellContent | null {
+  if (content?.kind !== "literal" || typeof content.value !== "string")
+    return withoutFontRuns(content);
+  const document = replaceCellTextByDiff(
+    destination?.kind === "literal" && typeof destination.value === "string"
+      ? { text: destination.value, fontRuns: destination.fontRuns }
+      : { text: "" },
+    content.value,
+  );
+  return {
+    kind: "literal",
+    value: document.text,
+    ...(document.fontRuns ? { fontRuns: document.fontRuns } : {}),
+  };
+}
+
 export function createCellFillCommand(
   workbook: Workbook,
   plan: CellFillPlan,
@@ -505,7 +548,8 @@ export function createCellFillCommand(
   captureCellFill(workbook, plan.sheetId, plan.sourceRange, plan.resultRange);
   if (!plan.availableModes.includes(mode))
     throw new CellFillError("modeUnavailable", `Fill mode ${mode} is unavailable for this source.`);
-  const protectedSheet = workbook.sheets.get(plan.sheetId)?.properties.protected;
+  const sheet = workbook.sheets.get(plan.sheetId)!;
+  const protectedSheet = sheet.properties.protected;
   if (protectedSheet && mode === "fillFormatsOnly")
     throw new CellFillError(
       "modeUnavailable",
@@ -526,11 +570,20 @@ export function createCellFillCommand(
                 : null,
         original = previous.get(key(target.address))!;
       if (protectedSheet)
-        return { sheetId: plan.sheetId, address: target.address, content: generated };
+        return {
+          sheetId: plan.sheetId,
+          address: target.address,
+          content: preserveDestinationFontRuns(generated, getCellContent(sheet, target.address)),
+        };
       return {
         sheetId: plan.sheetId,
         address: target.address,
-        content: mode === "fillFormatsOnly" ? original.content : generated,
+        content:
+          mode === "fillFormatsOnly"
+            ? withoutFontRuns(original.content)
+            : mode === "fillWithoutFormatting"
+              ? withoutFontRuns(generated)
+              : generated,
         style: mode === "fillWithoutFormatting" ? (original.style ?? null) : (source.style ?? null),
         namedStyle:
           mode === "fillWithoutFormatting"
