@@ -1,0 +1,19 @@
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 830ms on 3 files using 9 threads.
+FORMAT_EXIT=0
+LINT_EXIT=0
+DIFF_EXIT=0
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 939ms on 6 files using 9 threads.
+FINAL_FORMAT_EXIT=0
+STAGED_CODE_DOC_DIFF_EXIT=0
+docs/acceptance/evidence/symbol-20261011/initial-invocation.log:9: new blank line at EOF.
+docs/acceptance/evidence/symbol-20261011/stale-baseline.log:53: new blank line at EOF.
+docs/acceptance/evidence/symbol-20261011/web-baseline.log:9: new blank line at EOF.
+docs/acceptance/evidence/symbol-20261011/web-final.log:9: new blank line at EOF.
+docs/acceptance/evidence/symbol-20261011/web-guard-final.log:9: new blank line at EOF.
+STAGED_RAW_LOG_DIFF_EXIT=2

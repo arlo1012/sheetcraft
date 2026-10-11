@@ -1,0 +1,53 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/apps/web
+
+ ❯ src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts (15 tests | 2 failed | 13 skipped) 2759ms
+     × old Symbol callbacks cannot change the draft or a newer dialog after cancel 1571ms
+     × old Symbol callbacks cannot change the draft or a newer dialog after reopen 1186ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > old Symbol callbacks cannot change the draft or a newer dialog after cancel
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts:110:36
+    108|       insert("stale");
+    109|       await flushPromises();
+    110|       expect(session.state.active).toBe(false);
+       |                                    ^
+    111|       expect(serializeWorkbook(controller.session.workbook)).toEqual(b…
+    112|       expect(controller.session.history.undoStack).toHaveLength(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > old Symbol callbacks cannot change the draft or a newer dialog after reopen
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts:106:62
+    104|         close();
+    105|         await flushPromises();
+    106|         expect(wrapper.findComponent(SymbolDialog).exists()).toBe(true…
+       |                                                              ^
+    107|       }
+    108|       insert("stale");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 13 skipped (15)
+   Start at  22:48:39
+   Duration  14.58s (transform 8.76s, setup 0ms, import 11.49s, tests 2.76s, environment 201ms)
+

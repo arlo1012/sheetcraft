@@ -13,6 +13,7 @@ import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import PivotTableDialog from "../../../modules/pivot-tables/components/PivotTableDialog.vue";
+import SymbolDialog from "../../../modules/insert-tools/components/SymbolDialog.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { triggerCanvasCell } from "../canvas-interaction";
 import { createAppI18n } from "../../../shared/i18n";
@@ -83,6 +84,91 @@ async function fixture(withData = false) {
 }
 
 describe("workspace insert entry points", () => {
+  test.each(["cancel", "reopen", "navigation"] as const)(
+    "old Symbol callbacks cannot change the draft or a newer dialog after %s",
+    async (action) => {
+      const wrapper = await fixture(true);
+      const controller = captured.controller!;
+      const session = wrapper.getComponent(SheetGrid).props("editSession")!;
+      const before = serializeWorkbook(controller.session.workbook);
+      await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
+      await flushPromises();
+      const callbacks = wrapper.getComponent(SymbolDialog).vm.$.vnode.props!;
+      const insert = callbacks.onInsert as (symbol: string) => void;
+      const close = callbacks.onClose as () => void;
+      if (action === "navigation") {
+        controller.addSheet();
+        await flushPromises();
+      } else {
+        close();
+        await flushPromises();
+      }
+      const afterDismiss = serializeWorkbook(controller.session.workbook);
+      const historyLength = controller.session.history.undoStack.length;
+      if (action === "reopen") {
+        await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
+        await flushPromises();
+        close();
+        await flushPromises();
+        expect(wrapper.findComponent(SymbolDialog).exists()).toBe(true);
+      }
+      insert("stale");
+      await flushPromises();
+      expect(session.state.active).toBe(false);
+      expect(serializeWorkbook(controller.session.workbook)).toEqual(afterDismiss);
+      expect(controller.session.history.undoStack).toHaveLength(historyLength);
+      if (action !== "navigation") expect(afterDismiss).toEqual(before);
+      expect(wrapper.findComponent(SymbolDialog).exists()).toBe(action === "reopen");
+    },
+  );
+  test("Symbol replaces the retained editor selection as draft, with cancel and one commit history", async () => {
+    const wrapper = await fixture(true);
+    const controller = captured.controller!;
+    const grid = wrapper.getComponent(SheetGrid);
+    const session = grid.props("editSession")!;
+    const sheet = controller.activeSheet.value;
+    const before = serializeWorkbook(controller.session.workbook);
+    session.begin(
+      { sheetId: sheet.id, address: { row: 0, column: 0 }, input: "Region" },
+      { surface: "grid", mode: "append" },
+    );
+    session.setSelection(2, 4);
+    await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
+    await flushPromises();
+    wrapper.getComponent(SymbolDialog).vm.$emit("close");
+    await flushPromises();
+    expect(session.state.draft).toBe("Region");
+    expect(session.state.selection).toMatchObject({ start: 2, end: 4 });
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+    await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
+    await flushPromises();
+    wrapper.getComponent(SymbolDialog).vm.$emit("insert", "π");
+    await flushPromises();
+    expect(session.state.draft).toBe("Reπon");
+    expect(session.state.selection).toMatchObject({ start: 3, end: 3 });
+    expect(wrapper.findComponent(SymbolDialog).exists()).toBe(false);
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+    expect(controller.session.history.undoStack).toHaveLength(0);
+    session.cancel();
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+    await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
+    await flushPromises();
+    wrapper.getComponent(SymbolDialog).vm.$emit("insert", "Ω🙂");
+    await flushPromises();
+    expect(session.state.draft).toBe("RegionΩ🙂");
+    expect(session.finish()).toBe(true);
+    await flushPromises();
+    expect(getCellValue(controller.activeSheet.value, { row: 0, column: 0 })).toBe("RegionΩ🙂");
+    expect(controller.session.history.undoStack).toHaveLength(1);
+    const after = serializeWorkbook(controller.session.workbook);
+    await wrapper.get('[data-ribbon-category="home"]').trigger("click");
+    await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
+    await flushPromises();
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+    await wrapper.get('[data-ribbon-action="redo"]').trigger("click");
+    await flushPromises();
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(after);
+  });
   test.each([
     { tool: "shape", selector: '[data-insert-tool="shape"]', dialog: ".drawing-editor" },
     { tool: "text box", selector: '[data-insert-tool="text-box"]', dialog: ".drawing-editor" },

@@ -1379,7 +1379,7 @@ watch(
 );
 watch(workbookGeneration, () => {
   drawingActions.close();
-  symbolVisible.value = false;
+  symbolDialog.value = undefined;
 });
 function insertPivot(chart: boolean): void {
   if (chart && activePivot.value) chartActions.insertPivot(activePivot.value.id);
@@ -1392,8 +1392,44 @@ function editSheetDrawing(drawing: SheetDrawing): void {
   else if (drawing.kind === "camera") cameraActions.open(drawing);
   else drawingActions.edit(drawing);
 }
-const symbolVisible = ref(false);
+const symbolDialog = shallowRef<{
+  dialogId: number;
+  insert: (symbol: string) => void;
+  close: () => void;
+}>();
+const symbolVisible = computed(() => !!symbolDialog.value);
+let symbolDialogSequence = 0;
 const captureBusy = ref(false);
+function openSymbolDialog(): void {
+  if (
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    !canEditCell(activeSheet.value, activeAddress.value)
+  )
+    return;
+  const generation = workbookGeneration.value;
+  const sheet = activeSheet.value;
+  const address = { ...activeAddress.value };
+  const current = {
+    dialogId: ++symbolDialogSequence,
+    insert: (symbol: string) => {
+      if (
+        symbolDialog.value !== current ||
+        workbookGeneration.value !== generation ||
+        activeSheet.value !== sheet ||
+        activeAddress.value.row !== address.row ||
+        activeAddress.value.column !== address.column
+      )
+        return;
+      insertSymbol(symbol);
+    },
+    close: () => {
+      if (symbolDialog.value === current) symbolDialog.value = undefined;
+    },
+  };
+  symbolDialog.value = current;
+}
 function insertSymbol(symbol: string): void {
   if (
     loading.value ||
@@ -1418,13 +1454,13 @@ function insertSymbol(symbol: string): void {
   );
   cellEditSession.setDraft(result.value);
   cellEditSession.setSelection(result.caret, result.caret);
-  symbolVisible.value = false;
+  symbolDialog.value = undefined;
   void nextTick(focusCellEditor);
 }
 watch(
   () => activeSheet.value.id,
   () => {
-    symbolVisible.value = false;
+    symbolDialog.value = undefined;
   },
 );
 async function insertScreenCapture(): Promise<void> {
@@ -2633,7 +2669,7 @@ const gridInert = computed(
           :symbol-disabled="
             loading || fileBusy || xlsxBusy || !canEditCell(activeSheet, activeAddress)
           "
-          @insert-symbol="symbolVisible = true"
+          @insert-symbol="openSymbolDialog"
           @capture-screen="insertScreenCapture"
           :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
           :image-disabled="
@@ -4049,10 +4085,11 @@ const gridInert = computed(
     @close="drawingDialog.close"
   />
   <SymbolDialog
-    v-if="symbolVisible"
+    v-if="symbolDialog"
+    :key="symbolDialog.dialogId"
     :disabled="loading || fileBusy || xlsxBusy || !canEditCell(activeSheet, activeAddress)"
-    @insert="insertSymbol"
-    @close="symbolVisible = false"
+    @insert="symbolDialog.insert"
+    @close="symbolDialog.close"
   />
   <ChartEditorDialog
     v-if="chartDialog"

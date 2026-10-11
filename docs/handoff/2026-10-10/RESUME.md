@@ -1,5 +1,20 @@
 # Sheetcraft continuation after recovery — 2026-10-10
 
+## Existing Symbol lifecycle — 2026-10-11
+
+Read `docs/acceptance/symbol-20261011.md`. Real preset/custom insertion, retained
+selection into editor draft, dialog Cancel/Escape, editor Escape, commit,
+Undo/Redo and JSON save/reload were exercised on a newly added synthetic Sheet3.
+The three prior synthetic sheets are unchanged. No reset/import/Replace was used.
+Symbol still uses the ordinary editor parser and cell history, not a drawing.
+
+A focused old-callback regression failed twice: dismissed insert started a fresh
+draft, and dismissed close hid a newer dialog. The workspace now binds a keyed
+Symbol dialog identity and captured generation/sheet/address, retaining existing
+permission/busy/editor checks. Original failing and final passing check results
+are separated in the acceptance record. Full CI/native WPS+Excel text exchange
+were not run. No new raw JSON or screenshots were uploaded.
+
 ## Representative shape lifecycle — 2026-10-11
 
 Unchanged production baseline a44fe73f4d494d95e4be89d9cfad87f30c7f1720 now has a

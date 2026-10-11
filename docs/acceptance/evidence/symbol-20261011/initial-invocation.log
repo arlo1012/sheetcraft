@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454
+
+No test files found, exiting with code 1
+
+filter: apps/web/src/tests/modules/insert-tools/symbol-dialog.test.ts, apps/web/src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts, apps/web/src/tests/shared/cell-editing/useCellEditSession.test.ts
+include: src/**/*.test.ts
+exclude:  **/node_modules/**, **/.git/**
+
