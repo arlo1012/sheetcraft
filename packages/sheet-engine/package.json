@@ -94,6 +94,10 @@
     "./picture-layout-edit": {
       "types": "./dist/picture-layout-edit.d.ts",
       "import": "./dist/picture-layout-edit.js"
+    },
+    "./picture-crop-gesture": {
+      "types": "./dist/picture-crop-gesture.d.ts",
+      "import": "./dist/picture-crop-gesture.js"
     }
   },
   "scripts": {

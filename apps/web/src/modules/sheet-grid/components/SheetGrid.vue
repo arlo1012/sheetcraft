@@ -131,6 +131,20 @@ import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 import type { ImageInsertMode } from "../../sheet-images/useSheetImageActions";
 import SheetFloatingImageLayer from "../../sheet-images/components/SheetFloatingImageLayer.vue";
 import SheetOwnedPictureGroupLayer from "../../sheet-images/components/SheetOwnedPictureGroupLayer.vue";
+import SheetPictureCropOverlay from "../../sheet-images/components/SheetPictureCropOverlay.vue";
+import PictureCropToolbar from "../../sheet-images/components/PictureCropToolbar.vue";
+import {
+  usePictureCropSession,
+  type PictureCropDirection,
+} from "../../sheet-images/usePictureCropSession";
+import {
+  getPictureCropViewportFragments,
+  preparePictureCropPreview,
+} from "../../sheet-images/picture-crop-preview";
+import {
+  startPointerSession,
+  type PointerSession,
+} from "../../../shared/sheet-input/pointer-session";
 import { resolveOwnedPictureNode } from "../../sheet-images/picture-group-interaction";
 import SheetImagePreview from "../../sheet-images/components/SheetImagePreview.vue";
 import SheetNotePreview from "./SheetNotePreview.vue";
@@ -1186,6 +1200,190 @@ const pictureFrameContext = computed<PictureFrameLayoutContext | undefined>(() =
     metrics: pictureViewMetrics.value,
   };
 });
+const pictureCrop = usePictureCropSession({
+  getSheet: () => props.sheet,
+  getGeneration: () => props.pictureOwnerGeneration ?? 0,
+  getRevision: () => props.workbookRevision ?? 0,
+  getContext: () => pictureFrameContext.value,
+  getSelectedIds: () => selectedImageIds.value,
+  getSelectedPath: () => selectedOwnedPicturePath.value,
+  isReadOnly: () => objectsReadOnly.value,
+  execute: (roots) => props.applyPictureCollectionChange?.(roots) === true,
+  onFailure: () => emit("imageFeedback", "picture.operationFailed"),
+});
+const cropOverlayRef = ref<InstanceType<typeof SheetPictureCropOverlay>>();
+const cropToolbarRef = ref<InstanceType<typeof PictureCropToolbar>>();
+let cropPointer: PointerSession | undefined;
+function stopCropPointer(): void {
+  const pointer = cropPointer;
+  cropPointer = undefined;
+  pointer?.cancel();
+}
+function finishPictureCrop(cancel = false): boolean {
+  // Drop mode before releasing capture so pointer cancellation cannot restore an applied draft.
+  const accepted = cancel ? (pictureCrop.cancel(), true) : pictureCrop.apply();
+  if (accepted) {
+    stopCropPointer();
+    imageLayerRef.value?.closePictureContextMenu();
+    ownedImageLayerRef.value?.closePictureContextMenu();
+    focusEditor();
+  }
+  return accepted;
+}
+function startPictureCrop(): boolean {
+  if (pictureCrop.active.value) return finishPictureCrop();
+  if (!flushPendingEdit() || !pictureCrop.start()) return false;
+  void nextTick(() =>
+    (cropOverlayRef.value?.$el as HTMLElement | undefined)?.focus({ preventScroll: true }),
+  );
+  return true;
+}
+function openCropContextMenu(event: MouseEvent): void {
+  if (!pictureCrop.active.value) return;
+  if (selectedOwnedPicturePath.value?.length && selectedOwnedPicturePath.value.length > 1)
+    ownedImageLayerRef.value?.openSelectedContextMenu(event);
+  else imageLayerRef.value?.openSelectedContextMenu(event);
+}
+function startPictureCropGesture(direction: PictureCropDirection, event: PointerEvent): void {
+  if (event.button !== 0 || !pictureCrop.active.value) return;
+  stopCropPointer();
+  const snapshot = pictureCrop.captureGesture();
+  if (!snapshot) return;
+  const start = { x: event.clientX, y: event.clientY },
+    gestureScale = scale.value;
+  const move = (pointer: PointerEvent | MouseEvent) => {
+    if (
+      !pictureCrop.previewGesture(snapshot, direction, {
+        x: (pointer.clientX - start.x) / gestureScale,
+        y: (pointer.clientY - start.y) / gestureScale,
+      })
+    )
+      emit("imageFeedback", "picture.operationFailed");
+  };
+  cropPointer = startPointerSession({
+    event,
+    captureTarget: event.currentTarget instanceof HTMLElement ? event.currentTarget : null,
+    onMove: move,
+    onEnd: (pointer) => {
+      cropPointer = undefined;
+      move(pointer);
+      pictureCrop.finishGesture(snapshot);
+    },
+    onCancel: () => {
+      cropPointer = undefined;
+      pictureCrop.cancelGesture(snapshot);
+    },
+  });
+}
+function onPictureCropKeydown(event: KeyboardEvent): void {
+  if (!pictureCrop.active.value || event.isComposing || event.defaultPrevented) return;
+  const target = event.target;
+  if (
+    target instanceof Element &&
+    !rootRef.value?.contains(target) &&
+    !target.closest(
+      "[data-picture-crop-toolbar], [data-owned-picture-context-menu], [data-floating-image-context-menu]",
+    )
+  )
+    return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    finishPictureCrop();
+    return;
+  }
+  // Menus and toolbar buttons retain their own Arrow/Enter navigation. Only
+  // Escape is shared with the crop owner's exit contract.
+  if (
+    target instanceof Element &&
+    target.closest(
+      "[data-picture-crop-toolbar], [role=menu], input, textarea, [contenteditable=true]",
+    )
+  )
+    return;
+  const history = getWorkbookHistoryShortcut(event);
+  if (history) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    stopCropPointer();
+    if (history === "undo") pictureCrop.undoDraft();
+    else pictureCrop.redoDraft();
+    return;
+  }
+  if (event.key === "Enter") {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    cropToolbarRef.value?.openRatios();
+    return;
+  }
+  const distance = event.shiftKey ? 10 : 1;
+  const delta = {
+    ArrowLeft: { x: -distance, y: 0 },
+    ArrowRight: { x: distance, y: 0 },
+    ArrowUp: { x: 0, y: -distance },
+    ArrowDown: { x: 0, y: distance },
+  }[event.key];
+  if (!delta) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  stopCropPointer();
+  const snapshot = pictureCrop.captureGesture();
+  if (snapshot && pictureCrop.previewGesture(snapshot, "source", delta))
+    pictureCrop.finishGesture(snapshot);
+}
+const cropControls = computed(() => {
+  const view = pictureCrop.view.value;
+  if (!view) return null;
+  const id = view.id;
+  const current = () => pictureCrop.view.value?.id === id;
+  return {
+    id,
+    apply: () => current() && finishPictureCrop(),
+    cancel: () => {
+      if (current()) finishPictureCrop(true);
+    },
+    setRatio: (ratio: number) => {
+      if (!current()) return false;
+      stopCropPointer();
+      return pictureCrop.setRatio(ratio);
+    },
+  };
+});
+const cropToolbarAnchor = computed<FloatingReference | null>(() => {
+  const view = pictureCrop.view.value,
+    root = rootRef.value;
+  if (!view || !root) return null;
+  const fragments = getPictureCropViewportFragments(
+    preparePictureCropPreview(view.picture, view.geometry),
+    layout.value,
+  );
+  if (!fragments.length) return null;
+  const frame = fragments.find((fragment) => fragment.paneId === "body") ?? fragments[0]!;
+  const bounds = frame.clippedBounds,
+    zoom = scale.value,
+    header = headerSize.value;
+  return {
+    contextElement: root,
+    getBoundingClientRect: () => {
+      const host = root.getBoundingClientRect();
+      return new DOMRect(
+        host.left + (header.width + bounds.x) * zoom,
+        host.top + (header.height + bounds.y) * zoom,
+        bounds.width * zoom,
+        bounds.height * zoom,
+      );
+    },
+  };
+});
+watch([layout, scale], () => stopCropPointer(), { flush: "sync" });
+watch(
+  pictureCrop.active,
+  (active) => {
+    if (!active) stopCropPointer();
+  },
+  { flush: "sync" },
+);
+
 watch(
   [() => props.sheet, () => props.sheet.floatingImages, pictureFrameContext],
   () => {
@@ -1196,6 +1394,13 @@ watch(
 );
 const imagePaintState = computed<FloatingImagePaintState>(() => {
   const states = imagePaintStates.value;
+  const cropPreview = pictureCrop.previewRoots.value;
+  if (cropPreview)
+    return {
+      images: cropPreview,
+      revision: imagePaintRevision.value,
+      effects: drawingThemeEffects.value,
+    };
   const originals = props.sheet.floatingImages;
   const usable = (state: FloatingImagePaintState | undefined) =>
     state &&
@@ -1584,6 +1789,20 @@ const visibleNotes = computed(() => {
 });
 const notePreviewRefs = ref<InstanceType<typeof SheetNotePreview>[]>([]);
 function onDocumentPointerDown(event: PointerEvent): void {
+  if (
+    pictureCrop.active.value &&
+    event.button === 0 &&
+    event.target instanceof Element &&
+    !event.target.closest(
+      '[data-picture-crop-owner], [data-picture-crop-toolbar], [data-picture-tool="crop"], [data-owned-picture-context-menu], [data-floating-image-context-menu]',
+    )
+  ) {
+    if (!finishPictureCrop()) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+  }
   if (!(event.target instanceof Node)) return;
   for (const preview of notePreviewRefs.value) preview.outsidePointerDown(event.target);
 }
@@ -1967,6 +2186,7 @@ function ownedActionPaths(path: PictureGroupPath): PictureGroupPath[] {
 }
 function deleteOwnedPicture(path: PictureGroupPath, owner?: object): void {
   if (objectsReadOnly.value || owner !== props.sheet) return;
+  if (pictureCrop.active.value && !finishPictureCrop()) return;
   try {
     if (!props.applyOwnedPictureDelete?.(ownedActionPaths(path), props.sheet))
       emit("imageFeedback", "picture.operationFailed");
@@ -1986,6 +2206,7 @@ function ungroupOwnedPicture(rootId: string): void {
 }
 function formatOwnedPicture(path: PictureGroupPath, owner?: object): void {
   if (owner !== props.sheet || !pictureFrameContext.value) return;
+  if (pictureCrop.active.value && !finishPictureCrop()) return;
   try {
     if (
       resolveOwnedPictureNode(props.sheet.floatingImages, path, pictureFrameContext.value)?.visible
@@ -2001,6 +2222,7 @@ function requestOwnedPictureCopy(
   owner?: object,
 ): void {
   if (owner !== props.sheet) return;
+  if (pictureCrop.active.value && !finishPictureCrop()) return;
   if (mode === "cut" && objectsReadOnly.value) return;
   if (mode === "cut" && path.length > 1) {
     emit("imageFeedback", "picture.memberCutUnsupported");
@@ -2010,6 +2232,7 @@ function requestOwnedPictureCopy(
 }
 async function requestOwnedPicturePaste(path: PictureGroupPath, owner?: object): Promise<void> {
   if (owner !== props.sheet || objectsReadOnly.value) return;
+  if (pictureCrop.active.value && !finishPictureCrop()) return;
   const root = props.sheet.floatingImages.find((entry) => entry.id === path[0]);
   if (!root) return;
   setActiveCell(getPictureObjectOriginCell(root, props.sheet));
@@ -2032,6 +2255,7 @@ function currentOwnedClipboardPaths(): PictureGroupPath[] {
     : selectedImageIds.value.map((id) => [id]);
 }
 function deleteSelectedFloatingImage(id: string): void {
+  if (pictureCrop.active.value && (selectedImageId.value !== id || !finishPictureCrop())) return;
   if (objectsReadOnly.value) return;
   if (props.applyOwnedPictureDelete) {
     deleteOwnedPicture([id], props.sheet);
@@ -2048,6 +2272,7 @@ function deleteSelectedFloatingImage(id: string): void {
 }
 
 function convertSelectedFloatingImageToCell(id: string): void {
+  if (pictureCrop.active.value && (selectedImageId.value !== id || !finishPictureCrop())) return;
   if (props.readOnly) return;
   const image = props.sheet.floatingImages.find((entry) => entry.id === id);
   if (!image) return;
@@ -2058,6 +2283,11 @@ function convertSelectedFloatingImageToCell(id: string): void {
 }
 
 function onImageCopy(event: ClipboardEvent): void {
+  if (pictureCrop.active.value && !finishPictureCrop()) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
   if (event.target instanceof Element && event.target.closest("[data-page-header-footer]")) return;
   const image = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
   if (isEditing.value || !image) {
@@ -2072,6 +2302,11 @@ function onImageCopy(event: ClipboardEvent): void {
 }
 
 function onImageCut(event: ClipboardEvent): void {
+  if (pictureCrop.active.value && !finishPictureCrop()) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
   if (event.target instanceof Element && event.target.closest("[data-page-header-footer]")) return;
   const image = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
   if (isEditing.value || !image) {
@@ -2095,6 +2330,7 @@ function onImageCut(event: ClipboardEvent): void {
 }
 
 function requestFloatingImageCopy(id: string, mode: "copy" | "cut"): void {
+  if (pictureCrop.active.value && (selectedImageId.value !== id || !finishPictureCrop())) return;
   const image = props.sheet.floatingImages.find((entry) => entry.id === id);
   if (image) {
     if (
@@ -2111,6 +2347,7 @@ function requestFloatingImageCopy(id: string, mode: "copy" | "cut"): void {
 }
 
 async function requestFloatingImagePaste(id: string): Promise<void> {
+  if (pictureCrop.active.value && (selectedImageId.value !== id || !finishPictureCrop())) return;
   if (objectsReadOnly.value) return;
   const image = props.sheet.floatingImages.find((entry) => entry.id === id);
   if (!image) return;
@@ -2120,6 +2357,11 @@ async function requestFloatingImagePaste(id: string): Promise<void> {
 }
 
 function onImagePaste(event: ClipboardEvent): void {
+  if (pictureCrop.active.value && !finishPictureCrop()) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
   if (event.target instanceof Element && event.target.closest("[data-page-header-footer]")) return;
   if (isComposing.value || !event.clipboardData) return;
   const file =
@@ -2638,6 +2880,10 @@ function onDimensionResizeStart(
 }
 
 function onGridKeydown(event: KeyboardEvent): void {
+  if (pictureCrop.active.value) {
+    onPictureCropKeydown(event);
+    return;
+  }
   if (event.target instanceof Element && event.target.closest("[data-page-header-footer]")) return;
   if (
     event.target instanceof Element &&
@@ -3457,6 +3703,7 @@ function clearClipboard(): void {
 }
 
 function flushPendingEdit(): boolean {
+  if (pictureCrop.active.value && !finishPictureCrop()) return false;
   if (isComposing.value) {
     return false;
   }
@@ -3467,7 +3714,7 @@ function flushPendingEdit(): boolean {
 }
 
 function hasPendingEdit(): boolean {
-  return isComposing.value || isEditing.value;
+  return pictureCrop.active.value || isComposing.value || isEditing.value;
 }
 
 watch(
@@ -3513,6 +3760,7 @@ onMounted(() => {
   observeViewport();
   focusEditor();
   document.addEventListener("pointerdown", onDocumentPointerDown, true);
+  window.addEventListener("keydown", onPictureCropKeydown, true);
 });
 
 watch(horizontalScrollState, (state) => emit("horizontalScrollChange", state), {
@@ -3532,6 +3780,9 @@ onBeforeUnmount(() => {
   cancelNotePreviewLeave();
   clearPendingClipboard();
   document.removeEventListener("pointerdown", onDocumentPointerDown, true);
+  window.removeEventListener("keydown", onPictureCropKeydown, true);
+  pictureCrop.cancel();
+  stopCropPointer();
 });
 
 defineExpose({
@@ -3559,7 +3810,8 @@ defineExpose({
       ? ownedImageLayerRef.value?.arrangeSelection(ids, action)
       : imageLayerRef.value?.arrangeImages(ids, action);
   },
-  cropImage: () => imageLayerRef.value?.startCrop(),
+  cropImage: startPictureCrop,
+  canCropPicture: () => pictureCrop.canStart.value,
   rotateImage: (turns: -1 | 1 | 2) =>
     requiresOwnedClipboard()
       ? ownedImageLayerRef.value?.rotateSelected(turns)
@@ -3882,6 +4134,8 @@ defineExpose({
       />
       <SheetFloatingImageLayer
         :preview-on-double-click="imagePreviewOnDoubleClick ?? true"
+        :crop-handler="startPictureCrop"
+        :cropping-externally="pictureCrop.active.value"
         ref="imageLayerRef"
         @paint-state-change="acceptPicturePaintState('standalone', $event)"
         :scale="scale"
@@ -3914,6 +4168,7 @@ defineExpose({
         v-if="pictureFrameContext"
         ref="ownedImageLayerRef"
         :roots="sheet.floatingImages"
+        :cropping-externally="pictureCrop.active.value"
         :owner="sheet"
         :revision="workbookRevision ?? 0"
         :layout="layout"
@@ -3935,6 +4190,29 @@ defineExpose({
         @copy="(path, owner) => requestOwnedPictureCopy(path, 'copy', owner)"
         @cut="(path, owner) => requestOwnedPictureCopy(path, 'cut', owner)"
         @paste="requestOwnedPicturePaste"
+      />
+      <SheetPictureCropOverlay
+        v-if="pictureCrop.view.value"
+        ref="cropOverlayRef"
+        :key="pictureCrop.view.value.id"
+        :picture="pictureCrop.view.value.picture"
+        :geometry="pictureCrop.view.value.geometry"
+        :layout="layout"
+        :scale="scale"
+        :asset-url="resolvedImageUrls.get(pictureCrop.view.value.picture.assetId)"
+        @start="startPictureCropGesture"
+        @keydown="onPictureCropKeydown"
+        @contextmenu="openCropContextMenu"
+      />
+      <PictureCropToolbar
+        v-if="cropToolbarAnchor && cropControls"
+        ref="cropToolbarRef"
+        :key="cropControls.id"
+        :anchor="cropToolbarAnchor"
+        :owner-id="cropControls.id"
+        :apply="cropControls.apply"
+        :cancel="cropControls.cancel"
+        :set-ratio="cropControls.setRatio"
       />
     </div>
     <SheetAxisContextMenu

@@ -1832,6 +1832,10 @@ export const enUS = {
     applyCrop: "Apply crop",
     cancelCrop: "Cancel crop",
     cropSelection: "Crop selection",
+    cropRatio: "Aspect ratio",
+    cropFree: "Free crop",
+    sourceOperationsUnavailable:
+      "Finish cropping first. Picture-frame preview and conversion to a cell are not yet supported.",
     cropTop: "Adjust crop from top",
     cropBottom: "Adjust crop from bottom",
     cropLeft: "Adjust crop from left",

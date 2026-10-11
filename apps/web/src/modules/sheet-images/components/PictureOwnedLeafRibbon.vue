@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { ImagePlus, Settings2 } from "lucide-vue-next";
+import { Crop, ImagePlus, Settings2 } from "lucide-vue-next";
 import { isGroupedPicture, type GroupedPicture } from "@sheetcraft/core/picture-group";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
@@ -10,6 +10,8 @@ const props = defineProps<{
   image: GroupedPicture;
   disabled: boolean;
   canReplace: boolean;
+  canCrop?: boolean;
+  cropHandler?: () => boolean;
   replaceHandler: () => void;
   formatHandler: () => void;
   ownerKey: string;
@@ -21,7 +23,8 @@ const callbacks = computed(() => {
   const image = props.image,
     key = props.ownerKey,
     replace = props.replaceHandler,
-    format = props.formatHandler;
+    format = props.formatHandler,
+    crop = props.cropHandler;
   return {
     replace: () => {
       if (
@@ -33,6 +36,17 @@ const callbacks = computed(() => {
         replace === props.replaceHandler
       )
         replace();
+    },
+    crop: () => {
+      if (
+        image === props.image &&
+        isGroupedPicture(props.image) &&
+        !props.disabled &&
+        props.canCrop &&
+        key === props.ownerKey &&
+        crop === props.cropHandler
+      )
+        crop?.();
     },
     format: () => {
       if (
@@ -56,6 +70,15 @@ const callbacks = computed(() => {
       data-picture-tool="replace"
       @activate="callbacks.replace"
       ><ImagePlus
+    /></RibbonButton>
+    <RibbonButton
+      variant="tall"
+      :label="t('image.crop')"
+      :text="t('image.crop')"
+      :disabled="disabled || !canCrop"
+      data-picture-tool="crop"
+      @activate="callbacks.crop"
+      ><Crop
     /></RibbonButton>
     <RibbonButton
       variant="tall"

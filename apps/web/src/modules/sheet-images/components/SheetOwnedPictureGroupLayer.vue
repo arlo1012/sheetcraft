@@ -79,6 +79,7 @@ const props = withDefaults(
     selectedPath?: PictureGroupPath | null;
     scale?: number;
     readOnly?: boolean;
+    croppingExternally?: boolean;
     applyUpdateMany?: (roots: readonly FloatingImage[]) => boolean;
   }>(),
   { scale: 1, readOnly: false },
@@ -899,7 +900,20 @@ onBeforeUnmount(() => {
   finishGesture(false);
   window.removeEventListener("keydown", onActiveEscape, true);
 });
+function openSelectedContextMenu(event: MouseEvent): void {
+  const path = targetPath.value,
+    layer = layerRef.value;
+  if (!path || !layer || selectedIds.value.length !== 1) return;
+  openContextMenu(
+    markRaw(createContextMenuPoint(event, layer)),
+    path,
+    { rootIds: [...selectedIds.value], path: path.length > 1 ? [...path] : null },
+    props.selectedRootId ?? null,
+  );
+}
 defineExpose({
+  closePictureContextMenu: () => closeContextMenu(false),
+  openSelectedContextMenu,
   handleSurfacePointerDown,
   handleSurfacePointerMove,
   handleSurfacePointerUp,
@@ -918,7 +932,7 @@ defineExpose({
 <template>
   <div ref="layerRef" class="sheet-owned-picture-group-layer" data-owned-picture-group-layer>
     <div
-      v-for="overlay in overlays"
+      v-for="overlay in croppingExternally ? [] : overlays"
       :key="`${JSON.stringify(overlay.path)}:${overlay.fragment.paneId}`"
       class="sheet-owned-picture-group-layer__selection"
       :class="{ 'is-passive': overlay.passive }"
@@ -944,7 +958,7 @@ defineExpose({
       />
     </div>
     <SheetPictureGroupToolbar
-      v-if="toolbarAnchor && targetPath && groupToolbarActions"
+      v-if="!croppingExternally && toolbarAnchor && targetPath && groupToolbarActions"
       :anchor="toolbarAnchor"
       :disabled="readOnly"
       :can-ungroup="targetPath.length === 1"
@@ -953,7 +967,7 @@ defineExpose({
       @dismiss="groupToolbarActions.dismiss"
     />
     <SheetPictureSelectionToolbar
-      v-if="selectionToolbar"
+      v-if="!croppingExternally && selectionToolbar"
       :key="selectionToolbar.key"
       :anchor="selectionToolbar.anchor"
       :selection-key="selectionToolbar.key"

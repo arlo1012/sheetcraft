@@ -6,9 +6,16 @@ import { useContextMenu } from "../../../shared/menu/useContextMenu";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 
-const props = withDefaults(defineProps<{ anchor: FloatingReference; readOnly?: boolean }>(), {
-  readOnly: false,
-});
+const props = withDefaults(
+  defineProps<{
+    anchor: FloatingReference;
+    readOnly?: boolean;
+    sourceOperationsDisabled?: boolean;
+  }>(),
+  {
+    readOnly: false,
+  },
+);
 const emit = defineEmits<{
   convertToCell: [];
   preview: [];
@@ -49,13 +56,19 @@ function onKeydown(event: KeyboardEvent): void {
     <MenuSurface
       ref="menuSurfaceRef"
       class="sheet-floating-image-context-menu"
+      data-floating-image-context-menu
       :style="floatingStyles"
       :label="t('image.contextMenuActions')"
       @click.stop
       @keydown.stop="onKeydown"
       @contextmenu.prevent.stop
     >
-      <MenuItem data-floating-image-action="preview" @select="emit('preview')">
+      <MenuItem
+        data-floating-image-action="preview"
+        :disabled="sourceOperationsDisabled"
+        :title="sourceOperationsDisabled ? t('image.sourceOperationsUnavailable') : undefined"
+        @select="emit('preview')"
+      >
         {{ t("image.preview") }}
       </MenuItem>
       <MenuItem data-floating-image-action="copy" @select="emit('copy')">
@@ -72,7 +85,8 @@ function onKeydown(event: KeyboardEvent): void {
       </MenuItem>
       <MenuItem
         data-floating-image-action="convert-to-cell"
-        :disabled="readOnly"
+        :disabled="readOnly || sourceOperationsDisabled"
+        :title="sourceOperationsDisabled ? t('image.sourceOperationsUnavailable') : undefined"
         @select="emit('convertToCell')"
       >
         {{ t("image.convertToCell") }}

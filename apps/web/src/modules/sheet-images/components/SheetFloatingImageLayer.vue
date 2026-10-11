@@ -107,6 +107,8 @@ const props = withDefaults(
     readOnly?: boolean;
     previewOnDoubleClick?: boolean;
     scale?: number;
+    cropHandler?: () => boolean;
+    croppingExternally?: boolean;
   }>(),
   { readOnly: false, scale: 1, previewOnDoubleClick: true },
 );
@@ -191,6 +193,10 @@ type ContextMenuState = {
   imageId: string;
   anchor: FloatingReference;
   trigger: HTMLElement;
+  owner: object | undefined;
+  rootsReference: readonly PictureObject[];
+  roots: PictureObject[];
+  selectedIds: string[];
 };
 
 const gesture = shallowRef<Gesture>();
@@ -629,6 +635,11 @@ function planGestureAt(activeGesture: Gesture, point: Point): void {
 }
 
 function startCrop(): void {
+  if (props.cropHandler) {
+    closeContextMenu(false);
+    if (!props.readOnly && !props.cropHandler()) emit("feedback", "picture.operationFailed");
+    return;
+  }
   if (!props.readOnly) {
     if (selectedImage.value && isFramedPictureObject(selectedImage.value))
       emit("feedback", "picture.operationFailed");
@@ -829,7 +840,18 @@ function openContextMenu(
     imageId: image.id,
     trigger,
     anchor,
+    owner: props.owner,
+    rootsReference: selectionImages(),
+    roots: selectionImages().map(cloneFloatingImage),
+    selectedIds: [...selectedIds.value],
   };
+  const menu = contextMenu.value;
+  // Selection is an emitted controlled contract. Allow its one render-cycle
+  // acknowledgement, while uncontrolled consumers keep their original state.
+  void nextTick(() => {
+    if (contextMenu.value === menu && props.selectedImageId === menu.imageId)
+      menu.selectedIds = [...selectedIds.value];
+  });
 }
 
 function onImageContextMenu(image: FloatingImage, event: MouseEvent): void {
@@ -848,13 +870,60 @@ function openImageKeyboardContextMenu(image: FloatingImage, event: KeyboardEvent
   return true;
 }
 
+const contextMenuSourceUnsupported = computed(() => {
+  const image = currentImages.value.find((entry) => entry.id === contextMenu.value?.imageId);
+  return Boolean(image && isFramedPictureObject(image));
+});
+function isContextMenuOwnerCurrent(menu: ContextMenuState): boolean {
+  try {
+    return (
+      contextMenu.value === menu &&
+      menu.owner === props.owner &&
+      menu.rootsReference === selectionImages() &&
+      menu.selectedIds.length === selectedIds.value.size &&
+      menu.selectedIds.every((id) => selectedIds.value.has(id)) &&
+      areFloatingImageCollectionsEqual(menu.roots, selectionImages())
+    );
+  } catch {
+    return false;
+  }
+}
+const contextActions = computed(() => {
+  const menu = contextMenu.value;
+  const current = () => !!menu && isContextMenuOwnerCurrent(menu);
+  return {
+    copy: () => {
+      if (current()) requestClipboard("copy");
+    },
+    cut: () => {
+      if (current()) requestClipboard("cut");
+    },
+    paste: () => {
+      if (current()) requestClipboard("paste");
+    },
+    preview: () => {
+      if (current()) requestPreview();
+    },
+    convert: () => {
+      if (current()) requestConvertToCell();
+    },
+    delete: () => {
+      if (current()) requestDelete();
+    },
+    close: (restoreFocus: boolean) => {
+      if (contextMenu.value === menu) closeContextMenu(restoreFocus);
+    },
+  };
+});
 function requestConvertToCell(): void {
+  if (props.croppingExternally || contextMenuSourceUnsupported.value) return;
   const imageId = contextMenu.value?.imageId;
   closeContextMenu(false);
   if (imageId && !props.readOnly) emit("convertToCell", imageId);
 }
 
 function requestPreview(): void {
+  if (props.croppingExternally) return;
   const image = currentImages.value.find((entry) => entry.id === contextMenu.value?.imageId);
   const trigger = contextMenu.value?.trigger;
   closeContextMenu(false);
@@ -1200,7 +1269,15 @@ function dismissSelection(key: string): void {
   if (key === selectionKey.value) emit("select", null);
 }
 
+function openSelectedContextMenu(event: MouseEvent): void {
+  const image = selectedImage.value,
+    layer = layerRef.value;
+  if (!image || !layer || selectedIds.value.size !== 1) return;
+  openContextMenu(image, layer, createContextMenuPoint(event, layer));
+}
 defineExpose({
+  closePictureContextMenu: () => closeContextMenu(false),
+  openSelectedContextMenu,
   arrangeImages,
   startCrop,
   rotateImage,
@@ -1304,7 +1381,9 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     @dblclick.prevent.stop="onLayerDoubleClick"
   >
     <div
-      v-for="fragment in fragments.filter((entry) => selectedIds.has(entry.image.id))"
+      v-for="fragment in fragments.filter(
+        (entry) => !croppingExternally && selectedIds.has(entry.image.id),
+      )"
       :key="getFragmentKey(fragment)"
       class="sheet-floating-image-layer__selected"
       :class="{
@@ -1344,7 +1423,7 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
         @resize="(direction, event) => startGesture(fragment.image, direction, event)"
       />
     </div>
-    <template v-if="!crop && !readOnly && selectedImage">
+    <template v-if="!croppingExternally && !crop && !readOnly && selectedImage">
       <div
         v-for="fragment in groupFragments"
         :key="`group-${fragment.paneId}`"
@@ -1360,6 +1439,7 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     </template>
     <SheetPictureSelectionToolbar
       v-if="
+        !croppingExternally &&
         selectionToolbarAnchor &&
         !hasExtendedRootSelection &&
         !selectedGroup &&
@@ -1377,7 +1457,14 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       @dismiss="dismissSelection"
     />
     <SheetFloatingImageToolbar
-      v-if="toolbarAnchor && selectedImage && selectedIds.size <= 1 && !gesture && !contextMenu"
+      v-if="
+        !croppingExternally &&
+        toolbarAnchor &&
+        selectedImage &&
+        selectedIds.size <= 1 &&
+        !gesture &&
+        !contextMenu
+      "
       :anchor="toolbarAnchor"
       :cropping="Boolean(crop)"
       :can-restore="canRestore"
@@ -1393,13 +1480,14 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       v-if="contextMenu"
       :anchor="contextMenu.anchor"
       :read-only="readOnly"
-      @convert-to-cell="requestConvertToCell"
-      @preview="requestPreview"
-      @copy="requestClipboard('copy')"
-      @cut="requestClipboard('cut')"
-      @paste="requestClipboard('paste')"
-      @delete="requestDelete"
-      @close="closeContextMenu"
+      :source-operations-disabled="croppingExternally || contextMenuSourceUnsupported"
+      @convert-to-cell="contextActions.convert"
+      @preview="contextActions.preview"
+      @copy="contextActions.copy"
+      @cut="contextActions.cut"
+      @paste="contextActions.paste"
+      @delete="contextActions.delete"
+      @close="contextActions.close"
     />
   </div>
 </template>

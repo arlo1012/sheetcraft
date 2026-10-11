@@ -36,13 +36,15 @@ const props = withDefaults(
     aspectRatioHandler?: (locked: boolean) => boolean;
     replaceHandler?: () => void;
     canReplace?: boolean;
+    canCrop?: boolean;
+    cropHandler?: () => boolean;
     appearanceHandler?: (patch: Partial<ImageAppearance> | undefined) => boolean;
     disabled: boolean;
     busy?: boolean;
     selectionCount: number;
     previewOnDoubleClick: boolean;
   }>(),
-  { canReplace: undefined },
+  { canReplace: undefined, canCrop: undefined },
 );
 // Standalone source tools cannot establish a draft for an owned container.
 requireStandalonePicture(props.image);
@@ -165,6 +167,24 @@ const replaceCallback = computed(() => {
     else emit("replace");
   };
 });
+const cropCallback = computed(() => {
+  const image = props.image,
+    owner = props.draftOwnerKey,
+    handler = props.cropHandler;
+  return (): void => {
+    if (
+      props.disabled ||
+      props.selectionCount > 1 ||
+      (props.canCrop === undefined ? isFramed.value : !props.canCrop) ||
+      image !== props.image ||
+      owner !== props.draftOwnerKey ||
+      handler !== props.cropHandler
+    )
+      return;
+    if (handler) handler();
+    else emit("crop");
+  };
+});
 function sourceAction(action: () => void): void {
   requireStandalonePicture(props.image);
   action();
@@ -213,9 +233,9 @@ function sourceAction(action: () => void): void {
         variant="tall"
         :label="t('image.crop')"
         :text="t('image.crop')"
-        :disabled="disabled || selectionCount > 1 || isFramed"
+        :disabled="disabled || selectionCount > 1 || (canCrop === undefined ? isFramed : !canCrop)"
         data-picture-tool="crop"
-        @activate="sourceAction(() => emit('crop'))"
+        @activate="cropCallback"
         ><Crop
       /></RibbonButton>
       <div class="picture-toolbar__stack">

@@ -19,3 +19,8 @@ export * from "./viewport-layout.js";
 export * from "./visibility.js";
 export * from "./picture-group-geometry.js";
 export * from "./picture-layout-edit.js";
+export {
+  resizeResolvedPictureCropBy,
+  moveResolvedPictureCropSourceBy,
+  fitResolvedPictureCropToRatio,
+} from "./picture-crop-gesture.js";

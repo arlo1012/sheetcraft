@@ -388,6 +388,8 @@ const {
   redo,
   setGridNavigator,
   clearGridClipboard,
+  flushPendingGridEdit,
+  hasPendingGridEdit,
   scrollGridHorizontally,
 } = useSpreadsheetWorkspaceController();
 
@@ -1865,6 +1867,8 @@ const pictureSourceRibbonOwner = computed(() => {
   return {
     key,
     canReplace: imageActions.canReplace(image.id, path),
+    canCrop: sheetGridRef.value?.canCropPicture() ?? false,
+    crop: () => current() && (sheetGridRef.value?.cropImage() ?? false),
     replace: () => {
       if (current()) void imageActions.requestReplace(image.id, path);
     },
@@ -1919,8 +1923,8 @@ const fileActions = useWorkbookFileActions({
   persistence,
   assetStore,
   getWorkbook: () => session.workbook,
-  flushPendingEdits: () => cellEditSession.finish(),
-  hasPendingEdits: cellEditSession.hasPendingEdit,
+  flushPendingEdits: () => cellEditSession.finish() && flushPendingGridEdit(),
+  hasPendingEdits: () => cellEditSession.hasPendingEdit() || hasPendingGridEdit(),
   isBlocked: () =>
     xlsxActions.busy.value ||
     xlsxActions.passwordRequired.value ||
@@ -1932,8 +1936,8 @@ const xlsxActions = useWorkbookXlsxActions({
   persistence,
   getWorkbook: () => session.workbook,
   getRevision: () => workbookRevision.value,
-  flushPendingEdits: () => cellEditSession.finish(),
-  hasPendingEdits: cellEditSession.hasPendingEdit,
+  flushPendingEdits: () => cellEditSession.finish() && flushPendingGridEdit(),
+  hasPendingEdits: () => cellEditSession.hasPendingEdit() || hasPendingGridEdit(),
   isBlocked: () => fileBusy.value || confirmation.value !== undefined || imageBusy.value,
 });
 const { busy: xlsxBusy, confirmation: xlsxConfirmation, feedback: xlsxFeedback } = xlsxActions;
@@ -3030,6 +3034,8 @@ const gridInert = computed(
           :appearance-handler="pictureToolbarOwner?.appearance"
           :replace-handler="pictureSourceRibbonOwner?.replace"
           :can-replace="pictureSourceRibbonOwner?.canReplace"
+          :can-crop="pictureSourceRibbonOwner?.canCrop"
+          :crop-handler="pictureSourceRibbonOwner?.crop"
           @insert-image="imageActions.requestInsert"
           @crop="sheetGridRef?.cropImage()"
           @format="openOwnedPictureFormat()"
@@ -3058,6 +3064,8 @@ const gridInert = computed(
           :replace-handler="pictureSourceRibbonOwner.replace"
           :format-handler="pictureSourceRibbonOwner.format"
           :can-replace="pictureSourceRibbonOwner.canReplace"
+          :can-crop="pictureSourceRibbonOwner.canCrop"
+          :crop-handler="pictureSourceRibbonOwner.crop"
           :disabled="
             loading ||
             fileBusy ||

@@ -1769,6 +1769,9 @@ export type MessageSchema = ToolMessageSchema & {
     applyCrop: string;
     cancelCrop: string;
     cropSelection: string;
+    cropRatio: string;
+    cropFree: string;
+    sourceOperationsUnavailable: string;
     cropTop: string;
     cropBottom: string;
     cropLeft: string;

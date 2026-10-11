@@ -1,3 +1,34 @@
+## Current interactive picture-crop WIP — 2026-10-11
+
+Standalone pictures and exact owned leaves now have source-owned interactive crop:
+eight rotated black handles, a clipped full-source ghost, source-body movement,
+local draft Undo/Redo and a ratio menu. Handle edits preserve the physical source
+and opposite rotated edge/corner; ratio edits fit the complete source and use its
+unrotated center. The 16:9 desktop result is matched; other offered ratios apply
+the same product algorithm. Enter opens ratios. Escape/outside/apply retain the
+draft in one complete-forest transaction; explicit Cancel discards it.
+
+The object menu keeps crop mode. Clipboard/Delete/owned Format actions flush the
+actual draft first; rejection does not copy old geometry or continue the action.
+Closed menu callbacks and changed selections cannot borrow another owner.
+Root save/leave actions now use the Grid pending/flush contract, so Ctrl+S saves
+the new crop and rejected flushes keep the draft and unload warning. Current
+unsupported framed preview/conversion entries remain disabled with a reason.
+Read `docs/insert/pictures.md` for the detailed product contracts and limits.
+
+Final related checks: Web 20 files / 212 tests and sheet-engine 6 files / 98 tests
+passed. Full Web and sheet-engine types, both relevant builds, scoped lint,
+formatting and diff checks passed. Earlier test-wrapper type errors, one nested
+setProps fixture error and a legacy unselected-menu regression were corrected;
+the original failures remain recorded. Existing architecture diagnostics remain
+130 with exit 1, and existing bundle warnings remain.
+
+This is a bounded implementation checkpoint awaiting user detail acceptance.
+The full picture tool remains WIP: intrinsic-size/scale and other Reset actions,
+shape crop, complete effects, other resource consumers, Locked/Print Object and
+format-specific boundaries still need completion. Workbook I/O work remains paused.
+Older entries below describe earlier checkpoints and their then-current scope.
+
 ## Current source/crop and replacement WIP — 2026-10-11
 
 The actual four-tab pane now reads and applies the eight source/crop fields for
