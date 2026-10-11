@@ -322,14 +322,14 @@ function canExpandTable(sheet: Sheet, table: SheetTable, range: CellRange): bool
 function normalizeHeaderContent(content: CellContent | null, caption: string): CellContent {
   if (content?.kind !== "literal" || typeof content.value !== "string" || !content.fontRuns?.length)
     return { kind: "literal", value: caption };
-  const document = normalizeCellTextCaption(
+  const textDocument = normalizeCellTextCaption(
     { text: content.value, fontRuns: content.fontRuns },
     caption,
   );
   return {
     kind: "literal",
-    value: document.text,
-    ...(document.fontRuns ? { fontRuns: document.fontRuns } : {}),
+    value: textDocument.text,
+    ...(textDocument.fontRuns ? { fontRuns: textDocument.fontRuns } : {}),
   };
 }
 

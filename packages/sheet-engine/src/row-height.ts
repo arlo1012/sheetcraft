@@ -107,8 +107,8 @@ export function measureWrappedCellHeight(
   measurer: TextMeasurer,
   wrapText = true,
 ): number {
-  const document = typeof value === "string" ? { text: value } : value;
-  const { text } = document;
+  const textDocument = typeof value === "string" ? { text: value } : value;
+  const { text } = textDocument;
   if (!text) {
     return DEFAULT_ROW_HEIGHT;
   }
@@ -116,9 +116,9 @@ export function measureWrappedCellHeight(
     1,
     columnWidth - WRAPPED_CELL_HORIZONTAL_PADDING - WRAPPED_CELL_GRIDLINE_WIDTH,
   );
-  if (document.fontRuns?.length || measurer.measureMetrics) {
+  if (textDocument.fontRuns?.length || measurer.measureMetrics) {
     return measureAttributedCellHeight(
-      document,
+      textDocument,
       availableWidth,
       undefined,
       font,
@@ -210,14 +210,14 @@ function getSingleLineAvailableTextWidth(
 }
 
 function getShrinkToFitFont(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   columnWidth: number,
   style: Readonly<CellStyle> | undefined,
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
   wraps: boolean,
 ): AutoRowHeightFont {
-  const { text } = document;
+  const { text } = textDocument;
   const textRotation = style?.textRotation;
   if (
     !style?.shrinkToFit ||
@@ -230,8 +230,8 @@ function getShrinkToFitFont(
   }
   const radians = typeof textRotation === "number" ? (Math.abs(textRotation) * Math.PI) / 180 : 0;
   const naturalLine =
-    document.fontRuns?.length || measurer.measureMetrics
-      ? splitAttributedTextLines(document, Infinity, font, measurer, false)[0]
+    textDocument.fontRuns?.length || measurer.measureMetrics
+      ? splitAttributedTextLines(textDocument, Infinity, font, measurer, false)[0]
       : undefined;
   const naturalWidth = naturalLine?.width ?? measurer.measure(text, font);
   const naturalHeight = naturalLine
@@ -245,19 +245,19 @@ function getShrinkToFitFont(
 }
 
 function measureCellHeight(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   columnWidth: number,
   style: Readonly<CellStyle> | undefined,
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
 ): number {
-  const { text } = document;
+  const { text } = textDocument;
   const availableWidth = getAvailableTextWidth(columnWidth, style, measurer);
   const wraps = shouldWrapText(style, text);
-  const measuredFont = getShrinkToFitFont(document, columnWidth, style, font, measurer, wraps);
-  if (document.fontRuns?.length || measurer.measureMetrics) {
+  const measuredFont = getShrinkToFitFont(textDocument, columnWidth, style, font, measurer, wraps);
+  if (textDocument.fontRuns?.length || measurer.measureMetrics) {
     return measureAttributedCellHeight(
-      document,
+      textDocument,
       availableWidth,
       style,
       measuredFont,
@@ -310,12 +310,12 @@ function getHeightForTextExtent(height: number): number {
 }
 
 function getAttributedStackedHeight(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
 ): number {
   let maximum = font.size * WRAPPED_CELL_LINE_HEIGHT;
-  for (const paragraph of splitAttributedTextLines(document, Infinity, font, measurer, false)) {
+  for (const paragraph of splitAttributedTextLines(textDocument, Infinity, font, measurer, false)) {
     let offset = paragraph.start;
     let segmentIndex = 0;
     let height = 0;
@@ -338,7 +338,7 @@ function getAttributedStackedHeight(
 }
 
 function measureAttributedCellHeight(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   availableWidth: number,
   style: Readonly<CellStyle> | undefined,
   font: AutoRowHeightFont,
@@ -346,10 +346,10 @@ function measureAttributedCellHeight(
   wraps: boolean,
 ): number {
   if (style?.textRotation === "vertical")
-    return getAttributedStackedHeight(document, font, measurer);
-  const lines = splitAttributedTextLines(document, availableWidth, font, measurer, wraps);
+    return getAttributedStackedHeight(textDocument, font, measurer);
+  const lines = splitAttributedTextLines(textDocument, availableWidth, font, measurer, wraps);
   const heights = getAttributedTextLayoutLineHeights(
-    document,
+    textDocument,
     lines,
     font,
     WRAPPED_CELL_LINE_HEIGHT,
@@ -369,13 +369,13 @@ function measureAttributedCellHeight(
 }
 
 function getMeasuredExtentsFingerprint(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
 ): unknown {
   if (!measurer.measureMetrics) return undefined;
   // Actual extents can change after font loading even when text and metadata are unchanged.
-  return splitAttributedTextLines(document, Infinity, font, measurer, false).map((line) => [
+  return splitAttributedTextLines(textDocument, Infinity, font, measurer, false).map((line) => [
     line.width,
     line.ascent,
     line.descent,
@@ -410,10 +410,10 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
         }
         if (cell.content?.kind === "image") continue;
         const value = input.getComputedValue(address, cell);
-        const document = input.formatPresentation?.(address, cell, value) ?? {
+        const textDocument = input.formatPresentation?.(address, cell, value) ?? {
           text: input.formatValue?.(address, cell, value) ?? formatComputedValueForDisplay(value),
         };
-        const { text } = document;
+        const { text } = textDocument;
         const style = input.getCellStyle?.(address, cell) ?? cell.style;
         const wrapText = shouldWrapText(style, text);
         const hasLineBreak = hasExplicitLineBreak(text);
@@ -431,7 +431,7 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
         const font = getCellFont(style, defaultFontFamily);
         const fingerprint = JSON.stringify([
           text,
-          document.fontRuns,
+          textDocument.fontRuns,
           wrapText || hasLineBreak || hasHeightSensitiveTextLayout ? columnWidth : undefined,
           font,
           style?.horizontalAlign,
@@ -440,13 +440,13 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
           style?.textRotation,
           style?.textDirection,
           input.measurementVersion ?? 0,
-          getMeasuredExtentsFingerprint(document, font, measurer),
+          getMeasuredExtentsFingerprint(textDocument, font, measurer),
         ]);
         const cached = cellHeights.get(key);
         const height =
           cached?.fingerprint === fingerprint
             ? cached.height
-            : measureCellHeight(document, columnWidth, style, font, measurer);
+            : measureCellHeight(textDocument, columnWidth, style, font, measurer);
         if (!cached || cached.fingerprint !== fingerprint) {
           cellHeights.set(key, { fingerprint, height });
         }

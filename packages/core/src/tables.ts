@@ -525,14 +525,14 @@ export function applyCreateTableCommand(
     for (const [index, column] of table.columns.entries()) {
       const address = { row: table.range.start.row, column: table.range.start.column + index };
       const source = getCellContent(sheet, address);
-      const document =
+      const textDocument =
         source?.kind === "literal" && typeof source.value === "string"
           ? normalizeCellTextCaption({ text: source.value, fontRuns: source.fontRuns }, column.name)
           : { text: column.name };
       setCellContent(sheet, address, {
         kind: "literal",
-        value: document.text,
-        ...(document.fontRuns ? { fontRuns: document.fontRuns } : {}),
+        value: textDocument.text,
+        ...(textDocument.fontRuns ? { fontRuns: textDocument.fontRuns } : {}),
       });
     }
   if (command.hasHeaders === false) return previous as RestoreTableTransactionCommand;

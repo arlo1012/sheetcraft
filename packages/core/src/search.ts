@@ -395,7 +395,7 @@ export function buildSheetTextReplacements(
       typeof content.value === "string" &&
       content.fontRuns?.length
     ) {
-      let document: CellTextDocument = { text: content.value, fontRuns: content.fontRuns };
+      let textDocument: CellTextDocument = { text: content.value, fontRuns: content.fontRuns };
       const ranges = findGlobMatchRanges(input, query, options);
       // Do not split a supplementary character through a one-code-unit wildcard.
       if (
@@ -405,11 +405,11 @@ export function buildSheetTextReplacements(
       )
         continue;
       for (const [start, end] of [...ranges].reverse())
-        document = replaceCellTextRange(document, start, end, replacement);
+        textDocument = replaceCellTextRange(textDocument, start, end, replacement);
       replacementContent = {
         kind: "literal",
-        value: document.text,
-        ...(document.fontRuns ? { fontRuns: document.fontRuns } : {}),
+        value: textDocument.text,
+        ...(textDocument.fontRuns ? { fontRuns: textDocument.fontRuns } : {}),
       };
     }
     replacements.push({

@@ -66,15 +66,15 @@ export function getAttributedTextLineHeight(
  * Full cluster safety requires Intl.Segmenter; the inherited fallback is scalar-only.
  */
 function createLayoutContext(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   baseFont: AutoRowHeightFont,
 ): LayoutContext {
-  const runs = normalizeCellTextFontRuns(document.text, document.fontRuns) ?? [];
+  const runs = normalizeCellTextFontRuns(textDocument.text, textDocument.fontRuns) ?? [];
   const intervals: FontInterval[] = [];
   const boundaries = new Set<number>([0]);
   let start = 0;
   let runIndex = 0;
-  for (const grapheme of getCellTextGraphemes(document.text)) {
+  for (const grapheme of getCellTextGraphemes(textDocument.text)) {
     const end = start + grapheme.length;
     while (runIndex < runs.length && runs[runIndex]!.end <= start) runIndex++;
     const run = runs[runIndex];
@@ -85,7 +85,7 @@ function createLayoutContext(
     boundaries.add(end);
     start = end;
   }
-  return { document, baseFont, intervals, boundaries };
+  return { document: textDocument, baseFont, intervals, boundaries };
 }
 
 function assertRange(context: LayoutContext, start: number, end: number): void {
@@ -129,12 +129,12 @@ function getSegments(context: LayoutContext, start: number, end: number): Attrib
  * Segments are logical-order spans; this function does not implement bidi layout.
  */
 export function getAttributedTextSegments(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   baseFont: AutoRowHeightFont,
   start = 0,
-  end = document.text.length,
+  end = textDocument.text.length,
 ): AttributedTextSegment[] {
-  const context = createLayoutContext(document, baseFont);
+  const context = createLayoutContext(textDocument, baseFont);
   assertRange(context, start, end);
   return getSegments(context, start, end);
 }
@@ -146,20 +146,20 @@ export function getAttributedTextSegments(
  * a family assigned only to CR/LF delimiters does not add an effective text family.
  */
 export function requiresAttributedNativeBidiLayout(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   baseFont: AutoRowHeightFont,
   direction?: CellTextDirection,
 ): boolean {
   if (
-    !document.fontRuns?.length ||
+    !textDocument.fontRuns?.length ||
     (direction !== "rtl" &&
       !/[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufeff\u{10800}-\u{10fff}\u{1e800}-\u{1efff}\u200e\u200f\u202a-\u202e\u2066-\u206f]/u.test(
-        document.text,
+        textDocument.text,
       ))
   )
     return false;
   const families = new Set<string>();
-  for (const segment of getAttributedTextSegments(document, baseFont)) {
+  for (const segment of getAttributedTextSegments(textDocument, baseFont)) {
     if (!segment.text.replace(/[\r\n]/gu, "")) continue;
     families.add(segment.font.family);
     if (families.size > 1) return true;
@@ -176,7 +176,7 @@ export function requiresAttributedNativeBidiLayout(
  * Stacked glyph layouts use their own per-grapheme advances instead.
  */
 export function getAttributedTextLayoutLineHeights(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   lines: readonly Pick<AttributedTextLine, "ascent" | "descent">[],
   baseFont: AutoRowHeightFont,
   nominalLineHeight = 1.25,
@@ -185,7 +185,7 @@ export function getAttributedTextLayoutLineHeights(
   const heights = lines.map((line) =>
     getAttributedTextLineHeight(line, baseFont, nominalLineHeight),
   );
-  if (!requiresAttributedNativeBidiLayout(document, baseFont, direction)) return heights;
+  if (!requiresAttributedNativeBidiLayout(textDocument, baseFont, direction)) return heights;
   const maximum = heights.reduce(
     (height, current) => Math.max(height, current),
     baseFont.size * nominalLineHeight,
@@ -261,13 +261,13 @@ function measureRange(
  * getAttributedTextSegments; exact per-scalar mixed fonts inside a cluster are not promised.
  */
 export function measureAttributedText(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   baseFont: AutoRowHeightFont,
   measurer: TextMeasurer,
   start = 0,
-  end = document.text.length,
+  end = textDocument.text.length,
 ): number {
-  const context = createLayoutContext(document, baseFont);
+  const context = createLayoutContext(textDocument, baseFont);
   assertRange(context, start, end);
   return measureRange(context, start, end, measurer, true).width;
 }
@@ -288,13 +288,13 @@ function* getParagraphs(text: string): Generator<{ start: number; end: number }>
  * Family affinity and Intl.Segmenter fallback limitations match getAttributedTextSegments.
  */
 export function splitAttributedTextLines(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   availableWidth: number,
   baseFont: AutoRowHeightFont,
   measurer: TextMeasurer,
   wrapText: boolean,
 ): AttributedTextLine[] {
-  const context = createLayoutContext(document, baseFont);
+  const context = createLayoutContext(textDocument, baseFont);
   const lines: AttributedTextLine[] = [];
   const normalizedWidth = Math.max(1, availableWidth);
   const measure = (start: number, end: number, paragraphEnd = false) =>
@@ -305,7 +305,7 @@ export function splitAttributedTextLines(
     return lines.length < MAX_CELL_TEXT_LAYOUT_LINES;
   };
 
-  for (const paragraph of getParagraphs(document.text)) {
+  for (const paragraph of getParagraphs(textDocument.text)) {
     if (!wrapText || paragraph.start === paragraph.end) {
       if (!append(measure(paragraph.start, paragraph.end, true))) break;
       continue;
@@ -315,7 +315,7 @@ export function splitAttributedTextLines(
     let line: AttributedTextLine | undefined;
     let tokenStart = paragraph.start;
     for (const token of getCellTextWrapTokens(
-      document.text.slice(paragraph.start, paragraph.end),
+      textDocument.text.slice(paragraph.start, paragraph.end),
     )) {
       const tokenEnd = tokenStart + token.length;
       const candidate = measure(lineStart, tokenEnd);

@@ -74,12 +74,12 @@ export function areCellTextFontRunsEqual(
 
 /** Returns an explicit override only; gaps and outer boundaries inherit the cell font. */
 export function getCellTextFontOverride(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   offset: number,
   affinity: "backward" | "forward" = "backward",
 ): string | undefined {
-  if (!isCellTextBoundary(document.text, offset)) throw new RangeError("Invalid text offset.");
-  return normalizeCellTextFontRuns(document.text, document.fontRuns)?.find((run) =>
+  if (!isCellTextBoundary(textDocument.text, offset)) throw new RangeError("Invalid text offset.");
+  return normalizeCellTextFontRuns(textDocument.text, textDocument.fontRuns)?.find((run) =>
     affinity === "backward"
       ? run.start < offset && offset <= run.end
       : run.start <= offset && offset < run.end,
@@ -88,23 +88,23 @@ export function getCellTextFontOverride(
 
 /** No insertionFont means inherited font. Callers may explicitly supply their typing affinity. */
 export function replaceCellTextRange(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   start: number,
   end: number,
   insertion: string,
   insertionFont?: string,
 ): CellTextDocument & { caret: number } {
-  const runs = normalizeCellTextFontRuns(document.text, document.fontRuns) ?? [];
+  const runs = normalizeCellTextFontRuns(textDocument.text, textDocument.fontRuns) ?? [];
   if (
-    !isCellTextBoundary(document.text, start) ||
-    !isCellTextBoundary(document.text, end) ||
+    !isCellTextBoundary(textDocument.text, start) ||
+    !isCellTextBoundary(textDocument.text, end) ||
     start > end
   ) {
     throw new RangeError("Invalid text replacement range.");
   }
   if (typeof insertion !== "string") throw new TypeError("Inserted text must be a string.");
   const family = insertionFont === undefined ? undefined : normalizeFontFamily(insertionFont);
-  const text = document.text.slice(0, start) + insertion + document.text.slice(end);
+  const text = textDocument.text.slice(0, start) + insertion + textDocument.text.slice(end);
   const delta = insertion.length - (end - start);
   const next: CellTextFontRun[] = [];
   for (const run of runs) {
@@ -121,7 +121,7 @@ export function replaceCellTextRange(
 }
 
 /** Complete segments, including inherited gaps; useful before display-text projection. */
-export function getCellTextFontSegments(document: CellTextDocument): Array<{
+export function getCellTextFontSegments(textDocument: CellTextDocument): Array<{
   start: number;
   end: number;
   text: string;
@@ -129,57 +129,57 @@ export function getCellTextFontSegments(document: CellTextDocument): Array<{
 }> {
   const result: Array<{ start: number; end: number; text: string; fontFamily?: string }> = [];
   let start = 0;
-  for (const run of normalizeCellTextFontRuns(document.text, document.fontRuns) ?? []) {
+  for (const run of normalizeCellTextFontRuns(textDocument.text, textDocument.fontRuns) ?? []) {
     if (start < run.start)
-      result.push({ start, end: run.start, text: document.text.slice(start, run.start) });
-    result.push({ ...run, text: document.text.slice(run.start, run.end) });
+      result.push({ start, end: run.start, text: textDocument.text.slice(start, run.start) });
+    result.push({ ...run, text: textDocument.text.slice(run.start, run.end) });
     start = run.end;
   }
-  if (start < document.text.length)
-    result.push({ start, end: document.text.length, text: document.text.slice(start) });
+  if (start < textDocument.text.length)
+    result.push({ start, end: textDocument.text.length, text: textDocument.text.slice(start) });
   return result;
 }
 
 /** Deterministic single-range plain edit. Ambiguous repeated text uses longest prefix first. */
 export function replaceCellTextByDiff(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   text: string,
   options: { inheritInsertionFont?: boolean } = {},
 ): CellTextDocument {
-  if (text === document.text) {
-    const fontRuns = normalizeCellTextFontRuns(text, document.fontRuns);
+  if (text === textDocument.text) {
+    const fontRuns = normalizeCellTextFontRuns(text, textDocument.fontRuns);
     return { text, ...(fontRuns ? { fontRuns } : {}) };
   }
   let start = 0;
   while (
     start < text.length &&
-    start < document.text.length &&
-    text[start] === document.text[start]
+    start < textDocument.text.length &&
+    text[start] === textDocument.text[start]
   )
     start++;
-  while (!isCellTextBoundary(text, start) || !isCellTextBoundary(document.text, start)) start--;
+  while (!isCellTextBoundary(text, start) || !isCellTextBoundary(textDocument.text, start)) start--;
   let suffix = 0;
   while (
     suffix < text.length - start &&
-    suffix < document.text.length - start &&
-    text[text.length - 1 - suffix] === document.text[document.text.length - 1 - suffix]
+    suffix < textDocument.text.length - start &&
+    text[text.length - 1 - suffix] === textDocument.text[textDocument.text.length - 1 - suffix]
   )
     suffix++;
   while (
     !isCellTextBoundary(text, text.length - suffix) ||
-    !isCellTextBoundary(document.text, document.text.length - suffix)
+    !isCellTextBoundary(textDocument.text, textDocument.text.length - suffix)
   )
     suffix--;
   return replaceCellTextRange(
-    document,
+    textDocument,
     start,
-    document.text.length - suffix,
+    textDocument.text.length - suffix,
     text.slice(start, text.length - suffix),
     options.inheritInsertionFont
       ? getCellTextFontOverride(
-          document,
+          textDocument,
           start,
-          start === document.text.length - suffix ? "backward" : "forward",
+          start === textDocument.text.length - suffix ? "backward" : "forward",
         )
       : undefined,
   );
@@ -187,13 +187,18 @@ export function replaceCellTextByDiff(
 
 /** Preserve only the source portion of a trimmed caption with an optional uniqueness suffix. */
 export function normalizeCellTextCaption(
-  document: CellTextDocument,
+  textDocument: CellTextDocument,
   caption: string,
 ): CellTextDocument {
-  const trimmed = document.text.trim();
+  const trimmed = textDocument.text.trim();
   if (!caption.startsWith(trimmed)) return { text: caption };
-  const start = document.text.length - document.text.trimStart().length;
-  let result = replaceCellTextRange(document, start + trimmed.length, document.text.length, "");
+  const start = textDocument.text.length - textDocument.text.trimStart().length;
+  let result = replaceCellTextRange(
+    textDocument,
+    start + trimmed.length,
+    textDocument.text.length,
+    "",
+  );
   result = replaceCellTextRange(result, 0, start, "");
   return replaceCellTextRange(
     result,
