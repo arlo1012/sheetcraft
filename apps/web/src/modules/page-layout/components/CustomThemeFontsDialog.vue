@@ -6,7 +6,6 @@ import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { useAppI18n } from "../../../shared/i18n";
 import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
-import LocalFontAccess from "../../../shared/cell-text/LocalFontAccess.vue";
 
 export type ThemeFontScheme = {
   name: string;
@@ -131,7 +130,6 @@ watch(
           </div>
         </section>
       </div>
-      <LocalFontAccess />
     </TForm>
   </TDialog>
 </template>
