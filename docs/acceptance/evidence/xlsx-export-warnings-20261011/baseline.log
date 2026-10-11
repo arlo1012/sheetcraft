@@ -1,0 +1,273 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/apps/web
+
+ ❯ src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts (9 tests | 6 failed) 186ms
+     × retains the exact warning counts and original locations after a successful download 16ms
+     × waits for download completion before publishing warnings 54ms
+     × cancellation after the worker resolves but before continuation prevents download 2ms
+     × cancel while an already-started download is pending cannot publish late warnings 52ms
+     × a clean second export removes old warnings and keeps the existing plain success shape 2ms
+     × warning-bearing encrypted export keeps its existing filename and exported key 3ms
+ ❯ src/tests/modules/workbook-xlsx/components.test.ts (7 tests | 2 failed) 119ms
+     × renders warning occurrence counts and literal reported locations (en-US) 28ms
+     × renders warning occurrence counts and literal reported locations (zh-CN) 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/modules/workbook-xlsx/components.test.ts > XLSX feedback > renders warning occurrence counts and literal reported locations (en-US)
+ FAIL  src/tests/modules/workbook-xlsx/components.test.ts > XLSX feedback > renders warning occurrence counts and literal reported locations (zh-CN)
+Error: Unable to get [data-xlsx-warnings] within: <body>
+  <div>
+    <div data-v-app="">
+      <!--v-if-->
+    </div>
+  </div>
+</body>
+ ❯ DOMWrapper.get ../../node_modules/.bun/@vue+test-utils@2.4.11+bedd8b778080c456/node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js:7182:15
+ ❯ src/tests/modules/workbook-xlsx/components.test.ts:46:27
+     44|       await flushPromises();
+     45|       const body = new DOMWrapper(document.body);
+     46|       const report = body.get("[data-xlsx-warnings]");
+       |                           ^
+     47|       expect(body.get(".xlsx-file-feedback__dialog-description").text(…
+     48|       expect(report.text()).toContain("feature-omitted");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts > XLSX export warning feedback > retains the exact warning counts and original locations after a successful download
+AssertionError: expected { key: 'xlsx.feedback.exported', …(1) } to deeply equal { key: 'xlsx.feedback.exported', …(2) }
+
+- Expected
++ Received
+
+  {
+    "error": false,
+    "key": "xlsx.feedback.exported",
+-   "warnings": [
+-     {
+-       "code": "feature-omitted",
+-       "count": 12,
+-       "locations": [
+-         "Data.drawings[\"icon0\"]",
+-         "Data.drawings[\"icon1\"]",
+-         "Data.drawings[\"icon2\"]",
+-         "Data.drawings[\"icon3\"]",
+-         "Data.drawings[\"icon4\"]",
+-         "Data.drawings[\"icon5\"]",
+-         "Data.drawings[\"icon6\"]",
+-         "Data.drawings[\"icon7\"]",
+-         "Data.drawings[\"icon8\"]",
+-         "Data.drawings[\"icon9\"]",
+-       ],
+-       "severity": "warning",
+-     },
+-     {
+-       "code": "formula-not-calculated",
+-       "count": 2,
+-       "locations": [],
+-       "severity": "warning",
+-     },
+-   ],
+  }
+
+ ❯ src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts:84:38
+     82|     await f.actions.exportXlsx();
+     83|     expect(f.download).toHaveBeenCalledExactlyOnceWith(new Uint8Array(…
+     84|     expect(f.actions.feedback.value).toEqual({
+       |                                      ^
+     85|       key: "xlsx.feedback.exported",
+     86|       error: false,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts > XLSX export warning feedback > waits for download completion before publishing warnings
+AssertionError: expected { key: 'xlsx.feedback.exported', …(1) } to deeply equal { key: 'xlsx.feedback.exported', …(2) }
+
+- Expected
++ Received
+
+  {
+    "error": false,
+    "key": "xlsx.feedback.exported",
+-   "warnings": [
+-     {
+-       "code": "feature-omitted",
+-       "count": 12,
+-       "locations": [
+-         "Data.drawings[\"icon0\"]",
+-         "Data.drawings[\"icon1\"]",
+-         "Data.drawings[\"icon2\"]",
+-         "Data.drawings[\"icon3\"]",
+-         "Data.drawings[\"icon4\"]",
+-         "Data.drawings[\"icon5\"]",
+-         "Data.drawings[\"icon6\"]",
+-         "Data.drawings[\"icon7\"]",
+-         "Data.drawings[\"icon8\"]",
+-         "Data.drawings[\"icon9\"]",
+-       ],
+-       "severity": "warning",
+-     },
+-     {
+-       "code": "formula-not-calculated",
+-       "count": 2,
+-       "locations": [],
+-       "severity": "warning",
+-     },
+-   ],
+  }
+
+ ❯ src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts:122:38
+    120|     finish();
+    121|     await pending;
+    122|     expect(f.actions.feedback.value).toEqual({
+       |                                      ^
+    123|       key: "xlsx.feedback.exported",
+    124|       error: false,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts > XLSX export warning feedback > cancellation after the worker resolves but before continuation prevents download
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      Uint8Array [
+        1,
+        2,
+      ],
+      "workbook.xlsx",
+    ]
+
+
+Number of calls: 1
+
+ ❯ src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts:142:28
+    140|     f.afterResponse(() => f.actions.cancel());
+    141|     await f.actions.exportXlsx();
+    142|     expect(f.download).not.toHaveBeenCalled();
+       |                            ^
+    143|     expect(f.actions.feedback.value).toBeUndefined();
+    144|     expect(f.actions.busy.value).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts > XLSX export warning feedback > cancel while an already-started download is pending cannot publish late warnings
+AssertionError: expected { key: 'xlsx.feedback.exported', …(1) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "error": false,
+  "key": "xlsx.feedback.exported",
+}
+
+ ❯ src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts:165:40
+    163|       await pending;
+    164|       expect(f.download).toHaveBeenCalledOnce();
+    165|       expect(f.actions.feedback.value).toBeUndefined();
+       |                                        ^
+    166|       expect(f.actions.busy.value).toBe(false);
+    167|       f.scope.stop();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts > XLSX export warning feedback > a clean second export removes old warnings and keeps the existing plain success shape
+AssertionError: expected { key: 'xlsx.feedback.exported', …(1) } to have property "warnings" with value [ …(2) ]
+
+- Expected:
+[
+  {
+    "code": "feature-omitted",
+    "count": 12,
+    "locations": [
+      "Data.drawings[\"icon0\"]",
+      "Data.drawings[\"icon1\"]",
+      "Data.drawings[\"icon2\"]",
+      "Data.drawings[\"icon3\"]",
+      "Data.drawings[\"icon4\"]",
+      "Data.drawings[\"icon5\"]",
+      "Data.drawings[\"icon6\"]",
+      "Data.drawings[\"icon7\"]",
+      "Data.drawings[\"icon8\"]",
+      "Data.drawings[\"icon9\"]",
+    ],
+    "severity": "warning",
+  },
+  {
+    "code": "formula-not-calculated",
+    "count": 2,
+    "locations": [],
+    "severity": "warning",
+  },
+]
+
++ Received:
+undefined
+
+ ❯ src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts:173:38
+    171|     const f = fixture();
+    172|     await f.actions.exportXlsx();
+    173|     expect(f.actions.feedback.value).toHaveProperty("warnings", warnin…
+       |                                      ^
+    174|     f.setReport({ issues: [] });
+    175|     await f.actions.exportXlsx();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts > XLSX export warning feedback > warning-bearing encrypted export keeps its existing filename and exported key
+AssertionError: expected { key: 'xlsx.feedback.exported', …(1) } to deeply equal { key: 'xlsx.feedback.exported', …(2) }
+
+- Expected
++ Received
+
+  {
+    "error": false,
+    "key": "xlsx.feedback.exported",
+-   "warnings": [
+-     {
+-       "code": "feature-omitted",
+-       "count": 12,
+-       "locations": [
+-         "Data.drawings[\"icon0\"]",
+-         "Data.drawings[\"icon1\"]",
+-         "Data.drawings[\"icon2\"]",
+-         "Data.drawings[\"icon3\"]",
+-         "Data.drawings[\"icon4\"]",
+-         "Data.drawings[\"icon5\"]",
+-         "Data.drawings[\"icon6\"]",
+-         "Data.drawings[\"icon7\"]",
+-         "Data.drawings[\"icon8\"]",
+-         "Data.drawings[\"icon9\"]",
+-       ],
+-       "severity": "warning",
+-     },
+-     {
+-       "code": "formula-not-calculated",
+-       "count": 2,
+-       "locations": [],
+-       "severity": "warning",
+-     },
+-   ],
+  }
+
+ ❯ src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts:192:38
+    190|       "workbook-encrypted.xlsx",
+    191|     );
+    192|     expect(f.actions.feedback.value).toEqual({
+       |                                      ^
+    193|       key: "xlsx.feedback.exported",
+    194|       error: false,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  8 failed | 8 passed (16)
+   Start at  00:19:22
+   Duration  4.36s (transform 1.55s, setup 0ms, import 3.35s, tests 305ms, environment 426ms)
+

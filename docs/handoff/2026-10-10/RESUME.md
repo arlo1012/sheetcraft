@@ -1,3 +1,18 @@
+## Full desktop-aligned Symbol priority — 2026-10-11
+
+Prior representative lifecycle results remain valid only within their stated scope;
+they are not full tool completion. Current primary work is the complete Symbol
+capability and polished Chinese/responsive editor, based on actual desktop WPS ET,
+not the simplified online version. Font choice/coverage, subsets, special-character
+page, recent symbols, character code/information and full interaction need actual
+reference facts and implementation/whole-tool acceptance before moving on.
+
+Export warning rendering is deferred, not fixed. Regression WIP, exact source test
+bytes and original8fail/8pass baseline are preserved under
+`docs/handoff/2026-10-11/wip-export-warnings/`; no warning product source changed.
+Files have `.pending` extension outside live test/type roots, with exact original
+paths/hashes for restoration. Do not treat WIP checkpoint as all-green acceptance.
+
 ## Existing icon/equation lifecycle — 2026-10-11
 
 Read `docs/acceptance/icon-equation-20261011.md`. Existing fixed nine-shape icon and

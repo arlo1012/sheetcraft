@@ -1,0 +1,18 @@
+{
+  "base": "ca10c80f2a403995be349f5287d91d25626a17bf",
+  "production_changed": false,
+  "tests": [
+    {
+      "original": "apps/web/src/tests/modules/workbook-xlsx/components.test.ts",
+      "pending": "docs/handoff/2026-10-11/wip-export-warnings/components.test.ts.pending",
+      "sha256": "adc6c7d2e07c947c6fd4aa7d2715c35ad9d0efe3e9b1e75f03410666c68d8eb0",
+      "bytes": 7042
+    },
+    {
+      "original": "apps/web/src/tests/modules/workbook-xlsx/useWorkbookXlsxActions/export-warnings.test.ts",
+      "pending": "docs/handoff/2026-10-11/wip-export-warnings/export-warnings.test.ts.pending",
+      "sha256": "e004a53df11075da4fa58ee502958b4fb151a9a2928655fb9074fd320368cf4b",
+      "bytes": 7100
+    }
+  ]
+}
