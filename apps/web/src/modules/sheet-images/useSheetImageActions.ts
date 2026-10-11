@@ -26,6 +26,7 @@ import type { MessageKey } from "../../shared/i18n";
 import type { ImageAssetStore } from "../image-assets/imageAssetStore";
 import { imageAssetFeedback } from "../image-assets/imageAssetFeedback";
 import { prepareImageAsset } from "../image-assets/prepareImageAsset";
+import { normalizeClipboardImageGroup } from "./imageClipboard";
 
 export type ImageInsertMode = "cell" | "floating";
 type ImageTarget = { workbook: Workbook; sheet: Sheet; sheetId: string; address: CellAddress };
@@ -410,12 +411,13 @@ export function useSheetImageActions(options: {
     busy.value = true;
     feedback.value = undefined;
     try {
-      for (const image of images)
+      const captured = normalizeClipboardImageGroup(images);
+      for (const image of captured)
         if (!(await options.assetStore.get(image.assetId)))
           throw new Error("Missing picture asset.");
       if (!isCurrent(target)) return;
       const groups = new Map<string, string>();
-      const next = images.map((image) => {
+      const next = captured.map((image) => {
         if (image.groupId && !groups.has(image.groupId))
           groups.set(image.groupId, idFactory("picture-group"));
         return {

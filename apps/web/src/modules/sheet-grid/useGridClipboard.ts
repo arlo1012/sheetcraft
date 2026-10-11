@@ -566,6 +566,10 @@ export function useGridClipboard(options: {
     selection: CellSelection,
     kind: GridPasteKind,
   ): void {
+    if (transfer.invalidFloatingImage) {
+      options.onFeedback("pasteRejected");
+      return;
+    }
     if (kind === "all" && (transfer.imageFile || transfer.floatingImage) && options.onPasteImage) {
       options.onPasteImage(transfer, selection);
       return;
@@ -802,12 +806,13 @@ export function useGridClipboard(options: {
     try {
       if (nativeWrite) await nativeWrite;
       const asyncTransfer = await clipboardPort.read({ preferAsync: true });
+      const matches = areGridClipboardTextsEqual(eventTransfer.text, asyncTransfer.text);
       transfer = {
         text: eventTransfer.text,
         // A later clipboard item must not turn captured external text into a local cut.
-        localToken: areGridClipboardTextsEqual(eventTransfer.text, asyncTransfer.text)
-          ? asyncTransfer.localToken
-          : undefined,
+        localToken:
+          matches && !asyncTransfer.invalidFloatingImage ? asyncTransfer.localToken : undefined,
+        ...(matches && asyncTransfer.invalidFloatingImage ? { invalidFloatingImage: true } : {}),
       };
     } catch {
       // The synchronous event payload remains the safe text-only fallback.

@@ -1,8 +1,7 @@
 import type { FloatingImage } from "@sheetcraft/core/workbook";
 import {
   FLOATING_IMAGE_CLIPBOARD_TYPE,
-  readFloatingImageClipboard,
-  readFloatingImageGroup,
+  readFloatingImageTransfer,
   serializeFloatingImageClipboard,
 } from "../sheet-images/imageClipboard";
 export const SHEETCRAFT_CLIPBOARD_TYPE = "application/x-sheetcraft-cells";
@@ -15,6 +14,7 @@ export type GridClipboardTransfer = {
   imageFile?: File;
   floatingImage?: FloatingImage;
   floatingImages?: readonly FloatingImage[];
+  invalidFloatingImage?: boolean;
 };
 
 export type GridClipboardWriteResult = {
@@ -149,8 +149,7 @@ function readWithClipboardEvent(): GridClipboardTransfer | undefined {
       imageFile: event.clipboardData.files
         ? Array.from(event.clipboardData.files).find((file) => file.type.startsWith("image/"))
         : undefined,
-      floatingImage: readFloatingImageClipboard(event.clipboardData),
-      floatingImages: readFloatingImageGroup(event.clipboardData),
+      ...readFloatingImageTransfer(event.clipboardData),
     };
   };
 
@@ -238,12 +237,7 @@ async function readWithAsyncClipboard(): Promise<GridClipboardTransfer> {
                 }),
               }
             : {}),
-          ...(floatingText
-            ? {
-                floatingImage: readFloatingImageClipboard({ getData: () => floatingText }),
-                floatingImages: readFloatingImageGroup({ getData: () => floatingText }),
-              }
-            : {}),
+          ...(floatingText ? readFloatingImageTransfer({ getData: () => floatingText }) : {}),
         };
       }
     }
@@ -293,10 +287,24 @@ export function createBrowserGridClipboardPort(): GridClipboardPort {
       }
       const nativeTransfer = readWithClipboardEvent();
       if (!nativeTransfer) return readWithAsyncClipboard();
-      if (nativeTransfer.localToken) return nativeTransfer;
+      if (
+        nativeTransfer.localToken ||
+        nativeTransfer.floatingImage ||
+        nativeTransfer.imageFile ||
+        nativeTransfer.invalidFloatingImage
+      )
+        return nativeTransfer;
       try {
         const asyncTransfer = await readWithAsyncClipboard();
         if (
+          asyncTransfer.invalidFloatingImage &&
+          areGridClipboardTextsEqual(nativeTransfer.text, asyncTransfer.text)
+        )
+          return { ...nativeTransfer, invalidFloatingImage: true };
+        if (
+          !nativeTransfer.floatingImage &&
+          !nativeTransfer.imageFile &&
+          !nativeTransfer.invalidFloatingImage &&
           asyncTransfer.localToken &&
           areGridClipboardTextsEqual(nativeTransfer.text, asyncTransfer.text)
         ) {

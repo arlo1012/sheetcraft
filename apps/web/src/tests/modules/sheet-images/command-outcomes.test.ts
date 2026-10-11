@@ -99,6 +99,39 @@ beforeEach(() => {
 });
 
 describe("authoritative picture command outcomes", () => {
+  test("complete copied selection gets fresh ids and preserves distinct groups in one history entry", async () => {
+    const f = fixture();
+    await f.store.put(source);
+    const copied = Array.from({ length: 4 }, (_, index) => ({
+      ...image(),
+      id: `source-${index}`,
+      anchor: { row: 0, column: 0 },
+      offsetX: index * 190,
+      offsetY: index * 100,
+      groupId: index < 2 ? "group-a" : index === 2 ? "group-b" : undefined,
+    }));
+    const before = serializeWorkbook(f.session.workbook);
+    await f.actions.pasteFloatingImages(copied, { row: 3, column: 4 });
+    const pasted = f.sheet.floatingImages;
+    expect(pasted).toHaveLength(4);
+    expect(new Set(pasted.map((entry) => entry.id)).size).toBe(4);
+    expect(pasted.every((entry) => !copied.some((old) => old.id === entry.id))).toBe(true);
+    expect(pasted[0]!.groupId).toBe(pasted[1]!.groupId);
+    expect(pasted[2]!.groupId).not.toBe(pasted[0]!.groupId);
+    expect(pasted[3]!.groupId).toBeUndefined();
+    expect(pasted.map((entry) => [entry.offsetX, entry.offsetY])).toEqual([
+      [12, 12],
+      [202, 112],
+      [392, 212],
+      [582, 312],
+    ]);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    const after = serializeWorkbook(f.session.workbook);
+    undoWorkbookCommand(f.session);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+    redoWorkbookCommand(f.session);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(after);
+  });
   test("pasting identical transformed cell content is an informational no-op", async () => {
     const f = fixture();
     await f.store.put(source);

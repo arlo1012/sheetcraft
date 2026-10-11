@@ -1,6 +1,7 @@
 import {
   MAX_FLOATING_IMAGE_SIZE,
   MIN_FLOATING_IMAGE_SIZE,
+  cloneFloatingImage,
   normalizeImageTransform,
   type FloatingImage,
 } from "@sheetcraft/core/workbook";
@@ -31,6 +32,23 @@ function bounds(entries: Array<{ rect: Rect }>): Rect {
     width: Math.max(...entries.map(({ rect }) => rect.x + rect.width)) - x,
     height: Math.max(...entries.map(({ rect }) => rect.y + rect.height)) - y,
   };
+}
+/** Capture every selected member in one group-relative sheet-pixel coordinate space. */
+export function captureFloatingImageGroup(
+  images: readonly FloatingImage[],
+  layout: SheetViewportLayout,
+): FloatingImage[] | null {
+  if (images.length > 100 || new Set(images.map((image) => image.id)).size !== images.length)
+    return null;
+  const entries = members(images, layout);
+  if (!entries) return null;
+  const box = bounds(entries);
+  return entries.map(({ image, rect }) => ({
+    ...cloneFloatingImage(image),
+    anchor: { row: 0, column: 0 },
+    offsetX: rect.x - box.x,
+    offsetY: rect.y - box.y,
+  }));
 }
 function place(
   entries: Array<{ image: FloatingImage; rect: Rect }>,

@@ -102,6 +102,21 @@ function createFixture(options?: { evaluator?: SheetEvaluator }) {
 }
 
 describe("useGridClipboard menu commands", () => {
+  test("deferred native text cannot discard matching async invalid-picture status", async () => {
+    const fixture = createFixture();
+    await fixture.clipboard.copySelection();
+    fixture.setTransfer({ text: "Picture caption", invalidFloatingImage: true });
+    fixture.clipboard.onPaste(createTextPasteEvent("Picture caption"));
+    await vi.waitFor(() => expect(fixture.feedback).toContain("pasteRejected"));
+    expect(fixture.pastes).toEqual([]);
+  });
+  test("invalid rich picture metadata cannot fall back to its alt text as cell values", async () => {
+    const fixture = createFixture();
+    fixture.setTransfer({ text: "Must not become cell data", invalidFloatingImage: true });
+    await fixture.clipboard.pasteSelection();
+    expect(fixture.pastes).toEqual([]);
+    expect(fixture.feedback).toContain("pasteRejected");
+  });
   test("copies selected rows through their finite used column extent", async () => {
     const fixture = createFixture();
     setCellValue(fixture.sheet, { row: 3, column: 2 }, "row value");

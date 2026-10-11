@@ -3979,6 +3979,7 @@ const gridInert = computed(
           :workbook-revision="workbookRevision"
           :apply-paste="pasteCells"
           :apply-axis-move="moveAxis"
+          :apply-floating-image-move="pictureTools.updateMany"
           :apply-fill="fillActions.apply"
           @end-fill="fillActions.clear"
           @fill-feedback="

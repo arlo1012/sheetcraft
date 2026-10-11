@@ -126,12 +126,13 @@ import SheetFloatingImageLayer from "../../sheet-images/components/SheetFloating
 import SheetImagePreview from "../../sheet-images/components/SheetImagePreview.vue";
 import SheetNotePreview from "./SheetNotePreview.vue";
 import { useFloatingImageClipboard } from "../../sheet-images/useFloatingImageClipboard";
-import { areGridClipboardTextsEqual, createBrowserGridClipboardPort } from "../gridClipboardPort";
-import { getFloatingImageSheetRect } from "@sheetcraft/sheet-engine/floating-image-layout";
 import {
-  readFloatingImageClipboard,
-  readFloatingImageGroup,
-} from "../../sheet-images/imageClipboard";
+  areGridClipboardTextsEqual,
+  createBrowserGridClipboardPort,
+  readGridClipboardLocalToken,
+} from "../gridClipboardPort";
+import { captureFloatingImageGroup } from "@sheetcraft/sheet-engine/floating-image-group";
+import { readFloatingImageTransfer } from "../../sheet-images/imageClipboard";
 import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetFreezeHandles from "./SheetFreezeHandles.vue";
@@ -228,6 +229,7 @@ const props = withDefaults(
     workbookRevision?: number;
     applyPaste?: (payload: GridPastePayload) => GridPasteResult;
     applyAxisMove?: (payload: AxisMovePayload) => boolean;
+    applyFloatingImageMove?: (images: readonly FloatingImage[]) => boolean;
     applyFill?: (request: GridFillRequest) => GridFillResult;
     initialRowCount?: number;
     initialColumnCount?: number;
@@ -1643,7 +1645,13 @@ const {
     const address = targetSelection.active;
     const mode = getCellContent(props.sheet, address)?.kind === "image" ? "cell" : "floating";
     if (transfer.floatingImage)
-      floatingClipboard.paste(transfer.floatingImage, mode, address, transfer.floatingImages);
+      floatingClipboard.paste(
+        transfer.floatingImage,
+        mode,
+        address,
+        transfer.floatingImages,
+        transfer.localToken,
+      );
     else if (transfer.imageFile) emit("pasteImageFile", transfer.imageFile, mode, address);
   },
   onReadUnavailable: (targetSelection) => floatingClipboard.pastePending(targetSelection.active),
@@ -1677,31 +1685,28 @@ const {
 });
 const floatingClipboard = useFloatingImageClipboard({
   getSelectedImages: () => {
-    const members = props.sheet.floatingImages
-      .filter((image) => selectedImageIds.value.includes(image.id))
-      .flatMap((image) => {
-        const rect = getFloatingImageSheetRect(image, layout.value);
-        return rect ? [{ image, rect }] : [];
-      });
-    const left = Math.min(...members.map((entry) => entry.rect.x));
-    const top = Math.min(...members.map((entry) => entry.rect.y));
-    return members.map(({ image, rect }) => ({
-      ...image,
-      anchor: { row: 0, column: 0 },
-      offsetX: rect.x - left,
-      offsetY: rect.y - top,
-    }));
+    if (!selectedImageIds.value.length) return undefined;
+    const members = props.sheet.floatingImages.filter((image) =>
+      selectedImageIds.value.includes(image.id),
+    );
+    if (members.length !== selectedImageIds.value.length) return null;
+    return captureFloatingImageGroup(members, layout.value);
   },
   onPasteMany: (images, address) => emit("pasteFloatingImages", images, address),
-  onMoveMany: (images) => emit("updateFloatingImages", images),
+  onMoveMany: (images) => props.applyFloatingImageMove?.(images) === true,
   getSheet: () => props.sheet,
   getRevision: () => props.workbookRevision ?? 0,
   clipboardPort: browserClipboard,
   onCopy: clearPendingClipboard,
   onFeedback: (key) => emit("imageFeedback", key),
   onPaste: (image, mode, address) => emit("pasteFloatingImage", image, mode, address),
-  onMove: (image) => emit("updateFloatingImage", image),
+  onMove: (image) => props.applyFloatingImageMove?.([image]) === true,
 });
+watch(
+  () => props.sheet,
+  () => floatingClipboard.clearCut(),
+  { flush: "sync" },
+);
 const clipboardRangeRects = computed(() =>
   clipboardRange.value ? layout.value.getRangeFragments(clipboardRange.value) : [],
 );
@@ -1862,7 +1867,15 @@ async function requestFloatingImagePaste(id: string): Promise<void> {
 function onImagePaste(event: ClipboardEvent): void {
   if (event.target instanceof Element && event.target.closest("[data-page-header-footer]")) return;
   if (isComposing.value || !event.clipboardData) return;
-  const image = readFloatingImageClipboard(event.clipboardData);
+  const transfer = readFloatingImageTransfer(event.clipboardData);
+  const image = transfer.floatingImage;
+  if (transfer.invalidFloatingImage) {
+    floatingClipboard.observeTransfer(transfer);
+    event.preventDefault();
+    event.stopPropagation();
+    emit("imageFeedback", "clipboard.pasteRejected");
+    return;
+  }
   const file =
     Array.from(event.clipboardData.files ?? []).find((entry) => entry.type.startsWith("image/")) ??
     Array.from(event.clipboardData.items ?? [])
@@ -1875,12 +1888,13 @@ function onImagePaste(event: ClipboardEvent): void {
     else floatingClipboard.clear();
     return;
   }
+  const localToken = readGridClipboardLocalToken(event.clipboardData);
+  floatingClipboard.observeTransfer({ ...transfer, localToken });
   if (objectsReadOnly.value) {
     event.preventDefault();
     event.stopPropagation();
     return;
   }
-  floatingClipboard.observeTransfer({ floatingImage: image });
   event.preventDefault();
   event.stopPropagation();
   const mode: ImageInsertMode =
@@ -1892,12 +1906,7 @@ function onImagePaste(event: ClipboardEvent): void {
   if (isEditing.value) finishEdit(undefined, false);
   clearPendingClipboard();
   if (image)
-    floatingClipboard.paste(
-      image,
-      mode,
-      activeCell.value,
-      readFloatingImageGroup(event.clipboardData),
-    );
+    floatingClipboard.paste(image, mode, activeCell.value, transfer.floatingImages, localToken);
   else if (file) emit("pasteImageFile", file, mode);
 }
 
@@ -1907,6 +1916,7 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
   event.stopPropagation();
   const sheet = props.sheet;
   const revision = props.workbookRevision;
+  const clipboardOperation = floatingClipboard.getOperation();
   const address = { ...activeCell.value };
   const editing = isEditing.value;
   const draft = editingValue.value;
@@ -1916,17 +1926,21 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
   const text = event.clipboardData?.getData("text/plain") ?? "";
   let image: FloatingImage | undefined;
   let images: readonly FloatingImage[] | undefined;
+  let localToken: string | undefined;
+  let invalidFloatingImage = false;
   try {
     const transfer = await browserClipboard.read({ preferAsync: true });
     if (areGridClipboardTextsEqual(text, transfer.text)) {
       image = transfer.floatingImage;
       images = transfer.floatingImages;
+      localToken = transfer.localToken;
+      invalidFloatingImage = transfer.invalidFloatingImage === true;
     }
   } catch {
     // Keep the captured native text when the browser denies the optional rich read.
   }
+  if (floatingClipboard.getOperation() !== clipboardOperation) return;
   if (
-    objectsReadOnly.value ||
     props.sheet !== sheet ||
     props.workbookRevision !== revision ||
     !areCellAddressesEqual(activeCell.value, address) ||
@@ -1936,15 +1950,24 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
     emit("clipboardFeedback", "documentChanged");
     return;
   }
+  floatingClipboard.observeTransfer({ floatingImage: image, localToken, invalidFloatingImage });
+  if (objectsReadOnly.value) {
+    emit("clipboardFeedback", "documentChanged");
+    return;
+  }
+  if (invalidFloatingImage) {
+    emit("imageFeedback", "clipboard.pasteRejected");
+    return;
+  }
   if (image) {
     if (editing) finishEdit(undefined, false);
     clearPendingClipboard();
-    floatingClipboard.observeTransfer({ floatingImage: image });
     floatingClipboard.paste(
       image,
       editing || getCellContent(sheet, address)?.kind === "image" ? "cell" : "floating",
       address,
       images,
+      localToken,
     );
   } else {
     floatingClipboard.clear();
@@ -3107,6 +3130,7 @@ watch(horizontalScrollState, (state) => emit("horizontalScrollChange", state), {
 });
 
 onBeforeUnmount(() => {
+  floatingClipboard.clear();
   stopObservingViewport();
   stopGeometryWatching();
   stopDragSelection();

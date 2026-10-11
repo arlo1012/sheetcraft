@@ -6,8 +6,12 @@ import {
 } from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import type { MessageKey } from "../../shared/i18n";
-import type { GridClipboardPort, GridClipboardTransfer } from "../sheet-grid/gridClipboardPort";
-import { writeFloatingImageClipboard } from "./imageClipboard";
+import {
+  SHEETCRAFT_CLIPBOARD_TYPE,
+  type GridClipboardPort,
+  type GridClipboardTransfer,
+} from "../sheet-grid/gridClipboardPort";
+import { normalizeClipboardImageGroup, writeFloatingImageClipboard } from "./imageClipboard";
 import type { ImageInsertMode } from "./useSheetImageActions";
 
 type PendingFloatingImageClipboard = {
@@ -31,14 +35,14 @@ function isSameSheet(pending: PendingFloatingImageClipboard, sheet: Sheet): bool
 export function useFloatingImageClipboard(options: {
   getSheet: () => Sheet;
   getRevision: () => number;
-  getSelectedImages?: () => FloatingImage[];
+  getSelectedImages?: () => FloatingImage[] | null | undefined;
   onPasteMany?: (images: readonly FloatingImage[], address: CellAddress) => void;
-  onMoveMany?: (images: FloatingImage[]) => void;
+  onMoveMany?: (images: FloatingImage[]) => boolean;
   clipboardPort: GridClipboardPort;
   onCopy: () => void;
   onFeedback: (key: MessageKey) => void;
   onPaste: (image: FloatingImage, mode: ImageInsertMode, address: CellAddress) => void;
-  onMove: (image: FloatingImage) => void;
+  onMove: (image: FloatingImage) => boolean;
 }) {
   const idFactory = createBrowserIdFactory();
   let pending: PendingFloatingImageClipboard | undefined;
@@ -52,7 +56,7 @@ export function useFloatingImageClipboard(options: {
 
   function getPendingForCurrentSheet(): PendingFloatingImageClipboard | undefined {
     const currentSheet = options.getSheet();
-    if (pending && !isSameSheet(pending, currentSheet)) clear();
+    if (pending?.mode === "cut" && !isSameSheet(pending, currentSheet)) clear();
     return pending;
   }
 
@@ -60,7 +64,9 @@ export function useFloatingImageClipboard(options: {
     const current = getPendingForCurrentSheet();
     if (
       current &&
-      (!transfer.floatingImage || !matchesImage(current.image, transfer.floatingImage))
+      (!transfer.floatingImage ||
+        !matchesImage(current.image, transfer.floatingImage) ||
+        (current.mode === "cut" && transfer.localToken !== current.token))
     ) {
       clear();
     }
@@ -92,13 +98,27 @@ export function useFloatingImageClipboard(options: {
     event?: ClipboardEvent,
   ): Promise<void> {
     const sheet = options.getSheet();
-    const capturedOperation = ++operation;
     const capturedImage = cloneFloatingImage(image);
     const selected = options.getSelectedImages?.();
-    const images =
+    if (selected === null || (selected && !selected.some((entry) => entry.id === image.id))) {
+      options.onFeedback("image.copyFailed");
+      event?.preventDefault();
+      event?.stopPropagation();
+      return;
+    }
+    let images =
       selected && selected.length > 1 && selected.some((entry) => entry.id === image.id)
         ? selected.map(cloneFloatingImage)
         : undefined;
+    try {
+      if (images) images = normalizeClipboardImageGroup(images);
+    } catch {
+      options.onFeedback("image.copyFailed");
+      event?.preventDefault();
+      event?.stopPropagation();
+      return;
+    }
+    const capturedOperation = ++operation;
     const transfer = {
       text: capturedImage.altText,
       localToken: idFactory("floating-image"),
@@ -121,7 +141,12 @@ export function useFloatingImageClipboard(options: {
       event.preventDefault();
       event.stopPropagation();
       if (event.clipboardData) {
-        writeFloatingImageClipboard(event.clipboardData, capturedImage, images);
+        try {
+          writeFloatingImageClipboard(event.clipboardData, capturedImage, images);
+          event.clipboardData.setData(SHEETCRAFT_CLIPBOARD_TYPE, transfer.localToken);
+        } catch {
+          // Preserve the complete local snapshot if custom ClipboardEvent formats are rejected.
+        }
         await queueNativeRichWrite(transfer, capturedOperation);
         return;
       }
@@ -141,9 +166,15 @@ export function useFloatingImageClipboard(options: {
     mode: ImageInsertMode,
     address: CellAddress,
     transferredImages?: readonly FloatingImage[],
+    localToken?: string,
   ): void {
     const current = getPendingForCurrentSheet();
-    if (current && !matchesImage(current.image, image)) clear();
+    if (
+      current &&
+      (!matchesImage(current.image, image) ||
+        (current.mode === "cut" && localToken !== current.token))
+    )
+      clear();
     const pendingCut = getPendingForCurrentSheet();
     if (pendingCut?.mode === "cut" && matchesImage(pendingCut.image, image)) {
       const currentImage = options
@@ -158,7 +189,11 @@ export function useFloatingImageClipboard(options: {
         options.onFeedback("clipboard.documentChanged");
         return;
       }
-      if (pendingCut.images?.length && options.onMoveMany) {
+      if (pendingCut.images?.length) {
+        if (!options.onMoveMany) {
+          options.onFeedback("clipboard.pasteRejected");
+          return;
+        }
         if (
           pendingCut.images.some(
             (member) =>
@@ -169,38 +204,55 @@ export function useFloatingImageClipboard(options: {
           options.onFeedback("clipboard.documentChanged");
           return;
         }
-        options.onMoveMany(
-          pendingCut.images.map((member) => ({
-            ...cloneFloatingImage(member),
-            anchor: { ...address },
-            offsetX: member.offsetX + 12,
-            offsetY: member.offsetY + 12,
-          })),
-        );
-        clear();
+        let accepted = false;
+        try {
+          accepted = options.onMoveMany(
+            pendingCut.images.map((member) => ({
+              ...cloneFloatingImage(member),
+              anchor: { ...address },
+              offsetX: member.offsetX + 12,
+              offsetY: member.offsetY + 12,
+            })),
+          );
+        } catch {
+          /* The command boundary owns rejection. Keep the cut for retry. */
+        }
+        if (pending === pendingCut) {
+          if (accepted) clear();
+          else options.onFeedback("clipboard.pasteRejected");
+        }
         return;
       }
-      options.onMove({
-        ...cloneFloatingImage(currentImage),
-        anchor: { ...address },
-        offsetX: 12,
-        offsetY: 12,
-      });
-      clear();
+      let accepted = false;
+      try {
+        accepted = options.onMove({
+          ...cloneFloatingImage(currentImage),
+          anchor: { ...address },
+          offsetX: 12,
+          offsetY: 12,
+        });
+      } catch {
+        /* Keep the cut when an authoritative command throws. */
+      }
+      if (pending === pendingCut) {
+        if (accepted) clear();
+        else options.onFeedback("clipboard.pasteRejected");
+      }
       return;
     }
     const images =
       transferredImages ??
-      (current && matchesImage(current.image, image) ? current.images : undefined);
-    if (images && images.length > 1 && options.onPasteMany)
-      options.onPasteMany(images, { ...address });
-    else options.onPaste(cloneFloatingImage(image), mode, { ...address });
+      (current?.mode === "copy" && matchesImage(current.image, image) ? current.images : undefined);
+    if (images && images.length > 1) {
+      if (options.onPasteMany) options.onPasteMany(images, { ...address });
+      else options.onFeedback("clipboard.pasteRejected");
+    } else options.onPaste(cloneFloatingImage(image), mode, { ...address });
   }
 
   function pastePending(address: CellAddress): boolean {
     const current = getPendingForCurrentSheet();
     if (!current) return false;
-    paste(current.image, "floating", address);
+    paste(current.image, "floating", address, current.images, current.token);
     return true;
   }
 
@@ -209,7 +261,11 @@ export function useFloatingImageClipboard(options: {
     paste,
     pastePending,
     clear,
+    clearCut: () => {
+      if (pending?.mode === "cut") clear();
+    },
     observeTransfer,
     hasPending: () => Boolean(getPendingForCurrentSheet()),
+    getOperation: () => operation,
   };
 }

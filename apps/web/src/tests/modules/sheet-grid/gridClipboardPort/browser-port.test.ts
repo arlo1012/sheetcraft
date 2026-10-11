@@ -3,6 +3,7 @@ import {
   createBrowserGridClipboardPort,
   WEB_FLOATING_IMAGE_CLIPBOARD_TYPE,
 } from "../../../../modules/sheet-grid/gridClipboardPort";
+import { FLOATING_IMAGE_CLIPBOARD_TYPE } from "../../../../modules/sheet-images/imageClipboard";
 
 const WEB_SHEETCRAFT_CLIPBOARD_TYPE = "web application/x-sheetcraft-cells";
 
@@ -54,6 +55,64 @@ afterEach(() => {
 });
 
 describe("browser grid clipboard port", () => {
+  test("matching malformed async image data stays invalid through native text hydration", async () => {
+    const restore = stubLegacyPaste("Picture caption");
+    const item = {
+      types: ["text/plain", WEB_FLOATING_IMAGE_CLIPBOARD_TYPE],
+      getType: async (type: string) =>
+        new Blob([type === "text/plain" ? "Picture caption" : "{"], { type: "text/plain" }),
+    };
+    stubClipboard({ read: vi.fn().mockResolvedValue([item]) });
+    try {
+      await expect(createBrowserGridClipboardPort().read()).resolves.toEqual({
+        text: "Picture caption",
+        invalidFloatingImage: true,
+      });
+    } finally {
+      restore();
+    }
+  });
+  test("does not borrow an async token for native picture metadata with matching alt text", async () => {
+    const picture = {
+      id: "old",
+      assetId: "old-asset",
+      altText: "Same caption",
+      anchor: { row: 0, column: 0 },
+      offsetX: 0,
+      offsetY: 0,
+      width: 40,
+      height: 20,
+    };
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: vi.fn(() => {
+        const event = new Event("paste", { bubbles: true, cancelable: true });
+        Object.defineProperty(event, "clipboardData", {
+          value: {
+            types: ["text/plain", FLOATING_IMAGE_CLIPBOARD_TYPE],
+            getData: (format: string) =>
+              format === "text/plain"
+                ? picture.altText
+                : format === FLOATING_IMAGE_CLIPBOARD_TYPE
+                  ? JSON.stringify(picture)
+                  : "",
+          },
+        });
+        document.dispatchEvent(event);
+        return true;
+      }),
+    });
+    stubClipboard({
+      read: vi.fn().mockResolvedValue([createRichClipboardItem(picture.altText, "new-cut-token")]),
+    });
+    try {
+      const transfer = await createBrowserGridClipboardPort().read();
+      expect(transfer.floatingImage).toEqual(picture);
+      expect(transfer.localToken).toBeUndefined();
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
   test("writes the local token when custom clipboard formats are supported", async () => {
     const write = vi.fn().mockResolvedValue(undefined);
     const writeText = vi.fn().mockResolvedValue(undefined);

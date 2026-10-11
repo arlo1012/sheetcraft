@@ -20,9 +20,9 @@ function fixture() {
   let revision = 0;
   const write = vi.fn(async () => ({ localTokenWritten: true }));
   const onPasteMany = vi.fn();
-  const onMoveMany = vi.fn();
+  const onMoveMany = vi.fn(() => true);
   const onPaste = vi.fn();
-  const onMove = vi.fn();
+  const onMove = vi.fn(() => true);
   const onFeedback = vi.fn();
   const clipboard = useFloatingImageClipboard({
     getSheet: () => sheet,

@@ -38,7 +38,10 @@ function createFixture() {
     onCopy: vi.fn(),
     onFeedback: (key) => feedback.push(key),
     onPaste: (nextImage, mode, address) => pasted.push({ image: nextImage, mode, address }),
-    onMove: (nextImage) => moved.push(nextImage),
+    onMove: (nextImage) => {
+      moved.push(nextImage);
+      return true;
+    },
   });
 
   return {
@@ -48,6 +51,7 @@ function createFixture() {
     pasted,
     port,
     sheet,
+    token: () => vi.mocked(port.write).mock.calls.at(-1)?.[0].localToken,
     setRevision(nextRevision: number) {
       revision = nextRevision;
     },
@@ -58,6 +62,22 @@ function createFixture() {
 }
 
 describe("useFloatingImageClipboard", () => {
+  test("custom ClipboardEvent rejection does not reject the copy promise or lose local fallback", async () => {
+    const fixture = createFixture();
+    fixture.port.writeNativeRich = vi.fn(async () => {});
+    const event = new Event("copy", { cancelable: true }) as ClipboardEvent;
+    Object.defineProperty(event, "clipboardData", {
+      value: {
+        setData: () => {
+          throw new Error("Unsupported custom format");
+        },
+      },
+    });
+    await expect(fixture.clipboard.copy(image, "copy", event)).resolves.toBeUndefined();
+    expect(fixture.port.writeNativeRich).toHaveBeenCalledOnce();
+    expect(fixture.clipboard.pastePending({ row: 3, column: 4 })).toBe(true);
+    expect(fixture.pasted).toHaveLength(1);
+  });
   test("keeps menu copy and cut available when browser clipboard writes are denied", async () => {
     const fixture = createFixture();
     await fixture.clipboard.copy(image, "copy");
@@ -73,7 +93,7 @@ describe("useFloatingImageClipboard", () => {
 
     await fixture.clipboard.copy(image, "cut");
     expect(fixture.sheet.floatingImages).toEqual([image]);
-    fixture.clipboard.paste(image, "cell", { row: 4, column: 5 });
+    fixture.clipboard.paste(image, "cell", { row: 4, column: 5 }, undefined, fixture.token());
     expect(fixture.moved).toEqual([
       {
         ...image,
@@ -91,7 +111,7 @@ describe("useFloatingImageClipboard", () => {
     await fixture.clipboard.copy(image, "cut");
     fixture.setRevision(1);
 
-    fixture.clipboard.paste(image, "floating", { row: 4, column: 5 });
+    fixture.clipboard.paste(image, "floating", { row: 4, column: 5 }, undefined, fixture.token());
 
     expect(fixture.moved).toEqual([]);
     expect(fixture.pasted).toEqual([]);
@@ -129,6 +149,9 @@ describe("useFloatingImageClipboard", () => {
     expect(data.get("text/plain")).toBe("Chart");
     expect(data.get("application/x-sheetcraft-floating-image")).toBe(JSON.stringify(image));
     expect(fixture.port.writeNativeRich).toHaveBeenCalledOnce();
+    expect(data.get("application/x-sheetcraft-cells")).toEqual(
+      vi.mocked(fixture.port.writeNativeRich!).mock.calls[0]?.[0].localToken,
+    );
     expect(fixture.port.write).not.toHaveBeenCalled();
   });
 
