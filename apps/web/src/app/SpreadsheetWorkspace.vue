@@ -93,6 +93,8 @@ import PictureAnnotationDialog from "../modules/sheet-images/components/PictureA
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
 import type { Sheet, FloatingImage } from "@sheetcraft/core/workbook";
 import PictureGroupRibbon from "../modules/sheet-images/components/PictureGroupRibbon.vue";
+import PictureOwnedLeafRibbon from "../modules/sheet-images/components/PictureOwnedLeafRibbon.vue";
+import { resolveOwnedPictureNode } from "../modules/sheet-images/picture-group-interaction";
 import PictureFormatPane from "../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
 import { useOwnedPictureFormatPane } from "../modules/sheet-images/useOwnedPictureFormatPane";
 import type { PictureFormatLabelKey } from "../modules/sheet-images/picture-format-pane-model";
@@ -1179,6 +1181,9 @@ const imageActions = useSheetImageActions({
   getSheet: () => activeSheet.value,
   getGeneration: () => pictureOwnerGeneration.value,
   getAddress: () => activeAddress.value,
+  getSelectedIds: () => selectedPictureIds.value,
+  getSelectedPath: () => selectedOwnedPicturePath.value,
+  getFrameContext: () => sheetGridRef.value?.getPictureFrameContext(activeSheet.value),
   flushPendingEdits: () => cellEditSession.finish(),
   setCellImage,
   setFloatingImage: (image, sheetId) => {
@@ -1796,6 +1801,7 @@ const pictureFormatPane = useOwnedPictureFormatPane({
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
   execute: pictureTools.replaceAll,
   getDisabledReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
+  getUnsupportedCropReason: () => t("picture.groupReflectionUnsupported"),
 });
 function pictureFormatLabel(key: PictureFormatLabelKey): string {
   return t(`pictureFormat.${key}`);
@@ -1809,6 +1815,64 @@ function closeOwnedPictureFormat(): void {
   pictureFormatVisible.value = false;
   pictureFormatPane.close();
 }
+const selectedOwnedPictureLeaf = computed(() => {
+  void workbookRevision.value;
+  const path = selectedOwnedPicturePath.value;
+  const context = sheetGridRef.value?.getPictureFrameContext(activeSheet.value);
+  if (
+    !path ||
+    path.length < 2 ||
+    selectedPictureIds.value.length !== 1 ||
+    path[0] !== selectedPictureIds.value[0] ||
+    !context
+  )
+    return;
+  try {
+    const resolved = resolveOwnedPictureNode(activeSheet.value.floatingImages, path, context);
+    return resolved?.visible &&
+      resolved.layout &&
+      !resolved.layout.collapsed &&
+      resolved.node.kind === "grouped-picture-v1"
+      ? { node: resolved.node, path: [...path] }
+      : undefined;
+  } catch {
+    return;
+  }
+});
+let sourceRibbonSequence = 0;
+const pictureSourceRibbonOwner = computed(() => {
+  void workbookRevision.value;
+  const leaf = selectedOwnedPictureLeaf.value,
+    image = leaf?.node ?? selectedPicture.value;
+  if (!image || isPictureGroup(image)) return;
+  const workbook = session.workbook,
+    sheet = activeSheet.value,
+    generation = pictureOwnerGeneration.value,
+    revision = workbookRevision.value;
+  const path = leaf?.path,
+    selected = [...selectedPictureIds.value],
+    context = sheetGridRef.value?.getPictureFrameContext(sheet);
+  const key = `picture-source-owner-${++sourceRibbonSequence}`;
+  const current = () =>
+    workbook === session.workbook &&
+    sheet === activeSheet.value &&
+    generation === pictureOwnerGeneration.value &&
+    revision === workbookRevision.value &&
+    selected.length === selectedPictureIds.value.length &&
+    selected.every((id, index) => id === selectedPictureIds.value[index]) &&
+    JSON.stringify(path ?? null) === JSON.stringify(selectedOwnedPicturePath.value ?? null) &&
+    context?.metrics === sheetGridRef.value?.getPictureFrameContext(sheet)?.metrics;
+  return {
+    key,
+    canReplace: imageActions.canReplace(image.id, path),
+    replace: () => {
+      if (current()) void imageActions.requestReplace(image.id, path);
+    },
+    format: () => {
+      if (current()) openOwnedPictureFormat(path, sheet);
+    },
+  };
+});
 const pictureToolbarOwner = usePictureToolbarOwner({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -2964,8 +3028,11 @@ const gridInert = computed(
           :resize-handler="pictureToolbarOwner?.resize"
           :aspect-ratio-handler="pictureToolbarOwner?.aspectRatio"
           :appearance-handler="pictureToolbarOwner?.appearance"
+          :replace-handler="pictureSourceRibbonOwner?.replace"
+          :can-replace="pictureSourceRibbonOwner?.canReplace"
           @insert-image="imageActions.requestInsert"
           @crop="sheetGridRef?.cropImage()"
+          @format="openOwnedPictureFormat()"
           @rotate="sheetGridRef?.rotateImage($event)"
           @flip="sheetGridRef?.flipImage($event)"
           @restore="sheetGridRef?.restoreImage()"
@@ -2982,6 +3049,22 @@ const gridInert = computed(
           @align="sheetGridRef?.arrangePictures(selectedPictureIds, $event)"
           @selection-pane="pictureTools.paneVisible.value = !pictureTools.paneVisible.value"
           @convert-to-cell="convertFloatingImageToCell(selectedPicture.id)"
+        />
+        <PictureOwnedLeafRibbon
+          v-if="selectedOwnedPictureLeaf && pictureSourceRibbonOwner"
+          :key="pictureSourceRibbonOwner.key"
+          :image="selectedOwnedPictureLeaf.node"
+          :owner-key="pictureSourceRibbonOwner.key"
+          :replace-handler="pictureSourceRibbonOwner.replace"
+          :format-handler="pictureSourceRibbonOwner.format"
+          :can-replace="pictureSourceRibbonOwner.canReplace"
+          :disabled="
+            loading ||
+            fileBusy ||
+            xlsxBusy ||
+            imageBusy ||
+            !canUseSheetPermission(activeSheet, 'editObjects')
+          "
         />
         <PictureGroupRibbon
           v-if="

@@ -1,6 +1,17 @@
 import { computed, getCurrentScope, onScopeDispose, ref, watch } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import {
+  editResolvedPictureCrop,
+  resetResolvedPictureCrop,
+} from "@sheetcraft/core/picture-crop-edit";
+import {
+  applyStandalonePictureCrop,
+  getPictureFormatCropState,
+  isPictureFormatCropField,
+  pictureFormatCropEdit,
+  pictureFormatCropValues,
+} from "./picture-format-crop";
+import {
   isFramedPictureObject,
   normalizePictureObjectCollection,
 } from "@sheetcraft/core/picture-object";
@@ -137,6 +148,7 @@ export interface OwnedPictureFormatPaneOptions {
   /** Authoritative, synchronous complete-forest Core command acceptance. */
   execute: (nextForest: readonly FloatingImage[]) => boolean;
   getDisabledReason?: () => string;
+  getUnsupportedCropReason?: () => string;
 }
 type Lease = {
   workbook: Workbook;
@@ -261,7 +273,11 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       world = target.layout ?? undefined;
     } else {
       if (path.length !== 1) return undefined;
-      if (isFramedPictureObject(root)) world = resolvePictureFrame(root.frame, context!.metrics);
+      if (context)
+        world = resolvePictureFrame(
+          isFramedPictureObject(root) ? root.frame : pictureFrameFromLegacy(root, context.metrics),
+          context.metrics,
+        );
     }
     return {
       workbook,
@@ -341,7 +357,12 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       values.rotationDeg = geometry.angleDeg;
       values.lockAspectRatio = node.lockAspectRatio ?? sourceBearing;
     }
+    const cropState =
+      !isPictureGroup(node) && !isGroupedGroup(node)
+        ? getPictureFormatCropState(node, world, context?.metrics)
+        : undefined;
     if (sourceBearing) values.altDescription = node.altText;
+    if (cropState) Object.assign(values, pictureFormatCropValues(cropState));
     if (!inner && (isPictureGroup(root) || isFramedPictureObject(root)))
       values.anchor = anchorValue(root.frame.anchor.mode);
     else if (!inner) values.anchor = "move";
@@ -362,6 +383,60 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       }
       if (sourceBearing && (!inner || (world && !world.collapsed)))
         capabilities.fields.altDescription = { enabled: true };
+      if (
+        cropState &&
+        (isPictureGroup(node) ||
+          isGroupedGroup(node) ||
+          "frame" in node ||
+          !node.transform?.appearance?.reflection)
+      ) {
+        const dimension = {
+          enabled: true,
+          min: MIN_FLOATING_IMAGE_SIZE * POINTS_PER_PIXEL,
+          max: MAX_FLOATING_IMAGE_SIZE * POINTS_PER_PIXEL,
+        };
+        const offset = { enabled: true };
+        capabilities.fields.sourceWidthPt = { enabled: true };
+        capabilities.fields.sourceHeightPt = { enabled: true };
+        capabilities.fields.sourceOffsetXPt = offset;
+        capabilities.fields.sourceOffsetYPt = offset;
+        capabilities.fields.cropWidthPt = dimension;
+        capabilities.fields.cropHeightPt = dimension;
+        capabilities.fields.cropLeftPt = { enabled: true };
+        capabilities.fields.cropTopPt = { enabled: true };
+        const sourceWidth = cropState.layout.rect.width * cropState.source.widthRatio;
+        const sourceHeight = cropState.layout.rect.height * cropState.source.heightRatio;
+        if (
+          [sourceWidth, sourceHeight].every(
+            (size) => size >= MIN_FLOATING_IMAGE_SIZE && size <= MAX_FLOATING_IMAGE_SIZE,
+          )
+        )
+          capabilities.resets!["reset-crop"] = { enabled: true };
+      }
+    }
+    if (
+      cropState &&
+      !isPictureGroup(node) &&
+      !isGroupedGroup(node) &&
+      !("frame" in node) &&
+      node.transform?.appearance?.reflection
+    ) {
+      const reason =
+        options.getUnsupportedCropReason?.() ??
+        options.getDisabledReason?.() ??
+        "Crop editing cannot preserve this picture's reflection yet.";
+      for (const field of [
+        "sourceWidthPt",
+        "sourceHeightPt",
+        "sourceOffsetXPt",
+        "sourceOffsetYPt",
+        "cropWidthPt",
+        "cropHeightPt",
+        "cropLeftPt",
+        "cropTopPt",
+      ] as const)
+        capabilities.fields[field] = { enabled: false, reason };
+      capabilities.resets!["reset-crop"] = { enabled: false, reason };
     }
     const snapshot: PictureFormatSnapshot = {
       owner: {
@@ -386,6 +461,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
   ): FloatingImage[] {
     const { root, node, path, context, world } = lease;
     const inner = path.length > 1;
+    if (isPictureFormatCropField(intent.field)) return planCrop(lease, intent);
     let next: FloatingImage;
     if (inner) {
       if (!isPictureGroup(root) || !context || !world || world.collapsed)
@@ -488,6 +564,57 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
     validateForest(forest, context);
     return forest;
   }
+  function planCrop(lease: Lease, intent: PictureFormatIntent): FloatingImage[] {
+    const { root, node, path, context, world } = lease;
+    if (!context || isPictureGroup(node) || isGroupedGroup(node))
+      throw new TypeError("A real source-bearing picture and worksheet metrics are required.");
+    const before = getPictureFormatCropState(node, world, context.metrics);
+    if (!before) throw new TypeError("Expand the picture before crop editing.");
+    // Compare in the displayed canonical units before reversing the point conversion.
+    // Multiplying and dividing by 0.75 need not recover the exact original pixel value.
+    if (
+      intent.type === "set-field" &&
+      isPictureFormatCropField(intent.field) &&
+      pictureFormatCropValues(before)[intent.field] === intent.value
+    )
+      return lease.forest;
+    const changed =
+      intent.type === "reset-crop"
+        ? resetResolvedPictureCrop(before.layout, before.source)
+        : intent.type === "set-field" &&
+            isPictureFormatCropField(intent.field) &&
+            typeof intent.value === "number"
+          ? editResolvedPictureCrop(
+              before.layout,
+              before.source,
+              pictureFormatCropEdit(intent.field, intent.value),
+            )
+          : undefined;
+    if (!changed) throw new TypeError("Unknown crop operation.");
+    if (changed.layout === before.layout && changed.source === before.source) return lease.forest;
+    let next: FloatingImage;
+    if (path.length > 1) {
+      if (!isPictureGroup(root) || !isGroupedPicture(node))
+        throw new TypeError("Missing owned picture.");
+      next = applyPictureGroupChildWorldEdit(
+        root,
+        leasePictureGroupNode(root, path),
+        changed.layout,
+        context.metrics,
+        {
+          replacement: { ...node, frame: { ...node.frame, source: changed.source } },
+        },
+      );
+    } else {
+      if (isPictureGroup(root)) throw new TypeError("A container has no image source.");
+      next = applyStandalonePictureCrop(root, before, changed, context.metrics);
+    }
+    const forest = normalizePictureObjectCollection(
+      lease.forest.map((image) => (image.id === root.id ? next : image)),
+    );
+    validateForest(forest, context);
+    return forest;
+  }
   function onIntent(intent: PictureFormatIntent): boolean {
     const view = owned.value,
       lease = view.lease,
@@ -496,12 +623,14 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       !lease ||
       !snapshot ||
       mutation ||
-      intent.type !== "set-field" ||
+      (intent.type !== "set-field" && intent.type !== "reset-crop") ||
       !samePictureFormatOwner(intent.owner, snapshot.owner) ||
       intent.baseRevision !== snapshot.revision ||
       typeof intent.intentId !== "string" ||
       !intent.intentId ||
-      view.capabilities.fields[intent.field]?.enabled !== true ||
+      (intent.type === "set-field"
+        ? view.capabilities.fields[intent.field]?.enabled !== true
+        : view.capabilities.resets?.[intent.type]?.enabled !== true) ||
       options.isBusy() ||
       !canUseSheetPermission(lease.sheet, "editObjects")
     )
@@ -511,15 +640,19 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         clear();
         return false;
       }
-      const capability = view.capabilities.fields[intent.field];
+      const capability =
+        intent.type === "set-field" ? view.capabilities.fields[intent.field] : undefined;
       if (
-        (intent.field === "sizeWidthPt" ||
+        intent.type === "set-field" &&
+        (isPictureFormatCropField(intent.field) ||
+          intent.field === "sizeWidthPt" ||
           intent.field === "sizeHeightPt" ||
           intent.field === "rotationDeg") &&
         typeof intent.value !== "number"
       )
         return false;
       if (
+        intent.type === "set-field" &&
         typeof intent.value === "number" &&
         (!Number.isFinite(intent.value) ||
           (capability?.min !== undefined && intent.value < capability.min) ||
@@ -527,11 +660,12 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       )
         return false;
       if (
-        (intent.field === "lockAspectRatio" && typeof intent.value !== "boolean") ||
-        (intent.field === "altDescription" && typeof intent.value !== "string")
+        intent.type === "set-field" &&
+        ((intent.field === "lockAspectRatio" && typeof intent.value !== "boolean") ||
+          (intent.field === "altDescription" && typeof intent.value !== "string"))
       )
         return false;
-      const next = plan(lease, intent);
+      const next = intent.type === "set-field" ? plan(lease, intent) : planCrop(lease, intent);
       if (!current(lease)) {
         clear();
         return false;

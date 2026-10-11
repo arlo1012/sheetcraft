@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Crop, RotateCcw, ImageDown, ImagePlus, PencilLine } from "lucide-vue-next";
+import { Crop, RotateCcw, ImageDown, ImagePlus, PencilLine, Settings2 } from "lucide-vue-next";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { ChangeContext } from "tdesign-vue-next/es/input-number/type";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
@@ -25,20 +25,25 @@ import type { PictureSizeEdit, PictureToolGeometry } from "../picture-tool-geome
 import PictureAppearanceTools from "./PictureAppearanceTools.vue";
 import ImageInsertMenu from "../../home-tools/components/ImageInsertMenu.vue";
 import { requireStandalonePicture } from "../picture-document-support";
-const props = defineProps<{
-  image: FloatingImage;
-  geometry?: PictureToolGeometry;
-  error?: string;
-  draftOwnerKey?: number;
-  appearanceDraftKey?: number;
-  resizeHandler?: (edit: PictureSizeEdit) => boolean;
-  aspectRatioHandler?: (locked: boolean) => boolean;
-  appearanceHandler?: (patch: Partial<ImageAppearance> | undefined) => boolean;
-  disabled: boolean;
-  busy?: boolean;
-  selectionCount: number;
-  previewOnDoubleClick: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    image: FloatingImage;
+    geometry?: PictureToolGeometry;
+    error?: string;
+    draftOwnerKey?: number;
+    appearanceDraftKey?: number;
+    resizeHandler?: (edit: PictureSizeEdit) => boolean;
+    aspectRatioHandler?: (locked: boolean) => boolean;
+    replaceHandler?: () => void;
+    canReplace?: boolean;
+    appearanceHandler?: (patch: Partial<ImageAppearance> | undefined) => boolean;
+    disabled: boolean;
+    busy?: boolean;
+    selectionCount: number;
+    previewOnDoubleClick: boolean;
+  }>(),
+  { canReplace: undefined },
+);
 // Standalone source tools cannot establish a draft for an owned container.
 requireStandalonePicture(props.image);
 const standaloneImage = computed(() => requireStandalonePicture(props.image));
@@ -65,6 +70,7 @@ const emit = defineEmits<{
   viewSettings: [value: boolean];
   print: [];
   convertToCell: [];
+  format: [];
 }>();
 const { t } = useAppI18n();
 const isFramed = computed(() => isFramedPictureObject(standaloneImage.value));
@@ -141,6 +147,24 @@ const appearanceCallback = computed(() => {
     else emit("appearance", patch);
   };
 });
+const replaceCallback = computed(() => {
+  const image = props.image,
+    owner = props.draftOwnerKey,
+    handler = props.replaceHandler;
+  return (): void => {
+    if (
+      props.disabled ||
+      props.selectionCount > 1 ||
+      (props.canReplace === undefined ? isFramed.value : !props.canReplace) ||
+      owner !== props.draftOwnerKey ||
+      image !== props.image ||
+      handler !== props.replaceHandler
+    )
+      return;
+    if (handler) handler();
+    else emit("replace");
+  };
+});
 function sourceAction(action: () => void): void {
   requireStandalonePicture(props.image);
   action();
@@ -159,9 +183,11 @@ function sourceAction(action: () => void): void {
         <RibbonButton
           :label="t('image.replace')"
           :text="t('image.replace')"
-          :disabled="disabled || selectionCount > 1 || isFramed"
+          :disabled="
+            disabled || selectionCount > 1 || (canReplace === undefined ? isFramed : !canReplace)
+          "
           data-picture-tool="replace"
-          @activate="sourceAction(() => emit('replace'))"
+          @activate="replaceCallback"
           ><ImagePlus
         /></RibbonButton>
       </div>
@@ -278,6 +304,15 @@ function sourceAction(action: () => void): void {
       data-picture-tool="annotate"
       @activate="sourceAction(() => emit('annotate'))"
       ><PencilLine
+    /></RibbonButton>
+    <RibbonButton
+      variant="tall"
+      :label="t('pictureFormat.paneTitle')"
+      :text="t('pictureFormat.paneTitle')"
+      :disabled="selectionCount !== 1"
+      data-picture-tool="format"
+      @activate="sourceAction(() => emit('format'))"
+      ><Settings2
     /></RibbonButton>
     <PictureAssetTools
       :disabled="disabled || isFramed"

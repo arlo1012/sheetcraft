@@ -1,3 +1,35 @@
+## Current source/crop and replacement WIP — 2026-10-11
+
+The actual four-tab pane now reads and applies the eight source/crop fields for
+standalone pictures and exact owned leaves. Width/height, signed source-center
+offsets and absolute crop-layout positions are separate; transparent padding is
+valid. Ordinary crop edits preserve physical source placement, while Crop Reset
+uses the unrotated source rectangle origin, current source dimensions, zero
+offsets and retained rotation/style. Legacy pictures upgrade only on a real edit;
+unchanged fractional point values do not create history or promote them.
+
+Replace works for legacy/framed roots and actual owned leaves. The new source
+covers the current frame and is centered; geometry, valid appearance, annotations,
+ownership and custom descriptions remain. Pending requests lease the exact path,
+old source, forest topology, view metrics, Sheet instance and picker request.
+Safe intervening geometry/description edits are retained. Shared/undo assets are
+not removed. Source-free containers never receive a fabricated asset. An owned
+leaf has actual Replace and Format ribbon entries; full picture controls remain WIP.
+
+Reflected legacy pictures retain their effect and display source values, but
+source/crop promotion is disabled with a reason until framed reflection can be
+preserved. Interactive crop handles, ratio/shape crop, original-size Reset,
+complete effects, other resources and Locked/Print Object are still pending.
+Read `docs/insert/pictures.md` for current product contracts and file-format limits.
+
+Final related checks: Core 14 files / 232 tests and Web 14 files / 224 tests passed;
+Core/Web types and builds plus scoped lint, formatting and diff checks passed.
+Initial invalid grayscale fixture failures and the optional-Boolean source
+capability regression were corrected; their original failures remain recorded.
+Existing architecture diagnostics remain 130 with exit 1, and existing bundle
+warnings remain. This is a verified bounded implementation checkpoint, not full
+picture-tool or final user detail acceptance.
+
 ## Current owned-picture page integration WIP — 2026-10-11
 
 The current refactor branch now enables genuine Frame47/Group48 internal editing,

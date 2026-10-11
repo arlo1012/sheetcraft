@@ -179,6 +179,10 @@
       "types": "./dist/picture-frame.d.ts",
       "import": "./dist/picture-frame.js"
     },
+    "./picture-crop-edit": {
+      "types": "./dist/picture-crop-edit.d.ts",
+      "import": "./dist/picture-crop-edit.js"
+    },
     "./picture-object": {
       "types": "./dist/picture-object.d.ts",
       "import": "./dist/picture-object.js"

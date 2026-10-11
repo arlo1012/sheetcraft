@@ -67,7 +67,7 @@ beforeEach(() => {
   vi.mocked(prepareImageAsset).mockReset();
 });
 describe("sheet image insertion", () => {
-  test("replaces an image asset while retaining its identity, geometry, and edits", async () => {
+  test("replaces a legacy source with centered cover while retaining identity, geometry, and description", async () => {
     vi.mocked(prepareImageAsset).mockResolvedValue(asset);
     const f = fixture();
     const image = existingImage();
@@ -78,7 +78,14 @@ describe("sheet image insertion", () => {
     );
     await f.actions.insertFile(file, "floating", undefined, image.id);
     expect(f.setFloatingImage).toHaveBeenCalledExactlyOnceWith(
-      { ...image, assetId: asset.id, altText: file.name },
+      {
+        ...image,
+        assetId: asset.id,
+        transform: {
+          ...requireStandalone(image).transform,
+          crop: { x: (1 - 19 / 72) / 2, y: 0, width: 19 / 72, height: 1 },
+        },
+      },
       sheet.id,
     );
     expect(f.setCellImage).not.toHaveBeenCalled();

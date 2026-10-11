@@ -1,4 +1,6 @@
 import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
+import type { PictureGroupPath } from "@sheetcraft/core/picture-group";
+import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import { getCurrentScope, nextTick, onScopeDispose, readonly, ref } from "vue";
 import {
   MIN_FLOATING_IMAGE_SIZE,
@@ -6,9 +8,9 @@ import {
   MAX_SHEET_ROWS,
   getCellContent,
   cloneFloatingImage,
+  areFloatingImageCollectionsEqual,
   type CellAddress,
   type FloatingImage,
-  type LegacyFloatingImage,
   type ImageTransform,
   type Sheet,
   type Workbook,
@@ -30,6 +32,12 @@ import type { ImageAssetStore } from "../image-assets/imageAssetStore";
 import { imageAssetFeedback } from "../image-assets/imageAssetFeedback";
 import { prepareImageAsset } from "../image-assets/prepareImageAsset";
 import { normalizeClipboardImageGroup } from "./imageClipboard";
+import {
+  capturePictureSourceReplacement,
+  isPictureSourceReplacementCurrent,
+  planPictureSourceReplacement,
+  type PictureSourceReplacementSnapshot,
+} from "./picture-source-replacement";
 
 export type ImageInsertMode = "cell" | "floating";
 type ImageTarget = {
@@ -84,6 +92,9 @@ export function useSheetImageActions(options: {
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
   getGeneration?: () => number;
+  getSelectedPath?: () => PictureGroupPath | null;
+  getSelectedIds?: () => readonly string[];
+  getFrameContext?: () => PictureFrameLayoutContext | undefined;
   getAddress: () => CellAddress;
   flushPendingEdits: () => boolean;
   setCellImage: (payload: {
@@ -118,7 +129,13 @@ export function useSheetImageActions(options: {
   const fileInput = ref<HTMLInputElement | null>(null);
   const pickerKey = ref(0);
   let pending:
-    | { mode: ImageInsertMode; target: ImageTarget; replaceId?: string; replaceAssetId?: string }
+    | {
+        mode: ImageInsertMode;
+        target: ImageTarget;
+        replacement?: PictureSourceReplacementSnapshot;
+        input?: HTMLInputElement;
+        pickerKey: number;
+      }
     | undefined;
 
   function captureTarget(
@@ -172,35 +189,101 @@ export function useSheetImageActions(options: {
     cancelPending();
     const target = captureTarget(options.getAddress(), mode);
     if (!target) return;
-    pending = { mode, target };
     pickerKey.value += 1;
+    pending = { mode, target, pickerKey: pickerKey.value };
     await nextTick();
     if (!isCurrent(target, mode) || pending?.target !== target) return;
     openPicker(target, true);
   }
 
-  async function requestReplace(imageId: string): Promise<void> {
+  function selectionMatches(path: PictureGroupPath): boolean {
+    const ids = options.getSelectedIds?.();
+    if (ids && (ids.length !== 1 || ids[0] !== path[0])) return false;
+    if (options.getSelectedPath) {
+      const selected = options.getSelectedPath();
+      if (path.length === 1)
+        return selected == null || (selected.length === 1 && selected[0] === path[0]);
+      return (
+        !!selected &&
+        selected.length === path.length &&
+        selected.every((id, index) => id === path[index])
+      );
+    }
+    return true;
+  }
+
+  function replacementSource(imageId: string, path?: PictureGroupPath | null) {
+    const snapshot = capturePictureSourceReplacement(
+      options.getSheet().floatingImages,
+      imageId,
+      path === undefined ? options.getSelectedPath?.() : path,
+      options.getFrameContext?.(),
+    );
+    if (
+      !selectionMatches(snapshot.source.path) ||
+      (snapshot.source.kind !== "legacy" && !options.execute)
+    )
+      throw new Error("Picture replacement requires its exact supported selection.");
+    return snapshot;
+  }
+
+  function canReplace(imageId: string, path?: PictureGroupPath | null): boolean {
+    if (disposed || busy.value || !canUseSheetPermission(options.getSheet(), "editObjects"))
+      return false;
+    try {
+      replacementSource(imageId, path);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function replacementCurrent(
+    target: ImageTarget,
+    snapshot: PictureSourceReplacementSnapshot,
+  ): boolean {
+    return (
+      isCurrent(target) &&
+      selectionMatches(snapshot.source.path) &&
+      isPictureSourceReplacementCurrent(
+        snapshot,
+        target.sheet.floatingImages,
+        options.getFrameContext?.(),
+      )
+    );
+  }
+
+  async function requestReplace(imageId: string, path?: PictureGroupPath | null): Promise<void> {
     if (busy.value || disposed) return;
-    const image = options.getSheet().floatingImages.find((entry) => entry.id === imageId);
-    if (!image) return;
-    if (!isLegacyPictureObject(image)) {
+    const sourceSheet = options.getSheet();
+    const sourceWorkbook = options.getWorkbook();
+    const sourceGeneration = options.getGeneration?.() ?? 0;
+    let replacement: PictureSourceReplacementSnapshot;
+    try {
+      replacement = replacementSource(imageId, path);
+    } catch {
       feedback.value = "picture.operationFailed";
       return;
     }
     cancelPending();
-    const target = captureTarget(image.anchor);
+    const target = captureTarget();
     if (!target) return;
-    const replaceAssetId = image.assetId;
-    pending = { mode: "floating", target, replaceId: imageId, replaceAssetId };
+    // Flushing an editor may itself change the requested source. Never recapture a
+    // different source under the already-approved picker request.
+    if (
+      target.sheet !== sourceSheet ||
+      target.workbook !== sourceWorkbook ||
+      target.generation !== sourceGeneration ||
+      !replacementCurrent(target, replacement)
+    )
+      return;
     pickerKey.value += 1;
+    pending = { mode: "floating", target, replacement, pickerKey: pickerKey.value };
     await nextTick();
     if (
-      !isCurrent(target) ||
+      !replacementCurrent(target, replacement) ||
       pending?.target !== target ||
-      !target.sheet.floatingImages.some(
-        (entry) =>
-          isLegacyPictureObject(entry) && entry.id === image.id && entry.assetId === replaceAssetId,
-      )
+      pending.pickerKey !== pickerKey.value
     )
       return;
     openPicker(target, false);
@@ -209,6 +292,8 @@ export function useSheetImageActions(options: {
   function openPicker(target: ImageTarget, multiple: boolean): void {
     try {
       if (!fileInput.value) throw new Error("Picture file picker unavailable.");
+      if (pending?.target !== target || pending.pickerKey !== pickerKey.value) return;
+      pending.input = fileInput.value;
       fileInput.value.multiple = multiple;
       fileInput.value.value = "";
       fileInput.value.click();
@@ -226,61 +311,46 @@ export function useSheetImageActions(options: {
     target?: ImageTarget,
     replaceId?: string,
     replaceAssetId?: string,
+    replacePath?: PictureGroupPath | null,
   ): Promise<void> {
     if (replaceId) {
-      const current = options.getSheet().floatingImages.find((image) => image.id === replaceId);
-      if (current && !isLegacyPictureObject(current)) {
+      if (busy.value || disposed) return;
+      const sourceSheet = options.getSheet();
+      const sourceWorkbook = options.getWorkbook();
+      const sourceGeneration = options.getGeneration?.() ?? 0;
+      let replacement: PictureSourceReplacementSnapshot;
+      try {
+        replacement = replacementSource(replaceId, replacePath);
+      } catch {
         feedback.value = "picture.operationFailed";
         return;
       }
+      if (replaceAssetId !== undefined && replaceAssetId !== replacement.source.assetId) return;
+      target ??= captureTarget();
+      if (
+        !target ||
+        target.sheet !== sourceSheet ||
+        target.workbook !== sourceWorkbook ||
+        target.generation !== sourceGeneration
+      )
+        return;
+      return replaceFile(file, target, replacement);
     }
     target ??= captureTarget(options.getAddress(), mode);
     if (!target || !isCurrent(target, mode) || busy.value) return;
     const owner = target;
-    const original = replaceId
-      ? owner.sheet.floatingImages.find((image) => image.id === replaceId)
-      : undefined;
-    if (original && !isLegacyPictureObject(original)) {
-      feedback.value = "picture.operationFailed";
-      return;
-    }
-    replaceAssetId ??= original?.assetId;
-    const replacement = () =>
-      owner.sheet.floatingImages.find(
-        (image): image is LegacyFloatingImage =>
-          isLegacyPictureObject(image) &&
-          image.id === replaceId &&
-          image.assetId === replaceAssetId,
-      );
-    const valid = () => isCurrent(owner, mode) && (!replaceId || !!replacement());
+    const valid = () => isCurrent(owner, mode);
     if (!valid()) return;
     busy.value = true;
     feedback.value = undefined;
     try {
       const asset = await prepareImageAsset(file);
       if (!valid()) return;
-      const size =
-        mode === "floating" && !replaceId
-          ? initialFloatingSize(asset.width, asset.height)
-          : undefined;
+      const size = mode === "floating" ? initialFloatingSize(asset.width, asset.height) : undefined;
       await options.assetStore.put(asset);
       if (!valid()) return;
       const altText = file.name || "";
-      if (replaceId) {
-        const current = replacement();
-        if (!current) return;
-        if (current.assetId === asset.id && current.altText === altText) {
-          feedback.value = "image.unchanged";
-          return;
-        }
-        if (
-          (await options.setFloatingImage(
-            { ...current, assetId: asset.id, altText },
-            target.sheetId,
-          )) === false
-        )
-          throw new Error("Picture replacement was refused.");
-      } else if (mode === "cell") {
+      if (mode === "cell") {
         if (cellImageMatches(target.sheet, target.address, { assetId: asset.id, altText })) {
           feedback.value = "image.unchanged";
           return;
@@ -308,6 +378,53 @@ export function useSheetImageActions(options: {
         if (accepted === false) throw new Error("Picture insertion was refused.");
       }
       feedback.value = "image.inserted";
+    } catch (error) {
+      if (isOwnerCurrent(target)) feedback.value = assetFailureFeedback(error);
+    } finally {
+      busy.value = false;
+    }
+  }
+
+  async function replaceFile(
+    file: File,
+    target: ImageTarget,
+    replacement: PictureSourceReplacementSnapshot,
+  ): Promise<void> {
+    const valid = () => replacementCurrent(target, replacement);
+    if (busy.value || !valid()) return;
+    busy.value = true;
+    feedback.value = undefined;
+    try {
+      const asset = await prepareImageAsset(file);
+      if (!valid()) return;
+      // Preflight the replacement geometry before creating a stored resource.
+      planPictureSourceReplacement(
+        replacement,
+        target.sheet.floatingImages,
+        options.getFrameContext?.(),
+        asset,
+      );
+      await options.assetStore.put(asset);
+      if (!valid()) return;
+      const next = planPictureSourceReplacement(
+        replacement,
+        target.sheet.floatingImages,
+        options.getFrameContext?.(),
+        asset,
+      );
+      if (areFloatingImageCollectionsEqual(target.sheet.floatingImages, next)) {
+        feedback.value = "image.unchanged";
+        return;
+      }
+      const accepted =
+        replacement.source.kind === "legacy"
+          ? await options.setFloatingImage(
+              next.find((entry) => entry.id === replacement.source.rootId)!,
+              target.sheetId,
+            )
+          : await options.execute!(createSetSheetFloatingImagesCommand(target.sheetId, next));
+      if (accepted === false) throw new Error("Picture replacement was refused.");
+      if (isOwnerCurrent(target)) feedback.value = "image.inserted";
     } catch (error) {
       if (isOwnerCurrent(target)) feedback.value = assetFailureFeedback(error);
     } finally {
@@ -414,30 +531,25 @@ export function useSheetImageActions(options: {
 
   function onFileChange(event: Event): void {
     const input = event.target as HTMLInputElement;
-    if (input !== fileInput.value || disposed) return;
+    if (!input || input !== fileInput.value || disposed) return;
     const files = Array.from(input.files ?? []);
     const file = files[0];
     const request = pending;
-    if (request?.replaceId) {
-      const image = request.target.sheet.floatingImages.find(
-        (entry) => entry.id === request.replaceId,
-      );
-      if (image && !isLegacyPictureObject(image)) {
-        feedback.value = "picture.operationFailed";
-        return;
-      }
+    if (!request || request.input !== input || request.pickerKey !== pickerKey.value) return;
+    if (
+      !isCurrent(request.target, request.mode) ||
+      (request.replacement && !replacementCurrent(request.target, request.replacement))
+    ) {
+      // This input owns only this request. A stale input was already rejected
+      // above, and cannot cancel or consume a later picker operation.
+      input.value = "";
+      cancelPending();
+      return;
     }
     pending = undefined;
     input.value = "";
     if (file && request) {
-      if (request.replaceId)
-        void insertFile(
-          file,
-          request.mode,
-          request.target,
-          request.replaceId,
-          request.replaceAssetId,
-        );
+      if (request.replacement) void replaceFile(file, request.target, request.replacement);
       else void insertFiles(files, request.mode, request.target);
     }
   }
@@ -598,8 +710,14 @@ export function useSheetImageActions(options: {
     fileInput,
     pickerKey: readonly(pickerKey),
     onFileCancel: (event: Event) => {
-      if (event.target === fileInput.value) cancelPending();
+      if (
+        event.target === fileInput.value &&
+        pending?.input === event.target &&
+        pending.pickerKey === pickerKey.value
+      )
+        cancelPending();
     },
+    canReplace,
     requestInsert,
     requestReplace,
     insertFile,
