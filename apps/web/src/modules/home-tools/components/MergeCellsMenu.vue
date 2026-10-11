@@ -129,7 +129,6 @@ function onMenuFocusin(event: FocusEvent): void {
   <span v-bind="$attrs" class="ribbon-menu-tool ribbon-menu-tool--full-width">
     <RibbonSplitButton
       ref="splitActionRef"
-      variant="tall"
       :label="state.canUnmerge ? t('ribbon.unmergeCells') : t('ribbon.mergeCells')"
       :menu-label="t('ribbon.moreOptions', { tool: t('ribbon.mergeCells') })"
       :text="t('ribbon.merge')"
