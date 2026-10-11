@@ -1,0 +1,69 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/apps/web
+
+stderr | src/tests/modules/sheet-drawings/icon-equation.test.ts
+Warning: KaTeX doesn't work in quirks mode. Make sure your website has a suitable doctype.
+
+ ❯ src/tests/modules/sheet-drawings/icon-equation.test.ts (5 tests | 1 failed) 240ms
+     × equations hide unused fill and outline controls without deleting stored fields 102ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/modules/sheet-drawings/icon-equation.test.ts > existing icon and equation objects > equations hide unused fill and outline controls without deleting stored fields
+AssertionError: expected [ DOMWrapper{ …(3) }, …(2) ] to have a length of 1 but got 3
+
+- Expected
++ Received
+
+- 1
++ 3
+
+ ❯ src/tests/modules/sheet-drawings/icon-equation.test.ts:60:52
+     58|     const original = drawing("equation");
+     59|     const wrapper = editor(original);
+     60|     expect(wrapper.findAll('input[type="color"]')).toHaveLength(1);
+       |                                                    ^
+     61|     expect(wrapper.text()).not.toContain("No fill");
+     62|     expect(wrapper.text()).not.toContain("Line width");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 2 unhandled errors during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: Failed to execute 'getComputedStyle' on 'Window': parameter 1 is not of type 'Element'.
+ ❯ GlobalWindow.getComputedStyle ../../node_modules/.bun/happy-dom@20.11.6/node_modules/happy-dom/lib/window/BrowserWindow.js:1758:19
+ ❯ calculateNodeSize ../../node_modules/.bun/tdesign-vue-next@1.20.7+cbea368d07b71712/node_modules/common/js/utils/helper.ts:261:24
+ ❯ calcTextareaHeight ../../node_modules/.bun/tdesign-vue-next@1.20.7+cbea368d07b71712/node_modules/common/js/utils/calcTextareaHeight.ts:32:65
+ ❯ ../../node_modules/.bun/tdesign-vue-next@1.20.7+cbea368d07b71712/node_modules/components/textarea/textarea.tsx:68:33
+ ❯ processTicksAndRejections node:internal/process/task_queues:104:5
+
+This error originated in "src/tests/modules/sheet-drawings/icon-equation.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "equation renderer retains LaTeX source and uses bounded untrusted KaTeX". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: Failed to execute 'getComputedStyle' on 'Window': parameter 1 is not of type 'Element'.
+ ❯ GlobalWindow.getComputedStyle ../../node_modules/.bun/happy-dom@20.11.6/node_modules/happy-dom/lib/window/BrowserWindow.js:1758:19
+ ❯ calculateNodeSize ../../node_modules/.bun/tdesign-vue-next@1.20.7+cbea368d07b71712/node_modules/common/js/utils/helper.ts:261:24
+ ❯ calcTextareaHeight ../../node_modules/.bun/tdesign-vue-next@1.20.7+cbea368d07b71712/node_modules/common/js/utils/calcTextareaHeight.ts:32:65
+ ❯ ../../node_modules/.bun/tdesign-vue-next@1.20.7+cbea368d07b71712/node_modules/components/textarea/textarea.tsx:68:33
+ ❯ processTicksAndRejections node:internal/process/task_queues:104:5
+
+This error originated in "src/tests/modules/sheet-drawings/icon-equation.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "equation renderer retains LaTeX source and uses bounded untrusted KaTeX". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+     Errors  2 errors
+   Start at  23:59:44
+   Duration  4.10s (transform 1.85s, setup 0ms, import 3.50s, tests 240ms, environment 204ms)
+

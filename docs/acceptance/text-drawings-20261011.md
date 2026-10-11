@@ -53,8 +53,10 @@ User online pages were not edited or closed. Raw exports/screenshots remain loca
 
 The actual earlier 5,060-byte XLSX export has SHA256
 `27fdeefaaa06a7248ca3e5c80ff00125c0a586ef4b540b258e161dfc91867b09`.
-It emitted two located `feature-omitted` warnings and no drawing/chart/media
-parts. The surviving file was re-inspected after recovery. Native regressions
+The native API report emitted two located `feature-omitted` warnings; the ZIP has
+no drawing/chart/media parts. This is not evidence of a visible GUI warning.
+The later icon/equation investigation confirmed Web export discards warning
+issues and displays generic success; that visibility defect is separately pending. The surviving file was re-inspected after recovery. Native regressions
 prove each object is explicitly omitted without mutating the source workbook,
 ordinary cell content survives, and import does not invent objects.
 

@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/apps/web
+
+
+ Test Files  6 passed (6)
+      Tests  78 passed (78)
+   Start at  00:00:31
+   Duration  45.65s (transform 8.88s, setup 0ms, import 16.83s, tests 26.81s, environment 1.17s)
+

@@ -1,0 +1,18 @@
+Actual cloud Chrome production-preview observation, 2026-10-11 UTC.
+Only the existing Equation editor was used; no generated/online SVG assets.
+Expression x^2, outer default fontSize20. Before and after checking both
+existing Bold and Italic switches, settled actual .katex-html .mord nodes:
+- outer x2: KaTeX_Main, math, Times New Roman, serif; 24.2px; 400; normal
+- x glyph: KaTeX_Math; 24.2px; 400; italic
+- 2 glyph: KaTeX_Main, math, Times New Roman, serif; 16.94px; 400; normal
+All four reported style fields and text were identical before/after.
+The switches changed only the equation container to weight700/styleitalic;
+KaTeX's inner font reset and explicit glyph classes broke that inheritance.
+A preliminary first read before async EquationContent settled returned [];
+that is not a before-state proof. The corrected comparison waited for an
+actual visible .mord node, then recorded both settled states above.
+This proves unused generic switches for this expression and agrees with the
+existing renderer/CSS path. It does not claim LaTeX font commands are ineffective
+or that every possible mathematical glyph has a normal default style.
+All observation dialogs were canceled, pages closed and preview stopped before
+code changes/checks. No observed expression was committed by this observation.

@@ -1,0 +1,22 @@
+Fresh native API encode of the actual public final synthetic JSON:
+{
+  "issues": [
+    {
+      "code": "feature-omitted",
+      "severity": "warning",
+      "count": 5,
+      "locations": [
+        "Sheet1.drawings[\"drawing-f854f3aa-7d0a-44f7-b863-d56a75256b24\"]",
+        "Sheet1.drawings[\"drawing-d1913358-33aa-441d-8b04-e23a6769b8d4\"]",
+        "Sheet2.drawings[\"drawing-f8214351-ee65-4b39-9af9-bcfda5257d3f\"]",
+        "Sheet6.drawings[\"drawing-07100d6c-fd0f-4e51-83fa-a1047a9f6025\"]",
+        "Sheet6.drawings[\"drawing-cd11938c-0f8c-472d-81e2-166898b53c97\"]"
+      ]
+    }
+  ]
+}
+GUI XLSX: 8453 bytes
+GUI XLSX SHA256 54e89f3394613c7f366e9fb28e753ffbf314e3a4e1ce599caca5b6981ad93027
+No drawings/charts/media parts in the actual GUI-produced ZIP (separately inspected).
+Source public snapshot unchanged by fresh native API encode.
+Export GUI currently ignores warning issues and shows generic success: this is not a GUI omission-prompt pass.

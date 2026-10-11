@@ -10,7 +10,7 @@ import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import { decodeXlsx, encodeXlsx } from "../../index.js";
 
-test.each(["textBox", "wordArt"] as const)(
+test.each(["textBox", "wordArt", "icon", "equation"] as const)(
   "%s XLSX omission is located and does not change the workbook",
   async (kind) => {
     const workbook = createWorkbook({ id: "text-drawing", sheetId: "sheet", sheetName: "Data" });
