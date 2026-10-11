@@ -1,5 +1,58 @@
 # Sheetcraft continuation after recovery — 2026-10-10
 
+## Calculated-column continuation — 2026-10-11
+
+The user chose the conservative calculated-column contract. It is now implemented
+in Core and the real product UI: first manual formula in a truly blank column
+automatically fills that column in one reversible transaction; mixed existing
+values and blank/formula exceptions stay intact; whole-column replacement is an
+explicit dialog action; new rows inherit; even a one-cell native editor or
+formula-bar paste remains target-only. Snapshot 45 stores the explicit canonical
+first-data-row template and actual members remain its exceptions. Readers remain
+backward compatible with supported earlier snapshot versions.
+
+Core table/column/sheet rename, structural changes, conversion and Undo/Redo
+maintain templates or atomically reject an unproved unsafe transformation. Native
+XLSX uses explicit calculatedColumnFormula metadata without inferring uniform
+formulas. Its proven local scalar family is intentionally bounded; unsupported
+namespace/layout/array/name/spill/cross-table metadata gets a located warning and
+loses only the template, retaining actual members. Numeric literal total-row
+export blocking and other earlier limits remain.
+
+Actual Sheetcraft UI input/paste/explicit replacement/Undo/Redo/save/reload/XLSX
+export passed. WPS product export edits, exceptions, growth and save-close-reopen
+passed, and its saved copy imported through the actual product UI. Imported
+14/99/blank/10 retained exceptions, added row 6 inherited 12, save/reload retained
+the template, and row 7 inherited 14. Excel web likewise retained edits, exceptions
+and growth after save/reopen. Its browser showed a completed download, but that
+Excel-saved copy was not locally captured/parsed; do not claim that missing
+native adapter round-trip.
+
+Final checks: Core calculated-column: 59 passed; Web related: 142 passed plus the final typed dialog
+regression: 60 passed; XLSX related: 214 passed, including 50 new native cases. Core, sheet-engine,
+XLSX and Web types pass; three package builds and scoped lint/format pass.
+Initial failed implementation/review/typecheck runs are retained. Full repository
+tests and CI were not rerun, and the earlier 125 architecture diagnostics remain
+a separate known result. Whole Insert is not complete.
+
+Read these current records before the older candidate-contract observations:
+
+- docs/acceptance/calculated-columns-20261011.md (Core structure/history)
+- docs/acceptance/calculated-column-web-20261011.md
+- docs/acceptance/calculated-column-native-20261011.md
+- docs/acceptance/calculated-column-gui-20261011.md (final real UI closure)
+- docs/acceptance/evidence/calculated-columns-20261011/ (preserved code-check logs)
+
+The exact 23-file structural tree was preserved at
+1b624740566470fcf4798d87387e06ea71753ed6. The cumulative code checkpoint is
+f47042699ec6201f32b9582a82a8a54221f18fdf (tree
+886903c769d064f145bfb1f99a9b6c664665e041). Final-text checkpoints are on the
+same branch; read its current head rather than treating
+that structural WIP as the final feature state. New actual producer workbooks,
+raw XML, exported JSON and screenshots remain local and are not in these Git
+checkpoints. The public synthetic generator is
+tools/compatibility-lab/src/probes/calculated-column-fixture.mjs.
+
 ## Representative table matrix closure
 
 After659aa, the remaining real UI checks completed: Medium5 survives explicit
@@ -112,10 +165,14 @@ shape geometry. Preserve the user's current browser sessions and few tabs.
 
 Restore all source from the current branch through normal authorized Git access
 or GitHub blob/tree APIs; verify byte lengths and Git blob hashes. Recover into a
-fresh directory rather than overwriting another working copy. This cloud working
-copy's local Git HEAD is a synthetic recovery commit, while the index trees were
-verified against the actual published GitHub trees. Clone/reconstruct a proper
-checkout after reset instead of attempting to push that synthetic history.
+fresh directory rather than overwriting another working copy. The older 2026-10-10
+working copy used a synthetic recovery commit. The 2026-10-11 restoration instead
+reconstructed the exact published commit object and verified all 2,028 paths by
+Git blob hash and byte length. Reconstruct/clone from the newly verified branch
+head after a reset; do not reuse old synthetic history. Binary repository files
+were read with the purpose-built GitHub file API's base64 encoding and verified
+after decoding, not a generic UTF-8 fetch. No CLI token or login-cookie extraction
+was used.
 
 Use the repository's frozen Bun lockfile and read AGENTS.md / any relevant local
 skills first. Bun 1.3.11 was used. Build Core before the XLSX package, then run the

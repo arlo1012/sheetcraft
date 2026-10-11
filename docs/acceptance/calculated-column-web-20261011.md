@@ -1,6 +1,6 @@
 # Calculated-column Web checkpoint (2026-10-11)
 
-Status: **Web input and explicit replacement connected and verified in the real product UI**. Bounded native I/O and WPS/Excel checks are recorded separately; importing the saved WPS test copy into the isolated product workbook remains paused for its specific replacement confirmation. The separate Core structural checkpoint is frozen locally while its Git upload confirmation is pending; this document does not alter that payload.
+Status: **Web input and explicit replacement connected and verified in the real product UI**. Bounded native I/O and WPS/Excel checks are recorded separately; importing the saved WPS test copy into the backed-up isolated product workbook has also passed after its specific replacement confirmation. The separate Core structural checkpoint was published with its original frozen tree unchanged at 1b624740566470fcf4798d87387e06ea71753ed6; the cumulative Web/native checkpoint is verified at f47042699ec6201f32b9582a82a8a54221f18fdf.
 
 ## Implemented paths
 

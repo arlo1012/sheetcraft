@@ -8,10 +8,10 @@ All workbooks contained isolated synthetic test data. The cloud loopback service
 was bound to 127.0.0.1:7200. The existing Excel session was available after an
 ordinary page refresh. No login data was extracted or backed up.
 
-The saved WPS copy has been decoded through the public XLSX adapter. Replacing
-the backed-up isolated Sheetcraft workbook with this copy in the actual UI is
-still paused for specific confirmation, because replacement clears its undo
-history. It is not counted as completed GUI import acceptance.
+The saved WPS copy has been decoded through the public XLSX adapter. After
+specific confirmation of replacement/history clearing, the backed-up isolated
+Sheetcraft workbook was replaced with that copy in the actual UI. The imported
+exceptions, row inheritance, saved reload and later inheritance all passed.
 
 ## Actual Sheetcraft paths
 
@@ -80,6 +80,30 @@ public-control attempt also timed out. No private URL, cookie or browser-profile
 extraction was used. Excel GUI save/reopen is verified; an Excel-saved native copy
 has not been locally parsed and is not claimed as adapter round-trip evidence.
 
+## Confirmed WPS-saved copy import in the actual product UI
+
+The original isolated product workbook had separate JSON and XLSX backups. After
+the explicit confirmation, its current synthetic Sheet4 state was verified and
+the local WPS-saved exception copy was selected through Import XLSX. The visible
+Replace and import control disclosed replacing the saved local copy and clearing
+Undo history. It was confirmed, and the Data sheet replaced the old isolated
+workbook. No user file was involved.
+
+- Initial imported values were 14 / 99 / blank / 10, matching the WPS-saved copy.
+  Immediate Undo did not restore the prior Sheet4 workbook.
+- Adding E/6 below the table inherited C6=12 while the 99/blank exceptions stayed.
+- Save locally and an ordinary page reload retained the imported values and the
+  added row. Adding F/7 afterward inherited C7=14, with old exceptions unchanged.
+- A final UI JSON export was successfully captured locally. Its version was 45,
+  Sales range A1:C7, canonical Result formula =B2*2, actual C3 literal 99 and C4
+  blank, with C6=B6*2 and C7=B7*2. This backup remains local, outside Git.
+
+During this delayed final step, the older browser test tabs showed Error 9. The
+saved Excel test tab was closed, and a normal reload of the authorized local
+HTTP page recovered the product UI. The two user pages were left untouched. This
+transient cloud-browser failure is retained as environment evidence; no private
+error-page DOM or security-warning bypass was used.
+
 ## Latest code checks and retained failures
 
 - Core calculated-column foundation/lifecycle/structure: 3 files / 59 passed.
@@ -110,8 +134,12 @@ with a located compatibility warning. Actual worksheet members remain intact.
 Prefixed native filters still have a specifically reported existing reader limit.
 Numeric-constant totals retain the prior explicit XLSX export restriction.
 
-The last verified remote checkpoint is b1acd516da349d0fad6bc085a5ffba4861ce5b29.
-The separate 23-file Core structural snapshot and later Web/native snapshots are
-frozen locally while their publication confirmation is pending. This report does
-not assert a new push, completed GUI replacement, full Insert completion, or
-support for every native calculated-column formula family.
+The original 23-file Core structural freeze was published and its exact tree
+verified at 1b624740566470fcf4798d87387e06ea71753ed6. The later Web/native
+48-file cumulative snapshot was frozen separately, retaining earlier snapshots
+and failure evidence. That cumulative snapshot was published and verified at
+f47042699ec6201f32b9582a82a8a54221f18fdf (tree
+886903c769d064f145bfb1f99a9b6c664665e041), with no new code beyond its
+frozen tested content. GUI replacement is complete. This report does
+not assert full Insert completion, a full green CI run, or support for every
+native calculated-column formula family.

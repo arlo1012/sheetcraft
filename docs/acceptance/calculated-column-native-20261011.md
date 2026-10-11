@@ -88,9 +88,14 @@ commands and the public XLSX adapter, using synthetic data only.
 
 ## Local publication state
 
-The stage-2 23-file structural checkpoint is still frozen and paused pending its
-specific publication approval. Web and native changes are separate local stages;
-this document does not assert a new remote commit.
+The stage-2 23-file structural checkpoint was published after specific approval
+and verified at 1b624740566470fcf4798d87387e06ea71753ed6, with its original
+315c1e643ae075b5341fa61f9a173b65240d37b8 tree unchanged. The cumulative
+Web/native code checkpoint is verified at
+f47042699ec6201f32b9582a82a8a54221f18fdf, with its frozen
+886903c769d064f145bfb1f99a9b6c664665e041 tree unchanged. Actual
+WPS-saved-copy import into the backed-up product UI now passes, including
+exceptions, growth, save/reload and later growth. No raw artifacts are published.
 
 ## Additional bounded namespace/shape limits
 
