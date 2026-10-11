@@ -85,6 +85,8 @@ async function fixture(withData = false) {
 describe("workspace insert entry points", () => {
   test.each([
     { tool: "shape", selector: '[data-insert-tool="shape"]', dialog: ".drawing-editor" },
+    { tool: "text box", selector: '[data-insert-tool="text-box"]', dialog: ".drawing-editor" },
+    { tool: "WordArt", selector: '[data-insert-tool="wordArt"]', dialog: ".drawing-editor" },
     {
       tool: "chart",
       selector: '.chart-insert-tools [role="button"][aria-label="Column"]',

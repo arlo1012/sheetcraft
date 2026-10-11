@@ -1,0 +1,47 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/apps/web
+
+ ❯ src/tests/modules/sheet-drawings/text-drawings.test.ts (7 tests | 2 failed) 225ms
+     × textBox renders literal multiline text with font-relative line height 10ms
+     × wordArt renders literal multiline text with font-relative line height 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/modules/sheet-drawings/text-drawings.test.ts > existing text box and WordArt contract > textBox renders literal multiline text with font-relative line height
+AssertionError: expected 'color: #654321; font-size: 28px; font…' to contain 'line-height: normal'
+
+Expected: "line-height: normal"
+Received: "color: #654321; font-size: 28px; font-weight: 400; font-style: italic; background: #abcdef; border: 3px solid #123456;"
+
+ ❯ src/tests/modules/sheet-drawings/text-drawings.test.ts:83:40
+     81|       expect(text.attributes("style")).toContain("font-weight: 400");
+     82|       expect(text.attributes("style")).toContain("font-style: italic");
+     83|       expect(text.attributes("style")).toContain("line-height: normal"…
+       |                                        ^
+     84|       expect(wrapper.get(".drawing-content").attributes("style")).toCo…
+     85|       expect(text.classes().includes("is-word-art")).toBe(kind === "wo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/tests/modules/sheet-drawings/text-drawings.test.ts > existing text box and WordArt contract > wordArt renders literal multiline text with font-relative line height
+AssertionError: expected 'color: #654321; font-size: 28px; font…' to contain 'line-height: normal'
+
+Expected: "line-height: normal"
+Received: "color: #654321; font-size: 28px; font-weight: 400; font-style: italic;"
+
+ ❯ src/tests/modules/sheet-drawings/text-drawings.test.ts:83:40
+     81|       expect(text.attributes("style")).toContain("font-weight: 400");
+     82|       expect(text.attributes("style")).toContain("font-style: italic");
+     83|       expect(text.attributes("style")).toContain("line-height: normal"…
+       |                                        ^
+     84|       expect(wrapper.get(".drawing-content").attributes("style")).toCo…
+     85|       expect(text.classes().includes("is-word-art")).toBe(kind === "wo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 5 passed (7)
+   Start at  22:12:12
+   Duration  4.03s (transform 1.80s, setup 0ms, import 3.47s, tests 225ms, environment 190ms)
+
