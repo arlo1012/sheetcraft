@@ -22,11 +22,11 @@ export function assertSupportedXlsxImageAppearance(
     appearance !== undefined &&
     Object.hasOwn(appearance, "suppressThemeEffects")
   ) {
-    const location = `${issueLocation}.transform.appearance.suppressThemeEffects`;
+    const issuePath = `${issueLocation}.transform.appearance.suppressThemeEffects`;
     throw new XlsxCompatibilityError(
-      `Picture theme-effect suppression is not yet supported by XLSX export at ${location}.`,
+      `Picture theme-effect suppression is not yet supported by XLSX export at ${issuePath}.`,
       {
-        issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [location] }],
+        issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [issuePath] }],
       },
     );
   }
@@ -38,11 +38,11 @@ export function assertSupportedXlsxPicture(
   issueLocation: string,
 ): asserts image is LegacyFloatingImage {
   if (isFramedPictureObject(image) || isPictureGroup(image)) {
-    const location = `${issueLocation}.frame`;
+    const issuePath = `${issueLocation}.frame`;
     throw new XlsxCompatibilityError(
-      `Frame-aware pictures and owned groups are not yet supported by XLSX export at ${location}.`,
+      `Frame-aware pictures and owned groups are not yet supported by XLSX export at ${issuePath}.`,
       {
-        issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [location] }],
+        issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [issuePath] }],
       },
     );
   }
