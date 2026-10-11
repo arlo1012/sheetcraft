@@ -170,6 +170,14 @@
     "./pivot-tables": {
       "types": "./dist/pivot-tables.d.ts",
       "import": "./dist/pivot-tables.js"
+    },
+    "./picture-axis-metrics": {
+      "types": "./dist/picture-axis-metrics.d.ts",
+      "import": "./dist/picture-axis-metrics.js"
+    },
+    "./picture-frame": {
+      "types": "./dist/picture-frame.d.ts",
+      "import": "./dist/picture-frame.js"
     }
   },
   "scripts": {

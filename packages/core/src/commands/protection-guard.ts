@@ -5,7 +5,13 @@ import { MAX_SHEET_ROWS, MAX_SHEET_COLUMNS } from "../sheet-limits.js";
 import { canEditCell, canEditRange } from "../protection.js";
 import { expandSelectionToMergedCellRanges, MergedCellRangeResolver } from "../merged-cells.js";
 import { areCellStylesEqual } from "../style.js";
-import type { Workbook, Sheet, CellAddress } from "../workbook.js";
+import {
+  areFloatingImageCollectionsEqual,
+  type Workbook,
+  type Sheet,
+  type CellAddress,
+} from "../workbook.js";
+import { createSetSheetFloatingImagesCommand } from "./images.js";
 import type { WorkbookCommand } from "./contracts.js";
 
 function reject(sheetId: string): never {
@@ -231,6 +237,18 @@ export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookC
     case "restoreCellStyles":
       return Boolean(sheet.protection?.formatCells);
     case "restoreSheetDimensionState":
+      if (
+        command.floatingImageState !== undefined &&
+        !sheet.protection?.editObjects &&
+        !areFloatingImageCollectionsEqual(
+          sheet.floatingImages,
+          createSetSheetFloatingImagesCommand(sheet.id, command.floatingImageState).images,
+        )
+      )
+        reject(sheet.id);
+      return command.axis === "row"
+        ? Boolean(sheet.protection?.formatRows)
+        : Boolean(sheet.protection?.formatColumns);
     case "resizeSheetDimension":
     case "resizeSheetDimensions":
     case "setSheetDimensionSizes":

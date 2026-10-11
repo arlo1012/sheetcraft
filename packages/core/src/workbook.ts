@@ -3407,6 +3407,17 @@ function areFloatingImagesEqual(
   );
 }
 
+/** Domain equality for ordered picture collections, independent of object-key order. */
+export function areFloatingImageCollectionsEqual(
+  left: readonly FloatingImage[],
+  right: readonly FloatingImage[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((image, index) => areFloatingImagesEqual(image, right[index]))
+  );
+}
+
 export function isCellAddressInBounds(address: CellAddress): boolean {
   return isSheetAddressInBounds(address);
 }

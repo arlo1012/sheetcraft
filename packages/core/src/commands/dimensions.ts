@@ -8,6 +8,8 @@ import {
   MIN_COLUMN_WIDTH,
   MIN_ROW_HEIGHT,
   getDefaultColumnWidth,
+  cloneFloatingImage,
+  areFloatingImageCollectionsEqual,
   setDefaultColumnWidth,
   setColumnWidth,
   setSheetDimensionHidden,
@@ -25,6 +27,7 @@ import type {
   SetSheetDimensionSizesCommand,
 } from "./contracts.js";
 import { getSheetOrThrow, invalidCommandPayload } from "./helpers.js";
+import { createSetSheetFloatingImagesCommand } from "./images.js";
 
 export function createResizeSheetDimensionCommand(
   sheetId: string,
@@ -123,6 +126,7 @@ function createRestoreSheetDimensionStateCommand(
     axis,
     dimensions: [...dimensions].map(([index, size]) => ({ index, size })),
     hiddenIndexes,
+    floatingImageState: sheet.floatingImages.map(cloneFloatingImage),
     ...(axis === "column" ? { defaultColumnWidth: getDefaultColumnWidth(sheet) } : {}),
   };
 }
@@ -267,6 +271,19 @@ export function applyRestoreSheetDimensionStateCommand(
     if (hidden.has(index)) throw invalidCommandPayload("hiddenIndexes", command.hiddenIndexes);
     hidden.add(index);
   }
+  const pictures =
+    command.floatingImageState === undefined
+      ? undefined
+      : createSetSheetFloatingImagesCommand(command.sheetId, command.floatingImageState).images;
+  const currentHidden = command.axis === "row" ? sheet.hiddenRows : sheet.hiddenColumns;
+  const unchanged =
+    dimensions.size === command.dimensions.length &&
+    command.dimensions.every(({ index, size }) => dimensions.get(index) === size) &&
+    (currentHidden?.size ?? 0) === hidden.size &&
+    [...hidden].every((index) => currentHidden?.has(index)) &&
+    (command.axis === "row" || getDefaultColumnWidth(sheet) === defaultColumnWidth) &&
+    (pictures === undefined || areFloatingImageCollectionsEqual(sheet.floatingImages, pictures));
+  if (unchanged) return null;
   const inverse = createRestoreSheetDimensionStateCommand(command.sheetId, command.axis, sheet);
   dimensions.clear();
   for (const dimension of command.dimensions) dimensions.set(dimension.index, dimension.size);
@@ -275,5 +292,6 @@ export function applyRestoreSheetDimensionStateCommand(
     sheet.hiddenColumns = hidden;
     sheet.defaultColumnWidth = defaultColumnWidth;
   }
+  if (pictures !== undefined) sheet.floatingImages = pictures;
   return inverse;
 }

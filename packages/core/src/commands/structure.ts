@@ -16,6 +16,7 @@ import {
   cloneCellNote,
   cloneCellNamedStyleBinding,
   cloneFloatingImage,
+  areFloatingImageCollectionsEqual,
   cloneSheetTable,
   createCellKey,
   createSheetSparseState,
@@ -82,6 +83,7 @@ import {
   type SheetPageSetup,
 } from "../page-setup.js";
 import { cloneSheetPageDecoration } from "../page-decoration.js";
+import { createSetSheetFloatingImagesCommand } from "./images.js";
 import type {
   DeleteSheetAxisCommand,
   InsertSheetAxisCommand,
@@ -236,6 +238,9 @@ function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
       image: cloneFloatingImage(image),
       index,
     })),
+    ...(slice.floatingImageState === undefined
+      ? {}
+      : { floatingImageState: slice.floatingImageState.map(cloneFloatingImage) }),
     ...(slice.sparklineSources
       ? {
           sparklineSources: slice.sparklineSources.map((entry) => ({
@@ -891,6 +896,7 @@ function transformSheetAxis(
   count: number,
   maximum: number,
   operation: "insert" | "delete",
+  transformPictures = true,
 ): boolean {
   const cells = [...sheet.cells].flatMap(([key, cell]) => {
     const address = parseCellKey(key);
@@ -1004,7 +1010,7 @@ function transformSheetAxis(
     changed = true;
   }
   const transformedFloatingImages: FloatingImage[] = [];
-  for (const image of sheet.floatingImages) {
+  for (const image of transformPictures ? sheet.floatingImages : []) {
     const sourceIndex = axis === "row" ? image.anchor.row : image.anchor.column;
     const targetIndex = transformAxisIndex(sourceIndex, index, count, maximum, operation);
     if (targetIndex === null) {
@@ -1023,7 +1029,7 @@ function transformSheetAxis(
       changed = true;
     }
   }
-  sheet.floatingImages = transformedFloatingImages;
+  if (transformPictures) sheet.floatingImages = transformedFloatingImages;
   return changed;
 }
 
@@ -1084,6 +1090,7 @@ function captureSheetAxisSlice(
     dimensions: capturedDimensions,
     hiddenIndexes: capturedHiddenIndexes,
     floatingImages,
+    floatingImageState: sheet.floatingImages.map(cloneFloatingImage),
     formulaSources,
     sparklineSources: [...sheet.cells].flatMap(([key, cell]) =>
       cell.sparkline
@@ -1137,14 +1144,22 @@ function restoreSheetAxisSlice(
     hiddenIndexes?.add(hiddenIndex);
     changed = true;
   }
-  for (const { image, index } of slice.floatingImages) {
-    if (sheet.floatingImages.some((current) => current.id === image.id)) continue;
-    sheet.floatingImages.splice(
-      Math.min(index, sheet.floatingImages.length),
-      0,
-      cloneFloatingImage(image),
-    );
-    changed = true;
+  if (slice.floatingImageState !== undefined) {
+    const pictures = slice.floatingImageState.map(cloneFloatingImage);
+    if (!areFloatingImageCollectionsEqual(sheet.floatingImages, pictures)) {
+      sheet.floatingImages = pictures;
+      changed = true;
+    }
+  } else {
+    for (const { image, index } of slice.floatingImages) {
+      if (sheet.floatingImages.some((current) => current.id === image.id)) continue;
+      sheet.floatingImages.splice(
+        Math.min(index, sheet.floatingImages.length),
+        0,
+        cloneFloatingImage(image),
+      );
+      changed = true;
+    }
   }
   for (const entry of slice.sparklineSources ?? [])
     if (setCellSparkline(sheet, entry.address, entry.sparkline)) changed = true;
@@ -1184,6 +1199,8 @@ function validateSheetAxisSlice(
   if (command.operation !== "insert" && command.operation !== "delete") {
     throw invalidCommandPayload("operation", command.operation);
   }
+  if (command.slice.floatingImageState !== undefined)
+    createSetSheetFloatingImagesCommand(command.sheetId, command.slice.floatingImageState);
   const start = command.operation === "insert" ? maximum - command.count : command.index;
   const end = command.operation === "insert" ? maximum : command.index + command.count;
   for (const cell of command.slice.cells) {
@@ -1417,6 +1434,7 @@ export function applyRestoreSheetStateCommand(
       command.count,
       maximum,
       inverseOperation,
+      command.slice.floatingImageState === undefined,
     );
     const metadataTransformed = setSheetMetadata(sheet, nextMetadata);
     const restored = restoreSheetAxisSlice(sheet, command.axis, command.slice);

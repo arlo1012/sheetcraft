@@ -340,6 +340,8 @@ export type RestoreSheetDimensionStateCommand = {
   dimensions: SheetSparseDimension[];
   hiddenIndexes: number[];
   defaultColumnWidth?: number;
+  /** Exact ordered pictures; undefined reads legacy inverses without this field. */
+  floatingImageState?: FloatingImage[];
 };
 
 export type SetSheetFreezePanesCommand = {
@@ -769,6 +771,8 @@ export type SheetAxisSparseSlice = {
   hiddenIndexes?: number[];
   /** Images removed from the structural operation, preserving their sheet order. */
   floatingImages: Array<{ image: FloatingImage; index: number }>;
+  /** Complete ordered pictures, including retained objects changed by reflow. */
+  floatingImageState?: FloatingImage[];
   /** Exact raw formula sources before the structural change, for lossless undo. */
   formulaSources?: Array<{ address: CellAddress; source: string }>;
   sparklineSources?: Array<{ address: CellAddress; sparkline: CellSparkline }>;
