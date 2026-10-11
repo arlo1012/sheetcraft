@@ -4,6 +4,8 @@ import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import { formatCellContentForInput } from "@sheetcraft/core/input";
 import { getCellContent, type CellAddress, type Workbook } from "@sheetcraft/core/workbook";
 import type { CellEditSession } from "../../shared/cell-editing/useCellEditSession";
+import { cloneCellTextFontRuns } from "@sheetcraft/core/text-font-runs";
+import type { CellTextFontRun } from "@sheetcraft/core/formula";
 import { useAppI18n } from "../../shared/i18n";
 import { previewFormulaInput } from "./formula-value-preview";
 
@@ -24,6 +26,7 @@ export function useFormulaEditorController(options: {
   let priorDraft:
     | {
         value: string;
+        fontRuns?: CellTextFontRun[];
         start: number;
         end: number;
         direction: "none" | "forward" | "backward";
@@ -79,7 +82,12 @@ export function useFormulaEditorController(options: {
   function open(): void {
     if (visible.value || disabled.value || !sheet.value) return;
     const previous = session.state.active
-      ? { value: session.state.draft, ...session.state.selection, mode: session.state.mode }
+      ? {
+          value: session.state.draft,
+          fontRuns: cloneCellTextFontRuns(session.state.draftFontRuns),
+          ...session.state.selection,
+          mode: session.state.mode,
+        }
       : undefined;
     const { sheetId, address } = target.value;
     if (
@@ -88,6 +96,7 @@ export function useFormulaEditorController(options: {
           sheetId,
           address,
           input: formatCellContentForInput(getCellContent(sheet.value, address)),
+          content: getCellContent(sheet.value, address),
         },
         { surface: "formula-bar", mode: "append" },
       )
@@ -126,7 +135,7 @@ export function useFormulaEditorController(options: {
   function close(): void {
     if (session.state.composing) return;
     if (priorDraft) {
-      session.setDraft(priorDraft.value);
+      session.restoreDraft({ text: priorDraft.value, fontRuns: priorDraft.fontRuns });
       session.setSelection(priorDraft.start, priorDraft.end, priorDraft.direction);
       session.setMode(priorDraft.mode);
     } else session.cancel();

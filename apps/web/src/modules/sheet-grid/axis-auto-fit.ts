@@ -1,5 +1,7 @@
 import { formatComputedValueForDisplay, MergedCellRangeResolver } from "@sheetcraft/core";
 import type { FormulaValue } from "@sheetcraft/core/formula";
+import type { CellStyle } from "@sheetcraft/core/style";
+import type { CellTextDocument } from "@sheetcraft/core/text-font-runs";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
@@ -20,6 +22,12 @@ import {
 } from "@sheetcraft/sheet-engine/text-layout";
 import { WRAPPED_CELL_LINE_HEIGHT } from "@sheetcraft/sheet-engine/row-height";
 import {
+  getAttributedTextLineHeight,
+  getAttributedTextLayoutLineHeights,
+  getAttributedTextSegments,
+  splitAttributedTextLines,
+} from "@sheetcraft/sheet-engine/attributed-text-layout";
+import {
   getCellIndentPixels,
   getCellTextRenderFont,
   isCellTextWrapped,
@@ -37,6 +45,14 @@ export type AxisAutoFitInput = Readonly<{
   getComputedValue: (address: CellAddress, cell: Readonly<Cell>) => FormulaValue;
   /** Supplies the same locale and number-format text used by the cell renderer. */
   formatValue?: (address: CellAddress, cell: Readonly<Cell>, value: FormulaValue) => string;
+  /** Formatted text with verified UTF-16 font-run projection, as used by the renderer. */
+  formatPresentation?: (
+    address: CellAddress,
+    cell: Readonly<Cell>,
+    value: FormulaValue,
+  ) => CellTextDocument;
+  /** Effective table/theme/conditional style. Stored cell styles are never modified. */
+  getCellStyle?: (address: CellAddress, cell: Readonly<Cell>) => Readonly<CellStyle> | undefined;
   measurer: TextMeasurer;
 }>;
 
@@ -77,7 +93,7 @@ function hasLineBreak(text: string): boolean {
   return /[\r\n]/u.test(text);
 }
 
-function getText(
+function getTextGeometry(
   text: string,
   value: FormulaValue,
   style: Cell["style"],
@@ -85,8 +101,8 @@ function getText(
   measurer: TextMeasurer,
 ): {
   font: AutoRowHeightFont;
-  lines: ReturnType<typeof splitCellTextLines>;
   wrap: boolean;
+  availableWidth: number;
 } {
   const font = getCellTextRenderFont(style);
   const wrap = isCellTextWrapped(style);
@@ -103,7 +119,135 @@ function getText(
     (horizontal === "left" && !wrap && !hasLineBreak(text) ? 0 : CELL_HORIZONTAL_INSET) +
     (horizontal === "right" || horizontal === "distributed" ? indent : 0);
   const availableWidth = Math.max(1, width - leftInset - rightInset - GRIDLINE_WIDTH);
-  return { font, lines: splitCellTextLines(text, availableWidth, font, measurer, wrap), wrap };
+  return { font, wrap, availableWidth };
+}
+
+function getText(
+  text: string,
+  value: FormulaValue,
+  style: Cell["style"],
+  width: number,
+  measurer: TextMeasurer,
+) {
+  const geometry = getTextGeometry(text, value, style, width, measurer);
+  return {
+    ...geometry,
+    lines: splitCellTextLines(
+      text,
+      geometry.availableWidth,
+      geometry.font,
+      measurer,
+      geometry.wrap,
+    ),
+  };
+}
+
+function getStackedTextExtents(
+  document: CellTextDocument,
+  font: AutoRowHeightFont,
+  measurer: TextMeasurer,
+): { width: number; height: number } {
+  let width = 0;
+  let height = font.size * WRAPPED_CELL_LINE_HEIGHT;
+  for (const paragraph of splitAttributedTextLines(document, Infinity, font, measurer, false)) {
+    let offset = paragraph.start;
+    let segmentIndex = 0;
+    let paragraphWidth = font.size;
+    let paragraphHeight = 0;
+    for (const grapheme of getCellTextGraphemes(paragraph.text)) {
+      while (paragraph.segments[segmentIndex] && paragraph.segments[segmentIndex]!.end <= offset)
+        segmentIndex++;
+      const effectiveFont = paragraph.segments[segmentIndex]?.font ?? font;
+      const metrics = measurer.measureMetrics?.(grapheme, effectiveFont);
+      const graphemeWidth =
+        metrics && Number.isFinite(metrics.width)
+          ? metrics.width
+          : measurer.measure(grapheme, effectiveFont);
+      paragraphWidth = Math.max(paragraphWidth, graphemeWidth);
+      paragraphHeight = Math.min(
+        MAX_ROW_HEIGHT,
+        paragraphHeight +
+          getAttributedTextLineHeight(metrics ?? {}, effectiveFont, WRAPPED_CELL_LINE_HEIGHT),
+      );
+      offset += grapheme.length;
+    }
+    width = Math.min(MAX_COLUMN_WIDTH, width + paragraphWidth);
+    height = Math.max(height, paragraphHeight);
+  }
+  return { width, height };
+}
+
+function getAttributedAutoFitRowHeight(
+  document: CellTextDocument,
+  value: FormulaValue,
+  cell: Readonly<Cell>,
+  columnWidth: number,
+  measurer: TextMeasurer,
+): number {
+  const { font, wrap, availableWidth } = getTextGeometry(
+    document.text,
+    value,
+    cell.style,
+    columnWidth,
+    measurer,
+  );
+  const rotation = cell.style?.textRotation;
+  let height: number;
+  if (rotation === "vertical") height = getStackedTextExtents(document, font, measurer).height;
+  else {
+    const lines = splitAttributedTextLines(document, availableWidth, font, measurer, wrap);
+    const heights = getAttributedTextLayoutLineHeights(
+      document,
+      lines,
+      font,
+      WRAPPED_CELL_LINE_HEIGHT,
+      cell.style?.textDirection,
+    );
+    height = heights.reduce((sum, lineHeight) => Math.min(MAX_ROW_HEIGHT, sum + lineHeight), 0);
+    if (typeof rotation === "number" && rotation !== 0) {
+      const radians = (Math.abs(rotation) * Math.PI) / 180;
+      const width = Math.max(0, ...lines.map((line) => line.width));
+      height = width * Math.abs(Math.sin(radians)) + height * Math.abs(Math.cos(radians));
+    }
+  }
+  return clamp(height + CELL_VERTICAL_INSET + GRIDLINE_WIDTH, MIN_ROW_HEIGHT, MAX_ROW_HEIGHT);
+}
+
+function getAttributedAutoFitColumnWidth(
+  document: CellTextDocument,
+  value: FormulaValue,
+  cell: Readonly<Cell>,
+  measurer: TextMeasurer,
+): number {
+  const font = getCellTextRenderFont(cell.style);
+  const rotation = cell.style?.textRotation;
+  let width: number;
+  if (rotation === "vertical") width = getStackedTextExtents(document, font, measurer).width;
+  else {
+    const lines = splitAttributedTextLines(document, Infinity, font, measurer, false);
+    width = Math.max(0, ...lines.map((line) => line.width));
+    if (typeof rotation === "number" && rotation !== 0) {
+      const radians = (Math.abs(rotation) * Math.PI) / 180;
+      const height = getAttributedTextLayoutLineHeights(
+        document,
+        lines,
+        font,
+        WRAPPED_CELL_LINE_HEIGHT,
+        cell.style?.textDirection,
+      ).reduce((sum, lineHeight) => sum + lineHeight, 0);
+      width = width * Math.abs(Math.cos(radians)) + height * Math.abs(Math.sin(radians));
+    }
+  }
+  const horizontal = resolveCellHorizontalAlignment(
+    cell.style?.horizontalAlign,
+    value,
+    resolveCellTextDirection(document.text, cell.style?.textDirection),
+  );
+  const inset =
+    horizontal === "left" || horizontal === "right"
+      ? CELL_HORIZONTAL_INSET + getCellIndentPixels(cell.style, measurer)
+      : CELL_HORIZONTAL_INSET * 2;
+  return clamp(width + inset + GRIDLINE_WIDTH, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH);
 }
 
 function getAutoFitRowHeight(
@@ -189,12 +333,59 @@ function getFormattedCellText(
   input: AxisAutoFitInput,
   address: CellAddress,
   cell: Readonly<Cell>,
-): { text: string; value: FormulaValue } {
+): { document: CellTextDocument; text: string; value: FormulaValue; cell: Readonly<Cell> } {
   const value = input.getComputedValue(address, cell);
-  return {
-    text: input.formatValue?.(address, cell, value) ?? formatComputedValueForDisplay(value),
-    value,
+  const effectiveCell = input.getCellStyle
+    ? { ...cell, style: input.getCellStyle(address, cell) }
+    : cell;
+  const document = input.formatPresentation?.(address, effectiveCell, value) ?? {
+    text:
+      input.formatValue?.(address, effectiveCell, value) ?? formatComputedValueForDisplay(value),
+    ...(!input.formatValue &&
+    cell.content?.kind === "literal" &&
+    typeof cell.content.value === "string" &&
+    cell.content.value === value &&
+    cell.content.fontRuns?.length
+      ? { fontRuns: cell.content.fontRuns }
+      : {}),
   };
+  return {
+    document,
+    text: document.text,
+    value,
+    cell: effectiveCell,
+  };
+}
+
+/** Families that will actually be measured, excluding hidden and merged targets. */
+export function getAxisAutoFitFontFamilies(
+  input: AxisAutoFitInput,
+  axis: "row" | "column",
+): ReadonlySet<string> {
+  const families = new Set<string>();
+  const merged = new MergedCellRangeResolver(input.sheet.mergedCells);
+  const blocked = getMergedAxisIndexes(input.range, input.sheet.mergedCells, axis);
+  for (const [key, storedCell] of input.sheet.cells) {
+    const address = parseCellAddress(key);
+    if (
+      !address ||
+      !isInRange(address, input.range) ||
+      storedCell.content?.kind === "image" ||
+      isAxisHidden(input.sheet, "row", address.row) ||
+      isAxisHidden(input.sheet, "column", address.column) ||
+      blocked.has(address[axis]) ||
+      merged.getRangeAtAddress(address)
+    )
+      continue;
+    const { document, cell } = getFormattedCellText(input, address, storedCell);
+    if (!document.text) continue;
+    const font = getCellTextRenderFont(cell.style);
+    if (document.fontRuns?.length) {
+      for (const segment of getAttributedTextSegments(document, font))
+        if (segment.text.replace(/[\r\n]/gu, "")) families.add(segment.font.family);
+    } else families.add(font.family);
+  }
+  return families;
 }
 
 function differs(current: number | undefined, next: number, fallback: number): boolean {
@@ -260,15 +451,17 @@ export function getAutoFitRowHeights(input: AxisAutoFitInput): Map<number, numbe
       merged.getRangeAtAddress(address)
     )
       continue;
-    const { text, value } = getFormattedCellText(input, address, cell);
-    if (!text) continue;
-    const height = getAutoFitRowHeight(
+    const {
+      document,
       text,
       value,
-      cell,
-      getColumnWidth(sheet, address.column),
-      input.measurer,
-    );
+      cell: effectiveCell,
+    } = getFormattedCellText(input, address, cell);
+    if (!text) continue;
+    const columnWidth = getColumnWidth(sheet, address.column);
+    const height = document.fontRuns?.length
+      ? getAttributedAutoFitRowHeight(document, value, effectiveCell, columnWidth, input.measurer)
+      : getAutoFitRowHeight(text, value, effectiveCell, columnWidth, input.measurer);
     measured.set(address.row, Math.max(measured.get(address.row) ?? 0, height));
   }
 
@@ -314,9 +507,16 @@ export function getAutoFitColumnWidths(input: AxisAutoFitInput): Map<number, num
       merged.getRangeAtAddress(address)
     )
       continue;
-    const { text, value } = getFormattedCellText(input, address, cell);
+    const {
+      document,
+      text,
+      value,
+      cell: effectiveCell,
+    } = getFormattedCellText(input, address, cell);
     if (!text) continue;
-    const width = getAutoFitColumnWidth(text, value, cell, input.measurer);
+    const width = document.fontRuns?.length
+      ? getAttributedAutoFitColumnWidth(document, value, effectiveCell, input.measurer)
+      : getAutoFitColumnWidth(text, value, effectiveCell, input.measurer);
     measured.set(address.column, Math.max(measured.get(address.column) ?? 0, width));
   }
 

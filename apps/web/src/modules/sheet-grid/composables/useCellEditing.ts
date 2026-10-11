@@ -1,5 +1,6 @@
 import { computed, nextTick, ref } from "vue";
 import type { CellAddress } from "@sheetcraft/core/workbook";
+import type { CellContent } from "@sheetcraft/core/formula";
 import type { CellSelection } from "@sheetcraft/sheet-engine/selection";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 import { isCellEditSessionTarget } from "../../../shared/cell-editing/cell-edit-focus";
@@ -7,6 +8,7 @@ import {
   useCellEditSession,
   type CellEditSession,
   type CellEditFinishOptions,
+  type CellEditCommit,
 } from "../../../shared/cell-editing/useCellEditSession";
 
 export type CellEditorHandle = {
@@ -24,15 +26,17 @@ export function useCellEditing(options: {
   getSheetId?: () => string;
   getActiveCell: () => CellAddress;
   getInputValue: () => string;
+  getContent?: () => CellContent | null;
+  getAsText?: () => boolean;
   onClearClipboard: () => void;
-  onCommit: (payload: { address: CellAddress; input: string }) => void;
+  onCommit: (payload: CellEditCommit) => void;
   onSelectionChange: (selection: CellSelection) => void;
 }) {
   const editorRef = ref<CellEditorHandle | null>(null);
   const editSession =
     options.session ??
     useCellEditSession({
-      onCommit: ({ address, input }) => options.onCommit({ address, input }),
+      onCommit: (payload) => options.onCommit(payload),
     });
   const isEditing = computed(
     () => editSession.state.active && editSession.state.owner?.sheetId === options.getSheetId?.(),
@@ -55,6 +59,8 @@ export function useCellEditing(options: {
     return {
       address: { ...options.getActiveCell() },
       input: options.getInputValue(),
+      content: options.getContent?.(),
+      asText: options.getAsText?.(),
       ...(sheetId === undefined ? {} : { sheetId }),
     };
   }

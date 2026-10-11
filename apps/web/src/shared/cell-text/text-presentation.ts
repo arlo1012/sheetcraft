@@ -5,18 +5,29 @@ import {
   type CellTextDirection,
   type HorizontalCellAlignment,
 } from "@sheetcraft/core/style";
-import type { FormulaValue } from "@sheetcraft/core/formula";
+import type { CellTextFontRun, FormulaValue } from "@sheetcraft/core/formula";
 import type { CellNumberFormatPresentation } from "@sheetcraft/core/number-format";
 import {
   getCellTextGraphemes,
   splitCellTextLines,
   MAX_CELL_TEXT_LAYOUT_LINES,
+  type CellTextLine as PlainCellTextLine,
 } from "@sheetcraft/sheet-engine/text-layout";
 import {
   WRAPPED_CELL_LINE_HEIGHT,
   type AutoRowHeightFont,
   type TextMeasurer,
 } from "@sheetcraft/sheet-engine/row-height";
+import {
+  getAttributedTextLineHeight,
+  getAttributedTextLayoutLineHeights,
+  measureAttributedText,
+  requiresAttributedNativeBidiLayout,
+  splitAttributedTextLines,
+  type MeasuredAttributedTextSegment,
+  type AttributedTextLine,
+} from "@sheetcraft/sheet-engine/attributed-text-layout";
+import { normalizeCellTextFontRuns, type CellTextDocument } from "@sheetcraft/core/text-font-runs";
 import { getCellTextRenderFontSize } from "./font-presentation";
 
 export type ResolvedCellTextAlignment =
@@ -32,6 +43,12 @@ export type CellTextLine = Readonly<{
   y: number;
   width: number;
   align: "left" | "right" | "center" | "justify";
+  /** Logical-order, complete effective-family spans, preserving grapheme affinity. */
+  segments?: readonly MeasuredAttributedTextSegment[];
+  textWidth?: number;
+  height?: number;
+  ascent?: number;
+  descent?: number;
 }>;
 export type CellTextLayout = Readonly<{
   direction: "ltr" | "rtl";
@@ -46,6 +63,10 @@ export type CellTextLayout = Readonly<{
   angle: number;
   rotationX: number;
   rotationY: number;
+  /** Multi-family bidi needs paragraph-level visual runs or a browser DOM fallback. */
+  canvasBidiRequired?: true;
+  /** Final display text, including fill expansion; native bidi must see whole paragraphs. */
+  bidiDocument?: CellTextDocument;
 }>;
 
 export function resolveCellTextDirection(
@@ -112,23 +133,80 @@ export function getCellIndentPixels(
   return style.indent * measurer.measure("   ", getCellTextFont());
 }
 
+export type CellTextFillFontRuns = Readonly<{
+  /** UTF-16 offsets into fill.before and fill.after, respectively. */
+  before?: readonly CellTextFontRun[];
+  after?: readonly CellTextFontRun[];
+}>;
+
 function expandedNumberFill(
-  text: string,
+  document: CellTextDocument,
   fill: CellNumberFormatPresentation["fill"],
+  fillFontRuns: CellTextFillFontRuns | undefined,
   width: number,
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
-): string {
-  if (!fill) return text;
+): CellTextDocument {
+  if (!fill) return document;
+  if (document.fontRuns?.length && !fillFontRuns)
+    throw new RangeError("Number-format font runs require verified before/after projection.");
+  const beforeRuns = normalizeCellTextFontRuns(fill.before, fillFontRuns?.before) ?? [];
+  const afterRuns = normalizeCellTextFontRuns(fill.after, fillFontRuns?.after) ?? [];
+  const unfilled = {
+    text: fill.before + fill.after,
+    fontRuns: [
+      ...beforeRuns,
+      ...afterRuns.map((run) => ({
+        ...run,
+        start: run.start + fill.before.length,
+        end: run.end + fill.before.length,
+      })),
+    ],
+  };
   const characterWidth = measurer.measure(fill.character, font);
-  const remaining = width - measurer.measure(fill.before + fill.after, font);
+  const unfilledWidth = unfilled.fontRuns.length
+    ? measureAttributedText(unfilled, font, measurer)
+    : measurer.measure(unfilled.text, font);
+  const remaining = width - unfilledWidth;
   const repetitions =
     characterWidth > 0 ? Math.min(10000, Math.max(0, Math.floor(remaining / characterWidth))) : 0;
-  return fill.before + fill.character.repeat(repetitions) + fill.after;
+  const repeated = fill.character.repeat(repetitions);
+  const afterOffset = fill.before.length + repeated.length;
+  const fontRuns = [
+    ...beforeRuns,
+    ...afterRuns.map((run) => ({
+      ...run,
+      start: run.start + afterOffset,
+      end: run.end + afterOffset,
+    })),
+  ];
+  return {
+    text: fill.before + repeated + fill.after,
+    ...(fontRuns.length ? { fontRuns } : {}),
+  };
+}
+
+function repeatTextDocument(document: CellTextDocument, count: number): CellTextDocument {
+  const fontRuns = document.fontRuns?.length
+    ? Array.from({ length: count }, (_, index) =>
+        document.fontRuns!.map((run) => ({
+          ...run,
+          start: run.start + index * document.text.length,
+          end: run.end + index * document.text.length,
+        })),
+      ).flat()
+    : undefined;
+  return { text: document.text.repeat(count), ...(fontRuns ? { fontRuns } : {}) };
+}
+
+function isAttributedTextLine(line: PlainCellTextLine): line is AttributedTextLine {
+  return "segments" in line;
 }
 
 export function layoutCellText(options: {
   text: string;
+  fontRuns?: readonly CellTextFontRun[];
+  fillFontRuns?: CellTextFillFontRuns;
   value?: FormulaValue;
   style?: Readonly<CellStyle>;
   fill?: CellNumberFormatPresentation["fill"];
@@ -157,26 +235,142 @@ export function layoutCellText(options: {
   const cosine = Math.cos(radians);
   const sine = Math.sin(radians);
   const stacked = style?.textRotation === "vertical";
-  let renderedText = expandedNumberFill(text, options.fill, availableWidth, font, measurer);
+  let renderedDocument = expandedNumberFill(
+    { text, fontRuns: options.fontRuns },
+    options.fill,
+    options.fillFontRuns,
+    availableWidth,
+    font,
+    measurer,
+  );
+  const attributed = Boolean(renderedDocument.fontRuns?.length);
+  const measure = (document: CellTextDocument) =>
+    attributed
+      ? measureAttributedText(document, font, measurer)
+      : measurer.measure(document.text, font);
+  if (attributed && style?.shrinkToFit && !multiline && !stacked && horizontal !== "fill") {
+    lineHeight = Math.max(
+      lineHeight,
+      ...splitAttributedTextLines(renderedDocument, availableWidth, font, measurer, false).map(
+        (line) => getAttributedTextLineHeight(line, font, WRAPPED_CELL_LINE_HEIGHT),
+      ),
+    );
+  }
   if (style?.shrinkToFit && !multiline && !stacked && horizontal !== "fill") {
-    const naturalWidth = measurer.measure(renderedText, font);
+    const naturalWidth = measure(renderedDocument);
     const rotatedWidth = naturalWidth * Math.abs(cosine) + lineHeight * Math.abs(sine);
     const factor = rotatedWidth > 0 ? Math.min(1, availableWidth / rotatedWidth) : 1;
     font = { ...font, size: Math.max(1, font.size * factor) };
     lineHeight = font.size * WRAPPED_CELL_LINE_HEIGHT;
   }
   if (horizontal === "fill" && text) {
-    const textWidth = measurer.measure(renderedText, font);
+    const textWidth = measure(renderedDocument);
     const count =
       textWidth > 0 ? Math.min(10000, Math.max(1, Math.floor(availableWidth / textWidth))) : 1;
-    renderedText = renderedText.repeat(count);
+    renderedDocument = repeatTextDocument(renderedDocument, count);
   }
 
+  const renderedText = renderedDocument.text;
+  const canvasBidiRequired =
+    attributed && !stacked && requiresAttributedNativeBidiLayout(renderedDocument, font, direction);
   let lines: CellTextLine[] = [];
   let width: number;
   let naturalHeight: number;
   const vertical = style?.verticalAlign ?? "bottom";
-  if (stacked) {
+  if (stacked && attributed) {
+    const paragraphs = splitAttributedTextLines(
+      renderedDocument,
+      availableWidth,
+      font,
+      measurer,
+      false,
+    );
+    const columns = paragraphs.map((paragraph) => {
+      let offset = paragraph.start;
+      let segmentIndex = 0;
+      return getCellTextGraphemes(paragraph.text).map((grapheme) => {
+        const start = offset;
+        offset += grapheme.length;
+        while (paragraph.segments[segmentIndex] && paragraph.segments[segmentIndex]!.end <= start)
+          segmentIndex++;
+        const graphemeFont = paragraph.segments[segmentIndex]?.font ?? font;
+        const metrics = measurer.measureMetrics?.(grapheme, graphemeFont);
+        const validExtents =
+          metrics &&
+          Number.isFinite(metrics.ascent) &&
+          metrics.ascent >= 0 &&
+          Number.isFinite(metrics.descent) &&
+          metrics.descent >= 0;
+        const segments = [
+          {
+            text: grapheme,
+            start,
+            end: offset,
+            font: graphemeFont,
+            width:
+              metrics && Number.isFinite(metrics.width)
+                ? metrics.width
+                : measurer.measure(grapheme, graphemeFont),
+            ...(validExtents ? { ascent: metrics.ascent, descent: metrics.descent } : {}),
+          },
+        ];
+        const ascent = segments.every((segment) => segment.ascent !== undefined)
+          ? Math.max(0, ...segments.map((segment) => segment.ascent!))
+          : undefined;
+        const descent = segments.every((segment) => segment.descent !== undefined)
+          ? Math.max(0, ...segments.map((segment) => segment.descent!))
+          : undefined;
+        return {
+          text: grapheme,
+          segments,
+          ascent,
+          descent,
+          textWidth: segments.reduce((total, segment) => total + segment.width, 0),
+          height: getAttributedTextLineHeight({ ascent, descent }, font, WRAPPED_CELL_LINE_HEIGHT),
+        };
+      });
+    });
+    const columnWidths = columns.map((column) =>
+      Math.max(font.size, ...column.map((line) => line.textWidth)),
+    );
+    lineHeight = Math.max(
+      font.size * WRAPPED_CELL_LINE_HEIGHT,
+      ...columns.flatMap((column) => column.map((line) => line.height)),
+    );
+    width = Math.max(
+      1,
+      columnWidths.reduce((total, current) => total + current, 0),
+    );
+    naturalHeight = Math.max(
+      font.size * WRAPPED_CELL_LINE_HEIGHT,
+      ...columns.map((column) => column.reduce((total, line) => total + line.height, 0)),
+    );
+    const horizontalOffset =
+      horizontal === "right"
+        ? availableWidth - width
+        : horizontal === "center"
+          ? (availableWidth - width) / 2
+          : 0;
+    let columnStart = 0;
+    columns.forEach((column, columnIndex) => {
+      const columnWidth = columnWidths[columnIndex]!;
+      const x = direction === "rtl" ? width - columnStart - columnWidth : columnStart;
+      columnStart += columnWidth;
+      if (x + horizontalOffset + columnWidth < 0 || x + horizontalOffset > availableWidth) return;
+      let y = 0;
+      for (const line of column) {
+        if (lines.length >= MAX_CELL_TEXT_LAYOUT_LINES || y > availableHeight) break;
+        lines.push({
+          ...line,
+          x,
+          y,
+          width: columnWidth,
+          align: "center",
+        });
+        y += line.height;
+      }
+    });
+  } else if (stacked) {
     const columns = renderedText.replace(/\r\n?/gu, "\n").split("\n").map(getCellTextGraphemes);
     const columnWidth = columns.reduce(
       (widest, column) =>
@@ -209,12 +403,29 @@ export function layoutCellText(options: {
       }
     });
   } else {
-    const paragraphs = splitCellTextLines(renderedText, availableWidth, font, measurer, wrap);
+    const attributedParagraphs = attributed
+      ? splitAttributedTextLines(renderedDocument, availableWidth, font, measurer, wrap)
+      : undefined;
+    const paragraphs =
+      attributedParagraphs ??
+      splitCellTextLines(renderedText, availableWidth, font, measurer, wrap);
+    const heights = attributedParagraphs
+      ? getAttributedTextLayoutLineHeights(
+          renderedDocument,
+          attributedParagraphs,
+          font,
+          WRAPPED_CELL_LINE_HEIGHT,
+          direction,
+        )
+      : paragraphs.map(() => lineHeight);
+    if (attributed) lineHeight = Math.max(...heights);
     width =
       wrap || options.fill || horizontal === "fill"
         ? availableWidth
         : Math.max(1, ...paragraphs.map((line) => line.width));
-    naturalHeight = paragraphs.length * lineHeight;
+    naturalHeight = attributed
+      ? heights.reduce((total, height) => total + height, 0)
+      : paragraphs.length * lineHeight;
     const spare = Math.max(0, availableHeight - naturalHeight);
     const spread =
       angle === 0 &&
@@ -223,6 +434,7 @@ export function layoutCellText(options: {
     const gap = spread
       ? spare / (vertical === "distributed" ? paragraphs.length : paragraphs.length - 1)
       : 0;
+    let lineY = spread && vertical === "distributed" ? gap / 2 : 0;
     lines = paragraphs.map((line, index) => {
       const justified =
         horizontal === "distributed" || (horizontal === "justify" && !line.paragraphEnd);
@@ -239,10 +451,23 @@ export function layoutCellText(options: {
               : direction === "rtl" && horizontal === "justify"
                 ? "right"
                 : "left";
+      const y = attributed
+        ? lineY
+        : index * (lineHeight + gap) + (spread && vertical === "distributed" ? gap / 2 : 0);
+      lineY += heights[index]! + gap;
       return {
+        ...(isAttributedTextLine(line)
+          ? {
+              segments: line.segments,
+              textWidth: line.width,
+              height: heights[index],
+              ascent: line.ascent,
+              descent: line.descent,
+            }
+          : {}),
         text: line.text,
         x: 0,
-        y: index * (lineHeight + gap) + (spread && vertical === "distributed" ? gap / 2 : 0),
+        y,
         width,
         align,
       };
@@ -293,5 +518,8 @@ export function layoutCellText(options: {
     angle,
     rotationX: -minimumX,
     rotationY: -minimumY,
+    ...(canvasBidiRequired
+      ? { canvasBidiRequired: true as const, bidiDocument: renderedDocument }
+      : {}),
   };
 }

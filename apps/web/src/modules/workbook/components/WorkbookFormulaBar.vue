@@ -7,6 +7,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import { isCellEditSessionTarget } from "../../../shared/cell-editing/cell-edit-focus";
 import type { CellAddress, CellRange } from "@sheetcraft/core/workbook";
+import type { CellContent } from "@sheetcraft/core/formula";
 import { getCellAddressLabel } from "@sheetcraft/core/coordinates";
 import FormulaInputAssist from "../../../shared/formula-editing/FormulaInputAssist.vue";
 import FormulaTextOverlay from "../../../shared/formula-editing/FormulaTextOverlay.vue";
@@ -18,11 +19,15 @@ import {
   type CellEditCommit,
 } from "../../../shared/cell-editing/useCellEditSession";
 import WorkbookFormulaBarAddressInput from "./WorkbookFormulaBarAddressInput.vue";
+import CellTextInput from "../../../shared/cell-editing/CellTextInput.vue";
+import { getInputFontRuns } from "../../../shared/cell-editing/input-font-runs";
 
 const props = defineProps<{
   address: CellAddress;
   addressLabel: string;
   inputValue: string;
+  content?: CellContent | null;
+  asText?: boolean;
   searchOpen?: boolean;
   previewing?: boolean;
   previewValue?: string;
@@ -54,6 +59,7 @@ const emit = defineEmits<{
 
 const { t } = useAppI18n();
 const formulaInput = ref<HTMLTextAreaElement>();
+const richInputRef = ref<InstanceType<typeof CellTextInput>>();
 const formulaBarRoot = ref<HTMLDivElement>();
 const expanded = ref(false);
 
@@ -80,7 +86,10 @@ const editingThisSheet = computed(
   () => editSession.state.active && editSession.state.owner?.sheetId === props.sheetId,
 );
 const editingFormulaSession = computed(
-  () => editSession.state.active && editSession.state.draft.startsWith("="),
+  () =>
+    editSession.state.active &&
+    !editSession.state.asText &&
+    editSession.state.draft.startsWith("="),
 );
 const showsSessionDraft = computed(() => editingThisSheet.value || editingFormulaSession.value);
 const editingThisCell = computed(
@@ -96,6 +105,19 @@ const formulaOwnsSession = computed(
 const formulaDraft = computed(() =>
   showsSessionDraft.value ? editSession.state.draft : props.inputValue,
 );
+const formulaFontRuns = computed(() =>
+  showsSessionDraft.value
+    ? editSession.state.draftFontRuns
+    : getInputFontRuns(props.inputValue, props.content),
+);
+const useRichText = computed(
+  () =>
+    !props.previewing &&
+    (!formulaDraft.value.startsWith("=") || editSession.state.asText) &&
+    (showsSessionDraft.value
+      ? editSession.state.richTextMode
+      : Boolean(formulaFontRuns.value?.length)),
+);
 const formulaTarget = computed(() => editSession.state.owner?.address ?? props.address);
 const formulaTargetSheetId = computed(() => editSession.state.owner?.sheetId);
 const formulaTargetLabel = computed(() =>
@@ -107,6 +129,7 @@ const isComposing = computed(() => showsSessionDraft.value && editSession.state.
 const showFormulaColors = computed(
   () =>
     !props.previewing &&
+    !editSession.state.asText &&
     showsSessionDraft.value &&
     !isComposing.value &&
     formulaDraft.value.startsWith("="),
@@ -136,6 +159,8 @@ function context() {
   return {
     address: { ...props.address },
     input: props.inputValue,
+    content: props.content,
+    asText: props.asText,
     ...(props.sheetId === undefined ? {} : { sheetId: props.sheetId }),
   };
 }
@@ -176,6 +201,25 @@ function onFormulaInput(event: Event): void {
   void nextTick(captureSelection);
 }
 
+function onFormulaBeforeInput(event: Event): void {
+  if (!(event instanceof InputEvent) || props.readOnly || props.previewing) return;
+  if (
+    editSession.state.richTextMode &&
+    (event.inputType === "historyUndo" || event.inputType === "historyRedo")
+  ) {
+    event.preventDefault();
+    if (event.inputType === "historyUndo") editSession.undoDraft();
+    else editSession.redoDraft();
+    void nextTick(() => {
+      const selection = editSession.state.selection;
+      formulaInput.value?.setSelectionRange(selection.start, selection.end, selection.direction);
+    });
+    return;
+  }
+  const input = formulaInput.value;
+  if (input) editSession.prepareInput(input.selectionStart, input.selectionEnd, event.inputType);
+}
+
 function flushPendingEdit(): boolean {
   if (props.readOnly) return true;
   return editSession.flush();
@@ -186,6 +230,7 @@ function hasPendingEdit(): boolean {
 }
 
 function captureSelection(): void {
+  if (useRichText.value) return;
   const input = formulaInput.value;
   if (!input || !formulaOwnsSession.value || props.previewing) return;
   editSession.setSelection(
@@ -197,6 +242,10 @@ function captureSelection(): void {
 
 function insertFormulaLineBreak(): void {
   if (props.readOnly || !formulaOwnsSession.value) return;
+  if (useRichText.value) {
+    richInputRef.value?.insertLineBreak();
+    return;
+  }
   const input = formulaInput.value;
   if (!input) {
     return;
@@ -261,7 +310,7 @@ function onFormulaKeydown(event: KeyboardEvent): void {
         event.key === "Tab" ? (event.shiftKey ? "left" : "right") : event.shiftKey ? "up" : "down",
     });
     formulaFocused.value = false;
-    formulaInput.value?.blur();
+    blurFormulaInput();
   } else if (event.key === "Escape") {
     event.preventDefault();
     const ownerSheetId = editSession.state.owner?.sheetId;
@@ -269,7 +318,7 @@ function onFormulaKeydown(event: KeyboardEvent): void {
     compositionStartedHere = false;
     finishAfterComposition = false;
     formulaFocused.value = false;
-    formulaInput.value?.blur();
+    blurFormulaInput();
     emit("cancelEdit", ownerSheetId);
   }
 }
@@ -323,6 +372,21 @@ function onFormulaCompositionEnd(event: CompositionEvent): void {
   }
 }
 
+function onRichCompositionEnd(value: string, _event: CompositionEvent): void {
+  if (props.readOnly || !compositionStartedHere) return;
+  compositionStartedHere = false;
+  editSession.endComposition(value);
+  if (finishAfterComposition) {
+    finishAfterComposition = false;
+    editSession.finish();
+  }
+}
+
+function blurFormulaInput(): void {
+  richInputRef.value?.element?.blur();
+  formulaInput.value?.blur();
+}
+
 function focus(options: { preserveSelection?: boolean } = {}): void {
   if (props.previewing) {
     emit("updatePreviewing", false);
@@ -333,6 +397,15 @@ function focus(options: { preserveSelection?: boolean } = {}): void {
 }
 
 function focusInput(options: { preserveSelection?: boolean }): void {
+  if (useRichText.value) {
+    richInputRef.value?.focus({
+      selection:
+        options.preserveSelection && showsSessionDraft.value
+          ? editSession.state.selection
+          : { start: formulaDraft.value.length, end: formulaDraft.value.length, direction: "none" },
+    });
+    return;
+  }
   const input = formulaInput.value;
   if (!input) return;
   input.focus({ preventScroll: true });
@@ -431,7 +504,31 @@ defineExpose({
             })
           }}
         </span>
+        <CellTextInput
+          v-if="useRichText"
+          ref="richInputRef"
+          class="workbook-formula-bar__rich-input"
+          :class="{ 'is-expanded': expanded }"
+          :model-value="formulaDraft"
+          :font-runs="formulaFontRuns"
+          :edit-session="editSession"
+          surface="formula-bar"
+          :label="
+            t('formulaBar.editor', { address: formulaFocused ? formulaTargetLabel : addressLabel })
+          "
+          :read-only="readOnly || previewing"
+          :wrap="expanded"
+          :placeholder="t('formulaBar.placeholder')"
+          data-formula-input
+          @update:model-value="editSession.setDraft"
+          @focus="onFormulaFocus"
+          @blur="onFormulaBlur"
+          @keydown="onFormulaKeydown"
+          @composition-start="onFormulaCompositionStart"
+          @composition-end="onRichCompositionEnd"
+        />
         <Textarea
+          v-else
           v-native-control="{
             onElement: setFormulaInput,
             attributes: {
@@ -456,6 +553,7 @@ defineExpose({
           :readonly="readOnly || previewing"
           :placeholder="t('formulaBar.placeholder')"
           @input="onFormulaInput"
+          @beforeinput.capture="onFormulaBeforeInput"
           @paste.capture="editSession.markPasted()"
           @focus="onFormulaFocus"
           @blur="(_value, { e }) => onFormulaBlur(e)"
@@ -478,9 +576,11 @@ defineExpose({
           :input="formulaInput"
           :active="
             !readOnly &&
+            !useRichText &&
             !previewing &&
             formulaFocused &&
             formulaOwnsSession &&
+            !editSession.state.asText &&
             editSession.state.surface === 'formula-bar'
           "
           :composing="isComposing"
@@ -572,6 +672,24 @@ defineExpose({
     position: relative;
     min-width: 0;
     height: var(--td-comp-size-m);
+  }
+
+  &__rich-input {
+    box-sizing: border-box;
+    width: 100%;
+    height: var(--formula-bar-action-size);
+    padding: 5px 8px;
+    border: 1px solid var(--sheetcraft-border-control);
+    border-radius: var(--sheetcraft-radius-default);
+    background: var(--sheetcraft-surface-panel);
+    font-size: 13px;
+    line-height: 20px;
+    &:focus {
+      border-color: var(--sheetcraft-action-primary);
+    }
+    &.is-expanded {
+      height: 112px;
+    }
   }
 
   &__leading-actions {

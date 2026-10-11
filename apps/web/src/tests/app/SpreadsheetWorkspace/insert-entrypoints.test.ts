@@ -1,10 +1,12 @@
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { watch } from "vue";
 import {
   createWorkbook,
   getActiveSheet,
   setCellContent,
+  setCellStyle,
+  getCellContent,
   getCellValue,
   type Sheet,
 } from "@sheetcraft/core/workbook";
@@ -14,21 +16,43 @@ import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import PivotTableDialog from "../../../modules/pivot-tables/components/PivotTableDialog.vue";
 import SymbolDialog from "../../../modules/insert-tools/components/SymbolDialog.vue";
+import CellEditor from "../../../modules/sheet-grid/components/CellEditor.vue";
+import FormulaInputAssist from "../../../shared/formula-editing/FormulaInputAssist.vue";
 import SparklineDialog from "../../../modules/sparklines/components/SparklineDialog.vue";
 import RangeReferencePicker from "../../../shared/range-reference/RangeReferencePicker.vue";
 import HyperlinkDialog from "../../../modules/hyperlinks/components/HyperlinkDialog.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { triggerCanvasCell } from "../canvas-interaction";
 import { createAppI18n } from "../../../shared/i18n";
+import catalogData from "../../../modules/insert-tools/symbols/assets/unicode-catalog.json";
+import type { UnicodeCatalogData } from "../../../modules/insert-tools/symbols/unicode-catalog";
+import {
+  defaultSymbolPreferences,
+  useSymbolPreferences,
+} from "../../../modules/insert-tools/symbols/symbol-preferences";
 
 // Observe the real controller and command history without replacing their behavior.
 const captured = vi.hoisted(() => ({
+  ensureFont: vi.fn(async (_family: string): Promise<void> => undefined),
   controller: undefined as
     | ReturnType<
         typeof import("../../../app/composables/useSpreadsheetWorkspaceController").useSpreadsheetWorkspaceController
       >
     | undefined,
 }));
+vi.mock("../../../shared/cell-text/font-resources", async (original) => ({
+  ...(await original<object>()),
+  ensureCellFontResource: captured.ensureFont,
+}));
+vi.mock("../../../modules/insert-tools/symbols/unicode-catalog", async (original) => {
+  const actual =
+    await original<typeof import("../../../modules/insert-tools/symbols/unicode-catalog")>();
+  return {
+    ...actual,
+    loadSymbolUnicodeCatalog: async () =>
+      new actual.SymbolUnicodeCatalog(catalogData as unknown as UnicodeCatalogData),
+  };
+});
 vi.mock("../../../app/composables/useSpreadsheetWorkspaceController", async (importOriginal) => {
   const actual =
     await importOriginal<
@@ -49,6 +73,9 @@ const mounted: Array<{ unmount(): void }> = [];
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
   captured.controller = undefined;
+  captured.ensureFont.mockReset();
+  captured.ensureFont.mockResolvedValue(undefined);
+  useSymbolPreferences().update(defaultSymbolPreferences());
   document.body.replaceChildren();
   vi.restoreAllMocks();
 });
@@ -84,6 +111,17 @@ async function fixture(withData = false) {
   await flushPromises();
   await wrapper.get('[data-ribbon-category="insert"]').trigger("click");
   return wrapper;
+}
+
+async function openFullSymbolDialog(wrapper: VueWrapper): Promise<void> {
+  await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
+  await flushPromises();
+  const more = [
+    ...document.body.querySelectorAll<HTMLElement>('.symbol-menu [role="menuitem"]'),
+  ].find((item) => item.textContent?.includes("More symbols"));
+  if (!more) throw new Error("The Symbol menu must expose More symbols.");
+  more.click();
+  await flushPromises();
 }
 
 describe("workspace insert entry points", () => {
@@ -166,10 +204,9 @@ describe("workspace insert entry points", () => {
       const controller = captured.controller!;
       const session = wrapper.getComponent(SheetGrid).props("editSession")!;
       const before = serializeWorkbook(controller.session.workbook);
-      await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
-      await flushPromises();
+      await openFullSymbolDialog(wrapper);
       const callbacks = wrapper.getComponent(SymbolDialog).vm.$.vnode.props!;
-      const insert = callbacks.onInsert as (symbol: string) => void;
+      const insert = wrapper.getComponent(SymbolDialog).props("insertText")!;
       const close = callbacks.onClose as () => void;
       if (action === "navigation") {
         controller.addSheet();
@@ -181,15 +218,17 @@ describe("workspace insert entry points", () => {
       const afterDismiss = serializeWorkbook(controller.session.workbook);
       const historyLength = controller.session.history.undoStack.length;
       if (action === "reopen") {
-        await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
-        await flushPromises();
+        await openFullSymbolDialog(wrapper);
         close();
         await flushPromises();
         expect(wrapper.findComponent(SymbolDialog).exists()).toBe(true);
       }
-      insert("stale");
+      const draftBefore = session.state.draft;
+      const revisionBefore = session.state.revision;
+      expect(insert({ text: "stale" })).toBe(false);
       await flushPromises();
-      expect(session.state.active).toBe(false);
+      expect(session.state.draft).toBe(draftBefore);
+      expect(session.state.revision).toBe(revisionBefore);
       expect(serializeWorkbook(controller.session.workbook)).toEqual(afterDismiss);
       expect(controller.session.history.undoStack).toHaveLength(historyLength);
       if (action !== "navigation") expect(afterDismiss).toEqual(before);
@@ -207,33 +246,52 @@ describe("workspace insert entry points", () => {
       { sheetId: sheet.id, address: { row: 0, column: 0 }, input: "Region" },
       { surface: "grid", mode: "append" },
     );
-    session.setSelection(2, 4);
-    await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
     await flushPromises();
+    const editor = grid.get('[data-cell-editor="A1"]').element as HTMLTextAreaElement;
+    editor.setSelectionRange(2, 4);
+    session.setSelection(2, 4);
+    await openFullSymbolDialog(wrapper);
     wrapper.getComponent(SymbolDialog).vm.$emit("close");
     await flushPromises();
     expect(session.state.draft).toBe("Region");
     expect(session.state.selection).toMatchObject({ start: 2, end: 4 });
     expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
-    await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
-    await flushPromises();
-    wrapper.getComponent(SymbolDialog).vm.$emit("insert", "π");
+    await openFullSymbolDialog(wrapper);
+    expect(
+      wrapper.getComponent(SymbolDialog).props("insertText")!({
+        text: "π",
+        fontFamily: "Noto Sans Math",
+      }),
+    ).toBe(true);
     await flushPromises();
     expect(session.state.draft).toBe("Reπon");
     expect(session.state.selection).toMatchObject({ start: 3, end: 3 });
-    expect(wrapper.findComponent(SymbolDialog).exists()).toBe(false);
+    expect(wrapper.findComponent(SymbolDialog).exists()).toBe(true);
     expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
     expect(controller.session.history.undoStack).toHaveLength(0);
+    wrapper.getComponent(SymbolDialog).vm.$emit("close");
+    await flushPromises();
     session.cancel();
     expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
-    await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
-    await flushPromises();
-    wrapper.getComponent(SymbolDialog).vm.$emit("insert", "Ω🙂");
+    await openFullSymbolDialog(wrapper);
+    expect(
+      wrapper.getComponent(SymbolDialog).props("insertText")!({
+        text: "Ω🙂",
+        fontFamily: "Noto Sans Symbols 2",
+      }),
+    ).toBe(true);
     await flushPromises();
     expect(session.state.draft).toBe("RegionΩ🙂");
+    wrapper.getComponent(SymbolDialog).vm.$emit("close");
+    await flushPromises();
     expect(session.finish()).toBe(true);
     await flushPromises();
     expect(getCellValue(controller.activeSheet.value, { row: 0, column: 0 })).toBe("RegionΩ🙂");
+    expect(getCellContent(controller.activeSheet.value, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "RegionΩ🙂",
+      fontRuns: [{ start: 6, end: 9, fontFamily: "Noto Sans Symbols 2" }],
+    });
     expect(controller.session.history.undoStack).toHaveLength(1);
     const after = serializeWorkbook(controller.session.workbook);
     await wrapper.get('[data-ribbon-category="home"]').trigger("click");
@@ -243,6 +301,97 @@ describe("workspace insert entry points", () => {
     await wrapper.get('[data-ribbon-action="redo"]').trigger("click");
     await flushPromises();
     expect(serializeWorkbook(controller.session.workbook)).toEqual(after);
+  });
+  test("Text-format plain grid edits do not invoke formula completion", async () => {
+    const wrapper = await fixture();
+    const controller = captured.controller!;
+    const sheet = controller.activeSheet.value;
+    const address = { row: 0, column: 0 };
+    setCellStyle(sheet, address, { numberFormat: { kind: "text" } });
+    expect(controller.commitCell({ address, input: "'=SU" })).toBe(true);
+    await flushPromises();
+    await wrapper.get(".cell-editor").trigger("keydown", { key: "F2" });
+    const input = wrapper.get("textarea.cell-editor.is-editing");
+    await input.setValue("=SU");
+    const session = wrapper.getComponent(SheetGrid).props("editSession")!;
+    expect(session.state.asText).toBe(true);
+    expect(wrapper.getComponent(CellEditor).getComponent(FormulaInputAssist).props("active")).toBe(
+      false,
+    );
+    await input.trigger("keydown", { key: "Tab" });
+    expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value: "=SU" });
+  });
+  test.each(["Enter", "Tab"])(
+    "Symbol preserves incomplete formula-looking Text and its font through grid %s",
+    async (key) => {
+      const wrapper = await fixture();
+      const controller = captured.controller!;
+      const sheet = controller.activeSheet.value;
+      const address = { row: 0, column: 0 };
+      setCellStyle(sheet, address, { numberFormat: { kind: "text" } });
+      const session = wrapper.getComponent(SheetGrid).props("editSession")!;
+      session.begin(
+        { sheetId: sheet.id, address, input: "", content: null },
+        { surface: "grid", mode: "append" },
+      );
+      session.replaceSelection("=SUM(A");
+      await openFullSymbolDialog(wrapper);
+      expect(
+        wrapper.getComponent(SymbolDialog).props("insertText")!({
+          text: "1",
+          fontFamily: "Noto Sans Math",
+        }),
+      ).toBe(true);
+      wrapper.getComponent(SymbolDialog).vm.$emit("close");
+      await flushPromises();
+      // Text format still owns literal parsing if the user removes the editor escape.
+      session.prepareInput(0, 1, "deleteContentForward");
+      session.setDraft("=SUM(A1");
+      await flushPromises();
+      await wrapper.get(".cell-editor.is-editing").trigger("keydown", { key });
+      expect(getCellContent(sheet, address)).toEqual({
+        kind: "literal",
+        value: "=SUM(A1",
+        fontRuns: [{ start: 6, end: 7, fontFamily: "Noto Sans Math" }],
+      });
+    },
+  );
+  test("a delayed Symbol shortcut cannot insert after the same document target is undone", async () => {
+    const wrapper = await fixture();
+    const controller = captured.controller!;
+    const address = { row: 0, column: 0 };
+    expect(controller.commitCell({ address, input: "original" })).toBe(true);
+    await flushPromises();
+    const prefs = useSymbolPreferences();
+    prefs.update({
+      ...defaultSymbolPreferences(),
+      custom: [
+        { text: "Ω", fontFamily: "Noto Sans Math", visible: false, shortcut: "Ctrl+Shift+F11" },
+      ],
+    });
+    const recent = prefs.preferences.value.recent;
+    let resolve!: () => void;
+    captured.ensureFont.mockImplementationOnce(
+      () =>
+        new Promise<void>((done) => {
+          resolve = done;
+        }),
+    );
+    await wrapper
+      .get("[data-sheet-canvas]")
+      .trigger("keydown", { key: "F11", ctrlKey: true, shiftKey: true });
+    expect(captured.ensureFont).toHaveBeenCalledWith("Noto Sans Math");
+    expect(controller.undo()).toBe(true);
+    await flushPromises();
+    const session = wrapper.getComponent(SheetGrid).props("editSession")!;
+    const snapshot = serializeWorkbook(controller.session.workbook);
+    const state = { ...session.state, selection: { ...session.state.selection } };
+    resolve();
+    await flushPromises();
+    expect(session.state).toEqual(state);
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(snapshot);
+    expect(controller.session.history.undoStack).toHaveLength(0);
+    expect(prefs.preferences.value.recent).toEqual(recent);
   });
   test.each([
     { tool: "shape", selector: '[data-insert-tool="shape"]', dialog: ".drawing-editor" },

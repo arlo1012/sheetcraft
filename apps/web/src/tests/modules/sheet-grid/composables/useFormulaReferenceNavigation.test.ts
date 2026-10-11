@@ -3,6 +3,33 @@ import { useCellEditSession } from "../../../../shared/cell-editing/useCellEditS
 import { useFormulaReferenceNavigation } from "../../../../modules/sheet-grid/composables/useFormulaReferenceNavigation";
 
 describe("useFormulaReferenceNavigation", () => {
+  test("does not treat Text-format literals as formulas after their escape is removed", () => {
+    const session = useCellEditSession({ onCommit: () => undefined });
+    session.begin(
+      { address: { row: 0, column: 0 }, input: "=A1", asText: true },
+      { surface: "grid", mode: "append" },
+    );
+    session.setMode("point");
+    let editorReads = 0;
+    const { handleReferenceKeydown } = useFormulaReferenceNavigation({
+      session,
+      getEditor: () => {
+        editorReads += 1;
+        return null;
+      },
+      getActiveAddress: () => ({ row: 0, column: 0 }),
+      getVisibleRow: () => null,
+      ensureVisible: () => undefined,
+    });
+    for (const key of ["F2", "ArrowRight", "ArrowDown"]) {
+      const event = new KeyboardEvent("keydown", { key, cancelable: true });
+      expect(handleReferenceKeydown(event)).toBe(false);
+      expect(event.defaultPrevented).toBe(false);
+    }
+    expect(editorReads).toBe(0);
+    expect(session.state.mode).toBe("point");
+    expect(session.state.draft).toBe("=A1");
+  });
   test("switches point mode and moves or extends only the active reference", () => {
     const session = useCellEditSession({ onCommit: () => undefined });
     session.begin(

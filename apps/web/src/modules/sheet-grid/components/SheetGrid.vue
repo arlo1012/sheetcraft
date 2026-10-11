@@ -113,6 +113,8 @@ import { useDimensionResize } from "../composables/useDimensionResize";
 import { useAxisMoveDrag, type AxisMovePayload } from "../composables/useAxisMoveDrag";
 import { getViewportAxisBoundaryOffset } from "@sheetcraft/sheet-engine/axis-interactions";
 import { useCellEditing } from "../composables/useCellEditing";
+import { getCellStyle } from "@sheetcraft/core/workbook";
+import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
 import { useFormulaReferenceNavigation } from "../composables/useFormulaReferenceNavigation";
 import { useDragSelection } from "../composables/useDragSelection";
 import { useSheetAutoFill } from "../composables/useSheetAutoFill";
@@ -169,7 +171,14 @@ import type {
   SheetFreezeHandlesOverlay,
 } from "../rendering/overlay-types";
 import { getCellEditorFrameStyle, getCellEditorStyle } from "../cell-presentation";
-import { formatCellValueForGrid } from "../cell-value-presentation";
+import {
+  formatCellValueForGrid,
+  getCellValuePresentationForGrid,
+} from "../cell-value-presentation";
+import {
+  ensureCellFontResource,
+  getCellFontResourceFamilies,
+} from "../../../shared/cell-text/font-resources";
 import { isCellTextWrapped } from "../../../shared/cell-text/text-presentation";
 import { browserCellTextMeasurer } from "../../../shared/cell-text/text-metrics";
 
@@ -559,6 +568,25 @@ const display = useSheetDisplaySnapshot({
   getDateSystem: () => props.dateSystem,
   getTheme: () => props.theme,
 });
+watch(
+  display,
+  (snapshot) => {
+    const families = new Set<string>();
+    for (const [key, cell] of snapshot.sheet.cells) {
+      const [row, column] = key.split(":").map(Number);
+      const style = snapshot.getCellStyle({ row: row!, column: column! });
+      for (const family of getCellFontResourceFamilies(style?.fontFamily ?? ""))
+        families.add(family);
+      if (cell.content?.kind === "literal" && typeof cell.content.value === "string")
+        for (const run of cell.content.fontRuns ?? [])
+          for (const family of getCellFontResourceFamilies(run.fontFamily)) families.add(family);
+    }
+    // Only actual workbook faces are prepared. Loading completion invalidates the
+    // shared metric cache, including automatic heights of rows outside the viewport.
+    for (const family of families) void ensureCellFontResource(family).catch(() => undefined);
+  },
+  { immediate: true },
+);
 const contentExtent = computed(() => display.value.contentExtent);
 const {
   dimensionResize,
@@ -730,8 +758,15 @@ const automaticRowHeights = computed(() => {
   return autoRowHeightCalculator.reconcile({
     cells: props.sheet.cells,
     getComputedValue: sheetEvaluator.value.getComputedValue,
-    formatValue: (_address, cell, value) =>
-      formatCellValueForGrid(value, cell.style, locale.value, props.dateSystem),
+    formatPresentation: (address, cell, value) =>
+      getCellValuePresentationForGrid(
+        value,
+        display.value.getCellStyle(address),
+        locale.value,
+        props.dateSystem,
+        cell.content,
+      ),
+    getCellStyle: (address) => display.value.getCellStyle(address),
     columnWidths: effectiveColumnWidths.value,
     defaultColumnWidth: props.sheet.defaultColumnWidth,
     rowCount: gridExtent.rowCount,
@@ -772,6 +807,9 @@ const {
   getSheetId: () => props.sheet.id,
   getActiveCell: () => activeCell.value,
   getInputValue: () => formatCellContentForInput(getCellContent(props.sheet, activeCell.value)),
+  getContent: () => getCellContent(props.sheet, activeCell.value),
+  getAsText: () =>
+    isTextCellNumberFormat(getCellStyle(props.sheet, activeCell.value)?.numberFormat),
   onClearClipboard: () => clearPendingClipboard(),
   onCommit: (payload) => emit("commitCell", payload),
   onSelectionChange: (nextSelection) => setSelection(nextSelection),
@@ -2852,7 +2890,8 @@ function onEditorKeydown(event: KeyboardEvent): void {
         editorRef.value?.insertLineBreak();
         return;
       }
-      editingValue.value = completeFormulaForCommit(editingValue.value);
+      if (!editSession.state.asText)
+        editingValue.value = completeFormulaForCommit(editingValue.value);
       traverseSelection("Enter", event.shiftKey, true, {
         confirmPendingWarning: isExplicitWarningConfirmationKey(event),
       });
@@ -2860,7 +2899,8 @@ function onEditorKeydown(event: KeyboardEvent): void {
     }
     if (event.key === "Tab") {
       event.preventDefault();
-      editingValue.value = completeFormulaForCommit(editingValue.value);
+      if (!editSession.state.asText)
+        editingValue.value = completeFormulaForCommit(editingValue.value);
       traverseSelection("Tab", event.shiftKey, true);
     }
     return;

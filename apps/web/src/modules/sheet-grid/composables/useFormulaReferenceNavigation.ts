@@ -13,7 +13,13 @@ export function useFormulaReferenceNavigation(options: {
 }) {
   function handleReferenceKeydown(event: KeyboardEvent): boolean {
     const { state } = options.session;
-    if (!state.active || state.composing || event.isComposing || !state.draft.startsWith("="))
+    if (
+      !state.active ||
+      state.asText ||
+      state.composing ||
+      event.isComposing ||
+      !state.draft.startsWith("=")
+    )
       return false;
     if (event.altKey || event.ctrlKey || event.metaKey) return false;
     if (event.key === "F2") {

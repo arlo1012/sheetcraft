@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile, mkdir, writeFile, copyFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { readFontCharacterCoverage } from "../apps/web/src/modules/insert-tools/symbols/font-character-coverage.ts";
+import { readFontCharacterCoverage } from "../apps/web/src/shared/cell-text/font-character-coverage.ts";
 
 // Input is the verified, unmodified public font/UCD source directory. Nothing is
 // downloaded here, and no system-font or browser-profile files are read.

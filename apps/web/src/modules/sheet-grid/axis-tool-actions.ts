@@ -8,19 +8,29 @@ import {
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
+  type Cell,
+  type CellAddress,
   type CellRange,
   type Sheet,
   type SheetDimensionAxis,
   type SheetEvaluator,
 } from "@sheetcraft/core/workbook";
 import type { ExcelDateSystem } from "@sheetcraft/core/formula";
+import type { CellStyle } from "@sheetcraft/core/style";
+import { resolveThemeFontFamily, type WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import type { TextMeasurer } from "@sheetcraft/sheet-engine/row-height";
 import {
   getAutoFitColumnWidths,
   getAutoFitRowHeights,
+  getAxisAutoFitFontFamilies,
   type AxisAutoFitInput,
 } from "./axis-auto-fit";
-import { formatCellValueForGrid } from "./cell-value-presentation";
+import { getCellValuePresentationForGrid } from "./cell-value-presentation";
+import {
+  cellFontResourceNeedsLoading,
+  ensureCellFontResource,
+  getCellFontResourceFamilies,
+} from "../../shared/cell-text/font-resources";
 
 type AxisSpan = { axis: SheetDimensionAxis; index: number; count: number };
 
@@ -62,12 +72,20 @@ export function createAxisToolActions(options: {
   getEvaluator: () => SheetEvaluator;
   getLocale: () => string;
   getDateSystem: () => ExcelDateSystem;
+  getCellStyle?: (address: CellAddress, cell: Readonly<Cell>) => Readonly<CellStyle> | undefined;
+  getTheme?: () => WorkbookTheme | undefined;
+  /** Workbook/session ownership and document edits cancel a delayed AutoFit. */
+  getGeneration?: () => unknown;
+  getRevision?: () => unknown;
   measurer: TextMeasurer;
   flushPendingEdits: () => boolean;
   execute: (command: WorkbookCommand) => boolean;
   onError: () => void;
 }) {
+  let actionVersion = 0;
+
   function run(create: (sheet: Sheet) => WorkbookCommand | undefined): void {
+    actionVersion++;
     if (!options.flushPendingEdits()) return;
     try {
       const command = create(options.getSheet());
@@ -88,11 +106,25 @@ export function createAxisToolActions(options: {
     );
   }
 
-  function autoFit(payload: { axis: SheetDimensionAxis; range: CellRange }): void {
-    run((sheet) => {
+  async function autoFit(payload: { axis: SheetDimensionAxis; range: CellRange }): Promise<void> {
+    const version = ++actionVersion;
+    if (!options.flushPendingEdits()) return;
+    let isCurrent: (() => boolean) | undefined;
+    try {
+      const sheet = options.getSheet();
+      const sheetId = sheet.id;
+      const generation = options.getGeneration?.();
+      const revision = options.getRevision?.();
+      const axis = payload.axis;
+      isCurrent = () =>
+        version === actionVersion &&
+        options.getSheet() === sheet &&
+        options.getSheet().id === sheetId &&
+        Object.is(options.getGeneration?.(), generation) &&
+        Object.is(options.getRevision?.(), revision);
       // The ribbon sizes whole axes, including cells outside the selection's other dimension.
       const range: CellRange =
-        payload.axis === "row"
+        axis === "row"
           ? {
               start: { row: payload.range.start.row, column: 0 },
               end: { row: payload.range.end.row, column: MAX_SHEET_COLUMNS - 1 },
@@ -101,24 +133,52 @@ export function createAxisToolActions(options: {
               start: { row: 0, column: payload.range.start.column },
               end: { row: MAX_SHEET_ROWS - 1, column: payload.range.end.column },
             };
-      const input: AxisAutoFitInput = {
-        sheet,
-        range,
-        getComputedValue: options.getEvaluator().getComputedValue,
-        formatValue: (_address, cell, value) =>
-          formatCellValueForGrid(value, cell.style, options.getLocale(), options.getDateSystem()),
-        measurer: options.measurer,
+      const createInput = (currentSheet: Sheet): AxisAutoFitInput => {
+        const theme = options.getTheme?.();
+        const locale = options.getLocale();
+        const dateSystem = options.getDateSystem();
+        return {
+          sheet: currentSheet,
+          range,
+          getComputedValue: options.getEvaluator().getComputedValue,
+          getCellStyle: (address, cell) => {
+            const style = options.getCellStyle ? options.getCellStyle(address, cell) : cell.style;
+            if (theme && (style?.fontTheme || !style?.fontFamily))
+              return {
+                ...style,
+                fontFamily: resolveThemeFontFamily(theme, style?.fontTheme ?? "minor"),
+              };
+            return style;
+          },
+          formatPresentation: (_address, cell, value) =>
+            getCellValuePresentationForGrid(value, cell.style, locale, dateSystem, cell.content),
+          measurer: options.measurer,
+        };
       };
-      const sizes =
-        payload.axis === "row" ? getAutoFitRowHeights(input) : getAutoFitColumnWidths(input);
-      return sizes.size
-        ? createSetSheetDimensionSizesCommand(
-            sheet.id,
-            payload.axis,
+      const initialInput = createInput(sheet);
+      const families = new Set(
+        [...getAxisAutoFitFontFamilies(initialInput, axis)].flatMap(getCellFontResourceFamilies),
+      );
+      const pending = [...families].filter(cellFontResourceNeedsLoading);
+      let input = initialInput;
+      if (pending.length) {
+        await Promise.all(pending.map((family) => ensureCellFontResource(family)));
+        if (!isCurrent()) return;
+        // Never execute a command captured before font loading or against a new owner.
+        input = createInput(options.getSheet());
+      }
+      const sizes = axis === "row" ? getAutoFitRowHeights(input) : getAutoFitColumnWidths(input);
+      if (sizes.size && isCurrent())
+        options.execute(
+          createSetSheetDimensionSizesCommand(
+            sheetId,
+            axis,
             [...sizes].map(([index, size]) => ({ index, size })),
-          )
-        : undefined;
-    });
+          ),
+        );
+    } catch {
+      if (!isCurrent || isCurrent()) options.onError();
+    }
   }
 
   function standardWidth(payload: { size: number }): void {

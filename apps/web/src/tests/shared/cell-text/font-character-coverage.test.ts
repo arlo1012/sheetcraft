@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { describe, expect, test } from "vitest";
 import coverage from "../../../modules/insert-tools/symbols/assets/font-coverage.json";
-import { readFontCharacterCoverage } from "../../../modules/insert-tools/symbols/font-character-coverage";
+import { readFontCharacterCoverage } from "../../../shared/cell-text/font-character-coverage";
 
 function format12(groups: readonly (readonly [number, number, number])[]): Uint8Array {
   const bytes = new Uint8Array(16 + groups.length * 12);

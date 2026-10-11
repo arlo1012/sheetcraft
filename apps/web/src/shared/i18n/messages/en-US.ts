@@ -1,3 +1,4 @@
+import { symbolsEnUS } from "../../../modules/insert-tools/symbol-messages.en-US";
 import { pivotsEnUS } from "../../../modules/pivot-tables/pivot-messages.en-US";
 import { controlsEnUS } from "../../../modules/form-controls/control-messages.en-US";
 import { attachmentsEnUS } from "../../../modules/attachments/attachment-messages.en-US";
@@ -22,6 +23,7 @@ import { tableStylesEnUS } from "../../../modules/table-styles/table-style-messa
 import { tablesEnUS } from "../../../modules/table-styles/table-messages.en-US";
 
 export const enUS = {
+  ...symbolsEnUS,
   ...pivotsEnUS,
   ...controlsEnUS,
   ...attachmentsEnUS,

@@ -1,4 +1,10 @@
-import { isUnicodeScalar, type FontCoverageRange } from "./unicode-catalog";
+export type FontCoverageRange = readonly [start: number, end: number];
+
+function isUnicodeScalar(value: number): boolean {
+  return (
+    Number.isInteger(value) && value >= 0 && value <= 0x10ffff && (value < 0xd800 || value > 0xdfff)
+  );
+}
 
 export type FontCharacterCoverage =
   | Readonly<{

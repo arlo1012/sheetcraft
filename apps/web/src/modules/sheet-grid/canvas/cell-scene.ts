@@ -1,5 +1,6 @@
 import { getSparklineValues, type CellSparkline } from "@sheetcraft/core/sparklines";
 import type { Cell, CellAddress, CellRange } from "@sheetcraft/core/workbook";
+import type { CellTextFontRun } from "@sheetcraft/core/formula";
 import type { ExcelDateSystem, FormulaValue } from "@sheetcraft/core/formula";
 import type { CellStyle } from "@sheetcraft/core/style";
 import type { ConditionalFormatVisual } from "@sheetcraft/core/conditional-formatting";
@@ -18,6 +19,8 @@ export const SHEET_PANE_IDS = ["topLeft", "top", "left", "body"] as const;
 export type CanvasCellContent = {
   sparkline?: { definition: CellSparkline; values: Array<number | null> };
   text: string;
+  fontRuns?: readonly CellTextFontRun[];
+  fontProjectionUnavailable?: true;
   style: Readonly<CellStyle> | undefined;
   textLayout?: CellTextLayout;
   image?: Extract<NonNullable<Cell["content"]>, { kind: "image" }>["image"];
@@ -137,6 +140,7 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
       displayStyle,
       options.locale,
       options.dateSystem,
+      source?.content,
     );
     const style = presentation.color
       ? { ...displayStyle, textColor: presentation.color }
@@ -151,6 +155,10 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
     const textWidth = Math.max(0, rect.width - 1 - iconSlot);
     const content: CanvasCellContent = {
       text: hideValue ? "" : presentation.text,
+      ...(!hideValue && presentation.fontRuns ? { fontRuns: presentation.fontRuns } : {}),
+      ...(!hideValue && presentation.fontProjectionUnavailable
+        ? { fontProjectionUnavailable: true as const }
+        : {}),
       style,
       ...(conditionalFormatVisual ? { conditionalFormatVisual } : {}),
       ...(image ? { image } : {}),
@@ -174,6 +182,8 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
                 value,
                 style,
                 fill: presentation.fill,
+                fontRuns: presentation.fontRuns,
+                fillFontRuns: presentation.fillFontRuns,
                 width: textWidth,
                 height: Math.max(0, rect.height - 1),
                 measurer,
