@@ -1,0 +1,9 @@
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 220ms on 3 files using 9 threads.
+FORMAT_EXIT=0
+STAGED_MARKDOWN_DIFF_EXIT=0
+docs/acceptance/evidence/shape-lifecycle-20261011/geometry-baseline.log:9: new blank line at EOF.
+docs/acceptance/evidence/shape-lifecycle-20261011/web-baseline.log:9: new blank line at EOF.
+STAGED_RAW_LOG_DIFF_EXIT=2

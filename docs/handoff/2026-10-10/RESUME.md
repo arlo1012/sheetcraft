@@ -1,5 +1,24 @@
 # Sheetcraft continuation after recovery — 2026-10-10
 
+## Representative shape lifecycle — 2026-10-11
+
+Unchanged production baseline a44fe73f4d494d95e4be89d9cfad87f30c7f1720 now has a
+bounded actual rectangle→arrow lifecycle check; read
+`docs/acceptance/shape-lifecycle-20261011.md`. Create/edit cancel, effective
+style/text/dimensions/numeric rotation, keyboard move/delete, actual pointer move
+and east-handle resize, independent complete-snapshot Undo/Redo and explicit
+save/reload/JSON passed. Existing synthetic Data and Sheet1 are unchanged; only
+new empty Sheet2 was added. No model/preset/native or production code was changed.
+
+Fresh serial checks before GUI: Web related 60 passed; shared layout/resize 15
+passed. No build/check ran alongside GUI. Window-bound App.drag failed to produce
+motion; the documented Sky desktop multi-point route supplied real successful
+move/resize, not synthetic events. One optional XLSX download wait timed out and
+reset the UI tool kernel; no native result is claimed. The own page stayed alive,
+oom_kill stayed25, and final JSON save/reload completed. Own test page/server were
+cleaned up. More presets/gesture Escape/corner/zoom/protection and native shape
+exchange remain outside this representative closure.
+
 ## Existing text-object closure and recovery — 2026-10-11
 
 Read `docs/acceptance/text-drawings-20261011.md` and the updated Insert matrix.

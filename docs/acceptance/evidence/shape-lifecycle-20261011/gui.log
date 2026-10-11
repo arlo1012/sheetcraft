@@ -1,0 +1,24 @@
+2026-10-11 05:25–05:34 UTC, unchanged source baseline a44fe73f4d494d95e4be89d9cfad87f30c7f1720.
+One own cloud Chrome loopback page; no simultaneous builds or tests.
+Add sheet created empty Sheet2 in already backed-up synthetic workbook. No import/reset/replace.
+Insert draft changed then Cancel -> zero objects.
+Rectangle confirmed: 260x140, transparent fill, blue #2563eb outline width 3, 22px bold text Rectangle text.
+Edit Arrow/text/rotation then Cancel -> rectangle unchanged; Undo -> zero; Redo -> same rectangle.
+Arrow confirmed with same ID: 280x160, white fill, blue outline width 5, 24px italic text Arrow text, rotation 15.
+Editor Undo full snapshot exactly equals earlier rectangle; Redo full snapshot exactly equals earlier arrow.
+Shift+Right -> offsetX 8 to 18; Undo/Redo full snapshots exact. Delete -> zero objects; Undo -> one.
+Window-bound App.drag x3 had no geometric effect; not counted as actual passing gestures or inferred product failures.
+Documented Sky desktop drag with screenshot-derived multi-point coordinates -> +90x/+40y actual movement.
+Move changed anchor to row4/column2, offset12/0; all other fields unchanged. One Undo and Redo full snapshots exact.
+Sky desktop east-handle drag +50px -> width330, height160 and every other field unchanged.
+One resize Undo and Redo full snapshots exact.
+Explicit Save locally status confirmed. Public JSON -> normal reload -> public JSON byte-identical.
+Final 19103 bytes, SHA256 cebcb6f46f060e82acdf04c9bcc554bc7f4d0fd70503e4ac4a7216bb701044ba.
+Final Data/Sheet1 snapshots exactly equal pre-test baseline; only new Sheet2 added, one shape retained.
+oom_kill before GUI 25 at 05:24:51; remained25 at 05:27:06, 05:29:28, 05:31:06, 05:33:51 and 05:35:07.
+No Error9 observed on own test page; unrelated original WPS Book was seen Error9 with unknown onset and left untouched.
+Optional XLSX download wait hit CUA execution timeout/kernel reset, no new file captured; own page remained alive.
+Vite terminal recorded lazy dependency optimization and reloading during that optional export attempt; correlation only.
+Own test page closed after save/export; own Vite Ctrl+C stopped and terminal prompt verified.
+Raw JSON/screenshots remain local. No credential/account data or raw workbook published.
+In-progress GUI gesture Escape, all presets/corner/zoom/protection variants and native target-app shape I/O not accepted.
