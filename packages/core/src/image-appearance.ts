@@ -1,3 +1,8 @@
+import {
+  normalizeDetailedPictureStyle,
+  type PictureDetailedStyle,
+} from "./picture-detailed-style.js";
+
 /** Explicitly disables selected inherited theme effects; omitted flags still inherit. */
 export type ImageThemeEffectSuppression = {
   shadow?: true;
@@ -20,7 +25,23 @@ export type ImageAppearance = {
   shadow?: "soft" | "hard";
   reflection?: boolean;
   suppressThemeEffects?: ImageThemeEffectSuppression;
+  /** V50 typed categories; absent categories retain all established legacy/theme behavior. */
+  detailedStyle?: PictureDetailedStyle;
 };
+
+function normalizeDetailedStyleField(
+  appearance: ImageAppearance,
+): PictureDetailedStyle | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(appearance, "detailedStyle");
+  if (!descriptor) {
+    if ("detailedStyle" in appearance)
+      throw new TypeError("Detailed picture style must be an own data field.");
+    return undefined;
+  }
+  if (!("value" in descriptor))
+    throw new TypeError("Detailed picture style must be a data field, not an accessor.");
+  return normalizeDetailedPictureStyle(descriptor.value);
+}
 
 function normalizeThemeEffectSuppression(
   appearance: ImageAppearance,
@@ -63,6 +84,7 @@ export function normalizeImageAppearance(
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new TypeError("Invalid image appearance.");
   const suppressThemeEffects = normalizeThemeEffectSuppression(value);
+  const detailedStyle = normalizeDetailedStyleField(value);
   const result: ImageAppearance = {};
   const bounds = {
     opacity: [0, 1, 1],
@@ -113,5 +135,6 @@ export function normalizeImageAppearance(
     throw new TypeError("Invalid image reflection.");
   if (value.reflection) result.reflection = true;
   if (suppressThemeEffects) result.suppressThemeEffects = suppressThemeEffects;
+  if (detailedStyle) result.detailedStyle = detailedStyle;
   return Object.keys(result).length ? result : undefined;
 }

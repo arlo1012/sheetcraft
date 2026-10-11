@@ -47,6 +47,7 @@ function intersection(bounds: Rect, clip: Rect): Rect | null {
 export function getOwnedPictureGroupViewportFragments(
   group: PictureGroup,
   context: PictureFrameLayoutContext,
+  paintBounds?: (picture: GroupedPicture, geometry: ResolvedPictureFrame) => Rect | undefined,
 ): OwnedPictureGroupViewportFragment[] {
   const resolved = resolvePictureGroup(group, context.metrics);
   const fragments: OwnedPictureGroupViewportFragment[] = [];
@@ -59,7 +60,10 @@ export function getOwnedPictureGroupViewportFragments(
       if (!child.visible || !child.layout || child.layout.collapsed) continue;
       for (const paneId of ["topLeft", "top", "left", "body"] as const) {
         const geometry = projectPictureFrameIntoPane(child.layout, paneId, context.layout);
-        const clippedBounds = intersection(geometry.bounds, context.layout.panes[paneId].clip);
+        const clippedBounds = intersection(
+          paintBounds?.(child.node, geometry) ?? geometry.bounds,
+          context.layout.panes[paneId].clip,
+        );
         if (clippedBounds)
           fragments.push({
             kind: "group-leaf",

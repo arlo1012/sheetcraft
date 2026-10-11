@@ -92,6 +92,21 @@ import {
   normalizeImageTransform,
   type ImageTransform,
 } from "./image-transform.js";
+
+export type {
+  PictureDetailedStyle,
+  PictureChoice,
+  PictureColor,
+  PicturePaint,
+  PicturePaintStop,
+  PictureLine,
+  PictureShadow,
+  PictureReflection,
+  PictureGlow,
+  PictureSoftEdges,
+  PictureFormat3d,
+  PictureRotation3d,
+} from "./picture-detailed-style.js";
 import { normalizeOutlineGroups } from "./data-outline.js";
 import {
   cloneSheetPageSetup,

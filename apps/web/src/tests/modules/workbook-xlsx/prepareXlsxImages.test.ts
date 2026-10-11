@@ -70,11 +70,19 @@ afterEach(() => {
 });
 
 describe("prepareXlsxImages", () => {
-  test.each(["cell", "floating"] as const)(
-    "%s suppression blocks before asset reads or any browser image preparation",
-    async (kind) => {
+  test.each([
+    ["cell", "suppressThemeEffects"],
+    ["floating", "suppressThemeEffects"],
+    ["cell", "detailedStyle"],
+    ["floating", "detailedStyle"],
+  ] as const)(
+    "%s %s blocks before asset reads or any browser image preparation",
+    async (kind, field) => {
       const { workbook, sheet } = imageSnapshot();
-      const transform = { appearance: { suppressThemeEffects: { outline: true as const } } };
+      const transform =
+        field === "detailedStyle"
+          ? { appearance: { detailedStyle: { fill: { kind: "none" as const } } } }
+          : { appearance: { suppressThemeEffects: { outline: true as const } } };
       if (kind === "cell")
         setCellContent(
           sheet,
@@ -113,8 +121,8 @@ describe("prepareXlsxImages", () => {
               count: 1,
               locations: [
                 kind === "cell"
-                  ? "Images!C2.transform.appearance.suppressThemeEffects"
-                  : 'Images.floatingImages["floating"].transform.appearance.suppressThemeEffects',
+                  ? `Images!C2.transform.appearance.${field}`
+                  : `Images.floatingImages["floating"].transform.appearance.${field}`,
               ],
             },
           ],

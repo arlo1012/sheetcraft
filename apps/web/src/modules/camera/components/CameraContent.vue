@@ -119,6 +119,7 @@ function render() {
     screenScale: scale,
     skipBackground: true,
     imageUrls: props.imageAssetUrls,
+    imageTheme: props.theme,
     images,
     imagePlaceholder: () => "",
   });

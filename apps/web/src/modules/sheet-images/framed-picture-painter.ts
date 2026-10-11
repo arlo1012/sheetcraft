@@ -14,6 +14,14 @@ import {
   type ResolvedPictureFrame,
 } from "@sheetcraft/core/picture-frame";
 import { imageAppearanceFilter, imageAppearanceSource } from "../../shared/images/imageAppearance";
+import {
+  getPicturePixelAppearance,
+  getPicturePaintDensity,
+  preparePictureDetailedPaint,
+  PicturePaintUnavailableError,
+  type PicturePaintResources,
+} from "../../shared/images/picture-detailed-render";
+import { resolvePictureDetailedPaintStyle } from "../../shared/images/picture-detailed-paint-style";
 import { paintImageAnnotations } from "../../shared/images/imageAnnotations";
 import {
   hasVisibleDrawingThemeEffects,
@@ -38,11 +46,12 @@ export function paintFramedPictureContent(
   picture: FramedFloatingImage,
   geometry: ResolvedPictureFrame,
   effects?: DrawingThemeEffects,
+  resources?: PicturePaintResources,
 ): void {
   if (!isFramedPictureObject(picture))
     throw new TypeError("Prepared framed painting requires a standalone framed picture.");
   const normalized = clonePictureObject(picture);
-  paintSourceBearingPictureContent(context, decoded, normalized, geometry, effects);
+  paintSourceBearingPictureContent(context, decoded, normalized, geometry, effects, resources);
 }
 
 /** Paint an actual owned leaf without inventing a standalone anchor or container source. */
@@ -52,11 +61,12 @@ export function paintGroupedPictureContent(
   picture: GroupedPicture,
   geometry: ResolvedPictureFrame,
   effects?: DrawingThemeEffects,
+  resources?: PicturePaintResources,
 ): void {
   if (!isGroupedPicture(picture))
     throw new TypeError("Prepared grouped painting requires a source-bearing owned picture.");
   const normalized = clonePictureGroupChild(picture);
-  paintSourceBearingPictureContent(context, decoded, normalized, geometry, effects);
+  paintSourceBearingPictureContent(context, decoded, normalized, geometry, effects, resources);
 }
 
 function finite(value: number, name: string): number {
@@ -132,6 +142,7 @@ function paintSourceBearingPictureContent(
   normalized: FramedFloatingImage | GroupedPicture,
   geometry: ResolvedPictureFrame,
   effects?: DrawingThemeEffects,
+  resources?: PicturePaintResources,
 ): void {
   validateContentGeometry(normalized, geometry);
   // Appearance reflection changes legacy layout, unlike the theme's full local
@@ -140,6 +151,65 @@ function paintSourceBearingPictureContent(
   effects = resolvePictureThemeEffects(normalized.transform?.appearance, effects);
   if (normalized.hidden || geometry.collapsed || !geometry.sourceRect) return;
   const appearance = normalized.transform?.appearance;
+  const detailed = resolvePictureDetailedPaintStyle(appearance, effects);
+  if (detailed) {
+    const { rect } = geometry;
+    const local = resolvePictureSourceLayout(
+      { x: 0, y: 0, width: rect.width, height: rect.height },
+      0,
+      normalized.frame.source,
+    );
+    const pixelPicture = {
+      ...normalized,
+      transform: { ...normalized.transform, appearance: getPicturePixelAppearance(appearance) },
+    };
+    const result = preparePictureDetailedPaint({
+      key: JSON.stringify([
+        "framed",
+        normalized.frame.source,
+        normalized.frame.flipHorizontal,
+        normalized.frame.flipVertical,
+        normalized.transform,
+      ]),
+      sourceIdentity: decoded,
+      width: rect.width,
+      height: rect.height,
+      density: getPicturePaintDensity(context),
+      appearance,
+      inherited: effects,
+      resources,
+      angleDeg: geometry.angleDeg,
+      sourcePainter: (surface) =>
+        paintSourceBearingPictureContent(surface, decoded, pixelPicture, local),
+      finishFrontPainter: detailed.remainingTheme
+        ? (surface) =>
+            paintDrawingThemeOutline(
+              surface,
+              { x: 0, y: 0, width: rect.width, height: rect.height },
+              detailed.remainingTheme!,
+            )
+        : undefined,
+    })!;
+    if (result.kind === "unavailable") throw new PicturePaintUnavailableError(result);
+    const bounds = result.logicalBounds;
+    context.save();
+    try {
+      context.translate(rect.x + rect.width / 2, rect.y + rect.height / 2);
+      context.rotate((geometry.angleDeg * Math.PI) / 180);
+      context.translate(-rect.width / 2, -rect.height / 2);
+      context.globalAlpha *= appearance?.opacity ?? 1;
+      context.drawImage(
+        result.canvas,
+        bounds.left,
+        bounds.top,
+        bounds.right - bounds.left,
+        bounds.bottom - bounds.top,
+      );
+    } finally {
+      context.restore();
+    }
+    return;
+  }
   if (effects?.reflection) assertPictureReflectionGeometry(geometry);
   // Transparent-color preparation may allocate a canvas. Reject unavailable
   // decoded dimensions and invalid derived clipping before requesting it.

@@ -1428,6 +1428,7 @@ const paintSurfaceImages = computed(() => {
   const currentLayout = layout.value;
   const frameContext = pictureFrameContext.value;
   const assetUrls = resolvedImageUrls.value;
+  const imageTheme = props.theme;
   const loadingAssetIds = props.loadingImageAssetIds;
   const palette = environment.value;
   const loadingLabel = t("image.loading");
@@ -1439,6 +1440,7 @@ const paintSurfaceImages = computed(() => {
       frameContext,
       assetUrls,
       loadingAssetIds,
+      theme: imageTheme,
       cache: floatingImageCache,
       palette: {
         placeholderBackground: palette.cells.background,
@@ -3910,6 +3912,7 @@ defineExpose({
       :show-grid-lines="showGridLines"
       :locale="locale"
       :date-system="dateSystem"
+      :image-theme="theme"
       :image-asset-urls="imageAssetUrls"
       :loading-image-asset-ids="loadingImageAssetIds"
       :page-decoration="sheet.pageDecoration"
@@ -4308,6 +4311,8 @@ defineExpose({
       :src="previewUrl"
       :alt-text="imagePreview.altText"
       :transform="imagePreview.transform"
+      :theme="theme"
+      :asset-urls="imageAssetUrls"
       @close="closeImagePreview"
     />
     <SheetNotePreview

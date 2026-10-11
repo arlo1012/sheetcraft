@@ -1,5 +1,6 @@
 import { readPictureDataArray } from "./picture-data-array.js";
 import { cloneImageTransform } from "./image-transform.js";
+import { getDetailedPictureStyleAssetIds } from "./picture-detailed-style.js";
 import {
   normalizePictureAngle,
   normalizePictureFrameAnchor,
@@ -384,6 +385,10 @@ export function findPictureGroupNode(
 export function collectPictureGroupAssetIds(value: PictureGroup): Set<string> {
   const ids = new Set<string>();
   for (const { node } of traversePictureGroup(value))
-    if (node.kind === "grouped-picture-v1") ids.add(node.assetId);
+    if (node.kind === "grouped-picture-v1") {
+      ids.add(node.assetId);
+      for (const id of getDetailedPictureStyleAssetIds(node.transform?.appearance?.detailedStyle))
+        ids.add(id);
+    }
   return ids;
 }

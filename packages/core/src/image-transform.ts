@@ -10,6 +10,7 @@ export {
   type ImageAppearance,
   type ImageThemeEffectSuppression,
 } from "./image-appearance.js";
+export type { PictureDetailedStyle } from "./picture-detailed-style.js";
 export type ImageCrop = { x: number; y: number; width: number; height: number };
 export type ImageTransform = {
   annotations?: ImageAnnotation[];
@@ -75,7 +76,12 @@ export function normalizeImageTransform(
     throw new TypeError("Image vertical flip must be a boolean.");
   }
   const annotations = normalizeImageAnnotations(transform.annotations);
-  const appearance = normalizeImageAppearance(transform.appearance);
+  const appearanceDescriptor = Object.getOwnPropertyDescriptor(transform, "appearance");
+  if (appearanceDescriptor && !("value" in appearanceDescriptor))
+    throw new TypeError("Image appearance must be a data field, not an accessor.");
+  if (!appearanceDescriptor && "appearance" in transform)
+    throw new TypeError("Image appearance must be an own data field.");
+  const appearance = normalizeImageAppearance(appearanceDescriptor?.value);
   return crop ||
     rotation ||
     transform.flipHorizontal ||
@@ -96,6 +102,8 @@ export function normalizeImageTransform(
 export function cloneImageTransform(
   transform: ImageTransform | null | undefined,
 ): ImageTransform | undefined {
+  // Appearance normalization detaches all legacy fields and the complete typed style,
+  // including live theme references, auxiliary fills and ordered gradient-stop arrays.
   const normalized = normalizeImageTransform(transform);
   return normalized
     ? {

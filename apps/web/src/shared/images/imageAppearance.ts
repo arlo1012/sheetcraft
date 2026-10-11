@@ -1,6 +1,15 @@
 import { paintImageAnnotations } from "./imageAnnotations";
 import type { ImageAppearance, ImageTransform } from "@sheetcraft/core/workbook";
 import { getImagePresentation } from "./imagePresentation";
+import {
+  getPicturePixelAppearance,
+  getPicturePaintDensity,
+  preparePictureDetailedPaint,
+  PicturePaintUnavailableError,
+  type PicturePaintResources,
+} from "./picture-detailed-render";
+import { resolvePictureDetailedPaintStyle } from "./picture-detailed-paint-style";
+import type { DrawingThemeEffects } from "./picture-inherited-effects";
 
 type Rect = { x: number; y: number; width: number; height: number };
 const transparentSources = new WeakMap<HTMLImageElement, Map<string, HTMLCanvasElement>>();
@@ -67,9 +76,64 @@ export function paintImagePresentation(
   image: HTMLImageElement,
   rect: Rect,
   transform?: ImageTransform,
+  detailedOptions?: {
+    resources?: PicturePaintResources;
+    inherited?: DrawingThemeEffects;
+    finishFrontPainter?: (context: CanvasRenderingContext2D, frame: Rect) => void;
+  },
 ): void {
   const appearance = transform?.appearance;
-  if (appearance?.reflection) rect = { ...rect, height: rect.height / 1.25 };
+  if (appearance?.reflection && appearance.detailedStyle?.reflection === undefined)
+    rect = { ...rect, height: rect.height / 1.25 };
+  if (resolvePictureDetailedPaintStyle(appearance, detailedOptions?.inherited)) {
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const pixelTransform: ImageTransform = {
+      ...transform,
+      appearance: getPicturePixelAppearance(appearance),
+    };
+    const result = preparePictureDetailedPaint({
+      key: JSON.stringify(["legacy", transform]),
+      sourceIdentity: image,
+      width: rect.width,
+      height: rect.height,
+      density: getPicturePaintDensity(context),
+      appearance,
+      inherited: detailedOptions?.inherited,
+      resources: detailedOptions?.resources,
+      sourcePainter: (surface) =>
+        paintImagePresentation(
+          surface,
+          image,
+          { x: 0, y: 0, width: rect.width, height: rect.height },
+          pixelTransform,
+        ),
+      finishFrontPainter: detailedOptions?.finishFrontPainter
+        ? (surface) =>
+            detailedOptions.finishFrontPainter!(surface, {
+              x: 0,
+              y: 0,
+              width: rect.width,
+              height: rect.height,
+            })
+        : undefined,
+    })!;
+    if (result.kind === "unavailable") throw new PicturePaintUnavailableError(result);
+    const bounds = result.logicalBounds;
+    context.save();
+    try {
+      context.globalAlpha *= appearance?.opacity ?? 1;
+      context.drawImage(
+        result.canvas,
+        rect.x + bounds.left,
+        rect.y + bounds.top,
+        bounds.right - bounds.left,
+        bounds.bottom - bounds.top,
+      );
+    } finally {
+      context.restore();
+    }
+    return;
+  }
   const source = imageAppearanceSource(image, appearance);
   const sourceWidth = source instanceof HTMLCanvasElement ? source.width : source.naturalWidth;
   const sourceHeight = source instanceof HTMLCanvasElement ? source.height : source.naturalHeight;
@@ -150,9 +214,45 @@ export function createPictureCanvas(
   image: HTMLImageElement,
   transform?: ImageTransform,
   maxSide = 4096,
+  resources?: PicturePaintResources,
 ): HTMLCanvasElement {
   const geometry = getImagePresentation(transform, image.naturalWidth, image.naturalHeight);
+  if (!Number.isInteger(maxSide) || maxSide < 1 || maxSide > 4096)
+    throw new RangeError("Picture canvas limit must be an integer from 1 to 4096.");
   const scale = Math.min(1, maxSide / geometry.width, maxSide / geometry.height);
+  const appearance = transform?.appearance;
+  if (resolvePictureDetailedPaintStyle(appearance, undefined)) {
+    const width = geometry.width * scale;
+    const height =
+      (geometry.height * scale) /
+      (appearance?.reflection && appearance.detailedStyle?.reflection === undefined ? 1.25 : 1);
+    const result = preparePictureDetailedPaint({
+      key: JSON.stringify(["presentation-canvas", transform]),
+      sourceIdentity: image,
+      width,
+      height,
+      density: 1,
+      appearance,
+      resources,
+      sourcePainter: (surface) =>
+        paintImagePresentation(
+          surface,
+          image,
+          { x: 0, y: 0, width, height },
+          { ...transform, appearance: getPicturePixelAppearance(appearance) },
+        ),
+    })!;
+    if (result.kind === "unavailable") throw new PicturePaintUnavailableError(result);
+    // A consumer owns its copy: LRU eviction must not erase an asynchronous toBlob operation.
+    const copy = document.createElement("canvas");
+    copy.width = result.canvas.width;
+    copy.height = result.canvas.height;
+    const target = copy.getContext("2d");
+    if (!target) throw new Error("Image rendering is unavailable.");
+    target.globalAlpha = appearance?.opacity ?? 1;
+    target.drawImage(result.canvas, 0, 0);
+    return copy;
+  }
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(geometry.width * scale));
   canvas.height = Math.max(1, Math.round(geometry.height * scale));

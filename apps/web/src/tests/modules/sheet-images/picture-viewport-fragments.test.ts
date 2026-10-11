@@ -12,6 +12,7 @@ import {
   getFloatingImageViewportFragmentsForPaint,
   paintFloatingImages,
 } from "../../../modules/sheet-images/floating-image-painter";
+import { getPictureDetailedWorldBounds } from "../../../shared/images/picture-detailed-bounds";
 import { getPictureViewportFragments } from "../../../modules/sheet-images/picture-viewport-fragments";
 import type { DrawingThemeEffects } from "../../../modules/sheet-images/drawing-theme-effects";
 
@@ -412,4 +413,34 @@ describe("mixed framed picture canvas painting", () => {
       );
     },
   );
+});
+
+test("effects-only pane fragments do not change ordinary selection geometry", () => {
+  const view = createView(),
+    image = framed();
+  image.frame.anchor = { mode: "fixed", x: 260, y: 60, size: { width: 100, height: 50 } };
+  image.frame.angleDeg = 0;
+  image.transform = {
+    appearance: {
+      detailedStyle: {
+        glow: {
+          kind: "value",
+          value: { color: { kind: "rgb", rgb: "#FF0000" }, opacity: 1, sizePt: 40 },
+        },
+      },
+    },
+  };
+  expect(getPictureViewportFragments([image], view.layout, view)).toHaveLength(0);
+  const painted = getPictureViewportFragments([image], view.layout, view, (picture, geometry) =>
+    getPictureDetailedWorldBounds(geometry, picture.transform?.appearance, noEffects, undefined, 1),
+  );
+  expect(painted.some((fragment) => fragment.paneId === "body")).toBe(true);
+  const body = painted.find((fragment) => fragment.paneId === "body")!;
+  if (body.kind !== "framed") throw new Error("Expected actual framed fragment");
+  expect(body.geometry.rect.width).toBe(100);
+  expect(body.geometry.rect.height).toBe(50);
+  expect(body.geometry.bounds.x).toBeGreaterThan(
+    view.layout.panes.body.clip.x + view.layout.panes.body.clip.width,
+  );
+  expect(getPictureViewportFragments([image], view.layout, view)).toHaveLength(0);
 });

@@ -2,6 +2,7 @@ import { mount } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import { describe, expect, test } from "vitest";
 import SheetImageContent from "../../../../../modules/sheet-images/components/SheetImageContent.vue";
+import { createAppI18n } from "../../../../../shared/i18n";
 import { createSheetImagePresentationSvg } from "../../../../../modules/sheet-images/components/sheetImagePresentation";
 
 describe("SheetImageContent", () => {
@@ -14,6 +15,7 @@ describe("SheetImageContent", () => {
     "renders a normalized crop after %s degree rotation",
     async (rotation, viewBox, transform) => {
       const wrapper = mount(SheetImageContent, {
+        global: { plugins: [createAppI18n("en-US")] },
         props: {
           src: "blob:source",
           altText: "Diagram",
@@ -51,6 +53,7 @@ describe("SheetImageContent", () => {
 
   test("fills an arbitrary floating frame without replacing the source URL", () => {
     const wrapper = mount(SheetImageContent, {
+      global: { plugins: [createAppI18n("en-US")] },
       props: {
         src: "blob:animated-gif",
         altText: "Animated chart",
@@ -71,6 +74,7 @@ describe("SheetImageContent", () => {
             h(SheetImageContent, { src: "blob:second", altText: "Second" }),
           ]),
       }),
+      { global: { plugins: [createAppI18n("en-US")] } },
     );
     const ids = wrapper.findAll("clipPath").map((element) => element.attributes("id"));
     expect(new Set(ids).size).toBe(2);
@@ -93,6 +97,7 @@ describe("SheetImageContent", () => {
     [{ flipHorizontal: true, flipVertical: true }, "translate(500 400) scale(-1 -1)"],
   ] as const)("mirrors the cropped source before rotation for %o", async (flip, expected) => {
     const wrapper = mount(SheetImageContent, {
+      global: { plugins: [createAppI18n("en-US")] },
       props: {
         src: "blob:source",
         altText: "Diagram",

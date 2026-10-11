@@ -20,11 +20,15 @@ export function assertSupportedXlsxImageAppearance(
   if (
     appearance !== null &&
     appearance !== undefined &&
-    Object.hasOwn(appearance, "suppressThemeEffects")
+    (Object.hasOwn(appearance, "suppressThemeEffects") ||
+      Object.hasOwn(appearance, "detailedStyle"))
   ) {
-    const issuePath = `${issueLocation}.transform.appearance.suppressThemeEffects`;
+    const field = Object.hasOwn(appearance, "detailedStyle")
+      ? "detailedStyle"
+      : "suppressThemeEffects";
+    const issuePath = `${issueLocation}.transform.appearance.${field}`;
     throw new XlsxCompatibilityError(
-      `Picture theme-effect suppression is not yet supported by XLSX export at ${issuePath}.`,
+      `Picture ${field === "detailedStyle" ? "detailed styling" : "theme-effect suppression"} is not yet supported by XLSX export at ${issuePath}.`,
       {
         issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [issuePath] }],
       },

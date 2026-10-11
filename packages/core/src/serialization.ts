@@ -244,6 +244,8 @@ export type WorkbookSnapshotV46 = Omit<WorkbookSnapshotV45, "version"> & { versi
 export type WorkbookSnapshotV47 = Omit<WorkbookSnapshotV46, "version"> & { version: 47 };
 export type WorkbookSnapshotV48 = Omit<WorkbookSnapshotV47, "version"> & { version: 48 };
 export type WorkbookSnapshotV49 = Omit<WorkbookSnapshotV48, "version"> & { version: 49 };
+/** Complete typed picture appearance is one protocol feature. */
+export type WorkbookSnapshotV50 = Omit<WorkbookSnapshotV49, "version"> & { version: 50 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -251,7 +253,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV46
   | WorkbookSnapshotV47
   | WorkbookSnapshotV48
-  | WorkbookSnapshotV49;
+  | WorkbookSnapshotV49
+  | WorkbookSnapshotV50;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -317,7 +320,8 @@ type SnapshotVersion =
   | 46
   | 47
   | 48
-  | 49;
+  | 49
+  | 50;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -360,6 +364,40 @@ function hasCellThemeEffectSuppressionField(cell: unknown): boolean {
   if (!cell || typeof cell !== "object") return false;
   const content = (cell as CellSnapshotV6).content;
   return content?.kind === "image" && hasThemeEffectSuppressionField(content.image?.transform);
+}
+
+/** Detection must not execute accessors, including an invalid outer appearance field. */
+function pictureDataField(value: unknown, key: string): unknown {
+  if (!value || typeof value !== "object") return undefined;
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  if (!descriptor) {
+    if (key in value) throw new TypeError(`Picture ${key} must be an own data field.`);
+    return undefined;
+  }
+  if (!("value" in descriptor))
+    throw new TypeError(`Picture ${key} must be a data field, not an accessor.`);
+  return descriptor.value;
+}
+function hasDetailedPictureStyleField(transform: unknown): boolean {
+  const appearance = pictureDataField(transform, "appearance");
+  return !!appearance && typeof appearance === "object" && "detailedStyle" in appearance;
+}
+function hasPictureDetailedStyleField(image: unknown): boolean {
+  if (isPictureGroup(image)) {
+    return traversePictureGroup(image).some(
+      ({ node }) =>
+        node.kind === "grouped-picture-v1" &&
+        hasDetailedPictureStyleField(pictureDataField(node, "transform")),
+    );
+  }
+  return hasDetailedPictureStyleField(pictureDataField(image, "transform"));
+}
+function hasCellDetailedStyleField(cell: unknown): boolean {
+  const content = pictureDataField(cell, "content");
+  return (
+    pictureDataField(content, "kind") === "image" &&
+    hasDetailedPictureStyleField(pictureDataField(pictureDataField(content, "image"), "transform"))
+  );
 }
 
 function asArray(value: unknown, path: string): unknown[] {
@@ -456,6 +494,8 @@ function parseCellContent(value: unknown, path: string, version: SnapshotVersion
   }
   if (version >= 4 && record.kind === "image") {
     const image = asRecord(record.image, `${path}.image`);
+    if (version < 50 && hasDetailedPictureStyleField(image.transform))
+      return fail(path, "Detailed picture styles require snapshot version 50.");
     if (version < 49 && hasThemeEffectSuppressionField(image.transform))
       return fail(path, "Picture theme effect suppression requires snapshot version 49.");
     if (Object.hasOwn(image, "frame"))
@@ -700,6 +740,15 @@ function parseFilter(value: unknown, path: string, version: SnapshotVersion): Sh
 
 function parseFloatingImage(value: unknown, path: string, version: SnapshotVersion): FloatingImage {
   const record = asRecord(value, path);
+  if (version < 50) {
+    try {
+      if (hasPictureDetailedStyleField(record))
+        return fail(path, "Detailed picture styles require snapshot version 50.");
+    } catch (error) {
+      if (error instanceof WorkbookDomainError) throw error;
+      return fail(path, error instanceof Error ? error.message : "Invalid picture object.");
+    }
+  }
   if (version < 49) {
     try {
       if (hasPictureThemeEffectSuppressionField(record))
@@ -1128,6 +1177,19 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       );
     }
   }
+  if (version !== undefined && version < 50) {
+    try {
+      if (
+        (Array.isArray(record.cells) && record.cells.some(hasCellDetailedStyleField)) ||
+        (Array.isArray(record.floatingImages) &&
+          record.floatingImages.some(hasPictureDetailedStyleField))
+      )
+        return fail(path, "Detailed picture styles require snapshot version 50.");
+    } catch (error) {
+      if (error instanceof WorkbookDomainError) throw error;
+      return fail(path, error instanceof Error ? error.message : "Invalid picture object.");
+    }
+  }
   if (version !== undefined && version < 49) {
     try {
       if (
@@ -1292,6 +1354,12 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
         record.floatingImages.some(hasPictureThemeEffectSuppressionField))
     )
       version = 49;
+    if (
+      cells.some(hasCellDetailedStyleField) ||
+      (Array.isArray(record.floatingImages) &&
+        record.floatingImages.some(hasPictureDetailedStyleField))
+    )
+      version = 50;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -1394,26 +1462,32 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     // Preserve the existing protocol for documents that do not use the new feature.
     version: sheets.some(
       (sheet) =>
-        sheet.cells.some(hasCellThemeEffectSuppressionField) ||
-        sheet.floatingImages.some(hasPictureThemeEffectSuppressionField),
+        sheet.cells.some(hasCellDetailedStyleField) ||
+        sheet.floatingImages.some(hasPictureDetailedStyleField),
     )
-      ? 49
-      : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
-        ? 48
-        : sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
-          ? 47
-          : sheets.some((sheet) =>
-                sheet.cells.some(
-                  (cell) =>
-                    cell.content?.kind === "literal" && Boolean(cell.content.fontRuns?.length),
-                ),
-              )
-            ? 46
-            : calculatedColumns
-              ? 45
-              : manualOrder
-                ? 44
-                : 43,
+      ? 50
+      : sheets.some(
+            (sheet) =>
+              sheet.cells.some(hasCellThemeEffectSuppressionField) ||
+              sheet.floatingImages.some(hasPictureThemeEffectSuppressionField),
+          )
+        ? 49
+        : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
+          ? 48
+          : sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
+            ? 47
+            : sheets.some((sheet) =>
+                  sheet.cells.some(
+                    (cell) =>
+                      cell.content?.kind === "literal" && Boolean(cell.content.fontRuns?.length),
+                  ),
+                )
+              ? 46
+              : calculatedColumns
+                ? 45
+                : manualOrder
+                  ? 44
+                  : 43,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1494,7 +1568,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 46 &&
     record.version !== 47 &&
     record.version !== 48 &&
-    record.version !== 49
+    record.version !== 49 &&
+    record.version !== 50
   ) {
     throw new WorkbookDomainError(
       {

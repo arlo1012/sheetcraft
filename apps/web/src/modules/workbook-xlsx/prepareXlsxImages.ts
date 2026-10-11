@@ -67,11 +67,18 @@ function extensionFor(mimeType: string): EncodedImage | undefined {
 
 export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
   const assertAppearance = (transform: ImageTransform | undefined, ownerLocation: string): void => {
-    if (!transform?.appearance || !Object.hasOwn(transform.appearance, "suppressThemeEffects"))
+    if (
+      !transform?.appearance ||
+      (!Object.hasOwn(transform.appearance, "suppressThemeEffects") &&
+        !Object.hasOwn(transform.appearance, "detailedStyle"))
+    )
       return;
-    const location = `${ownerLocation}.transform.appearance.suppressThemeEffects`;
+    const field = Object.hasOwn(transform.appearance, "detailedStyle")
+      ? "detailedStyle"
+      : "suppressThemeEffects";
+    const location = `${ownerLocation}.transform.appearance.${field}`;
     throw new XlsxWorkerFailure(
-      `Picture theme-effect suppression is not yet supported by XLSX export at ${location}.`,
+      `Picture ${field === "detailedStyle" ? "detailed styling" : "theme-effect suppression"} is not yet supported by XLSX export at ${location}.`,
       {
         issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [location] }],
       },

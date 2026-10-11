@@ -110,7 +110,13 @@ export function preparePictureCropPreview(
   // Decorations belong to the retained crop frame, not the temporary full-source
   // frame. Keep pixel filters, transparency, opacity, annotations and both flips.
   if (ghostPicture.transform?.appearance) {
-    const { border: _border, shadow: _shadow, ...appearance } = ghostPicture.transform.appearance;
+    const {
+      border: _border,
+      shadow: _shadow,
+      reflection: _reflection,
+      detailedStyle: _detailed,
+      ...appearance
+    } = ghostPicture.transform.appearance;
     ghostPicture.transform = { ...ghostPicture.transform, appearance };
   }
   // The grouped leaf keeps its real parent-local ratios and local angle. Only

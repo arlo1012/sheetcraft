@@ -1,3 +1,7 @@
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detailed-style";
+import { createPicturePaintResources } from "../../../shared/images/picture-paint-resources";
+import { PicturePaintUnavailableError } from "../../../shared/images/picture-detailed-render";
 import { paintSparkline } from "../../sparklines/sparkline-painter";
 import type { CellAddress } from "@sheetcraft/core/workbook";
 import type { Rect } from "@sheetcraft/sheet-engine/geometry";
@@ -122,6 +126,7 @@ export function paintSheetScene(
     editingCell?: CellAddress;
     errorCells?: ReadonlySet<string>;
     imageUrls?: ReadonlyMap<string, string>;
+    imageTheme?: WorkbookTheme;
     images: CanvasImageCache;
     imagePlaceholder: (assetId: string) => string;
     /** Only a live surface with the native logical-span overlay may skip these glyphs. */
@@ -136,6 +141,11 @@ export function paintSheetScene(
     context.fillRect(0, 0, layout.viewportSize.width, layout.viewportSize.height);
   }
   const visibleImageUrls = new Set<string>();
+  const pictureResources = createPicturePaintResources(
+    options.imageTheme,
+    options.imageUrls,
+    options.images,
+  );
   for (const paneScene of scene.panes) {
     const pane = layout.panes[paneScene.id];
     if (pane.clip.width <= 0 || pane.clip.height <= 0) continue;
@@ -183,8 +193,22 @@ export function paintSheetScene(
         const url = options.imageUrls?.get(content.image.assetId);
         if (url) visibleImageUrls.add(url);
         const image = url ? options.images.get(url) : undefined;
-        if (image) paintCellImage(context, image, contentRect, content.image.transform);
-        else {
+        for (const id of getDetailedPictureStyleAssetIds(
+          content.image.transform?.appearance?.detailedStyle,
+        )) {
+          const auxiliaryUrl = options.imageUrls?.get(id);
+          if (auxiliaryUrl) visibleImageUrls.add(auxiliaryUrl);
+        }
+        let painted = false;
+        if (image) {
+          try {
+            paintCellImage(context, image, contentRect, content.image.transform, pictureResources);
+            painted = true;
+          } catch (error) {
+            if (!(error instanceof PicturePaintUnavailableError)) throw error;
+          }
+        }
+        if (!painted) {
           context.font = "12px sans-serif";
           context.fillStyle = palette.mutedText;
           context.textAlign = "left";

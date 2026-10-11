@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, useId, watchEffect } from "vue";
+import type { PicturePaintResources } from "../../../shared/images/picture-detailed-render";
+import { useAppI18n } from "../../../shared/i18n";
 import type { ImageTransform } from "@sheetcraft/core/workbook";
 import { createPictureCanvas } from "../../../shared/images/imageAppearance";
 import { getSheetImagePresentation } from "./sheetImagePresentation";
@@ -9,6 +11,7 @@ const props = withDefaults(
     src: string;
     altText: string;
     transform?: ImageTransform;
+    paintResources?: PicturePaintResources;
     fit?: "contain" | "fill";
   }>(),
   { fit: "contain" },
@@ -18,12 +21,25 @@ const emit = defineEmits<{ load: [size: { width: number; height: number }] }>();
 
 const clipPathId = `sheet-image-content-clip-${useId()}`;
 const processedSource = ref<string>();
+const unavailable = ref(false);
+const { t } = useAppI18n();
 const sourceImage = shallowRef<HTMLImageElement>();
 watchEffect(() => {
-  processedSource.value =
-    sourceImage.value && props.transform?.appearance
-      ? createPictureCanvas(sourceImage.value, props.transform).toDataURL("image/png")
-      : undefined;
+  unavailable.value = false;
+  try {
+    processedSource.value =
+      sourceImage.value && props.transform?.appearance
+        ? createPictureCanvas(
+            sourceImage.value,
+            props.transform,
+            4096,
+            props.paintResources,
+          ).toDataURL("image/png")
+        : undefined;
+  } catch {
+    processedSource.value = undefined;
+    unavailable.value = true;
+  }
 });
 const naturalWidth = ref(1);
 const naturalHeight = ref(1);
@@ -64,7 +80,7 @@ function onSourceLoad(event: Event): void {
       :height="presentation.height"
       preserveAspectRatio="none"
     />
-    <g v-else :transform="presentation.rotationTransform">
+    <g v-else-if="!unavailable" :transform="presentation.rotationTransform">
       <g :transform="presentation.flipTransform">
         <g :clip-path="`url(#${clipPathId})`">
           <image
@@ -79,6 +95,9 @@ function onSourceLoad(event: Event): void {
         </g>
       </g>
     </g>
+    <text v-if="unavailable" x="4" y="16" fill="currentColor" role="status">
+      {{ t("image.assetUnavailable") }}
+    </text>
   </svg>
   <img
     class="sheet-image-content__probe"

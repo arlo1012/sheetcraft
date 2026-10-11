@@ -1,6 +1,7 @@
 import { onBeforeUnmount, readonly, ref, watch } from "vue";
 import type { Workbook } from "@sheetcraft/core/workbook";
 import { collectPictureGroupAssetIds, isPictureGroup } from "@sheetcraft/core/picture-group";
+import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detailed-style";
 import { readEncodedImageSource } from "./readEncodedImageSource";
 import { assertImagePixelBudget } from "./imageAssetValidation";
 import type { ImageAsset, ImageAssetStore } from "./imageAssetStore";
@@ -16,12 +17,24 @@ export function collectWorkbookImageAssetIds(workbook: Workbook): Set<string> {
       ids.add(sheet.pageDecoration.watermark.image.assetId);
     for (const cell of sheet.cells.values()) {
       const content = cell.content;
-      if (content?.kind === "image") ids.add(content.image.assetId);
+      if (content?.kind === "image") {
+        ids.add(content.image.assetId);
+        for (const id of getDetailedPictureStyleAssetIds(
+          content.image.transform?.appearance?.detailedStyle,
+        ))
+          ids.add(id);
+      }
     }
     for (const image of sheet.floatingImages) {
       if (isPictureGroup(image)) {
         for (const id of collectPictureGroupAssetIds(image)) ids.add(id);
-      } else ids.add(image.assetId);
+      } else {
+        ids.add(image.assetId);
+        for (const id of getDetailedPictureStyleAssetIds(
+          image.transform?.appearance?.detailedStyle,
+        ))
+          ids.add(id);
+      }
     }
   }
   return ids;

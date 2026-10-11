@@ -175,6 +175,10 @@
       "types": "./dist/picture-axis-metrics.d.ts",
       "import": "./dist/picture-axis-metrics.js"
     },
+    "./picture-detailed-style": {
+      "types": "./dist/picture-detailed-style.d.ts",
+      "import": "./dist/picture-detailed-style.js"
+    },
     "./picture-frame": {
       "types": "./dist/picture-frame.d.ts",
       "import": "./dist/picture-frame.js"

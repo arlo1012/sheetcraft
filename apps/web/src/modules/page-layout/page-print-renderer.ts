@@ -629,6 +629,7 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
         screenScale: document.pagination.printScale * previewScale,
         skipBackground: true,
         imageUrls: options.imageAssetUrls,
+        imageTheme: options.theme,
         images,
         imagePlaceholder: () => "",
       });
@@ -661,6 +662,7 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
           loadingLabel: "",
           unavailableLabel: "",
           effects: getDrawingThemeEffects(options.theme),
+          theme: options.theme,
         });
       context.restore();
     };

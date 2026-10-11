@@ -71,7 +71,11 @@ export function assertSourceBearingPicturePaintSupport(
   picture: FramedFloatingImage | GroupedPicture,
   effects?: DrawingThemeEffects,
 ): void {
-  if (picture.transform?.appearance?.reflection) throw new UnsupportedPicturePaintError();
+  if (
+    picture.transform?.appearance?.reflection &&
+    picture.transform.appearance.detailedStyle?.reflection === undefined
+  )
+    throw new UnsupportedPicturePaintError();
   assertDrawingThemeEffects(effects);
 }
 

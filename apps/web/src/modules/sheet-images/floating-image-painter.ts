@@ -1,6 +1,23 @@
 import { requireLegacyPictures } from "./picture-document-support";
 import { createCanvasImageCache } from "../sheet-grid/canvas/image-painter";
 import type { FloatingImage, LegacyFloatingImage, ImageTransform } from "@sheetcraft/core/workbook";
+import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detailed-style";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import { resolvePictureFrame, resolvePictureSourceLayout } from "@sheetcraft/core/picture-frame";
+import {
+  resolvePictureGroup,
+  type ResolvedPictureGroupChild,
+} from "@sheetcraft/core/picture-group-layout";
+import { createPicturePaintResources } from "../../shared/images/picture-paint-resources";
+import {
+  getPicturePaintDensity,
+  PicturePaintUnavailableError,
+  type PicturePaintResources,
+} from "../../shared/images/picture-detailed-render";
+import { getPictureDetailedWorldBounds } from "../../shared/images/picture-detailed-bounds";
+import { resolvePictureDetailedPaintStyle } from "../../shared/images/picture-detailed-paint-style";
 import type { ResolvedPictureFrame } from "@sheetcraft/core/picture-frame";
 import {
   getFloatingImageViewportFragments,
@@ -57,7 +74,19 @@ function paintImage(
   rect: Rect,
   transform: ImageTransform | undefined,
   effects: DrawingThemeEffects | undefined,
+  resources?: PicturePaintResources,
 ): void {
+  const detailed = resolvePictureDetailedPaintStyle(transform?.appearance, effects);
+  if (detailed) {
+    paintImagePresentation(context, image, rect, transform, {
+      resources,
+      inherited: effects,
+      finishFrontPainter: detailed.remainingTheme
+        ? (surface, frame) => paintDrawingThemeOutline(surface, frame, detailed.remainingTheme!)
+        : undefined,
+    });
+    return;
+  }
   effects = resolvePictureThemeEffects(transform?.appearance, effects);
   context.save();
   try {
@@ -183,20 +212,84 @@ export function paintFloatingImages(
     loadingLabel: string;
     unavailableLabel: string;
     effects?: DrawingThemeEffects;
+    theme?: WorkbookTheme;
   },
 ): void {
   const effects = options.effects ?? options.state.effects;
   assertPicturePaintSupport(options.state.images, effects, options.frameContext?.metrics);
+  if (
+    !options.frameContext &&
+    options.state.images.some(
+      (picture) => isFramedPictureObject(picture) || isPictureGroup(picture),
+    )
+  )
+    throw new TypeError("Framed picture viewport fragments require a frame context.");
+  const resources = createPicturePaintResources(options.theme, options.assetUrls, options.cache);
+  const density = getPicturePaintDensity(context);
+  const bounds = (
+    picture:
+      | LegacyFloatingImage
+      | import("@sheetcraft/core/picture-object").FramedFloatingImage
+      | import("@sheetcraft/core/picture-group").GroupedPicture,
+    geometry: ResolvedPictureFrame,
+  ) => {
+    if (
+      !Object.hasOwn(picture, "frame") &&
+      picture.transform?.appearance?.reflection &&
+      picture.transform.appearance.detailedStyle?.reflection === undefined
+    )
+      geometry = resolvePictureSourceLayout(
+        { ...geometry.rect, height: geometry.rect.height / 1.25 },
+        0,
+        { widthRatio: 1, heightRatio: 1, offsetXRatio: 0, offsetYRatio: 0 },
+      );
+    return getPictureDetailedWorldBounds(
+      geometry,
+      picture.transform?.appearance,
+      effects,
+      resources,
+      density,
+    );
+  };
+  // Validate every source-bearing leaf, including hidden descendants, before the first cache request.
+  const preflightOwned = (children: readonly ResolvedPictureGroupChild[]): void => {
+    for (const child of children) {
+      if ("members" in child) preflightOwned(child.members);
+      else if (child.layout && !child.layout.collapsed) bounds(child.node, child.layout);
+    }
+  };
+  for (const picture of options.state.images) {
+    if (isPictureGroup(picture))
+      preflightOwned(resolvePictureGroup(picture, options.frameContext!.metrics).members);
+    else if (isFramedPictureObject(picture))
+      bounds(picture, resolvePictureFrame(picture.frame, options.frameContext!.metrics));
+    else
+      bounds(
+        picture,
+        resolvePictureSourceLayout(
+          { x: 0, y: 0, width: picture.width, height: picture.height },
+          0,
+          { widthRatio: 1, heightRatio: 1, offsetXRatio: 0, offsetYRatio: 0 },
+        ),
+      );
+  }
   const fragments = getPictureViewportFragments(
     options.state.images,
     options.layout,
     options.frameContext,
+    bounds,
   );
   const visibleUrls = new Set<string>();
   // Retain the complete visible collection even when a later cache/draw fails.
   for (const fragment of fragments) {
     const url = options.assetUrls.get(fragment.image.assetId);
     if (url) visibleUrls.add(url);
+    for (const id of getDetailedPictureStyleAssetIds(
+      fragment.image.transform?.appearance?.detailedStyle,
+    )) {
+      const auxiliaryUrl = options.assetUrls.get(id);
+      if (auxiliaryUrl) visibleUrls.add(auxiliaryUrl);
+    }
   }
   try {
     for (const fragment of fragments) {
@@ -208,9 +301,23 @@ export function paintFloatingImages(
         const url = options.assetUrls.get(fragment.image.assetId);
         const image = url ? options.cache.get(url) : undefined;
         if (image && fragment.kind === "framed")
-          paintFramedPictureContent(context, image, fragment.image, fragment.geometry, effects);
+          paintFramedPictureContent(
+            context,
+            image,
+            fragment.image,
+            fragment.geometry,
+            effects,
+            resources,
+          );
         else if (image && fragment.kind === "group-leaf")
-          paintGroupedPictureContent(context, image, fragment.image, fragment.geometry, effects);
+          paintGroupedPictureContent(
+            context,
+            image,
+            fragment.image,
+            fragment.geometry,
+            effects,
+            resources,
+          );
         else if (image && fragment.kind === "legacy")
           paintImage(
             context,
@@ -218,6 +325,7 @@ export function paintFloatingImages(
             fragment.rect,
             fragment.image.transform,
             hasVisibleDrawingThemeEffects(effects) ? effects : undefined,
+            resources,
           );
         else {
           const loading = Boolean(options.loadingAssetIds?.has(fragment.image.assetId));
@@ -226,6 +334,13 @@ export function paintFloatingImages(
             paintFramedPlaceholder(context, fragment.geometry, label, loading, options.palette);
           else paintPlaceholder(context, fragment.rect, label, loading, options.palette);
         }
+      } catch (error) {
+        if (!(error instanceof PicturePaintUnavailableError)) throw error;
+        const loading = error.missingAssetIds.some((id) => options.loadingAssetIds?.has(id));
+        const label = loading ? options.loadingLabel : options.unavailableLabel;
+        if (fragment.kind === "framed" || fragment.kind === "group-leaf")
+          paintFramedPlaceholder(context, fragment.geometry, label, loading, options.palette);
+        else paintPlaceholder(context, fragment.rect, label, loading, options.palette);
       } finally {
         context.restore();
       }

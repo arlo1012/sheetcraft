@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import { Button } from "tdesign-vue-next";
 import CellTextContent from "../../../shared/cell-text/CellTextContent.vue";
@@ -84,6 +85,7 @@ const props = withDefaults(
     locale?: string;
     dateSystem?: ExcelDateSystem;
     imageAssetUrls?: ReadonlyMap<string, string>;
+    imageTheme?: WorkbookTheme;
     loadingImageAssetIds?: ReadonlySet<string>;
     paintImages?: (context: CanvasRenderingContext2D) => void;
     pageDecoration?: SheetPageDecoration;
@@ -266,6 +268,7 @@ function paint(): void {
       editingCell: props.editing ? props.activeCell : undefined,
       errorCells: props.errorCells,
       imageUrls: props.imageAssetUrls,
+      imageTheme: props.imageTheme,
       images,
       imagePlaceholder: (id) =>
         t(props.loadingImageAssetIds?.has(id) ? "image.loading" : "image.assetUnavailable"),

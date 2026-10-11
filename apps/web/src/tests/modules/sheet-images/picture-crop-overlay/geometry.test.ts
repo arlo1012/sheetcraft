@@ -203,3 +203,29 @@ describe("crop controls in frozen panes", () => {
     ).toEqual([]);
   });
 });
+
+test("crop ghost removes every decoration while retaining source corrections and the stored appearance", () => {
+  const f = fixture();
+  f.picture.transform = {
+    appearance: {
+      brightness: 1.2,
+      opacity: 0.6,
+      shadow: "soft",
+      reflection: true,
+      border: { color: "#FF0000", width: 2 },
+      detailedStyle: {
+        reflection: { kind: "none" },
+        fill: { kind: "none" },
+        rotation3d: {
+          kind: "value",
+          value: { projection: "parallel", xDeg: 37, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+        },
+      },
+    },
+  };
+  const before = structuredClone(f.picture);
+  const preview = preparePictureCropPreview(f.picture, f.resolved());
+  expect(preview.ghostPicture.transform?.appearance).toEqual({ brightness: 1.2, opacity: 0.6 });
+  expect(preview.picture.transform?.appearance).toEqual(before.transform?.appearance);
+  expect(f.picture).toEqual(before);
+});
