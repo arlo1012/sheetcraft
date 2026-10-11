@@ -77,24 +77,44 @@ describe("floating image resize controls", () => {
     ).toBe(240);
   });
 
-  test("preserves the image aspect ratio during a locked edge resize", async () => {
+  test.each([
+    ["n", 15, -20, { x: 100, y: 50, width: 120, height: 80 }],
+    ["s", 15, 20, { x: 100, y: 70, width: 120, height: 80 }],
+    ["w", -40, 15, { x: 60, y: 70, width: 160, height: 60 }],
+    ["e", 40, 15, { x: 100, y: 70, width: 160, height: 60 }],
+  ] as const)("keeps locked side %s resize on one axis", async (direction, x, y, expected) => {
     const { wrapper, layout } = fixture({ image: { lockAspectRatio: true } });
     const layer = wrapper.get("[data-floating-image-layer]");
-    await wrapper.get('[data-image-resize="e"]').trigger("pointerdown", {
+    await wrapper.get(`[data-image-resize="${direction}"]`).trigger("pointerdown", {
       button: 0,
       pointerId: 12,
-      clientX: 220,
+      clientX: 200,
       clientY: 100,
     });
-    await layer.trigger("pointermove", { pointerId: 12, clientX: 260, clientY: 100 });
+    await layer.trigger("pointermove", { pointerId: 12, clientX: 200 + x, clientY: 100 + y });
     await layer.trigger("pointerup", { pointerId: 12 });
     const updates = wrapper.emitted("update")!;
     expect(updates).toHaveLength(1);
-    const image = updates[0]![0] as FloatingImage;
-    const rect = getFloatingImageSheetRect(image, layout)!;
-    expect(rect.width).toBe(160);
-    expect(rect.height).toBe(80);
-    expect(rect.width / rect.height).toBe(2);
+    expect(getFloatingImageSheetRect(updates[0]![0] as FloatingImage, layout)).toEqual(expected);
+  });
+
+  test.each([true, false])("uses aspect lock %s only for corner resize", async (locked) => {
+    const { wrapper, layout } = fixture({ image: { lockAspectRatio: locked } });
+    const layer = wrapper.get("[data-floating-image-layer]");
+    await wrapper.get('[data-image-resize="se"]').trigger("pointerdown", {
+      button: 0,
+      pointerId: 13,
+      clientX: 220,
+      clientY: 130,
+    });
+    await layer.trigger("pointermove", { pointerId: 13, clientX: 260, clientY: 140 });
+    await layer.trigger("pointerup", { pointerId: 13 });
+    expect(wrapper.emitted("update")).toHaveLength(1);
+    const rect = getFloatingImageSheetRect(
+      wrapper.emitted("update")![0]![0] as FloatingImage,
+      layout,
+    )!;
+    expect(rect).toEqual({ x: 100, y: 70, width: 160, height: locked ? 80 : 70 });
   });
 
   test("exposes all eight controls with their resize directions", () => {

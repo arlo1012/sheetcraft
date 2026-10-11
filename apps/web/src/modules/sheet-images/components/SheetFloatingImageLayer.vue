@@ -342,7 +342,8 @@ function moveGestureAt(activeGesture: Gesture, point: Point): void {
       {
         minSize: MINIMUM_IMAGE_SIZE,
         maxSize: MAX_FLOATING_IMAGE_SIZE,
-        preserveAspectRatio: activeGesture.image.lockAspectRatio ?? true,
+        preserveAspectRatio:
+          activeGesture.mode.length === 2 && (activeGesture.image.lockAspectRatio ?? true),
       },
     ) ?? activeGesture.image;
 }
