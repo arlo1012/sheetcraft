@@ -1732,6 +1732,9 @@ export type MessageSchema = ToolMessageSchema & {
     loading: string;
     invalidType: string;
     tooLarge: string;
+    tooManyPixels: string;
+    fileLimits: string;
+    placementFailed: string;
     invalidFile: string;
     decodeFailed: string;
     assetUnavailable: string;

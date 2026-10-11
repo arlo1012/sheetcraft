@@ -8,7 +8,10 @@ import {
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import { useSheetImageActions } from "../../../../modules/sheet-images/useSheetImageActions";
-import { prepareImageAsset } from "../../../../modules/image-assets/prepareImageAsset";
+import {
+  prepareImageAsset,
+  ImageAssetError,
+} from "../../../../modules/image-assets/prepareImageAsset";
 import { createMemoryImageAssetStore } from "../../../../modules/image-assets/imageAssetStore";
 
 vi.mock("../../../../modules/image-assets/prepareImageAsset", async (original) => ({
@@ -80,6 +83,19 @@ describe("batch picture insertion", () => {
       }
     },
   );
+
+  test("preserves a typed pixel-limit failure from a batch without partial insertion", async () => {
+    const f = fixture();
+    vi.mocked(prepareImageAsset)
+      .mockReset()
+      .mockResolvedValueOnce(assets[0]!)
+      .mockRejectedValueOnce(new ImageAssetError("pixel-limit"));
+    await f.actions.insertFiles(files, "floating");
+    expect(f.actions.feedback.value).toBe("image.tooManyPixels");
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.sheet.floatingImages).toEqual([]);
+    expect(await f.store.get(assets[0]!.id)).toBeUndefined();
+  });
 
   test("submits no command when the second image fails to decode", async () => {
     const f = fixture();

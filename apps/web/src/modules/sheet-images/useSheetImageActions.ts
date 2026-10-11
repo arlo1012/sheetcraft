@@ -1,6 +1,7 @@
 import { readonly, ref } from "vue";
 import {
   MIN_FLOATING_IMAGE_SIZE,
+  MAX_FLOATING_IMAGE_SIZE,
   MAX_SHEET_ROWS,
   getCellContent,
   type CellAddress,
@@ -23,10 +24,29 @@ import {
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import type { MessageKey } from "../../shared/i18n";
 import type { ImageAssetStore } from "../image-assets/imageAssetStore";
-import { ImageAssetError, prepareImageAsset } from "../image-assets/prepareImageAsset";
+import { imageAssetFeedback } from "../image-assets/imageAssetFeedback";
+import { prepareImageAsset } from "../image-assets/prepareImageAsset";
 
 export type ImageInsertMode = "cell" | "floating";
 type ImageTarget = { workbook: Workbook; sheet: Sheet; sheetId: string; address: CellAddress };
+class ImagePlacementError extends Error {}
+function initialFloatingSize(width: number, height: number): { width: number; height: number } {
+  const scale = Math.max(
+    MIN_FLOATING_IMAGE_SIZE / Math.min(width, height),
+    Math.min(1, 400 / width, 300 / height),
+  );
+  const size = { width: width * scale, height: height * scale };
+  if (
+    !Number.isFinite(size.width) ||
+    !Number.isFinite(size.height) ||
+    size.width < MIN_FLOATING_IMAGE_SIZE ||
+    size.height < MIN_FLOATING_IMAGE_SIZE ||
+    size.width > MAX_FLOATING_IMAGE_SIZE ||
+    size.height > MAX_FLOATING_IMAGE_SIZE
+  )
+    throw new ImagePlacementError("Picture aspect ratio cannot fit the floating frame limits.");
+  return size;
+}
 
 function cellImageMatches(
   sheet: Sheet,
@@ -40,6 +60,11 @@ function cellImageMatches(
     content.image.altText === image.altText &&
     areImageTransformsEqual(content.image.transform, image.transform)
   );
+}
+
+function assetFailureFeedback(error: unknown): MessageKey {
+  if (error instanceof ImagePlacementError) return "image.placementFailed";
+  return imageAssetFeedback(error) ?? "image.insertionFailed";
 }
 
 export function useSheetImageActions(options: {
@@ -152,6 +177,10 @@ export function useSheetImageActions(options: {
     try {
       const asset = await prepareImageAsset(file);
       if (!valid()) return;
+      const size =
+        mode === "floating" && !replaceId
+          ? initialFloatingSize(asset.width, asset.height)
+          : undefined;
       await options.assetStore.put(asset);
       if (!valid()) return;
       const altText = file.name || "";
@@ -182,10 +211,6 @@ export function useSheetImageActions(options: {
         });
         if (accepted === false) throw new Error("Cell image insertion was refused.");
       } else {
-        const scale = Math.max(
-          MIN_FLOATING_IMAGE_SIZE / Math.min(asset.width, asset.height),
-          Math.min(1, 400 / asset.width, 300 / asset.height),
-        );
         const accepted = await options.setFloatingImage(
           {
             id: idFactory("image"),
@@ -194,8 +219,7 @@ export function useSheetImageActions(options: {
             anchor: target.address,
             offsetX: 0,
             offsetY: 0,
-            width: asset.width * scale,
-            height: asset.height * scale,
+            ...size!,
           },
           target.sheetId,
         );
@@ -203,17 +227,7 @@ export function useSheetImageActions(options: {
       }
       feedback.value = "image.inserted";
     } catch (error) {
-      feedback.value =
-        error instanceof ImageAssetError
-          ? (
-              {
-                "unsupported-type": "image.invalidType",
-                "too-large": "image.tooLarge",
-                "invalid-image": "image.invalidFile",
-                "decode-failed": "image.decodeFailed",
-              } as const
-            )[error.code]
-          : "image.insertionFailed";
+      feedback.value = assetFailureFeedback(error);
     } finally {
       busy.value = false;
     }
@@ -260,6 +274,10 @@ export function useSheetImageActions(options: {
         assets.push(await prepareImageAsset(file));
         if (!valid()) return;
       }
+      const sizes =
+        mode === "floating"
+          ? assets.map((asset) => initialFloatingSize(asset.width, asset.height))
+          : [];
       for (const asset of assets) {
         await options.assetStore.put(asset);
         if (!valid()) return;
@@ -291,10 +309,6 @@ export function useSheetImageActions(options: {
           createSetSheetFloatingImagesCommand(target.sheetId, [
             ...sheet.floatingImages,
             ...assets.map((asset, index) => {
-              const scale = Math.max(
-                MIN_FLOATING_IMAGE_SIZE / Math.min(asset.width, asset.height),
-                Math.min(1, 400 / asset.width, 300 / asset.height),
-              );
               return {
                 id: idFactory("image"),
                 assetId: asset.id,
@@ -302,16 +316,15 @@ export function useSheetImageActions(options: {
                 anchor: { ...target.address },
                 offsetX: index * 24,
                 offsetY: index * 24,
-                width: asset.width * scale,
-                height: asset.height * scale,
+                ...sizes[index]!,
               };
             }),
           ]),
         );
       if (accepted === false) throw new Error("Picture batch insertion was refused.");
       feedback.value = "image.inserted";
-    } catch {
-      feedback.value = "image.insertionFailed";
+    } catch (error) {
+      feedback.value = assetFailureFeedback(error);
     } finally {
       busy.value = false;
     }
@@ -453,20 +466,18 @@ export function useSheetImageActions(options: {
       if (content.image.transform?.rotation === 90 || content.image.transform?.rotation === 270) {
         [width, height] = [height, width];
       }
-      const scale = Math.max(
-        MIN_FLOATING_IMAGE_SIZE / Math.min(width, height),
-        Math.min(1, 400 / width, 300 / height),
-      );
+      const size = initialFloatingSize(width, height);
       const accepted = await options.convertCellImageToFloating({
         sheetId: target.sheetId,
         address: target.address,
         imageId: idFactory("image"),
-        size: { width: width * scale, height: height * scale },
+        size,
       });
       if (accepted === false) throw new Error("Picture conversion was refused.");
       feedback.value = "image.convertedToFloating";
-    } catch {
-      feedback.value = "image.convertFailed";
+    } catch (error) {
+      feedback.value =
+        error instanceof ImagePlacementError ? "image.placementFailed" : "image.convertFailed";
     } finally {
       busy.value = false;
     }

@@ -1,50 +1,19 @@
 import type { ImageAsset } from "./imageAssetStore";
 
-export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const ACCEPTED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
-
-export class ImageAssetError extends Error {
-  constructor(readonly code: "unsupported-type" | "too-large" | "invalid-image" | "decode-failed") {
-    super(`Image asset: ${code}`);
-    this.name = "ImageAssetError";
-  }
-}
+import { readEncodedImageSource } from "./readEncodedImageSource";
+import { ImageAssetError, assertImagePixelBudget } from "./imageAssetValidation";
+export {
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_PIXELS,
+  MAX_IMAGE_SIDE,
+  ImageAssetError,
+} from "./imageAssetValidation";
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function detectedMimeType(bytes: Uint8Array): string | undefined {
-  if (
-    bytes.length >= 8 &&
-    bytes[0] === 0x89 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x4e &&
-    bytes[3] === 0x47 &&
-    bytes[4] === 0x0d &&
-    bytes[5] === 0x0a &&
-    bytes[6] === 0x1a &&
-    bytes[7] === 0x0a
-  )
-    return "image/png";
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff)
-    return "image/jpeg";
-  if (
-    bytes.length >= 6 &&
-    String.fromCharCode(...bytes.slice(0, 6)) in { GIF87a: true, GIF89a: true }
-  )
-    return "image/gif";
-  if (
-    bytes.length >= 12 &&
-    String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
-    String.fromCharCode(...bytes.slice(8, 12)) === "WEBP"
-  )
-    return "image/webp";
-  return undefined;
-}
-
-async function contentHash(blob: Blob): Promise<string> {
-  const bytes = await blob.arrayBuffer();
+async function contentHash(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
   if (globalThis.crypto?.subtle)
     return bytesToHex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
   return `unhashed-${globalThis.crypto?.randomUUID?.() ?? randomId()}`;
@@ -69,27 +38,16 @@ async function dimensions(blob: Blob): Promise<{ width: number; height: number }
       image.onerror = () => reject(new ImageAssetError("decode-failed"));
       image.src = url;
     });
-    if (
-      !Number.isFinite(image.naturalWidth) ||
-      !Number.isFinite(image.naturalHeight) ||
-      image.naturalWidth < 1 ||
-      image.naturalHeight < 1
-    )
-      throw new ImageAssetError("invalid-image");
-    return { width: image.naturalWidth, height: image.naturalHeight };
+    return assertImagePixelBudget(image.naturalWidth, image.naturalHeight);
   } finally {
     URL.revokeObjectURL(url);
   }
 }
 
-/** Validates encoded bytes and derives every persisted field from the decoded payload. */
+/** Preflights encoded declarations, retains original bytes and derives decoded display dimensions. */
 export async function prepareImageAsset(file: Blob): Promise<ImageAsset> {
-  if (!Number.isFinite(file.size) || file.size < 1 || file.size > MAX_IMAGE_BYTES)
-    throw new ImageAssetError("too-large");
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const mimeType = detectedMimeType(bytes);
-  if (!mimeType || !ACCEPTED_TYPES.has(mimeType)) throw new ImageAssetError("unsupported-type");
-  const blob = file.type === mimeType ? file : new Blob([bytes], { type: mimeType });
-  const [id, size] = await Promise.all([contentHash(blob), dimensions(blob)]);
-  return { id: `image-${id}`, mimeType, ...size, blob };
+  const { bytes, blob, header } = await readEncodedImageSource(file);
+  const size = await dimensions(blob);
+  const id = await contentHash(bytes);
+  return { id: `image-${id}`, mimeType: header.mimeType, ...size, blob };
 }

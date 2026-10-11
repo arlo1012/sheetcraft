@@ -31,26 +31,64 @@ function openDatabase(): Promise<IDBDatabase> {
     return Promise.reject(new Error("IndexedDB is unavailable."));
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE_NAME, 1);
+    let settled = false;
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(STORE_NAME))
         request.result.createObjectStore(STORE_NAME);
     };
-    request.onerror = () => reject(request.error ?? new Error("Could not open image storage."));
-    request.onblocked = () => reject(new Error("Image storage is blocked."));
-    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => fail(request.error ?? new Error("Could not open image storage."));
+    request.onblocked = () => fail(new Error("Image storage is blocked."));
+    request.onsuccess = () => {
+      if (settled) {
+        request.result.close();
+        return;
+      }
+      settled = true;
+      resolve(request.result);
+    };
   });
 }
 
 export function createIndexedDbImageAssetStore(): ImageAssetStore {
   let database: Promise<IDBDatabase> | undefined;
-  const getDatabase = () => (database ??= openDatabase());
+  const getDatabase = () => {
+    if (database) return database;
+    const opening = openDatabase()
+      .then((db) => {
+        db.onversionchange = () => {
+          db.close();
+          if (database === opening) database = undefined;
+        };
+        return db;
+      })
+      .catch((error) => {
+        if (database === opening) database = undefined;
+        throw error;
+      });
+    database = opening;
+    return opening;
+  };
   return {
     async get(id) {
       const db = await getDatabase();
       return new Promise((resolve, reject) => {
-        const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(id);
+        const transaction = db.transaction(STORE_NAME, "readonly");
+        const request = transaction.objectStore(STORE_NAME).get(id);
+        let result: ImageAsset | undefined;
+        transaction.onerror = () =>
+          reject(transaction.error ?? new Error("Could not read image asset."));
+        transaction.onabort = () =>
+          reject(transaction.error ?? new Error("Could not read image asset."));
+        transaction.oncomplete = () => resolve(result);
         request.onerror = () => reject(request.error ?? new Error("Could not read image asset."));
-        request.onsuccess = () => resolve(request.result as ImageAsset | undefined);
+        request.onsuccess = () => {
+          result = request.result as ImageAsset | undefined;
+        };
       });
     },
     async put(asset) {

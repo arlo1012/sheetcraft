@@ -1787,7 +1787,13 @@ export const enUS = {
     unchanged: "The image already has these settings. No changes were made.",
     loading: "Preparing image…",
     invalidType: "Choose a PNG, JPEG, WebP, or GIF image.",
-    tooLarge: "This image is too large to insert.",
+    tooLarge: "This picture exceeds 10 MiB. Reduce its file size and try again.",
+    tooManyPixels:
+      "This picture exceeds 33,554,432 pixels or 16,384 pixels on one side. Resize the original picture and try again.",
+    fileLimits:
+      "PNG, JPEG, WebP or GIF. Up to 10 MiB, 16,384 pixels per side and 33,554,432 pixels in total.",
+    placementFailed:
+      "This picture is too narrow or tall for a floating frame. Crop it to a less extreme aspect ratio, or insert it in a cell.",
     invalidFile: "This image file is invalid.",
     decodeFailed: "This image could not be read.",
     assetUnavailable: "The image file is unavailable.",

@@ -1748,7 +1748,12 @@ export const zhCN = {
     unchanged: "图片已是当前设置，无需修改。",
     loading: "正在准备图片…",
     invalidType: "请选择 PNG、JPEG、WebP 或 GIF 图片。",
-    tooLarge: "图片过大，无法插入。",
+    tooLarge: "图片超过 10 MiB。请减小文件体积后重试。",
+    tooManyPixels: "图片超过 33,554,432 像素，或任意一边超过 16,384 像素。请缩小原图后重试。",
+    fileLimits:
+      "支持 PNG、JPEG、WebP、GIF。最大 10 MiB，每边最多 16,384 像素，总像素最多 33,554,432。",
+    placementFailed:
+      "图片纵横比过于悬殊，无法放入浮动框。请先裁剪为较均衡的比例，或选择插入单元格图片。",
     invalidFile: "图片文件无效。",
     decodeFailed: "无法读取图片。",
     assetUnavailable: "图片文件不可用。",

@@ -144,6 +144,36 @@ describe("authoritative picture command outcomes", () => {
       expect(serializeWorkbook(f.session.workbook)).toEqual(before);
     },
   );
+  test.each(["cell", "floating"] as const)(
+    "an extreme aspect ratio reports placement distinctly in %s mode",
+    async (mode) => {
+      const f = fixture();
+      vi.mocked(prepareImageAsset).mockResolvedValue({ ...asset, width: 12000, height: 1 });
+      const before = serializeWorkbook(f.session.workbook);
+      await f.actions.insertFile(file, mode);
+      expect(f.actions.feedback.value).toBe(
+        mode === "cell" ? "image.inserted" : "image.placementFailed",
+      );
+      expect(f.execute).toHaveBeenCalledTimes(mode === "cell" ? 1 : 0);
+      expect(f.session.history.undoStack).toHaveLength(mode === "cell" ? 1 : 0);
+      if (mode === "floating") expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+    },
+  );
+  test("an unplaceable second batch picture does not commit or store the first", async () => {
+    const f = fixture();
+    vi.mocked(prepareImageAsset)
+      .mockReset()
+      .mockResolvedValueOnce(asset)
+      .mockResolvedValueOnce({ ...asset, id: "thin", width: 12000, height: 1 });
+    const before = serializeWorkbook(f.session.workbook);
+    await f.actions.insertFiles([file, file], "floating");
+    expect(f.actions.feedback.value).toBe("image.placementFailed");
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.session.history.undoStack).toHaveLength(0);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+    expect(await f.store.get(asset.id)).toBeUndefined();
+  });
+
   test("successful insertion remains one reversible Core history transaction", async () => {
     const f = fixture();
     const before = serializeWorkbook(f.session.workbook);

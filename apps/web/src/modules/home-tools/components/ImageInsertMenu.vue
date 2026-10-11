@@ -59,14 +59,19 @@ function insertImage(mode: "cell" | "floating"): void {
         :style="floatingStyles"
         :label="t('image.insertMenu')"
       >
-        <MenuItem data-image-insert-mode="cell" @select="insertImage('cell')">
-          <template #icon><ImageIcon :size="15" /></template>
-          {{ t("image.insertInCell") }}
-        </MenuItem>
-        <MenuItem data-image-insert-mode="floating" @select="insertImage('floating')">
-          <template #icon><PictureInPicture2 :size="15" /></template>
-          {{ t("image.insertFloating") }}
-        </MenuItem>
+        <template #items>
+          <MenuItem data-image-insert-mode="cell" @select="insertImage('cell')">
+            <template #icon><ImageIcon :size="15" /></template>
+            {{ t("image.insertInCell") }}
+          </MenuItem>
+          <MenuItem data-image-insert-mode="floating" @select="insertImage('floating')">
+            <template #icon><PictureInPicture2 :size="15" /></template>
+            {{ t("image.insertFloating") }}
+          </MenuItem>
+        </template>
+        <template #footer>
+          <li class="image-insert-menu__limits" role="none">{{ t("image.fileLimits") }}</li>
+        </template>
       </MenuSurface>
     </Teleport>
   </span>
@@ -81,5 +86,15 @@ function insertImage(mode: "cell" | "floating"): void {
 
 .image-insert-menu {
   z-index: var(--sheetcraft-layer-menu);
+
+  &__limits {
+    inline-size: 20rem;
+    max-inline-size: calc(100vw - var(--sheetcraft-space-4) * 4);
+    padding: var(--sheetcraft-space-2);
+    color: var(--sheetcraft-text-muted);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
 }
 </style>

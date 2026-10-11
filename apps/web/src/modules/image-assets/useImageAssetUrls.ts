@@ -1,6 +1,8 @@
 import { onBeforeUnmount, readonly, ref, watch } from "vue";
 import type { Workbook } from "@sheetcraft/core/workbook";
-import type { ImageAssetStore } from "./imageAssetStore";
+import { readEncodedImageSource } from "./readEncodedImageSource";
+import { assertImagePixelBudget } from "./imageAssetValidation";
+import type { ImageAsset, ImageAssetStore } from "./imageAssetStore";
 
 export function collectWorkbookImageAssetIds(workbook: Workbook): Set<string> {
   const ids = new Set<string>();
@@ -25,6 +27,22 @@ export function useImageAssetUrls(getWorkbook: () => Workbook, store: ImageAsset
   const loading = ref(new Set<string>());
   const missing = ref(new Set<string>());
   let generation = 0;
+  const reading = new Map<string, Promise<ImageAsset | undefined>>();
+  function read(id: string): Promise<ImageAsset | undefined> {
+    const existing = reading.get(id);
+    if (existing) return existing;
+    const pending = (async () => {
+      const asset = await store.get(id);
+      if (!asset) return;
+      assertImagePixelBudget(asset.width, asset.height);
+      const source = await readEncodedImageSource(asset.blob);
+      return { ...asset, blob: source.blob };
+    })().finally(() => {
+      if (reading.get(id) === pending) reading.delete(id);
+    });
+    reading.set(id, pending);
+    return pending;
+  }
 
   async function refresh(): Promise<void> {
     const current = ++generation;
@@ -37,11 +55,13 @@ export function useImageAssetUrls(getWorkbook: () => Workbook, store: ImageAsset
     loading.value = new Set([...ids].filter((id) => !retained.has(id)));
     missing.value = new Set();
     const createdUrls = new Set<string>();
-    await Promise.all(
-      [...ids].map(async (id) => {
-        if (retained.has(id)) return;
+    const pendingIds = [...ids].filter((id) => !retained.has(id));
+    let index = 0;
+    const load = async () => {
+      while (index < pendingIds.length && current === generation) {
+        const id = pendingIds[index++]!;
         try {
-          const asset = await store.get(id);
+          const asset = await read(id);
           if (current !== generation) return;
           if (asset) {
             const url = URL.createObjectURL(asset.blob);
@@ -58,8 +78,10 @@ export function useImageAssetUrls(getWorkbook: () => Workbook, store: ImageAsset
         } catch {
           if (current === generation) missing.value = new Set([...missing.value, id]);
         }
-      }),
-    );
+      }
+    };
+    // Header byte reads are bounded, and repeated refreshes reuse the same read.
+    await Promise.all([load(), load()]);
     if (current === generation) {
       urls.value = new Map(retained);
       loading.value = new Set();

@@ -1,3 +1,4 @@
+import { actualPng, png } from "./image-header-fixtures";
 import { createApp, nextTick, ref, type Ref } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
@@ -44,7 +45,7 @@ const asset = (id: string) => ({
   mimeType: "image/png",
   width: 1,
   height: 1,
-  blob: new Blob(["x"], { type: "image/png" }),
+  blob: new Blob([actualPng], { type: "image/png" }),
 });
 afterEach(() => vi.unstubAllGlobals());
 describe("useImageAssetUrls", () => {
@@ -101,6 +102,39 @@ describe("useImageAssetUrls", () => {
     pending.resolve(asset("old"));
     await Promise.resolve();
     await Promise.resolve();
+    expect(create).not.toHaveBeenCalled();
+  });
+  test.each(["bad-header", "pixel-limit"] as const)(
+    "does not expose %s stored bytes to a decoder",
+    async (failure) => {
+      const workbook = ref(imageWorkbook("bad"));
+      const create = vi.fn();
+      vi.stubGlobal("URL", { createObjectURL: create, revokeObjectURL: vi.fn() });
+      const bytes = failure === "bad-header" ? new Uint8Array([1, 2, 3]) : png(16385, 1);
+      const fixture = mount(workbook, {
+        get: async () => ({ ...asset("bad"), blob: new Blob([bytes]) }),
+        put: async () => {},
+      });
+      await fixture.value.refresh();
+      expect(create).not.toHaveBeenCalled();
+      expect(fixture.value.missing.value.has("bad")).toBe(true);
+      fixture.unmount();
+    },
+  );
+  test("a generation change during header reading cannot leak a source URL", async () => {
+    const pending = deferred<ArrayBuffer>();
+    const workbook = ref(imageWorkbook("old"));
+    const create = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL: create, revokeObjectURL: vi.fn() });
+    const original = asset("old");
+    vi.spyOn(original.blob, "arrayBuffer").mockReturnValue(pending.promise);
+    const fixture = mount(workbook, { get: async () => original, put: async () => {} });
+    const reading = fixture.value.refresh();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.unmount();
+    pending.resolve(actualPng.slice().buffer);
+    await reading;
     expect(create).not.toHaveBeenCalled();
   });
   test("marks rejected asset lookups as missing", async () => {

@@ -6,6 +6,7 @@ import {
 } from "@sheetcraft/core/commands";
 import type { FloatingImage, Sheet, Workbook } from "@sheetcraft/core/workbook";
 import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStore";
+import { imageAssetFeedback } from "../image-assets/imageAssetFeedback";
 import { prepareImageAsset } from "../image-assets/prepareImageAsset";
 import { downloadBlob } from "../../shared/files/download";
 import {
@@ -55,8 +56,8 @@ export function usePictureAssetTools(options: {
         );
       }
       options.feedback("picture.exported");
-    } catch {
-      options.feedback("picture.assetFailed", true);
+    } catch (error) {
+      options.feedback(imageAssetFeedback(error) ?? "picture.assetFailed", true);
     } finally {
       busy.value = false;
     }
@@ -125,8 +126,8 @@ export function usePictureAssetTools(options: {
       }
       options.feedback(changed ? "picture.compressed" : "picture.noSmaller");
       return true;
-    } catch {
-      options.feedback("picture.assetFailed", true);
+    } catch (error) {
+      options.feedback(imageAssetFeedback(error) ?? "picture.assetFailed", true);
       return false;
     } finally {
       busy.value = false;
