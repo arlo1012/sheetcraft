@@ -126,7 +126,7 @@ function onMenuFocusin(event: FocusEvent): void {
 </script>
 
 <template>
-  <span v-bind="$attrs" class="ribbon-menu-tool ribbon-menu-tool--full-width">
+  <span v-bind="$attrs" class="ribbon-menu-tool">
     <RibbonSplitButton
       ref="splitActionRef"
       :label="state.canUnmerge ? t('ribbon.unmergeCells') : t('ribbon.mergeCells')"
@@ -138,7 +138,6 @@ function onMenuFocusin(event: FocusEvent): void {
       :expanded="open"
       :menu-id="menuId"
       data-ribbon-action="merge-cells"
-      full-width
       @activate="activateMain"
       @toggle-menu="toggleMenu"
       @menu-keydown="onTriggerKeydown"
@@ -246,10 +245,6 @@ function onMenuFocusin(event: FocusEvent): void {
 
 .ribbon-menu-tool {
   @include ribbon.tool;
-
-  &--full-width {
-    width: 100%;
-  }
 }
 
 .merge-cells-menu {

@@ -121,7 +121,6 @@ function toggleWrapText(state: ToggleStyleState): void {
 
   &__action {
     display: grid;
-    min-width: 72px;
   }
 }
 </style>
