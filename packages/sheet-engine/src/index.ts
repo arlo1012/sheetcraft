@@ -9,6 +9,7 @@ export * from "./geometry.js";
 export * from "./page-layout.js";
 export * from "./row-height.js";
 export * from "./text-layout.js";
+export * from "./attributed-text-layout.js";
 export * from "./selection.js";
 export * from "./view-state.js";
 export * from "./viewport-layout.js";
