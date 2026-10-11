@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { FloatingImage, Workbook } from "@sheetcraft/core/workbook";
 import { getCellContent, getCellStyle } from "@sheetcraft/core/workbook";
 import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
 import { useWordProofreading } from "../modules/text-proofreading/useWordProofreading";
@@ -185,6 +184,7 @@ import {
 } from "../modules/image-assets/imageAssetStore";
 import { useImageAssetUrls } from "../modules/image-assets/useImageAssetUrls";
 import { useSheetImageActions } from "../modules/sheet-images/useSheetImageActions";
+import { usePictureDialogSessions } from "../modules/sheet-images/usePictureDialogSessions";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
 import { useSheetContextActions } from "./composables/useSheetContextActions";
 import type { SheetContextMenuState } from "../modules/sheet-grid/context-menu-contracts";
@@ -1112,6 +1112,14 @@ const {
   loading: loadingImageAssetIds,
   missing: missingImageAssetIds,
 } = useImageAssetUrls(() => session.workbook, assetStore);
+const pictureOwnerGeneration = ref(0);
+watch(
+  () => [session.workbook, activeSheet.value, workbookGeneration.value],
+  () => {
+    pictureOwnerGeneration.value += 1;
+  },
+  { flush: "sync" },
+);
 const imageActions = useSheetImageActions({
   assetStore,
   execute: (command) => {
@@ -1127,6 +1135,7 @@ const imageActions = useSheetImageActions({
   },
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
+  getGeneration: () => pictureOwnerGeneration.value,
   getAddress: () => activeAddress.value,
   flushPendingEdits: () => cellEditSession.finish(),
   setCellImage,
@@ -1660,43 +1669,10 @@ const drawingActions = useDrawingActions({
   name: (kind) => t(`drawing.${kind}`),
 });
 const { dialog: drawingDialog, editing: editingDrawing } = drawingActions;
-const pictureAnnotation = shallowRef<{
-  image: FloatingImage;
-  sheetId: string;
-  workbook: Workbook;
-}>();
-function openPictureAnnotation(): void {
-  const image = selectedPicture.value;
-  if (!image || !imageAssetUrls.value.get(image.assetId)) return;
-  pictureAnnotation.value = { image, sheetId: activeSheet.value.id, workbook: session.workbook };
-}
-function applyPictureAnnotation(image: FloatingImage): void {
-  const draft = pictureAnnotation.value;
-  if (
-    draft &&
-    draft.workbook === session.workbook &&
-    draft.sheetId === activeSheet.value.id &&
-    activeSheet.value.floatingImages.find((current) => current.id === image.id) === draft.image
-  )
-    setFloatingImage(image);
-  pictureAnnotation.value = undefined;
-}
-const pictureCompressVisible = ref(false);
-const pictureBatchSizeVisible = ref(false);
-watch(
-  () => activeSheet.value.id,
-  () => {
-    pictureAnnotation.value = undefined;
-    pictureCompressVisible.value = false;
-    pictureBatchSizeVisible.value = false;
-  },
-);
-watch(selectedPictureId, (id) => {
-  if (!id) pictureBatchSizeVisible.value = false;
-});
 const pictureAssetTools = usePictureAssetTools({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
+  getGeneration: () => pictureOwnerGeneration.value,
   getSelectedIds: () => selectedPictureIds.value,
   assetStore,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageActions.busy.value,
@@ -1711,6 +1687,27 @@ const pictureTools = usePictureTools({
   selectedIds: selectedPictureIds,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
   execute: executeCommand,
+});
+const pictureDialogs = usePictureDialogSessions({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => pictureOwnerGeneration.value,
+  getSelectedImage: () => selectedPicture.value ?? undefined,
+  getSelectedIds: () => selectedPictureIds.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
+  hasAsset: (id) => Boolean(imageAssetUrls.value.get(id)),
+  setImage: setFloatingImage,
+  compress: pictureAssetTools.compress,
+  resize: pictureTools.resizeMany,
+  resizeFeedback: () => pictureTools.sizeFeedback.value,
+});
+const {
+  annotation: pictureAnnotation,
+  compression: pictureCompression,
+  batch: pictureBatchSize,
+} = pictureDialogs;
+watch(selectedPictureId, (id) => {
+  if (!id) pictureDialogs.closeBatchSize();
 });
 
 const persistence = useWorkbookPersistence({
@@ -2640,11 +2637,13 @@ const gridInert = computed(
   >
     <input
       :ref="imageActions.fileInput"
+      :key="imageActions.pickerKey.value"
       type="file"
       class="spreadsheet-workspace__image-input"
       accept="image/png,image/jpeg,image/webp,image/gif"
       :aria-label="t('image.insertMenu')"
       @change="imageActions.onFileChange"
+      @cancel="imageActions.onFileCancel"
     />
     <SpreadsheetRibbon
       :has-image="!!selectedPicture"
@@ -2825,9 +2824,9 @@ const gridInert = computed(
           @flip="sheetGridRef?.flipImage($event)"
           @restore="sheetGridRef?.restoreImage()"
           @replace="imageActions.requestReplace(selectedPicture.id)"
-          @annotate="openPictureAnnotation"
-          @compress="pictureCompressVisible = true"
-          @batch-size="pictureBatchSizeVisible = true"
+          @annotate="pictureDialogs.openAnnotation"
+          @compress="pictureDialogs.openCompression"
+          @batch-size="pictureDialogs.openBatchSize"
           @export="pictureAssetTools.exportPictures"
           @preview="sheetGridRef?.previewSelectedPicture()"
           @print="pictureAssetTools.printPictures"
@@ -4072,33 +4071,29 @@ const gridInert = computed(
     />
     <PictureAnnotationDialog
       v-if="pictureAnnotation"
+      :key="pictureAnnotation.dialogId"
       :image="pictureAnnotation.image"
       :source="imageAssetUrls.get(pictureAnnotation.image.assetId) ?? ''"
-      @confirm="applyPictureAnnotation"
-      @close="pictureAnnotation = undefined"
+      :error="pictureAnnotation.error.value ? t(pictureAnnotation.error.value) : ''"
+      @confirm="pictureAnnotation.confirm"
+      @close="pictureAnnotation.close"
     />
     <PictureCompressDialog
-      v-if="pictureCompressVisible"
+      v-if="pictureCompression"
+      :key="pictureCompression.dialogId"
       :busy="pictureAssetTools.busy.value"
-      @confirm="
-        async (settings) => {
-          if (await pictureAssetTools.compress(settings)) pictureCompressVisible = false;
-        }
-      "
-      @close="pictureCompressVisible = false"
+      :error="pictureCompression.error.value ? t(pictureCompression.error.value) : ''"
+      @confirm="pictureCompression.confirm"
+      @close="pictureCompression.close"
     />
     <PictureBatchSizeDialog
-      v-if="pictureBatchSizeVisible && selectedPicture"
-      :width="selectedPicture.width"
-      :height="selectedPicture.height"
-      @confirm="
-        (value) => {
-          if (pictureTools.resizeMany(value)) pictureBatchSizeVisible = false;
-          else
-            MessagePlugin.warning(t(pictureTools.sizeFeedback.value ?? 'picture.operationFailed'));
-        }
-      "
-      @close="pictureBatchSizeVisible = false"
+      v-if="pictureBatchSize"
+      :key="pictureBatchSize.dialogId"
+      :width="pictureBatchSize.image.width"
+      :height="pictureBatchSize.image.height"
+      :error="pictureBatchSize.error.value ? t(pictureBatchSize.error.value) : ''"
+      @confirm="pictureBatchSize.confirm"
+      @close="pictureBatchSize.close"
     />
     <PagePrintPreview
       :theme="workbookTheme"

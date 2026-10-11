@@ -401,7 +401,7 @@ describe("authoritative picture command outcomes", () => {
     input.type = "file";
     vi.spyOn(input, "click").mockImplementation(() => undefined);
     f.actions.fileInput.value = input;
-    f.actions.requestReplace("picture");
+    await f.actions.requestReplace("picture");
     executeWorkbookCommand(
       f.session,
       createSetFloatingImageCommand(f.sheet.id, { ...image(), assetId: "newer-source" }),

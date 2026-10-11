@@ -1,4 +1,4 @@
-import { readonly, ref } from "vue";
+import { getCurrentScope, onScopeDispose, readonly, ref } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import {
   createSetSheetFloatingImagesCommand,
@@ -19,6 +19,7 @@ import type { MessageKey } from "../../shared/i18n";
 export function usePictureAssetTools(options: {
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
+  getGeneration?: () => number;
   getSelectedIds: () => readonly string[];
   assetStore: ImageAssetStore;
   isBusy: () => boolean;
@@ -26,6 +27,11 @@ export function usePictureAssetTools(options: {
   feedback: (key: MessageKey, error?: boolean) => void;
 }) {
   const busy = ref(false);
+  let disposed = false;
+  if (getCurrentScope())
+    onScopeDispose(() => {
+      disposed = true;
+    });
   function pictures(all = false): FloatingImage[] {
     return options
       .getSheet()
@@ -62,8 +68,13 @@ export function usePictureAssetTools(options: {
       busy.value = false;
     }
   }
-  async function compress(settings: PictureCompression): Promise<boolean> {
+  async function compress(
+    settings: PictureCompression,
+    shouldContinue: () => boolean = () => true,
+  ): Promise<boolean> {
     if (
+      disposed ||
+      !shouldContinue() ||
       busy.value ||
       options.isBusy() ||
       !Number.isFinite(settings.maxSide) ||
@@ -76,12 +87,17 @@ export function usePictureAssetTools(options: {
       return false;
     const workbook = options.getWorkbook();
     const sheet = options.getSheet();
+    const generation = options.getGeneration?.() ?? 0;
     if (!canUseSheetPermission(sheet, "editObjects")) return false;
     const selected = pictures(settings.all);
     if (!selected.length) return false;
     busy.value = true;
     const valid = () =>
       options.getWorkbook() === workbook &&
+      !disposed &&
+      shouldContinue() &&
+      options.getSheet() === sheet &&
+      (options.getGeneration?.() ?? 0) === generation &&
       workbook.sheets.get(sheet.id) === sheet &&
       canUseSheetPermission(sheet, "editObjects") &&
       selected.every((image) =>
@@ -94,7 +110,8 @@ export function usePictureAssetTools(options: {
       for (const image of selected) {
         if (converted.has(image.assetId)) continue;
         const source = await options.assetStore.get(image.assetId);
-        if (!source || !valid()) throw new Error("Picture changed.");
+        if (!valid()) return false;
+        if (!source) throw new Error("Picture asset unavailable.");
         const blob = await convertPictureBlob(
           source.blob,
           undefined,
@@ -102,13 +119,16 @@ export function usePictureAssetTools(options: {
           settings.maxSide,
           settings.quality,
         );
-        converted.set(
-          image.assetId,
-          blob.size < source.blob.size ? await prepareImageAsset(blob) : source,
-        );
+        if (!valid()) return false;
+        const asset = blob.size < source.blob.size ? await prepareImageAsset(blob) : source;
+        if (!valid()) return false;
+        converted.set(image.assetId, asset);
       }
       if (!valid()) return false;
-      for (const asset of converted.values()) await options.assetStore.put(asset);
+      for (const asset of converted.values()) {
+        if (!valid()) return false;
+        await options.assetStore.put(asset);
+      }
       if (!valid()) return false;
       const ids = new Set(selected.map((image) => image.id));
       const next = sheet.floatingImages.map((image) =>
@@ -127,7 +147,7 @@ export function usePictureAssetTools(options: {
       options.feedback(changed ? "picture.compressed" : "picture.noSmaller");
       return true;
     } catch (error) {
-      options.feedback(imageAssetFeedback(error) ?? "picture.assetFailed", true);
+      if (valid()) options.feedback(imageAssetFeedback(error) ?? "picture.assetFailed", true);
       return false;
     } finally {
       busy.value = false;

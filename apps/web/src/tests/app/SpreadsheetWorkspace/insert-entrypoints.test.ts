@@ -131,13 +131,17 @@ describe("workspace insert entry points", () => {
   test("repeated synchronous picture batch failures remain visible each time", async () => {
     const error = vi.spyOn(MessagePlugin, "error").mockResolvedValue({ close: vi.fn() });
     const wrapper = await fixture();
-    const input = wrapper.get<HTMLInputElement>(".spreadsheet-workspace__image-input");
-    vi.spyOn(input.element, "click").mockImplementation(() => undefined);
-    Object.defineProperty(input.element, "files", {
-      value: Array.from({ length: 101 }, () => new File(["x"], "test.png", { type: "image/png" })),
-    });
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => undefined);
     for (let attempt = 0; attempt < 2; attempt++) {
       wrapper.getComponent(ImageInsertMenu).vm.$emit("insertImage", "floating");
+      await flushPromises();
+      const input = wrapper.get<HTMLInputElement>(".spreadsheet-workspace__image-input");
+      Object.defineProperty(input.element, "files", {
+        value: Array.from(
+          { length: 101 },
+          () => new File(["x"], "test.png", { type: "image/png" }),
+        ),
+      });
       await input.trigger("change");
       await flushPromises();
     }

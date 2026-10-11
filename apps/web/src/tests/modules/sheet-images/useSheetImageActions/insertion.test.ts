@@ -145,7 +145,7 @@ describe("sheet image insertion", () => {
     },
   );
 
-  test("opens the replacement picker only for an editable existing image", () => {
+  test("opens the replacement picker only for an editable existing image", async () => {
     const f = fixture();
     const image = existingImage();
     const sheet = getActiveSheet(f.getWorkbook());
@@ -154,12 +154,12 @@ describe("sheet image insertion", () => {
     input.type = "file";
     const click = vi.spyOn(input, "click").mockImplementation(() => {});
     f.actions.fileInput.value = input;
-    f.actions.requestReplace("missing-image");
+    await f.actions.requestReplace("missing-image");
     expect(click).not.toHaveBeenCalled();
-    f.actions.requestReplace(image.id);
+    await f.actions.requestReplace(image.id);
     expect(click).toHaveBeenCalledTimes(1);
     sheet.properties.protected = true;
-    f.actions.requestReplace(image.id);
+    await f.actions.requestReplace(image.id);
     expect(click).toHaveBeenCalledTimes(1);
   });
 

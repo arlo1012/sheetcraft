@@ -4,7 +4,7 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { useAppI18n } from "../../../shared/i18n";
-const props = defineProps<{ width: number; height: number }>();
+const props = defineProps<{ width: number; height: number; error?: string }>();
 const emit = defineEmits<{
   confirm: [value: { width: number; height: number; locked: boolean; all: boolean }];
   close: [];
@@ -27,6 +27,7 @@ const all = ref(false);
     @close="emit('close')"
   >
     <div class="picture-batch-size">
+      <p v-if="error" role="alert">{{ error }}</p>
       <div class="picture-batch-size__field" role="group" :aria-label="t('image.widthPoints')">
         <span>{{ t("image.widthPoints") }}</span
         ><InputNumber

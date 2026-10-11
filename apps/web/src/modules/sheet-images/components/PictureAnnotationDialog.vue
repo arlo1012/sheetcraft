@@ -17,7 +17,7 @@ import {
   type PointerSession,
 } from "../../../shared/sheet-input/pointer-session";
 import { pictureAnnotationPoint } from "../picture-annotation-geometry";
-const props = defineProps<{ image: FloatingImage; source: string }>();
+const props = defineProps<{ image: FloatingImage; source: string; error?: string }>();
 const emit = defineEmits<{ confirm: [image: FloatingImage]; close: [] }>();
 const { t } = useAppI18n();
 const canvas = ref<HTMLCanvasElement>();
@@ -220,6 +220,7 @@ onBeforeUnmount(() => {
       <div v-else class="picture-annotation__surface">
         <canvas ref="canvas" :aria-label="t('picture.annotate')" @pointerdown="begin" />
       </div>
+      <p v-if="error" role="alert">{{ error }}</p>
       <p>{{ t("picture.annotationHint") }}</p>
     </div>
   </Dialog>

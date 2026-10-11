@@ -1,4 +1,4 @@
-import { readonly, ref } from "vue";
+import { getCurrentScope, nextTick, onScopeDispose, readonly, ref } from "vue";
 import {
   MIN_FLOATING_IMAGE_SIZE,
   MAX_FLOATING_IMAGE_SIZE,
@@ -29,7 +29,14 @@ import { prepareImageAsset } from "../image-assets/prepareImageAsset";
 import { normalizeClipboardImageGroup } from "./imageClipboard";
 
 export type ImageInsertMode = "cell" | "floating";
-type ImageTarget = { workbook: Workbook; sheet: Sheet; sheetId: string; address: CellAddress };
+type ImageTarget = {
+  workbook: Workbook;
+  sheet: Sheet;
+  sheetId: string;
+  address: CellAddress;
+  generation: number;
+  operation: number;
+};
 class ImagePlacementError extends Error {}
 function initialFloatingSize(width: number, height: number): { width: number; height: number } {
   const scale = Math.max(
@@ -73,6 +80,7 @@ export function useSheetImageActions(options: {
   execute?: (command: WorkbookCommand) => unknown;
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
+  getGeneration?: () => number;
   getAddress: () => CellAddress;
   flushPendingEdits: () => boolean;
   setCellImage: (payload: {
@@ -93,7 +101,19 @@ export function useSheetImageActions(options: {
   const busy = ref(false);
   const feedback = ref<MessageKey>();
   const idFactory = createBrowserIdFactory();
+  let operation = 0;
+  let disposed = false;
+  function cancelPending(): void {
+    operation += 1;
+    pending = undefined;
+  }
+  function dispose(): void {
+    disposed = true;
+    cancelPending();
+  }
+  if (getCurrentScope()) onScopeDispose(dispose);
   const fileInput = ref<HTMLInputElement | null>(null);
+  const pickerKey = ref(0);
   let pending:
     | { mode: ImageInsertMode; target: ImageTarget; replaceId?: string; replaceAssetId?: string }
     | undefined;
@@ -102,6 +122,7 @@ export function useSheetImageActions(options: {
     address = options.getAddress(),
     mode: ImageInsertMode = "floating",
   ): ImageTarget | undefined {
+    if (disposed) return;
     if (
       mode === "floating"
         ? !canUseSheetPermission(options.getSheet(), "editObjects")
@@ -114,46 +135,72 @@ export function useSheetImageActions(options: {
       workbook: options.getWorkbook(),
       sheet,
       sheetId: sheet.id,
+      generation: options.getGeneration?.() ?? 0,
+      operation,
       address: {
         ...(getMergedCellAnchor(sheet.mergedCells, address) ?? address),
       },
     };
   }
 
-  function isCurrent(target: ImageTarget, mode: ImageInsertMode = "floating"): boolean {
+  function isOwnerCurrent(target: ImageTarget): boolean {
     const sheet = target.workbook.sheets.get(target.sheetId);
     return (
       options.getWorkbook() === target.workbook &&
-      sheet === target.sheet &&
+      !disposed &&
+      operation === target.operation &&
+      (options.getGeneration?.() ?? 0) === target.generation &&
+      options.getSheet() === target.sheet &&
+      sheet === target.sheet
+    );
+  }
+  function isCurrent(target: ImageTarget, mode: ImageInsertMode = "floating"): boolean {
+    const sheet = target.sheet;
+    return (
+      isOwnerCurrent(target) &&
       (mode === "floating"
         ? canUseSheetPermission(sheet, "editObjects")
         : canEditCell(sheet, target.address))
     );
   }
 
-  function requestInsert(mode: ImageInsertMode): void {
-    if (busy.value) return;
+  async function requestInsert(mode: ImageInsertMode): Promise<void> {
+    if (busy.value || disposed) return;
+    cancelPending();
     const target = captureTarget(options.getAddress(), mode);
     if (!target) return;
     pending = { mode, target };
-    if (fileInput.value) {
-      fileInput.value.multiple = true;
-      fileInput.value.value = "";
-      fileInput.value.click();
-    }
+    pickerKey.value += 1;
+    await nextTick();
+    if (!isCurrent(target, mode) || pending?.target !== target) return;
+    openPicker(target, true);
   }
 
-  function requestReplace(imageId: string): void {
-    if (busy.value) return;
+  async function requestReplace(imageId: string): Promise<void> {
+    if (busy.value || disposed) return;
     const image = options.getSheet().floatingImages.find((entry) => entry.id === imageId);
     if (!image) return;
+    cancelPending();
     const target = captureTarget(image.anchor);
     if (!target) return;
     pending = { mode: "floating", target, replaceId: imageId, replaceAssetId: image.assetId };
-    if (fileInput.value) {
-      fileInput.value.multiple = false;
+    pickerKey.value += 1;
+    await nextTick();
+    if (!isCurrent(target) || pending?.target !== target) return;
+    openPicker(target, false);
+  }
+
+  function openPicker(target: ImageTarget, multiple: boolean): void {
+    try {
+      if (!fileInput.value) throw new Error("Picture file picker unavailable.");
+      fileInput.value.multiple = multiple;
       fileInput.value.value = "";
       fileInput.value.click();
+    } catch {
+      if (isOwnerCurrent(target)) {
+        cancelPending();
+        feedback.value = "image.insertionFailed";
+      }
     }
   }
 
@@ -228,7 +275,7 @@ export function useSheetImageActions(options: {
       }
       feedback.value = "image.inserted";
     } catch (error) {
-      feedback.value = assetFailureFeedback(error);
+      if (isOwnerCurrent(target)) feedback.value = assetFailureFeedback(error);
     } finally {
       busy.value = false;
     }
@@ -325,7 +372,7 @@ export function useSheetImageActions(options: {
       if (accepted === false) throw new Error("Picture batch insertion was refused.");
       feedback.value = "image.inserted";
     } catch (error) {
-      feedback.value = assetFailureFeedback(error);
+      if (isOwnerCurrent(target)) feedback.value = assetFailureFeedback(error);
     } finally {
       busy.value = false;
     }
@@ -333,6 +380,7 @@ export function useSheetImageActions(options: {
 
   function onFileChange(event: Event): void {
     const input = event.target as HTMLInputElement;
+    if (input !== fileInput.value || disposed) return;
     const files = Array.from(input.files ?? []);
     const file = files[0];
     const request = pending;
@@ -361,11 +409,12 @@ export function useSheetImageActions(options: {
     busy.value = true;
     feedback.value = undefined;
     try {
-      if (!(await options.assetStore.get(image.assetId))) {
+      const asset = await options.assetStore.get(image.assetId);
+      if (!isCurrent(target, mode)) return;
+      if (!asset) {
         feedback.value = "image.assetUnavailable";
         return;
       }
-      if (!isCurrent(target, mode)) return;
       if (mode === "cell") {
         if (cellImageMatches(target.sheet, target.address, image)) {
           feedback.value = "image.unchanged";
@@ -395,7 +444,7 @@ export function useSheetImageActions(options: {
       }
       feedback.value = "image.inserted";
     } catch {
-      feedback.value = "image.insertionFailed";
+      if (isOwnerCurrent(target)) feedback.value = "image.insertionFailed";
     } finally {
       busy.value = false;
     }
@@ -438,7 +487,7 @@ export function useSheetImageActions(options: {
       if (accepted === false) throw new Error("Picture group paste was refused.");
       feedback.value = "image.inserted";
     } catch {
-      feedback.value = "image.insertionFailed";
+      if (isOwnerCurrent(target)) feedback.value = "image.insertionFailed";
     } finally {
       busy.value = false;
     }
@@ -455,11 +504,11 @@ export function useSheetImageActions(options: {
     feedback.value = undefined;
     try {
       const asset = await options.assetStore.get(content.image.assetId);
+      if (!isCurrent(target)) return;
       if (!asset) {
         feedback.value = "image.assetUnavailable";
         return;
       }
-      if (!isCurrent(target)) return;
       const current = getCellContent(sheet, target.address);
       if (current?.kind !== "image" || current.image.assetId !== content.image.assetId) return;
       const crop = content.image.transform?.crop;
@@ -478,20 +527,27 @@ export function useSheetImageActions(options: {
       if (accepted === false) throw new Error("Picture conversion was refused.");
       feedback.value = "image.convertedToFloating";
     } catch (error) {
-      feedback.value =
-        error instanceof ImagePlacementError ? "image.placementFailed" : "image.convertFailed";
+      if (isOwnerCurrent(target))
+        feedback.value =
+          error instanceof ImagePlacementError ? "image.placementFailed" : "image.convertFailed";
     } finally {
       busy.value = false;
     }
   }
 
   return {
+    cancelPending,
+    dispose,
     busy: readonly(busy),
     feedback: readonly(feedback),
     reportFeedback: (message: MessageKey) => {
       feedback.value = message;
     },
     fileInput,
+    pickerKey: readonly(pickerKey),
+    onFileCancel: (event: Event) => {
+      if (event.target === fileInput.value) cancelPending();
+    },
     requestInsert,
     requestReplace,
     insertFile,

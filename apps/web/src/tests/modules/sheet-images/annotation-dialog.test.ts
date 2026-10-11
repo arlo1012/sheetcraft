@@ -98,3 +98,18 @@ test("pointer cancellation discards the unfinished stroke, and clear can be undo
     f.image.transform?.annotations,
   );
 });
+test("command failure shows an alert while preserving the loaded annotation draft", async () => {
+  const f = await fixture();
+  pointer(f.canvas, "pointerdown", 40, 20);
+  pointer(window, "pointermove", 80, 60);
+  pointer(window, "pointerup", 100, 70);
+  await f.wrapper.setProps({ error: "Annotations could not be applied" });
+  expect(document.querySelector('[role="alert"]')?.textContent).toBe(
+    "Annotations could not be applied",
+  );
+  expect(document.querySelector(".picture-annotation canvas")).toBe(f.canvas);
+  await confirm();
+  expect(
+    (f.wrapper.emitted("confirm")![0]![0] as FloatingImage).transform?.annotations,
+  ).toHaveLength(2);
+});

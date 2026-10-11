@@ -6,7 +6,7 @@ import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import { useAppI18n } from "../../../shared/i18n";
 import type { PictureCompression } from "../picture-asset-conversion";
-defineProps<{ busy: boolean }>();
+defineProps<{ busy: boolean; error?: string }>();
 const emit = defineEmits<{ confirm: [settings: PictureCompression]; close: [] }>();
 const { t } = useAppI18n();
 const maxSide = ref(1920);
@@ -20,13 +20,14 @@ const all = ref(false);
     :header="t('picture.compress')"
     width="400px"
     :close-on-overlay-click="false"
-    :close-btn="!busy"
+    :close-btn="true"
     :confirm-btn="{ content: t('picture.compress'), loading: busy }"
-    :cancel-btn="{ content: t('picture.cancel'), disabled: busy }"
+    :cancel-btn="t('picture.cancel')"
     @confirm="emit('confirm', { maxSide, quality: quality / 100, format, all })"
-    @close="!busy && emit('close')"
+    @close="emit('close')"
   >
     <div class="picture-compress">
+      <p v-if="error" role="alert">{{ error }}</p>
       <div class="picture-compress__field" role="group" :aria-label="t('picture.maxSide')">
         <span>{{ t("picture.maxSide") }}</span
         ><InputNumber
