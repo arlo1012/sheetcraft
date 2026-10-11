@@ -18,11 +18,15 @@ const emit = defineEmits<{
 }>();
 const { t } = useAppI18n();
 function toggle(id: string): void {
+  const image = props.images.find((entry) => entry.id === id);
+  const members = image?.groupId
+    ? props.images.filter((entry) => entry.groupId === image.groupId).map((entry) => entry.id)
+    : [id];
   emit(
     "select",
     props.selectedIds.includes(id)
-      ? props.selectedIds.filter((value) => value !== id)
-      : [...props.selectedIds, id],
+      ? props.selectedIds.filter((value) => !members.includes(value))
+      : [...new Set([...props.selectedIds, ...members])],
   );
 }
 </script>

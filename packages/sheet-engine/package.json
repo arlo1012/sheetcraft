@@ -82,6 +82,10 @@
     "./picture-frame-layout": {
       "types": "./dist/picture-frame-layout.d.ts",
       "import": "./dist/picture-frame-layout.js"
+    },
+    "./floating-image-selection": {
+      "types": "./dist/floating-image-selection.d.ts",
+      "import": "./dist/floating-image-selection.js"
     }
   },
   "scripts": {

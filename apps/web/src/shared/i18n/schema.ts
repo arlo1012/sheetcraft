@@ -1667,6 +1667,11 @@ export type MessageSchema = ToolMessageSchema & {
     front: string;
     back: string;
     selectionPane: string;
+    quickActions: string;
+    alignReference: string;
+    alignToSelection: string;
+    alignToLastSelected: string;
+    alignBoth: string;
     alignLeft: string;
     alignCenter: string;
     alignRight: string;

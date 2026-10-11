@@ -19,10 +19,12 @@ export type PictureAlignment =
   | "right"
   | "top"
   | "middle"
+  | "both"
   | "bottom"
   | "horizontal"
   | "vertical"
   | "grid";
+export type PictureAlignmentReference = "selection" | "last-selected";
 
 export function usePictureTools(options: {
   getSheet: () => Sheet;
@@ -49,9 +51,14 @@ export function usePictureTools(options: {
   function remove(ids = options.selectedIds.value): void {
     replace(options.getSheet().floatingImages.filter((image) => !ids.includes(image.id)));
   }
-  function group(ungroup = false): void {
-    const ids = new Set(options.selectedIds.value);
-    if (!ungroup && ids.size < 2) return;
+  function group(ungroup = false, targetIds = options.selectedIds.value): boolean {
+    const ids = new Set(targetIds);
+    if (
+      targetIds.length !== ids.size ||
+      targetIds.some((id) => !options.getSheet().floatingImages.some((image) => image.id === id))
+    )
+      return false;
+    if (!ungroup && ids.size < 2) return false;
     const groups = new Set(
       options
         .getSheet()
@@ -60,7 +67,7 @@ export function usePictureTools(options: {
         .filter(Boolean),
     );
     const groupId = ungroup ? undefined : idFactory("picture-group");
-    replace(
+    return replace(
       options
         .getSheet()
         .floatingImages.map((image) =>

@@ -1,13 +1,102 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { recordCanvasRenderPlans } from "./canvas-render-fixture";
-import { getCellContent, setCellContent } from "@sheetcraft/core/workbook";
+import {
+  getCellContent,
+  setCellContent,
+  createSheet,
+  type FloatingImage,
+} from "@sheetcraft/core/workbook";
+import { createSetSheetFloatingImagesCommand } from "@sheetcraft/core/commands";
+import {
+  executeWorkbookCommand,
+  undoWorkbookCommand,
+  redoWorkbookCommand,
+} from "@sheetcraft/core/history";
+import SheetFloatingImageLayer from "../../../../../modules/sheet-images/components/SheetFloatingImageLayer.vue";
 import { createTestClipboardEvent } from "./clipboard-fixture";
 import { mountSheetGrid, triggerCell } from "./fixture";
 
 const content = { kind: "image", image: { assetId: "asset", altText: "Diagram" } } as const;
 describe("SheetGrid cell images", () => {
   afterEach(() => vi.restoreAllMocks());
+  test("selection pane expands full groups and regroup/history changes reconcile all members", async () => {
+    const image = (id: string, groupId?: string): FloatingImage => ({
+      id,
+      assetId: "asset",
+      altText: id,
+      anchor: { row: 1, column: 1 },
+      offsetX: 0,
+      offsetY: 0,
+      width: 120,
+      height: 80,
+      ...(groupId ? { groupId } : {}),
+    });
+    const { wrapper, sheet, session } = mountSheetGrid({
+      beforeMount: (sheet) => {
+        sheet.floatingImages = [image("a", "old"), image("b", "old"), image("c")];
+      },
+    });
+    const grid = wrapper.vm as unknown as { selectFloatingImages: (ids: string[]) => void };
+    grid.selectFloatingImages(["a", "c"]);
+    await wrapper.vm.$nextTick();
+    const layer = wrapper.getComponent(SheetFloatingImageLayer);
+    expect(layer.props("selectedImageIds")).toEqual(["a", "b", "c"]);
+    expect(layer.props("selectedImageId")).toBe("c");
+    const original = structuredClone(
+      [...sheet.floatingImages].map((image) => ({ ...image, anchor: { ...image.anchor } })),
+    );
+    executeWorkbookCommand(
+      session,
+      createSetSheetFloatingImagesCommand(
+        sheet.id,
+        sheet.floatingImages.map((image) => ({ ...image, groupId: "new" })),
+      ),
+    );
+    await wrapper.vm.$nextTick();
+    expect(layer.props("selectedImageIds")).toEqual(["a", "b", "c"]);
+    expect(layer.findAll("[data-image-resize]")).toHaveLength(8);
+    expect(session.history.undoStack).toHaveLength(1);
+    undoWorkbookCommand(session);
+    await wrapper.vm.$nextTick();
+    expect(sheet.floatingImages).toEqual(original);
+    expect(layer.findAll("[data-floating-image-group]")).toHaveLength(0);
+    redoWorkbookCommand(session);
+    await wrapper.vm.$nextTick();
+    expect(layer.find("[data-floating-image-group]").exists()).toBe(true);
+    wrapper.unmount();
+  });
+  test("a restored same-ID Sheet cannot inherit the old document's image selection", async () => {
+    const { wrapper, sheet } = mountSheetGrid({
+      beforeMount: (sheet) => {
+        sheet.floatingImages = [
+          {
+            id: "a",
+            assetId: "asset",
+            altText: "Synthetic",
+            anchor: { row: 1, column: 1 },
+            offsetX: 0,
+            offsetY: 0,
+            width: 100,
+            height: 50,
+          },
+        ];
+      },
+    });
+    (
+      wrapper.vm as unknown as { selectFloatingImages: (ids: string[]) => void }
+    ).selectFloatingImages(["a"]);
+    await wrapper.vm.$nextTick();
+    const replacement = createSheet(sheet.name, sheet.id);
+    replacement.floatingImages = sheet.floatingImages.map((image) => ({
+      ...image,
+      anchor: { ...image.anchor },
+    }));
+    await wrapper.setProps({ sheet: replacement });
+    expect(wrapper.getComponent(SheetFloatingImageLayer).props("selectedImageIds")).toEqual([]);
+    expect(wrapper.getComponent(SheetFloatingImageLayer).props("selectedImageId")).toBeNull();
+    wrapper.unmount();
+  });
   test("renders the image and keeps double-click / F2 out of text editing", async () => {
     const plans = recordCanvasRenderPlans();
     const { wrapper } = mountSheetGrid({

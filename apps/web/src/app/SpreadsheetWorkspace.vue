@@ -3966,6 +3966,11 @@ const gridInert = computed(
           "
           @change-control="controlActions.change"
           @update-floating-images="pictureTools.updateMany"
+          @group-floating-images="
+            (ids) => {
+              if (!pictureTools.group(false, ids)) showImageFeedback('picture.operationFailed');
+            }
+          "
           @delete-floating-images="pictureTools.remove"
           @update-floating-image="setFloatingImage"
           @delete-floating-image="deleteFloatingImage"

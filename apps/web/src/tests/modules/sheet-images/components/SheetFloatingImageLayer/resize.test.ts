@@ -56,7 +56,7 @@ function fixture(options?: {
 
 describe("floating image resize controls", () => {
   test("resizes a selected group with one atomic update and preserved member spacing", async () => {
-    const { wrapper, image, layout } = fixture();
+    const { wrapper, image, layout } = fixture({ image: { groupId: "group" } });
     const second = { ...image, id: "second", anchor: { row: 3, column: 3 }, width: 60, height: 30 };
     await wrapper.setProps({ images: [image, second], selectedImageIds: [image.id, second.id] });
     expect(wrapper.findAll("[data-image-resize]")).toHaveLength(8);
@@ -75,6 +75,84 @@ describe("floating image resize controls", () => {
     expect(
       getFloatingImageSheetRect(last!, layout)!.x - getFloatingImageSheetRect(first!, layout)!.x,
     ).toBe(240);
+  });
+  test("Ctrl-multiselection shows each member's handles and resizes at independent origins", async () => {
+    const { wrapper, image, layout } = fixture({ image: { lockAspectRatio: true } });
+    const second = { ...image, id: "second", anchor: { row: 3, column: 3 }, width: 60, height: 30 };
+    await wrapper.setProps({ images: [image, second], selectedImageIds: [image.id, second.id] });
+    expect(wrapper.findAll("[data-floating-image-group]")).toHaveLength(0);
+    expect(wrapper.findAll("[data-image-resize]")).toHaveLength(16);
+    const layer = wrapper.get("[data-floating-image-layer]");
+    await wrapper
+      .get('[data-floating-image-id="image"] [data-image-resize="e"]')
+      .trigger("pointerdown", { button: 0, pointerId: 17, clientX: 220, clientY: 100 });
+    await layer.trigger("pointermove", { pointerId: 17, clientX: 260, clientY: 100 });
+    expect(wrapper.emitted("updateMany")).toBeUndefined();
+    await layer.trigger("pointerup", { pointerId: 17 });
+    expect(wrapper.emitted("updateMany")).toHaveLength(1);
+    const images = wrapper.emitted("updateMany")![0]![0] as FloatingImage[];
+    expect(images.map((entry) => getFloatingImageSheetRect(entry, layout))).toEqual([
+      { x: 100, y: 70, width: 160, height: 60 },
+      { x: 260, y: 70, width: 80, height: 30 },
+    ]);
+  });
+  test("a replaced owner or changed secondary member cancels the entire pending gesture", async () => {
+    const { wrapper, image } = fixture();
+    const second = { ...image, id: "second", anchor: { row: 3, column: 3 } };
+    const owner = {};
+    await wrapper.setProps({
+      owner,
+      images: [image, second],
+      selectedImageIds: [image.id, second.id],
+    });
+    const layer = wrapper.get("[data-floating-image-layer]");
+    await wrapper
+      .get('[data-floating-image-id="image"] [data-image-resize="e"]')
+      .trigger("pointerdown", { button: 0, pointerId: 18, clientX: 220, clientY: 100 });
+    await layer.trigger("pointermove", { pointerId: 18, clientX: 260, clientY: 100 });
+    await wrapper.setProps({ images: [image, { ...second, width: 200 }] });
+    await layer.trigger("pointerup", { pointerId: 18 });
+    expect(wrapper.emitted("updateMany")).toBeUndefined();
+    await wrapper
+      .get('[data-floating-image-id="image"] [data-image-resize="e"]')
+      .trigger("pointerdown", { button: 0, pointerId: 19, clientX: 220, clientY: 100 });
+    await layer.trigger("pointermove", { pointerId: 19, clientX: 260, clientY: 100 });
+    await wrapper.setProps({ owner: {} });
+    await layer.trigger("pointerup", { pointerId: 19 });
+    expect(wrapper.emitted("updateMany")).toBeUndefined();
+  });
+
+  test.each(["membership", "selection"] as const)(
+    "a pending group resize cancels when %s changes",
+    async (reason) => {
+      const { wrapper, image } = fixture({ image: { groupId: "group" } });
+      const second = { ...image, id: "second", anchor: { row: 3, column: 3 } };
+      await wrapper.setProps({ images: [image, second], selectedImageIds: [image.id, second.id] });
+      const layer = wrapper.get("[data-floating-image-layer]");
+      await wrapper
+        .get('[data-floating-image-group] [data-image-resize="e"]')
+        .trigger("pointerdown", { button: 0, pointerId: 80, clientX: 220, clientY: 100 });
+      await layer.trigger("pointermove", { pointerId: 80, clientX: 260, clientY: 100 });
+      if (reason === "membership")
+        await wrapper.setProps({ images: [image, second, { ...image, id: "third" }] });
+      else await wrapper.setProps({ selectedImageId: null, selectedImageIds: [] });
+      await layer.trigger("pointerup", { pointerId: 80 });
+      expect(wrapper.emitted("updateMany")).toBeUndefined();
+    },
+  );
+  test("an orthogonal-only multiselection side drag is a no-op", async () => {
+    const { wrapper, image } = fixture({ image: { width: 10, height: 5, offsetX: 100 } });
+    await wrapper.setProps({
+      images: [image, { ...image, id: "second" }],
+      selectedImageIds: [image.id, "second"],
+    });
+    const layer = wrapper.get("[data-floating-image-layer]");
+    await wrapper
+      .get('[data-floating-image-id="image"] [data-image-resize="e"]')
+      .trigger("pointerdown", { button: 0, pointerId: 81, clientX: 220, clientY: 100 });
+    await layer.trigger("pointermove", { pointerId: 81, clientX: 220, clientY: 120 });
+    await layer.trigger("pointerup", { pointerId: 81 });
+    expect(wrapper.emitted("updateMany")).toBeUndefined();
   });
 
   test.each([

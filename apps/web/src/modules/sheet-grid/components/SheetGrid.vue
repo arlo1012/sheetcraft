@@ -326,6 +326,7 @@ const emit = defineEmits<{
   updateFloatingImage: [image: FloatingImage];
   selectedFloatingImageChange: [id: string | null, ids: string[]];
   updateFloatingImages: [images: FloatingImage[]];
+  groupFloatingImages: [ids: string[]];
   deleteFloatingImages: [ids: string[]];
   deleteFloatingImage: [id: string];
   convertFloatingImageToCell: [id: string];
@@ -1779,6 +1780,19 @@ const {
   focusGrid: focusEditor,
 });
 
+function expandFloatingImageSelection(ids: readonly string[]): string[] {
+  const result = new Set<string>();
+  for (const id of ids) {
+    const image = props.sheet.floatingImages.find((entry) => entry.id === id);
+    if (!image) continue;
+    if (image.groupId)
+      for (const member of props.sheet.floatingImages) {
+        if (member.groupId === image.groupId) result.add(member.id);
+      }
+    else result.add(id);
+  }
+  return [...result];
+}
 function selectFloatingImage(id: string | null, additive = false): void {
   if (isComposing.value) return;
   if (isEditing.value) finishEdit(undefined, false);
@@ -1980,15 +1994,18 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
 }
 
 watch(
-  () => [props.sheet.id, ...props.sheet.floatingImages.map((image) => image.id)],
+  () => ({
+    sheet: props.sheet,
+    signature: JSON.stringify(props.sheet.floatingImages.map((image) => [image.id, image.groupId])),
+  }),
   (current, previous) => {
-    selectedImageIds.value = selectedImageIds.value.filter((id) =>
-      props.sheet.floatingImages.some((image) => image.id === id),
-    );
-    if (
-      current[0] !== previous[0] ||
-      !props.sheet.floatingImages.some((image) => image.id === selectedImageId.value)
-    )
+    if (current.sheet !== previous.sheet) {
+      selectedImageIds.value = [];
+      selectedImageId.value = null;
+      return;
+    }
+    selectedImageIds.value = expandFloatingImageSelection(selectedImageIds.value);
+    if (!props.sheet.floatingImages.some((image) => image.id === selectedImageId.value))
       selectedImageId.value = null;
   },
 );
@@ -3148,10 +3165,9 @@ defineExpose({
     if (image) openImagePreview(image);
   },
   selectFloatingImages: (ids: string[]) => {
-    selectedImageIds.value = ids.filter((id) =>
-      props.sheet.floatingImages.some((image) => image.id === id),
-    );
-    selectedImageId.value = selectedImageIds.value.at(-1) ?? null;
+    selectedImageIds.value = expandFloatingImageSelection(ids);
+    selectedImageId.value =
+      [...ids].reverse().find((id) => selectedImageIds.value.includes(id)) ?? null;
   },
   arrangePictures: (
     ids: string[],
@@ -3478,6 +3494,8 @@ defineExpose({
         @paint-state-change="imagePaintState = $event"
         :scale="scale"
         :images="sheet.floatingImages"
+        :owner="sheet"
+        :apply-update-many="applyFloatingImageMove"
         :effects="drawingThemeEffects"
         :layout="layout"
         :asset-urls="resolvedImageUrls"
@@ -3486,6 +3504,8 @@ defineExpose({
         :selected-image-id="selectedImageId"
         :selected-image-ids="selectedImageIds"
         @update-many="emit('updateFloatingImages', $event)"
+        @group="emit('groupFloatingImages', $event)"
+        @feedback="emit('imageFeedback', $event)"
         :read-only="objectsReadOnly"
         @select="selectFloatingImage"
         @update="emit('updateFloatingImage', $event)"

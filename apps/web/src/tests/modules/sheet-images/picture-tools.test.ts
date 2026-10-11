@@ -136,6 +136,19 @@ describe("picture tools", () => {
     );
     expect(f.sheet.floatingImages[4]?.groupId).toBe("untouched");
   });
+  test("one-click group uses its captured IDs and rejects missing targets atomically", () => {
+    const f = fixture();
+    f.selectedIds.value = ["e"];
+    expect(f.tools.group(false, ["a", "b"])).toBe(true);
+    expect(f.sheet.floatingImages[0]!.groupId).toBeTruthy();
+    expect(f.sheet.floatingImages[0]!.groupId).toBe(f.sheet.floatingImages[1]!.groupId);
+    expect(f.sheet.floatingImages[4]!.groupId).toBeUndefined();
+    const before = structuredClone(f.sheet.floatingImages);
+    expect(f.tools.group(false, ["a", "missing"])).toBe(false);
+    expect(f.tools.group(false, ["a", "a"])).toBe(false);
+    expect(f.execute).toHaveBeenCalledOnce();
+    expect(f.sheet.floatingImages).toEqual(before);
+  });
 
   test("updates only addressed pictures and ignores IDs absent from the sheet", () => {
     const f = fixture();
