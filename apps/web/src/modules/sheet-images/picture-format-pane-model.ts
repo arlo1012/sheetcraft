@@ -12,7 +12,8 @@ export interface PictureFormatOwner {
   workbookId: string;
   sheetId: string;
   pictureId: string;
-  assetId: string;
+  /** Source-free group containers deliberately have no asset identity. */
+  assetId?: string;
   /** Replace this on selection/context/cancellation boundaries, never for an ordinary own edit. */
   sessionId: string;
   /** Actual host-derived ancestor path. Omit only for a standalone leaf. Never fabricate it. */

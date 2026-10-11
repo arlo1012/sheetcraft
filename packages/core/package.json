@@ -210,6 +210,10 @@
     "./picture-group-copy": {
       "types": "./dist/picture-group-copy.d.ts",
       "import": "./dist/picture-group-copy.js"
+    },
+    "./picture-group-delete": {
+      "types": "./dist/picture-group-delete.d.ts",
+      "import": "./dist/picture-group-delete.js"
     }
   },
   "scripts": {

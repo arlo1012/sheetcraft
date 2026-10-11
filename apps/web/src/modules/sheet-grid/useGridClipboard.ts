@@ -210,6 +210,13 @@ export function useGridClipboard(options: {
   onPasteImage?: (transfer: GridClipboardTransfer, selection: CellSelection) => void;
   onReadUnavailable?: (selection: CellSelection) => boolean;
   onReadTransfer?: (transfer: GridClipboardTransfer) => void;
+  /** A document-local object token is claimed before text/cell parsing. */
+  onPasteTransfer?: (
+    transfer: GridClipboardTransfer,
+    selection: CellSelection,
+    kind: GridPasteKind,
+  ) => boolean;
+  onPreparedSelection?: () => void;
 }) {
   const clipboardPort = options.clipboardPort ?? createBrowserGridClipboardPort();
   const pendingClipboard = shallowRef<PendingClipboard | null>(null);
@@ -345,6 +352,7 @@ export function useGridClipboard(options: {
   }
 
   function commitPreparedSelection(prepared: PendingClipboard): void {
+    options.onPreparedSelection?.();
     pendingClipboard.value = prepared;
     options.onFeedback(prepared.mode === "cut" ? "readyToMove" : "copied");
   }
@@ -566,6 +574,7 @@ export function useGridClipboard(options: {
     selection: CellSelection,
     kind: GridPasteKind,
   ): void {
+    if (options.onPasteTransfer?.(transfer, selection, kind)) return;
     if (transfer.invalidFloatingImage) {
       options.onFeedback("pasteRejected");
       return;

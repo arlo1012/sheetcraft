@@ -1669,6 +1669,12 @@ export const enUS = {
     colorValue: "Color {value}",
   },
   picture: {
+    pageLayoutUnsupported:
+      "New picture frames and groups are not available in Page Layout. Use Normal view.",
+    groupReflectionUnsupported:
+      "This picture reflection style cannot yet be used in a new frame or group. The original pictures and styles were kept.",
+    memberCutUnsupported:
+      "Cutting an owned member is not supported yet. Copy it, or ungroup before cutting.",
     viewSettings: "View settings",
     doubleClickPreview: "Double-click to preview",
     doubleClickSelect: "Double-click to select only",

@@ -17,6 +17,24 @@ import {
   projectLegacyPictureAxisOrigin,
 } from "../../picture-axis-metrics.js";
 describe("sparse picture axis metrics", () => {
+  test("axis points reject executable or inherited fields without reading them", () => {
+    let reads = 0;
+    const accessor = {
+      get index() {
+        reads++;
+        return 1;
+      },
+      offset: 0,
+    };
+    expect(() => normalizePictureAxisPoint(accessor, 20)).toThrow(/accessors/);
+    expect(() => normalizePictureAxisPoint(Object.create({ index: 1, offset: 0 }), 20)).toThrow(
+      /ordinary/,
+    );
+    expect(() => normalizePictureAxisPoint({ index: 1, offset: 0, [Symbol("x")]: 1 }, 20)).toThrow(
+      /Unknown/,
+    );
+    expect(reads).toBe(0);
+  });
   test("separates underlying dimensions from zero-extent hidden locations", () => {
     const sheet = createSheet("Synthetic", "s");
     setRowHeight(sheet, 1, 40);

@@ -1632,6 +1632,9 @@ export const zhCN = {
     colorValue: "颜色 {value}",
   },
   picture: {
+    pageLayoutUnsupported: "页布局暂不支持新版图片或组合，请使用普通视图。",
+    groupReflectionUnsupported: "当前图片倒影样式暂不能放入新版图片或组合，原图片和样式未改动。",
+    memberCutUnsupported: "暂不支持剪切组内成员；可以复制成员，或先解组后剪切。",
     viewSettings: "查看设置",
     doubleClickPreview: "双击查看大图",
     doubleClickSelect: "双击仅选中图片",

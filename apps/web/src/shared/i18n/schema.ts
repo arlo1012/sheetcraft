@@ -1614,6 +1614,9 @@ export type MessageSchema = ToolMessageSchema & {
     colorValue: string;
   };
   picture: {
+    pageLayoutUnsupported: string;
+    groupReflectionUnsupported: string;
+    memberCutUnsupported: string;
     viewSettings: string;
     doubleClickPreview: string;
     doubleClickSelect: string;

@@ -98,7 +98,7 @@ describe("source-only group dialog owners", () => {
   });
 });
 describe("standalone toolbar and geometry boundaries", () => {
-  test("group roots and mixed targets have no source draft and cannot alter size, appearance or flat membership", () => {
+  test("source-free owners preserve mixed/container safety when current geometry is unavailable", () => {
     const f = fixture();
     const tools = usePictureTools({
       getSheet: () => f.sheet,
@@ -122,13 +122,17 @@ describe("standalone toolbar and geometry boundaries", () => {
     expect(oldOwner.geometry).toEqual({ width: 200, height: 100, angleDeg: 0 });
     const before = serializeWorkbook(f.session.workbook);
     f.selectedIds.value = [f.image.id, f.container.id];
-    expect(owner.value).toBeUndefined();
+    expect(owner.value?.geometry).toEqual({ width: 200, height: 100, angleDeg: 0 });
+    expect(owner.value?.resize({ axis: "width", value: 400 })).toBe(false);
+    expect(owner.value?.appearance({ opacity: 0.5 })).toBe(false);
     expect(oldOwner.resize({ axis: "width", value: 400 })).toBe(false);
     expect(tools.resizeMany(resize)).toBe(false);
     expect(tools.applyAppearance({ opacity: 0.5 })).toBe(false);
     expect(tools.group()).toBe(false);
     f.selectedIds.value = [f.container.id];
-    expect(owner.value).toBeUndefined();
+    expect(owner.value?.geometry).toBeUndefined();
+    expect(owner.value?.resize({ axis: "width", value: 400 })).toBe(false);
+    expect(owner.value?.appearance({ opacity: 0.5 })).toBe(false);
     expect(tools.resizeOne(f.container, { axis: "width", value: 400 })).toBe(false);
     expect(tools.setAspectRatio(f.container, true)).toBe(false);
     expect(tools.group(true)).toBe(false);
@@ -167,12 +171,39 @@ describe("standalone toolbar and geometry boundaries", () => {
     );
     expect(f.session.history.undoStack).toHaveLength(2);
   });
-  test("root metadata and layer edits preserve owned children and never synthesize a source or flat group", () => {
+  test("root metadata and layer edits require validated context and preserve owned children without a synthetic source", () => {
     const f = fixture();
     f.selectedIds.value = [f.container.id];
+    const before = serializeWorkbook(f.session.workbook);
+    const selection = f.selectedIds.value;
+    const noContext = usePictureTools({
+      getSheet: () => f.sheet,
+      selectedIds: f.selectedIds,
+      isBusy: () => false,
+      execute: f.execute,
+    });
+    noContext.rename(f.container, "Container label");
+    noContext.toggleVisibility(f.container);
+    noContext.layer("back");
+    expect(noContext.setAspectRatio(f.container, true)).toBe(false);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+    expect(f.selectedIds.value).toBe(selection);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.session.history.undoStack).toHaveLength(0);
+    const geometry = createSheetGeometry({ rowCount: 30, columnCount: 30 });
+    const rows = createRowVisibilityIndex({ rowCount: 30, defaultRowHeight: 24 });
+    const layout = createSheetViewportLayout({
+      geometry,
+      rows,
+      freeze: { rows: 0, columns: 0 },
+      bodyScrollPosition: { x: 0, y: 0 },
+      viewportSize: { width: 800, height: 500 },
+    });
+    const context = { layout, metrics: createPictureViewMetrics(f.sheet, geometry, rows) };
     const tools = usePictureTools({
       getSheet: () => f.sheet,
       selectedIds: f.selectedIds,
+      getFrameContext: () => context,
       isBusy: () => false,
       execute: f.execute,
     });

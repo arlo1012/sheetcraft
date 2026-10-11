@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+import { DEFAULT_WORKBOOK_THEME } from "@sheetcraft/core/workbook-theme";
 import { createSheet, type LegacyFloatingImage } from "@sheetcraft/core/workbook";
 import type { GroupedGroup, GroupedPicture, PictureGroup } from "@sheetcraft/core/picture-group";
 import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
@@ -7,6 +8,10 @@ import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-lay
 import { createPictureViewMetrics } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import { getPictureViewportFragments } from "../../../modules/sheet-images/picture-viewport-fragments";
 import { getOwnedPictureGroupViewportFragments } from "../../../modules/sheet-images/picture-owned-group-fragments";
+import {
+  assertPicturePaintSupport,
+  UnsupportedPicturePaintError,
+} from "../../../modules/sheet-images/picture-paint-effects";
 import { paintFloatingImages } from "../../../modules/sheet-images/floating-image-painter";
 import type { DrawingThemeEffects } from "../../../modules/sheet-images/drawing-theme-effects";
 import { pictureGroup } from "./picture-group-fixture";
@@ -331,20 +336,82 @@ describe("prepared actual owned leaf canvas dispatch", () => {
   );
 
   test.each([
+    DEFAULT_WORKBOOK_THEME.effects,
     { shadow: "soft", reflection: false, bevel: false, outlineWidth: 0, gradient: false },
     { shadow: "none", reflection: true, bevel: false, outlineWidth: 0, gradient: false },
     { shadow: "none", reflection: false, bevel: true, outlineWidth: 0, gradient: false },
     { shadow: "none", reflection: false, bevel: false, outlineWidth: 2, gradient: false },
   ] satisfies DrawingThemeEffects[])(
-    "rejects unsupported inherited effects before partial forest paint: %j",
+    "paints inherited effects using only real owned leaf sources: %j",
     (effects) => {
       const f = fixture();
-      f.root.hidden = true;
-      f.options.state = { images: [legacy("first"), f.root], revision: 1, effects };
-      expect(f.paint).toThrow("Inherited drawing theme effects");
-      noSideEffects(f);
+      const before = structuredClone(f.root);
+      f.options.state = { images: [f.root], revision: 1, effects };
+      f.paint();
+      expect(f.cache.get.mock.calls).toEqual([["blob:bottom"], ["blob:middle"], ["blob:top"]]);
+      expect(f.context.drawImage).toHaveBeenCalledTimes(effects.reflection ? 6 : 3);
+      expect(f.context.drawImage.mock.calls.every((call) => call[0] === f.decoded)).toBe(true);
+      expect(f.context.rotate.mock.calls).toEqual([[0], [(37 * Math.PI) / 180], [0]]);
+      expect(f.context.rect.mock.calls).toEqual(Array(3).fill([96, 24, 404, 476]));
+      expect(f.context.strokeRect).toHaveBeenCalledTimes(effects.outlineWidth > 0 ? 3 : 0);
+      expect(f.context.stroke).toHaveBeenCalledTimes(effects.bevel ? 6 : 0);
+      expect(f.cache.retain).toHaveBeenCalledExactlyOnceWith(
+        new Set(["blob:bottom", "blob:middle", "blob:top"]),
+      );
+      expect(f.root).toEqual(before);
+      expect(f.context.save.mock.calls.length).toBe(f.context.restore.mock.calls.length);
     },
   );
+
+  test("a hidden owned reflection rejects through the shared command/save guard before cache or source preparation", () => {
+    const f = fixture();
+    f.root.hidden = true;
+    const picture = f.root.members[0]!;
+    if (picture.kind !== "grouped-picture-v1") throw new Error("Expected fixture leaf.");
+    picture.transform = { appearance: { reflection: true, transparentColor: "#FFFFFF" } };
+    f.options.effects = DEFAULT_WORKBOOK_THEME.effects;
+    const create = vi.spyOn(document, "createElement");
+    expect(() => assertPicturePaintSupport([f.root], f.options.effects)).toThrow(
+      UnsupportedPicturePaintError,
+    );
+    expect(new UnsupportedPicturePaintError().code).toBe("unsupported-picture-reflection");
+    expect(f.paint).toThrow("reflection");
+    expect(create).not.toHaveBeenCalled();
+    noSideEffects(f);
+    create.mockRestore();
+  });
+
+  test("an unsupported future theme rejects the complete hidden forest before earlier legacy paint", () => {
+    const f = fixture();
+    f.root.hidden = true;
+    f.options.state = { images: [legacy("first"), f.root], revision: 1 };
+    f.options.effects = {
+      ...DEFAULT_WORKBOOK_THEME.effects,
+      shadow: "future-shadow",
+    } as unknown as DrawingThemeEffects;
+    expect(f.paint).toThrow("Inherited drawing theme shadow");
+    noSideEffects(f);
+  });
+
+  test("hidden reflection geometry overflow rejects before projecting or touching any cache", () => {
+    const f = fixture();
+    f.root.hidden = true;
+    f.root.frame.anchor = {
+      mode: "fixed",
+      x: 0,
+      y: 0,
+      size: { width: 100, height: 100 },
+    };
+    const picture = leaf("group-bottom");
+    picture.frame.rect.heightRatio = Number.MAX_VALUE * 0.0075;
+    f.root.members = [picture];
+    f.options.state = { images: [legacy("first"), f.root], revision: 1 };
+    f.options.effects = { ...DEFAULT_WORKBOOK_THEME.effects, reflection: true };
+    const project = vi.spyOn(f.options.layout, "getCellRect");
+    expect(f.paint).toThrow("reflection translation");
+    expect(project).not.toHaveBeenCalled();
+    noSideEffects(f);
+  });
 
   test("accepts a fill-only theme gradient without altering owned photo pixels", () => {
     const f = fixture();

@@ -4,6 +4,7 @@ export type PagePrintMessageSchema = {
     popupBlocked: string;
     failed: string;
     invalidRange: string;
+    unsupportedPictures: string;
     print: string;
     previous: string;
     next: string;

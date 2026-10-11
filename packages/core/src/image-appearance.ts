@@ -38,7 +38,10 @@ export function normalizeImageAppearance(
     if (number !== initial) result[key] = number;
   }
   if (value.transparentColor !== undefined) {
-    if (!/^#[\da-f]{6}$/i.test(value.transparentColor))
+    if (
+      typeof value.transparentColor !== "string" ||
+      !/^#[\da-f]{6}$/i.test(value.transparentColor)
+    )
       throw new TypeError("Invalid image transparent color.");
     result.transparentColor = value.transparentColor.toUpperCase();
   }
@@ -47,6 +50,7 @@ export function normalizeImageAppearance(
   if (value.border !== undefined) {
     if (
       !value.border ||
+      typeof value.border.color !== "string" ||
       !/^#[\da-f]{6}$/i.test(value.border.color) ||
       !Number.isFinite(value.border.width) ||
       value.border.width < 0 ||

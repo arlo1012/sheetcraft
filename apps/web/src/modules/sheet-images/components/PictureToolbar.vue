@@ -253,8 +253,9 @@ function sourceAction(action: () => void): void {
     />
     <PictureArrangeTools
       :disabled="disabled"
-      :group-disabled="isFramed"
-      :alignment-disabled="isFramed"
+      :group-disabled="false"
+      :alignment-disabled="false"
+      :grid-disabled="isFramed"
       :count="selectionCount"
       :grouped="!!standaloneImage.groupId"
       @group="sourceAction(() => emit('group'))"

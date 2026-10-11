@@ -54,7 +54,7 @@ afterEach(() => {
 });
 
 describe("spreadsheet workspace controller", () => {
-  test("unsupported frame replacement preserves workbook, selection, history and generation", () => {
+  test("unsupported frame reflection replacement preserves workbook, selection, history and generation", () => {
     const controller = mountController();
     controller.commitCell({ address: { row: 0, column: 0 }, input: "retained" });
     const oldWorkbook = controller.session.workbook;
@@ -64,8 +64,14 @@ describe("spreadsheet workspace controller", () => {
       revision = controller.workbookRevision.value,
       selection = controller.activeSheetViewState.value;
     const candidate = createWorkbook({ id: "candidate", sheetId: "new" });
-    getActiveSheet(candidate).floatingImages = [framedPicture()];
-    expect(() => controller.replaceWorkbook(candidate)).toThrow(/not yet enabled/);
+    getActiveSheet(candidate).floatingImages = [
+      {
+        ...framedPicture(),
+        hidden: true,
+        transform: { appearance: { reflection: true } },
+      },
+    ];
+    expect(() => controller.replaceWorkbook(candidate)).toThrow(/reflection/);
     expect(controller.session.workbook).toBe(oldWorkbook);
     expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
     expect(controller.session.history).toBe(history);
@@ -73,22 +79,22 @@ describe("spreadsheet workspace controller", () => {
     expect(controller.workbookGeneration.value).toBe(generation);
     expect(controller.workbookRevision.value).toBe(revision);
   });
-  test("both normal and replaceable live command ports reject frame ingress before history/revision changes", () => {
+  test("normal and replaceable live command ports accept supported frame ingress", () => {
     const controller = mountController(),
-      sheet = controller.activeSheet.value,
-      before = serializeWorkbook(controller.session.workbook),
-      revision = controller.workbookRevision.value;
-    const commands = [
-      createSetFloatingImageCommand(sheet.id, framedPicture()),
-      createSetSheetFloatingImagesCommand(sheet.id, [framedPicture()]),
-    ];
-    for (const command of commands) {
-      expect(() => controller.executeCommand(command)).toThrow(/not yet enabled/);
-      expect(() => controller.executeReplaceableCommand(command)).toThrow(/not yet enabled/);
-      expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
-      expect(controller.workbookRevision.value).toBe(revision);
-      expect(controller.session.history.undoStack).toEqual([]);
-    }
+      sheet = controller.activeSheet.value;
+    expect(
+      controller.executeCommand(createSetFloatingImageCommand(sheet.id, framedPicture())),
+    ).toBe(true);
+    expect(
+      controller.executeReplaceableCommand(
+        createSetSheetFloatingImagesCommand(sheet.id, [{ ...framedPicture(), altText: "Updated" }]),
+      ),
+    ).toMatchObject({ changed: true, accepted: true });
+    expect(sheet.floatingImages).toMatchObject([
+      { id: "framed", altText: "Updated", frame: { kind: "object-frame-v1" } },
+    ]);
+    expect(serializeWorkbook(controller.session.workbook).version).toBe(47);
+    expect(controller.session.history.undoStack).toHaveLength(2);
   });
   test("keeps formula source in the formula bar while the grid consumes its computed value", () => {
     const controller = mountController();

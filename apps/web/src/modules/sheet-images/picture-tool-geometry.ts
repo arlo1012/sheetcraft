@@ -2,13 +2,14 @@ import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { isPictureGroup } from "@sheetcraft/core";
 import { requireStandalonePicture } from "./picture-document-support";
 import { resolvePictureFrame } from "@sheetcraft/core/picture-frame";
+import { resolvePictureGroup } from "@sheetcraft/core/picture-group-layout";
 import {
   cloneFloatingImage,
   MIN_FLOATING_IMAGE_SIZE,
   MAX_FLOATING_IMAGE_SIZE,
   type FloatingImage,
 } from "@sheetcraft/core/workbook";
-import { resizeFramedPictureTo } from "@sheetcraft/sheet-engine";
+import { resizeFramedPictureTo, resizePictureGroupTo } from "@sheetcraft/sheet-engine";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
 
 /** Display-only local dimensions; never persist a derived rectangle on a picture. */
@@ -19,7 +20,17 @@ export function getPictureToolGeometry(
   image: FloatingImage,
   context?: PictureFrameLayoutContext,
 ): PictureToolGeometry | undefined {
-  if (isPictureGroup(image)) return undefined;
+  if (isPictureGroup(image)) {
+    if (!context) return undefined;
+    const layout = resolvePictureGroup(image, context.metrics).layout;
+    return layout.collapsed
+      ? undefined
+      : {
+          width: layout.rect.width,
+          height: layout.rect.height,
+          angleDeg: layout.angleDeg,
+        };
+  }
   if (!isFramedPictureObject(image))
     return { width: image.width, height: image.height, angleDeg: image.transform?.rotation ?? 0 };
   if (!context) return undefined;
@@ -34,7 +45,6 @@ export function resizePictureTo(
   edit: PictureSizeEdit,
   context?: PictureFrameLayoutContext,
 ): FloatingImage | null {
-  image = requireStandalonePicture(image);
   if (
     (edit.axis !== "width" && edit.axis !== "height") ||
     !Number.isFinite(edit.value) ||
@@ -42,6 +52,11 @@ export function resizePictureTo(
     edit.value > MAX_FLOATING_IMAGE_SIZE
   )
     throw new RangeError("Invalid picture size.");
+  if (isPictureGroup(image)) {
+    if (!context) throw new Error("Current worksheet group geometry is required.");
+    return resizePictureGroupTo(image, edit, context.metrics);
+  }
+  image = requireStandalonePicture(image);
   if (isFramedPictureObject(image)) {
     if (!context) throw new Error("Current worksheet frame geometry is required.");
     return resizeFramedPictureTo(image, edit, context.metrics);

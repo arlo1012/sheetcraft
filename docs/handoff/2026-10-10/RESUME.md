@@ -1,3 +1,35 @@
+## Current owned-picture page integration WIP — 2026-10-11
+
+The current refactor branch now enables genuine Frame47/Group48 internal editing,
+recovery and save. Read `docs/insert/pictures.md` for the current capability and
+remaining limits; older entries below describe earlier bounded checkpoints.
+
+Real Group/Ungroup and recursive member Delete use one complete-forest Core
+transaction. The page mounts source-free group/member handles, mixed-root floating
+alignment/group controls and leased local tree copy/cut/paste. Default inherited
+picture effects draw actual leaves, including hidden-tree validation. Rejected
+commands preserve history, selection and drafts; stale asynchronous native reads
+or metadata callbacks cannot borrow a new document owner.
+
+Format opens the actual four-tab pane. Local dimensions, angle, aspect lock, root
+anchoring and source-bearing descriptions are connected; other fields carry an
+unavailable reason. Remaining crop/effects/resource/Locked/Print Object capabilities
+are still picture WIP. Legacy flat groupId is not automatically migrated.
+
+New frame/group XLSX, external picture JSON packaging, printing and Page Layout
+remain unsupported with preflight feedback. Internal snapshots support them;
+explicit old reflection styles that cannot be preserved remain blocked without
+changing the source. Workbook I/O development remains paused.
+
+Related Web verification finished at 81 files / 904 tests, Core deletion/frame/tree
+regressions at 17 files / 238 tests. Core/Web types and builds and owned static checks
+passed. The final lazy-toolbar follow-up passed 5 files / 50 tests; its initial
+49pass/1fail was an async component fixture awaiting the real loaded toolbar.
+Original focused 140pass/2fail and module 900pass/1fail were capability
+expectations updated with real geometry/history assertions, not skipped. Existing
+130 architecture diagnostics and existing bundle warnings remain. This is a safe
+picture integration checkpoint, not full picture-tool acceptance.
+
 ## UI-style-v3 font integration — 2026-10-11
 
 The full UI-style-v3 state includes the complete Symbol implementation and is

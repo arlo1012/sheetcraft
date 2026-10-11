@@ -15,6 +15,13 @@ import {
 } from "@sheetcraft/core/picture-frame";
 import { imageAppearanceFilter, imageAppearanceSource } from "../../shared/images/imageAppearance";
 import { paintImageAnnotations } from "../../shared/images/imageAnnotations";
+import { hasVisibleDrawingThemeEffects, type DrawingThemeEffects } from "./drawing-theme-effects";
+import {
+  applyDrawingThemeShadow,
+  assertSourceBearingPicturePaintSupport,
+  assertPictureReflectionGeometry,
+  paintDrawingThemeOutline,
+} from "./picture-paint-effects";
 
 /**
  * Draw a prepared frame using the same resolved local rectangle as selection
@@ -26,11 +33,12 @@ export function paintFramedPictureContent(
   decoded: HTMLImageElement,
   picture: FramedFloatingImage,
   geometry: ResolvedPictureFrame,
+  effects?: DrawingThemeEffects,
 ): void {
   if (!isFramedPictureObject(picture))
     throw new TypeError("Prepared framed painting requires a standalone framed picture.");
   const normalized = clonePictureObject(picture);
-  paintSourceBearingPictureContent(context, decoded, normalized, geometry);
+  paintSourceBearingPictureContent(context, decoded, normalized, geometry, effects);
 }
 
 /** Paint an actual owned leaf without inventing a standalone anchor or container source. */
@@ -39,11 +47,12 @@ export function paintGroupedPictureContent(
   decoded: HTMLImageElement,
   picture: GroupedPicture,
   geometry: ResolvedPictureFrame,
+  effects?: DrawingThemeEffects,
 ): void {
   if (!isGroupedPicture(picture))
     throw new TypeError("Prepared grouped painting requires a source-bearing owned picture.");
   const normalized = clonePictureGroupChild(picture);
-  paintSourceBearingPictureContent(context, decoded, normalized, geometry);
+  paintSourceBearingPictureContent(context, decoded, normalized, geometry, effects);
 }
 
 function finite(value: number, name: string): number {
@@ -118,14 +127,15 @@ function paintSourceBearingPictureContent(
   decoded: HTMLImageElement,
   normalized: FramedFloatingImage | GroupedPicture,
   geometry: ResolvedPictureFrame,
+  effects?: DrawingThemeEffects,
 ): void {
   validateContentGeometry(normalized, geometry);
+  // Appearance reflection changes legacy layout, unlike the theme's full local
+  // mirrored clone. Reject it even for hidden leaves before preparation.
+  assertSourceBearingPicturePaintSupport(normalized, effects);
   if (normalized.hidden || geometry.collapsed || !geometry.sourceRect) return;
   const appearance = normalized.transform?.appearance;
-  // Legacy reflection shrinks the object before drawing. Its different geometry
-  // must be integrated deliberately rather than silently applied to a new frame.
-  if (appearance?.reflection)
-    throw new Error("Framed picture reflection is not supported by this prepared painter.");
+  if (effects?.reflection) assertPictureReflectionGeometry(geometry);
   // Transparent-color preparation may allocate a canvas. Reject unavailable
   // decoded dimensions and invalid derived clipping before requesting it.
   validateSourceDimensions(decoded.naturalWidth, decoded.naturalHeight);
@@ -177,64 +187,99 @@ function paintSourceBearingPictureContent(
     context.translate(rect.x + rect.width / 2, rect.y + rect.height / 2);
     context.rotate((geometry.angleDeg * Math.PI) / 180);
     context.translate(-rect.width / 2, -rect.height / 2);
-    context.globalAlpha *= appearance?.opacity ?? 1;
-    context.filter = imageAppearanceFilter(appearance);
-    if (appearance?.shadow) {
-      context.shadowColor = "rgb(0 0 0 / 35%)";
-      context.shadowBlur = appearance.shadow === "soft" ? 8 : 1;
-      context.shadowOffsetX = 3;
-      context.shadowOffsetY = 3;
-    }
-    if (crop && pixels) {
+    const drawContent = (inherited?: DrawingThemeEffects): void => {
+      applyDrawingThemeShadow(context, inherited);
+      context.globalAlpha *= appearance?.opacity ?? 1;
+      context.filter = imageAppearanceFilter(appearance);
+      if (appearance?.shadow) {
+        context.shadowColor = "rgb(0 0 0 / 35%)";
+        context.shadowBlur = appearance.shadow === "soft" ? 8 : 1;
+        context.shadowOffsetX = 3;
+        context.shadowOffsetY = 3;
+      }
+      if (crop && pixels) {
+        context.save();
+        try {
+          context.translate(left + (flipX ? crop.width : 0), top + (flipY ? crop.height : 0));
+          context.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+          // Intersect the source in local coordinates before drawing. This keeps
+          // blank padding transparent without allocating a frame-sized bitmap,
+          // and permits the cropped source's shadow to extend beyond the frame.
+          context.drawImage(
+            source,
+            pixels.x,
+            pixels.y,
+            pixels.width,
+            pixels.height,
+            0,
+            0,
+            crop.width,
+            crop.height,
+          );
+        } finally {
+          context.restore();
+        }
+      }
+      context.shadowColor = "transparent";
+      if (normalized.transform?.annotations?.length) {
+        context.save();
+        try {
+          context.beginPath();
+          context.rect(0, 0, rect.width, rect.height);
+          context.clip();
+          context.translate(
+            sx + (flipX ? sourceRect.width : 0),
+            sy + (flipY ? sourceRect.height : 0),
+          );
+          context.scale(
+            ((flipX ? -1 : 1) * sourceRect.width) / sourceWidth,
+            ((flipY ? -1 : 1) * sourceRect.height) / sourceHeight,
+          );
+          paintImageAnnotations(
+            context,
+            normalized.transform.annotations,
+            sourceWidth,
+            sourceHeight,
+          );
+        } finally {
+          context.restore();
+        }
+      }
+      if (appearance?.border) {
+        const width = Math.min(appearance.border.width, rect.width, rect.height);
+        context.filter = "none";
+        context.lineWidth = width;
+        context.strokeStyle = appearance.border.color;
+        context.strokeRect(width / 2, width / 2, rect.width - width, rect.height - width);
+      }
+    };
+    if (hasVisibleDrawingThemeEffects(effects)) {
       context.save();
       try {
-        context.translate(left + (flipX ? crop.width : 0), top + (flipY ? crop.height : 0));
-        context.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-        // Intersect the source in local coordinates before drawing. This keeps
-        // blank padding transparent without allocating a frame-sized bitmap,
-        // and permits the cropped source's shadow to extend beyond the frame.
-        context.drawImage(
-          source,
-          pixels.x,
-          pixels.y,
-          pixels.width,
-          pixels.height,
-          0,
-          0,
-          crop.width,
-          crop.height,
-        );
+        drawContent(effects);
       } finally {
         context.restore();
       }
-    }
-    context.shadowColor = "transparent";
-    if (normalized.transform?.annotations?.length) {
-      context.save();
-      try {
-        context.beginPath();
-        context.rect(0, 0, rect.width, rect.height);
-        context.clip();
-        context.translate(
-          sx + (flipX ? sourceRect.width : 0),
-          sy + (flipY ? sourceRect.height : 0),
-        );
-        context.scale(
-          ((flipX ? -1 : 1) * sourceRect.width) / sourceWidth,
-          ((flipY ? -1 : 1) * sourceRect.height) / sourceHeight,
-        );
-        paintImageAnnotations(context, normalized.transform.annotations, sourceWidth, sourceHeight);
-      } finally {
-        context.restore();
+      if (effects?.reflection) {
+        context.save();
+        try {
+          context.globalAlpha = 0.22;
+          context.translate(0, 2 * rect.height);
+          context.scale(1, -1);
+          // The inherited reflection repeats the same crop, padding, annotations
+          // and own border below the local frame, then rotates with that frame.
+          // Only the real leaf source is used; layout and selection stay intact.
+          drawContent();
+        } finally {
+          context.restore();
+        }
       }
-    }
-    if (appearance?.border) {
-      const width = Math.min(appearance.border.width, rect.width, rect.height);
-      context.filter = "none";
-      context.lineWidth = width;
-      context.strokeStyle = appearance.border.color;
-      context.strokeRect(width / 2, width / 2, rect.width - width, rect.height - width);
-    }
+      paintDrawingThemeOutline(
+        context,
+        { x: 0, y: 0, width: rect.width, height: rect.height },
+        effects!,
+      );
+    } else drawContent();
   } finally {
     context.restore();
   }

@@ -2,6 +2,7 @@ import {
   assertWorkbookPictureSupport,
   UnsupportedPictureDocumentError,
 } from "../sheet-images/picture-document-support";
+import { UnsupportedPicturePaintError } from "../sheet-images/picture-paint-effects";
 import { computed, onScopeDispose, ref, watch, type ComputedRef, type Ref } from "vue";
 import { WorkbookDomainError } from "@sheetcraft/core/errors";
 import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
@@ -60,7 +61,11 @@ function toPersistenceError(
   error: unknown,
   fallback: WorkbookPersistenceError,
 ): WorkbookPersistenceError {
-  if (error instanceof UnsupportedPictureDocumentError) return "unsupported-picture-frame";
+  if (
+    error instanceof UnsupportedPictureDocumentError ||
+    error instanceof UnsupportedPicturePaintError
+  )
+    return "unsupported-picture-frame";
   if (error instanceof WorkbookStoreError) {
     return error.code;
   }

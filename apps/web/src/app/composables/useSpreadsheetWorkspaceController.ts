@@ -2,6 +2,7 @@ import {
   assertWorkbookPictureSupport,
   assertPictureCommandSupport,
 } from "../../modules/sheet-images/picture-document-support";
+import { UnsupportedPicturePaintError } from "../../modules/sheet-images/picture-paint-effects";
 import { canEditCell, canEditRange } from "@sheetcraft/core";
 import type { FillDirection } from "@sheetcraft/sheet-engine/fill-selection";
 import {
@@ -490,7 +491,7 @@ export function useSpreadsheetWorkspaceController(
     let changed: boolean;
     try {
       assertWorkbookPictureSupport(session.workbook);
-      assertPictureCommandSupport(command);
+      assertPictureCommandSupport(command, session.workbook);
       if (
         !(
           options.allowDuplicateEntry &&
@@ -504,6 +505,10 @@ export function useSpreadsheetWorkspaceController(
       );
       changed = executeWorkbookCommand(session, command, operation);
     } catch (error) {
+      if (error instanceof UnsupportedPicturePaintError) {
+        showWorkspaceStatus({ key: "picture.groupReflectionUnsupported" });
+        return false;
+      }
       if (
         error instanceof WorkbookDomainError &&
         (error.data.code === "sheet_protected" ||
@@ -534,8 +539,14 @@ export function useSpreadsheetWorkspaceController(
     command: WorkbookCommand,
     token?: ReplaceableWorkbookCommandToken,
   ) {
-    assertWorkbookPictureSupport(session.workbook);
-    assertPictureCommandSupport(command);
+    try {
+      assertWorkbookPictureSupport(session.workbook);
+      assertPictureCommandSupport(command, session.workbook);
+    } catch (error) {
+      if (!(error instanceof UnsupportedPicturePaintError)) throw error;
+      showWorkspaceStatus({ key: "picture.groupReflectionUnsupported" });
+      return { changed: false, accepted: false };
+    }
     assertDuplicateEntriesAreAllowed(command);
     calculation.prepareMutation();
     const result = executeReplaceableWorkbookCommand(session, token, command);

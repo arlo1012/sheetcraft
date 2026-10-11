@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { requireStandalonePictures } from "../../sheet-images/picture-document-support";
+import {
+  requireStandalonePictures,
+  UnsupportedPictureDocumentError,
+} from "../../sheet-images/picture-document-support";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
@@ -42,7 +45,10 @@ const renderer = createPrintPreviewRenderer(() => {
   repaint.value += 1;
 });
 
-const documentPreview = computed<PrintPreviewDocument | undefined>(() => {
+const previewResult = computed<{
+  document?: PrintPreviewDocument;
+  errorKey?: "pagePrint.unsupportedPictures" | "pagePrint.invalidRange";
+}>(() => {
   try {
     const result = createPrintPreviewDocument({
       theme: props.theme,
@@ -55,11 +61,17 @@ const documentPreview = computed<PrintPreviewDocument | undefined>(() => {
       dateSystem: props.dateSystem,
       revision: props.workbookRevision,
     });
-    return result;
-  } catch {
-    return undefined;
+    return { document: result };
+  } catch (error) {
+    return {
+      errorKey:
+        error instanceof UnsupportedPictureDocumentError
+          ? "pagePrint.unsupportedPictures"
+          : "pagePrint.invalidRange",
+    };
   }
 });
+const documentPreview = computed(() => previewResult.value.document);
 const pages = computed(() => documentPreview.value?.pages ?? []);
 const activePage = computed(() => pages.value[selected.value] ?? pages.value[0]);
 const canPrevious = computed(() => selected.value > 0);
@@ -226,7 +238,9 @@ onBeforeUnmount(() => renderer.dispose());
         </button>
       </aside>
       <section class="page-print-preview__page" :aria-label="t('pagePrint.preview')">
-        <p v-if="!documentPreview" role="alert">{{ t("pagePrint.invalidRange") }}</p>
+        <p v-if="!documentPreview" role="alert">
+          {{ t(previewResult.errorKey ?? "pagePrint.invalidRange") }}
+        </p>
         <canvas v-else ref="pageCanvas" />
         <p v-if="activePage">
           {{ t("pagePrint.pageOf", { page: activePage.pageNumber, count: pages.length }) }}

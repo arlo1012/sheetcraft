@@ -248,6 +248,12 @@ const selectedGroup = computed(() => {
     members.every((image) => selectedIds.value.has(image.id))
   );
 });
+const hasExtendedRootSelection = computed(() =>
+  selectionImages().some(
+    (root) =>
+      selectedIds.value.has(root.id) && (isFramedPictureObject(root) || isPictureGroup(root)),
+  ),
+);
 const selectionToolbarAnchor = computed<FloatingReference | null>(() => {
   const visible = fragments.value.filter((entry) => selectedIds.value.has(entry.image.id));
   const layer = layerRef.value;
@@ -1353,7 +1359,14 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       </div>
     </template>
     <SheetPictureSelectionToolbar
-      v-if="selectionToolbarAnchor && !selectedGroup && !crop && !gesture && !contextMenu"
+      v-if="
+        selectionToolbarAnchor &&
+        !hasExtendedRootSelection &&
+        !selectedGroup &&
+        !crop &&
+        !gesture &&
+        !contextMenu
+      "
       :key="selectionKey"
       :anchor="selectionToolbarAnchor"
       :selection-key="selectionKey"

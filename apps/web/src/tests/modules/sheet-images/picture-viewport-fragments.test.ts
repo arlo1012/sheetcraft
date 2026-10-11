@@ -161,7 +161,7 @@ describe("owned picture viewport fragment adapter", () => {
       ),
     ).toEqual(getFloatingImageViewportFragmentsForPaint([first], view.layout));
     expect(() => getFloatingImageViewportFragmentsForPaint([first, picture], view.layout)).toThrow(
-      "not yet enabled",
+      "does not support",
     );
   });
 
@@ -348,7 +348,7 @@ describe("mixed framed picture canvas painting", () => {
     { ...noEffects, reflection: true },
     { ...noEffects, bevel: true },
     { ...noEffects, outlineWidth: 2 },
-  ])("refuses inherited visible drawing effects atomically: %j", (effects) => {
+  ])("paints inherited visible drawing effects with real sources: %j", (effects) => {
     for (const source of ["state", "options"] as const) {
       const f = paintFixture();
       f.options.state = {
@@ -357,8 +357,26 @@ describe("mixed framed picture canvas painting", () => {
         ...(source === "state" ? { effects } : {}),
       };
       if (source === "options") f.options.effects = effects;
-      expect(f.paint).toThrow("Inherited drawing theme effects");
-      expectNoPaintSideEffects(f);
+      f.options.assetUrls = new Map([
+        ["legacy", "blob:legacy"],
+        ["framed", "blob:framed"],
+      ]);
+      const before = structuredClone(f.options.state.images);
+      expect(f.paint).not.toThrow();
+      expect(f.cache.get.mock.calls).toEqual([
+        ...Array(4).fill(["blob:legacy"]),
+        ...Array(4).fill(["blob:framed"]),
+      ]);
+      expect(f.context.drawImage).toHaveBeenCalledTimes(effects.reflection ? 16 : 8);
+      expect(f.context.drawImage.mock.calls.every((call) => call[0] === f.decoded)).toBe(true);
+      expect(f.context.fillRect).not.toHaveBeenCalled();
+      expect(f.context.strokeRect).toHaveBeenCalledTimes(effects.outlineWidth > 0 ? 8 : 0);
+      expect(f.context.stroke).toHaveBeenCalledTimes(effects.bevel ? 16 : 0);
+      expect(f.cache.retain).toHaveBeenCalledExactlyOnceWith(
+        new Set(["blob:legacy", "blob:framed"]),
+      );
+      expect(f.options.state.images).toEqual(before);
+      expect(f.context.save.mock.calls.length).toBe(f.context.restore.mock.calls.length);
     }
   });
 

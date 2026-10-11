@@ -111,7 +111,7 @@ export function usePictureToolbarOwner(options: {
   );
   return computed(() => {
     const displayed = options.getImage();
-    if (!displayed || isPictureGroup(displayed)) return undefined;
+    if (!displayed) return undefined;
     const lease = leaseEpoch;
     const image = cloneFloatingImage(displayed);
     const workbook = options.getWorkbook(),
@@ -121,7 +121,6 @@ export function usePictureToolbarOwner(options: {
     const sources = ids
       .map((id) => sheet.floatingImages.find((entry) => entry.id === id))
       .map((source) => (source ? cloneFloatingImage(source) : undefined));
-    if (sources.some((source) => source && isPictureGroup(source))) return undefined;
     const context = options.getFrameContext();
     let geometry: ReturnType<typeof getPictureToolGeometry>;
     try {

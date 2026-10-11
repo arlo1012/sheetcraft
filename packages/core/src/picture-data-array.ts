@@ -1,6 +1,8 @@
 /** Reads bounded, dense own data without executing caller-supplied array methods. */
 export function readPictureDataArray<T>(value: readonly T[], name: string, maximum: number): T[] {
   if (!Array.isArray(value)) throw new TypeError(`Invalid ${name}.`);
+  if (Object.getPrototypeOf(value) !== Array.prototype)
+    throw new TypeError(`${name} must be an ordinary indexed data array.`);
   if (value.length > maximum) throw new RangeError(`${name} node budget exceeded.`);
   for (const key of Reflect.ownKeys(value)) {
     if (key === "length") continue;

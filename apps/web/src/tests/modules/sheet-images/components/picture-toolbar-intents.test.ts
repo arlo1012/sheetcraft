@@ -451,13 +451,20 @@ describe("framed picture ribbon capability boundary", () => {
     expect(wrapper.getComponent(PictureAppearanceTools).props("disabled")).toBe(false);
     expect(wrapper.getComponent(PictureArrangeTools).props()).toMatchObject({
       disabled: false,
-      groupDisabled: true,
-      alignmentDisabled: true,
+      groupDisabled: false,
+      alignmentDisabled: false,
+      gridDisabled: true,
     });
-    for (const label of ["Group", "Ungroup", "Align"])
+    expect(wrapper.get('.picture-arrange [aria-label="Group"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
+    for (const label of ["Ungroup", "Align"])
       expect(
         wrapper.get(`.picture-arrange [aria-label="${label}"]`).attributes("aria-disabled"),
-      ).toBe("true");
+      ).toBe("false");
+    await wrapper.setProps({ selectionCount: 2 });
+    await wrapper.get('.picture-arrange [aria-label="Group"]').trigger("click");
+    expect(wrapper.emitted("group")).toEqual([[]]);
     expect(
       wrapper.get('.picture-arrange [aria-label="Bring to front"]').attributes("aria-disabled"),
     ).toBe("false");

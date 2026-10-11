@@ -1,7 +1,12 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSheetEvaluator, createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
 import { DEFAULT_SHEET_PAGE_SETUP } from "@sheetcraft/core/page-setup";
-import { createPrintPreviewDocument } from "../../../modules/page-layout/page-print-renderer";
+import { framedPicture } from "../sheet-images/framed-picture-fixture";
+import { pictureGroup } from "../sheet-images/picture-group-fixture";
+import {
+  createPrintPreviewDocument,
+  createPrintPreviewRenderer,
+} from "../../../modules/page-layout/page-print-renderer";
 
 function documentFor(setup = DEFAULT_SHEET_PAGE_SETUP) {
   const workbook = createWorkbook({ id: "print-preview", sheetId: "sheet" });
@@ -12,7 +17,32 @@ function documentFor(setup = DEFAULT_SHEET_PAGE_SETUP) {
   };
 }
 
+afterEach(() => vi.restoreAllMocks());
+
 describe("print preview pagination", () => {
+  test.each([framedPicture(), pictureGroup()])(
+    "legacy print guards reject hidden $id before canvas sizing or drawing",
+    (image) => {
+      const { sheet, preview } = documentFor();
+      const canvas = document.createElement("canvas");
+      const getContext = vi.spyOn(canvas, "getContext");
+      const renderer = createPrintPreviewRenderer();
+      const before = { width: canvas.width, height: canvas.height, css: canvas.style.cssText };
+      image.hidden = true;
+      sheet.floatingImages = [image];
+      expect(() =>
+        createPrintPreviewDocument({ sheet, evaluator: createSheetEvaluator(sheet) }),
+      ).toThrow(/does not support/);
+      expect(() => renderer.render({ canvas, document: preview, page: preview.pages[0]! })).toThrow(
+        /does not support/,
+      );
+      expect({ width: canvas.width, height: canvas.height, css: canvas.style.cssText }).toEqual(
+        before,
+      );
+      expect(getContext).not.toHaveBeenCalled();
+      renderer.dispose();
+    },
+  );
   test("resolves fit-to-page before calculating pages", () => {
     const { sheet } = documentFor();
     for (let row = 0; row < 40; row += 1) sheet.rowHeights.set(row, 100);

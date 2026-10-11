@@ -249,8 +249,20 @@ async function readWithAsyncClipboard(): Promise<GridClipboardTransfer> {
   return { text: await navigator.clipboard.readText() };
 }
 
+// The operating-system clipboard is shared by cell, legacy-picture and owned-tree sessions.
+// Serialize actual writes across ports so an older in-flight write cannot finish last.
+let browserClipboardWriteQueue: Promise<void> = Promise.resolve();
+function queueBrowserClipboardWrite<T>(write: () => Promise<T>): Promise<T> {
+  const result = browserClipboardWriteQueue.then(write);
+  browserClipboardWriteQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
 export function createBrowserGridClipboardPort(): GridClipboardPort {
-  return {
+  const port: GridClipboardPort = {
     async writeNativeRich(transfer) {
       if (transfer.floatingImage)
         serializeFloatingImageClipboard(transfer.floatingImage, transfer.floatingImages);
@@ -326,5 +338,13 @@ export function createBrowserGridClipboardPort(): GridClipboardPort {
       }
       return nativeTransfer;
     },
+  };
+  return {
+    ...port,
+    write: (transfer) => queueBrowserClipboardWrite(() => port.write(transfer)),
+    writeNativeRich: (transfer) =>
+      queueBrowserClipboardWrite(async () => {
+        await port.writeNativeRich!(transfer);
+      }),
   };
 }

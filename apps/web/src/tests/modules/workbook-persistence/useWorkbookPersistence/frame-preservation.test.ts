@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { nextTick } from "vue";
 import { getActiveSheet } from "@sheetcraft/core/workbook";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { pictureGroup } from "../../sheet-images/picture-group-fixture";
 import { framedPicture } from "../../sheet-images/framed-picture-fixture";
 import {
   createStore,
@@ -12,12 +13,48 @@ import {
   savedCellValue,
 } from "./fixture";
 import { mountFileActions } from "../useWorkbookFileActions/fixture";
+function unsupportedReflection() {
+  return { ...framedPicture(), hidden: true, transform: { appearance: { reflection: true } } };
+}
 afterEach(() => vi.useRealTimers());
-describe("frame-aware recovery preservation during view integration", () => {
-  test("a valid newer snapshot stays in storage and cannot be overwritten by manual or automatic saves", async () => {
+describe("internal owned-picture recovery and unsupported paint preservation", () => {
+  test.each([
+    { image: framedPicture(), version: 47 },
+    { image: pictureGroup(), version: 48 },
+  ])(
+    "supported snapshot$version recovers and saves without flattening",
+    async ({ image, version }) => {
+      const original = createWorkbookWithValue("recoverable");
+      getActiveSheet(original).floatingImages = [image];
+      const snapshot = serializeWorkbook(original),
+        save = vi.fn(async (_snapshot: ReturnType<typeof serializeWorkbook>) => asReceipt(2));
+      const f = mountPersistence({
+        store: createStore({
+          load: async () => ({ revision: 1, savedAt: 1, snapshot }),
+          save,
+        }),
+        workbook: createWorkbookWithValue("current"),
+      });
+      await f.persistence.ready;
+      expect(f.persistence.error.value).toBeUndefined();
+      expect(f.value()).toBe("recoverable");
+      expect(f.replaceCalls).toHaveLength(1);
+      expect(serializeWorkbook(f.getWorkbook())).toEqual(snapshot);
+      expect(snapshot.version).toBe(version);
+      f.edit("saved owned document");
+      expect(await f.persistence.saveNow()).toBe(true);
+      expect(savedCellValue(save, 0)).toBe("saved owned document");
+      expect(save.mock.calls[0]?.[0]).toMatchObject({
+        version,
+        sheets: [{ floatingImages: [image] }],
+      });
+      f.wrapper.unmount();
+    },
+  );
+  test("a valid snapshot with unsupported hidden reflection stays in storage and cannot be overwritten by manual or automatic saves", async () => {
     vi.useFakeTimers();
     const original = createWorkbookWithValue("recoverable");
-    getActiveSheet(original).floatingImages = [framedPicture()];
+    getActiveSheet(original).floatingImages = [unsupportedReflection()];
     const snapshot = serializeWorkbook(original),
       save = vi.fn(async () => asReceipt(2)),
       replace = vi.fn(async () => asReceipt(2));
@@ -49,7 +86,7 @@ describe("frame-aware recovery preservation during view integration", () => {
   });
   test("a failed reload cannot unlock a known unsupported recovery record", async () => {
     const original = createWorkbookWithValue("recoverable");
-    getActiveSheet(original).floatingImages = [framedPicture()];
+    getActiveSheet(original).floatingImages = [unsupportedReflection()];
     const load = vi
       .fn()
       .mockResolvedValueOnce({ revision: 1, savedAt: 1, snapshot: serializeWorkbook(original) })
@@ -91,9 +128,9 @@ describe("frame-aware recovery preservation during view integration", () => {
     f.edit("saved current");
     await nextTick();
     const newer = createWorkbookWithValue("candidate");
-    getActiveSheet(newer).floatingImages = [framedPicture()];
+    getActiveSheet(newer).floatingImages = [unsupportedReflection()];
     await expect(f.persistence.replaceDocument(newer)).rejects.toMatchObject({
-      code: "unsupported-picture-frame",
+      code: "unsupported-picture-reflection",
     });
     await vi.advanceTimersByTimeAsync(350);
     expect(save).toHaveBeenCalledOnce();
@@ -101,7 +138,7 @@ describe("frame-aware recovery preservation during view integration", () => {
     expect(f.value()).toBe("saved current");
     f.wrapper.unmount();
   });
-  test("a candidate acquiring a frame while the old save settles is rejected before loading or replacement", async () => {
+  test("a candidate acquiring unsupported reflection while the old save settles is rejected before loading or replacement", async () => {
     const pending = deferred<ReturnType<typeof asReceipt>>(),
       save = vi.fn(() => pending.promise),
       replace = vi.fn(async () => asReceipt(2));
@@ -115,10 +152,10 @@ describe("frame-aware recovery preservation during view integration", () => {
     await vi.waitFor(() => expect(save).toHaveBeenCalledOnce());
     const candidate = createWorkbookWithValue("candidate"),
       replacing = f.persistence.replaceDocument(candidate);
-    getActiveSheet(candidate).floatingImages = [framedPicture()];
+    getActiveSheet(candidate).floatingImages = [unsupportedReflection()];
     pending.resolve(asReceipt(1));
     await saving;
-    await expect(replacing).rejects.toMatchObject({ code: "unsupported-picture-frame" });
+    await expect(replacing).rejects.toMatchObject({ code: "unsupported-picture-reflection" });
     expect(f.persistence.loading.value).toBe(false);
     expect(f.value()).toBe("pending");
     expect(f.replaceCalls).toEqual([]);

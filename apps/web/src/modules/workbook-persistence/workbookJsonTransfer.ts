@@ -1,9 +1,6 @@
 import {
   assertExternalPictureGroupSupport,
   requireStandalonePicture,
-} from "../sheet-images/picture-document-support";
-import {
-  assertWorkbookPictureSupport,
   UnsupportedPictureDocumentError,
 } from "../sheet-images/picture-document-support";
 import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
@@ -38,7 +35,7 @@ export function parseWorkbookJson(text: string): Workbook {
   }
   try {
     const workbook = deserializeWorkbook(value);
-    assertWorkbookPictureSupport(workbook);
+    assertExternalPictureGroupSupport(workbook);
     return workbook;
   } catch (error) {
     throw new WorkbookFileError(
@@ -159,7 +156,7 @@ export async function readWorkbookBundleFile(
     throw new WorkbookFileError("invalid-snapshot", { cause: error });
   }
   try {
-    assertWorkbookPictureSupport(workbook);
+    assertExternalPictureGroupSupport(workbook);
   } catch (error) {
     throw new WorkbookFileError("unsupported-picture-frame", { cause: error });
   }

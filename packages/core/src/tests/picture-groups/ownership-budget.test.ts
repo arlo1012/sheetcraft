@@ -67,6 +67,7 @@ describe("bounded ownership preflight", () => {
     expect(() => normalizePictureGroup(value)).toThrow(/indexed data array/);
     const sparse = group();
     delete sparse.members[0];
+    expect(() => normalizePictureGroup(sparse)).toThrow(/dense own data/);
     let reads = 0;
     Object.setPrototypeOf(sparse.members, {
       get 0() {
@@ -74,7 +75,7 @@ describe("bounded ownership preflight", () => {
         return leaf();
       },
     });
-    expect(() => normalizePictureGroup(sparse)).toThrow(/dense own data/);
+    expect(() => normalizePictureGroup(sparse)).toThrow(/ordinary indexed data array/);
     expect(reads).toBe(0);
   });
   test("rejects root collection method overrides, accessors and holes before their execution", () => {
@@ -97,13 +98,14 @@ describe("bounded ownership preflight", () => {
     expect(() => normalizePictureObjectCollection(accessor)).toThrow(/data fields/);
     const sparse = [group()];
     delete sparse[0];
+    expect(() => normalizePictureObjectCollection(sparse)).toThrow(/dense own data/);
     Object.setPrototypeOf(sparse, {
       get 0() {
         reads++;
         return group();
       },
     });
-    expect(() => normalizePictureObjectCollection(sparse)).toThrow(/dense own data/);
+    expect(() => normalizePictureObjectCollection(sparse)).toThrow(/ordinary indexed data array/);
     expect(reads).toBe(0);
   });
   test("nested geometry and fixed-shape image metadata reject getters or method overrides before evaluation", () => {

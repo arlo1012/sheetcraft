@@ -8,7 +8,13 @@ import WordDictionaryDialog from "../modules/text-proofreading/components/WordDi
 import DocumentPasswordDialog from "../modules/workbook-xlsx/components/DocumentPasswordDialog.vue";
 import { useTextReviewController } from "../modules/review-tools/useTextReviewController";
 import TextReviewDialog from "../modules/review-tools/components/TextReviewDialog.vue";
-import { canEditCell, canUseSheetPermission } from "@sheetcraft/core";
+import {
+  canEditCell,
+  canUseSheetPermission,
+  isPictureGroup,
+  type PictureGroupPath,
+} from "@sheetcraft/core";
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { useProtectionController } from "../modules/review-tools/useProtectionController";
 import UnlockRangeDialog from "../modules/review-tools/components/UnlockRangeDialog.vue";
 import SheetProtectionDialog from "../modules/review-tools/components/SheetProtectionDialog.vue";
@@ -85,6 +91,11 @@ import { usePictureTools } from "../modules/sheet-images/usePictureTools";
 import PictureSelectionPane from "../modules/sheet-images/components/PictureSelectionPane.vue";
 import PictureAnnotationDialog from "../modules/sheet-images/components/PictureAnnotationDialog.vue";
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
+import type { Sheet, FloatingImage } from "@sheetcraft/core/workbook";
+import PictureGroupRibbon from "../modules/sheet-images/components/PictureGroupRibbon.vue";
+import PictureFormatPane from "../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
+import { useOwnedPictureFormatPane } from "../modules/sheet-images/useOwnedPictureFormatPane";
+import type { PictureFormatLabelKey } from "../modules/sheet-images/picture-format-pane-model";
 import { usePictureToolbarOwner } from "../modules/sheet-images/usePictureToolbarOwner";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
@@ -568,6 +579,7 @@ const headerFooterTarget = shallowRef<HeaderFooterEditTarget>();
 const picturePreviewOnDoubleClick = ref(true);
 const selectedPictureId = ref<string | null>(null);
 const selectedPictureIds = ref<string[]>([]);
+const selectedOwnedPicturePath = shallowRef<PictureGroupPath | null>(null);
 const selectedPicture = computed(() => {
   const image = activeSheet.value.floatingImages.find(
     (image) => image.id === selectedPictureId.value,
@@ -575,9 +587,11 @@ const selectedPicture = computed(() => {
   return image;
 });
 watch(
-  () => activeSheet.value.id,
+  () => activeSheet.value,
   () => {
     selectedPictureId.value = null;
+    selectedPictureIds.value = [];
+    selectedOwnedPicturePath.value = null;
   },
 );
 const sheetGridRef = shallowRef<InstanceType<typeof SheetGrid> | null>(null);
@@ -597,9 +611,33 @@ function openHeaderFooter(target: HeaderFooterEditTarget): void {
   pageSetupVisible.value = true;
 }
 const activeViewMode = computed(() => pageViewModes.get(activeSheet.value.id) ?? "normal");
+watch(
+  [activeSheet, activeViewMode, () => activeSheet.value.floatingImages],
+  () => {
+    if (
+      activeViewMode.value === "page-layout" &&
+      activeSheet.value.floatingImages.some(
+        (root) => isPictureGroup(root) || isFramedPictureObject(root),
+      )
+    ) {
+      pageViewModes.set(activeSheet.value.id, "normal");
+      showImageFeedback("picture.pageLayoutUnsupported");
+    }
+  },
+  { flush: "sync", immediate: true },
+);
 const activePageSetup = computed(() => activeSheet.value.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
 const lastCustomMargins = ref<PageMargins | undefined>(readPageMarginHistory());
 function setViewMode(mode: SheetViewMode): void {
+  if (
+    mode === "page-layout" &&
+    activeSheet.value.floatingImages.some(
+      (root) => isPictureGroup(root) || isFramedPictureObject(root),
+    )
+  ) {
+    showImageFeedback("picture.pageLayoutUnsupported");
+    return;
+  }
   if (sheetGridRef.value?.flushPendingEdit() === false) return;
   pageViewModes.set(activeSheet.value.id, mode);
   void nextTick(focusCellEditor);
@@ -1693,6 +1731,84 @@ const pictureTools = usePictureTools({
   execute: executeCommand,
   getFrameContext: () => sheetGridRef.value?.getPictureFrameContext?.(activeSheet.value),
 });
+function performPictureGroup(
+  ungroup = false,
+  ids: readonly string[] = selectedPictureIds.value,
+  owner = activeSheet.value,
+): boolean {
+  if (owner !== activeSheet.value || activeViewMode.value === "page-layout") return false;
+  const accepted = pictureTools.group(ungroup, [...ids]);
+  if (accepted) sheetGridRef.value?.selectFloatingImages([...selectedPictureIds.value]);
+  else showImageFeedback("picture.operationFailed");
+  return accepted;
+}
+function deleteOwnedPictures(paths: readonly PictureGroupPath[], owner: Sheet): boolean {
+  if (owner !== activeSheet.value) return false;
+  const accepted = pictureTools.deletePaths(paths);
+  if (accepted) sheetGridRef.value?.selectFloatingImages([...selectedPictureIds.value]);
+  return accepted;
+}
+let picturePaneEpoch = 0;
+watch(
+  [() => session.workbook, activeSheet, pictureOwnerGeneration, pictureTools.paneVisible],
+  () => {
+    picturePaneEpoch += 1;
+  },
+  { flush: "sync" },
+);
+const picturePaneHandlers = computed(() => {
+  const workbook = session.workbook;
+  const sheet = activeSheet.value;
+  const generation = pictureOwnerGeneration.value;
+  const visible = pictureTools.paneVisible.value;
+  const epoch = picturePaneEpoch;
+  const current = () =>
+    visible &&
+    epoch === picturePaneEpoch &&
+    workbook === session.workbook &&
+    sheet === activeSheet.value &&
+    generation === pictureOwnerGeneration.value;
+  return {
+    rename: (image: FloatingImage, name: string) => current() && pictureTools.rename(image, name),
+    visibility: (image: FloatingImage) => current() && pictureTools.toggleVisibility(image),
+    select: (ids: string[]) => {
+      if (!current()) return false;
+      sheetGridRef.value?.selectFloatingImages(ids);
+      return true;
+    },
+    close: () => {
+      if (!current()) return false;
+      pictureTools.paneVisible.value = false;
+      return true;
+    },
+  };
+});
+const pictureFormatVisible = ref(false);
+const pictureFormatPane = useOwnedPictureFormatPane({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => pictureOwnerGeneration.value,
+  getRevision: () => workbookRevision.value,
+  getContext: () => sheetGridRef.value?.getPictureFrameContext(activeSheet.value),
+  getSelectedPath: () => selectedOwnedPicturePath.value,
+  getSelectedIds: () => selectedPictureIds.value,
+  isOpen: () => pictureFormatVisible.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
+  execute: pictureTools.replaceAll,
+  getDisabledReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
+});
+function pictureFormatLabel(key: PictureFormatLabelKey): string {
+  return t(`pictureFormat.${key}`);
+}
+function openOwnedPictureFormat(path?: PictureGroupPath, owner = activeSheet.value): void {
+  if (owner !== activeSheet.value) return;
+  if (path) selectedOwnedPicturePath.value = [...path];
+  pictureFormatVisible.value = true;
+}
+function closeOwnedPictureFormat(): void {
+  pictureFormatVisible.value = false;
+  pictureFormatPane.close();
+}
 const pictureToolbarOwner = usePictureToolbarOwner({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -2819,7 +2935,7 @@ const gridInert = computed(
       </template>
       <template #image-tools>
         <PictureToolbar
-          v-if="selectedPicture"
+          v-if="selectedPicture && !isPictureGroup(selectedPicture)"
           :key="pictureToolbarOwner?.key"
           :image="selectedPicture"
           :geometry="pictureToolbarOwner?.geometry"
@@ -2860,12 +2976,48 @@ const gridInert = computed(
           @export="pictureAssetTools.exportPictures"
           @preview="sheetGridRef?.previewSelectedPicture()"
           @print="pictureAssetTools.printPictures"
-          @group="pictureTools.group()"
-          @ungroup="pictureTools.group(true)"
+          @group="performPictureGroup()"
+          @ungroup="performPictureGroup(true)"
           @layer="pictureTools.layer"
           @align="sheetGridRef?.arrangePictures(selectedPictureIds, $event)"
           @selection-pane="pictureTools.paneVisible.value = !pictureTools.paneVisible.value"
           @convert-to-cell="convertFloatingImageToCell(selectedPicture.id)"
+        />
+        <PictureGroupRibbon
+          v-if="
+            selectedPicture &&
+            isPictureGroup(selectedPicture) &&
+            (selectedOwnedPicturePath?.length ?? 0) <= 1
+          "
+          :key="pictureToolbarOwner?.key"
+          :image="selectedPicture"
+          :geometry="pictureToolbarOwner?.geometry"
+          :draft-owner-key="pictureToolbarOwner?.draftKey"
+          :error="
+            pictureTools.sizeFeedback.value
+              ? t(pictureTools.sizeFeedback.value)
+              : pictureTools.operationFeedback.value
+                ? t(pictureTools.operationFeedback.value)
+                : undefined
+          "
+          :selection-count="selectedPictureIds.length"
+          :disabled="
+            loading ||
+            fileBusy ||
+            xlsxBusy ||
+            imageBusy ||
+            !canUseSheetPermission(activeSheet, 'editObjects')
+          "
+          :resize-handler="pictureToolbarOwner?.resize"
+          :aspect-ratio-handler="pictureToolbarOwner?.aspectRatio"
+          @group="performPictureGroup()"
+          @ungroup="performPictureGroup(true)"
+          @layer="pictureTools.layer"
+          @align="sheetGridRef?.arrangePictures(selectedPictureIds, $event)"
+          @rotate="sheetGridRef?.rotateImage($event)"
+          @flip="sheetGridRef?.flipImage($event)"
+          @selection-pane="pictureTools.paneVisible.value = !pictureTools.paneVisible.value"
+          @format="openOwnedPictureFormat()"
         />
       </template>
       <template #insert-tools>
@@ -3996,11 +4148,7 @@ const gridInert = computed(
           "
           @change-control="controlActions.change"
           @update-floating-images="pictureTools.updateMany"
-          @group-floating-images="
-            (ids) => {
-              if (!pictureTools.group(false, ids)) showImageFeedback('picture.operationFailed');
-            }
-          "
+          @group-floating-images="(ids) => performPictureGroup(false, ids)"
           @delete-floating-images="pictureTools.remove"
           @update-floating-image="setFloatingImage"
           @delete-floating-image="deleteFloatingImage"
@@ -4014,6 +4162,16 @@ const gridInert = computed(
           :apply-paste="pasteCells"
           :apply-axis-move="moveAxis"
           :apply-floating-image-move="pictureTools.updateMany"
+          :apply-picture-collection-change="pictureTools.replaceAll"
+          :picture-owner-generation="pictureOwnerGeneration"
+          :apply-owned-picture-delete="deleteOwnedPictures"
+          :apply-picture-ungroup="(ids, owner) => performPictureGroup(true, ids, owner)"
+          @selected-owned-picture-path-change="
+            (path, owner) => {
+              if (owner === activeSheet) selectedOwnedPicturePath = path;
+            }
+          "
+          @format-owned-picture="openOwnedPictureFormat"
           :apply-fill="fillActions.apply"
           @end-fill="fillActions.clear"
           @fill-feedback="
@@ -4056,6 +4214,14 @@ const gridInert = computed(
         @close="pivotFieldsVisible = false"
         @settings-open="pivotFieldSettingsOpen = $event"
       />
+      <PictureFormatPane
+        v-if="pictureFormatVisible"
+        :snapshot="pictureFormatPane.snapshot.value"
+        :capabilities="pictureFormatPane.capabilities.value"
+        :on-intent="pictureFormatPane.onIntent"
+        :t="pictureFormatLabel"
+        @close="closeOwnedPictureFormat"
+      />
       <PictureSelectionPane
         v-if="pictureTools.paneVisible.value"
         :images="activeSheet.floatingImages"
@@ -4067,10 +4233,10 @@ const gridInert = computed(
           imageBusy ||
           !canUseSheetPermission(activeSheet, 'editObjects')
         "
-        @select="sheetGridRef?.selectFloatingImages($event)"
-        @visibility="pictureTools.toggleVisibility"
-        @rename="pictureTools.rename"
-        @close="pictureTools.paneVisible.value = false"
+        :rename-handler="picturePaneHandlers.rename"
+        :visibility-handler="picturePaneHandlers.visibility"
+        :select-handler="picturePaneHandlers.select"
+        :close-handler="picturePaneHandlers.close"
       />
     </div>
     <DocumentPasswordDialog

@@ -21,6 +21,7 @@ const props = defineProps<{
   grouped: boolean;
   groupDisabled?: boolean;
   alignmentDisabled?: boolean;
+  gridDisabled?: boolean;
 }>();
 const emit = defineEmits<{
   group: [];
@@ -147,7 +148,9 @@ function align(action: PictureAlignment): void {
         <MenuItem :disabled="count < 3" @select="align('vertical')">{{
           t("picture.distributeVertical")
         }}</MenuItem>
-        <MenuItem @select="align('grid')">{{ t("picture.snapGrid") }}</MenuItem>
+        <MenuItem :disabled="gridDisabled" @select="align('grid')">{{
+          t("picture.snapGrid")
+        }}</MenuItem>
       </MenuSurface>
     </Teleport>
   </section>

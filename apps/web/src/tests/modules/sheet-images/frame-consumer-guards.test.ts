@@ -30,20 +30,20 @@ const legacy: LegacyFloatingImage = {
   width: 120,
   height: 80,
 };
-describe("temporary frame consumer boundaries", () => {
-  test("a mixed document is rejected without flattening or changing its valid snapshot", () => {
+describe("internal frame and legacy consumer boundaries", () => {
+  test("a mixed document is supported internally while legacy consumers reject it unchanged", () => {
     const workbook = createWorkbook({ id: "w", sheetId: "s" });
     const sheet = getActiveSheet(workbook);
     sheet.floatingImages = [legacy, framedPicture()];
     const before = serializeWorkbook(workbook);
-    expect(() => assertWorkbookPictureSupport(workbook)).toThrow(/not yet enabled/);
-    expect(() => requireLegacyPictures(sheet.floatingImages)).toThrow(/not yet enabled/);
+    expect(() => assertWorkbookPictureSupport(workbook)).not.toThrow();
+    expect(() => requireLegacyPictures(sheet.floatingImages)).toThrow(/does not support/);
     expect(serializeWorkbook(workbook)).toEqual(before);
   });
   test("legacy clipboard geometry cannot encode or silently consume a framed payload", () => {
-    expect(() => serializeFloatingImageClipboard(framedPicture())).toThrow(/not yet enabled/);
+    expect(() => serializeFloatingImageClipboard(framedPicture())).toThrow(/does not support/);
     expect(() => serializeFloatingImageClipboard(legacy, [legacy, framedPicture()])).toThrow(
-      /not yet enabled/,
+      /does not support/,
     );
     const data = {
       getData: (type: string) =>
@@ -85,7 +85,7 @@ describe("temporary frame consumer boundaries", () => {
     expect(move).toHaveBeenCalledOnce();
     expect(clipboard.hasPending()).toBe(false);
   });
-  test("damaged group frame data remains invalid without the valid-newer-model marker", () => {
+  test("the legacy consumer refuses a frame-bearing member before reading its frame geometry", () => {
     const payload = {
       ...legacy,
       clipboardImages: [legacy, { ...framedPicture(), frame: null }],
@@ -93,9 +93,10 @@ describe("temporary frame consumer boundaries", () => {
     };
     expect(readFloatingImageTransfer({ getData: () => JSON.stringify(payload) })).toEqual({
       invalidFloatingImage: true,
+      unsupportedFloatingImage: true,
     });
   });
-  test("a valid framed primary does not mask a malformed group envelope", () => {
+  test("a framed primary is refused before any malformed group envelope can be consumed", () => {
     const primary = framedPicture();
     for (const envelope of [
       { clipboardImages: "broken" },
@@ -111,7 +112,7 @@ describe("temporary frame consumer boundaries", () => {
     ]) {
       expect(
         readFloatingImageTransfer({ getData: () => JSON.stringify({ ...primary, ...envelope }) }),
-      ).toEqual({ invalidFloatingImage: true });
+      ).toEqual({ invalidFloatingImage: true, unsupportedFloatingImage: true });
     }
     expect(
       readFloatingImageTransfer({
@@ -132,6 +133,6 @@ describe("temporary frame consumer boundaries", () => {
     });
     expect(() =>
       getFloatingImageViewportFragmentsForPaint([legacy, framedPicture()], layout),
-    ).toThrow(/not yet enabled/);
+    ).toThrow(/does not support/);
   });
 });

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { DEFAULT_WORKBOOK_THEME } from "@sheetcraft/core/workbook-theme";
 import { createSheet } from "@sheetcraft/core/workbook";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { resolvePictureFrame, type ResolvedPictureFrame } from "@sheetcraft/core/picture-frame";
@@ -12,6 +13,7 @@ import {
 import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
 import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
+import type { DrawingThemeEffects } from "../../../modules/sheet-images/drawing-theme-effects";
 import {
   paintFramedPictureContent,
   paintGroupedPictureContent,
@@ -77,12 +79,13 @@ function fixture() {
     if ("members" in leaf || !leaf.layout) throw new Error("Expected a resolved owned leaf.");
     return leaf.layout;
   };
-  const draw = (resolved = geometry()) =>
+  const draw = (resolved = geometry(), effects?: DrawingThemeEffects) =>
     paintGroupedPictureContent(
       context as unknown as CanvasRenderingContext2D,
       source,
       picture,
       resolved,
+      effects,
     );
   return { framed, picture, group, metrics, source, context, geometry, draw };
 }
@@ -150,6 +153,97 @@ describe("genuine grouped leaf content kernel", () => {
       expect(f.picture.frame).not.toHaveProperty("anchor");
     },
   );
+
+  test("default theme outline/bevel and own-shadow precedence use the genuine leaf's composed crop frame", () => {
+    const f = fixture();
+    f.group.frame.angleDeg = 23;
+    f.framed.frame.angleDeg = 60;
+    f.picture.frame.flipHorizontal = f.framed.frame.flipHorizontal = true;
+    f.picture.transform = f.framed.transform = {
+      appearance: { shadow: "hard", border: { color: "#123456", width: 4 } },
+    };
+    const before = structuredClone(f.group);
+    const effects = { ...DEFAULT_WORKBOOK_THEME.effects, bevel: true };
+    f.draw(f.geometry(), effects);
+    const standaloneContext = canvas();
+    paintFramedPictureContent(
+      standaloneContext as unknown as CanvasRenderingContext2D,
+      f.source,
+      f.framed,
+      resolvePictureFrame(f.framed.frame, f.metrics),
+      effects,
+    );
+    expect(calls(f.context)).toEqual(calls(standaloneContext));
+    expect(f.context.drawImage).toHaveBeenCalledExactlyOnceWith(
+      f.source,
+      200,
+      25,
+      200,
+      100,
+      0,
+      0,
+      200,
+      100,
+    );
+    expect(f.context.rotate).toHaveBeenCalledExactlyOnceWith((60 * Math.PI) / 180);
+    expect(f.context.strokeRect.mock.calls).toEqual([
+      [2, 2, 196, 96],
+      [0.5, 0.5, 199, 99],
+    ]);
+    expect(f.context).toMatchObject({ shadowBlur: 1, shadowOffsetX: 3, shadowOffsetY: 3 });
+    expect(f.group).toEqual(before);
+    expect(f.context.save.mock.calls.length).toBe(f.context.restore.mock.calls.length);
+  });
+
+  test("theme reflection retains asymmetric transparent padding, actual source and local frame size", () => {
+    const f = fixture();
+    f.picture.frame.source = {
+      widthRatio: 0.5,
+      heightRatio: 0.5,
+      offsetXRatio: 0.25,
+      offsetYRatio: 0.25,
+    };
+    const geometry = f.geometry(),
+      before = structuredClone(f.group);
+    const create = vi.spyOn(document, "createElement");
+    f.draw(geometry, { ...DEFAULT_WORKBOOK_THEME.effects, reflection: true });
+    expect(f.context.drawImage.mock.calls).toEqual(
+      Array(2).fill([f.source, 0, 0, 400, 200, 0, 0, 100, 50]),
+    );
+    expect(f.context.translate.mock.calls).toContainEqual([0, 200]);
+    expect(
+      f.context.translate.mock.calls.filter((call) => call[0] === 100 && call[1] === 50),
+    ).toHaveLength(2);
+    expect(f.context.scale).toHaveBeenCalledWith(1, -1);
+    expect(f.context.strokeRect).toHaveBeenCalledExactlyOnceWith(0.5, 0.5, 199, 99);
+    expect(f.context.clip).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    expect(f.group).toEqual(before);
+    expect(f.geometry()).toEqual(geometry);
+    expect(f.context.save.mock.calls.length).toBe(f.context.restore.mock.calls.length);
+  });
+
+  test("default effects retain the same source crop and rotated local outline through every frozen pane", () => {
+    const f = fixture();
+    const geometry = createSheetGeometry({ rowCount: 30, columnCount: 20 });
+    const rows = createRowVisibilityIndex({ rowCount: 30, defaultRowHeight: 24 });
+    const layout = createSheetViewportLayout({
+      geometry,
+      rows,
+      freeze: { rows: 1, columns: 1 },
+      bodyScrollPosition: { x: 13, y: 7 },
+      viewportSize: { width: 500, height: 500 },
+    });
+    const resolved = f.geometry();
+    for (const paneId of ["topLeft", "top", "left", "body"] as const)
+      f.draw(projectPictureFrameIntoPane(resolved, paneId, layout), DEFAULT_WORKBOOK_THEME.effects);
+    expect(f.context.drawImage.mock.calls).toEqual(
+      Array(4).fill([f.source, 0, 25, 200, 100, 0, 0, 200, 100]),
+    );
+    expect(f.context.strokeRect.mock.calls).toEqual(Array(4).fill([0.5, 0.5, 199, 99]));
+    expect(f.context.rotate.mock.calls).toEqual(Array(4).fill([(37 * Math.PI) / 180]));
+    expect(f.context.save.mock.calls.length).toBe(f.context.restore.mock.calls.length);
+  });
 
   test("keeps padding transparent and permits clipped source shadow beyond the crop frame", () => {
     const f = fixture();

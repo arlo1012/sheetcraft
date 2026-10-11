@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   computed,
+  defineAsyncComponent,
   markRaw,
   nextTick,
   onBeforeUnmount,
@@ -16,6 +17,7 @@ import {
   type FloatingImage,
 } from "@sheetcraft/core/workbook";
 import { isPictureGroup, type PictureGroupPath } from "@sheetcraft/core/picture-group";
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import type { Point } from "@sheetcraft/sheet-engine/geometry";
 import type { FrozenPaneId } from "@sheetcraft/sheet-engine/frozen-layout";
 import type { FloatingImageResizeDirection } from "@sheetcraft/sheet-engine/floating-image-layout";
@@ -25,6 +27,7 @@ import {
 } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
+import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { clientPointToElementSurface } from "../../../shared/sheet-input/surface-coordinates";
 import {
@@ -49,6 +52,20 @@ import {
 } from "../picture-group-interaction";
 import SheetFramedPictureSelection from "./SheetFramedPictureSelection.vue";
 import SheetPictureGroupToolbar from "./SheetPictureGroupToolbar.vue";
+import SheetOwnedPictureContextMenu from "./SheetOwnedPictureContextMenu.vue";
+const SheetPictureSelectionToolbar = defineAsyncComponent(
+  () => import("./SheetPictureSelectionToolbar.vue"),
+);
+import { getPictureViewportFragments } from "../picture-viewport-fragments";
+import {
+  arrangeOwnedPictureSelection,
+  captureOwnedPictureSelection,
+  flipOwnedPictureSelection,
+  isOwnedPictureSelectionCurrent,
+  rotateOwnedPictureSelection,
+  type OwnedPictureSelectionSnapshot,
+} from "../owned-picture-selection-commands";
+import type { PictureAlignment, PictureAlignmentReference } from "../usePictureTools";
 
 const props = withDefaults(
   defineProps<{
@@ -73,14 +90,24 @@ const emit = defineEmits<{
   updateMany: [roots: FloatingImage[]];
   paintStateChange: [state: FloatingImagePaintState];
   ungroup: [rootId: string];
+  group: [rootIds: string[]];
   format: [path: PictureGroupPath, owner?: object];
   copy: [path: PictureGroupPath, owner?: object];
   cut: [path: PictureGroupPath, owner?: object];
+  paste: [path: PictureGroupPath, owner?: object];
   delete: [path: PictureGroupPath, owner?: object];
 }>();
 const { t } = useAppI18n();
 const layerRef = ref<HTMLElement | null>(null);
 const previewRoots = shallowRef<readonly FloatingImage[] | null>(null);
+const contextMenu = shallowRef<{
+  anchor: FloatingReference;
+  lease: OwnedPictureSelectionSnapshot;
+  path: PictureGroupPath;
+  selection: PictureGroupSelection;
+  actions: Record<"copy" | "cut" | "paste" | "delete" | "format" | "ungroup", () => void>;
+  close: (restoreFocus: boolean) => void;
+}>();
 const paintRevision = ref(0);
 const selectedIds = computed(() => [
   ...new Set([
@@ -131,7 +158,7 @@ const overlays = computed<SelectionOverlay[]>(() => {
 const toolbarAnchor = computed<FloatingReference | null>(() => {
   const path = targetPath.value,
     layer = layerRef.value;
-  if (!path || !layer || gesture.value) return null;
+  if (!path || !layer || gesture.value || contextMenu.value) return null;
   const fragments = getOwnedPictureSelectionFragments(displayRoots(), path, props.frameContext);
   if (!fragments.length) return null;
   const x = Math.min(...fragments.map(({ clippedBounds: b }) => b.x));
@@ -178,6 +205,149 @@ function currentContext(): PictureGroupInteractionContext {
 function currentSelection(): PictureGroupSelection {
   return { rootIds: selectedIds.value, path: innerPath.value };
 }
+function getSelectionSnapshot(): OwnedPictureSelectionSnapshot | null {
+  try {
+    return captureOwnedPictureSelection(
+      currentContext(),
+      currentSelection(),
+      props.selectedRootId ?? null,
+    );
+  } catch {
+    return null;
+  }
+}
+function isSelectionSnapshotCurrent(snapshot: OwnedPictureSelectionSnapshot): boolean {
+  return isOwnedPictureSelectionCurrent(
+    snapshot,
+    currentContext(),
+    currentSelection(),
+    props.selectedRootId ?? null,
+  );
+}
+function applySelectionPlan(
+  snapshot: OwnedPictureSelectionSnapshot | null,
+  plan: (lease: OwnedPictureSelectionSnapshot) => FloatingImage[],
+): boolean {
+  if (props.readOnly || gesture.value || !snapshot || !isSelectionSnapshotCurrent(snapshot))
+    return false;
+  const apply = props.applyUpdateMany;
+  try {
+    const next = plan(snapshot);
+    if (apply !== props.applyUpdateMany || !isSelectionSnapshotCurrent(snapshot)) return false;
+    return commitRoots(next);
+  } catch {
+    fail();
+    return false;
+  }
+}
+function rotateSelected(
+  turns: -1 | 1 | 2,
+  snapshot: OwnedPictureSelectionSnapshot | null = getSelectionSnapshot(),
+): boolean {
+  return applySelectionPlan(snapshot, (lease) => rotateOwnedPictureSelection(lease, turns));
+}
+function flipSelected(
+  axis: "horizontal" | "vertical",
+  snapshot: OwnedPictureSelectionSnapshot | null = getSelectionSnapshot(),
+): boolean {
+  return applySelectionPlan(snapshot, (lease) => flipOwnedPictureSelection(lease, axis));
+}
+function arrangeSelection(
+  ids: readonly string[],
+  action: PictureAlignment,
+  reference: PictureAlignmentReference = "selection",
+  snapshot: OwnedPictureSelectionSnapshot | null = getSelectionSnapshot(),
+): boolean {
+  return applySelectionPlan(snapshot, (lease) =>
+    arrangeOwnedPictureSelection(lease, ids, action, reference),
+  );
+}
+function focusSelected(): void {
+  const selection = currentSelection();
+  const path =
+    selection.path ?? (selectedGroupRoots.value[0] ? [selectedGroupRoots.value[0].id] : null);
+  if (path) focusSelection(selection, path);
+}
+
+let selectionToolbarSequence = 0;
+const selectionToolbar = computed(() => {
+  const layer = layerRef.value;
+  if (
+    !layer ||
+    gesture.value ||
+    contextMenu.value ||
+    innerPath.value ||
+    selectedIds.value.length < 2 ||
+    !props.roots.some(
+      (root) =>
+        selectedIds.value.includes(root.id) &&
+        (isPictureGroup(root) || isFramedPictureObject(root)),
+    )
+  )
+    return null;
+  const lease = getSelectionSnapshot();
+  if (!lease) return null;
+  try {
+    const roots = displayRoots();
+    const bounds = getPictureViewportFragments(roots, props.layout, props.frameContext).flatMap(
+      (fragment) =>
+        fragment.kind === "group-leaf" || !selectedIds.value.includes(fragment.image.id)
+          ? []
+          : [fragment.kind === "legacy" ? fragment.clippedRect : fragment.clippedBounds],
+    );
+    for (const root of selectedGroupRoots.value)
+      bounds.push(
+        ...getOwnedPictureSelectionFragments(roots, [root.id], props.frameContext).map(
+          (fragment) => fragment.clippedBounds,
+        ),
+      );
+    if (!bounds.length) return null;
+    const x = Math.min(...bounds.map((rect) => rect.x));
+    const y = Math.min(...bounds.map((rect) => rect.y));
+    const right = Math.max(...bounds.map((rect) => rect.x + rect.width));
+    const bottom = Math.max(...bounds.map((rect) => rect.y + rect.height));
+    const key = `owned-selection-${++selectionToolbarSequence}`;
+    const apply = props.applyUpdateMany;
+    const current = () =>
+      !gesture.value &&
+      !contextMenu.value &&
+      apply === props.applyUpdateMany &&
+      isSelectionSnapshotCurrent(lease);
+    return {
+      key,
+      count: lease.selection.rootIds.length,
+      anchor: markRaw({
+        contextElement: layer,
+        getBoundingClientRect: () => {
+          const client = layer.getBoundingClientRect();
+          return new DOMRect(
+            client.x + x * props.scale,
+            client.y + y * props.scale,
+            (right - x) * props.scale,
+            (bottom - y) * props.scale,
+          );
+        },
+      }),
+      align: (
+        action: PictureAlignment,
+        reference: PictureAlignmentReference,
+        selectedKey: string,
+      ) => {
+        if (selectedKey === key && current())
+          arrangeSelection(lease.selection.rootIds, action, reference, lease);
+      },
+      group: (selectedKey: string) => {
+        if (selectedKey === key && !props.readOnly && current())
+          emit("group", [...lease.selection.rootIds]);
+      },
+      dismiss: (selectedKey: string) => {
+        if (selectedKey === key && current()) clearSelection();
+      },
+    };
+  } catch {
+    return null;
+  }
+});
 function displayRoots(): readonly FloatingImage[] {
   return previewRoots.value ?? props.roots;
 }
@@ -449,6 +619,18 @@ function onKeydown(event: KeyboardEvent, overlayPath?: PictureGroupPath): void {
   const path = targetPath.value ?? overlayPath;
   if (!path) return;
   if (!resolveOwnedPictureNode(props.roots, path, props.frameContext)?.visible) return;
+  if (
+    event.key === "ContextMenu" ||
+    (event.key === "F10" && event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey)
+  ) {
+    const trigger = event.currentTarget;
+    if (!(trigger instanceof HTMLElement)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    finishGesture(false);
+    openContextMenu(markRaw(trigger), path, currentSelection(), props.selectedRootId ?? null);
+    return;
+  }
   if (event.key === "Escape") {
     event.preventDefault();
     event.stopPropagation();
@@ -458,11 +640,12 @@ function onKeydown(event: KeyboardEvent, overlayPath?: PictureGroupPath): void {
   }
   if ((event.ctrlKey || event.metaKey) && !event.altKey) {
     const key = event.key.toLowerCase();
-    if (key === "c" || (key === "x" && !props.readOnly)) {
+    if (key === "c" || ((key === "x" || key === "v") && !props.readOnly)) {
       event.preventDefault();
       event.stopPropagation();
       if (key === "c") emit("copy", [...path], props.owner);
-      else emit("cut", [...path], props.owner);
+      else if (key === "x") emit("cut", [...path], props.owner);
+      else emit("paste", [...path], props.owner);
     }
     return;
   }
@@ -546,6 +729,94 @@ function handleSurfaceDoubleClick(_event: MouseEvent, point: Point): boolean {
     return false;
   }
 }
+function handleSurfaceContextMenu(event: MouseEvent, point: Point): boolean {
+  let hit;
+  try {
+    hit = hitPictureRootAt(props.roots, point, props.layout, props.frameContext, selectedIds.value);
+  } catch {
+    fail();
+    return false;
+  }
+  if (hit?.kind !== "group-leaf" && hit?.kind !== "group-frame") return false;
+  event.preventDefault();
+  event.stopPropagation();
+  finishGesture(false);
+  const alreadySelected = selectedIds.value.includes(hit.rootId);
+  const multi = alreadySelected && selectedIds.value.length > 1;
+  const path = alreadySelected && !multi && hit.kind === "group-leaf" ? hit.path : [hit.rootId];
+  const expected = {
+    rootIds: multi ? selectedIds.value : [hit.rootId],
+    path: path.length > 1 ? path : null,
+  };
+  if (!multi) emit("select", hit.rootId);
+  emit("selectPath", expected.path ? [...expected.path] : null);
+  const trigger = layerRef.value;
+  if (trigger)
+    openContextMenu(
+      markRaw(createContextMenuPoint(event, trigger)),
+      path,
+      expected,
+      multi ? (props.selectedRootId ?? null) : hit.rootId,
+    );
+  return true;
+}
+function openContextMenu(
+  anchor: FloatingReference,
+  path: PictureGroupPath,
+  selection: PictureGroupSelection,
+  activeRootId: string | null,
+): void {
+  try {
+    const menu: NonNullable<typeof contextMenu.value> = {
+      anchor,
+      lease: captureOwnedPictureSelection(currentContext(), selection, activeRootId),
+      path: [...path],
+      selection: {
+        rootIds: [...selection.rootIds],
+        path: selection.path ? [...selection.path] : null,
+      },
+      actions: {
+        copy: () => contextAction(menu, "copy"),
+        cut: () => contextAction(menu, "cut"),
+        paste: () => contextAction(menu, "paste"),
+        delete: () => contextAction(menu, "delete"),
+        format: () => contextAction(menu, "format"),
+        ungroup: () => contextAction(menu, "ungroup"),
+      },
+      close: (restoreFocus) => {
+        if (contextMenu.value === menu) closeContextMenu(restoreFocus);
+      },
+    };
+    contextMenu.value = menu;
+  } catch {
+    fail();
+  }
+}
+function isContextMenuCurrent(menu: NonNullable<typeof contextMenu.value>): boolean {
+  return isSelectionSnapshotCurrent(menu.lease);
+}
+function closeContextMenu(restoreFocus = false): void {
+  const menu = contextMenu.value;
+  contextMenu.value = undefined;
+  if (restoreFocus && menu && isContextMenuCurrent(menu)) focusSelection(menu.selection, menu.path);
+}
+function contextAction(
+  menu: NonNullable<typeof contextMenu.value>,
+  action: "copy" | "cut" | "paste" | "delete" | "format" | "ungroup",
+): void {
+  if (contextMenu.value !== menu) return;
+  const valid = isContextMenuCurrent(menu);
+  closeContextMenu(false);
+  if (!valid || (props.readOnly && !["copy", "format"].includes(action))) return;
+  if (action === "ungroup") {
+    if (menu.path.length === 1 && menu.selection.rootIds.length === 1)
+      emit("ungroup", menu.path[0]!);
+  } else if (action === "copy") emit("copy", [...menu.path], props.owner);
+  else if (action === "cut") emit("cut", [...menu.path], props.owner);
+  else if (action === "paste") emit("paste", [...menu.path], props.owner);
+  else if (action === "delete") emit("delete", [...menu.path], props.owner);
+  else emit("format", [...menu.path], props.owner);
+}
 
 function getSurfaceCursor(point: Point): "move" | undefined {
   if (props.readOnly) return undefined;
@@ -572,17 +843,33 @@ function overlayStyle(fragment: PictureSelectionFrameFragment): CSSProperties {
     height: `${bounds.height}px`,
   };
 }
-function requestUngroup(): void {
-  const path = targetPath.value;
-  if (props.readOnly || !path || path.length !== 1) return;
+function requestUngroup(lease: OwnedPictureSelectionSnapshot, path: PictureGroupPath): void {
+  if (props.readOnly || gesture.value || !isSelectionSnapshotCurrent(lease) || path.length !== 1)
+    return;
   const target = resolveOwnedPictureNode(props.roots, path, props.frameContext);
   if (target?.visible && target.node.kind === "picture-group-v1") emit("ungroup", path[0]!);
 }
-function requestFormat(): void {
-  const path = targetPath.value;
-  if (!path || !resolveOwnedPictureNode(props.roots, path, props.frameContext)?.visible) return;
+function requestFormat(lease: OwnedPictureSelectionSnapshot, path: PictureGroupPath): void {
+  if (
+    gesture.value ||
+    !isSelectionSnapshotCurrent(lease) ||
+    !resolveOwnedPictureNode(props.roots, path, props.frameContext)?.visible
+  )
+    return;
   emit("format", [...path], props.owner);
 }
+const groupToolbarActions = computed(() => {
+  const path = targetPath.value;
+  const lease = getSelectionSnapshot();
+  if (!path || !lease) return null;
+  return {
+    format: () => requestFormat(lease, path),
+    ungroup: () => requestUngroup(lease, path),
+    dismiss: () => {
+      if (isSelectionSnapshotCurrent(lease)) clearSelection();
+    },
+  };
+});
 watch(
   () => [
     props.roots,
@@ -598,6 +885,7 @@ watch(
   ],
   () => {
     if (gesture.value && !isCurrent(gesture.value)) finishGesture(false);
+    if (contextMenu.value && !isContextMenuCurrent(contextMenu.value)) closeContextMenu(false);
   },
   { deep: true, flush: "sync" },
 );
@@ -617,8 +905,14 @@ defineExpose({
   handleSurfacePointerUp,
   handleSurfacePointerCancel,
   handleSurfaceDoubleClick,
+  handleSurfaceContextMenu,
   getSurfaceCursor,
   getPaintState,
+  getSelectionSnapshot,
+  rotateSelected,
+  flipSelected,
+  arrangeSelection,
+  focusSelected,
 });
 </script>
 <template>
@@ -650,13 +944,37 @@ defineExpose({
       />
     </div>
     <SheetPictureGroupToolbar
-      v-if="toolbarAnchor && targetPath"
+      v-if="toolbarAnchor && targetPath && groupToolbarActions"
       :anchor="toolbarAnchor"
       :disabled="readOnly"
       :can-ungroup="targetPath.length === 1"
-      @ungroup="requestUngroup"
-      @format="requestFormat"
-      @dismiss="clearSelection"
+      @ungroup="groupToolbarActions.ungroup"
+      @format="groupToolbarActions.format"
+      @dismiss="groupToolbarActions.dismiss"
+    />
+    <SheetPictureSelectionToolbar
+      v-if="selectionToolbar"
+      :key="selectionToolbar.key"
+      :anchor="selectionToolbar.anchor"
+      :selection-key="selectionToolbar.key"
+      :count="selectionToolbar.count"
+      :disabled="readOnly"
+      @align="selectionToolbar.align"
+      @group="selectionToolbar.group"
+      @dismiss="selectionToolbar.dismiss"
+    />
+    <SheetOwnedPictureContextMenu
+      v-if="contextMenu"
+      :anchor="contextMenu.anchor"
+      :read-only="readOnly"
+      :can-ungroup="contextMenu.path.length === 1 && contextMenu.selection.rootIds.length === 1"
+      @copy="contextMenu.actions.copy"
+      @cut="contextMenu.actions.cut"
+      @paste="contextMenu.actions.paste"
+      @delete="contextMenu.actions.delete"
+      @format="contextMenu.actions.format"
+      @ungroup="contextMenu.actions.ungroup"
+      @close="contextMenu.close"
     />
   </div>
 </template>

@@ -39,14 +39,14 @@ function fixture() {
 }
 
 describe("owned group prepared-consumer safety", () => {
-  test("whole live and standalone collections reject even a hidden container without changing snapshot48", () => {
+  test("internal recovery accepts a hidden owned container while standalone and external consumers reject it", () => {
     const { workbook, sheet } = fixture();
     sheet.floatingImages[0]!.hidden = true;
     const before = serializeWorkbook(workbook);
     expect(before.version).toBe(48);
-    expect(() => assertWorkbookPictureSupport(workbook)).toThrow(/not yet enabled/);
-    expect(() => requireStandalonePictures(sheet.floatingImages)).toThrow(/not yet enabled/);
-    expect(() => assertExternalPictureGroupSupport(workbook)).toThrow(/not yet enabled/);
+    expect(() => assertWorkbookPictureSupport(workbook)).not.toThrow();
+    expect(() => requireStandalonePictures(sheet.floatingImages)).toThrow(/does not support/);
+    expect(() => assertExternalPictureGroupSupport(workbook)).toThrow(/does not support/);
     expect(serializeWorkbook(workbook)).toEqual(before);
   });
   test("prepared projection and root operations require actual worksheet frame context", () => {
@@ -70,8 +70,8 @@ describe("owned group prepared-consumer safety", () => {
       put = vi.fn(async () => {}),
       store = { get, put };
     const before = serializeWorkbook(workbook);
-    expect(() => downloadWorkbookJson(workbook)).toThrow(/not yet enabled/);
-    await expect(downloadWorkbookBundle(workbook, store)).rejects.toThrow(/not yet enabled/);
+    expect(() => downloadWorkbookJson(workbook)).toThrow(/does not support/);
+    await expect(downloadWorkbookBundle(workbook, store)).rejects.toThrow(/does not support/);
     await expect(
       readWorkbookBundleFile(
         {
@@ -91,7 +91,7 @@ describe("owned group prepared-consumer safety", () => {
     expect(put).not.toHaveBeenCalled();
     expect(() =>
       createPrintPreviewDocument({ sheet, evaluator: createSheetEvaluator(sheet) }),
-    ).toThrow(/not yet enabled/);
+    ).toThrow(/does not support/);
     expect(serializeWorkbook(workbook)).toEqual(before);
   });
 });

@@ -93,14 +93,23 @@ export function normalizePictureAxisPoint(
     throw new RangeError("Invalid picture axis count.");
   if (!point || typeof point !== "object" || Array.isArray(point))
     throw new TypeError("Invalid picture axis point.");
-  assertIndex(point.index, count, true);
-  if (!Number.isFinite(point.offset) || (point.offset < 0 && point.index !== 0))
+  const prototype = Object.getPrototypeOf(point);
+  if (prototype !== Object.prototype && prototype !== null)
+    throw new TypeError("Picture axis points must be ordinary data records.");
+  for (const key of Reflect.ownKeys(point)) {
+    if (key !== "index" && key !== "offset")
+      throw new TypeError("Unknown picture axis point field.");
+    if (!("value" in Object.getOwnPropertyDescriptor(point, key)!))
+      throw new TypeError("Picture axis points must contain data fields, not accessors.");
+  }
+  const index = Object.getOwnPropertyDescriptor(point, "index")?.value as number;
+  const offset = Object.getOwnPropertyDescriptor(point, "offset")?.value as number;
+  assertIndex(index, count, true);
+  if (!Number.isFinite(offset) || (offset < 0 && index !== 0))
     throw new RangeError(
       "Picture inset must be finite; only the leading sheet boundary permits negative coordinates.",
     );
-  if (Object.keys(point).some((key) => key !== "index" && key !== "offset"))
-    throw new TypeError("Unknown picture axis point field.");
-  return { index: point.index, offset: point.offset === 0 ? 0 : point.offset };
+  return { index, offset: offset === 0 ? 0 : offset };
 }
 /** New logical endpoints clamp only their display inset, never the stored point. */
 export function projectPictureAxisPoint(

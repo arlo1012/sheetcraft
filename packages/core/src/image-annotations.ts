@@ -21,6 +21,7 @@ export function normalizeImageAnnotations(
       !Array.isArray(entry.points) ||
       entry.points.length < 1 ||
       entry.points.length > 1024 ||
+      typeof entry.color !== "string" ||
       !/^#[0-9a-f]{6}$/i.test(entry.color) ||
       !Number.isFinite(entry.width) ||
       entry.width <= 0 ||

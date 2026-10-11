@@ -1,11 +1,6 @@
 import { requireLegacyPictures } from "./picture-document-support";
 import { createCanvasImageCache } from "../sheet-grid/canvas/image-painter";
 import type { FloatingImage, LegacyFloatingImage, ImageTransform } from "@sheetcraft/core/workbook";
-import {
-  isFramedPictureObject,
-  normalizePictureObjectCollection,
-} from "@sheetcraft/core/picture-object";
-import { isPictureGroup, traversePictureGroup } from "@sheetcraft/core/picture-group";
 import type { ResolvedPictureFrame } from "@sheetcraft/core/picture-frame";
 import {
   getFloatingImageViewportFragments,
@@ -18,6 +13,11 @@ import { paintImagePresentation } from "../../shared/images/imageAppearance";
 import { hasVisibleDrawingThemeEffects, type DrawingThemeEffects } from "./drawing-theme-effects";
 import { paintFramedPictureContent, paintGroupedPictureContent } from "./framed-picture-painter";
 import { getPictureViewportFragments } from "./picture-viewport-fragments";
+import {
+  applyDrawingThemeShadow,
+  assertPicturePaintSupport,
+  paintDrawingThemeOutline,
+} from "./picture-paint-effects";
 
 export type FloatingImagePaintState = Readonly<{
   images: readonly FloatingImage[];
@@ -47,44 +47,6 @@ function paintImageContent(
   paintImagePresentation(context, image, rect, transform);
 }
 
-function paintThemeOutline(
-  context: CanvasRenderingContext2D,
-  rect: Rect,
-  effects: DrawingThemeEffects,
-): void {
-  const outlineWidth = Math.max(0, effects.outlineWidth);
-  if (outlineWidth > 0) {
-    context.save();
-    context.lineWidth = outlineWidth;
-    context.strokeStyle = "rgb(54 78 110 / 72%)";
-    const inset = outlineWidth / 2;
-    context.strokeRect(
-      rect.x + inset,
-      rect.y + inset,
-      Math.max(0, rect.width - outlineWidth),
-      Math.max(0, rect.height - outlineWidth),
-    );
-    context.restore();
-  }
-  if (effects.bevel) {
-    context.save();
-    context.lineWidth = 1;
-    context.strokeStyle = "rgb(255 255 255 / 76%)";
-    context.beginPath();
-    context.moveTo(rect.x + 0.5, rect.y + rect.height - 0.5);
-    context.lineTo(rect.x + 0.5, rect.y + 0.5);
-    context.lineTo(rect.x + rect.width - 0.5, rect.y + 0.5);
-    context.stroke();
-    context.strokeStyle = "rgb(0 0 0 / 40%)";
-    context.beginPath();
-    context.moveTo(rect.x + rect.width - 0.5, rect.y + 0.5);
-    context.lineTo(rect.x + rect.width - 0.5, rect.y + rect.height - 0.5);
-    context.lineTo(rect.x + 0.5, rect.y + rect.height - 0.5);
-    context.stroke();
-    context.restore();
-  }
-}
-
 function paintImage(
   context: CanvasRenderingContext2D,
   image: HTMLImageElement,
@@ -93,29 +55,25 @@ function paintImage(
   effects: DrawingThemeEffects | undefined,
 ): void {
   context.save();
-  if (effects?.shadow === "soft") {
-    context.shadowColor = "rgb(0 0 0 / 28%)";
-    context.shadowBlur = 8;
-    context.shadowOffsetX = 2;
-    context.shadowOffsetY = 3;
-  } else if (effects?.shadow === "hard") {
-    context.shadowColor = "rgb(0 0 0 / 42%)";
-    context.shadowBlur = 1;
-    context.shadowOffsetX = 3;
-    context.shadowOffsetY = 3;
+  try {
+    applyDrawingThemeShadow(context, effects);
+    paintImageContent(context, image, rect, transform);
+  } finally {
+    context.restore();
   }
-  paintImageContent(context, image, rect, transform);
-  context.restore();
 
   if (effects?.reflection) {
     context.save();
-    context.globalAlpha = 0.22;
-    context.translate(0, 2 * (rect.y + rect.height));
-    context.scale(1, -1);
-    paintImageContent(context, image, rect, transform);
-    context.restore();
+    try {
+      context.globalAlpha = 0.22;
+      context.translate(0, 2 * (rect.y + rect.height));
+      context.scale(1, -1);
+      paintImageContent(context, image, rect, transform);
+    } finally {
+      context.restore();
+    }
   }
-  if (effects) paintThemeOutline(context, rect, effects);
+  if (effects) paintDrawingThemeOutline(context, rect, effects);
 }
 
 function paintPlaceholder(
@@ -188,27 +146,6 @@ function paintFramedPlaceholder(
   }
 }
 
-/** Prepared frame content cannot yet represent every inherited drawing effect. */
-function assertPreparedPicturePaintSupport(
-  images: readonly FloatingImage[],
-  effects: DrawingThemeEffects | undefined,
-): void {
-  for (const image of normalizePictureObjectCollection(images)) {
-    if (!isFramedPictureObject(image) && !isPictureGroup(image)) continue;
-    const leaves = isPictureGroup(image)
-      ? traversePictureGroup(image)
-          .map(({ node }) => node)
-          .filter((node) => node.kind === "grouped-picture-v1")
-      : [image];
-    if (leaves.some((leaf) => leaf.transform?.appearance?.reflection))
-      throw new Error("Framed picture reflection is not supported by this prepared painter.");
-    if (hasVisibleDrawingThemeEffects(effects))
-      throw new Error(
-        "Inherited drawing theme effects are not supported by this prepared framed picture painter.",
-      );
-  }
-}
-
 export type FloatingImagePaintPalette = Readonly<{
   placeholderBackground: string;
   placeholderStripe: string;
@@ -243,13 +180,13 @@ export function paintFloatingImages(
     effects?: DrawingThemeEffects;
   },
 ): void {
+  const effects = options.effects ?? options.state.effects;
+  assertPicturePaintSupport(options.state.images, effects, options.frameContext?.metrics);
   const fragments = getPictureViewportFragments(
     options.state.images,
     options.layout,
     options.frameContext,
   );
-  const effects = options.effects ?? options.state.effects;
-  assertPreparedPicturePaintSupport(options.state.images, effects);
   const visibleUrls = new Set<string>();
   // Retain the complete visible collection even when a later cache/draw fails.
   for (const fragment of fragments) {
@@ -266,9 +203,9 @@ export function paintFloatingImages(
         const url = options.assetUrls.get(fragment.image.assetId);
         const image = url ? options.cache.get(url) : undefined;
         if (image && fragment.kind === "framed")
-          paintFramedPictureContent(context, image, fragment.image, fragment.geometry);
+          paintFramedPictureContent(context, image, fragment.image, fragment.geometry, effects);
         else if (image && fragment.kind === "group-leaf")
-          paintGroupedPictureContent(context, image, fragment.image, fragment.geometry);
+          paintGroupedPictureContent(context, image, fragment.image, fragment.geometry, effects);
         else if (image && fragment.kind === "legacy")
           paintImage(
             context,

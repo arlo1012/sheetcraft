@@ -1,10 +1,27 @@
 import { isPictureGroup } from "@sheetcraft/core";
-import type { WorkbookCommand } from "@sheetcraft/core/commands";
+import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import {
   isFramedPictureObject,
+  normalizePictureObjectCollection,
   type StandalonePictureObject,
 } from "@sheetcraft/core/picture-object";
-import type { FloatingImage, LegacyFloatingImage, Workbook } from "@sheetcraft/core/workbook";
+import {
+  DEFAULT_COLUMN_WIDTH,
+  type FloatingImage,
+  type LegacyFloatingImage,
+  type Sheet,
+  type SheetSparseState,
+  type Workbook,
+} from "@sheetcraft/core/workbook";
+import {
+  deserializeSheet,
+  deserializeWorkbook,
+  serializeWorkbook,
+} from "@sheetcraft/core/serialization";
+import { assertPictureObjectsForSheet } from "@sheetcraft/core/picture-object-sheet";
+import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import { getDrawingThemeEffects } from "./drawing-theme-effects";
+import { assertPicturePaintSupport } from "./picture-paint-effects";
 
 export class UnsupportedPictureDocumentError extends Error {
   readonly code = "unsupported-picture-frame";
@@ -13,19 +30,25 @@ export class UnsupportedPictureDocumentError extends Error {
     readonly imageIds: readonly string[],
   ) {
     super(
-      `Frame-aware picture and owned group editing is not yet enabled (sheet ${sheetId}, pictures ${imageIds.join(", ")}).`,
+      `This consumer does not support frame-aware pictures or owned groups (sheet ${sheetId}, pictures ${imageIds.join(", ")}).`,
     );
     this.name = "UnsupportedPictureDocumentError";
   }
 }
 
-/** Temporary live-document boundary while model and view consumers are integrated. */
+/** Internal editing/recovery supports genuine owned trees; legacy-only endpoints remain separate. */
 export function assertWorkbookPictureSupport(workbook: Workbook): void {
+  const effects = getDrawingThemeEffects(workbook.theme);
   for (const sheet of workbook.sheets.values()) {
-    const ids = sheet.floatingImages
-      .filter((image) => isFramedPictureObject(image) || isPictureGroup(image))
-      .map((image) => image.id);
-    if (ids.length) throw new UnsupportedPictureDocumentError(sheet.id, ids);
+    const roots = normalizePictureObjectCollection(sheet.floatingImages);
+    assertPictureObjectsForSheet(roots, sheet);
+    assertPicturePaintSupport(
+      roots,
+      effects,
+      roots.some((image) => isFramedPictureObject(image) || isPictureGroup(image))
+        ? createPictureSheetMetrics(sheet)
+        : undefined,
+    );
   }
 }
 
@@ -46,37 +69,120 @@ export function requireLegacyPicture(image: FloatingImage): LegacyFloatingImage 
   return requireLegacyPictures([image])[0]!;
 }
 
-/** Close every owned live-command ingress before Core can persist a newer picture. */
-export function assertPictureCommandSupport(command: WorkbookCommand): void {
+/** Preflight complete proposed trees before history, assets or worksheet state changes. */
+export function assertPictureCommandSupport(command: WorkbookCommand, workbook: Workbook): void {
+  const effects = getDrawingThemeEffects(
+    command.type === "setWorkbookTheme" ? command.theme : workbook.theme,
+  );
+  function check(images: readonly FloatingImage[], sheet?: Sheet): void {
+    const roots = normalizePictureObjectCollection(images);
+    if (sheet) assertPictureObjectsForSheet(roots, sheet);
+    assertPicturePaintSupport(
+      roots,
+      effects,
+      sheet && roots.some((image) => isFramedPictureObject(image) || isPictureGroup(image))
+        ? createPictureSheetMetrics(sheet)
+        : undefined,
+    );
+  }
+  function checkState(sheetId: string, state: SheetSparseState): void {
+    const sheet = workbook.sheets.get(sheetId);
+    check(
+      state.floatingImages,
+      sheet
+        ? {
+            ...sheet,
+            rowHeights: new Map(state.rowHeights.map(({ index, size }) => [index, size])),
+            columnWidths: new Map(state.columnWidths.map(({ index, size }) => [index, size])),
+            hiddenRows: new Set(state.hiddenRows),
+            hiddenColumns: new Set(state.hiddenColumns),
+            defaultColumnWidth: state.defaultColumnWidth ?? DEFAULT_COLUMN_WIDTH,
+          }
+        : undefined,
+    );
+  }
+  function checkProjectedWorkbook(): void {
+    // Let Core project structural reflow on a detached snapshot rather than duplicate
+    // its axis/restore algorithms or accidentally validate against outgoing metrics.
+    const proposed = deserializeWorkbook(serializeWorkbook(workbook));
+    applyWorkbookCommand(proposed, command, { fromHistory: true });
+    assertWorkbookPictureSupport(proposed);
+  }
+  const sheet = "sheetId" in command ? workbook.sheets.get(command.sheetId) : undefined;
   switch (command.type) {
-    case "setFloatingImage":
+    case "setWorkbookTheme":
+      for (const candidate of workbook.sheets.values()) check(candidate.floatingImages, candidate);
+      break;
+    case "setFloatingImage": {
+      const images = sheet?.floatingImages.slice() ?? [];
+      const index = images.findIndex((image) => image.id === command.image.id);
+      if (index < 0) images.push(command.image);
+      else images[index] = command.image;
+      check(images, sheet);
+      break;
+    }
     case "restoreFloatingImageToCell":
       requireLegacyPicture(command.image);
+      check([...(sheet?.floatingImages ?? []), command.image], sheet);
       break;
     case "setSheetFloatingImages":
-      requireLegacyPictures(command.images);
+      check(command.images, sheet);
       break;
     case "restoreSheetDimensionState":
-      requireLegacyPictures(command.floatingImageState ?? []);
+      if (sheet) {
+        const dimensions = new Map(command.dimensions.map(({ index, size }) => [index, size]));
+        check(command.floatingImageState ?? sheet.floatingImages, {
+          ...sheet,
+          ...(command.axis === "row"
+            ? {
+                rowHeights: dimensions,
+                hiddenRows: new Set(command.hiddenIndexes),
+              }
+            : {
+                columnWidths: dimensions,
+                hiddenColumns: new Set(command.hiddenIndexes),
+                defaultColumnWidth: command.defaultColumnWidth ?? DEFAULT_COLUMN_WIDTH,
+              }),
+        });
+      } else check(command.floatingImageState ?? []);
       break;
     case "restoreCellShift":
-      requireLegacyPictures(command.state.floatingImages);
+      checkState(command.sheetId, command.state);
       break;
     case "restoreSheetState":
-      requireLegacyPictures(
-        "state" in command
-          ? command.state.floatingImages
-          : (command.slice.floatingImageState ?? []),
-      );
+      if ("state" in command) checkState(command.sheetId, command.state);
+      else checkProjectedWorkbook();
       break;
     case "restoreTableTransaction":
-      for (const state of command.states) requireLegacyPictures(state.state.floatingImages);
+      for (const state of command.states) checkState(state.sheetId, state.state);
       break;
-    case "addSheet":
-      requireLegacyPictures(command.sheet.floatingImages);
+    case "addSheet": {
+      const added = deserializeSheet(command.sheet);
+      check(added.floatingImages, added);
       break;
-    case "batchDeleteSheetAxes":
-      for (const nested of command.commands) assertPictureCommandSupport(nested);
+    }
+    case "batchDeleteSheetAxes": {
+      const proposed = deserializeWorkbook(serializeWorkbook(workbook));
+      for (const nested of command.commands) {
+        assertPictureCommandSupport(nested, proposed);
+        applyWorkbookCommand(proposed, nested, { fromHistory: true });
+        assertWorkbookPictureSupport(proposed);
+      }
+      break;
+    }
+    case "resizeSheetDimension":
+    case "resizeSheetDimensions":
+    case "setSheetDimensionSizes":
+    case "setSheetDimensionHidden":
+    case "resetSheetDimensionSizes":
+    case "setSheetDefaultColumnWidth":
+    case "insertSheetAxis":
+    case "deleteSheetAxis":
+    case "moveSheetAxis":
+      if (
+        sheet?.floatingImages.some((image) => isFramedPictureObject(image) || isPictureGroup(image))
+      )
+        checkProjectedWorkbook();
       break;
   }
 }
@@ -84,7 +190,9 @@ export function assertPictureCommandSupport(command: WorkbookCommand): void {
 /** Internal snapshots do not implicitly enable paused external group packaging. */
 export function assertExternalPictureGroupSupport(workbook: Workbook): void {
   for (const sheet of workbook.sheets.values()) {
-    const ids = sheet.floatingImages.filter(isPictureGroup).map((group) => group.id);
+    const ids = sheet.floatingImages
+      .filter((image) => isPictureGroup(image) || isFramedPictureObject(image))
+      .map((image) => image.id);
     if (ids.length) throw new UnsupportedPictureDocumentError(sheet.id, ids);
   }
 }
