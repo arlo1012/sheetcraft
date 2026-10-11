@@ -19,6 +19,7 @@ import {
 } from "./useFontFormatPanel";
 import OptionList from "../option-list/OptionList.vue";
 import ColorPaletteSelect from "../color/ColorPaletteSelect.vue";
+import LocalFontAccess from "../cell-text/LocalFontAccess.vue";
 
 const props = defineProps<{
   state: FontFormatState;
@@ -108,6 +109,7 @@ const previewText = computed(() =>
             ><span :style="{ fontFamily: option.value }">{{ option.label }}</span></template
           >
         </OptionList>
+        <LocalFontAccess />
       </div>
       <div class="font-format__field" role="group" :aria-label="t('cellFormat.fontStyle')">
         <span>{{ t("cellFormat.fontStyle") }}</span>

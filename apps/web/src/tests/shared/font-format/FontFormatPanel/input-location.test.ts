@@ -5,9 +5,10 @@ import { defineComponent, ref } from "vue";
 import { createDefaultSelectionCellStyleState } from "@sheetcraft/core/style-state";
 import type { CellStylePatch } from "@sheetcraft/core/style";
 import FontFormatPanel from "../../../../shared/font-format/FontFormatPanel.vue";
+import { CELL_FONT_FAMILY_PRESETS } from "../../../../shared/cell-text/font-catalog";
 import { createAppI18n } from "../../../../shared/i18n";
 
-function mountPanel() {
+function mountPanel(locale: "en-US" | "zh-CN" = "en-US") {
   const Harness = defineComponent({
     components: { FontFormatPanel },
     setup() {
@@ -16,7 +17,7 @@ function mountPanel() {
     },
     template: `<FontFormatPanel :state="state" :patch="patch" :sample-value="'AaBbCc'" @update:patch="patch = { ...patch, ...$event }" />`,
   });
-  const wrapper = mount(Harness, { global: { plugins: [createAppI18n("en-US")] } });
+  const wrapper = mount(Harness, { global: { plugins: [createAppI18n(locale)] } });
   return { wrapper, panel: wrapper.getComponent(FontFormatPanel) };
 }
 
@@ -26,7 +27,7 @@ describe("font input location", () => {
       field: "family",
       query: "AR",
       match: "Arial",
-      count: 6,
+      count: CELL_FONT_FAMILY_PRESETS.length,
       value: "Arial",
       patch: { fontFamily: "Arial" },
     },
@@ -64,6 +65,25 @@ describe("font input location", () => {
       }
     },
   );
+
+  test("commits a typed Chinese font name using its canonical family", async () => {
+    const { wrapper, panel } = mountPanel("zh-CN");
+    try {
+      const input = panel.get("[data-cell-format-font-family]").getComponent(TInput);
+      const list = panel.get("[data-cell-format-font-family-list]");
+      input.vm.$emit("change", "微软雅黑");
+      await wrapper.vm.$nextTick();
+      expect(list.get("[data-option-list-match]").attributes("data-option-list-value")).toBe(
+        "Microsoft YaHei",
+      );
+      input.vm.$emit("enter");
+      await wrapper.vm.$nextTick();
+      expect(panel.props("patch")).toEqual({ fontFamily: "Microsoft YaHei" });
+      expect(input.props("modelValue")).toBe("微软雅黑");
+    } finally {
+      wrapper.unmount();
+    }
+  });
 
   test("scrolls to a matching size outside the visible portion of the list", async () => {
     const { wrapper, panel } = mountPanel();

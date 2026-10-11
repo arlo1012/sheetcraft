@@ -9,10 +9,9 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Slider as TSlider } from "tdesign-vue-next/es/slider";
 import type { SheetWatermark } from "@sheetcraft/core/page-decoration";
 import { DEFAULT_SHEET_WATERMARK } from "@sheetcraft/core/page-decoration";
-import {
-  CELL_FONT_FAMILY_PRESETS,
-  CELL_FONT_SIZE_PRESETS,
-} from "../../../shared/cell-text/font-catalog";
+import { CELL_FONT_SIZE_PRESETS } from "../../../shared/cell-text/font-catalog";
+import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
+import LocalFontAccess from "../../../shared/cell-text/LocalFontAccess.vue";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { paintWatermarkInRect } from "../page-decoration-painter";
@@ -41,8 +40,8 @@ const previewCanvas = ref<HTMLCanvasElement>();
 const localImageUrl = ref<string>();
 const previewImage = ref<HTMLImageElement>();
 const labelWidth = computed(() => (locale.value === "zh-CN" ? 72 : 104));
-const fontOptions = computed(() =>
-  CELL_FONT_FAMILY_PRESETS.map((value) => ({ label: value, value })),
+const { fontOptions } = useFontCatalog(() =>
+  draft.value.fontFamily ? [draft.value.fontFamily] : [],
 );
 const fontSizeOptions = CELL_FONT_SIZE_PRESETS.map((value) => ({ label: String(value), value }));
 const opacityPercent = computed({
@@ -305,6 +304,7 @@ onBeforeUnmount(clearLocalImage);
               filterable
             />
           </TFormItem>
+          <LocalFontAccess />
           <TFormItem :label="t('pageDecoration.fontSize')">
             <TSelect
               v-model="draft.fontSize"

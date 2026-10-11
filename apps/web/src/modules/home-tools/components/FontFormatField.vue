@@ -6,15 +6,19 @@ import { vIconAction } from "../../../shared/focus/icon-action";
 import RibbonDropdownArrow from "../../../shared/ribbon/RibbonDropdownArrow.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
+import MenuSearch from "../../../shared/menu/MenuSearch.vue";
 
 const props = defineProps<{
   modelValue?: string | number;
-  options: Array<{ label: string; value: string | number }>;
+  options: Array<{ label: string; value: string | number; fontFamily?: string }>;
   label: string;
   disabled: boolean;
   popupAttach?: () => HTMLElement;
   matchPanelWidth?: boolean;
+  searchLabel?: string;
+  emptyLabel?: string;
 }>();
+defineSlots<{ footer?: () => unknown }>();
 const emit = defineEmits<{ change: [value: string | number] }>();
 const displayValue = computed(
   () =>
@@ -37,6 +41,18 @@ const triggerRef = ref<HTMLElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = useId();
 const open = ref(false);
+const query = ref("");
+const filteredOptions = computed(() => {
+  const search = query.value.trim().toLowerCase();
+  return search
+    ? props.options.filter((option) =>
+        `${option.label} ${option.value}`.toLowerCase().includes(search),
+      )
+    : props.options;
+});
+watch(open, () => {
+  query.value = "";
+});
 const focusMenuOnMount = ref(false);
 watchPostEffect(() => {
   if (open.value && focusMenuOnMount.value && menuSurfaceRef.value?.rootElement) {
@@ -175,19 +191,52 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
                   boxSizing: 'border-box',
                   '--sheetcraft-menu-item-padding-inline': '6px',
                 }
-              : { minWidth: `${control?.offsetWidth ?? 48}px` }
+              : {
+                  minWidth: `${control?.offsetWidth ?? 48}px`,
+                  ...(searchLabel ? { width: '280px' } : {}),
+                }
           "
           @keydown="onMenuKeydown"
           :label="label"
         >
-          <MenuRadioItem
-            v-for="option in options"
-            :key="option.value"
-            :checked="option.value === modelValue"
-            indicator="none"
-            @select="select(option.value)"
-            >{{ option.label }}</MenuRadioItem
-          >
+          <template v-if="searchLabel" #header>
+            <ul class="font-format-field__search" role="presentation">
+              <MenuSearch
+                v-model="query"
+                :label="searchLabel"
+                @keydown="
+                  (event) => {
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      menuSurfaceRef?.focusFirstItem();
+                    }
+                  }
+                "
+              />
+            </ul>
+          </template>
+          <template #items>
+            <MenuRadioItem
+              v-for="option in filteredOptions"
+              :key="option.value"
+              :checked="option.value === modelValue"
+              indicator="none"
+              @select="select(option.value)"
+              ><span :style="{ fontFamily: option.fontFamily }">{{
+                option.label
+              }}</span></MenuRadioItem
+            >
+            <li
+              v-if="!filteredOptions.length && emptyLabel"
+              class="font-format-field__empty"
+              role="none"
+            >
+              {{ emptyLabel }}
+            </li>
+          </template>
+          <template v-if="$slots.footer" #footer>
+            <li role="none"><slot name="footer" /></li>
+          </template>
         </MenuSurface>
       </template>
     </TSelectInput>
@@ -237,6 +286,16 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
     z-index: var(--sheetcraft-layer-menu);
     min-width: 48px;
     max-height: min(360px, calc(100vh - 32px));
+  }
+  &__search {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+  &__empty {
+    padding: 8px 14px;
+    color: var(--sheetcraft-text-secondary);
+    list-style: none;
   }
 }
 </style>

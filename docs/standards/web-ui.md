@@ -62,6 +62,14 @@ Use CSS pixels at 100% scale; size and line height are a pair.
   samples may use 14px / 22px at 400. Workbook content, editors, row sizing,
   exports, and style previews follow workbook typography; sheet headers retain zoom.
 
+- Font choices share `shared/cell-text/useFontCatalog` across formatting, theme,
+  and watermark controls. Localized names are presentation; keep the document's
+  stored family names intact and retain custom families in the choices.
+- Common font choices do not guarantee installation. Explain font substitution;
+  request local-font access only from an explicit action, and explain unavailable
+  browser or origin support. Searchable font menus use `MenuSearch` and keep the
+  local-font action in the fixed footer while choices scroll.
+
 ## Surfaces, controls, and focus
 
 | Surface        | Padding                    | Owner                                                                   |

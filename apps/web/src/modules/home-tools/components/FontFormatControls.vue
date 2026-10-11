@@ -13,9 +13,11 @@ import {
 import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import {
-  CELL_FONT_FAMILY_PRESETS,
   CELL_FONT_SIZE_PRESETS,
+  resolveFontFamilyName,
 } from "../../../shared/cell-text/font-catalog";
+import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
+import LocalFontAccess from "../../../shared/cell-text/LocalFontAccess.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -33,27 +35,28 @@ const emit = defineEmits<{
 
 const { t } = useAppI18n();
 const workbookTheme = useWorkbookTheme();
+const { fontOptions } = useFontCatalog(() =>
+  props.state.fontFamily.value ? [props.state.fontFamily.value] : [],
+);
 const fontFamilyOptions = computed(() => [
   ...(workbookTheme?.value
     ? [
         {
           label: `${t("pageTools.themeHeadingFont")} (${workbookTheme.value.fonts?.headingEastAsia ?? workbookTheme.value.headingFont})`,
           value: "theme:major",
+          fontFamily: resolveThemeFontFamily(workbookTheme.value, "major"),
         },
         {
           label: `${t("pageTools.themeBodyFont")} (${workbookTheme.value.fonts?.bodyEastAsia ?? workbookTheme.value.bodyFont})`,
           value: "theme:minor",
+          fontFamily: resolveThemeFontFamily(workbookTheme.value, "minor"),
         },
       ]
     : []),
-  ...[
-    ...new Set([
-      ...CELL_FONT_FAMILY_PRESETS,
-      ...(props.state.fontFamily.value ? [props.state.fontFamily.value] : []),
-    ]),
-  ].map((family) => ({
-    label: family === DEFAULT_CELL_FONT_FAMILY ? t("format.defaultFont") : family,
-    value: family,
+  ...fontOptions.value.map(({ value, label }) => ({
+    label: value === DEFAULT_CELL_FONT_FAMILY ? t("format.defaultFont") : label,
+    value,
+    fontFamily: value,
   })),
 ]);
 const fontFamilyValue = computed(() => {
@@ -86,10 +89,13 @@ function setFontFamily(value: string | number): void {
     return;
   }
   const input = value.trim();
+  const canonical = resolveFontFamilyName(input);
   const option = fontFamilyOptions.value.find(
-    (option) => option.label.toLowerCase() === input.toLowerCase(),
+    (option) =>
+      option.label.toLowerCase() === input.toLowerCase() ||
+      option.value.toLowerCase() === canonical.toLowerCase(),
   );
-  value = option?.value ?? input;
+  value = option?.value ?? canonical;
   if ((value === "theme:major" || value === "theme:minor") && workbookTheme?.value) {
     const role = value === "theme:major" ? "major" : "minor";
     emit("applyStyle", {
@@ -144,10 +150,14 @@ function setFontSize(value: string | number): void {
         :model-value="fontFamilyValue"
         :options="fontFamilyOptions"
         :label="t('format.fontFamily')"
+        :search-label="t('format.searchFonts')"
+        :empty-label="t('format.noMatchingFonts')"
         :popup-attach="popupAttach"
         :disabled="disabled"
         @change="setFontFamily"
-      />
+      >
+        <template #footer><LocalFontAccess /></template>
+      </FontFormatField>
     </div>
     <div
       class="font-format-controls__field font-format-controls__field--size"

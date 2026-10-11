@@ -11,7 +11,12 @@ import {
   type CellUnderlineStyle,
 } from "@sheetcraft/core/style";
 import type { SelectionCellStyleState, ToggleStyleState } from "@sheetcraft/core/style-state";
-import { CELL_FONT_FAMILY_PRESETS, CELL_FONT_SIZE_PRESETS } from "../cell-text/font-catalog";
+import {
+  CELL_FONT_SIZE_PRESETS,
+  getFontFamilyLabel,
+  resolveFontFamilyName,
+} from "../cell-text/font-catalog";
+import { useFontCatalog } from "../cell-text/useFontCatalog";
 import { useAppI18n } from "../i18n";
 import { findOptionMatch } from "../option-list/option-list";
 
@@ -52,7 +57,7 @@ type Props = Readonly<{
 type FontStyleChoice = "regular" | "italic" | "bold" | "boldItalic";
 
 export function useFontFormatPanel(props: Props, update: (patch: FontFormatPatch) => void) {
-  const { t } = useAppI18n();
+  const { t, locale } = useAppI18n();
   const defaultFamily = computed(
     () => props.options?.defaultFontFamily ?? DEFAULT_CELL_FONT_FAMILY,
   );
@@ -112,10 +117,9 @@ export function useFontFormatPanel(props: Props, update: (patch: FontFormatPatch
     const value = read("underline", props.state.underlineStyle.value);
     return value === true ? "single" : (value ?? "none");
   });
+  const { fontOptions } = useFontCatalog(() => (family.value ? [family.value] : []));
   const familyOptions = computed(() =>
-    [
-      ...new Set<string>([...CELL_FONT_FAMILY_PRESETS, ...(family.value ? [family.value] : [])]),
-    ].map((code) => ({ code, label: code })),
+    fontOptions.value.map(({ value, label }) => ({ code: value, label })),
   );
   const sizeOptions = computed(() =>
     [
@@ -153,14 +157,18 @@ export function useFontFormatPanel(props: Props, update: (patch: FontFormatPatch
     () => styleOptions.value.find((option) => option.code === fontStyle.value)?.label ?? "",
   );
   watch(styleLabel, (value) => (fontStyleInput.value = value), { immediate: true });
-  watch(family, (value) => (familyInput.value = value ?? ""), { immediate: true });
+  watch(
+    [family, locale],
+    ([value]) => (familyInput.value = value ? getFontFamilyLabel(value, locale.value) : ""),
+    { immediate: true },
+  );
   watch(size, (value) => (sizeInput.value = value === undefined ? "" : String(value)), {
     immediate: true,
   });
   function setFamily(value: string | number): void {
     const name = String(value).trim();
     if (!name || name.length > 80) return;
-    familyInput.value = name;
+    familyInput.value = getFontFamilyLabel(name, locale.value);
     if (familyMixed.value || name !== family.value)
       update({ fontFamily: name === defaultFamily.value ? null : name });
   }
@@ -170,10 +178,19 @@ export function useFontFormatPanel(props: Props, update: (patch: FontFormatPatch
   function commitFamilyInput(): void {
     const name = familyInput.value.trim();
     if (!name || name.length > 80) {
-      familyInput.value = family.value ?? "";
+      familyInput.value = family.value ? getFontFamilyLabel(family.value, locale.value) : "";
       return;
     }
-    setFamily(findOptionMatch(familyOptions.value, name)?.code ?? name);
+    const resolved = resolveFontFamilyName(name);
+    const exact = familyOptions.value.find(
+      (option) => option.code.toLowerCase() === resolved.toLowerCase(),
+    );
+    const exactLabel = familyOptions.value.find(
+      (option) => option.label.toLowerCase() === name.toLowerCase(),
+    );
+    // A full custom name must not be replaced by a longer preset sharing its prefix.
+    const partial = /\s/.test(name) ? undefined : findOptionMatch(familyOptions.value, name);
+    setFamily(exact?.code ?? exactLabel?.code ?? partial?.code ?? resolved);
   }
   function setSize(value: string): void {
     const parsed = Number(value);

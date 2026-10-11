@@ -1366,6 +1366,18 @@ export type MessageSchema = ToolMessageSchema & {
     font: string;
     defaultFont: string;
     fontFamily: string;
+    searchFonts: string;
+    noMatchingFonts: string;
+    localFontsAction: string;
+    localFontsRefresh: string;
+    localFontsHint: string;
+    localFontsInsecure: string;
+    localFontsUnsupported: string;
+    localFontsDenied: string;
+    localFontsFailed: string;
+    localFontsEmpty: string;
+    localFontsLoaded: string;
+    fontFallbackHint: string;
     fontSize: string;
     increaseFontSize: string;
     decreaseFontSize: string;

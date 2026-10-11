@@ -5,7 +5,8 @@ import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { useAppI18n } from "../../../shared/i18n";
-import { CELL_FONT_FAMILY_PRESETS } from "../../../shared/cell-text/font-catalog";
+import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
+import LocalFontAccess from "../../../shared/cell-text/LocalFontAccess.vue";
 
 export type ThemeFontScheme = {
   name: string;
@@ -20,19 +21,12 @@ const { t } = useAppI18n();
 const draft = ref<ThemeFontScheme>({ ...props.fonts });
 const error = ref<string | null>(null);
 const nameInputRef = ref<HTMLElement | null>(null);
-const fontOptions = computed(() =>
-  [
-    ...new Set(
-      [
-        ...CELL_FONT_FAMILY_PRESETS,
-        draft.value.headingFont,
-        draft.value.bodyFont,
-        draft.value.headingEastAsia,
-        draft.value.bodyEastAsia,
-      ].filter(Boolean),
-    ),
-  ].map((value) => ({ label: value, value })),
-);
+const { fontOptions } = useFontCatalog(() => [
+  draft.value.headingFont,
+  draft.value.bodyFont,
+  draft.value.headingEastAsia,
+  draft.value.bodyEastAsia,
+]);
 const westernHeadingStyle = computed(() => ({
   fontFamily: `'${draft.value.headingFont}', sans-serif`,
 }));
@@ -137,6 +131,7 @@ watch(
           </div>
         </section>
       </div>
+      <LocalFontAccess />
     </TForm>
   </TDialog>
 </template>
