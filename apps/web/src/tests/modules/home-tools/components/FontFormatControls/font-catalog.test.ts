@@ -82,6 +82,43 @@ describe("font catalog in formatting controls", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
+  test("opens and filters while typing in the font field, then cancels or selects with the keyboard", async () => {
+    const wrapper = mountControls();
+    const input = wrapper.get<HTMLInputElement>(".font-format-controls__family input");
+    await input.setValue("宋体");
+    expect(menu().find(".sheetcraft-menu-search").exists()).toBe(false);
+    expect(
+      menu()
+        .findAll('[role="menuitemradio"]')
+        .map((item) => item.text()),
+    ).toContain("宋体");
+    expect(menu().text()).not.toContain("微软雅黑");
+    await input.setValue("Microsoft YaHei");
+    expect(
+      menu()
+        .findAll('[role="menuitemradio"]')
+        .map((item) => item.text()),
+    ).toEqual(["微软雅黑"]);
+    expect(wrapper.emitted("applyStyle")).toBeUndefined();
+    await input.trigger("keydown", { key: "Escape" });
+    expect(document.body.querySelector(".font-format-field__menu")).toBeNull();
+    expect(input.element.value).toBe("默认字体");
+    await openFonts(wrapper);
+    expect(menu().find('input[type="search"]').exists()).toBe(true);
+    expect(menu().find('[aria-label="字体设置"]').exists()).toBe(true);
+    await input.setValue("Arial");
+    expect(menu().find(".sheetcraft-menu-search").exists()).toBe(false);
+    await input.setValue("");
+    expect(menu().text()).toContain("微软雅黑");
+    await input.setValue("Microsoft YaHei");
+    await input.trigger("keydown", { key: "ArrowDown" });
+    await flushPromises();
+    const choice = menu().get('[role="menuitemradio"]');
+    expect(document.activeElement).toBe(choice.element);
+    await choice.trigger("keydown", { key: "Enter" });
+    expect(wrapper.emitted("applyStyle")).toEqual([[{ fontFamily: "Microsoft YaHei" }]]);
+  });
+
   test("syncs from settings after closing the menu and shares choices with another control", async () => {
     query.mockResolvedValue([{ family: "Team Font" }, { family: "Team Font" }]);
     const settings = mount(FontSettingsDialog, {

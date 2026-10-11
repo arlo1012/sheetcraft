@@ -71,9 +71,12 @@ Use CSS pixels at 100% scale; size and line height are a pair.
   stored family names intact and retain custom families in the choices.
 - Common font choices do not guarantee installation. Explain font substitution;
   request local-font access only from an explicit action, and explain unavailable
-  browser or origin support. Searchable font menus use `MenuSearch` and keep the
-  local-font action in a compact fixed footer while choices scroll. Put detailed
-  access and substitution explanations on the information icon.
+  browser or origin support. Typing in a font-family field opens and filters its
+  choices by localized label or stored name; this dropdown shows results without
+  a second search row. Focus alone does not open the list. Opening the font menu
+  from its arrow shows `MenuSearch`, with font settings to the right of the search
+  input. Keep local-font synchronization and access/substitution guidance in the
+  font settings dialog; host it outside dismissible menus.
 
 ## Surfaces, controls, and focus
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { SelectInput as TSelectInput } from "tdesign-vue-next/es/select-input";
 import type { PopupProps } from "tdesign-vue-next/es/popup";
+import type { SelectInputValueChangeContext } from "tdesign-vue-next/es/select-input";
 import { computed, nextTick, ref, useId, watch, watchPostEffect } from "vue";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import RibbonDropdownArrow from "../../../shared/ribbon/RibbonDropdownArrow.vue";
@@ -42,6 +43,7 @@ const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = useId();
 const open = ref(false);
 const query = ref("");
+const filteringFromInput = ref(false);
 const filteredOptions = computed(() => {
   const search = query.value.trim().toLowerCase();
   return search
@@ -50,8 +52,11 @@ const filteredOptions = computed(() => {
       )
     : props.options;
 });
-watch(open, () => {
-  query.value = "";
+watch(open, (visible) => {
+  if (!visible) {
+    query.value = "";
+    filteringFromInput.value = false;
+  }
 });
 const focusMenuOnMount = ref(false);
 watchPostEffect(() => {
@@ -89,12 +94,23 @@ function clickInput(event: MouseEvent): void {
 function closeMenu(): void {
   open.value = false;
 }
+function inputChange(value: string, context?: SelectInputValueChangeContext): void {
+  if (props.disabled || !props.searchLabel || context?.trigger !== "input") return;
+  query.value = value;
+  filteringFromInput.value = true;
+  open.value = true;
+}
 function dismiss(): void {
   closeMenu();
   void nextTick(() => triggerRef.value?.focus());
 }
 function toggleMenu(): void {
-  if (!props.disabled) open.value = !open.value;
+  if (props.disabled) return;
+  if (!open.value) {
+    query.value = "";
+    filteringFromInput.value = false;
+  }
+  open.value = !open.value;
 }
 function onTriggerKeydown(event: KeyboardEvent): void {
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
@@ -121,19 +137,33 @@ async function commit(): Promise<void> {
   await nextTick();
   draft.value = displayValue.value;
 }
+function blur(_value: unknown, { e }: { e: FocusEvent }): void {
+  if (
+    e.relatedTarget instanceof Node &&
+    menuSurfaceRef.value?.rootElement?.contains(e.relatedTarget)
+  )
+    return;
+  closeMenu();
+  void commit();
+}
 function select(value: string | number): void {
   draft.value = displayValue.value;
   emit("change", value);
   dismiss();
 }
 function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
-  if (e.key === "Enter" && !e.isComposing) {
+  if (e.isComposing) return;
+  if (e.key === "Enter") {
     e.preventDefault();
     e.stopPropagation();
+    closeMenu();
     void commit();
   } else if (e.key === "Escape") {
     draft.value = displayValue.value;
+    closeMenu();
     e.stopPropagation();
+  } else if (props.searchLabel && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+    onTriggerKeydown(e);
   }
 }
 </script>
@@ -162,7 +192,8 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
         }
       "
       @focus="focus"
-      @blur="commit"
+      @input-change="inputChange"
+      @blur="blur"
       @enter="(_value, context) => keydown(draft, context)"
     >
       <template #suffixIcon>
@@ -202,7 +233,7 @@ function keydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
           @keydown="onMenuKeydown"
           :label="label"
         >
-          <template v-if="searchLabel" #header>
+          <template v-if="searchLabel && !filteringFromInput" #header>
             <ul class="font-format-field__search" role="presentation">
               <MenuSearch
                 v-model="query"

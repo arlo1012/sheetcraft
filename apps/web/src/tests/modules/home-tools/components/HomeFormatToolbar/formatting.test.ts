@@ -214,27 +214,29 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper).at(-1)).toEqual({ fontSize: 20 });
   });
 
-  test.each(["family", "size"])("opens the %s list only from its arrow", async (kind) => {
-    const wrapper = mountToolbar();
-    const field = wrapper.get(`.font-format-controls__${kind}`);
-    const input = field.get("input");
-    await input.trigger("focus");
-    await input.trigger("click");
-    await input.setValue(kind === "family" ? "Arial" : "99");
-    expect(document.body.querySelector(".font-format-field__menu")).toBeNull();
-    await field.get('[aria-haspopup="menu"]').trigger("click");
-    await new Promise((resolve) => setTimeout(resolve, 30));
-    const menu = new DOMWrapper(document.body.querySelector(".font-format-field__menu")!);
-    expect(menu.exists()).toBe(true);
-    const target = menu
-      .findAll('[role="menuitemradio"]')
-      .find((item) => item.text() === (kind === "family" ? "Arial" : "18"))!;
-    await target.trigger("click");
-    expect(emittedPatches(wrapper)).toEqual([
-      kind === "family" ? { fontFamily: "Arial" } : { fontSize: 18 },
-    ]);
-    expect(document.body.querySelector(".font-format-field__menu")).toBeNull();
-  });
+  test.each(["family", "size"])(
+    "opens the %s list from its arrow without opening on focus",
+    async (kind) => {
+      const wrapper = mountToolbar();
+      const field = wrapper.get(`.font-format-controls__${kind}`);
+      const input = field.get("input");
+      await input.trigger("focus");
+      await input.trigger("click");
+      expect(document.body.querySelector(".font-format-field__menu")).toBeNull();
+      await field.get('[aria-haspopup="menu"]').trigger("click");
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      const menu = new DOMWrapper(document.body.querySelector(".font-format-field__menu")!);
+      expect(menu.exists()).toBe(true);
+      const target = menu
+        .findAll('[role="menuitemradio"]')
+        .find((item) => item.text() === (kind === "family" ? "Arial" : "18"))!;
+      await target.trigger("click");
+      expect(emittedPatches(wrapper)).toEqual([
+        kind === "family" ? { fontFamily: "Arial" } : { fontSize: 18 },
+      ]);
+      expect(document.body.querySelector(".font-format-field__menu")).toBeNull();
+    },
+  );
 
   test("selects the current size on focus without opening the panel", async () => {
     const wrapper = mountToolbar();
