@@ -1,25 +1,27 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { Input as TInput } from "tdesign-vue-next/es/input";
 
 defineOptions({ inheritAttrs: false });
 defineProps<{ label: string }>();
 const query = defineModel<string>({ default: "" });
 const emit = defineEmits<{ keydown: [event: KeyboardEvent] }>();
-const inputRef = ref<HTMLInputElement | null>(null);
+const inputRef = ref<InstanceType<typeof TInput> | null>(null);
 defineExpose({ focus: () => inputRef.value?.focus() });
 </script>
 
 <template>
   <li class="sheetcraft-menu-search" role="presentation">
     <div class="sheetcraft-menu-search__field">
-      <input
+      <TInput
         v-bind="$attrs"
         ref="inputRef"
         v-model="query"
         type="search"
+        clearable
         :aria-label="label"
         :placeholder="label"
-        @keydown="emit('keydown', $event)"
+        @keydown="(_value, { e }) => emit('keydown', e)"
       />
     </div>
   </li>
@@ -48,26 +50,6 @@ defineExpose({ focus: () => inputRef.value?.focus() });
 
   &__field {
     padding: 0 8px 6px;
-
-    input {
-      box-sizing: border-box;
-      width: 100%;
-      height: 26px;
-      padding: 0 8px;
-      background: var(--sheetcraft-surface-canvas);
-      border: 1px solid var(--sheetcraft-border-control);
-      border-radius: 3px;
-      color: var(--sheetcraft-text-primary);
-      font: inherit;
-      font-size: var(--sheetcraft-font-size-body-medium);
-      line-height: var(--sheetcraft-line-height-body-medium);
-
-      &:focus-visible {
-        border-color: var(--sheetcraft-action-primary);
-        box-shadow: 0 0 0 2px var(--sheetcraft-action-focus);
-        outline: none;
-      }
-    }
   }
 }
 </style>

@@ -41,9 +41,9 @@ describe("WorkbookSheetNavigator", () => {
     expect(trigger.attributes("aria-label")).toBe("全部工作表");
     await trigger.trigger("click");
     expect(menu().text()).not.toContain("全部工作表");
-    expect(menu().get('[data-workbook-sheet-navigator="search"]').attributes("placeholder")).toBe(
-      "搜索工作表",
-    );
+    expect(
+      menu().get('[data-workbook-sheet-navigator="search"] input').attributes("placeholder"),
+    ).toBe("搜索工作表");
   });
 
   test("opens an upward sheet list with search and a selected radio", async () => {
@@ -53,9 +53,9 @@ describe("WorkbookSheetNavigator", () => {
     await trigger.trigger("click");
     expect(wrapper.emitted("open")).toEqual([[]]);
     expect(menu().text()).not.toContain("All sheets");
-    expect(menu().get('[data-workbook-sheet-navigator="search"]').attributes("placeholder")).toBe(
-      "Search sheets",
-    );
+    expect(
+      menu().get('[data-workbook-sheet-navigator="search"] input').attributes("placeholder"),
+    ).toBe("Search sheets");
     const active = menu().get('[data-workbook-sheet-id="sheet-budget"]');
     expect(active.attributes()).toMatchObject({
       role: "menuitemradio",
@@ -77,7 +77,7 @@ describe("WorkbookSheetNavigator", () => {
   test("filters the list and moves from search into the result menu with ArrowDown", async () => {
     const wrapper = mountNavigator();
     await wrapper.get('[data-workbook-sheet-navigator="trigger"]').trigger("click");
-    const search = menu().get<HTMLInputElement>('[data-workbook-sheet-navigator="search"]');
+    const search = menu().get<HTMLInputElement>('[data-workbook-sheet-navigator="search"] input');
 
     await search.setValue("budget");
     expect(menu().findAll('[role="menuitemradio"]')).toHaveLength(1);
@@ -99,7 +99,7 @@ describe("WorkbookSheetNavigator", () => {
     const trigger = wrapper.get('[data-workbook-sheet-navigator="trigger"]');
 
     await trigger.trigger("click");
-    await menu().get('[data-workbook-sheet-navigator="search"]').setValue("missing");
+    await menu().get('[data-workbook-sheet-navigator="search"] input').setValue("missing");
     expect(menu().text()).toContain("No matching sheets");
     document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
     await nextTick();

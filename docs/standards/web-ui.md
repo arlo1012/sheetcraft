@@ -33,6 +33,10 @@
 | Searchable menus          | `shared/menu/MenuSearch.vue`, `WorkbookSheetNavigator`           |
 | Inputs and dialog actions | TDesign controls and `CellFormatDialog`; cancel precedes confirm |
 
+- Menu search fields use TDesign `Input` with `type="search"` and `clearable`,
+  matching formula-category menus. `MenuSearch` owns the menu layout; the shared
+  TDesign adapter owns input appearance and focus states.
+
 ## Data tables
 
 - Use TDesign `BaseTable` or `PrimaryTable` directly with `sheetcraft-table--mini` and
