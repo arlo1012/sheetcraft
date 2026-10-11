@@ -1,8 +1,8 @@
 # Insert 当前范围清单（2026-10-11）
 
-基线：`6b11ebb71f7e52a1b758b8ce5ae9b6fb77c0f693`。已有表格矩阵、有界计算列、
-文本框/艺术字及矩形→箭头代表路径已闭合；当前检查点验现有 Symbol 草稿/取消/历史/持久化，
-仅补陈旧对话框回调身份 guard，无新增插入类型。
+基线：`7a63e96be1e2529b67dc4b98e4092cc810362638`。已有表格矩阵、有界计算列、
+文本框/艺术字、矩形→箭头及 Symbol 代表路径已闭合；当前检查点完成现有超链接
+拒绝确认/陈旧回调修复及内部链接生命周期代表验收，无新增插入类型。
 
 “已有产品路径”指已找到真实 Web 入口、Core 命令/模型和快照持久化，不等于本轮
 逐项 GUI 验收或所有 XLSX 原生变体支持。全清单按实际 `InsertToolbar.vue` 及其
@@ -24,7 +24,7 @@
 | 表单控件            | checkbox/radio/combo/list/spinner/scrollbar/button/label/group；链接单元格与命令历史        | 原生控件交换未实现并报告省略；本检查点验证已有确认生命周期，不扩控件类型                                                                        |
 | 文档/附件           | 文件素材、文档/图标呈现、查看/下载和 Core 持久化路径                                        | 原生 embedded object/attachment 交换未实现并报告省略；本轮未用用户文件复验                                                                      |
 | 迷你图              | 真实编辑与 Core 路径                                                                        | 已有原生 I/O；整项本轮未复验                                                                                                                    |
-| 超链接              | 真实单元格/内部引用与 Web 打开路径                                                          | 已有原生 I/O；整项本轮未复验                                                                                                                    |
+| 超链接              | 真实单元格/内部引用与 Web 打开路径；拒绝保留草稿和实例/上下文 guard 已修                       | 内部链接 create/edit/Cancel/Escape/remove/UndoRedo/save-reload-JSON 已验；已有 native I/O 本轮未双应用复验                                                                                                                    |
 | 符号                | 写入普通单元格文字                                                                          | preset/custom、保留选区进草稿、Cancel/Escape、commit/UndoRedo/save-reload-JSON代表路径已验；普通文本native本轮未双应用复验                      |
 | 水印                | 实际工具栏 slot、页装饰和预设持久化                                                         | XLSX tiled watermark/presets 尚无对应实现，导出明确省略；本轮未复验                                                                             |
 
@@ -58,7 +58,13 @@
   pie/更多图型及通用原生 drawing 仍未扩展。
 - 现有符号的有界闭合见 [Symbol 验收](../acceptance/symbol-20261011.md)。
   陈旧 insert/close 回调在取消/重开后的缺陷已实证修复；符号本身只生成普通编辑草稿，
-  后续按原有单元格解析/提交，不是新对象或原生格式。超链接仍未做整项实际验收。
+  后续按原有单元格解析/提交，不是新对象或原生格式。
+- 现有超链接的有界闭合见 [Hyperlink 验收](../acceptance/hyperlink-20261011.md)。
+  实际 Core 拒绝保留字段/快照/历史，陈旧 confirm/remove/cancel 及上下文失效回归通过；
+  GUI 只走合成内部引用，不代表外链/保护/公式/native 全变体验收。
+- 下一最小已有路径候选为同表 line 迷你图的 create/edit/clear/Cancel/UndoRedo/保存。
+  `execute=false` 不能一概等于失败：Core 未变化编辑可能确实没有 inverse。
+  先实证区分拒绝变更与有效无变化；当前仅只读候选，未开始新实现或 GUI。
 - pie 的首系列原生来源证明仍需单独实测；仪表盘复制完整多系列来源，仅恢复首
   系列不能自动证明未序列化列/行，所以不能预先宣称已补齐仪表盘整体往返。
 - I/O/公式独立包与 API 阶段应按这张清单明确支持/省略合同；本次三个普通图型原生

@@ -1,0 +1,5 @@
+$ bun run typecheck && vite build
+$ vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json
+src/tests/modules/hyperlinks/dialog-lifecycle.test.ts(34,41): error TS2345: Argument of type '{ workbook: Workbook; }' is not assignable to parameter of type '{ workbook?: Workbook | undefined; idFactory: IdFactory; }'.
+  Property 'idFactory' is missing in type '{ workbook: Workbook; }' but required in type '{ workbook?: Workbook | undefined; idFactory: IdFactory; }'.
+WEB_TYPES_BUILD_EXIT=2

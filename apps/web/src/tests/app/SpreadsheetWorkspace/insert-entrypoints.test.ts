@@ -14,6 +14,7 @@ import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import PivotTableDialog from "../../../modules/pivot-tables/components/PivotTableDialog.vue";
 import SymbolDialog from "../../../modules/insert-tools/components/SymbolDialog.vue";
+import HyperlinkDialog from "../../../modules/hyperlinks/components/HyperlinkDialog.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { triggerCanvasCell } from "../canvas-interaction";
 import { createAppI18n } from "../../../shared/i18n";
@@ -84,6 +85,40 @@ async function fixture(withData = false) {
 }
 
 describe("workspace insert entry points", () => {
+  test("Hyperlink uses instance-bound callbacks from the actual Insert ribbon", async () => {
+    const wrapper = await fixture(true);
+    const controller = captured.controller!;
+    await wrapper.get('[data-insert-tool="hyperlink"]').trigger("click");
+    await flushPromises();
+    const old = wrapper.getComponent(HyperlinkDialog).vm.$.vnode.props!;
+    (old.onCancel as () => void)();
+    await flushPromises();
+    await wrapper.get('[data-insert-tool="hyperlink"]').trigger("click");
+    await flushPromises();
+    const current = wrapper.getComponent(HyperlinkDialog);
+    const uid = current.vm.$.uid;
+    const before = serializeWorkbook(controller.session.workbook);
+    (old.onConfirm as (value: { target: string; displayText: string; tooltip: string }) => void)({
+      target: "https://example.test/stale",
+      displayText: "stale",
+      tooltip: "",
+    });
+    (old.onCancel as () => void)();
+    await flushPromises();
+    expect(wrapper.getComponent(HyperlinkDialog).vm.$.uid).toBe(uid);
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+    current.vm.$emit("confirm", {
+      target: "#Sheet1!B3",
+      displayText: "Internal report",
+      tooltip: "Synthetic",
+    });
+    await flushPromises();
+    expect(wrapper.findComponent(HyperlinkDialog).exists()).toBe(false);
+    expect(getCellValue(controller.activeSheet.value, { row: 0, column: 0 })).toBe(
+      "Internal report",
+    );
+    expect(controller.session.history.undoStack).toHaveLength(1);
+  });
   test.each(["cancel", "reopen", "navigation"] as const)(
     "old Symbol callbacks cannot change the draft or a newer dialog after %s",
     async (action) => {

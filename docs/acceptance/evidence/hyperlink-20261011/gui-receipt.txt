@@ -1,0 +1,23 @@
+2026-10-11 06:19:55–06:23:48 UTC, own cloud Chrome tab19.
+Final production Web build preview only, loopback127.0.0.1:7200; no build/check concurrent.
+New synthetic Sheet4; no Replace/import/reset. Existing Data/Sheet1/Sheet2/Sheet3 unchanged.
+Create A1: Internal report / #Sheet4!C3 / Go to synthetic C3.
+Cancel after editing three fields: original fields on reopen. Escape changed label: discarded.
+Edit: Edited internal report / #Data!A1 / Go to synthetic data.
+One Undo: original three fields; Redo: edited three fields confirmed in reopened dialog.
+Alt+Enter: actual Data worksheet A1 selected. Source link visited=true afterward.
+Remove: label retained; fresh insert dialog target/tip empty, OK disabled.
+Undo/Redo removal, final Undo restores link; public removed JSON proves no hyperlink.
+Removed export: 24683 bytes SHA256 faf6081b0bbbd445b9559022d63719e3805601559c829293822a4d84dde267cf.
+Existing purple/underline style remains when link removed; no new clear-style promise.
+Explicit Save locally, Export JSON, ordinary reload waited for loaded A1 label.
+Restored dialog fields match edited three. Re-export identical byte-for-byte.
+Final exports: 24830 bytes SHA256 de5068be0798f87184eddc8d4b5e65c381093110460df520af06b932472f46ff.
+Final A1: literal Edited internal report; hyperlink target #Data!A1, tooltip Go to synthetic data, visited=true.
+Prior four sheets compared structurally to prior21942B Symbol export: identical.
+Two first-click attempts did not open dialog; following Cancel selector timed out no matches.
+Actual ribbon scroll control exposes tool; observing open state then continuing succeeds.
+No conclusion of controller bug or pass for those initial action attempts; no ribbon changes.
+No external destination followed. No native import/export attempt in this slice.
+No own Error9; oom_kill25 before/after. Own tab closed; preview CtrlC prompt confirmed.
+Raw JSON paths/screenshots local only, not included in Git checkpoint.

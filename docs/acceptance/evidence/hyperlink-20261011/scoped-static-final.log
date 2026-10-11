@@ -1,0 +1,7 @@
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 973ms on 4 files using 9 threads.
+FINAL_FORMAT_EXIT=0
+FINAL_LINT_EXIT=0
+FINAL_SOURCE_MARKDOWN_DIFF_EXIT=0

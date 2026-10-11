@@ -1,0 +1,216 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/apps/web
+
+ ❯ src/tests/modules/hyperlinks/dialog-lifecycle.test.ts (8 tests | 8 failed) 277ms
+     × real Core protection refusal preserves the save dialog and local draft for retry 79ms
+     × real Core protection refusal preserves the remove dialog and local draft for retry 33ms
+     × a dismissed confirm callback cannot act on a newer editor 46ms
+     × a dismissed remove callback cannot act on a newer editor 31ms
+     × a dismissed cancel callback cannot act on a newer editor 36ms
+     × a captured editor cannot save after generation changes 18ms
+     × a captured editor cannot save after sheet changes 17ms
+     × a captured editor cannot save after address changes 15ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/modules/hyperlinks/dialog-lifecycle.test.ts > hyperlink dialog bounded lifecycle > real Core protection refusal preserves the save dialog and local draft for retry
+ FAIL  src/tests/modules/hyperlinks/dialog-lifecycle.test.ts > hyperlink dialog bounded lifecycle > real Core protection refusal preserves the remove dialog and local draft for retry
+Error: Invalid sheet protection.
+ ❯ normalizeSheetProtection ../../packages/core/src/protection.ts:34:61
+ ❯ createSheetSparseState ../../packages/core/src/workbook.ts:3212:17
+ ❯ serializeSheet ../../packages/core/src/serialization.ts:1199:47
+ ❯ serializeWorkbook ../../packages/core/src/serialization.ts:1218:46
+ ❯ src/tests/modules/hyperlinks/dialog-lifecycle.test.ts:127:22
+    125|       inputs[2]!.vm.$emit("update:modelValue", edited.tooltip);
+    126|       await nextTick();
+    127|       const before = serializeWorkbook(f.workbook);
+       |                      ^
+    128|       if (action === "save") f.wrapper.getComponent(Dialog).vm.$emit("…
+    129|       else f.wrapper.getComponent(HyperlinkDialog).vm.$emit("remove");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  src/tests/modules/hyperlinks/dialog-lifecycle.test.ts > hyperlink dialog bounded lifecycle > a dismissed confirm callback cannot act on a newer editor
+AssertionError: expected { version: 43, …(11) } to deeply equal { version: 43, …(11) }
+
+- Expected
++ Received
+
+@@ -27,12 +27,21 @@
+          {
+            "address": {
+              "column": 1,
+              "row": 0,
+            },
++           "content": {
++             "kind": "literal",
++             "value": "Unsaved label",
++           },
+            "hyperlink": {
+-             "target": "https://example.test/new",
++             "target": "https://example.test/edited",
++             "tooltip": "Unsaved tooltip",
++           },
++           "style": {
++             "textColor": "#0000ff",
++             "underline": true,
+            },
+          },
+        ],
+        "columnWidths": [],
+        "conditionalFormats": [],
+
+ ❯ src/tests/modules/hyperlinks/dialog-lifecycle.test.ts:170:45
+    168|       else old[action]();
+    169|       await nextTick();
+    170|       expect(serializeWorkbook(f.workbook)).toEqual(before);
+       |                                             ^
+    171|       expect(f.session.history.undoStack).toHaveLength(0);
+    172|       expect(f.wrapper.getComponent(HyperlinkDialog).vm.$.uid).toBe(ui…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  src/tests/modules/hyperlinks/dialog-lifecycle.test.ts > hyperlink dialog bounded lifecycle > a dismissed remove callback cannot act on a newer editor
+AssertionError: expected { version: 43, …(11) } to deeply equal { version: 43, …(11) }
+
+- Expected
++ Received
+
+@@ -22,19 +22,10 @@
+            "content": {
+              "kind": "literal",
+              "value": "Original",
+            },
+          },
+-         {
+-           "address": {
+-             "column": 1,
+-             "row": 0,
+-           },
+-           "hyperlink": {
+-             "target": "https://example.test/new",
+-           },
+-         },
+        ],
+        "columnWidths": [],
+        "conditionalFormats": [],
+        "dataValidations": [],
+        "defaultColumnWidth": 96,
+
+ ❯ src/tests/modules/hyperlinks/dialog-lifecycle.test.ts:170:45
+    168|       else old[action]();
+    169|       await nextTick();
+    170|       expect(serializeWorkbook(f.workbook)).toEqual(before);
+       |                                             ^
+    171|       expect(f.session.history.undoStack).toHaveLength(0);
+    172|       expect(f.wrapper.getComponent(HyperlinkDialog).vm.$.uid).toBe(ui…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  src/tests/modules/hyperlinks/dialog-lifecycle.test.ts > hyperlink dialog bounded lifecycle > a dismissed cancel callback cannot act on a newer editor
+Error: Unable to get specified component within: 
+ ❯ VueWrapper.getComponent ../../node_modules/.bun/@vue+test-utils@2.4.11+bedd8b778080c456/node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js:7203:15
+ ❯ src/tests/modules/hyperlinks/dialog-lifecycle.test.ts:172:24
+    170|       expect(serializeWorkbook(f.workbook)).toEqual(before);
+    171|       expect(f.session.history.undoStack).toHaveLength(0);
+    172|       expect(f.wrapper.getComponent(HyperlinkDialog).vm.$.uid).toBe(ui…
+       |                        ^
+    173|     },
+    174|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  src/tests/modules/hyperlinks/dialog-lifecycle.test.ts > hyperlink dialog bounded lifecycle > a captured editor cannot save after generation changes
+AssertionError: expected { version: 43, …(11) } to deeply equal { version: 43, …(11) }
+
+- Expected
++ Received
+
+@@ -11,11 +11,30 @@
+    "definedNames": [],
+    "id": "replacement",
+    "pivotTableStyles": [],
+    "sheets": [
+      {
+-       "cells": [],
++       "cells": [
++         {
++           "address": {
++             "column": 0,
++             "row": 0,
++           },
++           "content": {
++             "kind": "literal",
++             "value": "Unsaved label",
++           },
++           "hyperlink": {
++             "target": "https://example.test/edited",
++             "tooltip": "Unsaved tooltip",
++           },
++           "style": {
++             "textColor": "#0000ff",
++             "underline": true,
++           },
++         },
++       ],
+        "columnWidths": [],
+        "conditionalFormats": [],
+        "dataValidations": [],
+        "defaultColumnWidth": 96,
+        "duplicateRules": [],
+
+ ❯ src/tests/modules/hyperlinks/dialog-lifecycle.test.ts:196:58
+    194|       old.confirm(edited);
+    195|       await nextTick();
+    196|       expect(serializeWorkbook(f.currentWorkbook.value)).toEqual(befor…
+       |                                                          ^
+    197|       expect(f.session.history.undoStack).toHaveLength(0);
+    198|       expect(f.links.draft.value).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  src/tests/modules/hyperlinks/dialog-lifecycle.test.ts > hyperlink dialog bounded lifecycle > a captured editor cannot save after sheet changes
+ FAIL  src/tests/modules/hyperlinks/dialog-lifecycle.test.ts > hyperlink dialog bounded lifecycle > a captured editor cannot save after address changes
+AssertionError: expected { version: 43, …(11) } to deeply equal { version: 43, …(11) }
+
+- Expected
++ Received
+
+@@ -19,11 +19,19 @@
+              "column": 0,
+              "row": 0,
+            },
+            "content": {
+              "kind": "literal",
+-             "value": "Original",
++             "value": "Unsaved label",
++           },
++           "hyperlink": {
++             "target": "https://example.test/edited",
++             "tooltip": "Unsaved tooltip",
++           },
++           "style": {
++             "textColor": "#0000ff",
++             "underline": true,
+            },
+          },
+        ],
+        "columnWidths": [],
+        "conditionalFormats": [],
+
+ ❯ src/tests/modules/hyperlinks/dialog-lifecycle.test.ts:196:58
+    194|       old.confirm(edited);
+    195|       await nextTick();
+    196|       expect(serializeWorkbook(f.currentWorkbook.value)).toEqual(befor…
+       |                                                          ^
+    197|       expect(f.session.history.undoStack).toHaveLength(0);
+    198|       expect(f.links.draft.value).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed (8)
+   Start at  23:08:13
+   Duration  3.85s (transform 1.71s, setup 0ms, import 3.24s, tests 277ms, environment 189ms)
+

@@ -384,7 +384,7 @@ const hyperlinkActions = useHyperlinksController({
   },
   focus: focusCellEditor,
 });
-const { draft: hyperlinkDraft, error: hyperlinkError } = hyperlinkActions;
+const { dialog: hyperlinkDialog, draft: hyperlinkDraft, error: hyperlinkError } = hyperlinkActions;
 const protectionActions = useProtectionController({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -3436,12 +3436,13 @@ const gridInert = computed(
       @cancel="tableCalculatedColumnTarget.cancel"
     />
     <HyperlinkDialog
-      v-if="hyperlinkDraft"
-      :draft="hyperlinkDraft"
+      v-if="hyperlinkDialog"
+      :key="hyperlinkDialog.dialogId"
+      :draft="hyperlinkDialog.initial"
       :error="hyperlinkError"
-      @confirm="hyperlinkActions.save"
-      @remove="hyperlinkActions.remove"
-      @cancel="hyperlinkActions.close"
+      @confirm="hyperlinkDialog.confirm"
+      @remove="hyperlinkDialog.remove"
+      @cancel="hyperlinkDialog.cancel"
     />
     <NewCellStyleDialog
       v-if="cellStyleDraft"

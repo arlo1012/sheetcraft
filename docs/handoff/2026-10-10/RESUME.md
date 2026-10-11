@@ -1,5 +1,23 @@
 # Sheetcraft continuation after recovery — 2026-10-10
 
+## Existing Hyperlink lifecycle — 2026-10-11
+
+Read `docs/acceptance/hyperlink-20261011.md`. The real Core/history protected-cell
+refusal reproduced discarded save/remove drafts. The local controller now retains
+that same editor on refused/throwing execution and binds a keyed captured workbook,
+generation, sheet and cell context. Old confirm/remove/cancel cannot affect a newer
+instance. Core commands, validation, external opener and native formats are unchanged.
+
+Fresh serial checks: related Web 39, grid interactions 3, Core link history 8 passed;
+full Web Vue/Node types plus production build exit 0, chunk-size warning remains.
+Initial eight target failures, two earlier fixture errors and the later idFactory
+type error remain in separate logs. Actual synthetic internal-link creation/edit,
+Cancel/Escape, remove, Undo/Redo, internal navigation and explicit save/reload/JSON
+passed. New Sheet4 only; the four prior synthetic sheets are unchanged. Public JSON
+before/after reload is identical (24,830 bytes, SHA256 de5068be0798f87184eddc8d4b5e65c381093110460df520af06b932472f46ff).
+No external navigation, native exchange or full CI was rerun. Raw exports stay local.
+Own preview/page cleaned up; no own Error 9 and oom_kill stayed 25.
+
 ## Existing Symbol lifecycle — 2026-10-11
 
 Read `docs/acceptance/symbol-20261011.md`. Real preset/custom insertion, retained
