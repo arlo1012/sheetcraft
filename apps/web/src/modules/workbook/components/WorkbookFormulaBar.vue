@@ -15,6 +15,7 @@ import {
   isExplicitWarningConfirmationKey,
   useCellEditSession,
   type CellEditSession,
+  type CellEditCommit,
 } from "../../../shared/cell-editing/useCellEditSession";
 import WorkbookFormulaBarAddressInput from "./WorkbookFormulaBarAddressInput.vue";
 
@@ -36,7 +37,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   navigate: [address: string];
-  commitCell: [payload: { address: CellAddress; input: string; sheetId?: string }];
+  commitCell: [payload: CellEditCommit];
   traverse: [
     payload: {
       address: CellAddress;
@@ -168,6 +169,8 @@ function onFormulaInput(event: Event): void {
   )
     return;
   editSession.activateSurface("formula-bar");
+  if (event instanceof InputEvent && event.inputType === "insertFromPaste")
+    editSession.markPasted();
   editSession.setDraft(value);
   if (startsFormula) editSession.setMode("point");
   void nextTick(captureSelection);
@@ -453,6 +456,7 @@ defineExpose({
           :readonly="readOnly || previewing"
           :placeholder="t('formulaBar.placeholder')"
           @input="onFormulaInput"
+          @paste.capture="editSession.markPasted()"
           @focus="onFormulaFocus"
           @blur="(_value, { e }) => onFormulaBlur(e)"
           @keydown="(_value, { e }) => onFormulaKeydown(e)"

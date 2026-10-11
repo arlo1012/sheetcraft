@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { Eraser, ListMinus, Table2, TableProperties } from "lucide-vue-next";
+import { Eraser, ListMinus, Table2, TableProperties, FunctionSquare } from "lucide-vue-next";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { createThemedTableStyles, type TableStyleDefinition } from "@sheetcraft/core/table-styles";
@@ -24,6 +24,7 @@ const emit = defineEmits<{
   rename: [name: string];
   changeOptions: [changes: TableOptionsPatch];
   resize: [];
+  calculatedColumn: [];
   removeDuplicates: [];
   convert: [];
   applyStyle: [style: TableStyleDefinition];
@@ -101,6 +102,14 @@ function onNameKeydown(_value: string | number, context: { e: KeyboardEvent }): 
         ><TableProperties
       /></RibbonButton>
       <div class="table-tools-toolbar__stack">
+        <RibbonButton
+          :disabled="disabled"
+          :label="t('tables.calculatedColumn')"
+          :text="t('tables.calculatedColumn')"
+          data-table-action="calculated-column"
+          @activate="emit('calculatedColumn')"
+          ><FunctionSquare
+        /></RibbonButton>
         <RibbonButton
           :disabled="disabled"
           :label="t('dataTools.removeDuplicates.title')"

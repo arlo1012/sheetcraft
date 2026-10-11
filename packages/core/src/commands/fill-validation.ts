@@ -55,6 +55,7 @@ function simpleValue(content: CellContent | null): CellValue | undefined {
 export function assertFillDataValidation(
   workbook: Workbook,
   command: SetCellContentsCommand,
+  confirmedInputWarning?: SetCellContentsCommand["inputValidationWarning"],
 ): void {
   const hasEnabledRule = command.changes.some((change) => {
     const sheet = workbook.sheets.get(change.sheetId);
@@ -72,6 +73,15 @@ export function assertFillDataValidation(
     const content = change.content;
     for (const rule of getCellDataValidations(sheet, change.address)) {
       if (rule.showError === false) continue;
+      if (
+        confirmedInputWarning &&
+        confirmedInputWarning.sheetId === change.sheetId &&
+        confirmedInputWarning.address.row === change.address.row &&
+        confirmedInputWarning.address.column === change.address.column &&
+        (rule.errorStyle === "warning" || rule.errorStyle === "information") &&
+        confirmedInputWarning.ruleSignature === JSON.stringify(rule)
+      )
+        continue;
       const value = simpleValue(content);
       if (content?.kind === "error" || content?.kind === "image")
         throw new DataFillError("validation", "The fill result violates data validation.");

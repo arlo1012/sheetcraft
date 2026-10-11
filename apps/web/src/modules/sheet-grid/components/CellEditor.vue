@@ -253,8 +253,15 @@ function onFocus(): void {
 }
 
 function onInput(event: Event): void {
+  if (props.editing && event instanceof InputEvent && event.inputType === "insertFromPaste")
+    props.editSession?.markPasted();
   emit("update:modelValue", readInputValue(event));
   void nextTick(captureSelection);
+}
+
+function onPaste(event: ClipboardEvent): void {
+  if (props.editing) props.editSession?.markPasted();
+  emit("paste", event);
 }
 
 function onBlur(event: FocusEvent): void {
@@ -322,7 +329,7 @@ defineExpose({
       @compositionend="emit('compositionEnd', readInputValue($event), $event)"
       @copy="emit('copy', $event)"
       @cut="emit('cut', $event)"
-      @paste="emit('paste', $event)"
+      @paste="onPaste"
     />
     <FormulaTextOverlay
       :input="inputRef"

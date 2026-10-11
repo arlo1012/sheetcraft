@@ -108,7 +108,7 @@ export function createSetCellContentCommand(
   sheetId: string,
   address: CellAddress,
   content: CellContent | null,
-  options: { inputIntent?: "manual" } = {},
+  options: { inputIntent?: "manual"; inputValidationWarningSignature?: string } = {},
 ): SetCellContentsCommand {
   return {
     type: "setCellContents",
@@ -120,6 +120,15 @@ export function createSetCellContentCommand(
       },
     ],
     ...(options.inputIntent ? { inputIntent: options.inputIntent } : {}),
+    ...(options.inputIntent === "manual" && options.inputValidationWarningSignature
+      ? {
+          inputValidationWarning: {
+            sheetId,
+            address: { ...address },
+            ruleSignature: options.inputValidationWarningSignature,
+          },
+        }
+      : {}),
   };
 }
 

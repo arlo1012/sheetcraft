@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261011/packages/xlsx-io
+
+ ❯ src/tests/native/calculated-column-metadata.test.ts (50 tests | 1 failed) 1525ms
+     × omits unsupported native metadata with located warning: <calculatedColumnFormula xmlnsUnknown="not-a-namespace">B2*2</calculatedColumnFormula> 40ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/native/calculated-column-metadata.test.ts > explicit native calculated-column templates > omits unsupported native metadata with located warning: <calculatedColumnFormula xmlnsUnknown="not-a-namespace">B2*2</calculatedColumnFormula>
+AssertionError: expected '=B2*2' to be undefined
+
+- Expected:
+undefined
+
++ Received:
+"=B2*2"
+
+ ❯ src/tests/native/calculated-column-metadata.test.ts:180:60
+    178|   ])("omits unsupported native metadata with located warning: %s", asy…
+    179|     const result = await nativeFormula(body);
+    180|     expect(restoredColumn(result).calculatedColumnFormula).toBeUndefin…
+       |                                                            ^
+    181|     expect(result.report.issues).toContainEqual(
+    182|       expect.objectContaining({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 49 passed (50)
+   Start at  20:08:39
+   Duration  6.94s (transform 4.59s, setup 0ms, import 5.25s, tests 1.52s, environment 0ms)
+

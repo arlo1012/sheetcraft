@@ -128,6 +128,7 @@ export function finalizeXlsxExport(
     defaultTableStyleId,
     nativePivotStyles,
     defaultPivotTableStyleId,
+    { workbook, report },
   );
   writeXlsxFilterColorFormats(
     entries,

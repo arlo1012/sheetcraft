@@ -8,8 +8,10 @@ import {
   createRemoveTableCommand,
   createSetWorkbookTableStylesCommand,
   createSetWorkbookPivotTableStylesCommand,
+  createApplyTableCalculatedColumnCommand,
   type WorkbookCommand,
 } from "@sheetcraft/core/commands";
+import { getFormulaAst } from "@sheetcraft/core/formula";
 import { resolveDataRange } from "@sheetcraft/core/data-range";
 import { WorkbookDomainError } from "@sheetcraft/core/errors";
 import {
@@ -20,13 +22,16 @@ import {
   type TableStyleDefinition,
 } from "@sheetcraft/core/table-styles";
 import type { PivotTableStyleDefinition } from "@sheetcraft/core/pivot-table-styles";
-import type {
-  CellAddress,
-  CellRange,
-  Sheet,
-  SheetTable,
-  Workbook,
+import {
+  getCellContent,
+  getTableDataRows,
+  type CellAddress,
+  type CellRange,
+  type Sheet,
+  type SheetTable,
+  type Workbook,
 } from "@sheetcraft/core/workbook";
+import { getCellAddressLabel } from "@sheetcraft/core/coordinates";
 import { useAppI18n } from "../../shared/i18n";
 import {
   formatRangeReference,
@@ -64,6 +69,19 @@ type ResizeTarget = DialogTarget & {
   confirm: (range: string) => void;
   cancel: () => void;
 };
+type CalculatedColumnTarget = DialogTarget & {
+  tableId: string;
+  columnId: string;
+  columnName: string;
+  tableName: string;
+  sourceAddress: CellAddress;
+  anchorLabel: string;
+  rangeLabel: string;
+  initial: string;
+  revision: number;
+  confirm: (source: string) => void;
+  cancel: () => void;
+};
 
 export function useTableStylesController(options: {
   getWorkbook: () => Workbook;
@@ -82,6 +100,7 @@ export function useTableStylesController(options: {
   const createTarget = shallowRef<Target>();
   const settingsTarget = shallowRef<SettingsTarget>();
   const resizeTarget = shallowRef<ResizeTarget>();
+  const calculatedColumnTarget = shallowRef<CalculatedColumnTarget>();
   const styleDraft = shallowRef<{ style?: TableStyleDefinition }>();
   const pivotStyleDraft = shallowRef<{ style?: PivotTableStyleDefinition }>();
   const error = ref("");
@@ -126,6 +145,7 @@ export function useTableStylesController(options: {
       createTarget.value ||
       settingsTarget.value ||
       resizeTarget.value ||
+      calculatedColumnTarget.value ||
       styleDraft.value ||
       pivotStyleDraft.value,
     ),
@@ -135,6 +155,7 @@ export function useTableStylesController(options: {
     createTarget.value = undefined;
     settingsTarget.value = undefined;
     resizeTarget.value = undefined;
+    calculatedColumnTarget.value = undefined;
     styleDraft.value = undefined;
     pivotStyleDraft.value = undefined;
     error.value = "";
@@ -177,6 +198,7 @@ export function useTableStylesController(options: {
     target: T | undefined,
     current: T | undefined,
     apply: (target: T) => void,
+    failureMessage: "tables.failed" | "tables.calculatedUnavailable" = "tables.failed",
   ): void {
     if (!target || target !== current || confirming || disposed) return;
     if (
@@ -189,7 +211,7 @@ export function useTableStylesController(options: {
       return;
     }
     if (options.isBusy() || target.sheet.properties.protected) {
-      error.value = t("tables.failed");
+      error.value = t(failureMessage);
       return;
     }
     confirming = true;
@@ -199,10 +221,13 @@ export function useTableStylesController(options: {
       confirming = false;
     }
   }
-  function execute(command: WorkbookCommand): boolean {
+  function execute(
+    command: WorkbookCommand,
+    failureMessage: "tables.failed" | "tables.calculatedUnavailable" = "tables.failed",
+  ): boolean {
     try {
       if (options.execute(command)) return true;
-      error.value = t("tables.failed");
+      error.value = t(failureMessage);
       if (!modalOpen.value) void MessagePlugin.warning(error.value);
       return false;
     } catch (cause) {
@@ -219,7 +244,7 @@ export function useTableStylesController(options: {
             ? "tables.invalidName"
             : field === "tableOverlap"
               ? "tables.overlap"
-              : "tables.failed",
+              : failureMessage,
       );
       if (!modalOpen.value) void MessagePlugin.warning(error.value);
       return false;
@@ -424,6 +449,75 @@ export function useTableStylesController(options: {
         close();
     });
   }
+
+  function openCalculatedColumn(): void {
+    if (!begin()) return;
+    const table = activeTable.value;
+    if (!table) return;
+    const columnIndex = options.getAddress().column - table.range.start.column;
+    const column = table.columns[columnIndex];
+    const rows = getTableDataRows(table);
+    if (!column || rows.start > rows.end) return;
+    const sourceAddress = { row: rows.start, column: table.range.start.column + columnIndex };
+    const sheet = options.getSheet();
+    const content = getCellContent(sheet, sourceAddress);
+    const target: CalculatedColumnTarget = {
+      ...captureTarget(table),
+      tableId: table.id,
+      columnId: column.id,
+      columnName: column.name,
+      tableName: table.name,
+      sourceAddress,
+      anchorLabel: getCellAddressLabel(sourceAddress),
+      rangeLabel: `${getCellAddressLabel(sourceAddress)}:${getCellAddressLabel({ ...sourceAddress, row: rows.end })}`,
+      initial:
+        column.calculatedColumnFormula ??
+        (content?.kind === "formula" ? content.formula.source : ""),
+      revision: options.getRevision(),
+      confirm: (source) => confirmCalculatedColumn(source, target),
+      cancel: () => {
+        if (calculatedColumnTarget.value === target) close();
+      },
+    };
+    calculatedColumnTarget.value = target;
+  }
+
+  function confirmCalculatedColumn(source: string, target = calculatedColumnTarget.value): void {
+    confirmTarget(
+      target,
+      calculatedColumnTarget.value,
+      (target) => {
+        if (target.revision !== options.getRevision()) {
+          error.value = t("tables.calculatedChanged");
+          return;
+        }
+        let valid = false;
+        try {
+          valid = source.trim().startsWith("=") && !!getFormulaAst(source.trim());
+        } catch {
+          /* The draft remains available on a malformed source. */
+        }
+        if (!valid) {
+          error.value = t("tables.invalidCalculatedFormula");
+          return;
+        }
+        if (
+          execute(
+            createApplyTableCalculatedColumnCommand(
+              target.sheetId,
+              target.tableId,
+              target.columnId,
+              target.sourceAddress,
+              source.trim(),
+            ),
+            "tables.calculatedUnavailable",
+          )
+        )
+          close();
+      },
+      "tables.calculatedUnavailable",
+    );
+  }
   function convertToRange(target = settingsTarget.value): void {
     if (target) {
       confirmTarget(target, settingsTarget.value, (target) => {
@@ -502,6 +596,7 @@ export function useTableStylesController(options: {
     createInitial,
     settingsTarget,
     resizeTarget,
+    calculatedColumnTarget,
     styleDraft,
     pivotStyleDraft,
     error,
@@ -515,6 +610,8 @@ export function useTableStylesController(options: {
     renameTable,
     openResize,
     confirmResize,
+    openCalculatedColumn,
+    confirmCalculatedColumn,
     convertToRange,
     clearStyle,
     openStyle,

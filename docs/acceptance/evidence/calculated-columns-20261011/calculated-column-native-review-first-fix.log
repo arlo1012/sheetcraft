@@ -1,0 +1,49 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261011/packages/xlsx-io
+
+ ❯ src/tests/native/calculated-column-metadata.test.ts (48 tests | 3 failed) 872ms
+     × keeps the bounded scalar family =IF(B2>0,B2*2,#N/A) 19ms
+     × omits the growth-blocking SPILL error in native template #SPILL! 16ms
+     × omits the growth-blocking SPILL error in native template IF(B2>0,0,#SPILL!) 14ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/native/calculated-column-metadata.test.ts > explicit native calculated-column templates > keeps the bounded scalar family =IF(B2>0,B2*2,#N/A)
+AssertionError: expected undefined to be '=IF(B2>0,B2*2,#N/A)' // Object.is equality
+
+- Expected:
+"=IF(B2>0,B2*2,#N/A)"
+
++ Received:
+undefined
+
+ ❯ src/tests/native/calculated-column-metadata.test.ts:127:60
+    125|     const f = fixture(source);
+    126|     const result = await decodeXlsx((await encodeXlsx(f.workbook)).byt…
+    127|     expect(restoredColumn(result).calculatedColumnFormula).toBe(
+       |                                                            ^
+    128|       source.includes("[@Qty]")
+    129|         ? "=Sales[[#This Row],[Qty]]*2"
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/tests/native/calculated-column-metadata.test.ts > explicit native calculated-column templates > omits the growth-blocking SPILL error in native template #SPILL!
+ FAIL  src/tests/native/calculated-column-metadata.test.ts > explicit native calculated-column templates > omits the growth-blocking SPILL error in native template IF(B2>0,0,#SPILL!)
+WorkbookDomainError: Table does not exist.
+ ❯ applyWorkbookCommand ../core/src/commands/apply.ts:486:11
+ ❯ src/tests/native/calculated-column-metadata.test.ts:281:7
+    279|       const sheet = getActiveSheet(result.workbook);
+    280|       expect(getCellContent(sheet, { row: 2, column: 2 })).toEqual({ k…
+    281|       applyWorkbookCommand(
+       |       ^
+    282|         result.workbook,
+    283|         createResizeTableCommand(sheet.id, "t", {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 45 passed (48)
+   Start at  20:04:36
+   Duration  2.69s (transform 1.22s, setup 0ms, import 1.68s, tests 872ms, environment 0ms)
+

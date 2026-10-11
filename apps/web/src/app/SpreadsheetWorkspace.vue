@@ -57,6 +57,7 @@ import DataTableDialog from "../modules/data-tools/components/DataTableDialog.vu
 import CreateTableDialog from "../modules/table-styles/components/CreateTableDialog.vue";
 import TableSettingsDialog from "../modules/table-styles/components/TableSettingsDialog.vue";
 import ResizeTableDialog from "../modules/table-styles/components/ResizeTableDialog.vue";
+import CalculatedColumnDialog from "../modules/table-styles/components/CalculatedColumnDialog.vue";
 import TableToolsToolbar from "../modules/table-styles/components/TableToolsToolbar.vue";
 import NewTableStyleDialog from "../modules/table-styles/components/NewTableStyleDialog.vue";
 import HyperlinkDialog from "../modules/hyperlinks/components/HyperlinkDialog.vue";
@@ -497,6 +498,7 @@ const {
   createInitial: createTableInitial,
   settingsTarget: tableSettingsTarget,
   resizeTarget: tableResizeTarget,
+  calculatedColumnTarget: tableCalculatedColumnTarget,
   styleDraft: tableStyleDraft,
   pivotStyleDraft: pivotTableStyleDraft,
   error: tableError,
@@ -2690,6 +2692,7 @@ const gridInert = computed(
           @rename="tableActions.renameTable"
           @change-options="tableActions.updateTable"
           @resize="tableActions.openResize"
+          @calculated-column="tableActions.openCalculatedColumn"
           @remove-duplicates="dataTools.openTableRemoveDuplicates(activeTable.id)"
           @convert="tableActions.convertToRange"
           @apply-style="tableActions.applyStyle"
@@ -3383,6 +3386,18 @@ const gridInert = computed(
       :select-reference="tableRangePicker.selectReference"
       @confirm="tableResizeTarget.confirm"
       @cancel="tableResizeTarget.cancel"
+    />
+    <CalculatedColumnDialog
+      v-if="tableCalculatedColumnTarget"
+      :key="tableCalculatedColumnTarget.dialogId"
+      :initial="tableCalculatedColumnTarget.initial"
+      :table-name="tableCalculatedColumnTarget.tableName"
+      :column-name="tableCalculatedColumnTarget.columnName"
+      :range-label="tableCalculatedColumnTarget.rangeLabel"
+      :anchor-label="tableCalculatedColumnTarget.anchorLabel"
+      :error="tableError"
+      @confirm="tableCalculatedColumnTarget.confirm"
+      @cancel="tableCalculatedColumnTarget.cancel"
     />
     <HyperlinkDialog
       v-if="hyperlinkDraft"

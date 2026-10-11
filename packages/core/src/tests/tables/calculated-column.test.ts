@@ -14,6 +14,79 @@ import { executeWorkbookCommand, undoWorkbookCommand, redoWorkbookCommand } from
 import { serializeWorkbook, deserializeWorkbook } from "../../serialization.js";
 
 describe("table calculated columns", () => {
+  test.each(["warning", "information"] as const)(
+    "confirmed %s applies only to the original manual input rule",
+    (errorStyle) => {
+      const { workbook, sheet, session } = calculatedColumnFixture();
+      const address = { row: 1, column: 2 };
+      const rule = {
+        id: "input-warning",
+        range: { start: address, end: address },
+        type: "whole" as const,
+        operator: "between" as const,
+        formula1: "1",
+        formula2: "3",
+        errorStyle,
+        allowBlank: false,
+      };
+      sheet.dataValidations = [rule];
+      const before = serializeWorkbook(workbook);
+      const command = createSetCellContentCommand(
+        sheet.id,
+        address,
+        { kind: "formula", formula: { source: "=B2*2" } },
+        { inputIntent: "manual", inputValidationWarningSignature: JSON.stringify(rule) },
+      );
+      executeWorkbookCommand(session, command);
+      expect(getCellContent(sheet, { row: 3, column: 2 })).toMatchObject({
+        formula: { source: "=B4*2" },
+      });
+      const after = serializeWorkbook(workbook);
+      undoWorkbookCommand(session);
+      expect(serializeWorkbook(workbook)).toEqual(before);
+      redoWorkbookCommand(session);
+      expect(serializeWorkbook(workbook)).toEqual(after);
+    },
+  );
+
+  test.each(["stop", "changed-rule", "wrong-target", "generated-warning"] as const)(
+    "%s cannot use an original-cell warning confirmation to bypass atomic validation",
+    (kind) => {
+      const { workbook, sheet, session } = calculatedColumnFixture();
+      const address = { row: 1, column: 2 };
+      const rule = {
+        id: "input-warning",
+        range: { start: address, end: address },
+        type: "whole" as const,
+        operator: "between" as const,
+        formula1: "1",
+        formula2: "3",
+        errorStyle: "warning" as const,
+        allowBlank: false,
+      };
+      const command = createSetCellContentCommand(
+        sheet.id,
+        address,
+        { kind: "formula", formula: { source: "=B2*2" } },
+        { inputIntent: "manual", inputValidationWarningSignature: JSON.stringify(rule) },
+      );
+      sheet.dataValidations = [rule];
+      if (kind === "stop") sheet.dataValidations = [{ ...rule, errorStyle: "stop" }];
+      if (kind === "changed-rule") sheet.dataValidations = [{ ...rule, formula2: "2" }];
+      if (kind === "wrong-target") command.inputValidationWarning!.address = { row: 2, column: 2 };
+      if (kind === "generated-warning")
+        sheet.dataValidations!.push({
+          ...rule,
+          id: "other-warning",
+          range: { start: { row: 3, column: 2 }, end: { row: 3, column: 2 } },
+        });
+      const before = serializeWorkbook(workbook);
+      const revision = session.history.revision;
+      expect(() => executeWorkbookCommand(session, command)).toThrow();
+      expect(serializeWorkbook(workbook)).toEqual(before);
+      expect(session.history.revision).toBe(revision);
+    },
+  );
   test("absent/undefined template keeps the old snapshot protocol and round-trip", () => {
     const { workbook, sheet } = calculatedColumnFixture();
     sheet.tables![0]!.columns[2]!.calculatedColumnFormula = undefined;

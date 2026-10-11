@@ -1089,6 +1089,7 @@ export type MessageSchema = ToolMessageSchema & {
     nameDeleted: string;
     filterUnavailable: string;
     sortUnavailable: string;
+    cellEditUnavailable: string;
     freezeUnavailable: string;
     mergeUnavailable: string;
     conversionUnavailable: string;

@@ -9,13 +9,26 @@ import {
   PIVOT_TABLE_STYLE_ELEMENTS,
   type PivotTableStyleDefinition,
 } from "@sheetcraft/core/pivot-table-styles";
-import type { CellRange, Sheet, SheetFilter, SheetTable } from "@sheetcraft/core/workbook";
+import type {
+  CellRange,
+  Sheet,
+  SheetFilter,
+  SheetTable,
+  Workbook,
+} from "@sheetcraft/core/workbook";
 import type { CompatibilityReportBuilder } from "./report.js";
 import type { CellBorder } from "@sheetcraft/core/style";
 import { readXlsxDxfEntries, readXlsxDxfStyle, xlsxDxfXml } from "./conditional-formatting.js";
 import { readXlsxAutoFilter, writeXlsxAutoFilter } from "./data-tools-metadata.js";
 import { materializeXlsxStyleColors } from "./xlsx-colors.js";
 import { readGeneratedTableTotalsCells, xlsxTableTotalsColumn } from "./table-totals.js";
+
+import { attr, child, nodes, parseXml, type XmlNode } from "./pivot-xml.js";
+import {
+  calculatedColumnXml,
+  calculatedColumnNamespaces,
+  readCalculatedColumnFormula,
+} from "./table-calculated-columns.js";
 
 type WorksheetPart = { path: string; xml: string };
 type ImportedTable = SheetTable;
@@ -387,42 +400,111 @@ function tableFilterButton(
   );
 }
 
+function reportUnsupportedTableMetadata(
+  root: XmlNode,
+  name: string,
+  report?: CompatibilityReportBuilder,
+): void {
+  if (!report) return;
+  const inspect = (node: XmlNode, allowed: readonly string[], location: string) => {
+    if (Object.keys(node).some((key) => key !== "@_xmlns" && !allowed.includes(key)))
+      report.add("feature-omitted", "warning", location);
+  };
+  inspect(
+    root,
+    [
+      "@_id",
+      "@_name",
+      "@_displayName",
+      "@_ref",
+      "@_headerRowCount",
+      "@_totalsRowCount",
+      "@_totalsRowShown",
+      "tableColumns",
+      "autoFilter",
+      "tableStyleInfo",
+    ],
+    `${name}.tableMetadata`,
+  );
+  inspect(
+    child(root, "tableStyleInfo"),
+    ["@_name", "@_showFirstColumn", "@_showLastColumn", "@_showRowStripes", "@_showColumnStripes"],
+    `${name}.tableStyleInfo`,
+  );
+  inspect(child(root, "tableColumns"), ["@_count", "tableColumn"], `${name}.tableColumns`);
+  for (const column of nodes(child(root, "tableColumns").tableColumn))
+    inspect(
+      column,
+      [
+        "@_id",
+        "@_name",
+        "@_hiddenButton",
+        "@_totalsRowLabel",
+        "@_totalsRowFunction",
+        "calculatedColumnFormula",
+        "totalsRowFormula",
+      ],
+      `${name}[${attr(column, "name")}].columnMetadata`,
+    );
+}
+
 function readTable(
   xml: string,
   styles: ReadonlyMap<string, TableStyleDefinition>,
   dxfs: readonly string[],
   report?: CompatibilityReportBuilder,
 ): ImportedTable | null {
-  const root = /<table\b([^>]*)>/i.exec(xml);
-  if (!root) return null;
-  const attrs = root[1] ?? "";
-  const range = parseRange(attribute(attrs, "ref") ?? "");
-  const name = attribute(attrs, "displayName") ?? attribute(attrs, "name");
+  let root: XmlNode;
+  try {
+    root = child(parseXml(strToU8(xml)), "table");
+  } catch {
+    report?.add("feature-omitted", "warning", "table.invalidXml");
+    return null;
+  }
+  const range = parseRange(attr(root, "ref"));
+  const name = attr(root, "displayName") || attr(root, "name");
   if (!range || !name) return null;
-  const info = /<tableStyleInfo\b([^>]*)\/?\s*>/i.exec(xml)?.[1] ?? "";
-  const styleName = attribute(info, "name");
-  // WPS stores Clear/None without a name; do not apply the default for new tables.
+  const info = child(root, "tableStyleInfo");
+  const styleName = info["@_name"] === undefined ? undefined : attr(info, "name");
   const style: TableStyleDefinition =
     styleName === undefined
       ? { id: "table-none", name: "None", category: "custom", elements: {} }
       : (styles.get(styleName) ?? builtinStyle(styleName) ?? fallbackExcelStyle(styleName));
-  const columns = [...xml.matchAll(/<tableColumn\b([^>]*)\/?\s*>/gi)].map((column, index) => ({
-    id: attribute(column[1] ?? "", "id") ?? String(index + 1),
-    name: attribute(column[1] ?? "", "name") ?? `Column${index + 1}`,
-  }));
+  const namespaces = calculatedColumnNamespaces(xml);
+  const scalarLayout =
+    ["0", "1"].includes(attr(root, "headerRowCount", "1")) &&
+    ["0", "1"].includes(attr(root, "totalsRowCount", "0"));
+  const columns = nodes(child(root, "tableColumns").tableColumn).map((column, index) => {
+    const id = attr(column, "id") || String(index + 1);
+    const columnName = attr(column, "name") || `Column${index + 1}`;
+    const calculatedColumnFormula = readCalculatedColumnFormula(
+      column,
+      report,
+      `${name}[${columnName}]`,
+      scalarLayout &&
+        namespaces.get(JSON.stringify([attr(column, "id"), attr(column, "name")])) === true,
+    );
+    return {
+      id,
+      name: columnName,
+      ...(calculatedColumnFormula === undefined ? {} : { calculatedColumnFormula }),
+    };
+  });
+  reportUnsupportedTableMetadata(root, name, report);
+  if (root.autoFilter !== undefined && !/<autoFilter\b/i.test(xml))
+    report?.add("feature-omitted", "warning", `${name}.filterNamespace`);
   return {
-    id: attribute(attrs, "id") ?? `xlsx-table-${name}`,
+    id: attr(root, "id") || `xlsx-table-${name}`,
     name,
     range,
     columns,
     style,
-    headerRow: Number(attribute(attrs, "headerRowCount") ?? "1") !== 0,
-    totalRow: Number(attribute(attrs, "totalsRowCount") ?? "0") > 0,
-    firstColumn: truthy(attribute(info, "showFirstColumn")),
-    lastColumn: truthy(attribute(info, "showLastColumn")),
-    bandedRows:
-      attribute(info, "showRowStripes") === undefined || truthy(attribute(info, "showRowStripes")),
-    bandedColumns: truthy(attribute(info, "showColumnStripes")),
+    headerRow: Number(attr(root, "headerRowCount", "1")) !== 0,
+    totalRow: Number(attr(root, "totalsRowCount", "0")) > 0,
+    firstColumn: truthy(attr(info, "showFirstColumn")),
+    lastColumn: truthy(attr(info, "showLastColumn")),
+    bandedRows: info["@_showRowStripes"] === undefined || truthy(attr(info, "showRowStripes")),
+    bandedColumns: truthy(attr(info, "showColumnStripes")),
     filterButton: tableFilterButton(xml, columns.length, name, report),
     filter: tableFilter(xml, dxfs),
   };
@@ -526,15 +608,16 @@ function tableXml(
   tableId: number,
   sheet: Sheet,
   totalsCells: ReturnType<typeof readGeneratedTableTotalsCells>,
+  workbook?: Workbook,
+  report?: CompatibilityReportBuilder,
 ): string {
   const name = encodeXml(table.name);
   const columns = table.columns
     .map((column, index) => {
       const totals = xlsxTableTotalsColumn(sheet, table, index, totalsCells);
       const attrs = `id="${index + 1}" name="${encodeXml(column.name)}"${totals.attributes}`;
-      return totals.body
-        ? `<tableColumn ${attrs}>${totals.body}</tableColumn>`
-        : `<tableColumn ${attrs}/>`;
+      const body = calculatedColumnXml(workbook, sheet, table, index, report) + totals.body;
+      return body ? `<tableColumn ${attrs}>${body}</tableColumn>` : `<tableColumn ${attrs}/>`;
     })
     .join("");
   const filterValue =
@@ -684,6 +767,7 @@ export function writeXlsxTableMetadata(
   defaultStyleId?: string,
   pivotStyles: readonly PivotTableStyleDefinition[] = [],
   defaultPivotStyleId?: string,
+  context?: { workbook?: Workbook; report?: CompatibilityReportBuilder },
 ): Map<string, string> {
   if (
     !sheets.some((sheet) => sheet.tables?.length) &&
@@ -724,7 +808,7 @@ export function writeXlsxTableMetadata(
       const currentId = tableId++;
       const relation = `rId${relationshipId++}`;
       entries[`xl/tables/table${currentId}.xml`] = strToU8(
-        tableXml(table, currentId, sheet, totalsCells),
+        tableXml(table, currentId, sheet, totalsCells, context?.workbook, context?.report),
       );
       addContentType(entries, currentId);
       rels = rels.replace(

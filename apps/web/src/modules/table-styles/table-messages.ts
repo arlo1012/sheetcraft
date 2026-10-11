@@ -10,6 +10,14 @@ export type TableMessageSchema = {
     settings: string;
     tools: string;
     resize: string;
+    calculatedColumn: string;
+    calculatedFormula: string;
+    calculatedOverwriteHint: string;
+    calculatedAnchorHint: string;
+    applyColumn: string;
+    invalidCalculatedFormula: string;
+    calculatedUnavailable: string;
+    calculatedChanged: string;
     range: string;
     selectRange: string;
     hasHeaders: string;

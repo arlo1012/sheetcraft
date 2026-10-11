@@ -70,6 +70,8 @@ export type SetCellContentsCommand = {
   changes: CellContentChange[];
   /** Only a committed manual edit can establish an automatic table column. */
   inputIntent?: "manual";
+  /** A confirmed non-stopping rule at the original manual input, never generated members. */
+  inputValidationWarning?: { sheetId: string; address: CellAddress; ruleSignature: string };
   /** Explicit, user-requested replacement of every data cell in one table column. */
   tableColumnFill?: {
     sheetId: string;

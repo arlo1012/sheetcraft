@@ -155,15 +155,7 @@ describe("Normal-relative Core font projection", () => {
     expect(original.font("I1").font).toContain('<color theme="4"/>');
     expect(original.font("I1").font).not.toContain("<family");
     const decoded = await decodeXlsx(first.bytes);
-    // Preflight currently flags every table part, including its supported own exports.
-    expect(decoded.report.issues).toEqual([
-      {
-        code: "feature-omitted",
-        count: 1,
-        locations: ["xl/tables/table1.xml"],
-        severity: "warning",
-      },
-    ]);
+    expect(decoded.report.issues).toEqual([]);
     const restored = getActiveSheet(decoded.workbook);
     const table = restored.tables![0]!;
     for (const column of [0, 1, 2, 6, 7]) {

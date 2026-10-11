@@ -1,0 +1,31 @@
+@sheetcraft/web test: 
+@sheetcraft/web test:  RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261011/apps/web
+@sheetcraft/web test: 
+@sheetcraft/web test:  ❯ src/tests/modules/table-styles/calculated-column-input.test.ts (8 tests | 1 failed) 266ms
+@sheetcraft/web test:      × cancel and denied/invalid apply retain the correct draft target without writing 30ms
+@sheetcraft/web test: 
+@sheetcraft/web test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+@sheetcraft/web test: 
+@sheetcraft/web test:  FAIL  src/tests/modules/table-styles/calculated-column-input.test.ts > calculated-column Web editing and explicit replacement > cancel and denied/invalid apply retain the correct draft target without writing
+@sheetcraft/web test: AssertionError: expected 'Could not apply this calculated colum…' to be 'Enter a valid formula beginning with …' // Object.is equality
+@sheetcraft/web test: 
+@sheetcraft/web test: Expected: "Enter a valid formula beginning with =."
+@sheetcraft/web test: Received: "Could not apply this calculated column. Check the formula and the cells’ protection or validation rules. Your draft and workbook are unchanged."
+@sheetcraft/web test: 
+@sheetcraft/web test:  ❯ src/tests/modules/table-styles/calculated-column-input.test.ts:225:34
+@sheetcraft/web test:     223|     expect(f.snapshot()).toEqual(before);
+@sheetcraft/web test:     224|     target.confirm("=B2*");
+@sheetcraft/web test:     225|     expect(f.tables.error.value).toBe("Enter a valid formula beginning…
+@sheetcraft/web test:        |                                  ^
+@sheetcraft/web test:     226|     expect(f.tables.calculatedColumnTarget.value).toBe(target);
+@sheetcraft/web test:     227|     expect(f.snapshot()).toEqual(before);
+@sheetcraft/web test: 
+@sheetcraft/web test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+@sheetcraft/web test: 
+@sheetcraft/web test: 
+@sheetcraft/web test:  Test Files  1 failed (1)
+@sheetcraft/web test:       Tests  1 failed | 7 passed (8)
+@sheetcraft/web test:    Start at  19:43:41
+@sheetcraft/web test:    Duration  5.52s (transform 2.57s, setup 0ms, import 4.81s, tests 266ms, environment 280ms)
+@sheetcraft/web test: 
+@sheetcraft/web test: Exited with code 1

@@ -672,23 +672,30 @@ export function useSpreadsheetWorkspaceController(
     input: string;
     sheetId?: string;
     confirmPendingWarning?: boolean;
+    inputOrigin?: "paste";
   }): boolean {
     const sheetId = payload.sheetId ?? activeSheet.value.id;
     const sheet = session.workbook.sheets.get(sheetId);
     if (!sheet || !canEditCell(sheet, payload.address)) return false;
-    const accepted = validationInput.commit(
-      {
-        sheetId,
-        address: payload.address,
-        content:
-          parseCellContent(payload.input, {
-            asText: isTextCellNumberFormat(getCellStyle(sheet, payload.address)?.numberFormat),
-          }) ?? null,
-      },
-      { confirmPendingWarning: payload.confirmPendingWarning },
-    );
-    if (accepted) clearWorkspaceStatus();
-    return accepted;
+    try {
+      const accepted = validationInput.commit(
+        {
+          sheetId,
+          address: payload.address,
+          ...(payload.inputOrigin === "paste" ? {} : { inputIntent: "manual" as const }),
+          content:
+            parseCellContent(payload.input, {
+              asText: isTextCellNumberFormat(getCellStyle(sheet, payload.address)?.numberFormat),
+            }) ?? null,
+        },
+        { confirmPendingWarning: payload.confirmPendingWarning },
+      );
+      if (accepted) clearWorkspaceStatus();
+      return accepted;
+    } catch {
+      showWorkspaceStatus({ key: "workspace.cellEditUnavailable" });
+      return false;
+    }
   }
 
   function commitCellValue(payload: {
@@ -701,6 +708,15 @@ export function useSpreadsheetWorkspaceController(
       address: payload.address,
       content: { kind: "literal", value: payload.value },
     });
+  }
+
+  function acceptValidationInput(): boolean {
+    try {
+      return validationInput.accept();
+    } catch {
+      showWorkspaceStatus({ key: "workspace.cellEditUnavailable" });
+      return false;
+    }
   }
 
   function setCellImage(payload: {
@@ -1696,7 +1712,7 @@ export function useSpreadsheetWorkspaceController(
     dataToolState,
     activeValidationInfo,
     validationFeedback: validationInput.feedback,
-    acceptValidationInput: validationInput.accept,
+    acceptValidationInput,
     dismissValidationInput: validationInput.dismiss,
     mergeState,
     workspaceStatusText,

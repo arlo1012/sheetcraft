@@ -15,6 +15,8 @@ export type CellEditContext = CellEditTarget & {
 
 export type CellEditCommit = CellEditTarget & {
   input: string;
+  /** Native editor paste stays target-only even when committed later with Enter. */
+  inputOrigin?: "paste";
   /** A second explicit Enter that may confirm an already displayed warning. */
   confirmPendingWarning?: boolean;
 };
@@ -92,6 +94,7 @@ export function useCellEditSession(options: {
   });
   const state = readonly(mutableState);
   let compositionStartDraft = "";
+  let pastedDraft = false;
 
   function reset(): void {
     mutableState.active = false;
@@ -103,6 +106,7 @@ export function useCellEditSession(options: {
     mutableState.composing = false;
     mutableState.mode = "edit";
     compositionStartDraft = "";
+    pastedDraft = false;
   }
 
   function begin(
@@ -118,6 +122,7 @@ export function useCellEditSession(options: {
     const draft =
       beginOptions.mode === "append" ? context.input : (beginOptions.initialValue ?? "");
     mutableState.active = true;
+    pastedDraft = false;
     mutableState.owner = copyTarget(context);
     mutableState.source = context.input;
     mutableState.draft = draft;
@@ -140,6 +145,10 @@ export function useCellEditSession(options: {
       mutableState.selection.end,
       mutableState.selection.direction,
     );
+  }
+
+  function markPasted(): void {
+    if (mutableState.active) pastedDraft = true;
   }
 
   function setSelection(
@@ -177,10 +186,12 @@ export function useCellEditSession(options: {
       const accepted = options.onCommit({
         ...copyTarget(mutableState.owner),
         input: mutableState.draft,
+        ...(pastedDraft ? { inputOrigin: "paste" as const } : {}),
         ...(flushOptions.confirmPendingWarning ? { confirmPendingWarning: true } : {}),
       });
       if (accepted === false) return false;
       mutableState.source = mutableState.draft;
+      pastedDraft = false;
     }
     if (flushOptions.end) reset();
     return true;
@@ -224,6 +235,7 @@ export function useCellEditSession(options: {
     begin,
     activateSurface,
     setDraft,
+    markPasted,
     setSelection,
     setMode,
     flush,

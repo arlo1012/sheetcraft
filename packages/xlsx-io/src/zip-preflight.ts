@@ -380,7 +380,6 @@ export async function preflightXlsxArchive(
     if (name.startsWith("xl/embeddings/") || name.startsWith("xl/activex/"))
       report.add("macro-content", "block", entry.name);
     if (
-      name.startsWith("xl/tables/") ||
       (name.startsWith("xl/charts") && !supportedChartParts.has(name)) ||
       name.startsWith("customxml/") ||
       name.startsWith("xl/connections")

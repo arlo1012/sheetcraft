@@ -49,6 +49,7 @@ import {
   isExplicitWarningConfirmationKey,
   type CellEditFinishOptions,
   type CellEditSession,
+  type CellEditCommit,
 } from "../../../shared/cell-editing/useCellEditSession";
 import { completeFormulaForCommit } from "../../../shared/formula-editing/formula-commit";
 import type { FormulaReferenceToken } from "../../../shared/formula-editing/formula-reference-tokens";
@@ -327,7 +328,7 @@ const emit = defineEmits<{
   pasteImageFile: [file: File, mode: ImageInsertMode, address?: CellAddress];
   pasteFloatingImage: [image: FloatingImage, mode: ImageInsertMode, address?: CellAddress];
   pasteFloatingImages: [images: readonly FloatingImage[], address: CellAddress];
-  commitCell: [payload: { address: CellAddress; input: string }];
+  commitCell: [payload: CellEditCommit];
   clearCells: [range: CellRange];
   clipboardFeedback: [feedback: GridClipboardFeedback];
   resizeDimension: [payload: { axis: SheetDimensionAxis; index: number; size: number }];

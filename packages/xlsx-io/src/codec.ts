@@ -1,3 +1,4 @@
+import { validateImportedCalculatedColumns } from "./table-calculated-columns.js";
 import { readXlsxPivotTables } from "./pivot-tables.js";
 import { collectNativeChartParts } from "./chart-package-parts.js";
 import { readXlsxColumnCharts } from "./column-chart-reader.js";
@@ -970,6 +971,7 @@ export async function decodeWithNativeXlsx(
         }
       : {}),
   };
+  validateImportedCalculatedColumns(workbook, report);
   const pivots = readXlsxPivotTables(bytes, workbook, report);
   const nativeCharts = await collectNativeChartParts(archive, async (part) => archive[part]);
   readXlsxPivotCharts(workbook, nativeCharts.charts, pivots, report);

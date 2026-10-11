@@ -1,0 +1,9 @@
+$ bun run --filter @sheetcraft/xlsx-io typecheck
+@sheetcraft/xlsx-io typecheck: Exited with code 0
+$ bun run --filter @sheetcraft/xlsx-io build
+@sheetcraft/xlsx-io build: Exited with code 0
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 981ms on 42 files using 9 threads.
+Scoped checks: 42 source/test files

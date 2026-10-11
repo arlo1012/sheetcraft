@@ -1105,6 +1105,8 @@ export const zhCN = {
     nameDeleted: "已删除名称。",
     filterUnavailable: "当前选区无法应用筛选。",
     sortUnavailable: "当前选区无法排序。",
+    cellEditUnavailable:
+      "无法应用此编辑及其计算列更新，输入草稿已保留。请检查受保护单元格、公式及验证规则。",
     freezeUnavailable: "冻结窗格不能穿过合并单元格。",
     mergeUnavailable: "当前选区无法合并或取消合并。",
     conversionUnavailable: "当前选区无法转换数据类型。",

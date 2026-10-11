@@ -20,6 +20,7 @@ type Candidate = {
   sheetId: string;
   address: CellAddress;
   content: CellContent | null;
+  inputIntent?: "manual";
 };
 
 type DuplicateConfirmation = {
@@ -80,6 +81,7 @@ export function useDataValidationInput(options: {
       left.sheetId === right.sheetId &&
       left.address.row === right.address.row &&
       left.address.column === right.address.column &&
+      left.inputIntent === right.inputIntent &&
       JSON.stringify(left.content) === JSON.stringify(right.content)
     );
   }
@@ -183,7 +185,9 @@ export function useDataValidationInput(options: {
     dismiss();
     try {
       const changed = options.execute(
-        createSetCellContentCommand(candidate.sheetId, candidate.address, candidate.content),
+        createSetCellContentCommand(candidate.sheetId, candidate.address, candidate.content, {
+          inputIntent: candidate.inputIntent,
+        }),
         duplicateBlocked && confirmedDuplicate ? { allowDuplicateEntry: true } : undefined,
       );
       if (
@@ -232,6 +236,10 @@ export function useDataValidationInput(options: {
           request.candidate.sheetId,
           request.candidate.address,
           request.candidate.content,
+          {
+            inputIntent: request.candidate.inputIntent,
+            inputValidationWarningSignature: request.ruleSignature,
+          },
         ),
         duplicateBlocked ? { allowDuplicateEntry: true } : undefined,
       );

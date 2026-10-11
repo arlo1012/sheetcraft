@@ -1,0 +1,10 @@
+@sheetcraft/web test: 
+@sheetcraft/web test:  RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261011/apps/web
+@sheetcraft/web test: 
+@sheetcraft/web test: 
+@sheetcraft/web test:  Test Files  1 passed (1)
+@sheetcraft/web test:       Tests  8 passed (8)
+@sheetcraft/web test:    Start at  19:44:01
+@sheetcraft/web test:    Duration  4.27s (transform 2.05s, setup 0ms, import 3.74s, tests 196ms, environment 209ms)
+@sheetcraft/web test: 
+@sheetcraft/web test: Exited with code 0

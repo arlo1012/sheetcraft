@@ -4,6 +4,48 @@ import { useCellEditSession } from "../../../shared/cell-editing/useCellEditSess
 const firstTarget = { sheetId: "sheet-a", address: { row: 2, column: 3 } };
 
 describe("useCellEditSession", () => {
+  test("native paste origin survives surface changes and rejected commits but resets after success", () => {
+    const commits: unknown[] = [];
+    let accepted = false;
+    const session = useCellEditSession({
+      onCommit: (payload) => {
+        commits.push(payload);
+        return accepted;
+      },
+    });
+    session.begin({ ...firstTarget, input: "" }, { surface: "grid", mode: "replace" });
+    session.markPasted();
+    session.setDraft("=B3*2");
+    session.activateSurface("formula-bar");
+    expect(session.finish()).toBe(false);
+    expect(session.state.draft).toBe("=B3*2");
+    accepted = true;
+    expect(session.flush()).toBe(true);
+    session.setDraft("=B3*3");
+    expect(session.finish()).toBe(true);
+    expect(commits).toEqual([
+      { ...firstTarget, input: "=B3*2", inputOrigin: "paste" },
+      { ...firstTarget, input: "=B3*2", inputOrigin: "paste" },
+      { ...firstTarget, input: "=B3*3" },
+    ]);
+  });
+
+  test("cancel discards native paste origin before a new manual edit", () => {
+    const commits: unknown[] = [];
+    const session = useCellEditSession({
+      onCommit: (payload) => {
+        commits.push(payload);
+      },
+    });
+    session.begin({ ...firstTarget, input: "" }, { surface: "grid", mode: "replace" });
+    session.markPasted();
+    session.setDraft("=B3");
+    session.cancel();
+    session.begin({ ...firstTarget, input: "" }, { surface: "grid", mode: "replace" });
+    session.setDraft("=B3");
+    session.finish();
+    expect(commits).toEqual([{ ...firstTarget, input: "=B3" }]);
+  });
   test("transfers a same-owner session between surfaces without changing its draft or caret", () => {
     const session = useCellEditSession({ onCommit: () => undefined });
     session.begin({ ...firstTarget, input: "before" }, { surface: "grid", mode: "append" });

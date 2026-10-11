@@ -1135,6 +1135,8 @@ export const enUS = {
     nameDeleted: "Name deleted.",
     filterUnavailable: "Filter cannot be applied to the current selection.",
     sortUnavailable: "The current selection cannot be sorted.",
+    cellEditUnavailable:
+      "Unable to apply this edit and its calculated-column changes. Your draft is retained. Check protected cells, formulas and validation rules.",
     freezeUnavailable: "Frozen panes cannot cross a merged cell.",
     mergeUnavailable: "The current selection cannot be merged or unmerged.",
     conversionUnavailable: "The selected cells cannot be converted.",

@@ -1,0 +1,73 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-resume-20261011/packages/xlsx-io
+
+ ❯ src/tests/native/calculated-column-metadata.test.ts (45 tests | 3 failed) 787ms
+     × does not keep a template with a foreign layout attribute as its canonical anchor 18ms
+     × omits the growth-blocking SPILL error in native template #SPILL! 16ms
+     × omits the growth-blocking SPILL error in native template IF(B2>0,0,#SPILL!) 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/native/calculated-column-metadata.test.ts > explicit native calculated-column templates > does not keep a template with a foreign layout attribute as its canonical anchor
+AssertionError: expected '=B2*2' to be undefined
+
+- Expected:
+undefined
+
++ Received:
+"=B2*2"
+
+ ❯ src/tests/native/calculated-column-metadata.test.ts:257:60
+    255|     );
+    256|     const result = await decodeXlsx(zipSync(entries));
+    257|     expect(restoredColumn(result).calculatedColumnFormula).toBeUndefin…
+       |                                                            ^
+    258|     expect(result.report.issues).toContainEqual(
+    259|       expect.objectContaining({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/tests/native/calculated-column-metadata.test.ts > explicit native calculated-column templates > omits the growth-blocking SPILL error in native template #SPILL!
+AssertionError: expected '=#SPILL!' to be undefined
+
+- Expected:
+undefined
+
++ Received:
+"=#SPILL!"
+
+ ❯ src/tests/native/calculated-column-metadata.test.ts:272:62
+    270|     "omits the growth-blocking SPILL error in native template %s", asy…
+    271|       const result = await nativeFormula(`<calculatedColumnFormula>${s…
+    272|       expect(restoredColumn(result).calculatedColumnFormula).toBeUndef…
+       |                                                              ^
+    273|       const sheet = getActiveSheet(result.workbook);
+    274|       expect(getCellContent(sheet, { row: 2, column: 2 })).toEqual({ k…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/tests/native/calculated-column-metadata.test.ts > explicit native calculated-column templates > omits the growth-blocking SPILL error in native template IF(B2>0,0,#SPILL!)
+AssertionError: expected '=IF(B2>0,0,#SPILL!)' to be undefined
+
+- Expected:
+undefined
+
++ Received:
+"=IF(B2>0,0,#SPILL!)"
+
+ ❯ src/tests/native/calculated-column-metadata.test.ts:272:62
+    270|     "omits the growth-blocking SPILL error in native template %s", asy…
+    271|       const result = await nativeFormula(`<calculatedColumnFormula>${s…
+    272|       expect(restoredColumn(result).calculatedColumnFormula).toBeUndef…
+       |                                                              ^
+    273|       const sheet = getActiveSheet(result.workbook);
+    274|       expect(getCellContent(sheet, { row: 2, column: 2 })).toEqual({ k…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 42 passed (45)
+   Start at  20:04:14
+   Duration  2.64s (transform 1.25s, setup 0ms, import 1.72s, tests 787ms, environment 0ms)
+

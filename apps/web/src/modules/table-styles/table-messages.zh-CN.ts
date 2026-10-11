@@ -12,6 +12,17 @@ export const tablesZhCN: TableMessageSchema = {
     settings: "表格设置",
     tools: "表格工具",
     resize: "调整表格大小",
+    calculatedColumn: "将公式应用到整列",
+    calculatedFormula: "计算列公式",
+    calculatedOverwriteHint:
+      "将替换 {table}[{column}] 的全部数据单元格（{range}），包括已有值、公式、空白例外及筛选隐藏行。标题和汇总行会保留，可撤销此操作。",
+    calculatedAnchorHint: "请按首个数据单元格 {address} 编写公式，各行的相对引用会自动调整。",
+    applyColumn: "替换整列数据",
+    invalidCalculatedFormula: "请输入以 = 开头的有效公式。",
+    calculatedUnavailable:
+      "无法应用此计算列。请检查公式及单元格的保护或验证规则。草稿和工作簿保持不变。",
+    calculatedChanged:
+      "对话框打开后工作簿已有变更。公式草稿已保留，请关闭后重新打开整列操作再应用。",
     range: "表格数据区域",
     selectRange: "选择表格区域",
     hasHeaders: "表包含标题",

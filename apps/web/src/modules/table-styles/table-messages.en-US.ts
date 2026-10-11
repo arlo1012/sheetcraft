@@ -13,6 +13,18 @@ export const tablesEnUS: TableMessageSchema = {
     settings: "Table settings",
     tools: "Table tools",
     resize: "Resize table",
+    calculatedColumn: "Apply formula to column",
+    calculatedFormula: "Column formula",
+    calculatedOverwriteHint:
+      "Replace every data cell in {table}[{column}] ({range}), including existing values, formulas, blank exceptions and filtered rows. Headers and totals are preserved. You can undo this action.",
+    calculatedAnchorHint:
+      "Write the formula for the first data cell, {address}. Relative references are adjusted for each row.",
+    applyColumn: "Replace entire data column",
+    invalidCalculatedFormula: "Enter a valid formula beginning with =.",
+    calculatedUnavailable:
+      "Could not apply this calculated column. Check the formula and the cells’ protection or validation rules. Your draft and workbook are unchanged.",
+    calculatedChanged:
+      "The workbook changed while this dialog was open. Your formula draft is retained; close and reopen the column operation before applying it.",
     range: "Table data range",
     selectRange: "Select table range",
     hasHeaders: "My table has headers",

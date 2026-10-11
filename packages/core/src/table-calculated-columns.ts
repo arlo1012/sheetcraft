@@ -206,7 +206,7 @@ export function assertCalculatedColumnChanges(
   command: SetCellContentsCommand,
 ): void {
   assertScalarResults(workbook, command);
-  assertFillDataValidation(workbook, command);
+  assertFillDataValidation(workbook, command, command.inputValidationWarning);
   if (!validateDuplicateEntries(workbook, command.changes).valid)
     throw new DataFillError(
       "validation",
@@ -231,6 +231,20 @@ export function prepareTableCalculatedColumnEdit(
     (original.inputIntent && original.tableColumnFill)
   )
     throw invalidCommandPayload("calculatedColumn", original);
+  if (original.inputValidationWarning) {
+    const confirmation = original.inputValidationWarning;
+    const input = original.changes[0];
+    if (
+      original.inputIntent !== "manual" ||
+      !input ||
+      !confirmation.address ||
+      confirmation.sheetId !== input.sheetId ||
+      confirmation.address.row !== input.address.row ||
+      confirmation.address.column !== input.address.column ||
+      typeof confirmation.ruleSignature !== "string"
+    )
+      throw invalidCommandPayload("inputValidationWarning", confirmation);
+  }
   let sheet: Sheet;
   let table: SheetTable;
   let columnId: string;
