@@ -229,7 +229,12 @@ export type SheetMetadata = {
   protection?: SheetProtection;
 };
 
-export type SheetTableColumn = { id: string; name: string };
+export type SheetTableColumn = {
+  id: string;
+  name: string;
+  /** Formula anchored at this column's first data row; cell contents retain exceptions. */
+  calculatedColumnFormula?: string;
+};
 /** A structured table, with an inclusive worksheet range. */
 export type SheetTable = {
   id: string;
@@ -2678,7 +2683,18 @@ function normalizeSheetTable(table: SheetTable): SheetTable {
       throw new TypeError("Table column IDs and names must be unique.");
     columnIds.add(column.id);
     columnNames.add(name.toLocaleLowerCase("en-US"));
-    return { id: column.id, name };
+    if (
+      column.calculatedColumnFormula !== undefined &&
+      (typeof column.calculatedColumnFormula !== "string" || !column.calculatedColumnFormula.trim())
+    )
+      throw new TypeError("Invalid calculated column formula.");
+    return {
+      id: column.id,
+      name,
+      ...(column.calculatedColumnFormula !== undefined
+        ? { calculatedColumnFormula: column.calculatedColumnFormula }
+        : {}),
+    };
   });
   const filter = normalizeSheetFilter(table.filter);
   if (

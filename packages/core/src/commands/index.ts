@@ -65,3 +65,4 @@ export * from "./drawings.js";
 export * from "./sparklines.js";
 
 export * from "./pivot-tables.js";
+export { createApplyTableCalculatedColumnCommand } from "../table-calculated-columns.js";

@@ -68,6 +68,16 @@ export type CellContentChange = {
 export type SetCellContentsCommand = {
   type: "setCellContents";
   changes: CellContentChange[];
+  /** Only a committed manual edit can establish an automatic table column. */
+  inputIntent?: "manual";
+  /** Explicit, user-requested replacement of every data cell in one table column. */
+  tableColumnFill?: {
+    sheetId: string;
+    tableId: string;
+    columnId: string;
+    sourceAddress: CellAddress;
+    source: string;
+  };
   /** Optional rule updates applied atomically with clipboard cell changes. */
   conditionalFormats?: Array<{ sheetId: string; rules: SheetConditionalFormatRule[] }>;
   reconcileBorders?: true;

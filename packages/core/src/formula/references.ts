@@ -293,12 +293,19 @@ export function collectFormulaEvaluationDependencies(sourceOrAst: string | Formu
   return { references, ranges };
 }
 
-export function translateFormulaForCopy(source: string, offset: FormulaCopyOffset): string {
+export function translateFormulaForCopy(
+  source: string,
+  offset: FormulaCopyOffset,
+  options: { includeSheetQualifiedReferences?: boolean } = {},
+): string {
   const ast = getFormulaAst(source);
   if (!ast) return source;
   const replacements: Replacement[] = [];
   walkExpression(ast.expression, (expression) => {
-    if (expression.kind === "axis-range" && !expression.range.sheetName) {
+    if (
+      expression.kind === "axis-range" &&
+      (!expression.range.sheetName || options.includeSheetQualifiedReferences)
+    ) {
       const delta = expression.range.axis === "row" ? offset.row : offset.column;
       const start = expression.range.start + (expression.range.startAbsolute ? 0 : delta);
       const end = expression.range.end + (expression.range.endAbsolute ? 0 : delta);
@@ -314,7 +321,7 @@ export function translateFormulaForCopy(source: string, offset: FormulaCopyOffse
       return;
     }
     if (expression.kind === "range") {
-      if (expression.range.start.sheetName) return;
+      if (expression.range.start.sheetName && !options.includeSheetQualifiedReferences) return;
       const translate = (reference: FormulaReference) => ({
         row: reference.row + (reference.rowAbsolute ? 0 : offset.row),
         column: reference.column + (reference.columnAbsolute ? 0 : offset.column),
@@ -333,7 +340,7 @@ export function translateFormulaForCopy(source: string, offset: FormulaCopyOffse
     }
     const reference =
       expression.kind === "reference" || expression.kind === "spill" ? expression.reference : null;
-    if (!reference || reference.sheetName) return;
+    if (!reference || (reference.sheetName && !options.includeSheetQualifiedReferences)) return;
     const address = {
       row: reference.row + (reference.rowAbsolute ? 0 : offset.row),
       column: reference.column + (reference.columnAbsolute ? 0 : offset.column),

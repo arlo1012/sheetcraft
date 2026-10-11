@@ -3,6 +3,7 @@ import type { PivotTableStyleDefinition } from "./pivot-table-styles.js";
 import type { StructuredFormulaReference } from "./formula/types.js";
 import {
   createSheetSparseState,
+  createSheet,
   createWorkbookEvaluator,
   replaceSheetSparseState,
   getCellContent,
@@ -33,6 +34,12 @@ import { applyCellShiftCommand } from "./commands/cell-shift.js";
 import { parseA1FormulaReference } from "./formula/reference-model.js";
 import { doMergedCellRangesIntersect } from "./merged-cells.js";
 import { invalidCommandPayload } from "./commands/helpers.js";
+import {
+  assertCalculatedColumnChanges,
+  createCalculatedColumnNewMemberChanges,
+  getTableDataRows,
+  translateCalculatedColumnFormula,
+} from "./table-calculated-columns.js";
 
 function cloneTable(table: SheetTable): SheetTable {
   return JSON.parse(JSON.stringify(table)) as SheetTable;
@@ -730,15 +737,79 @@ export function applyResizeTableCommand(
   const range = normalizeRange(command.range);
   // Validate the target range before a total-row expansion shifts any cells.
   // A rejected overlap must leave the workbook untouched.
+  const generatedColumns = columnNames(workbook, sheet, range, current.headerRow);
+  const oldAnchorRow = getTableDataRows(current).start;
+  const nextAnchorRow = range.start.row + Number(current.headerRow);
+  const usedIds = new Set(current.columns.map((column) => column.id));
+  const usedNames = new Set(
+    current.columns
+      .filter((_, index) => {
+        const physical = current.range.start.column + index;
+        return physical >= range.start.column && physical <= range.end.column;
+      })
+      .map((column) => column.name.toLowerCase()),
+  );
+  const columns = generatedColumns.map((column, index) => {
+    const physical = range.start.column + index;
+    const previous =
+      physical >= current.range.start.column && physical <= current.range.end.column
+        ? current.columns[physical - current.range.start.column]
+        : undefined;
+    if (previous)
+      return {
+        ...previous,
+        ...(previous.calculatedColumnFormula !== undefined
+          ? {
+              calculatedColumnFormula: translateCalculatedColumnFormula(
+                previous.calculatedColumnFormula,
+                { row: oldAnchorRow, column: physical },
+                { row: nextAnchorRow, column: physical },
+              ),
+            }
+          : {}),
+      };
+    let id = `${current.id}-column-${physical}`;
+    let suffix = 2;
+    while (usedIds.has(id)) id = `${current.id}-column-${physical}-${suffix++}`;
+    usedIds.add(id);
+    const base = column.name;
+    let name = base;
+    suffix = 2;
+    while (usedNames.has(name.toLowerCase())) name = `${base}${suffix++}`;
+    usedNames.add(name.toLowerCase());
+    return { id, name };
+  });
   const next = normalizeTable(workbook, command.sheetId, {
     ...current,
     range,
-    columns: [],
+    columns,
     filter: resizeTableFilter(current.filter, range, current.totalRow),
   });
+  let inherited: import("./commands/contracts.js").CellContentChange[] = [];
+  if (next.columns.some((column) => column.calculatedColumnFormula !== undefined)) {
+    // Simulate the existing totals-row shifts before validating any generated cell.
+    const shadow: Workbook = {
+      ...workbook,
+      definedNames: new Map([...workbook.definedNames].map(([id, value]) => [id, clone(value)])),
+      sheets: new Map(
+        [...workbook.sheets].map(([id, source]) => {
+          const copy = createSheet(source.name, source.id);
+          copy.properties = { ...source.properties };
+          replaceSheetSparseState(copy, createSheetSparseState(source));
+          return [id, copy];
+        }),
+      ),
+    };
+    const shadowSheet = shadow.sheets.get(sheet.id)!;
+    resizeTableTotals(shadow, shadowSheet, current, range);
+    shadowSheet.tables = shadowSheet.tables!.map((table) => (table.id === next.id ? next : table));
+    inherited = createCalculatedColumnNewMemberChanges(shadow, sheet.id, current, next);
+    assertCalculatedColumnChanges(shadow, { type: "setCellContents", changes: inherited });
+  }
   const previous = createRestoreTableTransactionCommand(workbook);
   resizeTableTotals(workbook, sheet, current, range);
   sheet.tables = (sheet.tables ?? []).map((table) => (table.id === next.id ? next : table));
+  for (const change of inherited) setCellContent(sheet, change.address, change.content);
   return previous;
 }
 

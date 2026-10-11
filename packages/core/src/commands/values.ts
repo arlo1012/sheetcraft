@@ -107,6 +107,7 @@ export function createSetCellContentCommand(
   sheetId: string,
   address: CellAddress,
   content: CellContent | null,
+  options: { inputIntent?: "manual" } = {},
 ): SetCellContentsCommand {
   return {
     type: "setCellContents",
@@ -117,6 +118,7 @@ export function createSetCellContentCommand(
         content: normalizeCommandCellContent(content, "content"),
       },
     ],
+    ...(options.inputIntent ? { inputIntent: options.inputIntent } : {}),
   };
 }
 
@@ -318,7 +320,7 @@ function getUniqueTableCaption(table: SheetTable, columnIndex: number, source: s
   return caption;
 }
 
-function getTableMetadataEdit(
+export function getTableMetadataEdit(
   sheet: Sheet,
   change: CellContentChange,
 ): TableMetadataEdit | undefined {
@@ -393,6 +395,7 @@ function createTableTransactionState(workbook: Workbook) {
 export function applySetCellContentsCommand(
   workbook: Workbook,
   command: SetCellContentsCommand,
+  calculatedColumnUpdate?: import("../table-calculated-columns.js").CalculatedColumnUpdate,
 ): WorkbookCommand | null {
   if (!Array.isArray(command.changes)) {
     throw invalidCommandPayload("changes", command.changes);
@@ -494,7 +497,7 @@ export function applySetCellContentsCommand(
     } satisfies CellContentChange;
   });
   const tableMetadataEdit =
-    normalizedChanges.length === 1
+    normalizedChanges.length === 1 || command.inputIntent === "manual"
       ? getTableMetadataEdit(
           getSheetOrThrow(workbook, normalizedChanges[0]!.sheetId),
           normalizedChanges[0]!,
@@ -509,9 +512,8 @@ export function applySetCellContentsCommand(
         )?.range.start.row)
   )
     normalizedChanges[0]!.content = { kind: "literal", value: tableMetadataEdit.caption };
-  const tableTransactionState = tableMetadataEdit
-    ? createTableTransactionState(workbook)
-    : undefined;
+  const tableTransactionState =
+    tableMetadataEdit || calculatedColumnUpdate ? createTableTransactionState(workbook) : undefined;
 
   const reverseChanges: CellContentChange[] = [];
   const reverseChangesByAddress = new Map<string, CellContentChange>();
@@ -776,6 +778,25 @@ export function applySetCellContentsCommand(
     return { type: "restoreTableTransaction", ...tableTransactionState! };
   }
 
+  if (calculatedColumnUpdate) {
+    const sheet = getSheetOrThrow(workbook, calculatedColumnUpdate.sheetId);
+    sheet.tables = sheet.tables!.map((table) =>
+      table.id !== calculatedColumnUpdate.tableId
+        ? table
+        : {
+            ...table,
+            columns: table.columns.map((column) =>
+              column.id !== calculatedColumnUpdate.columnId
+                ? column
+                : {
+                    ...column,
+                    calculatedColumnFormula: calculatedColumnUpdate.source,
+                  },
+            ),
+          },
+    );
+    return { type: "restoreTableTransaction", ...tableTransactionState! };
+  }
   if (!reverseChanges.length && !previousRules.length) return null;
   return {
     ...createBatchSetCellContentsCommand(reverseChanges),

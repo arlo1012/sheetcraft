@@ -231,7 +231,8 @@ export type WorkbookSnapshotV41 = Omit<WorkbookSnapshotV40, "version"> & { versi
 export type WorkbookSnapshotV42 = Omit<WorkbookSnapshotV41, "version"> & { version: 42 };
 export type WorkbookSnapshotV43 = Omit<WorkbookSnapshotV42, "version"> & { version: 43 };
 export type WorkbookSnapshotV44 = Omit<WorkbookSnapshotV43, "version"> & { version: 44 };
-export type WorkbookSnapshot = WorkbookSnapshotV43 | WorkbookSnapshotV44;
+export type WorkbookSnapshotV45 = Omit<WorkbookSnapshotV44, "version"> & { version: 45 };
+export type WorkbookSnapshot = WorkbookSnapshotV43 | WorkbookSnapshotV44 | WorkbookSnapshotV45;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -292,7 +293,8 @@ type SnapshotVersion =
   | 41
   | 42
   | 43
-  | 44;
+  | 44
+  | 45;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -1113,6 +1115,30 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       })
     )
       version = 44;
+    if (
+      Array.isArray(record.tables) &&
+      record.tables.some((item) => {
+        const columns = asRecord(item, path).columns;
+        return (
+          Array.isArray(columns) &&
+          columns.some((column) => Object.hasOwn(asRecord(column, path), "calculatedColumnFormula"))
+        );
+      })
+    )
+      version = 45;
+  }
+  if (version < 45 && Array.isArray(record.tables)) {
+    for (const [index, table] of record.tables.entries()) {
+      const columns = asRecord(table, `${path}.tables[${index}]`).columns;
+      if (
+        Array.isArray(columns) &&
+        columns.some((column) => Object.hasOwn(asRecord(column, path), "calculatedColumnFormula"))
+      )
+        return fail(
+          `${path}.tables[${index}].columns`,
+          "Calculated column formulas require snapshot version 45.",
+        );
+    }
   }
   if (version < 23 && record.protection !== undefined) {
     const protection = asRecord(record.protection, `${path}.protection`);
@@ -1193,9 +1219,14 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   const manualOrder = sheets.some((sheet) =>
     sheet.pivotTables?.some((table) => table.sortFields?.some((rule) => rule.order === "manual")),
   );
+  const calculatedColumns = sheets.some((sheet) =>
+    sheet.tables?.some((table) =>
+      table.columns.some((column) => column.calculatedColumnFormula !== undefined),
+    ),
+  );
   return {
     // Preserve the existing protocol for documents that do not use the new feature.
-    version: manualOrder ? 44 : 43,
+    version: calculatedColumns ? 45 : manualOrder ? 44 : 43,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1271,7 +1302,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 41 &&
     record.version !== 42 &&
     record.version !== 43 &&
-    record.version !== 44
+    record.version !== 44 &&
+    record.version !== 45
   ) {
     throw new WorkbookDomainError(
       {

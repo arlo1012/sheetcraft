@@ -50,7 +50,12 @@ function inRange(address: { row: number; column: number }, range: CellRange): bo
 }
 
 /** Performs the shared preflight before commands build their complete change set. */
-export function prepareFillTarget(workbook: Workbook, sheetId: string, input: CellRange) {
+export function prepareFillTarget(
+  workbook: Workbook,
+  sheetId: string,
+  input: CellRange,
+  options: { includeHiddenTableMembers?: boolean } = {},
+) {
   let range: CellRange;
   try {
     range = normalizeRange(input);
@@ -69,13 +74,14 @@ export function prepareFillTarget(workbook: Workbook, sheetId: string, input: Ce
   if (sheet.mergedCells.some((merged) => doMergedCellRangesIntersect(merged, range)))
     throw new DataFillError("mergedCells", "Cannot fill across merged cells.");
   if (
-    [...(sheet.hiddenRows ?? [])].some((row) => row >= range.start.row && row <= range.end.row) ||
-    [...(sheet.hiddenColumns ?? [])].some(
-      (column) => column >= range.start.column && column <= range.end.column,
-    ) ||
-    createSheetFilterHiddenRowIntervals(sheet).some(
-      (hidden) => hidden.start <= range.end.row && hidden.end >= range.start.row,
-    )
+    !options.includeHiddenTableMembers &&
+    ([...(sheet.hiddenRows ?? [])].some((row) => row >= range.start.row && row <= range.end.row) ||
+      [...(sheet.hiddenColumns ?? [])].some(
+        (column) => column >= range.start.column && column <= range.end.column,
+      ) ||
+      createSheetFilterHiddenRowIntervals(sheet).some(
+        (hidden) => hidden.start <= range.end.row && hidden.end >= range.start.row,
+      ))
   )
     throw new DataFillError("hiddenCells", "Cannot fill hidden or filtered cells.");
 

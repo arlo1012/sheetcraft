@@ -1,4 +1,5 @@
 import { assertPivotResultsAreWritable } from "./pivot-result-guard.js";
+import { prepareTableCalculatedColumnEdit } from "../table-calculated-columns.js";
 import { applySetPivotTableCommand, applyRemovePivotTableCommand } from "./pivot-tables.js";
 import { applySetCellSparklinesCommand } from "./sparklines.js";
 import { applySetSheetDrawingsCommand } from "./drawings.js";
@@ -284,6 +285,11 @@ export function applyWorkbookCommand(
   options: { fromHistory?: boolean } = {},
 ): WorkbookCommand | null {
   try {
+    const calculatedColumnPlan =
+      !options.fromHistory && command.type === "setCellContents"
+        ? prepareTableCalculatedColumnEdit(workbook, command)
+        : undefined;
+    if (calculatedColumnPlan) command = calculatedColumnPlan.command;
     if (!options.fromHistory) {
       assertWorkbookStructureProtection(workbook, command);
       assertCommandDoesNotModifyProtectedSheet(workbook, command);
@@ -311,7 +317,7 @@ export function applyWorkbookCommand(
       case "deleteDefinedName":
         return applyDeleteDefinedNameCommand(workbook, command);
       case "setCellContents":
-        return applySetCellContentsCommand(workbook, command);
+        return applySetCellContentsCommand(workbook, command, calculatedColumnPlan?.update);
       case "clearCellRange":
         return applyClearCellRangeCommand(workbook, command);
       case "setPivotTable":
