@@ -178,6 +178,14 @@
     "./picture-frame": {
       "types": "./dist/picture-frame.d.ts",
       "import": "./dist/picture-frame.js"
+    },
+    "./picture-object": {
+      "types": "./dist/picture-object.d.ts",
+      "import": "./dist/picture-object.js"
+    },
+    "./picture-frame-axis-edit": {
+      "types": "./dist/picture-frame-axis-edit.d.ts",
+      "import": "./dist/picture-frame-axis-edit.js"
     }
   },
   "scripts": {

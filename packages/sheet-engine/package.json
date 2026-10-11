@@ -78,6 +78,10 @@
     "./floating-image-group": {
       "types": "./dist/floating-image-group.d.ts",
       "import": "./dist/floating-image-group.js"
+    },
+    "./picture-frame-layout": {
+      "types": "./dist/picture-frame-layout.d.ts",
+      "import": "./dist/picture-frame-layout.js"
     }
   },
   "scripts": {

@@ -653,6 +653,8 @@ function parseFilter(value: unknown, path: string, version: SnapshotVersion): Sh
 
 function parseFloatingImage(value: unknown, path: string, version: SnapshotVersion): FloatingImage {
   const record = asRecord(value, path);
+  if (Object.hasOwn(record, "frame"))
+    return fail(path, "Framed pictures require the pending frame-aware snapshot reader.");
   if (typeof record.id !== "string" || !record.id.trim())
     return fail(`${path}.id`, "Expected a non-empty string.");
   if (typeof record.assetId !== "string" || !record.assetId.trim())

@@ -325,7 +325,7 @@ export type SheetDuplicateRule = {
 };
 
 /** A positioned image that is anchored to a sheet cell without owning its binary data. */
-export type FloatingImage = {
+export type LegacyFloatingImage = {
   id: string;
   assetId: string;
   altText: string;
@@ -339,6 +339,8 @@ export type FloatingImage = {
   groupId?: string;
   lockAspectRatio?: boolean;
 };
+/** Existing persisted image contract; framed-object persistence is enabled only with its consumers. */
+export type FloatingImage = LegacyFloatingImage;
 
 export type Cell = {
   content?: CellContent;
@@ -3340,6 +3342,8 @@ export function cloneFloatingImage(image: FloatingImage): FloatingImage {
 
 function normalizeFloatingImage(image: FloatingImage, ids?: Set<string>): FloatingImage {
   if (!image || typeof image !== "object") throw new TypeError("Invalid floating image.");
+  if (Object.hasOwn(image, "frame"))
+    throw new TypeError("Framed image persistence is not enabled.");
   if (typeof image.id !== "string" || !image.id.trim())
     throw new TypeError("Floating image ID must be non-empty.");
   if (ids?.has(image.id)) throw new Error(`Duplicate floating image ${image.id}.`);

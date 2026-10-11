@@ -2,7 +2,7 @@ import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./sheet-limits.js";
 import {
   MIN_FLOATING_IMAGE_SIZE,
   MAX_FLOATING_IMAGE_SIZE,
-  type FloatingImage,
+  type LegacyFloatingImage,
 } from "./workbook.js";
 import { normalizeImageTransform } from "./image-transform.js";
 import {
@@ -307,7 +307,14 @@ export function anchorPictureFrameRect(
   preferred?: PictureFrameAnchor,
 ): PictureFrameAnchor {
   assertRect(rect);
-  const size = normalizeSize({ width: rect.width, height: rect.height });
+  if (rect.width <= 0 || rect.height <= 0)
+    throw new RangeError("A picture anchor requires positive local dimensions.");
+  // A durable stretching frame may grow beyond the manual edit budget through
+  // row/column changes. Reanchoring it must not discard that resolved geometry.
+  const size =
+    mode === "move-and-size"
+      ? { width: rect.width, height: rect.height }
+      : normalizeSize({ width: rect.width, height: rect.height });
   if (mode === "fixed") return { mode, x: rect.x, y: rect.y, size };
   const preferredStart =
     preferred?.mode === "move-only"
@@ -333,7 +340,7 @@ export function anchorPictureFrameRect(
 }
 /** Geometry-only explicit adapter; it never mutates or promotes a persisted legacy object. */
 export function pictureFrameFromLegacy(
-  image: FloatingImage,
+  image: LegacyFloatingImage,
   metrics: PictureSheetMetrics,
 ): PictureFrame {
   const transform = normalizeImageTransform(image.transform);

@@ -37,3 +37,5 @@ export * from "./protection-password.js";
 export * from "./text-font-runs.js";
 export * from "./picture-axis-metrics.js";
 export * from "./picture-frame.js";
+export * from "./picture-object.js";
+export * from "./picture-frame-axis-edit.js";
