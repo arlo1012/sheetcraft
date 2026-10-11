@@ -67,10 +67,10 @@ function resetManualBreaks(): void {
 </script>
 <template>
   <TForm
-    class="page-setup-sheet sheetcraft-form-grid"
+    class="page-setup-sheet"
     :data="references"
     label-align="right"
-    :label-width="locale === 'zh-CN' ? 104 : 176"
+    :label-width="locale === 'zh-CN' ? 96 : 144"
   >
     <TFormItem
       name="printArea"
@@ -93,112 +93,106 @@ function resetManualBreaks(): void {
     </TFormItem>
     <section class="page-setup-sheet__section" :aria-label="t('pageLayout.printTitles')">
       <h3>{{ t("pageLayout.printTitles") }}</h3>
-      <div class="page-setup-sheet__titles">
-        <TFormItem
-          name="titleRows"
+      <TFormItem
+        name="titleRows"
+        :label="t('pageLayout.titleRows')"
+        :status="errors.titleRows ? 'error' : undefined"
+        ><RangeReferenceInput
+          class="page-setup-sheet__reference"
+          :model-value="references.titleRows"
           :label="t('pageLayout.titleRows')"
-          :status="errors.titleRows ? 'error' : undefined"
-          ><RangeReferenceInput
-            class="page-setup-sheet__reference"
-            :model-value="references.titleRows"
-            :label="t('pageLayout.titleRows')"
-            :show-picker="true"
-            :select-reference="picker('titleRows')"
-            data-page-setup="title-rows"
-            @update:model-value="setReference('titleRows', $event)"
-          />
-          <template #tips
-            ><p v-if="errors.titleRows" role="alert" class="page-setup-sheet__error">
-              {{ errors.titleRows }}
-            </p>
-          </template>
-        </TFormItem>
-        <TFormItem
-          name="titleColumns"
+          :show-picker="true"
+          :select-reference="picker('titleRows')"
+          data-page-setup="title-rows"
+          @update:model-value="setReference('titleRows', $event)"
+        />
+        <template #tips
+          ><p v-if="errors.titleRows" role="alert" class="page-setup-sheet__error">
+            {{ errors.titleRows }}
+          </p>
+        </template>
+      </TFormItem>
+      <TFormItem
+        name="titleColumns"
+        :label="t('pageLayout.titleColumns')"
+        :status="errors.titleColumns ? 'error' : undefined"
+        ><RangeReferenceInput
+          class="page-setup-sheet__reference"
+          :model-value="references.titleColumns"
           :label="t('pageLayout.titleColumns')"
-          :status="errors.titleColumns ? 'error' : undefined"
-          ><RangeReferenceInput
-            class="page-setup-sheet__reference"
-            :model-value="references.titleColumns"
-            :label="t('pageLayout.titleColumns')"
-            :show-picker="true"
-            :select-reference="picker('titleColumns')"
-            data-page-setup="title-columns"
-            @update:model-value="setReference('titleColumns', $event)"
-          />
-          <template #tips
-            ><p v-if="errors.titleColumns" role="alert" class="page-setup-sheet__error">
-              {{ errors.titleColumns }}
-            </p>
-          </template>
-        </TFormItem>
-        <TFormItem
-          name="bottomTitleRows"
+          :show-picker="true"
+          :select-reference="picker('titleColumns')"
+          data-page-setup="title-columns"
+          @update:model-value="setReference('titleColumns', $event)"
+        />
+        <template #tips
+          ><p v-if="errors.titleColumns" role="alert" class="page-setup-sheet__error">
+            {{ errors.titleColumns }}
+          </p>
+        </template>
+      </TFormItem>
+      <TFormItem
+        name="bottomTitleRows"
+        :label="t('pageLayout.bottomTitleRows')"
+        :status="errors.bottomTitleRows ? 'error' : undefined"
+        ><RangeReferenceInput
+          class="page-setup-sheet__reference"
+          :model-value="references.bottomTitleRows"
           :label="t('pageLayout.bottomTitleRows')"
-          :status="errors.bottomTitleRows ? 'error' : undefined"
-          ><RangeReferenceInput
-            class="page-setup-sheet__reference"
-            :model-value="references.bottomTitleRows"
-            :label="t('pageLayout.bottomTitleRows')"
-            :show-picker="true"
-            :select-reference="picker('bottomTitleRows')"
-            data-page-setup="bottom-title-rows"
-            @update:model-value="setReference('bottomTitleRows', $event)"
-          />
-          <template #tips
-            ><p v-if="errors.bottomTitleRows" role="alert" class="page-setup-sheet__error">
-              {{ errors.bottomTitleRows }}
-            </p>
-          </template>
-        </TFormItem>
-      </div>
+          :show-picker="true"
+          :select-reference="picker('bottomTitleRows')"
+          data-page-setup="bottom-title-rows"
+          @update:model-value="setReference('bottomTitleRows', $event)"
+        />
+        <template #tips
+          ><p v-if="errors.bottomTitleRows" role="alert" class="page-setup-sheet__error">
+            {{ errors.bottomTitleRows }}
+          </p>
+        </template>
+      </TFormItem>
     </section>
     <section class="page-setup-sheet__section" :aria-label="t('pageLayout.printSettings')">
       <h3>{{ t("pageLayout.printSettings") }}</h3>
-      <div class="page-setup-sheet__print-options">
-        <TFormItem :label-width="0">
-          <div class="page-setup-sheet__flags">
-            <TCheckbox
-              :checked="options.gridLines"
-              data-page-setup="print-gridlines"
-              @change="patchOptions({ gridLines: Boolean($event) })"
-              >{{ t("pageLayout.printGridLines") }}</TCheckbox
-            >
-            <TCheckbox
-              :checked="options.blackAndWhite"
-              data-page-setup="black-and-white"
-              @change="patchOptions({ blackAndWhite: Boolean($event) })"
-              >{{ t("pageLayout.blackAndWhite") }}</TCheckbox
-            >
-            <TCheckbox
-              :checked="options.headings"
-              data-page-setup="print-headings"
-              @change="patchOptions({ headings: Boolean($event) })"
-              >{{ t("pageLayout.printHeadings") }}</TCheckbox
-            >
-          </div>
-        </TFormItem>
-        <div class="page-setup-sheet__print-selects">
-          <TFormItem :label="t('pageLayout.cellComments')"
-            ><TSelect
-              :model-value="options.cellComments"
-              :options="commentOptions"
-              :aria-label="t('pageLayout.cellComments')"
-              data-page-setup="cell-comments"
-              @change="setComments"
-            />
-          </TFormItem>
-          <TFormItem :label="t('pageLayout.cellErrors')"
-            ><TSelect
-              :model-value="options.errors"
-              :options="errorOptions"
-              :aria-label="t('pageLayout.cellErrors')"
-              data-page-setup="cell-errors"
-              @change="setErrors"
-            />
-          </TFormItem>
+      <TFormItem :label-width="0">
+        <div class="page-setup-sheet__flags">
+          <TCheckbox
+            :checked="options.gridLines"
+            data-page-setup="print-gridlines"
+            @change="patchOptions({ gridLines: Boolean($event) })"
+            >{{ t("pageLayout.printGridLines") }}</TCheckbox
+          >
+          <TCheckbox
+            :checked="options.blackAndWhite"
+            data-page-setup="black-and-white"
+            @change="patchOptions({ blackAndWhite: Boolean($event) })"
+            >{{ t("pageLayout.blackAndWhite") }}</TCheckbox
+          >
+          <TCheckbox
+            :checked="options.headings"
+            data-page-setup="print-headings"
+            @change="patchOptions({ headings: Boolean($event) })"
+            >{{ t("pageLayout.printHeadings") }}</TCheckbox
+          >
         </div>
-      </div>
+      </TFormItem>
+      <TFormItem :label="t('pageLayout.cellComments')"
+        ><TSelect
+          :model-value="options.cellComments"
+          :options="commentOptions"
+          :aria-label="t('pageLayout.cellComments')"
+          data-page-setup="cell-comments"
+          @change="setComments"
+        />
+      </TFormItem>
+      <TFormItem :label="t('pageLayout.cellErrors')"
+        ><TSelect
+          :model-value="options.errors"
+          :options="errorOptions"
+          :aria-label="t('pageLayout.cellErrors')"
+          data-page-setup="cell-errors"
+          @change="setErrors"
+        />
+      </TFormItem>
     </section>
     <TFormItem class="page-setup-sheet__section" :label="t('pageLayout.pageOrder')">
       <div class="page-setup-sheet__order" data-page-setup="page-order">
@@ -237,23 +231,11 @@ function resetManualBreaks(): void {
     border-top: 1px solid var(--sheetcraft-border-subtle);
     padding-top: var(--sheetcraft-space-3);
   }
-  &__titles {
-    display: grid;
-    gap: var(--sheetcraft-space-2);
-  }
-  &__print-options {
-    display: grid;
-    gap: var(--sheetcraft-space-3);
-  }
   &__flags {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--sheetcraft-space-2) var(--sheetcraft-space-4);
     width: 100%;
-  }
-  &__print-selects {
-    display: grid;
-    gap: var(--sheetcraft-space-2);
   }
   &__order {
     display: flex;

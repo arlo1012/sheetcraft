@@ -81,54 +81,54 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
 
 <template>
   <TForm
-    class="page-setup-header-footer sheetcraft-form-grid"
+    class="page-setup-header-footer"
     :data="setup"
     label-align="right"
     :label-width="locale === 'zh-CN' ? 96 : 144"
   >
-    <section :aria-label="t('pageLayout.header')">
-      <div class="page-setup-header-footer__preview" :aria-label="t('pageLayout.headerPreview')">
-        <PageHeaderFooterField
-          :value="setup.header.left"
-          section="header"
-          part="left"
-          variant="odd"
-          :page-number="setup.firstPageNumber ?? 1"
-          :page-count="1"
-          :sheet-name="props.sheetName"
-          :file-name="props.fileName"
-          :disabled="false"
-          @open="emit('customEdit', $event)"
-        />
-        <PageHeaderFooterField
-          :value="setup.header.center"
-          section="header"
-          part="center"
-          variant="odd"
-          :page-number="setup.firstPageNumber ?? 1"
-          :page-count="1"
-          :sheet-name="props.sheetName"
-          :file-name="props.fileName"
-          :placeholder="setup.header.left || setup.header.right ? '' : t('pageLayout.preview')"
-          :ui-scale="0.65"
-          :disabled="false"
-          @open="emit('customEdit', $event)"
-        />
-        <PageHeaderFooterField
-          :value="setup.header.right"
-          section="header"
-          part="right"
-          variant="odd"
-          :page-number="setup.firstPageNumber ?? 1"
-          :page-count="1"
-          :sheet-name="props.sheetName"
-          :file-name="props.fileName"
-          :disabled="false"
-          @open="emit('customEdit', $event)"
-        />
-      </div>
-      <TFormItem :label="t('pageLayout.header')"
-        ><div class="page-setup-header-footer__row">
+    <TFormItem :label="t('pageLayout.header')">
+      <div class="page-setup-header-footer__field">
+        <div class="page-setup-header-footer__preview" :aria-label="t('pageLayout.headerPreview')">
+          <PageHeaderFooterField
+            :value="setup.header.left"
+            section="header"
+            part="left"
+            variant="odd"
+            :page-number="setup.firstPageNumber ?? 1"
+            :page-count="1"
+            :sheet-name="props.sheetName"
+            :file-name="props.fileName"
+            :disabled="false"
+            @open="emit('customEdit', $event)"
+          />
+          <PageHeaderFooterField
+            :value="setup.header.center"
+            section="header"
+            part="center"
+            variant="odd"
+            :page-number="setup.firstPageNumber ?? 1"
+            :page-count="1"
+            :sheet-name="props.sheetName"
+            :file-name="props.fileName"
+            :placeholder="setup.header.left || setup.header.right ? '' : t('pageLayout.preview')"
+            :ui-scale="0.65"
+            :disabled="false"
+            @open="emit('customEdit', $event)"
+          />
+          <PageHeaderFooterField
+            :value="setup.header.right"
+            section="header"
+            part="right"
+            variant="odd"
+            :page-number="setup.firstPageNumber ?? 1"
+            :page-count="1"
+            :sheet-name="props.sheetName"
+            :file-name="props.fileName"
+            :disabled="false"
+            @open="emit('customEdit', $event)"
+          />
+        </div>
+        <div class="page-setup-header-footer__row">
           <TSelect
             :model-value="presetValue(setup.header)"
             :options="presetOptions"
@@ -142,51 +142,51 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
             >{{ t("pageLayout.customHeader") }}</TButton
           >
         </div>
-      </TFormItem>
-    </section>
-    <section :aria-label="t('pageLayout.footer')">
-      <div class="page-setup-header-footer__preview" :aria-label="t('pageLayout.footerPreview')">
-        <PageHeaderFooterField
-          :value="setup.footer.left"
-          section="footer"
-          part="left"
-          variant="odd"
-          :page-number="setup.firstPageNumber ?? 1"
-          :page-count="1"
-          :sheet-name="props.sheetName"
-          :file-name="props.fileName"
-          :disabled="false"
-          @open="emit('customEdit', $event)"
-        />
-        <PageHeaderFooterField
-          :value="setup.footer.center"
-          section="footer"
-          part="center"
-          variant="odd"
-          :page-number="setup.firstPageNumber ?? 1"
-          :page-count="1"
-          :sheet-name="props.sheetName"
-          :file-name="props.fileName"
-          :placeholder="setup.footer.left || setup.footer.right ? '' : t('pageLayout.preview')"
-          :ui-scale="0.65"
-          :disabled="false"
-          @open="emit('customEdit', $event)"
-        />
-        <PageHeaderFooterField
-          :value="setup.footer.right"
-          section="footer"
-          part="right"
-          variant="odd"
-          :page-number="setup.firstPageNumber ?? 1"
-          :page-count="1"
-          :sheet-name="props.sheetName"
-          :file-name="props.fileName"
-          :disabled="false"
-          @open="emit('customEdit', $event)"
-        />
       </div>
-      <TFormItem :label="t('pageLayout.footer')"
-        ><div class="page-setup-header-footer__row">
+    </TFormItem>
+    <TFormItem :label="t('pageLayout.footer')">
+      <div class="page-setup-header-footer__field">
+        <div class="page-setup-header-footer__preview" :aria-label="t('pageLayout.footerPreview')">
+          <PageHeaderFooterField
+            :value="setup.footer.left"
+            section="footer"
+            part="left"
+            variant="odd"
+            :page-number="setup.firstPageNumber ?? 1"
+            :page-count="1"
+            :sheet-name="props.sheetName"
+            :file-name="props.fileName"
+            :disabled="false"
+            @open="emit('customEdit', $event)"
+          />
+          <PageHeaderFooterField
+            :value="setup.footer.center"
+            section="footer"
+            part="center"
+            variant="odd"
+            :page-number="setup.firstPageNumber ?? 1"
+            :page-count="1"
+            :sheet-name="props.sheetName"
+            :file-name="props.fileName"
+            :placeholder="setup.footer.left || setup.footer.right ? '' : t('pageLayout.preview')"
+            :ui-scale="0.65"
+            :disabled="false"
+            @open="emit('customEdit', $event)"
+          />
+          <PageHeaderFooterField
+            :value="setup.footer.right"
+            section="footer"
+            part="right"
+            variant="odd"
+            :page-number="setup.firstPageNumber ?? 1"
+            :page-count="1"
+            :sheet-name="props.sheetName"
+            :file-name="props.fileName"
+            :disabled="false"
+            @open="emit('customEdit', $event)"
+          />
+        </div>
+        <div class="page-setup-header-footer__row">
           <TSelect
             :model-value="presetValue(setup.footer)"
             :options="presetOptions"
@@ -200,9 +200,9 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
             >{{ t("pageLayout.customFooter") }}</TButton
           >
         </div>
-      </TFormItem>
-    </section>
-    <TFormItem :label-width="0">
+      </div>
+    </TFormItem>
+    <TFormItem>
       <div class="page-setup-header-footer__options">
         <TCheckbox
           :checked="options.differentOddEven"
@@ -237,13 +237,18 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
 @use "./page-setup-panel" as panel;
 .page-setup-header-footer {
   @include panel.panel;
+  &__field {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    gap: var(--sheetcraft-space-2);
+  }
   &__preview {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     height: 70px;
     box-sizing: border-box;
     border: 1px solid var(--sheetcraft-border-control);
-    margin-bottom: var(--sheetcraft-space-2);
     background: var(--sheetcraft-surface-panel);
   }
   &__row {

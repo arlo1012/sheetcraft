@@ -270,6 +270,9 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
 @use "./page-setup-panel" as panel;
 .page-setup-margins {
   @include panel.panel;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sheetcraft-space-4);
   &__diagram {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -104,7 +104,7 @@ function setQuality(value: SelectValue): void {
 
 <template>
   <TForm
-    class="page-setup-page sheetcraft-form-grid"
+    class="page-setup-page"
     :data="setup"
     label-align="right"
     :label-width="locale === 'zh-CN' ? 96 : 144"
@@ -125,129 +125,125 @@ function setQuality(value: SelectValue): void {
         >
       </div>
     </TFormItem>
-    <div class="page-setup-page__fields">
-      <TFormItem :label="t('pageLayout.scaling')">
-        <div class="page-setup-page__scaling">
-          <div class="page-setup-page__scaling-row">
-            <TRadio :checked="!fitting" @change="setScalingMode(false)">{{
-              t("pageLayout.scale")
-            }}</TRadio>
-            <TInputNumber
-              :model-value="setup.scale"
-              :disabled="fitting"
-              theme="column"
-              class="sheetcraft-input-number--persistent-controls page-setup-page__scale"
-              :min="10"
-              :max="400"
-              :decimal-places="0"
-              :aria-label="t('pageLayout.scale')"
-              data-page-setup="scale"
-              @update:model-value="typeof $event === 'number' && patch({ scale: $event })"
-            />
-            <span>% {{ t("pageLayout.normalSize") }}</span>
-          </div>
-          <div class="page-setup-page__scaling-row">
-            <TRadio :checked="fitting" @change="setScalingMode(true)">{{
-              t("pageLayout.fitToPages")
-            }}</TRadio>
-            <TSelect
-              :model-value="fitPreset"
-              :options="fitOptions"
-              :disabled="!fitting"
-              :aria-label="t('pageLayout.fitToPages')"
-              data-page-setup="fit-preset"
-              @change="setFitPreset"
-            />
-          </div>
+    <TFormItem :label="t('pageLayout.scaling')">
+      <div class="page-setup-page__scaling">
+        <div class="page-setup-page__scaling-row">
+          <TRadio :checked="!fitting" @change="setScalingMode(false)">{{
+            t("pageLayout.scale")
+          }}</TRadio>
+          <TInputNumber
+            :model-value="setup.scale"
+            :disabled="fitting"
+            theme="column"
+            class="sheetcraft-input-number--persistent-controls page-setup-page__scale"
+            :min="10"
+            :max="400"
+            :decimal-places="0"
+            :aria-label="t('pageLayout.scale')"
+            data-page-setup="scale"
+            @update:model-value="typeof $event === 'number' && patch({ scale: $event })"
+          />
+          <span>% {{ t("pageLayout.normalSize") }}</span>
         </div>
-      </TFormItem>
-      <div v-if="fitting && fitPreset === 'custom'" class="page-setup-page__fit-dimensions">
-        <TFormItem :label="t('pageLayout.fitWidth')"
-          ><TInputNumber
-            :model-value="setup.fitToPage?.width"
-            :aria-label="t('pageLayout.fitWidth')"
-            theme="column"
-            class="sheetcraft-input-number--persistent-controls"
-            :min="0"
-            :max="32767"
-            :decimal-places="0"
-            @update:model-value="setFit('width', $event)"
-          />
-        </TFormItem>
-        <TFormItem :label="t('pageLayout.fitHeight')" :help="t('pageLayout.fitUnlimited')"
-          ><TInputNumber
-            :model-value="setup.fitToPage?.height"
-            :aria-label="t('pageLayout.fitHeight')"
-            theme="column"
-            class="sheetcraft-input-number--persistent-controls"
-            :min="0"
-            :max="32767"
-            :decimal-places="0"
-            @update:model-value="setFit('height', $event)"
-          />
-        </TFormItem>
-      </div>
-    </div>
-    <div class="page-setup-page__fields">
-      <TFormItem :label="t('pageLayout.paperSize')">
-        <div class="page-setup-page__paper-select">
+        <div class="page-setup-page__scaling-row">
+          <TRadio :checked="fitting" @change="setScalingMode(true)">{{
+            t("pageLayout.fitToPages")
+          }}</TRadio>
           <TSelect
-            :model-value="setup.paperSize"
-            :options="paperOptions"
-            :aria-label="t('pageLayout.paperSize')"
-            data-page-setup="paper-size"
-            @change="setPaperSize"
-          /><TButton variant="outline" @click="customPaper">{{
-            t("pageLayout.customPaper")
-          }}</TButton>
+            :model-value="fitPreset"
+            :options="fitOptions"
+            :disabled="!fitting"
+            :aria-label="t('pageLayout.fitToPages')"
+            data-page-setup="fit-preset"
+            @change="setFitPreset"
+          />
         </div>
-      </TFormItem>
-      <div v-if="setup.paperSize === 'custom'" class="page-setup-page__paper-dimensions">
-        <TFormItem :label="t('pageLayout.paperWidth')"
-          ><TInputNumber
-            :model-value="setup.customPaperSize?.width"
-            :aria-label="t('pageLayout.paperWidth')"
-            theme="column"
-            class="sheetcraft-input-number--persistent-controls page-setup-page__paper-dimension"
-            :min="1"
-            :max="5000"
-            :decimal-places="2"
-            suffix="mm"
-            @update:model-value="setPaperDimension('width', $event)"
-          />
-        </TFormItem>
-        <TFormItem :label="t('pageLayout.paperHeight')"
-          ><TInputNumber
-            :model-value="setup.customPaperSize?.height"
-            :aria-label="t('pageLayout.paperHeight')"
-            theme="column"
-            class="sheetcraft-input-number--persistent-controls page-setup-page__paper-dimension"
-            :min="1"
-            :max="5000"
-            :decimal-places="2"
-            suffix="mm"
-            @update:model-value="setPaperDimension('height', $event)"
-          />
-        </TFormItem>
       </div>
-      <TFormItem :label="t('pageLayout.printQuality')"
-        ><TSelect
-          :model-value="setup.printQuality ?? 600"
-          :options="qualityOptions"
-          :aria-label="t('pageLayout.printQuality')"
-          data-page-setup="print-quality"
-          @change="setQuality"
+    </TFormItem>
+    <template v-if="fitting && fitPreset === 'custom'">
+      <TFormItem :label="t('pageLayout.fitWidth')"
+        ><TInputNumber
+          :model-value="setup.fitToPage?.width"
+          :aria-label="t('pageLayout.fitWidth')"
+          theme="column"
+          class="sheetcraft-input-number--persistent-controls"
+          :min="0"
+          :max="32767"
+          :decimal-places="0"
+          @update:model-value="setFit('width', $event)"
         />
       </TFormItem>
-      <TFormItem :label="t('pageLayout.firstPageNumber')"
-        ><TInput
-          v-model="firstPageText"
-          :aria-label="t('pageLayout.firstPageNumber')"
-          :placeholder="t('pageLayout.automaticPageNumber')"
-          data-page-setup="first-page-number"
+      <TFormItem :label="t('pageLayout.fitHeight')" :help="t('pageLayout.fitUnlimited')"
+        ><TInputNumber
+          :model-value="setup.fitToPage?.height"
+          :aria-label="t('pageLayout.fitHeight')"
+          theme="column"
+          class="sheetcraft-input-number--persistent-controls"
+          :min="0"
+          :max="32767"
+          :decimal-places="0"
+          @update:model-value="setFit('height', $event)"
         />
       </TFormItem>
-    </div>
+    </template>
+    <TFormItem :label="t('pageLayout.paperSize')">
+      <div class="page-setup-page__paper-select">
+        <TSelect
+          :model-value="setup.paperSize"
+          :options="paperOptions"
+          :aria-label="t('pageLayout.paperSize')"
+          data-page-setup="paper-size"
+          @change="setPaperSize"
+        /><TButton variant="outline" @click="customPaper">{{
+          t("pageLayout.customPaper")
+        }}</TButton>
+      </div>
+    </TFormItem>
+    <template v-if="setup.paperSize === 'custom'">
+      <TFormItem :label="t('pageLayout.paperWidth')"
+        ><TInputNumber
+          :model-value="setup.customPaperSize?.width"
+          :aria-label="t('pageLayout.paperWidth')"
+          theme="column"
+          class="sheetcraft-input-number--persistent-controls page-setup-page__paper-dimension"
+          :min="1"
+          :max="5000"
+          :decimal-places="2"
+          suffix="mm"
+          @update:model-value="setPaperDimension('width', $event)"
+        />
+      </TFormItem>
+      <TFormItem :label="t('pageLayout.paperHeight')"
+        ><TInputNumber
+          :model-value="setup.customPaperSize?.height"
+          :aria-label="t('pageLayout.paperHeight')"
+          theme="column"
+          class="sheetcraft-input-number--persistent-controls page-setup-page__paper-dimension"
+          :min="1"
+          :max="5000"
+          :decimal-places="2"
+          suffix="mm"
+          @update:model-value="setPaperDimension('height', $event)"
+        />
+      </TFormItem>
+    </template>
+    <TFormItem :label="t('pageLayout.printQuality')"
+      ><TSelect
+        :model-value="setup.printQuality ?? 600"
+        :options="qualityOptions"
+        :aria-label="t('pageLayout.printQuality')"
+        data-page-setup="print-quality"
+        @change="setQuality"
+      />
+    </TFormItem>
+    <TFormItem :label="t('pageLayout.firstPageNumber')"
+      ><TInput
+        v-model="firstPageText"
+        :aria-label="t('pageLayout.firstPageNumber')"
+        :placeholder="t('pageLayout.automaticPageNumber')"
+        data-page-setup="first-page-number"
+      />
+    </TFormItem>
   </TForm>
 </template>
 
@@ -291,10 +287,6 @@ function setQuality(value: SelectValue): void {
     width: 100px;
     flex: none;
   }
-  &__fields {
-    display: grid;
-    gap: var(--sheetcraft-space-2);
-  }
   &__paper-select {
     width: 100%;
     display: flex;
@@ -307,11 +299,6 @@ function setQuality(value: SelectValue): void {
     > :last-child {
       flex: none;
     }
-  }
-  &__paper-dimensions,
-  &__fit-dimensions {
-    display: grid;
-    gap: var(--sheetcraft-space-2);
   }
   &__paper-dimension {
     width: 160px;
