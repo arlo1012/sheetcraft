@@ -13,7 +13,7 @@ const mounted: Array<{ unmount(): void }> = [];
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
 });
-function fixture(kind: "shape" | "textBox" | "wordArt" = "shape") {
+function fixture(kind: "shape" | "textBox" | "wordArt" | "icon" | "equation" = "shape") {
   const workbook = createWorkbook({ id: "dialog", sheetId: "sheet" });
   const sheet = getActiveSheet(workbook);
   let rejected = true;
@@ -60,7 +60,7 @@ function fixture(kind: "shape" | "textBox" | "wordArt" = "shape") {
   };
 }
 describe("sheet-drawings concrete editor confirmation lifecycle", () => {
-  test.each(["shape", "textBox", "wordArt"] as const)(
+  test.each(["shape", "textBox", "wordArt", "icon", "equation"] as const)(
     "%s execute=false keeps edited fields and the same mounted editor for retry",
     async (kind) => {
       const f = fixture(kind);
@@ -88,7 +88,7 @@ describe("sheet-drawings concrete editor confirmation lifecycle", () => {
       expect(f.wrapper.findComponent(DrawingEditorDialog).exists()).toBe(false);
     },
   );
-  test.each(["shape", "textBox", "wordArt"] as const)(
+  test.each(["shape", "textBox", "wordArt", "icon", "equation"] as const)(
     "%s cancel discards uncommitted fields and detaches its callbacks",
     async (kind) => {
       const f = fixture(kind);
@@ -107,7 +107,7 @@ describe("sheet-drawings concrete editor confirmation lifecycle", () => {
       expect(f.sheet.drawings ?? []).toEqual([]);
     },
   );
-  test.each(["shape", "textBox", "wordArt"] as const)(
+  test.each(["shape", "textBox", "wordArt", "icon", "equation"] as const)(
     "%s same-ID reopen mounts a fresh editor without carrying the prior local fields",
     async (kind) => {
       const f = fixture(kind);

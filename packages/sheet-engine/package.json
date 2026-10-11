@@ -63,6 +63,10 @@
       "types": "./dist/text-layout.d.ts",
       "import": "./dist/text-layout.js"
     },
+    "./attributed-text-layout": {
+      "types": "./dist/attributed-text-layout.d.ts",
+      "import": "./dist/attributed-text-layout.js"
+    },
     "./viewport-layout": {
       "types": "./dist/viewport-layout.d.ts",
       "import": "./dist/viewport-layout.js"

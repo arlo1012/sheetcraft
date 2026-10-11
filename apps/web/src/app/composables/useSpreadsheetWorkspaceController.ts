@@ -81,6 +81,8 @@ import {
   parseCellContent,
 } from "@sheetcraft/core/input";
 import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
+import type { CellEditCommit } from "../../shared/cell-editing/useCellEditSession";
+import { applyInputFontRuns } from "../../shared/cell-editing/input-font-runs";
 import type { ExcelDateSystem } from "@sheetcraft/core/formula";
 import {
   createAutoSumFormula,
@@ -667,13 +669,7 @@ export function useSpreadsheetWorkspaceController(
     }
   }
 
-  function commitCell(payload: {
-    address: CellAddress;
-    input: string;
-    sheetId?: string;
-    confirmPendingWarning?: boolean;
-    inputOrigin?: "paste";
-  }): boolean {
+  function commitCell(payload: CellEditCommit): boolean {
     const sheetId = payload.sheetId ?? activeSheet.value.id;
     const sheet = session.workbook.sheets.get(sheetId);
     if (!sheet || !canEditCell(sheet, payload.address)) return false;
@@ -683,10 +679,13 @@ export function useSpreadsheetWorkspaceController(
           sheetId,
           address: payload.address,
           ...(payload.inputOrigin === "paste" ? {} : { inputIntent: "manual" as const }),
-          content:
+          content: applyInputFontRuns(
+            payload.input,
+            payload.inputFontRuns,
             parseCellContent(payload.input, {
               asText: isTextCellNumberFormat(getCellStyle(sheet, payload.address)?.numberFormat),
             }) ?? null,
+          ),
         },
         { confirmPendingWarning: payload.confirmPendingWarning },
       );

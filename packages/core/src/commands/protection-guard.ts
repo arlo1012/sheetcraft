@@ -1,10 +1,11 @@
+import { areCellTextFontRunsEqual, replaceCellTextByDiff } from "../text-font-runs.js";
 import { getSheetFilters } from "./filter.js";
 import { WorkbookDomainError } from "../errors.js";
 import { MAX_SHEET_ROWS, MAX_SHEET_COLUMNS } from "../sheet-limits.js";
 import { canEditCell, canEditRange } from "../protection.js";
-import { expandSelectionToMergedCellRanges } from "../merged-cells.js";
+import { expandSelectionToMergedCellRanges, MergedCellRangeResolver } from "../merged-cells.js";
 import { areCellStylesEqual } from "../style.js";
-import type { Workbook } from "../workbook.js";
+import type { Workbook, Sheet, CellAddress } from "../workbook.js";
 import type { WorkbookCommand } from "./contracts.js";
 
 function reject(sheetId: string): never {
@@ -33,6 +34,15 @@ export function assertWorkbookStructureProtection(
 
 /** Handles exceptions to whole-sheet protection; all other mutations use the existing guard. */
 export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookCommand): boolean {
+  const mergeResolvers = new Map<string, MergedCellRangeResolver>();
+  function targetAddress(sheet: Sheet, address: CellAddress): CellAddress {
+    let resolver = mergeResolvers.get(sheet.id);
+    if (!resolver) {
+      resolver = new MergedCellRangeResolver(sheet.mergedCells);
+      mergeResolvers.set(sheet.id, resolver);
+    }
+    return resolver.getAnchor(address) ?? address;
+  }
   if (command.type === "setCellContents") {
     for (const change of command.changes) {
       const sheet = workbook.sheets.get(change.sheetId);
@@ -42,7 +52,33 @@ export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookC
         sheet.mergedCells,
       );
       if (!canEditRange(sheet, range)) reject(sheet.id);
-      const cell = sheet.cells.get(`${change.address.row}:${change.address.column}`);
+      const address = targetAddress(sheet, change.address);
+      const cell = sheet.cells.get(`${address.row}:${address.column}`);
+      if (
+        !sheet.protection?.formatCells &&
+        change.content?.kind === "literal" &&
+        typeof change.content.value === "string"
+      ) {
+        const previous = cell?.content;
+        const expected =
+          previous?.kind === "literal" && typeof previous.value === "string"
+            ? replaceCellTextByDiff(
+                { text: previous.value, fontRuns: previous.fontRuns },
+                change.content.value,
+              ).fontRuns
+            : undefined;
+        if (!areCellTextFontRunsEqual(expected, change.content.fontRuns)) {
+          const inherited =
+            previous?.kind === "literal" && typeof previous.value === "string"
+              ? replaceCellTextByDiff(
+                  { text: previous.value, fontRuns: previous.fontRuns },
+                  change.content.value,
+                  { inheritInsertionFont: true },
+                ).fontRuns
+              : undefined;
+          if (!areCellTextFontRunsEqual(inherited, change.content.fontRuns)) reject(sheet.id);
+        }
+      }
       if (command.reconcileBorders && !sheet.protection?.formatCells && "style" in change)
         reject(sheet.id);
       if (change.style !== undefined) {
@@ -177,11 +213,13 @@ export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookC
     reject(sheet.id);
   if (
     command.type === "restoreCellStyles" &&
-    command.changes.some(
-      (change) =>
+    command.changes.some((change) => {
+      const address = targetAddress(sheet, change.address);
+      return (
         Boolean(change.style?.unlocked) !==
-        Boolean(sheet.cells.get(`${change.address.row}:${change.address.column}`)?.style?.unlocked),
-    )
+        Boolean(sheet.cells.get(`${address.row}:${address.column}`)?.style?.unlocked)
+      );
+    })
   )
     reject(sheet.id);
   switch (command.type) {

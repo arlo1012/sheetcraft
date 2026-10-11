@@ -1,3 +1,6 @@
+import { normalizeCommandCellContent } from "./values.js";
+import { areImageTransformsEqual } from "../image-transform.js";
+import type { CellContent } from "../formula/types.js";
 import {
   MAX_CELL_STYLE_PATCH_CELLS,
   MAX_CELL_INDENT,
@@ -28,6 +31,8 @@ import {
 import {
   createSheetSparseState,
   getCellStyle,
+  getCellContent,
+  setCellContent,
   getCellNamedStyle,
   cloneCellNamedStyleBinding,
   replaceSheetSparseState,
@@ -39,6 +44,7 @@ import {
 } from "../workbook.js";
 import { MergedCellRangeResolver } from "../merged-cells.js";
 import {
+  getExactCellBorderPatch,
   getExplicitCellBorderPatch,
   getCellBorderTargetKey,
   reconcileCellBorderTargets,
@@ -204,6 +210,7 @@ export function createAdjustCellIndentCommand(
 export function createRestoreCellStylesCommand(
   sheetId: string,
   changes: readonly RestoreCellStylesCommand["changes"][number][],
+  options?: { reconcileBorders?: boolean },
 ): RestoreCellStylesCommand {
   return {
     type: "restoreCellStyles",
@@ -211,6 +218,9 @@ export function createRestoreCellStylesCommand(
     changes: validateCommandPayload("changes", changes, () =>
       changes.map((change) => ({
         address: { ...change.address },
+        ...("content" in change
+          ? { content: normalizeCommandCellContent(change.content ?? null, "changes.content") }
+          : {}),
         style:
           validateCommandPayload("changes.style", change.style, () =>
             cloneCellStyle(change.style ?? undefined),
@@ -225,6 +235,7 @@ export function createRestoreCellStylesCommand(
           : {}),
       })),
     ),
+    ...(options?.reconcileBorders ? { reconcileBorders: true } : {}),
   };
 }
 
@@ -249,19 +260,26 @@ function applyStylePatches(
           ],
         }
       : undefined;
-    if (
-      !setCellNamedStyle(
-        sheet,
-        address,
-        normalizeCellStyle(mergeCellStyle(previousStyle, patch)),
-        nextNamedStyle,
-      )
-    )
-      continue;
+    const previousContent = getCellContent(sheet, address);
+    const resetRuns =
+      ("fontFamily" in patch || "fontTheme" in patch) &&
+      previousContent?.kind === "literal" &&
+      typeof previousContent.value === "string" &&
+      !!previousContent.fontRuns?.length;
+    const styleChanged = setCellNamedStyle(
+      sheet,
+      address,
+      normalizeCellStyle(mergeCellStyle(previousStyle, patch)),
+      nextNamedStyle,
+    );
+    if (resetRuns)
+      setCellContent(sheet, address, { kind: "literal", value: previousContent.value });
+    if (!styleChanged && !resetRuns) continue;
     reverseChanges.push({
       address: { ...address },
       style: previousStyle ?? null,
       namedStyle: previousNamedStyle ?? null,
+      ...(resetRuns ? { content: previousContent } : {}),
     });
   }
   return reverseChanges.length > 0 ? createRestoreCellStylesCommand(sheetId, reverseChanges) : null;
@@ -357,14 +375,22 @@ export function applyCellStyleCommand(
     );
     const priorOverrides = new Set(previousNamedStyle?.overrides ?? []);
     for (const key of Object.keys(patch) as Array<keyof CellStyle>) priorOverrides.delete(key);
-    if (
-      setCellNamedStyle(sheet, address, nextStyle, {
-        styleId: command.styleId,
-        includes,
-        ...(priorOverrides.size ? { overrides: [...priorOverrides] } : {}),
-      })
-    ) {
+    const previousContent = getCellContent(sheet, address);
+    const resetRuns =
+      includes.includes("font") &&
+      previousContent?.kind === "literal" &&
+      typeof previousContent.value === "string" &&
+      !!previousContent.fontRuns?.length;
+    const styleChanged = setCellNamedStyle(sheet, address, nextStyle, {
+      styleId: command.styleId,
+      includes,
+      ...(priorOverrides.size ? { overrides: [...priorOverrides] } : {}),
+    });
+    if (resetRuns)
+      setCellContent(sheet, address, { kind: "literal", value: previousContent.value });
+    if (styleChanged || resetRuns) {
       sheetReverse.push({
+        ...(resetRuns ? { content: previousContent } : {}),
         address: { ...address },
         style: previousStyle ?? null,
         namedStyle: previousNamedStyle ?? null,
@@ -801,43 +827,149 @@ export function applyCellBordersCommand(
   return reconcileAndApply(workbook, command.sheetId, resolver, patches, targets);
 }
 
+function hasSameContentExceptFontRuns(
+  previous: CellContent | null,
+  restored: CellContent | null,
+): boolean {
+  if (!previous || !restored) return previous === restored;
+  if (previous.kind !== restored.kind) return false;
+  if (previous.kind === "literal" && restored.kind === "literal")
+    return Object.is(previous.value, restored.value);
+  if (previous.kind === "formula" && restored.kind === "formula")
+    return previous.formula.source === restored.formula.source;
+  if (previous.kind === "error" && restored.kind === "error")
+    return previous.error.code === restored.error.code;
+  return (
+    previous.kind === "image" &&
+    restored.kind === "image" &&
+    previous.image.assetId === restored.image.assetId &&
+    previous.image.altText === restored.image.altText &&
+    areImageTransformsEqual(previous.image.transform, restored.image.transform)
+  );
+}
+
 export function applyRestoreCellStylesCommand(
   workbook: Workbook,
   command: RestoreCellStylesCommand,
+  fromHistory = false,
 ): RestoreCellStylesCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const mergeResolver = new MergedCellRangeResolver(sheet.mergedCells);
   const addresses = new Set<string>();
-  const normalizedChanges = validateCommandPayload("changes", command.changes, () =>
-    command.changes.map((change) => {
-      assertCellAddress(change.address);
-      const address = getMergeAwareAddress(mergeResolver, change.address);
-      const key = getCellBorderTargetKey(address);
-      if (addresses.has(key)) {
-        throw invalidCommandPayload(
-          "changes",
-          key,
-          `Cell style restore contains duplicate cell ${key}.`,
+  const normalizedChanges: RestoreCellStylesCommand["changes"] = validateCommandPayload(
+    "changes",
+    command.changes,
+    () =>
+      command.changes.map((change) => {
+        assertCellAddress(change.address);
+        const address = getMergeAwareAddress(mergeResolver, change.address);
+        const key = getCellBorderTargetKey(address);
+        if (addresses.has(key)) {
+          throw invalidCommandPayload(
+            "changes",
+            key,
+            `Cell style restore contains duplicate cell ${key}.`,
+          );
+        }
+        addresses.add(key);
+        const content =
+          "content" in change
+            ? normalizeCommandCellContent(change.content ?? null, "changes.content")
+            : undefined;
+        if (
+          !fromHistory &&
+          content !== undefined &&
+          !hasSameContentExceptFontRuns(getCellContent(sheet, address), content)
+        ) {
+          throw invalidCommandPayload(
+            "changes.content",
+            change.content,
+            "Cell style restoration may change only text font metadata, not cell content.",
+          );
+        }
+        return {
+          address,
+          ...(content !== undefined ? { content } : {}),
+          style:
+            validateCommandPayload("changes.style", change.style, () =>
+              normalizeCellStyle(change.style),
+            ) ?? null,
+          ...("namedStyle" in change
+            ? {
+                namedStyle:
+                  validateCommandPayload("changes.namedStyle", change.namedStyle, () =>
+                    cloneCellNamedStyleBinding(change.namedStyle),
+                  ) ?? null,
+              }
+            : {}),
+        };
+      }),
+  );
+  if (command.reconcileBorders) {
+    const targets: BorderPatchMap = new Map();
+    for (const change of normalizedChanges) {
+      const patch = getExactCellBorderPatch(change.style ?? undefined);
+      const range = mergeResolver.getRangeAtAddress(change.address);
+      if (!range) {
+        addTargetBorderPatch(targets, change.address, patch);
+        continue;
+      }
+      // The anchor owns the style, but every physical perimeter edge owns a
+      // different neighbor. Never reconcile a merged range's internal edges.
+      for (let row = range.start.row; row <= range.end.row; row++) {
+        addTargetBorderPatch(
+          targets,
+          { row, column: range.start.column },
+          {
+            borderLeft: patch.borderLeft,
+          },
+        );
+        addTargetBorderPatch(
+          targets,
+          { row, column: range.end.column },
+          {
+            borderRight: patch.borderRight,
+          },
         );
       }
-      addresses.add(key);
-      return {
-        address,
-        style:
-          validateCommandPayload("changes.style", change.style, () =>
-            normalizeCellStyle(change.style),
-          ) ?? null,
-        ...("namedStyle" in change
-          ? {
-              namedStyle:
-                validateCommandPayload("changes.namedStyle", change.namedStyle, () =>
-                  cloneCellNamedStyleBinding(change.namedStyle),
-                ) ?? null,
-            }
-          : {}),
-      };
-    }),
-  );
+      for (let column = range.start.column; column <= range.end.column; column++) {
+        addTargetBorderPatch(
+          targets,
+          { row: range.start.row, column },
+          {
+            borderTop: patch.borderTop,
+          },
+        );
+        addTargetBorderPatch(
+          targets,
+          { row: range.end.row, column },
+          {
+            borderBottom: patch.borderBottom,
+          },
+        );
+      }
+    }
+    const changesByAddress = new Map(
+      normalizedChanges.map((change) => [getCellBorderTargetKey(change.address), change]),
+    );
+    reconcileCellBorderTargets(targets, (physicalAddress, patch) => {
+      const visiblePatch = excludeInternalMergedBorderSides(patch, mergeResolver, physicalAddress);
+      if (!Object.keys(visiblePatch).length) return;
+      const address = getMergeAwareAddress(mergeResolver, physicalAddress);
+      const key = getCellBorderTargetKey(address);
+      const existing = changesByAddress.get(key);
+      if (existing)
+        existing.style = mergeCellStyle(existing.style ?? undefined, visiblePatch) ?? null;
+      else {
+        const change = {
+          address,
+          style: mergeCellStyle(getCellStyle(sheet, address), visiblePatch) ?? null,
+        };
+        changesByAddress.set(key, change);
+        normalizedChanges.push(change);
+      }
+    });
+  }
   const reverseChanges: RestoreCellStylesCommand["changes"] = [];
   for (const change of normalizedChanges) {
     const previousStyle = cloneCellStyle(
@@ -848,9 +980,14 @@ export function applyRestoreCellStylesCommand(
       "namedStyle" in change
         ? ((change as RestoreCellStylesCommand["changes"][number]).namedStyle ?? null)
         : getCellNamedStyle(sheet, change.address);
-    if (setCellNamedStyle(sheet, change.address, change.style, restoredNamedStyle)) {
+    const previousContent = getCellContent(sheet, change.address);
+    const styleChanged = setCellNamedStyle(sheet, change.address, change.style, restoredNamedStyle);
+    const contentChanged =
+      "content" in change ? setCellContent(sheet, change.address, change.content ?? null) : false;
+    if (styleChanged || contentChanged) {
       reverseChanges.push({
         address: { ...change.address },
+        ...("content" in change ? { content: previousContent } : {}),
         style: previousStyle ?? null,
         namedStyle: previousNamedStyle ?? null,
       });

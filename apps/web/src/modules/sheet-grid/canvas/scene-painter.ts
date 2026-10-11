@@ -5,7 +5,8 @@ import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layo
 import { paintCellFill } from "./cell-fill-painter";
 import { paintConditionalFormatVisual } from "../../../shared/conditional-formatting/conditional-format-painter";
 import { paintCellText } from "./cell-text-painter";
-import type { SheetCanvasScene } from "./cell-scene";
+import type { CanvasCell, SheetCanvasScene } from "./cell-scene";
+import type { FrozenPaneId } from "@sheetcraft/sheet-engine/frozen-layout";
 import { paintCellImage, type CanvasImageCache } from "./image-painter";
 import { paintGridLines } from "./grid-line-painter";
 import { createCanvasPixelGrid } from "../../../shared/canvas/pixel-grid";
@@ -24,6 +25,91 @@ function clipRect(context: CanvasRenderingContext2D, rect: Rect): void {
   context.clip();
 }
 
+type CellIndicatorOptions = {
+  errorIndicator?: string;
+  editingCell?: CellAddress;
+  errorCells?: ReadonlySet<string>;
+};
+
+function paneScroll(layout: SheetViewportLayout, id: FrozenPaneId) {
+  const pane = layout.panes[id];
+  return {
+    x:
+      id === "body" || id === "top"
+        ? layout.frozenSize.width + layout.bodyScrollPosition.x - pane.clip.x
+        : 0,
+    y:
+      id === "body" || id === "left"
+        ? layout.frozenSize.height + layout.bodyScrollPosition.y - pane.clip.y
+        : 0,
+  };
+}
+
+function paintPaneCellIndicators(
+  context: CanvasRenderingContext2D,
+  cells: readonly CanvasCell[],
+  layout: SheetViewportLayout,
+  paneId: FrozenPaneId,
+  options: CellIndicatorOptions,
+): void {
+  if (options.errorCells?.size) {
+    context.fillStyle = options.errorIndicator ?? "#008a00";
+    for (const cell of cells) {
+      if (
+        !options.errorCells.has(`${cell.address.row}:${cell.address.column}`) ||
+        layout.getPaneForAddress(cell.address) !== paneId ||
+        (cell.address.row === options.editingCell?.row &&
+          cell.address.column === options.editingCell.column)
+      )
+        continue;
+      const size = Math.min(6, cell.rect.width - 2, cell.rect.height - 2);
+      if (size <= 0) continue;
+      const x = cell.rect.x + 1;
+      const y = cell.rect.y + 1;
+      context.beginPath();
+      context.moveTo(x, y);
+      context.lineTo(x + size, y);
+      context.lineTo(x, y + size);
+      context.closePath();
+      context.fill();
+    }
+  }
+  context.fillStyle = "#e53935";
+  for (const cell of cells) {
+    if (!cell.hasNote) continue;
+    const rect = cell.contentRect;
+    const size = Math.min(8, rect.width - 1, rect.height - 1);
+    if (size <= 0) continue;
+    const right = rect.x + rect.width - 1;
+    const top = rect.y + 1;
+    context.beginPath();
+    context.moveTo(right - size, top);
+    context.lineTo(right, top);
+    context.lineTo(right, top + size);
+    context.closePath();
+    context.fill();
+  }
+}
+
+/** Cell indicators follow native attributed text, before the surface watermark. */
+export function paintSheetCellIndicators(
+  context: CanvasRenderingContext2D,
+  scene: SheetCanvasScene,
+  layout: SheetViewportLayout,
+  options: CellIndicatorOptions,
+): void {
+  for (const paneScene of scene.panes) {
+    const pane = layout.panes[paneScene.id];
+    if (pane.clip.width <= 0 || pane.clip.height <= 0) continue;
+    const scroll = paneScroll(layout, paneScene.id);
+    context.save();
+    clipRect(context, createCanvasPixelGrid(context).snapRect(pane.clip));
+    context.translate(-scroll.x, -scroll.y);
+    paintPaneCellIndicators(context, paneScene.cells, layout, paneScene.id, options);
+    context.restore();
+  }
+}
+
 export function paintSheetScene(
   context: CanvasRenderingContext2D,
   scene: SheetCanvasScene,
@@ -38,6 +124,10 @@ export function paintSheetScene(
     imageUrls?: ReadonlyMap<string, string>;
     images: CanvasImageCache;
     imagePlaceholder: (assetId: string) => string;
+    /** Only a live surface with the native logical-span overlay may skip these glyphs. */
+    attributedBidiMode?: "dom" | "plain";
+    /** Live native text surfaces paint these above their DOM layer instead. */
+    skipCellIndicators?: boolean;
   },
 ): void {
   const { palette } = options;
@@ -49,17 +139,10 @@ export function paintSheetScene(
   for (const paneScene of scene.panes) {
     const pane = layout.panes[paneScene.id];
     if (pane.clip.width <= 0 || pane.clip.height <= 0) continue;
-    const scrollX =
-      pane.id === "body" || pane.id === "top"
-        ? layout.frozenSize.width + layout.bodyScrollPosition.x - pane.clip.x
-        : 0;
-    const scrollY =
-      pane.id === "body" || pane.id === "left"
-        ? layout.frozenSize.height + layout.bodyScrollPosition.y - pane.clip.y
-        : 0;
+    const scroll = paneScroll(layout, paneScene.id);
     context.save();
     clipRect(context, createCanvasPixelGrid(context).snapRect(pane.clip));
-    context.translate(-scrollX, -scrollY);
+    context.translate(-scroll.x, -scroll.y);
     const pixels = createCanvasPixelGrid(context);
     for (const cell of paneScene.cells) paintCellFill(context, cell.rect, cell.style);
     for (const cell of paneScene.cells)
@@ -114,47 +197,18 @@ export function paintSheetScene(
         }
       } else if (content.textLayout) {
         context.translate(contentRect.x, contentRect.y);
-        paintCellText(context, content.textLayout, content.style, palette.text);
+        paintCellText(context, content.textLayout, content.style, palette.text, {
+          attributedBidiMode: options.attributedBidiMode,
+        });
       }
       context.restore();
     }
-    if (options.errorCells?.size) {
-      context.fillStyle = palette.errorIndicator ?? "#008a00";
-      for (const cell of paneScene.cells) {
-        if (
-          !options.errorCells.has(`${cell.address.row}:${cell.address.column}`) ||
-          layout.getPaneForAddress(cell.address) !== paneScene.id ||
-          (cell.address.row === options.editingCell?.row &&
-            cell.address.column === options.editingCell.column)
-        )
-          continue;
-        const size = Math.min(6, cell.rect.width - 2, cell.rect.height - 2);
-        if (size <= 0) continue;
-        const x = cell.rect.x + 1;
-        const y = cell.rect.y + 1;
-        context.beginPath();
-        context.moveTo(x, y);
-        context.lineTo(x + size, y);
-        context.lineTo(x, y + size);
-        context.closePath();
-        context.fill();
-      }
-    }
-    context.fillStyle = "#e53935";
-    for (const cell of paneScene.cells) {
-      if (!cell.hasNote) continue;
-      const rect = cell.contentRect;
-      const size = Math.min(8, rect.width - 1, rect.height - 1);
-      if (size <= 0) continue;
-      const right = rect.x + rect.width - 1;
-      const top = rect.y + 1;
-      context.beginPath();
-      context.moveTo(right - size, top);
-      context.lineTo(right, top);
-      context.lineTo(right, top + size);
-      context.closePath();
-      context.fill();
-    }
+    if (!options.skipCellIndicators)
+      paintPaneCellIndicators(context, paneScene.cells, layout, paneScene.id, {
+        errorIndicator: palette.errorIndicator,
+        editingCell: options.editingCell,
+        errorCells: options.errorCells,
+      });
     context.restore();
   }
   options.images.retain(visibleImageUrls);

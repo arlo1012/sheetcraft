@@ -1,3 +1,38 @@
+## Full desktop-aligned Symbol priority — 2026-10-11
+
+Prior representative lifecycle results remain valid only within their stated scope;
+they are not full tool completion. Current primary work is the complete Symbol
+capability and polished Chinese/responsive editor, based on actual desktop WPS ET,
+not the simplified online version. Font choice/coverage, subsets, special-character
+page, recent symbols, character code/information and full interaction need actual
+reference facts and implementation/whole-tool acceptance before moving on.
+
+Export warning rendering is deferred, not fixed. Regression WIP, exact source test
+bytes and original8fail/8pass baseline are preserved under
+`docs/handoff/2026-10-11/wip-export-warnings/`; no warning product source changed.
+Files have `.pending` extension outside live test/type roots, with exact original
+paths/hashes for restoration. Do not treat WIP checkpoint as all-green acceptance.
+
+## Existing icon/equation lifecycle — 2026-10-11
+
+Read `docs/acceptance/icon-equation-20261011.md`. Existing fixed nine-shape icon and
+LaTeX equation create/edit/cancel/UndoRedo/public JSON/save-reload passed on new
+synthetic Sheet6. Only production change is hiding equation fields without effective
+renderer consumption: fill/outline/width and generic Bold/Italic. Old stored fields
+and LaTeX-specific font commands remain intact; no model/snapshot/native changes.
+
+Final serial Web79, Core23, located native omissions4 pass; Web Vue/Node types and
+production build, scoped format/lint pass. Original appearance/font failures and
+Textarea teardown/GUI locator harness errors retained. Chunk warning/fullCI remain.
+Final public JSON33,262B SHA2561c1c2211965106400c0e0578e09532dac62d5afe257a74c013b3af3bea4f6df5;
+all prior six sheets exact, raw exports local, own GUI/preview closed, oom25 unchanged.
+
+Correction: native API warns of omitted objects, but current Web export throws away
+warning issues and reports generic success. Prior statements must not be read as
+GUI warning acceptance. Next bounded repair presents export warnings accurately;
+icon/equation native Excel/WPS exchange is unsupported and untested. The current
+formula hint treats literal braces as i18n placeholders; recorded, not repaired here.
+
 # Sheetcraft continuation after recovery — 2026-10-10
 
 ## Existing same-sheet line Sparkline lifecycle — 2026-10-11

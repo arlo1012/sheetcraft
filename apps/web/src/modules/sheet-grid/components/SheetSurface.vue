@@ -1,5 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
+import { Button } from "tdesign-vue-next";
+import CellTextContent from "../../../shared/cell-text/CellTextContent.vue";
+import { getAttributedDomCells } from "../canvas/attributed-dom-overlay";
+import {
+  ensureCellFontResource,
+  getCellFontResourceFamilies,
+  retryCellFontResource,
+  useCellFontResources,
+} from "../../../shared/cell-text/font-resources";
+import { findLocalSymbolFont } from "../../../shared/cell-text/local-font-source";
 import type { CellAddress } from "@sheetcraft/core/workbook";
 import type { SheetPageDecoration } from "@sheetcraft/core/page-decoration";
 import type { ExcelDateSystem } from "@sheetcraft/core/formula";
@@ -23,7 +33,7 @@ import {
 } from "../canvas/border-painter";
 import { createCanvasImageCache } from "../canvas/image-painter";
 import { clearCanvasTextMetrics } from "../canvas/cell-text-painter";
-import { paintSheetScene } from "../canvas/scene-painter";
+import { paintSheetCellIndicators, paintSheetScene } from "../canvas/scene-painter";
 import type { SheetDisplaySnapshot } from "../canvas/sheet-display-snapshot";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
 import type { SheetRenderEnvironment } from "../rendering/useSheetRenderEnvironment";
@@ -92,12 +102,45 @@ const emit = defineEmits<{
 defineSlots<{ "active-cell"?: (props: { cellRect: Rect }) => unknown }>();
 const { t } = useAppI18n();
 const surfaceCanvas = ref<HTMLCanvasElement>();
+const foregroundCanvas = ref<HTMLCanvasElement>();
+const foregroundAvailable = ref(false);
 const activeEditorId = `sheet-cell-editor-${useId().replaceAll(":", "")}`;
 const viewportKey = computed(() => getCanvasViewportKey(props.frame.layout));
 const presentationCache = createCellPresentationCache(browserCellTextMeasurer);
 let scene: SheetCanvasScene | undefined;
+const sceneRevision = ref(0);
+const fontResources = useCellFontResources();
+const visibleFontFamilies = ref<readonly string[]>([]);
+const hasFontProjectionWarning = ref(false);
+const attributedDomCells = computed(() => {
+  void sceneRevision.value;
+  return getAttributedDomCells({
+    scene,
+    frame: props.frame,
+    editingCell: props.editing ? props.activeCell : undefined,
+    pageView: props.pageView,
+  });
+});
+const renderedAttributedDomCells = computed(() =>
+  foregroundAvailable.value ? attributedDomCells.value : [],
+);
+const failedFontFamilies = computed(() =>
+  visibleFontFamilies.value.filter(
+    (family) => fontResources.resources.value.get(family)?.state === "error",
+  ),
+);
+const failedFontLabels = computed(() =>
+  failedFontFamilies.value
+    .map((family) => findLocalSymbolFont(family)?.displayFamily ?? family)
+    .join(", "),
+);
+function retryVisibleFonts(): void {
+  for (const family of failedFontFamilies.value)
+    void retryCellFontResource(family).catch(() => undefined);
+}
 let borderPlan: SheetBorderPaintPlan | undefined;
 let context: CanvasRenderingContext2D | null = null;
+let foregroundContext: CanvasRenderingContext2D | null = null;
 let scheduler: ReturnType<typeof createSheetRenderScheduler> | undefined;
 const images = createCanvasImageCache(() => invalidate());
 const backgroundImages = createCanvasImageCache(() => invalidate());
@@ -142,6 +185,20 @@ function rebuildScene(): void {
     fontRevision: cellTextFontRevision.value,
     cache: presentationCache,
   });
+  sceneRevision.value++;
+  const families = new Set<string>();
+  hasFontProjectionWarning.value = false;
+  for (const pane of scene.panes)
+    for (const cell of pane.cells) {
+      if (!cell.content.text) continue;
+      hasFontProjectionWarning.value ||= Boolean(cell.content.fontProjectionUnavailable);
+      for (const family of getCellFontResourceFamilies(cell.content.style?.fontFamily ?? ""))
+        families.add(family);
+      for (const run of cell.content.fontRuns ?? [])
+        for (const family of getCellFontResourceFamilies(run.fontFamily)) families.add(family);
+    }
+  visibleFontFamilies.value = [...families];
+  for (const family of families) void ensureCellFontResource(family).catch(() => undefined);
   borderPlan = createBorderPaintPlan(
     props.display.sheet,
     props.geometry,
@@ -165,6 +222,17 @@ function paint(): void {
   if (!context || !scene || !borderPlan) return;
   const frame = props.frame;
   resize(surfaceCanvas.value!, context);
+  if (foregroundContext && foregroundCanvas.value) {
+    resize(foregroundCanvas.value, foregroundContext);
+    // Clear the entire backing store, including fractional-density edge pixels.
+    // This layer must remain transparent between changed selections and objects.
+    foregroundContext.save();
+    foregroundContext.setTransform(1, 0, 0, 1, 0, 0);
+    foregroundContext.clearRect(0, 0, foregroundCanvas.value.width, foregroundCanvas.value.height);
+    foregroundContext.restore();
+  }
+  const splitTextLayer = renderedAttributedDomCells.value.length > 0;
+  const overlayContext = splitTextLayer ? foregroundContext! : context;
   context.fillStyle = props.environment.cells.background;
   context.fillRect(0, 0, frame.size.width, frame.size.height);
   context.save();
@@ -185,6 +253,7 @@ function paint(): void {
     );
   const pageBreakPreview =
     props.pageView?.mode === "page-break-preview" ? props.pageView : undefined;
+  let printed: Rect | undefined;
   const paintScene = (showGridLines: boolean) =>
     paintSheetScene(context!, scene!, frame.layout, {
       palette: {
@@ -200,6 +269,8 @@ function paint(): void {
       images,
       imagePlaceholder: (id) =>
         t(props.loadingImageAssetIds?.has(id) ? "image.loading" : "image.assetUnavailable"),
+      attributedBidiMode: splitTextLayer ? "dom" : "plain",
+      skipCellIndicators: splitTextLayer,
     });
   if (props.pageView?.mode === "page-layout") {
     paintPageLayoutBackground(
@@ -219,7 +290,7 @@ function paint(): void {
     paintScene(props.showGridLines);
     context.restore();
   } else if (pageBreakPreview) {
-    const printed = paintPageBreakPreviewBackground(
+    printed = paintPageBreakPreviewBackground(
       context,
       pageBreakPreview,
       frame.layout.bodyScrollPosition,
@@ -238,33 +309,58 @@ function paint(): void {
     paintBackground();
     paintScene(props.showGridLines);
   }
-  paintSheetWatermark(context, props.pageDecoration, frame, props.pageView, watermarkImage);
   context.restore();
-  paintSheetUnderlay(context, frame, props.overlays, props.environment.overlays);
-  context.save();
-  context.translate(frame.body.x, frame.body.y);
+  overlayContext.save();
+  overlayContext.translate(frame.body.x, frame.body.y);
+  if (splitTextLayer) {
+    const paintIndicators = () =>
+      paintSheetCellIndicators(overlayContext, scene!, frame.layout, {
+        errorIndicator: props.errorIndicatorColor ?? props.environment.cells.errorIndicator,
+        editingCell: props.editing ? props.activeCell : undefined,
+        errorCells: props.errorCells,
+      });
+    if (props.pageView?.mode === "page-layout") {
+      overlayContext.save();
+      clipPageContents(overlayContext, props.pageView, frame.layout.bodyScrollPosition);
+      paintIndicators();
+      overlayContext.restore();
+    } else if (pageBreakPreview) {
+      overlayContext.save();
+      if (clipPageBreakPreviewPrintArea(overlayContext, printed)) paintIndicators();
+      overlayContext.restore();
+      overlayContext.save();
+      clipPageBreakPreviewOutside(overlayContext, printed, frame.layout.viewportSize);
+      paintIndicators();
+      overlayContext.restore();
+    } else paintIndicators();
+  }
+  paintSheetWatermark(overlayContext, props.pageDecoration, frame, props.pageView, watermarkImage);
+  overlayContext.restore();
+  paintSheetUnderlay(overlayContext, frame, props.overlays, props.environment.overlays);
+  overlayContext.save();
+  overlayContext.translate(frame.body.x, frame.body.y);
   if (props.pageView?.mode === "page-layout")
-    clipPageContents(context, props.pageView, frame.layout.bodyScrollPosition);
-  paintSheetBorders(context, borderPlan, frame.layout);
-  if (props.pageBreakGuides) paintPageBreakGuides(context, frame, props.pageBreakGuides);
+    clipPageContents(overlayContext, props.pageView, frame.layout.bodyScrollPosition);
+  paintSheetBorders(overlayContext, borderPlan, frame.layout);
+  if (props.pageBreakGuides) paintPageBreakGuides(overlayContext, frame, props.pageBreakGuides);
   if (props.pageView?.mode === "page-break-preview")
     paintPageBreakPreview(
-      context,
+      overlayContext,
       props.pageView,
       frame.layout.bodyScrollPosition,
       frame.layout.viewportSize,
       frame.scale,
     );
-  context.restore();
-  paintSheetForeground(context, frame, props.overlays, props.environment.overlays, 0);
-  context.save();
-  context.translate(frame.body.x, frame.body.y);
+  overlayContext.restore();
+  paintSheetForeground(overlayContext, frame, props.overlays, props.environment.overlays, 0);
+  overlayContext.save();
+  overlayContext.translate(frame.body.x, frame.body.y);
   if (props.pageView?.mode === "page-layout")
-    clipPageContents(context, props.pageView, frame.layout.bodyScrollPosition);
-  props.paintImages?.(context);
-  context.restore();
+    clipPageContents(overlayContext, props.pageView, frame.layout.bodyScrollPosition);
+  props.paintImages?.(overlayContext);
+  overlayContext.restore();
   if (frame.headerSize.width || frame.headerSize.height)
-    paintSheetHeaders(context, {
+    paintSheetHeaders(overlayContext, {
       ...props.headers,
       frame,
       backdrop: props.pageView?.mode === "page-layout" ? PAGE_LAYOUT_DESKTOP_COLOR : undefined,
@@ -277,7 +373,7 @@ function paint(): void {
         ),
       },
     });
-  paintSheetChrome(context, frame, props.overlays, props.environment.overlays);
+  paintSheetChrome(overlayContext, frame, props.overlays, props.environment.overlays);
 }
 watch(
   [
@@ -290,6 +386,7 @@ watch(
     () => props.locale,
     () => props.dateSystem,
     cellTextFontRevision,
+    fontResources.revision,
   ],
   rebuildScene,
   { immediate: true, flush: "post" },
@@ -314,6 +411,15 @@ watch([() => props.headers, () => props.overlays, () => props.paintImages], () =
   flush: "post",
 });
 watch(cellTextFontRevision, clearCanvasTextMetrics, { flush: "sync" });
+watch(
+  foregroundCanvas,
+  (element) => {
+    foregroundContext = element?.getContext("2d", { alpha: true }) ?? null;
+    foregroundAvailable.value = Boolean(foregroundContext);
+    invalidate();
+  },
+  { flush: "post" },
+);
 onMounted(() => {
   context = surfaceCanvas.value!.getContext("2d", { alpha: false });
   scheduler = createSheetRenderScheduler(paint);
@@ -321,6 +427,8 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   scheduler?.dispose();
+  context = null;
+  foregroundContext = null;
   images.dispose();
   backgroundImages.dispose();
   watermarkImages.dispose();
@@ -346,6 +454,63 @@ defineExpose({ invalidate });
       @keydown="emit('keydown', $event)"
       @blur="emit('blur')"
     />
+    <div
+      v-for="item in renderedAttributedDomCells"
+      :key="item.key"
+      class="sheet-surface__attributed-clip"
+      :data-attributed-pane="item.paneId"
+      aria-hidden="true"
+      :style="{
+        left: `${item.clip.x}px`,
+        top: `${item.clip.y}px`,
+        width: `${item.clip.width}px`,
+        height: `${item.clip.height}px`,
+      }"
+    >
+      <div
+        class="sheet-surface__attributed-cell"
+        :style="{
+          left: `${item.placement.x}px`,
+          top: `${item.placement.y}px`,
+          width: `${item.placement.width}px`,
+          height: `${item.placement.height}px`,
+          color: item.cell.content.style?.textColor ?? environment.cells.text,
+        }"
+      >
+        <CellTextContent
+          :text="item.cell.content.text"
+          :text-layout="item.cell.content.textLayout"
+          :cell-style="item.cell.content.style"
+          :width="item.placement.width"
+          :height="item.placement.height"
+        />
+      </div>
+    </div>
+    <canvas
+      v-if="attributedDomCells.length"
+      ref="foregroundCanvas"
+      class="sheet-surface__canvas sheet-surface__canvas--foreground"
+      data-sheet-foreground-canvas
+      aria-hidden="true"
+    />
+    <div
+      v-if="failedFontFamilies.length || hasFontProjectionWarning"
+      class="sheet-surface__font-warning"
+      role="status"
+    >
+      <span v-if="failedFontFamilies.length">{{
+        t("symbolTools.cellFontUnavailable", { family: failedFontLabels })
+      }}</span>
+      <span v-else>{{ t("symbolTools.fontProjectionUnavailable") }}</span>
+      <Button
+        v-if="failedFontFamilies.length"
+        size="small"
+        variant="text"
+        @click="retryVisibleFonts"
+      >
+        {{ t("symbolTools.fontRetry") }}
+      </Button>
+    </div>
     <div
       v-if="activeEditor"
       class="sheet-surface__editor-pane"
@@ -373,16 +538,46 @@ defineExpose({ invalidate });
     position: absolute;
     inset: 0;
     display: block;
+    z-index: 0;
     width: 100%;
     height: 100%;
     outline: none;
     user-select: none;
     touch-action: none;
   }
+  &__canvas--foreground {
+    z-index: 2;
+    pointer-events: none;
+  }
   &__editor-pane {
     position: absolute;
     z-index: 5;
     pointer-events: none;
+  }
+  &__attributed-clip {
+    position: absolute;
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+    user-select: none;
+  }
+  &__attributed-cell {
+    position: absolute;
+    pointer-events: none;
+  }
+  &__font-warning {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    z-index: 4;
+    max-width: min(420px, calc(100% - 16px));
+    padding: 8px 12px;
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: 6px;
+    background: var(--sheetcraft-surface-panel);
+    color: var(--sheetcraft-text-primary);
+    font-size: 12px;
+    line-height: 1.5;
   }
   &__editor-anchor {
     position: absolute;

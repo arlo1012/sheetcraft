@@ -26,6 +26,7 @@ import { createRemoveTableCommand } from "../../tables.js";
 import { createInsertSheetAxisCommand } from "../../commands/structure.js";
 import { createMergeCellsCommand } from "../../commands/metadata.js";
 import { deserializeWorkbook, serializeWorkbook } from "../../serialization.js";
+import { createRestoreCellStylesCommand } from "../../commands/formatting.js";
 
 function fixture() {
   const workbook = createWorkbook({ id: "book", sheetId: "sheet" });
@@ -52,6 +53,28 @@ function fixture() {
 }
 
 describe("tables", () => {
+  test("style restore cannot rename header text outside the table transaction", () => {
+    const { workbook, sheet, table } = fixture();
+    const session = createWorkbookSession({ workbook, idFactory: () => "id" });
+    executeWorkbookCommand(session, createCreateTableCommand(sheet.id, table));
+    const before = serializeWorkbook(workbook),
+      undoCount = session.history.undoStack.length;
+    expect(() =>
+      executeWorkbookCommand(
+        session,
+        createRestoreCellStylesCommand(sheet.id, [
+          {
+            address: { row: 0, column: 0 },
+            style: { fontSize: 20 },
+            content: { kind: "literal", value: "Renamed" },
+          },
+        ]),
+      ),
+    ).toThrow();
+    expect(serializeWorkbook(workbook)).toEqual(before);
+    expect(session.history.undoStack).toHaveLength(undoCount);
+  });
+
   test("applies and replaces range-only table styling across multi-row headers", () => {
     const { workbook, sheet, table } = fixture();
     const first = {
@@ -322,6 +345,72 @@ describe("tables", () => {
       color: "#0000ff",
     });
     expect(resolveTableCellStyle(styled, { row: 0, column: 1 })?.borderLeft).toBeUndefined();
+  });
+
+  test("table creation retains mapped existing header fonts", () => {
+    const { workbook, sheet, table } = fixture();
+    applyWorkbookCommand(
+      workbook,
+      createSetCellContentCommand(
+        sheet.id,
+        { row: 0, column: 0 },
+        {
+          kind: "literal",
+          value: " Amount ",
+          fontRuns: [{ start: 1, end: 7, fontFamily: "Symbol" }],
+        },
+      ),
+    );
+    applyWorkbookCommand(workbook, createCreateTableCommand(sheet.id, table));
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "Amount",
+      fontRuns: [{ start: 0, end: 6, fontFamily: "Symbol" }],
+    });
+  });
+
+  test("preserves font runs through header trimming, suffixes and font-only edits", () => {
+    const { workbook, sheet, table } = fixture();
+    const session = createWorkbookSession({ workbook, idFactory: () => "id" });
+    executeWorkbookCommand(session, createCreateTableCommand(sheet.id, table));
+    const address = { row: 0, column: 1 };
+    const fontRuns = [{ start: 1, end: 7, fontFamily: "Symbol" }];
+    executeWorkbookCommand(
+      session,
+      createSetCellContentCommand(sheet.id, address, {
+        kind: "literal",
+        value: " Amount ",
+        fontRuns,
+      }),
+    );
+    expect(getCellContent(sheet, address)).toEqual({
+      kind: "literal",
+      value: "Amount2",
+      fontRuns: [{ start: 0, end: 6, fontFamily: "Symbol" }],
+    });
+    executeWorkbookCommand(
+      session,
+      createSetCellContentCommand(sheet.id, address, {
+        kind: "literal",
+        value: "Amount2",
+        fontRuns: [{ start: 0, end: 6, fontFamily: "Arial" }],
+      }),
+    );
+    expect(getCellContent(sheet, address)).toMatchObject({
+      fontRuns: [{ start: 0, end: 6, fontFamily: "Arial" }],
+    });
+    undoWorkbookCommand(session);
+    expect(getCellContent(sheet, address)).toMatchObject({
+      fontRuns: [{ start: 0, end: 6, fontFamily: "Symbol" }],
+    });
+    undoWorkbookCommand(session);
+    expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value: "Region" });
+    redoWorkbookCommand(session);
+    expect(getCellContent(sheet, address)).toEqual({
+      kind: "literal",
+      value: "Amount2",
+      fontRuns: [{ start: 0, end: 6, fontFamily: "Symbol" }],
+    });
   });
 
   test("normalizes visible header captions uniquely and restores them through undo", () => {

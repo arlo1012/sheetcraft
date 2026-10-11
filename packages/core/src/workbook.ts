@@ -1,3 +1,8 @@
+import {
+  normalizeCellTextFontRuns,
+  cloneCellTextFontRuns,
+  areCellTextFontRunsEqual,
+} from "./text-font-runs.js";
 import { normalizePivotTables, type SheetPivotTable } from "./pivot-tables.js";
 import { cloneCellSparkline, normalizeCellSparkline, type CellSparkline } from "./sparklines.js";
 import { normalizeSheetDrawings, type SheetDrawing } from "./sheet-drawings.js";
@@ -2044,6 +2049,9 @@ export function setCellSparkline(
 
 function normalizeCellContent(content: CellContent | null | undefined): CellContent | undefined {
   if (content === null || content === undefined) return undefined;
+  if ("fontRuns" in content && (content.kind !== "literal" || typeof content.value !== "string")) {
+    throw new TypeError("Font runs are only supported on string literal cell content.");
+  }
   if (content.kind === "literal") {
     const value = content.value;
     if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
@@ -2051,6 +2059,10 @@ function normalizeCellContent(content: CellContent | null | undefined): CellCont
     }
     if (typeof value === "number" && !Number.isFinite(value)) {
       throw new TypeError("Literal cell content numbers must be finite.");
+    }
+    if (typeof value === "string") {
+      const fontRuns = normalizeCellTextFontRuns(value, content.fontRuns);
+      return { kind: "literal", value, ...(fontRuns ? { fontRuns } : {}) };
     }
     return { kind: "literal", value };
   }
@@ -2088,7 +2100,11 @@ export function cloneCellContent(content: CellContent): CellContent {
   if (content.kind === "error") {
     return { kind: "error", error: createFormulaError(content.error.code) };
   }
-  if (content.kind === "literal") return { kind: "literal", value: content.value };
+  if (content.kind === "literal") {
+    if (typeof content.value !== "string") return { kind: "literal", value: content.value };
+    const fontRuns = cloneCellTextFontRuns(content.fontRuns);
+    return { kind: "literal", value: content.value, ...(fontRuns ? { fontRuns } : {}) };
+  }
   if (content.kind === "formula")
     return { kind: "formula", formula: { source: content.formula.source } };
   return {
@@ -2111,7 +2127,8 @@ function areCellContentsEqual(
   return (
     left.kind === right.kind &&
     (left.kind === "literal" && right.kind === "literal"
-      ? Object.is(left.value, right.value)
+      ? Object.is(left.value, right.value) &&
+        areCellTextFontRunsEqual(left.fontRuns, right.fontRuns)
       : left.kind === "error" && right.kind === "error"
         ? left.error.code === right.error.code
         : left.kind === "formula" &&

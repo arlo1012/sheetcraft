@@ -22,6 +22,7 @@ import { getCellStyle, getCellValue, setCellContent } from "../../workbook.js";
 import type { CellContent } from "../../formula/types.js";
 import { fixture } from "./fixture.js";
 import { getPivotTableRange } from "../../pivot-tables.js";
+import { createRestoreCellStylesCommand } from "../../commands/formatting.js";
 
 const resultCell = { row: 3, column: 3 };
 const ordinaryCell = { row: 3, column: 1 };
@@ -49,6 +50,27 @@ function expectAtomicRejection(f: ReturnType<typeof installed>, command: Workboo
 }
 
 describe("pivot result protection", () => {
+  test("style restore cannot overwrite pivot result data and remains atomic", () => {
+    const f = installed(),
+      before = serializeWorkbook(f.workbook);
+    const undoCount = f.session.history.undoStack.length;
+    expect(() =>
+      executeWorkbookCommand(
+        f.session,
+        createRestoreCellStylesCommand(f.destination.id, [
+          {
+            address: ordinaryCell,
+            style: { fontSize: 20 },
+            content: { kind: "literal", value: "Keep" },
+          },
+          { address: resultCell, style: null, content: { kind: "literal", value: 999 } },
+        ]),
+      ),
+    ).toThrow();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.session.history.undoStack).toHaveLength(undoCount);
+  });
+
   const blockedContents: Array<CellContent | null> = [
     { kind: "literal", value: 999 },
     { kind: "formula", formula: { source: "=1+2" } },

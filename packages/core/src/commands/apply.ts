@@ -368,7 +368,7 @@ export function applyWorkbookCommand(
       case "adjustCellIndent":
         return applyAdjustCellIndentCommand(workbook, command);
       case "restoreCellStyles":
-        return applyRestoreCellStylesCommand(workbook, command);
+        return applyRestoreCellStylesCommand(workbook, command, options.fromHistory);
       case "resizeSheetDimension":
         return applyResizeSheetDimensionCommand(workbook, command);
       case "resizeSheetDimensions":

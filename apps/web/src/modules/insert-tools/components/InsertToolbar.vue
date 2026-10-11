@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SymbolInsertMenu from "./SymbolInsertMenu.vue";
+import type { SymbolInsertion } from "../symbols/symbol-preferences";
 import PivotInsertTools from "../../pivot-tables/components/PivotInsertTools.vue";
 import ChartInsertTools from "../../charts/components/ChartInsertTools.vue";
 import type { ChartType } from "@sheetcraft/core/sheet-charts";
@@ -15,7 +17,6 @@ import {
   ALargeSmall,
   Star,
   Sigma,
-  Omega,
   Scan,
   Activity,
   Eraser,
@@ -36,6 +37,7 @@ defineProps<{
   hyperlinkDisabled: boolean;
   hasTable: boolean;
   editSessionId?: string;
+  insertSymbolTextHandler?: (payload: SymbolInsertion) => boolean;
 }>();
 const emit = defineEmits<{
   insertPivot: [chart: boolean];
@@ -47,6 +49,7 @@ const emit = defineEmits<{
   insertCamera: [];
   insertControl: [];
   insertSymbol: [];
+  insertSymbolText: [payload: SymbolInsertion];
   insertSparkline: [];
   clearSparklines: [];
   captureScreen: [];
@@ -220,15 +223,13 @@ const { t } = useAppI18n();
         @activate="emit('insertDrawing', 'equation')"
         ><Sigma
       /></RibbonButton>
-      <RibbonButton
-        variant="tall"
-        :label="t('drawing.symbol')"
-        :text="t('drawing.symbol')"
+      <SymbolInsertMenu
         :disabled="symbolDisabled"
-        data-insert-tool="symbol"
-        @activate="emit('insertSymbol')"
-        ><Omega
-      /></RibbonButton>
+        :edit-session-id="editSessionId"
+        :insert-text="insertSymbolTextHandler"
+        @more="emit('insertSymbol')"
+        @insert="emit('insertSymbolText', $event)"
+      />
     </section>
   </RibbonToolbar>
 </template>

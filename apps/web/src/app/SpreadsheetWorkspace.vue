@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { FloatingImage, Workbook } from "@sheetcraft/core/workbook";
+import { getCellContent, getCellStyle } from "@sheetcraft/core/workbook";
+import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
 import { useWordProofreading } from "../modules/text-proofreading/useWordProofreading";
 import ProofreadingToolbar from "../modules/text-proofreading/components/ProofreadingToolbar.vue";
 import WordReviewDialog from "../modules/text-proofreading/components/WordReviewDialog.vue";
@@ -111,8 +113,17 @@ const ChartEditorDialog = defineAsyncComponent(
   () => import("../modules/charts/components/ChartEditorDialog.vue"),
 );
 import SymbolDialog from "../modules/insert-tools/components/SymbolDialog.vue";
+import {
+  resolveSymbolShortcut,
+  useSymbolPreferences,
+  validSymbolInsertion,
+  withRecentSymbol,
+  type SymbolInsertion,
+} from "../modules/insert-tools/symbols/symbol-preferences";
+import { ensureCellFontResource } from "../shared/cell-text/font-resources";
+import { useSheetDisplaySnapshot } from "../modules/sheet-grid/canvas/sheet-display-snapshot";
+import { DEFAULT_CELL_FONT_FAMILY } from "@sheetcraft/core/style";
 import { captureScreen } from "../modules/insert-tools/captureScreen";
-import { insertTextAtSelection } from "../shared/forms/text-selection";
 import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
 import DrawingEditorDialog from "../modules/sheet-drawings/components/DrawingEditorDialog.vue";
 import InsertToolbar from "../modules/insert-tools/components/InsertToolbar.vue";
@@ -756,11 +767,22 @@ async function fillFromDataToolbar(direction: FillDirection): Promise<void> {
   fillSelection(direction);
   focusCellEditor();
 }
+const activeSheetDisplay = useSheetDisplaySnapshot({
+  getSheet: () => activeSheet.value,
+  getEvaluator: () => activeSheetEvaluator.value,
+  getRevision: () => workbookRevision.value,
+  getDateSystem: () => session.workbook.dateSystem,
+  getTheme: () => session.workbook.theme,
+});
 const axisTools = createAxisToolActions({
   getSheet: () => activeSheet.value,
   getEvaluator: () => activeSheetEvaluator.value,
   getLocale: () => locale.value,
   getDateSystem: () => session.workbook.dateSystem,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  getTheme: () => session.workbook.theme,
+  getCellStyle: (address) => activeSheetDisplay.value.getCellStyle(address),
   measurer: browserCellTextMeasurer,
   flushPendingEdits: () => cellEditSession.finish(),
   execute: executeCommand,
@@ -1425,10 +1447,11 @@ function editSheetDrawing(drawing: SheetDrawing): void {
 }
 const symbolDialog = shallowRef<{
   dialogId: number;
-  insert: (symbol: string) => void;
+  insert: (symbol: SymbolInsertion) => boolean;
   close: () => void;
 }>();
 const symbolVisible = computed(() => !!symbolDialog.value);
+const symbolPreferences = useSymbolPreferences();
 let symbolDialogSequence = 0;
 const captureBusy = ref(false);
 function openSymbolDialog(): void {
@@ -1442,52 +1465,128 @@ function openSymbolDialog(): void {
   const generation = workbookGeneration.value;
   const sheet = activeSheet.value;
   const address = { ...activeAddress.value };
+  const priorSurface = cellEditSession.state.active ? cellEditSession.state.surface : "grid";
+  if (
+    !cellEditSession.begin(
+      {
+        sheetId: sheet.id,
+        address,
+        input: activeCellInput.value,
+        content: getCellContent(sheet, address),
+        asText: isTextCellNumberFormat(getCellStyle(sheet, address)?.numberFormat),
+      },
+      { surface: priorSurface, mode: "append" },
+    )
+  )
+    return;
+  const editGeneration = cellEditSession.state.generation;
+  const documentRevision = workbookRevision.value;
+  let revision = cellEditSession.state.revision;
   const current = {
     dialogId: ++symbolDialogSequence,
-    insert: (symbol: string) => {
+    insert: (symbol: SymbolInsertion) => {
       if (
         symbolDialog.value !== current ||
         workbookGeneration.value !== generation ||
         activeSheet.value !== sheet ||
         activeAddress.value.row !== address.row ||
-        activeAddress.value.column !== address.column
+        activeAddress.value.column !== address.column ||
+        cellEditSession.state.generation !== editGeneration ||
+        workbookRevision.value !== documentRevision ||
+        cellEditSession.state.revision !== revision
       )
-        return;
-      insertSymbol(symbol);
+        return false;
+      const accepted = insertSymbol(symbol, false);
+      if (accepted) revision = cellEditSession.state.revision;
+      return accepted;
     },
     close: () => {
-      if (symbolDialog.value === current) symbolDialog.value = undefined;
+      if (symbolDialog.value !== current) return;
+      symbolDialog.value = undefined;
+      if (cellEditSession.state.generation === editGeneration) {
+        cellEditSession.activateSurface(priorSurface);
+        void nextTick(priorSurface === "formula-bar" ? focusFormulaBarOrGrid : focusCellEditor);
+      }
     },
   };
   symbolDialog.value = current;
 }
-function insertSymbol(symbol: string): void {
+function insertSymbol(symbol: SymbolInsertion, restoreFocus = true): boolean {
   if (
     loading.value ||
     fileBusy.value ||
     xlsxBusy.value ||
-    !canEditCell(activeSheet.value, activeAddress.value)
+    !canEditCell(activeSheet.value, activeAddress.value) ||
+    cellEditSession.state.composing ||
+    !validSymbolInsertion(symbol)
   )
-    return;
+    return false;
+  const formula =
+    (cellEditSession.state.active ? cellEditSession.state.draft : activeCellInput.value).startsWith(
+      "=",
+    ) &&
+    !isTextCellNumberFormat(getCellStyle(activeSheet.value, activeAddress.value)?.numberFormat);
+  if (symbol.fontFamily && !formula && !canUseSheetPermission(activeSheet.value, "formatCells")) {
+    void MessagePlugin.warning(t("workspace.cellEditUnavailable"));
+    return false;
+  }
   if (
     !cellEditSession.begin(
-      { sheetId: activeSheet.value.id, address: activeAddress.value, input: activeCellInput.value },
-      { surface: "grid", mode: "append" },
+      {
+        sheetId: activeSheet.value.id,
+        address: activeAddress.value,
+        input: activeCellInput.value,
+        content: getCellContent(activeSheet.value, activeAddress.value),
+        asText: isTextCellNumberFormat(
+          getCellStyle(activeSheet.value, activeAddress.value)?.numberFormat,
+        ),
+      },
+      {
+        surface: cellEditSession.state.active ? cellEditSession.state.surface : "grid",
+        mode: "append",
+      },
     )
   )
-    return;
-  const state = cellEditSession.state;
-  const result = insertTextAtSelection(
-    state.draft,
-    state.selection.start,
-    state.selection.end,
-    symbol,
-  );
-  cellEditSession.setDraft(result.value);
-  cellEditSession.setSelection(result.caret, result.caret);
-  symbolDialog.value = undefined;
-  void nextTick(focusCellEditor);
+    return false;
+  if (
+    !cellEditSession.replaceSelection(symbol.text, formula ? undefined : symbol.fontFamily, {
+      preserveLiteral: !formula,
+      preserveTypingFont: !formula,
+    })
+  )
+    return false;
+  if (restoreFocus)
+    void nextTick(
+      cellEditSession.state.surface === "formula-bar" ? focusFormulaBarOrGrid : focusCellEditor,
+    );
+  return true;
 }
+const quickSymbolInsert = computed(() => {
+  const generation = workbookGeneration.value;
+  const sheet = activeSheet.value;
+  const address = { ...activeAddress.value };
+  const editGeneration = cellEditSession.state.generation;
+  const revision = cellEditSession.state.revision;
+  const documentRevision = workbookRevision.value;
+  const selection = { ...cellEditSession.state.selection };
+  return (symbol: SymbolInsertion): boolean => {
+    if (
+      workbookGeneration.value !== generation ||
+      activeSheet.value !== sheet ||
+      activeAddress.value.row !== address.row ||
+      activeAddress.value.column !== address.column ||
+      cellEditSession.state.generation !== editGeneration ||
+      cellEditSession.state.revision !== revision ||
+      workbookRevision.value !== documentRevision ||
+      symbolVisible.value ||
+      cellEditSession.state.selection.start !== selection.start ||
+      cellEditSession.state.selection.end !== selection.end ||
+      cellEditSession.state.selection.direction !== selection.direction
+    )
+      return false;
+    return insertSymbol(symbol);
+  };
+});
 watch(
   () => activeSheet.value.id,
   () => {
@@ -2338,6 +2437,7 @@ function setShowFormulaBar(visible: boolean): void {
 }
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
+  if (symbolVisible.value) return;
   if (
     themeDialogVisible.value ||
     backgroundConflictVisible.value ||
@@ -2358,6 +2458,54 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     event.preventDefault();
     event.stopPropagation();
     return;
+  }
+  const target = event.target instanceof Element ? event.target : undefined;
+  const genericInput =
+    target?.closest("input, textarea, [contenteditable]") &&
+    !target?.closest("[data-cell-edit-surface]");
+  if (
+    !gridInert.value &&
+    !genericInput &&
+    !event.repeat &&
+    !event.isComposing &&
+    !cellEditSession.state.composing &&
+    !event.defaultPrevented
+  ) {
+    const symbol = resolveSymbolShortcut(symbolPreferences.preferences.value, event);
+    if (symbol) {
+      event.preventDefault();
+      event.stopPropagation();
+      const generation = workbookGeneration.value;
+      const sheet = activeSheet.value;
+      const address = { ...activeAddress.value };
+      const editGeneration = cellEditSession.state.generation;
+      const revision = cellEditSession.state.revision;
+      const documentRevision = workbookRevision.value;
+      const selection = { ...cellEditSession.state.selection };
+      void (symbol.fontFamily ? ensureCellFontResource(symbol.fontFamily) : Promise.resolve())
+        .then(() => {
+          if (
+            generation !== workbookGeneration.value ||
+            sheet !== activeSheet.value ||
+            address.row !== activeAddress.value.row ||
+            address.column !== activeAddress.value.column ||
+            editGeneration !== cellEditSession.state.generation ||
+            documentRevision !== workbookRevision.value ||
+            revision !== cellEditSession.state.revision ||
+            cellEditSession.state.selection.start !== selection.start ||
+            cellEditSession.state.selection.end !== selection.end ||
+            cellEditSession.state.selection.direction !== selection.direction ||
+            gridInert.value
+          )
+            return;
+          if (insertSymbol(symbol))
+            symbolPreferences.update(withRecentSymbol(symbolPreferences.preferences.value, symbol));
+        })
+        .catch(() => {
+          void MessagePlugin.warning(t("workspace.cellEditUnavailable"));
+        });
+      return;
+    }
   }
   if (
     event.key.toLowerCase() === "k" &&
@@ -2701,6 +2849,7 @@ const gridInert = computed(
             loading || fileBusy || xlsxBusy || !canEditCell(activeSheet, activeAddress)
           "
           @insert-symbol="openSymbolDialog"
+          :insert-symbol-text-handler="quickSymbolInsert"
           @capture-screen="insertScreenCapture"
           :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
           :image-disabled="
@@ -3603,6 +3752,8 @@ const gridInert = computed(
       :edit-target-sheet-name="editTargetSheet.name"
       :address-label="activeAddressLabel"
       :input-value="activeCellInput"
+      :content="getCellContent(activeSheet, activeAddress)"
+      :as-text="isTextCellNumberFormat(getCellStyle(activeSheet, activeAddress)?.numberFormat)"
       :edit-session="cellEditSession"
       :handle-reference-keydown="handleFormulaReferenceKeydown"
       :search-open="findDialogVisible"
@@ -4120,7 +4271,11 @@ const gridInert = computed(
     v-if="symbolDialog"
     :key="symbolDialog.dialogId"
     :disabled="loading || fileBusy || xlsxBusy || !canEditCell(activeSheet, activeAddress)"
-    @insert="symbolDialog.insert"
+    :edit-session-id="cellEditSession.id"
+    :insert-text="symbolDialog.insert"
+    :default-font-family="
+      activeSheetDisplay.getCellStyle(activeAddress)?.fontFamily ?? DEFAULT_CELL_FONT_FAMILY
+    "
     @close="symbolDialog.close"
   />
   <ChartEditorDialog

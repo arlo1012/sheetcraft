@@ -275,10 +275,14 @@ export type AdjustCellIndentCommand = {
 export type RestoreCellStylesCommand = {
   type: "restoreCellStyles";
   sheetId: string;
+  /** Clear-format requests reconcile shared edges; history restores exact snapshots. */
+  reconcileBorders?: true;
   changes: Array<{
     address: CellAddress;
     style: CellStyle | null;
     namedStyle?: CellNamedStyleBinding | null;
+    /** Non-history restores may change only font runs; history restores exact content. */
+    content?: CellContent | null;
   }>;
 };
 

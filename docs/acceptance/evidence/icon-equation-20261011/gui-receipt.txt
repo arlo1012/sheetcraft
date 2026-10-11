@@ -1,0 +1,23 @@
+Actual cloud Chrome production-preview GUI, 2026-10-11 UTC.
+Single own tab at a time, loopback127.0.0.1:7200; no build/test alongside GUI.
+New synthetic Sheet6, prior six sheets structurally exact.
+Icon: new Cancel defaults, create heart120x90 rot15/literaltext, creationUndoRedo,
+existing Escape cancel, edit star/fill/outline/width/name/text, editUndoRedo.
+Equation: new Cancel malformed source/name, create fraction+superscript atD4,
+creationUndoRedo, invalid draft safe error/Escape cancel, edit LaTeX font commands,
+name/geometry/font32/rotation-5, editUndoRedo, Save locally, ordinary reload.
+Both editors reopened after reload with exact committed fields; equation inert
+controls absent, icon effective controls intact.16 exported JSON comparisons
+verified byte-exact creation/edit/history/save-reload groups. Raw files stay local.
+GUI harness issues: helper closure retained closed tab21 -> Unknown CDP tab21,
+before any export action. Explicit current-tab helper repaired test harness.
+getByRole(table, Sheet6 worksheet) -> no-match timeout after reload; actual AX
+showed complete Sheet6 worksheet and both objects. Actual object DOM editor used
+instead; no product fix, no extra reload, no claimed pass from failed locator.
+Malformed LaTeX is preserved source and safe preview error, not a new invalid-input
+rejection policy. LaTeX glyph formatting itself remains supported.
+Actual XLSX downloaded; warning toast/report was not shown by current Web export.
+Native API omission evidence is recorded separately, not GUI warning acceptance.
+Own tabs21/22/23/24 all closed, own preview interrupted and terminal prompt visible.
+No own Error9 observed. oom_kill before25/after25; earlier crash root cause unproved.
+No raw artifacts/screenshots/cookies/token/password or personal account data uploaded.

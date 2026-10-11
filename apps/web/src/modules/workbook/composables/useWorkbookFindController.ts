@@ -248,7 +248,7 @@ export function useWorkbookFindController(deps: {
         const evaluator = deps.getEvaluator(sheet.id);
         const searchOptions = { ...options.value, format: activeFormat.value };
         const changes = new Map<string, CellContentChange>();
-        for (const { address, input } of buildSheetTextReplacements(
+        for (const { address, input, content } of buildSheetTextReplacements(
           sheet,
           queryText,
           replacementText,
@@ -260,13 +260,14 @@ export function useWorkbookFindController(deps: {
             sheetId: sheet.id,
             address,
             content:
-              input === ""
+              content ??
+              (input === ""
                 ? null
                 : cell?.content?.kind === "literal" && typeof cell.content.value === "string"
                   ? { kind: "literal" as const, value: input }
                   : parseCellContent(input, {
                       asText: isTextCellNumberFormat(cell?.style?.numberFormat),
-                    }),
+                    })),
           });
         }
         if (activeReplacementFormat.value) {

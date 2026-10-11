@@ -7,6 +7,7 @@ import FormulaTextOverlay from "../../../shared/formula-editing/FormulaTextOverl
 import { getFormulaReferenceTokens } from "../../../shared/formula-editing/formula-reference-tokens";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 import type { CellEditSession } from "../../../shared/cell-editing/useCellEditSession";
+import CellTextInput from "../../../shared/cell-editing/CellTextInput.vue";
 import type { Rect, Size } from "@sheetcraft/sheet-engine/geometry";
 
 const { t } = useAppI18n();
@@ -38,6 +39,13 @@ const emit = defineEmits<{
 }>();
 
 const inputRef = ref<HTMLTextAreaElement | null>(null);
+const richInputRef = ref<InstanceType<typeof CellTextInput>>();
+const useRichText = computed(
+  () =>
+    props.editing &&
+    props.editSession?.state.richTextMode &&
+    (!props.modelValue.startsWith("=") || props.editSession.state.asText),
+);
 const formulaAssistRef = ref<
   | (FormulaReferenceEditor & {
       handleKeydown: (event: KeyboardEvent) => boolean;
@@ -78,13 +86,20 @@ const accessibleLabel = computed(() => {
 });
 const formulaInputAria = computed(() => formulaAssistRef.value?.inputAria ?? {});
 const showFormulaColors = computed(
-  () => props.editing && !props.composing && props.modelValue.startsWith("="),
+  () =>
+    props.editing &&
+    !props.composing &&
+    !props.editSession?.state.asText &&
+    props.modelValue.startsWith("="),
 );
 const coloredReferences = computed(() =>
   showFormulaColors.value ? getFormulaReferenceTokens(props.modelValue) : [],
 );
 const formulaAssistActive = computed(
-  () => props.editing && (!props.editSession || props.editSession.state.surface === "grid"),
+  () =>
+    props.editing &&
+    !props.editSession?.state.asText &&
+    (!props.editSession || props.editSession.state.surface === "grid"),
 );
 
 async function measureEditor(): Promise<void> {
@@ -96,7 +111,7 @@ async function measureEditor(): Promise<void> {
   }
 
   await nextTick();
-  const input = inputRef.value;
+  const input = useRichText.value ? richInputRef.value?.element : inputRef.value;
   if (!input || sequence !== measurementSequence || !props.editing) {
     return;
   }
@@ -128,6 +143,7 @@ watch(
     props.viewportSize.width,
     props.viewportSize.height,
     props.style,
+    props.editSession?.state.draftFontRuns,
   ],
   () => void measureEditor(),
   { immediate: true, flush: "post" },
@@ -176,6 +192,10 @@ function focus(options?: {
     direction: "none" | "forward" | "backward";
   };
 }): void {
+  if (useRichText.value) {
+    richInputRef.value?.focus(options);
+    return;
+  }
   const input = inputRef.value;
   if (!input) {
     return;
@@ -201,6 +221,10 @@ function focus(options?: {
 }
 
 function insertLineBreak(): void {
+  if (useRichText.value) {
+    richInputRef.value?.insertLineBreak();
+    return;
+  }
   const input = inputRef.value;
   if (!input) {
     return;
@@ -259,6 +283,23 @@ function onInput(event: Event): void {
   void nextTick(captureSelection);
 }
 
+function onBeforeInput(event: Event): void {
+  if (!(event instanceof InputEvent) || !props.editing) return;
+  if (
+    props.editSession?.state.richTextMode &&
+    (event.inputType === "historyUndo" || event.inputType === "historyRedo")
+  ) {
+    event.preventDefault();
+    if (event.inputType === "historyUndo") props.editSession.undoDraft();
+    else props.editSession.redoDraft();
+    void nextTick(() => focus({ selection: props.editSession!.state.selection }));
+    return;
+  }
+  const input = inputRef.value;
+  if (input)
+    props.editSession?.prepareInput(input.selectionStart, input.selectionEnd, event.inputType);
+}
+
 function onPaste(event: ClipboardEvent): void {
   if (props.editing) props.editSession?.markPasted();
   emit("paste", event);
@@ -296,7 +337,28 @@ defineExpose({
     @mousedown.stop="onFrameMousedown"
     @dblclick.stop
   >
+    <CellTextInput
+      v-if="useRichText && editSession"
+      ref="richInputRef"
+      class="cell-editor is-editing"
+      :class="{ 'is-wrapped': wrapText }"
+      :model-value="modelValue"
+      :font-runs="editSession.state.draftFontRuns"
+      :edit-session="editSession"
+      surface="grid"
+      :label="accessibleLabel"
+      :wrap="wrapText"
+      :style="style"
+      :data-cell-editor="addressLabel"
+      @update:model-value="emit('update:modelValue', $event)"
+      @focus="onFocus"
+      @keydown="onKeydown"
+      @blur="emit('blur', $event)"
+      @composition-start="emit('compositionStart', $event)"
+      @composition-end="(value, event) => emit('compositionEnd', value, event)"
+    />
     <textarea
+      v-else
       ref="inputRef"
       class="cell-editor"
       :class="{
@@ -317,6 +379,7 @@ defineExpose({
       data-cell-edit-surface="grid"
       :style="editing ? style : undefined"
       @input="onInput"
+      @beforeinput="onBeforeInput"
       @focus="onFocus"
       @mousedown.stop
       @dblclick.stop

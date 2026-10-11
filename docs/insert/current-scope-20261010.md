@@ -1,11 +1,19 @@
 # Insert 当前范围清单（2026-10-11）
 
-基线：`656cbe0f3262b617a92d9a6fb634bf67a5d259c2`。已有表格矩阵、有界计算列、
+最新优先级：完整桌面WPS对标Symbol及中文/响应布局。Symbol完整信息层级、真实字体
+覆盖、子集、特殊字符、近期与自定义管理及字符字体编辑已实现，用户细节验收待完成；
+功能与边界见 [符号](symbols.md)。此前“已验”均只指明确列出的有限路径，不代表工具整体完成。
+队列为 Symbol → 图片 → 形状 → 艺术字 → 文本框 → 公式 → 统计图。
+文件I/O、跨应用交换和导出warning开发/验证暂停；原warning WIP保留。
+
+基线：`f6681287b3aaa902252d847f8a6ef7e222668eb7`。已有表格矩阵、有界计算列、
 文本框/艺术字、矩形→箭头、Symbol 及内部超链接代表路径已闭合；当前检查点完成
-同表 line 迷你图生命周期/实例与picker修复，无新增插入类型或原生格式。
+现有icon/equation代表性生命周期及公式无效控件修复，无新增插入类型或原生格式。
 
 “已有产品路径”指已找到真实 Web 入口、Core 命令/模型和快照持久化，不等于本轮
-逐项 GUI 验收或所有 XLSX 原生变体支持。全清单按实际 `InsertToolbar.vue` 及其
+逐项 GUI 验收或所有 XLSX 原生变体支持。
+注意：下表原生定位省略指native API report；当前Web export丢弃warning、仅阻断block，
+尚未向用户显示省略位置/数量，此可见性缺口下一片修复。全清单按实际 `InsertToolbar.vue` 及其
 具体子组件列出；本轮没有发现仅占位、完全没有实现的插入按钮。
 
 | 入口/已有能力       | 产品实现状态                                                                                | 原生 I/O 与当前验收边界                                                                                                                         |
@@ -17,15 +25,15 @@
 | 四图仪表盘          | 真实单次 Core 命令创建 column/line/pie/bar 四图                                             | 整个仪表盘本轮未 GUI 往返；pie 原生缺口导致当前整体原生导出不完整                                                                               |
 | 图片（单元格/浮动） | 真实素材与对象路径                                                                          | 已有准备后 raster 原生导出；导入仍 drawing/media 阻断；整项本轮未复验                                                                           |
 | 截图                | 捕获后复用图片路径，非空按钮                                                                | raster 导出沿图片路径；本轮未执行整项截图验收                                                                                                   |
-| 图标、公式          | 真实编辑器、对象渲染和 Core 快照；公式用既有呈现路径                                        | 通用对象原生交换尚未实现，导出有定位的 feature-omitted；本检查点修拒绝 draft/陈旧回调，未增加原生图形支持                                       |
+| 图标、公式          | 现有九选图标/LaTeX编辑器、Core快照；公式隐藏实证无效外观与字体开关                          | 通用对象原生交换尚未实现，导出有定位的 feature-omitted；本检查点修拒绝 draft/陈旧回调，未增加原生图形支持                                       |
 | 形状                | 现有9preset、样式/文字/数值旋转、指针移动/八向缩放、Core历史/快照                           | 矩形→箭头代表性实际UI创建/取消/编辑/移动/右边缩放/UndoRedo/save-reload-JSON已验；其余变体未验，原生XLSX仍定位省略                               |
 | 文本框、艺术字      | 真实编辑器/渲染/Core 快照；文本框保留有效外观控件，艺术字隐藏无效三控件；大字号多行行高已修 | 代表性实际 UI 新增/编辑/取消/撤销重做/移动删除/保存重开已验；原生 XLSX 仍定位省略，不是双应用原生通过                                           |
 | 照相机              | 活动区域关联、实时渲染与 Core 对象                                                          | 原生交换未实现并明确报告省略；本检查点验证已有编辑器失败/取消/重入/文档变化；不是本轮双应用 GUI 通过项                                          |
 | 表单控件            | checkbox/radio/combo/list/spinner/scrollbar/button/label/group；链接单元格与命令历史        | 原生控件交换未实现并报告省略；本检查点验证已有确认生命周期，不扩控件类型                                                                        |
 | 文档/附件           | 文件素材、文档/图标呈现、查看/下载和 Core 持久化路径                                        | 原生 embedded object/attachment 交换未实现并报告省略；本轮未用用户文件复验                                                                      |
-| 迷你图              | 真实编辑与 Core 路径；合法 no-op 与拒绝分开，实例/范围picker/owner guard 已验                  | 同表 line A1:C2→D1:D2 创建/编辑/纠错/取消/清除/UndoRedo/save-reload-JSON 已验；已有 native 本轮未双应用复验                                                                                                                    |
-| 超链接              | 真实单元格/内部引用与 Web 打开路径；拒绝保留草稿和实例/上下文 guard 已修                       | 内部链接 create/edit/Cancel/Escape/remove/UndoRedo/save-reload-JSON 已验；已有 native I/O 本轮未双应用复验                                                                                                                    |
-| 符号                | 写入普通单元格文字                                                                          | preset/custom、保留选区进草稿、Cancel/Escape、commit/UndoRedo/save-reload-JSON代表路径已验；普通文本native本轮未双应用复验                      |
+| 迷你图              | 真实编辑与 Core 路径；合法 no-op 与拒绝分开，实例/范围picker/owner guard 已验               | 同表 line A1:C2→D1:D2 创建/编辑/纠错/取消/清除/UndoRedo/save-reload-JSON 已验；已有 native 本轮未双应用复验                                     |
+| 超链接              | 真实单元格/内部引用与 Web 打开路径；拒绝保留草稿和实例/上下文 guard 已修                    | 内部链接 create/edit/Cancel/Escape/remove/UndoRedo/save-reload-JSON 已验；已有 native I/O 本轮未双应用复验                                      |
+| 符号                | 桌面式三页、真实字体覆盖/子集、代码与字符信息、近期与自定义管理；字符串值与字符字体区间     | 当前完整实现待用户细节验收，见 [符号](symbols.md)；历史基础路径仅在原范围有效，XLSX字符字体交换未实现且I/O工作暂停                              |
 | 水印                | 实际工具栏 slot、页装饰和预设持久化                                                         | XLSX tiled watermark/presets 尚无对应实现，导出明确省略；本轮未复验                                                                             |
 
 ## 支持边界与真实剩余缺口
@@ -52,7 +60,9 @@
 - 表格矩阵见 [整项矩阵](../acceptance/structured-table-matrix-20261010.md)，
   计算列最终合同/验收见上链接。原候选观察不再代表未实施状态。
 - 现有文本框/艺术字的本轮闭合与重置后重新核验见
-  [文本对象验收](../acceptance/text-drawings-20261011.md)。图标/公式仍未作同等实际验收。
+  [文本对象验收](../acceptance/text-drawings-20261011.md)。图标/公式现有代表路径见
+  [icon/equation验收](../acceptance/icon-equation-20261011.md)，创建/edit/取消/history/保存reload
+  已验；原生API定位省略不等于GUI警告已显示或双应用原生保真。
 - 形状的矩形→箭头代表路径见 [形状生命周期](../acceptance/shape-lifecycle-20261011.md)。
   同一对象实际拖动/右边缩放及完整快照 UndoRedo 已验；不代表所有preset/缩放/保护变体。
   pie/更多图型及通用原生 drawing 仍未扩展。
@@ -65,9 +75,9 @@
 - 现有同表 line 迷你图闭合见 [Sparkline 验收](../acceptance/sparkline-20261011.md)。
   Core 合法无变化 false 仍关闭，实际拒绝变更保留字段；range picker 替换及旧回调
   已实证修复。普通受保护锁定目标原本被预检阻断；不虚称 GUI 保护竞态漏洞。
-- 剩余已有路径建议优先不需文件的 icon/equation 代表性生命周期，其次单个
-  checkbox 表单控件与链接单元格、同表 camera；图片/截图/文档附件/水印/仪表盘
-  仍须独立有界验收。此处为后续优先候选，不代表新片已开始或 native 扩展获验。
+- 当前先完成完整Symbol用户细节验收，再按图片、形状、艺术字、文本框、公式、统计图
+  的优先队列补齐桌面能力与体验。文件I/O与导出warning工作暂停；其余表单控件、
+  camera、截图、文档附件、水印和仪表盘保留后续缺口，不因代表性路径而宣称完整。
 - pie 的首系列原生来源证明仍需单独实测；仪表盘复制完整多系列来源，仅恢复首
   系列不能自动证明未序列化列/行，所以不能预先宣称已补齐仪表盘整体往返。
 - I/O/公式独立包与 API 阶段应按这张清单明确支持/省略合同；本次三个普通图型原生

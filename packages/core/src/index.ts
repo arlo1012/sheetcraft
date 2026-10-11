@@ -34,3 +34,4 @@ export * from "./tables.js";
 export * from "./protection.js";
 
 export * from "./protection-password.js";
+export * from "./text-font-runs.js";

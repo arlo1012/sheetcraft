@@ -1,3 +1,4 @@
+import { normalizeCellTextFontRuns } from "./text-font-runs.js";
 import { normalizePivotTables, type SheetPivotTable } from "./pivot-tables.js";
 import { normalizeCellSparkline, type CellSparkline } from "./sparklines.js";
 import { normalizeSheetDrawings, type SheetDrawing } from "./sheet-drawings.js";
@@ -232,7 +233,12 @@ export type WorkbookSnapshotV42 = Omit<WorkbookSnapshotV41, "version"> & { versi
 export type WorkbookSnapshotV43 = Omit<WorkbookSnapshotV42, "version"> & { version: 43 };
 export type WorkbookSnapshotV44 = Omit<WorkbookSnapshotV43, "version"> & { version: 44 };
 export type WorkbookSnapshotV45 = Omit<WorkbookSnapshotV44, "version"> & { version: 45 };
-export type WorkbookSnapshot = WorkbookSnapshotV43 | WorkbookSnapshotV44 | WorkbookSnapshotV45;
+export type WorkbookSnapshotV46 = Omit<WorkbookSnapshotV45, "version"> & { version: 46 };
+export type WorkbookSnapshot =
+  | WorkbookSnapshotV43
+  | WorkbookSnapshotV44
+  | WorkbookSnapshotV45
+  | WorkbookSnapshotV46;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -294,7 +300,8 @@ type SnapshotVersion =
   | 42
   | 43
   | 44
-  | 45;
+  | 45
+  | 46;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -371,11 +378,24 @@ function parseStyle(value: unknown, path: string): CellStyle {
 
 function parseCellContent(value: unknown, path: string, version: SnapshotVersion): CellContent {
   const record = asRecord(value, path);
+  if (Object.hasOwn(record, "fontRuns")) {
+    if (version < 46) return fail(path, "Cell font runs require snapshot version 46.");
+    if (record.kind !== "literal" || typeof record.value !== "string") {
+      return fail(path, "Font runs are only supported on string literal cell content.");
+    }
+  }
   if (record.kind === "literal") {
-    return {
-      kind: "literal",
-      value: parseCellValue(record.value, `${path}.value`, version >= 3),
-    };
+    const value = parseCellValue(record.value, `${path}.value`, version >= 3);
+    if (typeof value !== "string") return { kind: "literal", value };
+    try {
+      const fontRuns = normalizeCellTextFontRuns(value, record.fontRuns);
+      return { kind: "literal", value, ...(fontRuns ? { fontRuns } : {}) };
+    } catch (error) {
+      return fail(
+        `${path}.fontRuns`,
+        error instanceof Error ? error.message : "Invalid font runs.",
+      );
+    }
   }
   if (version >= 3 && record.kind === "error") {
     const error = asRecord(record.error, `${path}.error`);
@@ -1126,6 +1146,15 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       })
     )
       version = 45;
+    if (
+      cells.some((cell) => {
+        const content = asRecord(cell, path).content;
+        return (
+          typeof content === "object" && content !== null && Object.hasOwn(content, "fontRuns")
+        );
+      })
+    )
+      version = 46;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -1226,7 +1255,17 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   );
   return {
     // Preserve the existing protocol for documents that do not use the new feature.
-    version: calculatedColumns ? 45 : manualOrder ? 44 : 43,
+    version: sheets.some((sheet) =>
+      sheet.cells.some(
+        (cell) => cell.content?.kind === "literal" && Boolean(cell.content.fontRuns?.length),
+      ),
+    )
+      ? 46
+      : calculatedColumns
+        ? 45
+        : manualOrder
+          ? 44
+          : 43,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1303,7 +1342,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 42 &&
     record.version !== 43 &&
     record.version !== 44 &&
-    record.version !== 45
+    record.version !== 45 &&
+    record.version !== 46
   ) {
     throw new WorkbookDomainError(
       {

@@ -1,0 +1,30 @@
+Packaged Symbol fonts
+
+These are unmodified public font files from google/fonts commit
+bd8f81ddb5c74d5c8897b36ad88b440266245103, distributed under the SIL Open Font
+License 1.1. The adjacent individual OFL files are retained in full. Original
+font family names have not been changed. The variable-font filenames have only
+been simplified for resource URLs; the font bytes are unchanged.
+
+Noto Sans 2.015
+Copyright 2022 The Noto Project Authors
+(https://github.com/notofonts/latin-greek-cyrillic)
+License: noto-sans-OFL.txt
+
+Noto Sans Math 3.000
+Copyright 2022 Google LLC. All Rights Reserved.
+The original accompanying OFL also contains the Noto Project Authors notice;
+both the font's embedded copyright and that original license are preserved.
+License: noto-math-OFL.txt
+
+Noto Sans Symbols 2.003
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/symbols)
+License: noto-symbols-OFL.txt
+
+Noto Sans Symbols 2 2.008
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/symbols)
+License: noto-symbols-2-OFL.txt
+
+Fixed source URLs, byte sizes and SHA-256 hashes are recorded in
+../../../modules/insert-tools/symbols/assets/resource-sources.json. Coverage is
+bound to those exact bytes. No proprietary WPS or Microsoft fonts are included.

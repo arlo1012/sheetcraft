@@ -61,7 +61,10 @@ const shapes: DrawingShape[] = [
       <p v-if="drawing.kind === 'equation'" class="drawing-editor__hint">
         {{ t("drawing.equationHint") }}
       </p>
-      <div v-if="drawing.kind !== 'wordArt'" class="drawing-editor__row">
+      <div
+        v-if="drawing.kind !== 'wordArt' && drawing.kind !== 'equation'"
+        class="drawing-editor__row"
+      >
         <label
           >{{ t("drawing.fill")
           }}<input
@@ -96,8 +99,12 @@ const shapes: DrawingShape[] = [
             :max="512"
             size="small"
         /></label>
-        <Checkbox v-model="draft.bold">{{ t("drawing.bold") }}</Checkbox
-        ><Checkbox v-model="draft.italic">{{ t("drawing.italic") }}</Checkbox>
+        <Checkbox v-if="drawing.kind !== 'equation'" v-model="draft.bold">{{
+          t("drawing.bold")
+        }}</Checkbox
+        ><Checkbox v-if="drawing.kind !== 'equation'" v-model="draft.italic">{{
+          t("drawing.italic")
+        }}</Checkbox>
       </div>
       <div class="drawing-editor__row">
         <label

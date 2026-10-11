@@ -11,6 +11,14 @@ export type AutoRowHeightFont = {
 
 export type TextMeasurer = {
   measure: (text: string, font: AutoRowHeightFont) => number;
+  /** Optional glyph extents in the same units as width and the supplied font size. */
+  measureMetrics?: (text: string, font: AutoRowHeightFont) => TextMeasurementMetrics;
+};
+
+export type TextMeasurementMetrics = {
+  width: number;
+  ascent: number;
+  descent: number;
 };
 
 export type CellTextLine = {
@@ -39,7 +47,7 @@ export function getCellTextGraphemes(text: string): string[] {
   return Array.from(text);
 }
 
-function getWrapTokens(text: string): string[] {
+export function getCellTextWrapTokens(text: string): string[] {
   const tokens: string[] = [];
   let buffered = "";
   let bufferKind: "space" | "word" | undefined;
@@ -107,7 +115,7 @@ export function splitCellTextLines(
     const flush = (paragraphEnd: boolean): boolean =>
       append({ text: lineText, width: lineWidth, paragraphEnd });
 
-    for (const token of getWrapTokens(paragraph)) {
+    for (const token of getCellTextWrapTokens(paragraph)) {
       const tokenWidth = measurer.measure(token, font);
       if (lineWidth > 0 && lineWidth + tokenWidth <= normalizedWidth) {
         lineText += token;

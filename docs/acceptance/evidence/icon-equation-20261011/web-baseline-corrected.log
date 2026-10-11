@@ -1,0 +1,36 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/apps/web
+
+stderr | src/tests/modules/sheet-drawings/icon-equation.test.ts
+Warning: KaTeX doesn't work in quirks mode. Make sure your website has a suitable doctype.
+
+ ❯ src/tests/modules/sheet-drawings/icon-equation.test.ts (5 tests | 1 failed) 255ms
+     × equations hide unused fill and outline controls without deleting stored fields 115ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/modules/sheet-drawings/icon-equation.test.ts > existing icon and equation objects > equations hide unused fill and outline controls without deleting stored fields
+AssertionError: expected [ DOMWrapper{ …(3) }, …(2) ] to have a length of 1 but got 3
+
+- Expected
++ Received
+
+- 1
++ 3
+
+ ❯ src/tests/modules/sheet-drawings/icon-equation.test.ts:61:52
+     59|     const original = drawing("equation");
+     60|     const wrapper = editor(original);
+     61|     expect(wrapper.findAll('input[type="color"]')).toHaveLength(1);
+       |                                                    ^
+     62|     expect(wrapper.text()).not.toContain("No fill");
+     63|     expect(wrapper.text()).not.toContain("Line width");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  00:00:09
+   Duration  3.84s (transform 1.75s, setup 0ms, import 3.25s, tests 255ms, environment 194ms)
+

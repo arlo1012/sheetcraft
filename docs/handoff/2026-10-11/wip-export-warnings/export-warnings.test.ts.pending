@@ -1,0 +1,199 @@
+import { effectScope, ref } from "vue";
+import { describe, expect, test, vi } from "vitest";
+import { createWorkbook } from "@sheetcraft/core/workbook";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { useWorkbookXlsxActions } from "../../../../modules/workbook-xlsx/useWorkbookXlsxActions";
+import type { XlsxWorkerPort } from "../../../../modules/workbook-xlsx/workbookXlsxWorker";
+import type {
+  XlsxCompatibilityReport,
+  XlsxWorkerRequest,
+} from "../../../../modules/workbook-xlsx/xlsxWorkerProtocol";
+
+const warnings: XlsxCompatibilityReport = {
+  issues: [
+    {
+      code: "feature-omitted",
+      severity: "warning",
+      count: 12,
+      locations: Array.from({ length: 10 }, (_, i) => `Data.drawings["icon${i}"]`),
+    },
+    { code: "formula-not-calculated", severity: "warning", count: 2, locations: [] },
+  ],
+};
+function fixture(report = warnings) {
+  const workbook = createWorkbook({ id: "warning-export", sheetId: "sheet" });
+  const scope = effectScope();
+  const download = vi.fn<(bytes: Uint8Array, filename: string) => void | Promise<void>>();
+  const requests: XlsxWorkerRequest[] = [];
+  let currentReport = report;
+  let afterResponse = () => {};
+  const actions = scope.run(() =>
+    useWorkbookXlsxActions({
+      persistence: { loading: ref(false), replaceDocument: vi.fn() } as never,
+      getWorkbook: () => workbook,
+      getRevision: () => 1,
+      flushPendingEdits: () => true,
+      hasPendingEdits: () => false,
+      download,
+      workerFactory: () => {
+        const worker: XlsxWorkerPort = {
+          onerror: null,
+          onmessage: null,
+          onmessageerror: null,
+          terminate: vi.fn(),
+          postMessage: (request) => {
+            requests.push(request);
+            queueMicrotask(() => {
+              worker.onmessage?.({
+                data: {
+                  id: request.id,
+                  ok: true,
+                  type: "encode",
+                  bytes: new Uint8Array([1, 2]).buffer,
+                  report: currentReport,
+                },
+              } as MessageEvent);
+              afterResponse();
+            });
+          },
+        };
+        return worker;
+      },
+    }),
+  )!;
+  return {
+    actions,
+    workbook,
+    scope,
+    download,
+    requests,
+    setReport: (next: XlsxCompatibilityReport) => {
+      currentReport = next;
+    },
+    afterResponse: (next: () => void) => {
+      afterResponse = next;
+    },
+  };
+}
+describe("XLSX export warning feedback", () => {
+  test("retains the exact warning counts and original locations after a successful download", async () => {
+    const f = fixture();
+    const before = serializeWorkbook(f.workbook);
+    await f.actions.exportXlsx();
+    expect(f.download).toHaveBeenCalledExactlyOnceWith(new Uint8Array([1, 2]), "workbook.xlsx");
+    expect(f.actions.feedback.value).toEqual({
+      key: "xlsx.feedback.exported",
+      error: false,
+      warnings: warnings.issues,
+    });
+    expect(f.actions.confirmation.value).toBeUndefined();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    f.actions.dismissFeedback();
+    expect(f.actions.feedback.value).toBeUndefined();
+    f.scope.stop();
+  });
+  test("warnings combined with a block never download or report successful export", async () => {
+    const f = fixture({
+      issues: [
+        ...warnings.issues,
+        { code: "unsupported-part", severity: "block", count: 1, locations: ["Data!A1"] },
+      ],
+    });
+    await f.actions.exportXlsx();
+    expect(f.download).not.toHaveBeenCalled();
+    expect(f.actions.feedback.value).toEqual({ key: "xlsx.feedback.blocked", error: true });
+    f.scope.stop();
+  });
+  test("waits for download completion before publishing warnings", async () => {
+    const f = fixture();
+    let finish!: () => void;
+    f.download.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = f.actions.exportXlsx();
+    await vi.waitFor(() => expect(f.download).toHaveBeenCalledOnce());
+    expect(f.actions.feedback.value).toBeUndefined();
+    expect(f.actions.busy.value).toBe(true);
+    finish();
+    await pending;
+    expect(f.actions.feedback.value).toEqual({
+      key: "xlsx.feedback.exported",
+      error: false,
+      warnings: warnings.issues,
+    });
+    expect(f.actions.busy.value).toBe(false);
+    f.scope.stop();
+  });
+  test("download failure publishes only failure, not pending warnings or success", async () => {
+    const f = fixture();
+    f.download.mockRejectedValue(new Error("Synthetic download failure"));
+    await f.actions.exportXlsx();
+    expect(f.actions.feedback.value).toEqual({ key: "xlsx.feedback.failed", error: true });
+    expect(f.actions.busy.value).toBe(false);
+    f.scope.stop();
+  });
+  test("cancellation after the worker resolves but before continuation prevents download", async () => {
+    const f = fixture();
+    f.afterResponse(() => f.actions.cancel());
+    await f.actions.exportXlsx();
+    expect(f.download).not.toHaveBeenCalled();
+    expect(f.actions.feedback.value).toBeUndefined();
+    expect(f.actions.busy.value).toBe(false);
+    f.scope.stop();
+  });
+  test.each(["cancel", "dispose"] as const)(
+    "%s while an already-started download is pending cannot publish late warnings",
+    async (action) => {
+      const f = fixture();
+      let finish!: () => void;
+      f.download.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const pending = f.actions.exportXlsx();
+      await vi.waitFor(() => expect(f.download).toHaveBeenCalledOnce());
+      if (action === "cancel") f.actions.cancel();
+      else f.scope.stop();
+      finish();
+      await pending;
+      expect(f.download).toHaveBeenCalledOnce();
+      expect(f.actions.feedback.value).toBeUndefined();
+      expect(f.actions.busy.value).toBe(false);
+      f.scope.stop();
+    },
+  );
+  test("a clean second export removes old warnings and keeps the existing plain success shape", async () => {
+    const f = fixture();
+    await f.actions.exportXlsx();
+    expect(f.actions.feedback.value).toHaveProperty("warnings", warnings.issues);
+    f.setReport({ issues: [] });
+    await f.actions.exportXlsx();
+    expect(f.actions.feedback.value).toEqual({ key: "xlsx.feedback.exported", error: false });
+    expect(f.download).toHaveBeenCalledTimes(2);
+    f.scope.stop();
+  });
+  test("warning-bearing encrypted export keeps its existing filename and exported key", async () => {
+    const f = fixture();
+    await f.actions.exportXlsx("synthetic-test-password");
+    expect(f.requests[0]).toMatchObject({
+      type: "encode",
+      password: "synthetic-test-password",
+      filename: "workbook-encrypted.xlsx",
+    });
+    expect(f.download).toHaveBeenCalledExactlyOnceWith(
+      new Uint8Array([1, 2]),
+      "workbook-encrypted.xlsx",
+    );
+    expect(f.actions.feedback.value).toEqual({
+      key: "xlsx.feedback.exported",
+      error: false,
+      warnings: warnings.issues,
+    });
+    f.scope.stop();
+  });
+});

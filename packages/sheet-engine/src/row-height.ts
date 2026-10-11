@@ -4,6 +4,7 @@ import {
   type CellStyle,
 } from "@sheetcraft/core/style";
 import { formatComputedValueForDisplay, type FormulaValue } from "@sheetcraft/core";
+import { type CellTextDocument } from "@sheetcraft/core/text-font-runs";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
@@ -18,6 +19,11 @@ import {
   type AutoRowHeightFont,
   type TextMeasurer,
 } from "./text-layout.js";
+import {
+  getAttributedTextLineHeight,
+  getAttributedTextLayoutLineHeights,
+  splitAttributedTextLines,
+} from "./attributed-text-layout.js";
 
 export type { AutoRowHeightFont, TextMeasurer } from "./text-layout.js";
 
@@ -45,6 +51,14 @@ export type AutoRowHeightInput = {
    * same presentation text as their rendered cell layer.
    */
   formatValue?: (address: CellAddress, cell: Readonly<Cell>, value: FormulaValue) => string;
+  /** Formatted display text and projected font runs, shared with the rendered cell layer. */
+  formatPresentation?: (
+    address: CellAddress,
+    cell: Readonly<Cell>,
+    value: FormulaValue,
+  ) => CellTextDocument;
+  /** Display-only table/theme/rule formatting, without changing stored cells. */
+  getCellStyle?: (address: CellAddress, cell: Readonly<Cell>) => Readonly<CellStyle> | undefined;
   columnWidths: ReadonlyMap<number, number>;
   /** Width used by columns without a stored manual dimension. */
   defaultColumnWidth?: number;
@@ -87,12 +101,14 @@ function getCellFont(
 }
 
 export function measureWrappedCellHeight(
-  text: string,
+  value: string | CellTextDocument,
   columnWidth: number,
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
   wrapText = true,
 ): number {
+  const textDocument = typeof value === "string" ? { text: value } : value;
+  const { text } = textDocument;
   if (!text) {
     return DEFAULT_ROW_HEIGHT;
   }
@@ -100,6 +116,16 @@ export function measureWrappedCellHeight(
     1,
     columnWidth - WRAPPED_CELL_HORIZONTAL_PADDING - WRAPPED_CELL_GRIDLINE_WIDTH,
   );
+  if (textDocument.fontRuns?.length || measurer.measureMetrics) {
+    return measureAttributedCellHeight(
+      textDocument,
+      availableWidth,
+      undefined,
+      font,
+      measurer,
+      wrapText,
+    );
+  }
   const lineCount = Math.min(
     splitCellTextLines(text, availableWidth, font, measurer, wrapText).length,
     getMaximumLineCount(font),
@@ -184,13 +210,14 @@ function getSingleLineAvailableTextWidth(
 }
 
 function getShrinkToFitFont(
-  text: string,
+  textDocument: CellTextDocument,
   columnWidth: number,
   style: Readonly<CellStyle> | undefined,
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
   wraps: boolean,
 ): AutoRowHeightFont {
+  const { text } = textDocument;
   const textRotation = style?.textRotation;
   if (
     !style?.shrinkToFit ||
@@ -202,25 +229,42 @@ function getShrinkToFitFont(
     return font;
   }
   const radians = typeof textRotation === "number" ? (Math.abs(textRotation) * Math.PI) / 180 : 0;
-  const naturalWidth = measurer.measure(text, font);
+  const naturalLine =
+    textDocument.fontRuns?.length || measurer.measureMetrics
+      ? splitAttributedTextLines(textDocument, Infinity, font, measurer, false)[0]
+      : undefined;
+  const naturalWidth = naturalLine?.width ?? measurer.measure(text, font);
+  const naturalHeight = naturalLine
+    ? getAttributedTextLineHeight(naturalLine, font, WRAPPED_CELL_LINE_HEIGHT)
+    : font.size * WRAPPED_CELL_LINE_HEIGHT;
   const rotatedWidth =
-    naturalWidth * Math.abs(Math.cos(radians)) +
-    font.size * WRAPPED_CELL_LINE_HEIGHT * Math.abs(Math.sin(radians));
+    naturalWidth * Math.abs(Math.cos(radians)) + naturalHeight * Math.abs(Math.sin(radians));
   const availableWidth = getSingleLineAvailableTextWidth(columnWidth, style, measurer);
   const factor = rotatedWidth > 0 ? Math.min(1, availableWidth / rotatedWidth) : 1;
   return { ...font, size: Math.max(1, font.size * factor) };
 }
 
 function measureCellHeight(
-  text: string,
+  textDocument: CellTextDocument,
   columnWidth: number,
   style: Readonly<CellStyle> | undefined,
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
 ): number {
+  const { text } = textDocument;
   const availableWidth = getAvailableTextWidth(columnWidth, style, measurer);
   const wraps = shouldWrapText(style, text);
-  const measuredFont = getShrinkToFitFont(text, columnWidth, style, font, measurer, wraps);
+  const measuredFont = getShrinkToFitFont(textDocument, columnWidth, style, font, measurer, wraps);
+  if (textDocument.fontRuns?.length || measurer.measureMetrics) {
+    return measureAttributedCellHeight(
+      textDocument,
+      availableWidth,
+      style,
+      measuredFont,
+      measurer,
+      wraps,
+    );
+  }
   const lines = splitCellTextLines(text, availableWidth, measuredFont, measurer, wraps);
   const textRotation = style?.textRotation;
   if (textRotation === "vertical") {
@@ -255,6 +299,95 @@ function measureCellHeight(
   );
 }
 
+function getHeightForTextExtent(height: number): number {
+  return Math.min(
+    MAX_ROW_HEIGHT,
+    Math.max(
+      DEFAULT_ROW_HEIGHT,
+      Math.ceil(height + WRAPPED_CELL_VERTICAL_PADDING + WRAPPED_CELL_GRIDLINE_WIDTH),
+    ),
+  );
+}
+
+function getAttributedStackedHeight(
+  textDocument: CellTextDocument,
+  font: AutoRowHeightFont,
+  measurer: TextMeasurer,
+): number {
+  let maximum = font.size * WRAPPED_CELL_LINE_HEIGHT;
+  for (const paragraph of splitAttributedTextLines(textDocument, Infinity, font, measurer, false)) {
+    let offset = paragraph.start;
+    let segmentIndex = 0;
+    let height = 0;
+    for (const grapheme of getCellTextGraphemes(paragraph.text)) {
+      while (
+        paragraph.segments[segmentIndex]?.end !== undefined &&
+        paragraph.segments[segmentIndex]!.end <= offset
+      )
+        segmentIndex++;
+      const graphemeFont = paragraph.segments[segmentIndex]?.font ?? font;
+      const metrics = measurer.measureMetrics?.(grapheme, graphemeFont);
+      height += getAttributedTextLineHeight(metrics ?? {}, graphemeFont, WRAPPED_CELL_LINE_HEIGHT);
+      offset += grapheme.length;
+      if (height >= MAX_ROW_HEIGHT) break;
+    }
+    maximum = Math.max(maximum, height);
+    if (maximum >= MAX_ROW_HEIGHT) break;
+  }
+  return getHeightForTextExtent(maximum);
+}
+
+function measureAttributedCellHeight(
+  textDocument: CellTextDocument,
+  availableWidth: number,
+  style: Readonly<CellStyle> | undefined,
+  font: AutoRowHeightFont,
+  measurer: TextMeasurer,
+  wraps: boolean,
+): number {
+  if (style?.textRotation === "vertical")
+    return getAttributedStackedHeight(textDocument, font, measurer);
+  const lines = splitAttributedTextLines(textDocument, availableWidth, font, measurer, wraps);
+  const heights = getAttributedTextLayoutLineHeights(
+    textDocument,
+    lines,
+    font,
+    WRAPPED_CELL_LINE_HEIGHT,
+    style?.textDirection,
+  );
+  const textHeight = heights.reduce(
+    (height, lineHeight) => Math.min(MAX_ROW_HEIGHT, height + lineHeight),
+    0,
+  );
+  const rotation = style?.textRotation;
+  if (typeof rotation === "number" && rotation !== 0) {
+    const radians = (Math.abs(rotation) * Math.PI) / 180;
+    const textWidth = wraps ? availableWidth : Math.max(0, ...lines.map((line) => line.width));
+    return getHeightForTextExtent(textWidth * Math.sin(radians) + textHeight * Math.cos(radians));
+  }
+  return getHeightForTextExtent(textHeight);
+}
+
+function getMeasuredExtentsFingerprint(
+  textDocument: CellTextDocument,
+  font: AutoRowHeightFont,
+  measurer: TextMeasurer,
+): unknown {
+  if (!measurer.measureMetrics) return undefined;
+  // Actual extents can change after font loading even when text and metadata are unchanged.
+  return splitAttributedTextLines(textDocument, Infinity, font, measurer, false).map((line) => [
+    line.width,
+    line.ascent,
+    line.descent,
+    line.segments.map((segment) => [
+      segment.font.family,
+      segment.width,
+      segment.ascent,
+      segment.descent,
+    ]),
+  ]);
+}
+
 export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHeightCalculator {
   const cellHeights = new Map<string, CachedCellHeight>();
 
@@ -277,11 +410,15 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
         }
         if (cell.content?.kind === "image") continue;
         const value = input.getComputedValue(address, cell);
-        const text =
-          input.formatValue?.(address, cell, value) ?? formatComputedValueForDisplay(value);
-        const wrapText = shouldWrapText(cell.style, text);
+        const textDocument = input.formatPresentation?.(address, cell, value) ?? {
+          text: input.formatValue?.(address, cell, value) ?? formatComputedValueForDisplay(value),
+        };
+        const { text } = textDocument;
+        const style = input.getCellStyle?.(address, cell) ?? cell.style;
+        const wrapText = shouldWrapText(style, text);
         const hasLineBreak = hasExplicitLineBreak(text);
-        const hasHeightSensitiveTextLayout = cell.style?.textRotation !== undefined;
+        const hasHeightSensitiveTextLayout =
+          style?.textRotation !== undefined || Boolean(measurer.measureMetrics);
         if (!text || (!wrapText && !hasLineBreak && !hasHeightSensitiveTextLayout)) {
           continue;
         }
@@ -291,22 +428,25 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
           input.columnWidths.get(address.column) ??
           input.defaultColumnWidth ??
           DEFAULT_COLUMN_WIDTH;
-        const font = getCellFont(cell.style, defaultFontFamily);
+        const font = getCellFont(style, defaultFontFamily);
         const fingerprint = JSON.stringify([
           text,
+          textDocument.fontRuns,
           wrapText || hasLineBreak || hasHeightSensitiveTextLayout ? columnWidth : undefined,
           font,
-          cell.style?.horizontalAlign,
-          cell.style?.indent,
-          cell.style?.shrinkToFit,
-          cell.style?.textRotation,
+          style?.horizontalAlign,
+          style?.indent,
+          style?.shrinkToFit,
+          style?.textRotation,
+          style?.textDirection,
           input.measurementVersion ?? 0,
+          getMeasuredExtentsFingerprint(textDocument, font, measurer),
         ]);
         const cached = cellHeights.get(key);
         const height =
           cached?.fingerprint === fingerprint
             ? cached.height
-            : measureCellHeight(text, columnWidth, cell.style, font, measurer);
+            : measureCellHeight(textDocument, columnWidth, style, font, measurer);
         if (!cached || cached.fingerprint !== fingerprint) {
           cellHeights.set(key, { fingerprint, height });
         }
