@@ -45,8 +45,12 @@ result. Native XLSX support is tracked separately from internal document support
    watermark have real owners and internal persistence. Their native drawing,
    embedded object, camera/control and watermark exports remain omissions.
 
-Table calculated-column autofill and an expanded native drawing/chart importer
-are separate outstanding capabilities. Compatibility diagnostics remain internal
+The bounded table calculated-column contract is complete; see the
+[actual GUI closure](../acceptance/calculated-column-gui-20261011.md). An expanded
+native drawing/chart importer remains outstanding. Existing text box / WordArt
+lifecycle checks and two renderer/editor corrections are recorded in the
+[text-object acceptance](../acceptance/text-drawings-20261011.md); their native
+XLSX exchange still reports located omissions. Compatibility diagnostics remain internal
 under the current [XLSX policy](../xlsx-io.md); this phase does not silently change
 the export-warning product policy.
 

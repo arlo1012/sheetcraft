@@ -1,0 +1,4 @@
+$ bun run --filter @sheetcraft/web typecheck
+@sheetcraft/web typecheck: src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts(130,30): error TS2540: Cannot assign to 'value' because it is a read-only property.
+@sheetcraft/web typecheck: Exited with code 2
+WEB_TYPES_EXIT=2

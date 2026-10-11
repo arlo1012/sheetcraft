@@ -134,6 +134,7 @@ const textStyle = computed(() => ({
       :class="{ 'is-word-art': drawing.kind === 'wordArt' }"
       :style="[
         textStyle,
+        drawing.kind === 'textBox' || drawing.kind === 'wordArt' ? { lineHeight: 'normal' } : {},
         drawing.kind === 'textBox'
           ? { background: drawing.fill, border: `${drawing.strokeWidth}px solid ${drawing.stroke}` }
           : {},

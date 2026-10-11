@@ -1,5 +1,112 @@
 # Sheetcraft continuation after recovery — 2026-10-10
 
+## Existing same-sheet line Sparkline lifecycle — 2026-10-11
+
+Read `docs/acceptance/sparkline-20261011.md`. Keyed workbook/generation/Sheet/dialog
+identity and local range-picker tokens fix reproduced stale confirm/close, reused
+fields, replacement-picker and owner-disposal defects. An actual unchanged Core
+edit returns false without history and still closes; refused changed execution
+retains local draft and a retry message. The real Core protection regression uses
+an explicitly injected execute-boundary transition, not an ordinary locked-target
+GUI bug (those were already rejected by Web preflight).
+
+Serial checks: related Web 69, Core Sparklines 24, and post-unused-import correction
+concrete lifecycle12 passed; full Web Vue/Node types/build, scoped lint/format pass.
+Initial module/picker/disposal failures, selector harness errors and TS6133 unused
+fixture import are recorded separately. Existing chunk warning remains; no full CI.
+
+Actual new synthetic Sheet5: same-sheet A1:C2→D1:D2 line creation, invalid correction,
+Cancel/Escape, picker cancel, unchanged confirmation, explicit two-cell edit/clear,
+independent complete-JSON UndoRedo, Save locally and ordinary reload passed. Final
+JSON is29,574B SHA256244e74517fc04d7f4185439fb9174438296d63aaa63bc0b10900347ad4ffe909.
+Prior five sheets and all six source values remain unchanged. No native exchange
+was rerun; raw exports/screenshots remain local. Own preview/tab cleaned up;
+no own Error9 and oom_kill stayed25. Scope stops at this representative lifecycle.
+
+## Existing Hyperlink lifecycle — 2026-10-11
+
+Read `docs/acceptance/hyperlink-20261011.md`. The real Core/history protected-cell
+refusal reproduced discarded save/remove drafts. The local controller now retains
+that same editor on refused/throwing execution and binds a keyed captured workbook,
+generation, sheet and cell context. Old confirm/remove/cancel cannot affect a newer
+instance. Core commands, validation, external opener and native formats are unchanged.
+
+Fresh serial checks: related Web 39, grid interactions 3, Core link history 8 passed;
+full Web Vue/Node types plus production build exit 0, chunk-size warning remains.
+Initial eight target failures, two earlier fixture errors and the later idFactory
+type error remain in separate logs. Actual synthetic internal-link creation/edit,
+Cancel/Escape, remove, Undo/Redo, internal navigation and explicit save/reload/JSON
+passed. New Sheet4 only; the four prior synthetic sheets are unchanged. Public JSON
+before/after reload is identical (24,830 bytes, SHA256 de5068be0798f87184eddc8d4b5e65c381093110460df520af06b932472f46ff).
+No external navigation, native exchange or full CI was rerun. Raw exports stay local.
+Own preview/page cleaned up; no own Error 9 and oom_kill stayed 25.
+
+## Existing Symbol lifecycle — 2026-10-11
+
+Read `docs/acceptance/symbol-20261011.md`. Real preset/custom insertion, retained
+selection into editor draft, dialog Cancel/Escape, editor Escape, commit,
+Undo/Redo and JSON save/reload were exercised on a newly added synthetic Sheet3.
+The three prior synthetic sheets are unchanged. No reset/import/Replace was used.
+Symbol still uses the ordinary editor parser and cell history, not a drawing.
+
+A focused old-callback regression failed twice: dismissed insert started a fresh
+draft, and dismissed close hid a newer dialog. The workspace now binds a keyed
+Symbol dialog identity and captured generation/sheet/address, retaining existing
+permission/busy/editor checks. Original failing and final passing check results
+are separated in the acceptance record. Full CI/native WPS+Excel text exchange
+were not run. No new raw JSON or screenshots were uploaded.
+
+## Representative shape lifecycle — 2026-10-11
+
+Unchanged production baseline a44fe73f4d494d95e4be89d9cfad87f30c7f1720 now has a
+bounded actual rectangle→arrow lifecycle check; read
+`docs/acceptance/shape-lifecycle-20261011.md`. Create/edit cancel, effective
+style/text/dimensions/numeric rotation, keyboard move/delete, actual pointer move
+and east-handle resize, independent complete-snapshot Undo/Redo and explicit
+save/reload/JSON passed. Existing synthetic Data and Sheet1 are unchanged; only
+new empty Sheet2 was added. No model/preset/native or production code was changed.
+
+Fresh serial checks before GUI: Web related 60 passed; shared layout/resize 15
+passed. No build/check ran alongside GUI. Window-bound App.drag failed to produce
+motion; the documented Sky desktop multi-point route supplied real successful
+move/resize, not synthetic events. One optional XLSX download wait timed out and
+reset the UI tool kernel; no native result is claimed. The own page stayed alive,
+oom_kill stayed25, and final JSON save/reload completed. Own test page/server were
+cleaned up. More presets/gesture Escape/corner/zoom/protection and native shape
+exchange remain outside this representative closure.
+
+## Existing text-object closure and recovery — 2026-10-11
+
+Read `docs/acceptance/text-drawings-20261011.md` and the updated Insert matrix.
+The existing textBox/WordArt lifecycle was exercised in the real UI. WordArt's
+inert fill/outline/line-width controls are hidden without discarding their stored
+fields; text boxes retain effective controls. Both text kinds now use font-relative
+line height, fixing the reproduced large-font multiline overlap. Native XLSX still
+explicitly omits these objects. No broader shape system or effect was introduced.
+
+The old unpushed 18-file freeze and logs disappeared while approval was pending.
+Both shell and the original GUI terminal confirmed the old project directory was
+absent. The authoritative baseline remained b79cf6c8a886b1f5c427e1eca90710ca883d0ed8,
+tree f73e348369da78e27f71e4f8519d258002fc5fea. All 2,064 files / 16,822,121 bytes
+were restored and checked by exact Git blob SHA/size/tree. The minimal two-line
+production slice and focused tests were reconstructed and checked afresh; old
+freeze hashes are not publication receipts.
+
+Current local source: `/workspace/shared/sheetcraft-recovery-20261011-0454`.
+Runtime/recovery materials: adjacent `sheetcraft-recovery-20261011-0454-materials`.
+Fresh checks: Web related 60 passed, existing Core drawings 23 passed, native
+omission 2 passed; Web Vue/Node types, production Web build, three package builds
+and scoped formatting/lint pass. Build chunk-size warning remains. Fresh initial
+3 product failures and controls-only 2 failures are retained. Full CI was not rerun.
+
+The surviving synthetic saved workbook was rechecked in the recovered app;
+control visibility, cancel, edit/Undo/Redo, normal line height and explicit save/
+reload were confirmed. Public before/after JSON is byte-identical to the surviving
+pre-loss final export. One Chromium test-tab Error 9 recovered by ordinary reload;
+its cause is unproved. Raw exports and screenshots stay local. The own loopback
+server and test tab were cleaned up. Read the branch's current remote head and
+acceptance record for the new publication, not the lost old freeze hashes.
+
 ## Calculated-column continuation — 2026-10-11
 
 The user chose the conservative calculated-column contract. It is now implemented

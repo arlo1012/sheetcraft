@@ -61,7 +61,7 @@ const shapes: DrawingShape[] = [
       <p v-if="drawing.kind === 'equation'" class="drawing-editor__hint">
         {{ t("drawing.equationHint") }}
       </p>
-      <div class="drawing-editor__row">
+      <div v-if="drawing.kind !== 'wordArt'" class="drawing-editor__row">
         <label
           >{{ t("drawing.fill")
           }}<input

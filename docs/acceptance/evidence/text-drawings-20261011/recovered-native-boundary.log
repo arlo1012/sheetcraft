@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/packages/xlsx-io
+
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  22:13:08
+   Duration  2.15s (transform 1.42s, setup 0ms, import 1.91s, tests 117ms, environment 0ms)
+

@@ -1,4 +1,4 @@
-import { ref, shallowRef } from "vue";
+import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
 import { canEditRange, canUseSheetPermission, doMergedCellRangesIntersect } from "@sheetcraft/core";
 import {
   createSetCellSparklinesCommand,
@@ -19,23 +19,50 @@ import {
   resolveRangeReference,
 } from "../../shared/range-reference/formatRangeReference";
 export type SparklineDraft = { source: string; destination: string; sparkline: CellSparkline };
+type SparklineDialogTarget = {
+  dialogId: number;
+  workbook: Workbook;
+  sheet: Sheet;
+  generation: number;
+  initial: SparklineDraft;
+  isCurrent: () => boolean;
+  confirm: (value: SparklineDraft) => void;
+  close: () => void;
+};
 export function useSparklineActions(options: {
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
   getRange: () => CellRange;
+  getGeneration: () => number;
   flush: () => boolean;
   isBusy: () => boolean;
-  execute: (command: WorkbookCommand) => unknown;
+  execute: (command: WorkbookCommand) => boolean;
 }) {
-  const draft = shallowRef<SparklineDraft>();
+  const dialog = shallowRef<SparklineDialogTarget>();
+  const draft = computed(() => dialog.value?.initial);
   const error = ref(false);
-  let target: { workbook: Workbook; sheetId: string } | undefined;
+  const errorKind = ref<"invalid" | "failed">("invalid");
+  const failed = computed(() => error.value && errorKind.value === "failed");
+  let dialogSequence = 0;
+  function isCurrent(target: SparklineDialogTarget): boolean {
+    return (
+      dialog.value === target &&
+      target.workbook === options.getWorkbook() &&
+      target.generation === options.getGeneration() &&
+      target.sheet === options.getSheet() &&
+      target.workbook.sheets.get(target.sheet.id) === target.sheet
+    );
+  }
+  watch([options.getWorkbook, options.getSheet, options.getGeneration], () => close(), {
+    flush: "sync",
+  });
   function allowed() {
     return !options.isBusy() && canUseSheetPermission(options.getSheet(), "formatCells");
   }
   function open() {
     if (!allowed() || !options.flush()) return;
     const sheet = options.getSheet();
+    if (!canUseSheetPermission(sheet, "formatCells")) return;
     const range = options.getRange();
     const existing = getCellSparkline(sheet, range.start);
     const source = existing?.source ?? range;
@@ -53,9 +80,8 @@ export function useSparklineActions(options: {
             },
             end: { row: Math.min(MAX_SHEET_ROWS - 1, range.end.row + 1), column: range.end.column },
           };
-    target = { workbook: options.getWorkbook(), sheetId: sheet.id };
     error.value = false;
-    draft.value = {
+    const initial: SparklineDraft = {
       source: formatRangeReference(sheet.name, source),
       destination: formatRangeReference(sheet.name, destination),
       sparkline: existing
@@ -71,16 +97,22 @@ export function useSparklineActions(options: {
             empty: "gap",
           },
     };
+    const target: SparklineDialogTarget = {
+      dialogId: ++dialogSequence,
+      workbook: options.getWorkbook(),
+      sheet,
+      generation: options.getGeneration(),
+      initial,
+      isCurrent: () => isCurrent(target),
+      confirm: (value) => confirm(value, target),
+      close: () => close(target),
+    };
+    dialog.value = target;
   }
-  function confirm(value: SparklineDraft) {
-    const sheet = options.getSheet();
-    if (
-      !allowed() ||
-      !target ||
-      target.workbook !== options.getWorkbook() ||
-      target.sheetId !== sheet.id
-    )
-      return;
+  function confirm(value: SparklineDraft, target = dialog.value) {
+    if (!target || !isCurrent(target) || !allowed()) return;
+    const sheet = target.sheet;
+    errorKind.value = "invalid";
     const source = resolveRangeReference(target.workbook, value.source, sheet.id);
     const destination = resolveRangeReference(target.workbook, value.destination, sheet.id);
     if (
@@ -137,10 +169,27 @@ export function useSparklineActions(options: {
             sparkline: normalizeCellSparkline({ ...value.sparkline, source: range })!,
           });
         }
-      options.execute(createSetCellSparklinesCommand(sheet.id, changes));
-      close();
+      const accepted = options.execute(createSetCellSparklinesCommand(sheet.id, changes));
+      if (!isCurrent(target)) return;
+      // Core returns false for a valid unchanged definition as well as Web's
+      // refused execution. Close only if every requested normalized result exists.
+      const alreadyApplied = changes.every(
+        (change) =>
+          JSON.stringify(
+            normalizeCellSparkline(getCellSparkline(sheet, change.address)) ?? null,
+          ) === JSON.stringify(change.sparkline),
+      );
+      if (!accepted && !alreadyApplied) {
+        errorKind.value = "failed";
+        error.value = true;
+        return;
+      }
+      close(target);
     } catch {
-      error.value = true;
+      if (isCurrent(target)) {
+        errorKind.value = "failed";
+        error.value = true;
+      }
     }
   }
   function remove() {
@@ -151,10 +200,11 @@ export function useSparklineActions(options: {
     const command = createClearCellSparklinesCommand(options.getWorkbook(), sheet.id, range);
     if (command) options.execute(command);
   }
-  function close() {
-    draft.value = undefined;
-    target = undefined;
+  function close(target = dialog.value) {
+    if (!target || dialog.value !== target) return;
+    dialog.value = undefined;
     error.value = false;
   }
-  return { draft, error, open, confirm, remove, close };
+  onScopeDispose(() => close(), true);
+  return { dialog, draft, error, failed, open, confirm, remove, close };
 }

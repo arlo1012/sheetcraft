@@ -1,0 +1,19 @@
+Recovered-source actual UI check, 2026-10-11 05:13–05:16 UTC.
+Own cloud Chrome, loopback http://127.0.0.1:7200, synthetic Data + Sheet1 only.
+Existing saved synthetic workbook survived the source-directory loss.
+WordArt: one color control; fill/outline/line-width absent; canceled rename retained original object.
+Text box: three color controls; fill/outline/line-width retained.
+Confirmed text-box rename -> toolbar Undo restored old name -> Redo restored temporary name.
+Next Undo CDP timed out; native screenshot showed single-tab Error 9. Normal Reload recovered page.
+Reloaded page retained autosaved temporary rename but not in-memory Undo; explicit edit restored original name.
+Save locally status confirmed, public JSON export -> normal reload -> public JSON export.
+Three public exports (pre-loss final, recovered before reload, recovered after reload) byte-identical.
+Size 16037 bytes; SHA256 90e2181d93ae355a80e890a6d08b793201815055fdbcc9a4452d4ca12e4b7c24.
+Snapshot sheets: Data has 0 drawings; Sheet1 has 2 drawings.
+Text box: Synthetic text box, 28px, #ffeecc fill, #123456 outline, width 3.
+WordArt: Synthetic WordArt, 40px, preserved hidden transparent/#2563eb/1 values.
+Computed line-height normal for both; actual final screenshot shows separated short WordArt lines.
+Surviving earlier actual XLSX re-inspected: 5060 bytes, SHA256 27fdeefaaa06a7248ca3e5c80ff00125c0a586ef4b540b258e161dfc91867b09.
+No xl/drawings, xl/charts or xl/media parts. Objects intentionally omitted with earlier located warnings.
+Own test tab closed after saving; own Vite stopped via Ctrl+C, terminal prompt verified.
+No raw JSON/XLSX/screenshots or account/session data included in this checkpoint.

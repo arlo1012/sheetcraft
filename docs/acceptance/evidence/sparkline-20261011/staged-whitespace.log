@@ -1,0 +1,21 @@
+STAGED_SOURCE_MARKDOWN_DIFF_EXIT=0
+docs/acceptance/evidence/sparkline-20261011/core-sparklines.log:9: new blank line at EOF.
+docs/acceptance/evidence/sparkline-20261011/disposal-baseline.log:93: new blank line at EOF.
+docs/acceptance/evidence/sparkline-20261011/lifecycle-baseline-context.log:15: trailing whitespace.
++Error: Unable to get specified component within: 
+docs/acceptance/evidence/sparkline-20261011/lifecycle-baseline-context.log:117: trailing whitespace.
++Error: Unable to get specified component within: 
+docs/acceptance/evidence/sparkline-20261011/lifecycle-baseline-context.log:247: new blank line at EOF.
+docs/acceptance/evidence/sparkline-20261011/lifecycle-baseline.log:15: trailing whitespace.
++Error: Unable to get specified component within: 
+docs/acceptance/evidence/sparkline-20261011/lifecycle-baseline.log:117: trailing whitespace.
++Error: Unable to get specified component within: 
+docs/acceptance/evidence/sparkline-20261011/lifecycle-baseline.log:247: new blank line at EOF.
+docs/acceptance/evidence/sparkline-20261011/lifecycle-final-after-types.log:9: new blank line at EOF.
+docs/acceptance/evidence/sparkline-20261011/picker-baseline-corrected.log:35: new blank line at EOF.
+docs/acceptance/evidence/sparkline-20261011/web-final-exact-paths.log:9: new blank line at EOF.
+docs/acceptance/evidence/sparkline-20261011/web-final-with-messages.log:9: new blank line at EOF.
+docs/acceptance/evidence/sparkline-20261011/web-final.log:9: new blank line at EOF.
+docs/acceptance/evidence/sparkline-20261011/web-types-build.log:116: trailing whitespace.
++[plugin builtin:vite-reporter] 
+WHOLE_STAGE_RAW_LOG_DIFF_EXIT=2

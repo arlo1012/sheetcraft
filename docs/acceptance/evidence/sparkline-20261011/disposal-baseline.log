@@ -1,0 +1,93 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/apps/web
+
+ ❯ src/tests/modules/sparklines/dialog-lifecycle.test.ts (12 tests | 1 failed | 11 skipped) 104ms
+     × disposed owner makes retained confirmation inert 102ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > disposed owner makes retained confirmation inert
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      Object {
+        "changes": Array [
+          Object {
+            "address": Object {
+              "column": 3,
+              "row": 0,
+            },
+            "sparkline": Object {
+              "axis": false,
+              "color": "#00aa66",
+              "empty": "gap",
+              "markers": true,
+              "negativeColor": "#ef4444",
+              "showHidden": false,
+              "source": Object {
+                "end": Object {
+                  "column": 2,
+                  "row": 0,
+                },
+                "start": Object {
+                  "column": 0,
+                  "row": 0,
+                },
+              },
+              "type": "line",
+            },
+          },
+          Object {
+            "address": Object {
+              "column": 3,
+              "row": 1,
+            },
+            "sparkline": Object {
+              "axis": false,
+              "color": "#00aa66",
+              "empty": "gap",
+              "markers": true,
+              "negativeColor": "#ef4444",
+              "showHidden": false,
+              "source": Object {
+                "end": Object {
+                  "column": 2,
+                  "row": 1,
+                },
+                "start": Object {
+                  "column": 0,
+                  "row": 1,
+                },
+              },
+              "type": "line",
+            },
+          },
+        ],
+        "sheetId": "sheet",
+        "type": "setCellSparklines",
+      },
+    ]
+
+
+Number of calls: 1
+
+ ❯ src/tests/modules/sparklines/dialog-lifecycle.test.ts:129:27
+    127|     const f = fixture(); await open(f); const old = callbacks(f); cons…
+    128|     f.wrapper.unmount(); old.confirm(value); old.close(); await nextTi…
+    129|     expect(f.execute).not.toHaveBeenCalled(); expect(snapshot(f)).toEq…
+       |                           ^
+    130|   });
+    131|   test("real Core unchanged confirmation is false without adding histo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 skipped (12)
+   Start at  23:36:49
+   Duration  3.94s (transform 1.91s, setup 0ms, import 3.50s, tests 104ms, environment 192ms)
+

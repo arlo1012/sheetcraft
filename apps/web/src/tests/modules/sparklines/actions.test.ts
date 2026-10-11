@@ -24,6 +24,7 @@ function fixture() {
   const actions = useSparklineActions({
     getWorkbook: () => workbook,
     getSheet: () => sheet,
+    getGeneration: () => 0,
     getRange: () => ({ start: { row: 0, column: 0 }, end: { row: 1, column: 2 } }),
     flush,
     isBusy: () => busy,

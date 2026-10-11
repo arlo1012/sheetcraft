@@ -1,0 +1,24 @@
+2026-10-11 06:42:29–06:47:07 UTC, own cloud Chrome tab20.
+Final production preview loopback127.0.0.1:7200 after checks/build; new syntheticSheet5 only.
+Six source values entered via actual editors: rows[2,4,3],[3,1,6].
+Cell-address A1:C2 did not select a range; real Shift+Arrow keys selected A1:C2.
+Dialog defaults=Sheet5!$A$1:$C$2 and =Sheet5!$D$1:$D$2, typeLine.
+Changedsource/destination/markers Cancel -> reopendefaults; no command.
+InvalidD1:D3 prompt and fields retained; source-range picker Cancel returns same draft.
+CorrectD1:D2 commit -> two visible blue line graphs D1/D2.
+D1 edit changed destination/markers Escape -> stored D1 source and options unchanged.
+Unchanged D1 confirmation closes; oneUndo removes both original graphs, Redo restores both.
+Explicit batcheditA1:C2->D1:D2, markers=true axis=true, typeLine unchanged.
+One editUndo publicJSON identicalcreated; editRedo identicaledited.
+ClearD1:D2 -> noSparkline metadata; numeric sources remain; oneUndo/Redo fullJSON exact.
+FinalUndo restoreedited, Save locally, Export, ordinaryreload waitingloadedA1, inspectD1, Cancel, export.
+10exports prove complete snapshotbyte equalities; prior5sheets exact; 6numeric sources preserved.
+Created29578B SHA256 d9d9912801ea165f83a449da3252065afe98fda12507f0c177cb8a483ad9e3a3.
+Cleared28408B SHA256 c9703a421403f73959d1457e43014901ab583c1bd8cc1c098d38efe6491b0e68.
+Final29574B SHA256 244e74517fc04d7f4185439fb9174438296d63aaa63bc0b10900347ad4ffe909.
+One input-selector timeout: aria-label on wrapper notinput; inspected actualeditableinput and used it.
+Immediate post-confirm screenshot caught oldfadeout whileAXclosed; settled screenshot proves two lines.
+No claimed GUI execute-boundary protection race; that is a labeled realCore controlled regression.
+No nativeexchange, externalnavigation, upload, Replace or userfile changes.
+Own tab20closed; previewCtrlC promptconfirmed; oom_kill25before/after; noownError9.
+Raw exports/screenshots staylocal, notGit.

@@ -10,6 +10,7 @@ const props = defineProps<{
   initial: SparklineDraft;
   disabled: boolean;
   error: boolean;
+  failed?: boolean;
   suspended: boolean;
   selectReference: (current: string) => Promise<string | undefined>;
 }>();
@@ -76,7 +77,9 @@ const { t } = useAppI18n();
           ]"
       /></label>
       <p>{{ t("sparkline.hint") }}</p>
-      <p v-if="error" class="sparkline-dialog__error" role="alert">{{ t("sparkline.invalid") }}</p>
+      <p v-if="error" class="sparkline-dialog__error" role="alert">
+        {{ t(failed ? "sparkline.failed" : "sparkline.invalid") }}
+      </p>
     </div>
   </Dialog>
 </template>

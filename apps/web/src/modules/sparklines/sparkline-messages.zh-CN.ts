@@ -16,5 +16,6 @@ export const sparklinesZhCN = {
     "每行或每列数据对应一个迷你图。放置区域需为等长的单列或单行；不会改动目标单元格的值。",
   "sparkline.invalid":
     "请检查来源和放置区域：须在当前工作表内、尺寸匹配、不含合并目标，且最多 10,000 个数据单元格。",
+  "sparkline.failed": "未能保存迷你图。草稿已保留，请检查权限后重试。",
   "sparkline.remove": "清除迷你图",
 };

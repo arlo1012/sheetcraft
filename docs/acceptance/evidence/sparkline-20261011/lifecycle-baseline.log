@@ -1,0 +1,247 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/apps/web
+
+ ❯ src/tests/modules/sparklines/dialog-lifecycle.test.ts (11 tests | 6 failed) 497ms
+     × real Core protection refusal at execute boundary keeps fields, instance and command history 61ms
+     × obsolete confirm cannot affect a newly reopened dialog 65ms
+     × obsolete close cannot affect a newly reopened dialog 48ms
+     × same-address open replaces local fields with a fresh keyed instance 57ms
+     × context generation invalidates the mounted dialog and old callbacks 26ms
+     × reentrant new dialog survives older successful confirmation 22ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > real Core protection refusal at execute boundary keeps fields, instance and command history
+Error: Unable to get specified component within: 
+ ❯ VueWrapper.getComponent ../../node_modules/.bun/@vue+test-utils@2.4.11+bedd8b778080c456/node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js:7203:15
+ ❯ src/tests/modules/sparklines/dialog-lifecycle.test.ts:174:22
+    172|     expect(f.session.history.undoStack).toHaveLength(0);
+    173|     expect(f.session.history.redoStack).toHaveLength(0);
+    174|     expect(f.wrapper.getComponent(SparklineDialog).vm.$.uid).toBe(uid);
+       |                      ^
+    175|     expect(f.actions.error.value).toBe(true);
+    176|     expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > obsolete confirm cannot affect a newly reopened dialog
+AssertionError: expected { version: 43, …(11) } to deeply equal { version: 43, …(11) }
+
+- Expected
++ Received
+
+@@ -44,10 +44,35 @@
+              "value": 4,
+            },
+          },
+          {
+            "address": {
++             "column": 3,
++             "row": 0,
++           },
++           "sparkline": {
++             "axis": false,
++             "color": "#00aa66",
++             "empty": "gap",
++             "markers": true,
++             "negativeColor": "#ef4444",
++             "showHidden": false,
++             "source": {
++               "end": {
++                 "column": 2,
++                 "row": 0,
++               },
++               "start": {
++                 "column": 0,
++                 "row": 0,
++               },
++             },
++             "type": "line",
++           },
++         },
++         {
++           "address": {
+              "column": 0,
+              "row": 1,
+            },
+            "content": {
+              "kind": "literal",
+@@ -70,10 +95,35 @@
+              "row": 1,
+            },
+            "content": {
+              "kind": "literal",
+              "value": 8,
++           },
++         },
++         {
++           "address": {
++             "column": 3,
++             "row": 1,
++           },
++           "sparkline": {
++             "axis": false,
++             "color": "#00aa66",
++             "empty": "gap",
++             "markers": true,
++             "negativeColor": "#ef4444",
++             "showHidden": false,
++             "source": {
++               "end": {
++                 "column": 2,
++                 "row": 1,
++               },
++               "start": {
++                 "column": 0,
++                 "row": 1,
++               },
++             },
++             "type": "line",
+            },
+          },
+        ],
+        "columnWidths": [],
+        "conditionalFormats": [],
+
+ ❯ src/tests/modules/sparklines/dialog-lifecycle.test.ts:204:27
+    202|       else old.close();
+    203|       await nextTick();
+    204|       expect(snapshot(f)).toEqual(before);
+       |                           ^
+    205|       expect(f.session.history.undoStack).toHaveLength(0);
+    206|       expect(f.wrapper.getComponent(SparklineDialog).vm.$.uid).toBe(ui…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > obsolete close cannot affect a newly reopened dialog
+Error: Unable to get specified component within: 
+ ❯ VueWrapper.getComponent ../../node_modules/.bun/@vue+test-utils@2.4.11+bedd8b778080c456/node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js:7203:15
+ ❯ src/tests/modules/sparklines/dialog-lifecycle.test.ts:206:24
+    204|       expect(snapshot(f)).toEqual(before);
+    205|       expect(f.session.history.undoStack).toHaveLength(0);
+    206|       expect(f.wrapper.getComponent(SparklineDialog).vm.$.uid).toBe(ui…
+       |                        ^
+    207|     },
+    208|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > same-address open replaces local fields with a fresh keyed instance
+AssertionError: expected 234 not to be 234 // Object.is equality
+ ❯ src/tests/modules/sparklines/dialog-lifecycle.test.ts:216:66
+    214|     f.actions.open();
+    215|     await nextTick();
+    216|     expect(f.wrapper.getComponent(SparklineDialog).vm.$.uid).not.toBe(…
+       |                                                                  ^
+    217|     expect(
+    218|       (f.wrapper.findAll(".sparkline-dialog input")[0]!.element as HTM…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > context generation invalidates the mounted dialog and old callbacks
+AssertionError: expected { version: 43, …(11) } to deeply equal { version: 43, …(11) }
+
+- Expected
++ Received
+
+@@ -44,10 +44,35 @@
+              "value": 4,
+            },
+          },
+          {
+            "address": {
++             "column": 3,
++             "row": 0,
++           },
++           "sparkline": {
++             "axis": false,
++             "color": "#00aa66",
++             "empty": "gap",
++             "markers": true,
++             "negativeColor": "#ef4444",
++             "showHidden": false,
++             "source": {
++               "end": {
++                 "column": 2,
++                 "row": 0,
++               },
++               "start": {
++                 "column": 0,
++                 "row": 0,
++               },
++             },
++             "type": "line",
++           },
++         },
++         {
++           "address": {
+              "column": 0,
+              "row": 1,
+            },
+            "content": {
+              "kind": "literal",
+@@ -70,10 +95,35 @@
+              "row": 1,
+            },
+            "content": {
+              "kind": "literal",
+              "value": 8,
++           },
++         },
++         {
++           "address": {
++             "column": 3,
++             "row": 1,
++           },
++           "sparkline": {
++             "axis": false,
++             "color": "#00aa66",
++             "empty": "gap",
++             "markers": true,
++             "negativeColor": "#ef4444",
++             "showHidden": false,
++             "source": {
++               "end": {
++                 "column": 2,
++                 "row": 1,
++               },
++               "start": {
++                 "column": 0,
++                 "row": 1,
++               },
++             },
++             "type": "line",
+            },
+          },
+        ],
+        "columnWidths": [],
+        "conditionalFormats": [],
+
+ ❯ src/tests/modules/sparklines/dialog-lifecycle.test.ts:244:27
+    242|       old.close();
+    243|       await nextTick();
+    244|       expect(snapshot(f)).toEqual(before);
+       |                           ^
+    245|       expect(f.session.history.undoStack).toHaveLength(0);
+    246|       expect(f.wrapper.findComponent(SparklineDialog).exists()).toBe(f…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > reentrant new dialog survives older successful confirmation
+AssertionError: expected undefined to be defined
+ ❯ src/tests/modules/sparklines/dialog-lifecycle.test.ts:277:35
+    275|     old.confirm(value);
+    276|     await nextTick();
+    277|     expect(f.actions.draft.value).toBeDefined();
+       |                                   ^
+    278|     expect(f.wrapper.findComponent(SparklineDialog).exists()).toBe(tru…
+    279|     expect(getCellSparkline(f.sheet, { row: 0, column: 3 })?.color).to…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 5 passed (11)
+   Start at  23:32:09
+   Duration  4.43s (transform 1.96s, setup 0ms, import 3.60s, tests 497ms, environment 192ms)
+

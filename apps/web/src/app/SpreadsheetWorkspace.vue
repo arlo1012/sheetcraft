@@ -384,7 +384,7 @@ const hyperlinkActions = useHyperlinksController({
   },
   focus: focusCellEditor,
 });
-const { draft: hyperlinkDraft, error: hyperlinkError } = hyperlinkActions;
+const { dialog: hyperlinkDialog, draft: hyperlinkDraft, error: hyperlinkError } = hyperlinkActions;
 const protectionActions = useProtectionController({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1319,18 +1319,49 @@ const sparklineActions = useSparklineActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
   getRange: () => activeSelectionRange.value,
+  getGeneration: () => workbookGeneration.value,
   flush: () => cellEditSession.finish(),
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   execute: executeCommand,
 });
-const { draft: sparklineDraft, error: sparklineError } = sparklineActions;
+const {
+  dialog: sparklineDialog,
+  draft: sparklineDraft,
+  error: sparklineError,
+  failed: sparklineFailed,
+} = sparklineActions;
 const sparklineRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingSparklineRange, reference: pickedSparklineReference } = sparklineRangePicker;
-watch(sparklineDraft, (value) => {
-  if (!value) sparklineRangePicker.cancel();
+let sparklinePickerSequence = 0;
+const sparklinePicker = shallowRef<{ id: number; confirm: () => void; cancel: () => void }>();
+const selectSparklineReference = computed(() => {
+  const dialog = sparklineDialog.value;
+  return async (current: string): Promise<string | undefined> => {
+    if (!dialog?.isCurrent()) return undefined;
+    const selection = sparklineRangePicker.selectReference(current);
+    const picker = {
+      id: ++sparklinePickerSequence,
+      confirm: () => {
+        if (sparklinePicker.value === picker && dialog.isCurrent()) sparklineRangePicker.confirm();
+      },
+      cancel: () => {
+        if (sparklinePicker.value === picker && dialog.isCurrent()) sparklineRangePicker.cancel();
+      },
+    };
+    sparklinePicker.value = picker;
+    const result = await selection;
+    if (sparklinePicker.value === picker) sparklinePicker.value = undefined;
+    return dialog.isCurrent() ? result : undefined;
+  };
 });
-watch(() => activeSheet.value.id, sparklineActions.close);
-watch(workbookGeneration, sparklineActions.close);
+watch(
+  sparklineDialog,
+  () => {
+    sparklineRangePicker.cancel();
+    sparklinePicker.value = undefined;
+  },
+  { flush: "sync" },
+);
 const chartActions = useChartActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1379,7 +1410,7 @@ watch(
 );
 watch(workbookGeneration, () => {
   drawingActions.close();
-  symbolVisible.value = false;
+  symbolDialog.value = undefined;
 });
 function insertPivot(chart: boolean): void {
   if (chart && activePivot.value) chartActions.insertPivot(activePivot.value.id);
@@ -1392,8 +1423,44 @@ function editSheetDrawing(drawing: SheetDrawing): void {
   else if (drawing.kind === "camera") cameraActions.open(drawing);
   else drawingActions.edit(drawing);
 }
-const symbolVisible = ref(false);
+const symbolDialog = shallowRef<{
+  dialogId: number;
+  insert: (symbol: string) => void;
+  close: () => void;
+}>();
+const symbolVisible = computed(() => !!symbolDialog.value);
+let symbolDialogSequence = 0;
 const captureBusy = ref(false);
+function openSymbolDialog(): void {
+  if (
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    !canEditCell(activeSheet.value, activeAddress.value)
+  )
+    return;
+  const generation = workbookGeneration.value;
+  const sheet = activeSheet.value;
+  const address = { ...activeAddress.value };
+  const current = {
+    dialogId: ++symbolDialogSequence,
+    insert: (symbol: string) => {
+      if (
+        symbolDialog.value !== current ||
+        workbookGeneration.value !== generation ||
+        activeSheet.value !== sheet ||
+        activeAddress.value.row !== address.row ||
+        activeAddress.value.column !== address.column
+      )
+        return;
+      insertSymbol(symbol);
+    },
+    close: () => {
+      if (symbolDialog.value === current) symbolDialog.value = undefined;
+    },
+  };
+  symbolDialog.value = current;
+}
 function insertSymbol(symbol: string): void {
   if (
     loading.value ||
@@ -1418,13 +1485,13 @@ function insertSymbol(symbol: string): void {
   );
   cellEditSession.setDraft(result.value);
   cellEditSession.setSelection(result.caret, result.caret);
-  symbolVisible.value = false;
+  symbolDialog.value = undefined;
   void nextTick(focusCellEditor);
 }
 watch(
   () => activeSheet.value.id,
   () => {
-    symbolVisible.value = false;
+    symbolDialog.value = undefined;
   },
 );
 async function insertScreenCapture(): Promise<void> {
@@ -2633,7 +2700,7 @@ const gridInert = computed(
           :symbol-disabled="
             loading || fileBusy || xlsxBusy || !canEditCell(activeSheet, activeAddress)
           "
-          @insert-symbol="symbolVisible = true"
+          @insert-symbol="openSymbolDialog"
           @capture-screen="insertScreenCapture"
           :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
           :image-disabled="
@@ -3400,12 +3467,13 @@ const gridInert = computed(
       @cancel="tableCalculatedColumnTarget.cancel"
     />
     <HyperlinkDialog
-      v-if="hyperlinkDraft"
-      :draft="hyperlinkDraft"
+      v-if="hyperlinkDialog"
+      :key="hyperlinkDialog.dialogId"
+      :draft="hyperlinkDialog.initial"
       :error="hyperlinkError"
-      @confirm="hyperlinkActions.save"
-      @remove="hyperlinkActions.remove"
-      @cancel="hyperlinkActions.close"
+      @confirm="hyperlinkDialog.confirm"
+      @remove="hyperlinkDialog.remove"
+      @cancel="hyperlinkDialog.cancel"
     />
     <NewCellStyleDialog
       v-if="cellStyleDraft"
@@ -4049,10 +4117,11 @@ const gridInert = computed(
     @close="drawingDialog.close"
   />
   <SymbolDialog
-    v-if="symbolVisible"
+    v-if="symbolDialog"
+    :key="symbolDialog.dialogId"
     :disabled="loading || fileBusy || xlsxBusy || !canEditCell(activeSheet, activeAddress)"
-    @insert="insertSymbol"
-    @close="symbolVisible = false"
+    @insert="symbolDialog.insert"
+    @close="symbolDialog.close"
   />
   <ChartEditorDialog
     v-if="chartDialog"
@@ -4164,23 +4233,26 @@ const gridInert = computed(
     @cancel="cameraRangePicker.cancel"
   />
   <SparklineDialog
-    v-if="sparklineDraft"
-    :initial="sparklineDraft"
+    v-if="sparklineDialog"
+    :key="sparklineDialog.dialogId"
+    :initial="sparklineDialog.initial"
     :disabled="
       loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'formatCells')
     "
     :error="sparklineError"
+    :failed="sparklineFailed"
     :suspended="pickingSparklineRange"
-    :select-reference="sparklineRangePicker.selectReference"
-    @confirm="sparklineActions.confirm"
-    @close="sparklineActions.close"
+    :select-reference="selectSparklineReference"
+    @confirm="sparklineDialog.confirm"
+    @close="sparklineDialog.close"
   />
   <RangeReferencePicker
-    v-if="pickingSparklineRange"
+    v-if="pickingSparklineRange && sparklinePicker"
+    :key="sparklinePicker.id"
     :reference="pickedSparklineReference"
     :edit-session-id="cellEditSession.id"
-    @confirm="sparklineRangePicker.confirm"
-    @cancel="sparklineRangePicker.cancel"
+    @confirm="sparklinePicker.confirm"
+    @cancel="sparklinePicker.cancel"
   />
 </template>
 

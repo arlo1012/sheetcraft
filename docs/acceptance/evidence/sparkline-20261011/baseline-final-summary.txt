@@ -1,0 +1,34 @@
+Retained original raw runner output locally, outside the Git checkpoint.
+Bytes: 606397
+SHA256: 05bf6d8068dede5853052cab4a09e9e92f03939a24de780b932674355350a42c
+10 failed / 3 passed / 17 skipped. Eight module product-boundary failures; two Workspace selector harness failures (no data-insert-tool attribute).
+Corrected actual picker baseline is picker-baseline-corrected.log. Original raw output was not rewritten.
+
+Selected original failure/result lines:
+     × real Core protection refusal at execute boundary keeps fields, instance and command history 58ms
+     × obsolete confirm cannot affect a newly reopened dialog 63ms
+     × obsolete close cannot affect a newly reopened dialog 50ms
+     × same-address open replaces local fields with a fresh keyed instance 63ms
+     × context generation invalidates the mounted dialog and old callbacks 31ms
+     × context sheet invalidates the mounted dialog and old callbacks 24ms
+     × context workbook invalidates the mounted dialog and old callbacks 24ms
+     × reentrant new dialog survives older successful confirmation 23ms
+     × Sparkline replaces and detaches an old range-picker confirm 1716ms
+     × Sparkline replaces and detaches an old range-picker cancel 1110ms
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > Sparkline replaces and detaches an old range-picker confirm
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > Sparkline replaces and detaches an old range-picker cancel
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > real Core protection refusal at execute boundary keeps fields, instance and command history
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > obsolete confirm cannot affect a newly reopened dialog
+AssertionError: expected { version: 43, …(11) } to deeply equal { version: 43, …(11) }
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > obsolete close cannot affect a newly reopened dialog
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > same-address open replaces local fields with a fresh keyed instance
+AssertionError: expected 234 not to be 234 // Object.is equality
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > context generation invalidates the mounted dialog and old callbacks
+AssertionError: expected { version: 43, …(11) } to deeply equal { version: 43, …(11) }
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > context sheet invalidates the mounted dialog and old callbacks
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > context workbook invalidates the mounted dialog and old callbacks
+AssertionError: expected true to be false // Object.is equality
+ FAIL  src/tests/modules/sparklines/dialog-lifecycle.test.ts > sparkline concrete dialog bounded lifecycle > reentrant new dialog survives older successful confirmation
+AssertionError: expected undefined to be defined
+ Test Files  2 failed (2)
+      Tests  10 failed | 3 passed | 17 skipped (30)

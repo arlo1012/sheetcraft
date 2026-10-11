@@ -1,0 +1,22 @@
+Actual cloud Sheetcraft GUI, ordinary http://127.0.0.1:7200; synthetic data only.
+05:44:25 UTC oom_kill=25, initial serial focused28 checks complete.
+05:45–05:48 UTC own tab17: new Sheet3; A1 Region selection2–4; π draft Reπon;
+editorEscape restores Region; repeat+Enter commit Reπon; dialogCancel+Escape keep
+pending Reπon draft; editorEscape restores cell. Custom Ω🙂<>& appended draft;
+Entercommit; oneUndo Reπon, oneRedo fullcustom. Save/reload JSON21737B equal,
+SHA256 d1396ac0ab51ab1a0f3fc518a84487cf47738c82620368b303a3c05d4e0dc484.
+Old Data/Sheet1/Sheet2 snapshots unchanged. Immediate reload DOM read was premature.
+Own tab17 closed and Vite CtrlC prompt confirmed before source regression checks.
+05:53:50 UTC final focused31 and Webtypes0 complete, oom_kill=25.
+05:54–05:56 UTC own tab18 final code: A1 selection2–3 retained through cancel/reopen;
+fresh default✓; emptycustom Insertdisabled; dialogEscape retainsdraft; doubleclick∞
+replacesπ only; editorEscape restores originalcell. B1 custom Symbol🙂Ω draft+commit;
+oneUndo blankB1, oneRedo literal. Save JSON21942B SHA256
+32169d30fb2d884f91a6475f955cb954922fe2ee1a10089c1c7ef304cd7b5e2f.
+Premature reload-address interaction races loadfocus; B1 text accidentally committed
+at syntheticA1, B1 selector deadline. DOM alive; oom25 unchanged. NormalUndo restores
+A1; correctedSave/export exactly equal intendedbefore file. Nextreload waitedfor
+loadedA1 beforeaddressentry; B1 correct; afterJSON exactly equal bothcorrectbefore.
+Data/Sheet1/Sheet2 unchanged. No Error9 on either own page. User pages untouched.
+05:56:14 UTC own tab18 closed, own Vite stopped/prompt verified; oom_kill=25.
+No build/test concurrentwithGUI; no nativeXLSX capture; no raw/screenshotupload.

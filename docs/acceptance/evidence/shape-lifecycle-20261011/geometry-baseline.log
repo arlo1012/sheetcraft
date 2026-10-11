@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/packages/sheet-engine
+
+
+ Test Files  2 passed (2)
+      Tests  15 passed (15)
+   Start at  22:24:44
+   Duration  1.02s (transform 1.14s, setup 0ms, import 1.72s, tests 16ms, environment 0ms)
+

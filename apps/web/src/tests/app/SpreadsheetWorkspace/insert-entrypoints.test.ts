@@ -13,6 +13,10 @@ import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import PivotTableDialog from "../../../modules/pivot-tables/components/PivotTableDialog.vue";
+import SymbolDialog from "../../../modules/insert-tools/components/SymbolDialog.vue";
+import SparklineDialog from "../../../modules/sparklines/components/SparklineDialog.vue";
+import RangeReferencePicker from "../../../shared/range-reference/RangeReferencePicker.vue";
+import HyperlinkDialog from "../../../modules/hyperlinks/components/HyperlinkDialog.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { triggerCanvasCell } from "../canvas-interaction";
 import { createAppI18n } from "../../../shared/i18n";
@@ -83,8 +87,167 @@ async function fixture(withData = false) {
 }
 
 describe("workspace insert entry points", () => {
+  test.each(["confirm", "cancel"] as const)(
+    "Sparkline replaces and detaches an old range-picker %s",
+    async (action) => {
+      const wrapper = await fixture(true);
+      await wrapper.get('[role="button"][aria-label="Sparklines"]').trigger("click");
+      await flushPromises();
+      const first = wrapper.getComponent(SparklineDialog);
+      const firstUid = first.vm.$.uid;
+      const firstSelection = first.props("selectReference")("A1:C2");
+      await flushPromises();
+      const oldPicker = wrapper.getComponent(RangeReferencePicker).vm.$.vnode.props!;
+      await wrapper.get('[role="button"][aria-label="Sparklines"]').trigger("click");
+      await flushPromises();
+      const current = wrapper.getComponent(SparklineDialog);
+      expect(current.props("suspended")).toBe(false);
+      expect(current.vm.$.uid).not.toBe(firstUid);
+      expect(wrapper.findComponent(RangeReferencePicker).exists()).toBe(false);
+      expect(await firstSelection).toBeUndefined();
+      expect(await first.props("selectReference")("A5:C5")).toBeUndefined();
+      expect(wrapper.findComponent(RangeReferencePicker).exists()).toBe(false);
+      const selection = current.props("selectReference")("A1:C2");
+      await flushPromises();
+      const picker = wrapper.getComponent(RangeReferencePicker);
+      const pickerUid = picker.vm.$.uid;
+      const before = serializeWorkbook(captured.controller!.session.workbook);
+      (oldPicker[action === "confirm" ? "onConfirm" : "onCancel"] as () => void)();
+      await flushPromises();
+      expect(wrapper.getComponent(RangeReferencePicker).vm.$.uid).toBe(pickerUid);
+      expect(current.props("suspended")).toBe(true);
+      expect(serializeWorkbook(captured.controller!.session.workbook)).toEqual(before);
+      expect(captured.controller!.session.history.undoStack).toHaveLength(0);
+      picker.vm.$emit("cancel");
+      expect(await selection).toBeUndefined();
+      await flushPromises();
+      expect(current.props("suspended")).toBe(false);
+    },
+  );
+
+  test("Hyperlink uses instance-bound callbacks from the actual Insert ribbon", async () => {
+    const wrapper = await fixture(true);
+    const controller = captured.controller!;
+    await wrapper.get('[data-insert-tool="hyperlink"]').trigger("click");
+    await flushPromises();
+    const old = wrapper.getComponent(HyperlinkDialog).vm.$.vnode.props!;
+    (old.onCancel as () => void)();
+    await flushPromises();
+    await wrapper.get('[data-insert-tool="hyperlink"]').trigger("click");
+    await flushPromises();
+    const current = wrapper.getComponent(HyperlinkDialog);
+    const uid = current.vm.$.uid;
+    const before = serializeWorkbook(controller.session.workbook);
+    (old.onConfirm as (value: { target: string; displayText: string; tooltip: string }) => void)({
+      target: "https://example.test/stale",
+      displayText: "stale",
+      tooltip: "",
+    });
+    (old.onCancel as () => void)();
+    await flushPromises();
+    expect(wrapper.getComponent(HyperlinkDialog).vm.$.uid).toBe(uid);
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+    current.vm.$emit("confirm", {
+      target: "#Sheet1!B3",
+      displayText: "Internal report",
+      tooltip: "Synthetic",
+    });
+    await flushPromises();
+    expect(wrapper.findComponent(HyperlinkDialog).exists()).toBe(false);
+    expect(getCellValue(controller.activeSheet.value, { row: 0, column: 0 })).toBe(
+      "Internal report",
+    );
+    expect(controller.session.history.undoStack).toHaveLength(1);
+  });
+  test.each(["cancel", "reopen", "navigation"] as const)(
+    "old Symbol callbacks cannot change the draft or a newer dialog after %s",
+    async (action) => {
+      const wrapper = await fixture(true);
+      const controller = captured.controller!;
+      const session = wrapper.getComponent(SheetGrid).props("editSession")!;
+      const before = serializeWorkbook(controller.session.workbook);
+      await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
+      await flushPromises();
+      const callbacks = wrapper.getComponent(SymbolDialog).vm.$.vnode.props!;
+      const insert = callbacks.onInsert as (symbol: string) => void;
+      const close = callbacks.onClose as () => void;
+      if (action === "navigation") {
+        controller.addSheet();
+        await flushPromises();
+      } else {
+        close();
+        await flushPromises();
+      }
+      const afterDismiss = serializeWorkbook(controller.session.workbook);
+      const historyLength = controller.session.history.undoStack.length;
+      if (action === "reopen") {
+        await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
+        await flushPromises();
+        close();
+        await flushPromises();
+        expect(wrapper.findComponent(SymbolDialog).exists()).toBe(true);
+      }
+      insert("stale");
+      await flushPromises();
+      expect(session.state.active).toBe(false);
+      expect(serializeWorkbook(controller.session.workbook)).toEqual(afterDismiss);
+      expect(controller.session.history.undoStack).toHaveLength(historyLength);
+      if (action !== "navigation") expect(afterDismiss).toEqual(before);
+      expect(wrapper.findComponent(SymbolDialog).exists()).toBe(action === "reopen");
+    },
+  );
+  test("Symbol replaces the retained editor selection as draft, with cancel and one commit history", async () => {
+    const wrapper = await fixture(true);
+    const controller = captured.controller!;
+    const grid = wrapper.getComponent(SheetGrid);
+    const session = grid.props("editSession")!;
+    const sheet = controller.activeSheet.value;
+    const before = serializeWorkbook(controller.session.workbook);
+    session.begin(
+      { sheetId: sheet.id, address: { row: 0, column: 0 }, input: "Region" },
+      { surface: "grid", mode: "append" },
+    );
+    session.setSelection(2, 4);
+    await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
+    await flushPromises();
+    wrapper.getComponent(SymbolDialog).vm.$emit("close");
+    await flushPromises();
+    expect(session.state.draft).toBe("Region");
+    expect(session.state.selection).toMatchObject({ start: 2, end: 4 });
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+    await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
+    await flushPromises();
+    wrapper.getComponent(SymbolDialog).vm.$emit("insert", "π");
+    await flushPromises();
+    expect(session.state.draft).toBe("Reπon");
+    expect(session.state.selection).toMatchObject({ start: 3, end: 3 });
+    expect(wrapper.findComponent(SymbolDialog).exists()).toBe(false);
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+    expect(controller.session.history.undoStack).toHaveLength(0);
+    session.cancel();
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+    await wrapper.get('[data-insert-tool="symbol"]').trigger("click");
+    await flushPromises();
+    wrapper.getComponent(SymbolDialog).vm.$emit("insert", "Ω🙂");
+    await flushPromises();
+    expect(session.state.draft).toBe("RegionΩ🙂");
+    expect(session.finish()).toBe(true);
+    await flushPromises();
+    expect(getCellValue(controller.activeSheet.value, { row: 0, column: 0 })).toBe("RegionΩ🙂");
+    expect(controller.session.history.undoStack).toHaveLength(1);
+    const after = serializeWorkbook(controller.session.workbook);
+    await wrapper.get('[data-ribbon-category="home"]').trigger("click");
+    await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
+    await flushPromises();
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+    await wrapper.get('[data-ribbon-action="redo"]').trigger("click");
+    await flushPromises();
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(after);
+  });
   test.each([
     { tool: "shape", selector: '[data-insert-tool="shape"]', dialog: ".drawing-editor" },
+    { tool: "text box", selector: '[data-insert-tool="text-box"]', dialog: ".drawing-editor" },
+    { tool: "WordArt", selector: '[data-insert-tool="wordArt"]', dialog: ".drawing-editor" },
     {
       tool: "chart",
       selector: '.chart-insert-tools [role="button"][aria-label="Column"]',

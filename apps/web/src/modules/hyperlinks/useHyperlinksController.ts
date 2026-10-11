@@ -1,5 +1,5 @@
 import { canUseSheetPermission } from "@sheetcraft/core";
-import { nextTick, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, ref, shallowRef, watch } from "vue";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { formatCellContentForInput } from "@sheetcraft/core/input";
 import {
@@ -20,7 +20,17 @@ import { resolveRangeReference } from "../../shared/range-reference/formatRangeR
 
 export type HyperlinkInput = { target: string; displayText: string; tooltip: string };
 export type HyperlinkDraft = HyperlinkInput & { hasLink: boolean; canEditDisplay: boolean };
-type Target = { sheetId: string; address: CellAddress };
+type HyperlinkDialogTarget = {
+  dialogId: number;
+  workbook: Workbook;
+  sheet: Sheet;
+  address: CellAddress;
+  generation: number;
+  initial: HyperlinkDraft;
+  confirm: (value: HyperlinkInput) => void;
+  remove: () => void;
+  cancel: () => void;
+};
 
 export function useHyperlinksController(options: {
   getWorkbook: () => Workbook;
@@ -35,17 +45,38 @@ export function useHyperlinksController(options: {
   focus: () => void;
 }) {
   const { t } = useAppI18n();
-  const draft = shallowRef<HyperlinkDraft>();
+  const dialog = shallowRef<HyperlinkDialogTarget>();
+  const draft = computed(() => dialog.value?.initial);
   const error = ref("");
-  let target: Target | undefined;
+  let dialogSequence = 0;
+  const isCurrent = (target: HyperlinkDialogTarget) =>
+    dialog.value === target &&
+    target.workbook === options.getWorkbook() &&
+    target.generation === options.getGeneration() &&
+    target.sheet === options.getSheet() &&
+    target.workbook.sheets.get(target.sheet.id) === target.sheet &&
+    target.address.row === options.getAddress().row &&
+    target.address.column === options.getAddress().column;
 
-  function close(): void {
-    draft.value = undefined;
-    target = undefined;
+  function close(target = dialog.value): void {
+    if (!target || dialog.value !== target) return;
+    dialog.value = undefined;
     error.value = "";
-    void nextTick(options.focus);
+    void nextTick(() => {
+      if (!dialog.value) options.focus();
+    });
   }
-  watch(options.getGeneration, close);
+  watch(
+    [
+      options.getWorkbook,
+      options.getSheet,
+      options.getGeneration,
+      () => options.getAddress().row,
+      () => options.getAddress().column,
+    ],
+    () => close(),
+    { flush: "sync" },
+  );
 
   function edit(): void {
     if (
@@ -55,19 +86,31 @@ export function useHyperlinksController(options: {
     )
       return;
     const sheet = options.getSheet();
+    if (!canUseSheetPermission(sheet, "insertHyperlinks")) return;
     const address = { ...options.getAddress() };
     const content = getCellContent(sheet, address);
     const link = getCellHyperlink(sheet, address);
     const displayText = formatCellContentForInput(content);
-    target = { sheetId: sheet.id, address };
     error.value = "";
-    draft.value = {
-      target: link?.target ?? (/^(https?:\/\/|mailto:|#)/i.test(displayText) ? displayText : ""),
-      tooltip: link?.tooltip ?? "",
-      displayText,
-      hasLink: Boolean(link),
-      canEditDisplay: !content || (content.kind === "literal" && typeof content.value === "string"),
+    const current: HyperlinkDialogTarget = {
+      dialogId: ++dialogSequence,
+      workbook: options.getWorkbook(),
+      sheet,
+      address,
+      generation: options.getGeneration(),
+      initial: {
+        target: link?.target ?? (/^(https?:\/\/|mailto:|#)/i.test(displayText) ? displayText : ""),
+        tooltip: link?.tooltip ?? "",
+        displayText,
+        hasLink: Boolean(link),
+        canEditDisplay:
+          !content || (content.kind === "literal" && typeof content.value === "string"),
+      },
+      confirm: (value) => save(value, current),
+      remove: () => remove(current),
+      cancel: () => close(current),
     };
+    dialog.value = current;
   }
 
   function validTarget(value: string, sheetId: string): boolean {
@@ -88,24 +131,24 @@ export function useHyperlinksController(options: {
     }
   }
 
-  function save(value: HyperlinkInput): void {
-    if (!target || !draft.value || options.isBusy()) return;
-    const sheet = options.getWorkbook().sheets.get(target.sheetId);
-    if (!sheet || !canUseSheetPermission(sheet, "insertHyperlinks")) return;
+  function save(value: HyperlinkInput, target = dialog.value): void {
+    if (!target || !isCurrent(target) || options.isBusy()) return;
+    const sheet = target.sheet;
+    if (!canUseSheetPermission(sheet, "insertHyperlinks")) return;
     const address = value.target.trim();
-    if (!validTarget(address, target.sheetId)) {
+    if (!validTarget(address, sheet.id)) {
       error.value = t("hyperlinks.invalidTarget");
       return;
     }
     try {
       const displayText =
-        draft.value.canEditDisplay &&
-        (value.displayText !== draft.value.displayText || !draft.value.displayText)
+        target.initial.canEditDisplay &&
+        (value.displayText !== target.initial.displayText || !target.initial.displayText)
           ? value.displayText || address
           : undefined;
-      options.execute(
+      const accepted = options.execute(
         createSetCellHyperlinkCommand(
-          target.sheetId,
+          sheet.id,
           target.address,
           {
             target: address,
@@ -117,21 +160,33 @@ export function useHyperlinksController(options: {
           displayText,
         ),
       );
-      close();
+      if (!isCurrent(target)) return;
+      if (!accepted) {
+        error.value = t("hyperlinks.failed");
+        return;
+      }
+      close(target);
     } catch {
-      error.value = t("hyperlinks.failed");
+      if (isCurrent(target)) error.value = t("hyperlinks.failed");
     }
   }
 
-  function remove(): void {
-    if (!target || options.isBusy()) return;
-    const sheet = options.getWorkbook().sheets.get(target.sheetId);
-    if (!sheet || !canUseSheetPermission(sheet, "insertHyperlinks")) return;
+  function remove(target = dialog.value): void {
+    if (!target || !isCurrent(target) || options.isBusy()) return;
+    const sheet = target.sheet;
+    if (!canUseSheetPermission(sheet, "insertHyperlinks")) return;
     try {
-      options.execute(createSetCellHyperlinkCommand(target.sheetId, target.address, null));
-      close();
+      const accepted = options.execute(
+        createSetCellHyperlinkCommand(sheet.id, target.address, null),
+      );
+      if (!isCurrent(target)) return;
+      if (!accepted) {
+        error.value = t("hyperlinks.failed");
+        return;
+      }
+      close(target);
     } catch {
-      error.value = t("hyperlinks.failed");
+      if (isCurrent(target)) error.value = t("hyperlinks.failed");
     }
   }
 
@@ -157,5 +212,5 @@ export function useHyperlinksController(options: {
     }
   }
 
-  return { draft, error, edit, save, remove, open, close };
+  return { dialog, draft, error, edit, save, remove, open, close };
 }

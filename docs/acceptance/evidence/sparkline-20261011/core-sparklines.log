@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/packages/core
+
+
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+   Start at  23:40:26
+   Duration  1.28s (transform 800ms, setup 0ms, import 1.12s, tests 36ms, environment 0ms)
+

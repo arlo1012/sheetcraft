@@ -1,0 +1,13 @@
+Retained original raw runner output locally, outside the Git checkpoint.
+Bytes: 596864
+SHA256: 75ae57f657325a4d84405e0ec7d7afb6d7f233bb037fb78e824ac6282d117a0b
+38 passed / 2 failed. Module guard cases passed; Workspace selector still matched the group. No product regression claimed for these two harness failures.
+Corrected actual picker baseline is picker-baseline-corrected.log. Original raw output was not rewritten.
+
+Selected original failure/result lines:
+     × Sparkline replaces and detaches an old range-picker confirm 1614ms
+     × Sparkline replaces and detaches an old range-picker cancel 1132ms
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > Sparkline replaces and detaches an old range-picker confirm
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > Sparkline replaces and detaches an old range-picker cancel
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 38 passed (40)

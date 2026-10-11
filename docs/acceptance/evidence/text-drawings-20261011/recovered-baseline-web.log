@@ -1,0 +1,67 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/apps/web
+
+ ❯ src/tests/modules/sheet-drawings/text-drawings.test.ts (7 tests | 3 failed) 221ms
+     × WordArt hides unused appearance controls while preserving stored fields 100ms
+     × textBox renders literal multiline text with font-relative line height 5ms
+     × wordArt renders literal multiline text with font-relative line height 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/modules/sheet-drawings/text-drawings.test.ts > existing text box and WordArt contract > WordArt hides unused appearance controls while preserving stored fields
+AssertionError: expected [ DOMWrapper{ …(3) }, …(2) ] to have a length of 1 but got 3
+
+- Expected
++ Received
+
+- 1
++ 3
+
+ ❯ src/tests/modules/sheet-drawings/text-drawings.test.ts:50:52
+     48|     const original = drawing("wordArt");
+     49|     const wrapper = editor(original);
+     50|     expect(wrapper.findAll('input[type="color"]')).toHaveLength(1);
+       |                                                    ^
+     51|     expect(wrapper.text()).not.toContain("No fill");
+     52|     expect(wrapper.text()).not.toContain("Line width");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/tests/modules/sheet-drawings/text-drawings.test.ts > existing text box and WordArt contract > textBox renders literal multiline text with font-relative line height
+AssertionError: expected 'color: #654321; font-size: 28px; font…' to contain 'line-height: normal'
+
+Expected: "line-height: normal"
+Received: "color: #654321; font-size: 28px; font-weight: 400; font-style: italic; background: #abcdef; border: 3px solid #123456;"
+
+ ❯ src/tests/modules/sheet-drawings/text-drawings.test.ts:83:40
+     81|       expect(text.attributes("style")).toContain("font-weight: 400");
+     82|       expect(text.attributes("style")).toContain("font-style: italic");
+     83|       expect(text.attributes("style")).toContain("line-height: normal"…
+       |                                        ^
+     84|       expect(wrapper.get(".drawing-content").attributes("style")).toCo…
+     85|       expect(text.classes().includes("is-word-art")).toBe(kind === "wo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/tests/modules/sheet-drawings/text-drawings.test.ts > existing text box and WordArt contract > wordArt renders literal multiline text with font-relative line height
+AssertionError: expected 'color: #654321; font-size: 28px; font…' to contain 'line-height: normal'
+
+Expected: "line-height: normal"
+Received: "color: #654321; font-size: 28px; font-weight: 400; font-style: italic;"
+
+ ❯ src/tests/modules/sheet-drawings/text-drawings.test.ts:83:40
+     81|       expect(text.attributes("style")).toContain("font-weight: 400");
+     82|       expect(text.attributes("style")).toContain("font-style: italic");
+     83|       expect(text.attributes("style")).toContain("line-height: normal"…
+       |                                        ^
+     84|       expect(wrapper.get(".drawing-content").attributes("style")).toCo…
+     85|       expect(text.classes().includes("is-word-art")).toBe(kind === "wo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 4 passed (7)
+   Start at  22:11:49
+   Duration  3.60s (transform 1.56s, setup 0ms, import 3.01s, tests 221ms, environment 215ms)
+
