@@ -68,7 +68,8 @@ Use CSS pixels at 100% scale; size and line height are a pair.
 - Common font choices do not guarantee installation. Explain font substitution;
   request local-font access only from an explicit action, and explain unavailable
   browser or origin support. Searchable font menus use `MenuSearch` and keep the
-  local-font action in the fixed footer while choices scroll.
+  local-font action in a compact fixed footer while choices scroll. Put detailed
+  access and substitution explanations on the information icon.
 
 ## Surfaces, controls, and focus
 

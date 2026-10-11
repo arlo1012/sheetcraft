@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
+import { Info } from "lucide-vue-next";
 import { useAppI18n } from "../i18n";
 import { localFontAccess } from "./local-fonts";
 
@@ -16,6 +17,7 @@ const message = computed(() => {
     return t("format.localFontsLoaded", { count: families.value.length });
   return t("format.localFontsHint");
 });
+const description = computed(() => `${message.value}\n${t("format.fontFallbackHint")}`);
 </script>
 
 <template>
@@ -23,7 +25,7 @@ const message = computed(() => {
     <TButton
       size="small"
       variant="text"
-      theme="primary"
+      theme="default"
       :loading="loading"
       :disabled="availability !== 'available'"
       @click="load"
@@ -31,24 +33,42 @@ const message = computed(() => {
         t(status === "loaded" ? "format.localFontsRefresh" : "format.localFontsAction")
       }}</TButton
     >
-    <span class="local-font-access__hint" role="status">{{ message }}</span>
-    <span class="local-font-access__hint">{{ t("format.fontFallbackHint") }}</span>
+    <span
+      class="local-font-access__info"
+      role="img"
+      tabindex="0"
+      :title="description"
+      :aria-label="description"
+      ><Info aria-hidden="true"
+    /></span>
+    <span class="ui-visually-hidden" role="status">{{ message }}</span>
   </div>
 </template>
 
 <style scoped lang="scss">
 .local-font-access {
-  display: grid;
-  justify-items: start;
-  gap: 4px;
-  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 14px 4px 6px;
+  border-top: 1px solid var(--sheetcraft-border-subtle);
   min-width: 0;
-  &__hint {
+  &__info {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
     color: var(--sheetcraft-text-secondary);
-    font-size: var(--sheetcraft-font-size-body-small);
-    line-height: var(--sheetcraft-line-height-body-small);
-    white-space: normal;
-    overflow-wrap: anywhere;
+    cursor: help;
+
+    svg {
+      width: var(--sheetcraft-action-icon-size);
+      height: var(--sheetcraft-action-icon-size);
+      stroke-width: var(--sheetcraft-icon-stroke-width);
+    }
   }
 }
 </style>
