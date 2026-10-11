@@ -120,6 +120,7 @@ function toggleMenu(): void {
   padding: 0;
   border-radius: var(--sheetcraft-radius-default);
 
+  &:has(> [aria-pressed="true"][aria-disabled="false"])::after,
   &:has(> [aria-disabled="false"]:hover)::after,
   &:has(> [aria-expanded="true"][aria-disabled="false"])::after {
     position: absolute;
