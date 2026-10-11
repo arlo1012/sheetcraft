@@ -1,3 +1,10 @@
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { getPictureObjectOriginCell } from "@sheetcraft/core/picture-object-sheet";
+import { resolvePictureFrame } from "@sheetcraft/core/picture-frame";
+import {
+  createPictureSheetMetrics,
+  locatePictureAxisPoint,
+} from "@sheetcraft/core/picture-axis-metrics";
 import { getPivotTableRange } from "@sheetcraft/core/pivot-tables";
 import {
   MAX_SHEET_COLUMNS,
@@ -65,7 +72,25 @@ export function getSheetContentExtent(sheet: Sheet): GridExtent {
       hiddenColumns: sheet.hiddenColumns,
     });
     const total = geometry.getTotalSize();
+    const pictureMetrics = sheet.floatingImages.some(isFramedPictureObject)
+      ? createPictureSheetMetrics(sheet)
+      : undefined;
     for (const image of sheet.floatingImages) {
+      if (isFramedPictureObject(image)) {
+        include(getPictureObjectOriginCell(image, sheet));
+        const bounds = resolvePictureFrame(image.frame, pictureMetrics!).bounds;
+        include({
+          row: Math.min(
+            MAX_SHEET_ROWS - 1,
+            locatePictureAxisPoint(bounds.y + bounds.height, pictureMetrics!.rows).index,
+          ),
+          column: Math.min(
+            MAX_SHEET_COLUMNS - 1,
+            locatePictureAxisPoint(bounds.x + bounds.width, pictureMetrics!.columns).index,
+          ),
+        });
+        continue;
+      }
       include(image.anchor);
       const anchor = geometry.getCellRect(image.anchor);
       const end = geometry.getCellAtPoint({

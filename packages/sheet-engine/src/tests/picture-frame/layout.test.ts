@@ -81,6 +81,22 @@ describe("prepared picture frame viewport geometry", () => {
     const badRows = createRowVisibilityIndex({ rowCount: 20, defaultRowHeight: 20 });
     expect(() => createPictureViewMetrics(f.sheet, f.geometry, badRows)).toThrow(/default height/);
   });
+  test("verified automatic row heights are view metrics, not guessed default dimensions", () => {
+    const f = fixture();
+    const effective = new Map([[0, 60]]);
+    const rows = createRowVisibilityIndex({
+      rowCount: 20,
+      defaultRowHeight: 24,
+      rowHeights: new Map([...f.sheet.rowHeights, ...effective]),
+    });
+    expect(() => createPictureViewMetrics(f.sheet, f.geometry, rows)).toThrow(/default height/);
+    const metrics = createPictureViewMetrics(f.sheet, f.geometry, rows, {
+      effectiveRowHeights: effective,
+    });
+    expect(metrics.rows.visiblePrefix(1)).toBe(60);
+    expect(metrics.rows.nominalSize(0)).toBe(24);
+    expect(metrics.rows.visiblePrefix(20)).toBe(rows.getTotalHeight());
+  });
   test("uses real hidden boundary origins without losing nominal sizes", () => {
     const f = fixture({ hiddenRows: [4], derivedHidden: true });
     expect(f.layout.getCellRect({ row: 4, column: 2 })).toBeNull();

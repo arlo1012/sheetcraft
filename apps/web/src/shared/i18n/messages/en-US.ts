@@ -819,6 +819,8 @@ export const enUS = {
     localOnly: "Saved in this browser. Export a JSON file to keep a separate backup.",
     unavailable:
       "Local storage is unavailable. Your edits are still here; export a JSON file to keep them.",
+    unsupportedPictures:
+      "This document uses picture frames that are not yet supported in this view. The saved document and your current workbook are preserved.",
     invalidSnapshot:
       "The local document could not be opened. Your saved data is preserved and automatic saving is paused. Retry, import a backup, or discard the old data and start blank.",
     conflict:

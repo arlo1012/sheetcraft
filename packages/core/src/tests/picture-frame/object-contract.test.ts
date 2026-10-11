@@ -84,18 +84,16 @@ describe("prepared picture object contract", () => {
     expect(clonePictureObject(image)).toEqual(image);
     expect(arePictureObjectsEqual(image, clonePictureObject(image))).toBe(true);
   });
-  test("prepared framed types cannot enter current commands or snapshots", () => {
+  test("strict commands and internal snapshots preserve framed geometry but reject dual truth", () => {
     const conflict = { ...legacy(), frame: framed().frame };
-    expect(() => normalizeFloatingImageForSheet(conflict)).toThrow(/persistence/);
-    expect(() =>
-      createSetFloatingImageCommand("sheet", framed() as unknown as LegacyFloatingImage),
-    ).toThrow();
+    expect(() => normalizeFloatingImageForSheet(conflict)).toThrow(/conflicting/);
+    expect(createSetFloatingImageCommand("sheet", framed()).image).toEqual(framed());
     const sheet = createSheet("Synthetic", "sheet");
-    sheet.floatingImages = [legacy()];
+    sheet.floatingImages = [legacy(), { ...framed(), id: "frame" }];
     const raw = serializeSheet(sheet);
     const bad = structuredClone(raw);
     Object.assign(bad.floatingImages[0]!, { frame: framed().frame });
-    expect(() => deserializeSheet(bad)).toThrow(/Framed pictures/);
-    expect(deserializeSheet(raw).floatingImages).toEqual([legacy()]);
+    expect(() => deserializeSheet(bad)).toThrow(/conflicting/);
+    expect(deserializeSheet(raw).floatingImages).toEqual(sheet.floatingImages);
   });
 });

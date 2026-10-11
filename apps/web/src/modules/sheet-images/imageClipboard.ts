@@ -1,4 +1,13 @@
-import { normalizeFloatingImageForSheet, type FloatingImage } from "@sheetcraft/core/workbook";
+import {
+  requireLegacyPicture,
+  requireLegacyPictures,
+  UnsupportedPictureDocumentError,
+} from "./picture-document-support";
+import {
+  normalizeFloatingImageForSheet,
+  type FloatingImage,
+  type LegacyFloatingImage,
+} from "@sheetcraft/core/workbook";
 
 export const FLOATING_IMAGE_CLIPBOARD_TYPE = "application/x-sheetcraft-floating-image";
 const GROUP_COORDINATE_SPACE = "group-relative-sheet-pixels-v1";
@@ -6,12 +15,18 @@ export type FloatingImageTransfer = {
   floatingImage?: FloatingImage;
   floatingImages?: FloatingImage[];
   invalidFloatingImage?: boolean;
+  unsupportedFloatingImage?: boolean;
 };
 
 /** A shared anchor makes relative pixel gaps provable without source sheet metrics. */
-export function normalizeClipboardImageGroup(images: readonly FloatingImage[]): FloatingImage[] {
+export function normalizeClipboardImageGroup(
+  images: readonly FloatingImage[],
+): LegacyFloatingImage[] {
   if (images.length < 2 || images.length > 100) throw new Error("Invalid picture group size.");
-  const result = images.map((image) => normalizeFloatingImageForSheet(image));
+  const normalized = images.map((image) => normalizeFloatingImageForSheet(image));
+  if (new Set(normalized.map((image) => image.id)).size !== normalized.length)
+    throw new Error("Duplicate group picture identity.");
+  const result = requireLegacyPictures(normalized);
   const anchor = result[0]!.anchor;
   if (
     new Set(result.map((image) => image.id)).size !== result.length ||
@@ -32,24 +47,34 @@ export function readFloatingImageTransfer(
   if (value.length > 2_000_000) return { invalidFloatingImage: true };
   try {
     const { clipboardImages, clipboardCoordinateSpace, ...image } = JSON.parse(value);
-    const floatingImage = normalizeFloatingImageForSheet(image as FloatingImage);
-    if (clipboardImages === undefined) return { floatingImage };
+    const primary = normalizeFloatingImageForSheet(image as FloatingImage);
+    if (clipboardImages === undefined) return { floatingImage: requireLegacyPicture(primary) };
     if (
       !Array.isArray(clipboardImages) ||
+      clipboardImages.length < 2 ||
+      clipboardImages.length > 100 ||
       (clipboardCoordinateSpace !== undefined &&
         clipboardCoordinateSpace !== GROUP_COORDINATE_SPACE)
     )
       throw new Error("Invalid group payload.");
-    const floatingImages = normalizeClipboardImageGroup(clipboardImages);
+    const normalized = clipboardImages.map((member) =>
+      normalizeFloatingImageForSheet(member as FloatingImage),
+    );
     if (
-      !floatingImages.some(
-        (member) => member.id === floatingImage.id && member.assetId === floatingImage.assetId,
-      )
+      new Set(normalized.map((member) => member.id)).size !== normalized.length ||
+      !normalized.some((member) => member.id === primary.id && member.assetId === primary.assetId)
     )
-      throw new Error("The primary picture is missing from the group.");
+      throw new Error("Invalid group identities.");
+    const floatingImages = normalizeClipboardImageGroup(normalized);
+    const floatingImage = requireLegacyPicture(primary);
     return { floatingImage, floatingImages };
-  } catch {
-    return { invalidFloatingImage: true };
+  } catch (error) {
+    return {
+      invalidFloatingImage: true,
+      ...(error instanceof UnsupportedPictureDocumentError
+        ? { unsupportedFloatingImage: true }
+        : {}),
+    };
   }
 }
 
@@ -69,6 +94,8 @@ export function serializeFloatingImageClipboard(
   image: FloatingImage,
   images?: readonly FloatingImage[],
 ): string {
+  requireLegacyPicture(image);
+  if (images) requireLegacyPictures(images);
   return JSON.stringify(
     images && images.length > 1
       ? {

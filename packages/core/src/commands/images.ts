@@ -1,3 +1,5 @@
+import { isFramedPictureObject } from "../picture-object.js";
+import { assertPictureObjectsForSheet } from "../picture-object-sheet.js";
 import {
   cloneFloatingImage,
   getCellContent,
@@ -99,6 +101,7 @@ export function applySetFloatingImageCommand(
 ): SetFloatingImageCommand | DeleteFloatingImageCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const image = normalizeCommandFloatingImage(command.image);
+  assertPictureObjectsForSheet([image], sheet);
   const index = sheet.floatingImages.findIndex((candidate) => candidate.id === image.id);
   const previous = index < 0 ? undefined : sheet.floatingImages[index];
   if (
@@ -158,6 +161,12 @@ export function applyConvertFloatingImageToCellCommand(
   if (index < 0) return null;
   const image = sheet.floatingImages[index];
   if (!image) return null;
+  if (isFramedPictureObject(image))
+    throw invalidCommandPayload(
+      "image.frame",
+      image.frame,
+      "Converting a framed picture to a cell is not yet supported.",
+    );
   const address = getMergedCellAnchor(sheet.mergedCells, image.anchor) ?? image.anchor;
   const content = getCellContent(sheet, address);
   sheet.floatingImages.splice(index, 1);
@@ -215,6 +224,12 @@ export function applyRestoreFloatingImageToCellCommand(
 ): ConvertFloatingImageToCellCommand {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const image = normalizeCommandFloatingImage(command.image);
+  if (isFramedPictureObject(image))
+    throw invalidCommandPayload(
+      "image.frame",
+      image.frame,
+      "Restoring a framed cell conversion is not supported.",
+    );
   assertCellAddress(command.address);
   if (
     !Number.isInteger(command.index) ||
@@ -248,6 +263,7 @@ export function applySetSheetFloatingImagesCommand(
 ): SetSheetFloatingImagesCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const next = createSetSheetFloatingImagesCommand(command.sheetId, command.images);
+  assertPictureObjectsForSheet(next.images, sheet);
   if (JSON.stringify(sheet.floatingImages) === JSON.stringify(next.images)) return null;
   const inverse = createSetSheetFloatingImagesCommand(command.sheetId, sheet.floatingImages);
   sheet.floatingImages = next.images;

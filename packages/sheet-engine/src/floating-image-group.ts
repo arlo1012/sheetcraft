@@ -1,9 +1,11 @@
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import {
   MAX_FLOATING_IMAGE_SIZE,
   MIN_FLOATING_IMAGE_SIZE,
   cloneFloatingImage,
   normalizeImageTransform,
   type FloatingImage,
+  type LegacyFloatingImage,
 } from "@sheetcraft/core/workbook";
 import {
   getFloatingImageSheetRect,
@@ -16,12 +18,13 @@ import type { SheetViewportLayout } from "./viewport-layout.js";
 import type { Rect } from "./geometry.js";
 
 function members(images: readonly FloatingImage[], layout: SheetViewportLayout) {
-  const entries = images.map((image) => ({
+  if (images.some(isFramedPictureObject)) return null;
+  const entries = (images as readonly LegacyFloatingImage[]).map((image) => ({
     image,
     rect: getFloatingImageSheetRect(image, layout),
   }));
   if (!entries.length || entries.some((entry) => !entry.rect)) return null;
-  return entries as Array<{ image: FloatingImage; rect: Rect }>;
+  return entries as Array<{ image: LegacyFloatingImage; rect: Rect }>;
 }
 function bounds(entries: Array<{ rect: Rect }>): Rect {
   const x = Math.min(...entries.map(({ rect }) => rect.x));
@@ -37,7 +40,7 @@ function bounds(entries: Array<{ rect: Rect }>): Rect {
 export function captureFloatingImageGroup(
   images: readonly FloatingImage[],
   layout: SheetViewportLayout,
-): FloatingImage[] | null {
+): LegacyFloatingImage[] | null {
   if (images.length > 100 || new Set(images.map((image) => image.id)).size !== images.length)
     return null;
   const entries = members(images, layout);
@@ -51,9 +54,9 @@ export function captureFloatingImageGroup(
   }));
 }
 function place(
-  entries: Array<{ image: FloatingImage; rect: Rect }>,
+  entries: Array<{ image: LegacyFloatingImage; rect: Rect }>,
   layout: SheetViewportLayout,
-): FloatingImage[] | null {
+): LegacyFloatingImage[] | null {
   const box = bounds(entries);
   const dx = Math.max(0, -box.x);
   const dy = Math.max(0, -box.y);
@@ -67,7 +70,7 @@ export function rotateFloatingImages(
   images: readonly FloatingImage[],
   turns: -1 | 1 | 2,
   layout: SheetViewportLayout,
-): FloatingImage[] | null {
+): LegacyFloatingImage[] | null {
   const entries = members(images, layout);
   if (!entries) return null;
   const box = bounds(entries);
@@ -101,7 +104,7 @@ export function flipFloatingImages(
   images: readonly FloatingImage[],
   axis: "horizontal" | "vertical",
   layout: SheetViewportLayout,
-): FloatingImage[] | null {
+): LegacyFloatingImage[] | null {
   const entries = members(images, layout);
   if (!entries) return null;
   const box = bounds(entries);
@@ -123,11 +126,11 @@ export function resizeFloatingImagesBy(
   direction: FloatingImageResizeDirection,
   delta: { x: number; y: number },
   layout: SheetViewportLayout,
-): FloatingImage[] | null {
+): LegacyFloatingImage[] | null {
   const entries = members(images, layout);
   if (!entries) return null;
   const box = bounds(entries);
-  const proxy = reanchorFloatingImageAtSheetRect(images[0]!, box, layout);
+  const proxy = reanchorFloatingImageAtSheetRect(entries[0]!.image, box, layout);
   if (!proxy) return null;
   const minScale = Math.max(
     ...entries.flatMap(({ rect }) => [

@@ -1,5 +1,6 @@
+import { requireLegacyPictures } from "./picture-document-support";
 import { createCanvasImageCache } from "../sheet-grid/canvas/image-painter";
-import type { FloatingImage, ImageTransform } from "@sheetcraft/core/workbook";
+import type { FloatingImage, LegacyFloatingImage, ImageTransform } from "@sheetcraft/core/workbook";
 import {
   getFloatingImageViewportFragments,
   type FloatingImageViewportFragment,
@@ -160,8 +161,8 @@ export type FloatingImagePaintPalette = Readonly<{
 export function getFloatingImageViewportFragmentsForPaint(
   images: readonly FloatingImage[],
   layout: SheetViewportLayout,
-): Array<FloatingImageViewportFragment & { image: FloatingImage }> {
-  return images
+): Array<FloatingImageViewportFragment & { image: LegacyFloatingImage }> {
+  return requireLegacyPictures(images)
     .filter((image) => !image.hidden)
     .flatMap((image) =>
       getFloatingImageViewportFragments(image, layout).map((fragment) => ({ ...fragment, image })),

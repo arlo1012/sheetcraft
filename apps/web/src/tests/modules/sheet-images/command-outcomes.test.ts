@@ -12,7 +12,11 @@ import {
   type WorkbookCommand,
 } from "@sheetcraft/core/commands";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
-import { getActiveSheet, setCellContent, type FloatingImage } from "@sheetcraft/core/workbook";
+import {
+  getActiveSheet,
+  setCellContent,
+  type LegacyFloatingImage as FloatingImage,
+} from "@sheetcraft/core/workbook";
 import {
   deserializeSheet,
   serializeSheet,

@@ -88,6 +88,7 @@ import { readXlsxCellNoteVmlBoxes, readXlsxCellNotes } from "./cell-notes.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
   createXlsxImageExporter,
+  assertSupportedXlsxPicture,
   type XlsxImageWorkbook,
   type XlsxImageWorksheet,
 } from "./image-export.js";
@@ -1110,6 +1111,12 @@ export async function encodeWithNativeXlsx(
   const report = new CompatibilityReportBuilder();
   const sheets = [...workbook.sheets.values()];
   if (!sheets.length) throw new RangeError("The workbook contains no worksheets.");
+  for (const sheet of sheets)
+    for (const image of sheet.floatingImages)
+      assertSupportedXlsxPicture(
+        image,
+        `${sheet.name}.floatingImages[${JSON.stringify(image.id)}].frame`,
+      );
   assertSupportedXlsxTableTotals(sheets, report);
   for (const sheet of sheets) {
     if (typeof sheet.properties.hidden !== "boolean")
@@ -1320,6 +1327,10 @@ export async function encodeWithNativeXlsx(
       );
     }
     for (const image of sheet.floatingImages) {
+      assertSupportedXlsxPicture(
+        image,
+        `${sheet.name}.floatingImages[${JSON.stringify(image.id)}].frame`,
+      );
       if (image.hidden) continue;
       const issueLocation = `${sheet.name}!${address(image.anchor.row, image.anchor.column)}`;
       imageExporter.addFloatingImage(output, sheet, image, issueLocation);

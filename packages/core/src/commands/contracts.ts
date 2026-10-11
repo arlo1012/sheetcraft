@@ -770,7 +770,7 @@ export type SheetAxisSparseSlice = {
   /** Hidden indexes removed by the structural operation. */
   hiddenIndexes?: number[];
   /** Images removed from the structural operation, preserving their sheet order. */
-  floatingImages: Array<{ image: FloatingImage; index: number }>;
+  floatingImages: Array<{ image: import("../workbook.js").LegacyFloatingImage; index: number }>;
   /** Complete ordered pictures, including retained objects changed by reflow. */
   floatingImageState?: FloatingImage[];
   /** Exact raw formula sources before the structural change, for lossless undo. */

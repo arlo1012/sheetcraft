@@ -3,7 +3,7 @@ import {
   createWorkbook,
   getActiveSheet,
   getCellContent,
-  type FloatingImage,
+  type LegacyFloatingImage as FloatingImage,
 } from "@sheetcraft/core/workbook";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";

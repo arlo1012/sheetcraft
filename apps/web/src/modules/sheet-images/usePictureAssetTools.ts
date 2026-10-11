@@ -1,3 +1,5 @@
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { requireLegacyPictures } from "./picture-document-support";
 import { getCurrentScope, onScopeDispose, readonly, ref } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import {
@@ -37,10 +39,18 @@ export function usePictureAssetTools(options: {
       .getSheet()
       .floatingImages.filter((image) => all || options.getSelectedIds().includes(image.id));
   }
+  function legacyPictures(all = false) {
+    try {
+      return requireLegacyPictures(pictures(all));
+    } catch {
+      options.feedback("picture.assetFailed", true);
+      return null;
+    }
+  }
   async function exportPictures(format: PictureFileFormat, all = false): Promise<void> {
     if (busy.value || options.isBusy()) return;
-    const selected = pictures(all);
-    if (!selected.length) return;
+    const selected = legacyPictures(all);
+    if (!selected?.length) return;
     busy.value = true;
     try {
       const files: Record<string, Uint8Array> = {};
@@ -89,8 +99,8 @@ export function usePictureAssetTools(options: {
     const sheet = options.getSheet();
     const generation = options.getGeneration?.() ?? 0;
     if (!canUseSheetPermission(sheet, "editObjects")) return false;
-    const selected = pictures(settings.all);
-    if (!selected.length) return false;
+    const selected = legacyPictures(settings.all);
+    if (!selected?.length) return false;
     busy.value = true;
     const valid = () =>
       options.getWorkbook() === workbook &&
@@ -102,7 +112,10 @@ export function usePictureAssetTools(options: {
       canUseSheetPermission(sheet, "editObjects") &&
       selected.every((image) =>
         sheet.floatingImages.some(
-          (current) => current.id === image.id && current.assetId === image.assetId,
+          (current) =>
+            current.id === image.id &&
+            current.assetId === image.assetId &&
+            !isFramedPictureObject(current),
         ),
       );
     try {
@@ -155,8 +168,8 @@ export function usePictureAssetTools(options: {
   }
   async function printPictures(): Promise<void> {
     if (busy.value || options.isBusy()) return;
-    const selected = pictures();
-    if (!selected.length) return;
+    const selected = legacyPictures();
+    if (!selected?.length) return;
     const popup = window.open("", "_blank");
     if (!popup) {
       options.feedback("picture.assetFailed", true);

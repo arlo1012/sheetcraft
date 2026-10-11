@@ -1,3 +1,4 @@
+import { getPictureObjectOriginCell } from "@sheetcraft/core/picture-object-sheet";
 import {
   createBatchDeleteSheetAxesCommand,
   createDeleteCellsCommand,
@@ -50,7 +51,8 @@ function hasNonblankContent(sheet: Sheet, rowStart: number, rowEnd: number): Set
     }
   }
   for (const image of sheet.floatingImages) {
-    if (image.anchor.row >= rowStart && image.anchor.row <= rowEnd) nonempty.add(image.anchor.row);
+    const row = getPictureObjectOriginCell(image, sheet).row;
+    if (row >= rowStart && row <= rowEnd) nonempty.add(row);
   }
   // Preserve every row participating in a merge. Coalesce row intervals first so
   // a stack of wide merges does not repeatedly scan the same selected rows.

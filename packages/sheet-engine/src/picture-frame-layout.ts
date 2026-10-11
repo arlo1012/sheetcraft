@@ -31,6 +31,7 @@ export function createPictureViewMetrics(
   sheet: Sheet,
   geometry: SheetGeometry,
   rows: RowVisibilityIndex,
+  options: { effectiveRowHeights?: ReadonlyMap<number, number> } = {},
 ): PictureSheetMetrics {
   if (geometry.rowCount !== rows.rowCount)
     throw new RangeError("Picture row metrics must share the viewport's logical count.");
@@ -42,7 +43,10 @@ export function createPictureViewMetrics(
       "Picture view geometry must use the worksheet's unscaled default dimensions.",
     );
   let defaultRow = rows.getLogicalRow(0);
-  while (defaultRow !== null && sheet.rowHeights.has(defaultRow))
+  while (
+    defaultRow !== null &&
+    (sheet.rowHeights.has(defaultRow) || options.effectiveRowHeights?.has(defaultRow))
+  )
     defaultRow = rows.getNextVisibleRow(defaultRow);
   if (defaultRow !== null && rows.getVisibleRow(defaultRow)!.height !== DEFAULT_ROW_HEIGHT)
     throw new RangeError("Picture row visibility must use the worksheet's default height.");

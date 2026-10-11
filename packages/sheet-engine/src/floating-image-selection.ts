@@ -1,7 +1,9 @@
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import {
   cloneFloatingImage,
   MAX_FLOATING_IMAGE_SIZE,
   type FloatingImage,
+  type LegacyFloatingImage,
 } from "@sheetcraft/core/workbook";
 import {
   getFloatingImageSheetRect,
@@ -19,7 +21,7 @@ export function resizeFloatingImageSelectionBy(
   delta: { x: number; y: number },
   layout: SheetViewportLayout,
   minActiveSize = 24,
-): FloatingImage[] | null {
+): LegacyFloatingImage[] | null {
   if (!["n", "s", "e", "w", "nw", "ne", "sw", "se"].includes(direction))
     throw new TypeError("Invalid image selection resize handle.");
   if (!Number.isFinite(delta.x) || !Number.isFinite(delta.y))
@@ -32,19 +34,21 @@ export function resizeFloatingImageSelectionBy(
     throw new RangeError("Invalid image selection resize minimum.");
   if (!images.length || new Set(images.map((image) => image.id)).size !== images.length)
     return null;
-  const active = images.find((image) => image.id === activeId);
+  if (images.some(isFramedPictureObject)) return null;
+  const legacy = images as readonly LegacyFloatingImage[];
+  const active = legacy.find((image) => image.id === activeId);
   if (!active) return null;
-  const entries = images.map((image) => ({
+  const entries = legacy.map((image) => ({
     image,
     rect: getFloatingImageSheetRect(image, layout),
   }));
   if (entries.some((entry) => !entry.rect)) return null;
-  if (delta.x === 0 && delta.y === 0) return [...images];
+  if (delta.x === 0 && delta.y === 0) return [...legacy];
   if (
     ((direction === "e" || direction === "w") && delta.x === 0) ||
     ((direction === "n" || direction === "s") && delta.y === 0)
   )
-    return [...images];
+    return [...legacy];
   const corner = direction.length === 2;
   const locked = corner && (active.lockAspectRatio ?? true);
   const resized = resizeFloatingImageBy(active, direction, delta, layout, {
@@ -87,7 +91,7 @@ export function resizeFloatingImageSelectionBy(
     scaleX = changesWidth ? clamp(scaleX, rx.lower, rx.upper) : 1;
     scaleY = changesHeight ? clamp(scaleY, ry.lower, ry.upper) : 1;
   }
-  if (scaleX === 1 && scaleY === 1) return [...images];
+  if (scaleX === 1 && scaleY === 1) return [...legacy];
   const next = entries.map(({ image, rect }) => {
     const width = Math.min(MAX_FLOATING_IMAGE_SIZE, Math.max(1, rect!.width * scaleX));
     const height = Math.min(MAX_FLOATING_IMAGE_SIZE, Math.max(1, rect!.height * scaleY));

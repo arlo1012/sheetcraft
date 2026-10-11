@@ -1,3 +1,7 @@
+import {
+  assertWorkbookPictureSupport,
+  UnsupportedPictureDocumentError,
+} from "../sheet-images/picture-document-support";
 import { computed, onScopeDispose, ref, watch, type ComputedRef, type Ref } from "vue";
 import { WorkbookDomainError } from "@sheetcraft/core/errors";
 import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
@@ -8,6 +12,7 @@ import { WorkbookStoreError, type PersistedWorkbook, type WorkbookStore } from "
 export type WorkbookPersistenceError =
   | "unavailable"
   | "invalid-snapshot"
+  | "unsupported-picture-frame"
   | "invalid-record"
   | "conflict"
   | "quota";
@@ -55,6 +60,7 @@ function toPersistenceError(
   error: unknown,
   fallback: WorkbookPersistenceError,
 ): WorkbookPersistenceError {
+  if (error instanceof UnsupportedPictureDocumentError) return "unsupported-picture-frame";
   if (error instanceof WorkbookStoreError) {
     return error.code;
   }
@@ -93,6 +99,7 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
     return savedAt.value === undefined ? "idle" : "saved";
   });
 
+  let knownUnsupportedPictureRecovery = false;
   let expectedRevision: number | undefined;
   let saveRequest: SaveRequest | undefined;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -132,7 +139,8 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
   }
 
   function blockAutomaticSaving(nextError: WorkbookPersistenceError): void {
-    error.value = nextError;
+    if (nextError === "unsupported-picture-frame") knownUnsupportedPictureRecovery = true;
+    error.value = knownUnsupportedPictureRecovery ? "unsupported-picture-frame" : nextError;
     automaticSavingBlocked = true;
     cancelQueuedSave();
   }
@@ -230,6 +238,7 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
         return "failed";
       }
       if (record === undefined) {
+        knownUnsupportedPictureRecovery = false;
         expectedRevision = undefined;
         savedAt.value = undefined;
         error.value = undefined;
@@ -242,7 +251,9 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
       }
       expectedRevision = record.revision;
       const workbook = deserializeWorkbook(record.snapshot);
+      assertWorkbookPictureSupport(workbook);
       replaceFromPersistence(workbook);
+      knownUnsupportedPictureRecovery = false;
       expectedRevision = record.revision;
       savedAt.value = record.savedAt;
       dirty.value = false;
@@ -284,9 +295,11 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
       return false;
     }
     if (
+      knownUnsupportedPictureRecovery ||
       error.value === "conflict" ||
       error.value === "invalid-record" ||
-      error.value === "invalid-snapshot"
+      error.value === "invalid-snapshot" ||
+      error.value === "unsupported-picture-frame"
     ) {
       return false;
     }
@@ -327,21 +340,31 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
     });
   }
 
+  function assertStoredPictureRecoveryCanBeReplaced(): void {
+    if (knownUnsupportedPictureRecovery || error.value === "unsupported-picture-frame")
+      throw new UnsupportedPictureDocumentError("saved-recovery", []);
+  }
+
   async function replaceDocument(workbook: Workbook): Promise<void> {
+    assertStoredPictureRecoveryCanBeReplaced();
+    assertWorkbookPictureSupport(workbook);
     await queueDocumentOperation(async () => {
       if (disposed) {
         return;
       }
+      await waitForActiveSave();
+      if (disposed) return;
+      assertStoredPictureRecoveryCanBeReplaced();
+      assertWorkbookPictureSupport(workbook);
       loading.value = true;
       cancelQueuedSave();
-      await waitForActiveSave();
       if (disposed) {
         return;
       }
-      replaceFromPersistence(workbook);
-      dirty.value = true;
-      savedAt.value = undefined;
       try {
+        replaceFromPersistence(workbook);
+        dirty.value = true;
+        savedAt.value = undefined;
         const request: SaveRequest = {
           revision: options.getRevision(),
           snapshot: serializeWorkbook(options.getWorkbook()),
@@ -376,8 +399,15 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
   }
 
   async function resetDocument(): Promise<boolean> {
+    if (knownUnsupportedPictureRecovery || error.value === "unsupported-picture-frame")
+      return false;
     return queueDocumentOperation(async () => {
-      if (disposed) return false;
+      if (
+        disposed ||
+        knownUnsupportedPictureRecovery ||
+        error.value === "unsupported-picture-frame"
+      )
+        return false;
       loading.value = true;
       cancelQueuedSave();
       await waitForActiveSave();

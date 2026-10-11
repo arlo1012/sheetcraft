@@ -1,5 +1,10 @@
+import { requireLegacyPicture } from "../../../../modules/sheet-images/picture-document-support";
 import { describe, expect, test, vi } from "vitest";
-import { createWorkbook, getActiveSheet, type FloatingImage } from "@sheetcraft/core/workbook";
+import {
+  createWorkbook,
+  getActiveSheet,
+  type LegacyFloatingImage as FloatingImage,
+} from "@sheetcraft/core/workbook";
 import type { MessageKey } from "../../../../shared/i18n";
 import type { GridClipboardPort } from "../../../../modules/sheet-grid/gridClipboardPort";
 import { useFloatingImageClipboard } from "../../../../modules/sheet-images/useFloatingImageClipboard";
@@ -37,9 +42,10 @@ function createFixture() {
     clipboardPort: port,
     onCopy: vi.fn(),
     onFeedback: (key) => feedback.push(key),
-    onPaste: (nextImage, mode, address) => pasted.push({ image: nextImage, mode, address }),
+    onPaste: (nextImage, mode, address) =>
+      pasted.push({ image: requireLegacyPicture(nextImage), mode, address }),
     onMove: (nextImage) => {
-      moved.push(nextImage);
+      moved.push(requireLegacyPicture(nextImage));
       return true;
     },
   });

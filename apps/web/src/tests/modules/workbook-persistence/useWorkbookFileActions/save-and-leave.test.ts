@@ -1,3 +1,5 @@
+import { createWorkbook } from "@sheetcraft/core/workbook";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createWorkbookFile, mountFileActions } from "./fixture";
 
@@ -45,9 +47,15 @@ describe("useWorkbookFileActions save and leave", () => {
     expect(fixture.persistence.saveNow).toHaveBeenCalledOnce();
   });
 
-  test("does not save, export, or import while IME composition blocks flushing", async () => {
+  test("does not save, export, replace or commit while IME composition blocks flushing", async () => {
     const fixture = mountActions({ flushPendingEdits: () => false });
-    const file = createWorkbookFile(vi.fn(async () => "{}"));
+    const file = createWorkbookFile(
+      vi.fn(async () =>
+        JSON.stringify(
+          serializeWorkbook(createWorkbook({ id: "candidate", sheetId: "candidate-sheet" })),
+        ),
+      ),
+    );
 
     await fixture.actions.save();
     fixture.actions.exportJson();
@@ -55,7 +63,9 @@ describe("useWorkbookFileActions save and leave", () => {
 
     expect(fixture.persistence.saveNow).not.toHaveBeenCalled();
     expect(mocks.downloadWorkbookJson).not.toHaveBeenCalled();
-    expect(file.text).not.toHaveBeenCalled();
+    expect(file.text).toHaveBeenCalledOnce();
+    expect(fixture.persistence.replaceDocument).not.toHaveBeenCalled();
+    expect(fixture.actions.confirmation.value).toBeUndefined();
     expect(fixture.actions.feedback.value).toEqual({
       key: "persistence.finishEditing",
       error: true,

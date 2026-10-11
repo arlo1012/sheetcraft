@@ -1,3 +1,4 @@
+import { framedPicture } from "../../sheet-images/framed-picture-fixture";
 import {
   createWorkbook,
   getActiveSheet,
@@ -30,6 +31,28 @@ afterEach(() => {
 });
 
 describe("workbook JSON transfer", () => {
+  test("unsupported frame documents reject before portable resource validation or storage writes", async () => {
+    const workbook = createTestWorkbook();
+    getActiveSheet(workbook).floatingImages = [framedPicture()];
+    const snapshot = serializeWorkbook(workbook),
+      text = JSON.stringify(snapshot);
+    expect(() => parseWorkbookJson(text)).toThrow(
+      expect.objectContaining({ code: "unsupported-picture-frame" }),
+    );
+    const assetStore = { get: vi.fn(async () => undefined), put: vi.fn(async () => {}) };
+    await expect(
+      readWorkbookBundleFile(
+        {
+          text: async () =>
+            JSON.stringify({ format: "sheetcraft-workbook", version: 1, snapshot, images: [] }),
+        },
+        assetStore,
+      ),
+    ).rejects.toMatchObject({ code: "unsupported-picture-frame" });
+    expect(assetStore.get).not.toHaveBeenCalled();
+    expect(assetStore.put).not.toHaveBeenCalled();
+    expect(serializeWorkbook(workbook)).toEqual(snapshot);
+  });
   test("parses a current workbook snapshot through Core", () => {
     const workbook = createTestWorkbook();
 

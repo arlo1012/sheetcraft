@@ -29,7 +29,7 @@ export type PictureSourceFrame = {
   offsetXRatio: number;
   offsetYRatio: number;
 };
-/** Independent geometry contract. Persisted FloatingImage writes are not enabled by this type. */
+/** One canonical local frame; persistence and view adapters consume it explicitly. */
 export type PictureFrame = {
   kind: "object-frame-v1";
   anchor: PictureFrameAnchor;

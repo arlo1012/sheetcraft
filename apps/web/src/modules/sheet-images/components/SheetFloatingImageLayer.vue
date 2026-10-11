@@ -22,6 +22,7 @@ import {
   cloneFloatingImage,
   areFloatingImageCollectionsEqual,
   type FloatingImage,
+  type LegacyFloatingImage,
 } from "@sheetcraft/core/workbook";
 import {
   moveFloatingImageBy,
@@ -43,6 +44,7 @@ import type { PictureAlignment, PictureAlignmentReference } from "../usePictureT
 import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import SheetFloatingImageContextMenu from "./SheetFloatingImageContextMenu.vue";
 import SheetFloatingImageSelection from "../../../shared/sheet-objects/SheetObjectSelection.vue";
+import { requireLegacyPictures } from "../picture-document-support";
 import type { DrawingThemeEffects } from "../drawing-theme-effects";
 
 import { useFloatingImageEditing } from "../useFloatingImageEditing";
@@ -86,15 +88,17 @@ const props = withDefaults(
   { readOnly: false, scale: 1, previewOnDoubleClick: true },
 );
 
+const legacyImages = computed(() => requireLegacyPictures(props.images));
+
 const emit = defineEmits<{
   select: [id: string | null, additive?: boolean];
-  updateMany: [images: FloatingImage[]];
-  update: [image: FloatingImage];
+  updateMany: [images: LegacyFloatingImage[]];
+  update: [image: LegacyFloatingImage];
   group: [ids: string[]];
   feedback: [key: MessageKey];
   delete: [id: string];
   convertToCell: [id: string];
-  preview: [image: FloatingImage, trigger?: HTMLElement];
+  preview: [image: LegacyFloatingImage, trigger?: HTMLElement];
   copy: [id: string];
   cut: [id: string];
   paste: [id: string];
@@ -102,8 +106,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-function commitImages(images: FloatingImage[]): void {
-  const current = images.map((image) => props.images.find((entry) => entry.id === image.id));
+function commitImages(images: LegacyFloatingImage[]): void {
+  const current = images.map((image) => legacyImages.value.find((entry) => entry.id === image.id));
   if (
     current.every((image) => image !== undefined) &&
     areFloatingImageCollectionsEqual(current as FloatingImage[], images)
@@ -120,10 +124,10 @@ function commitImages(images: FloatingImage[]): void {
   }
 }
 
-type ImageFragment = FloatingImageViewportFragment & { image: FloatingImage };
+type ImageFragment = FloatingImageViewportFragment & { image: LegacyFloatingImage };
 type Gesture = {
-  image: FloatingImage;
-  images: FloatingImage[];
+  image: LegacyFloatingImage;
+  images: LegacyFloatingImage[];
   mode: "move" | FloatingImageResizeDirection;
   pointerId: number;
   focusTarget: HTMLElement;
@@ -144,8 +148,8 @@ type ContextMenuState = {
 };
 
 const gesture = shallowRef<Gesture>();
-const previewImage = shallowRef<FloatingImage>();
-const previewImages = shallowRef<FloatingImage[]>([]);
+const previewImage = shallowRef<LegacyFloatingImage>();
+const previewImages = shallowRef<LegacyFloatingImage[]>([]);
 const selectedIds = computed(
   () =>
     new Set([
@@ -158,7 +162,7 @@ const contextMenu = shallowRef<ContextMenuState>();
 const paintRevision = ref(0);
 let pointerSession: PointerSession | undefined;
 const selectedImage = computed(() =>
-  props.images.find((image) => image.id === props.selectedImageId),
+  legacyImages.value.find((image) => image.id === props.selectedImageId),
 );
 const owners = new WeakMap<object, number>();
 const defaultOwner = {};
@@ -177,7 +181,7 @@ const selectionKey = computed(() =>
     ownerKey(),
     props.selectedImageId,
     [...selectedIds.value].map((id) => {
-      const image = props.images.find((entry) => entry.id === id);
+      const image = legacyImages.value.find((entry) => entry.id === id);
       return [id, image?.assetId, image?.groupId];
     }),
   ]),
@@ -185,7 +189,7 @@ const selectionKey = computed(() =>
 const selectedGroup = computed(() => {
   const groupId = selectedImage.value?.groupId;
   if (!groupId || selectedIds.value.size < 2) return false;
-  const members = props.images.filter((image) => image.groupId === groupId);
+  const members = legacyImages.value.filter((image) => image.groupId === groupId);
   return (
     members.length === selectedIds.value.size &&
     members.every((image) => selectedIds.value.has(image.id))
@@ -278,18 +282,18 @@ const groupFragments = computed<ImageFragment[]>(() => {
   return proxy ? getFloatingImageViewportFragmentsForPaint([proxy], props.layout) : [];
 });
 
-function displayImages(): readonly FloatingImage[] {
-  return props.images.map(displayImage);
+function displayImages(): readonly LegacyFloatingImage[] {
+  return legacyImages.value.map(displayImage);
 }
 
-function displayImage(image: FloatingImage): FloatingImage {
+function displayImage(image: LegacyFloatingImage): LegacyFloatingImage {
   return (
     previewImages.value.find((entry) => entry.id === image.id) ??
     (previewImage.value?.id === image.id ? previewImage.value : image)
   );
 }
 
-function cloneImage(image: FloatingImage): FloatingImage {
+function cloneImage(image: LegacyFloatingImage): LegacyFloatingImage {
   return cloneFloatingImage(image);
 }
 
@@ -307,7 +311,7 @@ function getFragmentKey(fragment: ImageFragment): string {
   return `${fragment.image.id}:${fragment.paneId}`;
 }
 
-function getAccessibleLabel(image: FloatingImage): string {
+function getAccessibleLabel(image: LegacyFloatingImage): string {
   if (props.assetUrls.has(image.assetId)) return image.altText || t("image.floatingAlt");
   return props.loadingAssetIds?.has(image.assetId)
     ? t("image.loading")
@@ -335,7 +339,7 @@ function cancelPointerSession(): void {
 }
 
 function startGesture(
-  image: FloatingImage,
+  image: LegacyFloatingImage,
   mode: Gesture["mode"],
   event: PointerEvent,
   startPoint = getLayerPoint(event),
@@ -352,9 +356,9 @@ function startGesture(
     return;
   }
   const group = selectedIds.value.has(image.id)
-    ? props.images.filter((entry) => selectedIds.value.has(entry.id))
+    ? legacyImages.value.filter((entry) => selectedIds.value.has(entry.id))
     : image.groupId
-      ? props.images.filter((entry) => entry.groupId === image.groupId)
+      ? legacyImages.value.filter((entry) => entry.groupId === image.groupId)
       : [image];
   emit("select", image.id);
   focusSelectedImageProxy(focusTarget);
@@ -376,7 +380,7 @@ function startGesture(
       image.groupId &&
       group.length > 1 &&
       group.every((entry) => entry.groupId === image.groupId) &&
-      group.length === props.images.filter((entry) => entry.groupId === image.groupId).length,
+      group.length === legacyImages.value.filter((entry) => entry.groupId === image.groupId).length,
     ),
     owner: props.owner,
     layout: props.layout,
@@ -390,7 +394,7 @@ function startGesture(
         .filter((entry) => entry.groupId)
         .map((entry) => [
           entry.groupId!,
-          props.images
+          legacyImages.value
             .filter((member) => member.groupId === entry.groupId)
             .map((member) => member.id),
         ]),
@@ -507,7 +511,7 @@ function applyCrop(): void {
 
 function rotateImage(turns: -1 | 1 | 2): void {
   if (props.readOnly) return;
-  const images = props.images.filter((image) => selectedIds.value.has(image.id));
+  const images = legacyImages.value.filter((image) => selectedIds.value.has(image.id));
   if (images.length < 2) rotateImageEdit(turns);
   else {
     const next = rotateFloatingImages(images, turns, props.layout);
@@ -518,7 +522,7 @@ function rotateImage(turns: -1 | 1 | 2): void {
 
 function flipImage(axis: "horizontal" | "vertical"): void {
   if (props.readOnly) return;
-  const images = props.images.filter((image) => selectedIds.value.has(image.id));
+  const images = legacyImages.value.filter((image) => selectedIds.value.has(image.id));
   if (images.length < 2) flipImageEdit(axis);
   else {
     const next = flipFloatingImages(images, axis, props.layout);
@@ -556,7 +560,9 @@ function startCropGesture(direction: ImageCropGesture, event: PointerEvent): voi
 }
 
 function isCurrentGesture(active: Gesture): boolean {
-  const current = active.images.map((image) => props.images.find((entry) => entry.id === image.id));
+  const current = active.images.map((image) =>
+    legacyImages.value.find((entry) => entry.id === image.id),
+  );
   const expected = active.images.map((image) => image.id);
   const matches = (ids: readonly string[]) =>
     ids.length === selectedIds.value.size && ids.every((id) => selectedIds.value.has(id));
@@ -564,7 +570,7 @@ function isCurrentGesture(active: Gesture): boolean {
   else if (active.selectionSettled || !matches(active.selectionAtStart)) return false;
   if (
     [...active.groups].some(([groupId, ids]) => {
-      const members = props.images.filter((image) => image.groupId === groupId);
+      const members = legacyImages.value.filter((image) => image.groupId === groupId);
       return members.length !== ids.length || members.some((image) => !ids.includes(image.id));
     })
   )
@@ -636,7 +642,7 @@ function closeContextMenu(restoreFocus: boolean): void {
 }
 
 function openContextMenu(
-  image: FloatingImage,
+  image: LegacyFloatingImage,
   trigger: HTMLElement,
   anchor: FloatingReference = trigger,
 ): void {
@@ -650,14 +656,14 @@ function openContextMenu(
   };
 }
 
-function onImageContextMenu(image: FloatingImage, event: MouseEvent): void {
+function onImageContextMenu(image: LegacyFloatingImage, event: MouseEvent): void {
   event.preventDefault();
   event.stopPropagation();
   const trigger = event.currentTarget as HTMLElement;
   openContextMenu(image, trigger, createContextMenuPoint(event, layerRef.value ?? trigger));
 }
 
-function openImageKeyboardContextMenu(image: FloatingImage, event: KeyboardEvent): boolean {
+function openImageKeyboardContextMenu(image: LegacyFloatingImage, event: KeyboardEvent): boolean {
   if (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey)) return false;
   event.preventDefault();
   event.stopPropagation();
@@ -673,7 +679,7 @@ function requestConvertToCell(): void {
 }
 
 function requestPreview(): void {
-  const image = props.images.find((entry) => entry.id === contextMenu.value?.imageId);
+  const image = legacyImages.value.find((entry) => entry.id === contextMenu.value?.imageId);
   const trigger = contextMenu.value?.trigger;
   closeContextMenu(false);
   if (image) emit("preview", image, trigger);
@@ -688,7 +694,7 @@ function requestClipboard(mode: "copy" | "cut" | "paste"): void {
   else if (mode === "paste" && !props.readOnly) emit("paste", imageId);
 }
 
-function onImageDoubleClick(image: FloatingImage, event: MouseEvent): void {
+function onImageDoubleClick(image: LegacyFloatingImage, event: MouseEvent): void {
   if (crop.value) {
     applyCrop();
     return;
@@ -706,7 +712,7 @@ function onLayerDoubleClick(event: MouseEvent): void {
     !props.previewOnDoubleClick
   )
     return;
-  const image = props.images.find((entry) => entry.id === props.selectedImageId);
+  const image = legacyImages.value.find((entry) => entry.id === props.selectedImageId);
   if (image)
     emit("preview", image, layerRef.value?.querySelector<HTMLElement>(".is-selected") ?? undefined);
 }
@@ -726,7 +732,7 @@ function emitPaintState(): void {
   emit("paintStateChange", getPaintState());
 }
 
-function hitTestFloatingImage(point: Point): FloatingImage | undefined {
+function hitTestFloatingImage(point: Point): LegacyFloatingImage | undefined {
   for (let index = fragments.value.length - 1; index >= 0; index -= 1) {
     const fragment = fragments.value[index];
     if (!fragment) continue;
@@ -797,7 +803,7 @@ function getSurfaceCursor(point: Point): "move" | undefined {
 }
 
 watch(
-  () => props.images.map((image) => image.id),
+  () => legacyImages.value.map((image) => image.id),
   (ids) => {
     if (gesture.value && !ids.includes(gesture.value.image.id)) finishGesture(false);
     if (crop.value && !ids.includes(crop.value.image.id)) cancelCrop(false);
@@ -807,7 +813,7 @@ watch(
 
 watch(
   [
-    () => props.images,
+    () => legacyImages.value,
     previewImage,
     previewImages,
     crop,
@@ -893,12 +899,12 @@ function arrangeImages(
   if (props.readOnly) return;
   if (
     new Set(ids).size !== ids.length ||
-    ids.some((id) => !props.images.some((image) => image.id === id))
+    ids.some((id) => !legacyImages.value.some((image) => image.id === id))
   ) {
     emit("feedback", "picture.operationFailed");
     return;
   }
-  const members = props.images
+  const members = legacyImages.value
     .filter((image) => ids.includes(image.id))
     .flatMap((image) => {
       const rect = getFloatingImageSheetRect(image, props.layout);
@@ -996,7 +1002,7 @@ defineExpose({
   getSurfaceCursor,
 });
 
-function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
+function onImageKeydown(image: LegacyFloatingImage, event: KeyboardEvent): void {
   if (crop.value) {
     event.stopPropagation();
     if (event.key === "Escape") {
@@ -1050,7 +1056,7 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     ArrowDown: { x: 0, y: distance },
   }[event.key];
   if (!offset) return;
-  const members = props.images.filter((entry) => selectedIds.value.has(entry.id));
+  const members = legacyImages.value.filter((entry) => selectedIds.value.has(entry.id));
   const rects = members
     .map((entry) => getFloatingImageSheetRect(entry, props.layout))
     .filter((entry) => entry !== null);

@@ -179,7 +179,8 @@ describe("exact ordered picture state in axis inverses", () => {
     (axis) => {
       const { session, sheet } = fixture();
       const maximum = axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
-      sheet.floatingImages[0]!.anchor[axis] = maximum - 1;
+      (sheet.floatingImages[0]! as import("../../workbook.js").LegacyFloatingImage).anchor[axis] =
+        maximum - 1;
       const before = serializeWorkbook(session.workbook);
       expect(
         executeWorkbookCommand(session, createInsertSheetAxisCommand(sheet.id, axis, 4, 1)),

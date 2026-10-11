@@ -1,3 +1,4 @@
+import type { FramedFloatingImage } from "@sheetcraft/core/picture-object";
 import { describe, expect, test } from "vitest";
 import {
   DEFAULT_COLUMN_WIDTH,
@@ -17,6 +18,24 @@ function createTestSheet() {
 }
 
 describe("sheet content extent", () => {
+  test("a framed picture's rotated bounds and far fixed origin remain reachable", () => {
+    const sheet = createTestSheet();
+    const image: FramedFloatingImage = {
+      id: "frame",
+      assetId: "asset",
+      altText: "",
+      frame: {
+        kind: "object-frame-v1",
+        anchor: { mode: "fixed", x: 192, y: 72, size: { width: 200, height: 100 } },
+        angleDeg: 90,
+        source: { widthRatio: 1, heightRatio: 1, offsetXRatio: 0, offsetYRatio: 0 },
+      },
+    };
+    sheet.floatingImages = [image];
+    expect(getSheetContentExtent(sheet)).toEqual({ rowCount: 10, columnCount: 4 });
+    image.frame.anchor = { mode: "fixed", x: -1000, y: -1000, size: { width: 200, height: 100 } };
+    expect(getSheetContentExtent(sheet)).toEqual({ rowCount: 1, columnCount: 1 });
+  });
   test("retains far styled blank cells and dimension metadata until each is removed", () => {
     const sheet = createTestSheet();
     setCellStyle(sheet, { row: 120, column: 4 }, { fillColor: "#123456" });

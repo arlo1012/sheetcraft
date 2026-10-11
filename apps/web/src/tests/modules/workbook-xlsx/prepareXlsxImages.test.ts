@@ -1,3 +1,4 @@
+import { framedPicture } from "../sheet-images/framed-picture-fixture";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import { createWorkbook, getActiveSheet, setCellContent } from "@sheetcraft/core/workbook";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -69,6 +70,28 @@ afterEach(() => {
 });
 
 describe("prepareXlsxImages", () => {
+  test("frame geometry is blocked before asset reads, decoding, URLs or raster preparation", async () => {
+    const { workbook, sheet } = imageSnapshot();
+    sheet.floatingImages = [framedPicture()];
+    const assets = store(imageAsset("asset")),
+      urls = { createObjectURL: vi.fn(), revokeObjectURL: vi.fn() };
+    vi.stubGlobal("URL", urls);
+    await expect(prepareXlsxImages(serializeWorkbook(workbook), assets)).rejects.toMatchObject({
+      name: "XlsxWorkerFailure",
+      report: {
+        issues: [
+          {
+            code: "feature-omitted",
+            severity: "block",
+            count: 1,
+            locations: ['Images.floatingImages["framed"].frame'],
+          },
+        ],
+      },
+    });
+    expect(assets.get).not.toHaveBeenCalled();
+    expect(urls.createObjectURL).not.toHaveBeenCalled();
+  });
   test("collects cell and floating references and deduplicates asset reads and variants", async () => {
     const { workbook, sheet } = imageSnapshot();
     setCellContent(

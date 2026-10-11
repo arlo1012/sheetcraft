@@ -3,6 +3,7 @@ import {
   createBrowserGridClipboardPort,
   WEB_FLOATING_IMAGE_CLIPBOARD_TYPE,
 } from "../../../../modules/sheet-grid/gridClipboardPort";
+import { framedPicture } from "../../sheet-images/framed-picture-fixture";
 import { FLOATING_IMAGE_CLIPBOARD_TYPE } from "../../../../modules/sheet-images/imageClipboard";
 
 const WEB_SHEETCRAFT_CLIPBOARD_TYPE = "web application/x-sheetcraft-cells";
@@ -55,6 +56,52 @@ afterEach(() => {
 });
 
 describe("browser grid clipboard port", () => {
+  test("unsupported async geometry retains its reason through matching native text hydration", async () => {
+    const restore = stubLegacyPaste("Synthetic");
+    stubClipboard({
+      read: vi.fn().mockResolvedValue([
+        {
+          types: ["text/plain", WEB_FLOATING_IMAGE_CLIPBOARD_TYPE],
+          getType: async (type: string) =>
+            new Blob([type === "text/plain" ? "Synthetic" : JSON.stringify(framedPicture())]),
+        },
+      ]),
+    });
+    try {
+      await expect(createBrowserGridClipboardPort().read()).resolves.toEqual({
+        text: "Synthetic",
+        invalidFloatingImage: true,
+        unsupportedFloatingImage: true,
+      });
+    } finally {
+      restore();
+    }
+  });
+  test("unsupported writes fail before native focus, text or rich payload effects", async () => {
+    const native = vi.fn(),
+      write = vi.fn(),
+      writeText = vi.fn();
+    Object.defineProperty(document, "execCommand", { configurable: true, value: native });
+    stubClipboard({ write, writeText });
+    stubClipboardItem();
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    const transfer = { text: "Synthetic", localToken: "token", floatingImage: framedPicture() };
+    try {
+      const port = createBrowserGridClipboardPort();
+      await expect(port.write(transfer)).rejects.toMatchObject({
+        code: "unsupported-picture-frame",
+      });
+      await expect(port.writeNativeRich!(transfer)).rejects.toMatchObject({
+        code: "unsupported-picture-frame",
+      });
+      expect(native).not.toHaveBeenCalled();
+      expect(write).not.toHaveBeenCalled();
+      expect(writeText).not.toHaveBeenCalled();
+      expect(focus).not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
   test("matching malformed async image data stays invalid through native text hydration", async () => {
     const restore = stubLegacyPaste("Picture caption");
     const item = {

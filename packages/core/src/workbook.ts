@@ -1,3 +1,11 @@
+import { assertPictureObjectsForSheet } from "./picture-object-sheet.js";
+import {
+  normalizePictureObject,
+  clonePictureObject,
+  arePictureObjectsEqual,
+  isFramedPictureObject,
+  type FramedFloatingImage,
+} from "./picture-object.js";
 import {
   normalizeCellTextFontRuns,
   cloneCellTextFontRuns,
@@ -339,8 +347,8 @@ export type LegacyFloatingImage = {
   groupId?: string;
   lockAspectRatio?: boolean;
 };
-/** Existing persisted image contract; framed-object persistence is enabled only with its consumers. */
-export type FloatingImage = LegacyFloatingImage;
+/** Versioned internal picture contract; runtime adapters declare which geometry they consume. */
+export type FloatingImage = LegacyFloatingImage | FramedFloatingImage;
 
 export type Cell = {
   content?: CellContent;
@@ -2054,6 +2062,8 @@ function normalizeCellContent(content: CellContent | null | undefined): CellCont
   if ("fontRuns" in content && (content.kind !== "literal" || typeof content.value !== "string")) {
     throw new TypeError("Font runs are only supported on string literal cell content.");
   }
+  if (content.kind === "image" && content.image && Object.hasOwn(content.image, "frame"))
+    throw new TypeError("Framed in-cell pictures are not supported.");
   if (content.kind === "literal") {
     const value = content.value;
     if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
@@ -2099,6 +2109,8 @@ function normalizeCellContent(content: CellContent | null | undefined): CellCont
 }
 
 export function cloneCellContent(content: CellContent): CellContent {
+  if (content.kind === "image" && content.image && Object.hasOwn(content.image, "frame"))
+    throw new TypeError("Framed in-cell pictures are not supported.");
   if (content.kind === "error") {
     return { kind: "error", error: createFormulaError(content.error.code) };
   }
@@ -3097,6 +3109,15 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
   const floatingImages = state.floatingImages.map((image) =>
     normalizeFloatingImage(image, floatingImageIds),
   );
+  if (floatingImages.some(isFramedPictureObject))
+    assertPictureObjectsForSheet(floatingImages, {
+      ...createSheet("Picture geometry validation", "picture-geometry-validation"),
+      rowHeights: new Map(rowHeights.map((entry) => [entry.index, entry.size])),
+      columnWidths: new Map(columnWidths.map((entry) => [entry.index, entry.size])),
+      hiddenRows: new Set(hiddenRows),
+      hiddenColumns: new Set(hiddenColumns),
+      defaultColumnWidth,
+    });
   return {
     cells,
     rowHeights,
@@ -3330,7 +3351,7 @@ export function cloneSheetTable(table: SheetTable): SheetTable {
   };
 }
 
-export function cloneFloatingImage(image: FloatingImage): FloatingImage {
+export function cloneLegacyFloatingImage(image: LegacyFloatingImage): LegacyFloatingImage {
   const { transform, ...fields } = image;
   const normalizedTransform = cloneImageTransform(transform);
   return {
@@ -3340,14 +3361,12 @@ export function cloneFloatingImage(image: FloatingImage): FloatingImage {
   };
 }
 
-function normalizeFloatingImage(image: FloatingImage, ids?: Set<string>): FloatingImage {
+function normalizeLegacyFloatingImage(image: LegacyFloatingImage): LegacyFloatingImage {
   if (!image || typeof image !== "object") throw new TypeError("Invalid floating image.");
   if (Object.hasOwn(image, "frame"))
-    throw new TypeError("Framed image persistence is not enabled.");
+    throw new TypeError("A frame-aware picture cannot be normalized as legacy geometry.");
   if (typeof image.id !== "string" || !image.id.trim())
     throw new TypeError("Floating image ID must be non-empty.");
-  if (ids?.has(image.id)) throw new Error(`Duplicate floating image ${image.id}.`);
-  ids?.add(image.id);
   if (typeof image.assetId !== "string" || !image.assetId.trim())
     throw new TypeError("Floating image asset ID must be non-empty.");
   if (typeof image.altText !== "string")
@@ -3381,16 +3400,29 @@ function normalizeFloatingImage(image: FloatingImage, ids?: Set<string>): Floati
   if (image.groupId !== undefined && (typeof image.groupId !== "string" || !image.groupId.trim()))
     throw new TypeError("Invalid image group.");
   const transform = normalizeImageTransform(image.transform);
-  return { ...cloneFloatingImage(image), ...(transform ? { transform } : {}) };
+  return { ...cloneLegacyFloatingImage(image), ...(transform ? { transform } : {}) };
 }
 
-export function normalizeFloatingImageForSheet(image: FloatingImage): FloatingImage {
-  return normalizeFloatingImage(image);
+export function normalizeLegacyFloatingImageForSheet(
+  image: LegacyFloatingImage,
+): LegacyFloatingImage {
+  return normalizeLegacyFloatingImage(image);
 }
-
-function areFloatingImagesEqual(
-  left: FloatingImage | undefined,
-  right: FloatingImage | undefined,
+export function cloneFloatingImage<T extends FloatingImage>(image: T): T {
+  return clonePictureObject(image);
+}
+function normalizeFloatingImage(image: FloatingImage, ids?: Set<string>): FloatingImage {
+  const normalized = normalizePictureObject(image);
+  if (ids?.has(normalized.id)) throw new Error(`Duplicate floating image ${normalized.id}.`);
+  ids?.add(normalized.id);
+  return normalized;
+}
+export function normalizeFloatingImageForSheet<T extends FloatingImage>(image: T): T {
+  return normalizeFloatingImage(image) as T;
+}
+export function areLegacyFloatingImagesEqual(
+  left: LegacyFloatingImage | undefined,
+  right: LegacyFloatingImage | undefined,
 ): boolean {
   return (
     !!left &&
@@ -3409,6 +3441,13 @@ function areFloatingImagesEqual(
     left.height === right.height &&
     areImageTransformsEqual(left.transform, right.transform)
   );
+}
+
+function areFloatingImagesEqual(
+  left: FloatingImage | undefined,
+  right: FloatingImage | undefined,
+): boolean {
+  return !!left && !!right && arePictureObjectsEqual(left, right);
 }
 
 /** Domain equality for ordered picture collections, independent of object-key order. */

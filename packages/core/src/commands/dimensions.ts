@@ -1,3 +1,4 @@
+import { assertPictureObjectsForSheet } from "../picture-object-sheet.js";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
@@ -135,6 +136,18 @@ function setSize(sheet: Sheet, axis: "row" | "column", index: number, size: numb
   return axis === "row" ? setRowHeight(sheet, index, size) : setColumnWidth(sheet, index, size);
 }
 
+function preflightDimensionMutation(sheet: Sheet, mutate: (shadow: Sheet) => void): void {
+  const shadow: Sheet = {
+    ...sheet,
+    rowHeights: new Map(sheet.rowHeights),
+    columnWidths: new Map(sheet.columnWidths),
+    hiddenRows: new Set(sheet.hiddenRows),
+    hiddenColumns: new Set(sheet.hiddenColumns),
+  };
+  mutate(shadow);
+  assertPictureObjectsForSheet(shadow.floatingImages, shadow);
+}
+
 export function applyResizeSheetDimensionCommand(
   workbook: Workbook,
   command: ResizeSheetDimensionCommand,
@@ -143,6 +156,9 @@ export function applyResizeSheetDimensionCommand(
   assertIndex(command.axis, command.index);
   assertSize(command.axis, command.size);
   const sheet = getSheetOrThrow(workbook, command.sheetId);
+  preflightDimensionMutation(sheet, (shadow) => {
+    setSize(shadow, command.axis, command.index, command.size);
+  });
   const inverse = createRestoreSheetDimensionStateCommand(command.sheetId, command.axis, sheet);
   const changed =
     command.axis === "row"
@@ -166,6 +182,9 @@ export function applyResizeSheetDimensionsCommand(
   );
   if (changedIndexes.length === 0) return null;
   const inverse = createRestoreSheetDimensionStateCommand(command.sheetId, command.axis, sheet);
+  preflightDimensionMutation(sheet, (shadow) => {
+    for (const index of changedIndexes) setSize(shadow, command.axis, index, command.size);
+  });
   for (const index of changedIndexes) setSize(sheet, command.axis, index, command.size);
   return inverse;
 }
@@ -193,6 +212,9 @@ export function applySetSheetDimensionSizesCommand(
   );
   if (changes.length === 0) return null;
   const inverse = createRestoreSheetDimensionStateCommand(command.sheetId, command.axis, sheet);
+  preflightDimensionMutation(sheet, (shadow) => {
+    for (const change of changes) setSize(shadow, command.axis, change.index, change.size);
+  });
   for (const change of changes) setSize(sheet, command.axis, change.index, change.size);
   return inverse;
 }
@@ -208,6 +230,10 @@ export function applySetSheetDimensionHiddenCommand(
   const hidden = command.axis === "row" ? sheet.hiddenRows : sheet.hiddenColumns;
   if (indexes.every((index) => (hidden?.has(index) ?? false) === command.hidden)) return null;
   const inverse = createRestoreSheetDimensionStateCommand(command.sheetId, command.axis, sheet);
+  preflightDimensionMutation(sheet, (shadow) => {
+    for (const index of indexes)
+      setSheetDimensionHidden(shadow, command.axis, index, command.hidden);
+  });
   for (const index of indexes) setSheetDimensionHidden(sheet, command.axis, index, command.hidden);
   return inverse;
 }
@@ -222,6 +248,10 @@ export function applyResetSheetDimensionSizesCommand(
   const dimensions = command.axis === "row" ? sheet.rowHeights : sheet.columnWidths;
   if (indexes.every((index) => !dimensions.has(index))) return null;
   const inverse = createRestoreSheetDimensionStateCommand(command.sheetId, command.axis, sheet);
+  preflightDimensionMutation(sheet, (shadow) => {
+    const next = command.axis === "row" ? shadow.rowHeights : shadow.columnWidths;
+    for (const index of indexes) next.delete(index);
+  });
   for (const index of indexes) dimensions.delete(index);
   return inverse;
 }
@@ -234,6 +264,9 @@ export function applySetSheetDefaultColumnWidthCommand(
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   if (getDefaultColumnWidth(sheet) === command.width) return null;
   const inverse = createRestoreSheetDimensionStateCommand(command.sheetId, "column", sheet);
+  preflightDimensionMutation(sheet, (shadow) => {
+    setDefaultColumnWidth(shadow, command.width);
+  });
   setDefaultColumnWidth(sheet, command.width);
   return inverse;
 }
@@ -284,6 +317,18 @@ export function applyRestoreSheetDimensionStateCommand(
     (command.axis === "row" || getDefaultColumnWidth(sheet) === defaultColumnWidth) &&
     (pictures === undefined || areFloatingImageCollectionsEqual(sheet.floatingImages, pictures));
   if (unchanged) return null;
+  preflightDimensionMutation(sheet, (shadow) => {
+    const nextDimensions = new Map(command.dimensions.map((entry) => [entry.index, entry.size]));
+    if (command.axis === "row") {
+      shadow.rowHeights = nextDimensions;
+      shadow.hiddenRows = hidden;
+    } else {
+      shadow.columnWidths = nextDimensions;
+      shadow.hiddenColumns = hidden;
+      shadow.defaultColumnWidth = defaultColumnWidth;
+    }
+    shadow.floatingImages = pictures ?? sheet.floatingImages;
+  });
   const inverse = createRestoreSheetDimensionStateCommand(command.sheetId, command.axis, sheet);
   dimensions.clear();
   for (const dimension of command.dimensions) dimensions.set(dimension.index, dimension.size);

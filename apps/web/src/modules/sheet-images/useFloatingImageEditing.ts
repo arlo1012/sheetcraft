@@ -1,5 +1,5 @@
 import { computed, nextTick, shallowRef, type Ref } from "vue";
-import type { FloatingImage, ImageCrop } from "@sheetcraft/core/workbook";
+import type { LegacyFloatingImage as FloatingImage, ImageCrop } from "@sheetcraft/core/workbook";
 import {
   cropFloatingImage,
   flipFloatingImage,

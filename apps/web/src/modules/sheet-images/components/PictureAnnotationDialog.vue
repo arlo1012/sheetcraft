@@ -7,7 +7,7 @@ import { Input } from "tdesign-vue-next/es/input";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import {
   normalizeImageTransform,
-  type FloatingImage,
+  type LegacyFloatingImage as FloatingImage,
   type ImageAnnotation,
 } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";

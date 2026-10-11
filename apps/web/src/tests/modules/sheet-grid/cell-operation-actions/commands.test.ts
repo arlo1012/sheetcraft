@@ -91,7 +91,7 @@ describe("cell operation actions", () => {
       kind: "formula",
       formula: { source: "=1" },
     });
-    expect(sheet.floatingImages[0]?.anchor.row).toBe(2);
+    expect(sheet.floatingImages[0]?.anchor?.row).toBe(2);
     expect(getCellContent(sheet, { row: 3, column: 0 })).toEqual({
       kind: "image",
       image: { assetId: "embedded-asset", altText: "embedded image" },
@@ -102,7 +102,7 @@ describe("cell operation actions", () => {
 
     expect(undoWorkbookCommand(session)).toBe(true);
     expect(getCellValue(sheet, { row: 1, column: 200 })).toBe("kept");
-    expect(sheet.floatingImages[0]?.anchor.row).toBe(4);
+    expect(sheet.floatingImages[0]?.anchor?.row).toBe(4);
     expect(redoWorkbookCommand(session)).toBe(true);
     expect(sheet.mergedCells).toEqual([
       { start: { row: 4, column: 0 }, end: { row: 5, column: 1 } },

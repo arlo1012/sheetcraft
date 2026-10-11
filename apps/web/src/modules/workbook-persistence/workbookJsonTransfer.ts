@@ -1,3 +1,7 @@
+import {
+  assertWorkbookPictureSupport,
+  UnsupportedPictureDocumentError,
+} from "../sheet-images/picture-document-support";
 import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
 import type { Workbook } from "@sheetcraft/core/workbook";
 import { prepareImageAsset, MAX_IMAGE_BYTES } from "../image-assets/prepareImageAsset";
@@ -7,6 +11,7 @@ import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStor
 export type WorkbookFileErrorCode =
   | "invalid-json"
   | "invalid-snapshot"
+  | "unsupported-picture-frame"
   | "read-failed"
   | "invalid-images"
   | "missing-image";
@@ -28,9 +33,16 @@ export function parseWorkbookJson(text: string): Workbook {
     throw new WorkbookFileError("invalid-json", { cause: error });
   }
   try {
-    return deserializeWorkbook(value);
+    const workbook = deserializeWorkbook(value);
+    assertWorkbookPictureSupport(workbook);
+    return workbook;
   } catch (error) {
-    throw new WorkbookFileError("invalid-snapshot", { cause: error });
+    throw new WorkbookFileError(
+      error instanceof UnsupportedPictureDocumentError
+        ? "unsupported-picture-frame"
+        : "invalid-snapshot",
+      { cause: error },
+    );
   }
 }
 
@@ -139,6 +151,11 @@ export async function readWorkbookBundleFile(
     workbook = deserializeWorkbook(value.snapshot);
   } catch (error) {
     throw new WorkbookFileError("invalid-snapshot", { cause: error });
+  }
+  try {
+    assertWorkbookPictureSupport(workbook);
+  } catch (error) {
+    throw new WorkbookFileError("unsupported-picture-frame", { cause: error });
   }
   const referencedIds = collectWorkbookImageAssetIds(workbook);
   const provided = new Map<string, PortableImage>();

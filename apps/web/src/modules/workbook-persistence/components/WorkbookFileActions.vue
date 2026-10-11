@@ -48,6 +48,7 @@ const errorKeys: Record<WorkbookPersistenceError, MessageKey> = {
   unavailable: "persistence.unavailable",
   "invalid-record": "persistence.invalidSnapshot",
   "invalid-snapshot": "persistence.invalidSnapshot",
+  "unsupported-picture-frame": "persistence.unsupportedPictures",
   conflict: "persistence.conflict",
   quota: "persistence.quota",
 };

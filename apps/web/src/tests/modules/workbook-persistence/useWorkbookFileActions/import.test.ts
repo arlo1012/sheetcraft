@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
-import { createWorkbook } from "@sheetcraft/core/workbook";
+import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
+import { framedPicture } from "../../sheet-images/framed-picture-fixture";
 import { createWorkbookFile, deferred, mountFileActions } from "./fixture";
 
 const wrappers: Array<{ unmount(): void }> = [];
@@ -83,13 +84,37 @@ describe("useWorkbookFileActions import", () => {
     expect(fixture.actions.confirmation.value).toBeUndefined();
   });
 
-  test("does not start an import while an IME edit still needs completion", async () => {
+  test("rejects unsupported geometry before flushing the current cell draft", async () => {
+    const fixture = mountActions();
+    const candidate = createWorkbook({ id: "candidate", sheetId: "candidate-sheet" });
+    getActiveSheet(candidate).floatingImages = [framedPicture()];
+    await fixture.actions.importJson(
+      createWorkbookFile(async () => JSON.stringify(serializeWorkbook(candidate))),
+    );
+    expect(fixture.flushPendingEdits).not.toHaveBeenCalled();
+    expect(fixture.persistence.replaceDocument).not.toHaveBeenCalled();
+    expect(fixture.actions.confirmation.value).toBeUndefined();
+    expect(fixture.actions.feedback.value).toEqual({
+      key: "persistence.unsupportedPictures",
+      error: true,
+    });
+  });
+
+  test("reads a valid candidate without replacing or committing while an IME edit still needs completion", async () => {
     const fixture = mountActions({ flushPendingEdits: () => false });
-    const file = createWorkbookFile(vi.fn(async () => "{}"));
+    const file = createWorkbookFile(
+      vi.fn(async () =>
+        JSON.stringify(
+          serializeWorkbook(createWorkbook({ id: "candidate", sheetId: "candidate-sheet" })),
+        ),
+      ),
+    );
 
     await fixture.actions.importJson(file);
 
-    expect(file.text).not.toHaveBeenCalled();
+    expect(file.text).toHaveBeenCalledOnce();
+    expect(fixture.persistence.replaceDocument).not.toHaveBeenCalled();
+    expect(fixture.actions.confirmation.value).toBeUndefined();
     expect(fixture.actions.feedback.value).toEqual({
       key: "persistence.finishEditing",
       error: true,

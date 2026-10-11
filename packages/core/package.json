@@ -186,6 +186,10 @@
     "./picture-frame-axis-edit": {
       "types": "./dist/picture-frame-axis-edit.d.ts",
       "import": "./dist/picture-frame-axis-edit.js"
+    },
+    "./picture-object-sheet": {
+      "types": "./dist/picture-object-sheet.d.ts",
+      "import": "./dist/picture-object-sheet.js"
     }
   },
   "scripts": {

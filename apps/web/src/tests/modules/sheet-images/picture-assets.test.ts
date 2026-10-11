@@ -1,3 +1,4 @@
+import { framedPicture } from "./framed-picture-fixture";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createWorkbook, getActiveSheet, type FloatingImage } from "@sheetcraft/core/workbook";
 import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
@@ -73,6 +74,21 @@ beforeEach(() => {
 });
 
 describe("picture asset compression", () => {
+  test("frame selections are rejected before export, print or compression resources", async () => {
+    const f = await fixture();
+    f.sheet.floatingImages[0] = { ...framedPicture(), id: "a" };
+    const read = vi.spyOn(f.store, "get"),
+      put = vi.spyOn(f.store, "put"),
+      popup = vi.spyOn(window, "open");
+    await f.tools.exportPictures("png");
+    await f.tools.printPictures();
+    expect(await f.tools.compress(settings)).toBe(false);
+    expect(read).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+    expect(popup).not.toHaveBeenCalled();
+    expect(convertPictureBlob).not.toHaveBeenCalled();
+    expect(f.execute).not.toHaveBeenCalled();
+  });
   test("stores the shared compressed asset before one collection command and preserves picture edits", async () => {
     const f = await fixture();
     const before = structuredClone(f.sheet.floatingImages);

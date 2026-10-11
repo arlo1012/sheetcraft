@@ -1,8 +1,16 @@
+import {
+  createSetFloatingImageCommand,
+  createSetSheetFloatingImagesCommand,
+} from "@sheetcraft/core/commands";
+import { framedPicture } from "../../modules/sheet-images/framed-picture-fixture";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
+  createWorkbook,
+  getActiveSheet,
   getCellStyle,
   getCellComputedValue,
   getCellContent,
@@ -46,6 +54,42 @@ afterEach(() => {
 });
 
 describe("spreadsheet workspace controller", () => {
+  test("unsupported frame replacement preserves workbook, selection, history and generation", () => {
+    const controller = mountController();
+    controller.commitCell({ address: { row: 0, column: 0 }, input: "retained" });
+    const oldWorkbook = controller.session.workbook;
+    const before = serializeWorkbook(oldWorkbook),
+      history = controller.session.history,
+      generation = controller.workbookGeneration.value,
+      revision = controller.workbookRevision.value,
+      selection = controller.activeSheetViewState.value;
+    const candidate = createWorkbook({ id: "candidate", sheetId: "new" });
+    getActiveSheet(candidate).floatingImages = [framedPicture()];
+    expect(() => controller.replaceWorkbook(candidate)).toThrow(/not yet enabled/);
+    expect(controller.session.workbook).toBe(oldWorkbook);
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+    expect(controller.session.history).toBe(history);
+    expect(controller.activeSheetViewState.value).toBe(selection);
+    expect(controller.workbookGeneration.value).toBe(generation);
+    expect(controller.workbookRevision.value).toBe(revision);
+  });
+  test("both normal and replaceable live command ports reject frame ingress before history/revision changes", () => {
+    const controller = mountController(),
+      sheet = controller.activeSheet.value,
+      before = serializeWorkbook(controller.session.workbook),
+      revision = controller.workbookRevision.value;
+    const commands = [
+      createSetFloatingImageCommand(sheet.id, framedPicture()),
+      createSetSheetFloatingImagesCommand(sheet.id, [framedPicture()]),
+    ];
+    for (const command of commands) {
+      expect(() => controller.executeCommand(command)).toThrow(/not yet enabled/);
+      expect(() => controller.executeReplaceableCommand(command)).toThrow(/not yet enabled/);
+      expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+      expect(controller.workbookRevision.value).toBe(revision);
+      expect(controller.session.history.undoStack).toEqual([]);
+    }
+  });
   test("keeps formula source in the formula bar while the grid consumes its computed value", () => {
     const controller = mountController();
     const sheet = controller.activeSheet.value;

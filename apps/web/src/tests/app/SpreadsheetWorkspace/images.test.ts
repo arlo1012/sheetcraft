@@ -1,3 +1,6 @@
+import { actualPng } from "../../modules/image-assets/image-header-fixtures";
+import { requireLegacyPicture } from "../../../modules/sheet-images/picture-document-support";
+import type { FloatingImage } from "@sheetcraft/core/workbook";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
@@ -60,7 +63,7 @@ async function fixture(cellImage = false) {
     mimeType: "image/png",
     width: 120,
     height: 80,
-    blob: new Blob(["fixture"], { type: "image/png" }),
+    blob: new Blob([new Uint8Array(actualPng)], { type: "image/png" }),
   };
   await imageAssetStore.put(asset);
   vi.mocked(prepareImageAsset).mockResolvedValue(asset);
@@ -96,16 +99,11 @@ async function fixture(cellImage = false) {
 
 async function triggerFloatingImage(
   wrapper: ReturnType<typeof mount>,
-  image: {
-    anchor: { row: number; column: number };
-    offsetX: number;
-    offsetY: number;
-    width: number;
-    height: number;
-  },
+  sourceImage: FloatingImage,
   event: "contextmenu" | "dblclick" | "pointerdown",
   options: PointerEventInit = {},
 ): Promise<void> {
+  const image = requireLegacyPicture(sourceImage);
   const surface = wrapper.getComponent(SheetSurface);
   const frame = surface.props("frame") as SheetRenderFrame;
   const anchor = frame.layout.getCellViewportRect(image.anchor);

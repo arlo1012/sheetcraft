@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import type { FloatingImage } from "@sheetcraft/core/workbook";
+import type { LegacyFloatingImage as FloatingImage } from "@sheetcraft/core/workbook";
 import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
 import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
@@ -71,7 +71,7 @@ describe("floating image canvas painter", () => {
             ...image,
             transform: {
               crop: { x: 0.25, y: 0, width: 0.5, height: 1 },
-              rotation: 90,
+              rotation: 90 as const,
               flipHorizontal: true,
             },
           },

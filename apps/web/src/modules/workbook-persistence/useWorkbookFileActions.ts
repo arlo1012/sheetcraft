@@ -62,24 +62,30 @@ export function useWorkbookFileActions(options: {
   }
 
   async function importJson(file: Pick<File, "text">): Promise<void> {
+    if (persistence.error.value === "unsupported-picture-frame") {
+      feedback.value = { key: "persistence.unsupportedPictures", error: true };
+      return;
+    }
     if (options.isBlocked?.()) return;
-    if (busy.value || persistence.loading.value || confirmation.value || !flushEdits()) return;
+    if (busy.value || persistence.loading.value || confirmation.value) return;
     busy.value = true;
     feedback.value = undefined;
     try {
       const workbook = options.assetStore
         ? await readWorkbookBundleFile(file, options.assetStore)
         : await readWorkbookFile(file);
-      if (disposed) return;
+      if (disposed || !flushEdits()) return;
       pendingImport.value = workbook;
       confirmation.value = "import";
     } catch (error) {
       if (disposed) return;
       feedback.value = {
         key:
-          error instanceof WorkbookFileError && error.code === "read-failed"
-            ? "persistence.readFailed"
-            : "persistence.invalidJson",
+          error instanceof WorkbookFileError && error.code === "unsupported-picture-frame"
+            ? "persistence.unsupportedPictures"
+            : error instanceof WorkbookFileError && error.code === "read-failed"
+              ? "persistence.readFailed"
+              : "persistence.invalidJson",
         error: true,
       };
     } finally {
@@ -107,6 +113,13 @@ export function useWorkbookFileActions(options: {
   }
 
   async function confirm(): Promise<void> {
+    if (
+      confirmation.value !== "reload" &&
+      persistence.error.value === "unsupported-picture-frame"
+    ) {
+      feedback.value = { key: "persistence.unsupportedPictures", error: true };
+      return;
+    }
     if (options.isBlocked?.()) return;
     if (busy.value || !confirmation.value || !flushEdits()) return;
     busy.value = true;

@@ -3,9 +3,10 @@ import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurf
 import { recordCanvasRenderPlans } from "./canvas-render-fixture";
 import {
   getCellContent,
+  cloneFloatingImage,
   setCellContent,
   createSheet,
-  type FloatingImage,
+  type LegacyFloatingImage as FloatingImage,
 } from "@sheetcraft/core/workbook";
 import { createSetSheetFloatingImagesCommand } from "@sheetcraft/core/commands";
 import {
@@ -43,9 +44,7 @@ describe("SheetGrid cell images", () => {
     const layer = wrapper.getComponent(SheetFloatingImageLayer);
     expect(layer.props("selectedImageIds")).toEqual(["a", "b", "c"]);
     expect(layer.props("selectedImageId")).toBe("c");
-    const original = structuredClone(
-      [...sheet.floatingImages].map((image) => ({ ...image, anchor: { ...image.anchor } })),
-    );
+    const original = structuredClone(sheet.floatingImages.map(cloneFloatingImage));
     executeWorkbookCommand(
       session,
       createSetSheetFloatingImagesCommand(
@@ -88,10 +87,7 @@ describe("SheetGrid cell images", () => {
     ).selectFloatingImages(["a"]);
     await wrapper.vm.$nextTick();
     const replacement = createSheet(sheet.name, sheet.id);
-    replacement.floatingImages = sheet.floatingImages.map((image) => ({
-      ...image,
-      anchor: { ...image.anchor },
-    }));
+    replacement.floatingImages = sheet.floatingImages.map(cloneFloatingImage);
     await wrapper.setProps({ sheet: replacement });
     expect(wrapper.getComponent(SheetFloatingImageLayer).props("selectedImageIds")).toEqual([]);
     expect(wrapper.getComponent(SheetFloatingImageLayer).props("selectedImageId")).toBeNull();

@@ -1,3 +1,5 @@
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { requireLegacyPictures } from "./picture-document-support";
 import { ref, type Ref } from "vue";
 import {
   createSetSheetFloatingImagesCommand,
@@ -38,6 +40,7 @@ export function usePictureTools(options: {
   function replace(images: readonly FloatingImage[]): boolean {
     const sheet = options.getSheet();
     if (options.isBusy() || !canUseSheetPermission(sheet, "editObjects")) return false;
+    if (images.some(isFramedPictureObject)) return false;
     const command = createSetSheetFloatingImagesCommand(sheet.id, images);
     if (JSON.stringify(sheet.floatingImages) === JSON.stringify(command.images)) return true;
     return options.execute(command) !== false;
@@ -66,6 +69,16 @@ export function usePictureTools(options: {
         .map((image) => image.groupId)
         .filter(Boolean),
     );
+    if (
+      options
+        .getSheet()
+        .floatingImages.some(
+          (image) =>
+            isFramedPictureObject(image) &&
+            (ids.has(image.id) || Boolean(image.groupId && groups.has(image.groupId))),
+        )
+    )
+      return false;
     const groupId = ungroup ? undefined : idFactory("picture-group");
     return replace(
       options
@@ -114,14 +127,18 @@ export function usePictureTools(options: {
       sizeFeedback.value = "picture.operationFailed";
       return false;
     }
-    const images = options
+    const targets = options
       .getSheet()
-      .floatingImages.filter((image) => value.all || options.selectedIds.value.includes(image.id))
-      .map((image) => ({
-        ...image,
-        width: value.width,
-        height: value.locked ? (image.height * value.width) / image.width : value.height,
-      }));
+      .floatingImages.filter((image) => value.all || options.selectedIds.value.includes(image.id));
+    if (targets.some(isFramedPictureObject)) {
+      sizeFeedback.value = "picture.operationFailed";
+      return false;
+    }
+    const images = requireLegacyPictures(targets).map((image) => ({
+      ...image,
+      width: value.width,
+      height: value.locked ? (image.height * value.width) / image.width : value.height,
+    }));
     if (
       !images.length ||
       images.some(
@@ -148,13 +165,20 @@ export function usePictureTools(options: {
       options
         .getSheet()
         .floatingImages.filter((image) => options.selectedIds.value.includes(image.id))
-        .map((image) => ({
-          ...image,
-          transform: normalizeImageTransform({
-            ...image.transform,
+        .map((image): FloatingImage => {
+          const appearance = normalizeImageTransform({
             appearance: patch ? { ...image.transform?.appearance, ...patch } : undefined,
-          }),
-        })),
+          })?.appearance;
+          if (isFramedPictureObject(image))
+            return {
+              ...image,
+              transform: { annotations: image.transform?.annotations, appearance },
+            };
+          return {
+            ...image,
+            transform: normalizeImageTransform({ ...image.transform, appearance }),
+          };
+        }),
     );
   }
   function toggleVisibility(image: FloatingImage): void {

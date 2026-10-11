@@ -795,6 +795,8 @@ export const zhCN = {
     finishEditingShort: "请先完成输入",
     localOnly: "数据保存在当前浏览器中，可导出 JSON 文件另行备份。",
     unavailable: "本地存储暂不可用，当前编辑仍保留在页面中，请导出 JSON 文件备份。",
+    unsupportedPictures:
+      "此文档包含当前视图尚未支持的图片框。已保存的原文档与当前工作簿均保留，请勿重置原数据。",
     invalidSnapshot:
       "本地文档暂时无法打开，自动保存已暂停。原数据仍保留，你可以重试、导入备份，或放弃旧数据新建空白文档。",
     conflict: "其他标签页已保存了新副本，当前编辑仍保留在页面中。请先导出，再重新加载本地副本。",

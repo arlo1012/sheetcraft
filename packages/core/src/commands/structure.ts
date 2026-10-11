@@ -1,3 +1,8 @@
+import { assertPictureObjectsForSheet } from "../picture-object-sheet.js";
+import { isFramedPictureObject } from "../picture-object.js";
+import { createPictureSheetMetrics } from "../picture-axis-metrics.js";
+import { clonePictureFrame } from "../picture-frame.js";
+import { transformPictureFrameAxis } from "../picture-frame-axis-edit.js";
 import {
   capturePivotTables,
   restorePivotTables,
@@ -898,6 +903,43 @@ function transformSheetAxis(
   operation: "insert" | "delete",
   transformPictures = true,
 ): boolean {
+  const mappedDimensions = new Map(
+    [...(axis === "row" ? sheet.rowHeights : sheet.columnWidths)].flatMap(([source, size]) => {
+      const target = transformAxisIndex(source, index, count, maximum, operation);
+      return target === null ? [] : [[target, size] as const];
+    }),
+  );
+  const mappedHidden = new Set(
+    [...(axis === "row" ? (sheet.hiddenRows ?? []) : (sheet.hiddenColumns ?? []))].flatMap(
+      (source) => {
+        const target = transformAxisIndex(source, index, count, maximum, operation);
+        return target === null ? [] : [target];
+      },
+    ),
+  );
+  const nextMetrics = createPictureSheetMetrics({
+    ...sheet,
+    ...(axis === "row"
+      ? { rowHeights: mappedDimensions, hiddenRows: mappedHidden }
+      : { columnWidths: mappedDimensions, hiddenColumns: mappedHidden }),
+  });
+  const plannedPictures: FloatingImage[] = transformPictures
+    ? sheet.floatingImages.flatMap<FloatingImage>((image) => {
+        if (isFramedPictureObject(image)) {
+          const frame = transformPictureFrameAxis(
+            image.frame,
+            { axis, operation, index, count },
+            nextMetrics,
+          );
+          return frame ? [{ ...image, frame }] : [];
+        }
+        const source = image.anchor[axis];
+        const target = transformAxisIndex(source, index, count, maximum, operation);
+        return target === null
+          ? []
+          : [target === source ? image : { ...image, anchor: { ...image.anchor, [axis]: target } }];
+      })
+    : sheet.floatingImages;
   const cells = [...sheet.cells].flatMap(([key, cell]) => {
     const address = parseCellKey(key);
     const sourceIndex = getAxisIndex(address, axis);
@@ -910,7 +952,8 @@ function transformSheetAxis(
   );
   const hiddenEntries = [...(hiddenIndexes ?? [])].filter((hiddenIndex) => hiddenIndex >= index);
 
-  let changed = false;
+  let changed =
+    transformPictures && !areFloatingImageCollectionsEqual(sheet.floatingImages, plannedPictures);
 
   if (operation === "delete") {
     for (const entry of cells) {
@@ -1009,27 +1052,7 @@ function transformSheetAxis(
     });
     changed = true;
   }
-  const transformedFloatingImages: FloatingImage[] = [];
-  for (const image of transformPictures ? sheet.floatingImages : []) {
-    const sourceIndex = axis === "row" ? image.anchor.row : image.anchor.column;
-    const targetIndex = transformAxisIndex(sourceIndex, index, count, maximum, operation);
-    if (targetIndex === null) {
-      changed = true;
-      continue;
-    }
-    if (targetIndex === sourceIndex) transformedFloatingImages.push(image);
-    else {
-      transformedFloatingImages.push({
-        ...image,
-        anchor:
-          axis === "row"
-            ? { row: targetIndex, column: image.anchor.column }
-            : { row: image.anchor.row, column: targetIndex },
-      });
-      changed = true;
-    }
-  }
-  if (transformPictures) sheet.floatingImages = transformedFloatingImages;
+  if (transformPictures) sheet.floatingImages = plannedPictures;
   return changed;
 }
 
@@ -1076,6 +1099,7 @@ function captureSheetAxisSlice(
     return [{ address: parseCellKey(key), source: cell.content.formula.source }];
   });
   const floatingImages = sheet.floatingImages.flatMap((image, imageIndex) => {
+    if (isFramedPictureObject(image)) return [];
     const axisIndex = axis === "row" ? image.anchor.row : image.anchor.column;
     return axisIndex >= start && axisIndex < end
       ? [{ image: cloneFloatingImage(image), index: imageIndex }]
@@ -1228,6 +1252,12 @@ function validateSheetAxisSlice(
     }
   }
   for (const entry of command.slice.floatingImages) {
+    if (isFramedPictureObject(entry.image))
+      throw invalidCommandPayload(
+        "slice.floatingImages",
+        entry,
+        "Framed images must use the full inverse image state.",
+      );
     if (!Number.isInteger(entry.index) || entry.index < 0) {
       throw invalidCommandPayload("slice.floatingImages", entry);
     }
@@ -1417,6 +1447,15 @@ export function applyRestoreSheetStateCommand(
     validateCommandPayload("slice", command.slice, () =>
       validateSheetAxisSlice(command, maximum, sheet),
     );
+    if (
+      command.slice.floatingImageState === undefined &&
+      sheet.floatingImages.some(isFramedPictureObject)
+    )
+      throw invalidCommandPayload(
+        "slice.floatingImageState",
+        undefined,
+        "A legacy structural inverse cannot restore frame-aware pictures.",
+      );
     const inverseOperation = command.operation === "insert" ? "delete" : "insert";
     const nextMetadata = transformSheetMetadataForAxis(
       getSheetMetadata(sheet),
@@ -1427,6 +1466,43 @@ export function applyRestoreSheetStateCommand(
       inverseOperation,
       sheet.name,
     );
+    if (command.slice.floatingImageState !== undefined) {
+      const dimensions = command.axis === "row" ? sheet.rowHeights : sheet.columnWidths;
+      const nextDimensions = new Map(
+        [...dimensions].flatMap(([source, size]) => {
+          const target = transformAxisIndex(
+            source,
+            command.index,
+            command.count,
+            maximum,
+            inverseOperation,
+          );
+          return target === null ? [] : [[target, size] as const];
+        }),
+      );
+      for (const entry of command.slice.dimensions) nextDimensions.set(entry.index, entry.size);
+      const hidden = command.axis === "row" ? sheet.hiddenRows : sheet.hiddenColumns;
+      const nextHidden = new Set(
+        [...(hidden ?? [])].flatMap((source) => {
+          const target = transformAxisIndex(
+            source,
+            command.index,
+            command.count,
+            maximum,
+            inverseOperation,
+          );
+          return target === null ? [] : [target];
+        }),
+      );
+      for (const index of command.slice.hiddenIndexes ?? []) nextHidden.add(index);
+      const shadow = {
+        ...sheet,
+        ...(command.axis === "row"
+          ? { rowHeights: nextDimensions, hiddenRows: nextHidden }
+          : { columnWidths: nextDimensions, hiddenColumns: nextHidden }),
+      };
+      assertPictureObjectsForSheet(command.slice.floatingImageState, shadow);
+    }
     const transformed = transformSheetAxis(
       sheet,
       command.axis,
@@ -2100,6 +2176,7 @@ export function applyMoveSheetAxisCommand(
     workbook,
     command.sheetId,
   );
+  const maximum = command.axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
   const mapIndex = (value: number) =>
     transformAxisIndexForMove(value, command.index, command.count, command.toIndex);
   const mapAddress = (address: SheetSparseCell["address"]): SheetSparseCell["address"] =>
@@ -2181,13 +2258,23 @@ export function applyMoveSheetAxisCommand(
     drawings: metadata.drawings,
     pivotTables: metadata.pivotTables,
     protection: metadata.protection,
-    floatingImages: previousState.floatingImages.map((image) => ({
-      ...image,
-      anchor:
-        command.axis === "row"
-          ? { row: mapIndex(image.anchor.row), column: image.anchor.column }
-          : { row: image.anchor.row, column: mapIndex(image.anchor.column) },
-    })),
+    floatingImages: previousState.floatingImages.map((image) => {
+      if (isFramedPictureObject(image)) {
+        const frame = clonePictureFrame(image.frame);
+        if (frame.anchor.mode === "fixed") return { ...image, frame };
+        if (frame.anchor.mode === "move-and-size")
+          throw invalidCommandPayload(
+            "image.frame.anchor",
+            frame.anchor,
+            "Axis reordering of stretch-anchored pictures is not yet supported.",
+          );
+        const point = frame.anchor.origin[command.axis];
+        if (point.index < maximum && !(point.index === 0 && point.offset < 0))
+          point.index = mapIndex(point.index);
+        return { ...image, frame };
+      }
+      return { ...image, anchor: mapAddress(image.anchor) };
+    }),
   };
   const stateChanged = replaceSheetSparseState(sheet, state);
   const pivotsChanged = restorePivotTables(workbook, nextPivots);

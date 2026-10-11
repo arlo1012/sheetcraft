@@ -7,7 +7,7 @@ import {
 import type { Workbook } from "@sheetcraft/core/workbook";
 import type { ImageAssetStore } from "../image-assets/imageAssetStore";
 import type { useWorkbookPersistence } from "../workbook-persistence/useWorkbookPersistence";
-import { prepareXlsxImages } from "./prepareXlsxImages";
+import { prepareXlsxImages, assertXlsxPictureGeometrySupport } from "./prepareXlsxImages";
 import type { XlsxCompatibilityReport } from "./xlsxWorkerProtocol";
 import {
   createWorkbookXlsxWorker,
@@ -139,6 +139,10 @@ export function useWorkbookXlsxActions(options: {
   function setFailure(error: unknown): void {
     if (error instanceof XlsxWorkerAbortError || disposed) return;
     if (error instanceof XlsxWorkerFailure && setNumericTotalsFailure(error.report)) return;
+    if (error instanceof XlsxWorkerFailure && error.report && hasBlockingIssue(error.report)) {
+      feedback.value = { key: "xlsx.feedback.blocked", error: true };
+      return;
+    }
     feedback.value = {
       key:
         error instanceof XlsxWorkerTimeoutError
@@ -156,6 +160,10 @@ export function useWorkbookXlsxActions(options: {
     file: Pick<File, "arrayBuffer" | "size">,
     password?: string,
   ): Promise<void> {
+    if (options.persistence.error?.value === "unsupported-picture-frame") {
+      feedback.value = { key: "xlsx.feedback.blocked", error: true };
+      return;
+    }
     if (password === undefined && !prepare()) return;
     const workbookAtStart = options.getWorkbook();
     const revisionAtStart = options.getRevision();
@@ -233,6 +241,12 @@ export function useWorkbookXlsxActions(options: {
   }
 
   async function exportXlsx(password?: string): Promise<void> {
+    try {
+      assertXlsxPictureGeometrySupport(options.getWorkbook());
+    } catch (error) {
+      setFailure(error);
+      return;
+    }
     if (!prepare()) return;
     const snapshot: WorkbookSnapshot = serializeWorkbook(options.getWorkbook());
     const requestId = `xlsx-export-${++requestNumber}`;
@@ -283,6 +297,10 @@ export function useWorkbookXlsxActions(options: {
   }
 
   async function confirm(): Promise<void> {
+    if (options.persistence.error?.value === "unsupported-picture-frame") {
+      feedback.value = { key: "xlsx.feedback.blocked", error: true };
+      return;
+    }
     if (busy.value || !pendingImport.value) return;
     busy.value = true;
     try {

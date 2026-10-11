@@ -1,3 +1,4 @@
+import { getPictureObjectOriginCell } from "./picture-object-sheet.js";
 import { createSheetFilterHiddenRowIntervals } from "./commands/filter.js";
 import { resolveContiguousDataRange } from "./data-range.js";
 import { WorkbookDomainError } from "./errors.js";
@@ -96,7 +97,7 @@ function getUsedRange(sheet: Sheet): CellRange | undefined {
     include(merged.start);
     include(merged.end);
   }
-  for (const image of sheet.floatingImages) include(image.anchor);
+  for (const image of sheet.floatingImages) include(getPictureObjectOriginCell(image, sheet));
   return bottom < 0
     ? undefined
     : { start: { row: top, column: left }, end: { row: bottom, column: right } };
@@ -402,8 +403,16 @@ export function findSheetGoToTargets(
         .sort((left, right) => compareRanges(left.range, right.range));
     case "objects":
       return sheet.floatingImages
-        .filter((image) => inRange(image.anchor, scope))
-        .map((image) => result({ start: { ...image.anchor }, end: { ...image.anchor } }, image.id))
+        .filter((image) => inRange(getPictureObjectOriginCell(image, sheet), scope))
+        .map((image) =>
+          result(
+            {
+              start: getPictureObjectOriginCell(image, sheet),
+              end: getPictureObjectOriginCell(image, sheet),
+            },
+            image.id,
+          ),
+        )
         .sort(
           (left, right) =>
             compareRanges(left.range, right.range) || (left.imageId! < right.imageId! ? -1 : 1),

@@ -1,3 +1,4 @@
+import { getPictureObjectOriginCell } from "../picture-object-sheet.js";
 import { WorkbookDomainError } from "../errors.js";
 import { getPivotTableRange, rangesIntersect } from "../pivot-tables.js";
 import { getCellContent, type CellRange, type Sheet, type Workbook } from "../workbook.js";
@@ -150,7 +151,10 @@ export function assertPivotResultsAreWritable(workbook: Workbook, command: Workb
       return;
     case "convertFloatingImageToCell": {
       const image = sheet.floatingImages.find((image) => image.id === command.id);
-      if (image) check(sheet.id, { start: image.anchor, end: image.anchor });
+      if (image) {
+        const address = getPictureObjectOriginCell(image, sheet);
+        check(sheet.id, { start: address, end: address });
+      }
       return;
     }
     case "convertCellImageToFloating":

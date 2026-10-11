@@ -812,7 +812,12 @@ export function useGridClipboard(options: {
         // A later clipboard item must not turn captured external text into a local cut.
         localToken:
           matches && !asyncTransfer.invalidFloatingImage ? asyncTransfer.localToken : undefined,
-        ...(matches && asyncTransfer.invalidFloatingImage ? { invalidFloatingImage: true } : {}),
+        ...(matches && asyncTransfer.invalidFloatingImage
+          ? {
+              invalidFloatingImage: true,
+              ...(asyncTransfer.unsupportedFloatingImage ? { unsupportedFloatingImage: true } : {}),
+            }
+          : {}),
       };
     } catch {
       // The synchronous event payload remains the safe text-only fallback.
@@ -824,7 +829,11 @@ export function useGridClipboard(options: {
       options.onFeedback("documentChanged");
       return;
     }
-    if (pendingClipboard.value && transfer.localToken !== pendingClipboard.value.token) {
+    if (
+      !transfer.unsupportedFloatingImage &&
+      pendingClipboard.value &&
+      transfer.localToken !== pendingClipboard.value.token
+    ) {
       pendingClipboard.value = null;
     }
     options.onReadTransfer?.(transfer);
@@ -850,7 +859,7 @@ export function useGridClipboard(options: {
     const sheetId = options.getSheet().id;
     const revision = getRevision();
     const selection = cloneSelection(options.getSelection());
-    const transfer = {
+    const transfer: GridClipboardTransfer = {
       text: types.includes("text/plain") ? data.getData("text/plain") : undefined,
       localToken: readGridClipboardLocalToken(data),
       imageFile: data.files
@@ -861,7 +870,11 @@ export function useGridClipboard(options: {
       void pasteClipboardEventTransfer(transfer, selection, operation, sheetId, revision);
       return;
     }
-    if (pendingClipboard.value && transfer.localToken !== pendingClipboard.value.token) {
+    if (
+      !transfer.unsupportedFloatingImage &&
+      pendingClipboard.value &&
+      transfer.localToken !== pendingClipboard.value.token
+    ) {
       pendingClipboard.value = null;
     }
     options.onReadTransfer?.(transfer);
@@ -905,7 +918,11 @@ export function useGridClipboard(options: {
       options.onFeedback("documentChanged");
       return;
     }
-    if (pendingClipboard.value && transfer.localToken !== pendingClipboard.value.token) {
+    if (
+      !transfer.unsupportedFloatingImage &&
+      pendingClipboard.value &&
+      transfer.localToken !== pendingClipboard.value.token
+    ) {
       pendingClipboard.value = null;
     }
     options.onReadTransfer?.(transfer);

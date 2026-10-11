@@ -1,3 +1,7 @@
+import {
+  assertWorkbookPictureSupport,
+  assertPictureCommandSupport,
+} from "../../modules/sheet-images/picture-document-support";
 import { canEditCell, canEditRange } from "@sheetcraft/core";
 import type { FillDirection } from "@sheetcraft/sheet-engine/fill-selection";
 import {
@@ -485,6 +489,8 @@ export function useSpreadsheetWorkspaceController(
   ): boolean {
     let changed: boolean;
     try {
+      assertWorkbookPictureSupport(session.workbook);
+      assertPictureCommandSupport(command);
       if (
         !(
           options.allowDuplicateEntry &&
@@ -528,6 +534,8 @@ export function useSpreadsheetWorkspaceController(
     command: WorkbookCommand,
     token?: ReplaceableWorkbookCommandToken,
   ) {
+    assertWorkbookPictureSupport(session.workbook);
+    assertPictureCommandSupport(command);
     assertDuplicateEntriesAreAllowed(command);
     calculation.prepareMutation();
     const result = executeReplaceableWorkbookCommand(session, token, command);
@@ -1491,6 +1499,7 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function replaceWorkbook(workbook: Workbook): void {
+    assertWorkbookPictureSupport(workbook);
     gridRef.value?.clearClipboard?.();
     session.workbook = workbook;
     calculation = createWorkbookCalculationSession(session.workbook);

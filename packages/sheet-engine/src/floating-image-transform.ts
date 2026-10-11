@@ -1,8 +1,10 @@
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import {
   MAX_FLOATING_IMAGE_SIZE,
   MIN_FLOATING_IMAGE_SIZE,
   normalizeImageTransform,
   type FloatingImage,
+  type LegacyFloatingImage,
   type ImageCrop,
   type ImageTransform,
 } from "@sheetcraft/core/workbook";
@@ -100,9 +102,9 @@ function fitImageSize(width: number, height: number): FloatingImageOriginalSize 
 }
 
 function withTransform(
-  image: FloatingImage,
+  image: LegacyFloatingImage,
   requestedTransform: ImageTransform | undefined,
-): FloatingImage {
+): LegacyFloatingImage {
   const transform = normalizeImageTransform(requestedTransform);
   const { transform: _previousTransform, ...fields } = image;
   return { ...fields, ...(transform ? { transform } : {}) };
@@ -112,7 +114,8 @@ export function cropFloatingImage(
   image: FloatingImage,
   selection: FloatingImageCropSelection,
   layout: SheetViewportLayout,
-): FloatingImage | null {
+): LegacyFloatingImage | null {
+  if (isFramedPictureObject(image)) return null;
   const rect = getFloatingImageSheetRect(image, layout);
   if (!rect) return null;
   const displayed = normalizeSelection(selection);
@@ -145,7 +148,8 @@ export function rotateFloatingImage(
   image: FloatingImage,
   quarterTurns: -1 | 1 | 2,
   layout: SheetViewportLayout,
-): FloatingImage | null {
+): LegacyFloatingImage | null {
+  if (isFramedPictureObject(image)) return null;
   const rect = getFloatingImageSheetRect(image, layout);
   if (!rect) return null;
   const rotation = ((((image.transform?.rotation ?? 0) + quarterTurns * 90) % 360) + 360) % 360;
@@ -167,7 +171,9 @@ export function rotateFloatingImage(
 export type ImageFlipAxis = "horizontal" | "vertical";
 
 /** Mirrors the current displayed image while preserving its frame and original source. */
-export function flipFloatingImage(image: FloatingImage, axis: ImageFlipAxis): FloatingImage {
+export function flipFloatingImage(image: FloatingImage, axis: ImageFlipAxis): LegacyFloatingImage {
+  if (isFramedPictureObject(image))
+    throw new TypeError("Use the frame-aware picture transform for framed images.");
   // Metadata describes source axes before rotation. A quarter-turn exchanges
   // those axes relative to the horizontal and vertical directions on screen.
   const horizontalSourceAxis = (axis === "horizontal") !== isQuarterTurn(image.transform?.rotation);
@@ -179,7 +185,8 @@ export function restoreFloatingImage(
   image: FloatingImage,
   layout: SheetViewportLayout,
   originalSize?: FloatingImageOriginalSize,
-): FloatingImage | null {
+): LegacyFloatingImage | null {
+  if (isFramedPictureObject(image)) return null;
   const rect = getFloatingImageSheetRect(image, layout);
   if (!rect) return null;
   const crop = image.transform?.crop ?? fullCrop();

@@ -1,3 +1,4 @@
+import { isFramedPictureObject } from "../picture-object.js";
 import {
   capturePivotTables,
   restorePivotTables,
@@ -420,12 +421,22 @@ export function applyCellShiftCommand(
       );
   }
 
+  if (
+    sheet.floatingImages.some(
+      (image) => isFramedPictureObject(image) && image.frame.anchor.mode !== "fixed",
+    )
+  )
+    throw invalidCommandPayload(
+      "floatingImages",
+      sheet.floatingImages,
+      "Partial cell shifts with moving framed pictures are not yet supported.",
+    );
   const map = createMap(range, command.direction);
   const previousState = createSheetSparseState(sheet);
   if (command.type === "insertCells") {
     const overflow =
       previousState.cells.some((cell) => !map(cell.address)) ||
-      sheet.floatingImages.some((image) => !map(image.anchor)) ||
+      sheet.floatingImages.some((image) => !isFramedPictureObject(image) && !map(image.anchor)) ||
       (sheet.drawings ?? []).some((drawing) => !map(drawing.anchor));
     if (overflow)
       throw invalidCommandPayload(
@@ -513,7 +524,10 @@ export function applyCellShiftCommand(
         ]
       : [];
   });
-  nextState.floatingImages = previousState.floatingImages.flatMap((image) => {
+  nextState.floatingImages = previousState.floatingImages.flatMap<
+    import("../workbook.js").FloatingImage
+  >((image) => {
+    if (isFramedPictureObject(image)) return [image];
     const anchor = map(image.anchor);
     return anchor ? [{ ...image, anchor }] : [];
   });

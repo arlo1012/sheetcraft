@@ -1,7 +1,30 @@
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { XlsxCompatibilityError } from "./types.js";
 import type { CellImage } from "@sheetcraft/core/formula";
-import { normalizeImageTransform, type FloatingImage, type Sheet } from "@sheetcraft/core/workbook";
+import {
+  normalizeImageTransform,
+  type FloatingImage,
+  type LegacyFloatingImage,
+  type Sheet,
+} from "@sheetcraft/core/workbook";
 import type { XlsxEncodeOptions, XlsxImageAsset } from "./types.js";
 import { nativeDrawingAnchor, type NativeDrawingAnchor } from "./drawing-geometry.js";
+
+/** The existing native writer cannot encode object-frame geometry. Reject before resources. */
+export function assertSupportedXlsxPicture(
+  image: FloatingImage,
+  issueLocation: string,
+): asserts image is LegacyFloatingImage {
+  if (isFramedPictureObject(image))
+    throw new XlsxCompatibilityError(
+      `Frame-aware pictures are not yet supported by XLSX export at ${issueLocation}.`,
+      {
+        issues: [
+          { code: "feature-omitted", severity: "block", count: 1, locations: [issueLocation] },
+        ],
+      },
+    );
+}
 
 export type XlsxImageAnchor = NativeDrawingAnchor & {
   altText?: string;
@@ -86,6 +109,10 @@ export function createXlsxImageExporter(
       image: FloatingImage,
       issueLocation: string,
     ): void {
+      assertSupportedXlsxPicture(
+        image,
+        `${issueLocation}.floatingImages[${JSON.stringify(image.id)}].frame`,
+      );
       const asset = requireAsset(image.assetId, image.transform, issueLocation);
       output.addImage(addAsset(asset), {
         ...nativeDrawingAnchor(

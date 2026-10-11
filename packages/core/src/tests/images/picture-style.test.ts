@@ -12,11 +12,11 @@ import {
   cloneFloatingImage,
   getActiveSheet,
   setCellContent,
-  type FloatingImage,
+  type LegacyFloatingImage,
 } from "../../workbook.js";
 import { createTestWorkbookSession } from "../helpers.js";
 
-function picture(id = "picture"): FloatingImage {
+function picture(id = "picture"): LegacyFloatingImage {
   return {
     id,
     assetId: "asset",
@@ -139,7 +139,7 @@ describe("picture styling", () => {
   });
 
   test("deep clones appearance, border, crop, and floating anchors", () => {
-    const image: FloatingImage = {
+    const image: LegacyFloatingImage = {
       ...picture(),
       transform: {
         appearance: { border: { color: "#abcdef", width: 2 }, brightness: 1.5 },

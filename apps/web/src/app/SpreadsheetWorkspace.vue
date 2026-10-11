@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { getCellContent, getCellStyle } from "@sheetcraft/core/workbook";
 import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
 import { useWordProofreading } from "../modules/text-proofreading/useWordProofreading";
@@ -567,9 +568,12 @@ const headerFooterTarget = shallowRef<HeaderFooterEditTarget>();
 const picturePreviewOnDoubleClick = ref(true);
 const selectedPictureId = ref<string | null>(null);
 const selectedPictureIds = ref<string[]>([]);
-const selectedPicture = computed(() =>
-  activeSheet.value.floatingImages.find((image) => image.id === selectedPictureId.value),
-);
+const selectedPicture = computed(() => {
+  const image = activeSheet.value.floatingImages.find(
+    (image) => image.id === selectedPictureId.value,
+  );
+  return image && !isFramedPictureObject(image) ? image : undefined;
+});
 watch(
   () => activeSheet.value.id,
   () => {

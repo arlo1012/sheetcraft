@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getPictureObjectOriginCell } from "@sheetcraft/core/picture-object-sheet";
 import { getPivotActiveField } from "../../pivot-tables/pivot-active-field";
 import PivotReportFilters from "../../pivot-tables/components/PivotReportFilters.vue";
 import { isPivotValueCell, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
@@ -1834,7 +1835,7 @@ function convertSelectedFloatingImageToCell(id: string): void {
   if (!image) return;
   emit("convertFloatingImageToCell", id);
   if (!props.sheet.floatingImages.some((entry) => entry.id === id)) {
-    setActiveCell(layout.value.getAnchorForAddress(image.anchor));
+    setActiveCell(layout.value.getAnchorForAddress(getPictureObjectOriginCell(image, props.sheet)));
   }
 }
 
@@ -1873,7 +1874,7 @@ async function requestFloatingImagePaste(id: string): Promise<void> {
   if (objectsReadOnly.value) return;
   const image = props.sheet.floatingImages.find((entry) => entry.id === id);
   if (!image) return;
-  setActiveCell(image.anchor);
+  setActiveCell(getPictureObjectOriginCell(image, props.sheet));
   await pasteSelection();
   focusEditor();
 }
@@ -1942,6 +1943,7 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
   let images: readonly FloatingImage[] | undefined;
   let localToken: string | undefined;
   let invalidFloatingImage = false;
+  let unsupportedFloatingImage = false;
   try {
     const transfer = await browserClipboard.read({ preferAsync: true });
     if (areGridClipboardTextsEqual(text, transfer.text)) {
@@ -1949,6 +1951,7 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
       images = transfer.floatingImages;
       localToken = transfer.localToken;
       invalidFloatingImage = transfer.invalidFloatingImage === true;
+      unsupportedFloatingImage = transfer.unsupportedFloatingImage === true;
     }
   } catch {
     // Keep the captured native text when the browser denies the optional rich read.
@@ -1964,7 +1967,12 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
     emit("clipboardFeedback", "documentChanged");
     return;
   }
-  floatingClipboard.observeTransfer({ floatingImage: image, localToken, invalidFloatingImage });
+  floatingClipboard.observeTransfer({
+    floatingImage: image,
+    localToken,
+    invalidFloatingImage,
+    unsupportedFloatingImage,
+  });
   if (objectsReadOnly.value) {
     emit("clipboardFeedback", "documentChanged");
     return;

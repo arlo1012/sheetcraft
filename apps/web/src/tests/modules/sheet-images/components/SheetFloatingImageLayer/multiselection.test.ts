@@ -1,6 +1,6 @@
 import { mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { FloatingImage } from "@sheetcraft/core/workbook";
+import type { LegacyFloatingImage as FloatingImage } from "@sheetcraft/core/workbook";
 import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
 import { getFloatingImageSheetRect } from "@sheetcraft/sheet-engine/floating-image-layout";
 import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";

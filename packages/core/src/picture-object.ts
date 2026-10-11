@@ -1,7 +1,7 @@
 import {
-  normalizeFloatingImageForSheet,
-  cloneFloatingImage,
-  areFloatingImageCollectionsEqual,
+  normalizeLegacyFloatingImageForSheet,
+  cloneLegacyFloatingImage,
+  areLegacyFloatingImagesEqual,
   type LegacyFloatingImage,
 } from "./workbook.js";
 import {
@@ -17,15 +17,25 @@ import {
 } from "./picture-frame.js";
 
 /** Appearance and annotations remain separate from the object's single geometry source. */
-export type PictureObjectAppearance = Pick<ImageTransform, "appearance" | "annotations">;
+export type PictureObjectAppearance = Pick<ImageTransform, "appearance" | "annotations"> & {
+  crop?: never;
+  rotation?: never;
+  flipHorizontal?: never;
+  flipVertical?: never;
+};
 export type FramedFloatingImage = Pick<
   LegacyFloatingImage,
   "id" | "assetId" | "altText" | "hidden" | "groupId" | "lockAspectRatio"
 > & {
   frame: PictureFrame;
+  anchor?: never;
+  offsetX?: never;
+  offsetY?: never;
+  width?: never;
+  height?: never;
   transform?: PictureObjectAppearance;
 };
-/** Consumer preparation contract. Sheet collections and snapshots still store legacy images. */
+/** Internal picture union; view consumers must declare framed-picture support. */
 export type PictureObject = LegacyFloatingImage | FramedFloatingImage;
 
 export function isFramedPictureObject(image: PictureObject): image is FramedFloatingImage {
@@ -35,7 +45,7 @@ export function isFramedPictureObject(image: PictureObject): image is FramedFloa
 export function normalizePictureObject(image: PictureObject): PictureObject {
   if (!image || typeof image !== "object" || Array.isArray(image))
     throw new TypeError("Invalid picture object.");
-  if (!isFramedPictureObject(image)) return normalizeFloatingImageForSheet(image);
+  if (!isFramedPictureObject(image)) return normalizeLegacyFloatingImageForSheet(image);
   const allowed = new Set([
     "id",
     "assetId",
@@ -67,7 +77,13 @@ export function normalizePictureObject(image: PictureObject): PictureObject {
       Object.keys(image.transform).some((key) => key !== "appearance" && key !== "annotations"))
   )
     throw new TypeError("Framed picture transforms may contain only appearance and annotations.");
-  const transform = cloneImageTransform(image.transform);
+  const cloned = cloneImageTransform(image.transform);
+  const transform: PictureObjectAppearance | undefined = cloned
+    ? {
+        ...(cloned.appearance ? { appearance: cloned.appearance } : {}),
+        ...(cloned.annotations ? { annotations: cloned.annotations } : {}),
+      }
+    : undefined;
   return {
     id: image.id,
     assetId: image.assetId,
@@ -81,7 +97,7 @@ export function normalizePictureObject(image: PictureObject): PictureObject {
 }
 
 export function clonePictureObject<T extends PictureObject>(image: T): T {
-  if (!isFramedPictureObject(image)) return cloneFloatingImage(image) as T;
+  if (!isFramedPictureObject(image)) return cloneLegacyFloatingImage(image) as T;
   const normalized = normalizePictureObject(image) as FramedFloatingImage;
   return { ...normalized, frame: clonePictureFrame(normalized.frame) } as T;
 }
@@ -91,7 +107,7 @@ export function arePictureObjectsEqual(left: PictureObject, right: PictureObject
     return (
       !isFramedPictureObject(left) &&
       !isFramedPictureObject(right) &&
-      areFloatingImageCollectionsEqual([left], [right])
+      areLegacyFloatingImagesEqual(left, right)
     );
   return (
     left.id === right.id &&

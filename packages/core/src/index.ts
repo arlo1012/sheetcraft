@@ -39,3 +39,4 @@ export * from "./picture-axis-metrics.js";
 export * from "./picture-frame.js";
 export * from "./picture-object.js";
 export * from "./picture-frame-axis-edit.js";
+export * from "./picture-object-sheet.js";

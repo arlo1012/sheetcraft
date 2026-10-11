@@ -1,3 +1,4 @@
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { getCurrentScope, nextTick, onScopeDispose, readonly, ref } from "vue";
 import {
   MIN_FLOATING_IMAGE_SIZE,
@@ -180,6 +181,10 @@ export function useSheetImageActions(options: {
     if (busy.value || disposed) return;
     const image = options.getSheet().floatingImages.find((entry) => entry.id === imageId);
     if (!image) return;
+    if (isFramedPictureObject(image)) {
+      feedback.value = "picture.operationFailed";
+      return;
+    }
     cancelPending();
     const target = captureTarget(image.anchor);
     if (!target) return;
@@ -207,18 +212,31 @@ export function useSheetImageActions(options: {
   async function insertFile(
     file: File,
     mode: ImageInsertMode = "floating",
-    target = captureTarget(options.getAddress(), mode),
+    target?: ImageTarget,
     replaceId?: string,
-    replaceAssetId = replaceId
-      ? target?.sheet.floatingImages.find((image) => image.id === replaceId)?.assetId
-      : undefined,
+    replaceAssetId?: string,
   ): Promise<void> {
+    if (replaceId) {
+      const current = options.getSheet().floatingImages.find((image) => image.id === replaceId);
+      if (current && isFramedPictureObject(current)) {
+        feedback.value = "picture.operationFailed";
+        return;
+      }
+    }
+    target ??= captureTarget(options.getAddress(), mode);
     if (!target || !isCurrent(target, mode) || busy.value) return;
+    const owner = target;
+    replaceAssetId ??= replaceId
+      ? owner.sheet.floatingImages.find((image) => image.id === replaceId)?.assetId
+      : undefined;
     const replacement = () =>
-      target.sheet.floatingImages.find(
-        (image) => image.id === replaceId && image.assetId === replaceAssetId,
+      owner.sheet.floatingImages.find(
+        (image) =>
+          image.id === replaceId &&
+          image.assetId === replaceAssetId &&
+          !isFramedPictureObject(image),
       );
-    const valid = () => isCurrent(target, mode) && (!replaceId || !!replacement());
+    const valid = () => isCurrent(owner, mode) && (!replaceId || !!replacement());
     if (!valid()) return;
     busy.value = true;
     feedback.value = undefined;
@@ -404,6 +422,10 @@ export function useSheetImageActions(options: {
     mode: ImageInsertMode = "floating",
     address = options.getAddress(),
   ): Promise<void> {
+    if (isFramedPictureObject(image)) {
+      feedback.value = "clipboard.pasteRejected";
+      return;
+    }
     const target = captureTarget(address, mode);
     if (!target || busy.value) return;
     busy.value = true;
@@ -454,6 +476,10 @@ export function useSheetImageActions(options: {
     images: readonly FloatingImage[],
     address: CellAddress,
   ): Promise<void> {
+    if (images.some(isFramedPictureObject)) {
+      feedback.value = "clipboard.pasteRejected";
+      return;
+    }
     const target = captureTarget(address);
     if (!target || busy.value || !options.execute || images.length < 2 || images.length > 100)
       return;

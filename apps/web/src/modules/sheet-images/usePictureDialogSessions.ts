@@ -1,9 +1,11 @@
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { getCurrentScope, onScopeDispose, ref, shallowRef, watch, type Ref } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import {
   cloneFloatingImage,
   normalizeImageTransform,
   type FloatingImage,
+  type LegacyFloatingImage,
   type Sheet,
   type Workbook,
 } from "@sheetcraft/core/workbook";
@@ -16,18 +18,18 @@ type Owner = {
   workbook: Workbook;
   sheet: Sheet;
   generation: number;
-  image: FloatingImage;
+  image: LegacyFloatingImage;
   selectedIds: string[];
   sources: Array<{ id: string; assetId: string }>;
 };
 type Dialog = { dialogId: string; error: Ref<MessageKey | undefined>; close: () => void };
 type AnnotationDialog = Dialog & {
-  image: FloatingImage;
+  image: LegacyFloatingImage;
   confirm: (image: FloatingImage) => boolean;
 };
 type CompressionDialog = Dialog & { confirm: (settings: PictureCompression) => Promise<boolean> };
 type BatchDialog = Dialog & {
-  image: FloatingImage;
+  image: LegacyFloatingImage;
   confirm: (settings: ResizeSettings) => boolean;
 };
 
@@ -57,7 +59,13 @@ export function usePictureDialogSessions(options: {
   function capture(): Owner | undefined {
     const image = options.getSelectedImage();
     const sheet = options.getSheet();
-    if (disposed || !image || options.isBusy() || !canUseSheetPermission(sheet, "editObjects"))
+    if (
+      disposed ||
+      !image ||
+      isFramedPictureObject(image) ||
+      options.isBusy() ||
+      !canUseSheetPermission(sheet, "editObjects")
+    )
       return;
     return {
       workbook: options.getWorkbook(),
@@ -113,6 +121,7 @@ export function usePictureDialogSessions(options: {
           !current(owner) ||
           options.isBusy() ||
           !target ||
+          isFramedPictureObject(target) ||
           target.assetId !== owner.image.assetId ||
           image.id !== owner.image.id ||
           image.assetId !== owner.image.assetId ||

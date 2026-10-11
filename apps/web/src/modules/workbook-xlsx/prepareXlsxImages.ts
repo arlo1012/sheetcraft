@@ -1,8 +1,11 @@
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { XlsxWorkerFailure } from "./workbookXlsxWorker";
 import { deserializeWorkbook, type WorkbookSnapshot } from "@sheetcraft/core/serialization";
 import {
   getWorkbookSheets,
   normalizeImageTransform,
   type ImageTransform,
+  type Workbook,
 } from "@sheetcraft/core/workbook";
 import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStore";
 import { paintImagePresentation } from "../../shared/images/imageAppearance";
@@ -59,8 +62,26 @@ function extensionFor(mimeType: string): EncodedImage | undefined {
   return undefined;
 }
 
+export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
+  for (const sheet of getWorkbookSheets(workbook))
+    for (const image of sheet.floatingImages) {
+      if (isFramedPictureObject(image)) {
+        const location = `${sheet.name}.floatingImages[${JSON.stringify(image.id)}].frame`;
+        throw new XlsxWorkerFailure(
+          `Frame-aware pictures are not yet supported by XLSX export at ${location}.`,
+          {
+            issues: [
+              { code: "feature-omitted", severity: "block", count: 1, locations: [location] },
+            ],
+          },
+        );
+      }
+    }
+}
+
 function collectImageReferences(snapshot: WorkbookSnapshot): readonly ImageReference[] {
   const workbook = deserializeWorkbook(snapshot);
+  assertXlsxPictureGeometrySupport(workbook);
   const references: ImageReference[] = [];
   for (const sheet of getWorkbookSheets(workbook)) {
     if (sheet.pageDecoration?.backgroundAssetId)

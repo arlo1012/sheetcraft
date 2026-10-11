@@ -1,7 +1,9 @@
+import { requireLegacyPicture, requireLegacyPictures } from "./picture-document-support";
 import {
   cloneFloatingImage,
   type CellAddress,
   type FloatingImage,
+  type LegacyFloatingImage,
   type Sheet,
 } from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
@@ -15,8 +17,8 @@ import { normalizeClipboardImageGroup, writeFloatingImageClipboard } from "./ima
 import type { ImageInsertMode } from "./useSheetImageActions";
 
 type PendingFloatingImageClipboard = {
-  image: FloatingImage;
-  images?: FloatingImage[];
+  image: LegacyFloatingImage;
+  images?: LegacyFloatingImage[];
   mode: "copy" | "cut";
   sheet: Sheet;
   sheetId: string;
@@ -61,6 +63,7 @@ export function useFloatingImageClipboard(options: {
   }
 
   function observeTransfer(transfer: GridClipboardTransfer): void {
+    if (transfer.invalidFloatingImage && transfer.unsupportedFloatingImage) return;
     const current = getPendingForCurrentSheet();
     if (
       current &&
@@ -98,7 +101,15 @@ export function useFloatingImageClipboard(options: {
     event?: ClipboardEvent,
   ): Promise<void> {
     const sheet = options.getSheet();
-    const capturedImage = cloneFloatingImage(image);
+    let capturedImage: LegacyFloatingImage;
+    try {
+      capturedImage = cloneFloatingImage(requireLegacyPicture(image));
+    } catch {
+      options.onFeedback("image.copyFailed");
+      event?.preventDefault();
+      event?.stopPropagation();
+      return;
+    }
     const selected = options.getSelectedImages?.();
     if (selected === null || (selected && !selected.some((entry) => entry.id === image.id))) {
       options.onFeedback("image.copyFailed");
@@ -106,12 +117,9 @@ export function useFloatingImageClipboard(options: {
       event?.stopPropagation();
       return;
     }
-    let images =
-      selected && selected.length > 1 && selected.some((entry) => entry.id === image.id)
-        ? selected.map(cloneFloatingImage)
-        : undefined;
+    let images: LegacyFloatingImage[] | undefined;
     try {
-      if (images) images = normalizeClipboardImageGroup(images);
+      if (selected && selected.length > 1) images = normalizeClipboardImageGroup(selected);
     } catch {
       options.onFeedback("image.copyFailed");
       event?.preventDefault();
@@ -168,6 +176,13 @@ export function useFloatingImageClipboard(options: {
     transferredImages?: readonly FloatingImage[],
     localToken?: string,
   ): void {
+    try {
+      requireLegacyPicture(image);
+      if (transferredImages) requireLegacyPictures(transferredImages);
+    } catch {
+      options.onFeedback("clipboard.pasteRejected");
+      return;
+    }
     const current = getPendingForCurrentSheet();
     if (
       current &&
@@ -226,7 +241,7 @@ export function useFloatingImageClipboard(options: {
       let accepted = false;
       try {
         accepted = options.onMove({
-          ...cloneFloatingImage(currentImage),
+          ...cloneFloatingImage(requireLegacyPicture(currentImage)),
           anchor: { ...address },
           offsetX: 12,
           offsetY: 12,

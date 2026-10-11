@@ -14,7 +14,7 @@ import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import {
   normalizeImageTransform,
-  type FloatingImage,
+  type LegacyFloatingImage as FloatingImage,
   type ImageAppearance,
 } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";

@@ -1,3 +1,4 @@
+import { framedPicture } from "../../sheet-images/framed-picture-fixture";
 import { effectScope, ref } from "vue";
 import { describe, expect, test, vi } from "vitest";
 import { createWorkbook, getActiveSheet, setCellContent } from "@sheetcraft/core/workbook";
@@ -29,6 +30,7 @@ function mountActions(assetStore?: ImageAssetStore, timeoutMs?: number) {
   );
   const snapshot = serializeWorkbook(workbook);
   const scope = effectScope();
+  const flushPendingEdits = vi.fn(() => true);
   const download = vi.fn();
   const postMessage = vi.fn<(request: XlsxWorkerRequest) => void>((request) => {
     queueMicrotask(() =>
@@ -56,7 +58,7 @@ function mountActions(assetStore?: ImageAssetStore, timeoutMs?: number) {
       persistence: { loading: ref(false), replaceDocument: vi.fn() } as never,
       getWorkbook: () => workbook,
       getRevision: () => 1,
-      flushPendingEdits: () => true,
+      flushPendingEdits,
       hasPendingEdits: () => false,
       assetStore,
       timeoutMs,
@@ -64,10 +66,33 @@ function mountActions(assetStore?: ImageAssetStore, timeoutMs?: number) {
       download,
     }),
   )!;
-  return { actions, workbook, snapshot, scope, download, postMessage, workerFactory };
+  return {
+    actions,
+    workbook,
+    snapshot,
+    scope,
+    download,
+    postMessage,
+    workerFactory,
+    flushPendingEdits,
+  };
 }
 
 describe("XLSX export image preparation", () => {
+  test("unsupported frame export rejects before committing a cell draft, worker or resource work", async () => {
+    const get = vi.fn(async () => imageAsset()),
+      f = mountActions({ get, put: vi.fn() });
+    getActiveSheet(f.workbook).floatingImages = [framedPicture()];
+    const before = serializeWorkbook(f.workbook);
+    await f.actions.exportXlsx();
+    expect(f.actions.feedback.value).toEqual({ key: "xlsx.feedback.blocked", error: true });
+    expect(f.flushPendingEdits).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    expect(f.workerFactory).not.toHaveBeenCalled();
+    expect(f.download).not.toHaveBeenCalled();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    f.scope.stop();
+  });
   test("sends image bytes and the same point-in-time snapshot to the worker before downloading", async () => {
     const asset = imageAsset();
     let finishRead: (value: ImageAsset) => void = () => undefined;
