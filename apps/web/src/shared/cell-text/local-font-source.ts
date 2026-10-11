@@ -37,21 +37,34 @@ export type LocalSymbolFontStatus = Readonly<{
   code?: LocalSymbolFontErrorCode;
 }>;
 export type LocalSymbolFontOptions = Readonly<{ persist?: boolean }>;
+export type SystemFontQueryStatus = Readonly<{
+  state: "idle" | "querying" | "ready" | "error";
+  code?: LocalSymbolFontErrorCode;
+}>;
+export type SystemFontQueryOptions = Readonly<{ refresh?: boolean }>;
 type SystemFontData = Omit<SystemSymbolFontChoice, "id"> & { blob: () => Promise<Blob> };
 type LocalFontWindow = Window & { queryLocalFonts?: () => Promise<readonly SystemFontData[]> };
 
 const fonts = shallowRef<readonly LocalSymbolFont[]>([]);
 const choices = shallowRef<readonly SystemSymbolFontChoice[]>([]);
 const status = shallowRef<LocalSymbolFontStatus>({ state: "idle" });
+const queryStatus = shallowRef<SystemFontQueryStatus>({ state: "idle" });
 const handles = new Map<string, SystemFontData>();
 const pending = new Map<string, Promise<LocalSymbolFont>>();
 let operationVersion = 0;
 let queryVersion = 0;
+let queryPromise: Promise<readonly SystemSymbolFontChoice[]> | undefined;
+let queriedSystemFonts = false;
 let restorePromise: Promise<readonly LocalSymbolFont[]> | undefined;
 
 /** No permission, filesystem, or storage access occurs while obtaining these refs. */
 export function useLocalSymbolFonts() {
-  return { fonts: readonly(fonts), choices: readonly(choices), status: readonly(status) };
+  return {
+    fonts: readonly(fonts),
+    choices: readonly(choices),
+    status: readonly(status),
+    queryStatus: readonly(queryStatus),
+  };
 }
 
 function run<T>(
@@ -99,8 +112,13 @@ function validMetadata(value: unknown): value is string {
 /** Explicit user gesture only. Retain metadata/handles, never read every font's bytes.
  * https://wicg.github.io/local-font-access/
  */
-export function requestSystemFontChoices(): Promise<readonly SystemSymbolFontChoice[]> {
-  return run(
+export function requestSystemFontChoices(
+  options: SystemFontQueryOptions = {},
+): Promise<readonly SystemSymbolFontChoice[]> {
+  if (queryPromise) return queryPromise;
+  if (queriedSystemFonts && !options.refresh) return Promise.resolve(choices.value);
+  queryStatus.value = { state: "querying" };
+  const request = run(
     "querying",
     async () => {
       if (
@@ -111,8 +129,6 @@ export function requestSystemFontChoices(): Promise<readonly SystemSymbolFontCho
       if (navigator.userActivation && !navigator.userActivation.isActive)
         throw new LocalSymbolFontError("gesture-required");
       const version = ++queryVersion;
-      handles.clear();
-      choices.value = [];
       const result = await (window as LocalFontWindow).queryLocalFonts!();
       const available: SystemSymbolFontChoice[] = [];
       const nextHandles = new Map<string, SystemFontData>();
@@ -139,13 +155,31 @@ export function requestSystemFontChoices(): Promise<readonly SystemSymbolFontCho
         nextHandles.set(id, entry);
       }
       if (version === queryVersion) {
-        choices.value = Object.freeze(available);
+        handles.clear();
         for (const [id, entry] of nextHandles) handles.set(id, entry);
+        choices.value = Object.freeze(available);
       }
       return available;
     },
-    "denied",
+    "query-failed",
   );
+  queryPromise = request
+    .then(
+      (result) => {
+        queriedSystemFonts = true;
+        queryStatus.value = { state: "ready" };
+        return result;
+      },
+      (error: unknown) => {
+        const failure = localFontFailure(error, "query-failed");
+        queryStatus.value = { state: "error", code: failure.code };
+        throw failure;
+      },
+    )
+    .finally(() => {
+      queryPromise = undefined;
+    });
+  return queryPromise;
 }
 
 /** Alias lookup is exact; a real family is resolved only when its loaded identity is unique. */

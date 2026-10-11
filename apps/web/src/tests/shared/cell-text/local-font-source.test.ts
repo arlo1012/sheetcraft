@@ -121,6 +121,102 @@ describe("explicit local Symbol font source", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
+  test("settings and Symbol share one metadata scan, no bytes, and cached reads need no gesture", async () => {
+    Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
+    const entry = systemChoice();
+    const query = vi.fn(async () => [entry]);
+    Object.assign(window, { queryLocalFonts: query });
+    const { localFontAccess } = await import("../../../shared/cell-text/local-fonts");
+    expect(localFontAccess.families.value).toEqual([]);
+    expect(query).not.toHaveBeenCalled();
+    await localFontAccess.load();
+    expect(localFontAccess.families.value).toEqual([entry.family]);
+    expect(localFontAccess.status.value).toBe("loaded");
+    Object.defineProperty(navigator, "userActivation", {
+      configurable: true,
+      value: { isActive: false },
+    });
+    expect(await module.requestSystemFontChoices()).toHaveLength(1);
+    await localFontAccess.load();
+    expect(query).toHaveBeenCalledOnce();
+    expect(entry.blob).not.toHaveBeenCalled();
+    expect(construct).not.toHaveBeenCalled();
+    expect(storage.read).not.toHaveBeenCalled();
+  });
+
+  test("coalesces concurrent metadata requests and caches a successful empty result", async () => {
+    let finish!: (result: ReturnType<typeof systemChoice>[]) => void;
+    const query = vi.fn(
+      () =>
+        new Promise<ReturnType<typeof systemChoice>[]>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    Object.assign(window, { queryLocalFonts: query });
+    const first = module.requestSystemFontChoices();
+    const second = module.requestSystemFontChoices({ refresh: true });
+    expect(second).toBe(first);
+    expect(query).toHaveBeenCalledOnce();
+    expect(module.useLocalSymbolFonts().queryStatus.value).toEqual({ state: "querying" });
+    finish([]);
+    expect(await first).toEqual([]);
+    expect(await module.requestSystemFontChoices()).toEqual([]);
+    expect(query).toHaveBeenCalledOnce();
+    expect(module.useLocalSymbolFonts().queryStatus.value).toEqual({ state: "ready" });
+  });
+
+  test.each(["NotAllowedError", "AbortError", "Error"])(
+    "failed %s refresh preserves prior metadata and usable handles until explicit retry",
+    async (name) => {
+      Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
+      const old = systemChoice();
+      const replacement = systemChoice("AnotherFont");
+      const query = vi
+        .fn()
+        .mockResolvedValueOnce([old])
+        .mockRejectedValueOnce(new DOMException("Refresh failed", name))
+        .mockResolvedValueOnce([replacement]);
+      Object.assign(window, { queryLocalFonts: query });
+      const previous = await module.requestSystemFontChoices();
+      await expect(module.requestSystemFontChoices({ refresh: true })).rejects.toMatchObject({
+        code:
+          name === "NotAllowedError"
+            ? "denied"
+            : name === "AbortError"
+              ? "cancelled"
+              : "query-failed",
+      });
+      const { localFontAccess } = await import("../../../shared/cell-text/local-fonts");
+      expect(localFontAccess.status.value).toBe(name === "Error" ? "failed" : "denied");
+      expect(module.useLocalSymbolFonts().choices.value).toEqual(previous);
+      expect(await module.requestSystemFontChoices()).toEqual(previous);
+      expect(query).toHaveBeenCalledTimes(2);
+      await module.loadSystemFont(previous[0]!.id);
+      expect(old.blob).toHaveBeenCalledOnce();
+      expect(replacement.blob).not.toHaveBeenCalled();
+      expect(await module.requestSystemFontChoices({ refresh: true })).toEqual([
+        expect.objectContaining({ id: "system:AnotherFont" }),
+      ]);
+      expect(query).toHaveBeenCalledTimes(3);
+      await expect(module.loadSystemFont(previous[0]!.id)).rejects.toMatchObject({
+        code: "invalid-choice",
+      });
+    },
+  );
+
+  test("successful empty refresh replaces old metadata and handles together", async () => {
+    const entry = systemChoice();
+    const query = vi.fn().mockResolvedValueOnce([entry]).mockResolvedValueOnce([]);
+    Object.assign(window, { queryLocalFonts: query });
+    const previous = await module.requestSystemFontChoices();
+    expect(await module.requestSystemFontChoices({ refresh: true })).toEqual([]);
+    expect(module.useLocalSymbolFonts().choices.value).toEqual([]);
+    await expect(module.loadSystemFont(previous[0]!.id)).rejects.toMatchObject({
+      code: "invalid-choice",
+    });
+    expect(entry.blob).not.toHaveBeenCalled();
+  });
+
   test("unsupported API, denied permission and cancellation have stable separate codes", async () => {
     await expect(module.requestSystemFontChoices()).rejects.toMatchObject({ code: "unsupported" });
     Object.assign(window, {

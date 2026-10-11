@@ -572,6 +572,10 @@ watch(
   display,
   (snapshot) => {
     const families = new Set<string>();
+    for (const family of getCellFontResourceFamilies(
+      snapshot.sheet.pageDecoration?.watermark?.fontFamily ?? "",
+    ))
+      families.add(family);
     for (const [key, cell] of snapshot.sheet.cells) {
       const [row, column] = key.split(":").map(Number);
       const style = snapshot.getCellStyle({ row: row!, column: column! });

@@ -6,6 +6,7 @@ import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { useAppI18n } from "../../../shared/i18n";
 import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
+import { filterFontFamilyOption } from "../../../shared/cell-text/font-catalog";
 
 export type ThemeFontScheme = {
   name: string;
@@ -99,19 +100,39 @@ watch(
           <section :aria-label="t('pageTools.westernFonts')">
             <strong>{{ t("pageTools.westernFonts") }}</strong>
             <TFormItem :label="t('pageTools.westernHeadingFont')"
-              ><TSelect v-model="draft.headingFont" filterable creatable :options="fontOptions"
+              ><TSelect
+                v-model="draft.headingFont"
+                filterable
+                creatable
+                :options="fontOptions"
+                :filter="filterFontFamilyOption"
             /></TFormItem>
             <TFormItem :label="t('pageTools.westernBodyFont')"
-              ><TSelect v-model="draft.bodyFont" filterable creatable :options="fontOptions"
+              ><TSelect
+                v-model="draft.bodyFont"
+                filterable
+                creatable
+                :options="fontOptions"
+                :filter="filterFontFamilyOption"
             /></TFormItem>
           </section>
           <section :aria-label="t('pageTools.chineseFonts')">
             <strong>{{ t("pageTools.chineseFonts") }}</strong>
             <TFormItem :label="t('pageTools.chineseHeadingFont')"
-              ><TSelect v-model="draft.headingEastAsia" filterable creatable :options="fontOptions"
+              ><TSelect
+                v-model="draft.headingEastAsia"
+                filterable
+                creatable
+                :options="fontOptions"
+                :filter="filterFontFamilyOption"
             /></TFormItem>
             <TFormItem :label="t('pageTools.chineseBodyFont')"
-              ><TSelect v-model="draft.bodyEastAsia" filterable creatable :options="fontOptions"
+              ><TSelect
+                v-model="draft.bodyEastAsia"
+                filterable
+                creatable
+                :options="fontOptions"
+                :filter="filterFontFamilyOption"
             /></TFormItem>
           </section>
         </div>

@@ -3,6 +3,7 @@ import {
   CELL_FONT_FAMILY_PRESETS,
   createFontFamilyOptions,
   getFontFamilyLabel,
+  filterFontFamilyOption,
   resolveFontFamilyName,
 } from "../../../shared/cell-text/font-catalog";
 
@@ -61,5 +62,28 @@ describe("font catalog", () => {
     expect(
       options.filter((option) => resolveFontFamilyName(option.value) === "Microsoft YaHei"),
     ).toEqual([{ label: "Microsoft YaHei", value: "microsoft yahei" }]);
+  });
+
+  test("includes the four managed names without claiming installed system coverage", () => {
+    expect(CELL_FONT_FAMILY_PRESETS).toEqual(
+      expect.arrayContaining([
+        "Noto Sans",
+        "Noto Sans Math",
+        "Noto Sans Symbols",
+        "Noto Sans Symbols 2",
+      ]),
+    );
+    expect(new Set(CELL_FONT_FAMILY_PRESETS).size).toBe(CELL_FONT_FAMILY_PRESETS.length);
+  });
+
+  test("Chinese source values match English aliases without rewriting the value", () => {
+    const option = createFontFamilyOptions("zh-CN", ["微软雅黑"]).find(
+      (item) => item.value === "微软雅黑",
+    )!;
+    expect(filterFontFamilyOption("Microsoft YaHei", option)).toBe(true);
+    expect(filterFontFamilyOption("微软雅黑", option)).toBe(true);
+    expect(filterFontFamilyOption("microsoft", option)).toBe(true);
+    expect(filterFontFamilyOption("SimSun", option)).toBe(false);
+    expect(option.value).toBe("微软雅黑");
   });
 });

@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { Select } from "tdesign-vue-next/es/select";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import type {
   LocalSymbolFont,
-  SystemSymbolFontChoice,
   LocalSymbolFontErrorCode,
+} from "../../../shared/cell-text/local-font-source";
+import {
+  requestSystemFontChoices,
+  useLocalSymbolFonts,
 } from "../../../shared/cell-text/local-font-source";
 const props = defineProps<{
   loading: boolean;
@@ -16,14 +19,33 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ register: [font: LocalSymbolFont, select: boolean] }>();
 const { t } = useAppI18n();
-const systemChoices = shallowRef<readonly SystemSymbolFontChoice[]>([]);
+const { choices: systemChoices, queryStatus } = useLocalSymbolFonts();
 const systemChoice = ref("");
+watch(
+  systemChoices,
+  (choices) => {
+    if (systemChoice.value && !choices.some((choice) => choice.id === systemChoice.value))
+      systemChoice.value = "";
+  },
+  { flush: "sync" },
+);
 const rememberLocalFont = ref(false);
 const localSourcesVisible = ref(false);
 const localBusy = ref(false);
 const localError = ref<LocalSymbolFontErrorCode>();
 const localLoaded = ref<false | "session" | "saved">(false);
-const emptyMessage = ref<MessageKey>();
+const operationEmptyMessage = ref<MessageKey>();
+const queryFeedback = ref(false);
+const emptyMessage = computed<MessageKey | undefined>(() =>
+  queryFeedback.value && queryStatus.value.state === "ready"
+    ? systemChoices.value.length
+      ? undefined
+      : "symbolTools.noLocalFonts"
+    : operationEmptyMessage.value,
+);
+watch(queryStatus, (status) => {
+  if (queryFeedback.value && status.state === "ready") localError.value = undefined;
+});
 const fontFileInput = ref<HTMLInputElement>();
 let mounted = true;
 onBeforeUnmount(() => {
@@ -33,6 +55,7 @@ watch(
   () => props.restoreError,
   (error) => {
     if (error) {
+      queryFeedback.value = false;
       localError.value = error;
       localSourcesVisible.value = true;
     }
@@ -48,6 +71,7 @@ const localErrorMessage = computed<MessageKey | undefined>(() => {
   if (localError.value === "denied" || localError.value === "cancelled")
     return "symbolTools.localDenied";
   if (localError.value === "gesture-required") return "symbolTools.localGesture";
+  if (localError.value === "query-failed") return "format.localFontsFailed";
   if (localError.value.startsWith("storage-")) return "symbolTools.localStorageError";
   if (localError.value === "size") return "symbolTools.localSizeError";
   if (localError.value === "font-load") return "symbolTools.fontFailed";
@@ -65,13 +89,12 @@ async function requestLocalFonts(): Promise<void> {
   localBusy.value = true;
   localError.value = undefined;
   localLoaded.value = false;
-  emptyMessage.value = undefined;
+  queryFeedback.value = true;
+  operationEmptyMessage.value = undefined;
   try {
-    const local = await import("../../../shared/cell-text/local-font-source");
-    const choices = await local.requestSystemFontChoices();
+    const choices = await requestSystemFontChoices();
     if (!mounted) return;
-    systemChoices.value = choices;
-    if (!choices.length) emptyMessage.value = "symbolTools.noLocalFonts";
+    if (!choices.length) operationEmptyMessage.value = "symbolTools.noLocalFonts";
     systemChoice.value = choices.find((item) => item.family === props.defaultFontFamily)?.id ?? "";
   } catch (error) {
     if (mounted) setLocalError(error);
@@ -84,7 +107,8 @@ async function loadSelectedLocalFont(): Promise<void> {
   localBusy.value = true;
   localError.value = undefined;
   localLoaded.value = false;
-  emptyMessage.value = undefined;
+  queryFeedback.value = false;
+  operationEmptyMessage.value = undefined;
   try {
     const item = await (
       await import("../../../shared/cell-text/local-font-source")
@@ -111,7 +135,8 @@ async function importFontFile(event: Event): Promise<void> {
   localBusy.value = true;
   localError.value = undefined;
   localLoaded.value = false;
-  emptyMessage.value = undefined;
+  queryFeedback.value = false;
+  operationEmptyMessage.value = undefined;
   try {
     const item = await (
       await import("../../../shared/cell-text/local-font-source")
@@ -132,7 +157,8 @@ async function restoreLocalFonts(): Promise<void> {
   localBusy.value = true;
   localError.value = undefined;
   localLoaded.value = false;
-  emptyMessage.value = undefined;
+  queryFeedback.value = false;
+  operationEmptyMessage.value = undefined;
   let source: typeof import("../../../shared/cell-text/local-font-source") | undefined;
   try {
     source = await import("../../../shared/cell-text/local-font-source");
@@ -140,7 +166,7 @@ async function restoreLocalFonts(): Promise<void> {
     if (mounted) {
       for (const item of items) emit("register", item, false);
       localLoaded.value = items.length > 0 ? "saved" : false;
-      if (!items.length) emptyMessage.value = "symbolTools.noSavedFonts";
+      if (!items.length) operationEmptyMessage.value = "symbolTools.noSavedFonts";
     }
   } catch (error) {
     if (mounted) {

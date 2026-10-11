@@ -119,7 +119,7 @@ export function useFontFormatPanel(props: Props, update: (patch: FontFormatPatch
   });
   const { fontOptions } = useFontCatalog(() => (family.value ? [family.value] : []));
   const familyOptions = computed(() =>
-    fontOptions.value.map(({ value, label }) => ({ code: value, label })),
+    fontOptions.value.map(({ value, label, aliases }) => ({ code: value, label, aliases })),
   );
   const sizeOptions = computed(() =>
     [
@@ -157,10 +157,20 @@ export function useFontFormatPanel(props: Props, update: (patch: FontFormatPatch
     () => styleOptions.value.find((option) => option.code === fontStyle.value)?.label ?? "",
   );
   watch(styleLabel, (value) => (fontStyleInput.value = value), { immediate: true });
+  function familyLabel(value: string): string {
+    return (
+      fontOptions.value.find((option) => option.value === value)?.label ??
+      getFontFamilyLabel(value, locale.value)
+    );
+  }
+  watch([family, locale], ([value]) => (familyInput.value = value ? familyLabel(value) : ""), {
+    immediate: true,
+  });
   watch(
-    [family, locale],
-    ([value]) => (familyInput.value = value ? getFontFamilyLabel(value, locale.value) : ""),
-    { immediate: true },
+    () => (family.value ? familyLabel(family.value) : ""),
+    (label, previous) => {
+      if (familyInput.value === previous) familyInput.value = label;
+    },
   );
   watch(size, (value) => (sizeInput.value = value === undefined ? "" : String(value)), {
     immediate: true,
@@ -168,7 +178,7 @@ export function useFontFormatPanel(props: Props, update: (patch: FontFormatPatch
   function setFamily(value: string | number): void {
     const name = String(value).trim();
     if (!name || name.length > 80) return;
-    familyInput.value = getFontFamilyLabel(name, locale.value);
+    familyInput.value = familyLabel(name);
     if (familyMixed.value || name !== family.value)
       update({ fontFamily: name === defaultFamily.value ? null : name });
   }
@@ -178,12 +188,12 @@ export function useFontFormatPanel(props: Props, update: (patch: FontFormatPatch
   function commitFamilyInput(): void {
     const name = familyInput.value.trim();
     if (!name || name.length > 80) {
-      familyInput.value = family.value ? getFontFamilyLabel(family.value, locale.value) : "";
+      familyInput.value = family.value ? familyLabel(family.value) : "";
       return;
     }
     const resolved = resolveFontFamilyName(name);
     const exact = familyOptions.value.find(
-      (option) => option.code.toLowerCase() === resolved.toLowerCase(),
+      (option) => resolveFontFamilyName(option.code).toLowerCase() === resolved.toLowerCase(),
     );
     const exactLabel = familyOptions.value.find(
       (option) => option.label.toLowerCase() === name.toLowerCase(),

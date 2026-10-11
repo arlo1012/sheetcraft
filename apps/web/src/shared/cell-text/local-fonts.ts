@@ -1,4 +1,5 @@
 import { computed, readonly, ref } from "vue";
+import { requestSystemFontChoices, useLocalSymbolFonts } from "./local-font-source";
 
 export type LocalFontEnvironment = {
   secure: boolean;
@@ -46,11 +47,42 @@ export function createLocalFontAccess(getEnvironment: () => LocalFontEnvironment
   };
 }
 
-export const localFontAccess = createLocalFontAccess(() => {
-  if (typeof window === "undefined") return { secure: false };
-  const host = window as Window & { queryLocalFonts?: LocalFontEnvironment["query"] };
-  return {
-    secure: window.isSecureContext,
-    query: host.queryLocalFonts ? () => host.queryLocalFonts!() : undefined,
-  };
+const source = useLocalSymbolFonts();
+const families = computed(() => {
+  const unique = new Map<string, string>();
+  for (const choice of source.choices.value) {
+    const family = choice.family.trim();
+    if (family && !unique.has(family.toLowerCase())) unique.set(family.toLowerCase(), family);
+  }
+  return [...unique.values()].sort((left, right) => left.localeCompare(right));
 });
+const loading = computed(() => source.queryStatus.value.state === "querying");
+const status = computed(() => {
+  const query = source.queryStatus.value;
+  if (query.state === "error")
+    return query.code === "denied" || query.code === "cancelled" ? "denied" : "failed";
+  if (query.state === "ready") return families.value.length ? "loaded" : "empty";
+  return "idle";
+});
+const availability = computed(() => {
+  if (typeof window === "undefined" || !window.isSecureContext) return "insecure";
+  return typeof (window as Window & { queryLocalFonts?: unknown }).queryLocalFonts === "function"
+    ? "available"
+    : "unsupported";
+});
+
+/** The global picker and Symbol share one metadata/handle scan; no font bytes are read here. */
+export const localFontAccess = {
+  families,
+  loading,
+  status,
+  availability,
+  async load(options: { refresh?: boolean } = {}): Promise<void> {
+    if (availability.value !== "available") return;
+    try {
+      await requestSystemFontChoices(options);
+    } catch {
+      // Shared status contains the failure; the settings UI keeps existing choices.
+    }
+  },
+};

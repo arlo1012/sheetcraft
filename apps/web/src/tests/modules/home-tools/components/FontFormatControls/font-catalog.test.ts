@@ -82,6 +82,20 @@ describe("font catalog in formatting controls", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
+  test("finds the saved Chinese family by English alias and retains its exact value", async () => {
+    const wrapper = mountControls();
+    const state = createDefaultSelectionCellStyleState();
+    state.fontFamily = { value: "微软雅黑", mixed: false };
+    await wrapper.setProps({ state });
+    await openFonts(wrapper);
+    await menu().get('input[type="search"]').setValue("Microsoft YaHei");
+    const choice = menu().findAll('[role="menuitemradio"]');
+    expect(choice.map((item) => item.text())).toEqual(["微软雅黑"]);
+    await choice[0]!.trigger("click");
+    expect(wrapper.emitted("applyStyle")?.at(-1)).toEqual([{ fontFamily: "微软雅黑" }]);
+    expect(query).not.toHaveBeenCalled();
+  });
+
   test("opens and filters while typing in the font field, then cancels or selects with the keyboard", async () => {
     const wrapper = mountControls();
     const input = wrapper.get<HTMLInputElement>(".font-format-controls__family input");
@@ -138,7 +152,7 @@ describe("font catalog in formatting controls", () => {
     await new DOMWrapper(document.body).get("[data-local-font-access] button").trigger("click");
     await flushPromises();
     expect(query).toHaveBeenCalledTimes(1);
-    expect(document.body.textContent).toContain("已同步 1 个本机字体");
+    expect(document.body.textContent).toContain("已列出 1 个本机字体名称，尚未加载字体文件");
     expect(first.emitted("applyStyle")).toBeUndefined();
     await new DOMWrapper(document.body).get(".t-dialog__close").trigger("click");
     await flushPromises();

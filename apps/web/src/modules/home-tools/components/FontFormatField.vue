@@ -2,16 +2,23 @@
 import { SelectInput as TSelectInput } from "tdesign-vue-next/es/select-input";
 import type { PopupProps } from "tdesign-vue-next/es/popup";
 import type { SelectInputValueChangeContext } from "tdesign-vue-next/es/select-input";
+import type { SelectInputBlurContext } from "tdesign-vue-next/es/select-input";
 import { computed, nextTick, ref, useId, watch, watchPostEffect } from "vue";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import RibbonDropdownArrow from "../../../shared/ribbon/RibbonDropdownArrow.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import MenuSearch from "../../../shared/menu/MenuSearch.vue";
+import { filterFontFamilyOption } from "../../../shared/cell-text/font-catalog";
 
 const props = defineProps<{
   modelValue?: string | number;
-  options: Array<{ label: string; value: string | number; fontFamily?: string }>;
+  options: Array<{
+    label: string;
+    value: string | number;
+    fontFamily?: string;
+    aliases?: readonly string[];
+  }>;
   label: string;
   disabled: boolean;
   popupAttach?: () => HTMLElement;
@@ -32,12 +39,15 @@ watchPostEffect(() => {
 });
 const draft = ref("");
 watch(
-  displayValue,
-  (value) => {
-    draft.value = value;
+  () => props.modelValue,
+  () => {
+    draft.value = displayValue.value;
   },
   { immediate: true },
 );
+watch(displayValue, (value, previous) => {
+  if (draft.value === previous) draft.value = value;
+});
 const triggerRef = ref<HTMLElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = useId();
@@ -47,9 +57,7 @@ const filteringFromInput = ref(false);
 const filteredOptions = computed(() => {
   const search = query.value.trim().toLowerCase();
   return search
-    ? props.options.filter((option) =>
-        `${option.label} ${option.value}`.toLowerCase().includes(search),
-      )
+    ? props.options.filter((option) => filterFontFamilyOption(search, option))
     : props.options;
 });
 watch(open, (visible) => {
@@ -137,8 +145,9 @@ async function commit(): Promise<void> {
   await nextTick();
   draft.value = displayValue.value;
 }
-function blur(_value: unknown, { e }: { e: FocusEvent }): void {
+function blur(_value: unknown, { e }: SelectInputBlurContext): void {
   if (
+    e instanceof FocusEvent &&
     e.relatedTarget instanceof Node &&
     menuSurfaceRef.value?.rootElement?.contains(e.relatedTarget)
   )

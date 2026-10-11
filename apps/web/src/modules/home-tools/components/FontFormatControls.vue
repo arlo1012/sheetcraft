@@ -53,10 +53,11 @@ const fontFamilyOptions = computed(() => [
         },
       ]
     : []),
-  ...fontOptions.value.map(({ value, label }) => ({
+  ...fontOptions.value.map(({ value, label, aliases }) => ({
     label: value === DEFAULT_CELL_FONT_FAMILY ? t("format.defaultFont") : label,
     value,
     fontFamily: value,
+    aliases,
   })),
 ]);
 const fontFamilyValue = computed(() => {
@@ -93,7 +94,7 @@ function setFontFamily(value: string | number): void {
   const option = fontFamilyOptions.value.find(
     (option) =>
       option.label.toLowerCase() === input.toLowerCase() ||
-      option.value.toLowerCase() === canonical.toLowerCase(),
+      resolveFontFamilyName(option.value).toLowerCase() === canonical.toLowerCase(),
   );
   value = option?.value ?? canonical;
   if ((value === "theme:major" || value === "theme:minor") && workbookTheme?.value) {

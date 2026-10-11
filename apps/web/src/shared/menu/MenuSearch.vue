@@ -6,16 +6,15 @@ defineOptions({ inheritAttrs: false });
 defineProps<{ label: string }>();
 const query = defineModel<string>({ default: "" });
 const emit = defineEmits<{ keydown: [event: KeyboardEvent] }>();
-const inputRef = ref<InstanceType<typeof TInput> | null>(null);
-defineExpose({ focus: () => inputRef.value?.focus() });
+const fieldRef = ref<HTMLElement | null>(null);
+defineExpose({ focus: () => fieldRef.value?.querySelector<HTMLInputElement>("input")?.focus() });
 </script>
 
 <template>
   <li class="sheetcraft-menu-search" role="presentation">
-    <div class="sheetcraft-menu-search__field">
+    <div ref="fieldRef" class="sheetcraft-menu-search__field">
       <TInput
         v-bind="$attrs"
-        ref="inputRef"
         v-model="query"
         type="search"
         clearable

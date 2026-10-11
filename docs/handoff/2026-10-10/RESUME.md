@@ -1,3 +1,11 @@
+## UI-style-v3 font integration — 2026-10-11
+
+The full UI-style-v3 state includes the complete Symbol implementation and is
+retained during font-source integration. Read `docs/features/font-sources.md` for
+the shared metadata scan, verified resource identities, search aliases and device
+boundaries. Product detail acceptance remains with the user. Workbook I/O work is
+still paused; the export-warning WIP below remains deferred.
+
 ## Full desktop-aligned Symbol priority — 2026-10-11
 
 Prior representative lifecycle results remain valid only within their stated scope;

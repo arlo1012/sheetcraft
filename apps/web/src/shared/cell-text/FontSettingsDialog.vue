@@ -36,7 +36,7 @@ const message = computed(() => {
             variant="base"
             :loading="loading"
             :disabled="availability !== 'available'"
-            @click="load"
+            @click="load({ refresh: true })"
             >{{
               t(status === "loaded" ? "format.localFontsRefresh" : "format.localFontsAction")
             }}</TButton

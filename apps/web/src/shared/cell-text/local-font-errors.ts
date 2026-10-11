@@ -1,6 +1,7 @@
 export type LocalSymbolFontErrorCode =
   | "unsupported"
   | "gesture-required"
+  | "query-failed"
   | "denied"
   | "cancelled"
   | "invalid-choice"
@@ -20,6 +21,7 @@ export type LocalSymbolFontErrorCode =
 const messages: Record<LocalSymbolFontErrorCode, string> = {
   unsupported: "This browser does not support local font access.",
   "gesture-required": "Choose local fonts using the button first.",
+  "query-failed": "The browser could not list local font names.",
   denied: "Local font access was denied or blocked by this browser.",
   cancelled: "Local font selection was cancelled.",
   "invalid-choice": "This font is no longer an available local font choice.",

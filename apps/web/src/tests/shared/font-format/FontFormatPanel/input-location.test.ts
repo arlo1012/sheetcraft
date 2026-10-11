@@ -39,7 +39,7 @@ describe("font input location", () => {
       value: "Italic",
       patch: { bold: null, italic: true },
     },
-    { field: "size", query: "2", match: "20", count: 17, value: "20", patch: { fontSize: 20 } },
+    { field: "size", query: "2", match: "2", count: 18, value: "2", patch: { fontSize: 2 } },
   ])(
     "locates $field without hiding options and confirms the match on Enter",
     async ({ field, query, match, count, value, patch }) => {
@@ -54,7 +54,9 @@ describe("font input location", () => {
           match,
         );
         expect(input.props("modelValue")).toBe(query);
-        expect(panel.props("patch")).toEqual({});
+        // Valid custom sizes preview immediately and remain exact, even when a
+        // preset starts with the same digit. Family/style inputs remain drafts.
+        expect(panel.props("patch")).toEqual(field === "size" ? patch : {});
         input.vm.$emit("enter");
         await wrapper.vm.$nextTick();
         expect(panel.props("patch")).toEqual(patch);
@@ -100,6 +102,24 @@ describe("font input location", () => {
       expect(list.get("[data-option-list-match]").attributes("data-option-list-value")).toBe("72");
       expect(list.element.scrollTop).toBeGreaterThan(0);
       expect(list.findAll("button")).toHaveLength(17);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  test.each(["enter", "blur"])("keeps the complete 2→20 input exact on %s", async (event) => {
+    const { wrapper, panel } = mountPanel();
+    try {
+      const input = panel.get("[data-cell-format-font-size]").getComponent(TInput);
+      input.vm.$emit("change", "2");
+      await wrapper.vm.$nextTick();
+      expect(panel.props("patch")).toEqual({ fontSize: 2 });
+      input.vm.$emit("change", "20");
+      await wrapper.vm.$nextTick();
+      input.vm.$emit(event);
+      await wrapper.vm.$nextTick();
+      expect(input.props("modelValue")).toBe("20");
+      expect(panel.props("patch")).toEqual({ fontSize: 20 });
     } finally {
       wrapper.unmount();
     }

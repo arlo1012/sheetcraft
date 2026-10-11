@@ -9,7 +9,10 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Slider as TSlider } from "tdesign-vue-next/es/slider";
 import type { SheetWatermark } from "@sheetcraft/core/page-decoration";
 import { DEFAULT_SHEET_WATERMARK } from "@sheetcraft/core/page-decoration";
-import { CELL_FONT_SIZE_PRESETS } from "../../../shared/cell-text/font-catalog";
+import {
+  CELL_FONT_SIZE_PRESETS,
+  filterFontFamilyOption,
+} from "../../../shared/cell-text/font-catalog";
 import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -39,7 +42,7 @@ const previewCanvas = ref<HTMLCanvasElement>();
 const localImageUrl = ref<string>();
 const previewImage = ref<HTMLImageElement>();
 const labelWidth = computed(() => (locale.value === "zh-CN" ? 72 : 104));
-const { fontOptions } = useFontCatalog(() =>
+const { fontOptions, fontResourceRevision } = useFontCatalog(() =>
   draft.value.fontFamily ? [draft.value.fontFamily] : [],
 );
 const fontSizeOptions = CELL_FONT_SIZE_PRESETS.map((value) => ({ label: String(value), value }));
@@ -185,9 +188,13 @@ watch(
   { immediate: true },
 );
 watch(currentImageUrl, (url) => loadPreviewImage(url));
-watch([draft, imageDraft, textEnabled, imageEnabled], () => void nextTick(drawPreview), {
-  deep: true,
-});
+watch(
+  [draft, imageDraft, textEnabled, imageEnabled, fontResourceRevision],
+  () => void nextTick(drawPreview),
+  {
+    deep: true,
+  },
+);
 watch(previewCanvas, (canvas) => {
   if (canvas) void nextTick(drawPreview);
 });
@@ -301,6 +308,7 @@ onBeforeUnmount(clearLocalImage);
               :disabled="!textEnabled || busy"
               :options="fontOptions"
               filterable
+              :filter="filterFontFamilyOption"
             />
           </TFormItem>
           <TFormItem :label="t('pageDecoration.fontSize')">

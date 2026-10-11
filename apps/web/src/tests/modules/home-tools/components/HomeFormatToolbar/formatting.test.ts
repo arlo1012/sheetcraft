@@ -521,9 +521,10 @@ describe("HomeFormatToolbar", () => {
 
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="undo"]')).toBeTruthy();
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="redo"]')).toBeTruthy();
-    expect(wrapper.get("[data-number-format-trigger]").get("svg").classes()).toContain(
-      "lucide-hash",
-    );
+    const numberFormatTrigger = wrapper.get("[data-number-format-trigger]");
+    expect(numberFormatTrigger.text()).toBe("General");
+    expect(numberFormatTrigger.attributes("aria-haspopup")).toBe("menu");
+    expect(numberFormatTrigger.find(".ribbon-menu-button__arrow").exists()).toBe(true);
     expect(
       wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="format-painter"]'),
     ).toBeTruthy();

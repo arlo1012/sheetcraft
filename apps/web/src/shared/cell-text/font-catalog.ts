@@ -1,3 +1,5 @@
+import { MANAGED_CELL_FONTS } from "./managed-fonts";
+
 // Names identify font families; presets do not imply that a font file is installed.
 const FONT_FAMILIES: ReadonlyArray<{ family: string; chinese?: string }> = [
   { family: "Inter" },
@@ -74,7 +76,10 @@ const FONT_FAMILIES: ReadonlyArray<{ family: string; chinese?: string }> = [
   { family: "Impact" },
 ];
 
-export const CELL_FONT_FAMILY_PRESETS = FONT_FAMILIES.map(({ family }) => family);
+export const CELL_FONT_FAMILY_PRESETS = [
+  ...FONT_FAMILIES.map(({ family }) => family),
+  ...MANAGED_CELL_FONTS.map(({ family }) => family),
+];
 
 function findFontFamily(input: string) {
   const name = input.trim().toLowerCase();
@@ -90,6 +95,38 @@ export function resolveFontFamilyName(input: string): string {
 export function getFontFamilyLabel(family: string, locale: string): string {
   const entry = findFontFamily(family);
   return (locale.startsWith("zh") ? entry?.chinese : undefined) ?? entry?.family ?? family;
+}
+
+/** Search aliases do not rewrite a saved family or identify a font's coverage. */
+export function getFontFamilyAliases(family: string): readonly string[] {
+  const entry = findFontFamily(family);
+  return [
+    ...new Set([family, entry?.family, entry?.chinese].filter((value): value is string => !!value)),
+  ];
+}
+
+export type FontFamilyOption = {
+  value: string;
+  label: string;
+  aliases?: readonly string[];
+};
+
+/** Shared by custom ribbon menus and the public TDesign Select filter API. */
+export function filterFontFamilyOption(input: string, option: unknown): boolean {
+  const query = input.trim().toLowerCase();
+  if (!query) return true;
+  if (typeof option === "string")
+    return getFontFamilyAliases(option).some((value) => value.toLowerCase().includes(query));
+  if (!option || typeof option !== "object") return false;
+  const entry = option as { label?: unknown; value?: unknown; aliases?: unknown };
+  const values = [
+    ...(typeof entry.label === "string" ? [entry.label] : []),
+    ...(typeof entry.value === "string" ? getFontFamilyAliases(entry.value) : []),
+    ...(Array.isArray(entry.aliases)
+      ? entry.aliases.filter((alias): alias is string => typeof alias === "string")
+      : []),
+  ];
+  return values.some((value) => value.toLowerCase().includes(query));
 }
 
 export function createFontFamilyOptions(locale: string, additional: readonly string[] = []) {

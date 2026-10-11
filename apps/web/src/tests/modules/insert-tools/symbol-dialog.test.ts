@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input } from "tdesign-vue-next/es/input";
 import { Select } from "tdesign-vue-next/es/select";
+import { shallowRef } from "vue";
 import { Tabs } from "tdesign-vue-next/es/tabs";
 import SymbolDialog from "../../../modules/insert-tools/components/SymbolDialog.vue";
 import SymbolCharacterGrid from "../../../modules/insert-tools/components/SymbolCharacterGrid.vue";
@@ -369,7 +370,7 @@ describe("complete Symbol dialog", () => {
       source: "system" as const,
       persisted: false,
     };
-    const query = vi.spyOn(localSource, "requestSystemFontChoices").mockResolvedValue([
+    const choices = shallowRef([
       {
         id: "system:Example",
         family: "Example Local Font",
@@ -378,6 +379,11 @@ describe("complete Symbol dialog", () => {
         style: "Regular",
       },
     ]);
+    const original = localSource.useLocalSymbolFonts();
+    vi.spyOn(localSource, "useLocalSymbolFonts").mockReturnValue({ ...original, choices });
+    const query = vi
+      .spyOn(localSource, "requestSystemFontChoices")
+      .mockResolvedValue(choices.value);
     const load = vi.spyOn(localSource, "loadSystemFont").mockResolvedValue(local);
     const wrapper = await fixture();
     await wrapper
@@ -402,6 +408,111 @@ describe("complete Symbol dialog", () => {
     mainDialog(wrapper).vm.$emit("confirm");
     expect(wrapper.emitted("insert")?.[0]).toEqual([{ text: "Ω", fontFamily: local.family }]);
     expect(wrapper.text()).toContain("Font verified for this session");
+  });
+  test("a settings refresh updates an open Symbol list and clears a removed choice without rescanning", async () => {
+    const choices = shallowRef([
+      {
+        id: "system:Old",
+        family: "Old Font",
+        fullName: "Old Font Regular",
+        postscriptName: "Old",
+        style: "Regular",
+      },
+    ]);
+    const original = localSource.useLocalSymbolFonts();
+    vi.spyOn(localSource, "useLocalSymbolFonts").mockReturnValue({ ...original, choices });
+    const query = vi
+      .spyOn(localSource, "requestSystemFontChoices")
+      .mockResolvedValue(choices.value);
+    const load = vi.spyOn(localSource, "loadSystemFont");
+    const wrapper = await fixture();
+    await wrapper
+      .findAll("button")
+      .find((entry) => entry.text() === "Access local fonts…")!
+      .trigger("click");
+    await flushPromises();
+    const choice = wrapper
+      .findAllComponents(Select)
+      .find((entry) => entry.props("placeholder") === "Choose one local font to read")!;
+    choice.vm.$emit("update:modelValue", "system:Old");
+    await wrapper.vm.$nextTick();
+    choices.value = [
+      {
+        id: "system:New",
+        family: "New Font",
+        fullName: "New Font Regular",
+        postscriptName: "New",
+        style: "Regular",
+      },
+    ];
+    await wrapper.vm.$nextTick();
+    expect(choice.props("options")).toEqual([{ label: "New Font Regular", value: "system:New" }]);
+    expect(choice.props("modelValue")).toBe("");
+    expect(
+      wrapper
+        .findAll("button")
+        .find((entry) => entry.text() === "Load selected font")!
+        .attributes("disabled"),
+    ).toBeDefined();
+    expect(query).toHaveBeenCalledOnce();
+    expect(load).not.toHaveBeenCalled();
+  });
+  test.each([false, true])(
+    "a settings refresh keeps Symbol empty-list feedback current (initially empty: %s)",
+    async (initiallyEmpty) => {
+      const font = {
+        id: "system:Example",
+        family: "Example Font",
+        fullName: "Example Font Regular",
+        postscriptName: "Example",
+        style: "Regular",
+      };
+      const choices = shallowRef(initiallyEmpty ? [] : [font]);
+      const queryStatus = shallowRef<localSource.SystemFontQueryStatus>({ state: "ready" });
+      const original = localSource.useLocalSymbolFonts();
+      vi.spyOn(localSource, "useLocalSymbolFonts").mockReturnValue({
+        ...original,
+        choices,
+        queryStatus,
+      });
+      const query = vi
+        .spyOn(localSource, "requestSystemFontChoices")
+        .mockResolvedValue(choices.value);
+      const wrapper = await fixture();
+      await wrapper
+        .findAll("button")
+        .find((entry) => entry.text() === "Access local fonts…")!
+        .trigger("click");
+      await flushPromises();
+      const emptyText = "No local font metadata was returned";
+      expect(wrapper.text().includes(emptyText)).toBe(initiallyEmpty);
+      choices.value = initiallyEmpty ? [font] : [];
+      queryStatus.value = { state: "ready" };
+      await wrapper.vm.$nextTick();
+      expect(wrapper.text().includes(emptyText)).toBe(!initiallyEmpty);
+      expect(query).toHaveBeenCalledOnce();
+    },
+  );
+  test("a successful settings scan clears a previous Symbol query error", async () => {
+    const original = localSource.useLocalSymbolFonts();
+    const queryStatus = shallowRef<localSource.SystemFontQueryStatus>({
+      state: "error",
+      code: "query-failed",
+    });
+    vi.spyOn(localSource, "useLocalSymbolFonts").mockReturnValue({ ...original, queryStatus });
+    vi.spyOn(localSource, "requestSystemFontChoices").mockRejectedValue(
+      new localSource.LocalSymbolFontError("query-failed"),
+    );
+    const wrapper = await fixture();
+    await wrapper
+      .findAll("button")
+      .find((entry) => entry.text() === "Access local fonts…")!
+      .trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+    queryStatus.value = { state: "ready" };
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
   });
   test("partial saved-font restoration keeps verified faces available while reporting failure", async () => {
     const wrapper = await fixture();
