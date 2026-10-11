@@ -263,3 +263,83 @@ describe("picture format pane pure continuous draft state", () => {
     ).not.toHaveProperty("ownerPath");
   });
 });
+
+describe("current-size percentage draft acknowledgement", () => {
+  test.each(["scaleWidthPercent", "scaleHeightPercent"] as const)(
+    "returns accepted %s to 100 while keeping its focus",
+    (field) => {
+      const source = { ...snapshot(), values: { relativeToOriginalSize: false, [field]: 100 } };
+      let state = focusPictureFormatDraft(
+        createPictureFormatDraftState(source),
+        field,
+        "100",
+        true,
+      );
+      state = editPictureFormatDraft(state, field, "125");
+      state.drafts[field]!.submitted = {
+        intentId: "scale",
+        generation: 1,
+        value: 125,
+        accepted: true,
+        baseRevision: 1,
+      };
+      state = reconcilePictureFormatDraftState(state, {
+        ...source,
+        revision: 2,
+        acceptedIntentId: "scale",
+      });
+      expect(state.drafts[field]).toMatchObject({ text: "100", focused: true, dirty: false });
+      expect(state.drafts[field]?.submitted).toBeUndefined();
+    },
+  );
+  test("a late accepted current-size scale cannot erase a later percentage", () => {
+    const source = {
+      ...snapshot(),
+      values: { relativeToOriginalSize: false, scaleWidthPercent: 100 },
+    };
+    let state = editPictureFormatDraft(
+      createPictureFormatDraftState(source),
+      "scaleWidthPercent",
+      "125",
+    );
+    state.drafts.scaleWidthPercent!.submitted = {
+      intentId: "scale",
+      generation: 1,
+      value: 125,
+      accepted: true,
+      baseRevision: 1,
+    };
+    state = editPictureFormatDraft(state, "scaleWidthPercent", "150");
+    state = reconcilePictureFormatDraftState(state, {
+      ...source,
+      revision: 2,
+      acceptedIntentId: "scale",
+    });
+    expect(state.drafts.scaleWidthPercent).toMatchObject({ text: "150", dirty: true });
+  });
+  test("original-size scale preserves accepted raw formatting", () => {
+    const source = {
+      ...snapshot(),
+      values: { relativeToOriginalSize: true, scaleWidthPercent: 125 },
+    };
+    let state = focusPictureFormatDraft(
+      createPictureFormatDraftState(source),
+      "scaleWidthPercent",
+      "125.",
+      true,
+    );
+    state.drafts.scaleWidthPercent!.submitted = {
+      intentId: "scale",
+      generation: 0,
+      value: 125,
+      accepted: true,
+      baseRevision: 1,
+    };
+    state = reconcilePictureFormatDraftState(state, {
+      ...source,
+      revision: 2,
+      acceptedIntentId: "scale",
+    });
+    expect(state.drafts.scaleWidthPercent).toMatchObject({ text: "125.", dirty: false });
+  });
+});

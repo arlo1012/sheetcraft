@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { Button as TButton } from "tdesign-vue-next/es/button";
+import type { PictureIntrinsicSizeStatus } from "../../usePictureIntrinsicSize";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
@@ -17,6 +19,8 @@ import PictureFormatResetButton from "./PictureFormatResetButton.vue";
 const props = defineProps<{
   controller: PictureFormatPaneController;
   unit: PictureFormatLengthUnit;
+  intrinsicStatus?: PictureIntrinsicSizeStatus;
+  retryIntrinsic?: () => void;
 }>();
 const anchor = computed(() => props.controller.choice("anchor"));
 const title = computed(() => props.controller.text("altTitle"));
@@ -40,6 +44,31 @@ const original = computed(() => {
       <PictureFormatField v-if="original" :label="controller.t('originalSize')"
         ><span>{{ original }}</span></PictureFormatField
       >
+      <div
+        v-if="
+          controller.snapshot.value?.owner.assetId &&
+          !original &&
+          intrinsicStatus &&
+          intrinsicStatus !== 'idle'
+        "
+        class="picture-format-size-properties__original-status"
+        role="status"
+        data-picture-original-status
+      >
+        <span>{{
+          controller.t(
+            intrinsicStatus === "loading" ? "originalSizeLoading" : "originalSizeUnavailable",
+          )
+        }}</span>
+        <TButton
+          v-if="intrinsicStatus === 'unavailable' && retryIntrinsic"
+          size="small"
+          variant="text"
+          data-picture-original-retry
+          @click="retryIntrinsic()"
+          >{{ controller.t("retryOriginalSize") }}</TButton
+        >
+      </div>
       <p class="picture-format-size-properties__hint">{{ controller.t("sizeHelp") }}</p>
       <PictureFormatResetButton :controller="controller" type="reset-size" />
     </PictureFormatSection>
@@ -117,6 +146,15 @@ const original = computed(() => {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+  }
+  &__original-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--sheetcraft-text-secondary);
+    font-size: 12px;
+    line-height: 18px;
   }
   &__hint {
     color: var(--sheetcraft-text-secondary);

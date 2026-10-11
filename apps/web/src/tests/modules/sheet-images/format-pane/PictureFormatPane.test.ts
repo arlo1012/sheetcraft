@@ -542,3 +542,43 @@ describe("picture format pane draft ownership and real input events", () => {
     },
   );
 });
+
+describe("selected source original-dimension feedback", () => {
+  test("loading dimensions are visible and do not offer a competing retry", () => {
+    const { wrapper, onIntent } = fixture({
+      snapshot: { ...snapshot(), originalSizePt: undefined },
+      intrinsicStatus: "loading",
+      retryIntrinsic: vi.fn(),
+    });
+    expect(wrapper.get("[data-picture-original-status]").text()).toContain("originalSizeLoading");
+    expect(wrapper.find("[data-picture-original-retry]").exists()).toBe(false);
+    expect(onIntent).not.toHaveBeenCalled();
+  });
+  test("unavailable source offers explicit retry without dispatching document edits", async () => {
+    const retryIntrinsic = vi.fn();
+    const { wrapper, onIntent } = fixture({
+      snapshot: { ...snapshot(), originalSizePt: undefined },
+      intrinsicStatus: "unavailable",
+      retryIntrinsic,
+    });
+    expect(wrapper.get("[data-picture-original-status]").text()).toContain(
+      "originalSizeUnavailable",
+    );
+    await wrapper.get("[data-picture-original-retry]").trigger("click");
+    expect(retryIntrinsic).toHaveBeenCalledTimes(1);
+    expect(onIntent).not.toHaveBeenCalled();
+    await wrapper.setProps({ snapshot: snapshot(), intrinsicStatus: "ready" });
+    expect(wrapper.find("[data-picture-original-status]").exists()).toBe(false);
+  });
+  test("a source-free group does not pretend to have unavailable original dimensions", () => {
+    const source = snapshot();
+    source.owner.assetId = undefined;
+    source.originalSizePt = undefined;
+    const { wrapper } = fixture({
+      snapshot: source,
+      intrinsicStatus: "unavailable",
+      retryIntrinsic: vi.fn(),
+    });
+    expect(wrapper.find("[data-picture-original-status]").exists()).toBe(false);
+  });
+});

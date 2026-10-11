@@ -24,3 +24,7 @@ export {
   moveResolvedPictureCropSourceBy,
   fitResolvedPictureCropToRatio,
 } from "./picture-crop-gesture.js";
+export {
+  scaleResolvedPictureCropBy,
+  resetResolvedPictureToOriginalSize,
+} from "./picture-original-size.js";

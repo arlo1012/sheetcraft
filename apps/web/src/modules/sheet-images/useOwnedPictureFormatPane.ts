@@ -1,5 +1,11 @@
 import { computed, getCurrentScope, onScopeDispose, ref, watch } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
+import { assertImagePixelBudget } from "../image-assets/imageAssetValidation";
+import type { PictureIntrinsicSize } from "./usePictureIntrinsicSize";
+import {
+  scaleResolvedPictureCropBy,
+  resetResolvedPictureToOriginalSize,
+} from "@sheetcraft/sheet-engine/picture-original-size";
 import {
   editResolvedPictureCrop,
   resetResolvedPictureCrop,
@@ -32,6 +38,7 @@ import {
   normalizePictureAngle,
   pictureFrameFromLegacy,
   resolvePictureFrame,
+  resolvePictureLayout,
   type PictureFrameAnchor,
   type ResolvedPictureLayout,
 } from "@sheetcraft/core/picture-frame";
@@ -149,6 +156,10 @@ export interface OwnedPictureFormatPaneOptions {
   execute: (nextForest: readonly FloatingImage[]) => boolean;
   getDisabledReason?: () => string;
   getUnsupportedCropReason?: () => string;
+  /** Stable, current selected-source dimensions from the preflighted display URL. */
+  getIntrinsicSize?: (assetId: string) => PictureIntrinsicSize | undefined;
+  getMissingIntrinsicReason?: () => string;
+  getOriginalSizeLimitReason?: () => string;
 }
 type Lease = {
   workbook: Workbook;
@@ -166,6 +177,8 @@ type Lease = {
   root: FloatingImage;
   node: FloatingImage | PictureGroupNode;
   world: ResolvedPictureLayout | undefined;
+  intrinsic: PictureIntrinsicSize | undefined;
+  intrinsicDimensions: Readonly<{ width: number; height: number; url: string }> | undefined;
 };
 function sameIds(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((id, index) => id === right[index]);
@@ -185,12 +198,31 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
   const prefix = `owned-picture-format-${++hostSequence}`;
   const epoch = ref(0);
   const acceptedIntentId = ref<string>();
+  const relativeToOriginalSize = ref(true);
   let disposed = false;
   let mutation: { boundaryChanged: boolean } | undefined;
   function clear(): void {
     if (mutation) mutation.boundaryChanged = true;
     epoch.value += 1;
     acceptedIntentId.value = undefined;
+  }
+  function intrinsicFor(node: Lease["node"]): PictureIntrinsicSize | undefined {
+    if (!("assetId" in node)) return;
+    try {
+      const size = options.getIntrinsicSize?.(node.assetId);
+      if (!size || size.assetId !== node.assetId || !size.url.startsWith("blob:")) return;
+      assertImagePixelBudget(size.width, size.height);
+      return size;
+    } catch {
+      return;
+    }
+  }
+  function selectedIntrinsic(): PictureIntrinsicSize | undefined {
+    try {
+      return capture()?.intrinsic;
+    } catch {
+      return;
+    }
   }
   function forestSignature(): string {
     if (options.isOpen?.() === false) return "closed-picture-format-pane";
@@ -214,12 +246,31 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       options.getRevision,
       forestSignature,
       () => options.isOpen?.() ?? true,
+      selectedIntrinsic,
     ],
     (next, previous) => {
       if (mutation) {
-        if (next.slice(0, 8).some((value, index) => value !== previous[index]))
+        if (
+          next.slice(0, 8).some((value, index) => value !== previous[index]) ||
+          next[11] !== previous[11] ||
+          next[12] !== previous[12]
+        )
           mutation.boundaryChanged = true;
       } else clear();
+    },
+    { flush: "sync" },
+  );
+  watch(
+    [
+      options.getWorkbook,
+      options.getSheet,
+      options.getGeneration,
+      () => JSON.stringify(options.getSelectedIds()),
+      () => JSON.stringify(options.getSelectedPath() ?? null),
+      () => options.isOpen?.() ?? true,
+    ],
+    () => {
+      relativeToOriginalSize.value = true;
     },
     { flush: "sync" },
   );
@@ -279,6 +330,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
           context.metrics,
         );
     }
+    const intrinsic = intrinsicFor(node);
     return {
       workbook,
       sheet,
@@ -295,6 +347,10 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       root,
       node,
       world,
+      intrinsic,
+      intrinsicDimensions: intrinsic
+        ? { width: intrinsic.width, height: intrinsic.height, url: intrinsic.url }
+        : undefined,
     };
   }
   function sameBoundary(lease: Lease): boolean {
@@ -316,8 +372,18 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       context?.layout === lease.layout
     );
   }
+  function sameIntrinsic(lease: Lease): boolean {
+    const intrinsic = intrinsicFor(lease.node);
+    return (
+      intrinsic === lease.intrinsic &&
+      intrinsic?.width === lease.intrinsicDimensions?.width &&
+      intrinsic?.height === lease.intrinsicDimensions?.height &&
+      intrinsic?.url === lease.intrinsicDimensions?.url
+    );
+  }
   function current(lease: Lease): boolean {
     return (
+      sameIntrinsic(lease) &&
       sameBoundary(lease) &&
       options.getRevision() === lease.revision &&
       lease.sheet.floatingImages === lease.forestReference &&
@@ -362,7 +428,21 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         ? getPictureFormatCropState(node, world, context?.metrics)
         : undefined;
     if (sourceBearing) values.altDescription = node.altText;
-    if (cropState) Object.assign(values, pictureFormatCropValues(cropState));
+    if (cropState) {
+      Object.assign(values, pictureFormatCropValues(cropState));
+      values.relativeToOriginalSize = relativeToOriginalSize.value;
+      if (!relativeToOriginalSize.value) {
+        values.scaleWidthPercent = 100;
+        values.scaleHeightPercent = 100;
+      } else if (lease.intrinsic) {
+        values.scaleWidthPercent =
+          ((cropState.layout.rect.width * cropState.source.widthRatio) / lease.intrinsic.width) *
+          100;
+        values.scaleHeightPercent =
+          ((cropState.layout.rect.height * cropState.source.heightRatio) / lease.intrinsic.height) *
+          100;
+      }
+    }
     if (!inner && (isPictureGroup(root) || isFramedPictureObject(root)))
       values.anchor = anchorValue(root.frame.anchor.mode);
     else if (!inner) values.anchor = "move";
@@ -396,6 +476,27 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
           max: MAX_FLOATING_IMAGE_SIZE * POINTS_PER_PIXEL,
         };
         const offset = { enabled: true };
+        capabilities.fields.relativeToOriginalSize = { enabled: true };
+        const originalReason =
+          options.getMissingIntrinsicReason?.() ?? "Original image dimensions are not available.";
+        const scaleCapability =
+          !relativeToOriginalSize.value || lease.intrinsic
+            ? { enabled: true }
+            : { enabled: false, reason: originalReason };
+        capabilities.fields.scaleWidthPercent = scaleCapability;
+        capabilities.fields.scaleHeightPercent = scaleCapability;
+        capabilities.resets!["reset-size"] = lease.intrinsic
+          ? [lease.intrinsic.width, lease.intrinsic.height].every(
+              (value) => value >= MIN_FLOATING_IMAGE_SIZE && value <= MAX_FLOATING_IMAGE_SIZE,
+            )
+            ? { enabled: true }
+            : {
+                enabled: false,
+                reason:
+                  options.getOriginalSizeLimitReason?.() ??
+                  "Original size exceeds the picture frame's 1–10000 pixel range.",
+              }
+          : { enabled: false, reason: originalReason };
         capabilities.fields.sourceWidthPt = { enabled: true };
         capabilities.fields.sourceHeightPt = { enabled: true };
         capabilities.fields.sourceOffsetXPt = offset;
@@ -426,6 +527,9 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         options.getDisabledReason?.() ??
         "Crop editing cannot preserve this picture's reflection yet.";
       for (const field of [
+        "scaleWidthPercent",
+        "scaleHeightPercent",
+        "relativeToOriginalSize",
         "sourceWidthPt",
         "sourceHeightPt",
         "sourceOffsetXPt",
@@ -437,6 +541,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       ] as const)
         capabilities.fields[field] = { enabled: false, reason };
       capabilities.resets!["reset-crop"] = { enabled: false, reason };
+      capabilities.resets!["reset-size"] = { enabled: false, reason };
     }
     const snapshot: PictureFormatSnapshot = {
       owner: {
@@ -450,6 +555,14 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       revision: lease.revision,
       values,
       name: node.altText,
+      ...(lease.intrinsic
+        ? {
+            originalSizePt: {
+              width: lease.intrinsic.width * POINTS_PER_PIXEL,
+              height: lease.intrinsic.height * POINTS_PER_PIXEL,
+            },
+          }
+        : {}),
       ...(acceptedIntentId.value ? { acceptedIntentId: acceptedIntentId.value } : {}),
     };
     return { lease, snapshot, capabilities };
@@ -462,6 +575,8 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
     const { root, node, path, context, world } = lease;
     const inner = path.length > 1;
     if (isPictureFormatCropField(intent.field)) return planCrop(lease, intent);
+    if (intent.field === "scaleWidthPercent" || intent.field === "scaleHeightPercent")
+      return planScale(lease, intent);
     let next: FloatingImage;
     if (inner) {
       if (!isPictureGroup(root) || !context || !world || world.collapsed)
@@ -564,8 +679,49 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
     validateForest(forest, context);
     return forest;
   }
+  function planScale(
+    lease: Lease,
+    intent: Extract<PictureFormatIntent, { type: "set-field" }>,
+  ): FloatingImage[] {
+    const { node, world, context, intrinsic } = lease;
+    if (
+      !context ||
+      isPictureGroup(node) ||
+      isGroupedGroup(node) ||
+      (intent.field !== "scaleWidthPercent" && intent.field !== "scaleHeightPercent") ||
+      typeof intent.value !== "number" ||
+      !Number.isFinite(intent.value) ||
+      intent.value <= 0
+    )
+      throw new TypeError("Invalid source scale edit.");
+    const before = getPictureFormatCropState(node, world, context.metrics);
+    if (!before) throw new TypeError("Missing actual source geometry.");
+    const axis = intent.field === "scaleWidthPercent" ? "width" : "height";
+    const sourceExtent =
+      before.layout.rect[axis] * before.source[axis === "width" ? "widthRatio" : "heightRatio"];
+    const currentPercent =
+      relativeToOriginalSize.value && intrinsic ? (sourceExtent / intrinsic[axis]) * 100 : 100;
+    if (intent.value === currentPercent) return lease.forest;
+    if (relativeToOriginalSize.value && !intrinsic)
+      throw new TypeError("Original image dimensions are unavailable.");
+    const factor = relativeToOriginalSize.value
+      ? (intrinsic![axis] * (intent.value / 100)) / sourceExtent
+      : intent.value / 100;
+    const locked = node.lockAspectRatio ?? true;
+    const changed = scaleResolvedPictureCropBy(
+      {
+        layout: resolvePictureLayout(before.layout.rect, before.layout.angleDeg),
+        source: before.source,
+      },
+      {
+        widthFactor: axis === "width" || locked ? factor : 1,
+        heightFactor: axis === "height" || locked ? factor : 1,
+      },
+    );
+    return projectSourceGeometry(lease, before, changed);
+  }
   function planCrop(lease: Lease, intent: PictureFormatIntent): FloatingImage[] {
-    const { root, node, path, context, world } = lease;
+    const { node, context, world } = lease;
     if (!context || isPictureGroup(node) || isGroupedGroup(node))
       throw new TypeError("A real source-bearing picture and worksheet metrics are required.");
     const before = getPictureFormatCropState(node, world, context.metrics);
@@ -579,19 +735,46 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
     )
       return lease.forest;
     const changed =
-      intent.type === "reset-crop"
-        ? resetResolvedPictureCrop(before.layout, before.source)
-        : intent.type === "set-field" &&
-            isPictureFormatCropField(intent.field) &&
-            typeof intent.value === "number"
-          ? editResolvedPictureCrop(
-              before.layout,
-              before.source,
-              pictureFormatCropEdit(intent.field, intent.value),
-            )
-          : undefined;
+      intent.type === "reset-size" && lease.intrinsic
+        ? resetResolvedPictureToOriginalSize(
+            {
+              layout: resolvePictureLayout(before.layout.rect, before.layout.angleDeg),
+              source: before.source,
+            },
+            { width: lease.intrinsic.width, height: lease.intrinsic.height },
+          )
+        : intent.type === "reset-crop"
+          ? resetResolvedPictureCrop(before.layout, before.source)
+          : intent.type === "set-field" &&
+              isPictureFormatCropField(intent.field) &&
+              typeof intent.value === "number"
+            ? editResolvedPictureCrop(
+                before.layout,
+                before.source,
+                pictureFormatCropEdit(intent.field, intent.value),
+              )
+            : undefined;
     if (!changed) throw new TypeError("Unknown crop operation.");
-    if (changed.layout === before.layout && changed.source === before.source) return lease.forest;
+    return projectSourceGeometry(lease, before, changed);
+  }
+  function projectSourceGeometry(
+    lease: Lease,
+    before: NonNullable<ReturnType<typeof getPictureFormatCropState>>,
+    changed: NonNullable<ReturnType<typeof getPictureFormatCropState>>,
+  ): FloatingImage[] {
+    const { root, node, path, context } = lease;
+    if (!context || isPictureGroup(node) || isGroupedGroup(node))
+      throw new TypeError("A real source and metrics are required.");
+    if (
+      changed.layout.angleDeg === before.layout.angleDeg &&
+      (["x", "y", "width", "height"] as const).every(
+        (key) => changed.layout.rect[key] === before.layout.rect[key],
+      ) &&
+      (["widthRatio", "heightRatio", "offsetXRatio", "offsetYRatio"] as const).every(
+        (key) => changed.source[key] === before.source[key],
+      )
+    )
+      return lease.forest;
     let next: FloatingImage;
     if (path.length > 1) {
       if (!isPictureGroup(root) || !isGroupedPicture(node))
@@ -623,7 +806,9 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       !lease ||
       !snapshot ||
       mutation ||
-      (intent.type !== "set-field" && intent.type !== "reset-crop") ||
+      (intent.type !== "set-field" &&
+        intent.type !== "reset-crop" &&
+        intent.type !== "reset-size") ||
       !samePictureFormatOwner(intent.owner, snapshot.owner) ||
       intent.baseRevision !== snapshot.revision ||
       typeof intent.intentId !== "string" ||
@@ -647,7 +832,9 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         (isPictureFormatCropField(intent.field) ||
           intent.field === "sizeWidthPt" ||
           intent.field === "sizeHeightPt" ||
-          intent.field === "rotationDeg") &&
+          intent.field === "rotationDeg" ||
+          intent.field === "scaleWidthPercent" ||
+          intent.field === "scaleHeightPercent") &&
         typeof intent.value !== "number"
       )
         return false;
@@ -661,10 +848,19 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         return false;
       if (
         intent.type === "set-field" &&
-        ((intent.field === "lockAspectRatio" && typeof intent.value !== "boolean") ||
+        (((intent.field === "lockAspectRatio" || intent.field === "relativeToOriginalSize") &&
+          typeof intent.value !== "boolean") ||
           (intent.field === "altDescription" && typeof intent.value !== "string"))
       )
         return false;
+      if (intent.type === "set-field" && intent.field === "relativeToOriginalSize") {
+        if (relativeToOriginalSize.value !== intent.value) {
+          relativeToOriginalSize.value = intent.value;
+          clear(); // A draft captured with the previous percentage basis cannot be reused.
+        }
+        acceptedIntentId.value = intent.intentId;
+        return true;
+      }
       const next = intent.type === "set-field" ? plan(lease, intent) : planCrop(lease, intent);
       if (!current(lease)) {
         clear();
@@ -683,6 +879,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         const exact =
           !pending.boundaryChanged &&
           sameBoundary(lease) &&
+          sameIntrinsic(lease) &&
           areFloatingImageCollectionsEqual(
             lease.sheet.floatingImages,
             accepted ? next : lease.forest,

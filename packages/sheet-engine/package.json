@@ -98,6 +98,10 @@
     "./picture-crop-gesture": {
       "types": "./dist/picture-crop-gesture.d.ts",
       "import": "./dist/picture-crop-gesture.js"
+    },
+    "./picture-original-size": {
+      "types": "./dist/picture-original-size.d.ts",
+      "import": "./dist/picture-original-size.js"
     }
   },
   "scripts": {

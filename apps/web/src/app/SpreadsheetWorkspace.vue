@@ -96,6 +96,7 @@ import PictureGroupRibbon from "../modules/sheet-images/components/PictureGroupR
 import PictureOwnedLeafRibbon from "../modules/sheet-images/components/PictureOwnedLeafRibbon.vue";
 import { resolveOwnedPictureNode } from "../modules/sheet-images/picture-group-interaction";
 import PictureFormatPane from "../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
+import { usePictureIntrinsicSize } from "../modules/sheet-images/usePictureIntrinsicSize";
 import { useOwnedPictureFormatPane } from "../modules/sheet-images/useOwnedPictureFormatPane";
 import type { PictureFormatLabelKey } from "../modules/sheet-images/picture-format-pane-model";
 import { usePictureToolbarOwner } from "../modules/sheet-images/usePictureToolbarOwner";
@@ -1790,33 +1791,6 @@ const picturePaneHandlers = computed(() => {
     },
   };
 });
-const pictureFormatVisible = ref(false);
-const pictureFormatPane = useOwnedPictureFormatPane({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => pictureOwnerGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getContext: () => sheetGridRef.value?.getPictureFrameContext(activeSheet.value),
-  getSelectedPath: () => selectedOwnedPicturePath.value,
-  getSelectedIds: () => selectedPictureIds.value,
-  isOpen: () => pictureFormatVisible.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
-  execute: pictureTools.replaceAll,
-  getDisabledReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
-  getUnsupportedCropReason: () => t("picture.groupReflectionUnsupported"),
-});
-function pictureFormatLabel(key: PictureFormatLabelKey): string {
-  return t(`pictureFormat.${key}`);
-}
-function openOwnedPictureFormat(path?: PictureGroupPath, owner = activeSheet.value): void {
-  if (owner !== activeSheet.value) return;
-  if (path) selectedOwnedPicturePath.value = [...path];
-  pictureFormatVisible.value = true;
-}
-function closeOwnedPictureFormat(): void {
-  pictureFormatVisible.value = false;
-  pictureFormatPane.close();
-}
 const selectedOwnedPictureLeaf = computed(() => {
   void workbookRevision.value;
   const path = selectedOwnedPicturePath.value;
@@ -1841,6 +1815,83 @@ const selectedOwnedPictureLeaf = computed(() => {
     return;
   }
 });
+const pictureFormatVisible = ref(false);
+const pictureIntrinsicOwner = computed<readonly unknown[]>((previous) => {
+  const next = [
+    session.workbook,
+    activeSheet.value,
+    pictureOwnerGeneration.value,
+    JSON.stringify(selectedPictureIds.value),
+    JSON.stringify(selectedOwnedPicturePath.value ?? null),
+  ];
+  // Grid revision notifications may replace selection arrays without changing their owner.
+  return previous && next.every((value, index) => value === previous[index]) ? previous : next;
+});
+function selectedPictureIntrinsicSource() {
+  if (!pictureFormatVisible.value) return;
+  const leaf = selectedOwnedPictureLeaf.value;
+  if (selectedOwnedPicturePath.value && selectedOwnedPicturePath.value.length > 1 && !leaf) return;
+  const node = leaf?.node ?? selectedPicture.value;
+  if (!node || isPictureGroup(node)) return;
+  const url = imageAssetUrls.value.get(node.assetId);
+  return url ? { assetId: node.assetId, url } : undefined;
+}
+const pictureIntrinsic = usePictureIntrinsicSize({
+  getOwner: () => pictureIntrinsicOwner.value,
+  getSource: selectedPictureIntrinsicSource,
+});
+const pictureIntrinsicRetry = computed(() => {
+  const owner = pictureIntrinsicOwner.value,
+    source = selectedPictureIntrinsicSource();
+  return () => {
+    const now = selectedPictureIntrinsicSource();
+    if (
+      owner === pictureIntrinsicOwner.value &&
+      source?.assetId === now?.assetId &&
+      source?.url === now?.url
+    )
+      pictureIntrinsic.retry();
+  };
+});
+const pictureFormatPane = useOwnedPictureFormatPane({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => pictureOwnerGeneration.value,
+  getRevision: () => workbookRevision.value,
+  getContext: () => sheetGridRef.value?.getPictureFrameContext(activeSheet.value),
+  getSelectedPath: () => selectedOwnedPicturePath.value,
+  getSelectedIds: () => selectedPictureIds.value,
+  isOpen: () => pictureFormatVisible.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
+  execute: pictureTools.replaceAll,
+  getDisabledReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
+  getUnsupportedCropReason: () => t("picture.groupReflectionUnsupported"),
+  getIntrinsicSize: (assetId) => {
+    const size = pictureIntrinsic.size.value;
+    return size?.assetId === assetId && imageAssetUrls.value.get(assetId) === size.url
+      ? size
+      : undefined;
+  },
+  getMissingIntrinsicReason: () =>
+    t(
+      pictureIntrinsic.status.value === "loading"
+        ? "pictureFormat.originalSizeLoading"
+        : "pictureFormat.originalSizeUnavailable",
+    ),
+  getOriginalSizeLimitReason: () => t("pictureFormat.originalSizeTooLarge"),
+});
+function pictureFormatLabel(key: PictureFormatLabelKey): string {
+  return t(`pictureFormat.${key}`);
+}
+function openOwnedPictureFormat(path?: PictureGroupPath, owner = activeSheet.value): void {
+  if (owner !== activeSheet.value) return;
+  if (path) selectedOwnedPicturePath.value = [...path];
+  pictureFormatVisible.value = true;
+}
+function closeOwnedPictureFormat(): void {
+  pictureFormatVisible.value = false;
+  pictureFormatPane.close();
+}
 let sourceRibbonSequence = 0;
 const pictureSourceRibbonOwner = computed(() => {
   void workbookRevision.value;
@@ -4306,6 +4357,8 @@ const gridInert = computed(
         @settings-open="pivotFieldSettingsOpen = $event"
       />
       <PictureFormatPane
+        :intrinsic-status="pictureIntrinsic.status.value"
+        :retry-intrinsic="pictureIntrinsicRetry"
         v-if="pictureFormatVisible"
         :snapshot="pictureFormatPane.snapshot.value"
         :capabilities="pictureFormatPane.capabilities.value"

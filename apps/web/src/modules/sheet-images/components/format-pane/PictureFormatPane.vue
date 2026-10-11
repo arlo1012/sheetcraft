@@ -12,6 +12,7 @@ import {
   type PictureFormatTab,
   type PictureFormatTranslate,
 } from "../../picture-format-pane-model";
+import type { PictureIntrinsicSizeStatus } from "../../usePictureIntrinsicSize";
 import { usePictureFormatPane } from "./usePictureFormatPane";
 import PictureFormatFillLine from "./PictureFormatFillLine.vue";
 import PictureFormatEffects from "./PictureFormatEffects.vue";
@@ -27,6 +28,8 @@ const props = withDefaults(
     options?: PictureFormatOptions;
     initialTab?: PictureFormatTab;
     initialUnit?: PictureFormatLengthUnit;
+    intrinsicStatus?: PictureIntrinsicSizeStatus;
+    retryIntrinsic?: () => void;
   }>(),
   { initialTab: "size-properties", initialUnit: "pt" },
 );
@@ -200,7 +203,12 @@ defineExpose({ cancel: controller.cancel });
           role="tabpanel"
           :aria-labelledby="`${paneId}-size-properties-tab`"
         >
-          <PictureFormatSizeProperties :controller="controller" :unit="unit" />
+          <PictureFormatSizeProperties
+            :controller="controller"
+            :unit="unit"
+            :intrinsic-status="intrinsicStatus"
+            :retry-intrinsic="retryIntrinsic"
+          />
         </div>
         <div
           :id="`${paneId}-picture-panel`"

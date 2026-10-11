@@ -1,3 +1,33 @@
+## Current picture original-size and Scale WIP — 2026-10-11
+
+The actual format pane now consumes the selected, preflighted picture resource's
+natural dimensions for standalone pictures and exact owned leaves. Resource
+loading does not edit the document; stale selection/source/pane callbacks are
+rejected, identical selection notifications retain the decoder, and failures
+provide an explicit retry. Pixel and floating-frame size budgets stay enforced.
+
+Scale uses original physical source dimensions, not the cropped frame. Aspect
+lock couples numeric scale axes while preserving the rotated local NW. With
+relative-to-original disabled, each entered percentage multiplies current
+geometry and acknowledges back to 100%; this is pane interaction state, not a
+new persistent workbook field. Reset Size independently restores the actual
+current asset's natural dimensions, source offsets and 2D angle, retaining the
+unrotated layout position, appearance, flips, metadata and owner tree. Accepted
+geometry is one complete-forest transaction with exact Undo/Redo; invalid edits
+retain the document, draft and history, and no-ops do not promote legacy pictures.
+
+Final related checks: Web 11 files / 217 tests and sheet-engine 4 files / 36 tests
+passed. Full Web/sheet-engine types, both relevant builds, scoped lint, formatting
+and diff checks passed. Initial array-property descriptor and test union-narrowing
+type errors, plus two nested-fixture setup failures, were corrected; originals
+remain recorded. Existing architecture diagnostics remain 130 with exit 1 and
+existing bundle warnings remain.
+
+This remains a bounded implementation checkpoint awaiting user detail acceptance.
+Full picture completion still needs Reset Picture/effects, shape crop, remaining
+resource consumers, Locked/Print Object and current format-specific limitations.
+Workbook I/O work remains paused. Older entries below preserve earlier scope.
+
 ## Current interactive picture-crop WIP — 2026-10-11
 
 Standalone pictures and exact owned leaves now have source-owned interactive crop:

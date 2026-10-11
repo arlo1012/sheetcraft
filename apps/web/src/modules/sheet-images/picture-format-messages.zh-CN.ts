@@ -18,6 +18,10 @@ export const pictureFormatZhCN = {
     sourcePosition: "源图位置",
     cropPosition: "裁剪框位置",
     originalSize: "原始大小",
+    originalSizeLoading: "正在读取原图尺寸…",
+    originalSizeUnavailable: "无法读取原图尺寸。请重试，或取消“相对于原始大小”以缩放当前图片。",
+    originalSizeTooLarge: "原图超出图片框单边 10,000 像素上限，请先缩小图片再重置大小。",
+    retryOriginalSize: "重试",
     units: "长度单位",
     unitIn: "英寸",
     unitCm: "厘米",
@@ -52,7 +56,8 @@ export const pictureFormatZhCN = {
     reset3dRotation: "重设三维旋转",
     cropHelp:
       "中心偏移表示源图中心相对裁剪框中心沿图片自身轴线的偏移。裁剪框的左侧和顶部位置是未旋转布局框在工作表中的坐标。",
-    sizeHelp: "宽度和高度沿图片自身轴线计算。原始大小仅供参考。",
+    sizeHelp:
+      "大小沿图片自身轴线计算。缩放以原图尺寸为基准；取消“相对于原始大小”后，每次百分比都缩放当前图片。",
     keepTextFlatUnavailable: "保持文字平面（图片不适用）",
     sizeWidthPt: "宽度",
     sizeHeightPt: "高度",

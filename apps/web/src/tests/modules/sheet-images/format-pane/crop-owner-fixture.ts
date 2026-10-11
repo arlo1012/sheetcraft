@@ -16,6 +16,7 @@ import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-lay
 import { createPictureViewMetrics } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import { assertPictureCommandSupport } from "../../../../modules/sheet-images/picture-document-support";
 import { useOwnedPictureFormatPane } from "../../../../modules/sheet-images/useOwnedPictureFormatPane";
+import type { PictureIntrinsicSize } from "../../../../modules/sheet-images/usePictureIntrinsicSize";
 import { resolveOwnedPictureNode } from "../../../../modules/sheet-images/picture-group-interaction";
 import {
   createPictureFormatFieldIntent,
@@ -25,7 +26,11 @@ import {
 import { pictureGroup } from "../picture-group-fixture";
 import { framedPicture } from "../framed-picture-fixture";
 
-export function cropOwnerFixture(id = "framed", path: PictureGroupPath | null = null) {
+export function cropOwnerFixture(
+  id = "framed",
+  path: PictureGroupPath | null = null,
+  initialIntrinsic?: PictureIntrinsicSize,
+) {
   const session = createWorkbookSession({ idFactory: createSequentialIdFactory() });
   const sheet = getActiveSheet(session.workbook),
     frame = framedPicture(),
@@ -76,8 +81,11 @@ export function cropOwnerFixture(id = "framed", path: PictureGroupPath | null = 
     revision = ref(0),
     busy = ref(false),
     open = ref(true);
-  let refusal = false;
+  const intrinsic = shallowRef<PictureIntrinsicSize | undefined>(initialIntrinsic);
+  let refusal = false,
+    exception = false;
   const execute = vi.fn((forest: readonly FloatingImage[]) => {
+    if (exception) throw new Error("Owner failure");
     if (refusal) return false;
     const command = createSetSheetFloatingImagesCommand(sheet.id, forest);
     assertPictureCommandSupport(command, session.workbook);
@@ -97,6 +105,7 @@ export function cropOwnerFixture(id = "framed", path: PictureGroupPath | null = 
       getSelectedIds: () => selectedIds.value,
       isBusy: () => busy.value,
       isOpen: () => open.value,
+      getIntrinsicSize: () => intrinsic.value,
       execute,
     }),
   )!;
@@ -139,6 +148,7 @@ export function cropOwnerFixture(id = "framed", path: PictureGroupPath | null = 
     revision,
     busy,
     open,
+    intrinsic,
     execute,
     scope,
     field,
@@ -146,6 +156,9 @@ export function cropOwnerFixture(id = "framed", path: PictureGroupPath | null = 
     resolved,
     refuse: () => {
       refusal = true;
+    },
+    throw: () => {
+      exception = true;
     },
   };
 }

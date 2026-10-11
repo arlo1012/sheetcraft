@@ -170,6 +170,10 @@ export const PICTURE_FORMAT_LABEL_KEYS = [
   "sourcePosition",
   "cropPosition",
   "originalSize",
+  "originalSizeLoading",
+  "originalSizeUnavailable",
+  "originalSizeTooLarge",
+  "retryOriginalSize",
   "units",
   "unitIn",
   "unitCm",
@@ -479,7 +483,11 @@ export function reconcilePictureFormatDraftState(
       drafts[field] = next;
     } else if (draft.focused) {
       drafts[field] = {
-        text: draft.text,
+        text:
+          (field === "scaleWidthPercent" || field === "scaleHeightPercent") &&
+          snapshot.values.relativeToOriginalSize === false
+            ? pictureFormatDisplayNumber(snapshot.values[field] ?? 100)
+            : draft.text,
         focused: true,
         dirty: false,
         generation: draft.generation,

@@ -18,6 +18,12 @@ export const pictureFormatEnUS = {
     sourcePosition: "Source picture position",
     cropPosition: "Crop box position",
     originalSize: "Original size",
+    originalSizeLoading: "Loading original image dimensions…",
+    originalSizeUnavailable:
+      "Original image dimensions could not be loaded. Retry, or turn off “Relative to original size” to scale the current picture.",
+    originalSizeTooLarge:
+      "The original image is larger than the 10,000-pixel picture-frame limit. Use a smaller image to reset its size.",
+    retryOriginalSize: "Retry",
     units: "Length units",
     unitIn: "in",
     unitCm: "cm",
@@ -52,7 +58,8 @@ export const pictureFormatEnUS = {
     reset3dRotation: "Reset 3-D rotation",
     cropHelp:
       "Center offsets locate the source center relative to the crop box center along the picture's own axes. Crop box left and top are worksheet coordinates of the unrotated layout box.",
-    sizeHelp: "Width and height use the picture's own axes. Original size is shown for reference.",
+    sizeHelp:
+      "Size uses the picture’s own axes. Scale uses the original source dimensions; with “Relative to original size” off, each percentage scales the current picture.",
     keepTextFlatUnavailable: "Keep text flat (not applicable to pictures)",
     sizeWidthPt: "Width",
     sizeHeightPt: "Height",
