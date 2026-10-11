@@ -1,0 +1,35 @@
+
+ RUN  v4.1.11 /workspace/shared/sheetcraft-recovery-20261011-0454/apps/web
+
+ ❯ src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts (19 tests | 2 failed | 17 skipped) 2961ms
+     × Sparkline replaces and detaches an old range-picker confirm 1792ms
+     × Sparkline replaces and detaches an old range-picker cancel 1167ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > Sparkline replaces and detaches an old range-picker confirm
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > Sparkline replaces and detaches an old range-picker cancel
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts:104:42
+    102|       await flushPromises();
+    103|       const current = wrapper.getComponent(SparklineDialog);
+    104|       expect(current.props("suspended")).toBe(false);
+       |                                          ^
+    105|       expect(current.vm.$.uid).not.toBe(firstUid);
+    106|       expect(wrapper.findComponent(RangeReferencePicker).exists()).toB…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 17 skipped (19)
+   Start at  23:36:01
+   Duration  14.98s (transform 8.85s, setup 0ms, import 11.69s, tests 2.96s, environment 191ms)
+

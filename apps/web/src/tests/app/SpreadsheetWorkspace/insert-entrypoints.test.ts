@@ -14,6 +14,8 @@ import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import PivotTableDialog from "../../../modules/pivot-tables/components/PivotTableDialog.vue";
 import SymbolDialog from "../../../modules/insert-tools/components/SymbolDialog.vue";
+import SparklineDialog from "../../../modules/sparklines/components/SparklineDialog.vue";
+import RangeReferencePicker from "../../../shared/range-reference/RangeReferencePicker.vue";
 import HyperlinkDialog from "../../../modules/hyperlinks/components/HyperlinkDialog.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { triggerCanvasCell } from "../canvas-interaction";
@@ -85,6 +87,44 @@ async function fixture(withData = false) {
 }
 
 describe("workspace insert entry points", () => {
+  test.each(["confirm", "cancel"] as const)(
+    "Sparkline replaces and detaches an old range-picker %s",
+    async (action) => {
+      const wrapper = await fixture(true);
+      await wrapper.get('[role="button"][aria-label="Sparklines"]').trigger("click");
+      await flushPromises();
+      const first = wrapper.getComponent(SparklineDialog);
+      const firstUid = first.vm.$.uid;
+      const firstSelection = first.props("selectReference")("A1:C2");
+      await flushPromises();
+      const oldPicker = wrapper.getComponent(RangeReferencePicker).vm.$.vnode.props!;
+      await wrapper.get('[role="button"][aria-label="Sparklines"]').trigger("click");
+      await flushPromises();
+      const current = wrapper.getComponent(SparklineDialog);
+      expect(current.props("suspended")).toBe(false);
+      expect(current.vm.$.uid).not.toBe(firstUid);
+      expect(wrapper.findComponent(RangeReferencePicker).exists()).toBe(false);
+      expect(await firstSelection).toBeUndefined();
+      expect(await first.props("selectReference")("A5:C5")).toBeUndefined();
+      expect(wrapper.findComponent(RangeReferencePicker).exists()).toBe(false);
+      const selection = current.props("selectReference")("A1:C2");
+      await flushPromises();
+      const picker = wrapper.getComponent(RangeReferencePicker);
+      const pickerUid = picker.vm.$.uid;
+      const before = serializeWorkbook(captured.controller!.session.workbook);
+      (oldPicker[action === "confirm" ? "onConfirm" : "onCancel"] as () => void)();
+      await flushPromises();
+      expect(wrapper.getComponent(RangeReferencePicker).vm.$.uid).toBe(pickerUid);
+      expect(current.props("suspended")).toBe(true);
+      expect(serializeWorkbook(captured.controller!.session.workbook)).toEqual(before);
+      expect(captured.controller!.session.history.undoStack).toHaveLength(0);
+      picker.vm.$emit("cancel");
+      expect(await selection).toBeUndefined();
+      await flushPromises();
+      expect(current.props("suspended")).toBe(false);
+    },
+  );
+
   test("Hyperlink uses instance-bound callbacks from the actual Insert ribbon", async () => {
     const wrapper = await fixture(true);
     const controller = captured.controller!;

@@ -1,8 +1,8 @@
 # Insert 当前范围清单（2026-10-11）
 
-基线：`7a63e96be1e2529b67dc4b98e4092cc810362638`。已有表格矩阵、有界计算列、
-文本框/艺术字、矩形→箭头及 Symbol 代表路径已闭合；当前检查点完成现有超链接
-拒绝确认/陈旧回调修复及内部链接生命周期代表验收，无新增插入类型。
+基线：`656cbe0f3262b617a92d9a6fb634bf67a5d259c2`。已有表格矩阵、有界计算列、
+文本框/艺术字、矩形→箭头、Symbol 及内部超链接代表路径已闭合；当前检查点完成
+同表 line 迷你图生命周期/实例与picker修复，无新增插入类型或原生格式。
 
 “已有产品路径”指已找到真实 Web 入口、Core 命令/模型和快照持久化，不等于本轮
 逐项 GUI 验收或所有 XLSX 原生变体支持。全清单按实际 `InsertToolbar.vue` 及其
@@ -23,7 +23,7 @@
 | 照相机              | 活动区域关联、实时渲染与 Core 对象                                                          | 原生交换未实现并明确报告省略；本检查点验证已有编辑器失败/取消/重入/文档变化；不是本轮双应用 GUI 通过项                                          |
 | 表单控件            | checkbox/radio/combo/list/spinner/scrollbar/button/label/group；链接单元格与命令历史        | 原生控件交换未实现并报告省略；本检查点验证已有确认生命周期，不扩控件类型                                                                        |
 | 文档/附件           | 文件素材、文档/图标呈现、查看/下载和 Core 持久化路径                                        | 原生 embedded object/attachment 交换未实现并报告省略；本轮未用用户文件复验                                                                      |
-| 迷你图              | 真实编辑与 Core 路径                                                                        | 已有原生 I/O；整项本轮未复验                                                                                                                    |
+| 迷你图              | 真实编辑与 Core 路径；合法 no-op 与拒绝分开，实例/范围picker/owner guard 已验                  | 同表 line A1:C2→D1:D2 创建/编辑/纠错/取消/清除/UndoRedo/save-reload-JSON 已验；已有 native 本轮未双应用复验                                                                                                                    |
 | 超链接              | 真实单元格/内部引用与 Web 打开路径；拒绝保留草稿和实例/上下文 guard 已修                       | 内部链接 create/edit/Cancel/Escape/remove/UndoRedo/save-reload-JSON 已验；已有 native I/O 本轮未双应用复验                                                                                                                    |
 | 符号                | 写入普通单元格文字                                                                          | preset/custom、保留选区进草稿、Cancel/Escape、commit/UndoRedo/save-reload-JSON代表路径已验；普通文本native本轮未双应用复验                      |
 | 水印                | 实际工具栏 slot、页装饰和预设持久化                                                         | XLSX tiled watermark/presets 尚无对应实现，导出明确省略；本轮未复验                                                                             |
@@ -62,9 +62,12 @@
 - 现有超链接的有界闭合见 [Hyperlink 验收](../acceptance/hyperlink-20261011.md)。
   实际 Core 拒绝保留字段/快照/历史，陈旧 confirm/remove/cancel 及上下文失效回归通过；
   GUI 只走合成内部引用，不代表外链/保护/公式/native 全变体验收。
-- 下一最小已有路径候选为同表 line 迷你图的 create/edit/clear/Cancel/UndoRedo/保存。
-  `execute=false` 不能一概等于失败：Core 未变化编辑可能确实没有 inverse。
-  先实证区分拒绝变更与有效无变化；当前仅只读候选，未开始新实现或 GUI。
+- 现有同表 line 迷你图闭合见 [Sparkline 验收](../acceptance/sparkline-20261011.md)。
+  Core 合法无变化 false 仍关闭，实际拒绝变更保留字段；range picker 替换及旧回调
+  已实证修复。普通受保护锁定目标原本被预检阻断；不虚称 GUI 保护竞态漏洞。
+- 剩余已有路径建议优先不需文件的 icon/equation 代表性生命周期，其次单个
+  checkbox 表单控件与链接单元格、同表 camera；图片/截图/文档附件/水印/仪表盘
+  仍须独立有界验收。此处为后续优先候选，不代表新片已开始或 native 扩展获验。
 - pie 的首系列原生来源证明仍需单独实测；仪表盘复制完整多系列来源，仅恢复首
   系列不能自动证明未序列化列/行，所以不能预先宣称已补齐仪表盘整体往返。
 - I/O/公式独立包与 API 阶段应按这张清单明确支持/省略合同；本次三个普通图型原生

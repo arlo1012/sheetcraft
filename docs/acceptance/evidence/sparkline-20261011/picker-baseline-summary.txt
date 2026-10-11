@@ -1,0 +1,13 @@
+Retained original raw runner output locally, outside the Git checkpoint.
+Bytes: 596865
+SHA256: a542810e70bdab7f6ed84fa84a393352aa6de60321f8c4a8ae554cf45d8b52ab
+2 failed / 17 skipped. Corrected to aria-label but matched a group rather than the button; no SparklineDialog opened. Harness failure, not picker product evidence.
+Corrected actual picker baseline is picker-baseline-corrected.log. Original raw output was not rewritten.
+
+Selected original failure/result lines:
+     × Sparkline replaces and detaches an old range-picker confirm 1595ms
+     × Sparkline replaces and detaches an old range-picker cancel 1053ms
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > Sparkline replaces and detaches an old range-picker confirm
+ FAIL  src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts > workspace insert entry points > Sparkline replaces and detaches an old range-picker cancel
+ Test Files  1 failed (1)
+      Tests  2 failed | 17 skipped (19)

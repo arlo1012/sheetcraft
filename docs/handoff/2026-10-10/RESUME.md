@@ -1,5 +1,28 @@
 # Sheetcraft continuation after recovery — 2026-10-10
 
+## Existing same-sheet line Sparkline lifecycle — 2026-10-11
+
+Read `docs/acceptance/sparkline-20261011.md`. Keyed workbook/generation/Sheet/dialog
+identity and local range-picker tokens fix reproduced stale confirm/close, reused
+fields, replacement-picker and owner-disposal defects. An actual unchanged Core
+edit returns false without history and still closes; refused changed execution
+retains local draft and a retry message. The real Core protection regression uses
+an explicitly injected execute-boundary transition, not an ordinary locked-target
+GUI bug (those were already rejected by Web preflight).
+
+Serial checks: related Web 69, Core Sparklines 24, and post-unused-import correction
+concrete lifecycle12 passed; full Web Vue/Node types/build, scoped lint/format pass.
+Initial module/picker/disposal failures, selector harness errors and TS6133 unused
+fixture import are recorded separately. Existing chunk warning remains; no full CI.
+
+Actual new synthetic Sheet5: same-sheet A1:C2→D1:D2 line creation, invalid correction,
+Cancel/Escape, picker cancel, unchanged confirmation, explicit two-cell edit/clear,
+independent complete-JSON UndoRedo, Save locally and ordinary reload passed. Final
+JSON is29,574B SHA256244e74517fc04d7f4185439fb9174438296d63aaa63bc0b10900347ad4ffe909.
+Prior five sheets and all six source values remain unchanged. No native exchange
+was rerun; raw exports/screenshots remain local. Own preview/tab cleaned up;
+no own Error9 and oom_kill stayed25. Scope stops at this representative lifecycle.
+
 ## Existing Hyperlink lifecycle — 2026-10-11
 
 Read `docs/acceptance/hyperlink-20261011.md`. The real Core/history protected-cell

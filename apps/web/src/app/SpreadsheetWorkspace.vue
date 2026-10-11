@@ -1319,18 +1319,49 @@ const sparklineActions = useSparklineActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
   getRange: () => activeSelectionRange.value,
+  getGeneration: () => workbookGeneration.value,
   flush: () => cellEditSession.finish(),
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   execute: executeCommand,
 });
-const { draft: sparklineDraft, error: sparklineError } = sparklineActions;
+const {
+  dialog: sparklineDialog,
+  draft: sparklineDraft,
+  error: sparklineError,
+  failed: sparklineFailed,
+} = sparklineActions;
 const sparklineRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingSparklineRange, reference: pickedSparklineReference } = sparklineRangePicker;
-watch(sparklineDraft, (value) => {
-  if (!value) sparklineRangePicker.cancel();
+let sparklinePickerSequence = 0;
+const sparklinePicker = shallowRef<{ id: number; confirm: () => void; cancel: () => void }>();
+const selectSparklineReference = computed(() => {
+  const dialog = sparklineDialog.value;
+  return async (current: string): Promise<string | undefined> => {
+    if (!dialog?.isCurrent()) return undefined;
+    const selection = sparklineRangePicker.selectReference(current);
+    const picker = {
+      id: ++sparklinePickerSequence,
+      confirm: () => {
+        if (sparklinePicker.value === picker && dialog.isCurrent()) sparklineRangePicker.confirm();
+      },
+      cancel: () => {
+        if (sparklinePicker.value === picker && dialog.isCurrent()) sparklineRangePicker.cancel();
+      },
+    };
+    sparklinePicker.value = picker;
+    const result = await selection;
+    if (sparklinePicker.value === picker) sparklinePicker.value = undefined;
+    return dialog.isCurrent() ? result : undefined;
+  };
 });
-watch(() => activeSheet.value.id, sparklineActions.close);
-watch(workbookGeneration, sparklineActions.close);
+watch(
+  sparklineDialog,
+  () => {
+    sparklineRangePicker.cancel();
+    sparklinePicker.value = undefined;
+  },
+  { flush: "sync" },
+);
 const chartActions = useChartActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -4202,23 +4233,26 @@ const gridInert = computed(
     @cancel="cameraRangePicker.cancel"
   />
   <SparklineDialog
-    v-if="sparklineDraft"
-    :initial="sparklineDraft"
+    v-if="sparklineDialog"
+    :key="sparklineDialog.dialogId"
+    :initial="sparklineDialog.initial"
     :disabled="
       loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'formatCells')
     "
     :error="sparklineError"
+    :failed="sparklineFailed"
     :suspended="pickingSparklineRange"
-    :select-reference="sparklineRangePicker.selectReference"
-    @confirm="sparklineActions.confirm"
-    @close="sparklineActions.close"
+    :select-reference="selectSparklineReference"
+    @confirm="sparklineDialog.confirm"
+    @close="sparklineDialog.close"
   />
   <RangeReferencePicker
-    v-if="pickingSparklineRange"
+    v-if="pickingSparklineRange && sparklinePicker"
+    :key="sparklinePicker.id"
     :reference="pickedSparklineReference"
     :edit-session-id="cellEditSession.id"
-    @confirm="sparklineRangePicker.confirm"
-    @cancel="sparklineRangePicker.cancel"
+    @confirm="sparklinePicker.confirm"
+    @cancel="sparklinePicker.cancel"
   />
 </template>
 

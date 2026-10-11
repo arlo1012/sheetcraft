@@ -1,0 +1,3 @@
+$ bun run typecheck && vite build
+$ vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json
+src/tests/modules/sparklines/dialog-lifecycle.test.ts(4,1): error TS6133: 'Dialog' is declared but its value is never read.

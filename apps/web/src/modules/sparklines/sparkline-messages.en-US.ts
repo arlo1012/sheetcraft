@@ -16,5 +16,7 @@ export const sparklinesEnUS = {
     "Each data row or column produces one sparkline. Use a matching single-column or single-row location range. Existing cell values are retained.",
   "sparkline.invalid":
     "Check the ranges: use this sheet, matching dimensions, unmerged locations and at most 10,000 source cells.",
+  "sparkline.failed":
+    "Could not save the sparklines. Your draft is kept; check permissions and try again.",
   "sparkline.remove": "Clear sparklines",
 };
