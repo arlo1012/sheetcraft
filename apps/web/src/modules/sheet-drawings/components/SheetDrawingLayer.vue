@@ -38,7 +38,7 @@ import {
 import { getPicturePaneTranslation } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import { pictureFrameLocalToWorld } from "@sheetcraft/core/picture-frame";
 import type { PageLayoutProjection } from "@sheetcraft/sheet-engine/page-layout";
-import { getShapePageFragments } from "../shape-page-layout";
+import { getShapePageFragments, shapePagePointFromViewport } from "../shape-page-layout";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import {
   startPointerSession,
@@ -133,7 +133,7 @@ function isStandard(drawing: SheetDrawing): drawing is SheetGraphicDrawing {
     (drawing.kind === "shape" &&
       !!(drawing.shapeGeometry || drawing.shapePath || drawing.shapeStyle || drawing.shapeText)) ||
     (drawing.kind === "textBox" && !!drawing.shapeText) ||
-    ((drawing.kind === "shape" || drawing.kind === "textBox") && canonicalOwner(drawing))
+    ((drawing.kind === "shape" || drawing.kind === "textBox") && hasContinuousView(drawing))
   );
 }
 const metrics = computed(() => {
@@ -164,9 +164,17 @@ function canonicalOwner(drawing: SheetDrawing): boolean {
     (item) => item.source.id === drawing.id && isFramedShapeDrawing(item.source),
   );
 }
+function hasContinuousView(drawing: SheetDrawing): boolean {
+  return (
+    canonicalOwner(drawing) ||
+    (!!props.pageProjection &&
+      (drawing.kind === "shape" || drawing.kind === "textBox") &&
+      !!metrics.value)
+  );
+}
 function legacyHitSurface(drawing: SheetDrawing): boolean {
   return (
-    canonicalOwner(drawing) &&
+    hasContinuousView(drawing) &&
     ((drawing.kind === "shape" &&
       !drawing.shapeGeometry &&
       !drawing.shapePath &&
@@ -176,7 +184,7 @@ function legacyHitSurface(drawing: SheetDrawing): boolean {
   );
 }
 function drawingGeometry(drawing: SheetGraphicDrawing) {
-  return getDrawingShapeGeometry(drawing, canonicalOwner(drawing));
+  return getDrawingShapeGeometry(drawing, hasContinuousView(drawing));
 }
 function sourceOwner(drawing: SheetDrawing): SourceSheetDrawing | undefined {
   return (
@@ -198,7 +206,7 @@ function canChange(drawing: SheetDrawing): boolean {
 }
 function viewLayout(drawing: SheetDrawing): SheetViewportLayout {
   const resolved = resolvedDrawings.value.find((item) => item.source.id === drawing.id);
-  return resolved && isFramedShapeDrawing(resolved.source) && resolved.metrics
+  return resolved && hasContinuousView(drawing) && resolved.metrics
     ? shapeViewLayout(props.layout, resolved.metrics)
     : props.layout;
 }
@@ -210,7 +218,7 @@ function moveView(drawing: SheetDrawing, delta: { x: number; y: number }) {
       { ...resolved.rect, x: resolved.rect.x + delta.x, y: resolved.rect.y + delta.y },
       resolved.metrics,
     );
-  return moveFloatingImageBy(drawing, delta, props.layout);
+  return moveFloatingImageBy(drawing, delta, viewLayout(drawing));
 }
 function resizeView(
   drawing: SheetDrawing,
@@ -232,8 +240,8 @@ function resizeView(
     return next ? shapeViewAtRect(drawing, next, resolved.metrics) : undefined;
   }
   return isStandard(drawing)
-    ? resizeStandardShapeBy(drawing, direction, delta, props.layout, shift)
-    : resizeFloatingImageBy(drawing, direction, delta, props.layout, {
+    ? resizeStandardShapeBy(drawing, direction, delta, viewLayout(drawing), shift)
+    : resizeFloatingImageBy(drawing, direction, delta, viewLayout(drawing), {
         minSize: 16,
         maxSize: 16384,
       });
@@ -251,6 +259,7 @@ type DrawingFragment = FloatingImageViewportFragment & {
   drawing: SheetDrawing;
   standard: boolean;
   pageKey?: string;
+  pageClip?: FloatingImageViewportFragment["rect"];
 };
 const preview = shallowRef<SheetDrawing>();
 let session: PointerSession | undefined;
@@ -268,7 +277,7 @@ const fragments = computed<DrawingFragment[]>(
         props.pageProjection &&
         standard &&
         resolved?.metrics &&
-        isFramedShapeDrawing(resolved.source)
+        (drawing.kind === "shape" || drawing.kind === "textBox")
           ? getShapePageFragments(
               drawing as SheetGraphicDrawing,
               props.layout,
@@ -281,7 +290,7 @@ const fragments = computed<DrawingFragment[]>(
                 drawing,
                 currentLayout,
                 selectedId.value === drawing.id,
-                canonicalOwner(drawing),
+                hasContinuousView(drawing),
               )
             : getFloatingImageViewportFragments(drawing, currentLayout);
       return projected.map((fragment) => ({ ...fragment, drawing, standard }));
@@ -303,7 +312,7 @@ const formatTarget = computed(() => {
 const formatTriggerStyle = computed(() => {
   const f = formatTarget.value;
   if (!f) return {};
-  const clip = props.layout.panes[f.paneId].clip;
+  const clip = f.pageClip ?? props.layout.panes[f.paneId].clip;
   return {
     left: `${Math.max(clip.x + 4, Math.min(clip.x + clip.width - 32, f.rect.x + f.rect.width + 12))}px`,
     top: `${Math.max(clip.y + 4, Math.min(clip.y + clip.height - 32, f.rect.y))}px`,
@@ -351,8 +360,14 @@ function commitUpdate(next: SheetDrawing, owner: SheetDrawing): boolean {
   if (pointEditingId.value === owner.id) pointRejected.value = !accepted;
   return accepted;
 }
-function fragmentStyle(fragment: FloatingImageViewportFragment): CSSProperties {
+function fragmentStyle(fragment: DrawingFragment): CSSProperties {
+  const clip = fragment.pageClip;
+  const clipX = clip ? clip.x - fragment.clippedRect.x : 0;
+  const clipY = clip ? clip.y - fragment.clippedRect.y : 0;
   return {
+    clipPath: clip
+      ? `polygon(${clipX}px ${clipY}px, ${clipX + clip.width}px ${clipY}px, ${clipX + clip.width}px ${clipY + clip.height}px, ${clipX}px ${clipY + clip.height}px)`
+      : undefined,
     left: `${fragment.clippedRect.x}px`,
     top: `${fragment.clippedRect.y}px`,
     width: `${fragment.clippedRect.width}px`,
@@ -383,7 +398,7 @@ function hits(fragment: DrawingFragment, event: MouseEvent): boolean {
   const shape = drawingGeometry(fragment.drawing);
   if (!shape) return event.target instanceof Element && !!event.target.closest('[role="status"]');
   if (
-    canonicalOwner(fragment.drawing) &&
+    hasContinuousView(fragment.drawing) &&
     !fragment.drawing.shapeText &&
     !fragment.drawing.shapeStyle &&
     event.target instanceof Element &&
@@ -436,12 +451,13 @@ function start(
   emit("select");
   (event.currentTarget as HTMLElement)?.focus?.();
   if (!canChange(drawing)) return;
-  // Paper gaps are a separate pointer coordinate space; numeric/keyboard editing remains available.
-  if (props.pageProjection && isFramedShapeDrawing(sourceOwner(drawing)!)) return;
   const sheet = props.sheet,
     revision = props.revision,
     layout = props.layout,
     currentLayout = viewLayout(drawing),
+    currentMetrics = metrics.value,
+    currentProjection = props.pageProjection,
+    projection = fragment.pageKey ? currentProjection : undefined,
     scale = props.scale;
   const valid = () =>
     canChange(drawing) &&
@@ -449,12 +465,22 @@ function start(
     props.sheet === sheet &&
     props.revision === revision &&
     props.layout === layout &&
+    props.pageProjection === currentProjection &&
+    metrics.value === currentMetrics &&
     props.scale === scale &&
     legacyDrawings.value.find((item) => item.id === drawing.id) === owner;
-  const origin = viewportPoint(event);
+  const gesturePoint = (next: MouseEvent) =>
+    projection
+      ? shapePagePointFromViewport(viewportPoint(next), layout, projection, currentMetrics!)?.point
+      : viewportPoint(next);
+  const origin = gesturePoint(event);
+  const referenceRect = projection
+    ? getFloatingImageSheetRect(drawing, currentLayout)
+    : fragment.rect;
+  if (!origin || !referenceRect) return;
   const center = {
-    x: fragment.rect.x + drawing.width / 2,
-    y: fragment.rect.y + drawing.height / 2,
+    x: referenceRect.x + drawing.width / 2,
+    y: referenceRect.y + drawing.height / 2,
   };
   const endpoint =
     isStandard(drawing) && mode === "endpoint" && (index === 0 || index === 1)
@@ -469,7 +495,7 @@ function start(
   const freeOrigin =
     freePosition && isStandard(drawing)
       ? pictureFrameLocalToWorld(
-          fragment.rect,
+          referenceRect,
           drawing.rotation,
           standardShapeFlipPoint(drawing, freePosition),
         )
@@ -477,20 +503,26 @@ function start(
   const endpointOrigin =
     endpoint && isStandard(drawing)
       ? pictureFrameLocalToWorld(
-          fragment.rect,
+          referenceRect,
           drawing.rotation,
           standardShapeFlipPoint(drawing, endpoint),
         )
       : undefined;
-  const paneTranslation = getPicturePaneTranslation(fragment.paneId, layout);
+  const paneTranslation = projection
+    ? { x: 0, y: 0 }
+    : getPicturePaneTranslation(fragment.paneId, layout);
   const initialAngle = Math.atan2(origin.y - center.y, origin.x - center.x);
   const update = (point: PointerEvent | MouseEvent) => {
     if (!valid()) {
       session?.cancel();
       return;
     }
-    const target = viewportPoint(point),
-      delta = { x: target.x - origin.x, y: target.y - origin.y };
+    const target = gesturePoint(point);
+    if (!target) {
+      preview.value = undefined;
+      return;
+    }
+    const delta = { x: target.x - origin.x, y: target.y - origin.y };
     if (isStandard(drawing) && mode === "rotate") {
       let rotation =
         drawing.rotation +
@@ -529,7 +561,7 @@ function start(
     } else if (isStandard(drawing) && mode === "adjust" && index !== undefined) {
       const local = standardShapeFlipPoint(
         drawing,
-        standardShapeWorldToLocal(fragment.rect, drawing.rotation, target),
+        standardShapeWorldToLocal(referenceRect, drawing.rotation, target),
       );
       const geometry = moveStandardShapeAdjustment(
         drawing.shapeGeometry!,
@@ -546,7 +578,8 @@ function start(
   };
   session = startPointerSession({
     event,
-    captureTarget: event.currentTarget as HTMLElement,
+    // A page fragment may disappear during preview; capture belongs to the stable layer.
+    captureTarget: projection ? layerElement.value : (event.currentTarget as HTMLElement),
     onMove: update,
     onEnd: (point) => {
       update(point);
@@ -852,7 +885,14 @@ watch(
   },
 );
 watch(
-  () => [props.sheet, props.revision, props.layout, props.scale],
+  () => [
+    props.sheet,
+    props.revision,
+    props.layout,
+    props.scale,
+    props.pageProjection,
+    metrics.value,
+  ],
   () => {
     session?.cancel();
     preview.value = undefined;
@@ -962,14 +1002,13 @@ watch(
         v-if="
           selectedId === fragment.drawing.id &&
           pointEditingId === fragment.drawing.id &&
-          !fragment.pageKey &&
           canChange(fragment.drawing) &&
           isStandard(fragment.drawing) &&
           fragment.drawing.shapePath
         "
         :drawing="fragment.drawing"
         :fragment="fragment"
-        :pane-clip="layout.panes[fragment.paneId].clip"
+        :pane-clip="fragment.pageClip ?? layout.panes[fragment.paneId].clip"
         :active-vertex="activeVertex"
         :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
         :handler="pointHandler(fragment.drawing)"
@@ -985,13 +1024,12 @@ watch(
       <StandardShapeSelection
         v-else-if="
           selectedId === fragment.drawing.id &&
-          !fragment.pageKey &&
           canChange(fragment.drawing) &&
           isStandard(fragment.drawing)
         "
         :drawing="fragment.drawing"
         :fragment="fragment"
-        :pane-clip="layout.panes[fragment.paneId].clip"
+        :pane-clip="fragment.pageClip ?? layout.panes[fragment.paneId].clip"
         @resize="(direction, event) => start(fragment, event, direction)"
         @rotate="(event) => start(fragment, event, undefined, 'rotate')"
         @endpoint="(index, event) => start(fragment, event, undefined, 'endpoint', index)"
@@ -1009,9 +1047,7 @@ watch(
         "
       />
       <SheetObjectSelection
-        v-else-if="
-          selectedId === fragment.drawing.id && !fragment.pageKey && canChange(fragment.drawing)
-        "
+        v-else-if="selectedId === fragment.drawing.id && canChange(fragment.drawing)"
         :fragment="fragment"
         @resize="(direction, event) => start(fragment, event, direction)"
       />

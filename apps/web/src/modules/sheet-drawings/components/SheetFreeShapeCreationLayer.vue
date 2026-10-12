@@ -10,6 +10,8 @@ import {
 } from "vue";
 import { Button as TButton } from "tdesign-vue-next";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import type { PageLayoutProjection } from "@sheetcraft/sheet-engine/page-layout";
 import type { FrozenPaneId } from "@sheetcraft/sheet-engine/frozen-layout";
 import type { FloatingImageViewportFragment } from "@sheetcraft/sheet-engine/floating-image-layout";
 import { getPicturePaneTranslation } from "@sheetcraft/sheet-engine/picture-frame-layout";
@@ -26,11 +28,19 @@ import {
 } from "../shape-creation-geometry";
 import { createFreeShapeDrawingFromPoints, MAX_FREE_SHAPE_POINTS } from "../free-shape-creation";
 import { getStandardShapeViewportFragments } from "../standard-shape-layout";
+import {
+  getShapePageFragments,
+  projectShapePointToViewport,
+  shapePagePointFromViewport,
+} from "../shape-page-layout";
+import { shapeViewLayout } from "../shape-view-layout";
 import DrawingContent from "./DrawingContent.vue";
 
 const props = defineProps<{
   request: ShapeCreationRequest;
   layout: SheetViewportLayout;
+  metrics?: PictureSheetMetrics;
+  pageProjection?: PageLayoutProjection;
   scale: number;
   readOnly: boolean;
   revision?: number;
@@ -41,7 +51,13 @@ const props = defineProps<{
 type FreeTool = "curve" | "freeform" | "scribble";
 type Lease = Readonly<{
   request: ShapeCreationRequest;
+  workbook: ShapeCreationRequest["workbook"];
+  sheet: ShapeCreationRequest["sheet"];
+  generation: ShapeCreationRequest["generation"];
   layout: SheetViewportLayout;
+  creationLayout: SheetViewportLayout;
+  metrics: PictureSheetMetrics | undefined;
+  pageProjection: PageLayoutProjection | undefined;
   scale: number;
   revision: number | undefined;
   paneId: FrozenPaneId;
@@ -107,13 +123,59 @@ const labels = computed(() =>
           "This path has too many nodes. No truncated path was inserted; start again with a shorter path.",
       },
 );
-const fragments = computed(() =>
-  preview.value ? getStandardShapeViewportFragments(preview.value, props.layout) : [],
-);
+const fragments = computed(() => {
+  const value = preview.value;
+  if (!value) return [];
+  if (props.pageProjection)
+    return props.metrics
+      ? getShapePageFragments(value, props.layout, props.pageProjection, props.metrics)
+      : [];
+  return getStandardShapeViewportFragments(value, props.layout);
+});
 const firstNode = computed(() => {
   const owner = lease.value;
   const first = points.value[0];
   if (!owner || !first) return;
+  if (owner.pageProjection) {
+    if (!owner.metrics) return;
+    const projected = projectShapePointToViewport(
+      first,
+      owner.layout,
+      owner.pageProjection,
+      owner.metrics,
+    );
+    if (!projected) return;
+    const [rowPage, columnPage] = projected.pageKey.split(":").map(Number);
+    const page = owner.pageProjection.getPage(rowPage!, columnPage!);
+    if (!page) return;
+    const bodyClip = owner.layout.panes.body.clip;
+    const scroll = owner.layout.bodyScrollPosition;
+    const x = Math.max(bodyClip.x, page.contentRect.x - scroll.x);
+    const y = Math.max(bodyClip.y, page.contentRect.y - scroll.y);
+    const pageWidth = Math.min(
+      page.contentRect.width,
+      owner.metrics.columns.visiblePrefix(page.range.end.column + 1) -
+        owner.metrics.columns.visiblePrefix(page.range.start.column),
+    );
+    const pageHeight = Math.min(
+      page.contentRect.height,
+      owner.metrics.rows.visiblePrefix(page.range.end.row + 1) -
+        owner.metrics.rows.visiblePrefix(page.range.start.row),
+    );
+    const clip = {
+      x,
+      y,
+      width: Math.min(bodyClip.x + bodyClip.width, page.contentRect.x + pageWidth - scroll.x) - x,
+      height:
+        Math.min(bodyClip.y + bodyClip.height, page.contentRect.y + pageHeight - scroll.y) - y,
+    };
+    return {
+      clip,
+      x: projected.point.x - clip.x,
+      y: projected.point.y - clip.y,
+      radius: 4 / owner.scale,
+    };
+  }
   const clip = owner.layout.panes[owner.paneId].clip;
   const translation = getPicturePaneTranslation(owner.paneId, owner.layout);
   return {
@@ -123,6 +185,9 @@ const firstNode = computed(() => {
     radius: 4 / owner.scale,
   };
 });
+function fragmentKey(fragment: FloatingImageViewportFragment & { pageKey?: string }): string {
+  return fragment.pageKey ?? fragment.paneId;
+}
 const canFinish = computed(
   () => points.value.length >= 2 && !pending.value && failure.value !== "budget",
 );
@@ -155,7 +220,12 @@ function viewportPoint(event: MouseEvent, scale: number): ShapeCreationPoint {
 function owned(owner: Lease): boolean {
   return (
     props.request === owner.request &&
+    props.request.workbook === owner.workbook &&
+    props.request.sheet === owner.sheet &&
+    props.request.generation === owner.generation &&
     props.layout === owner.layout &&
+    props.metrics === owner.metrics &&
+    props.pageProjection === owner.pageProjection &&
     props.scale === owner.scale &&
     props.revision === owner.revision &&
     !props.readOnly &&
@@ -163,11 +233,34 @@ function owned(owner: Lease): boolean {
   );
 }
 function sheetPoint(event: MouseEvent, owner: Lease): ShapeCreationPoint | undefined {
+  if (owner.pageProjection)
+    return owner.metrics
+      ? shapePagePointFromViewport(
+          viewportPoint(event, owner.scale),
+          owner.layout,
+          owner.pageProjection,
+          owner.metrics,
+        )?.point
+      : undefined;
   return shapeCreationPointFromViewport(
     viewportPoint(event, owner.scale),
     owner.layout,
     owner.paneId,
   )?.point;
+}
+function nearbyPoints(left: ShapeCreationPoint, right: ShapeCreationPoint, owner: Lease): boolean {
+  if (owner.pageProjection) {
+    if (!owner.metrics) return false;
+    const a = projectShapePointToViewport(left, owner.layout, owner.pageProjection, owner.metrics);
+    const b = projectShapePointToViewport(right, owner.layout, owner.pageProjection, owner.metrics);
+    return (
+      !!a &&
+      !!b &&
+      a.pageKey === b.pageKey &&
+      Math.hypot(a.point.x - b.point.x, a.point.y - b.point.y) * owner.scale <= 6
+    );
+  }
+  return Math.hypot(left.x - right.x, left.y - right.y) * owner.scale <= 6;
 }
 function cancelPointer(): void {
   const active = session;
@@ -205,7 +298,7 @@ function updatePreview(): void {
     base: owner.request.base,
     tool: owner.tool,
     points: draft,
-    layout: owner.layout,
+    layout: owner.creationLayout,
   });
   // An out-of-bounds rubber band must not hide an otherwise valid draft.
   preview.value =
@@ -215,7 +308,7 @@ function updatePreview(): void {
           base: owner.request.base,
           tool: owner.tool,
           points: points.value,
-          layout: owner.layout,
+          layout: owner.creationLayout,
         })
       : undefined);
 }
@@ -290,7 +383,7 @@ function finish(closed = false): void {
     base: owner.request.base,
     tool: owner.tool,
     points: points.value,
-    layout: owner.layout,
+    layout: owner.creationLayout,
     ...(closed ? { closed: true } : {}),
   });
   if (!value) {
@@ -330,12 +423,33 @@ function start(event: PointerEvent): void {
     return;
   }
   if (!owner) {
-    if (!(props.scale > 0) || !Number.isFinite(props.scale)) return;
-    const first = shapeCreationPointFromViewport(viewportPoint(event, props.scale), props.layout);
+    if (
+      !(props.scale > 0) ||
+      !Number.isFinite(props.scale) ||
+      (props.pageProjection && !props.metrics)
+    )
+      return;
+    const first = props.pageProjection
+      ? shapePagePointFromViewport(
+          viewportPoint(event, props.scale),
+          props.layout,
+          props.pageProjection,
+          props.metrics!,
+        )
+      : shapeCreationPointFromViewport(viewportPoint(event, props.scale), props.layout);
     if (!first) return;
     owner = {
       request: props.request,
+      workbook: props.request.workbook,
+      sheet: props.request.sheet,
+      generation: props.request.generation,
       layout: props.layout,
+      creationLayout:
+        props.pageProjection && props.metrics
+          ? shapeViewLayout(props.layout, props.metrics)
+          : props.layout,
+      metrics: props.metrics,
+      pageProjection: props.pageProjection,
       scale: props.scale,
       revision: props.revision,
       paneId: first.paneId,
@@ -355,27 +469,29 @@ function start(event: PointerEvent): void {
     owner.tool !== "scribble" &&
     points.value.length >= 3 &&
     first &&
-    Math.hypot(origin.x - first.x, origin.y - first.y) * owner.scale <= 6
+    nearbyPoints(origin, first, owner)
   ) {
     finish(true);
     return;
   }
   const startIndex = points.value.length;
+  const previousPoints = points.value;
+  const previousRawPointCount = rawPointCount;
   if (!appendSamples([origin], true)) return;
   updatePreview();
   const captured = owner;
   let dragged = false;
-  const update = (next: GestureEvent, final = false): void => {
+  const update = (next: GestureEvent, final = false): boolean => {
     if (!owned(captured)) {
       cancel();
-      return;
+      return false;
     }
     const end = sheetPoint(next, captured);
     if (!end) {
       hover.value = undefined;
       if (final) failure.value = "invalid";
       updatePreview();
-      return;
+      return false;
     }
     dragged ||= Math.hypot(next.clientX - event.clientX, next.clientY - event.clientY) >= 3;
     if (captured.tool === "curve" || (captured.tool === "freeform" && !dragged)) hover.value = end;
@@ -383,16 +499,19 @@ function start(event: PointerEvent): void {
       const coalesced = (next as PointerEvent).getCoalescedEvents?.() ?? [];
       if (coalesced.length + 1 > RAW_POINT_LIMIT - rawPointCount) {
         exceededBudget();
-        return;
+        return false;
       }
       const events: readonly MouseEvent[] = coalesced.length ? [...coalesced, next] : [next];
+      // In page layout, every sample is inverted independently. Whitespace
+      // samples have no continuous sheet coordinate and add no path distance.
       const samples = events
         .map((entry) => sheetPoint(entry, captured))
         .filter((entry): entry is ShapeCreationPoint => !!entry);
-      if (!appendSamples(samples, final)) return;
+      if (!appendSamples(samples, final)) return false;
       hover.value = undefined;
     }
     updatePreview();
+    return true;
   };
   session = startPointerSession({
     event,
@@ -400,8 +519,17 @@ function start(event: PointerEvent): void {
     onMove: (next) => update(next),
     onEnd: (next) => {
       session = undefined;
-      update(next, true);
+      const endedInContent = update(next, true);
       if (!owned(captured) || failure.value === "budget") return;
+      if (captured.pageProjection && !endedInContent) {
+        // A whitespace release cannot leave a silently finishable partial trail.
+        points.value = previousPoints;
+        rawPointCount = previousRawPointCount;
+        hover.value = undefined;
+        failure.value = "invalid";
+        updatePreview();
+        return;
+      }
       previousGesture = lastGesture;
       lastGesture = { startIndex, origin, dragged };
       hover.value = undefined;
@@ -435,6 +563,7 @@ function doubleClick(event: MouseEvent): void {
   event.stopPropagation();
   const owner = lease.value;
   if (!owner) return;
+  if (owner.pageProjection && !sheetPoint(event, owner)) return;
   // Browsers deliver both constituent clicks before dblclick. Keep the first
   // endpoint and remove only the second click's duplicate vertex, never a drag.
   if (
@@ -442,12 +571,7 @@ function doubleClick(event: MouseEvent): void {
     previousGesture &&
     !lastGesture.dragged &&
     !previousGesture.dragged &&
-    Math.hypot(
-      lastGesture.origin.x - previousGesture.origin.x,
-      lastGesture.origin.y - previousGesture.origin.y,
-    ) *
-      owner.scale <=
-      6
+    nearbyPoints(lastGesture.origin, previousGesture.origin, owner)
   ) {
     points.value = points.value.slice(0, lastGesture.startIndex);
   }
@@ -510,7 +634,18 @@ onBeforeUnmount(() => {
   window.removeEventListener("blur", cancel);
 });
 watch(
-  () => [props.request, props.layout, props.scale, props.revision, props.readOnly],
+  () => [
+    props.request,
+    props.request.workbook,
+    props.request.sheet,
+    props.request.generation,
+    props.layout,
+    props.metrics,
+    props.pageProjection,
+    props.scale,
+    props.revision,
+    props.readOnly,
+  ],
   () => {
     const owner = lease.value;
     resetDraft();
@@ -583,7 +718,7 @@ watch(
     </div>
     <div
       v-for="fragment in fragments"
-      :key="fragment.paneId"
+      :key="fragmentKey(fragment)"
       class="free-shape-creation-layer__fragment"
       :style="fragmentStyle(fragment)"
     >

@@ -9,6 +9,8 @@ import {
   type CSSProperties,
 } from "vue";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import type { PageLayoutProjection } from "@sheetcraft/sheet-engine/page-layout";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import {
   getFloatingImageViewportFragments,
@@ -24,11 +26,15 @@ import {
   shapeCreationPointFromViewport,
 } from "../shape-creation-geometry";
 import { getStandardShapeViewportFragments } from "../standard-shape-layout";
+import { getShapePageFragments, shapePagePointFromViewport } from "../shape-page-layout";
+import { shapeViewLayout } from "../shape-view-layout";
 import DrawingContent from "./DrawingContent.vue";
 
 const props = defineProps<{
   request: ShapeCreationRequest;
   layout: SheetViewportLayout;
+  metrics?: PictureSheetMetrics;
+  pageProjection?: PageLayoutProjection;
   scale: number;
   readOnly: boolean;
   revision?: number;
@@ -59,13 +65,20 @@ const labels = computed(() =>
         rejected: "Insertion did not succeed. Your preview is preserved; retry or finish drawing.",
       },
 );
-const fragments = computed(() =>
-  preview.value
-    ? preview.value.kind === "shape"
-      ? getStandardShapeViewportFragments(preview.value, props.layout)
-      : getFloatingImageViewportFragments(preview.value, props.layout)
-    : [],
-);
+const fragments = computed(() => {
+  const value = preview.value;
+  if (!value) return [];
+  if (props.pageProjection)
+    return props.metrics
+      ? getShapePageFragments(value, props.layout, props.pageProjection, props.metrics)
+      : [];
+  return value.kind === "shape"
+    ? getStandardShapeViewportFragments(value, props.layout)
+    : getFloatingImageViewportFragments(value, props.layout);
+});
+function fragmentKey(fragment: FloatingImageViewportFragment & { pageKey?: string }): string {
+  return fragment.pageKey ?? fragment.paneId;
+}
 function fragmentStyle(fragment: FloatingImageViewportFragment): CSSProperties {
   return {
     left: `${fragment.clippedRect.x}px`,
@@ -82,35 +95,59 @@ function contentStyle(fragment: FloatingImageViewportFragment): CSSProperties {
     height: `${fragment.rect.height}px`,
   };
 }
-function point(event: MouseEvent) {
+function point(event: MouseEvent, scale: number) {
   const bounds = root.value?.getBoundingClientRect();
   return {
-    x: (event.clientX - (bounds?.left ?? 0)) / props.scale,
-    y: (event.clientY - (bounds?.top ?? 0)) / props.scale,
+    x: (event.clientX - (bounds?.left ?? 0)) / scale,
+    y: (event.clientY - (bounds?.top ?? 0)) / scale,
   };
 }
 function retry(): void {
   if (props.readOnly || !preview.value) return;
   const value = preview.value;
-  if (props.commit(props.request, value)) {
+  attemptCommit(props.request, value);
+}
+function attemptCommit(request: ShapeCreationRequest, value: SheetGraphicDrawing): void {
+  let success = false;
+  try {
+    success = props.commit(request, value);
+  } catch {
+    // Keep the detached result available for an explicit retry.
+  }
+  if (success) {
     preview.value = undefined;
     failure.value = undefined;
-  } else failure.value = "rejected";
+  } else if (props.request === request && preview.value === value) failure.value = "rejected";
 }
 function start(event: PointerEvent): void {
   if (
     event.button !== 0 ||
     props.readOnly ||
+    session?.active ||
     (event.target instanceof Element && event.target.closest("[data-shape-creation-controls]"))
   )
     return;
   const request = props.request,
     layout = props.layout,
+    metrics = props.metrics,
+    pageProjection = props.pageProjection,
     scale = props.scale,
-    revision = props.revision;
+    revision = props.revision,
+    workbook = request.workbook,
+    sheet = request.sheet,
+    generation = request.generation;
   const choice = request.choice;
-  if (choice.kind === "drawingTool") return;
-  const startPoint = shapeCreationPointFromViewport(point(event), layout);
+  if (
+    choice.kind === "drawingTool" ||
+    !(scale > 0) ||
+    !Number.isFinite(scale) ||
+    (pageProjection && !metrics)
+  )
+    return;
+  const creationLayout = pageProjection && metrics ? shapeViewLayout(layout, metrics) : layout;
+  const startPoint = pageProjection
+    ? shapePagePointFromViewport(point(event, scale), layout, pageProjection, metrics!)
+    : shapeCreationPointFromViewport(point(event, scale), layout);
   if (!startPoint) return;
   event.preventDefault();
   event.stopPropagation();
@@ -119,7 +156,12 @@ function start(event: PointerEvent): void {
   preview.value = undefined;
   const valid = () =>
     props.request === request &&
+    props.request.workbook === workbook &&
+    props.request.sheet === sheet &&
+    props.request.generation === generation &&
     props.layout === layout &&
+    props.metrics === metrics &&
+    props.pageProjection === pageProjection &&
     props.scale === scale &&
     props.revision === revision &&
     !props.readOnly;
@@ -130,14 +172,16 @@ function start(event: PointerEvent): void {
       return;
     }
     moved ||= Math.hypot(next.clientX - event.clientX, next.clientY - event.clientY) >= 3;
-    const end = shapeCreationPointFromViewport(point(next), layout, startPoint.paneId);
+    const end = pageProjection
+      ? shapePagePointFromViewport(point(next, scale), layout, pageProjection, metrics!)
+      : shapeCreationPointFromViewport(point(next, scale), layout, startPoint.paneId);
     preview.value = end
       ? (createShapeDrawingFromChoice({
           base: request.base,
           choice,
           start: startPoint.point,
           end: end.point,
-          layout,
+          layout: creationLayout,
           mode: moved ? "drag" : "click",
           shiftKey: next.shiftKey,
         }) ?? undefined)
@@ -159,10 +203,7 @@ function start(event: PointerEvent): void {
         failure.value = "invalid";
         return;
       }
-      if (props.commit(request, value)) {
-        preview.value = undefined;
-        failure.value = undefined;
-      } else failure.value = "rejected";
+      attemptCommit(request, value);
     },
     onCancel: () => {
       preview.value = undefined;
@@ -172,6 +213,8 @@ function start(event: PointerEvent): void {
 }
 function cancel(): void {
   session?.cancel();
+  preview.value = undefined;
+  failure.value = undefined;
   props.cancel(props.request);
 }
 function keydown(event: KeyboardEvent): void {
@@ -196,7 +239,18 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", keydown, true);
 });
 watch(
-  () => [props.request, props.layout, props.scale, props.revision, props.readOnly],
+  () => [
+    props.request,
+    props.request.workbook,
+    props.request.sheet,
+    props.request.generation,
+    props.layout,
+    props.metrics,
+    props.pageProjection,
+    props.scale,
+    props.revision,
+    props.readOnly,
+  ],
   () => {
     session?.cancel();
     preview.value = undefined;
@@ -233,7 +287,7 @@ watch(
     </div>
     <div
       v-for="fragment in fragments"
-      :key="fragment.paneId"
+      :key="fragmentKey(fragment)"
       class="shape-creation-layer__fragment"
       :style="fragmentStyle(fragment)"
     >

@@ -1894,7 +1894,7 @@ function selectedShapeChanged(id: string | null) {
 }
 const shapeInteractionBlocked = ref(false);
 const shapeCreation = useShapeCreation({
-  getMetrics: () => sheetGridRef.value?.getPictureFrameContext?.(activeSheet.value)?.metrics,
+  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
   getGeneration: () => workbookGeneration.value,

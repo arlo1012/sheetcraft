@@ -1,6 +1,8 @@
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
+import { isFramedShapeDrawing } from "@sheetcraft/core/sheet-drawings";
+import SheetShapeCreationLayer from "../../../modules/sheet-drawings/components/SheetShapeCreationLayer.vue";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
@@ -19,6 +21,7 @@ function setupState(wrapper: VueWrapper) {
   return (wrapper.vm.$ as unknown as { setupState: unknown }).setupState as {
     shapeCreation: ReturnType<typeof useShapeCreation>;
     shapeInteractionBlocked: boolean;
+    setViewMode: (mode: "page-layout") => void;
     fileActions: ReturnType<
       typeof import("../../../modules/workbook-persistence/useWorkbookFileActions").useWorkbookFileActions
     >;
@@ -122,5 +125,35 @@ describe("Workspace shape startup", () => {
     ).toBe(true);
     expect(getActiveSheet(state.session.workbook).drawings).toHaveLength(1);
     expect(state.shapeCreation.request.value).toBeUndefined();
+  });
+  test("real Workspace page-layout creation receives shape metrics and commits a source-free frame", async () => {
+    const wrapper = fixture(async () => undefined);
+    await flushPromises();
+    const state = setupState(wrapper);
+    state.setViewMode("page-layout");
+    await flushPromises();
+    const choice = SHAPE_GALLERY.flatMap((group) => group.items).find(
+      (item) => item.kind === "preset" && item.preset === "rect",
+    )!;
+    expect(state.shapeCreation.start(choice, false)).toBe(true);
+    await flushPromises();
+    const layer = wrapper.getComponent(SheetShapeCreationLayer);
+    expect(layer.props("metrics")).toBeDefined();
+    expect(layer.props("pageProjection")).toBeDefined();
+    const request = state.shapeCreation.request.value!;
+    expect(
+      state.shapeCreation.commit(request, {
+        ...request.base,
+        anchor: { row: 1, column: 1 },
+        offsetX: 12,
+        offsetY: 5,
+        width: 100,
+        height: 50,
+        shapeGeometry: { preset: "rect" },
+      }),
+    ).toBe(true);
+    const source = getActiveSheet(state.session.workbook).drawings?.[0];
+    expect(isFramedShapeDrawing(source!)).toBe(true);
+    expect(serializeWorkbook(state.session.workbook).version).toBe(60);
   });
 });

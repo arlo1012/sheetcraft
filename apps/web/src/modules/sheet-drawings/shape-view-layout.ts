@@ -16,6 +16,38 @@ export function shapeViewLayout(
 ): SheetViewportLayout {
   return {
     ...viewport,
+    getTotalSize() {
+      return {
+        width: metrics.columns.visiblePrefix(metrics.columns.count),
+        height: metrics.rows.visiblePrefix(metrics.rows.count),
+      };
+    },
+    getRangeRect(range) {
+      const start = {
+        column: Math.min(range.start.column, range.end.column),
+        row: Math.min(range.start.row, range.end.row),
+      };
+      const end = {
+        column: Math.max(range.start.column, range.end.column),
+        row: Math.max(range.start.row, range.end.row),
+      };
+      if (
+        ![start.column, start.row, end.column, end.row].every(Number.isInteger) ||
+        start.column < 0 ||
+        start.row < 0 ||
+        end.column >= metrics.columns.count ||
+        end.row >= metrics.rows.count
+      )
+        return null;
+      const x = metrics.columns.visiblePrefix(start.column),
+        y = metrics.rows.visiblePrefix(start.row);
+      return {
+        x,
+        y,
+        width: metrics.columns.visiblePrefix(end.column + 1) - x,
+        height: metrics.rows.visiblePrefix(end.row + 1) - y,
+      };
+    },
     getCellRect(address) {
       if (
         !Number.isInteger(address.column) ||
