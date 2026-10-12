@@ -1764,11 +1764,15 @@ export const zhCN = {
     inserted: "已插入图片。",
     unchanged: "图片已是当前设置，无需修改。",
     loading: "正在准备图片…",
-    invalidType: "请选择 PNG、JPEG、WebP 或 GIF 图片。",
+    invalidType: "请选择 PNG、JPEG、WebP、GIF、受支持的 BMP 或静态 SVG 图片。",
+    bmpUnsupported: "此 BMP 编码或颜色配置尚不支持。请另存为 PNG 或 JPEG 后重试。",
+    svgUnsafe: "图片不能包含脚本或外部资源。请导出为独立的静态 SVG 或 PNG 后重试。",
+    svgUnsupported: "此 SVG 使用了尚不支持的绘制功能。请导出为较简单的静态 SVG 或 PNG 后重试。",
+    svgComplexity: "此 SVG 超过复杂度上限。请简化路径、引用或多层遮罩、缩小图片，或导出为 PNG。",
     tooLarge: "图片超过 10 MiB。请减小文件体积后重试。",
     tooManyPixels: "图片超过 33,554,432 像素，或任意一边超过 16,384 像素。请缩小原图后重试。",
     fileLimits:
-      "支持 PNG、JPEG、WebP、GIF。最大 10 MiB，每边最多 16,384 像素，总像素最多 33,554,432。",
+      "支持 PNG、JPEG、WebP、GIF、受支持的 BMP 或静态 SVG。最大 10 MiB，每边最多 16,384 像素，总像素最多 33,554,432。",
     placementFailed:
       "图片纵横比过于悬殊，无法放入浮动框。请先裁剪为较均衡的比例，或选择插入单元格图片。",
     invalidFile: "图片文件无效。",

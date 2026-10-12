@@ -1746,6 +1746,10 @@ export type MessageSchema = ToolMessageSchema & {
     unchanged: string;
     loading: string;
     invalidType: string;
+    bmpUnsupported: string;
+    svgUnsafe: string;
+    svgUnsupported: string;
+    svgComplexity: string;
     tooLarge: string;
     tooManyPixels: string;
     fileLimits: string;

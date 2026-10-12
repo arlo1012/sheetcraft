@@ -4,6 +4,12 @@ import {
   pictureTextureFromAssetId,
   type PictureTextureId,
 } from "../../picture-texture";
+import {
+  SUPPORTED_IMAGE_INPUT_TYPES,
+  SUPPORTED_IMAGE_FILE_ACCEPT,
+} from "../../../image-assets/supportedImageTypes";
+import { imageAssetFeedback } from "../../../image-assets/imageAssetFeedback";
+import { useAppI18n } from "../../../../shared/i18n";
 import PictureTextureGallery from "./PictureTextureGallery.vue";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -40,6 +46,7 @@ const props = defineProps<{
   loadAsset?: (blob: Blob, texture?: PictureTextureId) => Promise<string | undefined>;
   onCommit: (value: Choice<PicturePaint> | undefined) => boolean;
 }>();
+const { t: imageT } = useAppI18n();
 const paint = computed(() => (props.value?.kind === "value" ? props.value.value : undefined));
 const mode = computed(() =>
   props.mixed
@@ -238,9 +245,11 @@ async function loadSource(getBlob: () => Blob | Promise<Blob>, textureId?: Pictu
         flip: "none",
       };
     if (!apply({ kind: "value", value })) sourceError.value = props.t("applyRejected");
-  } catch {
-    if (generation === request && key === props.ownerKey)
-      sourceError.value = props.t("paintSourceFailed");
+  } catch (error) {
+    if (current()) {
+      const feedback = imageAssetFeedback(error);
+      sourceError.value = feedback ? imageT(feedback) : props.t("paintSourceFailed");
+    }
   } finally {
     if (generation === request) busy.value = false;
   }
@@ -255,13 +264,9 @@ async function clipboard() {
   await loadSource(async () => {
     const items = await navigator.clipboard.read();
     const item = items.find((candidate) =>
-      candidate.types.some((type) =>
-        ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(type),
-      ),
+      candidate.types.some((type) => SUPPORTED_IMAGE_INPUT_TYPES.includes(type)),
     );
-    const type = item?.types.find((type) =>
-      ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(type),
-    );
+    const type = item?.types.find((type) => SUPPORTED_IMAGE_INPUT_TYPES.includes(type));
     if (!item || !type) throw Error("No supported clipboard picture.");
     return item.getType(type);
   });
@@ -547,7 +552,7 @@ function patternPreview(preset: PicturePatternPreset) {
     <input
       ref="fileInput"
       type="file"
-      accept="image/png,image/jpeg,image/gif,image/webp"
+      :accept="SUPPORTED_IMAGE_FILE_ACCEPT"
       hidden
       :disabled="disabled || !loadAsset"
       @change="chooseFile"

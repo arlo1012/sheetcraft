@@ -7,13 +7,14 @@
 耐久组合已接入普通网格：创建/解组使用真实拥有成员的树，多选仍保留独立拖柄，
 悬浮快捷栏可直接组合。组框和组内路径分别选择，移动、八向拖缩、旋转及翻转使用真实
 局部几何；组合内删除递归消解单成员容器并保留幸存成员的世界位置，整次操作可撤销。
-内部版本 47/48 读取与自动保存已经启用，默认主题的阴影、边框与主题倒影消费真实叶图。
+内部恢复与自动保存已接入几何、组合、外观、对象属性、形状遮罩及保真单元格图片；
+没有相应新特性的文档仍沿用旧版本。默认主题的阴影、边框与主题倒影消费真实叶图。
 
 格式入口打开真正的四页属性窗格。局部尺寸、角度、比例锁、根锚定、叶描述、八个源位置/裁剪字段、
 “重置裁剪”、原图百分比缩放和“重置大小”已经接通；独立图片与组合内实际叶图可以更换图片。尚未建模或尚未绘制的
 属性和重置操作带不可用原因。旋转后的黑色裁剪柄、源图拖动及比例裁剪已接通；
-形状裁剪、完整 Ribbon 效果入口、更多源格式和其他整项资源操作还要继续补齐，
-不能据此称图片工具完成。
+147 项形状裁剪、详细外观与实际组内叶图标注已接入；来源格式及其他资源操作仍有下述
+明确边界，不能据此称图片工具完成。
 
 新框/组合的 XLSX、外部 JSON 图片包装、打印和页布局尚不支持，会在处理资源或绘制前
 明确阻断；普通内部恢复与编辑可用。页布局模式下撤销恢复新对象时会回到普通视图，
@@ -66,8 +67,10 @@
 4. 颜色、亮度/对比度、线条和效果的有效绘制及对应控件。
 5. 详细格式侧栏、工具栏、排列、选择窗格、元数据、锁定和打印属性的完整消费。
 
-现有解码仅支持 PNG/JPEG/GIF/WebP，编码大小限制为 10 MiB。桌面文件筛选器列出的
-其他格式不等于 Web 已有解码支持。对象属性、工具栏入口和按钮不能仅有名称而无实际行为。
+本地图片来源支持 PNG/JPEG/GIF/WebP、有界的未压缩 BMP 及静态 SVG，编码大小限制为
+10 MiB。BMP 与 SVG 的实际子集、预检和无固定视口的处理见
+[图片来源格式](picture-source-formats.md)。桌面文件筛选器列出的其他格式不等于 Web 已有
+解码支持。对象属性、工具栏入口和按钮不能仅有名称而无实际行为。
 
 工作簿文件交换仍沿用当前既有支持边界；当前图片阶段不开发新原生交换能力。
 
@@ -133,7 +136,8 @@
   缩小原图或减小文件体积。常见 6000×4000 的 24MP 照片在像素上限内，仍须满足编码大小。
 - 头部预算不是完整的压缩流验证，也不保证动画累计解码内存、元数据解压量或多图片
   工作簿的总内存。JPEG 无法从 SOF 证明高度的零高度/DNL 变体当前拒绝预检。
-  SVG/HEIC/TIFF/EMF 等尚无解码器，不能把桌面文件筛选器等同于支持清单。
+  BMP 与静态 SVG 沿用相同预算并增加结构/资源工作量预检；HEIC/TIFF/EMF/WMF 尚不支持，
+  不能把桌面文件筛选器等同于支持清单。
 - 保留原始图片字节与内容身份，不隐式重编码。浏览器可呈现 JPEG 的方向修正尺寸，
   所以原始编码轴与呈现轴不被强制相等。无法满足浮动框 1–10000 像素范围的极端
   纵横比会提示裁剪或改为单元格图片；这不把有效源图误称为解码损坏。
@@ -562,7 +566,8 @@ confirmation, exact Undo/Redo and source/destination protection checks. See
 [picture-cell-conversion.md](picture-cell-conversion.md). Owned leaf embedding is
 an explicit product enhancement; container embedding and owned leaf Cut are not
 advertised as supported. External native/portable packaging remains blocked for
-these local frames. Source-format expansion is still a separate remaining item.
+these local frames. Source-format support has independent, explicit limits described
+in [picture-source-formats.md](picture-source-formats.md).
 
 ## Source-owned annotations
 
@@ -571,4 +576,5 @@ owned picture leaves. Framed sources use an original-source drawing surface and 
 current-appearance preview. Applying the annotation list preserves editable
 geometry, source assets and other properties; exact owner/permission checks and
 single-command history apply. See [picture-annotations.md](picture-annotations.md).
-Source-format expansion remains pending.
+BMP and a bounded static SVG subset are available as local sources; additional
+codec formats remain limited. See [picture-source-formats.md](picture-source-formats.md).

@@ -3,8 +3,9 @@ import {
   ImageAssetError,
   type ImageDimensions,
 } from "./imageAssetValidation";
+import { inspectBmpImageHeader } from "./inspectBmpImageHeader";
 export type EncodedImageHeader = ImageDimensions & {
-  mimeType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+  mimeType: "image/png" | "image/jpeg" | "image/gif" | "image/webp" | "image/bmp";
 };
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const JPEG_SOF = new Set([
@@ -24,6 +25,8 @@ function crc32(bytes: Uint8Array): number {
 
 /** Bounded container/header preflight; compressed pixel data is still decoded by the platform. */
 export function inspectEncodedImageHeader(bytes: Uint8Array): EncodedImageHeader {
+  if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d)
+    return inspectBmpImageHeader(bytes);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const need = (offset: number, length: number, end = bytes.length) => {
     if (

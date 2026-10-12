@@ -35,7 +35,7 @@ export const picturePaintEnUS = {
   paintSourceReady: "Picture selected",
   paintSourceMissing: "Choose a picture for this fill.",
   paintSourceFailed:
-    "The picture could not be read. Use a valid PNG, JPEG, GIF or WebP under 10 MiB and 32 megapixels.",
+    "The picture could not be read. Use a valid PNG, JPEG, GIF, WebP, supported BMP or static SVG under 10 MiB and 32 megapixels.",
   paintSourceLoading: "Reading picture…",
   paintTile: "Tile as texture",
   paintStretch: "Stretch",

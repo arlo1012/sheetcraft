@@ -1,4 +1,5 @@
 import PictureFormatPane from "../../../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
+import PictureCellOverwriteDialog from "../../../modules/sheet-images/components/PictureCellOverwriteDialog.vue";
 import { framedPicture } from "../../modules/sheet-images/framed-picture-fixture";
 import { pictureGroup } from "../../modules/sheet-images/picture-group-fixture";
 import SheetOwnedPictureGroupLayer from "../../../modules/sheet-images/components/SheetOwnedPictureGroupLayer.vue";
@@ -418,7 +419,7 @@ describe("workspace cell image entry points", () => {
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
     expect(getCellContent(sheet, { row: 0, column: 0 })).toBeNull();
   });
-  test("right-click conversion targets the image anchor and undoes in one step", async () => {
+  test("right-click conversion confirms a nonempty anchor and undoes in one step", async () => {
     const { wrapper, sheet } = await fixture();
     await triggerFloatingImage(wrapper, sheet.floatingImages[0]!, "contextmenu");
     await flushPromises();
@@ -427,6 +428,15 @@ describe("workspace cell image entry points", () => {
     );
     expect(action).not.toBeNull();
     action!.click();
+    await flushPromises();
+    expect(sheet.floatingImages).toHaveLength(1);
+    expect(getCellContent(sheet, { row: 2, column: 2 })).toEqual({
+      kind: "literal",
+      value: "original",
+    });
+    const confirmation = wrapper.getComponent(PictureCellOverwriteDialog).props("confirmation");
+    expect(confirmation.address).toEqual({ row: 2, column: 2 });
+    expect(confirmation.confirm()).toBe(true);
     await flushPromises();
     expect(sheet.floatingImages).toHaveLength(0);
     expect(getCellContent(sheet, { row: 2, column: 2 })).toEqual({

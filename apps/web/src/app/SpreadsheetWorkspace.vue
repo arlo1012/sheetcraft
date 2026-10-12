@@ -204,6 +204,7 @@ import {
 } from "../modules/image-assets/imageAssetStore";
 import { useImageAssetUrls } from "../modules/image-assets/useImageAssetUrls";
 import { useSheetImageActions } from "../modules/sheet-images/useSheetImageActions";
+import { SUPPORTED_IMAGE_FILE_ACCEPT } from "../modules/image-assets/supportedImageTypes";
 import { usePictureDialogSessions } from "../modules/sheet-images/usePictureDialogSessions";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
 import { useSheetContextActions } from "./composables/useSheetContextActions";
@@ -2984,7 +2985,7 @@ const gridInert = computed(
       :key="imageActions.pickerKey.value"
       type="file"
       class="spreadsheet-workspace__image-input"
-      accept="image/png,image/jpeg,image/webp,image/gif"
+      :accept="SUPPORTED_IMAGE_FILE_ACCEPT"
       :aria-label="t('image.insertMenu')"
       @change="imageActions.onFileChange"
       @cancel="imageActions.onFileCancel"

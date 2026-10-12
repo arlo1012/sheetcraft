@@ -1807,12 +1807,20 @@ export const enUS = {
     inserted: "Image inserted.",
     unchanged: "The image already has these settings. No changes were made.",
     loading: "Preparing image…",
-    invalidType: "Choose a PNG, JPEG, WebP, or GIF image.",
+    invalidType: "Choose a PNG, JPEG, WebP, GIF, supported BMP or static SVG image.",
+    bmpUnsupported:
+      "This BMP encoding or color profile is not supported. Save it as PNG or JPEG and try again.",
+    svgUnsafe:
+      "Pictures cannot include scripts or external resources. Export a self-contained static SVG or PNG and try again.",
+    svgUnsupported:
+      "This SVG uses unsupported rendering features. Export a simpler static SVG or PNG and try again.",
+    svgComplexity:
+      "This SVG exceeds the complexity budget. Simplify paths, references or layered masks, reduce its size, or export it as PNG.",
     tooLarge: "This picture exceeds 10 MiB. Reduce its file size and try again.",
     tooManyPixels:
       "This picture exceeds 33,554,432 pixels or 16,384 pixels on one side. Resize the original picture and try again.",
     fileLimits:
-      "PNG, JPEG, WebP or GIF. Up to 10 MiB, 16,384 pixels per side and 33,554,432 pixels in total.",
+      "PNG, JPEG, WebP, GIF, supported BMP or static SVG. Up to 10 MiB, 16,384 pixels per side and 33,554,432 pixels in total.",
     placementFailed:
       "This picture is too narrow or tall for a floating frame. Crop it to a less extreme aspect ratio, or insert it in a cell.",
     invalidFile: "This image file is invalid.",

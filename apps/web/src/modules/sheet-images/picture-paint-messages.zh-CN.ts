@@ -34,7 +34,8 @@ export const picturePaintZhCN = {
   paintSource: "图片来源",
   paintSourceReady: "已选择图片",
   paintSourceMissing: "请选择用于填充的图片。",
-  paintSourceFailed: "无法读取图片。请使用不超过 10 MiB、3200 万像素的 PNG、JPEG、GIF 或 WebP。",
+  paintSourceFailed:
+    "无法读取图片。请使用不超过 10 MiB、3200 万像素的 PNG、JPEG、GIF、WebP、受支持的 BMP 或静态 SVG。",
   paintSourceLoading: "正在读取图片…",
   paintTile: "平铺为纹理",
   paintStretch: "拉伸",

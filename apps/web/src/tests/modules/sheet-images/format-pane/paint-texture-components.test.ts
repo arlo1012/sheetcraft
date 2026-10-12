@@ -1,6 +1,7 @@
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, expect, test, vi } from "vitest";
 import { Select } from "tdesign-vue-next/es/select";
+import { BmpImageSourceError } from "../../../../modules/image-assets/inspectBmpImageHeader";
 import { createAppI18n } from "../../../../shared/i18n";
 import PicturePaintEditor from "../../../../modules/sheet-images/components/format-pane/PicturePaintEditor.vue";
 import PictureTextureGallery from "../../../../modules/sheet-images/components/format-pane/PictureTextureGallery.vue";
@@ -165,4 +166,38 @@ test("file paint replacement keeps its stretch offsets and rejects unavailable s
   await flushPromises();
   expect(f.onCommit).not.toHaveBeenCalled();
   expect(f.wrapper.text()).toContain("applyRejected");
+});
+
+test("source-format chooser includes BMP/SVG and rejected bytes explain a usable alternative", async () => {
+  const f = create();
+  const accept = f.wrapper.get('input[type="file"]').attributes("accept");
+  expect(accept).toContain(".bmp");
+  expect(accept).toContain(".svg");
+  await f.wrapper.setProps({
+    loadAsset: vi.fn(async () => {
+      throw new BmpImageSourceError("unsupported-feature");
+    }),
+  });
+  f.wrapper.getComponent(PictureTextureGallery).props("onSelect")("paper");
+  await flushPromises();
+  expect(f.wrapper.text()).toContain("This BMP encoding or color profile is not supported.");
+  expect(f.onCommit).not.toHaveBeenCalled();
+});
+
+test("late source validation errors do not replace a new paint selection's feedback", async () => {
+  const f = create();
+  let reject!: (error: unknown) => void;
+  await f.wrapper.setProps({
+    loadAsset: () =>
+      new Promise<string>((_resolve, failure) => {
+        reject = failure;
+      }),
+  });
+  f.wrapper.getComponent(PictureTextureGallery).props("onSelect")("paper");
+  await flushPromises();
+  await f.wrapper.setProps({ value: { kind: "none" } });
+  reject(new BmpImageSourceError("unsupported-feature"));
+  await flushPromises();
+  expect(f.wrapper.text()).not.toContain("This BMP encoding");
+  expect(f.onCommit).not.toHaveBeenCalled();
 });
