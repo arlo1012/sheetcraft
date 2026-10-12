@@ -3,6 +3,9 @@ import { transformPictureAnchorAxis } from "../picture-frame-axis-edit.js";
 import { assertPictureObjectsForSheet } from "../picture-object-sheet.js";
 import { isFramedPictureObject } from "../picture-object.js";
 import { createPictureSheetMetrics } from "../picture-axis-metrics.js";
+import type { PictureSheetMetrics } from "../picture-axis-metrics.js";
+import { transformShapeFrameAxis } from "../shape-frame.js";
+import { assertShapeObjectsForSheet } from "../shape-object-sheet.js";
 import { clonePictureFrame } from "../picture-frame.js";
 import { transformPictureFrameAxis } from "../picture-frame-axis-edit.js";
 import {
@@ -13,7 +16,12 @@ import {
 } from "../pivot-tables.js";
 import { getCellSparkline, setCellSparkline } from "../workbook.js";
 import { cloneCellSparkline } from "../sparklines.js";
-import { normalizeSheetDrawings, mapDrawingSource } from "../sheet-drawings.js";
+import {
+  normalizeSheetDrawings,
+  mapDrawingSource,
+  isFramedShapeDrawing,
+  type SheetDrawing,
+} from "../sheet-drawings.js";
 import { normalizeSheetProtection } from "../protection.js";
 import {
   MAX_SHEET_COLUMNS,
@@ -636,6 +644,7 @@ function transformSheetMetadataForAxis(
   maximum: number,
   operation: "insert" | "delete",
   sheetName: string,
+  nextMetrics: PictureSheetMetrics,
 ): SheetMetadata {
   const transformTableColumns = (table: SheetTable) => {
     if (axis !== "column") return table.columns.map((column) => ({ ...column }));
@@ -700,7 +709,15 @@ function transformSheetMetadataForAxis(
   );
   return {
     pivotTables: normalizePivotTables(metadata.pivotTables),
-    drawings: normalizeSheetDrawings(metadata.drawings).flatMap((drawing) => {
+    drawings: normalizeSheetDrawings(metadata.drawings).flatMap<SheetDrawing>((drawing) => {
+      if (isFramedShapeDrawing(drawing)) {
+        const shapeFrame = transformShapeFrameAxis(
+          drawing.shapeFrame,
+          { axis, operation, index, count },
+          nextMetrics,
+        );
+        return shapeFrame === null ? [] : [{ ...drawing, shapeFrame }];
+      }
       const source = drawing.anchor[axis];
       const target = transformAxisIndex(source, index, count, maximum, operation);
       return target === null
@@ -896,6 +913,40 @@ function compareAxisEntries(
   return operation === "insert" ? right.index - left.index : left.index - right.index;
 }
 
+/** Plans only sparse worksheet metrics, without changing any live resource. */
+function createAxisEditMetricSheet(
+  sheet: Sheet,
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  maximum: number,
+  operation: "insert" | "delete",
+  restoredSlice?: SheetAxisSparseSlice,
+): Sheet {
+  const dimensions = new Map(
+    [...(axis === "row" ? sheet.rowHeights : sheet.columnWidths)].flatMap(([source, size]) => {
+      const target = transformAxisIndex(source, index, count, maximum, operation);
+      return target === null ? [] : [[target, size] as const];
+    }),
+  );
+  const hidden = new Set(
+    [...(axis === "row" ? (sheet.hiddenRows ?? []) : (sheet.hiddenColumns ?? []))].flatMap(
+      (source) => {
+        const target = transformAxisIndex(source, index, count, maximum, operation);
+        return target === null ? [] : [target];
+      },
+    ),
+  );
+  for (const entry of restoredSlice?.dimensions ?? []) dimensions.set(entry.index, entry.size);
+  for (const restoredIndex of restoredSlice?.hiddenIndexes ?? []) hidden.add(restoredIndex);
+  return {
+    ...sheet,
+    ...(axis === "row"
+      ? { rowHeights: dimensions, hiddenRows: hidden }
+      : { columnWidths: dimensions, hiddenColumns: hidden }),
+  };
+}
+
 function transformSheetAxis(
   sheet: Sheet,
   axis: SheetDimensionAxis,
@@ -905,26 +956,7 @@ function transformSheetAxis(
   operation: "insert" | "delete",
   transformPictures = true,
 ): boolean {
-  const mappedDimensions = new Map(
-    [...(axis === "row" ? sheet.rowHeights : sheet.columnWidths)].flatMap(([source, size]) => {
-      const target = transformAxisIndex(source, index, count, maximum, operation);
-      return target === null ? [] : [[target, size] as const];
-    }),
-  );
-  const mappedHidden = new Set(
-    [...(axis === "row" ? (sheet.hiddenRows ?? []) : (sheet.hiddenColumns ?? []))].flatMap(
-      (source) => {
-        const target = transformAxisIndex(source, index, count, maximum, operation);
-        return target === null ? [] : [target];
-      },
-    ),
-  );
-  const nextPictureSheet = {
-    ...sheet,
-    ...(axis === "row"
-      ? { rowHeights: mappedDimensions, hiddenRows: mappedHidden }
-      : { columnWidths: mappedDimensions, hiddenColumns: mappedHidden }),
-  };
+  const nextPictureSheet = createAxisEditMetricSheet(sheet, axis, index, count, maximum, operation);
   const nextMetrics = createPictureSheetMetrics(nextPictureSheet);
   const plannedPictures: FloatingImage[] = transformPictures
     ? sheet.floatingImages.flatMap<FloatingImage>((image) => {
@@ -1411,6 +1443,7 @@ function validateSheetAxisSlice(
     maximum,
     command.operation,
     sheet.name,
+    createPictureSheetMetrics(sheet),
   );
   if (command.slice.pivotTables)
     expectedMetadata.pivotTables =
@@ -1469,52 +1502,20 @@ export function applyRestoreSheetStateCommand(
         "A legacy structural inverse cannot restore frame-aware pictures.",
       );
     const inverseOperation = command.operation === "insert" ? "delete" : "insert";
-    const nextMetadata = transformSheetMetadataForAxis(
-      getSheetMetadata(sheet),
+    const restoredMetricSheet = createAxisEditMetricSheet(
+      sheet,
       command.axis,
       command.index,
       command.count,
       maximum,
       inverseOperation,
-      sheet.name,
+      command.slice,
     );
-    if (command.slice.floatingImageState !== undefined) {
-      const dimensions = command.axis === "row" ? sheet.rowHeights : sheet.columnWidths;
-      const nextDimensions = new Map(
-        [...dimensions].flatMap(([source, size]) => {
-          const target = transformAxisIndex(
-            source,
-            command.index,
-            command.count,
-            maximum,
-            inverseOperation,
-          );
-          return target === null ? [] : [[target, size] as const];
-        }),
-      );
-      for (const entry of command.slice.dimensions) nextDimensions.set(entry.index, entry.size);
-      const hidden = command.axis === "row" ? sheet.hiddenRows : sheet.hiddenColumns;
-      const nextHidden = new Set(
-        [...(hidden ?? [])].flatMap((source) => {
-          const target = transformAxisIndex(
-            source,
-            command.index,
-            command.count,
-            maximum,
-            inverseOperation,
-          );
-          return target === null ? [] : [target];
-        }),
-      );
-      for (const index of command.slice.hiddenIndexes ?? []) nextHidden.add(index);
-      const shadow = {
-        ...sheet,
-        ...(command.axis === "row"
-          ? { rowHeights: nextDimensions, hiddenRows: nextHidden }
-          : { columnWidths: nextDimensions, hiddenColumns: nextHidden }),
-      };
-      assertPictureObjectsForSheet(command.slice.floatingImageState, shadow);
-    }
+    // The inverse owns the original logical frames. Resolve them only after the
+    // captured dimensions and hidden indexes have been added to the shadow.
+    assertShapeObjectsForSheet(command.slice.metadata.drawings, restoredMetricSheet);
+    if (command.slice.floatingImageState !== undefined)
+      assertPictureObjectsForSheet(command.slice.floatingImageState, restoredMetricSheet);
     const transformed = transformSheetAxis(
       sheet,
       command.axis,
@@ -1524,7 +1525,6 @@ export function applyRestoreSheetStateCommand(
       inverseOperation,
       command.slice.floatingImageState === undefined,
     );
-    const metadataTransformed = setSheetMetadata(sheet, nextMetadata);
     const restored = restoreSheetAxisSlice(sheet, command.axis, command.slice);
     for (const formula of command.slice.workbookFormulaSources ?? []) {
       const targetSheet = workbook.sheets.get(formula.sheetId);
@@ -1556,8 +1556,7 @@ export function applyRestoreSheetStateCommand(
         });
     }
     const pivotsRestored = restorePivotTables(workbook, command.slice.pivotTables);
-    if (!transformed && !metadataTransformed && !restored && !pivotsRestored && !templatesRestored)
-      return null;
+    if (!transformed && !restored && !pivotsRestored && !templatesRestored) return null;
     return command.operation === "insert"
       ? createInsertSheetAxisCommand(command.sheetId, command.axis, command.index, command.count)
       : createDeleteSheetAxisCommand(command.sheetId, command.axis, command.index, command.count);
@@ -1709,6 +1708,14 @@ export function applySheetAxisCommand(
     (range) =>
       transformRangeForAxis(range, command.axis, command.index, command.count, maximum, operation),
   );
+  const nextMetricSheet = createAxisEditMetricSheet(
+    sheet,
+    command.axis,
+    command.index,
+    command.count,
+    maximum,
+    operation,
+  );
   const nextMetadata = transformSheetMetadataForAxis(
     getSheetMetadata(sheet),
     command.axis,
@@ -1717,7 +1724,9 @@ export function applySheetAxisCommand(
     maximum,
     operation,
     sheet.name,
+    createPictureSheetMetrics(nextMetricSheet),
   );
+  assertShapeObjectsForSheet(nextMetadata.drawings, nextMetricSheet);
   let inherited: import("./contracts.js").CellContentChange[] = [];
   if (
     operation === "insert" &&
@@ -1921,12 +1930,21 @@ function transformSheetMetadataForAxisMove(
   );
   return {
     pivotTables: normalizePivotTables(metadata.pivotTables),
-    drawings: normalizeSheetDrawings(metadata.drawings).map((drawing) => ({
-      ...mapDrawingSource(
+    drawings: normalizeSheetDrawings(metadata.drawings).map((drawing) => {
+      if (isFramedShapeDrawing(drawing)) {
+        if (drawing.shapeFrame.anchor.mode !== "fixed")
+          throw invalidCommandPayload(
+            "drawing.shapeFrame.anchor",
+            drawing.shapeFrame.anchor,
+            "Axis reordering with moving framed shapes is not yet supported.",
+          );
+        return drawing;
+      }
+      return mapDrawingSource(
         { ...drawing, anchor: { ...drawing.anchor, [axis]: map(drawing.anchor[axis]) } },
         moveRange,
-      ),
-    })),
+      );
+    }),
     freezePanes: { ...metadata.freezePanes },
     filter,
     mergedCells,

@@ -2,7 +2,7 @@
 import { computed, defineAsyncComponent } from "vue";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
-import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { SheetLegacyDrawing as SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import StandardShapeContent from "./StandardShapeContent.vue";
 import type { ShapeDetailedPresentation } from "../shape-detailed-presentation";
 const FormControlContent = defineAsyncComponent(

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   normalizeSheetDrawing,
+  requireLegacySheetDrawing,
   type SheetDrawing,
   type SheetGraphicDrawing,
 } from "../../sheet-drawings.js";
@@ -75,7 +76,7 @@ describe("standard shape flips", () => {
     expect(serializeSheet(deserializeSheet(sheetSnapshot))).toEqual(sheetSnapshot);
     delete (command.drawings[0] as SheetGraphicDrawing).shapeFlipX;
     delete (command.drawings[0] as SheetGraphicDrawing).shapeFlipY;
-    command.drawings[0]!.anchor.row = 88;
+    requireLegacySheetDrawing(command.drawings[0]!).anchor.row = 88;
     expect(sheet.drawings).toEqual([expected]);
     expect(undoWorkbookCommand(session)).toBe(true);
     expect(serializeWorkbook(session.workbook)).toEqual(before);

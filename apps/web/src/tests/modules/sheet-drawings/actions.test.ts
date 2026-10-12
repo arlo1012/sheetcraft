@@ -1,3 +1,4 @@
+import { requireLegacySheetDrawings } from "@sheetcraft/core/sheet-drawings";
 import { effectScope, ref } from "vue";
 import { describe, expect, test, vi } from "vitest";
 import { createWorkbook, createSheet, getActiveSheet } from "@sheetcraft/core/workbook";
@@ -75,7 +76,7 @@ describe("drawing actions", () => {
     f.actions.confirm(f.actions.editing.value!);
     f.actions.insert("textBox");
     f.actions.confirm(f.actions.editing.value!);
-    const [first, second] = f.getSheet().drawings!;
+    const [first, second] = requireLegacySheetDrawings(f.getSheet().drawings);
     if (!first || first.kind !== "shape") throw new Error("Expected a shape drawing.");
     f.actions.edit(first);
     f.actions.confirm({ ...first!, text: "Changed", width: 300 });
@@ -90,10 +91,10 @@ describe("drawing actions", () => {
     const f = fixture();
     f.actions.insert("shape");
     f.actions.confirm(f.actions.editing.value!);
-    const owner = f.getSheet().drawings![0]!;
+    const owner = requireLegacySheetDrawings(f.getSheet().drawings)[0]!;
     const next = { ...owner, name: "changed" };
     expect(f.actions.update(next, { ...owner })).toBe(false);
-    expect(f.getSheet().drawings![0]).toBe(owner);
+    expect(requireLegacySheetDrawings(f.getSheet().drawings)[0]).toBe(owner);
     f.execute.mockImplementation(() => false);
     expect(f.actions.update(next, owner)).toBe(false);
     f.execute.mockImplementation(() => {
@@ -105,7 +106,7 @@ describe("drawing actions", () => {
       throw new Error("after mutation");
     });
     expect(f.actions.update(next, owner)).toBe(true);
-    expect(f.getSheet().drawings![0]!.name).toBe("changed");
+    expect(requireLegacySheetDrawings(f.getSheet().drawings)[0]!.name).toBe("changed");
   });
 
   test("cancels drafts without committing and rejects stale confirmations on another sheet", () => {
@@ -155,7 +156,7 @@ describe("drawing actions", () => {
     let draft = f.actions.editing.value!;
     if (existing) {
       f.actions.confirm(draft);
-      const drawing = f.getSheet().drawings![0]!;
+      const drawing = requireLegacySheetDrawings(f.getSheet().drawings)[0]!;
       if (drawing.kind !== "shape") throw new Error("Expected shape");
       f.actions.edit(drawing);
       draft = f.actions.editing.value!;
@@ -193,7 +194,7 @@ describe("drawing actions", () => {
     expect(f.getSheet().drawings ?? []).toEqual([]);
     captured.confirm(draft);
     expect(f.getSheet().drawings).toHaveLength(1);
-    expect(f.getSheet().drawings![0]!.name).toBe("Retained changes");
+    expect(requireLegacySheetDrawings(f.getSheet().drawings)[0]!.name).toBe("Retained changes");
     expect(f.actions.editing.value).toBeUndefined();
     captured.confirm(draft);
     expect(f.execute).toHaveBeenCalledTimes(2);
@@ -218,14 +219,14 @@ describe("drawing actions", () => {
     let draft = f.actions.editing.value!;
     f.actions.confirm(draft);
     {
-      const saved = f.getSheet().drawings![0]!;
+      const saved = requireLegacySheetDrawings(f.getSheet().drawings)[0]!;
       if (saved.kind !== "shape") throw new Error("Expected shape");
       f.actions.edit(saved);
     }
     const captured = f.actions.dialog.value!;
     draft = f.actions.editing.value!;
     {
-      const saved = f.getSheet().drawings![0]!;
+      const saved = requireLegacySheetDrawings(f.getSheet().drawings)[0]!;
       if (saved.kind !== "shape") throw new Error("Expected shape");
       f.actions.edit(saved);
     }
@@ -239,7 +240,7 @@ describe("drawing actions", () => {
     current.confirm({ ...draft, name: "Current changes" });
     expect(f.execute).toHaveBeenCalledTimes(1);
     expect(f.getSheet().drawings).toHaveLength(1);
-    expect(f.getSheet().drawings![0]!.name).toBe("Current changes");
+    expect(requireLegacySheetDrawings(f.getSheet().drawings)[0]!.name).toBe("Current changes");
     expect(f.actions.editing.value).toBeUndefined();
   });
   test("a proven unchanged existing edit closes when executor reports no-op false", () => {
@@ -248,7 +249,7 @@ describe("drawing actions", () => {
     let draft = f.actions.editing.value!;
     f.actions.confirm(draft);
     {
-      const saved = f.getSheet().drawings![0]!;
+      const saved = requireLegacySheetDrawings(f.getSheet().drawings)[0]!;
       if (saved.kind !== "shape") throw new Error("Expected shape");
       f.actions.edit(saved);
     }
@@ -265,17 +266,19 @@ describe("drawing actions", () => {
     let draft = f.actions.editing.value!;
     f.actions.confirm(draft);
     {
-      const saved = f.getSheet().drawings![0]!;
+      const saved = requireLegacySheetDrawings(f.getSheet().drawings)[0]!;
       if (saved.kind !== "shape") throw new Error("Expected shape");
       f.actions.edit(saved);
     }
     draft = f.actions.editing.value!;
     const captured = f.actions.dialog.value!;
-    f.getSheet().drawings = [{ ...f.getSheet().drawings![0]!, name: "External replacement" }];
+    f.getSheet().drawings = [
+      { ...requireLegacySheetDrawings(f.getSheet().drawings)[0]!, name: "External replacement" },
+    ];
     f.execute.mockClear();
     captured.confirm(draft);
     expect(f.execute).not.toHaveBeenCalled();
-    expect(f.getSheet().drawings![0]!.name).toBe("External replacement");
+    expect(requireLegacySheetDrawings(f.getSheet().drawings)[0]!.name).toBe("External replacement");
     expect(f.actions.editing.value).toBeUndefined();
   });
   test.each(["replaceSheet", "generation", "busy", "protection"])(

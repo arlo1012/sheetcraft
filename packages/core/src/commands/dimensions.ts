@@ -1,4 +1,5 @@
 import { assertPictureObjectsForSheet } from "../picture-object-sheet.js";
+import { assertShapeObjectsForSheet } from "../shape-object-sheet.js";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
@@ -146,6 +147,7 @@ function preflightDimensionMutation(sheet: Sheet, mutate: (shadow: Sheet) => voi
   };
   mutate(shadow);
   assertPictureObjectsForSheet(shadow.floatingImages, shadow);
+  assertShapeObjectsForSheet(shadow.drawings, shadow);
 }
 
 export function applyResizeSheetDimensionCommand(

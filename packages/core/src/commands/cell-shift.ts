@@ -6,7 +6,7 @@ import {
   restorePivotTables,
   transformPivotReferences,
 } from "../pivot-tables.js";
-import { mapDrawingSource } from "../sheet-drawings.js";
+import { mapDrawingSource, isFramedShapeDrawing, type SheetDrawing } from "../sheet-drawings.js";
 import { collectFormulaRanges, transformFormulaReferences } from "../formula/references.js";
 import { conditionalFormatFormulaSources } from "../conditional-formatting.js";
 import {
@@ -435,13 +435,25 @@ export function applyCellShiftCommand(
       sheet.floatingImages,
       "Partial cell shifts with moving framed pictures are not yet supported.",
     );
+  if (
+    (sheet.drawings ?? []).some(
+      (drawing) => isFramedShapeDrawing(drawing) && drawing.shapeFrame.anchor.mode !== "fixed",
+    )
+  )
+    throw invalidCommandPayload(
+      "drawings",
+      sheet.drawings,
+      "Partial cell shifts with moving framed shapes are not yet supported.",
+    );
   const map = createMap(range, command.direction);
   const previousState = createSheetSparseState(sheet);
   if (command.type === "insertCells") {
     const overflow =
       previousState.cells.some((cell) => !map(cell.address)) ||
       sheet.floatingImages.some((image) => isLegacyPictureObject(image) && !map(image.anchor)) ||
-      (sheet.drawings ?? []).some((drawing) => !map(drawing.anchor));
+      (sheet.drawings ?? []).some(
+        (drawing) => !isFramedShapeDrawing(drawing) && !map(drawing.anchor),
+      );
     if (overflow)
       throw invalidCommandPayload(
         "range",
@@ -516,7 +528,8 @@ export function applyCellShiftCommand(
       },
     ];
   });
-  nextState.drawings = (previousState.drawings ?? []).flatMap((drawing) => {
+  nextState.drawings = (previousState.drawings ?? []).flatMap<SheetDrawing>((drawing) => {
+    if (isFramedShapeDrawing(drawing)) return [drawing];
     const anchor = map(drawing.anchor);
     return anchor
       ? [

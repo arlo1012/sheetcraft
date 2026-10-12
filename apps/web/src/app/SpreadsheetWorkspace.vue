@@ -110,7 +110,11 @@ import { onBeforeUnmount } from "vue";
 import { createPicturePaintAssetSource } from "../modules/sheet-images/picture-paint-asset-source";
 import type { PictureFormatLabelKey } from "../modules/sheet-images/picture-format-pane-model";
 import { usePictureToolbarOwner } from "../modules/sheet-images/usePictureToolbarOwner";
-import type { SheetDrawing, SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import {
+  isFramedShapeDrawing,
+  type SheetDrawing,
+  type SheetGraphicDrawing,
+} from "@sheetcraft/core/sheet-drawings";
 import { getShapeTextAssetIds } from "@sheetcraft/core/shape-text";
 import { createCanvasImageCache } from "../modules/sheet-grid/canvas/image-painter";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
@@ -1575,7 +1579,7 @@ function editSheetDrawing(drawing: SheetDrawing): void {
   else if (drawing.kind === "control") controlActions.open(drawing);
   else if (drawing.kind === "attachment") attachmentActions.viewing.value = drawing;
   else if (drawing.kind === "camera") cameraActions.open(drawing);
-  else drawingActions.edit(drawing);
+  else if (!isFramedShapeDrawing(drawing)) drawingActions.edit(drawing);
 }
 const symbolDialog = shallowRef<{
   dialogId: number;

@@ -195,11 +195,13 @@ function assertCommandDoesNotModifyProtectedSheet(
         ]
       : command.type === "advancedFilter" && command.mode === "copy" && command.destination
         ? [command.destination.sheetId]
-        : command.type === "setSheetsWatermark"
-          ? command.sheetIds
-          : "sheetId" in command
-            ? [command.sheetId]
-            : [];
+        : command.type === "restoreTableTransaction"
+          ? command.states.map((state) => state.sheetId)
+          : command.type === "setSheetsWatermark"
+            ? command.sheetIds
+            : "sheetId" in command
+              ? [command.sheetId]
+              : [];
   const blocked = sheetIds.find((sheetId) => workbook.sheets.get(sheetId)?.properties.protected);
   if (!blocked) return;
   switch (command.type) {
@@ -216,6 +218,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "insertCells":
     case "deleteCells":
     case "restoreCellShift":
+    case "restoreTableTransaction":
     case "applyCellStyle":
     case "setCellHyperlink":
     case "markCellHyperlinkVisited":

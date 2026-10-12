@@ -1,4 +1,8 @@
 import {
+  assertWorkbookShapeSupport,
+  UnsupportedShapeFrameDocumentError,
+} from "../sheet-drawings/shape-document-support";
+import {
   assertExternalPictureGroupSupport,
   requireStandalonePicture,
   UnsupportedPictureDocumentError,
@@ -13,6 +17,7 @@ export type WorkbookFileErrorCode =
   | "invalid-json"
   | "invalid-snapshot"
   | "unsupported-picture-frame"
+  | "unsupported-shape-frame"
   | "read-failed"
   | "invalid-images"
   | "missing-image";
@@ -35,13 +40,16 @@ export function parseWorkbookJson(text: string): Workbook {
   }
   try {
     const workbook = deserializeWorkbook(value);
+    assertWorkbookShapeSupport(workbook);
     assertExternalPictureGroupSupport(workbook);
     return workbook;
   } catch (error) {
     throw new WorkbookFileError(
-      error instanceof UnsupportedPictureDocumentError
-        ? "unsupported-picture-frame"
-        : "invalid-snapshot",
+      error instanceof UnsupportedShapeFrameDocumentError
+        ? "unsupported-shape-frame"
+        : error instanceof UnsupportedPictureDocumentError
+          ? "unsupported-picture-frame"
+          : "invalid-snapshot",
       { cause: error },
     );
   }
@@ -174,9 +182,15 @@ export async function readWorkbookBundleFile(
     throw new WorkbookFileError("invalid-snapshot", { cause: error });
   }
   try {
+    assertWorkbookShapeSupport(workbook);
     assertExternalPictureGroupSupport(workbook);
   } catch (error) {
-    throw new WorkbookFileError("unsupported-picture-frame", { cause: error });
+    throw new WorkbookFileError(
+      error instanceof UnsupportedShapeFrameDocumentError
+        ? "unsupported-shape-frame"
+        : "unsupported-picture-frame",
+      { cause: error },
+    );
   }
   const referencedIds = collectWorkbookImageAssetIds(workbook);
   const provided = new Map<string, PortableImage>();
@@ -224,6 +238,7 @@ export async function readWorkbookBundleFile(
 }
 
 export function downloadWorkbookJson(workbook: Workbook): void {
+  assertWorkbookShapeSupport(workbook);
   assertExternalPictureGroupSupport(workbook);
   const blob = new Blob([JSON.stringify(serializeWorkbook(workbook), null, 2)], {
     type: "application/json",
@@ -243,6 +258,7 @@ export async function downloadWorkbookBundle(
   workbook: Workbook,
   assetStore: ImageAssetStore,
 ): Promise<void> {
+  assertWorkbookShapeSupport(workbook);
   assertExternalPictureGroupSupport(workbook);
   // Snapshot first so async asset reads cannot combine a later document with earlier image IDs.
   const snapshot = serializeWorkbook(workbook);

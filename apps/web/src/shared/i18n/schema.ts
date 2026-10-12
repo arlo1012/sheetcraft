@@ -787,6 +787,7 @@ export type MessageSchema = ToolMessageSchema & {
     unavailable: string;
     invalidSnapshot: string;
     unsupportedPictures: string;
+    unsupportedShapes: string;
     conflict: string;
     quota: string;
     invalidJson: string;

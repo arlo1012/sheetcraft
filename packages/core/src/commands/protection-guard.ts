@@ -1,3 +1,4 @@
+import { canEditSheetDrawingCollection } from "../shape-protection.js";
 import { areCellTextFontRunsEqual, replaceCellTextByDiff } from "../text-font-runs.js";
 import { canEditPictureForest, canEditPictureRoot } from "../picture-protection.js";
 import { planFloatingPictureToCell } from "../picture-cell-conversion.js";
@@ -251,7 +252,8 @@ export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookC
     }
     return canEditPictureForest(sheet, next);
   }
-  if (command.type === "setSheetDrawings") return Boolean(sheet.protection?.editObjects);
+  if (command.type === "setSheetDrawings")
+    return canEditSheetDrawingCollection(sheet, command.drawings);
   if (command.type === "applyCellStyle" && "unlocked" in command.patch) reject(sheet.id);
   if (
     command.type === "applyCellFormat" &&

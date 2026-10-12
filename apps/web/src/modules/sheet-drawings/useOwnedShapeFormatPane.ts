@@ -2,6 +2,7 @@ import { computed, shallowRef, watch } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import {
   normalizeSheetDrawing,
+  isFramedShapeDrawing,
   type SheetGraphicDrawing,
   type SheetDrawing,
 } from "@sheetcraft/core/sheet-drawings";
@@ -69,7 +70,11 @@ export function useOwnedShapeFormatPane(options: {
     )
       return;
     const current = owner.sheet.drawings?.find((d) => d.id === owner.id);
-    return current?.kind === "shape" || current?.kind === "textBox" ? current : undefined;
+    return current &&
+      !isFramedShapeDrawing(current) &&
+      (current.kind === "shape" || current.kind === "textBox")
+      ? current
+      : undefined;
   });
   const snapshot = computed<ShapeFormatSnapshot | null>(() => {
     const d = drawing.value,
@@ -207,6 +212,7 @@ export function useOwnedShapeFormatPane(options: {
   }
   function open(d: SheetDrawing): boolean {
     if (
+      isFramedShapeDrawing(d) ||
       (d.kind !== "shape" && d.kind !== "textBox") ||
       options.isBusy() ||
       !canUseSheetPermission(options.getSheet(), "editObjects") ||

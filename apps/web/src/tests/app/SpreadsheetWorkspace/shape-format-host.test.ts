@@ -81,7 +81,7 @@ test("real Workspace connects selection, detailed pane command, Undo/Redo and st
   expect(wrapper.getComponent(ShapeFormatPane).vm.$.uid).toBe(uid);
   expect(pane.props("snapshot")?.acceptedIntentId).toBe("host-fill");
   const after = serializeWorkbook(state.session.workbook);
-  expect(after.version).toBe(58);
+  expect(after.version).toBe(59);
   expect(state.session.history.undoStack).toHaveLength(1);
   expect(submit(intent)).toBe(false);
   expect(serializeWorkbook(state.session.workbook)).toEqual(after);

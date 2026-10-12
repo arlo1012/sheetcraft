@@ -1,4 +1,8 @@
-import type { SheetDrawing, SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import {
+  requireLegacySheetDrawing,
+  type SheetDrawing,
+  type SheetGraphicDrawing,
+} from "@sheetcraft/core/sheet-drawings";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import {
   getFloatingImageSheetRect,
@@ -39,14 +43,16 @@ function autoFitInputs(drawing: SheetGraphicDrawing) {
 /** One pre-command text/geometry candidate. Never writes history or mutates a
  * source. Canvas/font readiness failures leave the caller's draft intact. */
 export function prepareShapeTextUpdate(
-  drawing: SheetDrawing,
-  owner: SheetDrawing | undefined,
+  candidate: SheetDrawing,
+  source: SheetDrawing | undefined,
   viewport: SheetViewportLayout | undefined,
   measurement?: DrawingShapeTextRuntimeOptions,
   paint?: Pick<ShapeTextPaintOptions, "resources"> & {
     preflight?: typeof preflightShapeTextGlyphBudgets;
   },
 ): SheetDrawing {
+  const drawing = requireLegacySheetDrawing(candidate);
+  const owner = source && requireLegacySheetDrawing(source);
   if (drawing.kind !== "shape" && drawing.kind !== "textBox") return drawing;
   const manualHeightChange =
     !!owner &&

@@ -160,7 +160,10 @@ export function useWorkbookXlsxActions(options: {
     file: Pick<File, "arrayBuffer" | "size">,
     password?: string,
   ): Promise<void> {
-    if (options.persistence.error?.value === "unsupported-picture-frame") {
+    if (
+      options.persistence.error?.value === "unsupported-picture-frame" ||
+      options.persistence.error?.value === "unsupported-shape-frame"
+    ) {
       feedback.value = { key: "xlsx.feedback.blocked", error: true };
       return;
     }
@@ -297,7 +300,10 @@ export function useWorkbookXlsxActions(options: {
   }
 
   async function confirm(): Promise<void> {
-    if (options.persistence.error?.value === "unsupported-picture-frame") {
+    if (
+      options.persistence.error?.value === "unsupported-picture-frame" ||
+      options.persistence.error?.value === "unsupported-shape-frame"
+    ) {
       feedback.value = { key: "xlsx.feedback.blocked", error: true };
       return;
     }

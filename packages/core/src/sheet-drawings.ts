@@ -1,3 +1,4 @@
+import { readPictureDataArray } from "./picture-data-array.js";
 import {
   isShapeLinePreset,
   normalizeShapeLineEnds,
@@ -7,6 +8,11 @@ import { normalizeShapePresetParameters } from "./shape-presets/contract.js";
 import type { ShapePresetParameters } from "./shape-presets/types.js";
 import { normalizeShapeStyle, type ShapeDetailedStyle } from "./shape-style.js";
 import { normalizeShapeText, type ShapeText } from "./shape-text.js";
+import { normalizeShapeFrame, type ShapeFrame } from "./shape-frame.js";
+import {
+  normalizeShapeObjectProperties,
+  type ShapeObjectProperties,
+} from "./shape-object-properties.js";
 import {
   isShapeFreePathClosed,
   normalizeShapeFreePath,
@@ -81,12 +87,49 @@ export type SheetAttachmentDrawing = DrawingBase & {
   attachment: SheetAttachment;
 };
 export type SheetControlDrawing = DrawingBase & { kind: "control"; control: SheetFormControl };
-export type SheetDrawing =
+export type SheetLegacyDrawing =
   | SheetGraphicDrawing
   | SheetChartDrawing
   | SheetCameraDrawing
   | SheetAttachmentDrawing
   | SheetControlDrawing;
+/** Canonical source-free placement, never accompanied by legacy physical fields. */
+export type SheetFramedGraphicDrawing = Omit<
+  SheetGraphicDrawing,
+  "anchor" | "offsetX" | "offsetY" | "width" | "height" | "kind"
+> & {
+  kind: "shape" | "textBox";
+  shapeFrame: ShapeFrame;
+  shapeProperties?: ShapeObjectProperties;
+};
+export type SheetDrawing = SheetLegacyDrawing | SheetFramedGraphicDrawing;
+type DrawingAppearance =
+  | Omit<SheetGraphicDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">
+  | Omit<SheetChartDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">
+  | Omit<SheetCameraDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">
+  | Omit<SheetAttachmentDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">
+  | Omit<SheetControlDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">;
+export function isFramedShapeDrawing(value: SheetDrawing): value is SheetFramedGraphicDrawing {
+  return "shapeFrame" in value;
+}
+/** Temporary consumer gate; it never drops a frame or invents legacy storage coordinates. */
+export function requireLegacySheetDrawing(value: SheetDrawing): SheetLegacyDrawing {
+  if (isFramedShapeDrawing(value))
+    throw new TypeError("This drawing consumer does not yet support canonical shape frames.");
+  return value;
+}
+export function requireLegacySheetDrawings(
+  values: readonly SheetDrawing[] | undefined,
+): SheetLegacyDrawing[] {
+  if (values === undefined) return [];
+  readPictureDataArray(values, "sheet drawings", Number.MAX_SAFE_INTEGER);
+  // Consume validated indexed fields through the caller's public view. Reactive
+  // collections may expose stable owner proxies while descriptors retain raw targets.
+  const result: SheetLegacyDrawing[] = [];
+  for (let index = 0; index < values.length; index++)
+    result.push(requireLegacySheetDrawing(values[index]!));
+  return result;
+}
 export function normalizeCameraRange(range: CellRange | null): CellRange | null {
   if (range === null) return null;
   if (
@@ -171,7 +214,7 @@ export function normalizeSheetShapeGeometry(
   return normalizeShapePresetParameters(value) ?? { preset: "rect" };
 }
 
-export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
+function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance {
   const finite = (n: number, min: number, max: number) =>
     typeof n === "number" && Number.isFinite(n) && n >= min && n <= max;
   const color = (s: string) => typeof s === "string" && /^(#[0-9a-f]{6}|transparent)$/i.test(s);
@@ -184,15 +227,6 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     typeof value.name !== "string" ||
     typeof value.text !== "string" ||
     value.text.length > 100000 ||
-    !value.anchor ||
-    !Number.isInteger(value.anchor.row) ||
-    !finite(value.anchor.row, 0, MAX_SHEET_ROWS - 1) ||
-    !Number.isInteger(value.anchor.column) ||
-    !finite(value.anchor.column, 0, MAX_SHEET_COLUMNS - 1) ||
-    !finite(value.offsetX, 0, 1000000) ||
-    !finite(value.offsetY, 0, 1000000) ||
-    !finite(value.width, 1, 16384) ||
-    !finite(value.height, 1, 16384) ||
     !finite(value.strokeWidth, 0, 32) ||
     !finite(value.fontSize, 1, 512) ||
     !finite(value.rotation, -360, 360) ||
@@ -299,11 +333,6 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     ...(shapeText ? { shapeText } : {}),
     ...(directionField ? { textDirection: "vertical" as const } : {}),
     name: value.name,
-    anchor: { ...value.anchor },
-    offsetX: value.offsetX,
-    offsetY: value.offsetY,
-    width: value.width,
-    height: value.height,
     text: value.text,
     shape: value.shape,
     fill: value.fill,
@@ -316,12 +345,100 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     rotation: value.rotation,
   };
 }
+const shapeFrameFields = [
+  "id",
+  "kind",
+  "name",
+  "text",
+  "shape",
+  "fill",
+  "stroke",
+  "strokeWidth",
+  "color",
+  "fontSize",
+  "bold",
+  "italic",
+  "rotation",
+  "shapeGeometry",
+  "shapePath",
+  "shapeLineEnds",
+  "shapeFlipX",
+  "shapeFlipY",
+  "shapeStyle",
+  "shapeText",
+  "textDirection",
+  "shapeFrame",
+  "shapeProperties",
+] as const;
+export function normalizeSheetDrawing(value: SheetFramedGraphicDrawing): SheetFramedGraphicDrawing;
+export function normalizeSheetDrawing(value: SheetLegacyDrawing): SheetLegacyDrawing;
+export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing;
+export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new RangeError("Invalid sheet drawing.");
+  if (isFramedShapeDrawing(value)) {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== null && prototype !== Object.prototype)
+      throw new TypeError("Framed shapes must be ordinary data records.");
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== "string" || !(shapeFrameFields as readonly string[]).includes(key))
+        throw new TypeError("Unknown or conflicting canonical shape field.");
+      if (!("value" in Object.getOwnPropertyDescriptor(value, key)!))
+        throw new TypeError("Canonical shapes must contain own data fields, not accessors.");
+    }
+    if (value.kind !== "shape" && value.kind !== "textBox")
+      throw new TypeError("Only shapes or text boxes may use canonical shape frames.");
+    const field = Object.getOwnPropertyDescriptor(value, "shapeFrame");
+    if (!field || !("value" in field))
+      throw new TypeError("Shape frame must be an own data field.");
+    const shapeFrame = normalizeShapeFrame(field.value);
+    const shapeProperties = normalizeShapeObjectProperties(
+      Object.getOwnPropertyDescriptor(value, "shapeProperties")?.value,
+    );
+    const appearance = normalizeDrawingAppearance(value) as Omit<
+      SheetGraphicDrawing,
+      "anchor" | "offsetX" | "offsetY" | "width" | "height"
+    >;
+    return {
+      ...appearance,
+      kind: value.kind,
+      shapeFrame,
+      ...(shapeProperties ? { shapeProperties } : {}),
+    };
+  }
+  if ("shapeProperties" in value)
+    throw new TypeError("Shape properties require a canonical shape frame.");
+  const finite = (n: number, min: number, max: number) =>
+    typeof n === "number" && Number.isFinite(n) && n >= min && n <= max;
+  if (
+    !value.anchor ||
+    !Number.isInteger(value.anchor.row) ||
+    !finite(value.anchor.row, 0, MAX_SHEET_ROWS - 1) ||
+    !Number.isInteger(value.anchor.column) ||
+    !finite(value.anchor.column, 0, MAX_SHEET_COLUMNS - 1) ||
+    !finite(value.offsetX, 0, 1000000) ||
+    !finite(value.offsetY, 0, 1000000) ||
+    !finite(value.width, 1, 16384) ||
+    !finite(value.height, 1, 16384)
+  )
+    throw new RangeError("Invalid legacy drawing placement.");
+  return {
+    ...normalizeDrawingAppearance(value),
+    anchor: { ...value.anchor },
+    offsetX: value.offsetX,
+    offsetY: value.offsetY,
+    width: value.width,
+    height: value.height,
+  };
+}
 export function normalizeSheetDrawings(
   values: readonly SheetDrawing[] | undefined,
 ): SheetDrawing[] {
   if (values === undefined) return [];
   if (!Array.isArray(values)) throw new RangeError("Invalid sheet drawings.");
-  const result = values.map(normalizeSheetDrawing);
+  const result = readPictureDataArray(values, "sheet drawings", Number.MAX_SAFE_INTEGER).map(
+    normalizeSheetDrawing,
+  );
   if (new Set(result.map((value) => value.id)).size !== result.length)
     throw new RangeError("Duplicate drawing IDs.");
   if (

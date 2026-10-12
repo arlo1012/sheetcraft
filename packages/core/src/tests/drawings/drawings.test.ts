@@ -2,7 +2,8 @@ import { describe, expect, test } from "vitest";
 import {
   normalizeSheetDrawing,
   normalizeSheetDrawings,
-  type SheetDrawing,
+  requireLegacySheetDrawing,
+  type SheetLegacyDrawing as SheetDrawing,
 } from "../../sheet-drawings.js";
 import { createSetSheetDrawingsCommand } from "../../commands/drawings.js";
 import {
@@ -52,8 +53,11 @@ describe("sheet drawings", () => {
     const command = createSetSheetDrawingsCommand(sheet.id, [original]);
     original.anchor.column = 9;
     executeWorkbookCommand(session, command);
-    command.drawings[0]!.anchor.row = 10;
-    expect(sheet.drawings?.[0]?.anchor).toEqual({ row: 3, column: 2 });
+    requireLegacySheetDrawing(command.drawings[0]!).anchor.row = 10;
+    expect(sheet.drawings?.[0] && requireLegacySheetDrawing(sheet.drawings[0]).anchor).toEqual({
+      row: 3,
+      column: 2,
+    });
   });
 
   test("records replacement as one command and restores it through undo and redo", () => {
@@ -146,13 +150,17 @@ describe("sheet drawings", () => {
     const index = drawing().anchor[axis];
     if (operation === "insert") {
       executeWorkbookCommand(session, createInsertSheetAxisCommand(sheet.id, axis, index, 2));
-      expect(sheet.drawings?.[0]?.anchor[axis]).toBe(index + 2);
+      expect(sheet.drawings?.[0] && requireLegacySheetDrawing(sheet.drawings[0]).anchor[axis]).toBe(
+        index + 2,
+      );
     } else if (operation === "delete") {
       executeWorkbookCommand(session, createDeleteSheetAxisCommand(sheet.id, axis, index));
       expect(sheet.drawings).toEqual([]);
     } else {
       executeWorkbookCommand(session, createMoveSheetAxisCommand(sheet.id, axis, index, 1, 0));
-      expect(sheet.drawings?.[0]?.anchor[axis]).toBe(0);
+      expect(sheet.drawings?.[0] && requireLegacySheetDrawing(sheet.drawings[0]).anchor[axis]).toBe(
+        0,
+      );
     }
     undoWorkbookCommand(session);
     expect(sheet.drawings).toEqual(before);

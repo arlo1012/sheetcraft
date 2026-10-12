@@ -1,3 +1,8 @@
+import {
+  assertWorkbookShapeSupport,
+  assertShapeCommandSupport,
+  UnsupportedShapeFrameDocumentError,
+} from "../../modules/sheet-drawings/shape-document-support";
 import { normalizeCellImage, type CellImage } from "@sheetcraft/core/cell-picture-frame";
 import type { ConvertFloatingImageToCellCommand } from "@sheetcraft/core/commands";
 import {
@@ -492,6 +497,8 @@ export function useSpreadsheetWorkspaceController(
   ): boolean {
     let changed: boolean;
     try {
+      assertWorkbookShapeSupport(session.workbook);
+      assertShapeCommandSupport(command);
       assertWorkbookPictureSupport(session.workbook);
       assertPictureCommandSupport(command, session.workbook);
       if (
@@ -507,6 +514,10 @@ export function useSpreadsheetWorkspaceController(
       );
       changed = executeWorkbookCommand(session, command, operation);
     } catch (error) {
+      if (error instanceof UnsupportedShapeFrameDocumentError) {
+        showWorkspaceStatus({ key: "persistence.unsupportedShapes" });
+        return false;
+      }
       if (error instanceof UnsupportedPicturePaintError) {
         showWorkspaceStatus({ key: "picture.groupReflectionUnsupported" });
         return false;
@@ -542,9 +553,18 @@ export function useSpreadsheetWorkspaceController(
     token?: ReplaceableWorkbookCommandToken,
   ) {
     try {
+      assertWorkbookShapeSupport(session.workbook);
+      assertShapeCommandSupport(command);
+      const previous = session.history.undoStack.at(-1);
+      if (token && previous?.replacementToken === token.id)
+        assertShapeCommandSupport(previous.command);
       assertWorkbookPictureSupport(session.workbook);
       assertPictureCommandSupport(command, session.workbook);
     } catch (error) {
+      if (error instanceof UnsupportedShapeFrameDocumentError) {
+        showWorkspaceStatus({ key: "persistence.unsupportedShapes" });
+        return { changed: false, accepted: false };
+      }
       if (!(error instanceof UnsupportedPicturePaintError)) throw error;
       showWorkspaceStatus({ key: "picture.groupReflectionUnsupported" });
       return { changed: false, accepted: false };
@@ -1533,6 +1553,7 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function replaceWorkbook(workbook: Workbook): void {
+    assertWorkbookShapeSupport(workbook);
     assertWorkbookPictureSupport(workbook);
     gridRef.value?.clearClipboard?.();
     session.workbook = workbook;
@@ -1668,8 +1689,21 @@ export function useSpreadsheetWorkspaceController(
   const updateSearchQuery = workbookFind.updateQuery;
   const findCell = workbookFind.find;
 
+  function canApplyShapeHistoryCommand(command: WorkbookCommand | undefined): boolean {
+    try {
+      assertWorkbookShapeSupport(session.workbook);
+      if (command) assertShapeCommandSupport(command);
+      return true;
+    } catch (error) {
+      if (!(error instanceof UnsupportedShapeFrameDocumentError)) throw error;
+      showWorkspaceStatus({ key: "persistence.unsupportedShapes" });
+      return false;
+    }
+  }
+
   function undo(): boolean {
     const command = session.history.undoStack.at(-1)?.command;
+    if (!canApplyShapeHistoryCommand(command)) return false;
     calculation.prepareMutation(
       command?.type === "setWorkbookCalculation" ? command.calculation.mode : undefined,
     );
@@ -1684,6 +1718,7 @@ export function useSpreadsheetWorkspaceController(
 
   function redo(): boolean {
     const command = session.history.redoStack.at(-1)?.command;
+    if (!canApplyShapeHistoryCommand(command)) return false;
     calculation.prepareMutation(
       command?.type === "setWorkbookCalculation" ? command.calculation.mode : undefined,
     );

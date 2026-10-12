@@ -1,3 +1,4 @@
+import { assertShapeObjectsForSheet } from "./shape-object-sheet.js";
 import { normalizeCellImage, cloneCellImage, areCellImagesEqual } from "./cell-picture-frame.js";
 import {
   normalizePictureProperties,
@@ -2949,6 +2950,7 @@ export function getSheetMetadata(sheet: Sheet): SheetMetadata {
 
 export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean {
   const normalized = normalizeSheetMetadata(metadata);
+  assertShapeObjectsForSheet(normalized.drawings, sheet);
   const current = getSheetMetadata(sheet);
   if (areSheetMetadataEqual(current, normalized)) return false;
   sheet.freezePanes = cloneFreezePanes(normalized.freezePanes);
@@ -3109,6 +3111,14 @@ export function normalizeSheetSparseState(state: SheetSparseState): SheetSparseS
       hiddenColumns: new Set(hiddenColumns),
       defaultColumnWidth,
     });
+  assertShapeObjectsForSheet(metadata.drawings, {
+    ...createSheet("Shape geometry validation", "shape-geometry-validation"),
+    rowHeights: new Map(rowHeights.map((entry) => [entry.index, entry.size])),
+    columnWidths: new Map(columnWidths.map((entry) => [entry.index, entry.size])),
+    hiddenRows: new Set(hiddenRows),
+    hiddenColumns: new Set(hiddenColumns),
+    defaultColumnWidth,
+  });
   return {
     cells,
     rowHeights,

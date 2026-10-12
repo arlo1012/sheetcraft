@@ -1,3 +1,4 @@
+import { requireLegacySheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import { effectScope, shallowRef } from "vue";
 import { describe, expect, test, vi } from "vitest";
 import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
@@ -135,7 +136,7 @@ describe("live shape text owner transactions", () => {
         f.pane.onIntent(f.intent({ type: "set-field", field: "textResizeToFit", value: true })),
       ).toBe(true);
       expect(f.prepare).toHaveBeenCalledTimes(1);
-      expect(f.prepare.mock.calls[0]![0].height).toBe(160);
+      expect(requireLegacySheetDrawing(f.prepare.mock.calls[0]![0]).height).toBe(160);
       const after = f.sheet.drawings![0] as SheetGraphicDrawing;
       expect(after.height).toBeLessThan(160);
       const corner = pictureFrameLocalToWorld(getFloatingImageSheetRect(after, viewport)!, 37, {

@@ -1,3 +1,4 @@
+import { assertShapeObjectsForSheet } from "../shape-object-sheet.js";
 import { normalizeSheetDrawings, type SheetDrawing } from "../sheet-drawings.js";
 import type { Workbook } from "../workbook.js";
 import type { SetSheetDrawingsCommand } from "./contracts.js";
@@ -18,6 +19,7 @@ export function applySetSheetDrawingsCommand(
 ): SetSheetDrawingsCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const next = createSetSheetDrawingsCommand(command.sheetId, command.drawings);
+  assertShapeObjectsForSheet(next.drawings, sheet);
   if (JSON.stringify(sheet.drawings ?? []) === JSON.stringify(next.drawings)) return null;
   const inverse = createSetSheetDrawingsCommand(command.sheetId, sheet.drawings ?? []);
   sheet.drawings = next.drawings;

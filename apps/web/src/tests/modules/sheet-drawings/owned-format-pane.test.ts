@@ -11,7 +11,7 @@ import { createSetSheetDrawingsCommand } from "@sheetcraft/core/commands";
 import { serializeWorkbook, deserializeWorkbook } from "@sheetcraft/core/serialization";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
 import { useOwnedShapeFormatPane } from "../../../modules/sheet-drawings/useOwnedShapeFormatPane";
-import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import { requireLegacySheetDrawing, type SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createPictureFormat3d,
@@ -108,7 +108,7 @@ test("unstyled legacy enabled fields succeed without migration and last override
     expect(f.pane.onIntent(f.intent({ type: "set-field", field: "sizeWidthPt", value: 225 }))).toBe(
       true,
     );
-    expect(f.sheet.value.drawings?.[0]?.width).toBe(300);
+    expect(requireLegacySheetDrawing(f.sheet.value.drawings![0]!).width).toBe(300);
     expect(serializeWorkbook(f.wb.value).version).toBe(before);
     expect(
       f.pane.onIntent(

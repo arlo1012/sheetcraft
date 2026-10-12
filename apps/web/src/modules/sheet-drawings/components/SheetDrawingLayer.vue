@@ -12,7 +12,12 @@ import {
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { cellTextFontRevision } from "../../../shared/cell-text/text-metrics";
-import type { SheetDrawing, SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import {
+  requireLegacySheetDrawings,
+  type SheetLegacyDrawing as SheetDrawing,
+  type SheetDrawing as SourceSheetDrawing,
+  type SheetGraphicDrawing,
+} from "@sheetcraft/core/sheet-drawings";
 import {
   getFloatingImageViewportFragments,
   getFloatingImageSheetRect,
@@ -54,7 +59,7 @@ import {
   type ShapeDetailedPresentation,
 } from "../shape-detailed-presentation";
 const props = defineProps<{
-  drawings: readonly SheetDrawing[];
+  drawings: readonly SourceSheetDrawing[];
   applyUpdate?: (drawing: SheetDrawing, expected: SheetDrawing) => boolean;
   selectedDrawingId?: string | null;
   sheet?: Sheet;
@@ -112,6 +117,7 @@ function isStandard(drawing: SheetDrawing): drawing is SheetGraphicDrawing {
     (drawing.kind === "textBox" && !!drawing.shapeText)
   );
 }
+const legacyDrawings = computed(() => requireLegacySheetDrawings(props.drawings));
 const detailedPresentations = new Map<string, ShapeDetailedPresentation>();
 function acceptDetailedPaint(
   fragment: DrawingFragment,
@@ -130,7 +136,7 @@ let session: PointerSession | undefined;
 const fragments = computed<DrawingFragment[]>(
   () => (
     void cellTextFontRevision.value,
-    props.drawings.flatMap((original) => {
+    legacyDrawings.value.flatMap((original) => {
       const drawing = preview.value?.id === original.id ? preview.value : original;
       const standard = isStandard(drawing);
       const shape = standard && getDrawingShapeGeometry(drawing);
@@ -172,14 +178,14 @@ function formatSelected() {
   if (
     (d?.kind === "shape" || d?.kind === "textBox") &&
     !props.readOnly &&
-    props.drawings.find((item) => item.id === d.id) === d
+    legacyDrawings.value.find((item) => item.id === d.id) === d
   )
     emit("format", d);
 }
 function commitUpdate(next: SheetDrawing, owner: SheetDrawing): boolean {
   if (
     props.readOnly ||
-    props.drawings.find((item) => item.id === owner.id) !== owner ||
+    legacyDrawings.value.find((item) => item.id === owner.id) !== owner ||
     (isStandard(next) && !getDrawingShapeGeometry(next))
   )
     return false;
@@ -263,7 +269,7 @@ function start(
   freePoint?: FreeShapePointDescriptor,
 ): void {
   const drawing = fragment.drawing;
-  const owner = props.drawings.find((item) => item.id === drawing.id);
+  const owner = legacyDrawings.value.find((item) => item.id === drawing.id);
   if (!owner || owner !== drawing || (mode === "point" && pointEditingId.value !== drawing.id))
     return;
   if (event.button !== 0) return;
@@ -288,7 +294,7 @@ function start(
     props.revision === revision &&
     props.layout === layout &&
     props.scale === scale &&
-    props.drawings.find((item) => item.id === drawing.id) === owner;
+    legacyDrawings.value.find((item) => item.id === drawing.id) === owner;
   const origin = viewportPoint(event);
   const center = {
     x: fragment.rect.x + drawing.width / 2,
@@ -401,7 +407,8 @@ function start(
   });
 }
 function edit(fragment: DrawingFragment, event: MouseEvent): void {
-  if (props.drawings.find((item) => item.id === fragment.drawing.id) !== fragment.drawing) return;
+  if (legacyDrawings.value.find((item) => item.id === fragment.drawing.id) !== fragment.drawing)
+    return;
   if ((props.readOnly && fragment.drawing.kind !== "attachment") || !hits(fragment, event)) return;
   event.preventDefault();
   event.stopPropagation();
@@ -417,7 +424,7 @@ function pointContext(fragment: DrawingFragment, event: MouseEvent): void {
     !isStandard(fragment.drawing) ||
     !fragment.drawing.shapePath ||
     props.readOnly ||
-    props.drawings.find((item) => item.id === fragment.drawing.id) !== fragment.drawing ||
+    legacyDrawings.value.find((item) => item.id === fragment.drawing.id) !== fragment.drawing ||
     !hits(fragment, event)
   )
     return;
@@ -436,7 +443,7 @@ function nudgeFreePoint(
   if (
     pointEditingId.value !== drawing.id ||
     props.readOnly ||
-    props.drawings.find((item) => item.id === drawing.id) !== drawing
+    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing
   )
     return;
   const position = listFreeShapePoints(drawing).find(
@@ -474,7 +481,7 @@ function selectFreeVertex(drawing: SheetGraphicDrawing, index: number): void {
   if (
     props.readOnly ||
     pointEditingId.value !== drawing.id ||
-    props.drawings.find((item) => item.id === drawing.id) !== drawing ||
+    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing ||
     !listFreeShapePoints(drawing).some((p) => p.role === "vertex" && p.commandIndex === index)
   )
     return;
@@ -487,7 +494,7 @@ function pointAction(
 ): boolean {
   if (
     props.readOnly ||
-    props.drawings.find((item) => item.id === drawing.id) !== drawing ||
+    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing ||
     pointEditingId.value !== drawing.id
   )
     return false;
@@ -526,7 +533,8 @@ function nudgeAdjustment(
   index: number,
   delta: { x: number; y: number },
 ): void {
-  if (props.readOnly || props.drawings.find((item) => item.id === drawing.id) !== drawing) return;
+  if (props.readOnly || legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing)
+    return;
   const shape = getDrawingShapeGeometry(drawing);
   const position = shape?.handles[index]?.position;
   if (!position || !drawing.shapeGeometry) return;
@@ -547,7 +555,8 @@ function nudgeEndpoint(
   index: 0 | 1,
   delta: { x: number; y: number },
 ): void {
-  if (props.readOnly || props.drawings.find((item) => item.id === drawing.id) !== drawing) return;
+  if (props.readOnly || legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing)
+    return;
   const position = getShapeLineLocalEndpoints(drawing)?.[index];
   const rect = getFloatingImageSheetRect(drawing, props.layout);
   if (!position || !rect) return;
@@ -565,12 +574,13 @@ function nudgeEndpoint(
   if (next) commitUpdate(next, drawing);
 }
 function nudgeRotation(drawing: SheetGraphicDrawing, degrees: number): void {
-  if (props.readOnly || props.drawings.find((item) => item.id === drawing.id) !== drawing) return;
+  if (props.readOnly || legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing)
+    return;
   const rotation = ((((drawing.rotation + degrees + 180) % 360) + 360) % 360) - 180;
   commitUpdate({ ...drawing, rotation }, drawing);
 }
 function keydown(drawing: SheetDrawing, event: KeyboardEvent) {
-  if (props.drawings.find((item) => item.id === drawing.id) !== drawing) return;
+  if (legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing) return;
   if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey)
     return;
   if (event.key === "Escape") {
@@ -664,11 +674,11 @@ watch(
   },
 );
 watch(
-  () => props.drawings,
+  () => legacyDrawings.value,
   () => {
     session?.cancel();
     preview.value = undefined;
-    const editing = props.drawings.find((drawing) => drawing.id === pointEditingId.value);
+    const editing = legacyDrawings.value.find((drawing) => drawing.id === pointEditingId.value);
     if (editing?.kind !== "shape" || !editing.shapePath) pointEditingId.value = null;
     else if (
       !listFreeShapePoints(editing).some(
@@ -676,7 +686,7 @@ watch(
       )
     )
       activeVertex.value = 0;
-    if (!props.drawings.some((drawing) => drawing.id === selectedId.value)) {
+    if (!legacyDrawings.value.some((drawing) => drawing.id === selectedId.value)) {
       session?.cancel();
       selectedId.value = null;
       pointEditingId.value = null;

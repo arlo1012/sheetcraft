@@ -1,3 +1,4 @@
+import { isFramedShapeDrawing } from "@sheetcraft/core/sheet-drawings";
 import { validateImportedCalculatedColumns } from "./table-calculated-columns.js";
 import { readXlsxPivotTables } from "./pivot-tables.js";
 import { collectNativeChartParts } from "./chart-package-parts.js";
@@ -1144,6 +1145,20 @@ export async function encodeWithNativeXlsx(
   const activeSheetIndex = sheets.findIndex((sheet) => sheet.id === workbook.activeSheetId);
   if (activeSheetIndex < 0 || sheets[activeSheetIndex]?.properties.hidden)
     throw new RangeError("The XLSX active sheet must identify a visible worksheet.");
+  for (const sheet of sheets) {
+    for (const drawing of sheet.drawings ?? []) {
+      if (!isFramedShapeDrawing(drawing)) continue;
+      const issueLocation = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].shapeFrame`;
+      throw new XlsxCompatibilityError(
+        `Canonical shape placement is not yet supported by XLSX export at ${issueLocation}.`,
+        {
+          issues: [
+            { code: "feature-omitted", severity: "block", count: 1, locations: [issueLocation] },
+          ],
+        },
+      );
+    }
+  }
   const target: BrowserWorkbook = new NativeWorkbook();
   target.views = [{ activeTab: activeSheetIndex }];
   const imageExporter = createXlsxImageExporter(target, options);

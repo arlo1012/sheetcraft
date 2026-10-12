@@ -254,6 +254,22 @@
     "./shape-presets": {
       "types": "./dist/shape-presets.d.ts",
       "import": "./dist/shape-presets.js"
+    },
+    "./shape-frame": {
+      "types": "./dist/shape-frame.d.ts",
+      "import": "./dist/shape-frame.js"
+    },
+    "./shape-object-properties": {
+      "types": "./dist/shape-object-properties.d.ts",
+      "import": "./dist/shape-object-properties.js"
+    },
+    "./shape-object-sheet": {
+      "types": "./dist/shape-object-sheet.d.ts",
+      "import": "./dist/shape-object-sheet.js"
+    },
+    "./shape-protection": {
+      "types": "./dist/shape-protection.d.ts",
+      "import": "./dist/shape-protection.js"
     }
   },
   "scripts": {

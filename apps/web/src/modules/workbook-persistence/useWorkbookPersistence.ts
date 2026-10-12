@@ -1,4 +1,8 @@
 import {
+  assertWorkbookShapeSupport,
+  UnsupportedShapeFrameDocumentError,
+} from "../sheet-drawings/shape-document-support";
+import {
   assertWorkbookPictureSupport,
   UnsupportedPictureDocumentError,
 } from "../sheet-images/picture-document-support";
@@ -14,6 +18,7 @@ export type WorkbookPersistenceError =
   | "unavailable"
   | "invalid-snapshot"
   | "unsupported-picture-frame"
+  | "unsupported-shape-frame"
   | "invalid-record"
   | "conflict"
   | "quota";
@@ -61,6 +66,7 @@ function toPersistenceError(
   error: unknown,
   fallback: WorkbookPersistenceError,
 ): WorkbookPersistenceError {
+  if (error instanceof UnsupportedShapeFrameDocumentError) return "unsupported-shape-frame";
   if (
     error instanceof UnsupportedPictureDocumentError ||
     error instanceof UnsupportedPicturePaintError
@@ -104,7 +110,10 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
     return savedAt.value === undefined ? "idle" : "saved";
   });
 
-  let knownUnsupportedPictureRecovery = false;
+  let knownUnsupportedPictureRecovery:
+    | "unsupported-picture-frame"
+    | "unsupported-shape-frame"
+    | undefined;
   let expectedRevision: number | undefined;
   let saveRequest: SaveRequest | undefined;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -144,8 +153,9 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
   }
 
   function blockAutomaticSaving(nextError: WorkbookPersistenceError): void {
-    if (nextError === "unsupported-picture-frame") knownUnsupportedPictureRecovery = true;
-    error.value = knownUnsupportedPictureRecovery ? "unsupported-picture-frame" : nextError;
+    if (nextError === "unsupported-picture-frame" || nextError === "unsupported-shape-frame")
+      knownUnsupportedPictureRecovery = nextError;
+    error.value = knownUnsupportedPictureRecovery ?? nextError;
     automaticSavingBlocked = true;
     cancelQueuedSave();
   }
@@ -238,12 +248,28 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
         return "failed";
       }
       if (options.getRevision() !== revisionAtStart) {
+        // A local draft conflict cannot make an unsupported saved document replaceable.
+        // Inspect a valid record read-only before reporting the draft conflict.
+        if (isPersistedWorkbook(record)) {
+          try {
+            const saved = deserializeWorkbook(record.snapshot);
+            assertWorkbookShapeSupport(saved);
+            assertWorkbookPictureSupport(saved);
+          } catch (cause) {
+            if (
+              cause instanceof UnsupportedShapeFrameDocumentError ||
+              cause instanceof UnsupportedPictureDocumentError ||
+              cause instanceof UnsupportedPicturePaintError
+            )
+              throw cause;
+          }
+        }
         blockAutomaticSaving("conflict");
         dirty.value = true;
         return "failed";
       }
       if (record === undefined) {
-        knownUnsupportedPictureRecovery = false;
+        knownUnsupportedPictureRecovery = undefined;
         expectedRevision = undefined;
         savedAt.value = undefined;
         error.value = undefined;
@@ -256,9 +282,10 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
       }
       expectedRevision = record.revision;
       const workbook = deserializeWorkbook(record.snapshot);
+      assertWorkbookShapeSupport(workbook);
       assertWorkbookPictureSupport(workbook);
       replaceFromPersistence(workbook);
-      knownUnsupportedPictureRecovery = false;
+      knownUnsupportedPictureRecovery = undefined;
       expectedRevision = record.revision;
       savedAt.value = record.savedAt;
       dirty.value = false;
@@ -304,7 +331,8 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
       error.value === "conflict" ||
       error.value === "invalid-record" ||
       error.value === "invalid-snapshot" ||
-      error.value === "unsupported-picture-frame"
+      error.value === "unsupported-picture-frame" ||
+      error.value === "unsupported-shape-frame"
     ) {
       return false;
     }
@@ -346,12 +374,18 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
   }
 
   function assertStoredPictureRecoveryCanBeReplaced(): void {
+    if (
+      knownUnsupportedPictureRecovery === "unsupported-shape-frame" ||
+      error.value === "unsupported-shape-frame"
+    )
+      throw new UnsupportedShapeFrameDocumentError("saved-recovery", []);
     if (knownUnsupportedPictureRecovery || error.value === "unsupported-picture-frame")
       throw new UnsupportedPictureDocumentError("saved-recovery", []);
   }
 
   async function replaceDocument(workbook: Workbook): Promise<void> {
     assertStoredPictureRecoveryCanBeReplaced();
+    assertWorkbookShapeSupport(workbook);
     assertWorkbookPictureSupport(workbook);
     await queueDocumentOperation(async () => {
       if (disposed) {
@@ -360,6 +394,7 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
       await waitForActiveSave();
       if (disposed) return;
       assertStoredPictureRecoveryCanBeReplaced();
+      assertWorkbookShapeSupport(workbook);
       assertWorkbookPictureSupport(workbook);
       loading.value = true;
       cancelQueuedSave();
@@ -410,7 +445,8 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
       if (
         disposed ||
         knownUnsupportedPictureRecovery ||
-        error.value === "unsupported-picture-frame"
+        error.value === "unsupported-picture-frame" ||
+        error.value === "unsupported-shape-frame"
       )
         return false;
       loading.value = true;

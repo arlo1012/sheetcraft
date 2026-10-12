@@ -62,8 +62,17 @@ export function useWorkbookFileActions(options: {
   }
 
   async function importJson(file: Pick<File, "text">): Promise<void> {
-    if (persistence.error.value === "unsupported-picture-frame") {
-      feedback.value = { key: "persistence.unsupportedPictures", error: true };
+    if (
+      persistence.error.value === "unsupported-picture-frame" ||
+      persistence.error.value === "unsupported-shape-frame"
+    ) {
+      feedback.value = {
+        key:
+          persistence.error.value === "unsupported-shape-frame"
+            ? "persistence.unsupportedShapes"
+            : "persistence.unsupportedPictures",
+        error: true,
+      };
       return;
     }
     if (options.isBlocked?.()) return;
@@ -81,8 +90,11 @@ export function useWorkbookFileActions(options: {
       if (disposed) return;
       feedback.value = {
         key:
-          error instanceof WorkbookFileError && error.code === "unsupported-picture-frame"
-            ? "persistence.unsupportedPictures"
+          error instanceof WorkbookFileError &&
+          (error.code === "unsupported-picture-frame" || error.code === "unsupported-shape-frame")
+            ? error.code === "unsupported-shape-frame"
+              ? "persistence.unsupportedShapes"
+              : "persistence.unsupportedPictures"
             : error instanceof WorkbookFileError && error.code === "read-failed"
               ? "persistence.readFailed"
               : "persistence.invalidJson",
@@ -115,9 +127,16 @@ export function useWorkbookFileActions(options: {
   async function confirm(): Promise<void> {
     if (
       confirmation.value !== "reload" &&
-      persistence.error.value === "unsupported-picture-frame"
+      (persistence.error.value === "unsupported-picture-frame" ||
+        persistence.error.value === "unsupported-shape-frame")
     ) {
-      feedback.value = { key: "persistence.unsupportedPictures", error: true };
+      feedback.value = {
+        key:
+          persistence.error.value === "unsupported-shape-frame"
+            ? "persistence.unsupportedShapes"
+            : "persistence.unsupportedPictures",
+        error: true,
+      };
       return;
     }
     if (options.isBlocked?.()) return;
