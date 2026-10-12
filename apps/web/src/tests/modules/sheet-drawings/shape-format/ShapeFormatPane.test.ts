@@ -143,6 +143,8 @@ describe("shape format pane desktop reference surface", () => {
     expect(wrapper.text()).toContain("Relative to original picture size");
     expect(wrapper.text()).toContain("Shapes do not have an original picture size");
     expect(wrapper.text()).toContain("Closed shape has no arrowheads");
+    expect(wrapper.findAll('[data-shape-format-field="shapeKeepTextFlat"]')).toHaveLength(1);
+    expect(wrapper.find('[data-shape-format-field="textKeepTextFlat"]').exists()).toBe(false);
     await textMode(wrapper);
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
       "Text Fill & Outline",
@@ -155,12 +157,14 @@ describe("shape format pane desktop reference surface", () => {
       "textMarginTopPt",
       "textMarginBottomPt",
       "textDirection",
+      "textLineOrder",
       "textVerticalAlignment",
       "textResizeToFit",
       "textWrap",
       "textOverflow",
       "fontFamily",
       "paragraphAlignment",
+      "paragraphLineSpacing",
     ])
       expect(wrapper.find(`[data-shape-format-field="${field}"]`).exists()).toBe(true);
   });

@@ -171,6 +171,33 @@ describe("shape-owned canonical format contract", () => {
     ).toBe(true);
     expect(f.handler).toHaveBeenCalledTimes(2);
   });
+  test("text paint remains independent and the layout KeepFlat field has one identity", () => {
+    const f = fixture();
+    f.capabilities.styles = {
+      shape: { fill: { enabled: true } },
+      text: { fill: { enabled: true } },
+    };
+    f.capabilities.fields.shapeKeepTextFlat = { enabled: true };
+    expect(f.session.styleAction("text", "fill")({ kind: "none" })).toBe(true);
+    expect(f.session.fieldAction("shapeKeepTextFlat")(true)).toBe(true);
+    expect(f.handler).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        type: "set-style",
+        target: "text",
+        category: "fill",
+        value: { kind: "none" },
+      }),
+    );
+    expect(f.handler).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        type: "set-field",
+        field: "shapeKeepTextFlat",
+        value: true,
+      }),
+    );
+  });
   test("margin presets are one atomic intent, require all four capabilities and respect bounds", () => {
     const f = fixture(),
       margins = { leftPt: 7.2, rightPt: 7.2, topPt: 3.6, bottomPt: 3.6 };

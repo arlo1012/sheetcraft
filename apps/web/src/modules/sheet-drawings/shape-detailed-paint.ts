@@ -73,23 +73,6 @@ export class ShapePaintUnavailableError extends Error {
     this.missingAssetIds = result.missingAssetIds;
   }
 }
-/** Transitional support gate until durable shape text joins the projective source. */
-export function hasUnsupportedShapeProjectedText(
-  drawing: SheetGraphicDrawing,
-  style: ShapeDetailedStyle | undefined = drawing.shapeStyle,
-): boolean {
-  return (
-    drawing.kind === "shape" &&
-    !!drawing.text.trim() &&
-    (style?.rotation3d?.kind === "value" || style?.format3d?.kind === "value")
-  );
-}
-export class ShapeProjectedTextUnavailableError extends Error {
-  readonly code = "shape-projected-text-unavailable";
-  constructor() {
-    super("Shape text cannot yet join the detailed 3D source.");
-  }
-}
 function solid(color: string): ShapePaint | undefined {
   if (color.toLowerCase() === "transparent") return;
   if (!/^#[\da-f]{6}$/i.test(color))
@@ -101,8 +84,8 @@ export function resolveShapeDetailedPaintStyle(
   drawing: SheetGraphicDrawing,
   style: ShapeDetailedStyle | undefined = drawing.shapeStyle,
 ): ShapeDetailedStyle {
-  if (drawing.kind !== "shape")
-    throw new TypeError("Detailed shape paint requires a shape drawing.");
+  if (drawing.kind !== "shape" && drawing.kind !== "textBox")
+    throw new TypeError("Detailed shape paint requires a shape or text box drawing.");
   const own = normalizeShapeStyle(style),
     result: ShapeDetailedStyle = { ...own };
   if (result.fill === undefined) {
@@ -142,8 +125,6 @@ export function resolveShapeDetailedPaintStyle(
 function prepareSource(options: ShapeDetailedPaintOptions) {
   const { drawing, geometry } = options;
   const explicit = normalizeShapeStyle(options.style ?? drawing.shapeStyle);
-  if (hasUnsupportedShapeProjectedText(drawing, explicit))
-    throw new ShapeProjectedTextUnavailableError();
   const style = resolveShapeDetailedPaintStyle(drawing, explicit);
   const workBudget = drawing.shapePath ? FREE_SHAPE_PATH_WORK_BUDGET : undefined;
   // A free path's explicit detailed fill requests Canvas fill closure. It never adds a Z stroke.

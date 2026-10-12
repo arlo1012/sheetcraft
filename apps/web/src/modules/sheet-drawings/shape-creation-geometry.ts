@@ -205,7 +205,15 @@ export function createShapeDrawingFromChoice(
     drawing.shape = "rectangle";
     drawing.fill = "transparent";
     drawing.strokeWidth = 0;
-    if (choice.direction === "vertical") drawing.textDirection = "vertical";
+    if (drawing.shapeText) {
+      drawing.shapeText = {
+        ...drawing.shapeText,
+        layout: {
+          ...drawing.shapeText.layout,
+          direction: choice.direction === "vertical" ? "vertical-rl" : "horizontal",
+        },
+      };
+    } else if (choice.direction === "vertical") drawing.textDirection = "vertical";
   } else {
     drawing.kind = "shape";
     drawing.shape = isLine ? "line" : "rectangle";

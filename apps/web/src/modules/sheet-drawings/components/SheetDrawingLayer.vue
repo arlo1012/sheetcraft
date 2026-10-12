@@ -11,6 +11,7 @@ import {
 } from "vue";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import { cellTextFontRevision } from "../../../shared/cell-text/text-metrics";
 import type { SheetDrawing, SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   getFloatingImageViewportFragments,
@@ -106,7 +107,9 @@ watch(
 );
 function isStandard(drawing: SheetDrawing): drawing is SheetGraphicDrawing {
   return (
-    drawing.kind === "shape" && !!(drawing.shapeGeometry || drawing.shapePath || drawing.shapeStyle)
+    (drawing.kind === "shape" &&
+      !!(drawing.shapeGeometry || drawing.shapePath || drawing.shapeStyle || drawing.shapeText)) ||
+    (drawing.kind === "textBox" && !!drawing.shapeText)
   );
 }
 const detailedPresentations = new Map<string, ShapeDetailedPresentation>();
@@ -124,23 +127,30 @@ type DrawingFragment = FloatingImageViewportFragment & {
 };
 const preview = shallowRef<SheetDrawing>();
 let session: PointerSession | undefined;
-const fragments = computed<DrawingFragment[]>(() =>
-  props.drawings.flatMap((original) => {
-    const drawing = preview.value?.id === original.id ? preview.value : original;
-    const standard = isStandard(drawing);
-    const shape = standard && getDrawingShapeGeometry(drawing);
-    const projected =
-      standard && shape
-        ? getStandardShapeViewportFragments(drawing, props.layout, selectedId.value === drawing.id)
-        : getFloatingImageViewportFragments(drawing, props.layout);
-    return projected.map((fragment) => ({ ...fragment, drawing, standard }));
-  }),
+const fragments = computed<DrawingFragment[]>(
+  () => (
+    void cellTextFontRevision.value,
+    props.drawings.flatMap((original) => {
+      const drawing = preview.value?.id === original.id ? preview.value : original;
+      const standard = isStandard(drawing);
+      const shape = standard && getDrawingShapeGeometry(drawing);
+      const projected =
+        standard && shape
+          ? getStandardShapeViewportFragments(
+              drawing,
+              props.layout,
+              selectedId.value === drawing.id,
+            )
+          : getFloatingImageViewportFragments(drawing, props.layout);
+      return projected.map((fragment) => ({ ...fragment, drawing, standard }));
+    })
+  ),
 );
 const formatTarget = computed(() => {
   const visible = fragments.value.filter(
     (f) =>
       f.drawing.id === selectedId.value &&
-      f.drawing.kind === "shape" &&
+      (f.drawing.kind === "shape" || f.drawing.kind === "textBox") &&
       f.drawing.id !== pointEditingId.value,
   );
   return visible.sort(
@@ -160,7 +170,7 @@ const formatTriggerStyle = computed(() => {
 function formatSelected() {
   const d = formatTarget.value?.drawing;
   if (
-    d?.kind === "shape" &&
+    (d?.kind === "shape" || d?.kind === "textBox") &&
     !props.readOnly &&
     props.drawings.find((item) => item.id === d.id) === d
   )
@@ -221,18 +231,21 @@ function hits(fragment: DrawingFragment, event: MouseEvent): boolean {
   if (!isStandard(fragment.drawing)) return false;
   const shape = getDrawingShapeGeometry(fragment.drawing);
   if (!shape) return event.target instanceof Element && !!event.target.closest('[role="status"]');
-  if (fragment.drawing.shapeStyle) {
+  if (fragment.drawing.shapeStyle || fragment.drawing.shapeText) {
     if (
       event.target instanceof Element &&
       event.target.closest('[role="status"], [data-standard-shape-text]')
     )
       return true;
-    return detailedShapeContainsWorldPoint(
+    const glyphOrDetailedHit = detailedShapeContainsWorldPoint(
       fragment.drawing,
       fragment.rect,
       viewportPoint(event),
       detailedPresentations.get(`${fragment.drawing.id}:${fragment.paneId}`),
     );
+    if (fragment.drawing.shapeStyle || glyphOrDetailedHit) return glyphOrDetailedHit;
+    // A text model does not replace the unformatted body's real SVG geometry.
+    // The independent glyph alpha adds hit coverage, including visible overflow.
   }
   return shapeDrawingContainsWorldPoint(
     fragment.drawing,

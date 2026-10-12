@@ -5,10 +5,7 @@ import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { getShapeStyleAssetIds } from "@sheetcraft/core/shape-style";
 import { createCanvasImageCache } from "../../sheet-grid/canvas/image-painter";
 import { createPicturePaintResources } from "../../../shared/images/picture-paint-resources";
-import {
-  prepareShapeDetailedPaint,
-  ShapeProjectedTextUnavailableError,
-} from "../shape-detailed-paint";
+import { prepareShapeDetailedPaint } from "../shape-detailed-paint";
 import { getDrawingShapeGeometry } from "../shape-geometry";
 import {
   shapePresentationBounds,
@@ -28,7 +25,7 @@ const emit = defineEmits<{
 }>();
 const { t } = useAppI18n();
 const canvas = ref<HTMLCanvasElement>();
-const status = ref<"loading" | "ready" | "unavailable" | "unsupported-text">("loading");
+const status = ref<"loading" | "ready" | "unavailable">("loading");
 const bounds = ref({
   left: 0,
   top: 0,
@@ -95,10 +92,8 @@ async function render() {
       density: result.actualDensity,
       bounds: { ...bounds.value },
     });
-  } catch (error) {
-    if (request === generation)
-      status.value =
-        error instanceof ShapeProjectedTextUnavailableError ? "unsupported-text" : "unavailable";
+  } catch {
+    if (request === generation) status.value = "unavailable";
   }
 }
 watch(
@@ -138,13 +133,7 @@ onBeforeUnmount(() => {
     <canvas ref="canvas" v-show="status === 'ready'" :style="style" aria-hidden="true" />
   </div>
   <span v-if="status !== 'ready'" class="shape-detailed-content__status" role="status">
-    {{
-      status === "loading"
-        ? t("image.loading")
-        : status === "unsupported-text"
-          ? t("drawing.projectedTextUnavailable")
-          : t("image.assetUnavailable")
-    }}
+    {{ status === "loading" ? t("image.loading") : t("image.assetUnavailable") }}
   </span>
 </template>
 <style scoped>

@@ -3,6 +3,7 @@ import type { Workbook } from "@sheetcraft/core/workbook";
 import { collectPictureGroupAssetIds, isPictureGroup } from "@sheetcraft/core/picture-group";
 import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detailed-style";
 import { getShapeStyleAssetIds } from "@sheetcraft/core/shape-style";
+import { getShapeTextAssetIds } from "@sheetcraft/core/shape-text";
 import { readEncodedImageSource } from "./readEncodedImageSource";
 import { assertImagePixelBudget } from "./imageAssetValidation";
 import type { ImageAsset, ImageAssetStore } from "./imageAssetStore";
@@ -19,6 +20,8 @@ export function collectWorkbookImageAssetIds(workbook: Workbook): Set<string> {
     for (const drawing of sheet.drawings ?? []) {
       if (drawing.kind === "shape")
         for (const id of getShapeStyleAssetIds(drawing.shapeStyle)) ids.add(id);
+      if (drawing.kind === "shape" || drawing.kind === "textBox")
+        for (const id of getShapeTextAssetIds(drawing.shapeText)) ids.add(id);
     }
     for (const cell of sheet.cells.values()) {
       const content = cell.content;

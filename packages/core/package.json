@@ -243,6 +243,10 @@
       "types": "./dist/shape-style.d.ts",
       "import": "./dist/shape-style.js"
     },
+    "./shape-text": {
+      "types": "./dist/shape-text.d.ts",
+      "import": "./dist/shape-text.js"
+    },
     "./shape-free-path": {
       "types": "./dist/shape-free-path.d.ts",
       "import": "./dist/shape-free-path.js"

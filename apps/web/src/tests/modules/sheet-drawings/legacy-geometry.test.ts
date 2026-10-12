@@ -69,6 +69,7 @@ test("numeric adaptation is opt-in through shapeStyle and never mutates or migra
     column: 0,
   });
   delete drawing.shapeGeometry;
+  delete drawing.shapeText;
   const before = structuredClone(drawing);
   expect(getDrawingShapeGeometry(drawing)).toBeUndefined();
   const styled = {

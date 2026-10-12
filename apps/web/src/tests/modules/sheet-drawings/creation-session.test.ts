@@ -69,7 +69,7 @@ function fixture() {
 }
 describe("owner-bound canvas shape creation", () => {
   test.each(["curve", "freeform", "scribble"] as const)(
-    "%s actual builder commits once with version57 and owner/history",
+    "%s actual builder commits once with version59 text defaults and owner/history",
     (tool) => {
       const f = fixture(),
         choice = SHAPE_GALLERY.flatMap((g) => g.items).find(
@@ -104,7 +104,7 @@ describe("owner-bound canvas shape creation", () => {
       expect(f.actions.commit(request, drawing)).toBe(true);
       expect(f.execute).toHaveBeenCalledTimes(1);
       const snapshot = serializeWorkbook(f.session.workbook);
-      expect(snapshot.version).toBe(57);
+      expect(snapshot.version).toBe(59);
       expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
       expect(undoWorkbookCommand(f.session)).toBe(true);
       expect(f.sheet.value.drawings ?? []).toEqual([]);

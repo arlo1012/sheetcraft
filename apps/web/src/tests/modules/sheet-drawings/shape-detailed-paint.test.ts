@@ -16,7 +16,6 @@ import {
   prepareShapeDetailedPaint,
   resolveShapeDetailedPaintStyle,
   ShapePaintPreflightError,
-  ShapeProjectedTextUnavailableError,
 } from "../../../modules/sheet-drawings/shape-detailed-paint";
 import {
   createDetailedPictureRaster,
@@ -436,7 +435,7 @@ test("detailed source fill modes shade each native path in order, skip none, and
     ]);
 });
 
-test("3D text safety gate fails before resources/Canvas, without changing the drawing", () => {
+test("body 3D preflight is independent of the separately rendered glyph layer", () => {
   const o = options();
   o.drawing.shapeStyle = {
     rotation3d: {
@@ -446,15 +445,8 @@ test("3D text safety gate fails before resources/Canvas, without changing the dr
   };
   expect(() => planShapeDetailedPaint(o)).not.toThrow();
   o.drawing.text = "existing label";
-  const before = JSON.stringify(o.drawing),
-    canvasFactory = vi.fn(() => {
-      throw new Error("Canvas must not be reached");
-    });
-  expect(() => planShapeDetailedPaint(o)).toThrow(ShapeProjectedTextUnavailableError);
-  expect(() => prepareShapeDetailedPaint({ ...o, canvasFactory })).toThrow(
-    ShapeProjectedTextUnavailableError,
-  );
-  expect(canvasFactory).not.toHaveBeenCalled();
+  const before = JSON.stringify(o.drawing);
+  expect(() => planShapeDetailedPaint(o)).not.toThrow();
   expect(JSON.stringify(o.drawing)).toBe(before);
   o.drawing.shapeStyle.rotation3d = { kind: "none" };
   expect(() => planShapeDetailedPaint(o)).not.toThrow();

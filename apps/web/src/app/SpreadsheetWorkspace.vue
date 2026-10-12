@@ -111,6 +111,8 @@ import { createPicturePaintAssetSource } from "../modules/sheet-images/picture-p
 import type { PictureFormatLabelKey } from "../modules/sheet-images/picture-format-pane-model";
 import { usePictureToolbarOwner } from "../modules/sheet-images/usePictureToolbarOwner";
 import type { SheetDrawing, SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import { getShapeTextAssetIds } from "@sheetcraft/core/shape-text";
+import { createCanvasImageCache } from "../modules/sheet-grid/canvas/image-painter";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
 import PivotGroupingDialog from "../modules/pivot-tables/components/PivotGroupingDialog.vue";
 import { usePivotGrouping } from "../modules/pivot-tables/usePivotGrouping";
@@ -151,6 +153,7 @@ import { captureScreen } from "../modules/insert-tools/captureScreen";
 import { useShapeCreation } from "../modules/sheet-drawings/useShapeCreation";
 import type { ShapeGalleryChoice } from "../modules/sheet-drawings/shape-gallery";
 import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
+import { prepareShapeTextUpdate } from "../modules/sheet-drawings/prepare-shape-text-update";
 import DrawingEditorDialog from "../modules/sheet-drawings/components/DrawingEditorDialog.vue";
 import ShapeFormatPane from "../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
 import { useOwnedShapeFormatPane } from "../modules/sheet-drawings/useOwnedShapeFormatPane";
@@ -1786,6 +1789,8 @@ const xlsxActions = useWorkbookXlsxActions({
 });
 const { busy: xlsxBusy, confirmation: xlsxConfirmation, feedback: xlsxFeedback } = xlsxActions;
 
+const shapeTextImages = createCanvasImageCache(() => {});
+onBeforeUnmount(shapeTextImages.dispose);
 const drawingActions = useDrawingActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1796,6 +1801,31 @@ const drawingActions = useDrawingActions({
   execute: executeCommand,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   name: (kind) => t(`drawing.${kind}`),
+  prepareDrawing: (next, owner) =>
+    prepareShapeTextUpdate(
+      next,
+      owner,
+      sheetGridRef.value?.getDrawingLayout(activeSheet.value),
+      undefined,
+      {
+        resources: {
+          theme: session.workbook.theme,
+          getAssetImage: (id) =>
+            shapePaintAssets.getAssetImage(id) ??
+            (imageAssetUrls.value.get(id)
+              ? shapeTextImages.get(imageAssetUrls.value.get(id)!)
+              : undefined),
+          getAssetSize: (id) => {
+            const image =
+              shapePaintAssets.getAssetImage(id) ??
+              (imageAssetUrls.value.get(id)
+                ? shapeTextImages.peek?.(imageAssetUrls.value.get(id)!)
+                : undefined);
+            return image ? { width: image.naturalWidth, height: image.naturalHeight } : undefined;
+          },
+        },
+      },
+    ),
 });
 const { dialog: drawingDialog, editing: editingDrawing } = drawingActions;
 const shapeFormatPane = useOwnedShapeFormatPane({
@@ -1812,8 +1842,37 @@ const shapeFormatPane = useOwnedShapeFormatPane({
 const shapePaintAssets = createShapePaintAssetSource({
   getSnapshot: () => shapeFormatPane.snapshot.value,
   store: assetStore,
+  preparePixels: async (asset) => {
+    if (asset.width * asset.height * 4 > 64 * 1024 * 1024) return;
+    const url = URL.createObjectURL(asset.blob),
+      image = new Image();
+    try {
+      image.src = url;
+      await image.decode();
+      return image;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  },
 });
 onBeforeUnmount(shapePaintAssets.dispose);
+watch(
+  () =>
+    [shapeFormatPane.drawing.value, drawingDialog.value?.initial, imageAssetUrls.value] as const,
+  ([selected, edited, urls]) => {
+    const retained = new Set<string>();
+    for (const drawing of [selected, edited])
+      for (const id of getShapeTextAssetIds(drawing?.shapeText)) {
+        const url = urls.get(id);
+        if (url) {
+          retained.add(url);
+          shapeTextImages.get(url);
+        }
+      }
+    shapeTextImages.retain(retained);
+  },
+  { immediate: true },
+);
 function openShapeFormat(drawing: SheetGraphicDrawing) {
   if (shapeFormatPane.open(drawing)) {
     drawingActions.close();
@@ -1855,6 +1914,10 @@ const shapeInsertHandler = computed(() => {
 const drawingTextBoxHandler = computed(() => {
   const target = drawingDialog.value;
   return (direction: "horizontal" | "vertical") => drawingActions.requestTextBox(direction, target);
+});
+const drawingConfirmHandler = computed(() => {
+  const target = drawingDialog.value;
+  return (drawing: SheetGraphicDrawing) => drawingActions.confirm(drawing, target);
 });
 const pictureAssetTools = usePictureAssetTools({
   getWorkbook: () => session.workbook,
@@ -4982,6 +5045,7 @@ watch(
     :theme="session.workbook.theme"
     :image-asset-urls="imageAssetUrls"
     :request-text-box="drawingTextBoxHandler"
+    :confirm-drawing="drawingConfirmHandler"
     :disabled="
       loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
     "

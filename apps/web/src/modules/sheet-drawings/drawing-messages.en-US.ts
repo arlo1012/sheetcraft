@@ -32,9 +32,10 @@ export const drawingsEnUS = {
   "drawing.preview": "Preview",
   "drawing.legacyGeometry":
     "Legacy paths are preserved. Choose a gallery shape to use standard geometry.",
-  "drawing.changeRejected": "Could not switch this editor. Your draft is preserved.",
-  "drawing.projectedTextUnavailable":
-    "3D shape text is not available yet. Remove the 3D effect before adding text; your existing text and appearance are preserved.",
+  "drawing.changeRejected": "Could not apply this change. Your draft is preserved.",
+  "drawing.textLoading": "Preparing text…",
+  "drawing.textRenderingUnavailable":
+    "Text cannot be displayed with the current font, resources or effects. The content is preserved.",
   "drawing.geometryUnavailable": "This shape geometry cannot be displayed.",
   "drawing.adjustShape": "Adjust shape {index}",
   "drawing.lineStart": "Line start (arrow keys move, Shift for larger steps)",

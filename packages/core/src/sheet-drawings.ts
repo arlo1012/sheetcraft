@@ -6,6 +6,7 @@ import {
 import { normalizeShapePresetParameters } from "./shape-presets/contract.js";
 import type { ShapePresetParameters } from "./shape-presets/types.js";
 import { normalizeShapeStyle, type ShapeDetailedStyle } from "./shape-style.js";
+import { normalizeShapeText, type ShapeText } from "./shape-text.js";
 import {
   isShapeFreePathClosed,
   normalizeShapeFreePath,
@@ -65,6 +66,8 @@ export type SheetGraphicDrawing = DrawingBase & {
   shapeFlipY?: true;
   /** Shape-only sparse paint, line and effects; absent categories keep the legacy appearance. */
   shapeStyle?: ShapeDetailedStyle;
+  /** Explicit shape/text-box layout, paragraph and glyph appearance, independent of body style. */
+  shapeText?: ShapeText;
   /** Sparse opt-in vertical text boxes; existing drawings retain horizontal text. */
   textDirection?: "vertical";
 };
@@ -252,7 +255,17 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   )
     throw new TypeError("Line ends require standard line geometry or an open free shape path.");
   const shapeLineEnds = normalizeShapeLineEnds(endsField?.value);
+  const textField = Object.getOwnPropertyDescriptor(value, "shapeText");
+  if (!textField && "shapeText" in value)
+    throw new TypeError("Shape text must be an own data field.");
+  if (textField && !("value" in textField))
+    throw new TypeError("Shape text cannot be an accessor.");
+  if (textField && value.kind !== "shape" && value.kind !== "textBox")
+    throw new TypeError("Only shape or text box drawings may carry shape text.");
   const directionField = Object.getOwnPropertyDescriptor(value, "textDirection");
+  if (textField && directionField)
+    throw new TypeError("Shape text and legacy text direction are mutually exclusive.");
+  const shapeText = normalizeShapeText(textField?.value);
   if (directionField && (directionField.get || directionField.set))
     throw new TypeError("Text direction cannot be an accessor.");
   if (directionField && (value.kind !== "textBox" || directionField.value !== "vertical"))
@@ -283,6 +296,7 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     ...(shapeFlipX ? { shapeFlipX: true as const } : {}),
     ...(shapeFlipY ? { shapeFlipY: true as const } : {}),
     ...(shapeStyle ? { shapeStyle } : {}),
+    ...(shapeText ? { shapeText } : {}),
     ...(directionField ? { textDirection: "vertical" as const } : {}),
     name: value.name,
     anchor: { ...value.anchor },

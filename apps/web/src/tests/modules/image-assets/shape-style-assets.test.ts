@@ -57,3 +57,43 @@ test("ordinary shapes and empty drawing collections need no image resources", ()
   ];
   expect(collectWorkbookImageAssetIds(workbook)).toEqual(new Set());
 });
+
+test.each(["shape", "textBox"] as const)(
+  "%s text fill/line assets are durable independent sources without duplicate loads",
+  (kind) => {
+    const workbook = createWorkbook({ id: "w", sheetId: "s" });
+    const drawing = createGraphicDrawing("d", kind, "", { row: 0, column: 0 });
+    const paint = {
+      kind: "picture" as const,
+      assetId: "text-fill",
+      opacity: 1,
+      rotateWithShape: true,
+      layout: {
+        kind: "stretch" as const,
+        offsetXRatio: 0,
+        offsetYRatio: 0,
+        widthRatio: 1,
+        heightRatio: 1,
+      },
+    };
+    drawing.shapeText!.style = {
+      fill: { kind: "value", value: paint },
+      line: {
+        kind: "value",
+        value: {
+          paint: { ...paint, assetId: "text-line" },
+          widthPt: 1,
+          compound: "single",
+          dash: "solid",
+          cap: "butt",
+          join: "miter",
+          miterLimit: 4,
+        },
+      },
+    };
+    getActiveSheet(workbook).drawings = [drawing];
+    const before = structuredClone(workbook);
+    expect(collectWorkbookImageAssetIds(workbook)).toEqual(new Set(["text-fill", "text-line"]));
+    expect(workbook).toEqual(before);
+  },
+);

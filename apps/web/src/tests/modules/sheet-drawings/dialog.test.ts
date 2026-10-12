@@ -37,6 +37,7 @@ function fixture(kind: "shape" | "textBox" | "wordArt" | "icon" | "equation" = "
             key: current.dialogId,
             drawing: current.initial,
             disabled: false,
+            confirmDrawing: (drawing: SheetGraphicDrawing) => actions.confirm(drawing, current),
             onConfirm: current.confirm,
             onClose: current.close,
           })

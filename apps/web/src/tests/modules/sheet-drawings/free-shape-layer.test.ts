@@ -276,7 +276,7 @@ describe("free path actual layer and Core owner", () => {
       expect(sheet.drawings![1]).toEqual(other);
       expectActive(wrapper, current(), 2);
       const after = serializeWorkbook(workbook);
-      expect(after.version).toBe(57);
+      expect(after.version).toBe(59);
       expect(serializeWorkbook(deserializeWorkbook(after))).toEqual(after);
       expect(undoWorkbookCommand(session)).toBe(true);
       await publish();
@@ -331,7 +331,7 @@ describe("free path actual layer and Core owner", () => {
     expect(document.body.querySelector("[data-free-shape-point-menu]")).toBeNull();
     expect(session.history.undoStack).toHaveLength(1);
     const after = serializeWorkbook(workbook);
-    expect(after.version).toBe(57);
+    expect(after.version).toBe(59);
     expect(serializeWorkbook(deserializeWorkbook(after))).toEqual(after);
     expect(undoWorkbookCommand(session)).toBe(true);
     await publish();

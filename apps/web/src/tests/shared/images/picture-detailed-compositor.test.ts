@@ -12,6 +12,8 @@ import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "@sheetcraft/core/wor
 import { evaluateShapePreset, type ShapePresetGeometry } from "@sheetcraft/core/shape-presets";
 import {
   createDetailedPictureRaster,
+  createDetailedPicturePaintSurface,
+  PicturePaintAssetReadError,
   planDetailedPictureRaster,
   PictureDetailedRasterUnsupportedError,
   PICTURE_DETAILED_RASTER_LIMITS,
@@ -395,6 +397,124 @@ function texture(): MemoryCanvas {
 function picture(layout: Extract<PicturePaint, { kind: "picture" }>["layout"]): PicturePaint {
   return { kind: "picture", assetId: "texture", opacity: 1, rotateWithShape: true, layout };
 }
+
+describe("independent mask paint fields and declared source ink", () => {
+  test("a solid mask field is fresh, exact and has no Canvas dependency", () => {
+    const request = {
+      paint: solid("#00ff00", 0.5),
+      theme: DEFAULT_WORKBOOK_THEME,
+      widthPx: 12,
+      heightPx: 10,
+      pixelDensity: 2,
+      boundsRaster: { left: -3, top: 2, right: 1, bottom: 5 },
+    };
+    const first = createDetailedPicturePaintSurface(request);
+    const second = createDetailedPicturePaintSurface(request);
+    expect([first.width, first.height]).toEqual([4, 3]);
+    expect(Array.from(first.data.slice(0, 4))).toEqual([0, 255, 0, 128]);
+    first.data.fill(0);
+    expect(Array.from(second.data.slice(0, 4))).toEqual([0, 255, 0, 128]);
+  });
+  test("gradient coordinates include the original negative raster origin", () => {
+    const surface = createDetailedPicturePaintSurface({
+      paint: {
+        kind: "linear",
+        opacity: 1,
+        angleDeg: 0,
+        rotateWithShape: true,
+        stops: [
+          { offset: 0, color: { kind: "rgb", rgb: "#000000" }, opacity: 1, brightness: 0 },
+          { offset: 1, color: { kind: "rgb", rgb: "#ffffff" }, opacity: 1, brightness: 0 },
+        ],
+      },
+      theme: DEFAULT_WORKBOOK_THEME,
+      widthPx: 4,
+      heightPx: 2,
+      pixelDensity: 1,
+      boundsRaster: { left: -1, top: 0, right: 5, bottom: 2 },
+    });
+    expect(surface.data[0]).toBe(0);
+    expect(surface.data[20]).toBe(255);
+    expect(surface.data[8]).toBeGreaterThan(surface.data[4]!);
+  });
+  test("bad bounds, unavailable textures and over-budget fields fail before allocation", () => {
+    const made = factory();
+    const request = {
+      ...made,
+      paint: solid(),
+      theme: DEFAULT_WORKBOOK_THEME,
+      widthPx: 12,
+      heightPx: 10,
+      pixelDensity: 1,
+      boundsRaster: { left: 0, top: 0, right: 12, bottom: 10 },
+    };
+    expect(() => createDetailedPicturePaintSurface({ ...request, limits: { pixels: 10 } })).toThrow(
+      /budget/,
+    );
+    expect(() =>
+      createDetailedPicturePaintSurface({
+        ...request,
+        boundsRaster: { ...request.boundsRaster, left: 0.5 },
+      }),
+    ).toThrow(/integer/);
+    expect(() =>
+      createDetailedPicturePaintSurface({
+        ...request,
+        paint: picture({
+          kind: "stretch",
+          offsetXRatio: 0,
+          offsetYRatio: 0,
+          widthRatio: 1,
+          heightRatio: 1,
+        }),
+      }),
+    ).toThrow(PicturePaintAssetReadError);
+    expect(made.canvases).toHaveLength(0);
+  });
+  test("textures release temporary canvases without touching caller-owned pixels", () => {
+    const sourceImage = texture();
+    const made = factory();
+    const surface = createDetailedPicturePaintSurface({
+      ...made,
+      paint: picture({
+        kind: "stretch",
+        offsetXRatio: 0,
+        offsetYRatio: 0,
+        widthRatio: 1,
+        heightRatio: 1,
+      }),
+      theme: DEFAULT_WORKBOOK_THEME,
+      widthPx: 2,
+      heightPx: 2,
+      pixelDensity: 1,
+      boundsRaster: { left: 0, top: 0, right: 2, bottom: 2 },
+      getAssetImage: () => sourceImage as unknown as HTMLCanvasElement,
+    });
+    expect(Array.from(surface.data.slice(0, 4))).toEqual([255, 0, 0, 255]);
+    expect(made.canvases.every((canvas) => canvas.width === 0 && canvas.height === 0)).toBe(true);
+    expect(sourceImage.width).toBe(2);
+  });
+  test("declared source ink permits overflow, while old padding alone still clips it", () => {
+    const bounds = { left: -2, top: -1, right: 14, bottom: 12 };
+    const sourcePainter = (context: CanvasRenderingContext2D) => {
+      context.fillStyle = "#00ff00";
+      context.fillRect(-2, -1, 16, 13);
+    };
+    const old = createDetailedPictureRaster(
+      options({ ...factory(), sourcePainter, frontPaintBounds: bounds }),
+    );
+    const current = createDetailedPictureRaster(
+      options({ ...factory(), sourcePainter, sourceBounds: bounds }),
+    );
+    expect(framePixel(old, -1, 0)[3]).toBe(0);
+    expect(framePixel(current, -1, 0)).toEqual([0, 255, 0, 255]);
+    expect(framePixel(current, 13, 11)).toEqual([0, 255, 0, 255]);
+    expect(framePixel(old, 1, 1)).toEqual(framePixel(current, 1, 1));
+    expect("sourceBounds" in old).toBe(false);
+    expect(current.sourceBounds).toEqual(bounds);
+    expect(current.sourceBounds).not.toBe(bounds);
+  });
+});
 
 describe("actual picture-shape alpha and outline composition", () => {
   function shaped(

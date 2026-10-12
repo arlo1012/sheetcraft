@@ -18,19 +18,42 @@ import { isShapeLinePreset, type ShapeLineEnds } from "@sheetcraft/core/shape-li
 import { isShapeFreePathClosed } from "@sheetcraft/core/shape-free-path";
 import ShapeLineEndsControls from "./ShapeLineEndsControls.vue";
 import { getDrawingShapeGeometry } from "../shape-geometry";
-import { hasUnsupportedShapeProjectedText } from "../shape-detailed-paint";
 import { editShapeBasicAppearance } from "../shape-basic-appearance-edit";
+import { materializeDrawingShapeText, withDrawingShapeText } from "../shape-text-options";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
   disabled: boolean;
   requestTextBox?: (direction: "horizontal" | "vertical") => boolean;
+  confirmDrawing?: (drawing: SheetGraphicDrawing) => boolean;
   theme?: WorkbookTheme;
   imageAssetUrls?: ReadonlyMap<string, string>;
 }>();
 const emit = defineEmits<{ confirm: [drawing: SheetGraphicDrawing]; close: [] }>();
 const { t, locale } = useAppI18n();
 const draft = ref<SheetGraphicDrawing>(normalizeSheetDrawing(props.drawing) as SheetGraphicDrawing);
+const applyError = ref(false);
+function confirm() {
+  if (props.disabled || !validGeometry.value) return;
+  applyError.value = false;
+  if (!props.confirmDrawing) {
+    emit("confirm", draft.value);
+    return;
+  }
+  try {
+    applyError.value = !props.confirmDrawing(draft.value);
+  } catch {
+    applyError.value = true;
+  }
+}
+function setHeight(height: number) {
+  const next = { ...draft.value, height };
+  if (next.shapeText?.layout.autoFit === "resize-shape") {
+    const text = materializeDrawingShapeText(next);
+    text.layout.autoFit = "none";
+    draft.value = withDrawingShapeText(next, text);
+  } else draft.value = next;
+}
 function setAppearance(field: "fill" | "stroke" | "strokeWidth", value: string | number) {
   if (!props.disabled) draft.value = editShapeBasicAppearance(draft.value, field, value);
 }
@@ -45,7 +68,6 @@ const selectedChoice = computed(() =>
     );
   }),
 );
-const supportedTextProjection = computed(() => !hasUnsupportedShapeProjectedText(draft.value));
 const validGeometry = computed(
   () =>
     draft.value.kind !== "shape" ||
@@ -118,10 +140,10 @@ const shapes: DrawingShape[] = [
     :close-on-overlay-click="false"
     :confirm-btn="{
       content: t('picture.confirm'),
-      disabled: disabled || !validGeometry || !supportedTextProjection,
+      disabled: disabled || !validGeometry,
     }"
     :cancel-btn="t('picture.cancel')"
-    @confirm="!disabled && validGeometry && supportedTextProjection && emit('confirm', draft)"
+    @confirm="confirm"
     @close="emit('close')"
   >
     <div class="drawing-editor" :class="{ 'has-shape-gallery': drawing.kind === 'shape' }">
@@ -141,6 +163,7 @@ const shapes: DrawingShape[] = [
         </p>
       </div>
       <div class="drawing-editor__fields">
+        <p v-if="applyError" role="alert">{{ t("drawing.changeRejected") }}</p>
         <label>{{ t("drawing.name") }}<Input v-model="draft.name" :maxlength="200" /></label>
         <div
           v-if="drawing.kind === 'icon'"
@@ -243,7 +266,8 @@ const shapes: DrawingShape[] = [
             >{{ t("drawing.height")
             }}<InputNumber
               class="drawing-editor__number"
-              v-model="draft.height"
+              :model-value="draft.height"
+              @update:model-value="setHeight"
               :min="lineGeometry ? 1 : 16"
               :max="16384"
               size="small"
@@ -277,9 +301,6 @@ const shapes: DrawingShape[] = [
             </div>
           </div>
         </div>
-        <p v-if="!supportedTextProjection" class="drawing-editor__hint" role="alert">
-          {{ t("drawing.projectedTextUnavailable") }}
-        </p>
         <p v-if="!validGeometry" class="drawing-editor__hint" role="alert">
           {{ t("drawing.geometryUnavailable") }}
         </p>

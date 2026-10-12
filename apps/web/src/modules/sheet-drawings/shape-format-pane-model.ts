@@ -1,6 +1,7 @@
 import type { PictureDetailedStyle } from "@sheetcraft/core/picture-detailed-style";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { ShapeLineEnds } from "@sheetcraft/core/shape-line-ends";
+import type { ShapeTextDirection, ShapeTextParagraph } from "@sheetcraft/core/shape-text";
 import type {
   PictureFormatCapability,
   PictureFormatLengthUnit,
@@ -36,10 +37,13 @@ export interface ShapeFormatValues {
   locked: boolean;
   altTitle: string;
   altDescription: string;
+  /** One layout property, exposed in the body's 3-D rotation section. */
   shapeKeepTextFlat: boolean;
-  textKeepTextFlat: boolean;
+  /** Logical start/center/end; option labels follow the current block axis. */
   textVerticalAlignment: "top" | "middle" | "bottom";
-  textDirection: "horizontal" | "vertical" | "rotate-90" | "rotate-270";
+  textDirection: ShapeTextDirection;
+  /** Stored independently of direction; editable only in stacked mode. */
+  textLineOrder: "rtl" | "ltr";
   textMarginLeftPt: number;
   textMarginRightPt: number;
   textMarginTopPt: number;
@@ -47,15 +51,17 @@ export interface ShapeFormatValues {
   textResizeToFit: boolean;
   textOverflow: boolean;
   textWrap: boolean;
+  /** Empty string inherits the existing application text stack. */
   fontFamily: string;
   fontSizePt: number;
   textBold: boolean;
   textItalic: boolean;
   textUnderline: boolean;
   textStrike: boolean;
-  paragraphAlignment: "left" | "center" | "right" | "justify";
+  paragraphAlignment: ShapeTextParagraph["alignment"];
   paragraphBeforePt: number;
   paragraphAfterPt: number;
+  paragraphLineSpacing: ShapeTextParagraph["lineSpacing"]["kind"];
   paragraphLineSpacingPt: number;
 }
 export type ShapeFormatField = keyof ShapeFormatValues;
@@ -69,7 +75,9 @@ export type ShapeFormatChoiceField =
   | "anchor"
   | "textVerticalAlignment"
   | "textDirection"
-  | "paragraphAlignment";
+  | "textLineOrder"
+  | "paragraphAlignment"
+  | "paragraphLineSpacing";
 export type ShapeFormatTextField = "altTitle" | "altDescription";
 export interface ShapeFormatSnapshot {
   owner: Readonly<ShapeFormatOwner>;

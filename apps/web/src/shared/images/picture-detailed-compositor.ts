@@ -99,6 +99,9 @@ export type PictureDetailedRasterPlanOptions = Readonly<{
   projectSurface?: PictureDetailedSurfaceProjector;
   /** Extra front paint such as an inherited outline must declare any outside-frame extent. */
   frontPaintBounds?: PictureEffectBounds;
+  /** Actual source ink in logical frame coordinates. Unlike frontPaintBounds,
+   * this explicitly permits source pixels outside the frame rectangle. */
+  sourceBounds?: PictureEffectBounds;
   /** Already evaluated numeric paths in the actual local frame. No rectangular fallback. */
   shapeGeometry?: ShapePresetGeometry;
   /** Actual source shapes allow stroke-only geometry and preserve per-path fill shading. */
@@ -125,6 +128,7 @@ type PictureDetailedRasterPlanBase = Readonly<{
   lineDecorations: PreparedPictureShapeGeometry | undefined;
   estimatedPeakBytes: number;
   assetIds: readonly string[];
+  sourceBounds?: PictureEffectBounds;
 }>;
 export type PictureDetailedRasterReadyPlan = PictureDetailedRasterPlanBase &
   Readonly<{ kind: "ready" }>;
@@ -162,7 +166,8 @@ export class PictureDetailedRasterUnsupportedError extends Error {
     this.name = "PictureDetailedRasterUnsupportedError";
   }
 }
-class PicturePaintAssetReadError extends Error {
+export class PicturePaintAssetReadError extends Error {
+  readonly code = "asset-pixels-unavailable";
   constructor(
     readonly assetId: string,
     options?: ErrorOptions,
@@ -296,6 +301,7 @@ export function planDetailedPictureRaster(
   if (isProjected !== hasProjector)
     throw new TypeError("Picture projection requires both pure bounds and a raster projector.");
   if (options.frontPaintBounds) assertPictureEffectBounds(options.frontPaintBounds);
+  if (options.sourceBounds) assertPictureEffectBounds(options.sourceBounds);
   const shape = options.shapeGeometry
     ? preparePictureShapeGeometry(
         options.shapeGeometry,
@@ -423,6 +429,15 @@ export function planDetailedPictureRaster(
           top: options.frontPaintBounds.top * density,
           right: options.frontPaintBounds.right * density,
           bottom: options.frontPaintBounds.bottom * density,
+        }),
+      );
+    if (options.sourceBounds)
+      front = integerPictureEffectBounds(
+        unionPictureEffectBounds(front, {
+          left: options.sourceBounds.left * density,
+          top: options.sourceBounds.top * density,
+          right: options.sourceBounds.right * density,
+          bottom: options.sourceBounds.bottom * density,
         }),
       );
     let body = front;
@@ -558,6 +573,7 @@ export function planDetailedPictureRaster(
       lineDecorations,
       estimatedPeakBytes,
       assetIds,
+      ...(options.sourceBounds ? { sourceBounds: { ...options.sourceBounds } } : {}),
     };
     return missingAssetIds.length
       ? { ...base, kind: "unavailable", reason: "asset-unavailable", missingAssetIds }
@@ -614,10 +630,17 @@ function sourceOverInto(
       destination.data[output + 3] = alpha * 255;
     }
 }
-function paintAffine(
-  plan: PictureDetailedRasterReadyPlan,
-  paint: PicturePaint,
-): PictureEffectAffine {
+type PicturePaintFrame = Pick<
+  PictureDetailedRasterReadyPlan,
+  | "widthPx"
+  | "heightPx"
+  | "actualDensity"
+  | "outerAngleDeg"
+  | "frontBoundsRaster"
+  | "widthRaster"
+  | "heightRaster"
+>;
+function paintAffine(plan: PicturePaintFrame, paint: PicturePaint): PictureEffectAffine {
   const body = plan.frontBoundsRaster;
   if (paint.kind === "solid" || paint.rotateWithShape || plan.outerAngleDeg === 0)
     return { a: 1, b: 0, c: 0, d: 1, e: body.left, f: body.top };
@@ -641,7 +664,7 @@ type CompiledPaint = (surface: PictureRgbaSurface, affine: PictureEffectAffine) 
 function compilePaint(
   paint: PicturePaint,
   theme: WorkbookTheme,
-  plan: PictureDetailedRasterReadyPlan,
+  plan: PicturePaintFrame,
   images: ReadonlyMap<string, DecodedPicturePaintImage>,
   makeCanvas: CanvasMaker,
   limits: ReturnType<typeof checkedLimits>,
@@ -944,6 +967,98 @@ function averageTextureAxes(
     }
   return output;
 }
+export type DetailedPicturePaintSurfaceOptions = Readonly<{
+  paint: PicturePaint;
+  theme: WorkbookTheme;
+  widthPx: number;
+  heightPx: number;
+  pixelDensity: number;
+  /** Integer raster bounds in original local-frame coordinates. */
+  boundsRaster: PictureEffectBounds;
+  outerAngleDeg?: number;
+  getAssetImage?: (assetId: string) => DecodedPicturePaintImage | undefined;
+  canvasFactory?: () => HTMLCanvasElement;
+  limits?: PictureDetailedRasterLimits;
+}>;
+
+/** A fresh RGBA paint field for a caller-owned alpha mask. It uses the same
+ * color, gradient, pattern and texture samplers as picture and shape surfaces.
+ * Requested density is exact: an over-budget field fails before allocation. */
+export function createDetailedPicturePaintSurface(
+  options: DetailedPicturePaintSurfaceOptions,
+): PictureRgbaSurface {
+  numberIn(options.widthPx, "paint frame width", Number.MIN_VALUE, 10_000_000);
+  numberIn(options.heightPx, "paint frame height", Number.MIN_VALUE, 10_000_000);
+  numberIn(options.pixelDensity, "paint density", Number.MIN_VALUE, 64);
+  numberIn(options.outerAngleDeg ?? 0, "paint outer angle", -3600, 3600);
+  assertPictureEffectBounds(options.boundsRaster);
+  for (const coordinate of Object.values(options.boundsRaster))
+    if (!Number.isSafeInteger(coordinate))
+      throw new RangeError("Picture paint raster bounds must have integer coordinates.");
+  const limits = checkedLimits(options.limits);
+  const width = options.boundsRaster.right - options.boundsRaster.left;
+  const height = options.boundsRaster.bottom - options.boundsRaster.top;
+  const pixels = width * height;
+  // Includes output pixels and one bounded texture Canvas/readback/mean field.
+  if (
+    width > limits.side ||
+    height > limits.side ||
+    pixels > limits.pixels ||
+    pixels * 32 + 4096 > limits.memoryBytes
+  )
+    throw new RangeError("Picture paint field exceeds the resource budget.");
+  const normalized = normalizeDetailedPictureStyle({
+    fill: { kind: "value", value: options.paint },
+  });
+  const paint = value(normalized?.fill);
+  if (!paint) throw new TypeError("Picture paint field requires an explicit paint.");
+  const images = new Map<string, DecodedPicturePaintImage>();
+  for (const id of getDetailedPictureStyleAssetIds(normalized)) {
+    const image = options.getAssetImage?.(id);
+    if (!image) throw new PicturePaintAssetReadError(id);
+    assetSize(imageSize(image));
+    images.set(id, image);
+  }
+  const frame: PicturePaintFrame = {
+    widthPx: options.widthPx,
+    heightPx: options.heightPx,
+    actualDensity: options.pixelDensity,
+    outerAngleDeg: options.outerAngleDeg ?? 0,
+    frontBoundsRaster: { ...options.boundsRaster },
+    widthRaster: width,
+    heightRaster: height,
+  };
+  const canvases = new Set<HTMLCanvasElement>();
+  const makeCanvas: CanvasMaker = (canvasWidth, canvasHeight) => {
+    if (
+      !Number.isSafeInteger(canvasWidth) ||
+      !Number.isSafeInteger(canvasHeight) ||
+      canvasWidth < 1 ||
+      canvasHeight < 1 ||
+      canvasWidth > limits.side ||
+      canvasHeight > limits.side ||
+      canvasWidth * canvasHeight > limits.pixels
+    )
+      throw new RangeError("Picture paint Canvas exceeds the resource budget.");
+    const canvas = options.canvasFactory
+      ? options.canvasFactory()
+      : document.createElement("canvas");
+    if (canvases.has(canvas) || [...images.values()].includes(canvas))
+      throw new TypeError("Picture paint factory must return a fresh, unowned Canvas.");
+    canvases.add(canvas);
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    return canvas;
+  };
+  try {
+    const compiled = compilePaint(paint, options.theme, frame, images, makeCanvas, limits);
+    const surface = createPictureRgbaSurface(width, height);
+    compiled(surface, paintAffine(frame, paint));
+    return surface;
+  } finally {
+    for (const canvas of canvases) releaseCanvas(canvas);
+  }
+}
 function paintRaster(
   paint: PicturePaint,
   compiled: CompiledPaint,
@@ -1108,7 +1223,7 @@ function drawSource(
   painter: PictureDetailedRasterOptions["sourcePainter"],
   makeCanvas: CanvasMaker,
 ): PictureRgbaSurface {
-  if (plan.shape) {
+  if (plan.shape || plan.sourceBounds) {
     const canvas = makeCanvas(plan.frontWidthRaster, plan.frontHeightRaster);
     try {
       const context = context2d(canvas);
@@ -1285,8 +1400,8 @@ export function createDetailedPictureRaster(
     sourceOverInto(
       body,
       source,
-      plan.shape ? 0 : -plan.frontBoundsRaster.left,
-      plan.shape ? 0 : -plan.frontBoundsRaster.top,
+      plan.shape || plan.sourceBounds ? 0 : -plan.frontBoundsRaster.left,
+      plan.shape || plan.sourceBounds ? 0 : -plan.frontBoundsRaster.top,
     );
     if (plan.shape && !plan.shape.drawingSource) {
       const shapeMask = createPictureShapeAlphaMask({

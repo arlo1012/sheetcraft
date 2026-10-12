@@ -19,6 +19,7 @@ export function useDrawingActions(options: {
   execute: (command: WorkbookCommand) => unknown;
   isBusy: () => boolean;
   name: (kind: SheetGraphicKind) => string;
+  prepareDrawing?: (drawing: SheetDrawing, owner?: SheetDrawing) => SheetDrawing;
 }) {
   const idFactory = createBrowserIdFactory();
   const targets = useDrawingDialogTarget<SheetGraphicDrawing, []>(options);
@@ -56,10 +57,29 @@ export function useDrawingActions(options: {
     const sheet = options.getSheet();
     const owner = sheet.drawings?.find((item) => item.id === drawing.id);
     if (!owner || (expected && owner !== expected)) return false;
-    const command = createSetSheetDrawingsCommand(
-      sheet.id,
-      sheet.drawings!.map((item) => (item === owner ? drawing : item)),
-    );
+    const revision = options.getRevision?.(),
+      workbook = options.getWorkbook(),
+      generation = options.getGeneration?.();
+    let command: ReturnType<typeof createSetSheetDrawingsCommand>;
+    try {
+      const next = options.prepareDrawing?.(drawing, owner) ?? drawing;
+      if (next.id !== owner.id || next.kind !== owner.kind) return false;
+      if (
+        !allowed() ||
+        options.getSheet() !== sheet ||
+        options.getWorkbook() !== workbook ||
+        options.getGeneration?.() !== generation ||
+        options.getRevision?.() !== revision ||
+        sheet.drawings?.find((item) => item.id === owner.id) !== owner
+      )
+        return false;
+      command = createSetSheetDrawingsCommand(
+        sheet.id,
+        sheet.drawings!.map((item) => (item === owner ? next : item)),
+      );
+    } catch {
+      return false;
+    }
     const applied = () =>
       options.getSheet() === sheet &&
       JSON.stringify(sheet.drawings ?? []) === JSON.stringify(command.drawings);
@@ -71,20 +91,38 @@ export function useDrawingActions(options: {
     }
   }
   function confirm(drawing: SheetGraphicDrawing, target = dialog.value) {
+    let accepted = false;
     targets.run(target, (currentTarget) => {
       if (drawing.id !== currentTarget.initial.id || drawing.kind !== currentTarget.initial.kind)
         return;
       const current = currentTarget.sheet.drawings ?? [];
-      targets.commit(
+      const identities = [...current],
+        revision = options.getRevision?.();
+      let next: SheetDrawing;
+      try {
+        next = options.prepareDrawing?.(drawing, currentTarget.existing) ?? drawing;
+      } catch {
+        return;
+      }
+      if (next.id !== drawing.id || next.kind !== drawing.kind) return;
+      const latest = currentTarget.sheet.drawings ?? [];
+      if (
+        options.getRevision?.() !== revision ||
+        latest.length !== identities.length ||
+        latest.some((item, index) => item !== identities[index])
+      )
+        return;
+      accepted = targets.commit(
         currentTarget,
         createSetSheetDrawingsCommand(
           currentTarget.sheet.id,
           currentTarget.existing
-            ? current.map((item) => (item === currentTarget.existing ? drawing : item))
-            : [...current, drawing],
+            ? current.map((item) => (item === currentTarget.existing ? next : item))
+            : [...current, next],
         ),
       );
     });
+    return accepted;
   }
   function remove(id: string) {
     if (!allowed()) return;

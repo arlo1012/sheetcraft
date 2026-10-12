@@ -399,14 +399,17 @@ describe("shape gallery text-box ownership", () => {
     expect(f.actions.requestTextBox("vertical", old)).toBe(true);
     const next = f.actions.dialog.value!;
     expect(next).not.toBe(old);
-    expect(next.initial).toMatchObject({ kind: "textBox", textDirection: "vertical" });
+    expect(next.initial).toMatchObject({
+      kind: "textBox",
+      shapeText: { layout: { direction: "vertical-rl" } },
+    });
     expect(f.actions.requestTextBox("horizontal", old)).toBe(false);
     expect(f.actions.dialog.value).toBe(next);
     expect(f.execute).not.toHaveBeenCalled();
     next.confirm(next.initial);
     expect(f.getSheet().drawings?.[0]).toMatchObject({
       kind: "textBox",
-      textDirection: "vertical",
+      shapeText: { layout: { direction: "vertical-rl" } },
     });
   });
   test("a failed repeated request cannot masquerade as successful because old draft is a text box", () => {

@@ -57,8 +57,9 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
         {{ reason("rotation3d") }}
       </p>
       <ShapeFormatCheckbox
+        v-if="target === 'shape'"
         :controller="controller"
-        :field="target === 'shape' ? 'shapeKeepTextFlat' : 'textKeepTextFlat'"
+        field="shapeKeepTextFlat"
       />
     </PictureFormatSection>
   </div>

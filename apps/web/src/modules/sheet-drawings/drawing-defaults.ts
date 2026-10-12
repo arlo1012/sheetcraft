@@ -1,5 +1,6 @@
 import type { CellAddress } from "@sheetcraft/core/workbook";
 import type { SheetGraphicDrawing, SheetGraphicKind } from "@sheetcraft/core/sheet-drawings";
+import { createDefaultShapeText } from "./shape-text-options";
 /** One initial graphic contract shared by dialog and direct canvas creation. */
 export function createGraphicDrawing(
   id: string,
@@ -25,8 +26,19 @@ export function createGraphicDrawing(
           : "",
     shape: kind === "icon" ? "star" : "rectangle",
     ...(kind === "shape" ? { shapeGeometry: { preset: "rect" as const } } : {}),
-    ...(kind === "textBox" && direction === "vertical"
-      ? { textDirection: "vertical" as const }
+    ...(kind === "shape" || kind === "textBox"
+      ? {
+          shapeText: {
+            ...createDefaultShapeText(),
+            layout: {
+              ...createDefaultShapeText().layout,
+              direction:
+                kind === "textBox" && direction === "vertical"
+                  ? ("vertical-rl" as const)
+                  : ("horizontal" as const),
+            },
+          },
+        }
       : {}),
     fill: kind === "shape" || kind === "icon" ? "#dbeafe" : "transparent",
     stroke: "#2563eb",

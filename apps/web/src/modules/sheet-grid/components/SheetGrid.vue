@@ -4142,6 +4142,7 @@ onBeforeUnmount(() => {
 });
 
 defineExpose({
+  getDrawingLayout: (sheet: Sheet) => (props.sheet === sheet ? layout.value : undefined),
   getPictureFrameContext: (sheet: Sheet) =>
     props.sheet === sheet ? pictureFrameContext.value : undefined,
   previewSelectedPicture,

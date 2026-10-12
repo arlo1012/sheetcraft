@@ -25,6 +25,7 @@ function fixture(legacy = false) {
     generation = ref(0),
     busy = ref(false);
   const drawing = createGraphicDrawing("d", "shape", "shape", { row: 0, column: 0 });
+  delete drawing.shapeText;
   if (legacy) delete drawing.shapeGeometry;
   sheet.value.drawings = [drawing];
   const session = createWorkbookSession({
@@ -158,7 +159,7 @@ test("false/throw/stale revision/owner/permission do not change snapshot or hist
     f.scope.stop();
   }
 });
-test("unsupported text and out-of-Core-range rotation are rejected; projective controls require no text yet", () => {
+test("out-of-Core-range rotation is rejected and independent text controls are available", () => {
   const f = fixture();
   try {
     expect(f.pane.capabilities.value.fields.rotationDeg?.max).toBe(360);
@@ -166,17 +167,17 @@ test("unsupported text and out-of-Core-range rotation are rejected; projective c
       false,
     );
     expect(f.pane.onIntent(f.intent({ type: "set-field", field: "textWrap", value: false }))).toBe(
-      false,
+      true,
     );
     expect(
       f.pane.onIntent(
         f.intent({ type: "set-style", target: "text", category: "fill", value: { kind: "none" } }),
       ),
-    ).toBe(false);
+    ).toBe(true);
     f.sheet.value.drawings![0]!.text = "text";
     f.revision.value++;
-    expect(f.pane.capabilities.value.styles?.shape?.rotation3d?.enabled).toBe(false);
-    expect(f.session.history.undoStack).toHaveLength(0);
+    expect(f.pane.capabilities.value.styles?.shape?.rotation3d?.enabled).toBe(true);
+    expect(f.session.history.undoStack).toHaveLength(2);
   } finally {
     f.scope.stop();
   }
@@ -202,7 +203,7 @@ test.each([false, true])("stroke-only line has no active fill control; legacy %s
   }
 });
 
-test("existing 3D text can remove each projection atomically without clearing its text or permitting another value", () => {
+test("existing 3D body accepts and removes projection while preserving legacy text", () => {
   const f = fixture();
   try {
     const drawing = f.sheet.value.drawings![0]!;
@@ -225,9 +226,8 @@ test("existing 3D text can remove each projection atomically without clearing it
           value: { kind: "value", value: createPictureRotation3d("perspective") },
         }),
       ),
-    ).toBe(false);
-    expect(serializeWorkbook(f.wb.value)).toEqual(original);
-    expect(f.session.history.undoStack).toHaveLength(0);
+    ).toBe(true);
+    expect(f.session.history.undoStack).toHaveLength(1);
     expect(
       f.pane.onIntent(
         f.intent({
@@ -239,7 +239,7 @@ test("existing 3D text can remove each projection atomically without clearing it
       ),
     ).toBe(true);
     expect(f.pane.snapshot.value?.drawing.text).toBe("preserved text");
-    expect(f.pane.capabilities.value.styles?.shape?.format3d?.enabled).toBe(false);
+    expect(f.pane.capabilities.value.styles?.shape?.format3d?.enabled).toBe(true);
     expect(
       f.pane.onIntent(
         f.intent({ type: "set-style", target: "shape", category: "rotation3d", value: undefined }),
@@ -247,7 +247,8 @@ test("existing 3D text can remove each projection atomically without clearing it
     ).toBe(true);
     expect(f.pane.snapshot.value?.drawing.text).toBe("preserved text");
     expect(f.pane.snapshot.value?.drawing.shapeStyle).toEqual({ format3d: { kind: "none" } });
-    expect(f.session.history.undoStack).toHaveLength(2);
+    expect(f.session.history.undoStack).toHaveLength(3);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
     expect(undoWorkbookCommand(f.session)).toBe(true);
     expect(undoWorkbookCommand(f.session)).toBe(true);
     expect(serializeWorkbook(f.wb.value)).toEqual(original);

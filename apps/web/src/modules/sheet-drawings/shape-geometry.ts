@@ -298,8 +298,10 @@ export function getStandardShapeGeometry(
 export function getDrawingShapeGeometry(
   drawing: SheetGraphicDrawing,
 ): EvaluatedShapePresetGeometry | undefined {
+  if (drawing.kind === "textBox" && drawing.shapeText)
+    return getStandardShapeGeometry({ preset: "rect" }, drawing.width, drawing.height);
   if (drawing.shapeGeometry && drawing.shapePath) return;
-  if (!drawing.shapeGeometry && !drawing.shapePath && drawing.shapeStyle) {
+  if (!drawing.shapeGeometry && !drawing.shapePath && (drawing.shapeStyle || drawing.shapeText)) {
     const geometry = getLegacyShapeGeometry(drawing.shape, drawing.width, drawing.height);
     if (!geometry) return;
     try {

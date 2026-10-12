@@ -42,8 +42,12 @@ const textStyle = computed(() => ({
   <div class="drawing-content" :style="{ transform: `rotate(${drawing.rotation}deg)` }">
     <StandardShapeContent
       v-if="
-        drawing.kind === 'shape' &&
-        (drawing.shapeGeometry || drawing.shapePath || drawing.shapeStyle)
+        (drawing.kind === 'shape' &&
+          (drawing.shapeGeometry ||
+            drawing.shapePath ||
+            drawing.shapeStyle ||
+            drawing.shapeText)) ||
+        (drawing.kind === 'textBox' && drawing.shapeText)
       "
       :drawing="drawing"
       :theme="theme"
@@ -149,8 +153,12 @@ const textStyle = computed(() => ({
       v-else
       v-show="
         !(
-          drawing.kind === 'shape' &&
-          (drawing.shapeGeometry || drawing.shapePath || drawing.shapeStyle)
+          (drawing.kind === 'shape' &&
+            (drawing.shapeGeometry ||
+              drawing.shapePath ||
+              drawing.shapeStyle ||
+              drawing.shapeText)) ||
+          (drawing.kind === 'textBox' && drawing.shapeText)
         )
       "
       class="drawing-content__text"

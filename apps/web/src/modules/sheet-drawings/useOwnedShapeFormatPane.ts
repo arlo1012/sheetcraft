@@ -6,16 +6,13 @@ import {
   type SheetDrawing,
 } from "@sheetcraft/core/sheet-drawings";
 import { getShapeStyleAssetIds } from "@sheetcraft/core/shape-style";
+import { getShapeTextAssetIds } from "@sheetcraft/core/shape-text";
 import { isShapeLinePreset } from "@sheetcraft/core/shape-line-ends";
 import { isShapeFreePathClosed } from "@sheetcraft/core/shape-free-path";
 import type { Sheet, Workbook } from "@sheetcraft/core/workbook";
 import { getDrawingShapeGeometry } from "./shape-geometry";
 import { getLegacyShapeGeometry } from "./legacy-shape-geometry";
-import {
-  hasUnsupportedShapeProjectedText,
-  planShapeDetailedPaint,
-  resolveShapeDetailedPaintStyle,
-} from "./shape-detailed-paint";
+import { planShapeDetailedPaint, resolveShapeDetailedPaintStyle } from "./shape-detailed-paint";
 import {
   shapeFormatOwnerKey,
   type ShapeFormatSnapshot,
@@ -23,6 +20,18 @@ import {
   type ShapeFormatIntent,
   type ShapeFormatField,
 } from "./shape-format-pane-model";
+import {
+  drawingShapeTextValues,
+  editDrawingShapeTextField,
+  materializeDrawingShapeText,
+  withDrawingShapeText,
+} from "./shape-text-options";
+import {
+  prepareDrawingShapeTextCandidate,
+  getDrawingShapeTextRect,
+  type PreparedDrawingShapeTextCandidate,
+} from "./shape-text-runtime";
+import { planShapeTextPaint, resolveShapeTextPaintStyle } from "./shape-text-paint";
 
 /** Exact committed owner; no drawing index, synthetic picture, or mutable selection callback. */
 export function useOwnedShapeFormatPane(options: {
@@ -35,6 +44,10 @@ export function useOwnedShapeFormatPane(options: {
   update: (next: SheetDrawing, owner: SheetDrawing) => boolean;
   isAssetAvailable?: (id: string) => boolean;
   getUnsupportedReason: () => string;
+  prepareText?: (
+    next: SheetGraphicDrawing,
+    current: SheetGraphicDrawing,
+  ) => PreparedDrawingShapeTextCandidate;
 }) {
   const selected = shallowRef<{
     workbook: Workbook;
@@ -56,7 +69,7 @@ export function useOwnedShapeFormatPane(options: {
     )
       return;
     const current = owner.sheet.drawings?.find((d) => d.id === owner.id);
-    return current?.kind === "shape" ? current : undefined;
+    return current?.kind === "shape" || current?.kind === "textBox" ? current : undefined;
   });
   const snapshot = computed<ShapeFormatSnapshot | null>(() => {
     const d = drawing.value,
@@ -79,8 +92,10 @@ export function useOwnedShapeFormatPane(options: {
         fontSizePt: d.fontSize * 0.75,
         textBold: d.bold,
         textItalic: d.italic,
+        ...drawingShapeTextValues(d),
       },
-      shapeStyle: resolveShapeDetailedPaintStyle(d),
+      shapeStyle: d.kind === "shape" ? resolveShapeDetailedPaintStyle(d) : undefined,
+      textStyle: resolveShapeTextPaintStyle(d),
       ...(acknowledged.value?.drawing === d && acknowledged.value.revision === revision
         ? { acceptedIntentId: acknowledged.value.id }
         : {}),
@@ -91,6 +106,12 @@ export function useOwnedShapeFormatPane(options: {
     const enabled =
       !!d && !options.isBusy() && canUseSheetPermission(options.getSheet(), "editObjects");
     const field = { enabled, reason: enabled ? undefined : options.getUnsupportedReason() };
+    const textRect = d && getDrawingShapeTextRect(d);
+    const textEnabled = enabled && !!textRect;
+    const textField = {
+      enabled: textEnabled,
+      reason: textEnabled ? undefined : options.getUnsupportedReason(),
+    };
     const minimum =
       d?.shapePath || (d?.shapeGeometry && isShapeLinePreset(d.shapeGeometry.preset)) ? 1 : 16;
     const fields: ShapeFormatCapabilities["fields"] = {
@@ -100,11 +121,45 @@ export function useOwnedShapeFormatPane(options: {
       fontSizePt: { ...field, min: 0.75, max: 384 },
       textBold: field,
       textItalic: field,
+      shapeKeepTextFlat: field,
+      textVerticalAlignment: field,
+      textDirection: field,
+      textLineOrder: {
+        ...field,
+        enabled: enabled && (d?.shapeText?.layout.direction ?? d?.textDirection) === "stacked",
+      },
+      textMarginLeftPt: { ...field, min: 0, max: 4096 },
+      textMarginRightPt: { ...field, min: 0, max: 4096 },
+      textMarginTopPt: { ...field, min: 0, max: 4096 },
+      textMarginBottomPt: { ...field, min: 0, max: 4096 },
+      textResizeToFit: field,
+      textOverflow: field,
+      textWrap: field,
+      fontFamily: field,
+      textUnderline: field,
+      textStrike: field,
+      paragraphAlignment: field,
+      paragraphBeforePt: { ...field, min: 0, max: 4096 },
+      paragraphAfterPt: { ...field, min: 0, max: 4096 },
+      paragraphLineSpacing: field,
+      paragraphLineSpacingPt: {
+        ...field,
+        enabled: enabled && d?.shapeText?.paragraph.lineSpacing.kind === "exact",
+        min: 0.001,
+        max: 4096,
+      },
     };
-    // Text projection/keep-flat belongs to the next durable text-layout stage.
-    const projective = enabled && !d?.text.trim();
+    const bodyField = { ...field, enabled: enabled && d?.kind === "shape" };
+    for (const key of Object.keys(fields) as ShapeFormatField[]) {
+      if (key === "sizeWidthPt" || key === "sizeHeightPt" || key === "rotationDeg") continue;
+      fields[key] = {
+        ...fields[key],
+        enabled: !!fields[key]?.enabled && textEnabled,
+        reason: textField.reason,
+      };
+    }
     const fillable =
-      !!d &&
+      d?.kind === "shape" &&
       !(d.shapeGeometry && isShapeLinePreset(d.shapeGeometry.preset)) &&
       !(!d.shapeGeometry && !d.shapePath && d.shape === "line");
     return {
@@ -115,19 +170,23 @@ export function useOwnedShapeFormatPane(options: {
             enabled: enabled && fillable,
             reason: enabled && fillable ? undefined : options.getUnsupportedReason(),
           },
-          line: field,
-          shadow: field,
-          reflection: field,
-          glow: field,
-          softEdges: field,
-          format3d: {
-            enabled: enabled && (projective || d?.shapeStyle?.format3d?.kind === "value"),
-            reason: projective ? undefined : options.getUnsupportedReason(),
-          },
-          rotation3d: {
-            enabled: enabled && (projective || d?.shapeStyle?.rotation3d?.kind === "value"),
-            reason: projective ? undefined : options.getUnsupportedReason(),
-          },
+          line: bodyField,
+          shadow: bodyField,
+          reflection: bodyField,
+          glow: bodyField,
+          softEdges: bodyField,
+          format3d: bodyField,
+          rotation3d: bodyField,
+        },
+        text: {
+          fill: textField,
+          line: textField,
+          shadow: textField,
+          reflection: textField,
+          glow: textField,
+          softEdges: textField,
+          format3d: textField,
+          rotation3d: textField,
         },
       },
       lineEnds: {
@@ -148,7 +207,7 @@ export function useOwnedShapeFormatPane(options: {
   }
   function open(d: SheetDrawing): boolean {
     if (
-      d.kind !== "shape" ||
+      (d.kind !== "shape" && d.kind !== "textBox") ||
       options.isBusy() ||
       !canUseSheetPermission(options.getSheet(), "editObjects") ||
       options.getSheet().drawings?.find((item) => item.id === d.id) !== d
@@ -185,28 +244,27 @@ export function useOwnedShapeFormatPane(options: {
       return false;
     const current = before.drawing;
     let next: SheetGraphicDrawing = { ...current };
-    let removingProjection = false;
     try {
       if (intent.type === "set-style") {
-        if (
-          intent.target !== "shape" ||
-          capabilities.value.styles?.shape?.[intent.category]?.enabled !== true
-        )
+        if (capabilities.value.styles?.[intent.target]?.[intent.category]?.enabled !== true)
           return false;
-        const projectiveCategory =
-          intent.category === "format3d" || intent.category === "rotation3d";
-        if (projectiveCategory && current.text.trim()) {
-          if (
-            current.shapeStyle?.[intent.category]?.kind !== "value" ||
-            intent.value?.kind === "value"
-          )
-            return false;
-          removingProjection = true;
-        }
-        const style = { ...current.shapeStyle };
+        const text = intent.target === "text" ? materializeDrawingShapeText(current) : undefined;
+        const style = { ...(text ? text.style : current.shapeStyle) };
         if (intent.value === undefined) delete style[intent.category];
         else Object.assign(style, { [intent.category]: intent.value });
-        next = { ...next, shapeStyle: style };
+        next = text
+          ? withDrawingShapeText(next, { ...text, style })
+          : { ...next, shapeStyle: style };
+      } else if (intent.type === "set-text-margins") {
+        if (
+          ["textMarginLeftPt", "textMarginRightPt", "textMarginTopPt", "textMarginBottomPt"].some(
+            (field) => capabilities.value.fields[field as ShapeFormatField]?.enabled !== true,
+          )
+        )
+          return false;
+        const text = materializeDrawingShapeText(next);
+        text.layout.marginsPt = { ...intent.value };
+        next = withDrawingShapeText(next, text);
       } else if (intent.type === "set-line-ends") {
         if (capabilities.value.lineEnds?.enabled !== true) return false;
         if (intent.value) next.shapeLineEnds = intent.value;
@@ -232,31 +290,63 @@ export function useOwnedShapeFormatPane(options: {
           textItalic: "italic",
         };
         const key = fields[intent.field];
-        if (!key) return false;
-        Object.assign(next, {
-          [key]:
-            intent.field === "sizeWidthPt" ||
-            intent.field === "sizeHeightPt" ||
-            intent.field === "fontSizePt"
-              ? ((intent.value as number) * 4) / 3
-              : intent.value,
-        });
+        if (key) {
+          Object.assign(next, {
+            [key]:
+              intent.field === "sizeWidthPt" ||
+              intent.field === "sizeHeightPt" ||
+              intent.field === "fontSizePt"
+                ? ((intent.value as number) * 4) / 3
+                : intent.value,
+          });
+          if (
+            intent.field === "sizeHeightPt" &&
+            next.shapeText?.layout.autoFit === "resize-shape"
+          ) {
+            const text = materializeDrawingShapeText(next);
+            text.layout.autoFit = "none";
+            next = withDrawingShapeText(next, text);
+          }
+        } else {
+          const edited = editDrawingShapeTextField(next, intent.field, intent.value);
+          if (!edited) return false;
+          next = edited;
+        }
       } else return false;
       next = normalizeSheetDrawing(next) as SheetGraphicDrawing;
-      const geometry =
-        getDrawingShapeGeometry(next) ??
-        (!next.shapeGeometry && !next.shapePath
-          ? getLegacyShapeGeometry(next.shape, next.width, next.height)
-          : undefined);
-      if (!geometry) return false;
-      // Existing unsupported payloads can shed one 3D category at a time. This budget-only
-      // preflight never strips the committed text or enables another unsupported edit.
-      const paintDrawing =
-        removingProjection && hasUnsupportedShapeProjectedText(next) ? { ...next, text: "" } : next;
-      const plan = planShapeDetailedPaint({ drawing: paintDrawing, geometry, density: 1 });
-      if (getShapeStyleAssetIds(next.shapeStyle).some((id) => !options.isAssetAvailable?.(id)))
+      if (next.shapeText && next.text) {
+        const prepared = options.prepareText
+          ? options.prepareText(next, current)
+          : prepareDrawingShapeTextCandidate(next);
+        // Only preflight the fitted result here. The command owner prepares the
+        // original candidate once, preserving its rotated anchor in that transaction.
+        const textPlan = planShapeTextPaint({
+          drawing: prepared.drawing,
+          layout: prepared.layout,
+          density: 1,
+        });
+        if (!Number.isFinite(textPlan.estimatedPeakBytes)) return false;
+      }
+      if (next.kind === "shape") {
+        const geometry =
+          getDrawingShapeGeometry(next) ??
+          (!next.shapeGeometry && !next.shapePath
+            ? getLegacyShapeGeometry(next.shape, next.width, next.height)
+            : undefined);
+        if (!geometry) return false;
+        const plan = planShapeDetailedPaint({
+          drawing: { ...next, text: "" },
+          geometry,
+          density: 1,
+        });
+        if (!Number.isFinite(plan.estimatedPeakBytes)) return false;
+      }
+      if (
+        [...getShapeStyleAssetIds(next.shapeStyle), ...getShapeTextAssetIds(next.shapeText)].some(
+          (id) => !options.isAssetAvailable?.(id),
+        )
+      )
         return false;
-      if (!Number.isFinite(plan.estimatedPeakBytes)) return false;
       if (
         snapshot.value?.drawing !== current ||
         snapshot.value.revision !== before.revision ||

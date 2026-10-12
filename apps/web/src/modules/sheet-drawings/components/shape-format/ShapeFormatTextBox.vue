@@ -65,6 +65,11 @@ const action = computed(() => {
     <PictureFormatSection :title="controller.s.value('textBox')" initially-open>
       <ShapeFormatChoiceField :controller="controller" field="textVerticalAlignment" />
       <ShapeFormatChoiceField :controller="controller" field="textDirection" />
+      <ShapeFormatChoiceField
+        v-show="controller.props.snapshot?.values.textDirection === 'stacked'"
+        :controller="controller"
+        field="textLineOrder"
+      />
       <PictureFormatField
         :label="controller.s.value('textMargins')"
         :reason="marginsCapability.enabled ? undefined : marginsCapability.reason"

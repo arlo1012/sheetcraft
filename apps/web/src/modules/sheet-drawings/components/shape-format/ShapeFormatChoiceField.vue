@@ -20,18 +20,43 @@ const options = computed<readonly ShapeFormatOption[]>(() => {
       { value: "move", label: c.props.t("anchorMove") },
       { value: "fixed", label: c.props.t("anchorFixed") },
     ];
-  if (props.field === "textVerticalAlignment")
+  if (props.field === "textVerticalAlignment") {
+    const values = c.props.snapshot?.values;
+    const direction = values?.textDirection ?? "horizontal";
+    if (direction === "horizontal")
+      return [
+        { value: "top", label: s("top") },
+        { value: "middle", label: s("middle") },
+        { value: "bottom", label: s("bottom") },
+      ];
+    const startsAtLeft =
+      direction === "vertical-lr" ||
+      direction === "rotate-270" ||
+      (direction === "stacked" && values?.textLineOrder === "ltr");
     return [
-      { value: "top", label: s("top") },
-      { value: "middle", label: s("middle") },
-      { value: "bottom", label: s("bottom") },
+      { value: "top", label: s(startsAtLeft ? "blockLeft" : "blockRight") },
+      { value: "middle", label: s("center") },
+      { value: "bottom", label: s(startsAtLeft ? "blockRight" : "blockLeft") },
     ];
+  }
   if (props.field === "textDirection")
     return [
       { value: "horizontal", label: s("horizontal") },
-      { value: "vertical", label: s("vertical") },
+      { value: "vertical-rl", label: s("verticalRightToLeft") },
+      { value: "vertical-lr", label: s("verticalLeftToRight") },
       { value: "rotate-90", label: s("rotate90") },
       { value: "rotate-270", label: s("rotate270") },
+      { value: "stacked", label: s("stacked") },
+    ];
+  if (props.field === "textLineOrder")
+    return [
+      { value: "rtl", label: s("rightToLeft") },
+      { value: "ltr", label: s("leftToRight") },
+    ];
+  if (props.field === "paragraphLineSpacing")
+    return [
+      { value: "normal", label: s("lineSpacingNormal") },
+      { value: "exact", label: s("lineSpacingExact") },
     ];
   return [
     { value: "left", label: s("left") },

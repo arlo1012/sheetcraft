@@ -166,7 +166,7 @@ describe("standard gallery editor intent and draft integrity", () => {
   });
 });
 
-test("3D shape adding text is blocked visibly, retains data and can be corrected without changing the original", async () => {
+test("3D body text is submitted to the command owner without mutating the original", async () => {
   const original: SheetGraphicDrawing = {
     ...shape,
     text: "",
@@ -181,17 +181,20 @@ test("3D shape adding text is blocked visibly, retains data and can be corrected
   try {
     w.getComponent(Textarea).vm.$emit("update:modelValue", "new label");
     await nextTick();
-    expect(w.getComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: true });
-    expect(w.text()).toContain("形状三维文字尚未接通");
+    expect(w.getComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: false });
+    expect(w.text()).not.toContain("形状三维文字尚未接通");
     w.getComponent(Dialog).vm.$emit("confirm");
-    expect(w.emitted("confirm")).toBeUndefined();
+    expect(w.emitted("confirm")?.[0]?.[0]).toMatchObject({
+      text: "new label",
+      shapeStyle: original.shapeStyle,
+    });
     expect(original.text).toBe("");
     expect(original.shapeStyle?.rotation3d?.kind).toBe("value");
     w.getComponent(Textarea).vm.$emit("update:modelValue", "");
     await nextTick();
     expect(w.getComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: false });
     w.getComponent(Dialog).vm.$emit("confirm");
-    expect(w.emitted("confirm")?.[0]?.[0]).toMatchObject({
+    expect(w.emitted("confirm")?.[1]?.[0]).toMatchObject({
       text: "",
       shapeStyle: original.shapeStyle,
     });

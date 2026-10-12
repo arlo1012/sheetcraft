@@ -319,3 +319,53 @@ test.each(["fill", "line"] as const)(
     }
   },
 );
+
+test("native paint pixels are owner-bound after decode/storage; changed owner never publishes them", async () => {
+  const drawing = createGraphicDrawing("d", "shape", "", { row: 0, column: 0 });
+  let snapshot: ShapeFormatSnapshot | null = {
+    owner: { workbookId: "b", sheetId: "s", drawingId: "d", sessionId: "one" },
+    revision: 0,
+    drawing,
+    values: {},
+  };
+  const pixels = deferred<HTMLImageElement | undefined>(),
+    decoded = asset();
+  const source = createShapePaintAssetSource({
+    getSnapshot: () => snapshot,
+    prepare: async () => decoded,
+    store: { get: async () => undefined, put: async () => {} },
+    preparePixels: () => pixels.promise,
+  });
+  const pending = source.load(new Blob(["local"]));
+  await Promise.resolve();
+  await Promise.resolve();
+  snapshot = { ...snapshot!, revision: 1 };
+  pixels.resolve({ naturalWidth: 1, naturalHeight: 1 } as HTMLImageElement);
+  expect(await pending).toBeUndefined();
+  expect(source.has(decoded.id)).toBe(false);
+  expect(source.getAssetImage(decoded.id)).toBeUndefined();
+  source.dispose();
+});
+test("successful explicit pixel source is available without object URL leakage; cancel/dispose clear its lease", async () => {
+  const drawing = createGraphicDrawing("d", "shape", "", { row: 0, column: 0 }),
+    decoded = asset(),
+    image = { naturalWidth: 1, naturalHeight: 1 } as HTMLImageElement;
+  const snapshot: ShapeFormatSnapshot = {
+    owner: { workbookId: "b", sheetId: "s", drawingId: "d", sessionId: "one" },
+    revision: 0,
+    drawing,
+    values: {},
+  };
+  const source = createShapePaintAssetSource({
+    getSnapshot: () => snapshot,
+    prepare: async () => decoded,
+    store: { get: async () => undefined, put: async () => {} },
+    preparePixels: async () => image,
+  });
+  expect(await source.load(new Blob(["local"]))).toBe(decoded.id);
+  expect(source.getAssetImage(decoded.id)).toBe(image);
+  source.cancel();
+  expect(source.getAssetImage(decoded.id)).toBeUndefined();
+  source.dispose();
+  expect(source.has(decoded.id)).toBe(false);
+});

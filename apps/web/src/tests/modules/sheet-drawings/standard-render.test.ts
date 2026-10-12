@@ -164,7 +164,7 @@ test("transparent text does not create an invisible hit layer over a donut hole"
   w.unmount();
 });
 
-test("unsupported restored 3D text shows an explicit error instead of an unprojected text overlay", async () => {
+test("restored 3D text uses the native glyph consumer; unavailable native Canvas never falls back to unprojected DOM text", async () => {
   const drawing = {
     ...shape,
     text: "preserved label",
@@ -176,7 +176,7 @@ test("unsupported restored 3D text shows an explicit error instead of an unproje
   const w = render(drawing);
   await flushPromises();
   expect(w.find("[data-standard-shape-text]").exists()).toBe(false);
-  expect(w.get('[role="status"]').text()).toContain("3D shape text is not available yet");
+  expect(w.get(".shape-text-content__status").text()).toContain("Text cannot be displayed");
   expect(drawing).toEqual(original);
   w.unmount();
 });

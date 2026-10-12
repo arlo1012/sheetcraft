@@ -1,3 +1,4 @@
+import { createGraphicDrawing } from "../../../../modules/sheet-drawings/drawing-defaults";
 import { pictureGroup } from "../../sheet-images/picture-group-fixture";
 import { framedPicture } from "../../sheet-images/framed-picture-fixture";
 import {
@@ -148,6 +149,36 @@ describe("workbook JSON transfer", () => {
       { row: 1, column: 1 },
       { kind: "image", image: { assetId: "untrusted-id", altText: "logo" } },
     );
+    const glyph = createGraphicDrawing("glyph", "textBox", "", { row: 2, column: 2 });
+    const paint = {
+      kind: "picture" as const,
+      assetId: "untrusted-id",
+      opacity: 1,
+      rotateWithShape: true,
+      layout: {
+        kind: "stretch" as const,
+        offsetXRatio: 0,
+        offsetYRatio: 0,
+        widthRatio: 1,
+        heightRatio: 1,
+      },
+    };
+    glyph.shapeText!.style = {
+      fill: { kind: "value", value: paint },
+      line: {
+        kind: "value",
+        value: {
+          paint,
+          widthPt: 1,
+          compound: "single",
+          dash: "solid",
+          cap: "butt",
+          join: "miter",
+          miterLimit: 4,
+        },
+      },
+    };
+    getActiveSheet(workbook).drawings = [glyph];
     const snapshot = serializeWorkbook(workbook);
     const png =
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9JZ4sAAAAASUVORK5CYII=";
@@ -190,6 +221,22 @@ describe("workbook JSON transfer", () => {
     expect(getActiveSheet(imported).pageDecoration?.watermark?.image?.assetId).toBe(
       (content as { kind: "image"; image: { assetId: string } }).image.assetId,
     );
+    const glyphImported = getActiveSheet(imported).drawings![0]!;
+    if (glyphImported.kind !== "textBox") throw new Error("Expected text box");
+    expect(glyphImported.shapeText!.style).toMatchObject({
+      fill: {
+        value: {
+          assetId: (content as { kind: "image"; image: { assetId: string } }).image.assetId,
+        },
+      },
+      line: {
+        value: {
+          paint: {
+            assetId: (content as { kind: "image"; image: { assetId: string } }).image.assetId,
+          },
+        },
+      },
+    });
     expect(imported.watermarkPresets?.[0]?.watermark.image?.assetId).toBe(
       (content as { kind: "image"; image: { assetId: string } }).image.assetId,
     );

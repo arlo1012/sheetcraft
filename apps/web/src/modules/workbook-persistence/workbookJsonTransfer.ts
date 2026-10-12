@@ -114,13 +114,15 @@ function rewriteImageReferences(workbook: Workbook, ids: ReadonlyMap<string, str
       watermarkImage.assetId = ids.get(watermarkImage.assetId) ?? watermarkImage.assetId;
     // Shape paint owns validated image assets just as cell and floating pictures do.
     for (const drawing of sheet.drawings ?? []) {
-      if (drawing.kind !== "shape") continue;
-      const fill = drawing.shapeStyle?.fill;
-      if (fill?.kind === "value" && fill.value.kind === "picture")
-        fill.value.assetId = ids.get(fill.value.assetId) ?? fill.value.assetId;
-      const line = drawing.shapeStyle?.line;
-      if (line?.kind === "value" && line.value.paint.kind === "picture")
-        line.value.paint.assetId = ids.get(line.value.paint.assetId) ?? line.value.paint.assetId;
+      if (drawing.kind !== "shape" && drawing.kind !== "textBox") continue;
+      for (const style of [drawing.shapeStyle, drawing.shapeText?.style]) {
+        const fill = style?.fill;
+        if (fill?.kind === "value" && fill.value.kind === "picture")
+          fill.value.assetId = ids.get(fill.value.assetId) ?? fill.value.assetId;
+        const line = style?.line;
+        if (line?.kind === "value" && line.value.paint.kind === "picture")
+          line.value.paint.assetId = ids.get(line.value.paint.assetId) ?? line.value.paint.assetId;
+      }
     }
     for (const cell of sheet.cells.values()) {
       if (cell.content?.kind === "image")

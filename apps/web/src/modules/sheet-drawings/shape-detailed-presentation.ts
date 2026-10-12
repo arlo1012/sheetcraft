@@ -7,6 +7,9 @@ import {
   standardShapeWorldToLocal,
   standardShapeFlipPoint,
 } from "./shape-geometry";
+import { layoutDrawingShapeText } from "./shape-text-runtime";
+import { planShapeTextPaint } from "./shape-text-paint";
+import { projectedShapeTextBounds } from "./shape-text-projection";
 
 /** This canvas is the component's own presentation copy, never an evictable shared cache entry. */
 export interface ShapeDetailedPresentation {
@@ -14,6 +17,26 @@ export interface ShapeDetailedPresentation {
   canvas: HTMLCanvasElement;
   density: number;
   bounds: ShapePresetBounds;
+  /** Independent owned body/glyph surfaces; each retains its own origin/density. */
+  layers?: readonly ShapeDetailedPresentation[];
+  /** Text follows readable desktop flip semantics, not the body's bitmap reflection. */
+  unflipped?: true;
+}
+export function combineShapePresentations(
+  drawing: SheetGraphicDrawing,
+  presentations: readonly (ShapeDetailedPresentation | undefined)[],
+): ShapeDetailedPresentation | undefined {
+  const layers = presentations.filter(
+    (p): p is ShapeDetailedPresentation => !!p && p.drawing === drawing,
+  );
+  const first = layers[0];
+  if (!first) return;
+  if (layers.length === 1) return first;
+  const left = Math.min(...layers.map((p) => p.bounds.left));
+  const top = Math.min(...layers.map((p) => p.bounds.top));
+  const right = Math.max(...layers.map((p) => p.bounds.left + p.bounds.width));
+  const bottom = Math.max(...layers.map((p) => p.bounds.top + p.bounds.height));
+  return { ...first, bounds: { left, top, width: right - left, height: bottom - top }, layers };
 }
 export const SHAPE_PRESENTATION_BYTE_LIMIT = 64 * 1024 * 1024;
 const presentationBytes = new WeakMap<HTMLCanvasElement, number>();
@@ -51,11 +74,31 @@ export function releaseShapePresentationCanvas(canvas: HTMLCanvasElement) {
 export function detailedShapeLocalBounds(
   drawing: SheetGraphicDrawing,
 ): ShapePresetBounds | undefined {
-  if (!drawing.shapeStyle) return;
+  if (!drawing.shapeStyle && !drawing.shapeText) return;
   const geometry = getDrawingShapeGeometry(drawing);
   if (!geometry) return;
   const plan = planShapeDetailedPaint({ drawing, geometry, density: 1 });
-  const bounds = plan.logicalBounds;
+  let bounds = plan.logicalBounds;
+  if (drawing.shapeText && drawing.text) {
+    const textPlan = planShapeTextPaint({
+      drawing,
+      layout: layoutDrawingShapeText(drawing),
+      density: 1,
+    });
+    const unflippedText = projectedShapeTextBounds(drawing, textPlan);
+    const text = {
+      left: drawing.shapeFlipX ? drawing.width - unflippedText.right : unflippedText.left,
+      right: drawing.shapeFlipX ? drawing.width - unflippedText.left : unflippedText.right,
+      top: drawing.shapeFlipY ? drawing.height - unflippedText.bottom : unflippedText.top,
+      bottom: drawing.shapeFlipY ? drawing.height - unflippedText.top : unflippedText.bottom,
+    };
+    bounds = {
+      left: Math.min(bounds.left, text.left),
+      top: Math.min(bounds.top, text.top),
+      right: Math.max(bounds.right, text.right),
+      bottom: Math.max(bounds.bottom, text.bottom),
+    };
+  }
   return {
     left: bounds.left,
     top: bounds.top,
@@ -81,10 +124,12 @@ export function detailedShapeContainsWorldPoint(
   presentation: ShapeDetailedPresentation | undefined,
 ): boolean {
   if (!presentation || presentation.drawing !== drawing) return false;
-  const local = standardShapeFlipPoint(
-    drawing,
-    standardShapeWorldToLocal(frame, drawing.rotation, point),
-  );
+  if (presentation.layers)
+    return presentation.layers.some((layer) =>
+      detailedShapeContainsWorldPoint(drawing, frame, point, layer),
+    );
+  const worldLocal = standardShapeWorldToLocal(frame, drawing.rotation, point);
+  const local = presentation.unflipped ? worldLocal : standardShapeFlipPoint(drawing, worldLocal);
   const x = Math.floor((local.x - presentation.bounds.left) * presentation.density);
   const y = Math.floor((local.y - presentation.bounds.top) * presentation.density);
   if (x < 0 || y < 0 || x >= presentation.canvas.width || y >= presentation.canvas.height)

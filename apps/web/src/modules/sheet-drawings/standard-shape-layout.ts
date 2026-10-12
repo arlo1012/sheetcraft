@@ -111,11 +111,15 @@ export function getStandardShapeViewportFragments(
   selected = false,
 ): FloatingImageViewportFragment[] {
   const rect = getFloatingImageSheetRect(drawing, layout);
-  if (!rect || (!drawing.shapeGeometry && !drawing.shapePath && !drawing.shapeStyle)) return [];
+  if (
+    !rect ||
+    (!drawing.shapeGeometry && !drawing.shapePath && !drawing.shapeStyle && !drawing.shapeText)
+  )
+    return [];
   const shape = getDrawingShapeGeometry(drawing);
   const bounds = getStandardShapeWorldBounds(
     shape,
-    drawing.shapeStyle
+    drawing.shapeStyle || drawing.shapeText
       ? {
           ...standardShapeAppearance(drawing),
           fill: "transparent",
@@ -132,7 +136,7 @@ export function getStandardShapeViewportFragments(
         { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
       ]
     : [];
-  if (drawing.shapeStyle) {
+  if (drawing.shapeStyle || drawing.shapeText) {
     try {
       const local = detailedShapeLocalBounds(drawing);
       if (local)
@@ -160,7 +164,9 @@ export function getStandardShapeViewportFragments(
       );
     }
   }
-  for (const paint of drawing.shapeStyle ? [] : getShapeEndPaint(drawing, shape)) {
+  for (const paint of drawing.shapeStyle || drawing.shapeText
+    ? []
+    : getShapeEndPaint(drawing, shape)) {
     points.push(
       ...[
         { x: paint.bounds.x, y: paint.bounds.y },

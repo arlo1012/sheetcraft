@@ -115,13 +115,14 @@ describe("standard shape flip consumers", () => {
     );
     w.unmount();
   });
-  test("text rect follows reflected location while glyphs stay unmirrored", () => {
+  test("legacy text rect follows reflected location while glyphs stay unmirrored", () => {
     const drawing = {
       ...base,
       text: "Readable Ω",
       shapeFlipX: true as const,
       shapeFlipY: true as const,
     };
+    delete drawing.shapeText;
     const geometry = getStandardShapeGeometry(drawing.shapeGeometry, 180, 90)!,
       textRect = geometry.textRect!;
     const w = mount(DrawingContent, {

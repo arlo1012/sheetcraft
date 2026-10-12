@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, shallowRef, watch, type CSSProperties } from "vue";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   getDrawingShapeGeometry,
@@ -11,9 +11,12 @@ import {
 import { standardShapeAppearance, getShapeEndPaint } from "../shape-line-paint";
 import { useAppI18n } from "../../../shared/i18n";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
-import type { ShapeDetailedPresentation } from "../shape-detailed-presentation";
+import {
+  combineShapePresentations,
+  type ShapeDetailedPresentation,
+} from "../shape-detailed-presentation";
 import ShapeDetailedContent from "./ShapeDetailedContent.vue";
-import { hasUnsupportedShapeProjectedText } from "../shape-detailed-paint";
+import ShapeTextContent from "./ShapeTextContent.vue";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
   theme?: WorkbookTheme;
@@ -24,6 +27,18 @@ const emit = defineEmits<{
   paint: [presentation: ShapeDetailedPresentation | undefined];
 }>();
 const { t } = useAppI18n();
+const bodyPaint = shallowRef<ShapeDetailedPresentation>();
+const textPaint = shallowRef<ShapeDetailedPresentation>();
+const canvasText = computed(
+  () =>
+    (!!props.drawing.shapeText && !!props.drawing.text) ||
+    (props.drawing.shapeStyle?.rotation3d?.kind === "value" && !!props.drawing.text.trim()),
+);
+watch(
+  () => [props.drawing, bodyPaint.value, textPaint.value],
+  () => emit("paint", combineShapePresentations(props.drawing, [bodyPaint.value, textPaint.value])),
+  { flush: "sync" },
+);
 const geometry = computed(() => getDrawingShapeGeometry(props.drawing));
 const paths = computed(() => getStandardShapeSvgPaths(geometry.value));
 const appearance = computed(() => standardShapeAppearance(props.drawing));
@@ -50,7 +65,7 @@ const textStyle = computed<CSSProperties | undefined>(() => {
 <template>
   <div
     class="standard-shape-content"
-    :class="{ 'has-detailed-style': !!drawing.shapeStyle }"
+    :class="{ 'has-detailed-style': !!(drawing.shapeStyle || drawing.shapeText) }"
     data-standard-shape-content
   >
     <template v-if="geometry">
@@ -60,7 +75,7 @@ const textStyle = computed<CSSProperties | undefined>(() => {
         :theme="theme"
         :asset-urls="assetUrls"
         :density="density"
-        @paint="emit('paint', $event)"
+        @paint="bodyPaint = $event"
       />
       <svg
         v-else
@@ -102,13 +117,16 @@ const textStyle = computed<CSSProperties | undefined>(() => {
           />
         </g>
       </svg>
+      <ShapeTextContent
+        v-if="canvasText"
+        :drawing="drawing"
+        :theme="theme"
+        :asset-urls="assetUrls"
+        :density="density"
+        @paint="textPaint = $event"
+      />
       <div
-        v-if="
-          drawing.text.trim() &&
-          drawing.color !== 'transparent' &&
-          textStyle &&
-          !hasUnsupportedShapeProjectedText(drawing)
-        "
+        v-if="drawing.text.trim() && drawing.color !== 'transparent' && textStyle && !canvasText"
         class="standard-shape-content__text"
         :style="textStyle"
         data-standard-shape-text

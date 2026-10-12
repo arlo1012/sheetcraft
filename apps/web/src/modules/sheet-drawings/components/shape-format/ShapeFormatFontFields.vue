@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import FontFormatField from "../../../home-tools/components/FontFormatField.vue";
 import { useFontCatalog } from "../../../../shared/cell-text/useFontCatalog";
 import { resolveFontFamilyName } from "../../../../shared/cell-text/font-catalog";
+import {
+  ensureCellFontResource,
+  getCellFontResourceFamilies,
+} from "../../../../shared/cell-text/font-resources";
 import FontSettingsAction from "../../../../shared/cell-text/FontSettingsAction.vue";
 import PictureFormatSection from "../../../sheet-images/components/format-pane/PictureFormatSection.vue";
 import PictureFormatField from "../../../sheet-images/components/format-pane/PictureFormatField.vue";
@@ -15,45 +19,83 @@ const family = computed(() => props.controller.props.snapshot?.values.fontFamily
 const draft = ref(family.value),
   dirty = ref(false),
   error = ref<string>();
+let request = 0;
 watch(
   () => props.controller.ownerKey.value,
   () => {
+    request++;
     draft.value = family.value;
     dirty.value = false;
     error.value = undefined;
   },
 );
+onUnmounted(() => request++);
 watch(family, (value) => {
   if (!dirty.value) draft.value = value;
 });
 const { fontOptions } = useFontCatalog(() =>
   [family.value, draft.value].filter((value): value is string => !!value),
 );
-const options = computed(() =>
-  fontOptions.value.map(({ label, value, aliases }) => ({
+const options = computed(() => [
+  { label: props.controller.s.value("fontInherited"), value: "" },
+  ...fontOptions.value.map(({ label, value, aliases }) => ({
     label,
     value,
     aliases,
     fontFamily: value,
   })),
-);
+]);
 const capability = computed(() => props.controller.fieldCapability("fontFamily"));
 const action = computed(() => {
-  const apply = props.controller.session.fieldAction("fontFamily");
+  // Both callbacks belong to this exact rendered owner and field action. Never
+  // recreate an action after awaiting a resource, which could retarget an edit.
+  const session = props.controller.session,
+    token = session.capture(),
+    apply = session.fieldAction("fontFamily");
   return (value: string | number) => {
-    if (typeof value !== "string" || !value.trim() || !capability.value.enabled) return;
-    draft.value = resolveFontFamilyName(value.trim());
+    if (typeof value !== "string" || !capability.value.enabled || !session.current(token)) return;
+    const trimmed = value.trim();
+    const next = options.value.some((option) => option.value === trimmed)
+      ? trimmed
+      : resolveFontFamilyName(trimmed);
+    const attempt = ++request;
+    draft.value = next;
     dirty.value = true;
-    if (apply(draft.value)) {
-      dirty.value = false;
-      error.value = undefined;
-    } else error.value = props.controller.s.value("applyRejected");
+    error.value = undefined;
+    const commit = () => {
+      if (attempt !== request) return;
+      if (!session.current(token)) {
+        error.value = props.controller.s.value("staleOwner");
+        return;
+      }
+      const accepted = apply(next);
+      if (attempt !== request) return;
+      if (accepted) {
+        dirty.value = false;
+        error.value = undefined;
+      } else error.value = props.controller.s.value("applyRejected");
+    };
+    const resources = getCellFontResourceFamilies(next);
+    if (!resources.length) {
+      commit();
+      return;
+    }
+    // Loading is preparatory work, never an accepted document edit. Failed
+    // exact resources keep the draft rather than choosing another font family.
+    return Promise.all(resources.map((family) => ensureCellFontResource(family))).then(
+      commit,
+      () => {
+        if (attempt === request && session.current(token))
+          error.value = props.controller.s.value("fontLoadFailed");
+      },
+    );
   };
 });
 function escape(event: KeyboardEvent) {
   if (event.key === "Escape" && dirty.value) {
     event.preventDefault();
     event.stopPropagation();
+    request++;
     draft.value = family.value;
     dirty.value = false;
     error.value = undefined;
@@ -94,7 +136,12 @@ function escape(event: KeyboardEvent) {
       <ShapeFormatChoiceField :controller="controller" field="paragraphAlignment" />
       <ShapeFormatNumberField :controller="controller" field="paragraphBeforePt" />
       <ShapeFormatNumberField :controller="controller" field="paragraphAfterPt" />
-      <ShapeFormatNumberField :controller="controller" field="paragraphLineSpacingPt" />
+      <ShapeFormatChoiceField :controller="controller" field="paragraphLineSpacing" />
+      <ShapeFormatNumberField
+        v-show="controller.props.snapshot?.values.paragraphLineSpacing === 'exact'"
+        :controller="controller"
+        field="paragraphLineSpacingPt"
+      />
     </PictureFormatSection>
   </div>
 </template>
