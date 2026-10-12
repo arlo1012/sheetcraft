@@ -1663,12 +1663,12 @@ export const zhCN = {
     filterFade: "淡雅",
 
     assetActionTooLarge:
-      "每次最多压缩 100 个不同图片源，源文件合计不超过 64 MiB。请减少本次选择后重试。",
+      "本次图片操作超过上限（100 个图片源或输出，或合计 64 MiB）。请减少选择后重试。",
     tooMany: "每次最多插入 100 张图片。",
     files: "图片文件",
     compress: "图片压缩",
     batchSize: "批量大小",
-    convert: "转换",
+    convert: "另存图片",
     print: "打印",
     exportAll: "导出本表全部图片 (ZIP)",
     maxSide: "最长边（像素）",

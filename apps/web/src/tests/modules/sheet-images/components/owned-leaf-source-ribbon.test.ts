@@ -78,14 +78,17 @@ describe("actual owned leaf source ribbon", () => {
     const tools = f.wrapper.getComponent(PictureAssetTools);
     expect(tools.props()).toMatchObject({
       disabled: false,
-      exportDisabled: true,
+      exportDisabled: false,
       printDisabled: true,
     });
     const oldCompress = tools.vm.$.vnode.props!.onCompress as () => void;
     const oldBatch = tools.vm.$.vnode.props!.onBatchSize as () => void;
+    const oldExport = tools.vm.$.vnode.props!.onExport as (format: string) => void;
     await f.wrapper.setProps({ ownerKey: "next-leaf-owner" });
     oldCompress();
     oldBatch();
+    oldExport("png");
+    expect(f.wrapper.emitted("export")).toBeUndefined();
     expect(f.wrapper.emitted("compress")).toBeUndefined();
     expect(f.wrapper.emitted("batchSize")).toBeUndefined();
     tools.vm.$emit("compress");
@@ -97,6 +100,11 @@ describe("actual owned leaf source ribbon", () => {
     tools.vm.$emit("batchSize");
     expect(f.wrapper.emitted("compress")).toHaveLength(1);
     expect(f.wrapper.emitted("batchSize")).toHaveLength(1);
+    tools.vm.$emit("export", "png", false);
+    expect(f.wrapper.emitted("export")).toEqual([["png", false]]);
+    await f.wrapper.setProps({ busy: true });
+    tools.vm.$emit("export", "png", false);
+    expect(f.wrapper.emitted("export")).toHaveLength(1);
   });
   test("owned preview invokes only its current actual source handler", async () => {
     const f = fixture(),

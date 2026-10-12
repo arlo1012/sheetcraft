@@ -1,6 +1,10 @@
 import { framedPicture } from "../../modules/sheet-images/framed-picture-fixture";
 import { pictureGroup } from "../../modules/sheet-images/picture-group-fixture";
 import SheetOwnedPictureGroupLayer from "../../../modules/sheet-images/components/SheetOwnedPictureGroupLayer.vue";
+import PictureToolbar from "../../../modules/sheet-images/components/PictureToolbar.vue";
+import PictureOwnedLeafRibbon from "../../../modules/sheet-images/components/PictureOwnedLeafRibbon.vue";
+import * as pictureExport from "../../../modules/sheet-images/picture-source-export";
+import * as download from "../../../shared/files/download";
 import type { PictureSourcePresentation } from "../../../modules/sheet-images/picture-source-presentation";
 import { actualPng } from "../../modules/image-assets/image-header-fixtures";
 import { requireLegacyPicture } from "../../../modules/sheet-images/picture-document-support";
@@ -293,6 +297,37 @@ describe("workspace cell image entry points", () => {
       oldClose();
       await flushPromises();
       expect(wrapper.find("[data-image-preview]").exists()).toBe(true);
+    },
+  );
+  test.each(["framed", "owned"] as const)(
+    "%s ribbon saves its actual rendered source through current worksheet geometry",
+    async (kind) => {
+      const { wrapper, sheet } = await fixture(false, kind),
+        grid = wrapper.getComponent(SheetGrid),
+        root = sheet.floatingImages[0]!;
+      grid.vm.selectFloatingImages([root.id]);
+      await flushPromises();
+      if (kind === "owned") {
+        wrapper
+          .getComponent(SheetOwnedPictureGroupLayer)
+          .vm.$emit("selectPath", [root.id, "owned-leaf"]);
+        await flushPromises();
+      }
+      const before = sheet.floatingImages.map(cloneFloatingImage),
+        render = vi
+          .spyOn(pictureExport, "exportPictureSourceBlob")
+          .mockResolvedValue(new Blob(["rendered"], { type: "image/png" })),
+        save = vi.spyOn(download, "downloadBlob").mockImplementation(() => {});
+      if (kind === "owned")
+        wrapper.getComponent(PictureOwnedLeafRibbon).vm.$emit("export", "png", false);
+      else wrapper.getComponent(PictureToolbar).vm.$emit("export", "png", false);
+      await flushPromises();
+      expect(render).toHaveBeenCalledOnce();
+      expect(save).toHaveBeenCalledOnce();
+      const presentation = render.mock.calls[0]![1];
+      expect(presentation.picture.assetId).toBe("asset");
+      if (kind === "owned") expect(presentation.geometry.angleDeg).toBe(74);
+      expect(sheet.floatingImages).toEqual(before);
     },
   );
 

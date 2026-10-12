@@ -6,10 +6,12 @@ import { useAppI18n } from "../../../shared/i18n";
 import PictureAssetTools from "./PictureAssetTools.vue";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
+import type { PictureFileFormat } from "../picture-asset-conversion";
 
 const props = defineProps<{
   image: GroupedPicture;
   disabled: boolean;
+  busy?: boolean;
   canReplace: boolean;
   canPreview?: boolean;
   previewHandler?: () => boolean;
@@ -21,7 +23,11 @@ const props = defineProps<{
 }>();
 if (!isGroupedPicture(props.image))
   throw new TypeError("An owned source ribbon requires a real picture leaf.");
-const emit = defineEmits<{ compress: []; batchSize: [] }>();
+const emit = defineEmits<{
+  compress: [];
+  batchSize: [];
+  export: [format: PictureFileFormat, all?: boolean];
+}>();
 const { t } = useAppI18n();
 const callbacks = computed(() => {
   const image = props.image,
@@ -31,6 +37,10 @@ const callbacks = computed(() => {
     crop = props.cropHandler,
     preview = props.previewHandler;
   return {
+    export: (fileFormat: PictureFileFormat, all = false) => {
+      if (image === props.image && key === props.ownerKey && !props.busy)
+        emit("export", fileFormat, all);
+    },
     preview: () => {
       if (
         image === props.image &&
@@ -112,11 +122,13 @@ const callbacks = computed(() => {
     /></RibbonButton>
     <PictureAssetTools
       :disabled="disabled"
-      :busy="disabled"
-      export-disabled
+      :busy="!!busy"
+      :owner-key="ownerKey"
+      :export-disabled="false"
       print-disabled
       @compress="callbacks.compress"
       @batch-size="callbacks.batchSize"
+      @export="callbacks.export"
     />
     <RibbonButton
       variant="tall"

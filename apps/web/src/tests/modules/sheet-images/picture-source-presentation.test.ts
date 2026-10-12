@@ -157,3 +157,23 @@ test("painter failures release the consumer-owned canvas and propagate the actua
   );
   expect([canvas.width, canvas.height]).toEqual([0, 0]);
 });
+test("a source-resolution consumer can increase sampling density within the same bounded painter", () => {
+  const presentation = framed(),
+    { canvas } = surface();
+  vi.spyOn(painters, "paintFramedPictureContent").mockImplementation(() => {});
+  createPictureSourcePresentationCanvas(source(), presentation);
+  const original = canvas.width;
+  createPictureSourcePresentationCanvas(source(), presentation, undefined, undefined, 4096, 4);
+  expect(canvas.width).toBeGreaterThan(original * 3);
+  expect(canvas.width * canvas.height).toBeLessThanOrEqual(4 * 1024 * 1024);
+  expect(() =>
+    createPictureSourcePresentationCanvas(
+      source(),
+      presentation,
+      undefined,
+      undefined,
+      4096,
+      Infinity,
+    ),
+  ).toThrow("density");
+});

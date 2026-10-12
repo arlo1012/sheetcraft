@@ -445,7 +445,7 @@ describe("framed picture ribbon capability boundary", () => {
     expect(wrapper.getComponent(PictureAssetTools).props()).toMatchObject({
       disabled: false,
       busy: false,
-      exportDisabled: true,
+      exportDisabled: false,
       printDisabled: true,
     });
     expect(wrapper.getComponent(PictureViewMenu).props()).toMatchObject({

@@ -1,11 +1,22 @@
-import type { PictureGroupPath } from "@sheetcraft/core/picture-group";
+import { isGroupedPicture, type PictureGroupPath } from "@sheetcraft/core/picture-group";
 import {
   capturePictureSourceSelection,
   isPictureSourceSelectionCurrent,
   mapPictureSourceAssets,
+  type PictureAssetSource,
   type PictureSourceSelection,
 } from "./picture-source-selection";
 import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
+import { resolvePictureFrame, resolvePictureSourceLayout } from "@sheetcraft/core/picture-frame";
+import { cloneWorkbookTheme, type WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
+import { resolveOwnedPictureNode } from "./picture-group-interaction";
+import { pictureToolGeometryIdentity } from "./picture-tool-geometry";
+import {
+  capturePictureSourcePresentation,
+  type PictureSourcePresentation,
+} from "./picture-source-presentation";
+import { exportPictureSourceBlob } from "./picture-source-export";
 import { requireLegacyPictures } from "./picture-document-support";
 import { getCurrentScope, onScopeDispose, readonly, ref } from "vue";
 import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
@@ -37,6 +48,7 @@ export function usePictureAssetTools(options: {
   getGeneration?: () => number;
   getSelectedIds: () => readonly string[];
   getSelectedPath?: () => PictureGroupPath | null;
+  getFrameContext?: () => PictureFrameLayoutContext | undefined;
   assetStore: ImageAssetStore;
   isBusy: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
@@ -82,22 +94,120 @@ export function usePictureAssetTools(options: {
     );
   }
   async function exportPictures(format: PictureFileFormat, all = false): Promise<void> {
-    if (busy.value || options.isBusy()) return;
-    const selected = legacyPictures(all);
-    if (!selected?.length) return;
-    const sheet = options.getSheet();
-    const valid = () => !disposed && sourcesCurrent(sheet, selected, all);
+    if (disposed || busy.value || options.isBusy()) return;
+    if (typeof all !== "boolean" || !["png", "jpeg", "webp"].includes(format)) return;
+    const workbook = options.getWorkbook(),
+      sheet = options.getSheet(),
+      generation = options.getGeneration?.() ?? 0,
+      selectedIds = JSON.stringify(options.getSelectedIds()),
+      selectedPath = JSON.stringify(options.getSelectedPath?.() ?? null),
+      context = options.getFrameContext?.(),
+      geometryIdentity = pictureToolGeometryIdentity(context);
+    let selection: PictureSourceSelection;
+    let selected: {
+      image: PictureAssetSource;
+      presentation?: PictureSourcePresentation;
+    }[];
+    let theme: WorkbookTheme;
+    try {
+      selection = capturePictureSourceSelection(
+        sheet.floatingImages,
+        options.getSelectedIds(),
+        options.getSelectedPath?.(),
+        all,
+      );
+      if (selection.sources.length > 100) {
+        options.feedback("picture.assetActionTooLarge", true);
+        return;
+      }
+      theme = cloneWorkbookTheme(workbook.theme);
+      selected = selection.sources.map(({ node, path }) => {
+        if (isGroupedPicture(node)) {
+          if (!context) throw new Error("Current picture geometry is unavailable.");
+          const geometry = resolveOwnedPictureNode(selection.roots, path, context)?.layout;
+          if (!geometry) throw new Error("Current owned picture geometry is unavailable.");
+          return {
+            image: node,
+            presentation: capturePictureSourcePresentation(
+              node,
+              resolvePictureSourceLayout(geometry.rect, geometry.angleDeg, node.frame.source),
+            ),
+          };
+        }
+        if (isLegacyPictureObject(node)) return { image: node, presentation: undefined };
+        if (!context) throw new Error("Current picture geometry is unavailable.");
+        const geometry = resolvePictureFrame(node.frame, context.metrics);
+        return { image: node, presentation: capturePictureSourcePresentation(node, geometry) };
+      });
+    } catch {
+      options.feedback("picture.assetFailed", true);
+      return;
+    }
+    const forest = JSON.stringify(selection.roots),
+      themeIdentity = JSON.stringify(workbook.theme);
+    const valid = () => {
+      try {
+        if (
+          disposed ||
+          options.getWorkbook() !== workbook ||
+          options.getSheet() !== sheet ||
+          workbook.sheets.get(sheet.id) !== sheet ||
+          (options.getGeneration?.() ?? 0) !== generation ||
+          JSON.stringify(options.getSelectedIds()) !== selectedIds ||
+          JSON.stringify(options.getSelectedPath?.() ?? null) !== selectedPath ||
+          JSON.stringify(workbook.theme) !== themeIdentity ||
+          !isPictureSourceSelectionCurrent(selection, sheet.floatingImages)
+        )
+          return false;
+        const currentGeometry = pictureToolGeometryIdentity(options.getFrameContext?.());
+        return (
+          geometryIdentity.every((value, index) => value === currentGeometry[index]) &&
+          JSON.stringify(
+            capturePictureSourceSelection(sheet.floatingImages, selection.rootIds, selection.path)
+              .roots,
+          ) === forest
+        );
+      } catch {
+        return false;
+      }
+    };
     busy.value = true;
     try {
       const files: Record<string, Uint8Array> = {};
-      for (const [index, image] of selected.entries()) {
-        const source = await options.assetStore.get(image.assetId);
+      const sources = new Map<string, Blob>();
+      let sourceBytes = 0,
+        outputBytes = 0;
+      async function readSource(id: string): Promise<Blob | undefined> {
+        if (!valid()) return;
+        const existing = sources.get(id);
+        if (existing) return existing;
+        const source = await options.assetStore.get(id);
         if (!valid()) return;
         if (!source) throw new Error("Missing picture asset.");
-        const blob = await convertPictureBlob(source.blob, image.transform, format);
+        sourceBytes += source.blob.size;
+        if (sourceBytes > 64 * 1024 * 1024) throw new RangeError("Picture source batch too large.");
+        sources.set(id, source.blob);
+        return source.blob;
+      }
+      for (const [index, entry] of selected.entries()) {
+        const { image, presentation } = entry;
+        const source = await readSource(image.assetId);
         if (!valid()) return;
-        const name = `${index + 1}-${(image.altText || "picture").replace(/\.[^.]+$/, "").replace(/[\\/:*?"<>|]/g, "_")}.${format}`;
+        if (!source) throw new Error("Missing picture asset.");
+        const blob = presentation
+          ? await exportPictureSourceBlob(source, presentation, format, theme, readSource, valid)
+          : await convertPictureBlob(source, image.transform, format);
+        if (!valid()) return;
+        if (!blob) return;
+        outputBytes += blob.size;
+        if (outputBytes > 64 * 1024 * 1024) throw new RangeError("Picture output batch too large.");
+        const name = `${index + 1}-${(image.altTitle || image.altText || "picture")
+          .replace(/\.[^.]+$/, "")
+          .replace(/[\\/:*?"<>|]/g, "_")
+          .replace(/\p{Cc}/gu, "_")
+          .slice(0, 120)}.${format}`;
         files[name] = new Uint8Array(await blob.arrayBuffer());
+        if (!valid()) return;
       }
       if (!valid()) return;
       if (selected.length === 1) {
@@ -107,13 +217,21 @@ export function usePictureAssetTools(options: {
         const { zipSync } = await import("fflate");
         if (!valid()) return;
         downloadBlob(
-          new Blob([new Uint8Array(zipSync(files, { level: 0 }))], { type: "application/zip" }),
+          new Blob([new Uint8Array(zipSync(files, { level: 0 }))], {
+            type: "application/zip",
+          }),
           "pictures.zip",
         );
       }
       options.feedback("picture.exported");
     } catch (error) {
-      options.feedback(imageAssetFeedback(error) ?? "picture.assetFailed", true);
+      if (valid())
+        options.feedback(
+          error instanceof RangeError && error.message.includes("batch too large")
+            ? "picture.assetActionTooLarge"
+            : (imageAssetFeedback(error) ?? "picture.assetFailed"),
+          true,
+        );
     } finally {
       busy.value = false;
     }

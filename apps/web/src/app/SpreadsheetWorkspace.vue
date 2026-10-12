@@ -1729,6 +1729,7 @@ const pictureAssetTools = usePictureAssetTools({
   getSelectedIds: () => selectedPictureIds.value,
   getSelectedPath: () => selectedOwnedPicturePath.value,
   assetStore,
+  getFrameContext: () => sheetGridRef.value?.getPictureFrameContext?.(activeSheet.value),
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageActions.busy.value,
   execute: executeCommand,
   feedback: (key, error) => {
@@ -3139,6 +3140,7 @@ const gridInert = computed(
           v-if="selectedOwnedPictureLeaf && pictureSourceRibbonOwner"
           :key="pictureSourceRibbonOwner.key"
           :image="selectedOwnedPictureLeaf.node"
+          :busy="loading || fileBusy || xlsxBusy || imageBusy"
           :owner-key="pictureSourceRibbonOwner.key"
           :replace-handler="pictureSourceRibbonOwner.replace"
           :format-handler="pictureSourceRibbonOwner.format"
@@ -3149,6 +3151,7 @@ const gridInert = computed(
           :crop-handler="pictureSourceRibbonOwner.crop"
           @compress="pictureDialogs.openCompression"
           @batch-size="pictureDialogs.openBatchSize"
+          @export="pictureAssetTools.exportPictures"
           :disabled="
             loading ||
             fileBusy ||

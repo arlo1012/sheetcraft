@@ -77,9 +77,12 @@ export function createPictureSourcePresentationCanvas(
   theme?: WorkbookTheme,
   resources?: PicturePaintResources,
   maxSide = 4096,
+  requestedDensity = 1,
 ): HTMLCanvasElement {
   if (!Number.isInteger(maxSide) || maxSide < 96 || maxSide > 4096)
     throw new RangeError("Invalid picture presentation limit.");
+  if (!Number.isFinite(requestedDensity) || requestedDensity <= 0 || requestedDensity > 64)
+    throw new RangeError("Invalid picture presentation density.");
   assertImagePixelBudget(decoded.naturalWidth, decoded.naturalHeight);
   const presentation = capturePictureSourcePresentation(input.picture, input.geometry),
     { picture, geometry } = presentation,
@@ -100,7 +103,7 @@ export function createPictureSourcePresentationCanvas(
     )
       throw new RangeError("Picture presentation bounds are unavailable.");
     return Math.min(
-      1,
+      requestedDensity,
       (maxSide - 2 * padding) / bounds.width,
       (maxSide - 2 * padding) / bounds.height,
       (Math.sqrt(pixelLimit) - 2 * padding) / Math.max(bounds.width, bounds.height),

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useId } from "vue";
+import { computed, ref, useId, watch } from "vue";
 import { Minimize2, Images, Download, Printer } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
@@ -13,6 +13,7 @@ const props = defineProps<{
   busy: boolean;
   exportDisabled?: boolean;
   printDisabled?: boolean;
+  ownerKey?: string | number;
 }>();
 const emit = defineEmits<{
   compress: [];
@@ -31,11 +32,24 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   menuSurfaceRef,
   disabled: computed(() => props.busy || props.exportDisabled),
 });
-function exportImage(format: PictureFileFormat, all = false): void {
-  if (props.busy || props.exportDisabled) return;
-  emit("export", format, all);
-  dismiss("programmatic", true);
-}
+watch(
+  () => props.ownerKey,
+  () => dismiss("programmatic", false),
+);
+const exportCallbacks = computed(() => {
+  const owner = props.ownerKey;
+  function exportImage(format: PictureFileFormat, all = false): void {
+    if (owner !== props.ownerKey || props.busy || props.exportDisabled) return;
+    emit("export", format, all);
+    dismiss("programmatic", true);
+  }
+  return {
+    png: () => exportImage("png"),
+    jpeg: () => exportImage("jpeg"),
+    webp: () => exportImage("webp"),
+    all: () => exportImage("png", true),
+  };
+});
 </script>
 <template>
   <section class="picture-asset-tools" role="group" :aria-label="t('picture.files')">
@@ -84,10 +98,10 @@ function exportImage(format: PictureFileFormat, all = false): void {
         class="picture-asset-tools__menu"
         :label="t('picture.convert')"
       >
-        <MenuItem @select="exportImage('png')">PNG</MenuItem>
-        <MenuItem @select="exportImage('jpeg')">JPEG</MenuItem>
-        <MenuItem @select="exportImage('webp')">WebP</MenuItem>
-        <MenuItem @select="exportImage('png', true)">{{ t("picture.exportAll") }}</MenuItem>
+        <MenuItem @select="exportCallbacks.png">PNG</MenuItem>
+        <MenuItem @select="exportCallbacks.jpeg">JPEG</MenuItem>
+        <MenuItem @select="exportCallbacks.webp">WebP</MenuItem>
+        <MenuItem @select="exportCallbacks.all">{{ t("picture.exportAll") }}</MenuItem>
       </MenuSurface>
     </Teleport>
   </section>

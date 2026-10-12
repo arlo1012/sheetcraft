@@ -1704,12 +1704,12 @@ export const enUS = {
     filterFade: "Faded",
 
     assetActionTooLarge:
-      "Compress up to 100 distinct picture sources and 64 MiB at a time. Select a smaller batch and try again.",
+      "This picture batch exceeds the limit (100 sources or outputs, or 64 MiB). Select a smaller batch and try again.",
     tooMany: "Insert up to 100 pictures at a time.",
     files: "Picture files",
     compress: "Compress pictures",
     batchSize: "Batch size",
-    convert: "Convert",
+    convert: "Save as picture",
     print: "Print",
     exportAll: "Export all sheet pictures (ZIP)",
     maxSide: "Maximum side (px)",

@@ -362,7 +362,8 @@ function sourceAction(action: () => void): void {
     <PictureAssetTools
       :disabled="disabled"
       :busy="!!busy"
-      :export-disabled="isFramed"
+      :owner-key="draftOwnerKey"
+      :export-disabled="isFramed && !sizeAvailable"
       :print-disabled="isFramed"
       @compress="sourceAction(() => emit('compress'))"
       @batch-size="sourceAction(() => emit('batchSize'))"
