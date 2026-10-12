@@ -1634,6 +1634,9 @@ export type MessageSchema = ToolMessageSchema & {
     undoAnnotation: string;
     clearAnnotations: string;
     annotationHint: string;
+    annotationSourceEditor: string;
+    annotationCurrentAppearance: string;
+    annotationSourceHint: string;
     design: string;
     filters: string;
     designPlain: string;

@@ -37,3 +37,15 @@ export function pictureAnnotationPoint(
     y: Math.max(0, Math.min(1, (geometry.cropY + y) / height)),
   };
 }
+
+/** Source-editor points refer only to the full original raster, never its framed preview. */
+export function pictureSourceAnnotationPoint(point: {
+  x: number;
+  y: number;
+}): { x: number; y: number } | null {
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+  return {
+    x: Math.max(0, Math.min(1, point.x)),
+    y: Math.max(0, Math.min(1, point.y)),
+  };
+}

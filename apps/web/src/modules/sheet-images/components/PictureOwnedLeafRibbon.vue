@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Crop, Eye, ImagePlus, ImageDown, Settings2 } from "lucide-vue-next";
+import { Crop, Eye, ImagePlus, ImageDown, PencilLine, Settings2 } from "lucide-vue-next";
 import { isGroupedPicture, type GroupedPicture } from "@sheetcraft/core/picture-group";
 import { useAppI18n } from "../../../shared/i18n";
 import PictureAssetTools from "./PictureAssetTools.vue";
@@ -15,6 +15,8 @@ const props = defineProps<{
   canReplace: boolean;
   canPreview?: boolean;
   previewHandler?: () => boolean;
+  canAnnotate?: boolean;
+  annotateHandler?: () => boolean;
   canCrop?: boolean;
   cropHandler?: () => boolean;
   replaceHandler: () => void;
@@ -38,8 +40,19 @@ const callbacks = computed(() => {
     format = props.formatHandler,
     crop = props.cropHandler,
     preview = props.previewHandler,
-    convert = props.convertHandler;
+    convert = props.convertHandler,
+    annotate = props.annotateHandler;
   return {
+    annotate: () => {
+      if (
+        image === props.image &&
+        key === props.ownerKey &&
+        !props.disabled &&
+        props.canAnnotate &&
+        annotate === props.annotateHandler
+      )
+        annotate?.();
+    },
     convert: () => {
       if (
         image === props.image &&
@@ -141,6 +154,15 @@ const callbacks = computed(() => {
       data-picture-tool="convert-to-cell"
       @activate="callbacks.convert"
       ><ImageDown
+    /></RibbonButton>
+    <RibbonButton
+      variant="tall"
+      :label="t('picture.annotate')"
+      :text="t('picture.annotate')"
+      :disabled="disabled || !canAnnotate"
+      data-picture-tool="annotate"
+      @activate="callbacks.annotate"
+      ><PencilLine
     /></RibbonButton>
     <PictureAssetTools
       :disabled="disabled"

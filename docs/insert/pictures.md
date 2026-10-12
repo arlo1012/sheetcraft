@@ -563,3 +563,12 @@ confirmation, exact Undo/Redo and source/destination protection checks. See
 an explicit product enhancement; container embedding and owned leaf Cut are not
 advertised as supported. External native/portable packaging remains blocked for
 these local frames. Source-format expansion is still a separate remaining item.
+
+## Source-owned annotations
+
+The existing annotation editor is available for new framed pictures and actual
+owned picture leaves. Framed sources use an original-source drawing surface and a
+current-appearance preview. Applying the annotation list preserves editable
+geometry, source assets and other properties; exact owner/permission checks and
+single-command history apply. See [picture-annotations.md](picture-annotations.md).
+Source-format expansion remains pending.

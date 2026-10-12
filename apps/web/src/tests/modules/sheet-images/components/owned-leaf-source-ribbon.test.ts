@@ -143,3 +143,20 @@ describe("actual owned leaf source ribbon", () => {
     expect(replace).toHaveBeenCalledOnce();
   });
 });
+
+test("owned annotation uses one captured source handler and respects capability/owner changes", async () => {
+  const f = fixture(),
+    annotate = vi.fn(() => true);
+  await f.wrapper.setProps({ canAnnotate: true, annotateHandler: annotate });
+  const annotation = button(f.wrapper, "annotate");
+  const old = annotation.vm.$.vnode.props!.onActivate as () => void;
+  expect(annotation.attributes("aria-disabled")).toBe("false");
+  await annotation.trigger("click");
+  expect(annotate).toHaveBeenCalledOnce();
+  await f.wrapper.setProps({ ownerKey: "new-owner", annotateHandler: vi.fn(() => true) });
+  old();
+  expect(annotate).toHaveBeenCalledOnce();
+  await f.wrapper.setProps({ canAnnotate: false });
+  await button(f.wrapper, "annotate").trigger("click");
+  expect(annotate).toHaveBeenCalledOnce();
+});

@@ -562,3 +562,23 @@ test("new framed conversion is available and old owner callbacks never retarget 
   expect(handler).toHaveBeenCalledOnce();
   wrapper.unmount();
 });
+
+test("framed annotation requires a captured real-source capability and stale callbacks cannot retarget", async () => {
+  const wrapper = fixture(framedPicture()),
+    annotate = vi.fn(() => true);
+  await wrapper.setProps({ canAnnotate: true, annotateHandler: annotate, draftOwnerKey: 1 });
+  const annotation = wrapper
+    .findAllComponents(RibbonButton)
+    .find((button) => button.attributes("data-picture-tool") === "annotate")!;
+  const old = annotation.vm.$.vnode.props!.onActivate as () => void;
+  expect(annotation.attributes("aria-disabled")).toBe("false");
+  await annotation.trigger("click");
+  expect(annotate).toHaveBeenCalledOnce();
+  expect(wrapper.emitted("annotate")).toBeUndefined();
+  await wrapper.setProps({ draftOwnerKey: 2, annotateHandler: vi.fn(() => true) });
+  old();
+  expect(annotate).toHaveBeenCalledOnce();
+  await wrapper.setProps({ canAnnotate: false });
+  await annotation.trigger("click");
+  expect(annotate).toHaveBeenCalledOnce();
+});

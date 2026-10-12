@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
 import type { ImageTransform } from "@sheetcraft/core/workbook";
-import { pictureAnnotationPoint } from "../../../modules/sheet-images/picture-annotation-geometry";
+import {
+  pictureAnnotationPoint,
+  pictureSourceAnnotationPoint,
+} from "../../../modules/sheet-images/picture-annotation-geometry";
 
 const cases: Array<{
   name: string;
@@ -59,5 +62,19 @@ describe("picture annotation coordinates", () => {
     { x: 0.5, y: 1.1 },
   ])("rejects points outside the displayed image", (point) => {
     expect(pictureAnnotationPoint(point, undefined, 400, 200)).toBeNull();
+  });
+});
+
+describe("original-source annotation coordinates", () => {
+  test("clamps the full-raster UVs without applying frame crop, flips or projected paint bounds", () => {
+    expect(pictureSourceAnnotationPoint({ x: 0.25, y: 0.75 })).toEqual({ x: 0.25, y: 0.75 });
+    expect(pictureSourceAnnotationPoint({ x: -0.1, y: 1.1 })).toEqual({ x: 0, y: 1 });
+    expect(pictureSourceAnnotationPoint({ x: 1.1, y: -0.1 })).toEqual({ x: 1, y: 0 });
+  });
+  test.each([
+    { x: NaN, y: 0.5 },
+    { x: 0.5, y: Infinity },
+  ])("rejects non-finite points", (point) => {
+    expect(pictureSourceAnnotationPoint(point)).toBeNull();
   });
 });

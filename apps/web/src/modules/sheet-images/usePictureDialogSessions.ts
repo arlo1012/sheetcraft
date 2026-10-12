@@ -4,17 +4,30 @@ import {
   capturePictureSourceSelection,
   isPictureSourceSelectionCurrent,
   type PictureSourceSelection,
+  type PictureAssetSource,
 } from "./picture-source-selection";
 import { getPictureToolGeometry, pictureToolGeometryIdentity } from "./picture-tool-geometry";
 import { resolveOwnedPictureNode } from "./picture-group-interaction";
-import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
+import {
+  isLegacyPictureObject,
+  isFramedPictureObject,
+  normalizePictureObjectCollection,
+} from "@sheetcraft/core/picture-object";
+import {
+  isGroupedPicture,
+  isPictureGroup,
+  findPictureGroupNode,
+} from "@sheetcraft/core/picture-group";
+import { resolvePictureFrame } from "@sheetcraft/core/picture-frame";
+import {
+  capturePictureSourcePresentation,
+  type PictureSourcePresentation,
+} from "./picture-source-presentation";
 import { getCurrentScope, onScopeDispose, ref, shallowRef, watch, type Ref } from "vue";
 import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import {
-  cloneFloatingImage,
   normalizeImageTransform,
   type FloatingImage,
-  type LegacyFloatingImage,
   type Sheet,
   type Workbook,
 } from "@sheetcraft/core/workbook";
@@ -23,33 +36,19 @@ import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory"
 import type { PictureCompression } from "./picture-asset-conversion";
 
 type ResizeSettings = { width: number; height: number; locked: boolean; all: boolean };
-type Owner = {
-  workbook: Workbook;
-  sheet: Sheet;
-  generation: number;
-  image: LegacyFloatingImage;
-  selectedIds: string[];
-  sources: FloatingImage[];
-};
 type Dialog = { dialogId: string; error: Ref<MessageKey | undefined>; close: () => void };
 type AnnotationDialog = Dialog & {
-  image: LegacyFloatingImage;
-  confirm: (image: FloatingImage) => boolean;
+  image: PictureAssetSource;
+  frameSource?: PictureSourcePresentation;
+  confirm: (
+    image: FloatingImage | import("@sheetcraft/core/picture-group").GroupedPicture,
+  ) => boolean;
 };
 type CompressionDialog = Dialog & { confirm: (settings: PictureCompression) => Promise<boolean> };
 type BatchDialog = Dialog & {
   image: { width: number; height: number };
   confirm: (settings: ResizeSettings) => boolean;
 };
-
-function sameLegacySource(left: FloatingImage, right: FloatingImage): boolean {
-  return (
-    isLegacyPictureObject(left) &&
-    isLegacyPictureObject(right) &&
-    left.id === right.id &&
-    left.assetId === right.assetId
-  );
-}
 
 export function usePictureDialogSessions(options: {
   getWorkbook: () => Workbook;
@@ -61,7 +60,9 @@ export function usePictureDialogSessions(options: {
   getFrameContext?: () => PictureFrameLayoutContext | undefined;
   isBusy: () => boolean;
   hasAsset: (id: string) => boolean;
+  flushPendingEdits?: () => boolean;
   setImage: (image: FloatingImage, sheetId: string) => boolean;
+  setImages?: (images: readonly FloatingImage[], sheetId: string) => boolean;
   compress: (settings: PictureCompression, shouldContinue: () => boolean) => Promise<boolean>;
   resize: (settings: ResizeSettings) => boolean;
   resizeFeedback: () => MessageKey | undefined;
@@ -76,117 +77,6 @@ export function usePictureDialogSessions(options: {
       disposed = true;
       clear();
     });
-  function capture(): Owner | undefined {
-    const image = options.getSelectedImage();
-    const sheet = options.getSheet();
-    const selectedIds = [...options.getSelectedIds()];
-    const selected = sheet.floatingImages.filter((entry) => selectedIds.includes(entry.id));
-    if (
-      disposed ||
-      !image ||
-      !isLegacyPictureObject(image) ||
-      new Set(selectedIds).size !== selectedIds.length ||
-      selected.length !== selectedIds.length ||
-      selected.some((entry) => !isLegacyPictureObject(entry)) ||
-      options.isBusy() ||
-      !canEditPictureSelection(sheet, selectedIds)
-    )
-      return;
-    return {
-      workbook: options.getWorkbook(),
-      sheet,
-      generation: options.getGeneration(),
-      image: cloneFloatingImage(image),
-      selectedIds,
-      sources: sheet.floatingImages.map((entry) => cloneFloatingImage(entry)),
-    };
-  }
-  function current(owner: Owner, all = false): boolean {
-    const selected = options.getSelectedImage();
-    return (
-      !disposed &&
-      options.getWorkbook() === owner.workbook &&
-      options.getSheet() === owner.sheet &&
-      owner.workbook.sheets.get(owner.sheet.id) === owner.sheet &&
-      options.getGeneration() === owner.generation &&
-      canEditPictureSelection(
-        owner.sheet,
-        all ? owner.sheet.floatingImages.map((root) => root.id) : owner.selectedIds,
-      ) &&
-      selected !== undefined &&
-      sameLegacySource(selected, owner.image) &&
-      JSON.stringify(options.getSelectedIds()) === JSON.stringify(owner.selectedIds) &&
-      (all
-        ? owner.sheet.floatingImages.length === owner.sources.length &&
-          owner.sources.every((source, index) => {
-            const target = owner.sheet.floatingImages[index];
-            return target !== undefined && sameLegacySource(source, target);
-          })
-        : owner.selectedIds.every((id) => {
-            const source = owner.sources.find((entry) => entry.id === id);
-            return (
-              source && owner.sheet.floatingImages.some((image) => sameLegacySource(image, source))
-            );
-          }))
-    );
-  }
-  function openAnnotation(): void {
-    const owner = capture();
-    if (!owner || !options.hasAsset(owner.image.assetId)) return;
-    const originalAnnotations = normalizeImageTransform(owner.image.transform)?.annotations ?? [];
-    const dialog: AnnotationDialog = {
-      dialogId: idFactory("picture-annotation"),
-      image: owner.image,
-      error: ref(),
-      close: () => {
-        if (annotation.value === dialog) annotation.value = undefined;
-      },
-      confirm: (image) => {
-        if (annotation.value !== dialog) return false;
-        dialog.error.value = undefined;
-        const target = owner.sheet.floatingImages.find((entry) => entry.id === owner.image.id);
-        if (
-          !current(owner) ||
-          options.isBusy() ||
-          !target ||
-          !isLegacyPictureObject(target) ||
-          !isLegacyPictureObject(image) ||
-          target.assetId !== owner.image.assetId ||
-          image.id !== owner.image.id ||
-          image.assetId !== owner.image.assetId ||
-          JSON.stringify(normalizeImageTransform(target.transform)?.annotations ?? []) !==
-            JSON.stringify(originalAnnotations)
-        ) {
-          dialog.error.value = "picture.operationFailed";
-          return false;
-        }
-        try {
-          const annotations = normalizeImageTransform(image.transform)?.annotations;
-          const unchanged =
-            JSON.stringify(annotations ?? []) === JSON.stringify(originalAnnotations);
-          const accepted =
-            unchanged ||
-            options.setImage(
-              {
-                ...target,
-                transform: normalizeImageTransform({ ...target.transform, annotations }),
-              },
-              owner.sheet.id,
-            );
-          if (!accepted) {
-            dialog.error.value = "picture.operationFailed";
-            return false;
-          }
-          if (annotation.value === dialog) annotation.value = undefined;
-          return true;
-        } catch {
-          if (annotation.value === dialog) dialog.error.value = "picture.operationFailed";
-          return false;
-        }
-      },
-    };
-    annotation.value = dialog;
-  }
   type SourceOwner = {
     workbook: Workbook;
     sheet: Sheet;
@@ -258,6 +148,169 @@ export function usePictureDialogSessions(options: {
     }
     const root = owner.selected.roots.find((root) => root.id === owner.primaryId);
     return root ? getPictureToolGeometry(root, owner.context) : undefined;
+  }
+  function annotationSource(owner: SourceOwner): PictureAssetSource | undefined {
+    if (owner.selectedIds.length !== 1 || owner.selected.sources.length !== 1) return;
+    const entry = owner.selected.sources[0]!;
+    const root = owner.sheet.floatingImages.find((value) => value.id === entry.rootId);
+    if (!root) return;
+    if (entry.path.length === 1) return isPictureGroup(root) ? undefined : root;
+    if (
+      !isPictureGroup(root) ||
+      !owner.selected.path ||
+      JSON.stringify(owner.selected.path) !== JSON.stringify(entry.path)
+    )
+      return;
+    const target = findPictureGroupNode(root, entry.path)?.node;
+    return isGroupedPicture(target) ? target : undefined;
+  }
+  function annotationPresentation(
+    owner: SourceOwner,
+    image: PictureAssetSource,
+  ): PictureSourcePresentation | undefined {
+    if (!isGroupedPicture(image) && isLegacyPictureObject(image)) return;
+    if (!owner.context) throw new TypeError("Picture annotation requires source geometry.");
+    if (isGroupedPicture(image)) {
+      const node = resolveOwnedPictureNode(
+        owner.selected.roots,
+        owner.selected.sources[0]!.path,
+        owner.context,
+      );
+      if (!node?.visible || !node.layout || !("sourceRect" in node.layout))
+        throw new TypeError("Picture annotation requires its visible source leaf.");
+      return capturePictureSourcePresentation(image, node.layout);
+    }
+    return capturePictureSourcePresentation(
+      image,
+      resolvePictureFrame(image.frame, owner.context.metrics),
+    );
+  }
+  function sameAnnotationKind(left: PictureAssetSource, right: PictureAssetSource): boolean {
+    if (isGroupedPicture(left) || isGroupedPicture(right))
+      return isGroupedPicture(left) && isGroupedPicture(right);
+    return isFramedPictureObject(left) === isFramedPictureObject(right);
+  }
+  function canAnnotate(): boolean {
+    const owner = captureSources();
+    if (!owner) return false;
+    try {
+      const image = annotationSource(owner);
+      if (
+        !image ||
+        !options.hasAsset(image.assetId) ||
+        (isGroupedPicture(image) && !options.setImages)
+      )
+        return false;
+      annotationPresentation(owner, image);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  function openAnnotation(): boolean {
+    if (disposed || options.flushPendingEdits?.() === false) return false;
+    const owner = captureSources();
+    if (!owner) return false;
+    let image: PictureAssetSource | undefined, frameSource: PictureSourcePresentation | undefined;
+    try {
+      const current = annotationSource(owner);
+      if (
+        !current ||
+        !options.hasAsset(current.assetId) ||
+        (isGroupedPicture(current) && !options.setImages)
+      )
+        return false;
+      image = owner.selected.sources[0]!.node;
+      frameSource = annotationPresentation(owner, image);
+    } catch {
+      return false;
+    }
+    const originalAnnotations = normalizeImageTransform(image.transform)?.annotations ?? [];
+    const dialog: AnnotationDialog = {
+      dialogId: idFactory("picture-annotation"),
+      image,
+      ...(frameSource ? { frameSource } : {}),
+      error: ref(),
+      close: () => {
+        if (annotation.value === dialog) annotation.value = undefined;
+      },
+      confirm: (payload) => {
+        if (annotation.value !== dialog) return false;
+        dialog.error.value = undefined;
+        try {
+          const target = annotationSource(owner);
+          if (
+            !currentSources(owner) ||
+            options.isBusy() ||
+            !target ||
+            isPictureGroup(payload) ||
+            !sameAnnotationKind(target, image) ||
+            target.id !== image.id ||
+            target.assetId !== image.assetId ||
+            payload.id !== image.id ||
+            payload.assetId !== image.assetId ||
+            isGroupedPicture(payload) !== isGroupedPicture(image) ||
+            (!isGroupedPicture(payload) &&
+              !isGroupedPicture(image) &&
+              isFramedPictureObject(payload) !== isFramedPictureObject(image)) ||
+            JSON.stringify(normalizeImageTransform(target.transform)?.annotations ?? []) !==
+              JSON.stringify(originalAnnotations)
+          )
+            throw new TypeError("Picture annotation owner or source changed.");
+          const annotations = normalizeImageTransform(payload.transform)?.annotations;
+          let accepted = JSON.stringify(annotations ?? []) === JSON.stringify(originalAnnotations);
+          if (!accepted) {
+            if (isGroupedPicture(target)) {
+              const roots = normalizePictureObjectCollection(owner.sheet.floatingImages),
+                entry = owner.selected.sources[0]!;
+              const root = roots.find((value) => value.id === entry.rootId);
+              if (!isPictureGroup(root))
+                throw new TypeError("Picture annotation owner disappeared.");
+              const leaf = findPictureGroupNode(root, entry.path)?.node;
+              if (!isGroupedPicture(leaf))
+                throw new TypeError("Picture annotation leaf disappeared.");
+              const transform = normalizeImageTransform({ ...leaf.transform, annotations });
+              leaf.transform = transform
+                ? {
+                    ...(transform.appearance ? { appearance: transform.appearance } : {}),
+                    ...(transform.annotations ? { annotations: transform.annotations } : {}),
+                  }
+                : undefined;
+              accepted = options.setImages?.(roots, owner.sheet.id) === true;
+            } else {
+              const transform = normalizeImageTransform({ ...target.transform, annotations });
+              if (isFramedPictureObject(target)) {
+                accepted =
+                  options.setImage(
+                    {
+                      ...target,
+                      transform: transform
+                        ? {
+                            ...(transform.appearance ? { appearance: transform.appearance } : {}),
+                            ...(transform.annotations
+                              ? { annotations: transform.annotations }
+                              : {}),
+                          }
+                        : undefined,
+                    },
+                    owner.sheet.id,
+                  ) === true;
+              } else {
+                accepted = options.setImage({ ...target, transform }, owner.sheet.id) === true;
+              }
+            }
+          }
+          if (!accepted) throw new TypeError("Picture annotations could not be applied.");
+          if (annotation.value === dialog) annotation.value = undefined;
+          return true;
+        } catch {
+          if (annotation.value === dialog) dialog.error.value = "picture.operationFailed";
+          return false;
+        }
+      },
+    };
+    annotation.value = dialog;
+    return true;
   }
   function openCompression(): void {
     const owner = captureSources();
@@ -344,6 +397,7 @@ export function usePictureDialogSessions(options: {
     compression,
     batch,
     openAnnotation,
+    canAnnotate,
     openCompression,
     openBatchSize,
     clear,

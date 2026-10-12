@@ -1693,6 +1693,10 @@ export const enUS = {
     clearAnnotations: "Clear annotations",
     annotationHint:
       "Drag on the picture to annotate; click to place text. Maximum 100 annotations.",
+    annotationSourceEditor: "Original source",
+    annotationCurrentAppearance: "Current appearance",
+    annotationSourceHint:
+      "Draw on the original source. The preview shows annotations with the current crop and effects.",
     design: "Picture design",
     filters: "Filters",
     designPlain: "Simple frame",

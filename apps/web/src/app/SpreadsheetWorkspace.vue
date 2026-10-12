@@ -1997,6 +1997,8 @@ const pictureSourceRibbonOwner = computed(() => {
   return {
     key,
     canReplace: imageActions.canReplace(image.id, path),
+    canAnnotate: pictureDialogs.canAnnotate(),
+    annotate: () => current() && pictureDialogs.openAnnotation(),
     canConvert: pictureCellConversion.canConvert(path?.[0] ?? image.id, path),
     convert: () => current() && pictureCellConversion.request(path?.[0] ?? image.id, path),
     canCrop: sheetGridRef.value?.canCropPicture() ?? false,
@@ -2035,6 +2037,10 @@ const pictureDialogs = usePictureDialogSessions({
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
   hasAsset: (id) => Boolean(imageAssetUrls.value.get(id)),
   setImage: setFloatingImage,
+  setImages: (images, sheetId) =>
+    sheetId === activeSheet.value.id && pictureTools.replaceAll(images),
+  flushPendingEdits: () =>
+    cellEditSession.finish() && (sheetGridRef.value?.applyPendingPictureCrop() ?? false),
   compress: pictureAssetTools.compress,
   resize: pictureTools.resizeMany,
   resizeFeedback: () => pictureTools.sizeFeedback.value,
@@ -3175,6 +3181,8 @@ const gridInert = computed(
           :can-replace="pictureSourceRibbonOwner?.canReplace"
           :can-preview="pictureSourceRibbonOwner?.canPreview"
           :preview-handler="pictureSourceRibbonOwner?.preview"
+          :can-annotate="pictureSourceRibbonOwner?.canAnnotate"
+          :annotate-handler="pictureSourceRibbonOwner?.annotate"
           :can-crop="pictureSourceRibbonOwner?.canCrop"
           :crop-handler="pictureSourceRibbonOwner?.crop"
           @insert-image="imageActions.requestInsert"
@@ -3210,6 +3218,8 @@ const gridInert = computed(
           :preview-handler="pictureSourceRibbonOwner.preview"
           :convert-handler="pictureSourceRibbonOwner.convert"
           :can-convert="pictureSourceRibbonOwner.canConvert"
+          :can-annotate="pictureSourceRibbonOwner.canAnnotate"
+          :annotate-handler="pictureSourceRibbonOwner.annotate"
           :can-crop="pictureSourceRibbonOwner.canCrop"
           :crop-handler="pictureSourceRibbonOwner.crop"
           @compress="pictureDialogs.openCompression"
@@ -4534,6 +4544,10 @@ const gridInert = computed(
       :key="pictureAnnotation.dialogId"
       :image="pictureAnnotation.image"
       :source="imageAssetUrls.get(pictureAnnotation.image.assetId) ?? ''"
+      :frame-source="pictureAnnotation.frameSource"
+      :theme="session.workbook.theme"
+      :asset-urls="imageAssetUrls"
+      :confirm-handler="pictureAnnotation.confirm"
       :error="pictureAnnotation.error.value ? t(pictureAnnotation.error.value) : ''"
       @confirm="pictureAnnotation.confirm"
       @close="pictureAnnotation.close"

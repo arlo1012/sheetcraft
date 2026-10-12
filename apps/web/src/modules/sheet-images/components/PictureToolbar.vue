@@ -40,6 +40,8 @@ const props = withDefaults(
     canReplace?: boolean;
     canPreview?: boolean;
     previewHandler?: () => boolean;
+    canAnnotate?: boolean;
+    annotateHandler?: () => boolean;
     canCrop?: boolean;
     cropHandler?: () => boolean;
     appearanceHandler?: (patch: Partial<ImageAppearance> | undefined) => boolean;
@@ -49,7 +51,13 @@ const props = withDefaults(
     selectionCount: number;
     previewOnDoubleClick: boolean;
   }>(),
-  { canReplace: undefined, canCrop: undefined, canPreview: undefined, canConvert: undefined },
+  {
+    canReplace: undefined,
+    canCrop: undefined,
+    canPreview: undefined,
+    canConvert: undefined,
+    canAnnotate: undefined,
+  },
 );
 // Standalone source tools cannot establish a draft for an owned container.
 requireStandalonePicture(props.image);
@@ -206,6 +214,24 @@ const previewCallback = computed(() => {
       return;
     if (handler) handler();
     else emit("preview");
+  };
+});
+const annotationCallback = computed(() => {
+  const image = props.image,
+    owner = props.draftOwnerKey,
+    handler = props.annotateHandler;
+  return () => {
+    if (
+      props.disabled ||
+      props.selectionCount > 1 ||
+      (props.canAnnotate === undefined ? isFramed.value : !props.canAnnotate) ||
+      image !== props.image ||
+      owner !== props.draftOwnerKey ||
+      handler !== props.annotateHandler
+    )
+      return;
+    if (handler) handler();
+    else emit("annotate");
   };
 });
 const convertCallback = computed(() => {
@@ -365,9 +391,11 @@ function sourceAction(action: () => void): void {
       variant="tall"
       :label="t('picture.annotate')"
       :text="t('picture.annotate')"
-      :disabled="disabled || selectionCount > 1 || isFramed"
+      :disabled="
+        disabled || selectionCount > 1 || (canAnnotate === undefined ? isFramed : !canAnnotate)
+      "
       data-picture-tool="annotate"
-      @activate="sourceAction(() => emit('annotate'))"
+      @activate="annotationCallback"
       ><PencilLine
     /></RibbonButton>
     <RibbonButton
