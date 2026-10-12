@@ -52,6 +52,9 @@ export type SheetGraphicDrawing = DrawingBase & {
   shapeGeometry?: SheetShapeGeometry;
   /** Endpoint decoration for explicit standard line/connector geometry. */
   shapeLineEnds?: ShapeLineEnds;
+  /** Sparse mirroring of explicit standard geometry, before drawing rotation. */
+  shapeFlipX?: true;
+  shapeFlipY?: true;
   /** Sparse opt-in vertical text boxes; existing drawings retain horizontal text. */
   textDirection?: "vertical";
 };
@@ -196,6 +199,20 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   if (geometryField && value.kind !== "shape")
     throw new TypeError("Only a shape drawing may carry standard shape geometry.");
   const shapeGeometry = normalizeSheetShapeGeometry(geometryField?.value);
+  const normalizeFlip = (key: "shapeFlipX" | "shapeFlipY"): boolean => {
+    const field = Object.getOwnPropertyDescriptor(value, key);
+    if (!field) {
+      if (key in value) throw new TypeError("Shape flips must be own data fields.");
+      return false;
+    }
+    if (!("value" in field)) throw new TypeError("Shape flips cannot be accessors.");
+    if (value.kind !== "shape" || !shapeGeometry)
+      throw new TypeError("Shape flips require standard shape geometry.");
+    if (typeof field.value !== "boolean") throw new TypeError("Shape flips must be booleans.");
+    return field.value;
+  };
+  const shapeFlipX = normalizeFlip("shapeFlipX"),
+    shapeFlipY = normalizeFlip("shapeFlipY");
   const endsField = Object.getOwnPropertyDescriptor(value, "shapeLineEnds");
   if (endsField && (endsField.get || endsField.set))
     throw new TypeError("Shape line ends cannot be accessors.");
@@ -232,6 +249,8 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
             : { kind: value.kind }),
     ...(shapeGeometry ? { shapeGeometry } : {}),
     ...(shapeLineEnds ? { shapeLineEnds } : {}),
+    ...(shapeFlipX ? { shapeFlipX: true as const } : {}),
+    ...(shapeFlipY ? { shapeFlipY: true as const } : {}),
     ...(directionField ? { textDirection: "vertical" as const } : {}),
     name: value.name,
     anchor: { ...value.anchor },

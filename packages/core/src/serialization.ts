@@ -267,6 +267,7 @@ export type WorkbookSnapshotV52 = Omit<WorkbookSnapshotV51, "version"> & { versi
 export type WorkbookSnapshotV53 = Omit<WorkbookSnapshotV52, "version"> & { version: 53 };
 export type WorkbookSnapshotV54 = Omit<WorkbookSnapshotV53, "version"> & { version: 54 };
 export type WorkbookSnapshotV55 = Omit<WorkbookSnapshotV54, "version"> & { version: 55 };
+export type WorkbookSnapshotV56 = Omit<WorkbookSnapshotV55, "version"> & { version: 56 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -280,7 +281,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV52
   | WorkbookSnapshotV53
   | WorkbookSnapshotV54
-  | WorkbookSnapshotV55;
+  | WorkbookSnapshotV55
+  | WorkbookSnapshotV56;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -352,7 +354,8 @@ type SnapshotVersion =
   | 52
   | 53
   | 54
-  | 55;
+  | 55
+  | 56;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -1323,6 +1326,11 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   if (Array.isArray(record.drawings)) {
     for (const [index, drawing] of record.drawings.entries()) {
       const item = asRecord(drawing, path);
+      if (("shapeFlipX" in item || "shapeFlipY" in item) && version !== undefined && version < 56)
+        return fail(
+          `${path}.drawings[${index}].shapeFlipX`,
+          "Standard shape flips require snapshot version 56.",
+        );
       if (
         (Object.hasOwn(item, "shapeLineEnds") || Object.hasOwn(item, "textDirection")) &&
         version !== undefined &&
@@ -1564,6 +1572,15 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       )
     )
       version = 55;
+    // Infer last so mixed earlier features cannot lower the shape-flip protocol.
+    if (
+      Array.isArray(record.drawings) &&
+      record.drawings.some((drawing) => {
+        const item = asRecord(drawing, path);
+        return "shapeFlipX" in item || "shapeFlipY" in item;
+      })
+    )
+      version = 56;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -1667,53 +1684,60 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     version: sheets.some((sheet) =>
       sheet.drawings?.some(
         (drawing) =>
-          Object.hasOwn(drawing, "shapeLineEnds") || Object.hasOwn(drawing, "textDirection"),
+          drawing.kind === "shape" && (drawing.shapeFlipX === true || drawing.shapeFlipY === true),
       ),
     )
-      ? 55
+      ? 56
       : sheets.some((sheet) =>
-            sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapeGeometry")),
+            sheet.drawings?.some(
+              (drawing) =>
+                Object.hasOwn(drawing, "shapeLineEnds") || Object.hasOwn(drawing, "textDirection"),
+            ),
           )
-        ? 54
-        : sheets.some((sheet) => sheet.cells.some(hasCellPictureFrameFields))
-          ? 53
-          : sheets.some((sheet) => sheet.floatingImages.some(hasPictureCropShapeFields))
-            ? 52
-            : sheets.some(
-                  (sheet) =>
-                    sheet.cells.some(hasCellPicturePropertyFields) ||
-                    sheet.floatingImages.some(hasPicturePropertyFields),
-                )
-              ? 51
+        ? 55
+        : sheets.some((sheet) =>
+              sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapeGeometry")),
+            )
+          ? 54
+          : sheets.some((sheet) => sheet.cells.some(hasCellPictureFrameFields))
+            ? 53
+            : sheets.some((sheet) => sheet.floatingImages.some(hasPictureCropShapeFields))
+              ? 52
               : sheets.some(
                     (sheet) =>
-                      sheet.cells.some(hasCellDetailedStyleField) ||
-                      sheet.floatingImages.some(hasPictureDetailedStyleField),
+                      sheet.cells.some(hasCellPicturePropertyFields) ||
+                      sheet.floatingImages.some(hasPicturePropertyFields),
                   )
-                ? 50
+                ? 51
                 : sheets.some(
                       (sheet) =>
-                        sheet.cells.some(hasCellThemeEffectSuppressionField) ||
-                        sheet.floatingImages.some(hasPictureThemeEffectSuppressionField),
+                        sheet.cells.some(hasCellDetailedStyleField) ||
+                        sheet.floatingImages.some(hasPictureDetailedStyleField),
                     )
-                  ? 49
-                  : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
-                    ? 48
-                    : sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
-                      ? 47
-                      : sheets.some((sheet) =>
-                            sheet.cells.some(
-                              (cell) =>
-                                cell.content?.kind === "literal" &&
-                                Boolean(cell.content.fontRuns?.length),
-                            ),
-                          )
-                        ? 46
-                        : calculatedColumns
-                          ? 45
-                          : manualOrder
-                            ? 44
-                            : 43,
+                  ? 50
+                  : sheets.some(
+                        (sheet) =>
+                          sheet.cells.some(hasCellThemeEffectSuppressionField) ||
+                          sheet.floatingImages.some(hasPictureThemeEffectSuppressionField),
+                      )
+                    ? 49
+                    : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
+                      ? 48
+                      : sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
+                        ? 47
+                        : sheets.some((sheet) =>
+                              sheet.cells.some(
+                                (cell) =>
+                                  cell.content?.kind === "literal" &&
+                                  Boolean(cell.content.fontRuns?.length),
+                              ),
+                            )
+                          ? 46
+                          : calculatedColumns
+                            ? 45
+                            : manualOrder
+                              ? 44
+                              : 43,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1800,7 +1824,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 52 &&
     record.version !== 53 &&
     record.version !== 54 &&
-    record.version !== 55
+    record.version !== 55 &&
+    record.version !== 56
   ) {
     throw new WorkbookDomainError(
       {

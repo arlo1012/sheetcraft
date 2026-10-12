@@ -27,6 +27,8 @@ export type StandardShapeAppearance = Readonly<{
   strokeWidth: number;
   text?: string;
   color?: string;
+  shapeFlipX?: true;
+  shapeFlipY?: true;
 }>;
 export type StandardShapeSvgPath = Readonly<{
   d: string;
@@ -414,6 +416,23 @@ export function standardShapeContainsLocalPoint(
   return false;
 }
 
+/** Geometry-local reflection is its own inverse; text glyphs remain readable. */
+export function standardShapeFlipPoint(
+  drawing: Readonly<{ width: number; height: number; shapeFlipX?: true; shapeFlipY?: true }>,
+  point: Point,
+): Point {
+  return {
+    x: drawing.shapeFlipX ? drawing.width - point.x : point.x,
+    y: drawing.shapeFlipY ? drawing.height - point.y : point.y,
+  };
+}
+export function standardShapeSvgTransform(
+  drawing: Readonly<{ width: number; height: number; shapeFlipX?: true; shapeFlipY?: true }>,
+): string | undefined {
+  if (!drawing.shapeFlipX && !drawing.shapeFlipY) return;
+  return `translate(${drawing.shapeFlipX ? drawing.width : 0} ${drawing.shapeFlipY ? drawing.height : 0}) scale(${drawing.shapeFlipX ? -1 : 1} ${drawing.shapeFlipY ? -1 : 1})`;
+}
+
 /** Source-free rotation/inverse use the same frame-center convention as pictures. */
 export const standardShapeLocalToWorld = pictureFrameLocalToWorld;
 export const standardShapeWorldToLocal = pictureFrameWorldToLocal;
@@ -430,7 +449,10 @@ export function standardShapeContainsWorldPoint(
     return standardShapeContainsLocalPoint(
       geometry,
       appearance,
-      standardShapeWorldToLocal(rect, rotation, point),
+      standardShapeFlipPoint(
+        { ...appearance, width: rect.width, height: rect.height },
+        standardShapeWorldToLocal(rect, rotation, point),
+      ),
     );
   } catch {
     return false;
@@ -452,7 +474,13 @@ export function getStandardShapeWorldBounds(
       { x: bounds.left + bounds.width, y: bounds.top },
       { x: bounds.left + bounds.width, y: bounds.top + bounds.height },
       { x: bounds.left, y: bounds.top + bounds.height },
-    ].map((point) => standardShapeLocalToWorld(rect, rotation, point));
+    ].map((point) =>
+      standardShapeLocalToWorld(
+        rect,
+        rotation,
+        standardShapeFlipPoint({ ...appearance, width: rect.width, height: rect.height }, point),
+      ),
+    );
     const projected = unionBounds(
       points.map((point) => ({ left: point.x, top: point.y, width: 0, height: 0 })),
     )!;

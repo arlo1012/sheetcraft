@@ -5,6 +5,8 @@ import PivotInsertTools from "../../pivot-tables/components/PivotInsertTools.vue
 import ChartInsertTools from "../../charts/components/ChartInsertTools.vue";
 import type { ChartType } from "@sheetcraft/core/sheet-charts";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import ShapeInsertMenu from "../../sheet-drawings/components/ShapeInsertMenu.vue";
+import type { ShapeGalleryChoice } from "../../sheet-drawings/shape-gallery";
 import {
   Camera,
   PanelsTopLeft,
@@ -38,6 +40,8 @@ defineProps<{
   hasTable: boolean;
   editSessionId?: string;
   insertSymbolTextHandler?: (payload: SymbolInsertion) => boolean;
+  insertShapeHandler?: (choice: ShapeGalleryChoice, continuous: boolean) => boolean;
+  shapeOwnerId?: string | number;
 }>();
 const emit = defineEmits<{
   insertPivot: [chart: boolean];
@@ -116,7 +120,15 @@ const { t } = useAppI18n();
         @activate="emit('captureScreen')"
         ><Scan
       /></RibbonButton>
+      <ShapeInsertMenu
+        v-if="insertShapeHandler"
+        :disabled="imageDisabled"
+        :owner-id="shapeOwnerId"
+        :edit-session-id="editSessionId"
+        :handler="insertShapeHandler"
+      />
       <RibbonButton
+        v-else
         variant="tall"
         :label="t('drawing.shape')"
         :text="t('drawing.shape')"

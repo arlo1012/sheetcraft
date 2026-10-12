@@ -1,3 +1,4 @@
+import { createGraphicDrawing } from "./drawing-defaults";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
@@ -27,35 +28,13 @@ export function useDrawingActions(options: {
   function insert(kind: SheetGraphicKind, direction?: "horizontal" | "vertical") {
     const target = targets.prepare();
     if (!target) return;
-    const initial: SheetGraphicDrawing = {
-      id: idFactory("drawing"),
+    const initial = createGraphicDrawing(
+      idFactory("drawing"),
       kind,
-      name: options.name(kind),
-      anchor: { ...options.getAddress() },
-      offsetX: 8,
-      offsetY: 8,
-      width: kind === "icon" ? 80 : 240,
-      height: kind === "icon" ? 80 : 120,
-      text:
-        kind === "equation"
-          ? "x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}"
-          : kind === "textBox" || kind === "wordArt"
-            ? options.name(kind)
-            : "",
-      shape: kind === "icon" ? "star" : "rectangle",
-      ...(kind === "shape" ? { shapeGeometry: { preset: "rect" as const } } : {}),
-      ...(kind === "textBox" && direction === "vertical"
-        ? { textDirection: "vertical" as const }
-        : {}),
-      fill: kind === "shape" || kind === "icon" ? "#dbeafe" : "transparent",
-      stroke: "#2563eb",
-      strokeWidth: kind === "textBox" ? 0 : 1,
-      color: "#1e3a8a",
-      fontSize: kind === "wordArt" ? 36 : 20,
-      bold: kind === "wordArt",
-      italic: false,
-      rotation: 0,
-    };
+      options.name(kind),
+      options.getAddress(),
+      direction,
+    );
     targets.open(target, initial, (current, next) => confirm(next, current));
   }
   function requestTextBox(direction: "horizontal" | "vertical", target = dialog.value): boolean {

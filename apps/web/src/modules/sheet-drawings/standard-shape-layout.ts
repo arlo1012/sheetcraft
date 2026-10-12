@@ -1,3 +1,4 @@
+import { isShapeLinePreset } from "@sheetcraft/core/shape-line-ends";
 import { pictureFrameLocalToWorld, type PictureFrameRect } from "@sheetcraft/core/picture-frame";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
@@ -8,7 +9,11 @@ import {
 } from "@sheetcraft/sheet-engine/floating-image-layout";
 import { getPicturePaneTranslation } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
-import { getStandardShapeGeometry, getStandardShapeWorldBounds } from "./shape-geometry";
+import {
+  getStandardShapeGeometry,
+  getStandardShapeWorldBounds,
+  standardShapeFlipPoint,
+} from "./shape-geometry";
 import { getShapeEndPaint, standardShapeAppearance } from "./shape-line-paint";
 
 export function standardShapeResizeRect(
@@ -17,10 +22,15 @@ export function standardShapeResizeRect(
   direction: FloatingImageResizeDirection,
   delta: Readonly<{ x: number; y: number }>,
   preserveRatio = false,
+  minimum = 16,
 ): PictureFrameRect | undefined {
   if (
     !["n", "s", "e", "w", "nw", "ne", "sw", "se"].includes(direction) ||
-    ![rect.x, rect.y, rect.width, rect.height, rotation, delta.x, delta.y].every(Number.isFinite) ||
+    ![rect.x, rect.y, rect.width, rect.height, rotation, delta.x, delta.y, minimum].every(
+      Number.isFinite,
+    ) ||
+    minimum < 1 ||
+    minimum > 16384 ||
     rect.width <= 0 ||
     rect.height <= 0
   )
@@ -40,14 +50,14 @@ export function standardShapeResizeRect(
       sy = height / rect.height;
     const request = Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy;
     const scale = Math.max(
-      Math.max(16 / rect.width, 16 / rect.height),
+      Math.max(minimum / rect.width, minimum / rect.height),
       Math.min(Math.min(16384 / rect.width, 16384 / rect.height), request),
     );
     width = rect.width * scale;
     height = rect.height * scale;
   } else {
-    if (horizontal) width = Math.max(16, Math.min(16384, width));
-    if (vertical) height = Math.max(16, Math.min(16384, height));
+    if (horizontal) width = Math.max(minimum, Math.min(16384, width));
+    if (vertical) height = Math.max(minimum, Math.min(16384, height));
   }
   const fx = direction.includes("w") ? 1 : direction.includes("e") ? 0 : 0.5;
   const fy = direction.includes("n") ? 1 : direction.includes("s") ? 0 : 0.5;
@@ -71,7 +81,15 @@ export function resizeStandardShapeBy(
 ): SheetGraphicDrawing | undefined {
   const rect = getFloatingImageSheetRect(drawing, layout);
   const next =
-    rect && standardShapeResizeRect(rect, drawing.rotation, direction, delta, preserveRatio);
+    rect &&
+    standardShapeResizeRect(
+      rect,
+      drawing.rotation,
+      direction,
+      delta,
+      preserveRatio,
+      drawing.shapeGeometry && isShapeLinePreset(drawing.shapeGeometry.preset) ? 1 : 16,
+    );
   return next ? (reanchorFloatingImageAtSheetRect(drawing, next, layout) ?? undefined) : undefined;
 }
 function intersect(left: PictureFrameRect, right: PictureFrameRect): PictureFrameRect | undefined {
@@ -110,7 +128,9 @@ export function getStandardShapeViewportFragments(
         { x: paint.bounds.x + paint.bounds.width, y: paint.bounds.y },
         { x: paint.bounds.x + paint.bounds.width, y: paint.bounds.y + paint.bounds.height },
         { x: paint.bounds.x, y: paint.bounds.y + paint.bounds.height },
-      ].map((p) => pictureFrameLocalToWorld(rect, drawing.rotation, p)),
+      ].map((p) =>
+        pictureFrameLocalToWorld(rect, drawing.rotation, standardShapeFlipPoint(drawing, p)),
+      ),
     );
   }
   if (selected) {
@@ -121,7 +141,7 @@ export function getStandardShapeViewportFragments(
         { x: drawing.width, y: drawing.height },
         { x: 0, y: drawing.height },
         { x: drawing.width / 2, y: -24 },
-        ...shape.handles.map((h) => h.position),
+        ...shape.handles.map((h) => standardShapeFlipPoint(drawing, h.position)),
       ].map((p) => pictureFrameLocalToWorld(rect, drawing.rotation, p)),
     );
   }

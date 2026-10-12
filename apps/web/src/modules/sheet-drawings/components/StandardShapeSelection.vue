@@ -7,7 +7,7 @@ import type {
   FloatingImageViewportFragment,
 } from "@sheetcraft/sheet-engine/floating-image-layout";
 import type { Rect } from "@sheetcraft/sheet-engine/geometry";
-import { getStandardShapeGeometry } from "../shape-geometry";
+import { getStandardShapeGeometry, standardShapeFlipPoint } from "../shape-geometry";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
@@ -68,7 +68,9 @@ const adjustments = computed(
   () =>
     getStandardShapeGeometry(props.drawing.shapeGeometry, props.drawing.width, props.drawing.height)
       ?.handles.flatMap((h, index) =>
-        h.fields.some((f) => f.disabled) ? [] : [{ index, point: point(h.position) }],
+        h.fields.some((f) => f.disabled)
+          ? []
+          : [{ index, point: point(standardShapeFlipPoint(props.drawing, h.position)) }],
       )
       .filter((h) => owns(h.point)) ?? [],
 );

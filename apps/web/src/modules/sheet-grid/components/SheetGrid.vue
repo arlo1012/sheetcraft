@@ -26,6 +26,9 @@ import { isPivotValueCell, type SheetPivotTable } from "@sheetcraft/core/pivot-t
 import PivotEmptyReports from "../../pivot-tables/components/PivotEmptyReports.vue";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer.vue";
+import SheetShapeCreationLayer from "../../sheet-drawings/components/SheetShapeCreationLayer.vue";
+import type { ShapeCreationRequest } from "../../sheet-drawings/useShapeCreation";
+import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import { canEditCell, canEditRange, canSelectCell, canUseSheetPermission } from "@sheetcraft/core";
 import {
   computed,
@@ -296,6 +299,9 @@ const props = withDefaults(
     loadingImageAssetIds?: ReadonlySet<string>;
     missingImageAssetIds?: ReadonlySet<string>;
     readOnly?: boolean;
+    shapeCreationRequest?: ShapeCreationRequest;
+    shapeCreationCommit?: (request: ShapeCreationRequest, drawing: SheetGraphicDrawing) => boolean;
+    shapeCreationCancel?: (request: ShapeCreationRequest) => void;
     gridId?: string;
     externalHorizontalScrollbar?: boolean;
     zoom?: number;
@@ -1001,6 +1007,28 @@ const selectedRange = computed(() =>
     columnCount: renderExtent.value.columnCount,
   }),
 );
+const selectedShapeDrawingId = ref<string | null>(null);
+watch(
+  () => props.shapeCreationRequest,
+  (next, previous) => {
+    const focused = document.activeElement;
+    if (
+      !previous ||
+      next ||
+      !(focused instanceof Element) ||
+      !focused.closest("[data-shape-creation-layer]")
+    )
+      return;
+    void nextTick(() => {
+      if (
+        !props.shapeCreationRequest &&
+        (document.activeElement === document.body || document.activeElement === focused)
+      )
+        editorRef.value?.focus();
+    });
+  },
+);
+
 const objectsReadOnly = computed(
   () =>
     props.readOnly &&
@@ -2304,6 +2332,7 @@ const {
   getRange: () => selectedRange.value,
   getCanFill: () =>
     Boolean(props.applyFill) &&
+    !props.shapeCreationRequest &&
     !selectionReadOnly.value &&
     !isEditing.value &&
     !isComposing.value &&
@@ -3153,7 +3182,7 @@ function onGridKeydown(event: KeyboardEvent): void {
   if (
     event.target instanceof Element &&
     event.target.closest(
-      "[data-floating-image-id], [data-owned-picture-selected], [data-sheet-drawing-id]",
+      "[data-floating-image-id], [data-owned-picture-selected], [data-sheet-drawing-id], [data-shape-creation-layer]",
     )
   ) {
     handleHistoryShortcut(event);
@@ -4077,6 +4106,10 @@ defineExpose({
     props.sheet === sheet ? pictureFrameContext.value : undefined,
   previewSelectedPicture,
   canPreviewPicture,
+  selectDrawing: (id: string | null) => {
+    selectFloatingImage(null);
+    selectedShapeDrawingId.value = id;
+  },
   selectFloatingImages: (ids: string[]) => {
     if (ids.length && !canEditPictureSelection(props.sheet, expandFloatingImageSelection(ids)))
       return;
@@ -4369,7 +4402,7 @@ defineExpose({
       @outline-level="emit('outlineLevel', $event)"
     />
     <button
-      v-if="fillHandlePoint"
+      v-if="fillHandlePoint && !shapeCreationRequest"
       type="button"
       class="sheet-grid__fill-handle"
       :style="fillHandleStyle"
@@ -4394,6 +4427,28 @@ defineExpose({
       fillPreviewLabel
     }}</span>
     <div
+      v-if="shapeCreationRequest && shapeCreationCommit && shapeCreationCancel"
+      class="sheet-grid__shape-creation-controls"
+      :style="{
+        left: `${headerSize.width}px`,
+        top: `${headerSize.height}px`,
+        width: `${viewportSize.width}px`,
+        height: `${viewportSize.height}px`,
+      }"
+    >
+      <SheetShapeCreationLayer
+        v-if="shapeCreationRequest && shapeCreationCommit && shapeCreationCancel"
+        :request="shapeCreationRequest"
+        :commit="shapeCreationCommit"
+        :cancel="shapeCreationCancel"
+        :layout="layout"
+        :scale="scale"
+        :revision="workbookRevision"
+        :read-only="objectsReadOnly"
+        :locale="locale"
+      />
+    </div>
+    <div
       class="sheet-grid__image-controls"
       :style="{
         left: `${headerSize.width}px`,
@@ -4406,6 +4461,7 @@ defineExpose({
         @control-change="(id, value) => emit('changeControl', id, value)"
         :key="sheet.id"
         :drawings="sheet.drawings ?? []"
+        :selected-drawing-id="selectedShapeDrawingId"
         :theme="theme"
         :image-asset-urls="imageAssetUrls"
         :locale="locale"
@@ -4730,6 +4786,12 @@ defineExpose({
 
   &__canvas {
     position: relative;
+  }
+
+  &__shape-creation-controls {
+    position: absolute;
+    z-index: 20;
+    pointer-events: none;
   }
 
   &__image-controls {

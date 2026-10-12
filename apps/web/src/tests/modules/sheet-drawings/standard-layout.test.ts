@@ -8,6 +8,7 @@ import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-lay
 import {
   getStandardShapeViewportFragments,
   standardShapeResizeRect,
+  resizeStandardShapeBy,
 } from "../../../modules/sheet-drawings/standard-shape-layout";
 const shape: SheetGraphicDrawing = {
   id: "s",
@@ -121,4 +122,26 @@ test("side resize never grows the valid untouched thin axis", () => {
   expect(
     standardShapeResizeRect({ x: 100, y: 100, width: 1, height: 1 }, 37, "se", { x: 0, y: 0 }),
   ).toEqual({ x: 100, y: 100, width: 1, height: 1 });
+});
+
+test("created thin line corner resize preserves its one-pixel axis and flip direction", () => {
+  const v = layout();
+  const line: SheetGraphicDrawing = {
+    ...shape,
+    width: 120,
+    height: 1,
+    rotation: 0,
+    shapeGeometry: { preset: "line" },
+    shapeFlipX: true,
+    shapeFlipY: true,
+  };
+  expect(resizeStandardShapeBy(line, "se", { x: 10, y: 0 }, v)).toMatchObject({
+    width: 130,
+    height: 1,
+    shapeFlipX: true,
+    shapeFlipY: true,
+  });
+  expect(
+    resizeStandardShapeBy({ ...line, width: 1, height: 120 }, "se", { x: 0, y: 10 }, v),
+  ).toMatchObject({ width: 1, height: 130 });
 });

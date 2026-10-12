@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   computed,
+  nextTick,
   onBeforeUnmount,
   onMounted,
   ref,
@@ -29,12 +30,14 @@ import {
   getStandardShapeGeometry,
   moveStandardShapeAdjustment,
   standardShapeWorldToLocal,
+  standardShapeFlipPoint,
 } from "../shape-geometry";
 import { getStandardShapeViewportFragments, resizeStandardShapeBy } from "../standard-shape-layout";
 import DrawingContent from "./DrawingContent.vue";
 import { shapeDrawingContainsWorldPoint } from "../shape-line-paint";
 const props = defineProps<{
   drawings: readonly SheetDrawing[];
+  selectedDrawingId?: string | null;
   sheet?: Sheet;
   evaluator?: SheetEvaluator;
   revision?: number;
@@ -55,6 +58,20 @@ const emit = defineEmits<{
 }>();
 const layerElement = ref<HTMLElement>();
 const selectedId = ref<string | null>(null);
+watch(
+  () => props.selectedDrawingId,
+  (id) => {
+    selectedId.value = id ?? null;
+    if (id)
+      void nextTick(() => {
+        const element = [
+          ...(layerElement.value?.querySelectorAll<HTMLElement>("[data-sheet-drawing-id]") ?? []),
+        ].find((item) => item.dataset.sheetDrawingId === id);
+        element?.focus({ preventScroll: true });
+      });
+  },
+  { immediate: true },
+);
 function isStandard(drawing: SheetDrawing): drawing is SheetGraphicDrawing {
   return drawing.kind === "shape" && !!drawing.shapeGeometry;
 }
@@ -161,7 +178,10 @@ function start(
       rotation = ((((rotation + 180) % 360) + 360) % 360) - 180;
       preview.value = { ...drawing, rotation };
     } else if (isStandard(drawing) && mode === "adjust" && index !== undefined) {
-      const local = standardShapeWorldToLocal(fragment.rect, drawing.rotation, target);
+      const local = standardShapeFlipPoint(
+        drawing,
+        standardShapeWorldToLocal(fragment.rect, drawing.rotation, target),
+      );
       const geometry = moveStandardShapeAdjustment(
         drawing.shapeGeometry!,
         drawing.width,
@@ -215,7 +235,10 @@ function nudgeAdjustment(
     drawing.width,
     drawing.height,
     index,
-    { x: position.x + delta.x, y: position.y + delta.y },
+    {
+      x: position.x + (drawing.shapeFlipX ? -delta.x : delta.x),
+      y: position.y + (drawing.shapeFlipY ? -delta.y : delta.y),
+    },
   );
   if (geometry) emit("update", { ...drawing, shapeGeometry: geometry });
 }

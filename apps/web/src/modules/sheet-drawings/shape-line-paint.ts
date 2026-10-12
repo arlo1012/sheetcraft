@@ -5,7 +5,11 @@ import {
   type EvaluatedShapePresetGeometry,
 } from "@sheetcraft/core/shape-presets";
 import { type PictureFrameRect } from "@sheetcraft/core/picture-frame";
-import { standardShapeContainsLocalPoint, standardShapeWorldToLocal } from "./shape-geometry";
+import {
+  standardShapeContainsLocalPoint,
+  standardShapeWorldToLocal,
+  standardShapeFlipPoint,
+} from "./shape-geometry";
 type Point = Readonly<{ x: number; y: number }>;
 export type ShapeEndPaint = Readonly<{
   d: string;
@@ -174,7 +178,10 @@ export function shapeDrawingContainsWorldPoint(
   rect: PictureFrameRect,
   point: Point,
 ): boolean {
-  const local = standardShapeWorldToLocal(rect, drawing.rotation, point);
+  const local = standardShapeFlipPoint(
+    drawing,
+    standardShapeWorldToLocal(rect, drawing.rotation, point),
+  );
   return (
     standardShapeContainsLocalPoint(geometry, standardShapeAppearance(drawing), local) ||
     getShapeEndPaint(drawing, geometry).some((p) => p.contains(local))

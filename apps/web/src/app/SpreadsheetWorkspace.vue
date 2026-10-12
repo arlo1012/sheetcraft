@@ -148,6 +148,8 @@ import { ensureCellFontResource } from "../shared/cell-text/font-resources";
 import { useSheetDisplaySnapshot } from "../modules/sheet-grid/canvas/sheet-display-snapshot";
 import { DEFAULT_CELL_FONT_FAMILY } from "@sheetcraft/core/style";
 import { captureScreen } from "../modules/insert-tools/captureScreen";
+import { useShapeCreation } from "../modules/sheet-drawings/useShapeCreation";
+import type { ShapeGalleryChoice } from "../modules/sheet-drawings/shape-gallery";
 import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
 import DrawingEditorDialog from "../modules/sheet-drawings/components/DrawingEditorDialog.vue";
 import InsertToolbar from "../modules/insert-tools/components/InsertToolbar.vue";
@@ -1763,6 +1765,32 @@ const drawingActions = useDrawingActions({
   name: (kind) => t(`drawing.${kind}`),
 });
 const { dialog: drawingDialog, editing: editingDrawing } = drawingActions;
+const shapeInteractionBlocked = ref(false);
+const shapeCreation = useShapeCreation({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  getAddress: () => activeAddress.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || shapeInteractionBlocked.value,
+  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+  name: (choice) => choice.label[locale.value === "zh-CN" ? "zh-CN" : "en-US"],
+  onStart: () => {
+    drawingActions.close();
+    sheetGridRef.value?.selectDrawing(null);
+  },
+  execute: executeCommand,
+  onCreated: (drawing) => {
+    if (!shapeCreation.request.value) sheetGridRef.value?.selectDrawing(drawing.id);
+  },
+});
+const shapeInsertHandler = computed(() => {
+  const owner = shapeCreation.captureOwner();
+  void workbookRevision.value;
+  return (choice: ShapeGalleryChoice, continuous: boolean) =>
+    shapeCreation.start(choice, continuous, owner);
+});
+
 const drawingTextBoxHandler = computed(() => {
   const target = drawingDialog.value;
   return (direction: "horizontal" | "vertical") => drawingActions.requestTextBox(direction, target);
@@ -3074,6 +3102,14 @@ const gridInert = computed(
     (pageSetupVisible.value && !pickingPageSetupRange.value) ||
     !!modalValidationFeedback.value,
 );
+watch(
+  gridInert,
+  (blocked) => {
+    shapeInteractionBlocked.value = blocked;
+    if (blocked) shapeCreation.cancel();
+  },
+  { immediate: true, flush: "sync" },
+);
 </script>
 
 <template>
@@ -3418,6 +3454,8 @@ const gridInert = computed(
           @insert-control="controlActions.open()"
           @insert-attachment="attachmentActions.requestInsert"
           @insert-drawing="drawingActions.insert"
+          :insert-shape-handler="shapeInsertHandler"
+          :shape-owner-id="`${workbookGeneration}:${activeSheet.id}:${workbookRevision}`"
           @insert-camera="cameraActions.open()"
           @insert-chart="chartActions.insert"
           :sparkline-disabled="
@@ -4513,6 +4551,9 @@ const gridInert = computed(
               selectedPictureIds = ids;
             }
           "
+          :shape-creation-request="shapeCreation.request.value"
+          :shape-creation-commit="shapeCreation.commit"
+          :shape-creation-cancel="shapeCreation.cancel"
           @update-drawing="drawingActions.update"
           @delete-drawing="drawingActions.remove"
           @edit-drawing="editSheetDrawing"

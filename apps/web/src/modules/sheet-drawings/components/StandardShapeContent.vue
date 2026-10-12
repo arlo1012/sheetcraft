@@ -5,6 +5,8 @@ import {
   getStandardShapeGeometry,
   getStandardShapeSvgPaths,
   standardShapeFillColor,
+  standardShapeSvgTransform,
+  standardShapeFlipPoint,
 } from "../shape-geometry";
 import { standardShapeAppearance, getShapeEndPaint } from "../shape-line-paint";
 import { useAppI18n } from "../../../shared/i18n";
@@ -19,9 +21,13 @@ const ends = computed(() => getShapeEndPaint(props.drawing, geometry.value));
 const textStyle = computed<CSSProperties | undefined>(() => {
   const rect = geometry.value?.textRect;
   if (!rect || rect.right <= rect.left || rect.bottom <= rect.top) return;
+  const p = standardShapeFlipPoint(props.drawing, {
+    x: props.drawing.shapeFlipX ? rect.right : rect.left,
+    y: props.drawing.shapeFlipY ? rect.bottom : rect.top,
+  });
   return {
-    left: `${(rect.left / props.drawing.width) * 100}%`,
-    top: `${(rect.top / props.drawing.height) * 100}%`,
+    left: `${(p.x / props.drawing.width) * 100}%`,
+    top: `${(p.y / props.drawing.height) * 100}%`,
     width: `${((rect.right - rect.left) / props.drawing.width) * 100}%`,
     height: `${((rect.bottom - rect.top) / props.drawing.height) * 100}%`,
     color: props.drawing.color,
@@ -39,37 +45,39 @@ const textStyle = computed<CSSProperties | undefined>(() => {
         preserveAspectRatio="none"
         aria-hidden="true"
       >
-        <path
-          v-for="(path, index) in paths"
-          :key="index"
-          :d="path.d"
-          :fill="
-            path.filled && path.fillMode !== 'none' && appearance.fill !== 'transparent'
-              ? standardShapeFillColor(appearance.fill, path.fillMode)
-              : 'none'
-          "
-          :stroke="
-            path.stroke && drawing.strokeWidth > 0 && drawing.stroke !== 'transparent'
-              ? drawing.stroke
-              : 'none'
-          "
-          :stroke-width="drawing.strokeWidth"
-          fill-rule="nonzero"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          :data-standard-shape-path="index"
-        />
-        <path
-          v-for="(end, index) in ends"
-          :key="`end-${index}`"
-          :d="end.d"
-          :fill="end.filled ? drawing.stroke : 'none'"
-          :stroke="drawing.stroke"
-          :stroke-width="drawing.strokeWidth"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          :data-shape-line-end="index"
-        />
+        <g :transform="standardShapeSvgTransform(drawing)">
+          <path
+            v-for="(path, index) in paths"
+            :key="index"
+            :d="path.d"
+            :fill="
+              path.filled && path.fillMode !== 'none' && appearance.fill !== 'transparent'
+                ? standardShapeFillColor(appearance.fill, path.fillMode)
+                : 'none'
+            "
+            :stroke="
+              path.stroke && drawing.strokeWidth > 0 && drawing.stroke !== 'transparent'
+                ? drawing.stroke
+                : 'none'
+            "
+            :stroke-width="drawing.strokeWidth"
+            fill-rule="nonzero"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            :data-standard-shape-path="index"
+          />
+          <path
+            v-for="(end, index) in ends"
+            :key="`end-${index}`"
+            :d="end.d"
+            :fill="end.filled ? drawing.stroke : 'none'"
+            :stroke="drawing.stroke"
+            :stroke-width="drawing.strokeWidth"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            :data-shape-line-end="index"
+          />
+        </g>
       </svg>
       <div
         v-if="drawing.text.trim() && drawing.color !== 'transparent' && textStyle"
