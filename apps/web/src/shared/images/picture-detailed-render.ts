@@ -16,6 +16,7 @@ import {
   getPictureProjectivePaintBounds,
 } from "./picture-projective-raster";
 import { resolvePictureDetailedPaintStyle } from "./picture-detailed-paint-style";
+import type { PictureShapeSourceProfile } from "./picture-shape-mask";
 import type { DrawingThemeEffects } from "./picture-inherited-effects";
 
 export type PicturePaintResources = Readonly<{
@@ -40,6 +41,7 @@ export function getPictureRasterProjection(
   style: PictureDetailedStyle,
   theme: WorkbookTheme,
   shapeGeometry?: ShapePresetGeometry,
+  shapeSource?: PictureShapeSourceProfile,
 ) {
   const format = style.format3d?.kind === "value" ? style.format3d.value : undefined;
   const rotation = style.rotation3d?.kind === "value" ? style.rotation3d.value : undefined;
@@ -64,6 +66,7 @@ export function getPictureRasterProjection(
         ),
         shapeGeometry,
         density,
+        shapeSource,
       ),
     projectSurface: (input, density, frame) =>
       createPictureProjectiveRaster({
@@ -73,6 +76,7 @@ export function getPictureRasterProjection(
         format,
         density,
         shapeGeometry,
+        shapeSource,
       }),
   };
   return projection;

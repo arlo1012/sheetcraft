@@ -1,5 +1,6 @@
 import type { PictureFormat3d } from "@sheetcraft/core/picture-detailed-style";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import type { PictureShapeSourceProfile } from "./picture-shape-mask";
 import type { ShapePresetGeometry } from "@sheetcraft/core/shape-presets";
 import {
   createPictureRgbaSurface,
@@ -84,6 +85,7 @@ export function getPictureProjectivePaintBounds(
   contourWidthPx = 0,
   shapeGeometry?: ShapePresetGeometry,
   density = 1,
+  shapeSource?: PictureShapeSourceProfile,
 ): PictureProjectiveBounds {
   return shapeGeometry
     ? preflightPictureShapeProjectiveRaster(
@@ -92,6 +94,7 @@ export function getPictureProjectivePaintBounds(
         contourWidthPx,
         shapeGeometry,
         density,
+        shapeSource,
       ).bounds
     : projectedPaintBounds(geometry, sourceBounds, contourWidthPx, geometry.visualBounds);
 }
@@ -215,6 +218,7 @@ export type PictureProjectiveRasterOptions = Readonly<{
   density: number;
   /** Evaluated logical-pixel geometry. Never a preset name/XML or a layout bbox. */
   shapeGeometry?: ShapePresetGeometry;
+  shapeSource?: PictureShapeSourceProfile;
 }>;
 
 function coordinates(
@@ -279,11 +283,12 @@ export function preflightPictureShapeProjectiveRaster(
   contourWidthPx: number,
   shapeGeometry: ShapePresetGeometry,
   density = 1,
+  shapeSource?: PictureShapeSourceProfile,
 ): PictureShapeProjectiveRasterPreflight {
   checkBounds(sourceBounds);
   if (!Number.isFinite(contourWidthPx) || contourWidthPx < 0 || contourWidthPx > 65536)
     throw new RangeError("Picture projected contour width is invalid.");
-  const shape = createPictureShapeExtrusion(geometry, shapeGeometry, density);
+  const shape = createPictureShapeExtrusion(geometry, shapeGeometry, density, shapeSource);
   const bounds = projectedPaintBounds(geometry, sourceBounds, contourWidthPx, shape.bounds);
   const rasterWidth = bounds.right - bounds.left,
     rasterHeight = bounds.bottom - bounds.top;
@@ -527,6 +532,7 @@ export function createPictureProjectiveRaster(
         width,
         options.shapeGeometry,
         density,
+        options.shapeSource,
       )
     : undefined;
   const bounds =

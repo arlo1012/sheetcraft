@@ -4,6 +4,7 @@ import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import StandardShapeContent from "./StandardShapeContent.vue";
+import type { ShapeDetailedPresentation } from "../shape-detailed-presentation";
 const FormControlContent = defineAsyncComponent(
   () => import("../../form-controls/components/FormControlContent.vue"),
 );
@@ -24,8 +25,12 @@ const props = defineProps<{
   imageAssetUrls?: ReadonlyMap<string, string>;
   locale?: string;
   dateSystem?: "1900" | "1904";
+  density?: number;
 }>();
-const emit = defineEmits<{ controlChange: [value: unknown] }>();
+const emit = defineEmits<{
+  controlChange: [value: unknown];
+  detailedPaint: [presentation: ShapeDetailedPresentation | undefined];
+}>();
 const textStyle = computed(() => ({
   color: props.drawing.color,
   fontSize: `${props.drawing.fontSize}px`,
@@ -36,8 +41,15 @@ const textStyle = computed(() => ({
 <template>
   <div class="drawing-content" :style="{ transform: `rotate(${drawing.rotation}deg)` }">
     <StandardShapeContent
-      v-if="drawing.kind === 'shape' && (drawing.shapeGeometry || drawing.shapePath)"
+      v-if="
+        drawing.kind === 'shape' &&
+        (drawing.shapeGeometry || drawing.shapePath || drawing.shapeStyle)
+      "
       :drawing="drawing"
+      :theme="theme"
+      :asset-urls="imageAssetUrls"
+      :density="density"
+      @paint="emit('detailedPaint', $event)"
     />
     <svg
       v-else-if="drawing.kind === 'shape' || drawing.kind === 'icon'"
@@ -135,7 +147,12 @@ const textStyle = computed(() => ({
     />
     <div
       v-else
-      v-show="!(drawing.kind === 'shape' && (drawing.shapeGeometry || drawing.shapePath))"
+      v-show="
+        !(
+          drawing.kind === 'shape' &&
+          (drawing.shapeGeometry || drawing.shapePath || drawing.shapeStyle)
+        )
+      "
       class="drawing-content__text"
       :class="{ 'is-word-art': drawing.kind === 'wordArt' }"
       :style="[
@@ -145,7 +162,10 @@ const textStyle = computed(() => ({
           : {},
         drawing.kind === 'textBox' || drawing.kind === 'wordArt' ? { lineHeight: 'normal' } : {},
         drawing.kind === 'textBox'
-          ? { background: drawing.fill, border: `${drawing.strokeWidth}px solid ${drawing.stroke}` }
+          ? {
+              background: drawing.fill,
+              border: `${drawing.strokeWidth}px solid ${drawing.stroke}`,
+            }
           : {},
       ]"
     >

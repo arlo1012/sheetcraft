@@ -29,6 +29,8 @@ export const drawingsZhCN = {
   "drawing.preview": "预览",
   "drawing.legacyGeometry": "旧版路径保持不变。选择图库形状将使用标准几何。",
   "drawing.changeRejected": "无法切换编辑器，当前草稿已保留。",
+  "drawing.projectedTextUnavailable":
+    "形状三维文字尚未接通。添加文字前请先移除三维效果；现有文字和外观都会保留。",
   "drawing.geometryUnavailable": "无法显示此形状的几何。",
   "drawing.adjustShape": "调整形状 {index}",
   "drawing.lineStart": "线条起点（方向键微调，Shift 加大步长）",

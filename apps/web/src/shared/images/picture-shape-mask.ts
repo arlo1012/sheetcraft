@@ -1,5 +1,7 @@
 import {
   flattenShapePath,
+  FREE_SHAPE_PATH_WORK_BUDGET,
+  type ShapePathWorkBudget,
   getShapePresetFillBounds,
   type ShapePolyline,
   type ShapePresetGeometry,
@@ -23,6 +25,35 @@ export const PICTURE_SHAPE_MASK_LIMITS = Object.freeze({
   side: 4096,
   pixels: 4_000_000,
 });
+/** Opt-in actual drawing source. Picture crop masks retain their existing defaults. */
+export type PictureShapeSourceProfile = Readonly<{
+  kind: "drawing";
+  workBudget?: ShapePathWorkBudget;
+  /** Endpoint polygons/curves use the line paint, never the shape fill. */
+  lineDecorations?: readonly ShapePresetPath[];
+}>;
+export function pictureShapeWorkBudget(
+  profile?: PictureShapeSourceProfile,
+): ShapePathWorkBudget | undefined {
+  if (!profile) return undefined;
+  if (profile.kind !== "drawing") throw new TypeError("Unknown numeric shape source profile.");
+  const budget = profile.workBudget;
+  if (
+    budget &&
+    (budget.commands !== FREE_SHAPE_PATH_WORK_BUDGET.commands ||
+      budget.points !== FREE_SHAPE_PATH_WORK_BUDGET.points)
+  )
+    throw new RangeError("Drawing source accepts only the explicit free-path work budget.");
+  return budget;
+}
+export function validatePictureShapeLineDecorations(
+  profile?: PictureShapeSourceProfile,
+): readonly ShapePresetPath[] {
+  const paths = profile?.lineDecorations ?? [];
+  if (!Array.isArray(paths) || paths.length > 2 || paths.some((path) => path.commands.length > 64))
+    throw new RangeError("Drawing line decorations exceed their bounded endpoint budget.");
+  return paths;
+}
 export type PreparedPictureShapeGeometry = Readonly<{
   geometry: ShapePresetGeometry;
   fillBounds: PictureEffectBounds;
@@ -30,6 +61,8 @@ export type PreparedPictureShapeGeometry = Readonly<{
   strokePolylines: readonly ShapePolyline[];
   pointCount: number;
   commandCount: number;
+  workBudget: ShapePathWorkBudget | undefined;
+  drawingSource: boolean;
 }>;
 const preparedShapes = new WeakSet<object>();
 function assertPrepared(shape: PreparedPictureShapeGeometry): void {
@@ -58,7 +91,9 @@ function box(bounds: {
 export function preparePictureShapeGeometry(
   geometry: ShapePresetGeometry,
   frame: Readonly<{ width: number; height: number }>,
+  profile?: PictureShapeSourceProfile,
 ): PreparedPictureShapeGeometry {
+  const workBudget = pictureShapeWorkBudget(profile);
   if (
     !geometry ||
     geometry.width !== frame.width ||
@@ -83,16 +118,32 @@ export function preparePictureShapeGeometry(
       !Array.isArray(path.commands)
     )
       throw new TypeError("Picture shape requires typed numeric fill/stroke paths.");
+    if (
+      profile &&
+      path.fillMode !== undefined &&
+      !["norm", "none", "lighten", "lightenLess", "darken", "darkenLess"].includes(path.fillMode)
+    )
+      throw new TypeError("Drawing source requires a known path fill mode.");
     commandCount += path.commands.length;
   }
-  if (commandCount > PICTURE_SHAPE_MASK_LIMITS.commands)
+  if (commandCount > (workBudget?.commands ?? PICTURE_SHAPE_MASK_LIMITS.commands))
     throw new RangeError("Picture shape exceeds its aggregate command budget.");
   // Core validates every command, coordinate, radius and finite arc sweep.
-  const bounds = getShapePresetFillBounds(geometry);
-  if (!bounds) throw new RangeError("Picture shape has no nonempty filled extent.");
+  const fillGeometry = profile
+    ? {
+        ...geometry,
+        paths: geometry.paths.map((path) => ({
+          ...path,
+          filled: path.filled && path.fillMode !== "none",
+        })),
+      }
+    : geometry;
+  const bounds = getShapePresetFillBounds(fillGeometry, workBudget);
+  if (!bounds && !profile) throw new RangeError("Picture shape has no nonempty filled extent.");
   const paths: ShapePresetPath[] = geometry.paths.map((path) =>
     Object.freeze({
-      filled: path.filled,
+      filled: path.filled && (!profile || path.fillMode !== "none"),
+      fillMode: path.fillMode,
       stroke: path.stroke,
       commands: Object.freeze(
         path.commands.map(
@@ -109,17 +160,43 @@ export function preparePictureShapeGeometry(
     adjustments: Object.freeze({}),
   });
   const strokePaths = paths.filter((path) => path.stroke);
-  const strokeBounds = getShapePresetFillBounds({
-    ...detached,
-    paths: strokePaths.map((path) => ({ ...path, filled: true })),
-  });
-  const strokePolylines = strokePaths.flatMap((path) => flattenShapePath(path, 0.01));
+  const nativeStrokeBounds = getShapePresetFillBounds(
+    {
+      ...detached,
+      paths: strokePaths.map((path) => ({ ...path, filled: true })),
+    },
+    workBudget,
+  );
+  const strokePolylines = strokePaths.flatMap((path) => flattenShapePath(path, 0.01, workBudget));
   const pointCount = strokePolylines.reduce((sum, path) => sum + path.points.length, 0);
   if (pointCount > PICTURE_SHAPE_MASK_LIMITS.points)
     throw new RangeError("Picture shape exceeds its flattened outline point budget.");
+  const points = strokePolylines.flatMap((path) => path.points);
+  const fallbackStroke = points.length
+    ? {
+        left: Math.min(...points.map((point) => point.x)),
+        top: Math.min(...points.map((point) => point.y)),
+        width:
+          Math.max(...points.map((point) => point.x)) - Math.min(...points.map((point) => point.x)),
+        height:
+          Math.max(...points.map((point) => point.y)) - Math.min(...points.map((point) => point.y)),
+      }
+    : undefined;
+  const strokeBounds = nativeStrokeBounds ?? fallbackStroke;
+  const extent = bounds ?? strokeBounds;
+  if (!extent) throw new RangeError("Drawing shape has no usable numeric extent.");
+  const allocationExtent = { ...extent };
+  if (allocationExtent.width === 0) {
+    allocationExtent.left -= 0.5;
+    allocationExtent.width = 1;
+  }
+  if (allocationExtent.height === 0) {
+    allocationExtent.top -= 0.5;
+    allocationExtent.height = 1;
+  }
   const prepared = Object.freeze({
     geometry: detached,
-    fillBounds: Object.freeze(box(bounds)),
+    fillBounds: Object.freeze(box(allocationExtent)),
     strokeBounds: strokeBounds ? Object.freeze(box(strokeBounds)) : undefined,
     strokePolylines: Object.freeze(
       strokePolylines.map((polyline) =>
@@ -131,6 +208,8 @@ export function preparePictureShapeGeometry(
     ),
     pointCount,
     commandCount,
+    workBudget,
+    drawingSource: !!profile,
   });
   preparedShapes.add(prepared);
   return prepared;
@@ -140,9 +219,13 @@ export function preparePictureShapeGeometry(
 export function tracePictureShapePath(
   context: CanvasRenderingContext2D,
   path: ShapePresetPath,
+  budget?: ShapePathWorkBudget,
 ): void {
   // Validate hand-built paths as well as prepared paths; no XML, strings or eval enter Canvas.
-  getShapePresetFillBounds({ width: 1, height: 1, paths: [path], handles: [], adjustments: {} });
+  getShapePresetFillBounds(
+    { width: 1, height: 1, paths: [path], handles: [], adjustments: {} },
+    budget,
+  );
   for (const command of path.commands) {
     switch (command[0]) {
       case "M":
@@ -197,7 +280,7 @@ export function paintPictureShapeFillMask(
     for (const path of shape.geometry.paths)
       if (path.filled) {
         context.beginPath();
-        tracePictureShapePath(context, path);
+        tracePictureShapePath(context, path, shape.workBudget);
         context.fill("nonzero");
       }
   } finally {
@@ -209,6 +292,7 @@ export type PictureShapeAlphaMaskOptions = Readonly<{
   density: number;
   boundsRaster: PictureEffectBounds;
   canvasFactory?: () => HTMLCanvasElement;
+  pathIndex?: number;
 }>;
 export function createPictureShapeAlphaMask(
   options: PictureShapeAlphaMaskOptions,
@@ -229,8 +313,17 @@ export function createPictureShapeAlphaMask(
     width * height > 4_000_000
   )
     throw new RangeError("Picture shape alpha exceeds the finite raster budget.");
+  if (
+    options.pathIndex !== undefined &&
+    (!Number.isSafeInteger(options.pathIndex) ||
+      !options.shape.geometry.paths[options.pathIndex]?.filled)
+  )
+    throw new TypeError("Shape fill mask requires a prepared filled path index.");
   // Verify the union/outline budget before the factory or any Canvas allocation.
-  if (options.shape.commandCount > 1024 || options.shape.pointCount > 16_384)
+  if (
+    options.shape.commandCount > (options.shape.workBudget?.commands ?? 1024) ||
+    options.shape.pointCount > 16_384
+  )
     throw new RangeError("Picture shape mask exceeds its path budget.");
   const canvas = options.canvasFactory ? options.canvasFactory() : document.createElement("canvas");
   try {
@@ -240,7 +333,14 @@ export function createPictureShapeAlphaMask(
     if (!context) throw new Error("Picture shape alpha processing is unavailable.");
     context.translate(-bounds.left, -bounds.top);
     context.scale(options.density, options.density);
-    paintPictureShapeFillMask(context, options.shape);
+    if (options.pathIndex === undefined) paintPictureShapeFillMask(context, options.shape);
+    else {
+      const path = options.shape.geometry.paths[options.pathIndex]!;
+      context.fillStyle = "#ffffff";
+      context.beginPath();
+      tracePictureShapePath(context, path, options.shape.workBudget);
+      context.fill("nonzero");
+    }
     const pixels = context.getImageData(0, 0, width, height).data;
     if (!(pixels instanceof Uint8ClampedArray) || pixels.length !== width * height * 4)
       throw new TypeError("Picture shape Canvas must return exact-length RGBA pixels.");
@@ -433,7 +533,7 @@ export function strokePictureShapeOutline(
       for (const path of shape.geometry.paths)
         if (path.stroke) {
           context.beginPath();
-          tracePictureShapePath(context, path);
+          tracePictureShapePath(context, path, shape.workBudget);
           context.stroke();
         }
       return;

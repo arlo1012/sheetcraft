@@ -110,7 +110,7 @@ import { onBeforeUnmount } from "vue";
 import { createPicturePaintAssetSource } from "../modules/sheet-images/picture-paint-asset-source";
 import type { PictureFormatLabelKey } from "../modules/sheet-images/picture-format-pane-model";
 import { usePictureToolbarOwner } from "../modules/sheet-images/usePictureToolbarOwner";
-import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { SheetDrawing, SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
 import PivotGroupingDialog from "../modules/pivot-tables/components/PivotGroupingDialog.vue";
 import { usePivotGrouping } from "../modules/pivot-tables/usePivotGrouping";
@@ -152,6 +152,9 @@ import { useShapeCreation } from "../modules/sheet-drawings/useShapeCreation";
 import type { ShapeGalleryChoice } from "../modules/sheet-drawings/shape-gallery";
 import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
 import DrawingEditorDialog from "../modules/sheet-drawings/components/DrawingEditorDialog.vue";
+import ShapeFormatPane from "../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
+import { useOwnedShapeFormatPane } from "../modules/sheet-drawings/useOwnedShapeFormatPane";
+import { createShapePaintAssetSource } from "../modules/sheet-drawings/shape-paint-asset-source";
 import InsertToolbar from "../modules/insert-tools/components/InsertToolbar.vue";
 import PageWatermarkMenu from "../modules/page-decorations/components/PageWatermarkMenu.vue";
 import WatermarkDialog from "../modules/page-decorations/components/WatermarkDialog.vue";
@@ -1795,6 +1798,34 @@ const drawingActions = useDrawingActions({
   name: (kind) => t(`drawing.${kind}`),
 });
 const { dialog: drawingDialog, editing: editingDrawing } = drawingActions;
+const shapeFormatPane = useOwnedShapeFormatPane({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+  update: drawingActions.update,
+  isAssetAvailable: (id) => imageAssetUrls.value.has(id) || shapePaintAssets.has(id),
+  getUnsupportedReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
+});
+const shapePaintAssets = createShapePaintAssetSource({
+  getSnapshot: () => shapeFormatPane.snapshot.value,
+  store: assetStore,
+});
+onBeforeUnmount(shapePaintAssets.dispose);
+function openShapeFormat(drawing: SheetGraphicDrawing) {
+  if (shapeFormatPane.open(drawing)) {
+    drawingActions.close();
+    sheetGridRef.value?.selectDrawing(drawing.id);
+  }
+}
+function selectedShapeChanged(id: string | null) {
+  if (shapeFormatPane.drawing.value && shapeFormatPane.drawing.value.id !== id) {
+    shapeFormatPane.close();
+    shapePaintAssets.cancel();
+  }
+}
 const shapeInteractionBlocked = ref(false);
 const shapeCreation = useShapeCreation({
   getWorkbook: () => session.workbook,
@@ -4558,6 +4589,8 @@ watch(
           @update-drawing="drawingActions.update"
           @delete-drawing="drawingActions.remove"
           @edit-drawing="editSheetDrawing"
+          @format-drawing="openShapeFormat"
+          @selected-drawing-change="selectedShapeChanged"
           @configure-pivot="openPivotFields"
           @update-pivot="pivotActions.update"
           @show-pivot-details="(id, address) => pivotActions.showDetails(id, address)"
@@ -4668,6 +4701,20 @@ watch(
         }"
         :t="pictureFormatLabel"
         @close="closeOwnedPictureFormat"
+      />
+      <ShapeFormatPane
+        v-if="shapeFormatPane.snapshot.value"
+        :snapshot="shapeFormatPane.snapshot.value"
+        :capabilities="shapeFormatPane.capabilities.value"
+        :on-intent="shapeFormatPane.onIntent"
+        :load-paint-asset="shapePaintAssets.load"
+        :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
+        :t="pictureFormatLabel"
+        initial-tab="fill-line"
+        @close="
+          shapeFormatPane.close();
+          shapePaintAssets.cancel();
+        "
       />
       <PictureSelectionPane
         v-if="pictureTools.paneVisible.value"
@@ -4932,6 +4979,8 @@ watch(
     v-if="drawingDialog"
     :key="drawingDialog.dialogId"
     :drawing="drawingDialog.initial"
+    :theme="session.workbook.theme"
+    :image-asset-urls="imageAssetUrls"
     :request-text-box="drawingTextBoxHandler"
     :disabled="
       loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')

@@ -1,5 +1,6 @@
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import { getFreeShapeGeometry } from "./free-shape-geometry";
+import { getLegacyShapeGeometry } from "./legacy-shape-geometry";
 import {
   evaluateShapePreset,
   FREE_SHAPE_PATH_WORK_BUDGET,
@@ -83,7 +84,10 @@ function coordinate(value: number): number {
   return value === 0 ? 0 : value;
 }
 function scaledPoint(point: Point, scale: number): Point {
-  return Object.freeze({ x: coordinate(point.x * scale), y: coordinate(point.y * scale) });
+  return Object.freeze({
+    x: coordinate(point.x * scale),
+    y: coordinate(point.y * scale),
+  });
 }
 function scaledCommand(command: ShapePathCommand, scale: number): ShapePathCommand {
   if (command[0] === "Z") return Object.freeze(["Z"] as const);
@@ -136,7 +140,10 @@ function detachGeometry(
       : null,
     connectionSites: Object.freeze(
       geometry.connectionSites.map((site) =>
-        Object.freeze({ position: scaledPoint(site.position, scale), angle: site.angle }),
+        Object.freeze({
+          position: scaledPoint(site.position, scale),
+          angle: site.angle,
+        }),
       ),
     ),
   });
@@ -261,7 +268,9 @@ export function getStandardShapeGeometry(
   const scale = extentScale(width, height);
   if (scale === undefined) return;
   try {
-    const normalized = normalizeShapePresetParameters(shape) ?? { preset: "rect" as const };
+    const normalized = normalizeShapePresetParameters(shape) ?? {
+      preset: "rect" as const,
+    };
     const key = JSON.stringify([normalized, width, height]);
     const cached = geometryCache.get(key);
     if (cached) {
@@ -290,6 +299,17 @@ export function getDrawingShapeGeometry(
   drawing: SheetGraphicDrawing,
 ): EvaluatedShapePresetGeometry | undefined {
   if (drawing.shapeGeometry && drawing.shapePath) return;
+  if (!drawing.shapeGeometry && !drawing.shapePath && drawing.shapeStyle) {
+    const geometry = getLegacyShapeGeometry(drawing.shape, drawing.width, drawing.height);
+    if (!geometry) return;
+    try {
+      if (!preparedGeometries.has(geometry))
+        preparedGeometries.set(geometry, prepareGeometry(geometry));
+      return geometry;
+    } catch {
+      return;
+    }
+  }
   if (!drawing.shapePath)
     return getStandardShapeGeometry(drawing.shapeGeometry, drawing.width, drawing.height);
   try {
@@ -448,7 +468,12 @@ export function standardShapeContainsLocalPoint(
 
 /** Geometry-local reflection is its own inverse; text glyphs remain readable. */
 export function standardShapeFlipPoint(
-  drawing: Readonly<{ width: number; height: number; shapeFlipX?: true; shapeFlipY?: true }>,
+  drawing: Readonly<{
+    width: number;
+    height: number;
+    shapeFlipX?: true;
+    shapeFlipY?: true;
+  }>,
   point: Point,
 ): Point {
   return {
@@ -457,7 +482,12 @@ export function standardShapeFlipPoint(
   };
 }
 export function standardShapeSvgTransform(
-  drawing: Readonly<{ width: number; height: number; shapeFlipX?: true; shapeFlipY?: true }>,
+  drawing: Readonly<{
+    width: number;
+    height: number;
+    shapeFlipX?: true;
+    shapeFlipY?: true;
+  }>,
 ): string | undefined {
   if (!drawing.shapeFlipX && !drawing.shapeFlipY) return;
   return `translate(${drawing.shapeFlipX ? drawing.width : 0} ${drawing.shapeFlipY ? drawing.height : 0}) scale(${drawing.shapeFlipX ? -1 : 1} ${drawing.shapeFlipY ? -1 : 1})`;
@@ -512,7 +542,12 @@ export function getStandardShapeWorldBounds(
       ),
     );
     const projected = unionBounds(
-      points.map((point) => ({ left: point.x, top: point.y, width: 0, height: 0 })),
+      points.map((point) => ({
+        left: point.x,
+        top: point.y,
+        width: 0,
+        height: 0,
+      })),
     )!;
     return {
       x: projected.left,

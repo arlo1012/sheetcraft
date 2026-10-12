@@ -48,6 +48,10 @@ import {
 import { addFreeShapePoint, deleteFreeShapePoint } from "../free-shape-point-operations";
 import DrawingContent from "./DrawingContent.vue";
 import { shapeDrawingContainsWorldPoint } from "../shape-line-paint";
+import {
+  detailedShapeContainsWorldPoint,
+  type ShapeDetailedPresentation,
+} from "../shape-detailed-presentation";
 const props = defineProps<{
   drawings: readonly SheetDrawing[];
   applyUpdate?: (drawing: SheetDrawing, expected: SheetDrawing) => boolean;
@@ -68,10 +72,20 @@ const emit = defineEmits<{
   delete: [id: string];
   edit: [drawing: SheetDrawing];
   select: [];
+  selectionChange: [id: string | null];
+  format: [drawing: SheetGraphicDrawing];
+  backgroundPointer: [event: PointerEvent];
   controlChange: [id: string, value: unknown];
 }>();
+const rasterDensity = computed(() =>
+  Math.max(
+    1,
+    Math.min(8, props.scale * (typeof window === "undefined" ? 1 : window.devicePixelRatio || 1)),
+  ),
+);
 const layerElement = ref<HTMLElement>();
 const selectedId = ref<string | null>(null);
+watch(selectedId, (id) => emit("selectionChange", id), { flush: "sync" });
 const pointEditingId = ref<string | null>(null);
 const activeVertex = ref(0);
 const pointRejected = ref(false);
@@ -91,9 +105,23 @@ watch(
   { immediate: true },
 );
 function isStandard(drawing: SheetDrawing): drawing is SheetGraphicDrawing {
-  return drawing.kind === "shape" && !!(drawing.shapeGeometry || drawing.shapePath);
+  return (
+    drawing.kind === "shape" && !!(drawing.shapeGeometry || drawing.shapePath || drawing.shapeStyle)
+  );
 }
-type DrawingFragment = FloatingImageViewportFragment & { drawing: SheetDrawing; standard: boolean };
+const detailedPresentations = new Map<string, ShapeDetailedPresentation>();
+function acceptDetailedPaint(
+  fragment: DrawingFragment,
+  presentation: ShapeDetailedPresentation | undefined,
+) {
+  const key = `${fragment.drawing.id}:${fragment.paneId}`;
+  if (presentation?.drawing === fragment.drawing) detailedPresentations.set(key, presentation);
+  else detailedPresentations.delete(key);
+}
+type DrawingFragment = FloatingImageViewportFragment & {
+  drawing: SheetDrawing;
+  standard: boolean;
+};
 const preview = shallowRef<SheetDrawing>();
 let session: PointerSession | undefined;
 const fragments = computed<DrawingFragment[]>(() =>
@@ -108,6 +136,36 @@ const fragments = computed<DrawingFragment[]>(() =>
     return projected.map((fragment) => ({ ...fragment, drawing, standard }));
   }),
 );
+const formatTarget = computed(() => {
+  const visible = fragments.value.filter(
+    (f) =>
+      f.drawing.id === selectedId.value &&
+      f.drawing.kind === "shape" &&
+      f.drawing.id !== pointEditingId.value,
+  );
+  return visible.sort(
+    (a, b) =>
+      b.clippedRect.width * b.clippedRect.height - a.clippedRect.width * a.clippedRect.height,
+  )[0];
+});
+const formatTriggerStyle = computed(() => {
+  const f = formatTarget.value;
+  if (!f) return {};
+  const clip = props.layout.panes[f.paneId].clip;
+  return {
+    left: `${Math.max(clip.x + 4, Math.min(clip.x + clip.width - 32, f.rect.x + f.rect.width + 12))}px`,
+    top: `${Math.max(clip.y + 4, Math.min(clip.y + clip.height - 32, f.rect.y))}px`,
+  };
+});
+function formatSelected() {
+  const d = formatTarget.value?.drawing;
+  if (
+    d?.kind === "shape" &&
+    !props.readOnly &&
+    props.drawings.find((item) => item.id === d.id) === d
+  )
+    emit("format", d);
+}
 function commitUpdate(next: SheetDrawing, owner: SheetDrawing): boolean {
   if (
     props.readOnly ||
@@ -148,7 +206,10 @@ function contentStyle(fragment: FloatingImageViewportFragment): CSSProperties {
     height: `${fragment.rect.height}px`,
   };
 }
-function viewportPoint(event: { clientX: number; clientY: number }): { x: number; y: number } {
+function viewportPoint(event: { clientX: number; clientY: number }): {
+  x: number;
+  y: number;
+} {
   const bounds = layerElement.value?.getBoundingClientRect();
   return {
     x: (event.clientX - (bounds?.left ?? 0)) / props.scale,
@@ -160,6 +221,19 @@ function hits(fragment: DrawingFragment, event: MouseEvent): boolean {
   if (!isStandard(fragment.drawing)) return false;
   const shape = getDrawingShapeGeometry(fragment.drawing);
   if (!shape) return event.target instanceof Element && !!event.target.closest('[role="status"]');
+  if (fragment.drawing.shapeStyle) {
+    if (
+      event.target instanceof Element &&
+      event.target.closest('[role="status"], [data-standard-shape-text]')
+    )
+      return true;
+    return detailedShapeContainsWorldPoint(
+      fragment.drawing,
+      fragment.rect,
+      viewportPoint(event),
+      detailedPresentations.get(`${fragment.drawing.id}:${fragment.paneId}`),
+    );
+  }
   return shapeDrawingContainsWorldPoint(
     fragment.drawing,
     shape,
@@ -179,7 +253,11 @@ function start(
   const owner = props.drawings.find((item) => item.id === drawing.id);
   if (!owner || owner !== drawing || (mode === "point" && pointEditingId.value !== drawing.id))
     return;
-  if (event.button !== 0 || (!direction && mode === "move" && !hits(fragment, event))) return;
+  if (event.button !== 0) return;
+  if (!direction && mode === "move" && !hits(fragment, event)) {
+    emit("backgroundPointer", event);
+    return;
+  }
   event.preventDefault();
   event.stopPropagation();
   selectedId.value = drawing.id;
@@ -531,7 +609,9 @@ function clearOutside(event: PointerEvent) {
   if (
     event.target instanceof Element &&
     !event.target.closest("[data-sheet-drawing-id]") &&
-    !event.target.closest('[role="dialog"]')
+    !event.target.closest(
+      '[role="dialog"],[role="menu"],[role="listbox"],[data-shape-format-pane],[data-shape-format-trigger]',
+    )
   ) {
     selectedId.value = null;
     pointEditingId.value = null;
@@ -539,6 +619,7 @@ function clearOutside(event: PointerEvent) {
 }
 onMounted(() => document.addEventListener("pointerdown", clearOutside));
 onBeforeUnmount(() => {
+  detailedPresentations.clear();
   session?.cancel();
   document.removeEventListener("pointerdown", clearOutside);
 });
@@ -592,6 +673,19 @@ watch(
 </script>
 <template>
   <div ref="layerElement" class="sheet-drawing-layer">
+    <button
+      v-if="formatTarget && !readOnly"
+      type="button"
+      class="sheet-drawing-layer__format"
+      :style="formatTriggerStyle"
+      data-shape-format-trigger
+      :aria-label="locale === 'zh-CN' ? '设置形状格式' : 'Format Shape'"
+      :title="locale === 'zh-CN' ? '设置形状格式' : 'Format Shape'"
+      @pointerdown.stop
+      @click.stop="formatSelected"
+    >
+      ⋯
+    </button>
     <div
       v-if="pointEditingId && pointRejected"
       role="status"
@@ -622,8 +716,10 @@ watch(
       <div class="sheet-drawing-layer__clip">
         <div class="sheet-drawing-layer__content" :style="contentStyle(fragment)">
           <DrawingContent
+            @detailed-paint="acceptDetailedPaint(fragment, $event)"
             @control-change="emit('controlChange', fragment.drawing.id, $event)"
             :drawing="fragment.drawing"
+            :density="rasterDensity"
             :sheet="sheet"
             :evaluator="evaluator"
             :revision="revision"
@@ -691,6 +787,19 @@ watch(
   position: absolute;
   inset: 0;
   pointer-events: none;
+  &__format {
+    position: absolute;
+    z-index: var(--sheetcraft-layer-toolbar);
+    pointer-events: auto;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--sheetcraft-border-control);
+    border-radius: 4px;
+    background: var(--sheetcraft-surface-panel);
+    color: var(--sheetcraft-text-primary);
+    font-size: 20px;
+    cursor: pointer;
+  }
   &__object {
     position: absolute;
     pointer-events: auto;

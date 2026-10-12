@@ -2,6 +2,7 @@ import { onBeforeUnmount, readonly, ref, watch } from "vue";
 import type { Workbook } from "@sheetcraft/core/workbook";
 import { collectPictureGroupAssetIds, isPictureGroup } from "@sheetcraft/core/picture-group";
 import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detailed-style";
+import { getShapeStyleAssetIds } from "@sheetcraft/core/shape-style";
 import { readEncodedImageSource } from "./readEncodedImageSource";
 import { assertImagePixelBudget } from "./imageAssetValidation";
 import type { ImageAsset, ImageAssetStore } from "./imageAssetStore";
@@ -15,6 +16,10 @@ export function collectWorkbookImageAssetIds(workbook: Workbook): Set<string> {
     if (sheet.pageDecoration?.backgroundAssetId) ids.add(sheet.pageDecoration.backgroundAssetId);
     if (sheet.pageDecoration?.watermark?.image)
       ids.add(sheet.pageDecoration.watermark.image.assetId);
+    for (const drawing of sheet.drawings ?? []) {
+      if (drawing.kind === "shape")
+        for (const id of getShapeStyleAssetIds(drawing.shapeStyle)) ids.add(id);
+    }
     for (const cell of sheet.cells.values()) {
       const content = cell.content;
       if (content?.kind === "image") {
@@ -122,5 +127,10 @@ export function useImageAssetUrls(getWorkbook: () => Workbook, store: ImageAsset
     generation += 1;
     for (const url of urls.value.values()) URL.revokeObjectURL(url);
   });
-  return { urls: readonly(urls), loading: readonly(loading), missing: readonly(missing), refresh };
+  return {
+    urls: readonly(urls),
+    loading: readonly(loading),
+    missing: readonly(missing),
+    refresh,
+  };
 }

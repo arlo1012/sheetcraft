@@ -327,7 +327,12 @@ const props = withDefaults(
     activeCellError?: CellErrorDescription;
     inputError?: { address: CellAddress; title: string; message: string };
     errorIndicatorColor?: string | null;
-    noteDraft?: { address: CellAddress; text: string; author: string; box?: CellNoteBox };
+    noteDraft?: {
+      address: CellAddress;
+      text: string;
+      author: string;
+      box?: CellNoteBox;
+    };
     noteError?: string;
     /** Whether selecting a noted cell shows its classic note preview. */
     showActiveNote?: boolean;
@@ -369,6 +374,8 @@ const emit = defineEmits<{
   updateDrawing: [drawing: SheetDrawing];
   deleteDrawing: [id: string];
   editDrawing: [drawing: SheetDrawing];
+  formatDrawing: [drawing: SheetGraphicDrawing];
+  selectedDrawingChange: [id: string | null];
   configurePivot: [id: string];
   updatePivot: [table: SheetPivotTable];
   configurePivotFilter: [id: string, index: number];
@@ -496,7 +503,10 @@ const headingSize = computed(() => ({
       pageUiScale.value
     : 0,
 }));
-const headingOrigin = computed(() => ({ x: rulerInset.value, y: rulerInset.value }));
+const headingOrigin = computed(() => ({
+  x: rulerInset.value,
+  y: rulerInset.value,
+}));
 const headerSize = computed(() => ({
   width: headingSize.value.width + rulerInset.value,
   height: headingSize.value.height + rulerInset.value,
@@ -606,7 +616,12 @@ function openImagePreview(
   trigger?: HTMLElement,
 ): void {
   if (pictureCrop.active.value || !props.imageAssetUrls?.has(image.assetId)) return;
-  imagePreview.value = { ...image, trigger, ownerId: ++imagePreviewSequence, sheet: props.sheet };
+  imagePreview.value = {
+    ...image,
+    trigger,
+    ownerId: ++imagePreviewSequence,
+    sheet: props.sheet,
+  };
 }
 
 function openFloatingImagePreview(image: StandalonePictureObject, trigger?: HTMLElement): void {
@@ -1010,6 +1025,7 @@ const selectedRange = computed(() =>
   }),
 );
 const selectedShapeDrawingId = ref<string | null>(null);
+watch(selectedShapeDrawingId, (id) => emit("selectedDrawingChange", id), { flush: "sync" });
 watch(
   () => props.shapeCreationRequest,
   (next, previous) => {
@@ -1228,7 +1244,10 @@ const pageBreakGuides = computed(() => {
   if (props.viewMode !== "normal" || !props.showPageBreaks) return undefined;
   const pages = pagination.value;
   if (!pages) return undefined;
-  return { rowBreaks: pages.layoutRowBreaks, columnBreaks: pages.layoutColumnBreaks };
+  return {
+    rowBreaks: pages.layoutRowBreaks,
+    columnBreaks: pages.layoutColumnBreaks,
+  };
 });
 const pageView = computed<PageViewPaintState | undefined>(() => {
   if (props.viewMode === "normal") return undefined;
@@ -1248,9 +1267,17 @@ const pageView = computed<PageViewPaintState | undefined>(() => {
     rulerSize: rulerInset.value,
     uiScale: 1 / pageUiScale.value,
     pages:
-      pageProjection.value?.getVisiblePages({ x: scroll.x, y: scroll.y, ...viewportSize }) ??
-      pages.getVisiblePages({ x: scroll.x, y: scroll.y, ...viewportSize }, props.viewMode),
-    printRect: { x, y, width: Math.max(0, right - x), height: Math.max(0, bottom - y) },
+      pageProjection.value?.getVisiblePages({
+        x: scroll.x,
+        y: scroll.y,
+        ...viewportSize,
+      }) ?? pages.getVisiblePages({ x: scroll.x, y: scroll.y, ...viewportSize }, props.viewMode),
+    printRect: {
+      x,
+      y,
+      width: Math.max(0, right - x),
+      height: Math.max(0, bottom - y),
+    },
     rowBreaks: pages.rowBreaks,
     columnBreaks: pages.columnBreaks,
     dragBoundary: pageBoundaryPreview.value,
@@ -1411,7 +1438,9 @@ function startPictureCrop(): boolean {
   if (pictureCrop.active.value) return finishPictureCrop();
   if (!flushPendingEdit() || !pictureCrop.start()) return false;
   void nextTick(() =>
-    (cropOverlayRef.value?.$el as HTMLElement | undefined)?.focus({ preventScroll: true }),
+    (cropOverlayRef.value?.$el as HTMLElement | undefined)?.focus({
+      preventScroll: true,
+    }),
   );
   return true;
 }
@@ -1505,7 +1534,10 @@ const pictureAdjustmentView = computed(() => {
   const root = props.sheet.floatingImages.find((entry) => entry.id === selectedImageIds.value[0]);
   if (!context || !root || root.hidden) return;
   if (isFramedPictureObject(root) && root.frame.cropShape)
-    return { picture: root, geometry: resolvePictureFrame(root.frame, context.metrics) };
+    return {
+      picture: root,
+      geometry: resolvePictureFrame(root.frame, context.metrics),
+    };
   const path = selectedOwnedPicturePath.value;
   if (!isPictureGroup(root) || !path || path.length < 2) return;
   const selected = resolveOwnedPictureNode(props.sheet.floatingImages, path, context);
@@ -1781,11 +1813,17 @@ const overlayState = computed<SheetOverlayState>(() => {
       : [
           ...layout.value.getRangeFragments({
             start: { row: range.start.row, column: 0 },
-            end: { row: range.end.row, column: renderExtent.value.columnCount - 1 },
+            end: {
+              row: range.end.row,
+              column: renderExtent.value.columnCount - 1,
+            },
           }),
           ...layout.value.getRangeFragments({
             start: { row: 0, column: range.start.column },
-            end: { row: renderExtent.value.rowCount - 1, column: range.end.column },
+            end: {
+              row: renderExtent.value.rowCount - 1,
+              column: range.end.column,
+            },
           }),
         ];
   return {
@@ -4471,6 +4509,9 @@ defineExpose({
       }"
     >
       <SheetDrawingLayer
+        @selection-change="selectedShapeDrawingId = $event"
+        @format="emit('formatDrawing', $event)"
+        @background-pointer="onSurfacePointerDown"
         @control-change="(id, value) => emit('changeControl', id, value)"
         :key="sheet.id"
         :drawings="sheet.drawings ?? []"
@@ -4676,7 +4717,10 @@ defineExpose({
         !canEditRange(
           sheet,
           expandSelectionToMergedCellRanges(
-            { start: cellContextMenu.imageAddress, end: cellContextMenu.imageAddress },
+            {
+              start: cellContextMenu.imageAddress,
+              end: cellContextMenu.imageAddress,
+            },
             sheet.mergedCells,
           ),
         )

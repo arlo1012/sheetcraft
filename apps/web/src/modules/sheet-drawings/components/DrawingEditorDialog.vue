@@ -18,14 +18,22 @@ import { isShapeLinePreset, type ShapeLineEnds } from "@sheetcraft/core/shape-li
 import { isShapeFreePathClosed } from "@sheetcraft/core/shape-free-path";
 import ShapeLineEndsControls from "./ShapeLineEndsControls.vue";
 import { getDrawingShapeGeometry } from "../shape-geometry";
+import { hasUnsupportedShapeProjectedText } from "../shape-detailed-paint";
+import { editShapeBasicAppearance } from "../shape-basic-appearance-edit";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
   disabled: boolean;
   requestTextBox?: (direction: "horizontal" | "vertical") => boolean;
+  theme?: WorkbookTheme;
+  imageAssetUrls?: ReadonlyMap<string, string>;
 }>();
 const emit = defineEmits<{ confirm: [drawing: SheetGraphicDrawing]; close: [] }>();
 const { t, locale } = useAppI18n();
 const draft = ref<SheetGraphicDrawing>(normalizeSheetDrawing(props.drawing) as SheetGraphicDrawing);
+function setAppearance(field: "fill" | "stroke" | "strokeWidth", value: string | number) {
+  if (!props.disabled) draft.value = editShapeBasicAppearance(draft.value, field, value);
+}
 const galleryError = ref(false);
 const selectedChoice = computed(() =>
   SHAPE_GALLERY.flatMap((group) => group.items).find((choice) => {
@@ -37,6 +45,7 @@ const selectedChoice = computed(() =>
     );
   }),
 );
+const supportedTextProjection = computed(() => !hasUnsupportedShapeProjectedText(draft.value));
 const validGeometry = computed(
   () =>
     draft.value.kind !== "shape" ||
@@ -107,9 +116,12 @@ const shapes: DrawingShape[] = [
     :width="drawing.kind === 'shape' ? '860px' : '660px'"
     :style="{ maxWidth: 'calc(100vw - 32px)' }"
     :close-on-overlay-click="false"
-    :confirm-btn="{ content: t('picture.confirm'), disabled: disabled || !validGeometry }"
+    :confirm-btn="{
+      content: t('picture.confirm'),
+      disabled: disabled || !validGeometry || !supportedTextProjection,
+    }"
     :cancel-btn="t('picture.cancel')"
-    @confirm="!disabled && validGeometry && emit('confirm', draft)"
+    @confirm="!disabled && validGeometry && supportedTextProjection && emit('confirm', draft)"
     @close="emit('close')"
   >
     <div class="drawing-editor" :class="{ 'has-shape-gallery': drawing.kind === 'shape' }">
@@ -166,20 +178,27 @@ const shapes: DrawingShape[] = [
             }}<input
               type="color"
               :value="draft.fill === 'transparent' ? '#ffffff' : draft.fill"
-              @input="draft.fill = ($event.target as HTMLInputElement).value"
+              @input="setAppearance('fill', ($event.target as HTMLInputElement).value)"
           /></label>
           <Checkbox
             v-if="!lineGeometry"
             :checked="draft.fill === 'transparent'"
-            @change="draft.fill = $event ? 'transparent' : '#ffffff'"
+            @change="setAppearance('fill', $event ? 'transparent' : '#ffffff')"
             >{{ t("drawing.noFill") }}</Checkbox
           >
-          <label>{{ t("drawing.stroke") }}<input v-model="draft.stroke" type="color" /></label>
+          <label
+            >{{ t("drawing.stroke")
+            }}<input
+              :value="draft.stroke === 'transparent' ? '#000000' : draft.stroke"
+              type="color"
+              @input="setAppearance('stroke', ($event.target as HTMLInputElement).value)"
+          /></label>
           <label
             >{{ t("drawing.strokeWidth")
             }}<InputNumber
               class="drawing-editor__number"
-              v-model="draft.strokeWidth"
+              :model-value="draft.strokeWidth"
+              @change="typeof $event === 'number' && setAppearance('strokeWidth', $event)"
               :min="0"
               :max="32"
               size="small"
@@ -254,10 +273,13 @@ const shapes: DrawingShape[] = [
                 transformOrigin: 'top left',
               }"
             >
-              <DrawingContent :drawing="draft" />
+              <DrawingContent :drawing="draft" :theme="theme" :image-asset-urls="imageAssetUrls" />
             </div>
           </div>
         </div>
+        <p v-if="!supportedTextProjection" class="drawing-editor__hint" role="alert">
+          {{ t("drawing.projectedTextUnavailable") }}
+        </p>
         <p v-if="!validGeometry" class="drawing-editor__hint" role="alert">
           {{ t("drawing.geometryUnavailable") }}
         </p>

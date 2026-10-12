@@ -1,7 +1,8 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import DrawingContent from "../../../modules/sheet-drawings/components/DrawingContent.vue";
+import { createPictureRotation3d } from "../../../modules/sheet-images/picture-effect-edit";
 import { createAppI18n } from "../../../shared/i18n";
 import { getStandardShapeGeometry } from "../../../modules/sheet-drawings/shape-geometry";
 import {
@@ -160,5 +161,22 @@ test("transparent text does not create an invisible hit layer over a donut hole"
     color: "transparent",
   });
   expect(w.find("[data-standard-shape-text]").exists()).toBe(false);
+  w.unmount();
+});
+
+test("unsupported restored 3D text shows an explicit error instead of an unprojected text overlay", async () => {
+  const drawing = {
+    ...shape,
+    text: "preserved label",
+    shapeStyle: {
+      rotation3d: { kind: "value" as const, value: createPictureRotation3d("parallel") },
+    },
+  };
+  const original = structuredClone(drawing);
+  const w = render(drawing);
+  await flushPromises();
+  expect(w.find("[data-standard-shape-text]").exists()).toBe(false);
+  expect(w.get('[role="status"]').text()).toContain("3D shape text is not available yet");
+  expect(drawing).toEqual(original);
   w.unmount();
 });

@@ -2,6 +2,7 @@ import {
   flattenShapePath,
   getShapePresetFillBounds,
   type ShapePathCommand,
+  type ShapePathWorkBudget,
   type ShapePolyline,
   type ShapePresetGeometry,
   type ShapePresetPath,
@@ -14,6 +15,12 @@ import {
   type PictureProjectivePoint,
   type PictureProjectiveVector,
 } from "./picture-projective-geometry";
+
+import {
+  pictureShapeWorkBudget,
+  validatePictureShapeLineDecorations,
+  type PictureShapeSourceProfile,
+} from "./picture-shape-mask";
 
 /** Shape tessellation, not another camera: all projection uses the owner's matrices. */
 export const PICTURE_SHAPE_EXTRUSION_LIMITS = Object.freeze({
@@ -72,7 +79,10 @@ function scaledShape(
   shape: ShapePresetGeometry,
   geometry: PictureProjectiveGeometry,
   density: number,
+  profile?: PictureShapeSourceProfile,
 ): ShapePresetGeometry {
+  const budget = pictureShapeWorkBudget(profile);
+  const decorations = validatePictureShapeLineDecorations(profile);
   if (
     !Number.isFinite(density) ||
     density <= 0 ||
@@ -103,35 +113,55 @@ function scaledShape(
       throw new TypeError("Picture projected shape needs numeric fill/stroke paths.");
     commands += path.commands.length;
   }
-  if (commands > PICTURE_SHAPE_EXTRUSION_LIMITS.commands)
+  if (commands > (budget?.commands ?? PICTURE_SHAPE_EXTRUSION_LIMITS.commands))
     throw new RangeError("Picture projected shape exceeds its aggregate command budget.");
   // Public Core validates commands/radii/sweeps before we scale or flatten anything.
-  const filled = getShapePresetFillBounds(shape);
-  if (!filled) throw new RangeError("Picture projected shape has no filled extent.");
+  const filled = getShapePresetFillBounds(shape, budget);
+  for (const path of decorations) getShapePresetFillBounds({ ...shape, paths: [path] });
+  if (!filled && !profile) throw new RangeError("Picture projected shape has no filled extent.");
   return {
     width: geometry.widthPx,
     height: geometry.heightPx,
     handles: [],
     adjustments: {},
-    paths: shape.paths.map((path) => ({
-      filled: path.filled,
+    paths: [...shape.paths, ...decorations].map((path) => ({
+      filled: path.filled && (!profile || path.fillMode !== "none"),
+      fillMode: path.fillMode,
       stroke: path.stroke,
       commands: path.commands.map((command: ShapePathCommand) => scaleCommand(command, density)),
     })),
   };
 }
-function sourceBounds(shape: ShapePresetGeometry): PictureProjectiveBounds {
-  const all = getShapePresetFillBounds({
-    ...shape,
-    paths: shape.paths.map((path) => ({ ...path, filled: path.filled || path.stroke })),
-  });
-  if (!all) throw new RangeError("Picture projected shape has no usable extent.");
-  return {
-    left: all.left,
-    top: all.top,
-    right: all.left + all.width,
-    bottom: all.top + all.height,
-  };
+function sourceBounds(
+  shape: ShapePresetGeometry,
+  budget?: ShapePathWorkBudget,
+): PictureProjectiveBounds {
+  const points: PictureProjectivePoint[] = [];
+  for (const path of shape.paths) {
+    const bounds = getShapePresetFillBounds(
+      { ...shape, paths: [{ ...path, filled: path.filled || path.stroke }] },
+      budget,
+    );
+    if (bounds)
+      points.push(
+        { x: bounds.left, y: bounds.top },
+        { x: bounds.left + bounds.width, y: bounds.top + bounds.height },
+      );
+    else if (path.filled || path.stroke)
+      points.push(...flattenShapePath(path, 0.01, budget).flatMap((contour) => contour.points));
+  }
+  if (!points.length) throw new RangeError("Picture projected shape has no usable extent.");
+  const bounds = { ...boundsOf(points) };
+  // Degenerate stroke-only axes need a finite sampling window, never a fill/extrusion polygon.
+  if (bounds.right === bounds.left) {
+    bounds.left -= 0.5;
+    bounds.right += 0.5;
+  }
+  if (bounds.bottom === bounds.top) {
+    bounds.top -= 0.5;
+    bounds.bottom += 0.5;
+  }
+  return bounds;
 }
 export function projectPictureShapePoint(
   geometry: PictureProjectiveGeometry,
@@ -190,8 +220,9 @@ export function getPictureShapeExtrusionBounds(
   geometry: PictureProjectiveGeometry,
   shape: ShapePresetGeometry,
   density: number,
+  profile?: PictureShapeSourceProfile,
 ): PictureProjectiveBounds {
-  return createPictureShapeExtrusion(geometry, shape, density).bounds;
+  return createPictureShapeExtrusion(geometry, shape, density, profile).bounds;
 }
 function contains(
   paths: readonly (readonly ShapePolyline[])[],
@@ -411,7 +442,11 @@ function curveTolerance(geometry: PictureProjectiveGeometry, box: PictureProject
   return Math.min(0.125, PICTURE_SHAPE_EXTRUSION_LIMITS.curveErrorPx / Math.max(lipschitz, 1e-12));
 }
 /** Core's hard depth cap must meet the declared curve error, never a coarse fallback. */
-function assertCurveResolution(path: ShapePresetPath, tolerance: number): void {
+function assertCurveResolution(
+  path: ShapePresetPath,
+  tolerance: number,
+  pointBudget: number = PICTURE_SHAPE_EXTRUSION_LIMITS.points,
+): void {
   let pen: PictureProjectivePoint = { x: 0, y: 0 },
     start = pen,
     leaves = 0;
@@ -429,7 +464,7 @@ function assertCurveResolution(path: ShapePresetPath, tolerance: number): void {
       return Math.hypot(point.x - a.x - t * dx, point.y - a.y - t * dy) <= tolerance;
     });
     if (flat) {
-      if (++leaves > PICTURE_SHAPE_EXTRUSION_LIMITS.points)
+      if (++leaves > pointBudget)
         throw new RangeError("Picture shape curve exceeds its subdivision work budget.");
       return;
     }
@@ -475,8 +510,10 @@ function assertCurveResolution(path: ShapePresetPath, tolerance: number): void {
 function buildPictureShapeExtrusion(
   geometry: PictureProjectiveGeometry,
   scaled: ShapePresetGeometry,
+  profile?: PictureShapeSourceProfile,
 ): PictureShapeExtrusion {
-  const box = sourceBounds(scaled),
+  const budget = pictureShapeWorkBudget(profile);
+  const box = sourceBounds(scaled, budget),
     bounds = guardedBounds(geometry, box);
   const tolerance = curveTolerance(geometry, box);
   const curved = scaled.paths.some((path) =>
@@ -488,7 +525,7 @@ function buildPictureShapeExtrusion(
     );
   let pointCount = 0;
   const flattened = scaled.paths.map((path) => {
-    assertCurveResolution(path, Math.max(0.01, tolerance));
+    assertCurveResolution(path, Math.max(0.01, tolerance), budget?.points);
     for (const command of path.commands)
       if (command[0] === "A") {
         const radius = Math.max(command[1], command[2]);
@@ -499,9 +536,9 @@ function buildPictureShapeExtrusion(
         if (Math.ceil(Math.abs(command[6] - command[5]) / Math.max(step, 1e-6)) > 1024)
           throw new RangeError("Picture shape arc cannot meet its bounded curve error.");
       }
-    const contours = flattenShapePath(path, Math.max(0.01, tolerance));
+    const contours = flattenShapePath(path, Math.max(0.01, tolerance), budget);
     pointCount += contours.reduce((sum, contour) => sum + contour.points.length, 0);
-    if (pointCount > PICTURE_SHAPE_EXTRUSION_LIMITS.points)
+    if (pointCount > (budget?.points ?? PICTURE_SHAPE_EXTRUSION_LIMITS.points))
       throw new RangeError("Picture shape exceeds its aggregate flattened point budget.");
     return contours;
   });
@@ -593,10 +630,12 @@ export function createPictureShapeExtrusion(
   geometry: PictureProjectiveGeometry,
   shape: ShapePresetGeometry,
   density: number,
+  profile?: PictureShapeSourceProfile,
 ): PictureShapeExtrusion {
-  const scaled = scaledShape(shape, geometry, density);
+  const scaled = scaledShape(shape, geometry, density, profile);
   // scaledShape rejects path/command counts and malformed numbers BEFORE stringify.
   const key = JSON.stringify([
+    profile ? [profile.kind, profile.workBudget ?? null] : null,
     geometry.widthPx,
     geometry.heightPx,
     geometry.depthPx,
@@ -610,7 +649,7 @@ export function createPictureShapeExtrusion(
     extrusionCache.set(key, previous);
     return previous.result;
   }
-  const result = buildPictureShapeExtrusion(geometry, scaled),
+  const result = buildPictureShapeExtrusion(geometry, scaled, profile),
     units = geometryUnits(result);
   freezeGeometry(result);
   if (units <= SHAPE_CACHE_UNITS) {

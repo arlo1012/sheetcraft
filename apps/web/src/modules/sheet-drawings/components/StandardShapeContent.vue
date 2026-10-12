@@ -10,7 +10,19 @@ import {
 } from "../shape-geometry";
 import { standardShapeAppearance, getShapeEndPaint } from "../shape-line-paint";
 import { useAppI18n } from "../../../shared/i18n";
-const props = defineProps<{ drawing: SheetGraphicDrawing }>();
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import type { ShapeDetailedPresentation } from "../shape-detailed-presentation";
+import ShapeDetailedContent from "./ShapeDetailedContent.vue";
+import { hasUnsupportedShapeProjectedText } from "../shape-detailed-paint";
+const props = defineProps<{
+  drawing: SheetGraphicDrawing;
+  theme?: WorkbookTheme;
+  assetUrls?: ReadonlyMap<string, string>;
+  density?: number;
+}>();
+const emit = defineEmits<{
+  paint: [presentation: ShapeDetailedPresentation | undefined];
+}>();
 const { t } = useAppI18n();
 const geometry = computed(() => getDrawingShapeGeometry(props.drawing));
 const paths = computed(() => getStandardShapeSvgPaths(geometry.value));
@@ -36,9 +48,22 @@ const textStyle = computed<CSSProperties | undefined>(() => {
 });
 </script>
 <template>
-  <div class="standard-shape-content" data-standard-shape-content>
+  <div
+    class="standard-shape-content"
+    :class="{ 'has-detailed-style': !!drawing.shapeStyle }"
+    data-standard-shape-content
+  >
     <template v-if="geometry">
+      <ShapeDetailedContent
+        v-if="drawing.shapeStyle"
+        :drawing="drawing"
+        :theme="theme"
+        :asset-urls="assetUrls"
+        :density="density"
+        @paint="emit('paint', $event)"
+      />
       <svg
+        v-else
         :viewBox="`0 0 ${drawing.width} ${drawing.height}`"
         preserveAspectRatio="none"
         aria-hidden="true"
@@ -78,7 +103,12 @@ const textStyle = computed<CSSProperties | undefined>(() => {
         </g>
       </svg>
       <div
-        v-if="drawing.text.trim() && drawing.color !== 'transparent' && textStyle"
+        v-if="
+          drawing.text.trim() &&
+          drawing.color !== 'transparent' &&
+          textStyle &&
+          !hasUnsupportedShapeProjectedText(drawing)
+        "
         class="standard-shape-content__text"
         :style="textStyle"
         data-standard-shape-text
@@ -97,6 +127,9 @@ const textStyle = computed<CSSProperties | undefined>(() => {
   height: 100%;
   position: relative;
   pointer-events: none;
+  &.has-detailed-style {
+    pointer-events: auto;
+  }
   svg {
     width: 100%;
     height: 100%;

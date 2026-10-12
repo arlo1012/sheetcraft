@@ -42,6 +42,9 @@ import {
   getPictureShapeOutlineIntervalCount,
   getPictureShapeStrokeBounds,
   preparePictureShapeGeometry,
+  paintPictureShapeFillMask,
+  validatePictureShapeLineDecorations,
+  type PictureShapeSourceProfile,
   strokePictureShapeOutline,
   type PreparedPictureShapeGeometry,
 } from "./picture-shape-mask";
@@ -98,6 +101,8 @@ export type PictureDetailedRasterPlanOptions = Readonly<{
   frontPaintBounds?: PictureEffectBounds;
   /** Already evaluated numeric paths in the actual local frame. No rectangular fallback. */
   shapeGeometry?: ShapePresetGeometry;
+  /** Actual source shapes allow stroke-only geometry and preserve per-path fill shading. */
+  shapeSource?: PictureShapeSourceProfile;
 }>;
 type PictureDetailedRasterPlanBase = Readonly<{
   widthPx: number;
@@ -117,6 +122,7 @@ type PictureDetailedRasterPlanBase = Readonly<{
   frontHeightRaster: number;
   isProjected: boolean;
   shape: PreparedPictureShapeGeometry | undefined;
+  lineDecorations: PreparedPictureShapeGeometry | undefined;
   estimatedPeakBytes: number;
   assetIds: readonly string[];
 }>;
@@ -291,10 +297,30 @@ export function planDetailedPictureRaster(
     throw new TypeError("Picture projection requires both pure bounds and a raster projector.");
   if (options.frontPaintBounds) assertPictureEffectBounds(options.frontPaintBounds);
   const shape = options.shapeGeometry
-    ? preparePictureShapeGeometry(options.shapeGeometry, {
-        width: options.widthPx,
-        height: options.heightPx,
-      })
+    ? preparePictureShapeGeometry(
+        options.shapeGeometry,
+        {
+          width: options.widthPx,
+          height: options.heightPx,
+        },
+        options.shapeSource,
+      )
+    : undefined;
+  if (options.shapeSource && !shape)
+    throw new TypeError("Drawing source profile requires numeric shape geometry.");
+  const decorationPaths = validatePictureShapeLineDecorations(options.shapeSource);
+  const lineDecorations = decorationPaths.length
+    ? preparePictureShapeGeometry(
+        {
+          width: options.widthPx,
+          height: options.heightPx,
+          paths: decorationPaths,
+          handles: [],
+          adjustments: {},
+        },
+        { width: options.widthPx, height: options.heightPx },
+        { kind: "drawing" },
+      )
     : undefined;
   const limits = checkedLimits(options.limits);
   const line = value(style?.line),
@@ -376,6 +402,20 @@ export function planDetailedPictureRaster(
             }),
           )
         : frame;
+    if (lineDecorations && line && line.widthPt > 0 && line.paint.opacity > 0) {
+      const decorationStroke = getPictureShapeStrokeBounds(lineDecorations, line);
+      const extent = decorationStroke
+        ? unionPictureEffectBounds(lineDecorations.fillBounds, decorationStroke)
+        : lineDecorations.fillBounds;
+      front = integerPictureEffectBounds(
+        unionPictureEffectBounds(front, {
+          left: extent.left * density - 1,
+          top: extent.top * density - 1,
+          right: extent.right * density + 1,
+          bottom: extent.bottom * density + 1,
+        }),
+      );
+    }
     if (options.frontPaintBounds)
       front = integerPictureEffectBounds(
         unionPictureEffectBounds(front, {
@@ -469,7 +509,10 @@ export function planDetailedPictureRaster(
             : []
           ).length;
     // Immutable preparation plus up to three compound offset/length work sets.
-    const pathBytes = shape ? shape.pointCount * 256 + shape.commandCount * 256 : 0;
+    const pathBytes = shape
+      ? (shape.pointCount + (lineDecorations?.pointCount ?? 0)) * 256 +
+        (shape.commandCount + (lineDecorations?.commandCount ?? 0)) * 256
+      : 0;
     // The union alpha's Canvas/readback/Float32 buffers and source group stay
     // within the aggregate estimate, including line and subsequent effect scratch.
     const bytesPerPixel = shape ? 80 : 64;
@@ -512,6 +555,7 @@ export function planDetailedPictureRaster(
       frontHeightRaster: front.bottom - front.top,
       isProjected,
       shape,
+      lineDecorations,
       estimatedPeakBytes,
       assetIds,
     };
@@ -774,6 +818,54 @@ function compilePaint(
       }
   };
 }
+/** DrawingML path modifiers apply to every paint kind while retaining its alpha/holes. */
+function paintDrawingShapeFill(
+  paint: PicturePaint,
+  compiled: CompiledPaint,
+  plan: PictureDetailedRasterReadyPlan,
+  makeCanvas: CanvasMaker,
+): PictureRgbaSurface {
+  const shape = plan.shape!;
+  const output = createPictureRgbaSurface(plan.frontWidthRaster, plan.frontHeightRaster);
+  const painted = paintRaster(paint, compiled, plan, false);
+  for (let pathIndex = 0; pathIndex < shape.geometry.paths.length; pathIndex++) {
+    const path = shape.geometry.paths[pathIndex]!;
+    if (!path.filled || path.fillMode === "none") continue;
+    const mask = createPictureShapeAlphaMask({
+      shape,
+      density: plan.actualDensity,
+      boundsRaster: plan.frontBoundsRaster,
+      pathIndex,
+      canvasFactory: () => makeCanvas(plan.frontWidthRaster, plan.frontHeightRaster),
+    });
+    const mode = path.fillMode ?? "norm";
+    const brightness =
+      mode === "lighten"
+        ? 0.4
+        : mode === "lightenLess"
+          ? 0.2
+          : mode === "darken"
+            ? -0.4
+            : mode === "darkenLess"
+              ? -0.2
+              : 0;
+    // Reuse one layer at a time; the estimate includes masks/readback/three RGBA surfaces.
+    const layer = createPictureRgbaSurface(painted.width, painted.height);
+    for (let pixel = 0; pixel < mask.data.length; pixel++) {
+      const index = pixel * 4;
+      layer.data[index + 3] = painted.data[index + 3]! * mask.data[pixel]!;
+      if (layer.data[index + 3] === 0) continue;
+      for (let channel = 0; channel < 3; channel++) {
+        const color = painted.data[index + channel]!;
+        layer.data[index + channel] =
+          brightness < 0 ? color * (1 + brightness) : color + (255 - color) * brightness;
+      }
+    }
+    sourceOverInto(output, layer, 0, 0);
+  }
+  return output;
+}
+
 function sampleTextureInto(
   texture: PictureRgbaSurface,
   x: number,
@@ -938,6 +1030,19 @@ function lineMask(
     if (plan.shape) {
       context.translate(-body.left, -body.top);
       strokePictureShapeOutline(context, plan.shape, line, plan.actualDensity);
+      if (plan.lineDecorations) {
+        context.save();
+        context.scale(plan.actualDensity, plan.actualDensity);
+        paintPictureShapeFillMask(context, plan.lineDecorations);
+        context.restore();
+        // Marker outlines are continuous, independent of the centerline's dash phase.
+        strokePictureShapeOutline(
+          context,
+          plan.lineDecorations,
+          { ...line, dash: "solid", compound: "single" },
+          plan.actualDensity,
+        );
+      }
       return readCanvas(canvas);
     }
     const width = plan.widthPx * plan.actualDensity,
@@ -1172,7 +1277,9 @@ export function createDetailedPictureRaster(
     const glowColor = glow ? resolvePictureColor(glow.color, options.theme) : undefined;
     let body =
       fill && fillPainter
-        ? paintRaster(fill, fillPainter, plan, !plan.shape)
+        ? plan.shape?.drawingSource
+          ? paintDrawingShapeFill(fill, fillPainter, plan, makeCanvas)
+          : paintRaster(fill, fillPainter, plan, !plan.shape)
         : createPictureRgbaSurface(plan.frontWidthRaster, plan.frontHeightRaster);
     const source = drawSource(plan, options.sourcePainter, makeCanvas);
     sourceOverInto(
@@ -1181,7 +1288,7 @@ export function createDetailedPictureRaster(
       plan.shape ? 0 : -plan.frontBoundsRaster.left,
       plan.shape ? 0 : -plan.frontBoundsRaster.top,
     );
-    if (plan.shape) {
+    if (plan.shape && !plan.shape.drawingSource) {
       const shapeMask = createPictureShapeAlphaMask({
         shape: plan.shape,
         density: plan.actualDensity,

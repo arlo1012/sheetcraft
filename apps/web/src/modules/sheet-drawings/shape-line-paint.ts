@@ -5,6 +5,7 @@ import {
   flattenShapePath,
   FREE_SHAPE_PATH_WORK_BUDGET,
   type EvaluatedShapePresetGeometry,
+  type ShapePathCommand,
 } from "@sheetcraft/core/shape-presets";
 import { type PictureFrameRect } from "@sheetcraft/core/picture-frame";
 import {
@@ -15,6 +16,8 @@ import {
 type Point = Readonly<{ x: number; y: number }>;
 export type ShapeEndPaint = Readonly<{
   d: string;
+  /** Bounded numeric marker source for raster paint; no SVG parsing. */
+  commands: readonly ShapePathCommand[];
   filled: boolean;
   bounds: PictureFrameRect;
   contains: (point: Point) => boolean;
@@ -42,6 +45,52 @@ function polygonContains(points: readonly Point[], p: Point): boolean {
     else if (a.y > p.y && b.y <= p.y && cross < 0) winding--;
   }
   return winding !== 0;
+}
+/** Cubic circular arcs have <= 2*r*theta^6/55296 radial error for theta<=pi/2.
+ * Rotation preserves that bound; the ellipse affine scales it by its largest radius. */
+function ovalCommands(
+  center: Point,
+  ux: number,
+  uy: number,
+  rx: number,
+  ry: number,
+): readonly ShapePathCommand[] {
+  const radius = Math.max(rx, ry);
+  const count = Math.max(
+    4,
+    Math.ceil((2 * Math.PI) / Math.min(Math.PI / 2, ((0.01 * 55296) / (2 * radius)) ** (1 / 6))),
+  );
+  if (count > 62) throw new RangeError("Shape oval endpoint exceeds its 0.01px curve budget.");
+  const point = (angle: number): Point => ({
+    x: center.x + ux * rx * Math.cos(angle) - uy * ry * Math.sin(angle),
+    y: center.y + uy * rx * Math.cos(angle) + ux * ry * Math.sin(angle),
+  });
+  const tangent = (angle: number): Point => ({
+    x: -ux * rx * Math.sin(angle) - uy * ry * Math.cos(angle),
+    y: -uy * rx * Math.sin(angle) + ux * ry * Math.cos(angle),
+  });
+  const first = point(0),
+    commands: ShapePathCommand[] = [["M", first.x, first.y]];
+  for (let index = 0; index < count; index++) {
+    const a = (index * 2 * Math.PI) / count,
+      b = ((index + 1) * 2 * Math.PI) / count,
+      k = (4 / 3) * Math.tan((b - a) / 4);
+    const start = point(a),
+      end = point(b),
+      ta = tangent(a),
+      tb = tangent(b);
+    commands.push([
+      "C",
+      start.x + k * ta.x,
+      start.y + k * ta.y,
+      end.x - k * tb.x,
+      end.y - k * tb.y,
+      end.x,
+      end.y,
+    ]);
+  }
+  commands.push(["Z"]);
+  return Object.freeze(commands.map((command) => Object.freeze(command)));
 }
 function marker(
   end: ShapeLineEnd,
@@ -73,6 +122,7 @@ function marker(
     return {
       d: `M${a.x} ${a.y} A${l / 2} ${w / 2} ${rotation} 1 0 ${b.x} ${b.y} A${l / 2} ${w / 2} ${rotation} 1 0 ${a.x} ${a.y} Z`,
       filled: true,
+      commands: ovalCommands(center, ux, uy, l / 2, w / 2),
       bounds: {
         x: center.x - rx - half,
         y: center.y - ry - half,
@@ -123,6 +173,12 @@ function marker(
   return {
     d: points.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ") + (filled ? " Z" : ""),
     filled,
+    commands: Object.freeze([
+      ...points.map(
+        (point, index) => Object.freeze([index ? "L" : "M", point.x, point.y]) as ShapePathCommand,
+      ),
+      ...(filled ? [Object.freeze(["Z"] as const)] : []),
+    ]),
     bounds: {
       x,
       y,

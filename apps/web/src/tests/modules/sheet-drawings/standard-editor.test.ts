@@ -165,3 +165,37 @@ describe("standard gallery editor intent and draft integrity", () => {
     w.unmount();
   });
 });
+
+test("3D shape adding text is blocked visibly, retains data and can be corrected without changing the original", async () => {
+  const original: SheetGraphicDrawing = {
+    ...shape,
+    text: "",
+    shapeStyle: {
+      rotation3d: {
+        kind: "value",
+        value: { projection: "parallel", xDeg: 37, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+      },
+    },
+  };
+  const w = fixture(original);
+  try {
+    w.getComponent(Textarea).vm.$emit("update:modelValue", "new label");
+    await nextTick();
+    expect(w.getComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: true });
+    expect(w.text()).toContain("形状三维文字尚未接通");
+    w.getComponent(Dialog).vm.$emit("confirm");
+    expect(w.emitted("confirm")).toBeUndefined();
+    expect(original.text).toBe("");
+    expect(original.shapeStyle?.rotation3d?.kind).toBe("value");
+    w.getComponent(Textarea).vm.$emit("update:modelValue", "");
+    await nextTick();
+    expect(w.getComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: false });
+    w.getComponent(Dialog).vm.$emit("confirm");
+    expect(w.emitted("confirm")?.[0]?.[0]).toMatchObject({
+      text: "",
+      shapeStyle: original.shapeStyle,
+    });
+  } finally {
+    w.unmount();
+  }
+});

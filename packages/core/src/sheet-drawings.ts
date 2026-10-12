@@ -5,6 +5,7 @@ import {
 } from "./shape-line-ends.js";
 import { normalizeShapePresetParameters } from "./shape-presets/contract.js";
 import type { ShapePresetParameters } from "./shape-presets/types.js";
+import { normalizeShapeStyle, type ShapeDetailedStyle } from "./shape-style.js";
 import {
   isShapeFreePathClosed,
   normalizeShapeFreePath,
@@ -62,6 +63,8 @@ export type SheetGraphicDrawing = DrawingBase & {
   /** Sparse mirroring of explicit standard or free geometry, before drawing rotation. */
   shapeFlipX?: true;
   shapeFlipY?: true;
+  /** Shape-only sparse paint, line and effects; absent categories keep the legacy appearance. */
+  shapeStyle?: ShapeDetailedStyle;
   /** Sparse opt-in vertical text boxes; existing drawings retain horizontal text. */
   textDirection?: "vertical";
 };
@@ -200,6 +203,14 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   }
   if (value.kind === "camera" && (!value.camera || typeof value.camera.gridLines !== "boolean"))
     throw new RangeError("Invalid camera.");
+  const styleField = Object.getOwnPropertyDescriptor(value, "shapeStyle");
+  if (!styleField && "shapeStyle" in value)
+    throw new TypeError("Shape styles must be own data fields.");
+  if (styleField && !("value" in styleField))
+    throw new TypeError("Shape styles cannot be accessors.");
+  if (styleField && value.kind !== "shape")
+    throw new TypeError("Only a shape drawing may carry a shape style.");
+  const shapeStyle = normalizeShapeStyle(styleField?.value);
   const geometryField = Object.getOwnPropertyDescriptor(value, "shapeGeometry");
   if (geometryField && (geometryField.get || geometryField.set))
     throw new TypeError("Shape geometry cannot be an accessor.");
@@ -271,6 +282,7 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     ...(shapeLineEnds ? { shapeLineEnds } : {}),
     ...(shapeFlipX ? { shapeFlipX: true as const } : {}),
     ...(shapeFlipY ? { shapeFlipY: true as const } : {}),
+    ...(shapeStyle ? { shapeStyle } : {}),
     ...(directionField ? { textDirection: "vertical" as const } : {}),
     name: value.name,
     anchor: { ...value.anchor },

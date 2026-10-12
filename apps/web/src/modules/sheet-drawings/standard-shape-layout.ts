@@ -16,6 +16,7 @@ import {
   standardShapeFlipPoint,
 } from "./shape-geometry";
 import { getShapeEndPaint, standardShapeAppearance } from "./shape-line-paint";
+import { detailedShapeLocalBounds } from "./shape-detailed-presentation";
 
 export function standardShapeResizeRect(
   rect: PictureFrameRect,
@@ -110,11 +111,17 @@ export function getStandardShapeViewportFragments(
   selected = false,
 ): FloatingImageViewportFragment[] {
   const rect = getFloatingImageSheetRect(drawing, layout);
-  if (!rect || (!drawing.shapeGeometry && !drawing.shapePath)) return [];
+  if (!rect || (!drawing.shapeGeometry && !drawing.shapePath && !drawing.shapeStyle)) return [];
   const shape = getDrawingShapeGeometry(drawing);
   const bounds = getStandardShapeWorldBounds(
     shape,
-    standardShapeAppearance(drawing),
+    drawing.shapeStyle
+      ? {
+          ...standardShapeAppearance(drawing),
+          fill: "transparent",
+          stroke: "transparent",
+        }
+      : standardShapeAppearance(drawing),
     rect,
     drawing.rotation,
   );
@@ -125,12 +132,43 @@ export function getStandardShapeViewportFragments(
         { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
       ]
     : [];
-  for (const paint of getShapeEndPaint(drawing, shape)) {
+  if (drawing.shapeStyle) {
+    try {
+      const local = detailedShapeLocalBounds(drawing);
+      if (local)
+        points.push(
+          ...[
+            { x: local.left, y: local.top },
+            { x: local.left + local.width, y: local.top },
+            { x: local.left + local.width, y: local.top + local.height },
+            { x: local.left, y: local.top + local.height },
+          ].map((p) =>
+            pictureFrameLocalToWorld(rect, drawing.rotation, standardShapeFlipPoint(drawing, p)),
+          ),
+        );
+    } catch {
+      // A bounded unavailable status remains reachable; no unformatted fallback.
+      points.push(
+        ...[
+          { x: 0, y: 0 },
+          { x: drawing.width, y: 0 },
+          { x: drawing.width, y: drawing.height },
+          { x: 0, y: drawing.height },
+        ].map((p) =>
+          pictureFrameLocalToWorld(rect, drawing.rotation, standardShapeFlipPoint(drawing, p)),
+        ),
+      );
+    }
+  }
+  for (const paint of drawing.shapeStyle ? [] : getShapeEndPaint(drawing, shape)) {
     points.push(
       ...[
         { x: paint.bounds.x, y: paint.bounds.y },
         { x: paint.bounds.x + paint.bounds.width, y: paint.bounds.y },
-        { x: paint.bounds.x + paint.bounds.width, y: paint.bounds.y + paint.bounds.height },
+        {
+          x: paint.bounds.x + paint.bounds.width,
+          y: paint.bounds.y + paint.bounds.height,
+        },
         { x: paint.bounds.x, y: paint.bounds.y + paint.bounds.height },
       ].map((p) =>
         pictureFrameLocalToWorld(rect, drawing.rotation, standardShapeFlipPoint(drawing, p)),
@@ -170,7 +208,13 @@ export function getStandardShapeViewportFragments(
       layout.panes[paneId].clip,
     );
     return clippedRect
-      ? [{ paneId, rect: { ...rect, x: rect.x + delta.x, y: rect.y + delta.y }, clippedRect }]
+      ? [
+          {
+            paneId,
+            rect: { ...rect, x: rect.x + delta.x, y: rect.y + delta.y },
+            clippedRect,
+          },
+        ]
       : [];
   });
 }

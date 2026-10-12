@@ -239,6 +239,10 @@
       "types": "./dist/shape-line-ends.d.ts",
       "import": "./dist/shape-line-ends.js"
     },
+    "./shape-style": {
+      "types": "./dist/shape-style.d.ts",
+      "import": "./dist/shape-style.js"
+    },
     "./shape-free-path": {
       "types": "./dist/shape-free-path.d.ts",
       "import": "./dist/shape-free-path.js"

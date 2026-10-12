@@ -57,7 +57,13 @@ export async function readWorkbookFile(file: Pick<File, "text">): Promise<Workbo
   return parseWorkbookJson(text);
 }
 
-type PortableImage = { id: string; mimeType: string; width: number; height: number; data: string };
+type PortableImage = {
+  id: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  data: string;
+};
 type PortableEnvelope = {
   format: "sheetcraft-workbook";
   version: 1;
@@ -106,6 +112,16 @@ function rewriteImageReferences(workbook: Workbook, ids: ReadonlyMap<string, str
     const watermarkImage = sheet.pageDecoration?.watermark?.image;
     if (watermarkImage)
       watermarkImage.assetId = ids.get(watermarkImage.assetId) ?? watermarkImage.assetId;
+    // Shape paint owns validated image assets just as cell and floating pictures do.
+    for (const drawing of sheet.drawings ?? []) {
+      if (drawing.kind !== "shape") continue;
+      const fill = drawing.shapeStyle?.fill;
+      if (fill?.kind === "value" && fill.value.kind === "picture")
+        fill.value.assetId = ids.get(fill.value.assetId) ?? fill.value.assetId;
+      const line = drawing.shapeStyle?.line;
+      if (line?.kind === "value" && line.value.paint.kind === "picture")
+        line.value.paint.assetId = ids.get(line.value.paint.assetId) ?? line.value.paint.assetId;
+    }
     for (const cell of sheet.cells.values()) {
       if (cell.content?.kind === "image")
         cell.content.image.assetId =
