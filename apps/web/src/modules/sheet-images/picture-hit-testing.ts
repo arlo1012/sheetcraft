@@ -1,4 +1,9 @@
-import { pictureFrameContainsPoint } from "@sheetcraft/core/picture-frame";
+import {
+  getPictureCropShapeWorldBounds,
+  pictureCropShapeContainsPoint,
+} from "./picture-crop-shape";
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { isGroupedPicture } from "@sheetcraft/core/picture-group";
 import type { FloatingImage } from "@sheetcraft/core/workbook";
 import type { Point } from "@sheetcraft/sheet-engine/geometry";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
@@ -21,7 +26,11 @@ export function hitPictureViewportPoint(
 ): PictureViewportFragment | null {
   if (!Number.isFinite(point.x) || !Number.isFinite(point.y))
     throw new RangeError("Picture hit coordinates must be finite.");
-  const fragments = getPictureViewportFragments(roots, layout, frameContext);
+  const fragments = getPictureViewportFragments(roots, layout, frameContext, (picture, geometry) =>
+    isGroupedPicture(picture) || isFramedPictureObject(picture)
+      ? getPictureCropShapeWorldBounds(picture, geometry)
+      : undefined,
+  );
   for (let index = fragments.length - 1; index >= 0; index--) {
     const fragment = fragments[index]!;
     const clip = layout.panes[fragment.paneId].clip;
@@ -40,7 +49,10 @@ export function hitPictureViewportPoint(
       point.y >= rect.y + rect.height
     )
       continue;
-    if (fragment.kind === "legacy" || pictureFrameContainsPoint(fragment.geometry, point))
+    if (
+      fragment.kind === "legacy" ||
+      pictureCropShapeContainsPoint(fragment.image, fragment.geometry, point)
+    )
       return fragment;
   }
   return null;

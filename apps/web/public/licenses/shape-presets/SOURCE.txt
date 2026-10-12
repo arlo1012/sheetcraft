@@ -1,0 +1,5 @@
+Sheetcraft's preset geometry data is compiled from Apache POI's presetShapeDefinitions.xml.
+Source: https://github.com/apache/poi/blob/338882ac8898df5c13a7d15f533204c5dd8607d6/poi/src/main/resources/org/apache/poi/sl/draw/geom/presetShapeDefinitions.xml
+License: Apache License 2.0. See LICENSE.txt and NOTICE.txt in this directory.
+The original pinned data and deterministic compiler are included in the Sheetcraft source tree.
+The product uses numeric geometry generated from these definitions, not copied office UI icons.

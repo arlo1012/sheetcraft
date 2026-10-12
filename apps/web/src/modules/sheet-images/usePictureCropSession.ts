@@ -1,3 +1,13 @@
+import { assertPicturePaintSupport } from "./picture-paint-effects";
+import type { DrawingThemeEffects } from "./drawing-theme-effects";
+import { moveShapePictureSource, retainShapePictureSource } from "./picture-crop-shape";
+import {
+  normalizePictureCropShape,
+  moveShapePresetAdjustment,
+  evaluateShapePreset,
+  type PictureCropShape,
+} from "@sheetcraft/core/shape-presets";
+import { resetResolvedPictureCrop } from "@sheetcraft/core/picture-crop-edit";
 import { normalizePictureProperties } from "@sheetcraft/core/picture-properties";
 import { computed, getCurrentScope, onScopeDispose, shallowRef, watch } from "vue";
 import { canEditPictureRoot, canEditPictureSelection } from "@sheetcraft/core/picture-protection";
@@ -41,6 +51,7 @@ import {
 import { resolveOwnedPictureNode, samePictureGroupPath } from "./picture-group-interaction";
 import { applyStandalonePictureCrop, getPictureFormatCropState } from "./picture-format-crop";
 
+type PictureCropDraft = ResolvedPictureCrop & { cropShape?: PictureCropShape };
 export type PictureCropDirection = FloatingImageResizeDirection | "source";
 type CropContext = PictureFrameLayoutContext;
 type Lease = {
@@ -55,12 +66,13 @@ type Lease = {
   metrics: CropContext["metrics"];
   geometryFunctions: readonly unknown[];
   geometryKey: string;
-  initial: ResolvedPictureCrop;
+  themeSignature: string;
+  initial: PictureCropDraft;
   node: Exclude<FloatingImage, { kind: "picture-group-v1" }> | GroupedPicture;
 };
 export type PictureCropGestureSnapshot = {
   sessionId: number;
-  crop: ResolvedPictureCrop;
+  crop: PictureCropDraft;
 };
 export interface PictureCropSessionOptions {
   getSheet: () => Sheet;
@@ -71,11 +83,13 @@ export interface PictureCropSessionOptions {
   getSelectedPath: () => PictureGroupPath | null | undefined;
   isReadOnly: () => boolean;
   execute: (roots: readonly FloatingImage[]) => boolean;
+  getThemeEffects?: () => DrawingThemeEffects | undefined;
   onFailure?: () => void;
 }
 let sessionSequence = 0;
-function sameCrop(left: ResolvedPictureCrop, right: ResolvedPictureCrop): boolean {
+function sameCrop(left: PictureCropDraft, right: PictureCropDraft): boolean {
   return (
+    JSON.stringify(left.cropShape) === JSON.stringify(right.cropShape) &&
     left.layout.angleDeg === right.layout.angleDeg &&
     (["x", "y", "width", "height"] as const).every(
       (key) => left.layout.rect[key] === right.layout.rect[key],
@@ -113,11 +127,11 @@ function forestGeometryKey(
 
 /** One real source owner, one complete-forest commit; pointer previews never edit the workbook. */
 export function usePictureCropSession(options: PictureCropSessionOptions) {
-  const active = shallowRef<{ lease: Lease; crop: ResolvedPictureCrop }>();
+  const active = shallowRef<{ lease: Lease; crop: PictureCropDraft }>();
   let disposed = false;
   let executing = false;
-  let undoDrafts: ResolvedPictureCrop[] = [];
-  let redoDrafts: ResolvedPictureCrop[] = [];
+  let undoDrafts: PictureCropDraft[] = [];
+  let redoDrafts: PictureCropDraft[] = [];
   function capture(): Lease | undefined {
     if (disposed || options.isReadOnly()) return;
     const sheet = options.getSheet(),
@@ -147,9 +161,12 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
       context.metrics,
     );
     if (!cropState) return;
-    const initial: ResolvedPictureCrop = {
+    const initial: PictureCropDraft = {
       layout: resolvePictureLayout(cropState.layout.rect, cropState.layout.angleDeg),
       source: cropState.source,
+      ...(isGroupedPicture(node) || isFramedPictureObject(node)
+        ? { cropShape: normalizePictureCropShape(node.frame.cropShape) }
+        : {}),
     };
     return {
       id: ++sessionSequence,
@@ -163,6 +180,7 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
       metrics: context.metrics,
       geometryFunctions: functions(context.metrics),
       geometryKey: forestGeometryKey(roots, context.metrics),
+      themeSignature: JSON.stringify(options.getThemeEffects?.()) ?? "",
       initial,
       node,
     };
@@ -178,6 +196,7 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
       options.getRevision() !== lease.revision ||
       lease.sheet.floatingImages !== lease.rootsReference ||
       context.metrics !== lease.metrics ||
+      (JSON.stringify(options.getThemeEffects?.()) ?? "") !== lease.themeSignature ||
       options.getSelectedIds().length !== 1 ||
       options.getSelectedIds()[0] !== lease.path[0] ||
       !samePictureGroupPath(options.getSelectedPath(), lease.selectedPath) ||
@@ -217,7 +236,7 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
       return false;
     }
   });
-  function plan(lease: Lease, crop: ResolvedPictureCrop): FloatingImage[] {
+  function plan(lease: Lease, crop: PictureCropDraft): FloatingImage[] {
     if (sameCrop(crop, lease.initial)) return lease.roots;
     const root = lease.roots.find((entry) => entry.id === lease.path[0])!;
     const replacement =
@@ -227,16 +246,24 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
             leasePictureGroupNode(root, lease.path),
             crop.layout,
             lease.metrics,
-            { replacement: { ...lease.node, frame: { ...lease.node.frame, source: crop.source } } },
+            {
+              replacement: {
+                ...lease.node,
+                frame: { ...lease.node.frame, source: crop.source, cropShape: crop.cropShape },
+              },
+            },
           )
         : !isPictureGroup(root)
-          ? applyStandalonePictureCrop(root, lease.initial, crop, lease.metrics)
+          ? applyStandalonePictureCrop(root, lease.initial, crop, lease.metrics, {
+              cropShape: crop.cropShape,
+            })
           : undefined;
     if (!replacement) throw new TypeError("Crop editing requires its exact source-bearing owner.");
     const roots = normalizePictureObjectCollection(
       lease.roots.map((entry) => (entry.id === root.id ? replacement : entry)),
     );
     forestGeometryKey(roots, lease.metrics);
+    assertPicturePaintSupport(roots, options.getThemeEffects?.(), lease.metrics);
     return roots;
   }
   const previewRoots = computed(() => {
@@ -254,7 +281,10 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
     const { lease, crop } = state;
     let picture: FramedFloatingImage | GroupedPicture;
     if (isGroupedPicture(lease.node)) {
-      picture = { ...lease.node, frame: { ...lease.node.frame, source: crop.source } };
+      picture = {
+        ...lease.node,
+        frame: { ...lease.node.frame, source: crop.source, cropShape: crop.cropShape },
+      };
     } else {
       const node = lease.node;
       const frame = isFramedPictureObject(node)
@@ -266,7 +296,7 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
         assetId: node.assetId,
         altText: node.altText,
         ...normalizePictureProperties(node),
-        frame: { ...frame, source: crop.source },
+        frame: { ...frame, source: crop.source, cropShape: crop.cropShape },
         ...(node.transform?.appearance || node.transform?.annotations
           ? {
               transform: {
@@ -296,10 +326,16 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
     const state = active.value;
     if (!state || snapshot.sessionId !== state.lease.id || !current(state.lease)) return false;
     try {
-      const crop =
+      const baseline = { layout: snapshot.crop.layout, source: snapshot.crop.source };
+      let moved =
         direction === "source"
-          ? moveResolvedPictureCropSourceBy(snapshot.crop, delta)
-          : resizeResolvedPictureCropBy(snapshot.crop, direction, delta);
+          ? snapshot.crop.cropShape
+            ? moveShapePictureSource(baseline, snapshot.crop.cropShape, delta)
+            : moveResolvedPictureCropSourceBy(baseline, delta)
+          : resizeResolvedPictureCropBy(baseline, direction, delta);
+      if (direction !== "source" && snapshot.crop.cropShape)
+        moved = retainShapePictureSource(baseline, moved, snapshot.crop.cropShape);
+      const crop: PictureCropDraft = { ...moved, cropShape: snapshot.crop.cropShape };
       plan(state.lease, crop);
       active.value = { lease: state.lease, crop };
       return true;
@@ -333,7 +369,13 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
     const state = active.value;
     if (!state || !current(state.lease)) return false;
     try {
-      const crop = fitResolvedPictureCropToRatio(state.crop, ratio);
+      const crop: PictureCropDraft = {
+        ...fitResolvedPictureCropToRatio(
+          { layout: state.crop.layout, source: state.crop.source },
+          ratio,
+        ),
+        cropShape: state.crop.cropShape,
+      };
       plan(state.lease, crop);
       if (!sameCrop(crop, state.crop)) {
         undoDrafts.push(state.crop);
@@ -344,6 +386,87 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
     } catch {
       options.onFailure?.();
       if (!current(state.lease)) cancel();
+      return false;
+    }
+  }
+  function setShape(value: PictureCropShape | undefined): boolean {
+    const state = active.value;
+    if (!state || !current(state.lease)) return false;
+    try {
+      const crop: PictureCropDraft = { ...state.crop, cropShape: normalizePictureCropShape(value) };
+      plan(state.lease, crop);
+      if (!sameCrop(crop, state.crop)) {
+        undoDrafts.push(state.crop);
+        redoDrafts = [];
+        active.value = { lease: state.lease, crop };
+      }
+      return true;
+    } catch {
+      options.onFailure?.();
+      if (!current(state.lease)) cancel();
+      return false;
+    }
+  }
+  function resetShapeAndCrop(): boolean {
+    const state = active.value;
+    if (!state || !current(state.lease)) return false;
+    try {
+      const crop: PictureCropDraft = {
+        ...resetResolvedPictureCrop(state.crop.layout, state.crop.source),
+      };
+      plan(state.lease, crop);
+      if (!sameCrop(crop, state.crop)) {
+        undoDrafts.push(state.crop);
+        redoDrafts = [];
+        active.value = { lease: state.lease, crop };
+      }
+      return true;
+    } catch {
+      options.onFailure?.();
+      if (!current(state.lease)) cancel();
+      return false;
+    }
+  }
+  function previewShapeAdjustment(
+    snapshot: PictureCropGestureSnapshot,
+    index: number,
+    delta: Point,
+  ): boolean {
+    const state = active.value;
+    if (
+      !state ||
+      snapshot.sessionId !== state.lease.id ||
+      !current(state.lease) ||
+      !snapshot.crop.cropShape
+    )
+      return false;
+    try {
+      const geometry = evaluateShapePreset(
+          snapshot.crop.cropShape,
+          snapshot.crop.layout.rect.width,
+          snapshot.crop.layout.rect.height,
+        ),
+        handle = geometry.handles[index];
+      if (!handle) return false;
+      const angle = (-snapshot.crop.layout.angleDeg * Math.PI) / 180;
+      const target = {
+        x: handle.position.x + delta.x * Math.cos(angle) - delta.y * Math.sin(angle),
+        y: handle.position.y + delta.x * Math.sin(angle) + delta.y * Math.cos(angle),
+      };
+      const crop: PictureCropDraft = {
+        ...snapshot.crop,
+        cropShape: moveShapePresetAdjustment(
+          snapshot.crop.cropShape,
+          geometry.width,
+          geometry.height,
+          index,
+          target,
+        ),
+      };
+      plan(state.lease, crop);
+      active.value = { lease: state.lease, crop };
+      return true;
+    } catch {
       return false;
     }
   }
@@ -390,6 +513,7 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
       options.getGeneration,
       options.getRevision,
       options.isReadOnly,
+      () => JSON.stringify(options.getThemeEffects?.()),
       () => options.getSheet().floatingImages,
       () => JSON.stringify(options.getSelectedIds()),
       () => JSON.stringify(options.getSelectedPath() ?? null),
@@ -419,6 +543,9 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
     cancelGesture,
     finishGesture,
     setRatio,
+    setShape,
+    resetShapeAndCrop,
+    previewShapeAdjustment,
     undoDraft: () => changeDraftHistory(false),
     redoDraft: () => changeDraftHistory(true),
   };

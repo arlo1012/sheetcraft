@@ -1,3 +1,6 @@
+import { getPictureCropShapeGeometry, getPictureShapeSourceRect } from "./picture-crop-shape";
+import { tracePictureShapePath } from "../../shared/images/picture-shape-mask";
+import type { ShapePresetGeometry } from "@sheetcraft/core/shape-presets";
 import {
   clonePictureObject,
   isFramedPictureObject,
@@ -151,7 +154,12 @@ function paintSourceBearingPictureContent(
   effects = resolvePictureThemeEffects(normalized.transform?.appearance, effects);
   if (normalized.hidden || geometry.collapsed || !geometry.sourceRect) return;
   const appearance = normalized.transform?.appearance;
-  const detailed = resolvePictureDetailedPaintStyle(appearance, effects);
+  const shape = getPictureCropShapeGeometry(
+    normalized.frame.cropShape,
+    geometry.rect.width,
+    geometry.rect.height,
+  );
+  const detailed = resolvePictureDetailedPaintStyle(appearance, effects, !!shape);
   if (detailed) {
     const { rect } = geometry;
     const local = resolvePictureSourceLayout(
@@ -167,6 +175,7 @@ function paintSourceBearingPictureContent(
       key: JSON.stringify([
         "framed",
         normalized.frame.source,
+        normalized.frame.cropShape,
         normalized.frame.flipHorizontal,
         normalized.frame.flipVertical,
         normalized.transform,
@@ -179,15 +188,20 @@ function paintSourceBearingPictureContent(
       inherited: effects,
       resources,
       angleDeg: geometry.angleDeg,
+      shapeGeometry: shape,
       sourcePainter: (surface) =>
-        paintSourceBearingPictureContent(surface, decoded, pixelPicture, local),
+        shape
+          ? paintShapeSourcePixels(surface, decoded, pixelPicture, local, shape)
+          : paintSourceBearingPictureContent(surface, decoded, pixelPicture, local),
       finishFrontPainter: detailed.remainingTheme
         ? (surface) =>
-            paintDrawingThemeOutline(
-              surface,
-              { x: 0, y: 0, width: rect.width, height: rect.height },
-              detailed.remainingTheme!,
-            )
+            shape
+              ? paintShapeThemeBevel(surface, shape, detailed.remainingTheme!)
+              : paintDrawingThemeOutline(
+                  surface,
+                  { x: 0, y: 0, width: rect.width, height: rect.height },
+                  detailed.remainingTheme!,
+                )
         : undefined,
     })!;
     if (result.kind === "unavailable") throw new PicturePaintUnavailableError(result);
@@ -363,4 +377,64 @@ function paintSourceBearingPictureContent(
 function validateSourceDimensions(width: number, height: number): void {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
     throw new RangeError("Picture source dimensions must be positive and finite.");
+}
+
+/** The compositor owns alpha masking/opacity/effects. This paints genuine source and annotations only. */
+function paintShapeSourcePixels(
+  context: CanvasRenderingContext2D,
+  decoded: HTMLImageElement,
+  picture: FramedFloatingImage | GroupedPicture,
+  geometry: ResolvedPictureFrame,
+  shape: ShapePresetGeometry,
+): void {
+  validateSourceDimensions(decoded.naturalWidth, decoded.naturalHeight);
+  const dest = getPictureShapeSourceRect(geometry, shape),
+    appearance = picture.transform?.appearance;
+  const source = imageAppearanceSource(decoded, appearance);
+  const width = source instanceof HTMLCanvasElement ? source.width : source.naturalWidth,
+    height = source instanceof HTMLCanvasElement ? source.height : source.naturalHeight;
+  validateSourceDimensions(width, height);
+  const flipX = picture.frame.flipHorizontal === true,
+    flipY = picture.frame.flipVertical === true;
+  context.save();
+  try {
+    context.filter = imageAppearanceFilter(appearance);
+    context.translate(dest.x + (flipX ? dest.width : 0), dest.y + (flipY ? dest.height : 0));
+    context.scale(
+      ((flipX ? -1 : 1) * dest.width) / width,
+      ((flipY ? -1 : 1) * dest.height) / height,
+    );
+    context.drawImage(source, 0, 0, width, height);
+    if (picture.transform?.annotations?.length)
+      paintImageAnnotations(context, picture.transform.annotations, width, height);
+  } finally {
+    context.restore();
+  }
+}
+/** Existing inherited bevel remains a simple two-tone edge, now following genuine preset strokes. */
+function paintShapeThemeBevel(
+  context: CanvasRenderingContext2D,
+  shape: ShapePresetGeometry,
+  effects: DrawingThemeEffects,
+): void {
+  if (!effects.bevel) return;
+  for (const [offset, color] of [
+    [-0.5, "rgb(255 255 255 / 76%)"],
+    [0.5, "rgb(0 0 0 / 40%)"],
+  ] as const) {
+    context.save();
+    try {
+      context.translate(offset, offset);
+      context.lineWidth = 1;
+      context.strokeStyle = color;
+      for (const path of shape.paths)
+        if (path.stroke) {
+          context.beginPath();
+          tracePictureShapePath(context, path);
+          context.stroke();
+        }
+    } finally {
+      context.restore();
+    }
+  }
 }

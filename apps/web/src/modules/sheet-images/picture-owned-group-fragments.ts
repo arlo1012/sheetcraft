@@ -1,7 +1,8 @@
 import {
-  pictureFrameContainsPoint,
-  type ResolvedPictureFrame,
-} from "@sheetcraft/core/picture-frame";
+  getPictureCropShapeWorldBounds,
+  pictureCropShapeContainsPoint,
+} from "./picture-crop-shape";
+import { type ResolvedPictureFrame } from "@sheetcraft/core/picture-frame";
 import type {
   GroupedPicture,
   PictureGroup,
@@ -92,7 +93,11 @@ export function hitOwnedPictureGroupViewportPoint(
 ): OwnedPictureGroupViewportFragment | null {
   if (!Number.isFinite(point.x) || !Number.isFinite(point.y))
     throw new RangeError("Owned picture hit coordinates must be finite.");
-  const fragments = getOwnedPictureGroupViewportFragments(group, context);
+  const fragments = getOwnedPictureGroupViewportFragments(
+    group,
+    context,
+    getPictureCropShapeWorldBounds,
+  );
   for (let index = fragments.length - 1; index >= 0; index--) {
     const fragment = fragments[index]!;
     const clip = context.layout.panes[fragment.paneId].clip;
@@ -101,7 +106,7 @@ export function hitOwnedPictureGroupViewportPoint(
       point.x < clip.x + clip.width &&
       point.y >= clip.y &&
       point.y < clip.y + clip.height &&
-      pictureFrameContainsPoint(fragment.geometry, point)
+      pictureCropShapeContainsPoint(fragment.image, fragment.geometry, point)
     )
       return fragment;
   }

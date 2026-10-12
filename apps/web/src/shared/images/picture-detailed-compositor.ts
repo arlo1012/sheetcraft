@@ -9,6 +9,7 @@ import {
   type PictureShadow,
 } from "@sheetcraft/core/picture-detailed-style";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import type { ShapePresetGeometry } from "@sheetcraft/core/shape-presets";
 import {
   assertPictureEffectBounds,
   expandPictureEffectBounds,
@@ -35,6 +36,15 @@ import {
 } from "./picture-effect-raster";
 import { resolvePictureColor, resolvePicturePaintStops } from "./picture-paint-color";
 import { createPicturePatternSampler } from "./picture-paint-pattern";
+import {
+  applyPictureShapeAlphaMask,
+  createPictureShapeAlphaMask,
+  getPictureShapeOutlineIntervalCount,
+  getPictureShapeStrokeBounds,
+  preparePictureShapeGeometry,
+  strokePictureShapeOutline,
+  type PreparedPictureShapeGeometry,
+} from "./picture-shape-mask";
 
 /** Domain lengths are points; frames and returned paint bounds are logical CSS pixels. */
 export const PICTURE_POINT_TO_LOGICAL_PIXEL = 4 / 3;
@@ -86,6 +96,8 @@ export type PictureDetailedRasterPlanOptions = Readonly<{
   projectSurface?: PictureDetailedSurfaceProjector;
   /** Extra front paint such as an inherited outline must declare any outside-frame extent. */
   frontPaintBounds?: PictureEffectBounds;
+  /** Already evaluated numeric paths in the actual local frame. No rectangular fallback. */
+  shapeGeometry?: ShapePresetGeometry;
 }>;
 type PictureDetailedRasterPlanBase = Readonly<{
   widthPx: number;
@@ -104,6 +116,7 @@ type PictureDetailedRasterPlanBase = Readonly<{
   frontWidthRaster: number;
   frontHeightRaster: number;
   isProjected: boolean;
+  shape: PreparedPictureShapeGeometry | undefined;
   estimatedPeakBytes: number;
   assetIds: readonly string[];
 }>;
@@ -121,8 +134,9 @@ export type PictureDetailedRasterPlan =
 export type PictureDetailedRasterOptions = Omit<PictureDetailedRasterPlanOptions, "getAssetSize"> &
   Readonly<{
     theme: WorkbookTheme;
-    /** Draw source pixels, pixel filters and annotations into the unrotated 0..width/height frame.
-     * The context is already scaled and clipped. Do not apply whole-picture opacity here. */
+    /** Draw source pixels, pixel filters and annotations in the unrotated local frame.
+     * With a shape, its true out-of-frame bounds are available; no second frame rect clips tails.
+     * The context is already scaled. Do not apply whole-picture opacity here. */
     sourcePainter: (context: CanvasRenderingContext2D) => void;
     getAssetImage?: (assetId: string) => DecodedPicturePaintImage | undefined;
     canvasFactory?: () => HTMLCanvasElement;
@@ -276,6 +290,12 @@ export function planDetailedPictureRaster(
   if (isProjected !== hasProjector)
     throw new TypeError("Picture projection requires both pure bounds and a raster projector.");
   if (options.frontPaintBounds) assertPictureEffectBounds(options.frontPaintBounds);
+  const shape = options.shapeGeometry
+    ? preparePictureShapeGeometry(options.shapeGeometry, {
+        width: options.widthPx,
+        height: options.heightPx,
+      })
+    : undefined;
   const limits = checkedLimits(options.limits);
   const line = value(style?.line),
     shadow = value(style?.shadow),
@@ -326,8 +346,27 @@ export function planDetailedPictureRaster(
       bottom: Math.max(1, Math.ceil(frameHeight)),
     };
     const lineWidth = activeLineWidthPt * PICTURE_POINT_TO_LOGICAL_PIXEL * density;
-    let front =
-      lineWidth > 0
+    const filledFrame = shape
+      ? {
+          left: shape.fillBounds.left * density,
+          top: shape.fillBounds.top * density,
+          right: shape.fillBounds.right * density,
+          bottom: shape.fillBounds.bottom * density,
+        }
+      : frame;
+    const shapeStroke = shape && line ? getPictureShapeStrokeBounds(shape, line) : undefined;
+    let front = shape
+      ? integerPictureEffectBounds(
+          shapeStroke
+            ? unionPictureEffectBounds(filledFrame, {
+                left: shapeStroke.left * density - 1,
+                top: shapeStroke.top * density - 1,
+                right: shapeStroke.right * density + 1,
+                bottom: shapeStroke.bottom * density + 1,
+              })
+            : filledFrame,
+        )
+      : lineWidth > 0
         ? integerPictureEffectBounds(
             unionPictureEffectBounds(frame, {
               left: -lineWidth / 2 - 1,
@@ -382,7 +421,14 @@ export function planDetailedPictureRaster(
       scratch.push(integerPictureEffectBounds(bounds));
     };
     if (shadow && shadow.opacity > 0) {
-      const geometry = shadowGeometry(shadow, density, frameWidth, frameHeight, body, isProjected);
+      const geometry = shadowGeometry(
+        shadow,
+        density,
+        frameWidth,
+        frameHeight,
+        body,
+        isProjected || !!shape,
+      );
       addEffect(getPictureShadowBounds(localBody, geometry));
       if (shadow.kind === "inner")
         scratch.push(expandPictureEffectBounds(localBody, Math.ceil(geometry.blurRadiusPx)));
@@ -415,16 +461,29 @@ export function planDetailedPictureRaster(
     }
     // Check path expansion before any Canvas, reads or raster loops. The same
     // centerline phase drives every compound band; no four independently phased sides.
-    const intervals =
-      lineWidth > 0 && line
-        ? getPictureLineDashIntervals(2 * (frameWidth + frameHeight), lineWidth, line.dash)
-        : [];
-    const estimatedPeakBytes = Math.ceil(maxPixels * 64 + intervals.length * 256 + 4096);
+    const intervalCount =
+      shape && line
+        ? getPictureShapeOutlineIntervalCount(shape, line, density)
+        : (lineWidth > 0 && line
+            ? getPictureLineDashIntervals(2 * (frameWidth + frameHeight), lineWidth, line.dash)
+            : []
+          ).length;
+    // Immutable preparation plus up to three compound offset/length work sets.
+    const pathBytes = shape ? shape.pointCount * 256 + shape.commandCount * 256 : 0;
+    // The union alpha's Canvas/readback/Float32 buffers and source group stay
+    // within the aggregate estimate, including line and subsequent effect scratch.
+    const bytesPerPixel = shape ? 80 : 64;
+    const estimatedPeakBytes = Math.ceil(
+      maxPixels * bytesPerPixel + intervalCount * 256 + pathBytes + 4096,
+    );
     const ratio = Math.min(
       1,
       limits.side / maxSide,
       Math.sqrt(limits.pixels / maxPixels),
-      Math.sqrt(Math.max(0, limits.memoryBytes - intervals.length * 256 - 4096) / (maxPixels * 64)),
+      Math.sqrt(
+        Math.max(0, limits.memoryBytes - intervalCount * 256 - pathBytes - 4096) /
+          (maxPixels * bytesPerPixel),
+      ),
     );
     if (ratio < 1) {
       density *= ratio * 0.99;
@@ -452,6 +511,7 @@ export function planDetailedPictureRaster(
       frontWidthRaster: front.right - front.left,
       frontHeightRaster: front.bottom - front.top,
       isProjected,
+      shape,
       estimatedPeakBytes,
       assetIds,
     };
@@ -875,6 +935,11 @@ function lineMask(
   try {
     const context = context2d(canvas),
       body = plan.frontBoundsRaster;
+    if (plan.shape) {
+      context.translate(-body.left, -body.top);
+      strokePictureShapeOutline(context, plan.shape, line, plan.actualDensity);
+      return readCanvas(canvas);
+    }
     const width = plan.widthPx * plan.actualDensity,
       height = plan.heightPx * plan.actualDensity;
     const totalWidth = line.widthPt * PICTURE_POINT_TO_LOGICAL_PIXEL * plan.actualDensity,
@@ -938,6 +1003,20 @@ function drawSource(
   painter: PictureDetailedRasterOptions["sourcePainter"],
   makeCanvas: CanvasMaker,
 ): PictureRgbaSurface {
+  if (plan.shape) {
+    const canvas = makeCanvas(plan.frontWidthRaster, plan.frontHeightRaster);
+    try {
+      const context = context2d(canvas);
+      context.save();
+      context.translate(-plan.frontBoundsRaster.left, -plan.frontBoundsRaster.top);
+      context.scale(plan.actualDensity, plan.actualDensity);
+      painter(context);
+      context.restore();
+      return readCanvas(canvas);
+    } finally {
+      releaseCanvas(canvas);
+    }
+  }
   const canvas = makeCanvas(
     Math.max(1, Math.ceil(plan.widthPx * plan.actualDensity)),
     Math.max(1, Math.ceil(plan.heightPx * plan.actualDensity)),
@@ -1093,10 +1172,24 @@ export function createDetailedPictureRaster(
     const glowColor = glow ? resolvePictureColor(glow.color, options.theme) : undefined;
     let body =
       fill && fillPainter
-        ? paintRaster(fill, fillPainter, plan, true)
+        ? paintRaster(fill, fillPainter, plan, !plan.shape)
         : createPictureRgbaSurface(plan.frontWidthRaster, plan.frontHeightRaster);
     const source = drawSource(plan, options.sourcePainter, makeCanvas);
-    sourceOverInto(body, source, -plan.frontBoundsRaster.left, -plan.frontBoundsRaster.top);
+    sourceOverInto(
+      body,
+      source,
+      plan.shape ? 0 : -plan.frontBoundsRaster.left,
+      plan.shape ? 0 : -plan.frontBoundsRaster.top,
+    );
+    if (plan.shape) {
+      const shapeMask = createPictureShapeAlphaMask({
+        shape: plan.shape,
+        density: plan.actualDensity,
+        boundsRaster: plan.frontBoundsRaster,
+        canvasFactory: () => makeCanvas(plan.frontWidthRaster, plan.frontHeightRaster),
+      });
+      applyPictureShapeAlphaMask(body, shapeMask);
+    }
     if (line && linePainter && line.widthPt > 0 && line.paint.opacity > 0) {
       const mask = lineMask(line, plan, makeCanvas),
         outline = paintRaster(line.paint, linePainter, plan, false);
@@ -1122,7 +1215,7 @@ export function createDetailedPictureRaster(
           plan.widthPx * plan.actualDensity,
           plan.heightPx * plan.actualDensity,
           plan.bodyBoundsRaster,
-          plan.isProjected,
+          plan.isProjected || !!plan.shape,
         )
       : undefined;
     if (shadow?.kind === "inner" && shadow.opacity > 0 && shadowColor && geometry) {

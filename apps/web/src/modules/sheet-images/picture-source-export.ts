@@ -1,3 +1,4 @@
+import { getPictureCropShapeGeometry, getPictureShapeSourceRect } from "./picture-crop-shape";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detailed-style";
 import {
@@ -9,6 +10,7 @@ import { readEncodedImageSource } from "../image-assets/readEncodedImageSource";
 import {
   createPictureSourcePresentationCanvas,
   capturePictureSourcePresentation,
+  planPictureSourcePresentation,
   type PictureSourcePresentation,
 } from "./picture-source-presentation";
 import type { PictureFileFormat } from "./picture-asset-conversion";
@@ -23,6 +25,7 @@ export async function exportPictureSourceBlob(
   shouldContinue: () => boolean,
 ): Promise<Blob | undefined> {
   const snapshot = capturePictureSourcePresentation(presentation.picture, presentation.geometry);
+  planPictureSourcePresentation(snapshot, theme);
   const urls: string[] = [];
   const images: HTMLImageElement[] = [];
   let canvas: HTMLCanvasElement | undefined;
@@ -63,7 +66,14 @@ export async function exportPictureSourceBlob(
     }
     if (!shouldContinue()) return;
     // Preserve source sampling rather than saving only worksheet display pixels.
-    const sourceRect = snapshot.geometry.sourceRect;
+    const mask = getPictureCropShapeGeometry(
+      snapshot.picture.frame.cropShape,
+      snapshot.geometry.rect.width,
+      snapshot.geometry.rect.height,
+    );
+    const sourceRect = mask
+      ? getPictureShapeSourceRect(snapshot.geometry, mask)
+      : snapshot.geometry.sourceRect;
     if (!sourceRect) throw new Error("Picture source geometry is unavailable.");
     const density = Math.min(
       64,

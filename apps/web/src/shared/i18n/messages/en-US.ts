@@ -1835,6 +1835,9 @@ export const enUS = {
     cancelCrop: "Cancel crop",
     cropSelection: "Crop selection",
     cropRatio: "Aspect ratio",
+    cropShape: "Crop to shape",
+    resetShapeAndCrop: "Reset shape and crop",
+    adjustShape: "Adjust shape handle {index} (arrow keys move, Shift for larger steps)",
     cropFree: "Free crop",
     sourceOperationsUnavailable:
       "Finish cropping first. Picture-frame preview and conversion to a cell are not yet supported.",

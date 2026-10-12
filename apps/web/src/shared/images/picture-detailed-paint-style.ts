@@ -11,9 +11,10 @@ const PT_PER_PX = 0.75;
 export function resolvePictureDetailedPaintStyle(
   appearance: ImageAppearance | undefined,
   inherited: DrawingThemeEffects | undefined,
+  forceRaster = false,
 ): { style: PictureDetailedStyle; remainingTheme: DrawingThemeEffects | undefined } | undefined {
   const own = normalizeDetailedPictureStyle(appearance?.detailedStyle);
-  if (!own) return;
+  if (!own && !forceRaster) return;
   const theme = resolvePictureThemeEffects(appearance, inherited);
   const style: PictureDetailedStyle = { ...own };
   if (style.line === undefined && appearance?.border)
@@ -29,6 +30,20 @@ export function resolvePictureDetailedPaintStyle(
         miterLimit: 4,
       },
     };
+  if (forceRaster && style.line === undefined && theme && theme.outlineWidth > 0) {
+    style.line = {
+      kind: "value",
+      value: {
+        paint: { kind: "solid", color: { kind: "rgb", rgb: "#364E6E" }, opacity: 0.72 },
+        widthPt: theme.outlineWidth * PT_PER_PX,
+        compound: "single",
+        dash: "solid",
+        cap: "butt",
+        join: "miter",
+        miterLimit: 4,
+      },
+    };
+  }
   if (style.shadow === undefined) {
     const shadow = appearance?.shadow ?? (theme?.shadow === "none" ? undefined : theme?.shadow);
     if (shadow) {
@@ -56,13 +71,14 @@ export function resolvePictureDetailedPaintStyle(
       value: { size: appearance?.reflection ? 0.25 : 1, opacity: 0.22, blurPt: 0, distancePt: 0 },
     };
   return {
-    style: normalizeDetailedPictureStyle(style)!,
+    style: normalizeDetailedPictureStyle(style) ?? {},
     remainingTheme: theme
       ? {
           ...theme,
           shadow: "none",
           reflection: false,
-          bevel: own.format3d !== undefined ? false : theme.bevel,
+          outlineWidth: forceRaster ? 0 : theme.outlineWidth,
+          bevel: own?.format3d !== undefined ? false : theme.bevel,
         }
       : undefined,
   };

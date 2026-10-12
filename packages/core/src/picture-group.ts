@@ -1,3 +1,5 @@
+import { normalizePictureCropShape } from "./shape-presets/contract.js";
+import type { PictureCropShape } from "./shape-presets/types.js";
 import {
   normalizePictureProperties,
   PICTURE_PROPERTY_KEYS,
@@ -40,6 +42,7 @@ export type PictureGroupMemberFrame = PictureGroupMemberLayout & {
   source: PictureSourceFrame;
   flipHorizontal?: boolean;
   flipVertical?: boolean;
+  cropShape?: PictureCropShape;
 };
 export type PictureGroupLocalFrame = PictureGroupMemberLayout & {
   kind: "group-local-frame-v1";
@@ -248,13 +251,14 @@ export function normalizePictureGroupMemberFrame(
 ): PictureGroupMemberFrame {
   const v = record(
     value,
-    ["kind", "rect", "angleDeg", "source", "flipHorizontal", "flipVertical"],
+    ["kind", "rect", "angleDeg", "source", "flipHorizontal", "flipVertical", "cropShape"],
     "picture group member frame",
   );
   if (v.kind !== "group-member-frame-v1")
     throw new TypeError("Unknown picture group member frame kind.");
   const flipHorizontal = optionalBoolean(v.flipHorizontal, "picture horizontal flip");
   const flipVertical = optionalBoolean(v.flipVertical, "picture vertical flip");
+  const cropShape = normalizePictureCropShape(v.cropShape as PictureCropShape | undefined);
   return {
     kind: "group-member-frame-v1",
     rect: normalizePictureGroupLocalRect(v.rect as PictureGroupLocalRect),
@@ -262,6 +266,7 @@ export function normalizePictureGroupMemberFrame(
     source: normalizePictureSourceFrame(v.source as PictureSourceFrame),
     ...(flipHorizontal === undefined ? {} : { flipHorizontal }),
     ...(flipVertical === undefined ? {} : { flipVertical }),
+    ...(cropShape ? { cropShape } : {}),
   };
 }
 function metadata(v: Record<string, unknown>): PictureGroupMetadata {

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { shapePresetPathToSvg } from "@sheetcraft/core/shape-presets";
+import { getPictureCropShapeGeometry } from "../picture-crop-shape";
 import {
   computed,
   onBeforeUnmount,
@@ -73,6 +75,21 @@ const polygon = (fragment: FramedPictureViewportFragment): string =>
       return `${local.x},${local.y}`;
     })
     .join(" ");
+const mask = computed(() =>
+  getPictureCropShapeGeometry(
+    props.picture.frame.cropShape,
+    props.geometry.rect.width,
+    props.geometry.rect.height,
+  ),
+);
+const maskPaths = computed(() =>
+  mask.value?.paths.filter((path) => path.filled).map(shapePresetPathToSvg),
+);
+function maskTransform(fragment: FramedPictureViewportFragment): string {
+  const r = fragment.geometry.rect,
+    angle = fragment.geometry.angleDeg;
+  return `translate(${r.x - fragment.clippedBounds.x} ${r.y - fragment.clippedBounds.y}) rotate(${angle} ${r.width / 2} ${r.height / 2})`;
+}
 function gridPath(fragment: FramedPictureViewportFragment): string {
   const [nw, ne, se, sw] = fragment.geometry.corners;
   const interpolate = (a: PicturePoint, b: PicturePoint, ratio: number): PicturePoint => ({
@@ -177,6 +194,24 @@ onBeforeUnmount(() => {
         <polygon
           class="sheet-picture-crop-overlay__body"
           :points="polygon(fragment)"
+          v-if="!maskPaths"
+          data-picture-crop-source
+          data-image-crop-selection
+          @pointerdown.prevent.stop="start('source', $event)"
+          @dblclick.prevent.stop
+        />
+        <polygon
+          v-if="maskPaths"
+          class="sheet-picture-crop-overlay__outline"
+          :points="polygon(fragment)"
+        />
+        <path
+          v-for="(path, index) in maskPaths"
+          :key="index"
+          class="sheet-picture-crop-overlay__body"
+          :d="path"
+          :transform="maskTransform(fragment)"
+          fill-rule="nonzero"
           data-picture-crop-source
           data-image-crop-selection
           @pointerdown.prevent.stop="start('source', $event)"
@@ -226,6 +261,12 @@ onBeforeUnmount(() => {
     pointer-events: fill;
     cursor: move;
     touch-action: none;
+  }
+  &__outline {
+    fill: none;
+    stroke: white;
+    stroke-width: 1;
+    pointer-events: none;
   }
   &__grid {
     fill: none;

@@ -61,8 +61,9 @@ for shape in root:
 assert len(definitions) == 187
 assert len(corrections) == 8
 (ROOT / "packages/core/resources/shape-presets/compiled-corrections.json").write_text(json.dumps(corrections, indent=2) + "\n")
+filled = [name for name, definition in definitions.items() if any(path["fill"] != "none" and len(path["commands"]) > 2 for path in definition["paths"])]
 header = "// Generated from the pinned licensed source; do not edit by hand.\n"
 OUT.mkdir(parents=True, exist_ok=True)
-(OUT / "catalog.ts").write_text(header + "export const SHAPE_PRESET_NAMES = " + json_data(list(definitions)) + " as const;\nexport type ShapePresetName = typeof SHAPE_PRESET_NAMES[number];\nexport const SHAPE_PRESET_DEFAULTS: Readonly<Record<ShapePresetName, Readonly<Record<string, number>>>> = " + json_data(defaults) + ";\n")
+(OUT / "catalog.ts").write_text(header + "export const SHAPE_PRESET_NAMES = " + json_data(list(definitions)) + " as const;\nexport type ShapePresetName = typeof SHAPE_PRESET_NAMES[number];\nexport const SHAPE_PRESET_DEFAULTS: Readonly<Record<ShapePresetName, Readonly<Record<string, number>>>> = " + json_data(defaults) + ";\nexport const SHAPE_PRESET_FILLED_NAMES = " + json_data(filled) + " as const;\n")
 (OUT / "definitions.ts").write_text(header + 'import type { ShapePresetDefinition } from "./types.js";\nimport type { ShapePresetName } from "./catalog.js";\nexport const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePresetDefinition>> = ' + json_data(definitions) + ";\n")
 print("Generated", len(definitions), "distinct preset geometries")

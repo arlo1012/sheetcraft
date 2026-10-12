@@ -1,6 +1,6 @@
 import { SHAPE_PRESET_DEFINITIONS } from "./definitions.js";
 import { SHAPE_PRESET_DEFAULTS } from "./catalog.js";
-import { normalizePictureCropShape } from "./contract.js";
+import { normalizeShapePresetParameters } from "./contract.js";
 import { evaluateShapeGuide, readShapeGuide, shapeGuideVariables } from "./formula.js";
 import type {
   PictureCropShape,
@@ -31,7 +31,7 @@ export function evaluateShapePreset(
 ): ShapePresetGeometry {
   if (![width, height].every((value) => Number.isFinite(value) && value > 0 && value <= 10_000))
     throw new RangeError("Preset extents must be positive and at most 10,000 pixels.");
-  const shape = normalizePictureCropShape(input) ?? { preset: "rect" as const };
+  const shape = normalizeShapePresetParameters(input) ?? { preset: "rect" as const };
   const definition = SHAPE_PRESET_DEFINITIONS[shape.preset];
   if (
     definition.guides.length > 512 ||

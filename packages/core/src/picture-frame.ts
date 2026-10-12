@@ -1,3 +1,5 @@
+import { normalizePictureCropShape } from "./shape-presets/contract.js";
+import type { PictureCropShape } from "./shape-presets/types.js";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./sheet-limits.js";
 import {
   MIN_FLOATING_IMAGE_SIZE,
@@ -37,6 +39,7 @@ export type PictureFrame = {
   angleDeg: number;
   flipHorizontal?: boolean;
   flipVertical?: boolean;
+  cropShape?: PictureCropShape;
 };
 export type ResolvedPictureLayout = {
   rect: PictureFrameRect;
@@ -154,13 +157,14 @@ export function normalizePictureAngle(value: number): number {
 export function normalizePictureFrame(frame: PictureFrame): PictureFrame {
   const v = record(
     frame,
-    ["kind", "anchor", "source", "angleDeg", "flipHorizontal", "flipVertical"],
+    ["kind", "anchor", "source", "angleDeg", "flipHorizontal", "flipVertical", "cropShape"],
     "picture frame",
   );
   if (v.kind !== "object-frame-v1") throw new TypeError("Unknown picture frame kind.");
   const anchor = normalizePictureFrameAnchor(v.anchor as PictureFrameAnchor);
   const source = normalizePictureSourceFrame(v.source as PictureSourceFrame);
   const angleDeg = normalizePictureAngle(v.angleDeg as number);
+  const cropShape = normalizePictureCropShape(v.cropShape as PictureCropShape | undefined);
   for (const key of ["flipHorizontal", "flipVertical"] as const)
     if (v[key] !== undefined && typeof v[key] !== "boolean") throw new TypeError(`Invalid ${key}.`);
   return {
@@ -170,6 +174,7 @@ export function normalizePictureFrame(frame: PictureFrame): PictureFrame {
     angleDeg,
     ...(v.flipHorizontal ? { flipHorizontal: true } : {}),
     ...(v.flipVertical ? { flipVertical: true } : {}),
+    ...(cropShape ? { cropShape } : {}),
   };
 }
 export function clonePictureFrame(frame: PictureFrame): PictureFrame {

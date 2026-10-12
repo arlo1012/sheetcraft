@@ -173,3 +173,21 @@ test("encoded source and output byte budgets prevent a partial ZIP download", as
   expect(f.feedback).toHaveBeenCalledWith("picture.assetActionTooLarge", true);
   f.scope.stop();
 });
+test("source-save pure shape admission runs before any current asset read or export request", async () => {
+  const f = await fixture();
+  const framed = f.sheet.floatingImages.find((p) => p.id === "framed")!;
+  if (!("frame" in framed) || !framed.frame || "members" in framed)
+    throw new Error("Expected frame source.");
+  framed.frame.cropShape = {
+    preset: "wedgeRectCallout",
+    adjustments: { adj1: 2147483647, adj2: 0 },
+  };
+  framed.frame.anchor = { mode: "fixed", x: 0, y: 0, size: { width: 1000, height: 1000 } };
+  const read = vi.spyOn(f.store, "get");
+  await f.tools.exportPictures("png");
+  expect(read).not.toHaveBeenCalled();
+  expect(exportPictureSourceBlob).not.toHaveBeenCalled();
+  expect(downloadBlob).not.toHaveBeenCalled();
+  expect(f.feedback).toHaveBeenCalledWith("picture.assetFailed", true);
+  f.scope.stop();
+});

@@ -4,7 +4,7 @@ import type { FloatingImage, LegacyFloatingImage, ImageTransform } from "@sheetc
 import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detailed-style";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
-import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import { isPictureGroup, isGroupedPicture } from "@sheetcraft/core/picture-group";
 import { resolvePictureFrame, resolvePictureSourceLayout } from "@sheetcraft/core/picture-frame";
 import {
   resolvePictureGroup,
@@ -249,6 +249,9 @@ export function paintFloatingImages(
       effects,
       resources,
       density,
+      isGroupedPicture(picture) || isFramedPictureObject(picture)
+        ? picture.frame.cropShape
+        : undefined,
     );
   };
   // Validate every source-bearing leaf, including hidden descendants, before the first cache request.

@@ -257,6 +257,7 @@ export type WorkbookSnapshotV49 = Omit<WorkbookSnapshotV48, "version"> & { versi
 /** Complete typed picture appearance is one protocol feature. */
 export type WorkbookSnapshotV50 = Omit<WorkbookSnapshotV49, "version"> & { version: 50 };
 export type WorkbookSnapshotV51 = Omit<WorkbookSnapshotV50, "version"> & { version: 51 };
+export type WorkbookSnapshotV52 = Omit<WorkbookSnapshotV51, "version"> & { version: 52 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -266,7 +267,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV48
   | WorkbookSnapshotV49
   | WorkbookSnapshotV50
-  | WorkbookSnapshotV51;
+  | WorkbookSnapshotV51
+  | WorkbookSnapshotV52;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -334,7 +336,8 @@ type SnapshotVersion =
   | 48
   | 49
   | 50
-  | 51;
+  | 51
+  | 52;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -409,6 +412,35 @@ function hasPicturePropertyFields(image: unknown): boolean {
       const members = readPictureDataArray<unknown>(
         pictureDataField(node, "members") as readonly unknown[],
         "picture property members",
+        MAX_PICTURE_GROUP_NODES,
+      );
+      for (const member of members) pending.push({ node: member, depth: depth + 1 });
+    }
+  }
+  return false;
+}
+/** Preserve field presence on old protocol payloads before canonical normalization. */
+function hasPictureCropShapeFields(image: unknown): boolean {
+  const pending = [{ node: image, depth: 0 }],
+    seen = new WeakSet<object>();
+  let count = 0;
+  while (pending.length) {
+    const { node, depth } = pending.pop()!;
+    if (!node || typeof node !== "object") continue;
+    if (depth > MAX_PICTURE_GROUP_DEPTH || ++count > MAX_PICTURE_GROUP_NODES)
+      throw new RangeError("Picture mask traversal exceeds ownership budget.");
+    if (seen.has(node)) throw new TypeError("Cyclic or shared picture ownership.");
+    seen.add(node);
+    const frame = pictureDataField(node, "frame");
+    if (frame && typeof frame === "object" && Object.hasOwn(frame, "cropShape")) {
+      pictureDataField(frame, "cropShape");
+      return true;
+    }
+    const kind = pictureDataField(node, "kind");
+    if (kind === "picture-group-v1" || kind === "grouped-group-v1") {
+      const members = readPictureDataArray<unknown>(
+        pictureDataField(node, "members") as readonly unknown[],
+        "picture mask members",
         MAX_PICTURE_GROUP_NODES,
       );
       for (const member of members) pending.push({ node: member, depth: depth + 1 });
@@ -799,6 +831,15 @@ function parseFilter(value: unknown, path: string, version: SnapshotVersion): Sh
 
 function parseFloatingImage(value: unknown, path: string, version: SnapshotVersion): FloatingImage {
   const record = asRecord(value, path);
+  if (version < 52) {
+    try {
+      if (hasPictureCropShapeFields(record))
+        return fail(path, "Picture crop shapes require snapshot version 52.");
+    } catch (error) {
+      if (error instanceof WorkbookDomainError) throw error;
+      return fail(path, error instanceof Error ? error.message : "Invalid picture mask.");
+    }
+  }
   if (version < 51) {
     try {
       if (hasPicturePropertyFields(record))
@@ -1434,6 +1475,11 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       (Array.isArray(record.floatingImages) && record.floatingImages.some(hasPicturePropertyFields))
     )
       version = 51;
+    if (
+      Array.isArray(record.floatingImages) &&
+      record.floatingImages.some(hasPictureCropShapeFields)
+    )
+      version = 52;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -1534,40 +1580,43 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   );
   return {
     // Preserve the existing protocol for documents that do not use the new feature.
-    version: sheets.some(
-      (sheet) =>
-        sheet.cells.some(hasCellPicturePropertyFields) ||
-        sheet.floatingImages.some(hasPicturePropertyFields),
-    )
-      ? 51
+    version: sheets.some((sheet) => sheet.floatingImages.some(hasPictureCropShapeFields))
+      ? 52
       : sheets.some(
             (sheet) =>
-              sheet.cells.some(hasCellDetailedStyleField) ||
-              sheet.floatingImages.some(hasPictureDetailedStyleField),
+              sheet.cells.some(hasCellPicturePropertyFields) ||
+              sheet.floatingImages.some(hasPicturePropertyFields),
           )
-        ? 50
+        ? 51
         : sheets.some(
               (sheet) =>
-                sheet.cells.some(hasCellThemeEffectSuppressionField) ||
-                sheet.floatingImages.some(hasPictureThemeEffectSuppressionField),
+                sheet.cells.some(hasCellDetailedStyleField) ||
+                sheet.floatingImages.some(hasPictureDetailedStyleField),
             )
-          ? 49
-          : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
-            ? 48
-            : sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
-              ? 47
-              : sheets.some((sheet) =>
-                    sheet.cells.some(
-                      (cell) =>
-                        cell.content?.kind === "literal" && Boolean(cell.content.fontRuns?.length),
-                    ),
-                  )
-                ? 46
-                : calculatedColumns
-                  ? 45
-                  : manualOrder
-                    ? 44
-                    : 43,
+          ? 50
+          : sheets.some(
+                (sheet) =>
+                  sheet.cells.some(hasCellThemeEffectSuppressionField) ||
+                  sheet.floatingImages.some(hasPictureThemeEffectSuppressionField),
+              )
+            ? 49
+            : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
+              ? 48
+              : sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
+                ? 47
+                : sheets.some((sheet) =>
+                      sheet.cells.some(
+                        (cell) =>
+                          cell.content?.kind === "literal" &&
+                          Boolean(cell.content.fontRuns?.length),
+                      ),
+                    )
+                  ? 46
+                  : calculatedColumns
+                    ? 45
+                    : manualOrder
+                      ? 44
+                      : 43,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1650,7 +1699,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 48 &&
     record.version !== 49 &&
     record.version !== 50 &&
-    record.version !== 51
+    record.version !== 51 &&
+    record.version !== 52
   ) {
     throw new WorkbookDomainError(
       {

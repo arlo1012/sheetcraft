@@ -14,6 +14,7 @@ import { resolveOwnedPictureNode } from "./picture-group-interaction";
 import { pictureToolGeometryIdentity } from "./picture-tool-geometry";
 import {
   capturePictureSourcePresentation,
+  planPictureSourcePresentation,
   type PictureSourcePresentation,
 } from "./picture-source-presentation";
 import { exportPictureSourceBlob } from "./picture-source-export";
@@ -139,6 +140,13 @@ export function usePictureAssetTools(options: {
         const geometry = resolvePictureFrame(node.frame, context.metrics);
         return { image: node, presentation: capturePictureSourcePresentation(node, geometry) };
       });
+    } catch {
+      options.feedback("picture.assetFailed", true);
+      return;
+    }
+    try {
+      for (const entry of selected)
+        if (entry.presentation) planPictureSourcePresentation(entry.presentation, theme);
     } catch {
       options.feedback("picture.assetFailed", true);
       return;

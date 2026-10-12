@@ -10,6 +10,44 @@ import { canvasContext, fixture } from "./fixture";
 afterEach(() => vi.restoreAllMocks());
 
 describe("excluded full-source ghost painter", () => {
+  test.each(["arc", "donut", "wedgeRectCallout"] as const)(
+    "%s erases the real nonzero mask from its mapped full-source ghost without a rectangular crop",
+    (preset) => {
+      const f = fixture();
+      f.picture.frame.cropShape = { preset };
+      const before = structuredClone(f.picture);
+      const preview = preparePictureCropPreview(f.picture, f.resolved());
+      const context = canvasContext();
+      const fills: unknown[] = [];
+      context.fill.mockImplementation((...args: unknown[]) => {
+        fills.push({
+          args,
+          alpha: context.globalAlpha,
+          operation: context.globalCompositeOperation,
+        });
+      });
+      paintPictureCropSourceGhost(
+        context as unknown as CanvasRenderingContext2D,
+        { naturalWidth: 400, naturalHeight: 200 } as HTMLImageElement,
+        preview,
+        f.layout,
+      );
+      expect(preview.ghostPicture.frame.cropShape).toBeUndefined();
+      expect(context.drawImage).toHaveBeenCalledOnce();
+      expect(context.drawImage.mock.calls[0]?.slice(-2)).toEqual([
+        preview.ghostGeometry.rect.width,
+        preview.ghostGeometry.rect.height,
+      ]);
+      expect(context.clip).not.toHaveBeenCalledWith("evenodd");
+      expect(fills.length).toBeGreaterThan(0);
+      for (const fill of fills)
+        expect(fill).toEqual({ args: ["nonzero"], alpha: 1, operation: "destination-out" });
+      expect(context.globalCompositeOperation).toBe("source-over");
+      expect(context.globalAlpha).toBe(1);
+      expect(context.save.mock.calls.length).toBe(context.restore.mock.calls.length);
+      expect(f.picture).toEqual(before);
+    },
+  );
   test.each([false, true].flatMap((flipX) => [false, true].map((flipY) => ({ flipX, flipY }))))(
     "uses full actual pixels with both flips $flipX/$flipY and preserves appearance and annotations",
     ({ flipX, flipY }) => {

@@ -1,3 +1,4 @@
+import type { PictureCropShape } from "@sheetcraft/core/shape-presets";
 import type { PictureTextureId } from "../../picture-texture";
 import { computed, onUnmounted, ref, useId, watch, type ComputedRef } from "vue";
 import type { PictureDetailedStyle } from "@sheetcraft/core/picture-detailed-style";
@@ -99,6 +100,14 @@ export interface PictureFormatPaneController {
   boolean: (field: PictureFormatBooleanField) => PictureFormatBooleanBinding;
   reset: (type: PictureFormatReset) => PictureFormatResetBinding;
   detailed: <K extends PictureDetailedCategory>(category: K) => PictureFormatDetailedBinding<K>;
+  cropShape: () => {
+    ownerKey: string;
+    value?: PictureCropShape;
+    disabled: boolean;
+    reason?: string;
+    error?: string;
+    apply: (value: PictureCropShape | undefined) => boolean;
+  };
   hasDetailedCapabilities: ComputedRef<boolean>;
   loadPaintAsset?: (blob: Blob, texture?: PictureTextureId) => Promise<string | undefined>;
   options: (
@@ -112,6 +121,9 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
   const prefix = `picture-format-${useId()}`;
   const state = ref(createPictureFormatDraftState(props.snapshot));
   const bindingGeneration = ref(0);
+  const shapeError = ref<string>();
+  let shapeBindingKey: string | undefined;
+  let shapeApply: (value: PictureCropShape | undefined) => boolean = () => false;
   const detailedErrors = ref<Partial<Record<PictureDetailedCategory, string>>>({});
   const detailedCallbackGeneration = ref(0);
   watch(
@@ -124,6 +136,7 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
     bindingGeneration.value += 1;
     state.value = cancelPictureFormatDraft(state.value);
     detailedErrors.value = {};
+    shapeError.value = undefined;
   }
   onUnmounted(cancel);
   const snapshot = computed(() => props.snapshot);
@@ -138,6 +151,7 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
       ) {
         bindingGeneration.value += 1;
         detailedErrors.value = {};
+        shapeError.value = undefined;
       }
       state.value = reconcilePictureFormatDraftState(state.value, next);
     },
@@ -329,6 +343,37 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
     snapshot,
     t,
     loadPaintAsset: props.loadPaintAsset,
+    cropShape: () => {
+      const capability = props.capabilities.cropShape;
+      const ownerKey = props.snapshot
+        ? `${pictureFormatOwnerKey(props.snapshot.owner)}:shape:${bindingGeneration.value}:${detailedCallbackGeneration.value}`
+        : "";
+      if (shapeBindingKey !== ownerKey) {
+        shapeBindingKey = ownerKey;
+        const owned = identity();
+        shapeApply = (value) => {
+          if (!owned() || !props.snapshot || props.capabilities.cropShape?.enabled !== true)
+            return false;
+          const accepted = dispatch({
+            type: "set-crop-shape",
+            value,
+            owner: clonePictureFormatOwner(props.snapshot.owner),
+            baseRevision: props.snapshot.revision,
+            intentId: nextId(),
+          });
+          if (owned()) shapeError.value = accepted ? undefined : t("applyRejected");
+          return accepted;
+        };
+      }
+      return {
+        ownerKey,
+        value: props.snapshot?.cropShape,
+        disabled: !props.snapshot || capability?.enabled !== true,
+        reason: capability?.reason,
+        error: shapeError.value,
+        apply: shapeApply,
+      };
+    },
     hasDetailedCapabilities: computed(() => props.capabilities.detailed !== undefined),
     number: (field, unit) => draftBinding(field, unit),
     text: (field) => draftBinding(field),

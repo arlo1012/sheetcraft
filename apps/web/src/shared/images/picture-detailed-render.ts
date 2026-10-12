@@ -1,3 +1,4 @@
+import { getShapePresetFillBounds, type ShapePresetGeometry } from "@sheetcraft/core/shape-presets";
 import type { ImageAppearance } from "@sheetcraft/core/workbook";
 import type { PictureDetailedStyle } from "@sheetcraft/core/picture-detailed-style";
 import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "@sheetcraft/core/workbook-theme";
@@ -35,7 +36,11 @@ export function getPicturePaintDensity(context: CanvasRenderingContext2D): numbe
 }
 
 /** Pure projective adapters share the exact density/front bounds used by the raster planner. */
-export function getPictureRasterProjection(style: PictureDetailedStyle, theme: WorkbookTheme) {
+export function getPictureRasterProjection(
+  style: PictureDetailedStyle,
+  theme: WorkbookTheme,
+  shapeGeometry?: ShapePresetGeometry,
+) {
   const format = style.format3d?.kind === "value" ? style.format3d.value : undefined;
   const rotation = style.rotation3d?.kind === "value" ? style.rotation3d.value : undefined;
   if (!format && !rotation) return {};
@@ -57,6 +62,8 @@ export function getPictureRasterProjection(style: PictureDetailedStyle, theme: W
           (((format?.contourPt ?? 0) * 4) / 3) * density,
           format?.material === "wire-frame" ? density : 0,
         ),
+        shapeGeometry,
+        density,
       ),
     projectSurface: (input, density, frame) =>
       createPictureProjectiveRaster({
@@ -65,6 +72,7 @@ export function getPictureRasterProjection(style: PictureDetailedStyle, theme: W
         theme,
         format,
         density,
+        shapeGeometry,
       }),
   };
   return projection;
@@ -78,8 +86,13 @@ export function planPictureDetailedPaint(options: {
   inherited?: DrawingThemeEffects;
   resources?: PicturePaintResources;
   angleDeg?: number;
+  shapeGeometry?: ShapePresetGeometry;
 }) {
-  const resolved = resolvePictureDetailedPaintStyle(options.appearance, options.inherited);
+  const resolved = resolvePictureDetailedPaintStyle(
+    options.appearance,
+    options.inherited,
+    !!options.shapeGeometry,
+  );
   if (!resolved) return;
   const theme = options.resources?.theme ?? DEFAULT_WORKBOOK_THEME;
   return planDetailedPictureRaster({
@@ -88,9 +101,30 @@ export function planPictureDetailedPaint(options: {
     pixelDensity: options.density,
     style: resolved.style,
     outerAngleDeg: options.angleDeg,
-    ...getPictureRasterProjection(resolved.style, theme),
+    ...getPictureRasterProjection(resolved.style, theme, options.shapeGeometry),
+    shapeGeometry: options.shapeGeometry,
+    frontPaintBounds: shapeThemePaintBounds(options.shapeGeometry, resolved.remainingTheme),
     getAssetSize: options.resources?.getAssetSize,
   });
+}
+
+function shapeThemePaintBounds(
+  shape: ShapePresetGeometry | undefined,
+  remaining: DrawingThemeEffects | undefined,
+) {
+  if (!shape || !remaining?.bevel) return undefined;
+  const bounds = getShapePresetFillBounds({
+    ...shape,
+    paths: shape.paths.filter((path) => path.stroke).map((path) => ({ ...path, filled: true })),
+  });
+  return bounds
+    ? {
+        left: bounds.left - 1,
+        top: bounds.top - 1,
+        right: bounds.left + bounds.width + 1,
+        bottom: bounds.top + bounds.height + 1,
+      }
+    : undefined;
 }
 
 const cache = new Map<string, Extract<PictureDetailedRaster, { kind: "ready" }>>();
@@ -130,14 +164,19 @@ export function preparePictureDetailedPaint(options: {
   inherited?: DrawingThemeEffects;
   resources?: PicturePaintResources;
   angleDeg?: number;
+  shapeGeometry?: ShapePresetGeometry;
   sourcePainter: (context: CanvasRenderingContext2D) => void;
   finishFrontPainter?: (context: CanvasRenderingContext2D) => void;
 }): PictureDetailedRaster | undefined {
-  const resolved = resolvePictureDetailedPaintStyle(options.appearance, options.inherited);
+  const resolved = resolvePictureDetailedPaintStyle(
+    options.appearance,
+    options.inherited,
+    !!options.shapeGeometry,
+  );
   if (!resolved) return;
   const theme = options.resources?.theme ?? DEFAULT_WORKBOOK_THEME;
   // A pure plan validates geometry/style/budgets before any Canvas or source painter.
-  const projection = getPictureRasterProjection(resolved.style, theme);
+  const projection = getPictureRasterProjection(resolved.style, theme, options.shapeGeometry);
   const plan = planPictureDetailedPaint(options)!;
   const images = new Map<string, DecodedPicturePaintImage>();
   for (const id of plan.assetIds) {
@@ -154,6 +193,7 @@ export function preparePictureDetailedPaint(options: {
     options.height,
     options.density,
     options.angleDeg ?? 0,
+    options.shapeGeometry ?? null,
     !!options.finishFrontPainter,
     resolved.style,
     resolved.remainingTheme ?? null,
@@ -173,6 +213,8 @@ export function preparePictureDetailedPaint(options: {
     style: resolved.style,
     outerAngleDeg: options.angleDeg,
     ...projection,
+    shapeGeometry: options.shapeGeometry,
+    frontPaintBounds: shapeThemePaintBounds(options.shapeGeometry, resolved.remainingTheme),
     theme,
     sourcePainter: options.sourcePainter,
     finishFrontPainter: options.finishFrontPainter,

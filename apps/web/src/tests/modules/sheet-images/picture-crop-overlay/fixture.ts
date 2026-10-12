@@ -40,10 +40,14 @@ export function fixture(frozen = false, scroll = { x: 0, y: 0 }) {
 }
 
 export function canvasContext() {
-  const states: { globalAlpha: number; filter: string }[] = [];
+  const states: { globalAlpha: number; filter: string; globalCompositeOperation: string }[] = [];
   const context = {
     save: vi.fn(() => {
-      states.push({ globalAlpha: context.globalAlpha, filter: context.filter });
+      states.push({
+        globalAlpha: context.globalAlpha,
+        filter: context.filter,
+        globalCompositeOperation: context.globalCompositeOperation,
+      });
     }),
     restore: vi.fn(() => {
       Object.assign(context, states.pop());
@@ -58,12 +62,17 @@ export function canvasContext() {
     closePath: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),
+    quadraticCurveTo: vi.fn(),
+    bezierCurveTo: vi.fn(),
+    ellipse: vi.fn(),
+    fill: vi.fn(),
     strokeRect: vi.fn(),
     stroke: vi.fn(),
     fillText: vi.fn(),
     setTransform: vi.fn(),
     clearRect: vi.fn(),
     globalAlpha: 1,
+    globalCompositeOperation: "source-over",
     filter: "none",
   };
   return context;

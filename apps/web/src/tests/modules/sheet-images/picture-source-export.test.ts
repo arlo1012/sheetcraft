@@ -252,3 +252,38 @@ test("an encoding result arriving after revocation is discarded; canvas is held 
   expect([canvas.width, canvas.height]).toEqual([0, 0]);
   expect(URL.revokeObjectURL).toHaveBeenCalledOnce();
 });
+test("Arc native source sampling uses the filled mapping, retaining all source pixels", async () => {
+  const input = presentation();
+  input.picture.frame.cropShape = { preset: "arc" };
+  surface();
+  await exportPictureSourceBlob(blob, input, "png", undefined, vi.fn(), () => true);
+  const density = vi.mocked(createPictureSourcePresentationCanvas).mock.calls[0]![5]!;
+  expect(density).toBeCloseTo(
+    Math.max(
+      400 / (input.geometry.sourceRect!.width / 2),
+      200 / (input.geometry.sourceRect!.height / 2),
+    ),
+  );
+});
+test("invalid actual shape bounds fail before decoder, source URL, auxiliary read or canvas", async () => {
+  const input = presentation();
+  input.picture.frame.cropShape = {
+    preset: "wedgeRectCallout",
+    adjustments: { adj1: 2147483647, adj2: 0 },
+  };
+  input.geometry = resolvePictureFrame(
+    {
+      ...input.picture.frame,
+      anchor: { mode: "fixed", x: 0, y: 0, size: { width: 1000, height: 1000 } },
+    },
+    createPictureSheetMetrics(createSheet("S", "s")),
+  );
+  const read = vi.fn();
+  await expect(
+    exportPictureSourceBlob(blob, input, "png", undefined, read, () => true),
+  ).rejects.toThrow();
+  expect(readEncodedImageSource).not.toHaveBeenCalled();
+  expect(read).not.toHaveBeenCalled();
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+  expect(createPictureSourcePresentationCanvas).not.toHaveBeenCalled();
+});

@@ -1,4 +1,8 @@
-import { SHAPE_PRESET_DEFAULTS, type ShapePresetName } from "./catalog.js";
+import {
+  SHAPE_PRESET_DEFAULTS,
+  SHAPE_PRESET_FILLED_NAMES,
+  type ShapePresetName,
+} from "./catalog.js";
 import type { PictureCropShape } from "./types.js";
 
 export function isShapePresetName(value: unknown): value is ShapePresetName {
@@ -19,7 +23,7 @@ function dataRecord(value: unknown, name: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 /** Default rectangular geometry has no extra persisted field. */
-export function normalizePictureCropShape(
+export function normalizeShapePresetParameters(
   value: PictureCropShape | undefined,
 ): PictureCropShape | undefined {
   if (value === undefined) return;
@@ -49,4 +53,15 @@ export function normalizePictureCropShape(
   }
   if (shape.preset === "rect") return;
   return { preset: shape.preset, ...(Object.keys(adjustments).length ? { adjustments } : {}) };
+}
+
+const filledPresets = new Set<string>(SHAPE_PRESET_FILLED_NAMES);
+/** Pictures require an actual fillable mask, never a connector-only path. */
+export function normalizePictureCropShape(
+  value: PictureCropShape | undefined,
+): PictureCropShape | undefined {
+  const shape = normalizeShapePresetParameters(value);
+  if (shape && !filledPresets.has(shape.preset))
+    throw new TypeError("This preset has no filled picture mask.");
+  return shape;
 }

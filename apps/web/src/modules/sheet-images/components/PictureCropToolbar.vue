@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import type { PictureCropShape } from "@sheetcraft/core/shape-presets";
+import PictureCropShapeMenu from "./PictureCropShapeMenu.vue";
 import { computed, ref, useId } from "vue";
-import { Check, ChevronDown, Crop, X } from "lucide-vue-next";
+import { Check, ChevronDown, Crop, X, RotateCcw } from "lucide-vue-next";
 import {
   useFloatingPanel,
   type FloatingReference,
@@ -16,6 +18,9 @@ const props = defineProps<{
   apply: () => boolean;
   cancel: () => void;
   setRatio: (ratio: number) => boolean;
+  setShape: (shape: PictureCropShape | undefined) => boolean;
+  resetShapeAndCrop: () => boolean;
+  shape?: PictureCropShape;
 }>();
 const { t } = useAppI18n();
 const toolbar = ref<HTMLElement | null>(null);
@@ -44,12 +49,16 @@ const actions = computed(() => {
   const id = props.ownerId,
     apply = props.apply,
     cancel = props.cancel,
-    ratio = props.setRatio;
+    ratio = props.setRatio,
+    shape = props.setShape,
+    reset = props.resetShapeAndCrop;
   const current = () =>
     id === props.ownerId &&
     apply === props.apply &&
     cancel === props.cancel &&
-    ratio === props.setRatio;
+    ratio === props.setRatio &&
+    shape === props.setShape &&
+    reset === props.resetShapeAndCrop;
   return {
     apply: () => {
       if (current()) apply();
@@ -57,6 +66,8 @@ const actions = computed(() => {
     cancel: () => {
       if (current()) cancel();
     },
+    shape: (value: PictureCropShape | undefined) => current() && shape(value),
+    reset: () => current() && reset(),
     ratio: (label: string) => {
       if (!current()) return;
       const [width, height] = label.split(":").map(Number);
@@ -112,6 +123,21 @@ defineExpose({
       >
         <Crop :size="16" /><span>{{ t("image.cropRatio") }}</span
         ><ChevronDown :size="12" />
+      </button>
+      <PictureCropShapeMenu
+        :owner-id="ownerId"
+        :current="shape"
+        :handler="actions.shape"
+        :labels="{ trigger: t('image.cropShape'), applyRejected: t('picture.operationFailed') }"
+      />
+      <button
+        type="button"
+        class="picture-crop-toolbar__button"
+        :title="t('image.resetShapeAndCrop')"
+        @click="actions.reset"
+        data-picture-crop-action="reset-shape"
+      >
+        <RotateCcw :size="16" /><span>{{ t("image.resetShapeAndCrop") }}</span>
       </button>
       <button
         type="button"

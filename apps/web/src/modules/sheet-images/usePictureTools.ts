@@ -433,6 +433,7 @@ export function usePictureTools(options: {
           if (isFramedPictureObject(image))
             return {
               ...image,
+              ...(!patch ? { frame: { ...image.frame, cropShape: undefined } } : {}),
               transform: { annotations: image.transform?.annotations, appearance },
             };
           return {

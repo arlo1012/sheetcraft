@@ -25,6 +25,7 @@ const props = withDefaults(
     snapshot: PictureFormatSnapshot | null;
     capabilities: PictureFormatCapabilities;
     onIntent: PictureFormatIntentHandler;
+    beforeInteraction?: () => boolean;
     t: PictureFormatTranslate;
     options?: PictureFormatOptions;
     loadPaintAsset?: (blob: Blob, texture?: PictureTextureId) => Promise<string | undefined>;
@@ -63,6 +64,41 @@ function close() {
   emit("cancel");
   emit("close");
 }
+let blockedInteraction = false;
+function beforeInteraction(event: Event): void {
+  if (
+    event.target instanceof Element &&
+    event.target.closest(
+      ".picture-format-pane__header, .picture-format-pane__tabs, .picture-format-pane__units",
+    )
+  )
+    return;
+  if (
+    !(event.target instanceof Element) ||
+    !event.target.closest(
+      "input, textarea, button, [role=combobox], [role=checkbox], [role=switch]",
+    )
+  )
+    return;
+  let accepted = false;
+  try {
+    accepted = props.beforeInteraction?.() !== false;
+  } catch {
+    /* Keep the unresolved crop owner intact. */
+  }
+  blockedInteraction = !accepted;
+  if (!accepted) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (event.type === "focusin" && event.target instanceof HTMLElement) event.target.blur();
+  }
+}
+function guardClick(event: MouseEvent): void {
+  if (!blockedInteraction) return;
+  blockedInteraction = false;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}
 function keydown(event: KeyboardEvent) {
   if (event.key === "Escape") {
     event.preventDefault();
@@ -91,7 +127,14 @@ defineExpose({
 });
 </script>
 <template>
-  <aside class="picture-format-pane" :aria-label="t('paneTitle')" @keydown="keydown">
+  <aside
+    class="picture-format-pane"
+    :aria-label="t('paneTitle')"
+    @keydown="keydown"
+    @pointerdown.capture="beforeInteraction"
+    @focusin.capture="beforeInteraction"
+    @click.capture="guardClick"
+  >
     <header class="picture-format-pane__header">
       <div class="picture-format-pane__heading">
         <strong>{{ t("paneTitle") }}</strong

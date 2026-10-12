@@ -1,3 +1,4 @@
+import { normalizePictureCropShape } from "@sheetcraft/core/shape-presets";
 import { getPictureProperties, type PictureProperties } from "@sheetcraft/core/picture-properties";
 import { computed, getCurrentScope, onScopeDispose, ref, watch } from "vue";
 import { canEditPictureRoot, canChangePictureLock } from "@sheetcraft/core/picture-protection";
@@ -175,6 +176,7 @@ export interface OwnedPictureFormatPaneOptions {
   isOpen?: () => boolean;
   /** Authoritative, synchronous complete-forest Core command acceptance. */
   execute: (nextForest: readonly FloatingImage[]) => boolean;
+  onCropShapeApplied?: (path: PictureGroupPath) => void;
   getDisabledReason?: () => string;
   getUnsupportedCropReason?: () => string;
   /** Stable, current selected-source dimensions from the preflighted display URL. */
@@ -672,10 +674,17 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         "cropTopPt",
       ] as const)
         capabilities.fields[field] = { enabled: false, reason };
+      capabilities.cropShape = { enabled: false, reason };
       capabilities.resets!["reset-crop"] = { enabled: false, reason };
       capabilities.resets!["reset-size"] = { enabled: false, reason };
     }
+    if (sourceBearing && cropState && !capabilities.cropShape)
+      capabilities.cropShape = { enabled: !!context };
     if (!canEditPictureRoot(lease.sheet, lease.root)) {
+      capabilities.cropShape = {
+        enabled: false,
+        reason: options.getProtectedReason?.() ?? options.getDisabledReason?.(),
+      };
       const reason = options.getProtectedReason?.() ?? "This picture is protected from editing.";
       for (const field of fields) capabilities.fields[field] = { enabled: false, reason };
       for (const category of PICTURE_DETAILED_CATEGORIES)
@@ -693,6 +702,9 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       },
       revision: lease.revision,
       values,
+      ...(sourceBearing && (isGroupedPicture(node) || isFramedPictureObject(node))
+        ? { cropShape: node.frame.cropShape }
+        : {}),
       ...(sourceBearing || groupPaint ? { appearance } : {}),
       ...(groupPaint
         ? { paintScope: "group-leaves" as const, mixedDetailed: groupPaint.mixed }
@@ -886,6 +898,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       target.transform = normalized
         ? { appearance: normalized.appearance, annotations: normalized.annotations }
         : undefined;
+      if (intent.type === "reset-picture") delete target.frame.cropShape;
       next = copy;
     } else {
       if (isPictureGroup(root)) throw new TypeError("A group has no own image appearance.");
@@ -893,6 +906,9 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       next = isFramedPictureObject(root)
         ? {
             ...root,
+            ...(intent.type === "reset-picture"
+              ? { frame: { ...root.frame, cropShape: undefined } }
+              : {}),
             transform: normalized
               ? { appearance: normalized.appearance, annotations: normalized.annotations }
               : undefined,
@@ -981,17 +997,20 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
               )
             : undefined;
     if (!changed) throw new TypeError("Unknown crop operation.");
-    return projectSourceGeometry(lease, before, changed);
+    return projectSourceGeometry(lease, before, changed, intent.type === "reset-crop");
   }
   function projectSourceGeometry(
     lease: Lease,
     before: NonNullable<ReturnType<typeof getPictureFormatCropState>>,
     changed: NonNullable<ReturnType<typeof getPictureFormatCropState>>,
+    clearShape = false,
   ): FloatingImage[] {
     const { root, node, path, context } = lease;
     if (!context || isPictureGroup(node) || isGroupedGroup(node))
       throw new TypeError("A real source and metrics are required.");
     if (
+      (!clearShape ||
+        !((isGroupedPicture(node) || isFramedPictureObject(node)) && node.frame.cropShape)) &&
       changed.layout.angleDeg === before.layout.angleDeg &&
       (["x", "y", "width", "height"] as const).every(
         (key) => changed.layout.rect[key] === before.layout.rect[key],
@@ -1011,15 +1030,59 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         changed.layout,
         context.metrics,
         {
-          replacement: { ...node, frame: { ...node.frame, source: changed.source } },
+          replacement: {
+            ...node,
+            frame: {
+              ...node.frame,
+              source: changed.source,
+              ...(clearShape ? { cropShape: undefined } : {}),
+            },
+          },
         },
       );
     } else {
       if (isPictureGroup(root)) throw new TypeError("A container has no image source.");
-      next = applyStandalonePictureCrop(root, before, changed, context.metrics);
+      next = applyStandalonePictureCrop(
+        root,
+        before,
+        changed,
+        context.metrics,
+        clearShape ? { cropShape: undefined } : undefined,
+      );
     }
     const forest = normalizePictureObjectCollection(
       lease.forest.map((image) => (image.id === root.id ? next : image)),
+    );
+    validateForest(forest, context);
+    return forest;
+  }
+  function planShape(
+    lease: Lease,
+    intent: Extract<PictureFormatIntent, { type: "set-crop-shape" }>,
+  ): FloatingImage[] {
+    const { root, node, context, world, path } = lease;
+    if (!context || isPictureGroup(node) || isGroupedGroup(node))
+      throw new TypeError("A source-bearing picture is required.");
+    const cropShape = normalizePictureCropShape(intent.value);
+    let replacement: FloatingImage;
+    if (isPictureGroup(root)) {
+      if (!isGroupedPicture(node)) throw new TypeError("An exact picture leaf is required.");
+      replacement = applyPictureGroupChildWorldEdit(
+        root,
+        leasePictureGroupNode(root, path),
+        world!,
+        context.metrics,
+        {
+          replacement: { ...node, frame: { ...node.frame, cropShape } },
+        },
+      );
+    } else {
+      const crop = getPictureFormatCropState(root, undefined, context.metrics);
+      if (!crop) throw new TypeError("Picture crop geometry is unavailable.");
+      replacement = applyStandalonePictureCrop(root, crop, crop, context.metrics, { cropShape });
+    }
+    const forest = normalizePictureObjectCollection(
+      lease.forest.map((entry) => (entry.id === root.id ? replacement : entry)),
     );
     validateForest(forest, context);
     return forest;
@@ -1033,6 +1096,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       !snapshot ||
       mutation ||
       (intent.type !== "set-field" &&
+        intent.type !== "set-crop-shape" &&
         intent.type !== "set-detailed" &&
         intent.type !== "reset-crop" &&
         intent.type !== "reset-size" &&
@@ -1043,9 +1107,11 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       !intent.intentId ||
       (intent.type === "set-field"
         ? view.capabilities.fields[intent.field]?.enabled !== true
-        : intent.type === "set-detailed"
-          ? view.capabilities.detailed?.[intent.category]?.enabled !== true
-          : view.capabilities.resets?.[intent.type]?.enabled !== true) ||
+        : intent.type === "set-crop-shape"
+          ? view.capabilities.cropShape?.enabled !== true
+          : intent.type === "set-detailed"
+            ? view.capabilities.detailed?.[intent.category]?.enabled !== true
+            : view.capabilities.resets?.[intent.type]?.enabled !== true) ||
       options.isBusy() ||
       !canEditPictureRoot(lease.sheet, lease.root)
     )
@@ -1098,14 +1164,23 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       const next =
         intent.type === "set-field"
           ? plan(lease, intent)
-          : intent.type === "reset-picture" || intent.type === "set-detailed"
-            ? planAppearance(lease, intent)
-            : planCrop(lease, intent);
+          : intent.type === "set-crop-shape"
+            ? planShape(lease, intent)
+            : intent.type === "reset-picture" || intent.type === "set-detailed"
+              ? planAppearance(lease, intent)
+              : planCrop(lease, intent);
       if (!current(lease)) {
         clear();
         return false;
       }
       if (areFloatingImageCollectionsEqual(next, lease.forest)) {
+        if (intent.type === "set-crop-shape") {
+          try {
+            options.onCropShapeApplied?.([...lease.path]);
+          } catch {
+            /* View-only callback. */
+          }
+        }
         acceptedIntentId.value = intent.intentId;
         return true;
       }
@@ -1129,6 +1204,18 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
           clear();
         if (accepted && exact && revision !== lease.revision)
           acceptedIntentId.value = intent.intentId;
+      }
+      if (
+        accepted &&
+        intent.type === "set-crop-shape" &&
+        sameBoundary(lease) &&
+        areFloatingImageCollectionsEqual(lease.sheet.floatingImages, next)
+      ) {
+        try {
+          options.onCropShapeApplied?.([...lease.path]);
+        } catch {
+          /* A view callback cannot revoke an accepted Core transaction. */
+        }
       }
       return accepted;
     } catch {

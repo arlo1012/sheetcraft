@@ -1,3 +1,4 @@
+import { normalizePictureCropShape, type PictureCropShape } from "@sheetcraft/core/shape-presets";
 import {
   anchorPictureFrameRect,
   pictureFrameFromLegacy,
@@ -84,8 +85,9 @@ export function applyStandalonePictureCrop(
   before: PictureFormatCropState,
   next: PictureFormatCropState,
   metrics: PictureSheetMetrics,
+  shapeEdit?: { cropShape?: PictureCropShape },
 ): StandalonePictureObject {
-  if (next.layout === before.layout && next.source === before.source) return picture;
+  if (!shapeEdit && next.layout === before.layout && next.source === before.source) return picture;
   const frame = isFramedPictureObject(picture)
     ? picture.frame
     : pictureFrameFromLegacy(picture, metrics);
@@ -102,6 +104,7 @@ export function applyStandalonePictureCrop(
       anchor: anchorPictureFrameRect(frame.anchor.mode, next.layout.rect, metrics, frame.anchor),
       angleDeg: next.layout.angleDeg,
       source: next.source,
+      ...(shapeEdit ? { cropShape: normalizePictureCropShape(shapeEdit.cropShape) } : {}),
     },
     ...(picture.transform?.appearance || picture.transform?.annotations
       ? {

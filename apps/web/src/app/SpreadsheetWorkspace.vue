@@ -1865,6 +1865,21 @@ const pictureIntrinsicRetry = computed(() => {
       pictureIntrinsic.retry();
   };
 });
+function beforePictureFormatInteraction(): boolean {
+  const workbook = session.workbook,
+    sheet = activeSheet.value,
+    generation = pictureOwnerGeneration.value;
+  const ids = JSON.stringify(selectedPictureIds.value),
+    path = JSON.stringify(selectedOwnedPicturePath.value);
+  if (sheetGridRef.value?.applyPendingPictureCrop() === false) return false;
+  return (
+    session.workbook === workbook &&
+    activeSheet.value === sheet &&
+    pictureOwnerGeneration.value === generation &&
+    JSON.stringify(selectedPictureIds.value) === ids &&
+    JSON.stringify(selectedOwnedPicturePath.value) === path
+  );
+}
 const pictureFormatPane = useOwnedPictureFormatPane({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1876,6 +1891,23 @@ const pictureFormatPane = useOwnedPictureFormatPane({
   isOpen: () => pictureFormatVisible.value,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
   execute: pictureTools.replaceAll,
+  onCropShapeApplied: (path) => {
+    const owner = activeSheet.value,
+      generation = pictureOwnerGeneration.value;
+    void nextTick(() => {
+      if (
+        activeSheet.value !== owner ||
+        pictureOwnerGeneration.value !== generation ||
+        selectedPictureIds.value.length !== 1 ||
+        selectedPictureIds.value[0] !== path[0]
+      )
+        return;
+      const selected = selectedOwnedPicturePath.value;
+      if (path.length > 1 && JSON.stringify(selected) !== JSON.stringify(path)) return;
+      if (path.length === 1 && selected && selected.length > 1) return;
+      if (sheetGridRef.value?.canCropPicture()) sheetGridRef.value.cropImage();
+    });
+  },
   getDisabledReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
   getUnsupportedCropReason: () => t("picture.groupReflectionUnsupported"),
   isImageAssetAvailable: (assetId) =>
@@ -4411,6 +4443,7 @@ const gridInert = computed(
         :snapshot="pictureFormatPane.snapshot.value"
         :capabilities="pictureFormatPane.capabilities.value"
         :on-intent="pictureFormatPane.onIntent"
+        :before-interaction="beforePictureFormatInteraction"
         :load-paint-asset="picturePaintAssets.load"
         :options="{
           lineMode: [

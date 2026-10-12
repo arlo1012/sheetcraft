@@ -229,6 +229,7 @@ function extract(visit: OwnedVisit, metrics: PictureSheetMetrics): PictureObject
       anchor,
       angleDeg: resolved.layout.angleDeg,
       source: node.frame.source,
+      ...(node.frame.cropShape ? { cropShape: node.frame.cropShape } : {}),
       ...(node.frame.flipHorizontal === undefined
         ? {}
         : { flipHorizontal: node.frame.flipHorizontal }),

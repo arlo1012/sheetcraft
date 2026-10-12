@@ -177,3 +177,29 @@ test("a source-resolution consumer can increase sampling density within the same
     ),
   ).toThrow("density");
 });
+test.each(["framed", "owned"])(
+  "explicit %s source rendering reveals its hidden copy without changing visibility",
+  (kind) => {
+    const leaf = kind === "framed" ? framedPicture() : pictureGroup().members[0]!;
+    if (!("assetId" in leaf)) throw new Error("Expected source.");
+    leaf.hidden = true;
+    const geometry = resolvePictureSourceLayout(
+      { x: 0, y: 0, width: 120, height: 80 },
+      37,
+      leaf.frame.source,
+    );
+    const input = capturePictureSourcePresentation(leaf, geometry),
+      before = structuredClone(input);
+    surface();
+    const paint =
+      kind === "framed"
+        ? vi.spyOn(painters, "paintFramedPictureContent")
+        : vi.spyOn(painters, "paintGroupedPictureContent");
+    paint.mockImplementation(() => {});
+    createPictureSourcePresentationCanvas(source(), input);
+    expect(paint).toHaveBeenCalledOnce();
+    expect(paint.mock.calls[0]![2].hidden).toBe(false);
+    expect(input).toEqual(before);
+    expect(leaf.hidden).toBe(true);
+  },
+);

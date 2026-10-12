@@ -47,7 +47,6 @@ import {
   type StandalonePictureObject as FloatingImage,
 } from "@sheetcraft/core/picture-object";
 import { requireStandalonePicture, requireStandalonePictures } from "../picture-document-support";
-import { pictureFrameContainsPoint } from "@sheetcraft/core/picture-frame";
 import { isPictureGroup } from "@sheetcraft/core/picture-group";
 import { hitPictureViewportPoint, pictureFragmentRootId } from "../picture-hit-testing";
 import {
@@ -1020,20 +1019,8 @@ function hitTestFloatingImage(point: Point): FloatingImage | undefined {
     const image = currentImages.value.find((image) => image.id === pictureFragmentRootId(hit));
     return image && isRootAvailable(image.id) ? image : undefined;
   }
-  for (let index = fragments.value.length - 1; index >= 0; index -= 1) {
-    const fragment = fragments.value[index];
-    if (!fragment) continue;
-    const rect = fragmentBounds(fragment);
-    if (
-      point.x >= rect.x &&
-      point.x < rect.x + rect.width &&
-      point.y >= rect.y &&
-      point.y < rect.y + rect.height &&
-      (fragment.kind === "legacy" || pictureFrameContainsPoint(fragment.geometry, point))
-    )
-      return isRootAvailable(fragment.image.id) ? fragment.image : undefined;
-  }
-  return undefined;
+  const hit = hitPictureViewportPoint(currentImages.value, point, props.layout, props.frameContext);
+  return hit && hit.kind !== "group-leaf" && isRootAvailable(hit.image.id) ? hit.image : undefined;
 }
 
 function isSelectedOverlayTarget(target: EventTarget | null): boolean {
@@ -1424,6 +1411,7 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       :class="{
         'is-selected': !crop,
         'is-framed': fragment.kind === 'framed',
+        'is-shaped-picture': fragment.kind === 'framed' && !!fragment.image.frame.cropShape,
         'is-read-only': readOnly,
       }"
       :style="getFragmentStyle(fragment)"
@@ -1455,6 +1443,7 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
         :fragment="fragment"
         :layout="layout"
         :read-only="interactionReadOnly"
+        :body-interactive="!fragment.image.frame.cropShape"
         @move="startGesture(fragment.image, 'move', $event)"
         @resize="(direction, event) => startGesture(fragment.image, direction, event)"
       />
@@ -1567,5 +1556,11 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       --picture-frame-focus-dash: 4 3;
     }
   }
+}
+</style>
+
+<style scoped lang="scss">
+.sheet-floating-image-layer__selected.is-shaped-picture {
+  pointer-events: none;
 }
 </style>

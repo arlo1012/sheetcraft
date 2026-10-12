@@ -1,5 +1,13 @@
-export { SHAPE_PRESET_NAMES, type ShapePresetName } from "./shape-presets/catalog.js";
-export { isShapePresetName, normalizePictureCropShape } from "./shape-presets/contract.js";
+export {
+  SHAPE_PRESET_NAMES,
+  SHAPE_PRESET_FILLED_NAMES,
+  type ShapePresetName,
+} from "./shape-presets/catalog.js";
+export {
+  isShapePresetName,
+  normalizePictureCropShape,
+  normalizeShapePresetParameters,
+} from "./shape-presets/contract.js";
 export { getShapePresetFillBounds, type ShapePresetBounds } from "./shape-presets/bounds.js";
 export { moveShapePresetAdjustment } from "./shape-presets/adjustment.js";
 export { evaluateShapePreset } from "./shape-presets/evaluate.js";

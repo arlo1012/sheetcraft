@@ -1,3 +1,4 @@
+import { createAppI18n } from "../../../../shared/i18n";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { Input } from "tdesign-vue-next/es/input";
@@ -103,6 +104,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
     props: { snapshot: snapshot(), capabilities, onIntent, t, ...overrides },
     // The shared palette is stubbed; this pane test covers the resolved-color field callback.
     global: {
+      plugins: [createAppI18n("en-US")],
       stubs: {
         ColorPaletteSelect: {
           props: ["modelValue", "disabled", "label"],
@@ -645,4 +647,46 @@ test("first paint quick entry opens fill-line and fill immediately without a rem
       .find((button) => button.text() === "fillSection")!
       .attributes("aria-expanded"),
   ).toBe("true");
+});
+test("shape gallery retains its selection and failed draft across rejection, with a stable owner callback", async () => {
+  const refused = vi.fn(() => false);
+  const { wrapper } = fixture({
+    initialTab: "picture",
+    capabilities: { ...capabilities, cropShape: { enabled: true } },
+    onIntent: refused,
+  });
+  const trigger = wrapper.get('.picture-crop-shape [aria-haspopup="menu"]');
+  await trigger.trigger("click");
+  await flushPromises();
+  const pick = () =>
+    document.querySelector<HTMLButtonElement>('[data-picture-crop-shape="ellipse"]')!;
+  expect(pick()).not.toBeNull();
+  pick().click();
+  await flushPromises();
+  expect(refused).toHaveBeenCalledOnce();
+  expect(document.querySelector(".picture-crop-shape__menu")).not.toBeNull();
+  expect(document.querySelector(".picture-crop-shape__error")?.textContent).toContain(
+    "applyRejected",
+  );
+  refused.mockReturnValue(true);
+  pick().click();
+  await flushPromises();
+  expect(refused).toHaveBeenCalledTimes(2);
+  expect(document.querySelector(".picture-crop-shape__menu")).toBeNull();
+});
+test("pane blocks pointer focus and the following click when pending crop application refuses", async () => {
+  const beforeInteraction = vi.fn(() => false),
+    { wrapper, onIntent } = fixture({ beforeInteraction });
+  const reset = wrapper.get('[data-picture-format-reset="reset-size"]');
+  await reset.trigger("pointerdown", { button: 0 });
+  await reset.trigger("click");
+  expect(beforeInteraction).toHaveBeenCalledOnce();
+  expect(onIntent).not.toHaveBeenCalled();
+  beforeInteraction.mockReturnValue(true);
+  await reset.trigger("pointerdown", { button: 0 });
+  await reset.trigger("click");
+  expect(onIntent).toHaveBeenCalledOnce();
+  expect(beforeInteraction.mock.invocationCallOrder[1]).toBeLessThan(
+    onIntent.mock.invocationCallOrder[0]!,
+  );
 });

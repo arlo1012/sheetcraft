@@ -9,6 +9,7 @@ import {
   type PictureShadow,
 } from "@sheetcraft/core/picture-detailed-style";
 import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import { evaluateShapePreset, type ShapePresetGeometry } from "@sheetcraft/core/shape-presets";
 import {
   createDetailedPictureRaster,
   planDetailedPictureRaster,
@@ -65,6 +66,10 @@ class MemoryContext {
   lineCap = "butt";
   lineJoin = "miter";
   miterLimit = 10;
+  globalAlpha = 1;
+  globalCompositeOperation = "source-over";
+  lineDashOffset = 0;
+  private dash: number[] = [];
   private sx = 1;
   private sy = 1;
   private tx = 0;
@@ -72,6 +77,7 @@ class MemoryContext {
   private clipping: readonly [number, number, number, number] | undefined;
   private readonly stack: (readonly [number, number, number, number, typeof this.clipping])[] = [];
   private points: Point[] = [];
+  private contours: { points: Point[]; closed: boolean }[] = [];
   private closed = false;
   private rectangle: readonly [number, number, number, number] | undefined;
   constructor(readonly canvas: MemoryCanvas) {}
@@ -92,6 +98,7 @@ class MemoryContext {
   }
   beginPath() {
     this.points = [];
+    this.contours = [];
     this.closed = false;
     this.rectangle = undefined;
   }
@@ -107,13 +114,64 @@ class MemoryContext {
     this.clipping = this.rectangle;
   }
   moveTo(x: number, y: number) {
-    this.points.push([x * this.sx + this.tx, y * this.sy + this.ty]);
+    const point: Point = [x * this.sx + this.tx, y * this.sy + this.ty];
+    this.contours.push({ points: [point], closed: false });
+    this.points.push(point);
   }
   lineTo(x: number, y: number) {
-    this.moveTo(x, y);
+    const point: Point = [x * this.sx + this.tx, y * this.sy + this.ty];
+    if (!this.contours.length) this.contours.push({ points: [], closed: false });
+    this.contours.at(-1)!.points.push(point);
+    this.points.push(point);
   }
   closePath() {
     this.closed = true;
+    if (this.contours.length) this.contours.at(-1)!.closed = true;
+  }
+  setLineDash(value: number[]) {
+    this.dash = [...value];
+  }
+  quadraticCurveTo(cx: number, cy: number, x: number, y: number) {
+    const current = this.points.at(-1)!;
+    const px = (current[0] - this.tx) / this.sx,
+      py = (current[1] - this.ty) / this.sy;
+    for (let index = 1; index <= 48; index++) {
+      const t = index / 48,
+        s = 1 - t;
+      this.lineTo(s * s * px + 2 * s * t * cx + t * t * x, s * s * py + 2 * s * t * cy + t * t * y);
+    }
+  }
+  bezierCurveTo(cx1: number, cy1: number, cx2: number, cy2: number, x: number, y: number) {
+    const current = this.points.at(-1)!;
+    const px = (current[0] - this.tx) / this.sx,
+      py = (current[1] - this.ty) / this.sy;
+    for (let index = 1; index <= 48; index++) {
+      const t = index / 48,
+        s = 1 - t;
+      this.lineTo(
+        s ** 3 * px + 3 * s * s * t * cx1 + 3 * s * t * t * cx2 + t ** 3 * x,
+        s ** 3 * py + 3 * s * s * t * cy1 + 3 * s * t * t * cy2 + t ** 3 * y,
+      );
+    }
+  }
+  ellipse(
+    cx: number,
+    cy: number,
+    rx: number,
+    ry: number,
+    _rotation: number,
+    start: number,
+    end: number,
+  ) {
+    const count = Math.max(1, Math.ceil((Math.abs(end - start) / (2 * Math.PI)) * 128));
+    const firstX = cx + rx * Math.cos(start),
+      firstY = cy + ry * Math.sin(start);
+    if (this.contours.length) this.lineTo(firstX, firstY);
+    else this.moveTo(firstX, firstY);
+    for (let index = 1; index <= count; index++) {
+      const t = start + ((end - start) * index) / count;
+      this.lineTo(cx + rx * Math.cos(t), cy + ry * Math.sin(t));
+    }
   }
   stroke() {
     this.canvas.strokes.push({
@@ -124,11 +182,89 @@ class MemoryContext {
       join: this.lineJoin,
       miter: this.miterLimit,
     });
+    const width = this.lineWidth * this.sx,
+      half = width / 2;
+    const pattern = this.dash.map((value) => value * this.sx),
+      period = pattern.reduce((sum, value) => sum + value, 0);
+    this.rasterPath((x, y) => {
+      for (const contour of this.contours) {
+        let along = 0;
+        for (let index = 1; index < contour.points.length + (contour.closed ? 1 : 0); index++) {
+          const a = contour.points[index - 1]!,
+            b = contour.points[index % contour.points.length]!;
+          const dx = b[0] - a[0],
+            dy = b[1] - a[1],
+            length = Math.hypot(dx, dy);
+          if (length === 0) continue;
+          const t = Math.max(
+            0,
+            Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (length * length)),
+          );
+          if (Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy) <= half) {
+            let phase = period
+              ? (((along + t * length + this.lineDashOffset) % period) + period) % period
+              : 0;
+            let entry = 0;
+            while (period && entry < pattern.length - 1 && phase > pattern[entry]!) {
+              phase -= pattern[entry]!;
+              entry++;
+            }
+            if (!period || entry % 2 === 0) return true;
+          }
+          along += length;
+        }
+      }
+      return false;
+    }, half);
   }
   arc(x: number, y: number, radius: number) {
     this.canvas.dots.push({ point: [x + this.tx, y + this.ty], radius });
+    this.ellipse(x, y, radius, radius, 0, 0, 2 * Math.PI);
   }
-  fill() {}
+  private rasterPath(inside: (x: number, y: number) => boolean, margin = 0) {
+    if (!this.points.length) return;
+    const left = Math.max(
+      0,
+      Math.floor(Math.min(...this.points.map((point) => point[0])) - margin),
+    );
+    const top = Math.max(0, Math.floor(Math.min(...this.points.map((point) => point[1])) - margin));
+    const right = Math.min(
+      this.canvas.width,
+      Math.ceil(Math.max(...this.points.map((point) => point[0])) + margin),
+    );
+    const bottom = Math.min(
+      this.canvas.height,
+      Math.ceil(Math.max(...this.points.map((point) => point[1])) + margin),
+    );
+    for (let y = top; y < bottom; y++)
+      for (let x = left; x < right; x++) {
+        let hits = 0;
+        for (const sx of [0.25, 0.75])
+          for (const sy of [0.25, 0.75]) if (inside(x + sx, y + sy)) hits++;
+        const index = (y * this.canvas.width + x) * 4,
+          sa = hits / 4,
+          da = this.canvas.data[index + 3]! / 255;
+        if (sa === 0) continue;
+        this.canvas.data[index] = 255;
+        this.canvas.data[index + 1] = 255;
+        this.canvas.data[index + 2] = 255;
+        this.canvas.data[index + 3] = (sa + da * (1 - sa)) * 255;
+      }
+  }
+  fill() {
+    this.rasterPath((x, y) => {
+      let winding = 0;
+      for (const contour of this.contours)
+        for (let index = 0; index < contour.points.length; index++) {
+          const a = contour.points[index]!,
+            b = contour.points[(index + 1) % contour.points.length]!;
+          const cross = (b[0] - a[0]) * (y - a[1]) - (x - a[0]) * (b[1] - a[1]);
+          if (a[1] <= y && b[1] > y && cross > 0) winding++;
+          else if (a[1] > y && b[1] <= y && cross < 0) winding--;
+        }
+      return winding !== 0;
+    });
+  }
   fillRect(x: number, y: number, width: number, height: number) {
     const rectangle = [
       x * this.sx + this.tx,
@@ -259,6 +395,297 @@ function texture(): MemoryCanvas {
 function picture(layout: Extract<PicturePaint, { kind: "picture" }>["layout"]): PicturePaint {
   return { kind: "picture", assetId: "texture", opacity: 1, rotateWithShape: true, layout };
 }
+
+describe("actual picture-shape alpha and outline composition", () => {
+  function shaped(
+    preset: Parameters<typeof evaluateShapePreset>[0],
+    extra: Partial<PictureDetailedRasterOptions> = {},
+  ) {
+    return createDetailedPictureRaster(
+      options({
+        ...factory(),
+        widthPx: 20,
+        heightPx: 20,
+        shapeGeometry: evaluateShapePreset(preset, 20, 20),
+        sourcePainter: (context) => {
+          context.fillStyle = "#0000ff";
+          context.fillRect(-100, -100, 200, 200);
+        },
+        ...extra,
+      }),
+    );
+  }
+  test("ellipse has real transparent corners while rect matches the complete legacy frame", () => {
+    const ellipse = shaped({ preset: "ellipse" });
+    expect(framePixel(ellipse, 0, 0)).toEqual([0, 0, 0, 0]);
+    expect(framePixel(ellipse, 10, 10)).toEqual([0, 0, 255, 255]);
+    const rect = shaped({ preset: "rect" });
+    expect(framePixel(rect, 0, 0)).toEqual([0, 0, 255, 255]);
+    expect(framePixel(rect, 19, 19)).toEqual([0, 0, 255, 255]);
+    const legacy = createDetailedPictureRaster(
+      options({
+        ...factory(),
+        widthPx: 20,
+        heightPx: 20,
+        sourcePainter: (context) => {
+          context.fillStyle = "#0000ff";
+          context.fillRect(0, 0, 20, 20);
+        },
+      }),
+    );
+    expect(rect.logicalBounds).toEqual(legacy.logicalBounds);
+    expect(
+      (rect.kind === "ready" ? (rect.canvas as unknown as MemoryCanvas) : undefined)?.data,
+    ).toEqual(
+      (legacy.kind === "ready" ? (legacy.canvas as unknown as MemoryCanvas) : undefined)?.data,
+    );
+  });
+  test("Arc fills a quarter sector in its true upper-right bounds, rather than an empty open arc", () => {
+    const result = shaped({ preset: "arc" });
+    expect(result.logicalBounds).toEqual({ left: 10, top: 0, right: 20, bottom: 10 });
+    expect(framePixel(result, 12, 8)).toEqual([0, 0, 255, 255]);
+    expect(framePixel(result, 19, 0)[3]).toBe(0);
+  });
+  test("leftBrace retains its closed colored area and donut retains its nonzero hole", () => {
+    const brace = shaped({ preset: "leftBrace" });
+    if (brace.kind !== "ready") throw new Error("missing brace");
+    expect(
+      (brace.canvas as unknown as MemoryCanvas).data.some(
+        (value, index) => index % 4 === 3 && value > 0,
+      ),
+    ).toBe(true);
+    const donut = shaped({ preset: "donut" });
+    expect(framePixel(donut, 10, 10)).toEqual([0, 0, 0, 0]);
+    expect(framePixel(donut, 10, 1)).toEqual([0, 0, 255, 255]);
+  });
+  test("callout tail remains colored outside the original frame without a second rect clip", () => {
+    const result = shaped({ preset: "wedgeRectCallout" });
+    expect(result.logicalBounds.bottom).toBeGreaterThan(20);
+    const canvas = result.kind === "ready" ? (result.canvas as unknown as MemoryCanvas) : undefined;
+    expect(canvas).toBeDefined();
+    let outsideAlpha = 0;
+    for (let y = 20; y < canvas!.height; y++)
+      for (let x = 0; x < canvas!.width; x++) outsideAlpha += pixel(result, x, y)[3]!;
+    expect(outsideAlpha).toBeGreaterThan(0);
+  });
+  test("source and behind-image fill are masked together once, including partial edge alpha", () => {
+    const result = shaped(
+      { preset: "ellipse" },
+      {
+        style: filled(solid("#ff0000")),
+        sourcePainter: (context) => {
+          context.fillStyle = "rgba(0,0,255,0.5)";
+          context.fillRect(-100, -100, 200, 200);
+        },
+      },
+    );
+    expect(framePixel(result, 0, 0)).toEqual([0, 0, 0, 0]);
+    expect(framePixel(result, 10, 10)).toEqual([127, 0, 128, 255]);
+    const canvas = result.kind === "ready" ? (result.canvas as unknown as MemoryCanvas) : undefined;
+    const edge = Array.from(
+      { length: canvas!.width * canvas!.height },
+      (_, index) => index * 4,
+    ).find((index) => canvas!.data[index + 3]! > 0 && canvas!.data[index + 3]! < 255)!;
+    expect(edge).toBeDefined();
+    expect(Array.from(canvas!.data.slice(edge, edge + 3))).toEqual([127, 0, 128]);
+  });
+  test("separate filled paths union while reversed contours inside one path remain holes", () => {
+    const rectangle = (
+      left: number,
+      top: number,
+      right: number,
+      bottom: number,
+      reverse = false,
+    ): ShapePresetGeometry["paths"][number]["commands"] =>
+      reverse
+        ? [["M", left, top], ["L", left, bottom], ["L", right, bottom], ["L", right, top], ["Z"]]
+        : [["M", left, top], ["L", right, top], ["L", right, bottom], ["L", left, bottom], ["Z"]];
+    const geometry: ShapePresetGeometry = {
+      width: 20,
+      height: 20,
+      handles: [],
+      adjustments: {},
+      paths: [
+        {
+          filled: true,
+          stroke: false,
+          commands: [
+            ...rectangle(0, 0, 16, 16),
+            ...rectangle(4, 4, 12, 12, true),
+          ] as ShapePresetGeometry["paths"][number]["commands"],
+        },
+        {
+          filled: true,
+          stroke: false,
+          commands: rectangle(
+            8,
+            8,
+            20,
+            20,
+            true,
+          ) as ShapePresetGeometry["paths"][number]["commands"],
+        },
+      ],
+    };
+    const result = shaped(undefined, { shapeGeometry: geometry });
+    expect(framePixel(result, 6, 6)[3]).toBe(0);
+    expect(framePixel(result, 10, 10)[3]).toBe(255);
+    expect(framePixel(result, 14, 14)[3]).toBe(255);
+  });
+  test("ellipse outline follows its actual perimeter, not the enclosing rectangle", () => {
+    const result = shaped(
+      { preset: "ellipse" },
+      {
+        sourcePainter: () => {},
+        style: {
+          line: {
+            kind: "value",
+            value: {
+              paint: solid("#ff0000"),
+              widthPt: 0.75,
+              compound: "single",
+              dash: "solid",
+              cap: "round",
+              join: "round",
+              miterLimit: 10,
+            },
+          },
+        },
+      },
+    );
+    expect(framePixel(result, 0, 0)[3]).toBe(0);
+    expect(framePixel(result, 10, 0)[0]).toBe(255);
+    expect(framePixel(result, 10, 10)[3]).toBe(0);
+  });
+  test("Arc's filled radial closure is never added to its stroke-only arc", () => {
+    const result = shaped(
+      { preset: "arc" },
+      {
+        sourcePainter: () => {},
+        style: {
+          line: {
+            kind: "value",
+            value: {
+              paint: solid(),
+              widthPt: 0.75,
+              compound: "single",
+              dash: "solid",
+              cap: "butt",
+              join: "round",
+              miterLimit: 10,
+            },
+          },
+        },
+      },
+    );
+    expect(framePixel(result, 10, 8)[3]).toBe(0);
+    expect(framePixel(result, 15, 9)[3]).toBe(0);
+    expect(framePixel(result, 10, 0)[3]).toBeGreaterThan(0);
+  });
+  test.each(["single", "double", "thick-thin", "thin-thick", "triple"] as const)(
+    "%s compound strokes actual curved contours and never draws Arc radial edges",
+    (compound) => {
+      const style: PictureDetailedStyle = {
+        line: {
+          kind: "value",
+          value: {
+            paint: solid(),
+            widthPt: 1.5,
+            compound,
+            dash: "solid",
+            cap: "butt",
+            join: "round",
+            miterLimit: 10,
+          },
+        },
+      };
+      for (const preset of ["ellipse", "donut", "arc"] as const) {
+        const result = shaped({ preset }, { sourcePainter: () => {}, style });
+        expect(framePixel(result, 10, 0)[3]).toBeGreaterThan(0);
+        if (preset !== "arc") expect(framePixel(result, 10, 10)[3]).toBe(0);
+        else {
+          expect(framePixel(result, 10, 8)[3]).toBe(0);
+          expect(framePixel(result, 15, 9)[3]).toBe(0);
+        }
+      }
+    },
+  );
+  test("shape silhouettes and holes feed true-alpha shadow/glow/reflection/projector stages", () => {
+    let checked = false;
+    const result = shaped(
+      { preset: "donut" },
+      {
+        projectedBounds: (_density, front) => front,
+        projectSurface: (layer) => {
+          checked = true;
+          expect(layer.surface.data[(10 * layer.surface.width + 10) * 4 + 3]).toBe(0);
+          return layer;
+        },
+        style: {
+          shadow: { kind: "value", value: shadow({ distancePt: 1.5, opacity: 1 }) },
+          glow: {
+            kind: "value",
+            value: { color: { kind: "rgb", rgb: "#ff0000" }, opacity: 1, sizePt: 0.75 },
+          },
+          reflection: {
+            kind: "value",
+            value: { size: 0.5, opacity: 0.5, blurPt: 0, distancePt: 0.75 },
+          },
+        },
+      },
+    );
+    expect(checked).toBe(true);
+    expect(framePixel(result, 0, 0)[3]).toBe(0);
+    expect(framePixel(result, 10, 10)[3]).toBe(0);
+    expect(result.logicalBounds.bottom).toBeGreaterThan(20);
+  });
+  test("invalid/mismatched/over-budget shapes fail before Canvas or source callbacks", () => {
+    const canvas = factory();
+    let painted = 0;
+    const base = evaluateShapePreset({ preset: "rect" }, 20, 20);
+    for (const geometry of [
+      { ...base, width: 19 },
+      { ...base, paths: [] },
+      { ...base, paths: [{ ...base.paths[0]!, filled: false }] },
+      {
+        ...base,
+        paths: [
+          { ...base.paths[0]!, commands: Array.from({ length: 1025 }, () => ["M", 0, 0] as const) },
+        ],
+      },
+    ]) {
+      expect(() =>
+        createDetailedPictureRaster(
+          options({
+            ...canvas,
+            widthPx: 20,
+            heightPx: 20,
+            shapeGeometry: geometry,
+            sourcePainter: () => {
+              painted++;
+            },
+          }),
+        ),
+      ).toThrow();
+    }
+    expect(canvas.canvases).toHaveLength(0);
+    expect(painted).toBe(0);
+  });
+  test("shape-mask scratch and real tail/outline bounds obey tightened aggregate budgets", () => {
+    const plan = planDetailedPictureRaster({
+      widthPx: 4000,
+      heightPx: 4000,
+      pixelDensity: 1,
+      shapeGeometry: evaluateShapePreset({ preset: "wedgeRectCallout" }, 4000, 4000),
+      limits: { side: 128, pixels: 8000, memoryBytes: 1_000_000 },
+    });
+    expect(plan.actualDensity).toBeLessThan(1);
+    expect(plan.widthRaster).toBeLessThanOrEqual(128);
+    expect(plan.widthRaster * plan.heightRaster).toBeLessThanOrEqual(8000);
+    expect(plan.estimatedPeakBytes).toBeLessThanOrEqual(1_000_000);
+    expect(plan.logicalBounds.bottom).toBeGreaterThan(4000);
+  });
+});
 
 describe("pure detailed-picture preflight", () => {
   test.each([NaN, Infinity, 0, -1])(

@@ -39,6 +39,7 @@ export function capturePictureSourcePresentation(
     throw new TypeError("Picture presentation requires a real source-bearing frame.");
   if (geometry.collapsed || geometry.rect.width <= 0 || geometry.rect.height <= 0)
     throw new RangeError("Expand the picture before previewing it.");
+  assertSourceBearingPicturePaintSupport(copy);
   return {
     picture: copy,
     geometry: resolvePictureSourceLayout(
@@ -70,26 +71,24 @@ function fallbackBounds(
   };
 }
 
-/** A bounded, consumer-owned canvas drawn by the exact worksheet leaf painter. */
-export function createPictureSourcePresentationCanvas(
-  decoded: HTMLImageElement,
+/** Pure preflight: source/effect/shape bounds and raster budgets precede any asset read or decode. */
+export function planPictureSourcePresentation(
   input: PictureSourcePresentation,
   theme?: WorkbookTheme,
   resources?: PicturePaintResources,
   maxSide = 4096,
   requestedDensity = 1,
-): HTMLCanvasElement {
+) {
   if (!Number.isInteger(maxSide) || maxSide < 96 || maxSide > 4096)
     throw new RangeError("Invalid picture presentation limit.");
   if (!Number.isFinite(requestedDensity) || requestedDensity <= 0 || requestedDensity > 64)
     throw new RangeError("Invalid picture presentation density.");
-  assertImagePixelBudget(decoded.naturalWidth, decoded.naturalHeight);
   const presentation = capturePictureSourcePresentation(input.picture, input.geometry),
     { picture, geometry } = presentation,
     inherited = getDrawingThemeEffects(theme);
   assertSourceBearingPicturePaintSupport(picture, inherited);
   const effects = resolvePictureThemeEffects(picture.transform?.appearance, inherited);
-  const typed = !!picture.transform?.appearance?.detailedStyle;
+  const typed = !!picture.transform?.appearance?.detailedStyle || !!picture.frame.cropShape;
   const fallback = fallbackBounds(presentation, !typed && effects?.reflection === true);
   // Native canvas shadows are screen-space pixels, unlike typed effect bounds.
   const shadow = picture.transform?.appearance?.shadow ?? effects?.shadow;
@@ -119,6 +118,7 @@ export function createPictureSourcePresentationCanvas(
         inherited,
         resources,
         density,
+        picture.frame.cropShape,
       ) ?? fallback;
     density = Math.min(density, fit(bounds));
   }
@@ -129,11 +129,28 @@ export function createPictureSourcePresentationCanvas(
       inherited,
       resources,
       density,
+      picture.frame.cropShape,
     ) ?? fallback;
   const width = Math.max(1, Math.ceil(bounds.width * density + 2 * padding)),
     height = Math.max(1, Math.ceil(bounds.height * density + 2 * padding));
   if (width > maxSide || height > maxSide || width > Math.floor(pixelLimit / height))
     throw new RangeError("Picture presentation exceeds its raster budget.");
+  return { presentation, inherited, bounds, density, padding, width, height };
+}
+
+/** A bounded, consumer-owned canvas drawn by the exact worksheet leaf painter. */
+export function createPictureSourcePresentationCanvas(
+  decoded: HTMLImageElement,
+  input: PictureSourcePresentation,
+  theme?: WorkbookTheme,
+  resources?: PicturePaintResources,
+  maxSide = 4096,
+  requestedDensity = 1,
+): HTMLCanvasElement {
+  const { presentation, inherited, bounds, density, padding, width, height } =
+    planPictureSourcePresentation(input, theme, resources, maxSide, requestedDensity);
+  assertImagePixelBudget(decoded.naturalWidth, decoded.naturalHeight);
+  const { picture, geometry } = presentation;
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -148,9 +165,13 @@ export function createPictureSourcePresentationCanvas(
       padding - bounds.x * density,
       padding - bounds.y * density,
     );
-    if (isGroupedPicture(picture))
-      paintGroupedPictureContent(context, decoded, picture, geometry, inherited, resources);
-    else paintFramedPictureContent(context, decoded, picture, geometry, inherited, resources);
+    // Explicit source preview/save renders an intentionally hidden leaf without
+    // changing its workbook visibility or selection identity.
+    const visiblePicture = picture.hidden ? { ...picture, hidden: false } : picture;
+    if (isGroupedPicture(visiblePicture))
+      paintGroupedPictureContent(context, decoded, visiblePicture, geometry, inherited, resources);
+    else
+      paintFramedPictureContent(context, decoded, visiblePicture, geometry, inherited, resources);
     return canvas;
   } catch (error) {
     canvas.width = 0;

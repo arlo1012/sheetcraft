@@ -210,6 +210,7 @@ function releaseRoot(child: PlannedChild, metrics: PictureSheetMetrics): Picture
       anchor,
       angleDeg: child.layout.angleDeg,
       source: { ...child.node.frame.source },
+      ...(child.node.frame.cropShape ? { cropShape: child.node.frame.cropShape } : {}),
       ...(child.node.frame.flipHorizontal === undefined
         ? {}
         : { flipHorizontal: child.node.frame.flipHorizontal }),

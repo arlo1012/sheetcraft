@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Point } from "@sheetcraft/sheet-engine/geometry";
 import { canEditPictureRoot, canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import { isPictureGroup, type PictureGroupPath } from "@sheetcraft/core/picture-group";
 import {
@@ -141,6 +142,7 @@ import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 import type { ImageInsertMode } from "../../sheet-images/useSheetImageActions";
 import SheetFloatingImageLayer from "../../sheet-images/components/SheetFloatingImageLayer.vue";
 import SheetOwnedPictureGroupLayer from "../../sheet-images/components/SheetOwnedPictureGroupLayer.vue";
+import SheetPictureAdjustmentHandles from "../../sheet-images/components/SheetPictureAdjustmentHandles.vue";
 import SheetPictureCropOverlay from "../../sheet-images/components/SheetPictureCropOverlay.vue";
 import PictureCropToolbar from "../../sheet-images/components/PictureCropToolbar.vue";
 import {
@@ -1341,6 +1343,7 @@ const pictureCrop = usePictureCropSession({
   getSelectedPath: () => selectedOwnedPicturePath.value,
   isReadOnly: () => pictureSelectionReadOnly.value,
   execute: (roots) => props.applyPictureCollectionChange?.(roots) === true,
+  getThemeEffects: () => drawingThemeEffects.value,
   onFailure: () => emit("imageFeedback", "picture.operationFailed"),
 });
 const cropOverlayRef = ref<InstanceType<typeof SheetPictureCropOverlay>>();
@@ -1351,14 +1354,14 @@ function stopCropPointer(): void {
   cropPointer = undefined;
   pointer?.cancel();
 }
-function finishPictureCrop(cancel = false): boolean {
+function finishPictureCrop(cancel = false, restoreFocus = true): boolean {
   // Drop mode before releasing capture so pointer cancellation cannot restore an applied draft.
   const accepted = cancel ? (pictureCrop.cancel(), true) : pictureCrop.apply();
   if (accepted) {
     stopCropPointer();
     imageLayerRef.value?.closePictureContextMenu();
     ownedImageLayerRef.value?.closePictureContextMenu();
-    focusEditor();
+    if (restoreFocus) focusEditor();
   }
   return accepted;
 }
@@ -1407,6 +1410,78 @@ function startPictureCropGesture(direction: PictureCropDirection, event: Pointer
     },
   });
 }
+function startPictureShapeAdjustment(index: number, event: PointerEvent): void {
+  if (event.button !== 0) return;
+  const immediate = !pictureCrop.active.value;
+  if (immediate && (!flushPendingEdit() || !pictureCrop.start())) return;
+  stopCropPointer();
+  const snapshot = pictureCrop.captureGesture();
+  if (!snapshot) return;
+  const start = { x: event.clientX, y: event.clientY },
+    zoom = scale.value;
+  const move = (pointer: PointerEvent | MouseEvent) =>
+    pictureCrop.previewShapeAdjustment(snapshot, index, {
+      x: (pointer.clientX - start.x) / zoom,
+      y: (pointer.clientY - start.y) / zoom,
+    });
+  cropPointer = startPointerSession({
+    event,
+    captureTarget: event.currentTarget instanceof HTMLElement ? event.currentTarget : null,
+    onMove: (pointer) => {
+      if (!move(pointer)) emit("imageFeedback", "picture.operationFailed");
+    },
+    onEnd: (pointer) => {
+      cropPointer = undefined;
+      move(pointer);
+      pictureCrop.finishGesture(snapshot);
+      if (immediate) finishPictureCrop();
+    },
+    onCancel: () => {
+      cropPointer = undefined;
+      pictureCrop.cancelGesture(snapshot);
+      if (immediate) pictureCrop.cancel();
+    },
+  });
+}
+function nudgePictureShapeAdjustment(index: number, delta: Point): void {
+  const immediate = !pictureCrop.active.value;
+  if (immediate && (!flushPendingEdit() || !pictureCrop.start())) return;
+  stopCropPointer();
+  const snapshot = pictureCrop.captureGesture();
+  if (!snapshot || !pictureCrop.previewShapeAdjustment(snapshot, index, delta)) {
+    if (immediate) pictureCrop.cancel();
+    emit("imageFeedback", "picture.operationFailed");
+    return;
+  }
+  pictureCrop.finishGesture(snapshot);
+  if (immediate) finishPictureCrop();
+}
+const pictureAdjustmentView = computed(() => {
+  if (pictureCrop.view.value) return pictureCrop.view.value;
+  if (selectedImageIds.value.length !== 1 || pictureSelectionReadOnly.value) return;
+  const context = pictureFrameContext.value;
+  const root = props.sheet.floatingImages.find((entry) => entry.id === selectedImageIds.value[0]);
+  if (!context || !root || root.hidden) return;
+  if (isFramedPictureObject(root) && root.frame.cropShape)
+    return { picture: root, geometry: resolvePictureFrame(root.frame, context.metrics) };
+  const path = selectedOwnedPicturePath.value;
+  if (!isPictureGroup(root) || !path || path.length < 2) return;
+  const selected = resolveOwnedPictureNode(props.sheet.floatingImages, path, context);
+  if (
+    selected?.visible &&
+    selected.layout &&
+    selected.node.kind === "grouped-picture-v1" &&
+    selected.node.frame.cropShape
+  )
+    return {
+      picture: selected.node,
+      geometry: resolvePictureSourceLayout(
+        selected.layout.rect,
+        selected.layout.angleDeg,
+        selected.node.frame.source,
+      ),
+    };
+});
 function onPictureCropKeydown(event: KeyboardEvent): void {
   if (!pictureCrop.active.value || event.isComposing || event.defaultPrevented) return;
   const target = event.target;
@@ -1429,7 +1504,7 @@ function onPictureCropKeydown(event: KeyboardEvent): void {
   if (
     target instanceof Element &&
     target.closest(
-      "[data-picture-crop-toolbar], [role=menu], input, textarea, [contenteditable=true]",
+      "[data-picture-crop-toolbar], [data-picture-shape-adjustment], [role=menu], input, textarea, [contenteditable=true]",
     )
   )
     return;
@@ -1473,6 +1548,16 @@ const cropControls = computed(() => {
     apply: () => current() && finishPictureCrop(),
     cancel: () => {
       if (current()) finishPictureCrop(true);
+    },
+    setShape: (shape: import("@sheetcraft/core/shape-presets").PictureCropShape | undefined) => {
+      if (!current()) return false;
+      stopCropPointer();
+      return pictureCrop.setShape(shape);
+    },
+    resetShapeAndCrop: () => {
+      if (!current()) return false;
+      stopCropPointer();
+      return pictureCrop.resetShapeAndCrop();
     },
     setRatio: (ratio: number) => {
       if (!current()) return false;
@@ -3950,6 +4035,7 @@ defineExpose({
       ? ownedImageLayerRef.value?.arrangeSelection(ids, action)
       : imageLayerRef.value?.arrangeImages(ids, action);
   },
+  applyPendingPictureCrop: () => !pictureCrop.active.value || finishPictureCrop(false, false),
   cropImage: startPictureCrop,
   canCropPicture: () => pictureCrop.canStart.value,
   rotateImage: (turns: -1 | 1 | 2) =>
@@ -4349,6 +4435,15 @@ defineExpose({
         @keydown="onPictureCropKeydown"
         @contextmenu="openCropContextMenu"
       />
+      <SheetPictureAdjustmentHandles
+        v-if="pictureAdjustmentView?.picture.frame.cropShape"
+        :shape="pictureAdjustmentView.picture.frame.cropShape"
+        :geometry="pictureAdjustmentView.geometry"
+        :layout="layout"
+        :disabled="pictureSelectionReadOnly"
+        @start="startPictureShapeAdjustment"
+        @nudge="nudgePictureShapeAdjustment"
+      />
       <PictureCropToolbar
         v-if="cropToolbarAnchor && cropControls"
         ref="cropToolbarRef"
@@ -4358,6 +4453,9 @@ defineExpose({
         :apply="cropControls.apply"
         :cancel="cropControls.cancel"
         :set-ratio="cropControls.setRatio"
+        :set-shape="cropControls.setShape"
+        :reset-shape-and-crop="cropControls.resetShapeAndCrop"
+        :shape="pictureCrop.view.value?.picture.frame.cropShape"
       />
     </div>
     <SheetAxisContextMenu

@@ -1,4 +1,10 @@
 import {
+  getPictureCropShapeGeometry,
+  getPictureShapeSourceRect,
+  getPictureCropShapeWorldBounds,
+} from "./picture-crop-shape";
+import { tracePictureShapePath } from "../../shared/images/picture-shape-mask";
+import {
   clonePictureObject,
   isFramedPictureObject,
   type FramedFloatingImage,
@@ -89,7 +95,15 @@ export function preparePictureCropPreview(
   if (!geometry.sourceRect) throw new TypeError("Crop preview requires resolved source geometry.");
   sameRect(geometry.sourceRect, canonical.sourceRect);
 
-  const source = canonical.sourceRect;
+  const shape = getPictureCropShapeGeometry(
+    normalized.frame.cropShape,
+    canonical.rect.width,
+    canonical.rect.height,
+  );
+  const mapped = shape ? getPictureShapeSourceRect(canonical, shape) : undefined;
+  const source = mapped
+    ? { ...mapped, x: canonical.rect.x + mapped.x, y: canonical.rect.y + mapped.y }
+    : canonical.sourceRect;
   // sourceRect is expressed in the crop frame's unrotated axes. Its physical
   // center is C + R(offset), not the center of that unrotated rectangle.
   const center = pictureFrameLocalToWorld(canonical.rect, canonical.angleDeg, {
@@ -107,6 +121,7 @@ export function preparePictureCropPreview(
     ? clonePictureGroupChild(normalized)
     : clonePictureObject(normalized);
   ghostPicture.frame.source = unitSource;
+  delete ghostPicture.frame.cropShape;
   // Decorations belong to the retained crop frame, not the temporary full-source
   // frame. Keep pixel filters, transparency, opacity, annotations and both flips.
   if (ghostPicture.transform?.appearance) {
@@ -145,7 +160,22 @@ export function getPictureCropViewportFragments(
   if (preview.picture.hidden) return [];
   return paneIds.flatMap((paneId) => {
     const geometry = projectPictureFrameIntoPane(preview.geometry, paneId, layout);
-    const clippedBounds = intersection(geometry.bounds, layout.panes[paneId].clip);
+    const shapeBounds = getPictureCropShapeWorldBounds(preview.picture, geometry);
+    const bounds = shapeBounds
+      ? {
+          x: Math.min(geometry.bounds.x, shapeBounds.x),
+          y: Math.min(geometry.bounds.y, shapeBounds.y),
+          width:
+            Math.max(geometry.bounds.x + geometry.bounds.width, shapeBounds.x + shapeBounds.width) -
+            Math.min(geometry.bounds.x, shapeBounds.x),
+          height:
+            Math.max(
+              geometry.bounds.y + geometry.bounds.height,
+              shapeBounds.y + shapeBounds.height,
+            ) - Math.min(geometry.bounds.y, shapeBounds.y),
+        }
+      : geometry.bounds;
+    const clippedBounds = intersection(bounds, layout.panes[paneId].clip);
     return clippedBounds ? [{ paneId, geometry, clippedBounds }] : [];
   });
 }
@@ -194,16 +224,39 @@ export function paintPictureCropSourceGhost(
       context.beginPath();
       context.rect(clip.x, clip.y, clip.width, clip.height);
       context.clip();
-      context.beginPath();
-      context.rect(clip.x, clip.y, clip.width, clip.height);
-      context.moveTo(frame.corners[0].x, frame.corners[0].y);
-      for (const point of frame.corners.slice(1)) context.lineTo(point.x, point.y);
-      context.closePath();
-      context.clip("evenodd");
+      const shape = getPictureCropShapeGeometry(
+        preview.picture.frame.cropShape,
+        frame.rect.width,
+        frame.rect.height,
+      );
+      if (!shape) {
+        context.beginPath();
+        context.rect(clip.x, clip.y, clip.width, clip.height);
+        context.moveTo(frame.corners[0].x, frame.corners[0].y);
+        for (const point of frame.corners.slice(1)) context.lineTo(point.x, point.y);
+        context.closePath();
+        context.clip("evenodd");
+      }
       context.globalAlpha *= 0.35;
       if (isGroupedPicture(preview.ghostPicture))
         paintGroupedPictureContent(context, decoded, preview.ghostPicture, source);
       else paintFramedPictureContent(context, decoded, preview.ghostPicture, source);
+      if (shape) {
+        // This dedicated overlay contains ghosts only. Erasing each nonzero fill
+        // independently preserves same-path holes and the union of separate paths.
+        context.globalAlpha = 1;
+        context.globalCompositeOperation = "destination-out";
+        const rect = frame.rect;
+        context.translate(rect.x + rect.width / 2, rect.y + rect.height / 2);
+        context.rotate((frame.angleDeg * Math.PI) / 180);
+        context.translate(-rect.width / 2, -rect.height / 2);
+        for (const path of shape.paths)
+          if (path.filled) {
+            context.beginPath();
+            tracePictureShapePath(context, path);
+            context.fill("nonzero");
+          }
+      }
     } finally {
       context.restore();
     }

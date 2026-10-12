@@ -1,4 +1,4 @@
-import { normalizePictureCropShape } from "./contract.js";
+import { normalizeShapePresetParameters } from "./contract.js";
 import { evaluateShapePreset } from "./evaluate.js";
 import type { PictureCropShape } from "./types.js";
 
@@ -10,7 +10,7 @@ export function moveShapePresetAdjustment(
   handleIndex: number,
   target: Readonly<{ x: number; y: number }>,
 ): PictureCropShape {
-  const shape = normalizePictureCropShape(input);
+  const shape = normalizeShapePresetParameters(input);
   if (!shape) throw new TypeError("A rectangle has no shape adjustment handle.");
   if (
     ![target.x, target.y].every((value) => Number.isFinite(value) && Math.abs(value) <= 10_000_000)
@@ -107,5 +107,5 @@ export function moveShapePresetAdjustment(
   fields.forEach((field, index) => {
     adjustments[field.name] = best.values[index]!;
   });
-  return normalizePictureCropShape({ preset: shape.preset, adjustments })!;
+  return normalizeShapePresetParameters({ preset: shape.preset, adjustments })!;
 }

@@ -1,3 +1,4 @@
+import { evaluateShapePreset } from "@sheetcraft/core/shape-presets";
 import type { FloatingImage } from "@sheetcraft/core/workbook";
 import {
   isFramedPictureObject,
@@ -97,14 +98,20 @@ function assertDetailedGeometry(
   geometry: ResolvedPictureFrame,
   effects: DrawingThemeEffects | undefined,
 ): void {
-  if (!geometry.collapsed && picture.transform?.appearance?.detailedStyle)
+  if (
+    !geometry.collapsed &&
+    (picture.transform?.appearance?.detailedStyle || picture.frame.cropShape)
+  )
     planPictureDetailedPaint({
       width: geometry.rect.width,
       height: geometry.rect.height,
       density: 1,
-      appearance: picture.transform.appearance,
+      appearance: picture.transform?.appearance,
       inherited: effects,
       angleDeg: geometry.angleDeg,
+      shapeGeometry: picture.frame.cropShape
+        ? evaluateShapePreset(picture.frame.cropShape, geometry.rect.width, geometry.rect.height)
+        : undefined,
     });
 }
 

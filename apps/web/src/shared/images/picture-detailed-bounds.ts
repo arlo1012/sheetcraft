@@ -1,3 +1,4 @@
+import { evaluateShapePreset, type PictureCropShape } from "@sheetcraft/core/shape-presets";
 import {
   pictureFrameLocalToWorld,
   type ResolvedPictureFrame,
@@ -14,6 +15,7 @@ export function getPictureDetailedWorldBounds(
   inherited: DrawingThemeEffects | undefined,
   resources: PicturePaintResources | undefined,
   density: number,
+  cropShape?: PictureCropShape,
 ): PictureFrameRect | undefined {
   if (geometry.collapsed) return;
   const plan = planPictureDetailedPaint({
@@ -24,6 +26,9 @@ export function getPictureDetailedWorldBounds(
     inherited,
     resources,
     angleDeg: geometry.angleDeg,
+    shapeGeometry: cropShape
+      ? evaluateShapePreset(cropShape, geometry.rect.width, geometry.rect.height)
+      : undefined,
   });
   if (!plan) return;
   const b = plan.logicalBounds;

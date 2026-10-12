@@ -1,3 +1,4 @@
+import type { PictureCropShape } from "@sheetcraft/core/shape-presets";
 import { PICTURE_PAINT_LABEL_KEYS } from "./picture-paint-labels";
 import type { ImageAppearance } from "@sheetcraft/core/workbook";
 import type { PictureDetailedStyle } from "@sheetcraft/core/picture-detailed-style";
@@ -120,6 +121,7 @@ export interface PictureFormatCapability {
 export interface PictureFormatCapabilities {
   fields: Partial<Record<PictureFormatField, PictureFormatCapability>>;
   detailed?: Partial<Record<PictureDetailedCategory, PictureFormatCapability>>;
+  cropShape?: PictureFormatCapability;
   resets?: Partial<Record<PictureFormatReset, PictureFormatCapability>>;
 }
 export interface PictureFormatSnapshot {
@@ -128,6 +130,7 @@ export interface PictureFormatSnapshot {
   values: Readonly<Partial<PictureFormatValues>>;
   /** Detached source appearance for real structured editors, not a whole-workbook patch. */
   appearance?: ImageAppearance;
+  cropShape?: PictureCropShape;
   /** Explicit member scope; containers have no source or local picture paint. */
   paintScope?: "group-leaves";
   mixedDetailed?: readonly ("fill" | "line")[];
@@ -159,6 +162,7 @@ export type PictureFormatDetailedIntent = {
 export type PictureFormatIntent =
   | PictureFormatDetailedIntent
   | PictureFormatEditIntent
+  | (PictureFormatIntentIdentity & { type: "set-crop-shape"; value: PictureCropShape | undefined })
   | (PictureFormatIntentIdentity & { type: PictureFormatReset });
 /** true means accepted for this exact owner; false must leave the draft intact. */
 export type PictureFormatIntentHandler = (intent: PictureFormatIntent) => boolean;
@@ -525,9 +529,11 @@ export function canApplyPictureFormatIntent(
   return (
     (intent.type === "set-field"
       ? capabilities.fields[intent.field]
-      : intent.type === "set-detailed"
-        ? capabilities.detailed?.[intent.category]
-        : capabilities.resets?.[intent.type]
+      : intent.type === "set-crop-shape"
+        ? capabilities.cropShape
+        : intent.type === "set-detailed"
+          ? capabilities.detailed?.[intent.category]
+          : capabilities.resets?.[intent.type]
     )?.enabled === true
   );
 }
