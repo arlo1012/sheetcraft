@@ -1,3 +1,5 @@
+import { normalizePictureProperties } from "@sheetcraft/core/picture-properties";
+import type { LegacyCellImage } from "@sheetcraft/core/cell-picture-frame";
 import { describe, expect, test, vi } from "vitest";
 import { createRenameSheetCommand } from "@sheetcraft/core/commands";
 import { createWorkbookSession, executeWorkbookCommand } from "@sheetcraft/core/history";
@@ -14,6 +16,15 @@ import {
   assertSupportedXlsxPicture,
   createXlsxImageExporter,
 } from "../../image-export.js";
+
+function cellPicture(image: LegacyFloatingImage): LegacyCellImage {
+  return {
+    assetId: image.assetId,
+    altText: image.altText,
+    ...normalizePictureProperties(image),
+    ...(image.transform ? { transform: image.transform } : {}),
+  };
+}
 
 function picture(transform?: ImageTransform): LegacyFloatingImage {
   return {
@@ -47,7 +58,8 @@ describe("picture theme-suppression native admission", () => {
       executeWorkbookCommand(session, createRenameSheetCommand("s", "Synthetic"));
       const sheet = getActiveSheet(workbook);
       const image = picture({ appearance: { suppressThemeEffects: { shadow: true } } });
-      if (kind === "cell") sheet.cells.set("3:2", { content: { kind: "image", image } });
+      if (kind === "cell")
+        sheet.cells.set("3:2", { content: { kind: "image", image: cellPicture(image) } });
       else sheet.floatingImages.push({ ...image, hidden: kind === "hidden-floating" });
       const before = structuredClone({ workbook, history: session.history });
       const resources: XlsxImageAsset[] = [
@@ -96,7 +108,9 @@ describe("picture theme-suppression native admission", () => {
         blockAt('Synthetic.floatingImages["picture"].transform.appearance.suppressThemeEffects'),
       );
       sheet.floatingImages = [];
-      sheet.cells.set("3:2", { content: { kind: "image", image: picture(transform) } });
+      sheet.cells.set("3:2", {
+        content: { kind: "image", image: cellPicture(picture(transform)) },
+      });
       await expect(encodeXlsx(workbook, options)).rejects.toMatchObject(
         blockAt("Synthetic!C4.transform.appearance.suppressThemeEffects"),
       );
@@ -110,7 +124,9 @@ describe("picture theme-suppression native admission", () => {
     const exporter = createXlsxImageExporter(target, undefined);
     const sheet = getActiveSheet(createWorkbook({ id: "w", sheetId: "s" }));
     const image = picture({ appearance: { suppressThemeEffects: { outline: true } } });
-    expect(() => exporter.registerCellImage(image, "Synthetic!C4")).toThrow(XlsxCompatibilityError);
+    expect(() => exporter.registerCellImage(cellPicture(image), "Synthetic!C4")).toThrow(
+      XlsxCompatibilityError,
+    );
     expect(() => exporter.addFloatingImage(output, sheet, image, "Synthetic!C4")).toThrow(
       XlsxCompatibilityError,
     );
@@ -178,7 +194,7 @@ describe("picture theme-suppression native admission", () => {
       const exporter = createXlsxImageExporter(target, {
         images: [{ assetId: "source", transform, bytes, extension: "png", width: 120, height: 80 }],
       });
-      expect(exporter.registerCellImage(image, "Synthetic!C4")).toEqual({
+      expect(exporter.registerCellImage(cellPicture(image), "Synthetic!C4")).toEqual({
         mediaFilename: "xl/media/image1.png",
         altText: "Synthetic",
       });

@@ -1758,6 +1758,9 @@ export type MessageSchema = ToolMessageSchema & {
     deleteImage: string;
     converted: string;
     convertFailed: string;
+    overwriteTitle: string;
+    overwriteMessage: string;
+    overwriteConfirm: string;
     preview: string;
     crop: string;
     rotate: string;

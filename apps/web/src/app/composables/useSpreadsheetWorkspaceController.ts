@@ -1,7 +1,5 @@
-import {
-  normalizePictureProperties,
-  type PictureProperties,
-} from "@sheetcraft/core/picture-properties";
+import { normalizeCellImage, type CellImage } from "@sheetcraft/core/cell-picture-frame";
+import type { ConvertFloatingImageToCellCommand } from "@sheetcraft/core/commands";
 import {
   assertWorkbookPictureSupport,
   assertPictureCommandSupport,
@@ -43,6 +41,7 @@ import {
   createSetFloatingImageCommand,
   createDeleteFloatingImageCommand,
   createConvertFloatingImageToCellCommand,
+  planFloatingPictureToCell,
   createConvertCellImageToFloatingCommand,
   createSetSheetFilterCriteriaCommand,
   createSetSheetFreezePanesCommand,
@@ -133,7 +132,6 @@ import {
   MAX_SHEET_ROWS,
   setActiveSheet,
   type FloatingImage,
-  type ImageTransform,
   type CellAddress,
   type CellRange,
   type SheetFilter,
@@ -564,8 +562,28 @@ export function useSpreadsheetWorkspaceController(
 
   /** Reject entire value mutations before history can record a partial duplicate entry. */
   function assertDuplicateEntriesAreAllowed(command: WorkbookCommand): void {
-    if (command.type !== "setCellContents") return;
-    const result = validateDuplicateEntries(session.workbook, command.changes);
+    const changes =
+      command.type === "setCellContents"
+        ? command.changes
+        : command.type === "convertFloatingImageToCell"
+          ? (() => {
+              const sheet = session.workbook.sheets.get(command.sheetId);
+              const plan = sheet
+                ? planFloatingPictureToCell(sheet, command.id, command.path)
+                : null;
+              return plan
+                ? [
+                    {
+                      sheetId: command.sheetId,
+                      address: plan.address,
+                      content: { kind: "image" as const, image: plan.image },
+                    },
+                  ]
+                : [];
+            })()
+          : [];
+    if (!changes.length) return;
+    const result = validateDuplicateEntries(session.workbook, changes);
     if (!result.valid) {
       throw new WorkbookDomainError(
         {
@@ -741,24 +759,12 @@ export function useSpreadsheetWorkspaceController(
     }
   }
 
-  function setCellImage(
-    payload: PictureProperties & {
-      sheetId: string;
-      address: CellAddress;
-      assetId: string;
-      altText: string;
-      transform?: ImageTransform;
-    },
-  ): boolean {
+  function setCellImage(payload: CellImage & { sheetId: string; address: CellAddress }): boolean {
+    const { sheetId, address, ...image } = payload;
     return execute(
-      createSetCellContentCommand(payload.sheetId, payload.address, {
+      createSetCellContentCommand(sheetId, address, {
         kind: "image",
-        image: {
-          assetId: payload.assetId,
-          altText: payload.altText,
-          ...normalizePictureProperties(payload),
-          ...(payload.transform ? { transform: payload.transform } : {}),
-        },
+        image: normalizeCellImage(image),
       }),
       "cells.edit",
     );
@@ -772,13 +778,23 @@ export function useSpreadsheetWorkspaceController(
     execute(createDeleteFloatingImageCommand(activeSheet.value.id, id));
   }
 
-  function convertFloatingImageToCell(id: string): void {
+  function convertFloatingImageToCell(
+    id: string,
+    options?: Omit<ConvertFloatingImageToCellCommand, "type" | "id">,
+  ): boolean {
     try {
-      if (execute(createConvertFloatingImageToCellCommand(activeSheet.value.id, id))) {
-        showWorkspaceStatus({ key: "image.converted" });
-      }
+      const changed = execute(
+        createConvertFloatingImageToCellCommand(
+          options?.sheetId ?? activeSheet.value.id,
+          id,
+          options,
+        ),
+      );
+      if (changed) showWorkspaceStatus({ key: "image.converted" });
+      return changed;
     } catch {
       showWorkspaceStatus({ key: "image.convertFailed" });
+      return false;
     }
   }
 

@@ -1,3 +1,4 @@
+import RibbonButton from "../../../../shared/ribbon/RibbonButton.vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { computed, defineComponent, h, ref, shallowRef } from "vue";
@@ -436,7 +437,7 @@ describe("framed picture ribbon capability boundary", () => {
     const image = { ...framedPicture(), groupId: "existing-group" };
     const wrapper = fixture(image);
     await wrapper.setProps({ geometry: { width: 120, height: 80, angleDeg: 37 } });
-    for (const action of ["replace", "convert-to-cell", "crop", "restore", "annotate"]) {
+    for (const action of ["replace", "crop", "restore", "annotate"]) {
       expect(wrapper.get(`[data-picture-tool="${action}"]`).attributes("aria-disabled")).toBe(
         "true",
       );
@@ -539,4 +540,25 @@ test("group creation permission is independent of existing ungroup and arrangeme
   expect(wrapper.emitted("group")).toBeUndefined();
   await wrapper.get('.picture-arrange [aria-label="Ungroup"]').trigger("click");
   expect(wrapper.emitted("ungroup")).toEqual([[]]);
+});
+
+test("new framed conversion is available and old owner callbacks never retarget a replacement", async () => {
+  const handler = vi.fn(() => true),
+    wrapper = fixture(framedPicture());
+  await wrapper.setProps({ convertHandler: handler, canConvert: true, draftOwnerKey: 1 });
+  const button = wrapper.get('[data-picture-tool="convert-to-cell"]');
+  const convertButton = wrapper
+    .findAllComponents(RibbonButton)
+    .find((component) => component.attributes("data-picture-tool") === "convert-to-cell")!;
+  const old = convertButton.vm.$.vnode.props?.onActivate as () => void;
+  expect(button.attributes("aria-disabled")).toBe("false");
+  await button.trigger("click");
+  expect(handler).toHaveBeenCalledOnce();
+  await wrapper.setProps({ draftOwnerKey: 2, convertHandler: vi.fn(() => true) });
+  old();
+  expect(handler).toHaveBeenCalledOnce();
+  await wrapper.setProps({ canConvert: false });
+  await button.trigger("click");
+  expect(handler).toHaveBeenCalledOnce();
+  wrapper.unmount();
 });

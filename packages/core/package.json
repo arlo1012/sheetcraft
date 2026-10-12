@@ -39,6 +39,10 @@
       "types": "./dist/cell-autofill.d.ts",
       "import": "./dist/cell-autofill.js"
     },
+    "./cell-picture-frame": {
+      "types": "./dist/cell-picture-frame.d.ts",
+      "import": "./dist/cell-picture-frame.js"
+    },
     "./cell-styles": {
       "types": "./dist/cell-styles.d.ts",
       "import": "./dist/cell-styles.js"

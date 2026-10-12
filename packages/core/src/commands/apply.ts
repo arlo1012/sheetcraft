@@ -91,6 +91,7 @@ import {
   applyConvertCellImageToFloatingCommand,
   applyDeleteFloatingImageCommand,
   applyRestoreFloatingImageToCellCommand,
+  applyRestorePictureCellConversionCommand,
   applySetFloatingImageCommand,
   applySetSheetFloatingImagesCommand,
 } from "./images.js";
@@ -264,6 +265,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "convertFloatingImageToCell":
     case "convertCellImageToFloating":
     case "restoreFloatingImageToCell":
+    case "restorePictureCellConversion":
     case "insertSheetAxis":
     case "deleteSheetAxis":
     case "batchDeleteSheetAxes":
@@ -451,6 +453,8 @@ export function applyWorkbookCommand(
         return applyConvertCellImageToFloatingCommand(workbook, command);
       case "restoreFloatingImageToCell":
         return applyRestoreFloatingImageToCellCommand(workbook, command);
+      case "restorePictureCellConversion":
+        return applyRestorePictureCellConversionCommand(workbook, command);
       case "addSheet":
         return applyAddSheetCommand(workbook, command);
       case "deleteSheet":

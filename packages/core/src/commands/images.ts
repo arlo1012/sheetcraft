@@ -1,3 +1,11 @@
+import { anchorPictureFrameRect } from "../picture-frame.js";
+import { createPictureSheetMetrics } from "../picture-axis-metrics.js";
+import { MIN_FLOATING_IMAGE_SIZE, MAX_FLOATING_IMAGE_SIZE } from "../workbook.js";
+import { isFramedCellImage } from "../cell-picture-frame.js";
+import { planFloatingPictureToCell } from "../picture-cell-conversion.js";
+import { assertFillDataValidation } from "./fill-validation.js";
+import { createSetCellContentCommand } from "./values.js";
+export { planFloatingPictureToCell } from "../picture-cell-conversion.js";
 import { normalizePictureProperties } from "../picture-properties.js";
 import { isPictureGroup } from "../picture-group.js";
 import { normalizePictureObjectCollection } from "../picture-object.js";
@@ -5,6 +13,7 @@ import { isFramedPictureObject } from "../picture-object.js";
 import { assertPictureObjectsForSheet } from "../picture-object-sheet.js";
 import {
   cloneFloatingImage,
+  cloneCellContent,
   getCellContent,
   normalizeFloatingImageForSheet,
   setCellContent,
@@ -18,6 +27,7 @@ import type {
   DeleteFloatingImageCommand,
   FloatingImageSize,
   RestoreFloatingImageToCellCommand,
+  RestorePictureCellConversionCommand,
   SetFloatingImageCommand,
   SetSheetFloatingImagesCommand,
 } from "./contracts.js";
@@ -75,9 +85,36 @@ export function createDeleteFloatingImageCommand(
 export function createConvertFloatingImageToCellCommand(
   sheetId: string,
   id: string,
+  options: {
+    path?: readonly string[];
+    expectedCellContent?: import("../formula/types.js").CellContent | null;
+    expectedAddress?: import("../workbook.js").CellAddress;
+  } = {},
 ): ConvertFloatingImageToCellCommand {
   if (typeof id !== "string" || !id.trim()) throw invalidCommandPayload("id", id);
-  return { type: "convertFloatingImageToCell", sheetId, id };
+  if (
+    options.path !== undefined &&
+    (!Array.isArray(options.path) ||
+      options.path.length < 1 ||
+      options.path.length > 33 ||
+      options.path.some((part) => typeof part !== "string" || !part.trim()))
+  )
+    throw invalidCommandPayload("path", options.path);
+  if (options.expectedAddress) assertCellAddress(options.expectedAddress);
+  return {
+    type: "convertFloatingImageToCell",
+    sheetId,
+    id,
+    ...(options.path ? { path: [...options.path] } : {}),
+    ...(Object.hasOwn(options, "expectedCellContent")
+      ? {
+          expectedCellContent: options.expectedCellContent
+            ? cloneCellContent(options.expectedCellContent)
+            : null,
+        }
+      : {}),
+    ...(options.expectedAddress ? { expectedAddress: { ...options.expectedAddress } } : {}),
+  };
 }
 
 export function createConvertCellImageToFloatingCommand(
@@ -153,46 +190,55 @@ export function applyDeleteFloatingImageCommand(
 export function applyConvertFloatingImageToCellCommand(
   workbook: Workbook,
   command: ConvertFloatingImageToCellCommand,
-): RestoreFloatingImageToCellCommand | null {
+): RestorePictureCellConversionCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   if (typeof command.id !== "string" || !command.id.trim())
     throw invalidCommandPayload("id", command.id);
-  const index = sheet.floatingImages.findIndex((image) => image.id === command.id);
-  if (index < 0) return null;
-  const image = sheet.floatingImages[index];
-  if (!image) return null;
-  if (isFramedPictureObject(image) || isPictureGroup(image))
+  const plan = validateCommandPayload("picture conversion", command, () =>
+    planFloatingPictureToCell(sheet, command.id, command.path),
+  );
+  if (!plan) return null;
+  const content = getCellContent(sheet, plan.address);
+  if (
+    command.expectedAddress &&
+    (command.expectedAddress.row !== plan.address.row ||
+      command.expectedAddress.column !== plan.address.column)
+  )
     throw invalidCommandPayload(
-      "image.frame",
-      image.frame,
-      "Converting a framed picture to a cell is not yet supported.",
+      "expectedAddress",
+      command.expectedAddress,
+      "The picture destination changed after confirmation.",
     );
-  const address = getMergedCellAnchor(sheet.mergedCells, image.anchor) ?? image.anchor;
-  const content = getCellContent(sheet, address);
-  sheet.floatingImages.splice(index, 1);
-  setCellContent(sheet, address, {
-    kind: "image",
-    image: {
-      assetId: image.assetId,
-      altText: image.altText,
-      ...normalizePictureProperties(image),
-      ...(image.transform ? { transform: image.transform } : {}),
-    },
-  });
-  return {
-    type: "restoreFloatingImageToCell",
-    sheetId: command.sheetId,
-    image: cloneFloatingImage(image),
-    index,
-    address: { ...address },
+  if (
+    Object.hasOwn(command, "expectedCellContent") &&
+    JSON.stringify(content) !== JSON.stringify(command.expectedCellContent ?? null)
+  )
+    throw invalidCommandPayload(
+      "expectedCellContent",
+      command.expectedCellContent,
+      "The destination content changed after confirmation.",
+    );
+  assertFillDataValidation(
+    workbook,
+    createSetCellContentCommand(sheet.id, plan.address, { kind: "image", image: plan.image }),
+  );
+  assertPictureObjectsForSheet(plan.roots, sheet);
+  const inverse: RestorePictureCellConversionCommand = {
+    type: "restorePictureCellConversion",
+    sheetId: sheet.id,
+    address: { ...plan.address },
+    images: normalizePictureObjectCollection(sheet.floatingImages),
     content,
   };
+  setCellContent(sheet, plan.address, { kind: "image", image: plan.image });
+  sheet.floatingImages = plan.roots;
+  return inverse;
 }
 
 export function applyConvertCellImageToFloatingCommand(
   workbook: Workbook,
   command: ConvertCellImageToFloatingCommand,
-): ConvertFloatingImageToCellCommand | null {
+): RestorePictureCellConversionCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   assertCellAddress(command.address);
   if (typeof command.imageId !== "string" || !command.imageId.trim())
@@ -204,24 +250,70 @@ export function applyConvertCellImageToFloatingCommand(
   if (sheet.floatingImages.some((image) => image.id === command.imageId)) {
     throw invalidCommandPayload("imageId", command.imageId, "Floating image id already exists.");
   }
-  const image = normalizeCommandFloatingImage({
-    id: command.imageId,
-    assetId: content.image.assetId,
-    altText: content.image.altText,
-    ...normalizePictureProperties(content.image),
-    ...(content.image.transform ? { transform: content.image.transform } : {}),
-    anchor: address,
-    offsetX: 0,
-    offsetY: 0,
-    ...size,
-  });
+  const source = content.image;
+  const metrics = createPictureSheetMetrics(sheet);
+  const frameAnchor = isFramedCellImage(source)
+    ? anchorPictureFrameRect(
+        [source.frame.size.width, source.frame.size.height].every(
+          (value) => value >= MIN_FLOATING_IMAGE_SIZE && value <= MAX_FLOATING_IMAGE_SIZE,
+        )
+          ? "move-only"
+          : "move-and-size",
+        {
+          x: metrics.columns.visiblePrefix(address.column),
+          y: metrics.rows.visiblePrefix(address.row),
+          ...source.frame.size,
+        },
+        metrics,
+      )
+    : undefined;
+  const image = normalizeCommandFloatingImage(
+    isFramedCellImage(source)
+      ? {
+          id: command.imageId,
+          assetId: source.assetId,
+          altText: source.altText,
+          ...normalizePictureProperties(source),
+          ...(source.transform ? { transform: source.transform } : {}),
+          ...(source.lockAspectRatio === undefined
+            ? {}
+            : { lockAspectRatio: source.lockAspectRatio }),
+          frame: {
+            kind: "object-frame-v1",
+            anchor: frameAnchor!,
+            source: { ...source.frame.source },
+            angleDeg: source.frame.angleDeg,
+            ...(source.frame.flipHorizontal ? { flipHorizontal: true } : {}),
+            ...(source.frame.flipVertical ? { flipVertical: true } : {}),
+            ...(source.frame.cropShape ? { cropShape: source.frame.cropShape } : {}),
+          },
+        }
+      : {
+          id: command.imageId,
+          assetId: source.assetId,
+          altText: source.altText,
+          ...normalizePictureProperties(source),
+          ...(source.transform ? { transform: source.transform } : {}),
+          anchor: address,
+          offsetX: 0,
+          offsetY: 0,
+          ...size,
+        },
+  );
   const nextImages = validateCommandPayload("images", [...sheet.floatingImages, image], () =>
     normalizePictureObjectCollection([...sheet.floatingImages, image]),
   );
   assertPictureObjectsForSheet(nextImages, sheet);
+  const inverse: RestorePictureCellConversionCommand = {
+    type: "restorePictureCellConversion",
+    sheetId: sheet.id,
+    address: { ...address },
+    images: normalizePictureObjectCollection(sheet.floatingImages),
+    content: cloneCellContent(content),
+  };
   setCellContent(sheet, address, null);
   sheet.floatingImages = nextImages;
-  return createConvertFloatingImageToCellCommand(command.sheetId, image.id);
+  return inverse;
 }
 
 export function applyRestoreFloatingImageToCellCommand(
@@ -256,6 +348,35 @@ export function applyRestoreFloatingImageToCellCommand(
   setCellContent(sheet, command.address, command.content);
   sheet.floatingImages = nextImages;
   return createConvertFloatingImageToCellCommand(command.sheetId, image.id);
+}
+
+/** History restores exact cell content and the complete ownership forest in one transaction. */
+export function applyRestorePictureCellConversionCommand(
+  workbook: Workbook,
+  command: RestorePictureCellConversionCommand,
+): RestorePictureCellConversionCommand {
+  const sheet = getSheetOrThrow(workbook, command.sheetId);
+  assertCellAddress(command.address);
+  const images = validateCommandPayload("images", command.images, () =>
+    normalizePictureObjectCollection(command.images),
+  );
+  const content =
+    command.content === null
+      ? null
+      : validateCommandPayload("content", command.content, () =>
+          cloneCellContent(command.content!),
+        );
+  assertPictureObjectsForSheet(images, sheet);
+  const inverse: RestorePictureCellConversionCommand = {
+    type: "restorePictureCellConversion",
+    sheetId: sheet.id,
+    address: { ...command.address },
+    images: normalizePictureObjectCollection(sheet.floatingImages),
+    content: getCellContent(sheet, command.address),
+  };
+  setCellContent(sheet, command.address, content);
+  sheet.floatingImages = images;
+  return inverse;
 }
 
 /** Replaces one sheet's picture collection atomically for grouping, arranging, and batch edits. */

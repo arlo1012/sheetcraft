@@ -1,6 +1,7 @@
 import {
   createSetFloatingImageCommand,
   createSetSheetFloatingImagesCommand,
+  planFloatingPictureToCell,
 } from "@sheetcraft/core/commands";
 import { framedPicture } from "../../modules/sheet-images/framed-picture-fixture";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
@@ -649,4 +650,24 @@ describe("spreadsheet workspace controller", () => {
     controller.cancelFormatPainter();
     expect(controller.formatPainterActive.value).toBe(false);
   });
+});
+
+test("embedding cannot bypass a destination duplicate-entry reject rule", () => {
+  const controller = mountController(),
+    sheet = controller.activeSheet.value;
+  const image = framedPicture();
+  sheet.floatingImages = [image];
+  const address = planFloatingPictureToCell(sheet, image.id)!.address;
+  const other = { ...address, column: address.column + 1 };
+  sheet.duplicateRules = [
+    { id: "reject-images", kind: "reject", range: { start: address, end: other } },
+  ];
+  setCellContent(sheet, other, {
+    kind: "image",
+    image: { assetId: "existing", altText: "Existing" },
+  });
+  const before = serializeWorkbook(controller.session.workbook);
+  expect(controller.convertFloatingImageToCell(image.id)).toBe(false);
+  expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+  expect(controller.session.history.undoStack).toHaveLength(0);
 });

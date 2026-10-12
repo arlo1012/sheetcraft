@@ -1,4 +1,5 @@
-import { getPictureObjectOriginCell } from "../picture-object-sheet.js";
+import { planFloatingPictureToCell } from "../picture-cell-conversion.js";
+import { expandSelectionToMergedCellRanges } from "../merged-cells.js";
 import { WorkbookDomainError } from "../errors.js";
 import { getPivotTableRange, rangesIntersect } from "../pivot-tables.js";
 import { getCellContent, type CellRange, type Sheet, type Workbook } from "../workbook.js";
@@ -150,15 +151,34 @@ export function assertPivotResultsAreWritable(workbook: Workbook, command: Workb
         check(sheet.id, { start: command.address, end: command.address });
       return;
     case "convertFloatingImageToCell": {
-      const image = sheet.floatingImages.find((image) => image.id === command.id);
-      if (image) {
-        const address = getPictureObjectOriginCell(image, sheet);
-        check(sheet.id, { start: address, end: address });
-      }
+      const plan = planFloatingPictureToCell(sheet, command.id, command.path);
+      if (plan)
+        check(
+          sheet.id,
+          expandSelectionToMergedCellRanges(
+            { start: plan.address, end: plan.address },
+            sheet.mergedCells,
+          ),
+        );
       return;
     }
+    case "restorePictureCellConversion":
+      check(
+        sheet.id,
+        expandSelectionToMergedCellRanges(
+          { start: command.address, end: command.address },
+          sheet.mergedCells,
+        ),
+      );
+      return;
     case "convertCellImageToFloating":
-      check(sheet.id, { start: command.address, end: command.address });
+      check(
+        sheet.id,
+        expandSelectionToMergedCellRanges(
+          { start: command.address, end: command.address },
+          sheet.mergedCells,
+        ),
+      );
       return;
   }
 }

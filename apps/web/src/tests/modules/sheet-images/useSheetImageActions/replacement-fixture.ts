@@ -142,8 +142,8 @@ export function fixture() {
       getFrameContext: () => context,
       flushPendingEdits: flush,
       setFloatingImage,
-      setCellImage: vi.fn(),
-      convertCellImageToFloating: vi.fn(),
+      setCellImage: vi.fn(() => true),
+      convertCellImageToFloating: vi.fn(() => true),
     }),
   )!;
   function select(rootId: string, memberPath: PictureGroupPath | null = null) {

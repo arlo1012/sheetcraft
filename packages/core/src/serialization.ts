@@ -1,3 +1,4 @@
+import { normalizeCellImage } from "./cell-picture-frame.js";
 import {
   hasPicturePropertiesField,
   normalizePictureProperties,
@@ -81,7 +82,12 @@ import {
   type SheetPageDecoration,
   type WatermarkPreset,
 } from "./page-decoration.js";
-import { createFormulaError, isFormulaErrorCode, type CellContent } from "./formula/types.js";
+import {
+  createFormulaError,
+  isFormulaErrorCode,
+  type CellContent,
+  type CellImage,
+} from "./formula/types.js";
 import {
   cloneWorkbookTheme,
   DEFAULT_WORKBOOK_THEME,
@@ -258,6 +264,7 @@ export type WorkbookSnapshotV49 = Omit<WorkbookSnapshotV48, "version"> & { versi
 export type WorkbookSnapshotV50 = Omit<WorkbookSnapshotV49, "version"> & { version: 50 };
 export type WorkbookSnapshotV51 = Omit<WorkbookSnapshotV50, "version"> & { version: 51 };
 export type WorkbookSnapshotV52 = Omit<WorkbookSnapshotV51, "version"> & { version: 52 };
+export type WorkbookSnapshotV53 = Omit<WorkbookSnapshotV52, "version"> & { version: 53 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -268,7 +275,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV49
   | WorkbookSnapshotV50
   | WorkbookSnapshotV51
-  | WorkbookSnapshotV52;
+  | WorkbookSnapshotV52
+  | WorkbookSnapshotV53;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -337,7 +345,8 @@ type SnapshotVersion =
   | 49
   | 50
   | 51
-  | 52;
+  | 52
+  | 53;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -454,6 +463,13 @@ function hasCellPicturePropertyFields(cell: unknown): boolean {
     pictureDataField(content, "kind") === "image" &&
     hasPicturePropertiesField(pictureDataField(content, "image"))
   );
+}
+/** New local geometry is detected by field presence without reading a frame getter. */
+function hasCellPictureFrameFields(cell: unknown): boolean {
+  const content = pictureDataField(cell, "content");
+  if (pictureDataField(content, "kind") !== "image") return false;
+  const image = pictureDataField(content, "image");
+  return !!image && typeof image === "object" && ("frame" in image || "lockAspectRatio" in image);
 }
 function parsePictureProperties(
   value: unknown,
@@ -584,12 +600,22 @@ function parseCellContent(value: unknown, path: string, version: SnapshotVersion
   }
   if (version >= 4 && record.kind === "image") {
     const image = asRecord(record.image, `${path}.image`);
+    if ("frame" in image || "lockAspectRatio" in image) {
+      if (version < 53)
+        return fail(`${path}.image`, "Local cell picture frames require snapshot version 53.");
+      try {
+        return { kind: "image", image: normalizeCellImage(image as CellImage) };
+      } catch (error) {
+        return fail(
+          `${path}.image`,
+          error instanceof Error ? error.message : "Invalid cell picture.",
+        );
+      }
+    }
     if (version < 50 && hasDetailedPictureStyleField(image.transform))
       return fail(path, "Detailed picture styles require snapshot version 50.");
     if (version < 49 && hasThemeEffectSuppressionField(image.transform))
       return fail(path, "Picture theme effect suppression requires snapshot version 49.");
-    if (Object.hasOwn(image, "frame"))
-      return fail(`${path}.image.frame`, "Framed in-cell pictures are not supported.");
     if (typeof image.assetId !== "string" || !image.assetId.trim())
       return fail(`${path}.image.assetId`, "Expected a non-empty string.");
     if (typeof image.altText !== "string")
@@ -1287,6 +1313,21 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       );
     }
   }
+  // Validate new geometry before older inference paths can read appearance fields.
+  try {
+    if (Array.isArray(record.cells)) {
+      for (const cell of record.cells) {
+        if (!hasCellPictureFrameFields(cell)) continue;
+        if (version !== undefined && version < 53)
+          return fail(`${path}.cells`, "Local cell picture frames require snapshot version 53.");
+        const content = pictureDataField(cell, "content");
+        normalizeCellImage(pictureDataField(content, "image") as CellImage);
+      }
+    }
+  } catch (error) {
+    if (error instanceof WorkbookDomainError) throw error;
+    return fail(`${path}.cells`, error instanceof Error ? error.message : "Invalid cell picture.");
+  }
   if (version !== undefined && version < 50) {
     try {
       if (
@@ -1480,6 +1521,8 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       record.floatingImages.some(hasPictureCropShapeFields)
     )
       version = 52;
+    // Infer last so unrelated older features cannot lower the cell-frame protocol.
+    if (cells.some(hasCellPictureFrameFields)) version = 53;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -1580,43 +1623,45 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   );
   return {
     // Preserve the existing protocol for documents that do not use the new feature.
-    version: sheets.some((sheet) => sheet.floatingImages.some(hasPictureCropShapeFields))
-      ? 52
-      : sheets.some(
-            (sheet) =>
-              sheet.cells.some(hasCellPicturePropertyFields) ||
-              sheet.floatingImages.some(hasPicturePropertyFields),
-          )
-        ? 51
+    version: sheets.some((sheet) => sheet.cells.some(hasCellPictureFrameFields))
+      ? 53
+      : sheets.some((sheet) => sheet.floatingImages.some(hasPictureCropShapeFields))
+        ? 52
         : sheets.some(
               (sheet) =>
-                sheet.cells.some(hasCellDetailedStyleField) ||
-                sheet.floatingImages.some(hasPictureDetailedStyleField),
+                sheet.cells.some(hasCellPicturePropertyFields) ||
+                sheet.floatingImages.some(hasPicturePropertyFields),
             )
-          ? 50
+          ? 51
           : sheets.some(
                 (sheet) =>
-                  sheet.cells.some(hasCellThemeEffectSuppressionField) ||
-                  sheet.floatingImages.some(hasPictureThemeEffectSuppressionField),
+                  sheet.cells.some(hasCellDetailedStyleField) ||
+                  sheet.floatingImages.some(hasPictureDetailedStyleField),
               )
-            ? 49
-            : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
-              ? 48
-              : sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
-                ? 47
-                : sheets.some((sheet) =>
-                      sheet.cells.some(
-                        (cell) =>
-                          cell.content?.kind === "literal" &&
-                          Boolean(cell.content.fontRuns?.length),
-                      ),
-                    )
-                  ? 46
-                  : calculatedColumns
-                    ? 45
-                    : manualOrder
-                      ? 44
-                      : 43,
+            ? 50
+            : sheets.some(
+                  (sheet) =>
+                    sheet.cells.some(hasCellThemeEffectSuppressionField) ||
+                    sheet.floatingImages.some(hasPictureThemeEffectSuppressionField),
+                )
+              ? 49
+              : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
+                ? 48
+                : sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
+                  ? 47
+                  : sheets.some((sheet) =>
+                        sheet.cells.some(
+                          (cell) =>
+                            cell.content?.kind === "literal" &&
+                            Boolean(cell.content.fontRuns?.length),
+                        ),
+                      )
+                    ? 46
+                    : calculatedColumns
+                      ? 45
+                      : manualOrder
+                        ? 44
+                        : 43,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1700,7 +1745,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 49 &&
     record.version !== 50 &&
     record.version !== 51 &&
-    record.version !== 52
+    record.version !== 52 &&
+    record.version !== 53
   ) {
     throw new WorkbookDomainError(
       {

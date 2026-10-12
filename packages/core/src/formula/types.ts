@@ -1,4 +1,5 @@
 import type { PictureProperties } from "../picture-properties.js";
+import type { CellPictureFrame } from "../cell-picture-frame.js";
 export const MAX_FORMULA_ROWS = 1_048_576;
 export const MAX_FORMULA_COLUMNS = 16_384;
 
@@ -53,11 +54,27 @@ export type CellFormula = {
 };
 
 /** A binary image resource owned by the Web storage adapter. */
-export type CellImage = PictureProperties & {
+export type LegacyCellImage = PictureProperties & {
   assetId: string;
   altText: string;
   transform?: ImageTransform;
+  frame?: never;
+  lockAspectRatio?: never;
 };
+/** A local crop frame moves with its owning cell and never carries worksheet coordinates. */
+export type FramedCellImage = PictureProperties & {
+  assetId: string;
+  altText: string;
+  frame: CellPictureFrame;
+  transform?: Pick<ImageTransform, "appearance" | "annotations"> & {
+    crop?: never;
+    rotation?: never;
+    flipHorizontal?: never;
+    flipVertical?: never;
+  };
+  lockAspectRatio?: boolean;
+};
+export type CellImage = LegacyCellImage | FramedCellImage;
 
 export type CellTextFontRun = Readonly<{ start: number; end: number; fontFamily: string }>;
 

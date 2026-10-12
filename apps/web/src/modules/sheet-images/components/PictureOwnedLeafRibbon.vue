@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Crop, Eye, ImagePlus, Settings2 } from "lucide-vue-next";
+import { Crop, Eye, ImagePlus, ImageDown, Settings2 } from "lucide-vue-next";
 import { isGroupedPicture, type GroupedPicture } from "@sheetcraft/core/picture-group";
 import { useAppI18n } from "../../../shared/i18n";
 import PictureAssetTools from "./PictureAssetTools.vue";
@@ -18,6 +18,8 @@ const props = defineProps<{
   canCrop?: boolean;
   cropHandler?: () => boolean;
   replaceHandler: () => void;
+  convertHandler?: () => boolean;
+  canConvert?: boolean;
   formatHandler: () => void;
   ownerKey: string;
 }>();
@@ -35,8 +37,19 @@ const callbacks = computed(() => {
     replace = props.replaceHandler,
     format = props.formatHandler,
     crop = props.cropHandler,
-    preview = props.previewHandler;
+    preview = props.previewHandler,
+    convert = props.convertHandler;
   return {
+    convert: () => {
+      if (
+        image === props.image &&
+        key === props.ownerKey &&
+        !props.disabled &&
+        props.canConvert !== false &&
+        convert === props.convertHandler
+      )
+        convert?.();
+    },
     export: (fileFormat: PictureFileFormat, all = false) => {
       if (image === props.image && key === props.ownerKey && !props.busy)
         emit("export", fileFormat, all);
@@ -119,6 +132,15 @@ const callbacks = computed(() => {
       data-picture-tool="preview"
       @activate="callbacks.preview"
       ><Eye
+    /></RibbonButton>
+    <RibbonButton
+      variant="tall"
+      :label="t('image.convertToCell')"
+      :text="t('image.convertToCell')"
+      :disabled="disabled || !convertHandler || canConvert === false"
+      data-picture-tool="convert-to-cell"
+      @activate="callbacks.convert"
+      ><ImageDown
     /></RibbonButton>
     <PictureAssetTools
       :disabled="disabled"

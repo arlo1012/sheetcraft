@@ -93,7 +93,7 @@ function actionFixture() {
     execute: f.execute,
     setFloatingImage,
     setCellImage,
-    convertCellImageToFloating: vi.fn(),
+    convertCellImageToFloating: vi.fn(() => true),
   });
   vi.mocked(prepareImageAsset).mockResolvedValue(f.asset);
   const input = document.createElement("input");

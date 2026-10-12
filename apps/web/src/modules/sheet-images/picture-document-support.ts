@@ -1,4 +1,6 @@
 import { isPictureGroup } from "@sheetcraft/core";
+import { isFramedCellImage, normalizeCellImage } from "@sheetcraft/core/cell-picture-frame";
+import type { CellContent } from "@sheetcraft/core/formula";
 import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import {
   isFramedPictureObject,
@@ -22,6 +24,20 @@ import { assertPictureObjectsForSheet } from "@sheetcraft/core/picture-object-sh
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { getDrawingThemeEffects } from "./drawing-theme-effects";
 import { assertPicturePaintSupport } from "./picture-paint-effects";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import { captureCellPictureSourcePresentation } from "./cell-picture-presentation";
+import { planPictureSourcePresentation } from "./picture-source-presentation";
+
+/** Pure content admission shares the source painter's geometry and appearance contract. */
+function assertCellPictureSupport(
+  content: CellContent | null | undefined,
+  theme: WorkbookTheme,
+): void {
+  if (content?.kind !== "image") return;
+  const image = normalizeCellImage(content.image);
+  if (isFramedCellImage(image))
+    planPictureSourcePresentation(captureCellPictureSourcePresentation(image), theme);
+}
 
 export class UnsupportedPictureDocumentError extends Error {
   readonly code = "unsupported-picture-frame";
@@ -40,6 +56,7 @@ export class UnsupportedPictureDocumentError extends Error {
 export function assertWorkbookPictureSupport(workbook: Workbook): void {
   const effects = getDrawingThemeEffects(workbook.theme);
   for (const sheet of workbook.sheets.values()) {
+    for (const cell of sheet.cells.values()) assertCellPictureSupport(cell.content, workbook.theme);
     const roots = normalizePictureObjectCollection(sheet.floatingImages);
     assertPictureObjectsForSheet(roots, sheet);
     assertPicturePaintSupport(
@@ -71,9 +88,8 @@ export function requireLegacyPicture(image: FloatingImage): LegacyFloatingImage 
 
 /** Preflight complete proposed trees before history, assets or worksheet state changes. */
 export function assertPictureCommandSupport(command: WorkbookCommand, workbook: Workbook): void {
-  const effects = getDrawingThemeEffects(
-    command.type === "setWorkbookTheme" ? command.theme : workbook.theme,
-  );
+  const theme = command.type === "setWorkbookTheme" ? command.theme : workbook.theme;
+  const effects = getDrawingThemeEffects(theme);
   function check(images: readonly FloatingImage[], sheet?: Sheet): void {
     const roots = normalizePictureObjectCollection(images);
     if (sheet) assertPictureObjectsForSheet(roots, sheet);
@@ -86,6 +102,7 @@ export function assertPictureCommandSupport(command: WorkbookCommand, workbook: 
     );
   }
   function checkState(sheetId: string, state: SheetSparseState): void {
+    for (const cell of state.cells) assertCellPictureSupport(cell.content, theme);
     const sheet = workbook.sheets.get(sheetId);
     check(
       state.floatingImages,
@@ -110,8 +127,17 @@ export function assertPictureCommandSupport(command: WorkbookCommand, workbook: 
   }
   const sheet = "sheetId" in command ? workbook.sheets.get(command.sheetId) : undefined;
   switch (command.type) {
+    case "setCellContents":
+      for (const change of command.changes) assertCellPictureSupport(change.content, theme);
+      break;
+    case "restoreCellStyles":
+      for (const change of command.changes) assertCellPictureSupport(change.content, theme);
+      break;
     case "setWorkbookTheme":
-      for (const candidate of workbook.sheets.values()) check(candidate.floatingImages, candidate);
+      for (const candidate of workbook.sheets.values()) {
+        for (const cell of candidate.cells.values()) assertCellPictureSupport(cell.content, theme);
+        check(candidate.floatingImages, candidate);
+      }
       break;
     case "setFloatingImage": {
       const images = sheet?.floatingImages.slice() ?? [];
@@ -122,8 +148,14 @@ export function assertPictureCommandSupport(command: WorkbookCommand, workbook: 
       break;
     }
     case "restoreFloatingImageToCell":
+      assertCellPictureSupport(command.content, theme);
       requireLegacyPicture(command.image);
       check([...(sheet?.floatingImages ?? []), command.image], sheet);
+      break;
+    case "convertFloatingImageToCell":
+    case "convertCellImageToFloating":
+    case "restorePictureCellConversion":
+      checkProjectedWorkbook();
       break;
     case "setSheetFloatingImages":
       check(command.images, sheet);
@@ -158,6 +190,7 @@ export function assertPictureCommandSupport(command: WorkbookCommand, workbook: 
       break;
     case "addSheet": {
       const added = deserializeSheet(command.sheet);
+      for (const cell of added.cells.values()) assertCellPictureSupport(cell.content, theme);
       check(added.floatingImages, added);
       break;
     }
@@ -193,6 +226,9 @@ export function assertExternalPictureGroupSupport(workbook: Workbook): void {
     const ids = sheet.floatingImages
       .filter((image) => isPictureGroup(image) || isFramedPictureObject(image))
       .map((image) => image.id);
+    for (const [key, cell] of sheet.cells)
+      if (cell.content?.kind === "image" && Object.hasOwn(cell.content.image, "frame"))
+        ids.push(`cell:${key}`);
     if (ids.length) throw new UnsupportedPictureDocumentError(sheet.id, ids);
   }
 }

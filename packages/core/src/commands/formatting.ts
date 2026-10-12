@@ -1,5 +1,5 @@
 import { normalizeCommandCellContent } from "./values.js";
-import { areImageTransformsEqual } from "../image-transform.js";
+import { areCellImagesEqual } from "../cell-picture-frame.js";
 import type { CellContent } from "../formula/types.js";
 import {
   MAX_CELL_STYLE_PATCH_CELLS,
@@ -842,9 +842,7 @@ function hasSameContentExceptFontRuns(
   return (
     previous.kind === "image" &&
     restored.kind === "image" &&
-    previous.image.assetId === restored.image.assetId &&
-    previous.image.altText === restored.image.altText &&
-    areImageTransformsEqual(previous.image.transform, restored.image.transform)
+    areCellImagesEqual(previous.image, restored.image)
   );
 }
 

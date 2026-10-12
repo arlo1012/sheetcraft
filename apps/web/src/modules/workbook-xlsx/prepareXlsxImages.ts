@@ -117,6 +117,17 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
       if (cell.content?.kind !== "image") continue;
       const [row, column] = key.split(":").map(Number);
       if (row === undefined || column === undefined) continue;
+      if (Object.hasOwn(cell.content.image, "frame")) {
+        const location = `${sheet.name}!${formatFormulaAddress({ row, column })}.frame`;
+        throw new XlsxWorkerFailure(
+          `Frame-aware in-cell pictures are not yet supported by XLSX export at ${location}.`,
+          {
+            issues: [
+              { code: "feature-omitted", severity: "block", count: 1, locations: [location] },
+            ],
+          },
+        );
+      }
       assertProperties(
         cell.content.image,
         `${sheet.name}!${formatFormulaAddress({ row, column })}`,

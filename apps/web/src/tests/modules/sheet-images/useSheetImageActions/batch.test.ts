@@ -47,16 +47,16 @@ function fixture() {
   const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
   const sheet = getActiveSheet(workbook);
   const store = createMemoryImageAssetStore();
-  const execute = vi.fn((command: WorkbookCommand) => applyWorkbookCommand(workbook, command));
+  const execute = vi.fn((command: WorkbookCommand) => !!applyWorkbookCommand(workbook, command));
   const actions = useSheetImageActions({
     assetStore: store,
     getWorkbook: () => workbook,
     getSheet: () => sheet,
     getAddress: () => ({ row: 2, column: 3 }),
     flushPendingEdits: () => true,
-    setCellImage: vi.fn(),
-    setFloatingImage: vi.fn(),
-    convertCellImageToFloating: vi.fn(),
+    setCellImage: vi.fn(() => true),
+    setFloatingImage: vi.fn(() => true),
+    convertCellImageToFloating: vi.fn(() => true),
     execute,
   });
   return { actions, sheet, store, execute };
@@ -69,6 +69,38 @@ beforeEach(() => {
 });
 
 describe("batch picture insertion", () => {
+  test.each(["cell", "floating"] as const)(
+    "undefined does not acknowledge a %s batch",
+    async (mode) => {
+      const f = fixture();
+      f.execute.mockReturnValueOnce(undefined as unknown as boolean);
+      await f.actions.insertFiles(files, mode);
+      expect(f.actions.feedback.value).toBe("image.insertionFailed");
+      expect(f.execute).toHaveBeenCalledOnce();
+    },
+  );
+
+  test("undefined does not acknowledge a copied picture group", async () => {
+    const f = fixture();
+    for (const asset of assets) await f.store.put(asset);
+    f.execute.mockReturnValueOnce(undefined as unknown as boolean);
+    await f.actions.pasteFloatingImages(
+      assets.map((asset, index) => ({
+        id: `copied-${index}`,
+        assetId: asset.id,
+        altText: "Copied",
+        anchor: { row: 0, column: 0 },
+        offsetX: index * 100,
+        offsetY: 0,
+        width: 100,
+        height: 50,
+      })),
+      { row: 2, column: 3 },
+    );
+    expect(f.actions.feedback.value).toBe("image.insertionFailed");
+    expect(f.execute).toHaveBeenCalledOnce();
+  });
+
   test.each(["cell", "floating"] as const)(
     "inserts two %s images in a single document command",
     async (mode) => {

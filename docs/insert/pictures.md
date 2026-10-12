@@ -553,3 +553,13 @@ GIF 联合范围也考虑 [Wuffs 的首帧画布扩展](https://raw.githubuserco
 独立新框与实际组内叶共用绘制、二维透明区域命中、裁剪草稿、源预览和另存消费者。
 内部 V52 保留遮罩，旧无此特性的快照版本不变。具体操作、资源许可、三维预算及
 仍未支持的交换/转换边界见 [图片形状裁剪](picture-shape-crop.md)。
+
+## Editable in-cell source frames
+
+The previously limited framed-picture conversion entry is now connected to real
+cell content with full local geometry, shared drawing/preview, overwrite
+confirmation, exact Undo/Redo and source/destination protection checks. See
+[picture-cell-conversion.md](picture-cell-conversion.md). Owned leaf embedding is
+an explicit product enhancement; container embedding and owned leaf Cut are not
+advertised as supported. External native/portable packaging remains blocked for
+these local frames. Source-format expansion is still a separate remaining item.

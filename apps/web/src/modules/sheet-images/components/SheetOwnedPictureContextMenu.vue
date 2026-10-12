@@ -6,13 +6,20 @@ import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import { useAppI18n } from "../../../shared/i18n";
-const props = defineProps<{ anchor: FloatingReference; readOnly: boolean; canUngroup: boolean }>();
+const props = defineProps<{
+  anchor: FloatingReference;
+  readOnly: boolean;
+  canUngroup: boolean;
+  canConvert?: boolean;
+  convertDisabled?: boolean;
+}>();
 const emit = defineEmits<{
   copy: [];
   cut: [];
   paste: [];
   delete: [];
   format: [];
+  convertToCell: [];
   ungroup: [];
   close: [restoreFocus: boolean];
 }>();
@@ -78,6 +85,13 @@ function onKeydown(event: KeyboardEvent): void {
       >
         {{ t("picture.ungroup") }}
       </MenuItem>
+      <MenuItem
+        v-if="canConvert"
+        data-owned-picture-action="convert-to-cell"
+        :disabled="readOnly || convertDisabled"
+        @select="emit('convertToCell')"
+        >{{ t("image.convertToCell") }}</MenuItem
+      >
       <MenuItem data-owned-picture-action="format" @select="emit('format')">
         {{ t("pictureFormat.paneTitle") }}
       </MenuItem>

@@ -1,5 +1,6 @@
 import { areCellTextFontRunsEqual, replaceCellTextByDiff } from "../text-font-runs.js";
-import { canEditPictureForest } from "../picture-protection.js";
+import { canEditPictureForest, canEditPictureRoot } from "../picture-protection.js";
+import { planFloatingPictureToCell } from "../picture-cell-conversion.js";
 import { getSheetFilters } from "./filter.js";
 import { WorkbookDomainError } from "../errors.js";
 import { MAX_SHEET_ROWS, MAX_SHEET_COLUMNS } from "../sheet-limits.js";
@@ -205,6 +206,36 @@ export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookC
     return true;
   }
   if (command.type === "setSheetFloatingImages") return canEditPictureForest(sheet, command.images);
+  if (command.type === "convertFloatingImageToCell") {
+    const plan = planFloatingPictureToCell(sheet, command.id, command.path);
+    if (!plan) return true;
+    if (
+      !canEditPictureRoot(sheet, plan.sourceRoot) ||
+      !canEditRange(
+        sheet,
+        expandSelectionToMergedCellRanges(
+          { start: plan.address, end: plan.address },
+          sheet.mergedCells,
+        ),
+      )
+    )
+      reject(sheet.id);
+    return true;
+  }
+  if (command.type === "convertCellImageToFloating") {
+    if (
+      !canEditRange(
+        sheet,
+        expandSelectionToMergedCellRanges(
+          { start: command.address, end: command.address },
+          sheet.mergedCells,
+        ),
+      )
+    )
+      reject(sheet.id);
+    // This transfers an existing cell-owned source; it does not authorize new picture paste.
+    return true;
+  }
   if (command.type === "deleteFloatingImage")
     return canEditPictureForest(
       sheet,

@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import {
-  createWorkbook,
-  getActiveSheet,
-  setCellContent,
-  type FloatingImage,
-} from "@sheetcraft/core/workbook";
+import { createWorkbook, getActiveSheet, setCellContent } from "@sheetcraft/core/workbook";
 import { isPictureGroup } from "@sheetcraft/core/picture-group";
 import type { PictureObject, StandalonePictureObject } from "@sheetcraft/core/picture-object";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
@@ -22,7 +17,7 @@ function requireStandalone(image: PictureObject): StandalonePictureObject {
   if (isPictureGroup(image)) throw new Error("Expected a standalone picture.");
   return image;
 }
-function existingImage(): FloatingImage {
+function existingImage(): StandalonePictureObject {
   return {
     id: "existing-image",
     assetId: "original-asset",
@@ -38,9 +33,15 @@ function existingImage(): FloatingImage {
 function fixture() {
   let workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
   const store = createMemoryImageAssetStore();
-  const setCellImage = vi.fn();
-  const setFloatingImage = vi.fn();
-  const convertCellImageToFloating = vi.fn();
+  const setCellImage = vi.fn<Parameters<typeof useSheetImageActions>[0]["setCellImage"]>(
+    () => true,
+  );
+  const setFloatingImage = vi.fn<Parameters<typeof useSheetImageActions>[0]["setFloatingImage"]>(
+    () => true,
+  );
+  const convertCellImageToFloating = vi.fn<
+    Parameters<typeof useSheetImageActions>[0]["convertCellImageToFloating"]
+  >(() => true);
   const actions = useSheetImageActions({
     assetStore: store,
     getWorkbook: () => workbook,
@@ -67,6 +68,84 @@ beforeEach(() => {
   vi.mocked(prepareImageAsset).mockReset();
 });
 describe("sheet image insertion", () => {
+  test("same-asset cell insertion does not mistake a local frame for an unchanged legacy image", async () => {
+    const f = fixture();
+    vi.mocked(prepareImageAsset).mockResolvedValue(asset);
+    setCellContent(
+      getActiveSheet(f.getWorkbook()),
+      { row: 2, column: 3 },
+      {
+        kind: "image",
+        image: {
+          assetId: asset.id,
+          altText: file.name,
+          frame: {
+            kind: "cell-picture-frame-v1",
+            size: { width: 120, height: 80 },
+            source: { widthRatio: 1, heightRatio: 1, offsetXRatio: 0, offsetYRatio: 0 },
+            angleDeg: 0,
+          },
+        },
+      },
+    );
+    await f.actions.insertFile(file, "cell");
+    expect(f.setCellImage).toHaveBeenCalledOnce();
+    expect(f.actions.feedback.value).toBe("image.inserted");
+  });
+
+  test.each(["cell", "floating"] as const)(
+    "undefined does not acknowledge a %s insertion",
+    async (mode) => {
+      vi.mocked(prepareImageAsset).mockResolvedValue(asset);
+      const f = fixture();
+      f.setCellImage.mockReturnValue(undefined);
+      f.setFloatingImage.mockReturnValue(undefined);
+      await f.actions.insertFile(file, mode);
+      expect(f.actions.feedback.value).toBe("image.insertionFailed");
+    },
+  );
+
+  test.each(["cell", "floating"] as const)(
+    "undefined does not acknowledge a %s paste",
+    async (mode) => {
+      const f = fixture();
+      const image = existingImage();
+      await f.store.put({ ...asset, id: image.assetId });
+      f.setCellImage.mockReturnValue(undefined);
+      f.setFloatingImage.mockReturnValue(undefined);
+      await f.actions.pasteFloatingImage(image, mode);
+      expect(f.actions.feedback.value).toBe("image.insertionFailed");
+    },
+  );
+
+  test("undefined does not acknowledge source replacement", async () => {
+    vi.mocked(prepareImageAsset).mockResolvedValue(asset);
+    const f = fixture();
+    const image = existingImage();
+    getActiveSheet(f.getWorkbook()).floatingImages = [image];
+    f.setFloatingImage.mockReturnValue(undefined);
+    await f.actions.insertFile(file, "floating", undefined, image.id);
+    expect(f.actions.feedback.value).toBe("image.insertionFailed");
+  });
+
+  test.each(["cell", "floating"] as const)(
+    "late %s insertion acknowledgement leaves a new owner's feedback alone",
+    async (mode) => {
+      vi.mocked(prepareImageAsset).mockResolvedValue(asset);
+      const f = fixture();
+      const acknowledge = async () => {
+        await Promise.resolve();
+        f.replace();
+        f.actions.reportFeedback("picture.noSmaller");
+        return true;
+      };
+      f.setCellImage.mockImplementation(acknowledge);
+      f.setFloatingImage.mockImplementation(acknowledge);
+      await f.actions.insertFile(file, mode);
+      expect(f.actions.feedback.value).toBe("picture.noSmaller");
+    },
+  );
+
   test("a paste differing only in object metadata is not treated as an unchanged cell image", async () => {
     const f = fixture(),
       image = { ...existingImage(), altTitle: "Title", locked: false, printObject: false };
@@ -93,9 +172,10 @@ describe("sheet image insertion", () => {
     const image = existingImage();
     const sheet = getActiveSheet(f.getWorkbook());
     sheet.floatingImages.push(image);
-    f.setFloatingImage.mockImplementation(async (replacement) =>
-      expect(await f.store.get(replacement.assetId)).toEqual(asset),
-    );
+    f.setFloatingImage.mockImplementation(async (replacement) => {
+      expect(await f.store.get(requireStandalone(replacement).assetId)).toEqual(asset);
+      return true;
+    });
     await f.actions.insertFile(file, "floating", undefined, image.id);
     expect(f.setFloatingImage).toHaveBeenCalledExactlyOnceWith(
       {
@@ -216,9 +296,10 @@ describe("sheet image insertion", () => {
   test("saves the asset before dispatching a cell-image edit", async () => {
     vi.mocked(prepareImageAsset).mockResolvedValue(asset);
     const f = fixture();
-    f.setCellImage.mockImplementation(async ({ assetId }) =>
-      expect(await f.store.get(assetId)).toEqual(asset),
-    );
+    f.setCellImage.mockImplementation(async ({ assetId }) => {
+      expect(await f.store.get(assetId)).toEqual(asset);
+      return true;
+    });
     await f.actions.insertFile(file, "cell");
     expect(f.setCellImage).toHaveBeenCalledWith({
       sheetId: getActiveSheet(f.getWorkbook()).id,

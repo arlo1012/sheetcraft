@@ -86,6 +86,8 @@ import { workbookThemeKey } from "../shared/color/workbook-theme-context";
 import PageBackgroundMenu from "../modules/page-decorations/components/PageBackgroundMenu.vue";
 import type { SheetWatermark, WatermarkPreset } from "@sheetcraft/core/page-decoration";
 import { usePictureAssetTools } from "../modules/sheet-images/usePictureAssetTools";
+import { usePictureCellConversion } from "../modules/sheet-images/usePictureCellConversion";
+import PictureCellOverwriteDialog from "../modules/sheet-images/components/PictureCellOverwriteDialog.vue";
 import PictureCompressDialog from "../modules/sheet-images/components/PictureCompressDialog.vue";
 import PictureBatchSizeDialog from "../modules/sheet-images/components/PictureBatchSizeDialog.vue";
 import { usePictureTools } from "../modules/sheet-images/usePictureTools";
@@ -1170,6 +1172,21 @@ watch(
   },
   { flush: "sync" },
 );
+const pictureCellConversion = usePictureCellConversion({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => pictureOwnerGeneration.value,
+  getSelectedIds: () => selectedPictureIds.value,
+  getSelectedPath: () => selectedOwnedPicturePath.value,
+  flushPendingEdits: () =>
+    cellEditSession.finish() && (sheetGridRef.value?.applyPendingPictureCrop() ?? true),
+  apply: convertFloatingImageToCell,
+  onApplied: (address) => {
+    sheetGridRef.value?.selectFloatingImage(null);
+    navigateToAddress(formatCellAddress(address));
+  },
+});
+
 const imageActions = useSheetImageActions({
   assetStore,
   execute: (command) => {
@@ -1980,6 +1997,8 @@ const pictureSourceRibbonOwner = computed(() => {
   return {
     key,
     canReplace: imageActions.canReplace(image.id, path),
+    canConvert: pictureCellConversion.canConvert(path?.[0] ?? image.id, path),
+    convert: () => current() && pictureCellConversion.request(path?.[0] ?? image.id, path),
     canCrop: sheetGridRef.value?.canCropPicture() ?? false,
     canPreview: sheetGridRef.value?.canPreviewPicture() ?? false,
     preview: () => current() && (sheetGridRef.value?.previewSelectedPicture() ?? false),
@@ -3150,6 +3169,8 @@ const gridInert = computed(
           :resize-handler="pictureToolbarOwner?.resize"
           :aspect-ratio-handler="pictureToolbarOwner?.aspectRatio"
           :appearance-handler="pictureToolbarOwner?.appearance"
+          :convert-handler="pictureSourceRibbonOwner?.convert"
+          :can-convert="pictureSourceRibbonOwner?.canConvert"
           :replace-handler="pictureSourceRibbonOwner?.replace"
           :can-replace="pictureSourceRibbonOwner?.canReplace"
           :can-preview="pictureSourceRibbonOwner?.canPreview"
@@ -3174,7 +3195,7 @@ const gridInert = computed(
           @layer="pictureTools.layer"
           @align="sheetGridRef?.arrangePictures(selectedPictureIds, $event)"
           @selection-pane="pictureTools.paneVisible.value = !pictureTools.paneVisible.value"
-          @convert-to-cell="convertFloatingImageToCell(selectedPicture.id)"
+          @convert-to-cell="pictureCellConversion.request(selectedPicture.id)"
         />
         <PictureOwnedLeafRibbon
           v-if="selectedOwnedPictureLeaf && pictureSourceRibbonOwner"
@@ -3187,6 +3208,8 @@ const gridInert = computed(
           :can-replace="pictureSourceRibbonOwner.canReplace"
           :can-preview="pictureSourceRibbonOwner.canPreview"
           :preview-handler="pictureSourceRibbonOwner.preview"
+          :convert-handler="pictureSourceRibbonOwner.convert"
+          :can-convert="pictureSourceRibbonOwner.canConvert"
           :can-crop="pictureSourceRibbonOwner.canCrop"
           :crop-handler="pictureSourceRibbonOwner.crop"
           @compress="pictureDialogs.openCompression"
@@ -4372,7 +4395,8 @@ const gridInert = computed(
           @delete-floating-images="pictureTools.remove"
           @update-floating-image="setFloatingImage"
           @delete-floating-image="deleteFloatingImage"
-          @convert-floating-image-to-cell="convertFloatingImageToCell"
+          :apply-picture-to-cell="pictureCellConversion.request"
+          :can-convert-picture-to-cell="pictureCellConversion.canConvert"
           @paste-image-file="imageActions.pasteImageFile"
           @convert-cell-image-to-floating="imageActions.convertCellImageToFloating"
           @paste-floating-image="imageActions.pasteFloatingImage"
@@ -4513,6 +4537,11 @@ const gridInert = computed(
       :error="pictureAnnotation.error.value ? t(pictureAnnotation.error.value) : ''"
       @confirm="pictureAnnotation.confirm"
       @close="pictureAnnotation.close"
+    />
+    <PictureCellOverwriteDialog
+      v-if="pictureCellConversion.confirmation.value"
+      :key="pictureCellConversion.confirmation.value.key"
+      :confirmation="pictureCellConversion.confirmation.value"
     />
     <PictureCompressDialog
       v-if="pictureCompression"

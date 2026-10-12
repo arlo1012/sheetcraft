@@ -206,7 +206,14 @@ export function paintSheetScene(
         let painted = false;
         if (image) {
           try {
-            paintCellImage(context, image, contentRect, content.image.transform, pictureResources);
+            paintCellImage(
+              context,
+              image,
+              contentRect,
+              content.image.transform,
+              pictureResources,
+              content.image,
+            );
             painted = true;
           } catch (error) {
             if (!(error instanceof PicturePaintUnavailableError)) throw error;

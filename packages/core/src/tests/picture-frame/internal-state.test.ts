@@ -1,3 +1,4 @@
+import type { CellContent } from "../../formula/types.js";
 import { describe, expect, test } from "vitest";
 import { createTestWorkbookSession } from "../helpers.js";
 import {
@@ -147,27 +148,31 @@ describe("frame-aware internal state", () => {
     expect(undoWorkbookCommand(f.session)).toBe(true);
     expect(serializeWorkbook(f.session.workbook)).toEqual(after);
   });
-  test("unsupported framed cell conversions preserve snapshot/history and reserved cell geometry is rejected", () => {
+  test("framed cell conversion is reversible and worksheet-anchored cell geometry is rejected", () => {
     const f = fixture();
     f.sheet.floatingImages = [f.picture];
     const before = serializeWorkbook(f.session.workbook);
-    expect(() =>
+    expect(
       executeWorkbookCommand(
         f.session,
         createConvertFloatingImageToCellCommand(f.sheet.id, f.picture.id),
       ),
-    ).toThrow(/not yet supported/);
+    ).toBe(true);
+    expect(serializeWorkbook(f.session.workbook).version).toBe(53);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
     expect(serializeWorkbook(f.session.workbook)).toEqual(before);
-    expect(f.session.history.undoStack).toHaveLength(0);
     const content = {
       kind: "image",
       image: { assetId: "asset", altText: "", frame: f.picture.frame },
-    } as const;
-    expect(() => setCellContent(f.sheet, { row: 0, column: 0 }, content)).toThrow(/in-cell/);
-    expect(() => cloneCellContent(content)).toThrow(/in-cell/);
+    } as unknown as CellContent;
+    expect(() => setCellContent(f.sheet, { row: 0, column: 0 }, content)).toThrow(
+      /cell picture|kind/i,
+    );
+    expect(() => cloneCellContent(content)).toThrow(/cell picture|kind/i);
     const raw = serializeSheet(f.sheet);
     raw.cells = [{ address: { row: 0, column: 0 }, content }];
-    expect(() => deserializeSheet(raw)).toThrow(/in-cell/);
+    expect(() => deserializeSheet(raw)).toThrow(/cell picture|kind/i);
   });
   test.each(["fixed", "move-only", "move-and-size"] as const)(
     "%s dimensions and Undo retain exact frame geometry",

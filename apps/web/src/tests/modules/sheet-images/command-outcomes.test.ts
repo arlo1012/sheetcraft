@@ -84,13 +84,8 @@ function fixture() {
     getAddress: () => ({ row: 3, column: 4 }),
     flushPendingEdits: () => true,
     execute,
-    setCellImage: (value) =>
-      execute(
-        createSetCellContentCommand(value.sheetId, value.address, {
-          kind: "image",
-          image: { assetId: value.assetId, altText: value.altText, transform: value.transform },
-        }),
-      ),
+    setCellImage: ({ sheetId, address, ...image }) =>
+      execute(createSetCellContentCommand(sheetId, address, { kind: "image", image })),
     setFloatingImage: (value, sheetId) => execute(createSetFloatingImageCommand(sheetId, value)),
     convertCellImageToFloating: () => false,
   });
@@ -148,7 +143,14 @@ describe("authoritative picture command outcomes", () => {
       ...image(),
       transform: { crop: { x: 0.2, y: 0.1, width: 0.5, height: 0.6 }, rotation: 90 as const },
     };
-    setCellContent(f.sheet, { row: 3, column: 4 }, { kind: "image", image: picture });
+    setCellContent(
+      f.sheet,
+      { row: 3, column: 4 },
+      {
+        kind: "image",
+        image: { assetId: picture.assetId, altText: picture.altText, transform: picture.transform },
+      },
+    );
     const before = serializeWorkbook(f.session.workbook);
     await f.actions.pasteFloatingImage(picture, "cell");
     expect(f.actions.feedback.value).toBe("image.unchanged");

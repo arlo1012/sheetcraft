@@ -35,6 +35,8 @@ const props = withDefaults(
     resizeHandler?: (edit: PictureSizeEdit) => boolean;
     aspectRatioHandler?: (locked: boolean) => boolean;
     replaceHandler?: () => void;
+    convertHandler?: () => boolean;
+    canConvert?: boolean;
     canReplace?: boolean;
     canPreview?: boolean;
     previewHandler?: () => boolean;
@@ -47,7 +49,7 @@ const props = withDefaults(
     selectionCount: number;
     previewOnDoubleClick: boolean;
   }>(),
-  { canReplace: undefined, canCrop: undefined, canPreview: undefined },
+  { canReplace: undefined, canCrop: undefined, canPreview: undefined, canConvert: undefined },
 );
 // Standalone source tools cannot establish a draft for an owned container.
 requireStandalonePicture(props.image);
@@ -206,6 +208,24 @@ const previewCallback = computed(() => {
     else emit("preview");
   };
 });
+const convertCallback = computed(() => {
+  const image = props.image,
+    owner = props.draftOwnerKey,
+    handler = props.convertHandler;
+  return () => {
+    if (
+      props.disabled ||
+      props.selectionCount > 1 ||
+      props.canConvert === false ||
+      image !== props.image ||
+      owner !== props.draftOwnerKey ||
+      handler !== props.convertHandler
+    )
+      return;
+    if (handler) handler();
+    else emit("convertToCell");
+  };
+});
 function sourceAction(action: () => void): void {
   requireStandalonePicture(props.image);
   action();
@@ -237,9 +257,9 @@ function sourceAction(action: () => void): void {
         variant="tall"
         :label="t('image.convertToCell')"
         :text="t('image.convertToCell')"
-        :disabled="disabled || selectionCount > 1 || isFramed"
+        :disabled="disabled || selectionCount > 1 || canConvert === false"
         data-picture-tool="convert-to-cell"
-        @activate="sourceAction(() => emit('convertToCell'))"
+        @activate="convertCallback"
         ><ImageDown
       /></RibbonButton>
     </section>

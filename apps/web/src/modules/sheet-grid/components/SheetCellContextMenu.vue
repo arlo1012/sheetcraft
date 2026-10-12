@@ -57,6 +57,7 @@ const props = withDefaults(
     pasteFormatsDisabled?: boolean;
     cutDisabledReason?: string;
     hasImage?: boolean;
+    imageConversionDisabled?: boolean;
     showPivotDetails?: boolean;
     groupPivotField?: boolean;
     ungroupPivotField?: boolean;
@@ -67,7 +68,12 @@ const props = withDefaults(
     sheet?: Sheet;
     range?: CellRange;
   }>(),
-  { pasteSpecialDisabled: false, pasteFormatsDisabled: false, readOnly: false },
+  {
+    pasteSpecialDisabled: false,
+    pasteFormatsDisabled: false,
+    readOnly: false,
+    imageConversionDisabled: undefined,
+  },
 );
 const emit = defineEmits<{
   cut: [];
@@ -319,7 +325,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
             ><template #icon><ImageIcon :size="16" /></template>{{ t("image.preview") }}</MenuItem
           ><MenuItem
             data-cell-action="convert-image-to-floating"
-            :disabled="readOnly"
+            :disabled="imageConversionDisabled ?? readOnly"
             @select="emit('convertImageToFloating')"
             ><template #icon><MoveUpRight :size="16" /></template
             >{{ t("image.convertToFloating") }}</MenuItem

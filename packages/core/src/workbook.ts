@@ -1,3 +1,4 @@
+import { normalizeCellImage, cloneCellImage, areCellImagesEqual } from "./cell-picture-frame.js";
 import {
   normalizePictureProperties,
   arePicturePropertiesEqual,
@@ -2084,8 +2085,6 @@ function normalizeCellContent(content: CellContent | null | undefined): CellCont
   if ("fontRuns" in content && (content.kind !== "literal" || typeof content.value !== "string")) {
     throw new TypeError("Font runs are only supported on string literal cell content.");
   }
-  if (content.kind === "image" && content.image && Object.hasOwn(content.image, "frame"))
-    throw new TypeError("Framed in-cell pictures are not supported.");
   if (content.kind === "literal") {
     const value = content.value;
     if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
@@ -2103,23 +2102,8 @@ function normalizeCellContent(content: CellContent | null | undefined): CellCont
   if (content.kind === "error" && isFormulaError(content.error)) {
     return { kind: "error", error: createFormulaError(content.error.code) };
   }
-  if (
-    content.kind === "image" &&
-    typeof content.image?.assetId === "string" &&
-    content.image.assetId.trim() &&
-    typeof content.image.altText === "string"
-  ) {
-    return {
-      kind: "image",
-      image: {
-        assetId: content.image.assetId,
-        altText: content.image.altText,
-        ...normalizePictureProperties(content.image),
-        ...(normalizeImageTransform(content.image.transform)
-          ? { transform: normalizeImageTransform(content.image.transform) }
-          : {}),
-      },
-    };
+  if (content.kind === "image") {
+    return { kind: "image", image: normalizeCellImage(content.image) };
   }
   if (
     content.kind === "formula" &&
@@ -2132,8 +2116,6 @@ function normalizeCellContent(content: CellContent | null | undefined): CellCont
 }
 
 export function cloneCellContent(content: CellContent): CellContent {
-  if (content.kind === "image" && content.image && Object.hasOwn(content.image, "frame"))
-    throw new TypeError("Framed in-cell pictures are not supported.");
   if (content.kind === "error") {
     return { kind: "error", error: createFormulaError(content.error.code) };
   }
@@ -2144,17 +2126,7 @@ export function cloneCellContent(content: CellContent): CellContent {
   }
   if (content.kind === "formula")
     return { kind: "formula", formula: { source: content.formula.source } };
-  return {
-    kind: "image",
-    image: {
-      assetId: content.image.assetId,
-      altText: content.image.altText,
-      ...normalizePictureProperties(content.image),
-      ...(cloneImageTransform(content.image.transform)
-        ? { transform: cloneImageTransform(content.image.transform) }
-        : {}),
-    },
-  };
+  return { kind: "image", image: cloneCellImage(content.image) };
 }
 
 function areCellContentsEqual(
@@ -2175,10 +2147,7 @@ function areCellContentsEqual(
           ? true
           : left.kind === "image" &&
             right.kind === "image" &&
-            left.image.assetId === right.image.assetId &&
-            left.image.altText === right.image.altText &&
-            arePicturePropertiesEqual(left.image, right.image) &&
-            areImageTransformsEqual(left.image.transform, right.image.transform))
+            areCellImagesEqual(left.image, right.image))
   );
 }
 

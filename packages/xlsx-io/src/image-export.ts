@@ -12,11 +12,20 @@ import {
 import type { XlsxEncodeOptions, XlsxImageAsset } from "./types.js";
 import { nativeDrawingAnchor, type NativeDrawingAnchor } from "./drawing-geometry.js";
 
-/** Reject unencodable appearance intent before normalization or resource registration. */
+/** Reject unencodable geometry/appearance before normalization or resource registration. */
 export function assertSupportedXlsxImageAppearance(
   image: Pick<CellImage, "transform"> & PictureProperties,
   issueLocation: string,
 ): void {
+  if (Object.hasOwn(image, "frame")) {
+    const issuePath = `${issueLocation}.frame`;
+    throw new XlsxCompatibilityError(
+      `Frame-aware in-cell pictures are not yet supported by XLSX export at ${issuePath}.`,
+      {
+        issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [issuePath] }],
+      },
+    );
+  }
   const property = PICTURE_PROPERTY_KEYS.find((key) => Object.hasOwn(image, key));
   if (property) {
     const issuePath = `${issueLocation}.${property}`;

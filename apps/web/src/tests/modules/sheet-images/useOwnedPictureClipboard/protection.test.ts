@@ -1,0 +1,53 @@
+import { expect, test } from "vitest";
+import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { fixture } from "./fixture";
+test("protected locked roots may be read/copied but cannot create a Cut lease", async () => {
+  const f = fixture();
+  f.sheet.properties.protected = true;
+  const before = serializeWorkbook(f.session.workbook);
+  await f.clipboard.copy([["owned-group"]], "copy");
+  expect(f.clipboard.hasPending()).toBe(true);
+  const identity = f.clipboard.getIdentity();
+  await f.clipboard.copy([["owned-group"]], "cut");
+  expect(f.clipboard.getIdentity()).toEqual(identity);
+  expect(f.onFeedback).toHaveBeenLastCalledWith("image.copyFailed");
+  expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+});
+test("protected unlocked existing roots move with one accepted atomic paste, preserving identities", async () => {
+  const f = fixture();
+  f.sheet.floatingImages[1]!.locked = false;
+  f.sheet.properties.protected = true;
+  const ids = f.sheet.floatingImages.map((root) => root.id);
+  await f.clipboard.copy([["owned-group"]], "cut");
+  expect(f.clipboard.hasPending()).toBe(true);
+  expect(f.clipboard.paste({ row: 7, column: 6 })).toBe(true);
+  expect(f.clipboard.hasPending()).toBe(false);
+  expect(f.sheet.floatingImages.map((root) => root.id)).toEqual(ids);
+  expect(f.session.history.undoStack).toHaveLength(1);
+});
+test("copying an unlocked root grants no new-identity object creation exemption", async () => {
+  const f = fixture();
+  f.sheet.floatingImages[1]!.locked = false;
+  f.sheet.properties.protected = true;
+  await f.clipboard.copy([["owned-group"]], "copy");
+  const before = serializeWorkbook(f.session.workbook);
+  expect(f.clipboard.paste({ row: 7, column: 6 })).toBe(true);
+  expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+  expect(f.session.history.undoStack).toHaveLength(0);
+  expect(f.clipboard.hasPending()).toBe(true);
+  expect(f.onFeedback).toHaveBeenLastCalledWith("clipboard.pasteRejected");
+});
+test("permission refusal after Cut preserves the source and reusable lease", async () => {
+  const f = fixture();
+  await f.clipboard.copy([["owned-group"]], "cut");
+  const identity = f.clipboard.getIdentity();
+  f.sheet.properties.protected = true;
+  const before = serializeWorkbook(f.session.workbook);
+  expect(f.clipboard.paste({ row: 7, column: 6 })).toBe(true);
+  expect(f.clipboard.getIdentity()).toEqual(identity);
+  expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+  expect(f.session.history.undoStack).toHaveLength(0);
+  f.sheet.properties.protected = false;
+  expect(f.clipboard.paste({ row: 7, column: 6 })).toBe(true);
+  expect(f.clipboard.hasPending()).toBe(false);
+});

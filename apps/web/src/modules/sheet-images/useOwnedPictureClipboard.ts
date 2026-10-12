@@ -1,3 +1,4 @@
+import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import {
   projectLegacyPictureAxisOrigin,
   type PictureSheetMetrics,
@@ -206,6 +207,16 @@ export function useOwnedPictureClipboard(options: {
       options.onFeedback("image.copyFailed");
       return;
     }
+    const selectedPaths = paths ?? options.getSelectedPaths?.() ?? [];
+    if (
+      mode === "cut" &&
+      !canEditPictureSelection(capturedOwner.sheet, [
+        ...new Set(selectedPaths.map((path) => path[0]).filter((id): id is string => !!id)),
+      ])
+    ) {
+      options.onFeedback("image.copyFailed");
+      return;
+    }
     let captured: OwnedPictureClipboardSnapshot;
     try {
       captured = session.capture({
@@ -214,7 +225,7 @@ export function useOwnedPictureClipboard(options: {
         ownerGeneration: capturedOwner.generation,
         sourceMetrics: capturedOwner.context.metrics,
         mode,
-        selectedPaths: paths ?? options.getSelectedPaths?.() ?? [],
+        selectedPaths,
       });
     } catch {
       options.onFeedback("image.copyFailed");

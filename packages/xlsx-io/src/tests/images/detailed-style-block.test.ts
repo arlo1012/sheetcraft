@@ -1,3 +1,5 @@
+import { normalizePictureProperties } from "@sheetcraft/core/picture-properties";
+import type { LegacyCellImage } from "@sheetcraft/core/cell-picture-frame";
 import { expect, test, vi } from "vitest";
 import {
   createWorkbook,
@@ -7,6 +9,15 @@ import {
 } from "@sheetcraft/core/workbook";
 import { encodeXlsx, XlsxCompatibilityError } from "../../index.js";
 import { assertSupportedXlsxImageAppearance, createXlsxImageExporter } from "../../image-export.js";
+
+function cellPicture(image: LegacyFloatingImage): LegacyCellImage {
+  return {
+    assetId: image.assetId,
+    altText: image.altText,
+    ...normalizePictureProperties(image),
+    ...(image.transform ? { transform: image.transform } : {}),
+  };
+}
 
 function image(): LegacyFloatingImage {
   return {
@@ -27,7 +38,8 @@ test.each(["cell", "floating"] as const)(
   async (kind) => {
     const workbook = createWorkbook({ id: "w", sheetId: "s", sheetName: "Synthetic" });
     const sheet = getActiveSheet(workbook);
-    if (kind === "cell") sheet.cells.set("0:0", { content: { kind: "image", image: image() } });
+    if (kind === "cell")
+      sheet.cells.set("0:0", { content: { kind: "image", image: cellPicture(image()) } });
     else sheet.floatingImages = [image()];
     const before = structuredClone(workbook);
     const resources = vi.fn(() => []);
@@ -58,7 +70,10 @@ test.each(["cell", "floating"] as const)(
 test("a direct cell exporter cannot register a detailed-style image", () => {
   const target = { addImage: vi.fn(() => 1) };
   expect(() =>
-    createXlsxImageExporter(target, undefined).registerCellImage(image(), "Synthetic!A1"),
+    createXlsxImageExporter(target, undefined).registerCellImage(
+      cellPicture(image()),
+      "Synthetic!A1",
+    ),
   ).toThrow(XlsxCompatibilityError);
   expect(target.addImage).not.toHaveBeenCalled();
 });
@@ -98,7 +113,8 @@ test.each(["altTitle", "locked", "printObject"] as const)(
         transform: undefined,
         [field]: field === "altTitle" ? "Title" : false,
       };
-      if (kind === "cell") sheet.cells.set("0:0", { content: { kind: "image", image: value } });
+      if (kind === "cell")
+        sheet.cells.set("0:0", { content: { kind: "image", image: cellPicture(value) } });
       else sheet.floatingImages = [value];
       const before = structuredClone(workbook),
         resources = vi.fn(() => []);

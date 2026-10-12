@@ -1822,6 +1822,10 @@ export const enUS = {
     deleteImage: "Delete image",
     converted: "Image converted to a cell image.",
     convertFailed: "This image could not be converted.",
+    overwriteTitle: "Replace cell content",
+    overwriteMessage:
+      "Embedding this picture in {cell} will replace its existing content. Cancel keeps the original picture and cell unchanged.",
+    overwriteConfirm: "Replace and embed",
     preview: "Image preview",
     crop: "Crop",
     rotate: "Rotate",

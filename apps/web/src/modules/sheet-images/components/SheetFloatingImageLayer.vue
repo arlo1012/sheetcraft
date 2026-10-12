@@ -105,6 +105,7 @@ const props = withDefaults(
     selectedImageId?: string | null;
     selectedImageIds?: readonly string[];
     readOnly?: boolean;
+    canConvertToCell?: (id: string) => boolean;
     canEditRoot?: (root: PictureObject) => boolean;
     canGroup?: boolean;
     previewOnDoubleClick?: boolean;
@@ -892,10 +893,6 @@ function openImageKeyboardContextMenu(image: FloatingImage, event: KeyboardEvent
   return true;
 }
 
-const contextMenuSourceUnsupported = computed(() => {
-  const image = currentImages.value.find((entry) => entry.id === contextMenu.value?.imageId);
-  return Boolean(image && isFramedPictureObject(image));
-});
 function isContextMenuOwnerCurrent(menu: ContextMenuState): boolean {
   try {
     return (
@@ -938,8 +935,9 @@ const contextActions = computed(() => {
   };
 });
 function requestConvertToCell(): void {
-  if (props.croppingExternally || contextMenuSourceUnsupported.value) return;
+  if (props.croppingExternally) return;
   const imageId = contextMenu.value?.imageId;
+  if (imageId && props.canConvertToCell?.(imageId) === false) return;
   closeContextMenu(false);
   if (imageId && !interactionReadOnly.value) emit("convertToCell", imageId);
 }
@@ -1506,7 +1504,10 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       v-if="contextMenu"
       :anchor="contextMenu.anchor"
       :read-only="interactionReadOnly"
-      :source-operations-disabled="croppingExternally || contextMenuSourceUnsupported"
+      :source-operations-disabled="
+        croppingExternally ||
+        (contextMenu.imageId ? props.canConvertToCell?.(contextMenu.imageId) === false : true)
+      "
       :preview-disabled="
         croppingExternally ||
         !assetUrls.has(

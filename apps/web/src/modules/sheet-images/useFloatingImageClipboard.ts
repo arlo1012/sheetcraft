@@ -1,3 +1,4 @@
+import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import { requireLegacyPicture, requireLegacyPictures } from "./picture-document-support";
 import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import {
@@ -135,6 +136,18 @@ export function useFloatingImageClipboard(options: {
       if (selected) requireLegacyPictures(selected);
       if (selected && selected.length > 1) images = normalizeClipboardImageGroup(selected);
     } catch {
+      options.onFeedback("image.copyFailed");
+      event?.preventDefault();
+      event?.stopPropagation();
+      return;
+    }
+    if (
+      mode === "cut" &&
+      !canEditPictureSelection(
+        sheet,
+        (images ?? [capturedImage]).map((member) => member.id),
+      )
+    ) {
       options.onFeedback("image.copyFailed");
       event?.preventDefault();
       event?.stopPropagation();

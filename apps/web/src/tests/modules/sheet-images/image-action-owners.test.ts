@@ -49,9 +49,9 @@ function fixture() {
       getGeneration: () => generation,
       getAddress: () => ({ row: 0, column: 0 }),
       flushPendingEdits: () => true,
-      setCellImage: vi.fn(),
+      setCellImage: vi.fn(() => true),
       setFloatingImage: execute,
-      convertCellImageToFloating: vi.fn(),
+      convertCellImageToFloating: vi.fn(() => true),
     }),
   )!;
   cleanups.push(() => scope.stop());
@@ -131,7 +131,14 @@ describe("picture image-operation owners", () => {
         height: 100,
       };
       if (kind === "convert")
-        setCellContent(f.sheet, { row: 0, column: 0 }, { kind: "image", image });
+        setCellContent(
+          f.sheet,
+          { row: 0, column: 0 },
+          {
+            kind: "image",
+            image: { assetId: image.assetId, altText: image.altText, transform: image.transform },
+          },
+        );
       const operation =
         kind === "paste"
           ? f.actions.pasteFloatingImage(image)

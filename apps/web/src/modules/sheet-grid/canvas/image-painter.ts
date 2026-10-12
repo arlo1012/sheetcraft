@@ -1,8 +1,16 @@
 import type { ImageTransform } from "@sheetcraft/core/workbook";
+import { isFramedCellImage, type CellImage } from "@sheetcraft/core/cell-picture-frame";
 import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 import { paintImagePresentation } from "../../../shared/images/imageAppearance";
-import type { PicturePaintResources } from "../../../shared/images/picture-detailed-render";
+import {
+  getPicturePaintDensity,
+  type PicturePaintResources,
+} from "../../../shared/images/picture-detailed-render";
 import { getImagePresentation } from "../../../shared/images/imagePresentation";
+import { captureCellPictureSourcePresentation } from "../../sheet-images/cell-picture-presentation";
+import { planPictureSourcePresentation } from "../../sheet-images/picture-source-presentation";
+import { paintFramedPictureContent } from "../../sheet-images/framed-picture-painter";
+import { isGroupedPicture } from "@sheetcraft/core/picture-group";
 
 /** Decoded sources belong to the viewport, not to individual cell components. */
 export function createCanvasImageCache(onChange: () => void): CanvasImageCache {
@@ -60,7 +68,60 @@ export function paintCellImage(
   rect: Rect,
   transform?: ImageTransform,
   resources?: PicturePaintResources,
+  cellImage?: CellImage,
 ): void {
+  if (cellImage && isFramedCellImage(cellImage)) {
+    const input = captureCellPictureSourcePresentation(cellImage);
+    const viewportDensity = getPicturePaintDensity(context);
+    const width = Math.max(0, rect.width - 10),
+      height = Math.max(0, rect.height - 10);
+    if (!width || !height) return;
+    let plan = planPictureSourcePresentation(input, resources?.theme, resources),
+      scale = Math.min(width / plan.bounds.width, height / plan.bounds.height);
+    // Detailed raster bounds can include density-dependent reconstruction pixels.
+    // Replan at the actual viewport density before containment, without decoding
+    // or allocating a presentation canvas. The leaf painter owns raster caching.
+    for (let iteration = 0; iteration < 4; iteration++) {
+      plan = planPictureSourcePresentation(
+        input,
+        resources?.theme,
+        resources,
+        4096,
+        Math.min(64, viewportDensity * scale),
+      );
+      // Native Canvas shadows are physical pixels, unaffected by our local scale.
+      const padding = plan.padding / viewportDensity;
+      const contained = Math.min(
+        Math.max(0, width - padding * 2) / plan.bounds.width,
+        Math.max(0, height - padding * 2) / plan.bounds.height,
+      );
+      if (contained <= 0) return;
+      if (contained >= scale) break;
+      scale = contained;
+    }
+    const { bounds, presentation, inherited } = plan;
+    if (isGroupedPicture(presentation.picture))
+      throw new TypeError("Cell picture presentation requires a local framed source.");
+    context.save();
+    try {
+      context.translate(
+        rect.x + rect.width / 2 - (bounds.x + bounds.width / 2) * scale,
+        rect.y + rect.height / 2 - (bounds.y + bounds.height / 2) * scale,
+      );
+      context.scale(scale, scale);
+      paintFramedPictureContent(
+        context,
+        image,
+        presentation.picture,
+        presentation.geometry,
+        inherited,
+        resources,
+      );
+    } finally {
+      context.restore();
+    }
+    return;
+  }
   const geometry = getImagePresentation(transform, image.naturalWidth, image.naturalHeight);
   const scale = Math.min(
     Math.max(0, rect.width - 5) / geometry.width,

@@ -79,6 +79,7 @@ const props = withDefaults(
     selectedPath?: PictureGroupPath | null;
     scale?: number;
     readOnly?: boolean;
+    canConvertToCell?: (path: PictureGroupPath) => boolean;
     canEditRoot?: (root: FloatingImage) => boolean;
     canGroup?: boolean;
     croppingExternally?: boolean;
@@ -94,6 +95,7 @@ const emit = defineEmits<{
   paintStateChange: [state: FloatingImagePaintState];
   ungroup: [rootId: string];
   group: [rootIds: string[]];
+  convertToCell: [path: PictureGroupPath, owner?: object];
   format: [path: PictureGroupPath, owner?: object, paint?: "fill" | "line"];
   copy: [path: PictureGroupPath, owner?: object];
   cut: [path: PictureGroupPath, owner?: object];
@@ -108,7 +110,10 @@ const contextMenu = shallowRef<{
   lease: OwnedPictureSelectionSnapshot;
   path: PictureGroupPath;
   selection: PictureGroupSelection;
-  actions: Record<"copy" | "cut" | "paste" | "delete" | "format" | "ungroup", () => void>;
+  actions: Record<
+    "copy" | "cut" | "paste" | "delete" | "format" | "ungroup" | "convert",
+    () => void
+  >;
   close: (restoreFocus: boolean) => void;
 }>();
 const paintRevision = ref(0);
@@ -835,6 +840,7 @@ function openContextMenu(
         delete: () => contextAction(menu, "delete"),
         format: () => contextAction(menu, "format"),
         ungroup: () => contextAction(menu, "ungroup"),
+        convert: () => contextAction(menu, "convert"),
       },
       close: (restoreFocus) => {
         if (contextMenu.value === menu) closeContextMenu(restoreFocus);
@@ -855,7 +861,7 @@ function closeContextMenu(restoreFocus = false): void {
 }
 function contextAction(
   menu: NonNullable<typeof contextMenu.value>,
-  action: "copy" | "cut" | "paste" | "delete" | "format" | "ungroup",
+  action: "copy" | "cut" | "paste" | "delete" | "format" | "ungroup" | "convert",
 ): void {
   if (contextMenu.value !== menu) return;
   const valid = isContextMenuCurrent(menu);
@@ -868,6 +874,7 @@ function contextAction(
   else if (action === "cut") emit("cut", [...menu.path], props.owner);
   else if (action === "paste") emit("paste", [...menu.path], props.owner);
   else if (action === "delete") emit("delete", [...menu.path], props.owner);
+  else if (action === "convert") emit("convertToCell", [...menu.path], props.owner);
   else emit("format", [...menu.path], props.owner);
 }
 
@@ -1047,7 +1054,17 @@ defineExpose({
       v-if="contextMenu"
       :anchor="contextMenu.anchor"
       :read-only="interactionReadOnly"
+      :convert-disabled="props.canConvertToCell?.(contextMenu.path) === false"
       :can-ungroup="contextMenu.path.length === 1 && contextMenu.selection.rootIds.length === 1"
+      :can-convert="
+        resolveOwnedPictureNode(roots, contextMenu.path, frameContext)?.node.kind ===
+          'grouped-picture-v1' ||
+        Boolean(
+          contextMenu.path.length === 1 &&
+          roots.some((root) => root.id === contextMenu?.path[0] && !isPictureGroup(root)),
+        )
+      "
+      @convert-to-cell="contextMenu.actions.convert"
       @copy="contextMenu.actions.copy"
       @cut="contextMenu.actions.cut"
       @paste="contextMenu.actions.paste"

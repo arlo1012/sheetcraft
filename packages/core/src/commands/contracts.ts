@@ -578,6 +578,10 @@ export type ConvertFloatingImageToCellCommand = {
   type: "convertFloatingImageToCell";
   sheetId: string;
   id: string;
+  path?: readonly string[];
+  /** Confirmation leases never overwrite changed destination content. */
+  expectedCellContent?: CellContent | null;
+  expectedAddress?: CellAddress;
 };
 
 export type FloatingImageSize = {
@@ -599,6 +603,15 @@ export type RestoreFloatingImageToCellCommand = {
   sheetId: string;
   image: FloatingImage;
   index: number;
+  address: CellAddress;
+  content: CellContent | null;
+};
+
+/** Exact inverse of a cell/picture ownership transfer, including contracted groups. */
+export type RestorePictureCellConversionCommand = {
+  type: "restorePictureCellConversion";
+  sheetId: string;
+  images: readonly FloatingImage[];
   address: CellAddress;
   content: CellContent | null;
 };
@@ -914,6 +927,7 @@ export type WorkbookCommand =
   | DeleteFloatingImageCommand
   | ConvertFloatingImageToCellCommand
   | ConvertCellImageToFloatingCommand
+  | RestorePictureCellConversionCommand
   | RestoreFloatingImageToCellCommand
   | AddSheetCommand
   | DeleteSheetCommand
@@ -1104,6 +1118,7 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "convertCellImageToFloating":
       return "images.cell.convert";
     case "restoreFloatingImageToCell":
+    case "restorePictureCellConversion":
       return "history.restore";
     case "addSheet":
       return "sheets.add";

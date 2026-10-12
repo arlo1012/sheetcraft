@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { captureCellPictureSourcePresentation } from "../../sheet-images/cell-picture-presentation";
+import { isFramedCellImage } from "@sheetcraft/core/cell-picture-frame";
 import type { Point } from "@sheetcraft/sheet-engine/geometry";
 import { canEditPictureRoot, canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import { isPictureGroup, type PictureGroupPath } from "@sheetcraft/core/picture-group";
@@ -268,6 +270,8 @@ const props = withDefaults(
     applyFloatingImageMove?: (images: readonly FloatingImage[]) => boolean;
     applyPictureCollectionChange?: (images: readonly FloatingImage[]) => boolean;
     pictureOwnerGeneration?: number;
+    canConvertPictureToCell?: (id: string, path?: PictureGroupPath) => boolean;
+    applyPictureToCell?: (id: string, path?: PictureGroupPath) => boolean;
     applyOwnedPictureDelete?: (paths: readonly PictureGroupPath[], owner: Sheet) => boolean;
     applyPictureUngroup?: (ids: readonly string[], owner: Sheet) => boolean;
     applyFill?: (request: GridFillRequest) => GridFillResult;
@@ -2449,7 +2453,7 @@ function requestOwnedPictureCopy(
 ): void {
   if (owner !== props.sheet) return;
   if (pictureCrop.active.value && !finishPictureCrop()) return;
-  if (mode === "cut" && objectsReadOnly.value) return;
+  if (mode === "cut" && pictureSelectionReadOnly.value) return;
   if (mode === "cut" && path.length > 1) {
     emit("imageFeedback", "picture.memberCutUnsupported");
     return;
@@ -2457,12 +2461,13 @@ function requestOwnedPictureCopy(
   void ownedClipboard.copy(ownedActionPaths(path), mode);
 }
 async function requestOwnedPicturePaste(path: PictureGroupPath, owner?: object): Promise<void> {
-  if (owner !== props.sheet || objectsReadOnly.value) return;
+  if (owner !== props.sheet || pictureLayerReadOnly.value) return;
   if (pictureCrop.active.value && !finishPictureCrop()) return;
   const root = props.sheet.floatingImages.find((entry) => entry.id === path[0]);
   if (!root) return;
   setActiveCell(getPictureObjectOriginCell(root, props.sheet));
-  await pasteSelection();
+  if (!ownedClipboard.paste(activeCell.value) && !floatingClipboard.pastePending(activeCell.value))
+    await pasteSelection();
   focusEditor();
 }
 function requiresOwnedClipboard(): boolean {
@@ -2497,15 +2502,13 @@ function deleteSelectedFloatingImage(id: string): void {
   }
 }
 
-function convertSelectedFloatingImageToCell(id: string): void {
+function convertSelectedFloatingImageToCell(id: string, path?: PictureGroupPath): void {
   if (pictureCrop.active.value && (selectedImageId.value !== id || !finishPictureCrop())) return;
-  if (props.readOnly) return;
   const image = props.sheet.floatingImages.find((entry) => entry.id === id);
-  if (!image) return;
-  emit("convertFloatingImageToCell", id);
-  if (!props.sheet.floatingImages.some((entry) => entry.id === id)) {
-    setActiveCell(layout.value.getAnchorForAddress(getPictureObjectOriginCell(image, props.sheet)));
-  }
+  if (!image || pictureLayerReadOnly.value || !canEditPictureSelection(props.sheet, [id])) return;
+  if (props.applyPictureToCell)
+    props.applyPictureToCell(id, path ?? selectedOwnedPicturePath.value ?? undefined);
+  else if (!props.readOnly) emit("convertFloatingImageToCell", id);
 }
 
 function onImageCopy(event: ClipboardEvent): void {
@@ -2540,7 +2543,7 @@ function onImageCut(event: ClipboardEvent): void {
     ownedClipboard.clear();
     return;
   }
-  if (objectsReadOnly.value) {
+  if (pictureSelectionReadOnly.value) {
     event.preventDefault();
     return;
   }
@@ -2574,11 +2577,12 @@ function requestFloatingImageCopy(id: string, mode: "copy" | "cut"): void {
 
 async function requestFloatingImagePaste(id: string): Promise<void> {
   if (pictureCrop.active.value && (selectedImageId.value !== id || !finishPictureCrop())) return;
-  if (objectsReadOnly.value) return;
+  if (pictureLayerReadOnly.value) return;
   const image = props.sheet.floatingImages.find((entry) => entry.id === id);
   if (!image) return;
   setActiveCell(getPictureObjectOriginCell(image, props.sheet));
-  await pasteSelection();
+  if (!ownedClipboard.paste(activeCell.value) && !floatingClipboard.pastePending(activeCell.value))
+    await pasteSelection();
   focusEditor();
 }
 
@@ -2590,6 +2594,11 @@ function onImagePaste(event: ClipboardEvent): void {
   }
   if (event.target instanceof Element && event.target.closest("[data-page-header-footer]")) return;
   if (isComposing.value || !event.clipboardData) return;
+  if (pictureLayerReadOnly.value) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   const file =
     Array.from(event.clipboardData.files ?? []).find((entry) => entry.type.startsWith("image/")) ??
     Array.from(event.clipboardData.items ?? [])
@@ -2637,7 +2646,7 @@ function onImagePaste(event: ClipboardEvent): void {
   }
   const localToken = readGridClipboardLocalToken(event.clipboardData);
   floatingClipboard.observeTransfer({ ...transfer, localToken });
-  if (objectsReadOnly.value) {
+  if (pictureLayerReadOnly.value) {
     event.preventDefault();
     event.stopPropagation();
     return;
@@ -2660,7 +2669,7 @@ function onImagePaste(event: ClipboardEvent): void {
 async function pasteDeferredOwnedPicture(event: ClipboardEvent): Promise<void> {
   event.preventDefault();
   event.stopPropagation();
-  if (objectsReadOnly.value || isEditing.value) return;
+  if (pictureLayerReadOnly.value || isEditing.value) return;
   const identity = ownedClipboard.getIdentity();
   if (!identity) return;
   const operation = ownedClipboard.getOperation();
@@ -2693,7 +2702,7 @@ async function pasteDeferredOwnedPicture(event: ClipboardEvent): Promise<void> {
     !areCellAddressesEqual(activeCell.value, address) ||
     isEditing.value ||
     isComposing.value ||
-    objectsReadOnly.value
+    pictureLayerReadOnly.value
   ) {
     emit("clipboardFeedback", "documentChanged");
     return;
@@ -2739,7 +2748,7 @@ async function pasteDeferredOwnedPicture(event: ClipboardEvent): Promise<void> {
 }
 
 async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> {
-  if (objectsReadOnly.value) return;
+  if (pictureLayerReadOnly.value) return;
   event.preventDefault();
   event.stopPropagation();
   const sheet = props.sheet;
@@ -2786,7 +2795,7 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
     invalidFloatingImage,
     unsupportedFloatingImage,
   });
-  if (objectsReadOnly.value) {
+  if (pictureLayerReadOnly.value) {
     emit("clipboardFeedback", "documentChanged");
     return;
   }
@@ -3475,15 +3484,32 @@ function requestContextAction(action: SheetContextAction): void {
 }
 
 function requestCellImageAction(action: "preview" | "float"): void {
-  if (props.readOnly && action === "float") return;
   const address = cellContextMenu.value?.imageAddress;
   cellContextMenu.value = undefined;
-  if (!address) return;
+  if (
+    !address ||
+    (action === "float" &&
+      (pictureLayerReadOnly.value ||
+        !canEditRange(
+          props.sheet,
+          expandSelectionToMergedCellRanges(
+            { start: address, end: address },
+            props.sheet.mergedCells,
+          ),
+        )))
+  )
+    return;
   setActiveCell(address);
   if (action === "float") emit("convertCellImageToFloating", address);
   else {
     const content = getCellContent(props.sheet, address);
-    if (content?.kind === "image") openImagePreview(content.image);
+    if (content?.kind === "image")
+      openImagePreview({
+        ...content.image,
+        ...(isFramedCellImage(content.image)
+          ? { frameSource: captureCellPictureSourcePresentation(content.image) }
+          : {}),
+      });
   }
 }
 
@@ -3556,7 +3582,12 @@ function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
   const content = getCellContent(props.sheet, address);
   if (content?.kind === "image") {
     event.preventDefault();
-    openImagePreview(content.image);
+    openImagePreview({
+      ...content.image,
+      ...(isFramedCellImage(content.image)
+        ? { frameSource: captureCellPictureSourcePresentation(content.image) }
+        : {}),
+    });
     return;
   }
   if (isComposing.value) return;
@@ -4381,6 +4412,7 @@ defineExpose({
         @update-many="emit('updateFloatingImages', $event)"
         @group="emit('groupFloatingImages', $event)"
         @feedback="emit('imageFeedback', $event)"
+        :can-convert-to-cell="(id) => props.canConvertPictureToCell?.(id) ?? false"
         :read-only="pictureLayerReadOnly"
         :can-edit-root="pictureRootAvailable"
         :can-group="canUseSheetPermission(sheet, 'editObjects')"
@@ -4407,6 +4439,7 @@ defineExpose({
         :selected-root-ids="selectedImageIds"
         :selected-path="selectedOwnedPicturePath"
         :read-only="pictureLayerReadOnly"
+        :can-convert-to-cell="(path) => props.canConvertPictureToCell?.(path[0]!, path) ?? false"
         :can-edit-root="pictureRootAvailable"
         :can-group="canUseSheetPermission(sheet, 'editObjects')"
         :apply-update-many="applyPictureCollectionChange"
@@ -4416,6 +4449,11 @@ defineExpose({
         @feedback="emit('imageFeedback', $event)"
         @ungroup="ungroupOwnedPicture"
         @group="emit('groupFloatingImages', $event)"
+        @convert-to-cell="
+          (path, owner) => {
+            if (owner === props.sheet) convertSelectedFloatingImageToCell(path[0]!, path);
+          }
+        "
         @format="formatOwnedPicture"
         @delete="deleteOwnedPicture"
         @copy="(path, owner) => requestOwnedPictureCopy(path, 'copy', owner)"
@@ -4520,6 +4558,17 @@ defineExpose({
       :show-pivot-details="Boolean(contextPivotDetails)"
       @show-pivot-details="requestPivotDetails"
       :has-image="Boolean(cellContextMenu.imageAddress)"
+      :image-conversion-disabled="
+        pictureLayerReadOnly ||
+        !cellContextMenu.imageAddress ||
+        !canEditRange(
+          sheet,
+          expandSelectionToMergedCellRanges(
+            { start: cellContextMenu.imageAddress, end: cellContextMenu.imageAddress },
+            sheet.mergedCells,
+          ),
+        )
+      "
       :has-note="
         Boolean(
           sheet.cells.get(
