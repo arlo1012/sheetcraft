@@ -128,6 +128,8 @@ export const pictureFormatEnUS = {
     perspectiveDeg: "Perspective",
     distanceFromGroundPt: "Distance from ground",
     capabilityReasons: {
+      inheritedProperties:
+        "Positioning, locking and printing follow the outer picture group. Select the group to change them.",
       inheritedLine:
         "This line follows the workbook theme. Choose Local solid line to set an independent color and width.",
       compositeLine:

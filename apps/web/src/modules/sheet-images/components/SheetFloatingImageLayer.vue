@@ -398,7 +398,8 @@ function getFragmentKey(fragment: ImageFragment): string {
 }
 
 function getAccessibleLabel(image: FloatingImage): string {
-  if (props.assetUrls.has(image.assetId)) return image.altText || t("image.floatingAlt");
+  if (props.assetUrls.has(image.assetId))
+    return [image.altTitle, image.altText].filter(Boolean).join(". ") || t("image.floatingAlt");
   return props.loadingAssetIds?.has(image.assetId)
     ? t("image.loading")
     : t("image.assetUnavailable");
@@ -1398,6 +1399,7 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       tabindex="0"
       role="group"
       :aria-label="getAccessibleLabel(fragment.image)"
+      :title="fragment.image.altTitle || undefined"
       @pointerdown.stop="fragment.kind === 'legacy' && startGesture(fragment.image, 'move', $event)"
       @contextmenu="onImageContextMenu(fragment.image, $event)"
       @dblclick.prevent.stop="onImageDoubleClick(fragment.image, $event)"

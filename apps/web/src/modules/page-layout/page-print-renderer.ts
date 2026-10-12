@@ -1,4 +1,6 @@
 import { requireLegacyPictures } from "../sheet-images/picture-document-support";
+import { getPrintablePictureRoots } from "./page-print-pictures";
+import { getPictureProperties } from "@sheetcraft/core/picture-properties";
 import { isFormulaError, type FormulaValue } from "@sheetcraft/core/formula";
 import {
   DEFAULT_ROW_HEIGHT,
@@ -197,7 +199,7 @@ export function createPrintPreviewDocument(options: {
   dateSystem?: "1900" | "1904";
   revision?: number;
 }): PrintPreviewDocument {
-  requireLegacyPictures(options.sheet.floatingImages);
+  requireLegacyPictures(getPrintablePictureRoots(options.sheet));
   const requested = pageSetupForPrint(
     options.sheet,
     cloneSheetPageSetup(options.setup ?? options.sheet.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
@@ -523,7 +525,8 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
     scale?: number;
     density?: number;
   }): void {
-    requireLegacyPictures(options.document.sheet.floatingImages);
+    const printableRoots = getPrintablePictureRoots(options.document.sheet);
+    requireLegacyPictures(printableRoots);
     const previewScale = options.scale ?? 1;
     const density = options.density ?? window.devicePixelRatio ?? 1;
     const { document, page, canvas } = options;
@@ -632,6 +635,7 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
         imageTheme: options.theme,
         images,
         imagePlaceholder: () => "",
+        isImageVisible: (image) => getPictureProperties(image).printObject,
       });
       paintSheetBorders(
         context,
@@ -647,7 +651,7 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
       if (rows === page.row && columns === page.column && options.imageAssetUrls)
         paintFloatingImages(context, {
           state: {
-            images: document.sheet.floatingImages,
+            images: printableRoots,
             revision: document.display.revision ?? 0,
           },
           layout,

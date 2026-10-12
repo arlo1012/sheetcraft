@@ -218,9 +218,6 @@ describe("real picture format pane document owner", () => {
       "cropLeftPt",
       "scaleWidthPercent",
       "relativeToOriginalSize",
-      "altTitle",
-      "printObject",
-      "locked",
       "shadowBlurPt",
       "rotation3dXDeg",
       "fillColor",
@@ -231,11 +228,7 @@ describe("real picture format pane document owner", () => {
           intent(
             f,
             field,
-            field === "fillColor" || field === "altTitle"
-              ? "text"
-              : field === "locked" || field === "printObject" || field === "relativeToOriginalSize"
-                ? true
-                : 12,
+            field === "fillColor" ? "text" : field === "relativeToOriginalSize" ? true : 12,
           ) as PictureFormatIntent,
         ),
       ).toBe(false);

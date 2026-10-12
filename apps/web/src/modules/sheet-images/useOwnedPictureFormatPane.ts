@@ -1,3 +1,4 @@
+import { getPictureProperties, type PictureProperties } from "@sheetcraft/core/picture-properties";
 import { computed, getCurrentScope, onScopeDispose, ref, watch } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import {
@@ -181,6 +182,7 @@ export interface OwnedPictureFormatPaneOptions {
   getOriginalSizeLimitReason?: () => string;
   getInheritedLineReason?: () => string;
   getCompositeLineReason?: () => string;
+  getInheritedPropertiesReason?: () => string;
   /** Current, validated resource registry; callers never gain access by supplying an arbitrary ID. */
   isImageAssetAvailable?: (assetId: string) => boolean;
 }
@@ -463,7 +465,21 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         ? { width: world.rect.width, height: world.rect.height, angleDeg: world.angleDeg }
         : undefined
       : getPictureToolGeometry(root, context);
-    const values: Partial<PictureFormatValues> = {};
+    const behavior = getPictureProperties(root),
+      ownProperties = getPictureProperties(node);
+    const values: Partial<PictureFormatValues> = {
+      altTitle: ownProperties.altTitle,
+      altDescription: node.altText,
+      locked: behavior.locked,
+      printObject: behavior.printObject,
+    };
+    if (inner) {
+      const reason =
+        options.getInheritedPropertiesReason?.() ??
+        "Positioning, locking and printing are controlled by the outer picture group.";
+      for (const field of ["anchor", "locked", "printObject"] as const)
+        capabilities.fields[field] = { enabled: false, reason };
+    }
     if (geometry) {
       values.sizeWidthPt = geometry.width * POINTS_PER_PIXEL;
       values.sizeHeightPt = geometry.height * POINTS_PER_PIXEL;
@@ -555,8 +571,14 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         if (!inner && world && (isPictureGroup(root) || isFramedPictureObject(root)))
           capabilities.fields.anchor = { enabled: true };
       }
-      if (sourceBearing && (!inner || (world && !world.collapsed)))
+      if (!inner || (world && !world.collapsed)) {
         capabilities.fields.altDescription = { enabled: true };
+        capabilities.fields.altTitle = { enabled: true };
+      }
+      if (!inner) {
+        capabilities.fields.locked = { enabled: true };
+        capabilities.fields.printObject = { enabled: true };
+      }
       if (
         cropState &&
         (isPictureGroup(node) ||
@@ -679,7 +701,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       if (!isPictureGroup(root) || !context || !world || world.collapsed)
         throw new TypeError("Missing exact child geometry.");
       let edit = world;
-      const metadata: { lockAspectRatio?: boolean; altText?: string } = {};
+      const metadata: PictureProperties & { lockAspectRatio?: boolean; altText?: string } = {};
       if (intent.field === "sizeWidthPt" || intent.field === "sizeHeightPt") {
         const axis = intent.field === "sizeWidthPt" ? "width" : "height";
         const value = intent.value / POINTS_PER_PIXEL;
@@ -723,6 +745,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         edit = { ...world, angleDeg: normalizePictureAngle(intent.value) };
       else if (intent.field === "lockAspectRatio") metadata.lockAspectRatio = intent.value;
       else if (intent.field === "altDescription") metadata.altText = intent.value;
+      else if (intent.field === "altTitle") metadata.altTitle = intent.value;
       else throw new TypeError("Unsupported child field.");
       next = applyPictureGroupChildWorldEdit(
         root,
@@ -744,8 +767,13 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       next = resized;
     } else if (intent.field === "lockAspectRatio")
       next = { ...root, lockAspectRatio: intent.value };
-    else if (intent.field === "altDescription" && !isPictureGroup(root))
-      next = { ...root, altText: intent.value };
+    else if (
+      intent.field === "altTitle" ||
+      intent.field === "locked" ||
+      intent.field === "printObject"
+    )
+      next = { ...root, [intent.field]: intent.value };
+    else if (intent.field === "altDescription") next = { ...root, altText: intent.value };
     else if (
       (intent.field === "rotationDeg" || intent.field === "anchor") &&
       (isPictureGroup(root) || isFramedPictureObject(root)) &&
@@ -1011,9 +1039,13 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         return false;
       if (
         intent.type === "set-field" &&
-        (((intent.field === "lockAspectRatio" || intent.field === "relativeToOriginalSize") &&
+        (((intent.field === "lockAspectRatio" ||
+          intent.field === "relativeToOriginalSize" ||
+          intent.field === "locked" ||
+          intent.field === "printObject") &&
           typeof intent.value !== "boolean") ||
-          (intent.field === "altDescription" && typeof intent.value !== "string"))
+          ((intent.field === "altDescription" || intent.field === "altTitle") &&
+            typeof intent.value !== "string"))
       )
         return false;
       if (intent.type === "set-field" && intent.field === "relativeToOriginalSize") {

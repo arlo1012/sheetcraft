@@ -4,6 +4,7 @@ import { createPicturePaintResources } from "../../../shared/images/picture-pain
 import { PicturePaintUnavailableError } from "../../../shared/images/picture-detailed-render";
 import { paintSparkline } from "../../sparklines/sparkline-painter";
 import type { CellAddress } from "@sheetcraft/core/workbook";
+import type { CellImage } from "@sheetcraft/core/formula";
 import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import { paintCellFill } from "./cell-fill-painter";
@@ -129,6 +130,8 @@ export function paintSheetScene(
     imageTheme?: WorkbookTheme;
     images: CanvasImageCache;
     imagePlaceholder: (assetId: string) => string;
+    /** Print-only visibility. Omitted on ordinary grid and camera surfaces. */
+    isImageVisible?: (image: CellImage, address: CellAddress) => boolean;
     /** Only a live surface with the native logical-span overlay may skip these glyphs. */
     attributedBidiMode?: "dom" | "plain";
     /** Live native text surfaces paint these above their DOM layer instead. */
@@ -179,6 +182,7 @@ export function paintSheetScene(
         drawnSpans.add(key);
       }
       if (!content.image && !content.textLayout) continue;
+      if (content.image && options.isImageVisible?.(content.image, source) === false) continue;
       context.save();
       clipRect(
         context,

@@ -156,6 +156,15 @@ const overlays = computed<SelectionOverlay[]>(() => {
       result.push({ path: innerPath.value, fragment, passive: false });
   return result;
 });
+function getOverlayTitle(path: PictureGroupPath): string | undefined {
+  return (
+    resolveOwnedPictureNode(displayRoots(), path, props.frameContext)?.node.altTitle || undefined
+  );
+}
+function getOverlayLabel(path: PictureGroupPath): string {
+  const node = resolveOwnedPictureNode(displayRoots(), path, props.frameContext)?.node;
+  return [node?.altTitle, node?.altText].filter(Boolean).join(". ") || t("image.floatingAlt");
+}
 const toolbarAnchor = computed<FloatingReference | null>(() => {
   const path = targetPath.value,
     layer = layerRef.value;
@@ -939,7 +948,8 @@ defineExpose({
       :style="overlayStyle(overlay.fragment)"
       :tabindex="overlay.passive ? undefined : 0"
       :role="overlay.passive ? undefined : 'button'"
-      :aria-label="overlay.passive ? undefined : t('image.floatingAlt')"
+      :aria-label="overlay.passive ? undefined : getOverlayLabel(overlay.path)"
+      :title="getOverlayTitle(overlay.path)"
       :data-owned-picture-selected="overlay.path.join('/')"
       :data-owned-picture-path="JSON.stringify(overlay.path)"
       :data-passive-outline="overlay.passive ? '' : undefined"

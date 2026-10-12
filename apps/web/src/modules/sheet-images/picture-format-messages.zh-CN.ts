@@ -126,6 +126,7 @@ export const pictureFormatZhCN = {
     perspectiveDeg: "透视角度",
     distanceFromGroundPt: "距地面距离",
     capabilityReasons: {
+      inheritedProperties: "位置、锁定与打印由外层图片组合统一控制，请选择组合后修改。",
       inheritedLine: "当前描边继承工作簿主题。选择“本地实线”后可独立设置颜色和宽度。",
       compositeLine: "这些控件只修改本地描边；另有一层主题描边，修改时会保留。",
       unsupportedFeature: "暂不支持此项设置。",

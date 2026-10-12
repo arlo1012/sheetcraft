@@ -1885,6 +1885,7 @@ const pictureFormatPane = useOwnedPictureFormatPane({
   getOriginalSizeLimitReason: () => t("pictureFormat.originalSizeTooLarge"),
   getInheritedLineReason: () => t("pictureFormat.capabilityReasons.inheritedLine"),
   getCompositeLineReason: () => t("pictureFormat.capabilityReasons.compositeLine"),
+  getInheritedPropertiesReason: () => t("pictureFormat.capabilityReasons.inheritedProperties"),
 });
 const picturePaintAssets = createPicturePaintAssetSource({
   getSnapshot: () => pictureFormatPane.snapshot.value,

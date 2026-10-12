@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import {
-  requireStandalonePictures,
-  UnsupportedPictureDocumentError,
-} from "../../sheet-images/picture-document-support";
+import { UnsupportedPictureDocumentError } from "../../sheet-images/picture-document-support";
+import { getPrintPictureAssetIds } from "../page-print-pictures";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
@@ -134,13 +132,7 @@ async function print(): Promise<void> {
   try {
     printWindow.opener = null;
     const document = documentPreview.value;
-    const assetIds = new Set(
-      requireStandalonePictures(document.sheet.floatingImages).map((image) => image.assetId),
-    );
-    for (const cell of document.sheet.cells.values())
-      if (cell.content?.kind === "image") assetIds.add(cell.content.image.assetId);
-    const watermarkAssetId = document.sheet.pageDecoration?.watermark?.image?.assetId;
-    if (watermarkAssetId) assetIds.add(watermarkAssetId);
+    const assetIds = getPrintPictureAssetIds(document.sheet);
     const urls = [...assetIds].map((id) => props.imageAssetUrls?.get(id));
     if (urls.some((url) => !url)) throw new Error("Image assets are not ready.");
     await renderer.prepareImages(urls as string[]);
