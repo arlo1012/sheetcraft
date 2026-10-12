@@ -1,7 +1,9 @@
+import { isShapeFreePathClosed } from "@sheetcraft/core/shape-free-path";
 import { isShapeLinePreset, type ShapeLineEnd } from "@sheetcraft/core/shape-line-ends";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   flattenShapePath,
+  FREE_SHAPE_PATH_WORK_BUDGET,
   type EvaluatedShapePresetGeometry,
 } from "@sheetcraft/core/shape-presets";
 import { type PictureFrameRect } from "@sheetcraft/core/picture-frame";
@@ -18,7 +20,8 @@ export type ShapeEndPaint = Readonly<{
   contains: (point: Point) => boolean;
 }>;
 export function standardShapeAppearance(drawing: SheetGraphicDrawing): SheetGraphicDrawing {
-  return drawing.shapeGeometry && isShapeLinePreset(drawing.shapeGeometry.preset)
+  return (drawing.shapeGeometry && isShapeLinePreset(drawing.shapeGeometry.preset)) ||
+    (drawing.shapePath && !isShapeFreePathClosed(drawing.shapePath))
     ? { ...drawing, fill: "transparent" }
     : drawing;
 }
@@ -141,8 +144,10 @@ export function getShapeEndPaint(
 ): readonly ShapeEndPaint[] {
   if (
     !geometry ||
-    !drawing.shapeGeometry ||
-    !isShapeLinePreset(drawing.shapeGeometry.preset) ||
+    !(
+      (drawing.shapeGeometry && isShapeLinePreset(drawing.shapeGeometry.preset)) ||
+      (drawing.shapePath && !isShapeFreePathClosed(drawing.shapePath))
+    ) ||
     !drawing.shapeLineEnds ||
     drawing.strokeWidth <= 0 ||
     drawing.stroke === "transparent"
@@ -150,7 +155,9 @@ export function getShapeEndPaint(
     return [];
   const lines = geometry.paths
     .filter((p) => p.stroke)
-    .flatMap((p) => flattenShapePath(p, 0.05))
+    .flatMap((p) =>
+      flattenShapePath(p, 0.05, drawing.shapePath ? FREE_SHAPE_PATH_WORK_BUDGET : undefined),
+    )
     .filter((p) => p.points.length >= 2);
   const first = lines[0]?.points,
     last = lines.at(-1)?.points;

@@ -66,6 +66,46 @@ describe("startPointerSession", () => {
     expect(secondCancel).toHaveBeenCalledOnce();
   });
 
+  test("composing, prevented or another control's Escape never cancels a sheet gesture", () => {
+    const cancel = vi.fn();
+    const session = startPointerSession({
+      event: pointerEvent("pointerdown"),
+      onMove: () => undefined,
+      onEnd: () => undefined,
+      onCancel: cancel,
+    });
+    const composing = new KeyboardEvent("keydown", {
+      key: "Escape",
+      isComposing: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(composing);
+    expect(composing.defaultPrevented).toBe(false);
+    const prevented = new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    });
+    prevented.preventDefault();
+    window.dispatchEvent(prevented);
+    for (const tag of ["form", "input", "textarea", "select"]) {
+      const control = document.createElement(tag);
+      document.body.append(control);
+      const event = new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      });
+      control.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      control.remove();
+    }
+    expect(session.active).toBe(true);
+    expect(cancel).not.toHaveBeenCalled();
+    session.cancel();
+  });
+
   test("uses mouse listeners for callers that still start from mousedown", () => {
     const move = vi.fn();
     const end = vi.fn();

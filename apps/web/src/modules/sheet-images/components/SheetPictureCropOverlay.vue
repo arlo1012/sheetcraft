@@ -83,7 +83,7 @@ const mask = computed(() =>
   ),
 );
 const maskPaths = computed(() =>
-  mask.value?.paths.filter((path) => path.filled).map(shapePresetPathToSvg),
+  mask.value?.paths.filter((path) => path.filled).map((path) => shapePresetPathToSvg(path)),
 );
 function maskTransform(fragment: FramedPictureViewportFragment): string {
   const r = fragment.geometry.rect,

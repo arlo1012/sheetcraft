@@ -1,8 +1,30 @@
 import type { ShapePresetPath } from "./types.js";
 
+export type ShapePathWorkBudget = Readonly<{ commands: number; points: number }>;
+export const FREE_SHAPE_PATH_WORK_BUDGET: ShapePathWorkBudget = Object.freeze({
+  commands: 2048,
+  points: 16384,
+});
+export function normalizeShapePathWorkBudget(budget?: ShapePathWorkBudget): ShapePathWorkBudget {
+  if (!budget) return { commands: 1024, points: 4096 };
+  if (
+    !Number.isInteger(budget.commands) ||
+    budget.commands < 1 ||
+    budget.commands > 2048 ||
+    !Number.isInteger(budget.points) ||
+    budget.points < 1 ||
+    budget.points > 16384
+  )
+    throw new RangeError("Invalid shape path work budget.");
+  return budget;
+}
+
 /** Public geometry helpers also reject hand-built paths outside the evaluator's limits. */
-export function assertShapePathBudget(path: ShapePresetPath): void {
-  if (!Array.isArray(path.commands) || path.commands.length > 1024)
+export function assertShapePathBudget(path: ShapePresetPath, budget?: ShapePathWorkBudget): void {
+  if (
+    !Array.isArray(path.commands) ||
+    path.commands.length > normalizeShapePathWorkBudget(budget).commands
+  )
     throw new RangeError("Shape path exceeds its command budget.");
   for (const command of path.commands) {
     const length =

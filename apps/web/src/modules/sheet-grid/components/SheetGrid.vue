@@ -26,6 +26,7 @@ import { isPivotValueCell, type SheetPivotTable } from "@sheetcraft/core/pivot-t
 import PivotEmptyReports from "../../pivot-tables/components/PivotEmptyReports.vue";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer.vue";
+import SheetFreeShapeCreationLayer from "../../sheet-drawings/components/SheetFreeShapeCreationLayer.vue";
 import SheetShapeCreationLayer from "../../sheet-drawings/components/SheetShapeCreationLayer.vue";
 import type { ShapeCreationRequest } from "../../sheet-drawings/useShapeCreation";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
@@ -300,6 +301,7 @@ const props = withDefaults(
     missingImageAssetIds?: ReadonlySet<string>;
     readOnly?: boolean;
     shapeCreationRequest?: ShapeCreationRequest;
+    applyDrawingUpdate?: (drawing: SheetDrawing, expected: SheetDrawing) => boolean;
     shapeCreationCommit?: (request: ShapeCreationRequest, drawing: SheetGraphicDrawing) => boolean;
     shapeCreationCancel?: (request: ShapeCreationRequest) => void;
     gridId?: string;
@@ -4436,8 +4438,19 @@ defineExpose({
         height: `${viewportSize.height}px`,
       }"
     >
+      <SheetFreeShapeCreationLayer
+        v-if="shapeCreationRequest.choice.kind === 'drawingTool'"
+        :request="shapeCreationRequest"
+        :commit="shapeCreationCommit"
+        :cancel="shapeCreationCancel"
+        :layout="layout"
+        :scale="scale"
+        :revision="workbookRevision"
+        :read-only="objectsReadOnly"
+        :locale="locale"
+      />
       <SheetShapeCreationLayer
-        v-if="shapeCreationRequest && shapeCreationCommit && shapeCreationCancel"
+        v-else
         :request="shapeCreationRequest"
         :commit="shapeCreationCommit"
         :cancel="shapeCreationCancel"
@@ -4472,6 +4485,7 @@ defineExpose({
         :layout="layout"
         :scale="scale"
         :read-only="objectsReadOnly"
+        :apply-update="applyDrawingUpdate"
         @select="selectFloatingImage(null)"
         @update="emit('updateDrawing', $event)"
         @delete="emit('deleteDrawing', $event)"

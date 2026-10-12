@@ -102,13 +102,9 @@ test("nine line choices carry static path identity and distinct begin/end arrow 
     ["curvedConnector3", "triangle", "triangle"],
   ]);
   for (const item of lines.slice(9)) {
-    expect(item).toMatchObject({ kind: "drawingTool", available: false });
+    expect(item).toMatchObject({ kind: "drawingTool", available: true });
     expect(item).not.toHaveProperty("preset");
     expect(item).not.toHaveProperty("beginArrow");
-    if (item.kind === "drawingTool") {
-      expect(item.disabledReason["en-US"]).toContain("not available yet");
-      expect(item.disabledReason["zh-CN"]).toContain("暂未提供");
-    }
   }
 });
 
@@ -163,23 +159,27 @@ test("bilingual search matches either language and categories without changing s
   }
 });
 
-test("concrete picker shows all 161 named choices, three truthful disabled tools and controlled selection", async () => {
+test("concrete picker shows all 161 named choices, three distinct drawing gestures and controlled selection", async () => {
   const wrapper = gallery();
   expect(wrapper.findAll("button[data-shape-choice]")).toHaveLength(161);
-  expect(wrapper.findAll("button[data-shape-choice]:disabled")).toHaveLength(3);
+  expect(wrapper.findAll("button[data-shape-choice]:disabled")).toHaveLength(0);
   expect(wrapper.findAll('button[tabindex="0"]')).toHaveLength(1);
   expect(wrapper.findAll('button[aria-pressed="true"]')).toHaveLength(1);
   expect(button(wrapper, "ellipse").getAttribute("aria-pressed")).toBe("true");
   expect(wrapper.text()).toContain("Selected: Oval");
   expect(wrapper.find("img, image, use").exists()).toBe(false);
   for (const id of ["curve", "freeform", "scribble"]) {
-    expect(button(wrapper, id).disabled).toBe(true);
-    expect(button(wrapper, id).title).toContain("not available yet");
+    expect(button(wrapper, id).disabled).toBe(false);
+    expect(button(wrapper, id).title).toBe(choice(id).label["en-US"]);
     await wrapper.get(`[data-shape-choice="${id}"]`).trigger("click");
   }
-  expect(wrapper.emitted("choose")).toBeUndefined();
+  expect(wrapper.emitted("choose")).toEqual([
+    [choice("curve")],
+    [choice("freeform")],
+    [choice("scribble")],
+  ]);
   await wrapper.get('[data-shape-choice="heart"]').trigger("click");
-  expect(wrapper.emitted("choose")).toEqual([[choice("heart")]]);
+  expect(wrapper.emitted("choose")!.at(-1)).toEqual([choice("heart")]);
   expect(button(wrapper, "ellipse").getAttribute("aria-pressed")).toBe("true");
   expect(button(wrapper, "heart").getAttribute("aria-pressed")).toBe("false");
   await wrapper.setProps({ selected: choice("heart") });
@@ -219,15 +219,19 @@ test("locale switches labels and feedback while English search continues to work
   expect(wrapper.findAll("button[data-shape-choice]")).toHaveLength(161);
 });
 
-test("roving focus uses responsive rows, skips disabled gestures and never changes the selection", async () => {
+test("roving focus uses responsive rows, includes drawing gestures and never changes the selection", async () => {
   const wrapper = gallery();
   button(wrapper, "line").focus();
   await press(wrapper, "line", "ArrowRight");
   expect(document.activeElement).toBe(button(wrapper, "arrow"));
   expect(wrapper.findAll('button[tabindex="0"]')).toHaveLength(1);
   await press(wrapper, "arrow", "ArrowDown");
+  expect(document.activeElement).toBe(button(wrapper, "scribble"));
+  await press(wrapper, "scribble", "ArrowDown");
   expect(document.activeElement).toBe(button(wrapper, "roundRect"));
   await press(wrapper, "roundRect", "ArrowUp");
+  expect(document.activeElement).toBe(button(wrapper, "scribble"));
+  await press(wrapper, "scribble", "ArrowUp");
   expect(document.activeElement).toBe(button(wrapper, "arrow"));
   await press(wrapper, "arrow", "End");
   expect(document.activeElement).toBe(button(wrapper, "accentBorderCallout3"));

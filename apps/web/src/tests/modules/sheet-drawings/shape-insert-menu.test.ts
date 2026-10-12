@@ -52,9 +52,9 @@ test("the Insert menu composes the full concrete gallery and marks the document-
   await open(wrapper);
   expect(wrapper.findComponent(ShapeGallery).exists()).toBe(true);
   expect(menu()!.querySelectorAll("button[data-shape-choice]")).toHaveLength(161);
-  expect(menu()!.querySelectorAll("button[data-shape-choice]:disabled")).toHaveLength(3);
+  expect(menu()!.querySelectorAll("button[data-shape-choice]:disabled")).toHaveLength(0);
   expect(menu()!.querySelectorAll("[data-shape-category]")).toHaveLength(8);
-  expect(button("curve").title).toContain("not available yet");
+  expect(button("curve").title).toBe("Curve");
   expect(menu()!.querySelector("img, image, use")).toBeNull();
   expect(menu()!.getAttribute("data-shape-insert-owner")).toBe("sheet-1");
   expect(menu()!.getAttribute("data-cell-edit-session")).toBe("edit-1");
@@ -153,17 +153,17 @@ test.each(["reopen", "owner", "handler", "edit session", "disabled", "unmount"] 
   },
 );
 
-test("disabled freehand gestures cannot arm a tool even through an emitted event", async () => {
-  const { wrapper, handler } = fixture();
-  await open(wrapper);
-  for (const id of ["curve", "freeform", "scribble"]) {
+test.each(["curve", "freeform", "scribble"])(
+  "free drawing %s arms the exact tool and closes its menu",
+  async (id) => {
+    const { wrapper, handler } = fixture();
+    await open(wrapper);
     button(id).click();
-    wrapper.getComponent(ShapeGallery).vm.$emit("choose", shape(id));
-  }
-  await nextTick();
-  expect(handler).not.toHaveBeenCalled();
-  expect(menu()).not.toBeNull();
-});
+    await nextTick();
+    expect(handler).toHaveBeenCalledWith(shape(id), false);
+    expect(menu()).toBeNull();
+  },
+);
 
 test("shared trigger keys, gallery navigation, Escape and outside dismissal remain local", async () => {
   const { wrapper, handler } = fixture();

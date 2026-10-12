@@ -36,7 +36,7 @@ const textStyle = computed(() => ({
 <template>
   <div class="drawing-content" :style="{ transform: `rotate(${drawing.rotation}deg)` }">
     <StandardShapeContent
-      v-if="drawing.kind === 'shape' && drawing.shapeGeometry"
+      v-if="drawing.kind === 'shape' && (drawing.shapeGeometry || drawing.shapePath)"
       :drawing="drawing"
     />
     <svg
@@ -135,7 +135,7 @@ const textStyle = computed(() => ({
     />
     <div
       v-else
-      v-show="!(drawing.kind === 'shape' && drawing.shapeGeometry)"
+      v-show="!(drawing.kind === 'shape' && (drawing.shapeGeometry || drawing.shapePath))"
       class="drawing-content__text"
       :class="{ 'is-word-art': drawing.kind === 'wordArt' }"
       :style="[

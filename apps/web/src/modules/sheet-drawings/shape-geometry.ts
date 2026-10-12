@@ -1,5 +1,9 @@
+import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import { getFreeShapeGeometry } from "./free-shape-geometry";
 import {
   evaluateShapePreset,
+  FREE_SHAPE_PATH_WORK_BUDGET,
+  type ShapePathWorkBudget,
   flattenShapePath,
   getShapePresetFillBounds,
   moveShapePresetAdjustment,
@@ -42,7 +46,7 @@ export const STANDARD_SHAPE_GEOMETRY_LIMITS = Object.freeze({
   evaluatorExtent: 10_000,
   coordinate: 10_000_000,
   paths: 16,
-  commands: 1024,
+  commands: 2048,
   points: 16_384,
   cache: 128,
   strokeWidth: 32,
@@ -175,7 +179,10 @@ function hasFillArea({ points }: ShapePolyline): boolean {
     ),
   );
 }
-function prepareGeometry(geometry: EvaluatedShapePresetGeometry): PreparedGeometry {
+function prepareGeometry(
+  geometry: EvaluatedShapePresetGeometry,
+  budget?: ShapePathWorkBudget,
+): PreparedGeometry {
   if (geometry.paths.length < 1 || geometry.paths.length > STANDARD_SHAPE_GEOMETRY_LIMITS.paths)
     throw new RangeError("Standard shape exceeds its path budget.");
   let commandCount = 0,
@@ -185,21 +192,26 @@ function prepareGeometry(geometry: EvaluatedShapePresetGeometry): PreparedGeomet
     if (commandCount > STANDARD_SHAPE_GEOMETRY_LIMITS.commands)
       throw new RangeError("Standard shape exceeds its aggregate command budget.");
     const polylines = Object.freeze(
-      flattenShapePath(path, STANDARD_SHAPE_GEOMETRY_LIMITS.hitTolerance).map((polyline) => {
-        pointCount += polyline.points.length;
-        if (pointCount > STANDARD_SHAPE_GEOMETRY_LIMITS.points)
-          throw new RangeError("Standard shape exceeds its aggregate hit-point budget.");
-        return Object.freeze({
-          closed: polyline.closed,
-          points: Object.freeze(polyline.points.map((point) => Object.freeze({ ...point }))),
-        });
-      }),
+      flattenShapePath(path, STANDARD_SHAPE_GEOMETRY_LIMITS.hitTolerance, budget).map(
+        (polyline) => {
+          pointCount += polyline.points.length;
+          if (pointCount > STANDARD_SHAPE_GEOMETRY_LIMITS.points)
+            throw new RangeError("Standard shape exceeds its aggregate hit-point budget.");
+          return Object.freeze({
+            closed: polyline.closed,
+            points: Object.freeze(polyline.points.map((point) => Object.freeze({ ...point }))),
+          });
+        },
+      ),
     );
     const fillPolylines = Object.freeze(polylines.filter(hasFillArea));
-    const nativeBounds = getShapePresetFillBounds({
-      ...geometry,
-      paths: [{ ...path, filled: true }],
-    });
+    const nativeBounds = getShapePresetFillBounds(
+      {
+        ...geometry,
+        paths: [{ ...path, filled: true }],
+      },
+      budget,
+    );
     // Core's area bounds intentionally omit horizontal/vertical lines. They still paint strokes.
     const fallback = polylineBounds(polylines);
     const hasCurve = path.commands.some((command) => ["Q", "C", "A"].includes(command[0]));
@@ -227,7 +239,7 @@ function prepareGeometry(geometry: EvaluatedShapePresetGeometry): PreparedGeomet
     svg: Object.freeze(
       geometry.paths.map((path) =>
         Object.freeze({
-          d: shapePresetPathToSvg(path),
+          d: shapePresetPathToSvg(path, budget),
           fillMode: path.fillMode,
           filled: path.filled,
           stroke: path.stroke,
@@ -267,6 +279,24 @@ export function getStandardShapeGeometry(
     geometryCache.set(key, geometry);
     if (geometryCache.size > STANDARD_SHAPE_GEOMETRY_LIMITS.cache)
       geometryCache.delete(geometryCache.keys().next().value!);
+    return geometry;
+  } catch {
+    return;
+  }
+}
+
+/** Explicit preset and bounded numeric free paths share paint/hit preparation. */
+export function getDrawingShapeGeometry(
+  drawing: SheetGraphicDrawing,
+): EvaluatedShapePresetGeometry | undefined {
+  if (drawing.shapeGeometry && drawing.shapePath) return;
+  if (!drawing.shapePath)
+    return getStandardShapeGeometry(drawing.shapeGeometry, drawing.width, drawing.height);
+  try {
+    const geometry = getFreeShapeGeometry(drawing.shapePath, drawing.width, drawing.height);
+    if (!geometry) return;
+    if (!preparedGeometries.has(geometry))
+      preparedGeometries.set(geometry, prepareGeometry(geometry, FREE_SHAPE_PATH_WORK_BUDGET));
     return geometry;
   } catch {
     return;

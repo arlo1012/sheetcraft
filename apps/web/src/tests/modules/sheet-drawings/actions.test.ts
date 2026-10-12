@@ -32,6 +32,7 @@ function fixture() {
     revision,
     execute,
     flush,
+    getWorkbook: () => workbook,
     getSheet: () => sheet,
     replaceSheet() {
       sheet = createSheet("Replaced", sheet.id);
@@ -83,6 +84,28 @@ describe("drawing actions", () => {
     expect(f.getSheet().drawings).toHaveLength(2);
     f.actions.remove(first!.id);
     expect(f.getSheet().drawings).toEqual([second]);
+  });
+
+  test("acknowledged updates reject stale owners and false/throw before mutation, but acknowledge already applied changes", () => {
+    const f = fixture();
+    f.actions.insert("shape");
+    f.actions.confirm(f.actions.editing.value!);
+    const owner = f.getSheet().drawings![0]!;
+    const next = { ...owner, name: "changed" };
+    expect(f.actions.update(next, { ...owner })).toBe(false);
+    expect(f.getSheet().drawings![0]).toBe(owner);
+    f.execute.mockImplementation(() => false);
+    expect(f.actions.update(next, owner)).toBe(false);
+    f.execute.mockImplementation(() => {
+      throw new Error("rejected");
+    });
+    expect(f.actions.update(next, owner)).toBe(false);
+    f.execute.mockImplementation((command) => {
+      applyWorkbookCommand(f.getWorkbook(), command);
+      throw new Error("after mutation");
+    });
+    expect(f.actions.update(next, owner)).toBe(true);
+    expect(f.getSheet().drawings![0]!.name).toBe("changed");
   });
 
   test("cancels drafts without committing and rejects stale confirmations on another sheet", () => {

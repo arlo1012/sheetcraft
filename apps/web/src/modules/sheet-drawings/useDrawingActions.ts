@@ -51,16 +51,24 @@ export function useDrawingActions(options: {
     const target = targets.prepare(drawing);
     if (target) targets.open(target, drawing, (current, next) => confirm(next, current));
   }
-  function update(drawing: SheetDrawing) {
-    if (!allowed()) return;
+  function update(drawing: SheetDrawing, expected?: SheetDrawing): boolean {
+    if (!allowed()) return false;
     const sheet = options.getSheet();
-    if (!sheet.drawings?.some((item) => item.id === drawing.id)) return;
-    options.execute(
-      createSetSheetDrawingsCommand(
-        sheet.id,
-        sheet.drawings.map((item) => (item.id === drawing.id ? drawing : item)),
-      ),
+    const owner = sheet.drawings?.find((item) => item.id === drawing.id);
+    if (!owner || (expected && owner !== expected)) return false;
+    const command = createSetSheetDrawingsCommand(
+      sheet.id,
+      sheet.drawings!.map((item) => (item === owner ? drawing : item)),
     );
+    const applied = () =>
+      options.getSheet() === sheet &&
+      JSON.stringify(sheet.drawings ?? []) === JSON.stringify(command.drawings);
+    if (applied()) return true;
+    try {
+      return options.execute(command) === true || applied();
+    } catch {
+      return applied();
+    }
   }
   function confirm(drawing: SheetGraphicDrawing, target = dialog.value) {
     targets.run(target, (currentTarget) => {

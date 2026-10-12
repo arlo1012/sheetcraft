@@ -1,4 +1,8 @@
-import { assertShapePathBudget } from "./path-budget.js";
+import {
+  assertShapePathBudget,
+  normalizeShapePathWorkBudget,
+  type ShapePathWorkBudget,
+} from "./path-budget.js";
 import type { ShapePresetGeometry, ShapePresetPath } from "./types.js";
 
 type Point = Readonly<{ x: number; y: number }>;
@@ -21,16 +25,19 @@ function distance(point: Point, a: Point, b: Point): number {
 export function flattenShapePath(
   path: ShapePresetPath,
   tolerance = 0.25,
+  budget?: ShapePathWorkBudget,
 ): readonly ShapePolyline[] {
-  assertShapePathBudget(path);
+  assertShapePathBudget(path, budget);
   if (!Number.isFinite(tolerance) || tolerance < 0.01 || tolerance > 10)
     throw new RangeError("Invalid shape curve tolerance.");
+  const limits = normalizeShapePathWorkBudget(budget);
   const result: { points: Point[]; closed: boolean }[] = [];
   let current = { points: [] as Point[], closed: false },
     pen: Point = { x: 0, y: 0 },
     count = 0;
   function append(point: Point) {
-    if (++count > 4096) throw new RangeError("Shape hit geometry exceeds its point budget.");
+    if (++count > limits.points)
+      throw new RangeError("Shape hit geometry exceeds its point budget.");
     current.points.push(point);
     pen = point;
   }
@@ -113,8 +120,8 @@ export function isPointInShapePreset(geometry: ShapePresetGeometry, point: Point
 }
 
 /** Numeric-only SVG commands for product-owned previews; no XML or HTML comes from user data. */
-export function shapePresetPathToSvg(path: ShapePresetPath): string {
-  assertShapePathBudget(path);
+export function shapePresetPathToSvg(path: ShapePresetPath, budget?: ShapePathWorkBudget): string {
+  assertShapePathBudget(path, budget);
   const number = (value: number) => String(Number(value.toPrecision(12)));
   const parts: string[] = [];
   for (const c of path.commands) {

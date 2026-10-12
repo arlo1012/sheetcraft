@@ -11,7 +11,7 @@ import {
 import { getPicturePaneTranslation } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import {
-  getStandardShapeGeometry,
+  getDrawingShapeGeometry,
   getStandardShapeWorldBounds,
   standardShapeFlipPoint,
 } from "./shape-geometry";
@@ -89,7 +89,10 @@ export function resizeStandardShapeBy(
       direction,
       delta,
       preserveRatio,
-      drawing.shapeGeometry && isShapeLinePreset(drawing.shapeGeometry.preset) ? 1 : 16,
+      drawing.shapePath ||
+        (drawing.shapeGeometry && isShapeLinePreset(drawing.shapeGeometry.preset))
+        ? 1
+        : 16,
     );
   return next ? (reanchorFloatingImageAtSheetRect(drawing, next, layout) ?? undefined) : undefined;
 }
@@ -107,8 +110,8 @@ export function getStandardShapeViewportFragments(
   selected = false,
 ): FloatingImageViewportFragment[] {
   const rect = getFloatingImageSheetRect(drawing, layout);
-  if (!rect || !drawing.shapeGeometry) return [];
-  const shape = getStandardShapeGeometry(drawing.shapeGeometry, drawing.width, drawing.height);
+  if (!rect || (!drawing.shapeGeometry && !drawing.shapePath)) return [];
+  const shape = getDrawingShapeGeometry(drawing);
   const bounds = getStandardShapeWorldBounds(
     shape,
     standardShapeAppearance(drawing),

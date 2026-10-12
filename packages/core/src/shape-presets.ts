@@ -30,3 +30,8 @@ export type {
   ShapePresetParameters,
   ShapePresetTextRect,
 } from "./shape-presets/types.js";
+
+export {
+  FREE_SHAPE_PATH_WORK_BUDGET,
+  type ShapePathWorkBudget,
+} from "./shape-presets/path-budget.js";

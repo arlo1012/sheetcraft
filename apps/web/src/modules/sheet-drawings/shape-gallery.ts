@@ -47,8 +47,7 @@ export type ShapeDrawingToolChoice = ChoiceBase &
   Readonly<{
     kind: "drawingTool";
     tool: "curve" | "freeform" | "scribble";
-    available: false;
-    disabledReason: ShapeGalleryLabel;
+    available: true;
   }>;
 export type ShapeGalleryChoice =
   | ShapePresetChoice
@@ -75,10 +74,6 @@ function line(
 ): ShapeLineChoice {
   return { id: tool, kind: "line", tool, label: label(en, zh), preset, beginArrow, endArrow };
 }
-const gestureUnavailable = label(
-  "Freehand drawing is not available yet.",
-  "自由绘制功能暂未提供。",
-);
 function drawingTool(
   tool: ShapeDrawingToolChoice["tool"],
   en: string,
@@ -89,8 +84,7 @@ function drawingTool(
     kind: "drawingTool",
     tool,
     label: label(en, zh),
-    available: false,
-    disabledReason: gestureUnavailable,
+    available: true,
   };
 }
 
@@ -201,7 +195,7 @@ export const SHAPE_GALLERY_LABELS: Readonly<
     connectorHint:
       "Connectors use fixed paths. Automatic connections to other shapes are not available yet.",
     drawingToolHint:
-      "Curve, Freeform and Scribble need freehand drawing, which is not available yet.",
+      "Choose Curve or Freeform to place points; double-click to finish. Drag Scribble to draw a stroke.",
   },
   "zh-CN": {
     gallery: "形状库",
@@ -211,7 +205,7 @@ export const SHAPE_GALLERY_LABELS: Readonly<
     noMatches: "没有匹配的形状",
     count: "个形状",
     connectorHint: "连接符使用固定路径，暂不支持自动连接其他形状。",
-    drawingToolHint: "曲线、任意多边形和自由曲线需要自由绘制功能，目前暂未提供。",
+    drawingToolHint: "曲线和任意多边形单击添加节点、双击完成；自由曲线按住拖动画出轨迹。",
   },
 };
 
@@ -259,7 +253,7 @@ export function shapeGalleryPreview(choice: ShapeGalleryChoice): ShapeGalleryPre
   const cached = previews.get(choice.id);
   if (cached) return cached;
   // Gesture icons are illustrative standard paths only. They carry no insertion preset
-  // and remain disabled until actual gesture capture has been implemented.
+  // and create bounded numeric paths through their own gesture capture.
   const preset: ShapePresetName =
     choice.kind === "preset" || choice.kind === "line"
       ? choice.preset

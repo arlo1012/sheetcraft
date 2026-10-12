@@ -5,7 +5,7 @@ import { normalizeSheetDrawing, type SheetGraphicDrawing } from "@sheetcraft/cor
 import type { CellAddress, Sheet, Workbook } from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { createGraphicDrawing } from "./drawing-defaults";
-import { getStandardShapeGeometry } from "./shape-geometry";
+import { getDrawingShapeGeometry } from "./shape-geometry";
 import type { ShapeGalleryChoice } from "./shape-gallery";
 
 export type ShapeCreationOwner = Readonly<{
@@ -17,7 +17,7 @@ export type ShapeCreationRequest = ShapeCreationOwner &
   Readonly<{
     requestId: number;
     revision?: number;
-    choice: Exclude<ShapeGalleryChoice, { kind: "drawingTool" }>;
+    choice: ShapeGalleryChoice;
     continuous: boolean;
     base: SheetGraphicDrawing;
   }>;
@@ -82,7 +82,7 @@ export function useShapeCreation(options: {
     };
   }
   function start(choice: ShapeGalleryChoice, continuous: boolean, owner = captureOwner()): boolean {
-    if (committing || choice.kind === "drawingTool" || !allowed(owner)) return false;
+    if (committing || !allowed(owner)) return false;
     const token = ++generation;
     if (!options.flush() || token !== generation || !allowed(owner)) return false;
     options.onStart?.();
@@ -106,17 +106,16 @@ export function useShapeCreation(options: {
     } catch {
       return false;
     }
-    if (
-      drawing.kind === "shape" &&
-      drawing.shapeGeometry?.preset !==
-        (current.choice.kind === "textBox" ? undefined : current.choice.preset)
-    )
-      return false;
-    if (
-      drawing.kind === "shape" &&
-      !getStandardShapeGeometry(drawing.shapeGeometry, drawing.width, drawing.height)
-    )
-      return false;
+    if (drawing.kind === "shape") {
+      if (current.choice.kind === "drawingTool") {
+        if (drawing.shapePath?.tool !== current.choice.tool || drawing.shapeGeometry) return false;
+      } else if (
+        current.choice.kind !== "textBox" &&
+        (drawing.shapeGeometry?.preset !== current.choice.preset || drawing.shapePath)
+      )
+        return false;
+      if (!getDrawingShapeGeometry(drawing)) return false;
+    }
     if ((current.sheet.drawings ?? []).some((item) => item.id === drawing.id)) return false;
     let command: ReturnType<typeof createSetSheetDrawingsCommand>;
     try {

@@ -99,7 +99,14 @@ class ActivePointerSession implements PointerSession {
   };
 
   private onKeydown = (event: KeyboardEvent): void => {
-    if (event.key !== "Escape") return;
+    if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+    if (
+      event.target instanceof Element &&
+      event.target.closest(
+        '[role="dialog"], [role="menu"], form, input, textarea, select, [role="textbox"], [contenteditable="true"]',
+      )
+    )
+      return;
     event.preventDefault();
     event.stopPropagation();
     this.finish("cancel");

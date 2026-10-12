@@ -2,6 +2,9 @@ import { expect, test } from "vitest";
 import {
   evaluateShapePreset,
   flattenShapePath,
+  FREE_SHAPE_PATH_WORK_BUDGET,
+  getShapePresetFillBounds,
+  type ShapePresetPath,
   isPointInShapePreset,
   shapePresetPathToSvg,
   SHAPE_PRESET_NAMES,
@@ -41,4 +44,37 @@ test("SVG ellipse splits a full turn into safe arcs and quadratics/cubics preser
   const smile = evaluateShapePreset({ preset: "smileyFace" }, 360, 240);
   expect(smile.paths.some((path) => shapePresetPathToSvg(path).includes("Q"))).toBe(true);
   expect(() => flattenShapePath(ellipse.paths[0]!, 0)).toThrow("tolerance");
+});
+
+test("dedicated bounded free-path work does not relax the default preset guard", () => {
+  const path: ShapePresetPath = {
+    filled: true,
+    stroke: true,
+    commands: Array.from({ length: 2048 }, (_, i) => [i ? "L" : "M", i, i % 2] as const),
+  };
+  expect(() => flattenShapePath(path)).toThrow("command budget");
+  expect(() => shapePresetPathToSvg(path)).toThrow("command budget");
+  expect(() =>
+    getShapePresetFillBounds({
+      width: 2048,
+      height: 1,
+      paths: [path],
+      handles: [],
+      adjustments: {},
+    }),
+  ).toThrow("command budget");
+  expect(flattenShapePath(path, 0.05, FREE_SHAPE_PATH_WORK_BUDGET)[0]!.points).toHaveLength(2048);
+  expect(shapePresetPathToSvg(path, FREE_SHAPE_PATH_WORK_BUDGET)).toContain("L2047 1");
+  expect(
+    getShapePresetFillBounds(
+      { width: 2048, height: 1, paths: [path], handles: [], adjustments: {} },
+      FREE_SHAPE_PATH_WORK_BUDGET,
+    ),
+  ).toEqual({ left: 0, top: 0, width: 2047, height: 1 });
+  expect(() => flattenShapePath(path, 0.05, { commands: 2049, points: 16384 })).toThrow(
+    "Invalid shape path work budget",
+  );
+  expect(() => flattenShapePath(path, 0.05, { commands: 2048, points: 2047 })).toThrow(
+    "point budget",
+  );
 });

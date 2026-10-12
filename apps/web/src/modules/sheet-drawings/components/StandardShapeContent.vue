@@ -2,7 +2,7 @@
 import { computed, type CSSProperties } from "vue";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
-  getStandardShapeGeometry,
+  getDrawingShapeGeometry,
   getStandardShapeSvgPaths,
   standardShapeFillColor,
   standardShapeSvgTransform,
@@ -12,9 +12,7 @@ import { standardShapeAppearance, getShapeEndPaint } from "../shape-line-paint";
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{ drawing: SheetGraphicDrawing }>();
 const { t } = useAppI18n();
-const geometry = computed(() =>
-  getStandardShapeGeometry(props.drawing.shapeGeometry, props.drawing.width, props.drawing.height),
-);
+const geometry = computed(() => getDrawingShapeGeometry(props.drawing));
 const paths = computed(() => getStandardShapeSvgPaths(geometry.value));
 const appearance = computed(() => standardShapeAppearance(props.drawing));
 const ends = computed(() => getShapeEndPaint(props.drawing, geometry.value));

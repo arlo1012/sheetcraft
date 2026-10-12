@@ -11,6 +11,10 @@ import {
 import { serializeWorkbook, deserializeWorkbook } from "@sheetcraft/core/serialization";
 import type { WorkbookCommand } from "@sheetcraft/core/commands";
 import { useShapeCreation } from "../../../modules/sheet-drawings/useShapeCreation";
+import { createFreeShapeDrawingFromPoints } from "../../../modules/sheet-drawings/free-shape-creation";
+import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
+import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
+import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import { SHAPE_GALLERY } from "../../../modules/sheet-drawings/shape-gallery";
 const choice = SHAPE_GALLERY.flatMap((g) => g.items).find(
   (c) => c.kind === "preset" && c.preset === "rect",
@@ -64,6 +68,51 @@ function fixture() {
   };
 }
 describe("owner-bound canvas shape creation", () => {
+  test.each(["curve", "freeform", "scribble"] as const)(
+    "%s actual builder commits once with version57 and owner/history",
+    (tool) => {
+      const f = fixture(),
+        choice = SHAPE_GALLERY.flatMap((g) => g.items).find(
+          (c) => c.kind === "drawingTool" && c.tool === tool,
+        )!;
+      expect(f.actions.start(choice, false)).toBe(true);
+      const request = f.actions.request.value!;
+      const layout = createSheetViewportLayout({
+        geometry: createSheetGeometry({
+          rowCount: 200,
+          columnCount: 100,
+          rowHeight: 24,
+          columnWidth: 80,
+        }),
+        rows: createRowVisibilityIndex({ rowCount: 200, defaultRowHeight: 24 }),
+        viewportSize: { width: 800, height: 600 },
+      });
+      const points =
+        tool === "scribble"
+          ? Array.from({ length: 1025 }, (_, i) => ({ x: 100 + i, y: 100 + (i % 2) }))
+          : [
+              { x: 100, y: 100 },
+              { x: 150, y: 160 },
+              { x: 220, y: 100 },
+            ];
+      const drawing = createFreeShapeDrawingFromPoints({
+        base: request.base,
+        tool,
+        points,
+        layout,
+      })!;
+      expect(f.actions.commit(request, drawing)).toBe(true);
+      expect(f.execute).toHaveBeenCalledTimes(1);
+      const snapshot = serializeWorkbook(f.session.workbook);
+      expect(snapshot.version).toBe(57);
+      expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
+      expect(undoWorkbookCommand(f.session)).toBe(true);
+      expect(f.sheet.value.drawings ?? []).toEqual([]);
+      expect(redoWorkbookCommand(f.session)).toBe(true);
+      expect(serializeWorkbook(f.session.workbook)).toEqual(snapshot);
+      f.scope.stop();
+    },
+  );
   test("one release is one reversible command, snapshot and ordinary ID", () => {
     const f = fixture();
     expect(f.actions.start(choice, false)).toBe(true);

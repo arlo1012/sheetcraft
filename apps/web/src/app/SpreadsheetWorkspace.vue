@@ -4554,6 +4554,7 @@ watch(
           :shape-creation-request="shapeCreation.request.value"
           :shape-creation-commit="shapeCreation.commit"
           :shape-creation-cancel="shapeCreation.cancel"
+          :apply-drawing-update="drawingActions.update"
           @update-drawing="drawingActions.update"
           @delete-drawing="drawingActions.remove"
           @edit-drawing="editSheetDrawing"

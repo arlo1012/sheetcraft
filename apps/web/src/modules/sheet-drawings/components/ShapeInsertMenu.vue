@@ -94,7 +94,7 @@ function selectionAction(): (choice: ShapeGalleryChoice) => void {
     props.ownerId === ownerId &&
     props.handler === handler;
   return (choice) => {
-    if (!current() || choice.kind === "drawingTool") return;
+    if (!current()) return;
     let accepted = false;
     try {
       accepted = handler(choice, continuous.value) === true;

@@ -108,6 +108,8 @@ function start(event: PointerEvent): void {
     layout = props.layout,
     scale = props.scale,
     revision = props.revision;
+  const choice = request.choice;
+  if (choice.kind === "drawingTool") return;
   const startPoint = shapeCreationPointFromViewport(point(event), layout);
   if (!startPoint) return;
   event.preventDefault();
@@ -132,7 +134,7 @@ function start(event: PointerEvent): void {
     preview.value = end
       ? (createShapeDrawingFromChoice({
           base: request.base,
-          choice: request.choice,
+          choice,
           start: startPoint.point,
           end: end.point,
           layout,

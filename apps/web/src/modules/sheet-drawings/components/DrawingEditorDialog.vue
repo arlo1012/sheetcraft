@@ -15,8 +15,9 @@ import DrawingContent from "./DrawingContent.vue";
 import ShapeGallery from "./ShapeGallery.vue";
 import { SHAPE_GALLERY, type ShapeGalleryChoice } from "../shape-gallery";
 import { isShapeLinePreset, type ShapeLineEnds } from "@sheetcraft/core/shape-line-ends";
+import { isShapeFreePathClosed } from "@sheetcraft/core/shape-free-path";
 import ShapeLineEndsControls from "./ShapeLineEndsControls.vue";
-import { getStandardShapeGeometry } from "../shape-geometry";
+import { getDrawingShapeGeometry } from "../shape-geometry";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
   disabled: boolean;
@@ -39,8 +40,8 @@ const selectedChoice = computed(() =>
 const validGeometry = computed(
   () =>
     draft.value.kind !== "shape" ||
-    !draft.value.shapeGeometry ||
-    !!getStandardShapeGeometry(draft.value.shapeGeometry, draft.value.width, draft.value.height),
+    (!draft.value.shapeGeometry && !draft.value.shapePath) ||
+    !!getDrawingShapeGeometry(draft.value),
 );
 function chooseShape(choice: ShapeGalleryChoice): void {
   if (props.disabled || choice.kind === "drawingTool") return;
@@ -50,6 +51,7 @@ function chooseShape(choice: ShapeGalleryChoice): void {
     return;
   }
   const next = { ...draft.value };
+  delete next.shapePath;
   next.shapeGeometry =
     choice.preset === next.shapeGeometry?.preset ? next.shapeGeometry : { preset: choice.preset };
   delete next.shapeLineEnds;
@@ -63,12 +65,20 @@ function chooseShape(choice: ShapeGalleryChoice): void {
   draft.value = next;
 }
 const lineGeometry = computed(
-  () => !!draft.value.shapeGeometry && isShapeLinePreset(draft.value.shapeGeometry.preset),
+  () =>
+    (!!draft.value.shapeGeometry && isShapeLinePreset(draft.value.shapeGeometry.preset)) ||
+    (!!draft.value.shapePath && !isShapeFreePathClosed(draft.value.shapePath)),
 );
 const lineEndsHandler = computed(() => {
-  const sourceGeometry = draft.value.shapeGeometry;
+  const sourceGeometry = draft.value.shapeGeometry,
+    sourcePath = draft.value.shapePath;
   return (ends: ShapeLineEnds | undefined): boolean => {
-    if (props.disabled || !lineGeometry.value || draft.value.shapeGeometry !== sourceGeometry)
+    if (
+      props.disabled ||
+      !lineGeometry.value ||
+      draft.value.shapeGeometry !== sourceGeometry ||
+      draft.value.shapePath !== sourcePath
+    )
       return false;
     const next = { ...draft.value };
     if (ends) next.shapeLineEnds = ends;
@@ -108,9 +118,10 @@ const shapes: DrawingShape[] = [
           :selected="selectedChoice"
           :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
           :disabled="disabled"
+          :allow-drawing-tools="false"
           @choose="chooseShape"
         />
-        <p v-if="!draft.shapeGeometry" class="drawing-editor__hint">
+        <p v-if="!draft.shapeGeometry && !draft.shapePath" class="drawing-editor__hint">
           {{ t("drawing.legacyGeometry") }}
         </p>
         <p v-if="galleryError" class="drawing-editor__hint" role="alert">

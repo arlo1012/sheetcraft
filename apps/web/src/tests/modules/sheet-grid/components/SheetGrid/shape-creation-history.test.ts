@@ -59,3 +59,40 @@ test("creation mode routes workbook history, finish restores editor focus withou
   dialog.remove();
   f.wrapper.unmount();
 });
+
+test("free creation uses the dedicated live layer, normal history routing and acknowledged drawing owner callback", async () => {
+  const f = mountSheetGrid({ attachTo: document.body });
+  const choice = SHAPE_GALLERY.flatMap((g) => g.items).find(
+    (c) => c.kind === "drawingTool" && c.tool === "freeform",
+  )!;
+  const request: ShapeCreationRequest = {
+    workbook: f.session.workbook,
+    sheet: f.sheet,
+    requestId: 7,
+    choice,
+    continuous: false,
+    base: createGraphicDrawing("free-new", "shape", "Freeform", { row: 0, column: 0 }),
+  };
+  const commit = vi.fn(() => true),
+    applyDrawingUpdate = vi.fn(() => false);
+  await f.wrapper.setProps({
+    shapeCreationRequest: request,
+    shapeCreationCommit: commit,
+    shapeCreationCancel: () => {},
+    applyDrawingUpdate,
+  });
+  const layer = f.wrapper.get("[data-shape-creation-layer]");
+  expect(layer.attributes("data-free-shape-tool")).toBe("freeform");
+  expect(layer.element.closest(".sheet-grid__image-controls")).toBeNull();
+  const base = createGraphicDrawing("undo", "shape", "Old", { row: 0, column: 0 });
+  executeWorkbookCommand(f.session, createSetSheetDrawingsCommand(f.sheet.id, [base]));
+  await layer.trigger("keydown", { key: "z", ctrlKey: true });
+  expect(f.sheet.drawings ?? []).toEqual([]);
+  await layer.trigger("keydown", { key: "z", ctrlKey: true, shiftKey: true });
+  expect(f.sheet.drawings).toHaveLength(1);
+  expect(commit).not.toHaveBeenCalled();
+  await f.wrapper.setProps({ shapeCreationRequest: undefined });
+  await nextTick();
+  expect(document.activeElement).toBe(f.wrapper.get("textarea.cell-editor").element);
+  f.wrapper.unmount();
+});

@@ -5,6 +5,11 @@ import {
 } from "./shape-line-ends.js";
 import { normalizeShapePresetParameters } from "./shape-presets/contract.js";
 import type { ShapePresetParameters } from "./shape-presets/types.js";
+import {
+  isShapeFreePathClosed,
+  normalizeShapeFreePath,
+  type ShapeFreePath,
+} from "./shape-free-path.js";
 import { normalizeFormControl, type SheetFormControl } from "./form-controls.js";
 import {
   normalizeSheetAttachment,
@@ -50,9 +55,11 @@ export type SheetGraphicDrawing = DrawingBase & {
   kind: SheetGraphicKind;
   /** Only kind=shape may carry this feature. Other drawing kinds retain their own contracts. */
   shapeGeometry?: SheetShapeGeometry;
-  /** Endpoint decoration for explicit standard line/connector geometry. */
+  /** Bounded numeric free geometry; exclusive with standard shapeGeometry. */
+  shapePath?: ShapeFreePath;
+  /** Endpoint decoration for explicit standard lines or open free paths. */
   shapeLineEnds?: ShapeLineEnds;
-  /** Sparse mirroring of explicit standard geometry, before drawing rotation. */
+  /** Sparse mirroring of explicit standard or free geometry, before drawing rotation. */
   shapeFlipX?: true;
   shapeFlipY?: true;
   /** Sparse opt-in vertical text boxes; existing drawings retain horizontal text. */
@@ -199,6 +206,16 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   if (geometryField && value.kind !== "shape")
     throw new TypeError("Only a shape drawing may carry standard shape geometry.");
   const shapeGeometry = normalizeSheetShapeGeometry(geometryField?.value);
+  const pathField = Object.getOwnPropertyDescriptor(value, "shapePath");
+  if (!pathField && "shapePath" in value)
+    throw new TypeError("Free shape paths must be own data fields.");
+  if (pathField && !("value" in pathField))
+    throw new TypeError("Free shape paths cannot be accessors.");
+  if (pathField && value.kind !== "shape")
+    throw new TypeError("Only a shape drawing may carry a free shape path.");
+  if (pathField && (geometryField || "shapeGeometry" in value))
+    throw new TypeError("Free shape paths and standard shape geometry are mutually exclusive.");
+  const shapePath = pathField ? normalizeShapeFreePath(pathField.value) : undefined;
   const normalizeFlip = (key: "shapeFlipX" | "shapeFlipY"): boolean => {
     const field = Object.getOwnPropertyDescriptor(value, key);
     if (!field) {
@@ -206,8 +223,8 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
       return false;
     }
     if (!("value" in field)) throw new TypeError("Shape flips cannot be accessors.");
-    if (value.kind !== "shape" || !shapeGeometry)
-      throw new TypeError("Shape flips require standard shape geometry.");
+    if (value.kind !== "shape" || (!shapeGeometry && !shapePath))
+      throw new TypeError("Shape flips require standard shape geometry or a free shape path.");
     if (typeof field.value !== "boolean") throw new TypeError("Shape flips must be booleans.");
     return field.value;
   };
@@ -218,9 +235,11 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     throw new TypeError("Shape line ends cannot be accessors.");
   if (
     endsField &&
-    (value.kind !== "shape" || !shapeGeometry || !isShapeLinePreset(shapeGeometry.preset))
+    (value.kind !== "shape" ||
+      (!(shapeGeometry && isShapeLinePreset(shapeGeometry.preset)) &&
+        !(shapePath && !isShapeFreePathClosed(shapePath))))
   )
-    throw new TypeError("Line ends require standard line geometry.");
+    throw new TypeError("Line ends require standard line geometry or an open free shape path.");
   const shapeLineEnds = normalizeShapeLineEnds(endsField?.value);
   const directionField = Object.getOwnPropertyDescriptor(value, "textDirection");
   if (directionField && (directionField.get || directionField.set))
@@ -248,6 +267,7 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
             ? ({ kind: "control", control: normalizeFormControl(value.control) } as const)
             : { kind: value.kind }),
     ...(shapeGeometry ? { shapeGeometry } : {}),
+    ...(shapePath ? { shapePath } : {}),
     ...(shapeLineEnds ? { shapeLineEnds } : {}),
     ...(shapeFlipX ? { shapeFlipX: true as const } : {}),
     ...(shapeFlipY ? { shapeFlipY: true as const } : {}),

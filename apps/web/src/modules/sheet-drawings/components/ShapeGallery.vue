@@ -17,8 +17,9 @@ const props = withDefaults(
     selected?: ShapeGalleryChoice | null;
     locale?: ShapeGalleryLocale;
     disabled?: boolean;
+    allowDrawingTools?: boolean;
   }>(),
-  { locale: "en-US", disabled: false },
+  { locale: "en-US", disabled: false, allowDrawingTools: true },
 );
 const emit = defineEmits<{ choose: [choice: ShapeGalleryChoice] }>();
 const root = ref<HTMLElement | null>(null);
@@ -30,7 +31,7 @@ const labels = computed(() => SHAPE_GALLERY_LABELS[props.locale]);
 const groups = computed(() => filterShapeGallery(query.value));
 const visibleChoices = computed(() => groups.value.flatMap((group) => group.items));
 const availableChoices = computed(() =>
-  visibleChoices.value.filter((choice) => choice.kind !== "drawingTool"),
+  visibleChoices.value.filter((choice) => choice.kind !== "drawingTool" || props.allowDrawingTools),
 );
 const selected = computed(() =>
   props.selected
@@ -54,12 +55,13 @@ const selectedConnector = computed(
 );
 
 function title(choice: ShapeGalleryChoice): string {
-  return choice.kind === "drawingTool"
-    ? `${choice.label[props.locale]}: ${choice.disabledReason[props.locale]}`
+  return choice.kind === "drawingTool" && !props.allowDrawingTools
+    ? `${choice.label[props.locale]}: ${props.locale === "zh-CN" ? "请从顶部形状菜单开始新绘制" : "Start a new drawing from the Shapes menu"}`
     : choice.label[props.locale];
 }
 function choose(choice: ShapeGalleryChoice): void {
-  if (!props.disabled && choice.kind !== "drawingTool") emit("choose", choice);
+  if (!props.disabled && (choice.kind !== "drawingTool" || props.allowDrawingTools))
+    emit("choose", choice);
 }
 function focusChoice(button: HTMLButtonElement | undefined): void {
   if (!button) return;
@@ -75,7 +77,15 @@ function galleryButtons(): HTMLButtonElement[] {
   ];
 }
 function onSearchKeydown(event: KeyboardEvent): void {
-  if (!props.disabled && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+  if (
+    !props.disabled &&
+    !event.defaultPrevented &&
+    !event.isComposing &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    (event.key === "ArrowDown" || event.key === "ArrowUp")
+  ) {
     event.preventDefault();
     const buttons = galleryButtons();
     focusChoice(event.key === "ArrowUp" ? buttons.at(-1) : buttons[0]);
@@ -85,6 +95,10 @@ function onGalleryKeydown(event: KeyboardEvent): void {
   if (
     props.disabled ||
     event.defaultPrevented ||
+    event.isComposing ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey ||
     !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)
   )
     return;
@@ -182,11 +196,13 @@ defineExpose({
             class="shape-gallery__choice"
             :data-shape-choice="choice.id"
             :data-shape-kind="choice.kind"
-            :disabled="disabled || choice.kind === 'drawingTool'"
-            :aria-disabled="disabled || choice.kind === 'drawingTool'"
+            :disabled="disabled || (choice.kind === 'drawingTool' && !allowDrawingTools)"
+            :aria-disabled="disabled || (choice.kind === 'drawingTool' && !allowDrawingTools)"
             :aria-pressed="choice.id === selected?.id"
             :aria-label="choice.label[locale]"
-            :aria-describedby="choice.kind === 'drawingTool' ? toolHintId : undefined"
+            :aria-describedby="
+              choice.kind === 'drawingTool' && allowDrawingTools ? toolHintId : undefined
+            "
             :title="title(choice)"
             :tabindex="choice.id === tabChoiceId ? 0 : -1"
             @focus="activeId = choice.id"

@@ -1,4 +1,4 @@
-import { assertShapePathBudget } from "./path-budget.js";
+import { assertShapePathBudget, type ShapePathWorkBudget } from "./path-budget.js";
 import type { ShapePresetGeometry } from "./types.js";
 
 export type ShapePresetBounds = Readonly<{
@@ -11,6 +11,7 @@ export type ShapePresetBounds = Readonly<{
 /** Exact curve extrema of the union's filled paths, including out-of-frame callout tails. */
 export function getShapePresetFillBounds(
   geometry: ShapePresetGeometry,
+  budget?: ShapePathWorkBudget,
 ): ShapePresetBounds | undefined {
   if (geometry.paths.length > 16) throw new RangeError("Shape exceeds its path budget.");
   let left = Infinity,
@@ -24,7 +25,7 @@ export function getShapePresetFillBounds(
     bottom = Math.max(bottom, y);
   };
   for (const path of geometry.paths) {
-    assertShapePathBudget(path);
+    assertShapePathBudget(path, budget);
     if (!path.filled) continue;
     let x = 0,
       y = 0,
