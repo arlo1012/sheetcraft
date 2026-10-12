@@ -1575,7 +1575,7 @@ function insertPivot(chart: boolean): void {
   else if (!activePivot.value) pivotActions.open(chart);
 }
 function editSheetDrawing(drawing: SheetDrawing): void {
-  if (drawing.kind === "shapeGroup") throw new TypeError("Shape group editing is not yet enabled.");
+  if (drawing.kind === "shapeGroup") return;
   if (drawing.kind === "chart") chartActions.edit(drawing);
   else if (drawing.kind === "control") controlActions.open(drawing);
   else if (drawing.kind === "attachment") attachmentActions.viewing.value = drawing;
@@ -4658,9 +4658,11 @@ watch(
           :shape-creation-commit="shapeCreation.commit"
           :shape-creation-cancel="shapeCreation.cancel"
           :apply-drawing-update="drawingActions.update"
+          :apply-drawing-collection="drawingActions.replaceCollection"
           @update-drawing="drawingActions.update"
           @delete-drawing="drawingActions.remove"
           @edit-drawing="editSheetDrawing"
+          @edit-owned-shape="drawingActions.editGroupLeaf"
           @format-drawing="openShapeFormat"
           @selected-drawing-change="selectedShapeChanged"
           @configure-pivot="openPivotFields"

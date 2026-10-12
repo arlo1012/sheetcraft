@@ -4,6 +4,11 @@ import {
   type SheetGraphicDrawing,
 } from "@sheetcraft/core/sheet-drawings";
 import { getShapeObjectProperties } from "@sheetcraft/core/shape-object-properties";
+import type {
+  ShapeGroupDrawing,
+  ShapeGroupPath,
+  SheetGroupedGraphicDrawing,
+} from "@sheetcraft/core/shape-group";
 import {
   type PictureAxisMetrics,
   type PictureSheetMetrics,
@@ -32,6 +37,7 @@ import {
   createSheetHiddenRowIntervals,
 } from "../sheet-grid/data-visibility";
 import { resolveShapeDrawing } from "../sheet-drawings/resolved-shape-drawing";
+import { resolveShapeGroupProjection } from "../sheet-drawings/resolved-shape-group";
 import {
   getDrawingShapeGeometry,
   getStandardShapeGeometry,
@@ -58,22 +64,96 @@ import {
   releaseShapePresentationCanvas,
 } from "../sheet-drawings/shape-detailed-presentation";
 
-type PrintableShape = SheetGraphicDrawing | SheetFramedGraphicDrawing;
+type PrintableShape = SheetGraphicDrawing | SheetFramedGraphicDrawing | ShapeGroupDrawing;
 type Bounds = { left: number; top: number; right: number; bottom: number };
 
 /** Preserve the real owners and their sheet drawing order. Other graphic kinds are separate consumers. */
 export function getPrintableShapeRoots(sheet: Pick<Sheet, "drawings">): PrintableShape[] {
-  if (sheet.drawings?.some((drawing) => drawing.kind === "shapeGroup"))
-    throw new ShapeTextRuntimeError(
-      "unsupported-drawing",
-      "Shape group printing is not yet enabled.",
-    );
   return (sheet.drawings ?? []).filter(
     (drawing): drawing is PrintableShape =>
-      (drawing.kind === "shape" || drawing.kind === "textBox") &&
-      (!isFramedShapeDrawing(drawing) ||
-        getShapeObjectProperties(drawing.shapeProperties).printObject),
+      (drawing.kind === "shape" || drawing.kind === "textBox" || drawing.kind === "shapeGroup") &&
+      checked(drawing.id, () =>
+        drawing.kind !== "shapeGroup" && !isFramedShapeDrawing(drawing)
+          ? true
+          : getShapeObjectProperties(drawing.shapeProperties).printObject,
+      ),
   );
+}
+
+export type PrintableShapeLeaf = {
+  sourceRoot: PrintableShape;
+  sourceNode: PrintableShape | SheetGroupedGraphicDrawing;
+  /** Stable real root/node ownership, never the disposable world view. */
+  sourceIdentity: object;
+  path: ShapeGroupPath;
+  drawingId: string;
+  drawing: SheetGraphicDrawing;
+  rect: ShapeFrameRect;
+};
+const groupedPrintIdentities = new WeakMap<
+  ShapeGroupDrawing,
+  WeakMap<SheetGroupedGraphicDrawing, { pathKey: string; identity: object }>
+>();
+function groupedPrintIdentity(
+  root: ShapeGroupDrawing,
+  node: SheetGroupedGraphicDrawing,
+  path: ShapeGroupPath,
+): object {
+  let members = groupedPrintIdentities.get(root);
+  if (!members) groupedPrintIdentities.set(root, (members = new WeakMap()));
+  const pathKey = JSON.stringify(path);
+  let cached = members.get(node);
+  if (!cached || cached.pathKey !== pathKey) {
+    cached = {
+      pathKey,
+      identity: Object.freeze({
+        sourceRoot: root,
+        sourceNode: node,
+        path: Object.freeze([...path]),
+      }),
+    };
+    members.set(node, cached);
+  }
+  return cached.identity;
+}
+
+/** Real leaf order follows worksheet owners, then each owner's depth-first sibling order.
+ * Projection validates the entire canonical tree even when the root is collapsed. */
+export function* getPrintableShapeLeaves(
+  sheet: Pick<Sheet, "drawings">,
+  metrics: PictureSheetMetrics,
+): Generator<PrintableShapeLeaf> {
+  for (const sourceRoot of getPrintableShapeRoots(sheet)) {
+    if (sourceRoot.kind === "shapeGroup") {
+      const projection = checked(sourceRoot.id, () =>
+        resolveShapeGroupProjection(sourceRoot, metrics),
+      );
+      for (const leaf of projection.leaves) {
+        if (leaf.collapsed || !leaf.view || !leaf.layout) continue;
+        yield {
+          sourceRoot,
+          sourceNode: leaf.sourceNode,
+          sourceIdentity: groupedPrintIdentity(sourceRoot, leaf.sourceNode, leaf.path),
+          path: leaf.path,
+          drawingId: leaf.path.join("/"),
+          drawing: leaf.view,
+          rect: leaf.layout.rect,
+        };
+      }
+      continue;
+    }
+    const resolved = checked(sourceRoot.id, () => resolveShapeDrawing(sourceRoot, metrics));
+    if (resolved.collapsed) continue;
+    yield {
+      sourceRoot,
+      sourceNode: sourceRoot,
+      sourceIdentity: sourceRoot,
+      path: [sourceRoot.id],
+      drawingId: sourceRoot.id,
+      drawing: resolved.view as SheetGraphicDrawing,
+      rect: resolved.rect,
+    };
+  }
 }
 
 /** Sparse continuous worksheet geometry, including actual filter/outline visibility, never page gaps. */
@@ -190,11 +270,9 @@ export function getPrintShapeContentExtent(
 ) {
   let rowCount = 0,
     columnCount = 0;
-  for (const source of getPrintableShapeRoots(sheet))
-    checked(source.id, () => {
-      const resolved = resolveShapeDrawing(source, metrics);
-      if (resolved.collapsed) return;
-      const drawing = resolved.view as SheetGraphicDrawing;
+  for (const leaf of getPrintableShapeLeaves(sheet, metrics))
+    checked(leaf.drawingId, () => {
+      const { drawing, rect } = leaf;
       const plan = planShapeDetailedPaint({
         drawing,
         geometry: geometryFor(drawing),
@@ -203,7 +281,7 @@ export function getPrintShapeContentExtent(
       });
       let bounds = worldBounds(
         drawing,
-        resolved.rect,
+        rect,
         union(plan.logicalBounds, {
           left: 0,
           top: 0,
@@ -222,12 +300,7 @@ export function getPrintShapeContentExtent(
           });
           bounds = union(
             bounds,
-            worldBounds(
-              drawing,
-              resolved.rect,
-              projectedShapeTextBounds(drawing, textPlan, theme),
-              false,
-            ),
+            worldBounds(drawing, rect, projectedShapeTextBounds(drawing, textPlan, theme), false),
           );
         } catch (error) {
           if (!(error instanceof ShapeTextRuntimeError) || error.code !== "font-not-ready")
@@ -244,13 +317,12 @@ export async function preparePrintShapeFonts(
   sheet: Sheet,
   metrics: PictureSheetMetrics,
 ): Promise<void> {
-  for (const source of getPrintableShapeRoots(sheet)) {
-    const resolved = checked(source.id, () => resolveShapeDrawing(source, metrics));
-    if (resolved.collapsed || !resolved.view.text) continue;
+  for (const leaf of getPrintableShapeLeaves(sheet, metrics)) {
+    if (!leaf.drawing.text) continue;
     try {
-      await ensureDrawingShapeTextFont(resolved.view as SheetGraphicDrawing);
+      await ensureDrawingShapeTextFont(leaf.drawing);
     } catch (error) {
-      throw new ShapePrintError(source.id, error);
+      throw new ShapePrintError(leaf.drawingId, error);
     }
   }
 }
@@ -275,21 +347,19 @@ export function paintPrintShapes(
     context.beginPath();
     context.rect(0, 0, options.viewport.width, options.viewport.height);
     context.clip();
-    for (const source of getPrintableShapeRoots(options.sheet))
-      checked(source.id, () => {
-        const resolved = resolveShapeDrawing(source, options.metrics);
-        if (resolved.collapsed) return;
-        const drawing = resolved.view as SheetGraphicDrawing;
+    for (const leaf of getPrintableShapeLeaves(options.sheet, options.metrics))
+      checked(leaf.drawingId, () => {
+        const { drawing, rect, sourceIdentity } = leaf;
         const bodyOptions = {
           drawing,
           geometry: geometryFor(drawing),
           density,
           resources,
-          sourceIdentity: source,
+          sourceIdentity,
         };
         const bodyPlan = planShapeDetailedPaint(bodyOptions);
         if (bodyPlan.kind !== "ready") throw new ShapePaintUnavailableError(bodyPlan);
-        let bounds = worldBounds(drawing, resolved.rect, bodyPlan.logicalBounds, true);
+        let bounds = worldBounds(drawing, rect, bodyPlan.logicalBounds, true);
         // Resolve every printable text source before culling. Unknown/missing fonts
         // cannot be silently hidden by a page clip or replaced with fallback glyphs.
         const layout = drawing.text ? layoutDrawingShapeText(drawing) : undefined;
@@ -300,7 +370,7 @@ export function paintPrintShapes(
             bounds,
             worldBounds(
               drawing,
-              resolved.rect,
+              rect,
               projectedShapeTextBounds(drawing, textPlan, options.theme),
               false,
             ),
@@ -316,8 +386,8 @@ export function paintPrintShapes(
         context.save();
         try {
           context.translate(
-            resolved.rect.x + drawing.width / 2 - options.viewport.x,
-            resolved.rect.y + drawing.height / 2 - options.viewport.y,
+            rect.x + drawing.width / 2 - options.viewport.x,
+            rect.y + drawing.height / 2 - options.viewport.y,
           );
           context.rotate((drawing.rotation * Math.PI) / 180);
           context.translate(-drawing.width / 2, -drawing.height / 2);
@@ -335,7 +405,7 @@ export function paintPrintShapes(
             context.restore();
           }
           if (layout)
-            paintText(context, drawing, layout, density, resources, options.theme, source);
+            paintText(context, drawing, layout, density, resources, options.theme, sourceIdentity);
         } finally {
           context.restore();
         }
@@ -367,14 +437,14 @@ function paintText(
   density: number,
   resources: PicturePaintResources,
   theme: WorkbookTheme | undefined,
-  source: PrintableShape,
+  sourceIdentity: object,
 ): void {
   const text = prepareShapeTextPaint({
     drawing,
     layout,
     density,
     resources,
-    sourceIdentity: source,
+    sourceIdentity,
   });
   if (text.kind !== "ready") throw new ShapePaintUnavailableError(text);
   try {

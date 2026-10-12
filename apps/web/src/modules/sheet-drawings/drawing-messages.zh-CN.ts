@@ -1,4 +1,8 @@
 export const drawingsZhCN = {
+  "drawing.groupName": "组合",
+  "drawing.selectionShortcuts": "形状多选快捷操作",
+  "drawing.collectionRejected":
+    "无法应用此形状操作。对象及撤销记录已保留，请检查当前选择、权限或可用资源。",
   "drawing.symbol": "符号",
   "drawing.insert": "插入",
   "drawing.customSymbol": "自定义字符",

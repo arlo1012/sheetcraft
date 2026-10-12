@@ -1,4 +1,8 @@
 export const drawingsEnUS = {
+  "drawing.groupName": "Group",
+  "drawing.selectionShortcuts": "Shape selection shortcuts",
+  "drawing.collectionRejected":
+    "This shape operation could not be applied. Objects and undo history were preserved. Check the selection, permissions, or available resources.",
   "drawing.symbol": "Symbol",
   "drawing.insert": "Insert",
   "drawing.customSymbol": "Custom characters",

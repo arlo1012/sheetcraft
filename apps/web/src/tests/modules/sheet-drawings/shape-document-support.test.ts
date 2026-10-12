@@ -113,7 +113,7 @@ test("legacy boundary preserves the exposed reactive owner identity for gesture 
   expect(requireLegacySheetDrawings(legacy)[0]).toBe(legacy[0]);
 });
 
-test("owned group documents and commands stay blocked until every live consumer is ready", () => {
+test("owned group documents and commands pass the complete live admission without changing data", () => {
   const workbook = createWorkbook({ id: "group-test", sheetId: "s" }),
     sheet = getActiveSheet(workbook);
   const { shapeFrame, ...appearance } = framedShape();
@@ -136,9 +136,9 @@ test("owned group documents and commands stay blocked until every live consumer 
     },
   ];
   const before = serializeWorkbook(workbook);
-  expect(() => assertWorkbookShapeSupport(workbook)).toThrow(/not yet enabled/);
+  expect(() => assertWorkbookShapeSupport(workbook)).not.toThrow();
   expect(() =>
     assertShapeCommandSupport(createSetSheetDrawingsCommand(sheet.id, sheet.drawings!)),
-  ).toThrow(/not yet enabled/);
+  ).not.toThrow();
   expect(serializeWorkbook(workbook)).toEqual(before);
 });

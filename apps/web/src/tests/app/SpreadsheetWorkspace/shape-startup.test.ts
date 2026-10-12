@@ -1,6 +1,11 @@
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
+import { isShapeGroupDrawing } from "@sheetcraft/core/shape-group";
+import { groupShapeRoots, ungroupShapeRoot } from "@sheetcraft/core/shape-group-planning";
+import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import { framedShape } from "../../modules/sheet-drawings/framed-shape-fixture";
+import SheetDrawingLayer from "../../../modules/sheet-drawings/components/SheetDrawingLayer.vue";
 import { isFramedShapeDrawing } from "@sheetcraft/core/sheet-drawings";
 import SheetShapeCreationLayer from "../../../modules/sheet-drawings/components/SheetShapeCreationLayer.vue";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
@@ -156,4 +161,42 @@ describe("Workspace shape startup", () => {
     expect(isFramedShapeDrawing(source!)).toBe(true);
     expect(serializeWorkbook(state.session.workbook).version).toBe(60);
   });
+});
+
+test("saved group starts in real Workspace and its collection command port performs genuine Ungroup", async () => {
+  const workbook = createWorkbook({ id: "saved-group", sheetId: "group-sheet" });
+  const sheet = getActiveSheet(workbook);
+  const a = framedShape();
+  a.id = "a";
+  a.text = "";
+  a.rotation = 0;
+  a.shapeGeometry = { preset: "rect" };
+  const b = framedShape();
+  b.id = "b";
+  b.text = "";
+  b.rotation = 0;
+  b.shapeGeometry = { preset: "rect" };
+  b.shapeFrame.anchor = { mode: "fixed", x: 350, y: 50, size: { width: 100, height: 70 } };
+  sheet.drawings = groupShapeRoots(
+    [a, b],
+    ["a", "b"],
+    { id: "group", name: "Group" },
+    createPictureSheetMetrics(sheet),
+  );
+  const snapshot = serializeWorkbook(workbook);
+  expect(snapshot.version).toBe(61);
+  const wrapper = fixture(async () => ({ revision: 1, savedAt: 1, snapshot }));
+  await flushPromises();
+  const state = setupState(wrapper),
+    current = getActiveSheet(state.session.workbook);
+  expect(isShapeGroupDrawing(current.drawings![0])).toBe(true);
+  const layer = wrapper.getComponent(SheetDrawingLayer);
+  expect(layer.findAll("[data-sheet-drawing-id]")).toHaveLength(2);
+  const expected = layer.props("drawings"),
+    metrics = layer.props("metrics");
+  const next = ungroupShapeRoot(expected, "group", metrics!);
+  expect(layer.props("applyCollection")!(next, expected, metrics!)).toBe(true);
+  await flushPromises();
+  expect(getActiveSheet(state.session.workbook).drawings!.map((d) => d.id)).toEqual(["a", "b"]);
+  expect(serializeWorkbook(state.session.workbook).version).toBe(60);
 });

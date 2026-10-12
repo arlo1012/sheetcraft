@@ -1,4 +1,4 @@
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { createGraphicDrawing } from "./drawing-defaults";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { canUseSheetPermission } from "@sheetcraft/core";
@@ -9,8 +9,14 @@ import {
   type SheetDrawing,
   type SheetGraphicDrawing,
   type SheetGraphicKind,
+  normalizeSheetDrawings,
+  normalizeSheetDrawing,
 } from "@sheetcraft/core/sheet-drawings";
-import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
+import {
+  canEditShapeObject,
+  canEditSheetDrawingCollection,
+} from "@sheetcraft/core/shape-protection";
+import type { ShapeGroupDrawing, ShapeGroupPath } from "@sheetcraft/core/shape-group";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { frameShapeView } from "./shape-view-layout";
 import {
@@ -18,6 +24,11 @@ import {
   updateResolvedShapeDrawing,
   type ResolvedShapeDrawing,
 } from "./resolved-shape-drawing";
+import {
+  resolveShapeGroupProjection,
+  updateResolvedShapeGroupLeaf,
+  type ResolvedShapeGroupLeaf,
+} from "./resolved-shape-group";
 import { useDrawingDialogTarget } from "../../shared/drawing-dialog/useDrawingDialogTarget";
 import type { Workbook, Sheet, CellAddress } from "@sheetcraft/core/workbook";
 export function useDrawingActions(options: {
@@ -39,10 +50,54 @@ export function useDrawingActions(options: {
     canEditExisting: canEditShapeObject,
   });
   const { dialog, editing, close } = targets;
+  const projectionRevision = ref(0);
   const dialogProjections = new WeakMap<object, ResolvedShapeDrawing>();
+  const groupDialogProjections = new WeakMap<
+    object,
+    { leaf: ResolvedShapeGroupLeaf; revision: number | undefined }
+  >();
+  function validGroupDialog(
+    target: NonNullable<typeof dialog.value>,
+    projection: {
+      leaf: ResolvedShapeGroupLeaf;
+      revision: number | undefined;
+    },
+  ): boolean {
+    const { leaf, revision } = projection;
+    return (
+      dialog.value === target &&
+      !options.isBusy() &&
+      canEditShapeObject(target.sheet, leaf.sourceRoot) &&
+      target.existing === leaf.sourceRoot &&
+      options.getWorkbook() === target.workbook &&
+      options.getSheet() === target.sheet &&
+      target.workbook.sheets.get(target.sheet.id) === target.sheet &&
+      options.getGeneration?.() === target.generation &&
+      options.getRevision?.() === revision &&
+      options.getMetrics?.() === leaf.metrics &&
+      target.sheet.drawings?.includes(leaf.sourceRoot) === true
+    );
+  }
   const normalizeDialogDrawing = computed(() => {
+    void projectionRevision.value;
     const target = dialog.value,
-      resolved = target && dialogProjections.get(target);
+      resolved = target && dialogProjections.get(target),
+      group = target && groupDialogProjections.get(target);
+    if (target && group) {
+      return (view: SheetGraphicDrawing): SheetGraphicDrawing => {
+        if (!validGroupDialog(target, group))
+          throw new Error("The shape group editor owner is stale.");
+        const root = updateResolvedShapeGroupLeaf(group.leaf, view, group.leaf.metrics);
+        const leaf = resolveShapeGroupProjection(root, group.leaf.metrics).leaves.find(
+          (item) =>
+            item.path.length === group.leaf.path.length &&
+            item.path.every((id, index) => id === group.leaf.path[index]),
+        );
+        if (!validGroupDialog(target, group) || !leaf?.view)
+          throw new Error("The shape group editor owner is stale.");
+        return leaf.view;
+      };
+    }
     if (!resolved) return undefined;
     return (view: SheetGraphicDrawing): SheetGraphicDrawing => {
       if (
@@ -63,7 +118,12 @@ export function useDrawingActions(options: {
     (drawing
       ? canEditShapeObject(options.getSheet(), drawing)
       : canUseSheetPermission(options.getSheet(), "editObjects"));
-  const canEditDialog = computed(() => !!dialog.value && allowed(dialog.value.existing));
+  const canEditDialog = computed(() => {
+    void projectionRevision.value;
+    const target = dialog.value;
+    const group = target && groupDialogProjections.get(target);
+    return !!target && allowed(target.existing) && (!group || validGroupDialog(target, group));
+  });
   function insert(kind: SheetGraphicKind, direction?: "horizontal" | "vertical") {
     const target = targets.prepare();
     if (!target) return;
@@ -105,45 +165,174 @@ export function useDrawingActions(options: {
     )
       return;
     targets.open(target, view, (current, next) => confirm(next, current, resolved));
-    if (resolved && dialog.value) dialogProjections.set(dialog.value, resolved);
+    if (resolved && dialog.value) {
+      dialogProjections.set(dialog.value, resolved);
+      projectionRevision.value++;
+    }
   }
-  function update(drawing: SheetDrawing, expected?: SheetDrawing): boolean {
-    if (!allowed(drawing)) return false;
-    const sheet = options.getSheet();
-    const owner = sheet.drawings?.find((item) => item.id === drawing.id);
-    if (!owner || (expected && owner !== expected)) return false;
-    const revision = options.getRevision?.(),
-      workbook = options.getWorkbook(),
-      generation = options.getGeneration?.();
-    let command: ReturnType<typeof createSetSheetDrawingsCommand>;
+  function editGroupLeaf(root: ShapeGroupDrawing, path: ShapeGroupPath): boolean {
+    const target = targets.prepare(root);
+    if (!target) return false;
+    const metrics = options.getMetrics?.(),
+      revision = options.getRevision?.();
+    if (!metrics) return false;
     try {
-      const next = options.prepareDrawing?.(drawing, owner) ?? drawing;
-      if (next.id !== owner.id || next.kind !== owner.kind) return false;
+      const leaf = resolveShapeGroupProjection(root, metrics).leaves.find(
+        (item) =>
+          item.path.length === path.length && item.path.every((id, index) => id === path[index]),
+      );
       if (
-        !allowed(owner) ||
-        options.getSheet() !== sheet ||
-        options.getWorkbook() !== workbook ||
-        options.getGeneration?.() !== generation ||
+        !leaf?.view ||
+        leaf.collapsed ||
+        options.getMetrics?.() !== metrics ||
         options.getRevision?.() !== revision ||
-        sheet.drawings?.find((item) => item.id === owner.id) !== owner
+        options.getSheet() !== target.sheet ||
+        options.getWorkbook() !== target.workbook ||
+        options.getGeneration?.() !== target.generation ||
+        !target.sheet.drawings?.includes(root)
       )
         return false;
-      command = createSetSheetDrawingsCommand(
-        sheet.id,
-        sheet.drawings!.map((item) => (item === owner ? next : item)),
-      );
+      targets.open(target, leaf.view, (current, next) => confirm(next, current));
+      const opened = dialog.value;
+      if (!opened || opened.existing !== root || opened.initial !== leaf.view) return false;
+      groupDialogProjections.set(opened, { leaf, revision });
+      projectionRevision.value++;
+      return true;
     } catch {
       return false;
     }
-    const applied = () =>
-      options.getSheet() === sheet &&
-      JSON.stringify(sheet.drawings ?? []) === JSON.stringify(command.drawings);
-    if (applied()) return true;
+  }
+  type CollectionBinding = {
+    workbook: Workbook;
+    sheet: Sheet;
+    generation: number | undefined;
+    revision: number | undefined;
+    metrics: PictureSheetMetrics | undefined;
+    expected: readonly SheetDrawing[];
+    guard?: () => boolean;
+  };
+  let replacing = false;
+  function currentCollection(binding: CollectionBinding): boolean {
+    const current = binding.sheet.drawings ?? [];
+    return (
+      !options.isBusy() &&
+      options.getWorkbook() === binding.workbook &&
+      options.getSheet() === binding.sheet &&
+      binding.workbook.sheets.get(binding.sheet.id) === binding.sheet &&
+      options.getGeneration?.() === binding.generation &&
+      options.getRevision?.() === binding.revision &&
+      options.getMetrics?.() === binding.metrics &&
+      current.length === binding.expected.length &&
+      current.every((drawing, index) => drawing === binding.expected[index]) &&
+      (binding.guard?.() ?? true)
+    );
+  }
+  function bindCollection(
+    expected: readonly SheetDrawing[],
+    expectedMetrics?: PictureSheetMetrics,
+    guard?: () => boolean,
+  ): CollectionBinding | undefined {
+    const binding: CollectionBinding = {
+      workbook: options.getWorkbook(),
+      sheet: options.getSheet(),
+      generation: options.getGeneration?.(),
+      revision: options.getRevision?.(),
+      metrics: options.getMetrics?.(),
+      expected: [...expected],
+      guard,
+    };
+    if ((expectedMetrics && binding.metrics !== expectedMetrics) || !currentCollection(binding))
+      return undefined;
+    return binding;
+  }
+  function applyCollection(next: readonly SheetDrawing[], binding: CollectionBinding): boolean {
+    if (replacing) return false;
+    replacing = true;
     try {
-      return options.execute(command) === true || applied();
-    } catch {
+      if (
+        !currentCollection(binding) ||
+        !canEditSheetDrawingCollection(binding.sheet, next) ||
+        !currentCollection(binding)
+      )
+        return false;
+      // Equal canonical data is a legitimate no-op, including a detached clone.
+      const proposed = [...next];
+      if (
+        JSON.stringify(normalizeSheetDrawings(proposed)) ===
+        JSON.stringify(binding.sheet.drawings ?? [])
+      )
+        return currentCollection(binding);
+      const owners = new Map(binding.expected.map((drawing) => [drawing.id, drawing]));
+      const canonicalOwners = new Map(
+        normalizeSheetDrawings([...binding.expected]).map((drawing) => [
+          drawing.id,
+          JSON.stringify(drawing),
+        ]),
+      );
+      const prepared: SheetDrawing[] = [];
+      for (const drawing of proposed) {
+        if (!currentCollection(binding)) return false;
+        const id = drawing.id,
+          kind = drawing.kind;
+        const owner = owners.get(id);
+        const unchanged =
+          !!owner &&
+          (drawing === owner ||
+            canonicalOwners.get(id) === JSON.stringify(normalizeSheetDrawing(drawing)));
+        const candidate = unchanged ? owner : (options.prepareDrawing?.(drawing, owner) ?? drawing);
+        if (candidate.id !== id || candidate.kind !== kind || !currentCollection(binding))
+          return false;
+        prepared.push(candidate);
+      }
+      const command = createSetSheetDrawingsCommand(binding.sheet.id, prepared);
+      if (
+        !currentCollection(binding) ||
+        !canEditSheetDrawingCollection(binding.sheet, command.drawings) ||
+        !currentCollection(binding)
+      )
+        return false;
+      const appliedData = JSON.stringify(command.drawings);
+      const applied = () =>
+        options.getWorkbook() === binding.workbook &&
+        options.getSheet() === binding.sheet &&
+        binding.workbook.sheets.get(binding.sheet.id) === binding.sheet &&
+        options.getGeneration?.() === binding.generation &&
+        JSON.stringify(binding.sheet.drawings ?? []) === appliedData;
+      if (applied()) return true;
+      // Recheck the complete lease immediately before the single atomic command.
+      if (!currentCollection(binding)) return false;
+      try {
+        options.execute(command);
+      } catch {
+        return applied();
+      }
       return applied();
+    } catch {
+      return false;
+    } finally {
+      replacing = false;
     }
+  }
+  function replaceCollection(
+    next: readonly SheetDrawing[],
+    expected: readonly SheetDrawing[],
+    expectedMetrics?: PictureSheetMetrics,
+  ): boolean {
+    try {
+      const binding = bindCollection(expected, expectedMetrics);
+      return !!binding && applyCollection(next, binding);
+    } catch {
+      return false;
+    }
+  }
+  function update(drawing: SheetDrawing, expected?: SheetDrawing): boolean {
+    const current = options.getSheet().drawings ?? [];
+    const owner = current.find((item) => item.id === drawing.id);
+    if (!owner || (expected && owner !== expected) || drawing.kind !== owner.kind) return false;
+    return replaceCollection(
+      current.map((item) => (item === owner ? drawing : item)),
+      current,
+    );
   }
   function confirm(
     drawing: SheetGraphicDrawing,
@@ -156,66 +345,56 @@ export function useDrawingActions(options: {
       if (drawing.id !== currentTarget.initial.id || drawing.kind !== currentTarget.initial.kind)
         return;
       const current = currentTarget.sheet.drawings ?? [];
-      const identities = [...current],
-        revision = options.getRevision?.();
-      let next: SheetDrawing;
+      const group = groupDialogProjections.get(currentTarget);
+      if (group && !validGroupDialog(currentTarget, group)) return;
+      const binding = bindCollection(
+        current,
+        group?.leaf.metrics ?? resolved?.metrics,
+        () => dialog.value === currentTarget && (!group || validGroupDialog(currentTarget, group)),
+      );
+      if (!binding) return;
+      let candidate: SheetDrawing;
       try {
-        if (currentTarget.existing && isFramedShapeDrawing(currentTarget.existing)) {
-          const metrics = options.getMetrics?.();
+        if (group) {
+          candidate = updateResolvedShapeGroupLeaf(group.leaf, drawing, group.leaf.metrics);
+        } else if (currentTarget.existing && isFramedShapeDrawing(currentTarget.existing)) {
           if (
             !resolved ||
             resolved.source !== currentTarget.existing ||
-            metrics !== resolved.metrics
+            binding.metrics !== resolved.metrics
           )
             return;
-          const candidate = updateResolvedShapeDrawing(resolved, drawing, metrics);
-          next = options.prepareDrawing?.(candidate, currentTarget.existing) ?? candidate;
+          candidate = updateResolvedShapeDrawing(resolved, drawing, resolved.metrics);
         } else {
-          let candidate: SheetDrawing = drawing;
+          candidate = drawing;
           if (
             !currentTarget.existing &&
             (drawing.kind === "shape" || drawing.kind === "textBox") &&
             options.getMetrics
           ) {
-            const metrics = options.getMetrics();
-            if (!metrics) return;
-            candidate = frameShapeView(drawing, metrics);
-            if (options.getMetrics() !== metrics) return;
+            if (!binding.metrics) return;
+            candidate = frameShapeView(drawing, binding.metrics);
           }
-          next = options.prepareDrawing?.(candidate, currentTarget.existing) ?? candidate;
         }
       } catch {
         return;
       }
-      if (next.id !== drawing.id || next.kind !== drawing.kind) return;
-      const latest = currentTarget.sheet.drawings ?? [];
-      if (
-        options.getRevision?.() !== revision ||
-        latest.length !== identities.length ||
-        latest.some((item, index) => item !== identities[index])
-      )
-        return;
-      accepted = targets.commit(
-        currentTarget,
-        createSetSheetDrawingsCommand(
-          currentTarget.sheet.id,
-          currentTarget.existing
-            ? current.map((item) => (item === currentTarget.existing ? next : item))
-            : [...current, next],
-        ),
+      accepted = applyCollection(
+        currentTarget.existing
+          ? current.map((item) => (item === currentTarget.existing ? candidate : item))
+          : [...current, candidate],
+        binding,
       );
+      if (accepted) close(currentTarget);
     });
     return accepted;
   }
   function remove(id: string) {
-    const sheet = options.getSheet();
-    const owner = sheet.drawings?.find((item) => item.id === id);
-    if (!owner || !allowed(owner)) return;
-    options.execute(
-      createSetSheetDrawingsCommand(
-        sheet.id,
-        (sheet.drawings ?? []).filter((item) => item.id !== id),
-      ),
+    const current = options.getSheet().drawings ?? [];
+    if (!current.some((drawing) => drawing.id === id)) return;
+    replaceCollection(
+      current.filter((drawing) => drawing.id !== id),
+      current,
     );
   }
   return {
@@ -225,7 +404,9 @@ export function useDrawingActions(options: {
     normalizeDialogDrawing,
     insert,
     edit,
+    editGroupLeaf,
     update,
+    replaceCollection,
     confirm,
     remove,
     close,

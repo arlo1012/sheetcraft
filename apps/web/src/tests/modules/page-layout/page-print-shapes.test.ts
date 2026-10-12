@@ -5,6 +5,7 @@ import {
   type SheetFramedGraphicDrawing,
   type SheetGraphicDrawing,
 } from "@sheetcraft/core/sheet-drawings";
+import type { ShapeGroupDrawing } from "@sheetcraft/core/shape-group";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
 import * as bodyPaint from "../../../modules/sheet-drawings/shape-detailed-paint";
 import * as textPaint from "../../../modules/sheet-drawings/shape-text-paint";
@@ -16,6 +17,7 @@ import { createPrintPreviewDocument } from "../../../modules/page-layout/page-pr
 import { getPrintPictureAssetIds } from "../../../modules/page-layout/page-print-pictures";
 import {
   createPrintShapeMetrics,
+  getPrintableShapeLeaves,
   getPrintableShapeRoots,
   getPrintShapeContentExtent,
   paintPrintShapes,
@@ -443,26 +445,38 @@ describe("genuine print shape consumer", () => {
   });
 });
 
-test("model-stage groups cannot silently disappear from print output", () => {
+test("a genuine source-free group reaches the exact supported shape print consumer", () => {
   const leaf = framed(),
     { shapeFrame, ...appearance } = leaf;
-  const { sheet } = fixture([
-    {
-      kind: "shapeGroup",
-      id: "g",
-      name: "Group",
-      rotation: 0,
-      shapeFrame,
-      members: [
-        {
-          ...appearance,
-          groupFrame: {
-            kind: "shape-group-local-v1",
-            rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
-          },
+  const group: ShapeGroupDrawing = {
+    kind: "shapeGroup",
+    id: "g",
+    name: "Group",
+    rotation: 0,
+    shapeFrame,
+    members: [
+      {
+        ...appearance,
+        groupFrame: {
+          kind: "shape-group-local-v1",
+          rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
         },
-      ],
-    },
-  ]);
-  expect(() => getPrintableShapeRoots(sheet)).toThrow(/group printing is not yet enabled/);
+      },
+    ],
+  };
+  const { sheet, metrics } = fixture([group]);
+  const [resolved] = [...getPrintableShapeLeaves(sheet, metrics)];
+  expect(getPrintableShapeRoots(sheet)).toEqual([group]);
+  expect(resolved?.sourceRoot).toBe(group);
+  expect(resolved?.sourceNode).toBe(group.members[0]);
+  const body = readyBody(resolved!.drawing);
+  const prepare = vi.spyOn(bodyPaint, "prepareShapeDetailedPaint").mockReturnValue(body);
+  const target = paint(sheet, metrics);
+  expect(prepare).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      sourceIdentity: resolved!.sourceIdentity,
+      drawing: resolved!.drawing,
+    }),
+  );
+  expect(target.drawImage).toHaveBeenCalledExactlyOnceWith(body.canvas, -10, -10, 120, 80);
 });

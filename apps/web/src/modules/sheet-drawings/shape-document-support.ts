@@ -1,3 +1,4 @@
+import { assertShapeObjectsForSheet } from "@sheetcraft/core/shape-object-sheet";
 import { normalizeSheetDrawings } from "@sheetcraft/core/sheet-drawings";
 import { deserializeSheet } from "@sheetcraft/core/serialization";
 import type { WorkbookCommand } from "@sheetcraft/core/commands";
@@ -17,17 +18,14 @@ export class UnsupportedShapeFrameDocumentError extends Error {
     this.name = "UnsupportedShapeFrameDocumentError";
   }
 }
-function checkDrawings(sheetId: string, drawings: readonly SheetDrawing[] | undefined): void {
-  const normalized = normalizeSheetDrawings(drawings);
-  const groups = normalized.filter((drawing) => drawing.kind === "shapeGroup");
-  if (groups.length)
-    throw new UnsupportedShapeFrameDocumentError(
-      sheetId,
-      groups.map((drawing) => drawing.id),
-    );
+function checkDrawings(_sheetId: string, drawings: readonly SheetDrawing[] | undefined): void {
+  normalizeSheetDrawings(drawings);
 }
 export function assertWorkbookShapeSupport(workbook: Workbook): void {
-  for (const sheet of workbook.sheets.values()) checkDrawings(sheet.id, sheet.drawings);
+  for (const sheet of workbook.sheets.values()) {
+    checkDrawings(sheet.id, sheet.drawings);
+    assertShapeObjectsForSheet(sheet.drawings, sheet);
+  }
 }
 
 function requireOwnDataRecord(value: object): void {

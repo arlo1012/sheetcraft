@@ -305,6 +305,11 @@ const props = withDefaults(
     readOnly?: boolean;
     shapeCreationRequest?: ShapeCreationRequest;
     applyDrawingUpdate?: (drawing: SheetDrawing, expected: SheetDrawing) => boolean;
+    applyDrawingCollection?: (
+      drawings: readonly SheetDrawing[],
+      expected: readonly SheetDrawing[],
+      metrics?: import("@sheetcraft/core/picture-axis-metrics").PictureSheetMetrics,
+    ) => boolean;
     shapeCreationCommit?: (request: ShapeCreationRequest, drawing: SheetGraphicDrawing) => boolean;
     shapeCreationCancel?: (request: ShapeCreationRequest) => void;
     gridId?: string;
@@ -377,6 +382,10 @@ const emit = defineEmits<{
   updateDrawing: [drawing: SheetDrawing];
   deleteDrawing: [id: string];
   editDrawing: [drawing: SheetDrawing];
+  editOwnedShape: [
+    root: import("@sheetcraft/core/shape-group").ShapeGroupDrawing,
+    path: import("@sheetcraft/core/shape-group").ShapeGroupPath,
+  ];
   formatDrawing: [drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing];
   selectedDrawingChange: [id: string | null];
   configurePivot: [id: string];
@@ -4539,10 +4548,12 @@ defineExpose({
         :scale="scale"
         :read-only="pictureLayerReadOnly"
         :apply-update="applyDrawingUpdate"
+        :apply-collection="applyDrawingCollection"
         @select="selectFloatingImage(null)"
         @update="emit('updateDrawing', $event)"
         @delete="emit('deleteDrawing', $event)"
         @edit="emit('editDrawing', $event)"
+        @edit-owned="(root, path) => emit('editOwnedShape', root, path)"
       />
       <SheetFloatingImageLayer
         :source-tools-disabled="pictureSourceBusy"

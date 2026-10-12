@@ -79,8 +79,8 @@ function freeDrawing(overrides: Partial<SheetGraphicDrawing> = {}): SheetGraphic
 }
 
 function fixture(source = freeDrawing(), readOnly = false) {
-  const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
-  const sheet = reactive(getActiveSheet(workbook));
+  const workbook = reactive(createWorkbook({ idFactory: createSequentialIdFactory() }));
+  const sheet = getActiveSheet(workbook);
   const other = createGraphicDrawing("other", "shape", "Untouched", { row: 20, column: 8 });
   sheet.drawings = [source, other];
   const session = createWorkbookSession({ workbook, idFactory: createSequentialIdFactory() });

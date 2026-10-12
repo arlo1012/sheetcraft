@@ -15,6 +15,38 @@ import {
   createPictureSheetMetrics,
   type PictureSheetMetrics,
 } from "@sheetcraft/core/picture-axis-metrics";
+import {
+  isShapeGroupDrawing,
+  type ShapeGroupDrawing,
+  type ShapeGroupPath,
+} from "@sheetcraft/core/shape-group";
+import {
+  groupShapeRoots,
+  ungroupShapeRoot,
+  isShapeGroupEligibleRoot,
+} from "@sheetcraft/core/shape-group-planning";
+import { planDeleteShapeGroupNodes } from "@sheetcraft/core/shape-group-delete";
+import { normalizeSheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import {
+  resolveShapeGroupProjection,
+  updateResolvedShapeGroupLeaf,
+  type ResolvedShapeGroupLeaf,
+} from "../resolved-shape-group";
+import {
+  getShapeGroupFrameFragments,
+  type ShapeGroupFrameFragment,
+} from "../shape-group-fragments";
+import {
+  moveSelectedShapeRoots,
+  resizeSelectedShapeRoots,
+  alignSelectedShapeRoots,
+} from "../shape-root-selection-planning";
+import type { ShapeAlignment, ShapeAlignmentReference } from "../shape-selection-actions";
+import { createBrowserIdFactory } from "../../../shared/runtime/browser-id-factory";
+import { useAppI18n } from "../../../shared/i18n";
+import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
+import SheetShapeSelectionToolbar from "./SheetShapeSelectionToolbar.vue";
+import ShapeGroupSelection from "./ShapeGroupSelection.vue";
 import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
 import { getShapeObjectProperties } from "@sheetcraft/core/shape-object-properties";
 import { resolveShapeDrawing, updateResolvedShapeDrawing } from "../resolved-shape-drawing";
@@ -77,6 +109,11 @@ import {
 const props = defineProps<{
   drawings: readonly SourceSheetDrawing[];
   applyUpdate?: (drawing: SourceSheetDrawing, expected: SourceSheetDrawing) => boolean;
+  applyCollection?: (
+    drawings: readonly SourceSheetDrawing[],
+    expected: readonly SourceSheetDrawing[],
+    metrics?: PictureSheetMetrics,
+  ) => boolean;
   metrics?: PictureSheetMetrics;
   pageProjection?: PageLayoutProjection;
   selectedDrawingId?: string | null;
@@ -95,12 +132,21 @@ const emit = defineEmits<{
   update: [drawing: SourceSheetDrawing];
   delete: [id: string];
   edit: [drawing: SourceSheetDrawing];
+  editOwned: [root: ShapeGroupDrawing, path: ShapeGroupPath];
   select: [];
   selectionChange: [id: string | null];
   format: [drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing];
   backgroundPointer: [event: PointerEvent];
   controlChange: [id: string, value: unknown];
 }>();
+const { t } = useAppI18n();
+const createId = createBrowserIdFactory();
+const selectedRoots = shallowRef<string[]>([]);
+const selectedOwnedId = ref<string | null>(null);
+const selectionFailure = ref(false);
+const alignmentReference = ref<ShapeAlignmentReference>("selection");
+const selectionEpoch = ref(0);
+const rootsPreview = shallowRef<readonly SourceSheetDrawing[]>();
 const rasterDensity = computed(() =>
   Math.max(
     1,
@@ -116,7 +162,11 @@ const pointRejected = ref(false);
 watch(
   () => props.selectedDrawingId,
   (id) => {
-    selectedId.value = id ?? null;
+    if ((id ?? null) !== selectedId.value || !selectedRoots.value.length) {
+      selectedRoots.value = id ? [id] : [];
+      selectedOwnedId.value = null;
+      selectedId.value = id ?? null;
+    }
     if (pointEditingId.value && pointEditingId.value !== id) pointEditingId.value = null;
     if (id)
       void nextTick(() => {
@@ -127,6 +177,20 @@ watch(
       });
   },
   { immediate: true },
+);
+watch(
+  () => [selectedId.value, selectedOwnedId.value],
+  ([root, owned]) => {
+    const id = owned ?? root;
+    if (!id) return;
+    void nextTick(() => {
+      if ((selectedOwnedId.value ?? selectedId.value) !== id) return;
+      const target = [
+        ...(layerElement.value?.querySelectorAll<HTMLElement>("[data-sheet-drawing-id]") ?? []),
+      ].find((el) => el.dataset.sheetDrawingId === id);
+      target?.focus({ preventScroll: true });
+    });
+  },
 );
 function isStandard(drawing: SheetDrawing): drawing is SheetGraphicDrawing {
   return (
@@ -140,29 +204,65 @@ const metrics = computed(() => {
   void props.revision;
   return props.metrics ?? (props.sheet ? createPictureSheetMetrics(props.sheet) : undefined);
 });
-const resolvedDrawings = computed(() => {
+type DrawingProjection = {
+  source: SourceSheetDrawing;
+  view: SheetDrawing;
+  metrics: PictureSheetMetrics | undefined;
+  rect?: { x: number; y: number; width: number; height: number };
+  collapsed: boolean;
+  groupLeaf?: ResolvedShapeGroupLeaf;
+};
+const resolvedDrawings = computed<DrawingProjection[]>(() => {
   const currentMetrics = metrics.value;
-  return props.drawings.map((source) => {
+  return props.drawings.flatMap((source): DrawingProjection[] => {
+    if (isShapeGroupDrawing(source)) {
+      if (!currentMetrics) throw new Error("Shape group placement requires worksheet metrics.");
+      return resolveShapeGroupProjection(source, currentMetrics).leaves.flatMap((leaf) =>
+        leaf.view
+          ? [
+              {
+                source,
+                view: leaf.view,
+                metrics: currentMetrics,
+                rect: leaf.layout!.rect,
+                collapsed: leaf.collapsed,
+                groupLeaf: leaf,
+              },
+            ]
+          : [],
+      );
+    }
     if (isFramedShapeDrawing(source) && !currentMetrics)
       throw new Error("Shape placement requires current worksheet metrics.");
-    return currentMetrics
-      ? resolveShapeDrawing(source, currentMetrics)
-      : {
-          source,
-          view: source as SheetDrawing,
-          metrics: undefined,
-          collapsed: false,
-        };
+    return [
+      currentMetrics
+        ? resolveShapeDrawing(source, currentMetrics)
+        : { source, view: source as SheetDrawing, metrics: undefined, collapsed: false },
+    ];
   });
 });
 const legacyDrawings = computed(() => resolvedDrawings.value.map((item) => item.view));
+const previewViews = computed(() => {
+  const output = new Map<string, SheetDrawing>();
+  const m = metrics.value;
+  if (!rootsPreview.value || !m) return output;
+  for (const root of rootsPreview.value) {
+    if (isShapeGroupDrawing(root)) {
+      for (const leaf of resolveShapeGroupProjection(root, m).leaves)
+        if (leaf.view) output.set(leaf.view.id, leaf.view);
+    } else output.set(root.id, resolveShapeDrawing(root, m).view);
+  }
+  return output;
+});
 function resolvedOwner(drawing: SheetDrawing) {
   return resolvedDrawings.value.find((item) => item.view === drawing);
 }
+function projectionById(drawing: SheetDrawing) {
+  return resolvedDrawings.value.find((item) => item.view.id === drawing.id);
+}
 function canonicalOwner(drawing: SheetDrawing): boolean {
-  return resolvedDrawings.value.some(
-    (item) => item.source.id === drawing.id && isFramedShapeDrawing(item.source),
-  );
+  const item = projectionById(drawing);
+  return !!item && (!!item.groupLeaf || isFramedShapeDrawing(item.source));
 }
 function hasContinuousView(drawing: SheetDrawing): boolean {
   return (
@@ -171,6 +271,54 @@ function hasContinuousView(drawing: SheetDrawing): boolean {
       (drawing.kind === "shape" || drawing.kind === "textBox") &&
       !!metrics.value)
   );
+}
+function isSelectedView(drawing: SheetDrawing): boolean {
+  const owner = projectionById(drawing);
+  return owner?.groupLeaf
+    ? selectedRoots.value.length === 1 &&
+        selectedRoots.value[0] === owner.source.id &&
+        selectedOwnedId.value === drawing.id
+    : selectedRoots.value.includes(drawing.id);
+}
+function selectRoots(ids: string[], owned: string | null = null) {
+  selectedRoots.value = ids;
+  selectedOwnedId.value = owned;
+  selectedId.value = ids.at(-1) ?? null;
+  pointEditingId.value = null;
+  selectionFailure.value = false;
+}
+function chooseDrawing(
+  drawing: SheetDrawing,
+  event: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean },
+): boolean {
+  const entry = resolvedOwner(drawing);
+  if (!entry) return false;
+  const id = entry.source.id;
+  if (
+    (event.ctrlKey || event.metaKey || event.shiftKey) &&
+    isShapeGroupEligibleRoot(entry.source)
+  ) {
+    const next = selectedRoots.value.filter((key) =>
+      props.drawings.some((root) => root.id === key && isShapeGroupEligibleRoot(root)),
+    );
+    selectRoots(next.includes(id) ? next.filter((key) => key !== id) : [...next, id]);
+    return false;
+  }
+  if (selectedRoots.value.length > 1 && selectedRoots.value.includes(id)) return true;
+  const owned =
+    entry.groupLeaf &&
+    selectedRoots.value.length === 1 &&
+    selectedRoots.value[0] === id &&
+    selectedOwnedId.value
+      ? drawing.id
+      : null;
+  if (
+    selectedRoots.value.length !== 1 ||
+    selectedRoots.value[0] !== id ||
+    selectedOwnedId.value !== owned
+  )
+    selectRoots([id], owned);
+  return true;
 }
 function legacyHitSurface(drawing: SheetDrawing): boolean {
   return (
@@ -187,16 +335,13 @@ function drawingGeometry(drawing: SheetGraphicDrawing) {
   return getDrawingShapeGeometry(drawing, hasContinuousView(drawing));
 }
 function sourceOwner(drawing: SheetDrawing): SourceSheetDrawing | undefined {
-  return (
-    resolvedOwner(drawing)?.source ??
-    (preview.value === drawing
-      ? resolvedDrawings.value.find((item) => item.source.id === drawing.id)?.source
-      : undefined)
-  );
+  return projectionById(drawing)?.source;
 }
 function pointEditOptions(drawing: SheetDrawing): ShapePointEditOptions | undefined {
   const resolved = resolvedOwner(drawing);
-  return resolved && isFramedShapeDrawing(resolved.source) && resolved.metrics
+  return resolved &&
+    (isFramedShapeDrawing(resolved.source) || !!resolved.groupLeaf) &&
+    resolved.metrics
     ? { metrics: resolved.metrics }
     : undefined;
 }
@@ -205,14 +350,19 @@ function canChange(drawing: SheetDrawing): boolean {
   return !!source && !props.readOnly && (!props.sheet || canEditShapeObject(props.sheet, source));
 }
 function viewLayout(drawing: SheetDrawing): SheetViewportLayout {
-  const resolved = resolvedDrawings.value.find((item) => item.source.id === drawing.id);
+  const resolved = projectionById(drawing);
   return resolved && hasContinuousView(drawing) && resolved.metrics
     ? shapeViewLayout(props.layout, resolved.metrics)
     : props.layout;
 }
 function moveView(drawing: SheetDrawing, delta: { x: number; y: number }) {
   const resolved = resolvedOwner(drawing);
-  if (resolved && isFramedShapeDrawing(resolved.source) && resolved.metrics && "rect" in resolved)
+  if (
+    resolved &&
+    (isFramedShapeDrawing(resolved.source) || !!resolved.groupLeaf) &&
+    resolved.metrics &&
+    resolved.rect
+  )
     return shapeViewAtRect(
       drawing,
       { ...resolved.rect, x: resolved.rect.x + delta.x, y: resolved.rect.y + delta.y },
@@ -227,13 +377,21 @@ function resizeView(
   shift: boolean,
 ) {
   const resolved = resolvedOwner(drawing);
-  if (resolved && isFramedShapeDrawing(resolved.source) && resolved.metrics && "rect" in resolved) {
+  if (
+    resolved &&
+    (isFramedShapeDrawing(resolved.source) || !!resolved.groupLeaf) &&
+    resolved.metrics &&
+    resolved.rect
+  ) {
     const next = standardShapeResizeRect(
       resolved.rect,
       drawing.rotation,
       direction,
       delta,
-      getShapeObjectProperties(resolved.source.shapeProperties).lockAspectRatio || shift,
+      getShapeObjectProperties(
+        resolved.groupLeaf?.sourceNode.shapeProperties ??
+          (isFramedShapeDrawing(resolved.source) ? resolved.source.shapeProperties : undefined),
+      ).lockAspectRatio || shift,
       1,
       true,
     );
@@ -268,7 +426,10 @@ const fragments = computed<DrawingFragment[]>(
     void cellTextFontRevision.value,
     legacyDrawings.value.flatMap((original) => {
       if (resolvedOwner(original)?.collapsed) return [];
-      const drawing = preview.value?.id === original.id ? preview.value : original;
+      const drawing =
+        preview.value?.id === original.id
+          ? preview.value
+          : (previewViews.value.get(original.id) ?? original);
       const currentLayout = viewLayout(drawing);
       const standard = isStandard(drawing);
       const shape = standard && drawingGeometry(drawing);
@@ -283,13 +444,13 @@ const fragments = computed<DrawingFragment[]>(
               props.layout,
               props.pageProjection,
               resolved.metrics,
-              selectedId.value === drawing.id,
+              isSelectedView(drawing),
             )
           : standard && shape
             ? getStandardShapeViewportFragments(
                 drawing,
                 currentLayout,
-                selectedId.value === drawing.id,
+                isSelectedView(drawing),
                 hasContinuousView(drawing),
               )
             : getFloatingImageViewportFragments(drawing, currentLayout);
@@ -300,7 +461,9 @@ const fragments = computed<DrawingFragment[]>(
 const formatTarget = computed(() => {
   const visible = fragments.value.filter(
     (f) =>
-      f.drawing.id === selectedId.value &&
+      isSelectedView(f.drawing) &&
+      selectedRoots.value.length === 1 &&
+      !projectionById(f.drawing)?.groupLeaf &&
       (f.drawing.kind === "shape" || f.drawing.kind === "textBox") &&
       f.drawing.id !== pointEditingId.value,
   );
@@ -346,9 +509,19 @@ function commitUpdate(next: SheetDrawing, owner: SheetDrawing): boolean {
     const source = resolved?.source;
     if (!source) return false;
     const candidate =
-      resolved && resolved.metrics && "rect" in resolved
-        ? updateResolvedShapeDrawing(resolved, next, resolved.metrics)
-        : next;
+      resolved?.groupLeaf && resolved.metrics
+        ? updateResolvedShapeGroupLeaf(
+            resolved.groupLeaf,
+            next as SheetGraphicDrawing,
+            resolved.metrics,
+          )
+        : resolved && resolved.metrics && resolved.rect
+          ? updateResolvedShapeDrawing(
+              resolved as Parameters<typeof updateResolvedShapeDrawing>[0],
+              next,
+              resolved.metrics,
+            )
+          : next;
     if (props.applyUpdate) accepted = props.applyUpdate(candidate, source) === true;
     else {
       emit("update", candidate);
@@ -360,7 +533,350 @@ function commitUpdate(next: SheetDrawing, owner: SheetDrawing): boolean {
   if (pointEditingId.value === owner.id) pointRejected.value = !accepted;
   return accepted;
 }
-function fragmentStyle(fragment: DrawingFragment): CSSProperties {
+const selectionKey = computed(
+  () =>
+    `${props.sheet?.id ?? "sheet"}:${props.revision ?? 0}:${selectionEpoch.value}:${selectedRoots.value.join("|")}:${selectedOwnedId.value ?? ""}`,
+);
+const selectionDisabled = computed(
+  () =>
+    !props.applyCollection ||
+    !metrics.value ||
+    props.readOnly ||
+    selectedRoots.value.some((id) => {
+      const root = props.drawings.find((d) => d.id === id);
+      return (
+        !root ||
+        !isShapeGroupEligibleRoot(root) ||
+        (!!props.sheet && !canEditShapeObject(props.sheet, root))
+      );
+    }),
+);
+const groupFragments = computed(() => {
+  const m = metrics.value;
+  if (!m) return [];
+  return props.drawings.flatMap((source) => {
+    if (!isShapeGroupDrawing(source) || !selectedRoots.value.includes(source.id)) return [];
+    const displayed = rootsPreview.value?.find((d) => d.id === source.id) ?? source;
+    if (!isShapeGroupDrawing(displayed)) return [];
+    const projected = resolveShapeGroupProjection(displayed, m);
+    return getShapeGroupFrameFragments(projected.layout, props.layout, m, props.pageProjection).map(
+      (fragment) => ({ source, layout: projected.layout, fragment }),
+    );
+  });
+});
+const toolbarAnchor = computed<FloatingReference | null>(() => {
+  if (selectedRoots.value.length < 2 || !layerElement.value) return null;
+  const visible = [
+    ...fragments.value
+      .filter((f) => selectedRoots.value.includes(projectionById(f.drawing)?.source.id ?? ""))
+      .map((f) => f.clippedRect),
+    ...groupFragments.value.map((f) => f.fragment.clippedRect),
+  ];
+  if (!visible.length) return null;
+  const x = Math.min(...visible.map((f) => f.x)),
+    y = Math.min(...visible.map((f) => f.y));
+  const right = Math.max(...visible.map((f) => f.x + f.width)),
+    bottom = Math.max(...visible.map((f) => f.y + f.height));
+  return {
+    contextElement: layerElement.value,
+    getBoundingClientRect: () => {
+      const host = layerElement.value?.getBoundingClientRect();
+      const left = (host?.left ?? 0) + x * props.scale,
+        top = (host?.top ?? 0) + y * props.scale;
+      return new DOMRect(left, top, (right - x) * props.scale, (bottom - y) * props.scale);
+    },
+  };
+});
+function runSelectionPlan(
+  plan: () => readonly SourceSheetDrawing[],
+  key = selectionKey.value,
+): boolean {
+  const m = metrics.value;
+  if (key !== selectionKey.value || selectionDisabled.value || !m || !props.applyCollection)
+    return false;
+  const expected = [...props.drawings];
+  try {
+    const next = plan();
+    if (
+      key !== selectionKey.value ||
+      metrics.value !== m ||
+      props.drawings.length !== expected.length ||
+      props.drawings.some((d, i) => d !== expected[i])
+    )
+      return false;
+    const accepted = props.applyCollection(next, expected, m) === true;
+    selectionFailure.value = !accepted;
+    return accepted;
+  } catch {
+    selectionFailure.value = true;
+    return false;
+  }
+}
+function alignSelected(
+  action: ShapeAlignment,
+  reference: ShapeAlignmentReference,
+  key: string,
+): void {
+  if (metrics.value)
+    runSelectionPlan(
+      () =>
+        alignSelectedShapeRoots(
+          props.drawings,
+          selectedRoots.value,
+          action,
+          metrics.value!,
+          reference,
+        ),
+      key,
+    );
+}
+function groupSelected(key: string): void {
+  if (key !== selectionKey.value || !metrics.value) return;
+  const id = createId("shape-group");
+  if (
+    runSelectionPlan(
+      () =>
+        groupShapeRoots(
+          props.drawings,
+          selectedRoots.value,
+          { id, name: t("drawing.groupName") },
+          metrics.value!,
+        ),
+      key,
+    )
+  )
+    selectRoots([id]);
+}
+function ungroupSelected(source: ShapeGroupDrawing): void {
+  const m = metrics.value;
+  if (
+    !m ||
+    props.drawings.find((d) => d.id === source.id) !== source ||
+    !selectedRoots.value.includes(source.id)
+  )
+    return;
+  if (runSelectionPlan(() => ungroupShapeRoot(props.drawings, source.id, m)))
+    selectRoots(source.members.map((d) => d.id));
+}
+function deleteSelected(): void {
+  const m = metrics.value;
+  if (!m) return;
+  const own =
+    selectedOwnedId.value &&
+    resolvedDrawings.value.find((d) => d.view.id === selectedOwnedId.value)?.groupLeaf;
+  const paths: ShapeGroupPath[] = own ? [own.path] : selectedRoots.value.map((id) => [id]);
+  if (runSelectionPlan(() => planDeleteShapeGroupNodes(props.drawings, paths, m))) {
+    if (own && props.drawings.some((d) => d.id === own.sourceRoot.id))
+      selectRoots([own.sourceRoot.id]);
+    else selectRoots([]);
+  }
+}
+function rotateRootSelection(degrees: number): readonly SourceSheetDrawing[] {
+  const ids = new Set(selectedRoots.value);
+  return props.drawings.map((root) =>
+    ids.has(root.id)
+      ? normalizeSheetDrawing({
+          ...root,
+          rotation: ((((root.rotation + degrees + 180) % 360) + 360) % 360) - 180,
+        })
+      : root,
+  );
+}
+function startRootGesture(
+  id: string,
+  fragment: FloatingImageViewportFragment & { pageKey?: string },
+  event: PointerEvent,
+  direction?: FloatingImageResizeDirection,
+  mode: "move" | "rotate" = "move",
+  onClick?: () => void,
+): void {
+  const m = metrics.value;
+  const root = props.drawings.find((d) => d.id === id);
+  if (
+    !m ||
+    !root ||
+    !isShapeGroupEligibleRoot(root) ||
+    selectionDisabled.value ||
+    event.button !== 0
+  )
+    return;
+  event.preventDefault();
+  event.stopPropagation();
+  const expected = [...props.drawings],
+    expectedData = JSON.stringify(props.drawings),
+    key = selectionKey.value,
+    selected = [...selectedRoots.value];
+  const sheet = props.sheet,
+    revision = props.revision,
+    viewport = props.layout,
+    projection = props.pageProjection,
+    scale = props.scale;
+  const valid = () =>
+    key === selectionKey.value &&
+    !selectionDisabled.value &&
+    metrics.value === m &&
+    props.sheet === sheet &&
+    props.revision === revision &&
+    props.layout === viewport &&
+    props.pageProjection === projection &&
+    props.scale === scale &&
+    props.drawings.length === expected.length &&
+    props.drawings.every((d, i) => d === expected[i]) &&
+    JSON.stringify(props.drawings) === expectedData;
+  const translation = getPicturePaneTranslation(fragment.paneId, viewport);
+  const sample = (point: MouseEvent) =>
+    projection
+      ? shapePagePointFromViewport(viewportPoint(point), viewport, projection, m)?.point
+      : { x: viewportPoint(point).x - translation.x, y: viewportPoint(point).y - translation.y };
+  const origin = sample(event);
+  if (!origin) return;
+  const worldRect = {
+    ...fragment.rect,
+    x: fragment.rect.x - translation.x,
+    y: fragment.rect.y - translation.y,
+  };
+  const groupLayout = isShapeGroupDrawing(root)
+    ? resolveShapeGroupProjection(root, m).layout
+    : undefined;
+  const centerRect =
+    groupLayout?.rect ?? resolvedDrawings.value.find((d) => d.source === root)?.rect ?? worldRect;
+  const center = {
+    x: centerRect.x + centerRect.width / 2,
+    y: centerRect.y + centerRect.height / 2,
+  };
+  const initialAngle = Math.atan2(origin.y - center.y, origin.x - center.x);
+  let rejected = false;
+  let moved = false;
+  const updateRoots = (point: MouseEvent) => {
+    if (!valid()) {
+      session?.cancel();
+      return;
+    }
+    const nextPoint = sample(point);
+    if (!nextPoint) {
+      rootsPreview.value = undefined;
+      return;
+    }
+    const delta = { x: nextPoint.x - origin.x, y: nextPoint.y - origin.y };
+    moved = delta.x !== 0 || delta.y !== 0;
+    try {
+      if (mode === "rotate") {
+        let degrees =
+          ((Math.atan2(nextPoint.y - center.y, nextPoint.x - center.x) - initialAngle) * 180) /
+          Math.PI;
+        if (point.shiftKey)
+          degrees = Math.round((root.rotation + degrees) / 15) * 15 - root.rotation;
+        const ids = new Set(selected);
+        rootsPreview.value = expected.map((d) =>
+          ids.has(d.id)
+            ? normalizeSheetDrawing({
+                ...d,
+                rotation: ((((d.rotation + degrees + 180) % 360) + 360) % 360) - 180,
+              })
+            : d,
+        );
+      } else
+        rootsPreview.value = direction
+          ? resizeSelectedShapeRoots(expected, selected, id, direction, delta, m, point.shiftKey)
+          : moveSelectedShapeRoots(expected, selected, delta, m);
+      rejected = false;
+    } catch {
+      rootsPreview.value = undefined;
+      rejected = true;
+    }
+  };
+  session = startPointerSession({
+    event,
+    captureTarget: layerElement.value,
+    onMove: updateRoots,
+    onEnd: (point) => {
+      updateRoots(point);
+      const next = rootsPreview.value;
+      rootsPreview.value = undefined;
+      if (valid() && next) {
+        const accepted = runSelectionPlan(() => next, key);
+        if (accepted && !moved && !direction && mode === "move") onClick?.();
+      } else if (valid() && rejected) selectionFailure.value = true;
+    },
+    onCancel: () => {
+      rootsPreview.value = undefined;
+    },
+  });
+}
+function startGroupFrame(
+  source: ShapeGroupDrawing,
+  fragment: ShapeGroupFrameFragment,
+  event: PointerEvent,
+  direction?: FloatingImageResizeDirection,
+  mode: "move" | "rotate" = "move",
+): void {
+  if (props.drawings.find((d) => d.id === source.id) !== source) return;
+  if (!selectedRoots.value.includes(source.id)) selectRoots([source.id]);
+  selectedOwnedId.value = null;
+  emit("select");
+  startRootGesture(source.id, fragment, event, direction, mode);
+}
+function groupKeydown(source: ShapeGroupDrawing, event: KeyboardEvent): void {
+  if (
+    event.defaultPrevented ||
+    event.isComposing ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey ||
+    props.drawings.find((d) => d.id === source.id) !== source
+  )
+    return;
+  if (!selectedRoots.value.includes(source.id)) selectRoots([source.id]);
+  if (selectedOwnedId.value) selectedOwnedId.value = null;
+  if (event.key === "Escape") {
+    selectRoots([]);
+    event.stopPropagation();
+    return;
+  }
+  if (event.key === "Delete" || event.key === "Backspace") {
+    event.preventDefault();
+    event.stopPropagation();
+    deleteSelected();
+    return;
+  }
+  const step = event.shiftKey ? 10 : 1;
+  const delta = {
+    ArrowLeft: { x: -step, y: 0 },
+    ArrowRight: { x: step, y: 0 },
+    ArrowUp: { x: 0, y: -step },
+    ArrowDown: { x: 0, y: step },
+  }[event.key];
+  if (delta && metrics.value) {
+    event.preventDefault();
+    event.stopPropagation();
+    runSelectionPlan(() =>
+      moveSelectedShapeRoots(props.drawings, selectedRoots.value, delta, metrics.value!),
+    );
+  }
+}
+watch(
+  () => [
+    props.drawings,
+    props.sheet,
+    props.revision,
+    metrics.value,
+    props.layout,
+    props.pageProjection,
+    props.scale,
+    selectedRoots.value,
+    selectedOwnedId.value,
+  ],
+  () => {
+    selectionEpoch.value++;
+    session?.cancel();
+    rootsPreview.value = undefined;
+  },
+  { flush: "sync" },
+);
+
+function fragmentStyle(
+  fragment: FloatingImageViewportFragment & { pageClip?: FloatingImageViewportFragment["rect"] },
+): CSSProperties {
   const clip = fragment.pageClip;
   const clipX = clip ? clip.x - fragment.clippedRect.x : 0;
   const clipY = clip ? clip.y - fragment.clippedRect.y : 0;
@@ -445,12 +961,41 @@ function start(
     emit("backgroundPointer", event);
     return;
   }
+  const maySelectMember =
+    !!resolvedOwner(drawing)?.groupLeaf &&
+    selectedRoots.value.length === 1 &&
+    selectedRoots.value[0] === sourceOwner(drawing)?.id &&
+    !selectedOwnedId.value;
   event.preventDefault();
   event.stopPropagation();
-  selectedId.value = drawing.id;
+  if (!direction && mode === "move" && !chooseDrawing(drawing, event)) {
+    emit("select");
+    return;
+  }
   emit("select");
   (event.currentTarget as HTMLElement)?.focus?.();
   if (!canChange(drawing)) return;
+  if (
+    (selectedRoots.value.length > 1 ||
+      (projectionById(drawing)?.groupLeaf && !selectedOwnedId.value)) &&
+    (mode === "move" || mode === "rotate")
+  ) {
+    startRootGesture(
+      projectionById(drawing)!.source.id,
+      fragment,
+      event,
+      direction,
+      mode,
+      maySelectMember && !direction && mode === "move"
+        ? () => {
+            selectedOwnedId.value = drawing.id;
+          }
+        : undefined,
+    );
+
+    return;
+  }
+  const gestureKey = selectionKey.value;
   const sheet = props.sheet,
     revision = props.revision,
     layout = props.layout,
@@ -460,6 +1005,7 @@ function start(
     projection = fragment.pageKey ? currentProjection : undefined,
     scale = props.scale;
   const valid = () =>
+    gestureKey === selectionKey.value &&
     canChange(drawing) &&
     (mode !== "point" || pointEditingId.value === drawing.id) &&
     props.sheet === sheet &&
@@ -603,13 +1149,18 @@ function edit(fragment: DrawingFragment, event: MouseEvent): void {
   event.preventDefault();
   event.stopPropagation();
   if (isStandard(fragment.drawing) && fragment.drawing.shapePath) {
-    selectedId.value = fragment.drawing.id;
+    selectRoots(
+      [sourceOwner(fragment.drawing)!.id],
+      resolvedOwner(fragment.drawing)?.groupLeaf ? fragment.drawing.id : null,
+    );
     pointEditingId.value = fragment.drawing.id;
     activeVertex.value = 0;
     emit("select");
   } else {
     const source = sourceOwner(fragment.drawing);
-    if (source) emit("edit", source);
+    const owned = resolvedOwner(fragment.drawing)?.groupLeaf;
+    if (owned) emit("editOwned", owned.sourceRoot, owned.path);
+    else if (source) emit("edit", source);
   }
 }
 function pointContext(fragment: DrawingFragment, event: MouseEvent): void {
@@ -623,7 +1174,10 @@ function pointContext(fragment: DrawingFragment, event: MouseEvent): void {
     return;
   event.preventDefault();
   event.stopPropagation();
-  selectedId.value = fragment.drawing.id;
+  selectRoots(
+    [sourceOwner(fragment.drawing)!.id],
+    resolvedOwner(fragment.drawing)?.groupLeaf ? fragment.drawing.id : null,
+  );
   pointEditingId.value = fragment.drawing.id;
   activeVertex.value = 0;
   emit("select");
@@ -661,15 +1215,22 @@ function nudgeFreePoint(
 type PointAction = "add" | "delete" | "smooth" | "straight" | "corner" | "close" | "open" | "exit";
 const pointHandlers = new WeakMap<
   SheetGraphicDrawing,
-  (action: PointAction, index: number) => boolean
+  { key: string; handler: (action: PointAction, index: number) => boolean }
 >();
 function pointHandler(drawing: SheetGraphicDrawing) {
-  let handler = pointHandlers.get(drawing);
-  if (!handler) {
-    handler = (action, index) => pointAction(drawing, action, index);
-    pointHandlers.set(drawing, handler);
+  const key = selectionKey.value;
+  let entry = pointHandlers.get(drawing);
+  if (!entry || entry.key !== key) {
+    entry = {
+      key,
+      handler: (action, index) =>
+        key === selectionKey.value &&
+        isSelectedView(drawing) &&
+        pointAction(drawing, action, index),
+    };
+    pointHandlers.set(drawing, entry);
   }
-  return handler;
+  return entry.handler;
 }
 function selectFreeVertex(drawing: SheetGraphicDrawing, index: number): void {
   if (
@@ -803,12 +1364,27 @@ function nudgeRotation(drawing: SheetGraphicDrawing, degrees: number): void {
   )
     return;
   const rotation = ((((drawing.rotation + degrees + 180) % 360) + 360) % 360) - 180;
-  commitUpdate({ ...drawing, rotation }, drawing);
+  if (
+    selectedRoots.value.length > 1 ||
+    (resolvedOwner(drawing)?.groupLeaf && !selectedOwnedId.value)
+  )
+    runSelectionPlan(() => rotateRootSelection(degrees));
+  else commitUpdate({ ...drawing, rotation }, drawing);
 }
 function keydown(drawing: SheetDrawing, event: KeyboardEvent) {
   if (legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing) return;
   if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey)
     return;
+  const keyboardOwner = sourceOwner(drawing);
+  if (keyboardOwner && !selectedRoots.value.includes(keyboardOwner.id))
+    selectRoots([keyboardOwner.id], resolvedOwner(drawing)?.groupLeaf ? drawing.id : null);
+  else if (
+    resolvedOwner(drawing)?.groupLeaf &&
+    selectedRoots.value.length === 1 &&
+    selectedOwnedId.value &&
+    selectedOwnedId.value !== drawing.id
+  )
+    selectedOwnedId.value = drawing.id;
   if (event.key === "Escape") {
     if (pointEditingId.value === drawing.id) {
       pointEditingId.value = null;
@@ -816,7 +1392,8 @@ function keydown(drawing: SheetDrawing, event: KeyboardEvent) {
       event.stopPropagation();
       return;
     }
-    selectedId.value = null;
+    if (selectedOwnedId.value) selectedOwnedId.value = null;
+    else selectRoots([]);
     event.stopPropagation();
     return;
   }
@@ -831,20 +1408,44 @@ function keydown(drawing: SheetDrawing, event: KeyboardEvent) {
   if (event.key === "Delete" || event.key === "Backspace") {
     event.preventDefault();
     event.stopPropagation();
-    emit("delete", drawing.id);
+    if (
+      metrics.value &&
+      props.applyCollection &&
+      (selectedRoots.value.length > 1 || resolvedOwner(drawing)?.groupLeaf)
+    )
+      deleteSelected();
+    else emit("delete", drawing.id);
     return;
   }
   if (event.key === "Enter" || event.key === "F2") {
     event.preventDefault();
     event.stopPropagation();
-    const source = sourceOwner(drawing);
-    if (source) emit("edit", source);
+    const source = sourceOwner(drawing),
+      owned = resolvedOwner(drawing)?.groupLeaf;
+    if (owned && selectedOwnedId.value === drawing.id)
+      emit("editOwned", owned.sourceRoot, owned.path);
+    else if (source && source.kind !== "shapeGroup") emit("edit", source);
     return;
   }
   if (event.key.startsWith("Arrow")) {
     event.preventDefault();
     event.stopPropagation();
     const step = event.shiftKey ? 10 : 1;
+    const delta = {
+      x: event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0,
+      y: event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0,
+    };
+    if (
+      metrics.value &&
+      props.applyCollection &&
+      (selectedRoots.value.length > 1 ||
+        (resolvedOwner(drawing)?.groupLeaf && !selectedOwnedId.value))
+    ) {
+      runSelectionPlan(() =>
+        moveSelectedShapeRoots(props.drawings, selectedRoots.value, delta, metrics.value!),
+      );
+      return;
+    }
     const moved = moveView(drawing, {
       x: event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0,
       y: event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0,
@@ -852,16 +1453,68 @@ function keydown(drawing: SheetDrawing, event: KeyboardEvent) {
     if (moved) commitUpdate(moved, drawing);
   }
 }
+function freeSelectionHandlers(fragment: DrawingFragment) {
+  const key = selectionKey.value,
+    drawing = fragment.drawing;
+  const valid = () =>
+    key === selectionKey.value &&
+    isSelectedView(drawing) &&
+    pointEditingId.value === drawing.id &&
+    legacyDrawings.value.includes(drawing) &&
+    isStandard(drawing);
+  return {
+    selectVertex: (index: number) => {
+      if (valid() && isStandard(drawing)) selectFreeVertex(drawing, index);
+    },
+    move: (point: FreeShapePointDescriptor, event: PointerEvent) => {
+      if (valid()) start(fragment, event, undefined, "point", undefined, point);
+    },
+    nudge: (point: FreeShapePointDescriptor, delta: { x: number; y: number }) => {
+      if (valid() && isStandard(drawing)) nudgeFreePoint(drawing, point, delta);
+    },
+  };
+}
+function standardSelectionHandlers(fragment: DrawingFragment) {
+  const key = selectionKey.value,
+    drawing = fragment.drawing;
+  const valid = () =>
+    key === selectionKey.value &&
+    isSelectedView(drawing) &&
+    legacyDrawings.value.includes(drawing) &&
+    isStandard(drawing);
+  return {
+    resize: (direction: FloatingImageResizeDirection, event: PointerEvent) => {
+      if (valid()) start(fragment, event, direction);
+    },
+    rotate: (event: PointerEvent) => {
+      if (valid()) start(fragment, event, undefined, "rotate");
+    },
+    endpoint: (index: 0 | 1, event: PointerEvent) => {
+      if (valid()) start(fragment, event, undefined, "endpoint", index);
+    },
+    nudgeEndpoint: (index: 0 | 1, delta: { x: number; y: number }) => {
+      if (valid() && isStandard(drawing)) nudgeEndpoint(drawing, index, delta);
+    },
+    adjust: (index: number, event: PointerEvent) => {
+      if (valid()) start(fragment, event, undefined, "adjust", index);
+    },
+    nudgeAdjustment: (index: number, delta: { x: number; y: number }) => {
+      if (valid() && isStandard(drawing)) nudgeAdjustment(drawing, index, delta);
+    },
+    nudgeRotation: (degrees: number) => {
+      if (valid() && isStandard(drawing)) nudgeRotation(drawing, degrees);
+    },
+  };
+}
 function clearOutside(event: PointerEvent) {
   if (
     event.target instanceof Element &&
     !event.target.closest("[data-sheet-drawing-id]") &&
     !event.target.closest(
-      '[role="dialog"],[role="menu"],[role="listbox"],[data-shape-format-pane],[data-shape-format-trigger]',
+      '[role="dialog"],[role="menu"],[role="listbox"],[data-shape-format-pane],[data-shape-format-trigger],[data-shape-selection-toolbar],[data-shape-selection-reference-menu],[data-shape-group-selection]',
     )
   ) {
-    selectedId.value = null;
-    pointEditingId.value = null;
+    selectRoots([]);
   }
 }
 onMounted(() => document.addEventListener("pointerdown", clearOutside));
@@ -917,16 +1570,48 @@ watch(
       )
     )
       activeVertex.value = 0;
-    if (!legacyDrawings.value.some((drawing) => drawing.id === selectedId.value)) {
-      session?.cancel();
-      selectedId.value = null;
-      pointEditingId.value = null;
-    }
+    const surviving = selectedRoots.value.filter((id) => props.drawings.some((d) => d.id === id));
+    if (surviving.length !== selectedRoots.value.length) selectRoots(surviving);
+    if (selectedOwnedId.value && !legacyDrawings.value.some((d) => d.id === selectedOwnedId.value))
+      selectedOwnedId.value = null;
   },
 );
 </script>
 <template>
   <div ref="layerElement" class="sheet-drawing-layer">
+    <SheetShapeSelectionToolbar
+      v-if="toolbarAnchor"
+      :anchor="toolbarAnchor"
+      :selection-key="selectionKey"
+      :count="selectedRoots.length"
+      :disabled="selectionDisabled"
+      :can-group="
+        !!applyCollection && (!sheet?.properties.protected || !!sheet.protection?.editObjects)
+      "
+      :alignment-reference="alignmentReference"
+      :label="t('drawing.selectionShortcuts')"
+      :failure="selectionFailure ? t('drawing.collectionRejected') : undefined"
+      @align="alignSelected"
+      @group="groupSelected"
+      @reference="
+        (reference, key) => {
+          if (key === selectionKey) alignmentReference = reference;
+        }
+      "
+      @dismiss="
+        (key) => {
+          if (key === selectionKey) selectRoots([]);
+        }
+      "
+    />
+    <div
+      v-if="selectionFailure && !toolbarAnchor"
+      role="status"
+      class="sheet-drawing-layer__point-feedback"
+      data-shape-collection-rejected
+    >
+      {{ t("drawing.collectionRejected") }}
+    </div>
     <button
       v-if="formatTarget && canChange(formatTarget.drawing)"
       type="button"
@@ -1000,7 +1685,7 @@ watch(
       </div>
       <FreeShapePointSelection
         v-if="
-          selectedId === fragment.drawing.id &&
+          isSelectedView(fragment.drawing) &&
           pointEditingId === fragment.drawing.id &&
           canChange(fragment.drawing) &&
           isStandard(fragment.drawing) &&
@@ -1012,44 +1697,62 @@ watch(
         :active-vertex="activeVertex"
         :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
         :handler="pointHandler(fragment.drawing)"
-        @select-vertex="
-          (index) => isStandard(fragment.drawing) && selectFreeVertex(fragment.drawing, index)
-        "
-        @move="(point, event) => start(fragment, event, undefined, 'point', undefined, point)"
-        @nudge="
-          (point, delta) =>
-            isStandard(fragment.drawing) && nudgeFreePoint(fragment.drawing, point, delta)
-        "
+        v-on="freeSelectionHandlers(fragment)"
       />
       <StandardShapeSelection
         v-else-if="
-          selectedId === fragment.drawing.id &&
+          isSelectedView(fragment.drawing) &&
           canChange(fragment.drawing) &&
           isStandard(fragment.drawing)
         "
         :drawing="fragment.drawing"
         :fragment="fragment"
         :pane-clip="fragment.pageClip ?? layout.panes[fragment.paneId].clip"
-        @resize="(direction, event) => start(fragment, event, direction)"
-        @rotate="(event) => start(fragment, event, undefined, 'rotate')"
-        @endpoint="(index, event) => start(fragment, event, undefined, 'endpoint', index)"
-        @nudge-endpoint="
-          (index, delta) =>
-            isStandard(fragment.drawing) && nudgeEndpoint(fragment.drawing, index, delta)
-        "
-        @adjust="(index, event) => start(fragment, event, undefined, 'adjust', index)"
-        @nudge-adjustment="
-          (index, delta) =>
-            isStandard(fragment.drawing) && nudgeAdjustment(fragment.drawing, index, delta)
-        "
-        @nudge-rotation="
-          (degrees) => isStandard(fragment.drawing) && nudgeRotation(fragment.drawing, degrees)
-        "
+        v-on="standardSelectionHandlers(fragment)"
       />
       <SheetObjectSelection
-        v-else-if="selectedId === fragment.drawing.id && canChange(fragment.drawing)"
+        v-else-if="isSelectedView(fragment.drawing) && canChange(fragment.drawing)"
         :fragment="fragment"
         @resize="(direction, event) => start(fragment, event, direction)"
+      />
+    </div>
+    <div
+      v-for="item in groupFragments"
+      :key="`group-${item.source.id}-${item.fragment.pageKey ?? item.fragment.paneId}`"
+      class="sheet-drawing-layer__group"
+      :data-sheet-drawing-id="item.source.id"
+      :data-shape-group-id="item.source.id"
+      :style="fragmentStyle(item.fragment)"
+      tabindex="0"
+      role="group"
+      :aria-label="item.source.name"
+      @keydown="groupKeydown(item.source, $event)"
+    >
+      <ShapeGroupSelection
+        :rect="item.layout.rect"
+        :rotation="item.layout.angleDeg"
+        :fragment="item.fragment"
+        :pane-clip="item.fragment.pageClip ?? layout.panes[item.fragment.paneId].clip"
+        :show-action="
+          groupFragments
+            .filter((g) => g.source === item.source)
+            .sort(
+              (a, b) =>
+                b.fragment.clippedRect.width * b.fragment.clippedRect.height -
+                a.fragment.clippedRect.width * a.fragment.clippedRect.height,
+            )[0] === item
+        "
+        :disabled="selectionDisabled"
+        :show-handles="!selectedOwnedId"
+        :selection-key="selectionKey"
+        :locale="locale"
+        @move="(event) => startGroupFrame(item.source, item.fragment, event)"
+        @resize="
+          (direction, event) => startGroupFrame(item.source, item.fragment, event, direction)
+        "
+        @rotate="(event) => startGroupFrame(item.source, item.fragment, event, undefined, 'rotate')"
+        @nudge-rotation="(degrees) => runSelectionPlan(() => rotateRootSelection(degrees))"
+        @ungroup="ungroupSelected(item.source)"
       />
     </div>
   </div>
@@ -1085,6 +1788,11 @@ watch(
         overflow: visible;
       }
     }
+  }
+  &__group {
+    position: absolute;
+    pointer-events: none;
+    outline: none;
   }
   &__clip {
     position: absolute;

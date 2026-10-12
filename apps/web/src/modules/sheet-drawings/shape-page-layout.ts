@@ -95,17 +95,19 @@ export function projectShapePointToViewport(
     ? { point: projected, paneId: "body", pageKey: `${page.rowPage}:${page.columnPage}` }
     : null;
 }
-/** A shape is one continuous object, clipped once per paper content band. */
-export function getShapePageFragments(
-  view: SheetGraphicDrawing,
+export type ShapePageProjectionBand = {
+  pageKey: string;
+  clip: Rect;
+  translation: { x: number; y: number };
+};
+export function getShapePageProjectionBands(
   viewport: SheetViewportLayout,
   projection: PageLayoutProjection,
   metrics: PictureSheetMetrics,
-  selected = false,
-): ShapePageFragment[] {
+): ShapePageProjectionBand[] {
   const scroll = viewport.bodyScrollPosition;
   const pages = projection.getVisiblePages({ ...scroll, ...viewport.viewportSize });
-  const output: ShapePageFragment[] = [];
+  const output: ShapePageProjectionBand[] = [];
   for (const page of pages) {
     const sheetRect = pageSheetRect(page, metrics);
     const content = pageContentRect(page, metrics);
@@ -120,6 +122,28 @@ export function getShapePageFragments(
       x: page.contentRect.x - sheetRect.x - scroll.x,
       y: page.contentRect.y - sheetRect.y - scroll.y,
     };
+    output.push({
+      pageKey: `${page.rowPage}:${page.columnPage}`,
+      clip: { x, y, width, height },
+      translation,
+    });
+  }
+  return output;
+}
+/** A shape is one continuous object, clipped once per paper content band. */
+export function getShapePageFragments(
+  view: SheetGraphicDrawing,
+  viewport: SheetViewportLayout,
+  projection: PageLayoutProjection,
+  metrics: PictureSheetMetrics,
+  selected = false,
+): ShapePageFragment[] {
+  const output: ShapePageFragment[] = [];
+  for (const band of getShapePageProjectionBands(viewport, projection, metrics)) {
+    const {
+      clip: { x, y, width, height },
+      translation,
+    } = band;
     const empty = { x: 0, y: 0, width: 0, height: 0 };
     const layout = shapeViewLayout(
       {
@@ -138,7 +162,7 @@ export function getShapePageFragments(
     for (const fragment of getStandardShapeViewportFragments(view, layout, selected, true))
       output.push({
         ...fragment,
-        pageKey: `${page.rowPage}:${page.columnPage}`,
+        pageKey: band.pageKey,
         pageClip: { x, y, width, height },
       });
   }
