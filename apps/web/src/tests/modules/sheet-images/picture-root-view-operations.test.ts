@@ -6,7 +6,7 @@ import {
   type LegacyFloatingImage,
 } from "@sheetcraft/core/workbook";
 import { resolvePictureGroup } from "@sheetcraft/core/picture-group-layout";
-import { resolvePictureFrame } from "@sheetcraft/core/picture-frame";
+import { anchorPictureFrameRect, resolvePictureFrame } from "@sheetcraft/core/picture-frame";
 import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
 import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
@@ -17,6 +17,7 @@ import {
   rotatePictureViewBy,
   flipPictureView,
   getPictureViewRect,
+  snapPictureViewToGrid,
 } from "../../../modules/sheet-images/picture-view-operations";
 import { framedPicture } from "./framed-picture-fixture";
 import { pictureGroup } from "./picture-group-fixture";
@@ -36,6 +37,52 @@ function view() {
 }
 
 describe("explicit picture root view dispatch", () => {
+  test.each(["fixed", "move-only", "move-and-size"] as const)(
+    "%s snapping preserves actual source/frame/group geometry",
+    (mode) => {
+      const context = view();
+      for (const original of [framedPicture(), pictureGroup()]) {
+        original.frame.anchor = anchorPictureFrameRect(
+          mode,
+          { x: 194, y: 74, width: 120, height: 80 },
+          context.metrics,
+        );
+        const before = structuredClone(original),
+          rect = getPictureViewRect(original, context.layout, context)!;
+        const cell = context.layout.getCellAtSheetPoint({ x: rect.x, y: rect.y })!,
+          target = context.layout.getCellRect(cell)!;
+        const next = snapPictureViewToGrid(original, context.layout, context)!;
+        expect(getPictureViewRect(next, context.layout, context)).toEqual({
+          ...target,
+          width: 120,
+          height: 80,
+        });
+        expect(next).toMatchObject({ frame: { anchor: { mode }, angleDeg: 37 } });
+        if ("members" in original) expect(next).toMatchObject({ members: original.members });
+        else
+          expect(next).toMatchObject({
+            assetId: original.assetId,
+            frame: { source: original.frame.source },
+          });
+        expect(original).toEqual(before);
+      }
+    },
+  );
+  test("grid rejects out-of-sheet fixed origins rather than using clamped navigation coordinates", () => {
+    const context = view(),
+      original = framedPicture();
+    original.frame.anchor = { mode: "fixed", x: -10, y: 74, size: { width: 120, height: 80 } };
+    const before = structuredClone(original);
+    expect(() => snapPictureViewToGrid(original, context.layout, context)).toThrow(/outside/);
+    original.frame.anchor = {
+      mode: "fixed",
+      x: context.layout.getTotalSize().width,
+      y: 74,
+      size: { width: 120, height: 80 },
+    };
+    expect(() => snapPictureViewToGrid(original, context.layout, context)).toThrow(/outside/);
+    expect(before.frame.anchor).toMatchObject({ x: -10 });
+  });
   test("owned container movement and rotation preserve genuine subtree assets", () => {
     const context = view(),
       original = pictureGroup(),

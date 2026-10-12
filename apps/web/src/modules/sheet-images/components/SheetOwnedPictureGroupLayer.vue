@@ -76,6 +76,7 @@ const props = withDefaults(
     frameContext: PictureFrameLayoutContext;
     selectedRootId?: string | null;
     selectedRootIds?: readonly string[];
+    alignmentReference?: PictureAlignmentReference;
     selectedPath?: PictureGroupPath | null;
     scale?: number;
     readOnly?: boolean;
@@ -91,6 +92,7 @@ const emit = defineEmits<{
   select: [rootId: string | null, additive?: boolean];
   selectPath: [path: PictureGroupPath | null];
   feedback: [key: MessageKey];
+  reference: [reference: PictureAlignmentReference];
   updateMany: [roots: FloatingImage[]];
   paintStateChange: [state: FloatingImagePaintState];
   ungroup: [rootId: string];
@@ -375,6 +377,10 @@ const selectionToolbar = computed(() => {
       ) => {
         if (selectedKey === key && current())
           arrangeSelection(lease.selection.rootIds, action, reference, lease);
+      },
+      reference: (reference: PictureAlignmentReference, selectedKey: string) => {
+        if (selectedKey === key && !interactionReadOnly.value && current())
+          emit("reference", reference);
       },
       group: (selectedKey: string) => {
         if (
@@ -1043,10 +1049,12 @@ defineExpose({
       :key="selectionToolbar.key"
       :anchor="selectionToolbar.anchor"
       :selection-key="selectionToolbar.key"
+      :alignment-reference="alignmentReference"
       :can-group="canGroup"
       :count="selectionToolbar.count"
       :disabled="interactionReadOnly"
       @align="selectionToolbar.align"
+      @reference="selectionToolbar.reference"
       @group="selectionToolbar.group"
       @dismiss="selectionToolbar.dismiss"
     />

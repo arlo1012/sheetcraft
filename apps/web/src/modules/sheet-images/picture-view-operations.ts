@@ -100,6 +100,43 @@ export function getPictureViewRect(
   const geometry = resolvePictureFrame(image.frame, frameContext(layout, context).metrics);
   return geometry.collapsed ? null : geometry.rect;
 }
+/** Snap a root to its existing anchor cell origin; fixed frames use their containing cell. */
+export function snapPictureViewToGrid(
+  root: FloatingImage,
+  layout: SheetViewportLayout,
+  context?: PictureFrameLayoutContext,
+): FloatingImage | null {
+  const rect = getPictureViewRect(root, layout, context);
+  if (!rect) return null;
+  if (!isPictureGroup(root) && !isFramedPictureObject(root))
+    return normalizePictureObject({ ...root, offsetX: 0, offsetY: 0 });
+  const metrics = frameContext(layout, context).metrics,
+    anchor = root.frame.anchor;
+  let x: number, y: number;
+  if (anchor.mode === "fixed") {
+    // Navigation lookup clamps; data edits must not snap out-of-sheet frames
+    // silently onto an unrelated boundary cell.
+    const size = layout.getTotalSize();
+    if (rect.x < 0 || rect.y < 0 || rect.x >= size.width || rect.y >= size.height)
+      throw new RangeError("The picture origin is outside the current worksheet geometry.");
+    const cell = layout.getCellAtSheetPoint({ x: rect.x, y: rect.y }),
+      target = cell && layout.getCellRect(cell);
+    if (!target) return null;
+    x = target.x;
+    y = target.y;
+  } else {
+    const origin = anchor.mode === "move-only" ? anchor.origin : anchor.start;
+    x = metrics.columns.visiblePrefix(origin.column.index);
+    y = metrics.rows.visiblePrefix(origin.row.index);
+  }
+  const next = movePictureViewBy(root, { x: x - rect.x, y: y - rect.y }, layout, context);
+  if (!next) return null;
+  const actual = getPictureViewRect(next, layout, context);
+  if (!actual || Math.abs(actual.x - x) > 1e-7 || Math.abs(actual.y - y) > 1e-7)
+    throw new RangeError("The picture cannot snap atomically to the grid origin.");
+  return next;
+}
+
 export function movePictureViewBy(
   root: StandalonePictureObject,
   delta: Point,

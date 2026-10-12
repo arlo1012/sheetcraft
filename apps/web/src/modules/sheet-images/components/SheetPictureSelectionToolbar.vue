@@ -29,6 +29,7 @@ const props = withDefaults(
     count: number;
     disabled: boolean;
     canGroup?: boolean;
+    alignmentReference?: PictureAlignmentReference;
   }>(),
   { canGroup: true },
 );
@@ -36,13 +37,15 @@ const emit = defineEmits<{
   align: [action: PictureAlignment, reference: PictureAlignmentReference, selectionKey: string];
   group: [selectionKey: string];
   dismiss: [selectionKey: string];
+  reference: [reference: PictureAlignmentReference, selectionKey: string];
 }>();
 const { t } = useAppI18n();
 const toolbarRef = ref<HTMLElement | null>(null);
 const triggerRef = ref<HTMLButtonElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `picture-selection-reference-${useId()}`;
-const reference = ref<PictureAlignmentReference>("selection");
+const localReference = ref<PictureAlignmentReference>("selection");
+const reference = computed(() => props.alignmentReference ?? localReference.value);
 const { floatingStyles } = useFloatingPanel(
   computed(() => props.anchor),
   toolbarRef,
@@ -62,7 +65,9 @@ const {
   defaultFocus: "selected",
 });
 function chooseReference(next: PictureAlignmentReference): void {
-  reference.value = next;
+  if (props.disabled) return;
+  localReference.value = next;
+  emit("reference", next, props.selectionKey);
   dismiss("programmatic", true);
 }
 function align(action: PictureAlignment): void {

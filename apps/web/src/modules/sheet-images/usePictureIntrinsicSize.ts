@@ -13,7 +13,7 @@ export interface PictureIntrinsicSizeOptions {
   /**
    * Only return the selected leaf's current entry from useImageAssetUrls.urls.
    * That adapter must have preflighted the encoded source before creating its URL.
-   * An absent source (including a closed pane) clears the displayed dimensions.
+   * An absent selected source clears the displayed dimensions.
    */
   getSource: () => PictureIntrinsicSource | undefined;
 }

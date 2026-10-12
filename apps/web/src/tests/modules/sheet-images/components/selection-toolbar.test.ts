@@ -100,3 +100,20 @@ test("denying new grouping leaves existing selection alignment usable", async ()
   button("left").click();
   expect(wrapper.emitted("align")).toEqual([["left", "selection", "owner:selection"]]);
 });
+
+test("controlled alignment reference sends an owner-bound request and follows host changes", async () => {
+  const wrapper = fixture();
+  await wrapper.setProps({ alignmentReference: "last-selected" });
+  button("left").click();
+  expect(wrapper.emitted("align")).toEqual([["left", "last-selected", "owner:selection"]]);
+  button("reference").click();
+  await wrapper.vm.$nextTick();
+  document.querySelector<HTMLElement>('[data-picture-selection-reference="selection"]')!.click();
+  await wrapper.vm.$nextTick();
+  expect(wrapper.emitted("reference")).toEqual([["selection", "owner:selection"]]);
+  button("right").click();
+  expect(wrapper.emitted("align")!.at(-1)).toEqual(["right", "last-selected", "owner:selection"]);
+  await wrapper.setProps({ alignmentReference: "selection" });
+  button("right").click();
+  expect(wrapper.emitted("align")!.at(-1)).toEqual(["right", "selection", "owner:selection"]);
+});

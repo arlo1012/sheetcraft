@@ -38,6 +38,7 @@ import type { Point } from "@sheetcraft/sheet-engine/geometry";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import type { PictureAlignment, PictureAlignmentReference } from "../usePictureTools";
+import { planEqualPictureDimensions } from "../picture-equal-dimensions";
 import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import SheetFloatingImageContextMenu from "./SheetFloatingImageContextMenu.vue";
 import SheetFloatingImageSelection from "../../../shared/sheet-objects/SheetObjectSelection.vue";
@@ -104,6 +105,7 @@ const props = withDefaults(
     missingAssetIds?: ReadonlySet<string>;
     selectedImageId?: string | null;
     selectedImageIds?: readonly string[];
+    alignmentReference?: PictureAlignmentReference;
     readOnly?: boolean;
     canConvertToCell?: (id: string) => boolean;
     canEditRoot?: (root: PictureObject) => boolean;
@@ -111,6 +113,8 @@ const props = withDefaults(
     previewOnDoubleClick?: boolean;
     scale?: number;
     cropHandler?: () => boolean;
+    restoreOriginalHandler?: () => boolean;
+    canRestoreOriginal?: boolean;
     croppingExternally?: boolean;
   }>(),
   { readOnly: false, canGroup: true, scale: 1, previewOnDoubleClick: true },
@@ -132,6 +136,7 @@ const emit = defineEmits<{
   cut: [id: string];
   paste: [id: string];
   paintStateChange: [state: FloatingImagePaintState];
+  reference: [reference: PictureAlignmentReference];
 }>();
 
 const { t } = useAppI18n();
@@ -738,7 +743,10 @@ function planFlipImage(axis: "horizontal" | "vertical"): void {
 
 function restoreImage(): void {
   if (!interactionReadOnly.value) {
-    if (selectedImage.value && isFramedPictureObject(selectedImage.value))
+    if (props.restoreOriginalHandler) {
+      if (props.canRestoreOriginal !== false && !props.restoreOriginalHandler())
+        emit("feedback", "picture.operationFailed");
+    } else if (selectedImage.value && isFramedPictureObject(selectedImage.value))
       emit("feedback", "picture.operationFailed");
     else restoreImageEdit();
   }
@@ -1190,6 +1198,22 @@ function arrangeImages(
   reference: PictureAlignmentReference = "selection",
 ): void {
   if (interactionReadOnly.value) return;
+  if (action === "equal-height" || action === "equal-width" || action === "equal-size") {
+    try {
+      const next = planEqualPictureDimensions(
+        currentImages.value,
+        ids,
+        props.selectedImageId ?? ids.at(-1),
+        action,
+        props.layout,
+        props.frameContext,
+      );
+      commitImages([...requireStandalonePictures(next.filter((root) => ids.includes(root.id)))]);
+    } catch {
+      emit("feedback", "picture.operationFailed");
+    }
+    return;
+  }
   if (currentImages.value.some((image) => ids.includes(image.id) && isFramedPictureObject(image))) {
     emit("feedback", "picture.operationFailed");
     return;
@@ -1274,6 +1298,10 @@ function alignSelection(
 ): void {
   if (key === selectionKey.value && !gesture.value && !crop.value)
     arrangeImages([...selectedIds.value], action, reference);
+}
+function changeAlignmentReference(reference: PictureAlignmentReference, key: string): void {
+  if (key === selectionKey.value && !interactionReadOnly.value && !gesture.value && !crop.value)
+    emit("reference", reference);
 }
 function groupSelection(key: string): void {
   if (
@@ -1473,10 +1501,12 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       :key="selectionKey"
       :anchor="selectionToolbarAnchor"
       :selection-key="selectionKey"
+      :alignment-reference="alignmentReference"
       :can-group="canGroup"
       :count="selectedIds.size"
       :disabled="interactionReadOnly"
       @align="alignSelection"
+      @reference="changeAlignmentReference"
       @group="groupSelection"
       @dismiss="dismissSelection"
     />
@@ -1491,7 +1521,7 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       "
       :anchor="toolbarAnchor"
       :cropping="Boolean(crop)"
-      :can-restore="canRestore"
+      :can-restore="restoreOriginalHandler ? canRestoreOriginal !== false : canRestore"
       :disabled="readOnly || !assetUrls.has(selectedImage.assetId)"
       @crop="startCrop"
       @rotate="rotateImage"

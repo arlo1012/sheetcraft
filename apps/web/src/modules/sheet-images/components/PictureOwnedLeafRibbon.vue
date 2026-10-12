@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Crop, Eye, ImagePlus, ImageDown, PencilLine, Settings2 } from "lucide-vue-next";
+import { Crop, Eye, ImagePlus, ImageDown, PencilLine, Settings2, RotateCcw } from "lucide-vue-next";
 import { isGroupedPicture, type GroupedPicture } from "@sheetcraft/core/picture-group";
 import { useAppI18n } from "../../../shared/i18n";
 import PictureAssetTools from "./PictureAssetTools.vue";
@@ -19,6 +19,9 @@ const props = defineProps<{
   annotateHandler?: () => boolean;
   canCrop?: boolean;
   cropHandler?: () => boolean;
+  canRestore?: boolean;
+  restoreHandler?: () => boolean;
+  restoreUnavailableReason?: string;
   replaceHandler: () => void;
   convertHandler?: () => boolean;
   canConvert?: boolean;
@@ -42,7 +45,18 @@ const callbacks = computed(() => {
     preview = props.previewHandler,
     convert = props.convertHandler,
     annotate = props.annotateHandler;
+  const restore = props.restoreHandler;
   return {
+    restore: () => {
+      if (
+        image === props.image &&
+        key === props.ownerKey &&
+        !props.disabled &&
+        props.canRestore &&
+        restore === props.restoreHandler
+      )
+        restore?.();
+    },
     annotate: () => {
       if (
         image === props.image &&
@@ -119,6 +133,19 @@ const callbacks = computed(() => {
 </script>
 <template>
   <RibbonToolbar :label="t('image.tools')" data-owned-picture-source-ribbon>
+    <RibbonButton
+      variant="tall"
+      :label="
+        canRestore === false && restoreUnavailableReason
+          ? `${t('image.restoreOriginal')}：${restoreUnavailableReason}`
+          : t('image.restoreOriginal')
+      "
+      :text="t('image.restoreOriginal')"
+      :disabled="disabled || !canRestore || !restoreHandler"
+      data-picture-tool="restore"
+      @activate="callbacks.restore"
+      ><RotateCcw
+    /></RibbonButton>
     <RibbonButton
       variant="tall"
       :label="t('image.replace')"

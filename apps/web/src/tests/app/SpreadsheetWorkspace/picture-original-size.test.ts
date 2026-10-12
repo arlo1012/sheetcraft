@@ -2,10 +2,13 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
-import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
+import { createWorkbook, cloneFloatingImage, getActiveSheet } from "@sheetcraft/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import PictureFormatPane from "../../../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
+import PictureToolbar from "../../../modules/sheet-images/components/PictureToolbar.vue";
+import { framedPicture } from "../../modules/sheet-images/framed-picture-fixture";
+import { getPictureViewRect } from "../../../modules/sheet-images/picture-view-operations";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { createAppI18n } from "../../../shared/i18n";
 import { actualPng } from "../../modules/image-assets/image-header-fixtures";
@@ -33,13 +36,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
-async function fixture() {
+async function fixture(framed = false, openPane = true) {
   Decoder.instances = [];
   vi.stubGlobal("Image", Decoder);
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:current-picture");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
   const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
-  const picture = legacyPicture();
+  const picture = framed ? framedPicture() : legacyPicture();
   getActiveSheet(workbook).floatingImages = [picture];
   const snapshot = serializeWorkbook(workbook);
   const store = {
@@ -67,15 +70,68 @@ async function fixture() {
     picture.id,
   ]);
   await flushPromises();
-  grid.vm.$emit("format-owned-picture", undefined, grid.props("sheet"));
-  await flushPromises();
-  expect(wrapper.findComponent(PictureFormatPane).exists()).toBe(true);
-  const decoder = Decoder.instances.at(-1)!;
+  if (openPane) {
+    grid.vm.$emit("format-owned-picture", undefined, grid.props("sheet"));
+    await flushPromises();
+  }
+  expect(wrapper.findComponent(PictureFormatPane).exists()).toBe(openPane);
+  const decoder = Decoder.instances.find(
+    (entry) => entry.src === "blob:current-picture" && entry.onerror !== null,
+  )!;
   expect(decoder.src).toBe("blob:current-picture");
   return { wrapper, grid, decoder, picture, store, snapshot };
 }
 
 describe("workspace selected original-size source", () => {
+  test("framed Restore Original uses a ready source even without opening the pane and undoes exactly", async () => {
+    const f = await fixture(true, false);
+    expect(f.wrapper.getComponent(PictureToolbar).props("canRestore")).toBe(false);
+    expect(f.store.save).not.toHaveBeenCalled();
+    f.decoder.naturalWidth = 360;
+    f.decoder.naturalHeight = 240;
+    f.decoder.onload?.();
+    await flushPromises();
+    const sheet = f.grid.props("sheet"),
+      before = sheet.floatingImages.map(cloneFloatingImage),
+      context = f.grid.vm.getPictureFrameContext(sheet)!;
+    const rect = getPictureViewRect(sheet.floatingImages[0]!, context.layout, context)!;
+    const toolbar = f.wrapper.getComponent(PictureToolbar);
+    expect(toolbar.props("canRestore")).toBe(true);
+    expect(toolbar.props("restoreHandler")!()).toBe(true);
+    await flushPromises();
+    const after = sheet.floatingImages.map(cloneFloatingImage);
+    expect(getPictureViewRect(after[0]!, context.layout, context)).toEqual({
+      x: rect.x + (rect.width - 360) / 2,
+      y: rect.y + (rect.height - 240) / 2,
+      width: 360,
+      height: 240,
+    });
+    expect(after[0]).toMatchObject({
+      assetId: f.picture.assetId,
+      frame: {
+        angleDeg: 0,
+        source: { widthRatio: 1, heightRatio: 1, offsetXRatio: 0, offsetYRatio: 0 },
+      },
+    });
+    await f.wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
+    expect(sheet.floatingImages).toEqual(before);
+    await f.wrapper.get("textarea.cell-editor").trigger("keydown", { key: "y", ctrlKey: true });
+    expect(sheet.floatingImages).toEqual(after);
+  });
+  test("a captured original reset cannot target a newer selection", async () => {
+    const f = await fixture(true, false);
+    f.decoder.naturalWidth = 360;
+    f.decoder.naturalHeight = 240;
+    f.decoder.onload?.();
+    await flushPromises();
+    const reset = f.wrapper.getComponent(PictureToolbar).props("restoreHandler")!;
+    f.grid.vm.selectFloatingImages([]);
+    await flushPromises();
+    const before = f.grid.props("sheet").floatingImages.map(cloneFloatingImage);
+    expect(reset()).toBe(false);
+    expect(f.grid.props("sheet").floatingImages).toEqual(before);
+    expect(f.store.save).not.toHaveBeenCalled();
+  });
   test("identical selection notifications keep the in-flight decoder and loading has no document side effect", async () => {
     const f = await fixture(),
       count = Decoder.instances.length;

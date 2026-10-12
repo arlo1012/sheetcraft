@@ -1691,6 +1691,9 @@ export type MessageSchema = ToolMessageSchema & {
     distributeHorizontal: string;
     distributeVertical: string;
     snapGrid: string;
+    equalHeight: string;
+    equalWidth: string;
+    equalSize: string;
     close: string;
     selectAll: string;
     noPictures: string;

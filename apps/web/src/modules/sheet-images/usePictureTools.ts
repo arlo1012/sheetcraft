@@ -1,4 +1,5 @@
 import { planPictureBatchSize } from "./picture-batch-size";
+import { planPictureOriginalReset } from "./picture-original-reset";
 import {
   canEditPictureRoot,
   canEditPictureSelection,
@@ -47,6 +48,9 @@ export type PictureAlignment =
   | "bottom"
   | "horizontal"
   | "vertical"
+  | "equal-height"
+  | "equal-width"
+  | "equal-size"
   | "grid";
 export type PictureAlignmentReference = "selection" | "last-selected";
 
@@ -472,6 +476,33 @@ export function usePictureTools(options: {
     sizeFeedback.value = undefined;
     operationFeedback.value = undefined;
   }
+  function restoreOriginal(
+    path: PictureGroupPath,
+    original: { assetId: string; width: number; height: number },
+  ): boolean {
+    operationFeedback.value = undefined;
+    try {
+      const lease = capture();
+      if (
+        !lease.context ||
+        lease.selectedIds.length !== 1 ||
+        path[0] !== lease.selectedIds[0] ||
+        (path.length === 1
+          ? !!lease.selectedPath && lease.selectedPath.length > 1
+          : JSON.stringify(path) !== JSON.stringify(lease.selectedPath))
+      )
+        throw new Error("The original reset target changed.");
+      const accepted = replace(
+        planPictureOriginalReset(lease.forest, path, original, lease.context),
+        lease,
+      );
+      if (!accepted) operationFeedback.value = "picture.operationFailed";
+      return accepted;
+    } catch {
+      operationFeedback.value = "picture.operationFailed";
+      return false;
+    }
+  }
   return {
     clearFeedback,
     applyAppearance,
@@ -488,6 +519,7 @@ export function usePictureTools(options: {
     resizeMany,
     resizeOne,
     setAspectRatio,
+    restoreOriginal,
     sizeFeedback,
     operationFeedback,
   };

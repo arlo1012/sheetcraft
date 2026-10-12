@@ -4,6 +4,8 @@ import { framedPicture } from "../../modules/sheet-images/framed-picture-fixture
 import { pictureGroup } from "../../modules/sheet-images/picture-group-fixture";
 import SheetOwnedPictureGroupLayer from "../../../modules/sheet-images/components/SheetOwnedPictureGroupLayer.vue";
 import PictureToolbar from "../../../modules/sheet-images/components/PictureToolbar.vue";
+import PictureArrangeTools from "../../../modules/sheet-images/components/PictureArrangeTools.vue";
+import SheetPictureSelectionToolbar from "../../../modules/sheet-images/components/SheetPictureSelectionToolbar.vue";
 import PictureOwnedLeafRibbon from "../../../modules/sheet-images/components/PictureOwnedLeafRibbon.vue";
 import * as pictureExport from "../../../modules/sheet-images/picture-source-export";
 import * as download from "../../../shared/files/download";
@@ -554,4 +556,54 @@ test("group floating Fill/Outline shortcuts open the actual member pane at the r
       .find((button) => button.text() === "Line")!
       .attributes("aria-expanded"),
   ).toBe("true");
+});
+
+test("ribbon and floating alignment references share one state without a document edit", async () => {
+  const { wrapper, sheet } = await fixture(),
+    grid = wrapper.getComponent(SheetGrid);
+  const first = sheet.floatingImages[0]!;
+  sheet.floatingImages.push({ ...cloneFloatingImage(first), id: "extra" });
+  grid.vm.selectFloatingImages([first.id, "extra"]);
+  await flushPromises();
+  await vi.waitFor(() =>
+    expect(wrapper.findComponent(SheetPictureSelectionToolbar).exists()).toBe(true),
+  );
+  const before = sheet.floatingImages.map(cloneFloatingImage),
+    arrange = wrapper.getComponent(PictureArrangeTools);
+  arrange.vm.$emit("reference", "last-selected");
+  await flushPromises();
+  expect(wrapper.getComponent(SheetPictureSelectionToolbar).props("alignmentReference")).toBe(
+    "last-selected",
+  );
+  const bar = wrapper.getComponent(SheetPictureSelectionToolbar);
+  bar.vm.$emit("reference", "selection", bar.props("selectionKey"));
+  await flushPromises();
+  expect(wrapper.getComponent(PictureArrangeTools).props("alignmentReference")).toBe("selection");
+  expect(sheet.floatingImages).toEqual(before);
+});
+
+test("equal size is one real history transaction using the active picture rather than forest order", async () => {
+  const { wrapper, sheet } = await fixture(),
+    grid = wrapper.getComponent(SheetGrid);
+  const first = requireLegacyPicture(sheet.floatingImages[0]!);
+  sheet.floatingImages.push({ ...cloneFloatingImage(first), id: "extra", width: 160, height: 40 });
+  grid.vm.selectFloatingImages([first.id, "extra"]);
+  await flushPromises();
+  const before = sheet.floatingImages.map(cloneFloatingImage);
+  grid.vm.arrangePictures([first.id, "extra"], "equal-size", "selection");
+  await flushPromises();
+  expect(
+    sheet.floatingImages.map((root) => {
+      const image = requireLegacyPicture(root);
+      return { width: image.width, height: image.height };
+    }),
+  ).toEqual([
+    { width: 160, height: 40 },
+    { width: 160, height: 40 },
+  ]);
+  const after = sheet.floatingImages.map(cloneFloatingImage);
+  await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
+  expect(sheet.floatingImages).toEqual(before);
+  await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "y", ctrlKey: true });
+  expect(sheet.floatingImages).toEqual(after);
 });

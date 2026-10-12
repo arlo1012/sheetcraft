@@ -20,7 +20,11 @@ import PictureRotationMenu from "./PictureRotationMenu.vue";
 import PictureAssetTools from "./PictureAssetTools.vue";
 import type { PictureFileFormat } from "../picture-asset-conversion";
 import PictureArrangeTools from "./PictureArrangeTools.vue";
-import type { PictureAlignment, PictureLayerAction } from "../usePictureTools";
+import type {
+  PictureAlignment,
+  PictureAlignmentReference,
+  PictureLayerAction,
+} from "../usePictureTools";
 import type { PictureSizeEdit, PictureToolGeometry } from "../picture-tool-geometry";
 import PictureAppearanceTools from "./PictureAppearanceTools.vue";
 import ImageInsertMenu from "../../home-tools/components/ImageInsertMenu.vue";
@@ -43,12 +47,16 @@ const props = withDefaults(
     canAnnotate?: boolean;
     annotateHandler?: () => boolean;
     canCrop?: boolean;
+    canRestore?: boolean;
+    restoreHandler?: () => boolean;
+    restoreUnavailableReason?: string;
     cropHandler?: () => boolean;
     appearanceHandler?: (patch: Partial<ImageAppearance> | undefined) => boolean;
     disabled: boolean;
     groupCreateDisabled?: boolean;
     busy?: boolean;
     selectionCount: number;
+    alignmentReference?: PictureAlignmentReference;
     previewOnDoubleClick: boolean;
   }>(),
   {
@@ -57,6 +65,7 @@ const props = withDefaults(
     canPreview: undefined,
     canConvert: undefined,
     canAnnotate: undefined,
+    canRestore: undefined,
   },
 );
 // Standalone source tools cannot establish a draft for an owned container.
@@ -74,7 +83,8 @@ const emit = defineEmits<{
   replace: [];
   group: [];
   ungroup: [];
-  align: [action: PictureAlignment];
+  align: [action: PictureAlignment, reference: PictureAlignmentReference];
+  reference: [reference: PictureAlignmentReference];
   layer: [action: PictureLayerAction];
   selectionPane: [];
   compress: [];
@@ -256,6 +266,38 @@ function sourceAction(action: () => void): void {
   requireStandalonePicture(props.image);
   action();
 }
+const arrangeCallbacks = computed(() => {
+  const image = props.image,
+    owner = props.draftOwnerKey;
+  const current = () => !props.disabled && image === props.image && owner === props.draftOwnerKey;
+  return {
+    align: (action: PictureAlignment, reference: PictureAlignmentReference) => {
+      if (current()) emit("align", action, reference);
+    },
+    reference: (reference: PictureAlignmentReference) => {
+      if (current()) emit("reference", reference);
+    },
+  };
+});
+const restoreCallback = computed(() => {
+  const image = props.image,
+    owner = props.draftOwnerKey,
+    handler = props.restoreHandler;
+  return () => {
+    if (
+      props.disabled ||
+      props.selectionCount > 1 ||
+      props.canRestore === false ||
+      (isFramed.value && !handler) ||
+      image !== props.image ||
+      owner !== props.draftOwnerKey ||
+      handler !== props.restoreHandler
+    )
+      return;
+    if (handler) handler();
+    else emit("restore");
+  };
+});
 </script>
 <template>
   <RibbonToolbar v-if="!isPictureGroup(image)" :label="t('image.tools')">
@@ -353,11 +395,17 @@ function sourceAction(action: () => void): void {
           >{{ t("image.lockAspectRatio") }}</TCheckbox
         >
         <RibbonButton
-          :label="t('image.restoreOriginal')"
+          :label="
+            canRestore === false && restoreUnavailableReason
+              ? `${t('image.restoreOriginal')}：${restoreUnavailableReason}`
+              : t('image.restoreOriginal')
+          "
           :text="t('image.restoreOriginal')"
-          :disabled="disabled || selectionCount > 1 || isFramed"
+          :disabled="
+            disabled || selectionCount > 1 || canRestore === false || (isFramed && !restoreHandler)
+          "
           data-picture-tool="restore"
-          @activate="sourceAction(() => emit('restore'))"
+          @activate="restoreCallback"
           ><RotateCcw
         /></RibbonButton>
       </div>
@@ -368,16 +416,18 @@ function sourceAction(action: () => void): void {
       @flip="(axis) => sourceAction(() => emit('flip', axis))"
     />
     <PictureArrangeTools
+      :alignment-reference="alignmentReference"
       :group-create-disabled="groupCreateDisabled"
       :disabled="disabled"
       :group-disabled="false"
       :alignment-disabled="false"
-      :grid-disabled="isFramed"
+      :grid-disabled="false"
       :count="selectionCount"
       :grouped="!!standaloneImage.groupId"
       @group="!groupCreateDisabled && sourceAction(() => emit('group'))"
       @ungroup="sourceAction(() => emit('ungroup'))"
-      @align="(action) => sourceAction(() => emit('align', action))"
+      @align="arrangeCallbacks.align"
+      @reference="arrangeCallbacks.reference"
       @layer="(action) => sourceAction(() => emit('layer', action))"
       @selection-pane="emit('selectionPane')"
     />

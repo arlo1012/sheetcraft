@@ -144,6 +144,7 @@ import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 import type { ImageInsertMode } from "../../sheet-images/useSheetImageActions";
 import SheetFloatingImageLayer from "../../sheet-images/components/SheetFloatingImageLayer.vue";
 import SheetOwnedPictureGroupLayer from "../../sheet-images/components/SheetOwnedPictureGroupLayer.vue";
+import type { PictureAlignmentReference } from "../../sheet-images/usePictureTools";
 import SheetPictureAdjustmentHandles from "../../sheet-images/components/SheetPictureAdjustmentHandles.vue";
 import SheetPictureCropOverlay from "../../sheet-images/components/SheetPictureCropOverlay.vue";
 import PictureCropToolbar from "../../sheet-images/components/PictureCropToolbar.vue";
@@ -287,6 +288,9 @@ const props = withDefaults(
     editSession?: CellEditSession;
     imageAssetUrls?: ReadonlyMap<string, string>;
     imagePreviewOnDoubleClick?: boolean;
+    pictureAlignmentReference?: PictureAlignmentReference;
+    restorePictureOriginal?: () => boolean;
+    canRestorePictureOriginal?: boolean;
     loadingImageAssetIds?: ReadonlySet<string>;
     missingImageAssetIds?: ReadonlySet<string>;
     readOnly?: boolean;
@@ -383,6 +387,7 @@ const emit = defineEmits<{
   cancelNote: [];
   updateNoteBox: [payload: { address: CellAddress; box: CellNoteBox }];
   imageFeedback: [key: MessageKey];
+  pictureAlignmentReference: [reference: PictureAlignmentReference];
   pasteImageFile: [file: File, mode: ImageInsertMode, address?: CellAddress];
   pasteFloatingImage: [image: FloatingImage, mode: ImageInsertMode, address?: CellAddress];
   pasteFloatingImages: [images: readonly FloatingImage[], address: CellAddress];
@@ -4058,13 +4063,14 @@ defineExpose({
   arrangePictures: (
     ids: string[],
     action: Parameters<NonNullable<typeof imageLayerRef.value>["arrangeImages"]>[1],
+    reference: PictureAlignmentReference = props.pictureAlignmentReference ?? "selection",
   ) => {
     const extended = props.sheet.floatingImages.some(
       (root) => ids.includes(root.id) && (isPictureGroup(root) || isFramedPictureObject(root)),
     );
     return extended
-      ? ownedImageLayerRef.value?.arrangeSelection(ids, action)
-      : imageLayerRef.value?.arrangeImages(ids, action);
+      ? ownedImageLayerRef.value?.arrangeSelection(ids, action, reference)
+      : imageLayerRef.value?.arrangeImages(ids, action, reference);
   },
   applyPendingPictureCrop: () => !pictureCrop.active.value || finishPictureCrop(false, false),
   cropImage: startPictureCrop,
@@ -4391,6 +4397,10 @@ defineExpose({
         @edit="emit('editDrawing', $event)"
       />
       <SheetFloatingImageLayer
+        :restore-original-handler="restorePictureOriginal"
+        :can-restore-original="canRestorePictureOriginal"
+        :alignment-reference="pictureAlignmentReference"
+        @reference="emit('pictureAlignmentReference', $event)"
         :preview-on-double-click="imagePreviewOnDoubleClick ?? true"
         :crop-handler="startPictureCrop"
         :cropping-externally="pictureCrop.active.value"
@@ -4426,6 +4436,8 @@ defineExpose({
         @paste="requestFloatingImagePaste"
       />
       <SheetOwnedPictureGroupLayer
+        :alignment-reference="pictureAlignmentReference"
+        @reference="emit('pictureAlignmentReference', $event)"
         v-if="pictureFrameContext"
         ref="ownedImageLayerRef"
         :roots="sheet.floatingImages"

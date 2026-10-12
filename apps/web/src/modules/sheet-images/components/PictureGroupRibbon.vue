@@ -12,7 +12,11 @@ import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import PictureRotationMenu from "./PictureRotationMenu.vue";
 import PictureAssetTools from "./PictureAssetTools.vue";
 import PictureArrangeTools from "./PictureArrangeTools.vue";
-import type { PictureAlignment, PictureLayerAction } from "../usePictureTools";
+import type {
+  PictureAlignment,
+  PictureAlignmentReference,
+  PictureLayerAction,
+} from "../usePictureTools";
 import type { PictureSizeEdit, PictureToolGeometry } from "../picture-tool-geometry";
 
 const props = defineProps<{
@@ -23,6 +27,7 @@ const props = defineProps<{
   disabled: boolean;
   groupCreateDisabled?: boolean;
   selectionCount: number;
+  alignmentReference?: PictureAlignmentReference;
   resizeHandler?: (edit: PictureSizeEdit) => boolean;
   aspectRatioHandler?: (locked: boolean) => boolean;
 }>();
@@ -31,7 +36,8 @@ const emit = defineEmits<{
   batchSize: [];
   group: [];
   ungroup: [];
-  align: [action: PictureAlignment];
+  align: [action: PictureAlignment, reference: PictureAlignmentReference];
+  reference: [reference: PictureAlignmentReference];
   layer: [action: PictureLayerAction];
   selectionPane: [];
   format: [];
@@ -125,7 +131,9 @@ const actionCallbacks = computed(() => {
       if (!props.groupCreateDisabled) action(() => emit("group"));
     },
     ungroup: () => action(() => emit("ungroup")),
-    align: (alignment: PictureAlignment) => action(() => emit("align", alignment)),
+    align: (alignment: PictureAlignment, reference: PictureAlignmentReference) =>
+      action(() => emit("align", alignment, reference)),
+    reference: (reference: PictureAlignmentReference) => action(() => emit("reference", reference)),
     layer: (layer: PictureLayerAction) => action(() => emit("layer", layer)),
     rotate: (turns: -1 | 1 | 2) => action(() => emit("rotate", turns)),
     flip: (axis: "horizontal" | "vertical") => action(() => emit("flip", axis)),
@@ -211,8 +219,9 @@ const actionCallbacks = computed(() => {
       @batch-size="actionCallbacks.batchSize"
     />
     <PictureArrangeTools
+      :alignment-reference="alignmentReference"
       :group-create-disabled="groupCreateDisabled"
-      :grid-disabled="true"
+      :grid-disabled="false"
       :key="`${image.id}:${draftOwnerKey}:arrange`"
       :disabled="disabled"
       :count="selectionCount"
@@ -220,6 +229,7 @@ const actionCallbacks = computed(() => {
       @group="actionCallbacks.group"
       @ungroup="actionCallbacks.ungroup"
       @align="actionCallbacks.align"
+      @reference="actionCallbacks.reference"
       @layer="actionCallbacks.layer"
       @selection-pane="actionCallbacks.selectionPane"
     />

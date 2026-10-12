@@ -26,7 +26,9 @@ import {
   getPictureViewRect,
   movePictureViewBy,
   rotatePictureViewBy,
+  snapPictureViewToGrid,
 } from "./picture-view-operations";
+import { planEqualPictureDimensions } from "./picture-equal-dimensions";
 import { getPictureViewportFragments } from "./picture-viewport-fragments";
 import type { PictureAlignment, PictureAlignmentReference } from "./usePictureTools";
 
@@ -293,10 +295,27 @@ export function arrangeOwnedPictureSelection(
       "bottom",
       "horizontal",
       "vertical",
+      "grid",
+      "equal-height",
+      "equal-width",
+      "equal-size",
     ].includes(action) ||
     !["selection", "last-selected"].includes(reference)
   )
     throw new TypeError("Unsupported picture arrangement or stale root selection.");
+  if (action === "grid")
+    return replaceSelectedRoots(snapshot, (root) =>
+      snapPictureViewToGrid(root, context.layout, context.frameContext),
+    );
+  if (action === "equal-height" || action === "equal-width" || action === "equal-size")
+    return planEqualPictureDimensions(
+      snapshot.roots,
+      ids,
+      snapshot.activeRootId ?? ids.at(-1),
+      action,
+      context.layout,
+      context.frameContext,
+    );
   const entries = snapshot.roots
     .filter((root) => ids.includes(root.id))
     .map((image) => ({

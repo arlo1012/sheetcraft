@@ -144,14 +144,14 @@ describe("owned group ribbon source-free capabilities", () => {
     expect(wrapper.emitted("batchSize")).toEqual([[]]);
     wrapper.getComponent(PictureRotationMenu).vm.$emit("rotate", 1);
     wrapper.getComponent(PictureRotationMenu).vm.$emit("flip", "horizontal");
-    wrapper.getComponent(PictureArrangeTools).vm.$emit("align", "grid");
+    wrapper.getComponent(PictureArrangeTools).vm.$emit("align", "grid", "last-selected");
     await wrapper.get('.picture-arrange [aria-label="Ungroup"]').trigger("click");
     await wrapper.get('.picture-arrange [aria-label="Bring to front"]').trigger("click");
     await wrapper.get('.picture-arrange [aria-label="Selection pane"]').trigger("click");
     await wrapper.get('[data-picture-group-action="format"]').trigger("click");
     expect(wrapper.emitted("rotate")).toEqual([[1]]);
     expect(wrapper.emitted("flip")).toEqual([["horizontal"]]);
-    expect(wrapper.emitted("align")).toEqual([["grid"]]);
+    expect(wrapper.emitted("align")).toEqual([["grid", "last-selected"]]);
     expect(wrapper.emitted("ungroup")).toEqual([[]]);
     expect(wrapper.emitted("layer")).toEqual([["front"]]);
     expect(wrapper.emitted("selectionPane")).toEqual([[]]);

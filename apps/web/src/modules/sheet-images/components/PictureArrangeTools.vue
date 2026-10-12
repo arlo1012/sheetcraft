@@ -13,8 +13,13 @@ import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
-import type { PictureAlignment, PictureLayerAction } from "../usePictureTools";
+import type {
+  PictureAlignment,
+  PictureAlignmentReference,
+  PictureLayerAction,
+} from "../usePictureTools";
 const props = defineProps<{
   disabled: boolean;
   groupCreateDisabled?: boolean;
@@ -23,15 +28,19 @@ const props = defineProps<{
   groupDisabled?: boolean;
   alignmentDisabled?: boolean;
   gridDisabled?: boolean;
+  alignmentReference?: PictureAlignmentReference;
 }>();
 const emit = defineEmits<{
   group: [];
   ungroup: [];
-  align: [action: PictureAlignment];
+  align: [action: PictureAlignment, reference: PictureAlignmentReference];
+  reference: [reference: PictureAlignmentReference];
   layer: [action: PictureLayerAction];
   selectionPane: [];
 }>();
 const { t } = useAppI18n();
+const localReference = ref<PictureAlignmentReference>("selection");
+const reference = computed(() => props.alignmentReference ?? localReference.value);
 const buttonRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const triggerRef = computed(() => buttonRef.value?.rootElement ?? null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
@@ -43,7 +52,13 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
 });
 function align(action: PictureAlignment): void {
   if (props.disabled || props.alignmentDisabled) return;
-  emit("align", action);
+  emit("align", action, reference.value);
+  dismiss("programmatic", true);
+}
+function chooseReference(next: PictureAlignmentReference): void {
+  if (props.disabled || props.alignmentDisabled) return;
+  localReference.value = next;
+  emit("reference", next);
   dismiss("programmatic", true);
 }
 </script>
@@ -127,6 +142,16 @@ function align(action: PictureAlignment): void {
         class="picture-arrange__menu"
         :label="t('picture.align')"
       >
+        <MenuRadioItem
+          :checked="reference === 'selection'"
+          @select="chooseReference('selection')"
+          >{{ t("picture.alignToSelection") }}</MenuRadioItem
+        >
+        <MenuRadioItem
+          :checked="reference === 'last-selected'"
+          @select="chooseReference('last-selected')"
+          >{{ t("picture.alignToLastSelected") }}</MenuRadioItem
+        >
         <MenuItem :disabled="count < 2" @select="align('left')">{{
           t("picture.alignLeft")
         }}</MenuItem>
@@ -153,6 +178,15 @@ function align(action: PictureAlignment): void {
         }}</MenuItem>
         <MenuItem :disabled="gridDisabled" @select="align('grid')">{{
           t("picture.snapGrid")
+        }}</MenuItem>
+        <MenuItem :disabled="count < 2" @select="align('equal-height')">{{
+          t("picture.equalHeight")
+        }}</MenuItem>
+        <MenuItem :disabled="count < 2" @select="align('equal-width')">{{
+          t("picture.equalWidth")
+        }}</MenuItem>
+        <MenuItem :disabled="count < 2" @select="align('equal-size')">{{
+          t("picture.equalSize")
         }}</MenuItem>
       </MenuSurface>
     </Teleport>

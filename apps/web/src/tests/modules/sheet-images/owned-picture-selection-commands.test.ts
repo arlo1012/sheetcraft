@@ -268,9 +268,9 @@ describe("owned picture selection command planning", () => {
     expect(() => rotateOwnedPictureSelection(readonly, 1)).toThrow(/read-only/);
     expect(() => flipOwnedPictureSelection(readonly, "vertical")).toThrow(/read-only/);
     expect(() => rotateOwnedPictureSelection(f.capture(), 0.25 as 1)).toThrow(/quarter-turn/);
-    expect(() => arrangeOwnedPictureSelection(f.capture(), f.selection.rootIds, "grid")).toThrow(
-      /Unsupported/,
-    );
+    expect(() =>
+      arrangeOwnedPictureSelection(f.capture(), f.selection.rootIds, "unknown" as PictureAlignment),
+    ).toThrow(/Unsupported/);
     const inner = captureOwnedPictureSelection(f.context, {
       rootIds: [f.group.id],
       path: [f.group.id, f.group.members[0]!.id],

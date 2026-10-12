@@ -91,7 +91,10 @@ import PictureCellOverwriteDialog from "../modules/sheet-images/components/Pictu
 import type { PictureCellOverwriteConfirmation } from "../modules/sheet-images/picture-cell-overwrite-confirmation";
 import PictureCompressDialog from "../modules/sheet-images/components/PictureCompressDialog.vue";
 import PictureBatchSizeDialog from "../modules/sheet-images/components/PictureBatchSizeDialog.vue";
-import { usePictureTools } from "../modules/sheet-images/usePictureTools";
+import {
+  usePictureTools,
+  type PictureAlignmentReference,
+} from "../modules/sheet-images/usePictureTools";
 import PictureSelectionPane from "../modules/sheet-images/components/PictureSelectionPane.vue";
 import PictureAnnotationDialog from "../modules/sheet-images/components/PictureAnnotationDialog.vue";
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
@@ -591,6 +594,7 @@ const headerFooterTarget = shallowRef<HeaderFooterEditTarget>();
 const picturePreviewOnDoubleClick = ref(true);
 const selectedPictureId = ref<string | null>(null);
 const selectedPictureIds = ref<string[]>([]);
+const pictureAlignmentReference = ref<PictureAlignmentReference>("selection");
 const selectedOwnedPicturePath = shallowRef<PictureGroupPath | null>(null);
 const selectedPicture = computed(() => {
   const image = activeSheet.value.floatingImages.find(
@@ -1876,7 +1880,7 @@ const pictureIntrinsicOwner = computed<readonly unknown[]>((previous) => {
   return previous && next.every((value, index) => value === previous[index]) ? previous : next;
 });
 function selectedPictureIntrinsicSource() {
-  if (!pictureFormatVisible.value) return;
+  if (selectedPictureIds.value.length !== 1) return;
   const leaf = selectedOwnedPictureLeaf.value;
   if (selectedOwnedPicturePath.value && selectedOwnedPicturePath.value.length > 1 && !leaf) return;
   const node = leaf?.node ?? selectedPicture.value;
@@ -1899,6 +1903,54 @@ const pictureIntrinsicRetry = computed(() => {
       source?.url === now?.url
     )
       pictureIntrinsic.retry();
+  };
+});
+const pictureOriginalResetOwner = computed(() => {
+  const owner = pictureIntrinsicOwner.value,
+    node = selectedOwnedPictureLeaf.value?.node ?? selectedPicture.value,
+    size = pictureIntrinsic.size.value,
+    source = selectedPictureIntrinsicSource(),
+    path =
+      selectedOwnedPictureLeaf.value?.path ??
+      (selectedPictureIds.value.length === 1 ? [selectedPictureIds.value[0]!] : []),
+    signature = node ? JSON.stringify(node) : undefined;
+  const available =
+    !!node &&
+    !isPictureGroup(node) &&
+    !!size &&
+    size.assetId === source?.assetId &&
+    size.url === source?.url;
+  return {
+    available,
+    reason: t(
+      pictureIntrinsic.status.value === "loading"
+        ? "pictureFormat.originalSizeLoading"
+        : "pictureFormat.originalSizeUnavailable",
+    ),
+    apply: (): boolean => {
+      const current = selectedOwnedPictureLeaf.value?.node ?? selectedPicture.value,
+        now = selectedPictureIntrinsicSource();
+      if (
+        !available ||
+        !size ||
+        owner !== pictureIntrinsicOwner.value ||
+        size !== pictureIntrinsic.size.value ||
+        source?.assetId !== now?.assetId ||
+        source?.url !== now?.url ||
+        JSON.stringify(current) !== signature ||
+        loading.value ||
+        fileBusy.value ||
+        xlsxBusy.value ||
+        imageBusy.value ||
+        !beforePictureFormatInteraction()
+      )
+        return false;
+      return pictureTools.restoreOriginal(path, {
+        assetId: size.assetId,
+        width: size.width,
+        height: size.height,
+      });
+    },
   };
 });
 function beforePictureFormatInteraction(): boolean {
@@ -3164,6 +3216,11 @@ const gridInert = computed(
       </template>
       <template #image-tools>
         <PictureToolbar
+          :can-restore="pictureOriginalResetOwner.available"
+          :restore-handler="pictureOriginalResetOwner.apply"
+          :restore-unavailable-reason="pictureOriginalResetOwner.reason"
+          :alignment-reference="pictureAlignmentReference"
+          @reference="pictureAlignmentReference = $event"
           v-if="selectedPicture && !isPictureGroup(selectedPicture)"
           :key="pictureToolbarOwner?.key"
           :image="selectedPicture"
@@ -3220,11 +3277,17 @@ const gridInert = computed(
           @group="performPictureGroup()"
           @ungroup="performPictureGroup(true)"
           @layer="pictureTools.layer"
-          @align="sheetGridRef?.arrangePictures(selectedPictureIds, $event)"
+          @align="
+            (action, reference) =>
+              sheetGridRef?.arrangePictures(selectedPictureIds, action, reference)
+          "
           @selection-pane="pictureTools.paneVisible.value = !pictureTools.paneVisible.value"
           @convert-to-cell="pictureCellConversion.request(selectedPicture.id)"
         />
         <PictureOwnedLeafRibbon
+          :can-restore="pictureOriginalResetOwner.available"
+          :restore-handler="pictureOriginalResetOwner.apply"
+          :restore-unavailable-reason="pictureOriginalResetOwner.reason"
           v-if="selectedOwnedPictureLeaf && pictureSourceRibbonOwner"
           :key="pictureSourceRibbonOwner.key"
           :image="selectedOwnedPictureLeaf.node"
@@ -3253,6 +3316,8 @@ const gridInert = computed(
           "
         />
         <PictureGroupRibbon
+          :alignment-reference="pictureAlignmentReference"
+          @reference="pictureAlignmentReference = $event"
           v-if="
             selectedPicture &&
             isPictureGroup(selectedPicture) &&
@@ -3285,7 +3350,10 @@ const gridInert = computed(
           @group="performPictureGroup()"
           @ungroup="performPictureGroup(true)"
           @layer="pictureTools.layer"
-          @align="sheetGridRef?.arrangePictures(selectedPictureIds, $event)"
+          @align="
+            (action, reference) =>
+              sheetGridRef?.arrangePictures(selectedPictureIds, action, reference)
+          "
           @rotate="sheetGridRef?.rotateImage($event)"
           @flip="sheetGridRef?.flipImage($event)"
           @selection-pane="pictureTools.paneVisible.value = !pictureTools.paneVisible.value"
@@ -4330,6 +4398,10 @@ const gridInert = computed(
     >
       <div class="spreadsheet-workspace__sheet">
         <SheetGrid
+          :restore-picture-original="pictureOriginalResetOwner.apply"
+          :can-restore-picture-original="pictureOriginalResetOwner.available"
+          :picture-alignment-reference="pictureAlignmentReference"
+          @picture-alignment-reference="pictureAlignmentReference = $event"
           @unlock-range="protectionActions.requestRangeUnlock"
           :note-draft="noteDraft"
           :note-error="noteError"

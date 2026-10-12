@@ -584,3 +584,7 @@ codec formats remain limited. See [picture-source-formats.md](picture-source-for
 单个及批量本地文件嵌入非空单元格前会统一确认实际目标；合并目标、异步解码/存储、
 确认期间的新内容与权限变化均复核，失败不部分插入。明确确认后的整批可一次撤销。
 具体边界见 [本地图片嵌入单元格](picture-cell-insertion.md)。
+
+### 排列与还原原图
+
+图片新框和真实组合支持共享排列参照、等高/等宽/等尺寸，以及一次对齐网格。新框和组合内真实图片的“还原原图”采用实际资产尺寸，并保持完整可撤销状态。各入口的作用范围见 [图片排列与还原原图](picture-arrangement-and-original-reset.md)。

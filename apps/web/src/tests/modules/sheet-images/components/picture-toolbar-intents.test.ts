@@ -459,7 +459,7 @@ describe("framed picture ribbon capability boundary", () => {
       disabled: false,
       groupDisabled: false,
       alignmentDisabled: false,
-      gridDisabled: true,
+      gridDisabled: false,
     });
     expect(wrapper.get('.picture-arrange [aria-label="Group"]').attributes("aria-disabled")).toBe(
       "true",
