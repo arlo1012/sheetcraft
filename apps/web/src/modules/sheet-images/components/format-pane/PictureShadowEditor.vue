@@ -7,6 +7,12 @@ import type {
   PictureFormatLabelKey,
 } from "../../picture-format-pane-model";
 import { createPictureShadow } from "../../picture-effect-edit";
+import {
+  getPictureEffectPresetGroups,
+  getPictureEffectPreset,
+  findPictureEffectPresetId,
+} from "../../picture-effect-presets";
+import PicturePresetGallery from "./PicturePresetGallery.vue";
 import PictureFormatField from "./PictureFormatField.vue";
 import PicturePaintNumber from "./PicturePaintNumber.vue";
 import PicturePaintColor from "./PicturePaintColor.vue";
@@ -79,9 +85,25 @@ function numberProps(
     rejectedMessage: props.t("applyRejected"),
   };
 }
+const presetGroups = getPictureEffectPresetGroups("shadow");
+const presetId = computed(() => findPictureEffectPresetId("shadow", props.value));
+function selectPreset(id: string) {
+  const value = getPictureEffectPreset("shadow", id);
+  return !props.disabled && value !== undefined && props.onCommit(value);
+}
 </script>
 <template>
   <div class="picture-shadow-editor">
+    <PicturePresetGallery
+      :owner-key="ownerKey"
+      :groups="presetGroups"
+      :selected-id="presetId"
+      :disabled="disabled"
+      :t="t"
+      :on-select="selectPreset"
+      :columns="3"
+      :empty-label="mode === 'inherit' ? t('effectInherit') : t('effectCustom')"
+    />
     <PictureFormatField :label="t('effectMode')"
       ><TSelect
         :model-value="mode"

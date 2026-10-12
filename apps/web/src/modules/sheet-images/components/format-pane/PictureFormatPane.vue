@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { PictureTextureId } from "../../picture-texture";
 import { computed, nextTick, ref, useId } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -26,7 +27,7 @@ const props = withDefaults(
     onIntent: PictureFormatIntentHandler;
     t: PictureFormatTranslate;
     options?: PictureFormatOptions;
-    loadPaintAsset?: (blob: Blob) => Promise<string | undefined>;
+    loadPaintAsset?: (blob: Blob, texture?: PictureTextureId) => Promise<string | undefined>;
     initialTab?: PictureFormatTab;
     initialUnit?: PictureFormatLengthUnit;
     intrinsicStatus?: PictureIntrinsicSizeStatus;

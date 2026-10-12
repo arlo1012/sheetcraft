@@ -1,3 +1,8 @@
+import {
+  PICTURE_TEXTURE_IDS,
+  pictureTextureAssetId,
+  type PictureTextureId,
+} from "./picture-texture";
 import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStore";
 import { prepareImageAsset } from "../image-assets/prepareImageAsset";
 import { pictureFormatOwnerKey, type PictureFormatSnapshot } from "./picture-format-pane-model";
@@ -11,9 +16,11 @@ export function createPicturePaintAssetSource(options: {
   const prepared = new Set<string>();
   let operation = 0;
   let disposed = false;
-  async function load(blob: Blob): Promise<string | undefined> {
+  async function load(blob: Blob, texture?: PictureTextureId): Promise<string | undefined> {
     const snapshot = options.getSnapshot();
     if (!snapshot || disposed) return;
+    if (texture !== undefined && !PICTURE_TEXTURE_IDS.includes(texture))
+      throw new TypeError("Unknown picture texture.");
     const owner = pictureFormatOwnerKey(snapshot.owner),
       revision = snapshot.revision;
     const request = ++operation;
@@ -27,7 +34,10 @@ export function createPicturePaintAssetSource(options: {
         now.revision === revision
       );
     };
-    const asset = await (options.prepare ?? prepareImageAsset)(blob);
+    const decoded = await (options.prepare ?? prepareImageAsset)(blob);
+    const asset = texture
+      ? { ...decoded, id: pictureTextureAssetId(texture, decoded.id) }
+      : decoded;
     if (!current()) return;
     await options.store.put(asset);
     if (!current()) return;

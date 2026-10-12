@@ -4,6 +4,12 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { Choice, PictureSoftEdges } from "@sheetcraft/core/picture-detailed-style";
 import type { PictureFormatTranslate } from "../../picture-format-pane-model";
 import { createPictureSoftEdges } from "../../picture-effect-edit";
+import {
+  getPictureEffectPresetGroups,
+  getPictureEffectPreset,
+  findPictureEffectPresetId,
+} from "../../picture-effect-presets";
+import PicturePresetGallery from "./PicturePresetGallery.vue";
 import PictureFormatField from "./PictureFormatField.vue";
 import PicturePaintNumber from "./PicturePaintNumber.vue";
 const props = defineProps<{
@@ -27,9 +33,25 @@ function choose(value: unknown) {
   else if (value === "value")
     props.onCommit({ kind: "value", value: soft.value ?? createPictureSoftEdges() });
 }
+const presetGroups = getPictureEffectPresetGroups("softEdges");
+const presetId = computed(() => findPictureEffectPresetId("softEdges", props.value));
+function selectPreset(id: string) {
+  const value = getPictureEffectPreset("softEdges", id);
+  return !props.disabled && value !== undefined && props.onCommit(value);
+}
 </script>
 <template>
   <div class="picture-soft-edges-editor">
+    <PicturePresetGallery
+      :owner-key="ownerKey"
+      :groups="presetGroups"
+      :selected-id="presetId"
+      :disabled="disabled"
+      :t="t"
+      :on-select="selectPreset"
+      :columns="3"
+      :empty-label="mode === 'inherit' ? t('effectInherit') : t('effectCustom')"
+    />
     <PictureFormatField :label="t('effectMode')"
       ><TSelect
         :model-value="mode"

@@ -10,6 +10,7 @@ import PictureGradientEditor from "../../../../modules/sheet-images/components/f
 import PicturePaintNumber from "../../../../modules/sheet-images/components/format-pane/PicturePaintNumber.vue";
 import PicturePaintColor from "../../../../modules/sheet-images/components/format-pane/PicturePaintColor.vue";
 import PictureShadowEditor from "../../../../modules/sheet-images/components/format-pane/PictureShadowEditor.vue";
+import PicturePresetGallery from "../../../../modules/sheet-images/components/format-pane/PicturePresetGallery.vue";
 import PictureFormat3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureFormat3dEditor.vue";
 import PictureRotation3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureRotation3dEditor.vue";
 import { createPictureGradientPaint } from "../../../../modules/sheet-images/picture-paint-edit";
@@ -20,8 +21,12 @@ import {
   expectAppearanceUnchanged,
 } from "./appearance-owner-fixture";
 import { selectedNode } from "./source-scale/owner-fixture";
+vi.mock("../../../../modules/sheet-images/picture-preset-preview", () => ({
+  picturePresetPreview: () => "data:image/png;base64,c2FtcGxl",
+}));
 const wrappers: VueWrapper[] = [];
-afterEach(() => {
+afterEach(async () => {
+  await flushPromises();
   wrappers.splice(0).forEach((w) => w.unmount());
   document.body.replaceChildren();
 });
@@ -146,6 +151,37 @@ test("old field callback cannot apply to a later selection/session", async () =>
   expect(old({ kind: "none" })).toBe(false);
   expectAppearanceUnchanged(f, before);
 });
+test.each(["callback", "close"] as const)(
+  "detailed gallery identity expires on pane %s without changing workbook history",
+  async (boundary) => {
+    const f = appearanceOwnerFixture(),
+      wrapper = mount(PictureFormatPane, {
+        props: {
+          snapshot: f.pane.snapshot.value,
+          capabilities: f.pane.capabilities.value,
+          onIntent: f.pane.onIntent,
+          t: (key) => key,
+        },
+        global: {
+          plugins: [createAppI18n("en-US")],
+          stubs: { ColorPaletteSelect: paletteStub, TTextarea: true },
+        },
+      });
+    wrappers.push(wrapper);
+    await flushPromises();
+    const editor = wrapper.findAllComponents(PicturePaintEditor)[0]!,
+      old = editor.props("onCommit"),
+      key = editor.props("ownerKey");
+    if (boundary === "callback") await wrapper.setProps({ onIntent: vi.fn(f.pane.onIntent) });
+    else await wrapper.setProps({ snapshot: null });
+    if (boundary === "callback")
+      expect(wrapper.findAllComponents(PicturePaintEditor)[0]!.props("ownerKey")).not.toBe(key);
+    else expect(wrapper.findAllComponents(PicturePaintEditor)).toHaveLength(0);
+    const before = appearanceCheckpoint(f);
+    expect(old({ kind: "none" })).toBe(false);
+    expectAppearanceUnchanged(f, before);
+  },
+);
 test("shadow, material and real camera controls use detailed transactions instead of inert legacy fields", async () => {
   const { f, wrapper } = mountOwner(),
     shadow = wrapper.getComponent(PictureShadowEditor);
@@ -156,7 +192,11 @@ test("shadow, material and real camera controls use detailed transactions instea
   });
   const format = wrapper.getComponent(PictureFormat3dEditor);
   await select(format, "format3dSection", "value");
-  await select(format, "material", "metal");
+  const material = format
+    .findAllComponents(PicturePresetGallery)
+    .find((c) => c.props("label") === "material")!;
+  expect(material.props("onSelect")("metal")).toBe(true);
+  await flushPromises();
   expect(selectedNode(f).transform?.appearance?.detailedStyle?.format3d).toMatchObject({
     kind: "value",
     value: { material: "metal" },

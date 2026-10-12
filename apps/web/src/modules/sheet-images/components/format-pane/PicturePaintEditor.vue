@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import {
+  createPictureTextureBlob,
+  pictureTextureFromAssetId,
+  type PictureTextureId,
+} from "../../picture-texture";
+import PictureTextureGallery from "./PictureTextureGallery.vue";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Button as TButton } from "tdesign-vue-next/es/button";
@@ -29,7 +35,8 @@ const props = defineProps<{
   disabled?: boolean;
   t: PictureFormatTranslate;
   sourceAssetId?: string;
-  loadAsset?: (blob: Blob) => Promise<string | undefined>;
+  paintRole?: "fill" | "line";
+  loadAsset?: (blob: Blob, texture?: PictureTextureId) => Promise<string | undefined>;
   onCommit: (value: Choice<PicturePaint> | undefined) => boolean;
 }>();
 const paint = computed(() => (props.value?.kind === "value" ? props.value.value : undefined));
@@ -60,11 +67,17 @@ onUnmounted(() => {
 const disabled = computed(() => props.disabled || busy.value);
 const modes = computed(() => [
   { value: "inherit", label: props.t("paintInherit") },
-  { value: "none", label: props.t("paintNone") },
-  { value: "solid", label: props.t("paintSolid") },
-  { value: "gradient", label: props.t("paintGradient") },
-  { value: "picture", label: props.t("paintPicture") },
-  { value: "pattern", label: props.t("paintPattern") },
+  { value: "none", label: props.t(props.paintRole === "line" ? "none" : "paintNone") },
+  { value: "solid", label: props.t(props.paintRole === "line" ? "solid" : "paintSolid") },
+  { value: "gradient", label: props.t(props.paintRole === "line" ? "gradient" : "paintGradient") },
+  {
+    value: "picture",
+    label: props.t(props.paintRole === "line" ? "paintLinePicture" : "paintPicture"),
+  },
+  {
+    value: "pattern",
+    label: props.t(props.paintRole === "line" ? "paintLinePattern" : "paintPattern"),
+  },
 ]);
 const anchors: readonly { value: PictureAnchor; key: Parameters<PictureFormatTranslate>[0] }[] = [
   { value: "top-left", key: "alignTopLeft" },
@@ -115,7 +128,8 @@ function changeMode(value: unknown) {
       rotateWithShape: true,
     });
   else if (value === "picture") {
-    if (props.sourceAssetId) commit(picture(props.sourceAssetId));
+    if (props.loadAsset) void texture("paper");
+    else if (props.sourceAssetId) commit(picture(props.sourceAssetId));
     else fileInput.value?.click();
   }
 }
@@ -179,25 +193,47 @@ function stretchSide(side: "left" | "right" | "top" | "bottom", value: number) {
   const current = paint.value;
   return current?.kind === "picture" && commit(editPictureStretchOffset(current, side, value));
 }
-async function load(blob: Blob) {
+async function loadSource(getBlob: () => Blob | Promise<Blob>, textureId?: PictureTextureId) {
   if (disabled.value || !props.loadAsset) return;
   const generation = ++request,
     key = props.ownerKey,
     loader = props.loadAsset,
     apply = props.onCommit;
+  const choice = JSON.stringify(props.value),
+    previous =
+      paint.value?.kind === "picture"
+        ? { ...paint.value, layout: { ...paint.value.layout } }
+        : undefined;
+  const current = () =>
+    generation === request &&
+    key === props.ownerKey &&
+    !props.disabled &&
+    props.loadAsset === loader &&
+    props.onCommit === apply &&
+    JSON.stringify(props.value) === choice;
   busy.value = true;
   sourceError.value = undefined;
   try {
-    const id = await loader(blob);
-    if (
-      generation !== request ||
-      key !== props.ownerKey ||
-      props.disabled ||
-      props.loadAsset !== loader
-    )
-      return;
-    if (!id || !apply({ kind: "value", value: picture(id) }))
+    const blob = await getBlob();
+    if (!current()) return;
+    const id = await loader(blob, textureId);
+    if (!current()) return;
+    if (!id) {
       sourceError.value = props.t("applyRejected");
+      return;
+    }
+    const value = previous ? { ...previous, assetId: id } : picture(id);
+    if (textureId && value.layout.kind !== "tile")
+      value.layout = {
+        kind: "tile",
+        scaleX: 1,
+        scaleY: 1,
+        offsetXPt: 0,
+        offsetYPt: 0,
+        anchor: "center",
+        flip: "none",
+      };
+    if (!apply({ kind: "value", value })) sourceError.value = props.t("applyRejected");
   } catch {
     if (generation === request && key === props.ownerKey)
       sourceError.value = props.t("paintSourceFailed");
@@ -206,20 +242,14 @@ async function load(blob: Blob) {
   }
 }
 function chooseFile(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
+  const input = event.target as HTMLInputElement,
+    file = input.files?.[0];
   input.value = "";
-  if (file) void load(file);
+  if (file) void loadSource(() => file);
 }
 async function clipboard() {
-  if (disabled.value || !props.loadAsset) return;
-  const generation = ++request,
-    key = props.ownerKey;
-  busy.value = true;
-  sourceError.value = undefined;
-  try {
+  await loadSource(async () => {
     const items = await navigator.clipboard.read();
-    if (generation !== request || key !== props.ownerKey || props.disabled) return;
     const item = items.find((candidate) =>
       candidate.types.some((type) =>
         ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(type),
@@ -228,19 +258,16 @@ async function clipboard() {
     const type = item?.types.find((type) =>
       ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(type),
     );
-    if (!item || !type) throw new Error("No supported clipboard image.");
-    const blob = await item.getType(type);
-    if (generation === request && key === props.ownerKey && !props.disabled) {
-      busy.value = false;
-      await load(blob);
-    }
-  } catch {
-    if (generation === request && key === props.ownerKey)
-      sourceError.value = props.t("paintSourceFailed");
-  } finally {
-    if (generation === request) busy.value = false;
-  }
+    if (!item || !type) throw Error("No supported clipboard picture.");
+    return item.getType(type);
+  });
 }
+async function texture(id: PictureTextureId) {
+  await loadSource(() => createPictureTextureBlob(id), id);
+}
+const selectedTexture = computed(() =>
+  paint.value?.kind === "picture" ? pictureTextureFromAssetId(paint.value.assetId) : undefined,
+);
 const patternPreviews = new Map<PicturePatternPreset, string>();
 function patternPreview(preset: PicturePatternPreset) {
   const cached = patternPreviews.get(preset);
@@ -260,20 +287,23 @@ function patternPreview(preset: PicturePatternPreset) {
 </script>
 <template>
   <div class="picture-paint-editor">
-    <PictureFormatField :label="t('paintMode')"
+    <PictureFormatField :label="t(paintRole === 'line' ? 'lineMode' : 'paintMode')"
       ><TSelect
         :model-value="mode"
         :options="modes"
         :disabled="disabled"
         size="small"
-        :aria-label="t('paintMode')"
+        :aria-label="t(paintRole === 'line' ? 'lineMode' : 'paintMode')"
         @change="changeMode"
     /></PictureFormatField>
     <template v-if="paint">
+      <p v-if="paintRole !== 'line'" class="picture-paint-editor__source">
+        {{ t("paintBehindSourceHelp") }}
+      </p>
       <PicturePaintColor
         v-if="paint.kind === 'solid'"
         :value="paint.color"
-        :label="t('paintColor')"
+        :label="t(paintRole === 'line' ? 'lineColor' : 'paintColor')"
         :automatic-label="t('automatic')"
         :disabled="disabled"
         :on-commit="(color) => paint?.kind === 'solid' && commit({ ...paint, color })"
@@ -323,6 +353,13 @@ function patternPreview(preset: PicturePatternPreset) {
       </template>
       <template v-if="paint.kind === 'picture'">
         <p class="picture-paint-editor__source">{{ t("paintSourceReady") }}</p>
+        <PictureTextureGallery
+          :owner-key="ownerKey"
+          :selected="selectedTexture"
+          :disabled="disabled || !loadAsset"
+          :t="t"
+          :on-select="texture"
+        />
         <div class="picture-paint-editor__actions">
           <TButton
             variant="outline"

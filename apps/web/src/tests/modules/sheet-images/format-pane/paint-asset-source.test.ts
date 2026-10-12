@@ -116,3 +116,26 @@ test("failed validation or storage does not admit an ID", async () => {
     expect(source.has(asset().id)).toBe(false);
   }
 });
+
+test("generated textures preserve content hash while explicitly recording their preset identity", async () => {
+  const store = createMemoryImageAssetStore(),
+    decoded = { ...asset(), id: `image-${"a".repeat(64)}` };
+  const source = createPicturePaintAssetSource({
+    getSnapshot: snapshot,
+    store,
+    prepare: async () => decoded,
+  });
+  const id = await source.load(new Blob(["synthetic"]), "paper");
+  expect(id).toBe(`image-texture-v1-paper-${"a".repeat(64)}`);
+  expect(source.has(id!)).toBe(true);
+  expect(await store.get(id!)).toMatchObject({ id, width: 16, height: 16 });
+});
+test("an unknown texture identifier is rejected before any image decode or storage", async () => {
+  const prepare = vi.fn(async () => asset()),
+    store = createMemoryImageAssetStore(),
+    put = vi.spyOn(store, "put"),
+    source = createPicturePaintAssetSource({ getSnapshot: snapshot, store, prepare });
+  await expect(source.load(new Blob(["synthetic"]), "unknown" as never)).rejects.toThrow();
+  expect(prepare).not.toHaveBeenCalled();
+  expect(put).not.toHaveBeenCalled();
+});

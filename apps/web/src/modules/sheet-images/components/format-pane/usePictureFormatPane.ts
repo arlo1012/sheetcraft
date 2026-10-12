@@ -1,3 +1,4 @@
+import type { PictureTextureId } from "../../picture-texture";
 import { computed, onUnmounted, ref, useId, watch, type ComputedRef } from "vue";
 import type { PictureDetailedStyle } from "@sheetcraft/core/picture-detailed-style";
 import {
@@ -42,7 +43,7 @@ export interface PictureFormatPaneInputs {
   onIntent: PictureFormatIntentHandler;
   t: PictureFormatTranslate;
   options?: PictureFormatOptions;
-  loadPaintAsset?: (blob: Blob) => Promise<string | undefined>;
+  loadPaintAsset?: (blob: Blob, texture?: PictureTextureId) => Promise<string | undefined>;
 }
 export interface PictureFormatDraftBinding {
   text: string;
@@ -99,7 +100,7 @@ export interface PictureFormatPaneController {
   reset: (type: PictureFormatReset) => PictureFormatResetBinding;
   detailed: <K extends PictureDetailedCategory>(category: K) => PictureFormatDetailedBinding<K>;
   hasDetailedCapabilities: ComputedRef<boolean>;
-  loadPaintAsset?: (blob: Blob) => Promise<string | undefined>;
+  loadPaintAsset?: (blob: Blob, texture?: PictureTextureId) => Promise<string | undefined>;
   options: (
     field: PictureFormatChoiceField,
   ) => readonly { value: string; label: string; disabled?: boolean }[] | undefined;
@@ -112,6 +113,13 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
   const state = ref(createPictureFormatDraftState(props.snapshot));
   const bindingGeneration = ref(0);
   const detailedErrors = ref<Partial<Record<PictureDetailedCategory, string>>>({});
+  const detailedCallbackGeneration = ref(0);
+  watch(
+    () => props.onIntent,
+    () => {
+      detailedCallbackGeneration.value++;
+    },
+  );
   function cancel() {
     bindingGeneration.value += 1;
     state.value = cancelPictureFormatDraft(state.value);
@@ -383,7 +391,9 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
       const capability = props.capabilities.detailed?.[category];
       const owned = identity();
       return {
-        ownerKey: props.snapshot ? pictureFormatOwnerKey(props.snapshot.owner) : "",
+        ownerKey: props.snapshot
+          ? `${pictureFormatOwnerKey(props.snapshot.owner)}:detail:${bindingGeneration.value}:${detailedCallbackGeneration.value}`
+          : "",
         value: getPictureOwnDetailedStyle(props.snapshot?.appearance)?.[category],
         disabled: !props.snapshot || capability?.enabled !== true,
         reason: capability?.reason,

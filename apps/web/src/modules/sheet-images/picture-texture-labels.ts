@@ -1,0 +1,28 @@
+import type { PictureTextureId } from "./picture-texture";
+import type { PictureFormatLabelKey } from "./picture-format-pane-model";
+export const PICTURE_TEXTURE_LABELS = {
+  paper: "texturePaper",
+  parchment: "textureParchment",
+  linen: "textureLinen",
+  canvas: "textureCanvas",
+  denim: "textureDenim",
+  burlap: "textureBurlap",
+  "white-marble": "textureWhiteMarble",
+  "green-marble": "textureGreenMarble",
+  granite: "textureGranite",
+  sand: "textureSand",
+  cork: "textureCork",
+  oak: "textureOak",
+  walnut: "textureWalnut",
+  pine: "texturePine",
+  bamboo: "textureBamboo",
+  "brushed-steel": "textureBrushedSteel",
+  copper: "textureCopper",
+  pebbles: "texturePebbles",
+  water: "textureWater",
+  ripple: "textureRipple",
+  mist: "textureMist",
+  slate: "textureSlate",
+  brick: "textureBrick",
+  terrazzo: "textureTerrazzo",
+} as const satisfies Record<PictureTextureId, PictureFormatLabelKey>;

@@ -8,6 +8,12 @@ import type {
   PictureFormatLabelKey,
 } from "../../picture-format-pane-model";
 import { createPictureRotation3d } from "../../picture-effect-edit";
+import {
+  getPictureEffectPresetGroups,
+  getPictureEffectPreset,
+  findPictureEffectPresetId,
+} from "../../picture-effect-presets";
+import PicturePresetGallery from "./PicturePresetGallery.vue";
 import PictureFormatField from "./PictureFormatField.vue";
 import PicturePaintNumber from "./PicturePaintNumber.vue";
 const props = defineProps<{
@@ -65,9 +71,25 @@ function numberProps(
     rejectedMessage: props.t("applyRejected"),
   };
 }
+const presetGroups = getPictureEffectPresetGroups("rotation3d");
+const presetId = computed(() => findPictureEffectPresetId("rotation3d", props.value));
+function selectPreset(id: string) {
+  const value = getPictureEffectPreset("rotation3d", id);
+  return !props.disabled && value !== undefined && props.onCommit(value);
+}
 </script>
 <template>
   <div class="picture-rotation3d-editor">
+    <PicturePresetGallery
+      :owner-key="ownerKey"
+      :groups="presetGroups"
+      :selected-id="presetId"
+      :disabled="disabled"
+      :t="t"
+      :on-select="selectPreset"
+      :columns="4"
+      :empty-label="mode === 'inherit' ? t('effectInherit') : t('effectCustom')"
+    />
     <PictureFormatField :label="t('projectionMode')"
       ><TSelect
         :model-value="mode"

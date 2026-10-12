@@ -7,6 +7,12 @@ import type {
   PictureFormatLabelKey,
 } from "../../picture-format-pane-model";
 import { createPictureGlow } from "../../picture-effect-edit";
+import {
+  getPictureEffectPresetGroups,
+  getPictureEffectPreset,
+  findPictureEffectPresetId,
+} from "../../picture-effect-presets";
+import PicturePresetGallery from "./PicturePresetGallery.vue";
 import PictureFormatField from "./PictureFormatField.vue";
 import PicturePaintNumber from "./PicturePaintNumber.vue";
 import PicturePaintColor from "./PicturePaintColor.vue";
@@ -57,9 +63,25 @@ function numberProps(
     rejectedMessage: props.t("applyRejected"),
   };
 }
+const presetGroups = getPictureEffectPresetGroups("glow");
+const presetId = computed(() => findPictureEffectPresetId("glow", props.value));
+function selectPreset(id: string) {
+  const value = getPictureEffectPreset("glow", id);
+  return !props.disabled && value !== undefined && props.onCommit(value);
+}
 </script>
 <template>
   <div class="picture-glow-editor">
+    <PicturePresetGallery
+      :owner-key="ownerKey"
+      :groups="presetGroups"
+      :selected-id="presetId"
+      :disabled="disabled"
+      :t="t"
+      :on-select="selectPreset"
+      :columns="6"
+      :empty-label="mode === 'inherit' ? t('effectInherit') : t('effectCustom')"
+    />
     <PictureFormatField :label="t('effectMode')"
       ><TSelect
         :model-value="mode"

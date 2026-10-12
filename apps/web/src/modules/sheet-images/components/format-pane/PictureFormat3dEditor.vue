@@ -12,7 +12,8 @@ import type {
   PictureFormatTranslate,
   PictureFormatLabelKey,
 } from "../../picture-format-pane-model";
-import { PICTURE_MATERIAL_LABELS, PICTURE_LIGHTING_LABELS } from "../../picture-effect-options";
+import { PICTURE_MATERIAL_GALLERY, PICTURE_LIGHTING_GALLERY } from "../../picture-material-presets";
+import PicturePresetGallery from "./PicturePresetGallery.vue";
 import { createPictureFormat3d } from "../../picture-effect-edit";
 import PictureFormatField from "./PictureFormatField.vue";
 import PicturePaintNumber from "./PicturePaintNumber.vue";
@@ -31,12 +32,6 @@ const modes = computed(() => [
   { value: "none", label: props.t("effectNone") },
   { value: "value", label: props.t("effectCustom") },
 ]);
-const materials = computed(() =>
-  PICTURE_MATERIAL_IDS.map((value) => ({ value, label: props.t(PICTURE_MATERIAL_LABELS[value]) })),
-);
-const lighting = computed(() =>
-  PICTURE_LIGHTING_IDS.map((value) => ({ value, label: props.t(PICTURE_LIGHTING_LABELS[value]) })),
-);
 function choose(value: unknown) {
   if (props.disabled) return;
   if (value === "inherit") props.onCommit(undefined);
@@ -49,6 +44,18 @@ function update(patch: Partial<PictureFormat3d>) {
     !!format.value &&
     !props.disabled &&
     props.onCommit({ kind: "value", value: { ...format.value, ...patch } })
+  );
+}
+function selectMaterial(id: string): boolean {
+  return (
+    PICTURE_MATERIAL_IDS.includes(id as PictureFormat3d["material"]) &&
+    update({ material: id as PictureFormat3d["material"] })
+  );
+}
+function selectLighting(id: string): boolean {
+  return (
+    PICTURE_LIGHTING_IDS.includes(id as PictureFormat3d["lighting"]) &&
+    update({ lighting: id as PictureFormat3d["lighting"] })
   );
 }
 function numberProps(
@@ -117,32 +124,26 @@ function numberProps(
         "
         unit="pt"
       />
-      <PictureFormatField :label="t('material')"
-        ><TSelect
-          :model-value="format.material"
-          :options="materials"
-          :disabled="disabled"
-          size="small"
-          :aria-label="t('material')"
-          @change="
-            (value) =>
-              PICTURE_MATERIAL_IDS.includes(value as PictureFormat3d['material']) &&
-              update({ material: value as PictureFormat3d['material'] })
-          "
-      /></PictureFormatField>
-      <PictureFormatField :label="t('lighting')"
-        ><TSelect
-          :model-value="format.lighting"
-          :options="lighting"
-          :disabled="disabled"
-          size="small"
-          :aria-label="t('lighting')"
-          @change="
-            (value) =>
-              PICTURE_LIGHTING_IDS.includes(value as PictureFormat3d['lighting']) &&
-              update({ lighting: value as PictureFormat3d['lighting'] })
-          "
-      /></PictureFormatField>
+      <PicturePresetGallery
+        :owner-key="ownerKey"
+        :groups="PICTURE_MATERIAL_GALLERY"
+        :selected-id="format.material"
+        :label="t('material')"
+        :t="t"
+        :disabled="disabled"
+        :columns="4"
+        :on-select="selectMaterial"
+      />
+      <PicturePresetGallery
+        :owner-key="ownerKey"
+        :groups="PICTURE_LIGHTING_GALLERY"
+        :selected-id="format.lighting"
+        :label="t('lighting')"
+        :t="t"
+        :disabled="disabled"
+        :columns="4"
+        :on-select="selectLighting"
+      />
       <PicturePaintNumber
         v-bind="
           numberProps(

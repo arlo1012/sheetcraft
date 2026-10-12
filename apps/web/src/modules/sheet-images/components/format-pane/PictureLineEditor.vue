@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { PictureTextureId } from "../../picture-texture";
 import { computed } from "vue";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { Choice, PictureLine, PicturePaint } from "@sheetcraft/core/picture-detailed-style";
@@ -16,7 +17,7 @@ const props = defineProps<{
   disabled?: boolean;
   t: PictureFormatTranslate;
   sourceAssetId?: string;
-  loadAsset?: (blob: Blob) => Promise<string | undefined>;
+  loadAsset?: (blob: Blob, texture?: PictureTextureId) => Promise<string | undefined>;
   onCommit: (value: Choice<PictureLine> | undefined) => boolean;
 }>();
 const line = computed(() => (props.value?.kind === "value" ? props.value.value : undefined));
@@ -98,6 +99,7 @@ function select<K extends "compound" | "dash" | "cap" | "join">(
 <template>
   <div class="picture-line-editor">
     <PicturePaintEditor
+      paint-role="line"
       :owner-key="ownerKey"
       :value="paint"
       :disabled="disabled"
