@@ -51,7 +51,7 @@ function shape(id: string, x: number, y: number, width = 120, height = 80) {
   s.shapeFrame.anchor = { mode: "fixed", x, y, size: { width, height } };
   return s;
 }
-function fixture(grouped = false, rejected = false) {
+function fixture(grouped = false, rejected = false, nested = false) {
   const workbook = reactive(createWorkbook({ id: "groups-ui", sheetId: "s" })),
     sheet = getActiveSheet(workbook),
     metrics = reactive(createPictureSheetMetrics(sheet));
@@ -61,6 +61,13 @@ function fixture(grouped = false, rejected = false) {
       sheet.drawings,
       ["a", "b"],
       { id: "g", name: "Group" },
+      metrics,
+    );
+  if (nested)
+    sheet.drawings = groupShapeRoots(
+      [...sheet.drawings!, shape("c", 450, 140)],
+      ["g", "c"],
+      { id: "outer", name: "Outer" },
       metrics,
     );
   const session = createWorkbookSession({ workbook, idFactory: createSequentialIdFactory() });
@@ -329,4 +336,88 @@ test("retained member handle callbacks cannot edit a different current member se
   await nextTick();
   expect(serializeWorkbook(f.workbook)).toEqual(before);
   expect(f.applyOne).not.toHaveBeenCalled();
+});
+
+test("multi floating equal dimensions uses last selected owner and one reversible collection transaction", async () => {
+  const f = fixture();
+  await f.click("a", 130, 80);
+  await f.click("b", 300, 90, true);
+  const before = serializeWorkbook(f.workbook);
+  action('[data-shape-selection-action="equal-width"]');
+  await nextTick();
+  expect(resolveShapeDrawing(f.sheet.drawings![0]!, f.metrics).rect.width).toBe(90);
+  expect(resolveShapeDrawing(f.sheet.drawings![0]!, f.metrics).rect.height).toBe(80);
+  expect(resolveShapeDrawing(f.sheet.drawings![1]!, f.metrics).rect.width).toBe(90);
+  expect(undoWorkbookCommand(f.session)).toBe(true);
+  await f.sync();
+  expect(serializeWorkbook(f.workbook)).toEqual(before);
+});
+test("nested container is directly selectable, moves only its subtree, and one-level Ungroup preserves all world leaves", async () => {
+  const f = fixture(true, false, true);
+  await f.click("a", 130, 80);
+  const beforeRoot = f.sheet.drawings![0]!;
+  if (!isShapeGroupDrawing(beforeRoot)) throw Error("group");
+  const before = resolveShapeGroupProjection(beforeRoot, f.metrics).leaves;
+  const border = f.wrapper.get('[data-shape-group-id="g"] [data-shape-group-move]');
+  border.element.dispatchEvent(pointer("pointerdown", 350, 80));
+  window.dispatchEvent(pointer("pointerup", 350, 80));
+  await nextTick();
+  expect(
+    f.wrapper.get('[data-shape-group-id="g"]').findAll("[data-shape-group-resize]"),
+  ).toHaveLength(8);
+  expect(
+    f.wrapper.get('[data-shape-group-id="outer"]').findAll("[data-shape-group-resize]"),
+  ).toHaveLength(0);
+  border.element.dispatchEvent(pointer("pointerdown", 350, 80));
+  window.dispatchEvent(pointer("pointerup", 390, 100));
+  await nextTick();
+  const movedRoot = f.sheet.drawings![0]!;
+  if (!isShapeGroupDrawing(movedRoot)) throw Error("group");
+  const moved = resolveShapeGroupProjection(movedRoot, f.metrics).leaves;
+  expect(moved[0]!.layout!.rect.x).toBeCloseTo(before[0]!.layout!.rect.x + 40);
+  expect(moved[1]!.layout!.rect.y).toBeCloseTo(before[1]!.layout!.rect.y + 20);
+  expect(moved[2]!.layout!.rect).toEqual(before[2]!.layout!.rect);
+  f.wrapper
+    .get('[data-shape-group-id="g"]')
+    .element.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "F2", bubbles: true, cancelable: true }),
+    );
+  expect(f.wrapper.emitted("formatGroup")!.at(-1)!).toEqual([movedRoot, ["outer", "g"]]);
+  action("[data-shape-group-ungroup]");
+  await nextTick();
+  const result = f.sheet.drawings![0]!;
+  if (!isShapeGroupDrawing(result)) throw Error("group");
+  expect(result.members.map((n) => n.id)).toEqual(["a", "b", "c"]);
+  const after = resolveShapeGroupProjection(result, f.metrics).leaves;
+  expect(after.map((l) => l.layout!.rect)).toEqual(moved.map((l) => l.layout!.rect));
+  expect(undoWorkbookCommand(f.session)).toBe(true);
+  await f.sync();
+  expect(f.sheet.drawings![0]).toEqual(movedRoot);
+});
+
+test("dragging a selected root group frame preserves and transforms every multi-selected root", async () => {
+  const f = fixture(true);
+  f.sheet.drawings = [...f.sheet.drawings!, shape("c", 450, 140)];
+  await f.sync();
+  await f.click("a", 130, 80);
+  await f.click("c", 500, 180, true);
+  const before = serializeWorkbook(f.workbook);
+  f.wrapper
+    .get('[data-shape-group-id="g"] [data-shape-group-move]')
+    .element.dispatchEvent(pointer("pointerdown", 350, 80));
+  window.dispatchEvent(pointer("pointerup", 380, 100));
+  await nextTick();
+  const root = f.sheet.drawings![0]!;
+  if (!isShapeGroupDrawing(root)) throw Error("group");
+  const leaves = resolveShapeGroupProjection(root, f.metrics).leaves;
+  expect(leaves[0]!.layout!.rect.x).toBe(110);
+  expect(leaves[1]!.layout!.rect.y).toBe(80);
+  expect(resolveShapeDrawing(f.sheet.drawings![1]!, f.metrics).rect).toMatchObject({
+    x: 480,
+    y: 160,
+  });
+  expect(document.querySelectorAll('[data-shape-selection-action="group"]')).toHaveLength(1);
+  expect(undoWorkbookCommand(f.session)).toBe(true);
+  await f.sync();
+  expect(serializeWorkbook(f.workbook)).toEqual(before);
 });

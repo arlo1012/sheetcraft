@@ -11,6 +11,7 @@ import {
   type ShapeFormatNumberField,
 } from "../../shape-format-pane-model";
 import type { ShapeFormatController } from "./useShapeFormatPane";
+import ShapeFormatMixedNumber from "./ShapeFormatMixedNumber.vue";
 const props = withDefaults(
   defineProps<{
     controller: ShapeFormatController;
@@ -33,6 +34,7 @@ function escape(event: KeyboardEvent) {
 }
 const capability = computed(() => props.controller.fieldCapability(props.field));
 const value = computed(() => props.controller.props.snapshot?.values[props.field]);
+const mixed = computed(() => props.controller.isMixedField(props.field));
 const binding = computed(() => {
   const c = props.controller,
     field = props.field,
@@ -41,9 +43,10 @@ const binding = computed(() => {
   const length = isShapeFormatLengthField(field);
   const display = (value: number) => (length ? shapeFormatToDisplay(value, unit) : value);
   const apply = c.session.fieldAction(field);
+  const draftOwnerKey = `${c.ownerKey.value}:${field}:${unit}`;
   return {
-    ownerKey: `${c.ownerKey.value}:${field}:${unit}`,
-    value: display(value.value ?? 0),
+    ownerKey: draftOwnerKey,
+    value: value.value === undefined || mixed.value ? undefined : display(value.value),
     label: c.fieldLabel(field),
     disabled: !cap.enabled,
     min: cap.min === undefined ? undefined : display(cap.min),
@@ -53,7 +56,10 @@ const binding = computed(() => {
     rejectedMessage: c.s.value("applyRejected"),
     onCommit: (next: number) => {
       const accepted = apply(length ? shapeFormatFromDisplay(next, unit) : next);
-      c.setNumericDraft(draftId, !accepted);
+      // A retained callback may report stale ownership, but must not mark the
+      // newly selected drawing as having an active numeric draft.
+      if (`${c.ownerKey.value}:${props.field}:${props.unit}` === draftOwnerKey)
+        c.setNumericDraft(draftId, !accepted);
       return accepted;
     },
   };
@@ -61,7 +67,16 @@ const binding = computed(() => {
 </script>
 <template>
   <div :data-shape-format-field="field" @input.capture="input" @keydown.capture="escape">
-    <PicturePaintNumber v-if="value !== undefined" v-bind="binding" />
+    <ShapeFormatMixedNumber
+      v-if="mixed"
+      v-bind="binding"
+      :placeholder="controller.s.value('mixedValues')"
+    />
+    <PicturePaintNumber
+      v-else-if="binding.value !== undefined"
+      v-bind="binding"
+      :value="binding.value"
+    />
     <PictureFormatField v-else :label="controller.fieldLabel(field)"
       ><TInput model-value="" disabled size="small" :aria-label="controller.fieldLabel(field)"
     /></PictureFormatField>

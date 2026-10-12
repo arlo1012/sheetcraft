@@ -133,7 +133,7 @@ defineExpose({
   <aside
     data-shape-format-pane
     class="shape-format-pane"
-    :aria-label="controller.s.value('paneTitle')"
+    :aria-label="controller.s.value(controller.isGroup.value ? 'groupPaneTitle' : 'paneTitle')"
     @keydown="keydown"
     @pointerdown.capture="beforeInteraction"
     @focusin.capture="beforeInteraction"
@@ -141,7 +141,9 @@ defineExpose({
   >
     <header class="shape-format-pane__header">
       <div class="shape-format-pane__heading">
-        <strong>{{ controller.s.value("paneTitle") }}</strong
+        <strong>{{
+          controller.s.value(controller.isGroup.value ? "groupPaneTitle" : "paneTitle")
+        }}</strong
         ><span v-if="snapshot?.drawing.name" :title="snapshot.drawing.name">{{
           snapshot.drawing.name
         }}</span>
@@ -244,6 +246,25 @@ defineExpose({
         {{ controller.s.value("missingSelection") }}
       </p>
       <template v-else>
+        <div
+          v-if="controller.isGroup.value"
+          class="shape-format-pane__scope"
+          data-shape-format-group-scope
+        >
+          <strong>{{ controller.s.value("groupScope") }}</strong>
+          <p>
+            {{
+              controller.s.value(
+                tab === "size-properties"
+                  ? "groupSizeScopeHelp"
+                  : mode === "text"
+                    ? "groupTextScopeHelp"
+                    : "groupShapeScopeHelp",
+              )
+            }}
+          </p>
+          <p v-if="snapshot.scopeDescription">{{ snapshot.scopeDescription }}</p>
+        </div>
         <p class="shape-format-pane__hint">{{ controller.s.value("capabilityNote") }}</p>
         <p v-if="controller.error.value" class="shape-format-pane__error" role="alert">
           {{ controller.error.value }}
@@ -425,6 +446,19 @@ defineExpose({
     font-size: 12px;
     line-height: 18px;
     overflow-wrap: anywhere;
+  }
+  &__scope {
+    margin: 8px 0;
+    color: var(--sheetcraft-text-secondary);
+    font-size: 12px;
+    line-height: 18px;
+    strong {
+      color: var(--sheetcraft-text-primary);
+      font-weight: 500;
+    }
+    p {
+      margin: 3px 0 0;
+    }
   }
   &__error {
     color: var(--sheetcraft-text-primary);

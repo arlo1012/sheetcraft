@@ -317,9 +317,10 @@ export function useDrawingActions(options: {
     next: readonly SheetDrawing[],
     expected: readonly SheetDrawing[],
     expectedMetrics?: PictureSheetMetrics,
+    guard?: () => boolean,
   ): boolean {
     try {
-      const binding = bindCollection(expected, expectedMetrics);
+      const binding = bindCollection(expected, expectedMetrics, guard);
       return !!binding && applyCollection(next, binding);
     } catch {
       return false;

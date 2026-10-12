@@ -160,6 +160,12 @@ import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
 import { prepareShapeTextUpdate } from "../modules/sheet-drawings/prepare-shape-text-update";
 import DrawingEditorDialog from "../modules/sheet-drawings/components/DrawingEditorDialog.vue";
 import ShapeFormatPane from "../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
+import { useOwnedShapeGroupFormatPane } from "../modules/sheet-drawings/useOwnedShapeGroupFormatPane";
+import {
+  traverseShapeGroup,
+  type ShapeGroupDrawing,
+  type ShapeGroupPath,
+} from "@sheetcraft/core/shape-group";
 import { useOwnedShapeFormatPane } from "../modules/sheet-drawings/useOwnedShapeFormatPane";
 import { createShapePaintAssetSource } from "../modules/sheet-drawings/shape-paint-asset-source";
 import InsertToolbar from "../modules/insert-tools/components/InsertToolbar.vue";
@@ -1575,7 +1581,10 @@ function insertPivot(chart: boolean): void {
   else if (!activePivot.value) pivotActions.open(chart);
 }
 function editSheetDrawing(drawing: SheetDrawing): void {
-  if (drawing.kind === "shapeGroup") return;
+  if (drawing.kind === "shapeGroup") {
+    openShapeGroupFormat(drawing, [drawing.id]);
+    return;
+  }
   if (drawing.kind === "chart") chartActions.edit(drawing);
   else if (drawing.kind === "control") controlActions.open(drawing);
   else if (drawing.kind === "attachment") attachmentActions.viewing.value = drawing;
@@ -1847,8 +1856,43 @@ const shapeFormatPane = useOwnedShapeFormatPane({
   isAssetAvailable: (id) => imageAssetUrls.value.has(id) || shapePaintAssets.has(id),
   getUnsupportedReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
 });
+const shapeGroupFormatPane = useOwnedShapeGroupFormatPane({
+  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+  replaceCollection: drawingActions.replaceCollection,
+  isAssetAvailable: (id) => imageAssetUrls.value.has(id) || shapePaintAssets.has(id),
+  getUnsupportedReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
+  getScopeDescription: (scope) =>
+    t("drawing.groupFormatScope", {
+      count: scope.descendantCount,
+      body: scope.bodyEligibleCount,
+      text: scope.textEligibleCount,
+    }),
+});
+function openShapeGroupFormat(root: ShapeGroupDrawing, path: ShapeGroupPath) {
+  if (shapeGroupFormatPane.open(root, path)) {
+    shapeFormatPane.close();
+    drawingActions.close();
+    sheetGridRef.value?.selectDrawing(root.id);
+  }
+}
+function selectedShapeGroupChanged(rootId: string | null, path: ShapeGroupPath | null) {
+  if (
+    shapeGroupFormatPane.root.value &&
+    (shapeGroupFormatPane.root.value.id !== rootId ||
+      JSON.stringify(shapeGroupFormatPane.path.value) !== JSON.stringify(path))
+  ) {
+    shapeGroupFormatPane.close();
+    shapePaintAssets.cancel();
+  }
+}
 const shapePaintAssets = createShapePaintAssetSource({
-  getSnapshot: () => shapeFormatPane.snapshot.value,
+  getSnapshot: () => shapeGroupFormatPane.snapshot.value ?? shapeFormatPane.snapshot.value,
   store: assetStore,
   preparePixels: async (asset) => {
     if (asset.width * asset.height * 4 > 64 * 1024 * 1024) return;
@@ -1866,11 +1910,21 @@ const shapePaintAssets = createShapePaintAssetSource({
 onBeforeUnmount(shapePaintAssets.dispose);
 watch(
   () =>
-    [shapeFormatPane.drawing.value, drawingDialog.value?.initial, imageAssetUrls.value] as const,
-  ([selected, edited, urls]) => {
+    [
+      shapeFormatPane.drawing.value,
+      drawingDialog.value?.initial,
+      shapeGroupFormatPane.root.value,
+      imageAssetUrls.value,
+    ] as const,
+  ([selected, edited, group, urls]) => {
     const retained = new Set<string>();
-    for (const drawing of [selected, edited])
-      for (const id of getShapeTextAssetIds(drawing?.shapeText)) {
+    const groupText = group
+      ? traverseShapeGroup(group).flatMap((visit) =>
+          visit.node.kind !== "shapeGroup" ? [visit.node.shapeText] : [],
+        )
+      : [];
+    for (const text of [selected?.shapeText, edited?.shapeText, ...groupText])
+      for (const id of getShapeTextAssetIds(text)) {
         const url = urls.get(id);
         if (url) {
           retained.add(url);
@@ -1883,11 +1937,16 @@ watch(
 );
 function openShapeFormat(drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing) {
   if (shapeFormatPane.open(drawing)) {
+    shapeGroupFormatPane.close();
     drawingActions.close();
     sheetGridRef.value?.selectDrawing(drawing.id);
   }
 }
 function selectedShapeChanged(id: string | null) {
+  if (shapeGroupFormatPane.root.value && shapeGroupFormatPane.root.value.id !== id) {
+    shapeGroupFormatPane.close();
+    shapePaintAssets.cancel();
+  }
   if (shapeFormatPane.drawing.value && shapeFormatPane.drawing.value.id !== id) {
     shapeFormatPane.close();
     shapePaintAssets.cancel();
@@ -4664,6 +4723,8 @@ watch(
           @edit-drawing="editSheetDrawing"
           @edit-owned-shape="drawingActions.editGroupLeaf"
           @format-drawing="openShapeFormat"
+          @format-shape-group="openShapeGroupFormat"
+          @selected-shape-group-change="selectedShapeGroupChanged"
           @selected-drawing-change="selectedShapeChanged"
           @configure-pivot="openPivotFields"
           @update-pivot="pivotActions.update"
@@ -4777,16 +4838,25 @@ watch(
         @close="closeOwnedPictureFormat"
       />
       <ShapeFormatPane
-        v-if="shapeFormatPane.snapshot.value"
-        :snapshot="shapeFormatPane.snapshot.value"
-        :capabilities="shapeFormatPane.capabilities.value"
-        :on-intent="shapeFormatPane.onIntent"
+        v-if="shapeGroupFormatPane.snapshot.value || shapeFormatPane.snapshot.value"
+        :snapshot="shapeGroupFormatPane.snapshot.value ?? shapeFormatPane.snapshot.value"
+        :capabilities="
+          shapeGroupFormatPane.snapshot.value
+            ? shapeGroupFormatPane.capabilities.value
+            : shapeFormatPane.capabilities.value
+        "
+        :on-intent="
+          shapeGroupFormatPane.snapshot.value
+            ? shapeGroupFormatPane.onIntent
+            : shapeFormatPane.onIntent
+        "
         :load-paint-asset="shapePaintAssets.load"
         :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
         :t="pictureFormatLabel"
         initial-tab="fill-line"
         @close="
           shapeFormatPane.close();
+          shapeGroupFormatPane.close();
           shapePaintAssets.cancel();
         "
       />

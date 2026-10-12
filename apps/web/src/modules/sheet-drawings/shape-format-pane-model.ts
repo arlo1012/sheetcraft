@@ -4,6 +4,7 @@ import type {
   SheetFramedGraphicDrawing,
 } from "@sheetcraft/core/sheet-drawings";
 import type { ShapeLineEnds } from "@sheetcraft/core/shape-line-ends";
+import type { ShapeGroupNode } from "@sheetcraft/core/shape-group";
 import type { ShapeTextDirection, ShapeTextParagraph } from "@sheetcraft/core/shape-text";
 import type {
   PictureFormatCapability,
@@ -86,10 +87,18 @@ export interface ShapeFormatSnapshot {
   owner: Readonly<ShapeFormatOwner>;
   revision: number;
   /** Actual committed drawing. Never a FloatingImage facsimile or a mutable drawing index. */
-  drawing: Readonly<SheetGraphicDrawing | SheetFramedGraphicDrawing>;
+  drawing: Readonly<SheetGraphicDrawing | SheetFramedGraphicDrawing | ShapeGroupNode>;
   values: Readonly<Partial<ShapeFormatValues>>;
+  /** An omitted mixed value is editable only when its explicit capability allows it. */
+  mixedFields?: readonly ShapeFormatField[];
+  /** Optional host-localized explanation, such as exact selected-subtree member counts. */
+  scopeDescription?: string;
   shapeStyle?: Readonly<PictureDetailedStyle>;
   textStyle?: Readonly<PictureDetailedStyle>;
+  /** Mixed categories are not represented by an arbitrary leaf's style. */
+  mixedStyleCategories?: Readonly<
+    Partial<Record<ShapeFormatMode, readonly ShapeFormatStyleCategory[]>>
+  >;
   /** Exact intent acknowledgement allows other active drafts to survive our own accepted edit. */
   acceptedIntentId?: string;
 }
@@ -267,11 +276,17 @@ export function createShapeFormatSession(source: {
   function lineEndsAction() {
     const token = capture();
     return (value: ShapeLineEnds | undefined): boolean =>
-      send(token, source.capabilities().lineEnds, (identity) => ({
-        ...identity,
-        type: "set-line-ends",
-        value,
-      }));
+      send(
+        token,
+        source.snapshot()?.drawing.kind === "shapeGroup"
+          ? { enabled: false }
+          : source.capabilities().lineEnds,
+        (identity) => ({
+          ...identity,
+          type: "set-line-ends",
+          value,
+        }),
+      );
   }
   function marginsAction() {
     const token = capture();

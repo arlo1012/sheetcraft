@@ -6,11 +6,17 @@ import { groupShapeRoots, ungroupShapeRoot } from "@sheetcraft/core/shape-group-
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { framedShape } from "../../modules/sheet-drawings/framed-shape-fixture";
 import SheetDrawingLayer from "../../../modules/sheet-drawings/components/SheetDrawingLayer.vue";
+import ShapeFormatPane from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
 import { isFramedShapeDrawing } from "@sheetcraft/core/sheet-drawings";
 import SheetShapeCreationLayer from "../../../modules/sheet-drawings/components/SheetShapeCreationLayer.vue";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
-import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
+import {
+  createMemoryImageAssetStore,
+  type ImageAssetStore,
+} from "../../../modules/image-assets/imageAssetStore";
+import * as imagePainter from "../../../modules/sheet-grid/canvas/image-painter";
+import { materializeDrawingShapeText } from "../../../modules/sheet-drawings/shape-text-options";
 import type { useShapeCreation } from "../../../modules/sheet-drawings/useShapeCreation";
 import { SHAPE_GALLERY } from "../../../modules/sheet-drawings/shape-gallery";
 import { createAppI18n } from "../../../shared/i18n";
@@ -18,6 +24,7 @@ import { createAppI18n } from "../../../shared/i18n";
 const mounted: VueWrapper[] = [];
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
+  vi.restoreAllMocks();
   document.body.replaceChildren();
 });
 
@@ -26,6 +33,9 @@ function setupState(wrapper: VueWrapper) {
   return (wrapper.vm.$ as unknown as { setupState: unknown }).setupState as {
     shapeCreation: ReturnType<typeof useShapeCreation>;
     shapeInteractionBlocked: boolean;
+    shapeGroupFormatPane: ReturnType<
+      typeof import("../../../modules/sheet-drawings/useOwnedShapeGroupFormatPane").useOwnedShapeGroupFormatPane
+    >;
     setViewMode: (mode: "page-layout") => void;
     fileActions: ReturnType<
       typeof import("../../../modules/workbook-persistence/useWorkbookFileActions").useWorkbookFileActions
@@ -41,6 +51,7 @@ function fixture(
     | undefined
     | { revision: number; savedAt: number; snapshot: ReturnType<typeof serializeWorkbook> }
   >,
+  imageAssetStore: ImageAssetStore = createMemoryImageAssetStore(),
 ) {
   const wrapper = mount(SpreadsheetWorkspace, {
     props: {
@@ -49,7 +60,7 @@ function fixture(
         save: vi.fn(async () => ({ revision: 1, savedAt: 1 })),
         replace: vi.fn(async () => ({ revision: 1, savedAt: 1 })),
       },
-      imageAssetStore: createMemoryImageAssetStore(),
+      imageAssetStore,
     },
     global: { plugins: [createAppI18n("en-US")] },
   });
@@ -194,9 +205,119 @@ test("saved group starts in real Workspace and its collection command port perfo
   expect(layer.findAll("[data-sheet-drawing-id]")).toHaveLength(2);
   const expected = layer.props("drawings"),
     metrics = layer.props("metrics");
+  const root = expected[0]!;
+  if (!isShapeGroupDrawing(root)) throw new Error("Expected persisted group.");
+  layer.vm.$emit("formatGroup", root, [root.id]);
+  await flushPromises();
+  expect(state.shapeGroupFormatPane.root.value).toBe(root);
+  const pane = wrapper.getComponent(ShapeFormatPane);
+  expect(pane.props("snapshot")?.drawing).toBe(root);
+  expect(pane.props("snapshot")?.scopeDescription).toContain("2");
+  expect(pane.props("snapshot")?.drawing).not.toHaveProperty("text");
+  state.shapeGroupFormatPane.close();
+  await flushPromises();
   const next = ungroupShapeRoot(expected, "group", metrics!);
   expect(layer.props("applyCollection")!(next, expected, metrics!)).toBe(true);
   await flushPromises();
   expect(getActiveSheet(state.session.workbook).drawings!.map((d) => d.id)).toEqual(["a", "b"]);
   expect(serializeWorkbook(state.session.workbook).version).toBe(60);
+});
+
+test("opening a nested pane warms sibling glyph assets required by whole-root preflight without changing edit scope", async () => {
+  const createCache = imagePainter.createCanvasImageCache;
+  const caches: ReturnType<typeof createCache>[] = [];
+  vi.spyOn(imagePainter, "createCanvasImageCache").mockImplementation((onChange) => {
+    const cache = createCache(onChange);
+    const observed = { ...cache, get: vi.fn(cache.get), retain: vi.fn(cache.retain) };
+    caches.push(observed);
+    return observed;
+  });
+  const workbook = createWorkbook({ id: "saved-texture", sheetId: "texture-sheet" });
+  const sheet = getActiveSheet(workbook),
+    a = framedShape(),
+    b = framedShape();
+  a.id = "a";
+  b.id = "b";
+  a.text = "Glyph";
+  b.text = "";
+  const text = materializeDrawingShapeText({
+    ...a,
+    anchor: { row: 0, column: 0 },
+    offsetX: 0,
+    offsetY: 0,
+    width: 100,
+    height: 60,
+  });
+  text.style = {
+    fill: {
+      kind: "value",
+      value: {
+        kind: "picture",
+        assetId: "glyph",
+        opacity: 1,
+        rotateWithShape: true,
+        layout: {
+          kind: "stretch",
+          offsetXRatio: 0,
+          offsetYRatio: 0,
+          widthRatio: 1,
+          heightRatio: 1,
+        },
+      },
+    },
+  };
+  a.shapeText = text;
+  b.shapeFrame.anchor = { mode: "fixed", x: 350, y: 30, size: { width: 100, height: 60 } };
+  const c = framedShape();
+  c.id = "c";
+  c.text = "";
+  const inner = groupShapeRoots(
+    [b, c],
+    ["b", "c"],
+    { id: "inner", name: "Inner" },
+    createPictureSheetMetrics(sheet),
+  )[0]!;
+  sheet.drawings = groupShapeRoots(
+    [a, inner],
+    ["a", "inner"],
+    { id: "group", name: "Group" },
+    createPictureSheetMetrics(sheet),
+  );
+  const assets = createMemoryImageAssetStore();
+  await assets.put({
+    id: "glyph",
+    width: 1,
+    height: 1,
+    mimeType: "image/png",
+    blob: new Blob(
+      [
+        Uint8Array.from(
+          atob(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==",
+          ),
+          (ch) => ch.charCodeAt(0),
+        ),
+      ],
+      { type: "image/png" },
+    ),
+  });
+  const wrapper = fixture(
+    async () => ({ revision: 1, savedAt: 1, snapshot: serializeWorkbook(workbook) }),
+    assets,
+  );
+  await flushPromises();
+  const cache = caches[0]!;
+  expect(cache.get).not.toHaveBeenCalled();
+  const layer = wrapper.getComponent(SheetDrawingLayer),
+    root = layer.props("drawings")[0]!;
+  if (!isShapeGroupDrawing(root)) throw new Error("Expected texture group.");
+  expect(setupState(wrapper).shapeGroupFormatPane.open(root, [root.id, "inner"])).toBe(true);
+  await flushPromises();
+  expect(wrapper.getComponent(ShapeFormatPane).props("snapshot")?.drawing.id).toBe("inner");
+  expect(cache.get).toHaveBeenCalledWith(expect.stringMatching(/^blob:/));
+  const url = vi.mocked(cache.get).mock.calls[0]![0];
+  expect(cache.retain).toHaveBeenLastCalledWith(new Set([url]));
+  setupState(wrapper).shapeGroupFormatPane.close();
+  await flushPromises();
+  expect(cache.retain).toHaveBeenLastCalledWith(new Set());
 });

@@ -24,6 +24,10 @@ const endsCapability = computed(
     },
 );
 const endsAction = computed(() => props.controller.session.lineEndsAction());
+const leaf = computed(() => {
+  const drawing = props.controller.props.snapshot?.drawing;
+  return drawing?.kind === "shape" || drawing?.kind === "textBox" ? drawing : undefined;
+});
 const fillRef = ref<InstanceType<typeof PictureFormatSection>>(),
   lineRef = ref<InstanceType<typeof PictureFormatSection>>();
 defineExpose({
@@ -42,6 +46,13 @@ defineExpose({
     >
       <PicturePaintEditor v-bind="fill" :load-asset="fillAssetLoader" />
       <p
+        v-if="controller.isMixedStyle(target, 'fill')"
+        class="shape-format-fill-line__reason"
+        data-shape-format-mixed-style="fill"
+      >
+        {{ controller.s.value("mixedStyleNotice") }}
+      </p>
+      <p
         v-if="!fillCapability.enabled && fillCapability.reason"
         class="shape-format-fill-line__reason"
       >
@@ -57,14 +68,21 @@ defineExpose({
     >
       <PictureLineEditor v-bind="line" :load-asset="lineAssetLoader" />
       <p
+        v-if="controller.isMixedStyle(target, 'line')"
+        class="shape-format-fill-line__reason"
+        data-shape-format-mixed-style="line"
+      >
+        {{ controller.s.value("mixedStyleNotice") }}
+      </p>
+      <p
         v-if="!lineCapability.enabled && lineCapability.reason"
         class="shape-format-fill-line__reason"
       >
         {{ lineCapability.reason }}
       </p>
-      <template v-if="target === 'shape'">
+      <template v-if="target === 'shape' && leaf && controller.props.capabilities.lineEnds">
         <ShapeLineEndsControls
-          :ends="controller.props.snapshot?.drawing.shapeLineEnds"
+          :ends="leaf.shapeLineEnds"
           :disabled="!endsCapability.enabled"
           :locale="controller.props.locale"
           :handler="endsAction"

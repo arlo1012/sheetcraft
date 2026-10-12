@@ -22,6 +22,12 @@ const options = computed<readonly ShapeFormatOption[]>(() => {
     ];
   if (props.field === "textVerticalAlignment") {
     const values = c.props.snapshot?.values;
+    if (c.isMixedField("textDirection") || c.isMixedField("textLineOrder"))
+      return [
+        { value: "top", label: s("blockStart") },
+        { value: "middle", label: s("center") },
+        { value: "bottom", label: s("blockEnd") },
+      ];
     const direction = values?.textDirection ?? "horizontal";
     if (direction === "horizontal")
       return [
@@ -81,7 +87,10 @@ const action = computed(() => {
     :data-shape-format-field="field"
   >
     <TSelect
-      :model-value="controller.props.snapshot?.values[field]"
+      :model-value="
+        controller.isMixedField(field) ? '' : (controller.props.snapshot?.values[field] ?? '')
+      "
+      :placeholder="controller.isMixedField(field) ? controller.s.value('mixedValues') : undefined"
       :options="[...options]"
       :disabled="!capability.enabled"
       size="small"

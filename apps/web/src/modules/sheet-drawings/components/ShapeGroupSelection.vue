@@ -25,6 +25,7 @@ const props = withDefaults(
     selectionKey?: string;
     showHandles?: boolean;
     showAction?: boolean;
+    showFormat?: boolean;
   }>(),
   { showHandles: true, showAction: true },
 );
@@ -34,10 +35,11 @@ const emit = defineEmits<{
   rotate: [event: PointerEvent];
   nudgeRotation: [degrees: number];
   ungroup: [];
+  format: [];
 }>();
 const composer = useI18n({ useScope: "global" });
 const rootElement = ref<HTMLElement | null>(null);
-const actionElement = ref<HTMLButtonElement | null>(null);
+const actionElement = ref<HTMLDivElement | null>(null);
 const label = (key: MessageKey): string =>
   props.locale ? composer.t(key, {}, { locale: props.locale }) : composer.t(key);
 const resizeLabels: Record<FloatingImageResizeDirection, MessageKey> = {
@@ -178,6 +180,10 @@ const selectionActions = computed(() => {
       resize(direction, event, selectionKey),
     rotate: (event: PointerEvent) => rotate(event, selectionKey),
     rotateKey: (event: KeyboardEvent) => rotateKey(event, selectionKey),
+    format: (event: MouseEvent) => {
+      event.stopPropagation();
+      if (enabled(selectionKey, true) && actionOpen.value && props.showFormat) emit("format");
+    },
     ungroup: (event: MouseEvent) => {
       event.stopPropagation();
       if (enabled(selectionKey, true) && actionOpen.value) emit("ungroup");
@@ -262,23 +268,39 @@ const selectionActions = computed(() => {
       />
     </div>
     <Teleport to="body">
-      <button
+      <div
         v-if="actionOpen"
         ref="actionElement"
-        type="button"
-        :disabled="disabled"
-        class="shape-group-selection__ungroup"
         :style="actionStyle"
-        :aria-label="label('picture.ungroup')"
-        :title="label('picture.ungroup')"
-        data-shape-group-ungroup
-        :data-shape-group-action-owner="selectionKey"
+        class="shape-group-selection__actions"
         @pointerdown.stop
-        v-on="{ click: selectionActions.ungroup }"
-        @dblclick.prevent.stop
+        @click.stop
       >
-        {{ label("picture.ungroup") }}
-      </button>
+        <button
+          v-if="showFormat"
+          type="button"
+          :disabled="disabled"
+          :aria-label="label('drawing.formatGroup')"
+          data-shape-group-format
+          v-on="{ click: selectionActions.format }"
+        >
+          {{ label("drawing.formatGroup") }}
+        </button>
+        <button
+          type="button"
+          :disabled="disabled"
+          class="shape-group-selection__ungroup"
+          :aria-label="label('picture.ungroup')"
+          :title="label('picture.ungroup')"
+          data-shape-group-ungroup
+          :data-shape-group-action-owner="selectionKey"
+          @pointerdown.stop
+          v-on="{ click: selectionActions.ungroup }"
+          @dblclick.prevent.stop
+        >
+          {{ label("picture.ungroup") }}
+        </button>
+      </div>
     </Teleport>
   </div>
 </template>
@@ -286,6 +308,24 @@ const selectionActions = computed(() => {
 <style scoped lang="scss">
 @use "../../../shared/floating/floating-panel" as panel;
 .shape-group-selection {
+  &__actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    pointer-events: auto;
+    z-index: var(--sheetcraft-layer-toolbar);
+    @include panel.toolbar-surface(var(--sheetcraft-layer-toolbar));
+    padding: 4px;
+    button {
+      font: inherit;
+      color: inherit;
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      padding: 4px 6px;
+      white-space: nowrap;
+    }
+  }
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -350,7 +390,6 @@ const selectionActions = computed(() => {
     }
   }
   &__ungroup {
-    @include panel.toolbar-surface(var(--sheetcraft-layer-toolbar));
     height: 28px;
     padding: 0 8px;
     color: var(--sheetcraft-text-primary);

@@ -62,6 +62,13 @@ export function useShapeFormatPane(props: ShapeFormatPaneInput) {
   const ownerKey = computed(
     () => `${props.snapshot ? shapeFormatOwnerKey(props.snapshot.owner) : "none"}:${epoch.value}`,
   );
+  const isGroup = computed(() => props.snapshot?.drawing.kind === "shapeGroup");
+  function isMixedField(field: ShapeFormatField): boolean {
+    return props.snapshot?.mixedFields?.includes(field) === true;
+  }
+  function isMixedStyle(target: ShapeFormatMode, category: ShapeFormatStyleCategory): boolean {
+    return props.snapshot?.mixedStyleCategories?.[target]?.includes(category) === true;
+  }
   watch(
     () =>
       [
@@ -93,7 +100,7 @@ export function useShapeFormatPane(props: ShapeFormatPaneInput) {
   function fieldCapability(field: ShapeFormatField): PictureFormatCapability {
     const capability = props.capabilities.fields[field];
     if (!props.snapshot) return { enabled: false, reason: s.value("missingSelection") };
-    if (props.snapshot.values[field] === undefined)
+    if (props.snapshot.values[field] === undefined && !isMixedField(field))
       return { enabled: false, reason: capability?.reason ?? s.value("missingValue") };
     return capability ?? { enabled: false, reason: s.value("unsupported") };
   }
@@ -120,7 +127,8 @@ export function useShapeFormatPane(props: ShapeFormatPaneInput) {
         : base(key);
     return {
       ownerKey: `${ownerKey.value}:${target}:${category}`,
-      value: style(target)?.[category],
+      value: isMixedStyle(target, category) ? undefined : style(target)?.[category],
+      mixed: isMixedStyle(target, category),
       disabled: !capability.enabled,
       t,
       onCommit: session.styleAction(target, category),
@@ -169,6 +177,9 @@ export function useShapeFormatPane(props: ShapeFormatPaneInput) {
     props,
     s,
     ownerKey,
+    isGroup,
+    isMixedField,
+    isMixedStyle,
     error,
     session,
     cancel,

@@ -1,4 +1,10 @@
 export const drawingsEnUS = {
+  "drawing.equalHeight": "Equal height",
+  "drawing.equalWidth": "Equal width",
+  "drawing.equalSize": "Equal size",
+  "drawing.formatGroup": "Format group",
+  "drawing.groupFormatScope":
+    "Size and properties belong to this group. Body and text changes apply to eligible members ({body}/{count} body, {text}/{count} text).",
   "drawing.groupName": "Group",
   "drawing.selectionShortcuts": "Shape selection shortcuts",
   "drawing.collectionRejected":

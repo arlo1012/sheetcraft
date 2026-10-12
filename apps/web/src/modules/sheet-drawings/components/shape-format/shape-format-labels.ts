@@ -1,6 +1,21 @@
 /** Localized shape-only labels. Existing structured paint/effect editors use the host's picture translator. */
 const en = {
   paneTitle: "Format Shape",
+  groupPaneTitle: "Format Group",
+  groupScope: "Selected group",
+  groupSizeScopeHelp:
+    "Size and object properties apply to this group. Text-box settings apply to its shape and text-box members, including members of nested groups.",
+  groupShapeScopeHelp:
+    "Shape fill, outline, and effects apply to all shape and text-box members in this group, including members of nested groups.",
+  groupTextScopeHelp:
+    "Text formatting applies to all shape and text-box members in this group, including members of nested groups.",
+  mixedValues: "Mixed values",
+  mixedStyleNotice:
+    "Members have different settings. Choosing a setting applies this entire category to every shape and text-box member in the selected group.",
+  mixedEffectSetting: "Common effect setting",
+  mixedEffectNone: "Remove this effect",
+  mixedEffectInherit: "Use inherited effect",
+  mixedEffectDefault: "Apply default effect, then customize",
   shapeOptions: "Shape Options",
   textOptions: "Text Options",
   textFillOutline: "Text Fill & Outline",
@@ -53,6 +68,8 @@ const en = {
   leftToRight: "Left-to-Right",
   blockLeft: "Left",
   blockRight: "Right",
+  blockStart: "Start of text block",
+  blockEnd: "End of text block",
   left: "Left",
   center: "Center",
   right: "Right",
@@ -77,6 +94,18 @@ export type ShapeFormatLabelKey = keyof typeof en;
 export type ShapeFormatTranslate = (key: ShapeFormatLabelKey) => string;
 const zh: Record<ShapeFormatLabelKey, string> = {
   paneTitle: "设置形状格式",
+  groupPaneTitle: "设置组合格式",
+  groupScope: "所选组合",
+  groupSizeScopeHelp:
+    "大小和对象属性应用于此组合；文本框设置应用于组合内所有形状和文本框，包括嵌套组合中的成员。",
+  groupShapeScopeHelp: "形状填充、轮廓和效果应用于组合内所有形状和文本框，包括嵌套组合中的成员。",
+  groupTextScopeHelp: "文本格式应用于组合内所有形状和文本框，包括嵌套组合中的成员。",
+  mixedValues: "不同值",
+  mixedStyleNotice: "成员的设置不同。选择设置后，此类别的全部设置会应用于所选组合内的每个成员。",
+  mixedEffectSetting: "统一效果设置",
+  mixedEffectNone: "移除此效果",
+  mixedEffectInherit: "使用继承的效果",
+  mixedEffectDefault: "应用默认效果后自定义",
   shapeOptions: "形状选项",
   textOptions: "文本选项",
   textFillOutline: "文本填充与轮廓",
@@ -129,6 +158,8 @@ const zh: Record<ShapeFormatLabelKey, string> = {
   leftToRight: "从左向右",
   blockLeft: "左端",
   blockRight: "右端",
+  blockStart: "文本块起始端",
+  blockEnd: "文本块末端",
   left: "左对齐",
   center: "居中",
   right: "右对齐",

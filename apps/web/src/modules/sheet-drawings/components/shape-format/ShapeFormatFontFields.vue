@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from "vue";
+import {
+  computed,
+  onUnmounted,
+  ref,
+  watch,
+  type DirectiveBinding,
+  type ObjectDirective,
+} from "vue";
 import FontFormatField from "../../../home-tools/components/FontFormatField.vue";
 import { useFontCatalog } from "../../../../shared/cell-text/useFontCatalog";
 import { resolveFontFamilyName } from "../../../../shared/cell-text/font-catalog";
@@ -15,11 +22,24 @@ import ShapeFormatCheckbox from "./ShapeFormatCheckbox.vue";
 import ShapeFormatChoiceField from "./ShapeFormatChoiceField.vue";
 import type { ShapeFormatController } from "./useShapeFormatPane";
 const props = defineProps<{ controller: ShapeFormatController }>();
-const family = computed(() => props.controller.props.snapshot?.values.fontFamily);
+const family = computed(() =>
+  props.controller.isMixedField("fontFamily")
+    ? undefined
+    : props.controller.props.snapshot?.values.fontFamily,
+);
 const draft = ref(family.value),
   dirty = ref(false),
   error = ref<string>();
 let request = 0;
+// FontFormatField owns its inner input. Attach the shape-specific mixed placeholder
+// to that input without turning the placeholder into a selected font family.
+function fontPlaceholder(element: HTMLElement, binding: DirectiveBinding<string | undefined>) {
+  element.querySelector("input")?.setAttribute("placeholder", binding.value ?? "");
+}
+const vFontPlaceholder: ObjectDirective<HTMLElement, string | undefined> = {
+  mounted: fontPlaceholder,
+  updated: fontPlaceholder,
+};
 watch(
   () => props.controller.ownerKey.value,
   () => {
@@ -113,6 +133,11 @@ function escape(event: KeyboardEvent) {
       >
         <div @keydown.capture="escape">
           <FontFormatField
+            v-font-placeholder="
+              !dirty && controller.isMixedField('fontFamily')
+                ? controller.s.value('mixedValues')
+                : undefined
+            "
             :model-value="draft"
             :options="options"
             :label="controller.s.value('fontFamily')"
@@ -138,7 +163,10 @@ function escape(event: KeyboardEvent) {
       <ShapeFormatNumberField :controller="controller" field="paragraphAfterPt" />
       <ShapeFormatChoiceField :controller="controller" field="paragraphLineSpacing" />
       <ShapeFormatNumberField
-        v-show="controller.props.snapshot?.values.paragraphLineSpacing === 'exact'"
+        v-show="
+          controller.isMixedField('paragraphLineSpacing') ||
+          controller.props.snapshot?.values.paragraphLineSpacing === 'exact'
+        "
         :controller="controller"
         field="paragraphLineSpacingPt"
       />

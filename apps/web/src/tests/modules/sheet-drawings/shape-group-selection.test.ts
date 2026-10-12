@@ -33,6 +33,7 @@ function fixture(
     selectionKey?: string;
     showHandles?: boolean;
     showAction?: boolean;
+    showFormat?: boolean;
   } = {},
 ): VueWrapper {
   const wrapper = mount(ShapeGroupSelection, {
@@ -192,8 +193,8 @@ describe("genuine shape group selection frame", () => {
   test("has focusable, translated rotate and explicit Ungroup controls without a format pane", async () => {
     const wrapper = fixture({ locale: "zh-CN" });
     const ungroup = ungroupButton();
-    expect(ungroup.parentElement).toBe(document.body);
-    expect(ungroup.style.position).toBe("fixed");
+    expect(ungroup.parentElement!.parentElement).toBe(document.body);
+    expect(ungroup.parentElement!.style.position).toBe("fixed");
     expect(ungroup.textContent!.trim()).toBe("取消组合");
     expect(ungroup.getAttribute("aria-label")).toBe("取消组合");
     expect(ungroup.title).toBe("取消组合");
@@ -212,6 +213,22 @@ describe("genuine shape group selection frame", () => {
     await wrapper.setProps({ locale: "en-US" });
     expect(ungroup.textContent!.trim()).toBe("Ungroup");
     expect(ungroup.getAttribute("aria-label")).toBe("Ungroup");
+  });
+
+  test("the shared floating container exposes real Format and Ungroup with stale-owner rejection", async () => {
+    const wrapper = fixture({ showFormat: true });
+    const format = document.querySelector<HTMLButtonElement>("[data-shape-group-format]")!;
+    expect(format.parentElement).toBe(ungroupButton().parentElement);
+    expect(format.parentElement!.parentElement).toBe(document.body);
+    format.focus();
+    expect(document.activeElement).toBe(format);
+    format.click();
+    expect(wrapper.emitted("format")).toEqual([[]]);
+    const retained = renderedCallback(wrapper, "data-shape-group-format", "onClick");
+    await wrapper.setProps({ selectionKey: "sheet-1:other", showFormat: false });
+    retained(new MouseEvent("click"));
+    expect(wrapper.emitted("format")).toHaveLength(1);
+    expect(document.querySelector("[data-shape-group-format]")).toBeNull();
   });
 
   test("disabled synthetic control events cannot request mutations and close the floating action", async () => {
@@ -252,7 +269,7 @@ describe("genuine shape group selection frame", () => {
     expect(options).toEqual({ placement: "right-start", offset: 12 });
     const visible = reference.value!.getBoundingClientRect();
     expect([visible.x, visible.y, visible.width, visible.height]).toEqual([600, 400, 80, 80]);
-    expect(ungroupButton().parentElement).toBe(document.body);
+    expect(ungroupButton().parentElement!.parentElement).toBe(document.body);
     expect(wrapper.get("[data-shape-group-selection-clip]").element.contains(ungroupButton())).toBe(
       false,
     );

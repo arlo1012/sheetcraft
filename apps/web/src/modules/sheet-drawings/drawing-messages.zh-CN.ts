@@ -1,4 +1,10 @@
 export const drawingsZhCN = {
+  "drawing.equalHeight": "等高",
+  "drawing.equalWidth": "等宽",
+  "drawing.equalSize": "等尺寸",
+  "drawing.formatGroup": "组合格式",
+  "drawing.groupFormatScope":
+    "大小和属性属于此组合；主体与文字设置应用到对应成员（主体 {body}/{count}，文字 {text}/{count}）。",
   "drawing.groupName": "组合",
   "drawing.selectionShortcuts": "形状多选快捷操作",
   "drawing.collectionRejected":

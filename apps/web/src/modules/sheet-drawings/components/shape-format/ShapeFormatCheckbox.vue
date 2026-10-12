@@ -13,9 +13,15 @@ const action = computed(() => {
 <template>
   <div :data-shape-format-field="field">
     <TCheckbox
-      :model-value="controller.props.snapshot?.values[field] ?? false"
+      :model-value="
+        controller.isMixedField(field) ? false : (controller.props.snapshot?.values[field] ?? false)
+      "
+      :indeterminate="
+        controller.isMixedField(field) || controller.props.snapshot?.values[field] === undefined
+      "
       :disabled="!capability.enabled"
       :onChange="action"
+      :aria-checked="controller.isMixedField(field) ? 'mixed' : undefined"
       >{{ controller.fieldLabel(field) }}</TCheckbox
     >
     <p v-if="!capability.enabled && capability.reason" class="shape-format-checkbox-reason">

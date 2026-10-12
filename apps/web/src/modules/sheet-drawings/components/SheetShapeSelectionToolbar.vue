@@ -12,6 +12,9 @@ import {
   Crosshair,
   Group,
   ChevronDown,
+  Equal,
+  MoveHorizontal,
+  MoveVertical,
 } from "lucide-vue-next";
 import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import {
@@ -22,6 +25,7 @@ import { useMenu } from "../../../shared/menu/useMenu";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import type { EqualShapeDimensionsAction } from "../shape-root-selection-planning";
 import type { ShapeAlignment, ShapeAlignmentReference } from "../shape-selection-actions";
 
 const props = defineProps<{
@@ -37,11 +41,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   align: [action: ShapeAlignment, reference: ShapeAlignmentReference, selectionKey: string];
   group: [selectionKey: string];
+  equalize: [action: EqualShapeDimensionsAction, selectionKey: string];
   dismiss: [selectionKey: string];
   reference: [reference: ShapeAlignmentReference, selectionKey: string];
 }>();
 
-type ToolbarAction = ShapeAlignment | "reference" | "group";
+type ToolbarAction = ShapeAlignment | EqualShapeDimensionsAction | "reference" | "group";
 const { t } = useAppI18n();
 const surfaceRef = ref<InstanceType<typeof FloatingPanelSurface> | null>(null);
 const toolbarRef = computed(() => surfaceRef.value?.rootElement ?? null);
@@ -83,6 +88,7 @@ function enabled(action: ToolbarAction): boolean {
   if (props.disabled) return false;
   if (action === "horizontal" || action === "vertical") return props.count >= 3;
   if (action === "group") return props.canGroup === true && props.count >= 2;
+  if (action.startsWith("equal-")) return props.count >= 2;
   return true;
 }
 function tabIndex(action: ToolbarAction): number {
@@ -174,6 +180,18 @@ const toolbarActions = computed(() => {
     horizontal: () => align("horizontal", selectionKey),
     vertical: () => align("vertical", selectionKey),
     group: () => group(selectionKey),
+    equalHeight: () => {
+      if (selectionKey === props.selectionKey && enabled("equal-height"))
+        emit("equalize", "equal-height", selectionKey);
+    },
+    equalWidth: () => {
+      if (selectionKey === props.selectionKey && enabled("equal-width"))
+        emit("equalize", "equal-width", selectionKey);
+    },
+    equalSize: () => {
+      if (selectionKey === props.selectionKey && enabled("equal-size"))
+        emit("equalize", "equal-size", selectionKey);
+    },
     keydown: (event: KeyboardEvent) => onKeydown(event, selectionKey),
   };
 });
@@ -333,6 +351,39 @@ onBeforeUnmount(() => generation++);
           @click="toolbarActions.vertical"
         >
           <AlignVerticalDistributeCenter aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          :disabled="!enabled('equal-height')"
+          :tabindex="tabIndex('equal-height')"
+          :aria-label="t('drawing.equalHeight')"
+          :title="t('drawing.equalHeight')"
+          data-shape-selection-action="equal-height"
+          @click="toolbarActions.equalHeight"
+        >
+          <MoveVertical aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          :disabled="!enabled('equal-width')"
+          :tabindex="tabIndex('equal-width')"
+          :aria-label="t('drawing.equalWidth')"
+          :title="t('drawing.equalWidth')"
+          data-shape-selection-action="equal-width"
+          @click="toolbarActions.equalWidth"
+        >
+          <MoveHorizontal aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          :disabled="!enabled('equal-size')"
+          :tabindex="tabIndex('equal-size')"
+          :aria-label="t('drawing.equalSize')"
+          :title="t('drawing.equalSize')"
+          data-shape-selection-action="equal-size"
+          @click="toolbarActions.equalSize"
+        >
+          <Equal aria-hidden="true" />
         </button>
         <span class="sheet-shape-selection-toolbar__separator" aria-hidden="true" />
         <button

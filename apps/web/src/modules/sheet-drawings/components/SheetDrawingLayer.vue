@@ -40,7 +40,14 @@ import {
   moveSelectedShapeRoots,
   resizeSelectedShapeRoots,
   alignSelectedShapeRoots,
+  equalizeSelectedShapeRoots,
+  type EqualShapeDimensionsAction,
 } from "../shape-root-selection-planning";
+import {
+  updateOwnedShapeContainer,
+  ungroupOwnedShapeContainer,
+} from "../shape-group-container-editing";
+import { resolveShapeGroupFormatContext } from "../shape-group-format-planning";
 import type { ShapeAlignment, ShapeAlignmentReference } from "../shape-selection-actions";
 import { createBrowserIdFactory } from "../../../shared/runtime/browser-id-factory";
 import { useAppI18n } from "../../../shared/i18n";
@@ -113,6 +120,7 @@ const props = defineProps<{
     drawings: readonly SourceSheetDrawing[],
     expected: readonly SourceSheetDrawing[],
     metrics?: PictureSheetMetrics,
+    guard?: () => boolean,
   ) => boolean;
   metrics?: PictureSheetMetrics;
   pageProjection?: PageLayoutProjection;
@@ -133,6 +141,8 @@ const emit = defineEmits<{
   delete: [id: string];
   edit: [drawing: SourceSheetDrawing];
   editOwned: [root: ShapeGroupDrawing, path: ShapeGroupPath];
+  formatGroup: [root: ShapeGroupDrawing, path: ShapeGroupPath];
+  groupSelectionChange: [rootId: string | null, path: ShapeGroupPath | null];
   select: [];
   selectionChange: [id: string | null];
   format: [drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing];
@@ -559,11 +569,36 @@ const groupFragments = computed(() => {
     const displayed = rootsPreview.value?.find((d) => d.id === source.id) ?? source;
     if (!isShapeGroupDrawing(displayed)) return [];
     const projected = resolveShapeGroupProjection(displayed, m);
-    return getShapeGroupFrameFragments(projected.layout, props.layout, m, props.pageProjection).map(
-      (fragment) => ({ source, layout: projected.layout, fragment }),
+    return projected.owners.flatMap((owner) =>
+      owner.layout
+        ? getShapeGroupFrameFragments(owner.layout, props.layout, m, props.pageProjection).map(
+            (fragment) => ({ source, owner, layout: owner.layout!, fragment }),
+          )
+        : [],
     );
   });
 });
+watch(
+  () => [selectedRoots.value, selectedOwnedId.value, props.drawings] as const,
+  () => {
+    const root =
+      selectedRoots.value.length === 1
+        ? props.drawings.find((d) => d.id === selectedRoots.value[0])
+        : undefined;
+    if (!root || !isShapeGroupDrawing(root) || !metrics.value) {
+      emit("groupSelectionChange", null, null);
+      return;
+    }
+    const projection = resolveShapeGroupProjection(root, metrics.value);
+    const node = selectedOwnedId.value
+      ? [...projection.owners, ...projection.leaves].find(
+          (n) => n.sourceNode.id === selectedOwnedId.value,
+        )
+      : projection.owners[0];
+    emit("groupSelectionChange", root.id, node?.path ?? null);
+  },
+  { flush: "sync" },
+);
 const toolbarAnchor = computed<FloatingReference | null>(() => {
   if (selectedRoots.value.length < 2 || !layerElement.value) return null;
   const visible = [
@@ -604,7 +639,18 @@ function runSelectionPlan(
       props.drawings.some((d, i) => d !== expected[i])
     )
       return false;
-    const accepted = props.applyCollection(next, expected, m) === true;
+    const accepted =
+      props.applyCollection(
+        next,
+        expected,
+        m,
+        () =>
+          key === selectionKey.value &&
+          metrics.value === m &&
+          !selectionDisabled.value &&
+          props.drawings.length === expected.length &&
+          props.drawings.every((d, i) => d === expected[i]),
+      ) === true;
     selectionFailure.value = !accepted;
     return accepted;
   } catch {
@@ -630,6 +676,34 @@ function alignSelected(
       key,
     );
 }
+function equalizeSelected(action: EqualShapeDimensionsAction, key: string): void {
+  if (metrics.value)
+    runSelectionPlan(
+      () =>
+        equalizeSelectedShapeRoots(
+          props.drawings,
+          selectedRoots.value,
+          action,
+          metrics.value!,
+          alignmentReference.value,
+        ),
+      key,
+    );
+}
+function selectedContainerPath(source: ShapeGroupDrawing): ShapeGroupPath {
+  const own =
+    selectedOwnedId.value &&
+    metrics.value &&
+    resolveShapeGroupProjection(source, metrics.value).owners.find(
+      (o) => o.sourceNode.id === selectedOwnedId.value,
+    );
+  return own ? own.path : [source.id];
+}
+function formatGroup(source: ShapeGroupDrawing, path: ShapeGroupPath): void {
+  if (props.drawings.find((d) => d.id === source.id) !== source || selectionDisabled.value) return;
+  selectRoots([source.id], path.length > 1 ? path.at(-1)! : null);
+  emit("formatGroup", source, path);
+}
 function groupSelected(key: string): void {
   if (key !== selectionKey.value || !metrics.value) return;
   const id = createId("shape-group");
@@ -647,7 +721,7 @@ function groupSelected(key: string): void {
   )
     selectRoots([id]);
 }
-function ungroupSelected(source: ShapeGroupDrawing): void {
+function ungroupSelected(source: ShapeGroupDrawing, path: ShapeGroupPath = [source.id]): void {
   const m = metrics.value;
   if (
     !m ||
@@ -655,7 +729,14 @@ function ungroupSelected(source: ShapeGroupDrawing): void {
     !selectedRoots.value.includes(source.id)
   )
     return;
-  if (runSelectionPlan(() => ungroupShapeRoot(props.drawings, source.id, m)))
+  if (path.length > 1) {
+    if (
+      runSelectionPlan(() =>
+        props.drawings.map((d) => (d === source ? ungroupOwnedShapeContainer(source, path, m) : d)),
+      )
+    )
+      selectRoots([source.id], path.length > 2 ? path.at(-2)! : null);
+  } else if (runSelectionPlan(() => ungroupShapeRoot(props.drawings, source.id, m)))
     selectRoots(source.members.map((d) => d.id));
 }
 function deleteSelected(): void {
@@ -664,7 +745,16 @@ function deleteSelected(): void {
   const own =
     selectedOwnedId.value &&
     resolvedDrawings.value.find((d) => d.view.id === selectedOwnedId.value)?.groupLeaf;
-  const paths: ShapeGroupPath[] = own ? [own.path] : selectedRoots.value.map((id) => [id]);
+  const selectedRoot = props.drawings.find((d) => d.id === selectedRoots.value[0]);
+  const container =
+    selectedRoot && isShapeGroupDrawing(selectedRoot)
+      ? selectedContainerPath(selectedRoot)
+      : undefined;
+  const paths: ShapeGroupPath[] = own
+    ? [own.path]
+    : container && container.length > 1
+      ? [container]
+      : selectedRoots.value.map((id) => [id]);
   if (runSelectionPlan(() => planDeleteShapeGroupNodes(props.drawings, paths, m))) {
     if (own && props.drawings.some((d) => d.id === own.sourceRoot.id))
       selectRoots([own.sourceRoot.id]);
@@ -689,6 +779,7 @@ function startRootGesture(
   direction?: FloatingImageResizeDirection,
   mode: "move" | "rotate" = "move",
   onClick?: () => void,
+  ownedPath?: ShapeGroupPath,
 ): void {
   const m = metrics.value;
   const root = props.drawings.find((d) => d.id === id);
@@ -736,7 +827,9 @@ function startRootGesture(
     y: fragment.rect.y - translation.y,
   };
   const groupLayout = isShapeGroupDrawing(root)
-    ? resolveShapeGroupProjection(root, m).layout
+    ? ownedPath
+      ? resolveShapeGroupFormatContext(root, ownedPath, m).layout
+      : resolveShapeGroupProjection(root, m).layout
     : undefined;
   const centerRect =
     groupLayout?.rect ?? resolvedDrawings.value.find((d) => d.source === root)?.rect ?? worldRect;
@@ -760,7 +853,34 @@ function startRootGesture(
     const delta = { x: nextPoint.x - origin.x, y: nextPoint.y - origin.y };
     moved = delta.x !== 0 || delta.y !== 0;
     try {
-      if (mode === "rotate") {
+      if (ownedPath && isShapeGroupDrawing(root) && groupLayout) {
+        let angle = groupLayout.angleDeg;
+        let rect = { ...groupLayout.rect };
+        if (mode === "rotate") {
+          angle +=
+            ((Math.atan2(nextPoint.y - center.y, nextPoint.x - center.x) - initialAngle) * 180) /
+            Math.PI;
+          if (point.shiftKey) angle = Math.round(angle / 15) * 15;
+        } else if (direction) {
+          const node = resolveShapeGroupFormatContext(root, ownedPath, m).sourceNode;
+          const resized = standardShapeResizeRect(
+            rect,
+            angle,
+            direction,
+            delta,
+            getShapeObjectProperties(node.shapeProperties).lockAspectRatio || point.shiftKey,
+            1,
+            true,
+          );
+          if (!resized) throw new RangeError("Nested group resize has no valid placement.");
+          rect = resized;
+        } else {
+          rect.x += delta.x;
+          rect.y += delta.y;
+        }
+        const next = updateOwnedShapeContainer(root, ownedPath, { rect, angleDeg: angle }, m);
+        rootsPreview.value = expected.map((d) => (d === root ? next : d));
+      } else if (mode === "rotate") {
         let degrees =
           ((Math.atan2(nextPoint.y - center.y, nextPoint.x - center.x) - initialAngle) * 180) /
           Math.PI;
@@ -809,14 +929,36 @@ function startGroupFrame(
   event: PointerEvent,
   direction?: FloatingImageResizeDirection,
   mode: "move" | "rotate" = "move",
+  path: ShapeGroupPath = [source.id],
 ): void {
   if (props.drawings.find((d) => d.id === source.id) !== source) return;
-  if (!selectedRoots.value.includes(source.id)) selectRoots([source.id]);
-  selectedOwnedId.value = null;
+  const nestedId = path.length > 1 ? path.at(-1)! : null;
+  if (nestedId !== null) {
+    if (
+      selectedRoots.value.length !== 1 ||
+      selectedRoots.value[0] !== source.id ||
+      selectedOwnedId.value !== nestedId
+    )
+      selectRoots([source.id], nestedId);
+  } else if (!selectedRoots.value.includes(source.id) || selectedOwnedId.value !== null)
+    selectRoots([source.id]);
+  pointEditingId.value = null;
   emit("select");
-  startRootGesture(source.id, fragment, event, direction, mode);
+  startRootGesture(
+    source.id,
+    fragment,
+    event,
+    direction,
+    mode,
+    undefined,
+    path.length > 1 ? path : undefined,
+  );
 }
-function groupKeydown(source: ShapeGroupDrawing, event: KeyboardEvent): void {
+function groupKeydown(
+  source: ShapeGroupDrawing,
+  event: KeyboardEvent,
+  path: ShapeGroupPath = [source.id],
+): void {
   if (
     event.defaultPrevented ||
     event.isComposing ||
@@ -826,10 +968,20 @@ function groupKeydown(source: ShapeGroupDrawing, event: KeyboardEvent): void {
     props.drawings.find((d) => d.id === source.id) !== source
   )
     return;
-  if (!selectedRoots.value.includes(source.id)) selectRoots([source.id]);
-  if (selectedOwnedId.value) selectedOwnedId.value = null;
+  if (
+    !selectedRoots.value.includes(source.id) ||
+    selectedOwnedId.value !== (path.length > 1 ? path.at(-1)! : null)
+  )
+    selectRoots([source.id], path.length > 1 ? path.at(-1)! : null);
+  if (event.key === "F2" || event.key === "Enter") {
+    event.preventDefault();
+    event.stopPropagation();
+    formatGroup(source, path);
+    return;
+  }
   if (event.key === "Escape") {
-    selectRoots([]);
+    if (path.length > 1) selectRoots([source.id], path.length > 2 ? path.at(-2)! : null);
+    else selectRoots([]);
     event.stopPropagation();
     return;
   }
@@ -849,9 +1001,25 @@ function groupKeydown(source: ShapeGroupDrawing, event: KeyboardEvent): void {
   if (delta && metrics.value) {
     event.preventDefault();
     event.stopPropagation();
-    runSelectionPlan(() =>
-      moveSelectedShapeRoots(props.drawings, selectedRoots.value, delta, metrics.value!),
-    );
+    if (path.length > 1)
+      runSelectionPlan(() => {
+        const layout = resolveShapeGroupFormatContext(source, path, metrics.value!).layout;
+        if (!layout) throw new RangeError("Nested group is collapsed.");
+        const next = updateOwnedShapeContainer(
+          source,
+          path,
+          {
+            rect: { ...layout.rect, x: layout.rect.x + delta.x, y: layout.rect.y + delta.y },
+            angleDeg: layout.angleDeg,
+          },
+          metrics.value!,
+        );
+        return props.drawings.map((d) => (d === source ? next : d));
+      });
+    else
+      runSelectionPlan(() =>
+        moveSelectedShapeRoots(props.drawings, selectedRoots.value, delta, metrics.value!),
+      );
   }
 }
 watch(
@@ -1572,7 +1740,18 @@ watch(
       activeVertex.value = 0;
     const surviving = selectedRoots.value.filter((id) => props.drawings.some((d) => d.id === id));
     if (surviving.length !== selectedRoots.value.length) selectRoots(surviving);
-    if (selectedOwnedId.value && !legacyDrawings.value.some((d) => d.id === selectedOwnedId.value))
+    if (
+      selectedOwnedId.value &&
+      !legacyDrawings.value.some((d) => d.id === selectedOwnedId.value) &&
+      !props.drawings.some(
+        (d) =>
+          isShapeGroupDrawing(d) &&
+          metrics.value &&
+          resolveShapeGroupProjection(d, metrics.value).owners.some(
+            (o) => o.sourceNode.id === selectedOwnedId.value,
+          ),
+      )
+    )
       selectedOwnedId.value = null;
   },
 );
@@ -1592,6 +1771,7 @@ watch(
       :label="t('drawing.selectionShortcuts')"
       :failure="selectionFailure ? t('drawing.collectionRejected') : undefined"
       @align="alignSelected"
+      @equalize="equalizeSelected"
       @group="groupSelected"
       @reference="
         (reference, key) => {
@@ -1718,15 +1898,15 @@ watch(
     </div>
     <div
       v-for="item in groupFragments"
-      :key="`group-${item.source.id}-${item.fragment.pageKey ?? item.fragment.paneId}`"
+      :key="`group-${item.owner.sourceNode.id}-${item.fragment.pageKey ?? item.fragment.paneId}`"
       class="sheet-drawing-layer__group"
-      :data-sheet-drawing-id="item.source.id"
-      :data-shape-group-id="item.source.id"
+      :data-sheet-drawing-id="item.owner.sourceNode.id"
+      :data-shape-group-id="item.owner.sourceNode.id"
       :style="fragmentStyle(item.fragment)"
       tabindex="0"
       role="group"
-      :aria-label="item.source.name"
-      @keydown="groupKeydown(item.source, $event)"
+      :aria-label="item.owner.sourceNode.name"
+      @keydown="groupKeydown(item.source, $event, item.owner.path)"
     >
       <ShapeGroupSelection
         :rect="item.layout.rect"
@@ -1735,7 +1915,7 @@ watch(
         :pane-clip="item.fragment.pageClip ?? layout.panes[item.fragment.paneId].clip"
         :show-action="
           groupFragments
-            .filter((g) => g.source === item.source)
+            .filter((g) => g.owner.sourceNode.id === item.owner.sourceNode.id)
             .sort(
               (a, b) =>
                 b.fragment.clippedRect.width * b.fragment.clippedRect.height -
@@ -1743,16 +1923,46 @@ watch(
             )[0] === item
         "
         :disabled="selectionDisabled"
-        :show-handles="!selectedOwnedId"
+        :show-handles="
+          selectedOwnedId
+            ? selectedOwnedId === item.owner.sourceNode.id
+            : item.owner.path.length === 1
+        "
+        show-format
         :selection-key="selectionKey"
         :locale="locale"
-        @move="(event) => startGroupFrame(item.source, item.fragment, event)"
-        @resize="
-          (direction, event) => startGroupFrame(item.source, item.fragment, event, direction)
+        @move="
+          (event) =>
+            startGroupFrame(item.source, item.fragment, event, undefined, 'move', item.owner.path)
         "
-        @rotate="(event) => startGroupFrame(item.source, item.fragment, event, undefined, 'rotate')"
-        @nudge-rotation="(degrees) => runSelectionPlan(() => rotateRootSelection(degrees))"
-        @ungroup="ungroupSelected(item.source)"
+        @resize="
+          (direction, event) =>
+            startGroupFrame(item.source, item.fragment, event, direction, 'move', item.owner.path)
+        "
+        @rotate="
+          (event) =>
+            startGroupFrame(item.source, item.fragment, event, undefined, 'rotate', item.owner.path)
+        "
+        @nudge-rotation="
+          (degrees) =>
+            runSelectionPlan(() => {
+              if (item.owner.path.length === 1) return rotateRootSelection(degrees);
+              const layout = resolveShapeGroupFormatContext(
+                item.source,
+                item.owner.path,
+                metrics!,
+              ).layout!;
+              const next = updateOwnedShapeContainer(
+                item.source,
+                item.owner.path,
+                { rect: layout.rect, angleDeg: layout.angleDeg + degrees },
+                metrics!,
+              );
+              return drawings.map((d) => (d === item.source ? next : d));
+            })
+        "
+        @ungroup="ungroupSelected(item.source, item.owner.path)"
+        @format="formatGroup(item.source, item.owner.path)"
       />
     </div>
   </div>

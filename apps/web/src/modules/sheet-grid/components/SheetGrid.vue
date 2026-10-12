@@ -309,6 +309,7 @@ const props = withDefaults(
       drawings: readonly SheetDrawing[],
       expected: readonly SheetDrawing[],
       metrics?: import("@sheetcraft/core/picture-axis-metrics").PictureSheetMetrics,
+      guard?: () => boolean,
     ) => boolean;
     shapeCreationCommit?: (request: ShapeCreationRequest, drawing: SheetGraphicDrawing) => boolean;
     shapeCreationCancel?: (request: ShapeCreationRequest) => void;
@@ -387,6 +388,14 @@ const emit = defineEmits<{
     path: import("@sheetcraft/core/shape-group").ShapeGroupPath,
   ];
   formatDrawing: [drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing];
+  formatShapeGroup: [
+    root: import("@sheetcraft/core/shape-group").ShapeGroupDrawing,
+    path: import("@sheetcraft/core/shape-group").ShapeGroupPath,
+  ];
+  selectedShapeGroupChange: [
+    rootId: string | null,
+    path: import("@sheetcraft/core/shape-group").ShapeGroupPath | null,
+  ];
   selectedDrawingChange: [id: string | null];
   configurePivot: [id: string];
   updatePivot: [table: SheetPivotTable];
@@ -4554,6 +4563,8 @@ defineExpose({
         @delete="emit('deleteDrawing', $event)"
         @edit="emit('editDrawing', $event)"
         @edit-owned="(root, path) => emit('editOwnedShape', root, path)"
+        @format-group="(root, path) => emit('formatShapeGroup', root, path)"
+        @group-selection-change="(id, path) => emit('selectedShapeGroupChange', id, path)"
       />
       <SheetFloatingImageLayer
         :source-tools-disabled="pictureSourceBusy"

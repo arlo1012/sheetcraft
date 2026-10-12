@@ -11,7 +11,11 @@ const props = defineProps<{
   multiline?: boolean;
 }>();
 const capability = computed(() => props.controller.fieldCapability(props.field));
-const value = computed(() => props.controller.props.snapshot?.values[props.field] ?? "");
+const value = computed(() =>
+  props.controller.isMixedField(props.field)
+    ? ""
+    : (props.controller.props.snapshot?.values[props.field] ?? ""),
+);
 const draft = ref(value.value),
   dirty = ref(false),
   error = ref<string>();
@@ -75,6 +79,9 @@ function keydown(_value: unknown, context: { e: KeyboardEvent }) {
       <TTextarea
         v-if="multiline"
         :model-value="draft"
+        :placeholder="
+          controller.isMixedField(field) ? controller.s.value('mixedValues') : undefined
+        "
         :disabled="!capability.enabled"
         :aria-label="controller.fieldLabel(field)"
         :aria-describedby="feedbackId"
@@ -87,6 +94,9 @@ function keydown(_value: unknown, context: { e: KeyboardEvent }) {
       <TInput
         v-else
         :model-value="draft"
+        :placeholder="
+          controller.isMixedField(field) ? controller.s.value('mixedValues') : undefined
+        "
         :disabled="!capability.enabled"
         :aria-label="controller.fieldLabel(field)"
         :aria-describedby="feedbackId"

@@ -171,6 +171,51 @@ describe("shape-owned canonical format contract", () => {
     ).toBe(true);
     expect(f.handler).toHaveBeenCalledTimes(2);
   });
+  test("actual group owners accept field intents but never container line-end intents", () => {
+    const f = fixture();
+    f.snapshot = {
+      ...f.snapshot!,
+      owner: { ...f.snapshot!.owner, drawingId: "group" },
+      drawing: {
+        kind: "shapeGroup",
+        id: "group",
+        name: "Actual group",
+        rotation: 0,
+        shapeFrame: {
+          kind: "shape-frame-v1",
+          anchor: { mode: "fixed", x: 10, y: 20, size: { width: 200, height: 100 } },
+        },
+        members: [
+          {
+            kind: "shape",
+            id: "member",
+            name: "Member",
+            shape: "rectangle",
+            groupFrame: {
+              kind: "shape-group-local-v1",
+              rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
+            },
+            rotation: 0,
+            text: "",
+            fill: "#4472C4",
+            stroke: "#203864",
+            strokeWidth: 1,
+            color: "#FFFFFF",
+            fontSize: 12,
+            bold: false,
+            italic: false,
+          },
+        ],
+      },
+    };
+    expect(f.session.fieldAction("sizeWidthPt")(300)).toBe(true);
+    expect(f.handler).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ owner: f.snapshot.owner, field: "sizeWidthPt", value: 300 }),
+    );
+    expect(f.session.lineEndsAction()(undefined)).toBe(false);
+    expect(f.failures.at(-1)).toBe("unsupported");
+    expect(f.handler).toHaveBeenCalledTimes(1);
+  });
   test("text paint remains independent and the layout KeepFlat field has one identity", () => {
     const f = fixture();
     f.capabilities.styles = {

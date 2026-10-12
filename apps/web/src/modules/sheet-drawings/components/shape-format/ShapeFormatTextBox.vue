@@ -35,6 +35,7 @@ const marginsCapability = computed(() => {
   return { enabled: true, reason: undefined };
 });
 const selectedPreset = computed(() => {
+  if (marginFields.some((field) => props.controller.isMixedField(field))) return undefined;
   const values = props.controller.props.snapshot?.values;
   if (!values) return "custom";
   for (const [key, preset] of Object.entries(marginPresets))
@@ -66,7 +67,10 @@ const action = computed(() => {
       <ShapeFormatChoiceField :controller="controller" field="textVerticalAlignment" />
       <ShapeFormatChoiceField :controller="controller" field="textDirection" />
       <ShapeFormatChoiceField
-        v-show="controller.props.snapshot?.values.textDirection === 'stacked'"
+        v-show="
+          controller.isMixedField('textDirection') ||
+          controller.props.snapshot?.values.textDirection === 'stacked'
+        "
         :controller="controller"
         field="textLineOrder"
       />
@@ -76,7 +80,10 @@ const action = computed(() => {
         data-shape-format-margins
       >
         <TSelect
-          :model-value="selectedPreset"
+          :model-value="selectedPreset ?? ''"
+          :placeholder="
+            selectedPreset === undefined ? controller.s.value('mixedValues') : undefined
+          "
           :options="options"
           :disabled="!marginsCapability.enabled"
           size="small"

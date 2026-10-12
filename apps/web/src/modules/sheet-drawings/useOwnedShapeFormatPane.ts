@@ -120,7 +120,12 @@ export function useOwnedShapeFormatPane(options: {
     if (!isFramedShapeDrawing(source))
       return { metrics: undefined, resolved: undefined, view: source };
   });
-  const snapshot = computed<ShapeFormatSnapshot | null>(() => {
+  const snapshot = computed<
+    | (Omit<ShapeFormatSnapshot, "drawing"> & {
+        drawing: Readonly<SheetGraphicDrawing | SheetFramedGraphicDrawing>;
+      })
+    | null
+  >(() => {
     const d = drawing.value,
       owner = selected.value,
       view = context.value?.view;
@@ -357,8 +362,9 @@ export function useOwnedShapeFormatPane(options: {
       shapeFormatOwnerKey(intent.owner) !== shapeFormatOwnerKey(before.owner)
     )
       return false;
-    const current = before.drawing,
-      captured = context.value,
+    const current = drawing.value;
+    if (!current || before.drawing !== current) return false;
+    const captured = context.value,
       selection = selected.value;
     if (
       !captured ||

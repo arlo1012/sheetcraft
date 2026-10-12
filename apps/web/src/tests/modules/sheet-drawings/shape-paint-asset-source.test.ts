@@ -98,7 +98,8 @@ function invalidate(f: Fixture, boundary: (typeof boundaries)[number]) {
   if (boundary === "revision") f.snapshot = { ...snapshot, revision: snapshot.revision + 1 };
   if (boundary === "drawing-reference")
     f.snapshot = { ...snapshot, drawing: { ...snapshot.drawing } };
-  if (boundary === "picture-source")
+  if (boundary === "picture-source") {
+    if (snapshot.drawing.kind === "shapeGroup") throw new Error("Expected graphic fixture.");
     f.snapshot = {
       ...snapshot,
       drawing: {
@@ -106,6 +107,7 @@ function invalidate(f: Fixture, boundary: (typeof boundaries)[number]) {
         shapeStyle: { fill: { kind: "value", value: picturePaint("other-texture") } },
       },
     };
+  }
   if (boundary === "missing-selection") f.snapshot = null;
   if (boundary === "cancel") f.source.cancel();
   if (boundary === "dispose") f.source.dispose();

@@ -7,6 +7,10 @@ import { createAppI18n } from "../../../../shared/i18n";
 import ShapeFormatPane from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
 import ShapeFormatNumberField from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatNumberField.vue";
 import ShapeFormatCheckbox from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatCheckbox.vue";
+import ShapeFormatChoiceField from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatChoiceField.vue";
+import ShapeFormatMixedNumber from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatMixedNumber.vue";
+import ShapeFormatMixedEffect from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatMixedEffect.vue";
+import ShapeLineEndsControls from "../../../../modules/sheet-drawings/components/ShapeLineEndsControls.vue";
 import PicturePaintNumber from "../../../../modules/sheet-images/components/format-pane/PicturePaintNumber.vue";
 import PicturePaintEditor from "../../../../modules/sheet-images/components/format-pane/PicturePaintEditor.vue";
 import PictureLineEditor from "../../../../modules/sheet-images/components/format-pane/PictureLineEditor.vue";
@@ -81,6 +85,58 @@ function snapshot(): ShapeFormatSnapshot {
         value: { kind: "solid", color: { kind: "rgb", rgb: "#4472C4" }, opacity: 1 },
       },
     },
+  };
+}
+function groupSnapshot(): ShapeFormatSnapshot {
+  const source = snapshot();
+  return {
+    ...source,
+    owner: { ...source.owner, drawingId: "group" },
+    drawing: {
+      kind: "shapeGroup",
+      id: "group",
+      name: "Actual group",
+      rotation: 31,
+      shapeFrame: {
+        kind: "shape-frame-v1",
+        anchor: { mode: "fixed", x: 10, y: 20, size: { width: 360, height: 180 } },
+      },
+      members: [
+        {
+          kind: "shape",
+          id: "member",
+          name: "Actual member",
+          shape: "rectangle",
+          groupFrame: {
+            kind: "shape-group-local-v1",
+            rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
+          },
+          rotation: 0,
+          text: "member text",
+          fill: "#4472C4",
+          stroke: "#203864",
+          strokeWidth: 1,
+          color: "#FFFFFF",
+          fontSize: 12,
+          bold: false,
+          italic: false,
+        },
+      ],
+    },
+    values: {
+      ...source.values,
+      sizeWidthPt: 360,
+      sizeHeightPt: 180,
+      rotationDeg: 31,
+      fontSizePt: undefined,
+      fontFamily: undefined,
+      textBold: undefined,
+      textWrap: undefined,
+      textDirection: undefined,
+    },
+    mixedFields: ["fontSizePt", "fontFamily", "textBold", "textWrap", "textDirection"],
+    mixedStyleCategories: { shape: ["fill", "shadow"] },
+    scopeDescription: "1 descendant belongs to this selected group.",
   };
 }
 const capabilities: ShapeFormatCapabilities = {
@@ -313,5 +369,207 @@ describe("shape format pane desktop reference surface", () => {
     expect(overflow.text()).toContain("暂不支持");
     await wrapper.trigger("keydown", { key: "Escape" });
     expect(wrapper.emitted("close")).toHaveLength(1);
+  });
+});
+
+describe("actual shape group aggregate controls", () => {
+  test("the genuine group header and scope retain root values and suppress container line ends", async () => {
+    const source = groupSnapshot();
+    const { wrapper } = fixture({
+      snapshot: source,
+      capabilities: { ...capabilities, lineEnds: { enabled: true } },
+    });
+    expect(wrapper.get(".shape-format-pane__heading").text()).toContain("Format Group");
+    expect(wrapper.get(".shape-format-pane__heading").text()).toContain("Actual group");
+    expect(wrapper.props("snapshot")!.drawing).toEqual(source.drawing);
+    expect(input(wrapper, "sizeWidthPt").element.value).toBe("360");
+    expect(input(wrapper, "sizeHeightPt").element.value).toBe("180");
+    expect(input(wrapper, "rotationDeg").element.value).toBe("31");
+    expect(wrapper.get("[data-shape-format-group-scope]").text()).toContain(
+      "Size and object properties apply to this group",
+    );
+    expect(wrapper.get("[data-shape-format-group-scope]").text()).toContain(
+      source.scopeDescription,
+    );
+    expect(wrapper.findComponent(ShapeLineEndsControls).exists()).toBe(false);
+    expect(wrapper.findAll('[role="tabpanel"]')).toHaveLength(6);
+    const fill = wrapper.findAllComponents(PicturePaintEditor)[0]!;
+    expect(fill.props("mixed")).toBe(true);
+    expect(fill.props("value")).toBeUndefined();
+    expect(wrapper.find('[data-shape-format-mixed-style="fill"]').text()).toContain(
+      "entire category",
+    );
+    await textMode(wrapper);
+    expect(wrapper.get("[data-shape-format-group-scope]").text()).toContain(
+      "Text formatting applies to all shape and text-box members",
+    );
+    const font = wrapper.get<HTMLInputElement>('[data-shape-format-field="fontFamily"] input');
+    expect(font.element.value).toBe("");
+    expect(font.attributes("placeholder")).toBe("Mixed values");
+  });
+  test("mixed numeric fields start blank and preserve full digits until one explicit canonical commit", async () => {
+    const { wrapper, onIntent } = fixture({
+      snapshot: groupSnapshot(),
+      capabilities: {
+        ...capabilities,
+        fields: { ...capabilities.fields, fontSizePt: { enabled: true, min: 1 } },
+      },
+    });
+    const field = input(wrapper, "fontSizePt");
+    expect(field.element.value).toBe("");
+    expect(field.attributes("placeholder")).toBe("Mixed values");
+    expect(field.element.disabled).toBe(false);
+    for (const digits of ["1", "12", "123", "123.", "123.45"]) {
+      await field.setValue(digits);
+      expect(field.element.value).toBe(digits);
+      expect(onIntent).not.toHaveBeenCalled();
+    }
+    await field.trigger("keydown", { key: "Enter" });
+    expect(onIntent).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        type: "set-field",
+        field: "fontSizePt",
+        value: 123.45,
+        owner: groupSnapshot().owner,
+      }),
+    );
+    await field.trigger("blur");
+    expect(onIntent).toHaveBeenCalledTimes(1);
+  });
+  test("mixed numeric invalid and rejected drafts remain intact; external changes reset and stale actions reject", async () => {
+    const onIntent = vi.fn(() => false);
+    const { wrapper } = fixture({
+      snapshot: groupSnapshot(),
+      onIntent,
+      capabilities: {
+        ...capabilities,
+        fields: { ...capabilities.fields, fontSizePt: { enabled: true, min: 1 } },
+      },
+    });
+    const field = input(wrapper, "fontSizePt");
+    const action = number(wrapper, "fontSizePt")
+      .getComponent(ShapeFormatMixedNumber)
+      .props("onCommit");
+    await field.setValue("12e");
+    await field.trigger("blur");
+    expect(field.element.value).toBe("12e");
+    expect(onIntent).not.toHaveBeenCalled();
+    await field.setValue("123.45");
+    await field.trigger("blur");
+    expect(field.element.value).toBe("123.45");
+    expect(wrapper.text()).toContain("Your draft has been kept");
+    expect(onIntent).toHaveBeenCalledTimes(1);
+    await field.trigger("keydown", { key: "Escape" });
+    expect(field.element.value).toBe("");
+    expect(wrapper.emitted("close")).toBeUndefined();
+    await field.setValue("555.");
+    await wrapper.setProps({ snapshot: { ...groupSnapshot(), revision: 3 } });
+    expect(field.element.value).toBe("");
+    expect(action(200)).toBe(false);
+    expect(onIntent).toHaveBeenCalledTimes(1);
+    await flushPromises();
+    expect(
+      wrapper
+        .findAllComponents(Select)
+        .find((component) => component.attributes("data-shape-format-units") !== undefined)!
+        .props("disabled"),
+    ).toBe(false);
+  });
+  test("accepted group edits preserve another mixed numeric draft at the acknowledged revision", async () => {
+    const { wrapper, onIntent } = fixture({
+      snapshot: groupSnapshot(),
+      capabilities: {
+        ...capabilities,
+        fields: { ...capabilities.fields, fontSizePt: { enabled: true, min: 1 } },
+      },
+    });
+    const field = input(wrapper, "fontSizePt"),
+      element = field.element;
+    await field.setValue("123.");
+    expect(
+      number(wrapper, "sizeWidthPt").getComponent(PicturePaintNumber).props("onCommit")(400),
+    ).toBe(true);
+    const intent = onIntent.mock.calls.at(-1)![0];
+    await wrapper.setProps({
+      snapshot: {
+        ...groupSnapshot(),
+        revision: 3,
+        acceptedIntentId: intent.intentId,
+        values: { ...groupSnapshot().values, sizeWidthPt: 400 },
+      },
+    });
+    expect(field.element).toBe(element);
+    expect(field.element.value).toBe("123.");
+    await field.trigger("blur");
+    expect(onIntent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ field: "fontSizePt", value: 123, baseRevision: 3 }),
+    );
+  });
+  test("indeterminate booleans and empty mixed choices emit explicit common values with exact ownership", async () => {
+    const { wrapper, onIntent } = fixture({
+      snapshot: groupSnapshot(),
+      capabilities: {
+        ...capabilities,
+        fields: {
+          ...capabilities.fields,
+          textBold: { enabled: true },
+          textDirection: { enabled: true },
+        },
+      },
+    });
+    const bold = wrapper
+      .findAllComponents(ShapeFormatCheckbox)
+      .find((component) => component.props("field") === "textBold")!
+      .getComponent(Checkbox);
+    expect(bold.props("indeterminate")).toBe(true);
+    expect(bold.props("modelValue")).toBe(false); // Controlled backing state; indeterminate is the displayed aggregate.
+    bold.vm.$emit("change", true);
+    const direction = wrapper
+      .findAllComponents(ShapeFormatChoiceField)
+      .find((component) => component.props("field") === "textDirection")!
+      .getComponent(Select);
+    expect(direction.props("modelValue")).toBe("");
+    expect(direction.props("placeholder")).toBe("Mixed values");
+    direction.vm.$emit("change", "horizontal");
+    await flushPromises();
+    expect(onIntent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ field: "textBold", value: true, owner: groupSnapshot().owner }),
+    );
+    expect(onIntent).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        field: "textDirection",
+        value: "horizontal",
+        owner: groupSnapshot().owner,
+      }),
+    );
+    const unsupported = number(wrapper, "paragraphBeforePt").getComponent(Input);
+    expect(unsupported.props("modelValue")).toBe("");
+    expect(unsupported.props("disabled")).toBe(true);
+  });
+  test("mixed effect reset is explicit and capability gated instead of displaying invented inheritance", async () => {
+    const { wrapper, onIntent } = fixture({
+      snapshot: groupSnapshot(),
+      capabilities: {
+        ...capabilities,
+        styles: { shape: { ...capabilities.styles?.shape, shadow: { enabled: true } } },
+      },
+    });
+    const mixed = wrapper.getComponent(ShapeFormatMixedEffect),
+      select = mixed.getComponent(Select);
+    expect(mixed.props("category")).toBe("shadow");
+    expect(select.props("modelValue")).toBe("");
+    expect(select.props("placeholder")).toBe("Mixed values");
+    select.vm.$emit("change", "none");
+    await flushPromises();
+    expect(onIntent).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        type: "set-style",
+        target: "shape",
+        category: "shadow",
+        value: { kind: "none" },
+      }),
+    );
   });
 });
