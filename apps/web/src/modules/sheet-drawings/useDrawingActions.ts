@@ -24,7 +24,7 @@ export function useDrawingActions(options: {
   const { dialog, editing, close } = targets;
   const allowed = () =>
     !options.isBusy() && canUseSheetPermission(options.getSheet(), "editObjects");
-  function insert(kind: SheetGraphicKind) {
+  function insert(kind: SheetGraphicKind, direction?: "horizontal" | "vertical") {
     const target = targets.prepare();
     if (!target) return;
     const initial: SheetGraphicDrawing = {
@@ -43,6 +43,10 @@ export function useDrawingActions(options: {
             ? options.name(kind)
             : "",
       shape: kind === "icon" ? "star" : "rectangle",
+      ...(kind === "shape" ? { shapeGeometry: { preset: "rect" as const } } : {}),
+      ...(kind === "textBox" && direction === "vertical"
+        ? { textDirection: "vertical" as const }
+        : {}),
       fill: kind === "shape" || kind === "icon" ? "#dbeafe" : "transparent",
       stroke: "#2563eb",
       strokeWidth: kind === "textBox" ? 0 : 1,
@@ -53,6 +57,16 @@ export function useDrawingActions(options: {
       rotation: 0,
     };
     targets.open(target, initial, (current, next) => confirm(next, current));
+  }
+  function requestTextBox(direction: "horizontal" | "vertical", target = dialog.value): boolean {
+    let accepted = false;
+    targets.run(target, () => {
+      accepted = true;
+    });
+    if (!accepted) return false;
+    const before = dialog.value;
+    insert("textBox", direction);
+    return dialog.value !== before && dialog.value?.initial.kind === "textBox";
   }
   function edit(drawing: SheetGraphicDrawing) {
     const target = targets.prepare(drawing);
@@ -95,5 +109,5 @@ export function useDrawingActions(options: {
       ),
     );
   }
-  return { dialog, editing, insert, edit, update, confirm, remove, close };
+  return { dialog, editing, insert, edit, update, confirm, remove, close, requestTextBox };
 }

@@ -358,3 +358,40 @@ describe("drawing actions", () => {
     scope.stop();
   });
 });
+
+describe("shape gallery text-box ownership", () => {
+  test("failed target preparation retains existing editor and all local draft ownership", () => {
+    const f = fixture();
+    f.actions.insert("shape");
+    const old = f.actions.dialog.value!;
+    f.flush.mockReturnValue(false);
+    expect(f.actions.requestTextBox("vertical", old)).toBe(false);
+    expect(f.actions.dialog.value).toBe(old);
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+  test("explicit vertical request replaces only after success, and stale handlers cannot switch new draft", () => {
+    const f = fixture();
+    f.actions.insert("shape");
+    const old = f.actions.dialog.value!;
+    expect(f.actions.requestTextBox("vertical", old)).toBe(true);
+    const next = f.actions.dialog.value!;
+    expect(next).not.toBe(old);
+    expect(next.initial).toMatchObject({ kind: "textBox", textDirection: "vertical" });
+    expect(f.actions.requestTextBox("horizontal", old)).toBe(false);
+    expect(f.actions.dialog.value).toBe(next);
+    expect(f.execute).not.toHaveBeenCalled();
+    next.confirm(next.initial);
+    expect(f.getSheet().drawings?.[0]).toMatchObject({
+      kind: "textBox",
+      textDirection: "vertical",
+    });
+  });
+  test("a failed repeated request cannot masquerade as successful because old draft is a text box", () => {
+    const f = fixture();
+    f.actions.insert("textBox");
+    const old = f.actions.dialog.value!;
+    f.flush.mockReturnValue(false);
+    expect(f.actions.requestTextBox("vertical", old)).toBe(false);
+    expect(f.actions.dialog.value).toBe(old);
+  });
+});

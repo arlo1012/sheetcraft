@@ -1,0 +1,182 @@
+import { isShapeLinePreset, type ShapeLineEnd } from "@sheetcraft/core/shape-line-ends";
+import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import {
+  flattenShapePath,
+  type EvaluatedShapePresetGeometry,
+} from "@sheetcraft/core/shape-presets";
+import { type PictureFrameRect } from "@sheetcraft/core/picture-frame";
+import { standardShapeContainsLocalPoint, standardShapeWorldToLocal } from "./shape-geometry";
+type Point = Readonly<{ x: number; y: number }>;
+export type ShapeEndPaint = Readonly<{
+  d: string;
+  filled: boolean;
+  bounds: PictureFrameRect;
+  contains: (point: Point) => boolean;
+}>;
+export function standardShapeAppearance(drawing: SheetGraphicDrawing): SheetGraphicDrawing {
+  return drawing.shapeGeometry && isShapeLinePreset(drawing.shapeGeometry.preset)
+    ? { ...drawing, fill: "transparent" }
+    : drawing;
+}
+function distance(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x,
+    dy = b.y - a.y,
+    s = dx * dx + dy * dy,
+    t = s ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / s)) : 0;
+  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
+function polygonContains(points: readonly Point[], p: Point): boolean {
+  let winding = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]!,
+      b = points[(i + 1) % points.length]!,
+      cross = (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y);
+    if (a.y <= p.y && b.y > p.y && cross > 0) winding++;
+    else if (a.y > p.y && b.y <= p.y && cross < 0) winding--;
+  }
+  return winding !== 0;
+}
+function marker(
+  end: ShapeLineEnd,
+  tip: Point,
+  previous: Point,
+  strokeWidth: number,
+): ShapeEndPaint | undefined {
+  const length = Math.hypot(tip.x - previous.x, tip.y - previous.y);
+  if (length < 1e-8) return;
+  const ux = (tip.x - previous.x) / length,
+    uy = (tip.y - previous.y) / length,
+    nx = -uy,
+    ny = ux;
+  const factors = { small: 2, medium: 3, large: 5 };
+  const w = Math.max(2, strokeWidth) * factors[end.width ?? "medium"],
+    l = Math.max(2, strokeWidth) * factors[end.length ?? "medium"];
+  const project = (along: number, across: number): Point => ({
+    x: tip.x + ux * along + nx * across,
+    y: tip.y + uy * along + ny * across,
+  });
+  const half = strokeWidth / 2;
+  if (end.kind === "oval") {
+    const center = project(-l / 2, 0),
+      a = project(0, 0),
+      b = project(-l, 0),
+      rotation = (Math.atan2(uy, ux) * 180) / Math.PI;
+    const rx = Math.hypot((ux * l) / 2, (nx * w) / 2),
+      ry = Math.hypot((uy * l) / 2, (ny * w) / 2);
+    return {
+      d: `M${a.x} ${a.y} A${l / 2} ${w / 2} ${rotation} 1 0 ${b.x} ${b.y} A${l / 2} ${w / 2} ${rotation} 1 0 ${a.x} ${a.y} Z`,
+      filled: true,
+      bounds: {
+        x: center.x - rx - half,
+        y: center.y - ry - half,
+        width: 2 * (rx + half),
+        height: 2 * (ry + half),
+      },
+      contains: (p) => {
+        const dx = p.x - center.x,
+          dy = p.y - center.y;
+        return (
+          ((dx * ux + dy * uy) / (l / 2 + half)) ** 2 +
+            ((dx * nx + dy * ny) / (w / 2 + half)) ** 2 <=
+          1
+        );
+      },
+    };
+  }
+  const coords =
+    end.kind === "diamond"
+      ? [
+          [0, 0],
+          [-l / 2, w / 2],
+          [-l, 0],
+          [-l / 2, -w / 2],
+        ]
+      : end.kind === "stealth"
+        ? [
+            [0, 0],
+            [-l, w / 2],
+            [-l * 0.65, 0],
+            [-l, -w / 2],
+          ]
+        : end.kind === "open"
+          ? [
+              [-l, w / 2],
+              [0, 0],
+              [-l, -w / 2],
+            ]
+          : [
+              [0, 0],
+              [-l, w / 2],
+              [-l, -w / 2],
+            ];
+  const points = coords.map(([a, b]) => project(a!, b!)),
+    filled = end.kind !== "open";
+  const x = Math.min(...points.map((p) => p.x)) - half,
+    y = Math.min(...points.map((p) => p.y)) - half;
+  return {
+    d: points.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ") + (filled ? " Z" : ""),
+    filled,
+    bounds: {
+      x,
+      y,
+      width: Math.max(...points.map((p) => p.x)) - x + half,
+      height: Math.max(...points.map((p) => p.y)) - y + half,
+    },
+    contains: (p) => {
+      if (filled && polygonContains(points, p)) return true;
+      for (let i = 1; i < points.length; i++)
+        if (distance(p, points[i - 1]!, points[i]!) <= half) return true;
+      return filled && distance(p, points.at(-1)!, points[0]!) <= half;
+    },
+  };
+}
+/** Endpoint paint is product-owned, bounded numeric geometry, never user SVG. */
+export function getShapeEndPaint(
+  drawing: SheetGraphicDrawing,
+  geometry: EvaluatedShapePresetGeometry | undefined,
+): readonly ShapeEndPaint[] {
+  if (
+    !geometry ||
+    !drawing.shapeGeometry ||
+    !isShapeLinePreset(drawing.shapeGeometry.preset) ||
+    !drawing.shapeLineEnds ||
+    drawing.strokeWidth <= 0 ||
+    drawing.stroke === "transparent"
+  )
+    return [];
+  const lines = geometry.paths
+    .filter((p) => p.stroke)
+    .flatMap((p) => flattenShapePath(p, 0.05))
+    .filter((p) => p.points.length >= 2);
+  const first = lines[0]?.points,
+    last = lines.at(-1)?.points;
+  const result: ShapeEndPaint[] = [];
+  if (first && drawing.shapeLineEnds.begin) {
+    const tip = first[0]!;
+    const previous = first.find((point) => Math.hypot(point.x - tip.x, point.y - tip.y) > 1e-8);
+    const paint =
+      previous && marker(drawing.shapeLineEnds.begin, tip, previous, drawing.strokeWidth);
+    if (paint) result.push(paint);
+  }
+  if (last && drawing.shapeLineEnds.end) {
+    const tip = last.at(-1)!;
+    const previous = [...last]
+      .reverse()
+      .find((point) => Math.hypot(point.x - tip.x, point.y - tip.y) > 1e-8);
+    const paint = previous && marker(drawing.shapeLineEnds.end, tip, previous, drawing.strokeWidth);
+    if (paint) result.push(paint);
+  }
+  return result;
+}
+export function shapeDrawingContainsWorldPoint(
+  drawing: SheetGraphicDrawing,
+  geometry: EvaluatedShapePresetGeometry | undefined,
+  rect: PictureFrameRect,
+  point: Point,
+): boolean {
+  const local = standardShapeWorldToLocal(rect, drawing.rotation, point);
+  return (
+    standardShapeContainsLocalPoint(geometry, standardShapeAppearance(drawing), local) ||
+    getShapeEndPaint(drawing, geometry).some((p) => p.contains(local))
+  );
+}

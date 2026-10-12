@@ -235,6 +235,10 @@
       "types": "./dist/picture-protection.d.ts",
       "import": "./dist/picture-protection.js"
     },
+    "./shape-line-ends": {
+      "types": "./dist/shape-line-ends.d.ts",
+      "import": "./dist/shape-line-ends.js"
+    },
     "./shape-presets": {
       "types": "./dist/shape-presets.d.ts",
       "import": "./dist/shape-presets.js"

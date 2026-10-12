@@ -1,3 +1,8 @@
+import {
+  isShapeLinePreset,
+  normalizeShapeLineEnds,
+  type ShapeLineEnds,
+} from "./shape-line-ends.js";
 import { normalizeShapePresetParameters } from "./shape-presets/contract.js";
 import type { ShapePresetParameters } from "./shape-presets/types.js";
 import { normalizeFormControl, type SheetFormControl } from "./form-controls.js";
@@ -45,6 +50,10 @@ export type SheetGraphicDrawing = DrawingBase & {
   kind: SheetGraphicKind;
   /** Only kind=shape may carry this feature. Other drawing kinds retain their own contracts. */
   shapeGeometry?: SheetShapeGeometry;
+  /** Endpoint decoration for explicit standard line/connector geometry. */
+  shapeLineEnds?: ShapeLineEnds;
+  /** Sparse opt-in vertical text boxes; existing drawings retain horizontal text. */
+  textDirection?: "vertical";
 };
 export type SheetChartDrawing = DrawingBase & { kind: "chart"; chart: SheetChart };
 export type SheetCameraDrawing = DrawingBase & {
@@ -187,6 +196,20 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   if (geometryField && value.kind !== "shape")
     throw new TypeError("Only a shape drawing may carry standard shape geometry.");
   const shapeGeometry = normalizeSheetShapeGeometry(geometryField?.value);
+  const endsField = Object.getOwnPropertyDescriptor(value, "shapeLineEnds");
+  if (endsField && (endsField.get || endsField.set))
+    throw new TypeError("Shape line ends cannot be accessors.");
+  if (
+    endsField &&
+    (value.kind !== "shape" || !shapeGeometry || !isShapeLinePreset(shapeGeometry.preset))
+  )
+    throw new TypeError("Line ends require standard line geometry.");
+  const shapeLineEnds = normalizeShapeLineEnds(endsField?.value);
+  const directionField = Object.getOwnPropertyDescriptor(value, "textDirection");
+  if (directionField && (directionField.get || directionField.set))
+    throw new TypeError("Text direction cannot be an accessor.");
+  if (directionField && (value.kind !== "textBox" || directionField.value !== "vertical"))
+    throw new TypeError("Vertical text direction requires a text box.");
   return {
     id: value.id,
     ...(value.kind === "chart"
@@ -208,6 +231,8 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
             ? ({ kind: "control", control: normalizeFormControl(value.control) } as const)
             : { kind: value.kind }),
     ...(shapeGeometry ? { shapeGeometry } : {}),
+    ...(shapeLineEnds ? { shapeLineEnds } : {}),
+    ...(directionField ? { textDirection: "vertical" as const } : {}),
     name: value.name,
     anchor: { ...value.anchor },
     offsetX: value.offsetX,

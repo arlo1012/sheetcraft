@@ -30,6 +30,12 @@ export const drawingsEnUS = {
   "drawing.height": "Height (px)",
   "drawing.rotation": "Rotation",
   "drawing.preview": "Preview",
+  "drawing.legacyGeometry":
+    "Legacy paths are preserved. Choose a gallery shape to use standard geometry.",
+  "drawing.changeRejected": "Could not switch this editor. Your draft is preserved.",
+  "drawing.geometryUnavailable": "This shape geometry cannot be displayed.",
+  "drawing.adjustShape": "Adjust shape {index}",
+  "drawing.rotateShape": "Rotate shape",
   "drawing.rectangle": "Rectangle",
   "drawing.roundedRectangle": "Rounded rectangle",
   "drawing.ellipse": "Ellipse",

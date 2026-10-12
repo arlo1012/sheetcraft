@@ -1763,6 +1763,10 @@ const drawingActions = useDrawingActions({
   name: (kind) => t(`drawing.${kind}`),
 });
 const { dialog: drawingDialog, editing: editingDrawing } = drawingActions;
+const drawingTextBoxHandler = computed(() => {
+  const target = drawingDialog.value;
+  return (direction: "horizontal" | "vertical") => drawingActions.requestTextBox(direction, target);
+});
 const pictureAssetTools = usePictureAssetTools({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -4886,6 +4890,7 @@ const gridInert = computed(
     v-if="drawingDialog"
     :key="drawingDialog.dialogId"
     :drawing="drawingDialog.initial"
+    :request-text-box="drawingTextBoxHandler"
     :disabled="
       loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
     "

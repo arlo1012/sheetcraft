@@ -3,6 +3,7 @@ import { computed, defineAsyncComponent } from "vue";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import StandardShapeContent from "./StandardShapeContent.vue";
 const FormControlContent = defineAsyncComponent(
   () => import("../../form-controls/components/FormControlContent.vue"),
 );
@@ -34,8 +35,12 @@ const textStyle = computed(() => ({
 </script>
 <template>
   <div class="drawing-content" :style="{ transform: `rotate(${drawing.rotation}deg)` }">
+    <StandardShapeContent
+      v-if="drawing.kind === 'shape' && drawing.shapeGeometry"
+      :drawing="drawing"
+    />
     <svg
-      v-if="drawing.kind === 'shape' || drawing.kind === 'icon'"
+      v-else-if="drawing.kind === 'shape' || drawing.kind === 'icon'"
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
       aria-hidden="true"
@@ -130,10 +135,14 @@ const textStyle = computed(() => ({
     />
     <div
       v-else
+      v-show="!(drawing.kind === 'shape' && drawing.shapeGeometry)"
       class="drawing-content__text"
       :class="{ 'is-word-art': drawing.kind === 'wordArt' }"
       :style="[
         textStyle,
+        drawing.kind === 'textBox' && drawing.textDirection === 'vertical'
+          ? { writingMode: 'vertical-rl', textOrientation: 'mixed' }
+          : {},
         drawing.kind === 'textBox' || drawing.kind === 'wordArt' ? { lineHeight: 'normal' } : {},
         drawing.kind === 'textBox'
           ? { background: drawing.fill, border: `${drawing.strokeWidth}px solid ${drawing.stroke}` }
