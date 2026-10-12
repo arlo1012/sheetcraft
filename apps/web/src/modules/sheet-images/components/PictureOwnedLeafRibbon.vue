@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Crop, ImagePlus, Settings2 } from "lucide-vue-next";
+import { Crop, Eye, ImagePlus, Settings2 } from "lucide-vue-next";
 import { isGroupedPicture, type GroupedPicture } from "@sheetcraft/core/picture-group";
 import { useAppI18n } from "../../../shared/i18n";
 import PictureAssetTools from "./PictureAssetTools.vue";
@@ -11,6 +11,8 @@ const props = defineProps<{
   image: GroupedPicture;
   disabled: boolean;
   canReplace: boolean;
+  canPreview?: boolean;
+  previewHandler?: () => boolean;
   canCrop?: boolean;
   cropHandler?: () => boolean;
   replaceHandler: () => void;
@@ -26,8 +28,19 @@ const callbacks = computed(() => {
     key = props.ownerKey,
     replace = props.replaceHandler,
     format = props.formatHandler,
-    crop = props.cropHandler;
+    crop = props.cropHandler,
+    preview = props.previewHandler;
   return {
+    preview: () => {
+      if (
+        image === props.image &&
+        key === props.ownerKey &&
+        !props.disabled &&
+        props.canPreview &&
+        preview === props.previewHandler
+      )
+        preview?.();
+    },
     compress: () => {
       if (image === props.image && key === props.ownerKey && !props.disabled) emit("compress");
     },
@@ -87,6 +100,15 @@ const callbacks = computed(() => {
       data-picture-tool="crop"
       @activate="callbacks.crop"
       ><Crop
+    /></RibbonButton>
+    <RibbonButton
+      variant="tall"
+      :label="t('image.preview')"
+      :text="t('image.preview')"
+      :disabled="disabled || !canPreview"
+      data-picture-tool="preview"
+      @activate="callbacks.preview"
+      ><Eye
     /></RibbonButton>
     <PictureAssetTools
       :disabled="disabled"

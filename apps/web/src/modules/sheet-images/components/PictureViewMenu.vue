@@ -7,7 +7,11 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
-const props = defineProps<{ disabled: boolean; previewOnDoubleClick: boolean }>();
+const props = defineProps<{
+  disabled: boolean;
+  previewOnDoubleClick: boolean;
+  previewDisabled?: boolean;
+}>();
 const emit = defineEmits<{ preview: []; change: [value: boolean] }>();
 const { t } = useAppI18n();
 const button = ref<InstanceType<typeof RibbonMenuButton>>();
@@ -24,6 +28,7 @@ function change(value: boolean): void {
   dismiss("programmatic", true);
 }
 function preview(): void {
+  if (props.disabled || props.previewDisabled) return;
   emit("preview");
   dismiss("programmatic", true);
 }
@@ -51,7 +56,7 @@ function preview(): void {
         :style="floatingStyles"
         :label="t('picture.viewSettings')"
       >
-        <MenuItem @select="preview">{{ t("image.preview") }}</MenuItem>
+        <MenuItem :disabled="previewDisabled" @select="preview">{{ t("image.preview") }}</MenuItem>
         <MenuRadioItem :checked="previewOnDoubleClick" @select="change(true)">{{
           t("picture.doubleClickPreview")
         }}</MenuRadioItem>

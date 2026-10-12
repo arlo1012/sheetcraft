@@ -1,3 +1,7 @@
+import { framedPicture } from "../../modules/sheet-images/framed-picture-fixture";
+import { pictureGroup } from "../../modules/sheet-images/picture-group-fixture";
+import SheetOwnedPictureGroupLayer from "../../../modules/sheet-images/components/SheetOwnedPictureGroupLayer.vue";
+import type { PictureSourcePresentation } from "../../../modules/sheet-images/picture-source-presentation";
 import { actualPng } from "../../modules/image-assets/image-header-fixtures";
 import { requireLegacyPicture } from "../../../modules/sheet-images/picture-document-support";
 import type { FloatingImage } from "@sheetcraft/core/workbook";
@@ -7,6 +11,7 @@ import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { serializeWorkbook, type WorkbookSnapshot } from "@sheetcraft/core/serialization";
 import {
   createWorkbook,
+  cloneFloatingImage,
   getActiveSheet,
   getCellContent,
   setCellContent,
@@ -29,7 +34,7 @@ afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
   vi.restoreAllMocks();
 });
-async function fixture(cellImage = false) {
+async function fixture(cellImage = false, kind?: "framed" | "owned") {
   const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
   const sheet = getActiveSheet(workbook);
   if (cellImage)
@@ -57,6 +62,15 @@ async function fixture(cellImage = false) {
     height: 80,
     transform: { crop: { x: 0.1, y: 0, width: 0.8, height: 1 }, rotation: 180 },
   });
+  if (kind === "framed")
+    sheet.floatingImages = [{ ...framedPicture(), id: "float", assetId: "asset" }];
+  if (kind === "owned") {
+    const group = pictureGroup(),
+      leaf = group.members[0]!;
+    if (leaf.kind !== "grouped-picture-v1") throw new Error("Expected real leaf.");
+    leaf.assetId = "asset";
+    sheet.floatingImages = [group];
+  }
   const imageAssetStore = createMemoryImageAssetStore();
   const asset = {
     id: "asset",
@@ -84,7 +98,8 @@ async function fixture(cellImage = false) {
       plugins: [createAppI18n("en-US")],
       stubs: {
         SheetImagePreview: {
-          props: ["src", "altText"],
+          name: "SheetImagePreview",
+          props: ["src", "altText", "frameSource"],
           emits: ["close"],
           template:
             '<div data-image-preview :data-src="src">{{ altText }}<button @click="$emit(\'close\')">Close preview</button></div>',
@@ -240,6 +255,46 @@ describe("workspace cell image entry points", () => {
     expect(sheet.floatingImages).toHaveLength(1);
     expect(getCellContent(sheet, { row: 0, column: 0 })?.kind).toBe("image");
   });
+
+  test.each(["framed", "owned"] as const)(
+    "%s preview receives a genuine resolved source frame without editing the workbook",
+    async (kind) => {
+      const { wrapper, sheet } = await fixture(false, kind);
+      const grid = wrapper.getComponent(SheetGrid),
+        root = sheet.floatingImages[0]!;
+      grid.vm.selectFloatingImages([root.id]);
+      await flushPromises();
+      if (kind === "owned") {
+        expect(grid.vm.canPreviewPicture()).toBe(false);
+        wrapper
+          .getComponent(SheetOwnedPictureGroupLayer)
+          .vm.$emit("selectPath", [root.id, "owned-leaf"]);
+        await flushPromises();
+      }
+      const before = sheet.floatingImages.map(cloneFloatingImage);
+      expect(grid.vm.canPreviewPicture()).toBe(true);
+      expect(grid.vm.previewSelectedPicture()).toBe(true);
+      await flushPromises();
+      const preview = wrapper.getComponent({ name: "SheetImagePreview" });
+      const presentation = preview.props("frameSource") as PictureSourcePresentation;
+      expect(presentation.picture.assetId).toBe("asset");
+      expect(presentation.geometry.sourceRect).not.toBeNull();
+      if (kind === "owned") {
+        expect(presentation.picture).toMatchObject({
+          kind: "grouped-picture-v1",
+          id: "owned-leaf",
+        });
+        expect(presentation.geometry.angleDeg).toBe(74);
+      }
+      expect(sheet.floatingImages).toEqual(before);
+      const oldClose = preview.vm.$.vnode.props!.onClose as () => void;
+      expect(grid.vm.previewSelectedPicture()).toBe(true);
+      await flushPromises();
+      oldClose();
+      await flushPromises();
+      expect(wrapper.find("[data-image-preview]").exists()).toBe(true);
+    },
+  );
 
   test("lets a selected image proxy bubble wheel scrolling to the grid root", async () => {
     const { wrapper, sheet } = await fixture();

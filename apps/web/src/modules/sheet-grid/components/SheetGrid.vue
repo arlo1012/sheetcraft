@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { canEditPictureRoot, canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import { isPictureGroup, type PictureGroupPath } from "@sheetcraft/core/picture-group";
-import { arePictureObjectsEqual, isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import {
+  arePictureObjectsEqual,
+  isFramedPictureObject,
+  type StandalonePictureObject,
+} from "@sheetcraft/core/picture-object";
 import {
   createPictureViewMetrics,
   type PictureFrameLayoutContext,
 } from "@sheetcraft/sheet-engine/picture-frame-layout";
+import { resolvePictureFrame, resolvePictureSourceLayout } from "@sheetcraft/core/picture-frame";
+import {
+  capturePictureSourcePresentation,
+  type PictureSourcePresentation,
+} from "../../sheet-images/picture-source-presentation";
 import { getPictureObjectOriginCell } from "@sheetcraft/core/picture-object-sheet";
 import { getPivotActiveField } from "../../pivot-tables/pivot-active-field";
 import PivotReportFilters from "../../pivot-tables/components/PivotReportFilters.vue";
@@ -551,10 +560,14 @@ watch([selectedImageId, selectedImageIds], ([id, ids]) =>
   emit("selectedFloatingImageChange", id, [...ids]),
 );
 const selection = shallowRef<CellSelection>(createCellSelection({ row: 0, column: 0 }));
+let imagePreviewSequence = 0;
 const imagePreview = shallowRef<{
+  ownerId: number;
+  sheet: Sheet;
   assetId: string;
   altText: string;
   transform?: ImageTransform;
+  frameSource?: PictureSourcePresentation;
   trigger?: HTMLElement;
 }>();
 const previewUrl = computed(
@@ -562,18 +575,127 @@ const previewUrl = computed(
 );
 
 function openImagePreview(
-  image: { assetId: string; altText: string; transform?: ImageTransform },
+  image: {
+    assetId: string;
+    altText: string;
+    transform?: ImageTransform;
+    frameSource?: PictureSourcePresentation;
+  },
   trigger?: HTMLElement,
 ): void {
-  if (!props.imageAssetUrls?.has(image.assetId)) return;
-  imagePreview.value = { ...image, trigger };
+  if (pictureCrop.active.value || !props.imageAssetUrls?.has(image.assetId)) return;
+  imagePreview.value = { ...image, trigger, ownerId: ++imagePreviewSequence, sheet: props.sheet };
 }
 
+function openFloatingImagePreview(image: StandalonePictureObject, trigger?: HTMLElement): void {
+  try {
+    if (!isFramedPictureObject(image)) {
+      openImagePreview(image, trigger);
+      return;
+    }
+    const context = pictureFrameContext.value;
+    if (!context) throw new Error("Picture projection unavailable.");
+    openImagePreview(
+      {
+        assetId: image.assetId,
+        altText: image.altText,
+        transform: image.transform,
+        frameSource: capturePictureSourcePresentation(
+          image,
+          resolvePictureFrame(image.frame, context.metrics),
+        ),
+      },
+      trigger,
+    );
+  } catch {
+    emit("imageFeedback", "picture.operationFailed");
+  }
+}
+
+function selectedPicturePreview():
+  | {
+      assetId: string;
+      altText: string;
+      transform?: ImageTransform;
+      frameSource?: PictureSourcePresentation;
+    }
+  | undefined {
+  if (pictureCrop.active.value || selectedImageIds.value.length !== 1) return;
+  const root = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
+  if (!root) return;
+  if (root.hidden) return;
+  if (isFramedPictureObject(root)) {
+    const context = pictureFrameContext.value;
+    if (!context) return;
+    return {
+      assetId: root.assetId,
+      altText: root.altText,
+      transform: root.transform,
+      frameSource: capturePictureSourcePresentation(
+        root,
+        resolvePictureFrame(root.frame, context.metrics),
+      ),
+    };
+  }
+  if (!isPictureGroup(root)) return root;
+  const context = pictureFrameContext.value,
+    path = selectedOwnedPicturePath.value;
+  if (!context || !path || path.length <= 1) return;
+  const selected = resolveOwnedPictureNode(props.sheet.floatingImages, path, context);
+  if (
+    !selected ||
+    !selected.visible ||
+    !selected.layout ||
+    selected.node.kind !== "grouped-picture-v1"
+  )
+    return;
+  return {
+    assetId: selected.node.assetId,
+    altText: selected.node.altText,
+    transform: selected.node.transform,
+    frameSource: capturePictureSourcePresentation(
+      selected.node,
+      resolvePictureSourceLayout(
+        { ...selected.layout.rect },
+        selected.layout.angleDeg,
+        selected.node.frame.source,
+      ),
+    ),
+  };
+}
+function canPreviewPicture(): boolean {
+  try {
+    const source = selectedPicturePreview();
+    return !!source && !!props.imageAssetUrls?.has(source.assetId);
+  } catch {
+    return false;
+  }
+}
+function previewSelectedPicture(): boolean {
+  try {
+    const source = selectedPicturePreview();
+    if (!source || !props.imageAssetUrls?.has(source.assetId)) return false;
+    openImagePreview(source);
+    return !!imagePreview.value;
+  } catch {
+    emit("imageFeedback", "picture.operationFailed");
+    return false;
+  }
+}
+
+const imagePreviewClose = computed(() => {
+  const owner = imagePreview.value;
+  return (): void => {
+    if (imagePreview.value === owner) closeImagePreview();
+  };
+});
 function closeImagePreview(): void {
   if (!imagePreview.value) return;
-  const trigger = imagePreview.value?.trigger;
+  const owner = imagePreview.value,
+    trigger = owner.trigger;
   imagePreview.value = undefined;
   void nextTick(() => {
+    if (imagePreview.value || owner.sheet !== props.sheet) return;
     if (trigger?.isConnected) {
       trigger.focus({ preventScroll: true });
       if (document.activeElement === trigger) return;
@@ -582,7 +704,7 @@ function closeImagePreview(): void {
   });
 }
 
-watch(() => props.sheet.id, closeImagePreview);
+watch(() => [props.sheet, props.pictureOwnerGeneration, props.workbookRevision], closeImagePreview);
 watch(previewUrl, (url) => {
   if (!url && imagePreview.value) closeImagePreview();
 });
@@ -3806,11 +3928,8 @@ onBeforeUnmount(() => {
 defineExpose({
   getPictureFrameContext: (sheet: Sheet) =>
     props.sheet === sheet ? pictureFrameContext.value : undefined,
-  previewSelectedPicture: () => {
-    const image = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
-    if (image && !isPictureGroup(image)) openImagePreview(image);
-    else if (image) emit("imageFeedback", "picture.operationFailed");
-  },
+  previewSelectedPicture,
+  canPreviewPicture,
   selectFloatingImages: (ids: string[]) => {
     if (ids.length && !canEditPictureSelection(props.sheet, expandFloatingImageSelection(ids)))
       return;
@@ -4182,7 +4301,7 @@ defineExpose({
         @update="emit('updateFloatingImage', $event)"
         @delete="deleteSelectedFloatingImage"
         @convert-to-cell="convertSelectedFloatingImageToCell"
-        @preview="openImagePreview"
+        @preview="openFloatingImagePreview"
         @copy="requestFloatingImageCopy($event, 'copy')"
         @cut="requestFloatingImageCopy($event, 'cut')"
         @paste="requestFloatingImagePaste"
@@ -4330,12 +4449,14 @@ defineExpose({
     />
     <SheetImagePreview
       v-if="imagePreview && previewUrl"
+      :key="imagePreview.ownerId"
       :src="previewUrl"
       :alt-text="imagePreview.altText"
       :transform="imagePreview.transform"
+      :frame-source="imagePreview.frameSource"
       :theme="theme"
       :asset-urls="imageAssetUrls"
-      @close="closeImagePreview"
+      @close="imagePreviewClose"
     />
     <SheetNotePreview
       v-for="preview in visibleNotes"

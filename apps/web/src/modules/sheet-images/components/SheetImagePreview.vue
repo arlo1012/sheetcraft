@@ -10,6 +10,10 @@ import {
 } from "vue";
 import { PicturePaintUnavailableError } from "../../../shared/images/picture-detailed-render";
 import { createPictureCanvas } from "../../../shared/images/imageAppearance";
+import {
+  createPictureSourcePresentationCanvas,
+  type PictureSourcePresentation,
+} from "../picture-source-presentation";
 import { createCanvasImageCache } from "../../sheet-grid/canvas/image-painter";
 import { createPicturePaintResources } from "../../../shared/images/picture-paint-resources";
 import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detailed-style";
@@ -27,6 +31,7 @@ const props = withDefaults(
     src: string;
     altText: string;
     transform?: ImageTransform;
+    frameSource?: PictureSourcePresentation;
     theme?: WorkbookTheme;
     assetUrls?: ReadonlyMap<string, string>;
     visible?: boolean;
@@ -45,6 +50,7 @@ const auxiliaryImages = createCanvasImageCache(() => {
 });
 const hasTransform = computed(() =>
   Boolean(
+    props.frameSource ||
     props.transform?.annotations?.length ||
     props.transform?.appearance ||
     props.transform?.crop ||
@@ -77,28 +83,50 @@ function clearPresentationUrl(): void {
 async function onPresentationSourceLoad(event: Event): Promise<void> {
   if (!hasTransform.value) return;
   const image = event.currentTarget as HTMLImageElement;
-  if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return;
+  if (image.dataset.previewSourceGeneration !== String(sourceGeneration.value)) return;
+  if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+    presentationError.value = true;
+    return;
+  }
   decodedSource.value = image;
   await preparePresentation(image);
+}
+
+function onPresentationSourceError(event: Event): void {
+  const image = event.currentTarget as HTMLImageElement;
+  if (props.visible && image.dataset.previewSourceGeneration === String(sourceGeneration.value))
+    presentationError.value = true;
 }
 
 async function preparePresentation(image: HTMLImageElement): Promise<void> {
   if (!props.visible || !hasTransform.value) return;
   const generation = ++presentationGeneration.value;
   try {
-    if (props.transform?.appearance || props.transform?.annotations?.length) {
-      const canvas = createPictureCanvas(
-        image,
-        props.transform,
-        4096,
-        createPicturePaintResources(props.theme, props.assetUrls, auxiliaryImages),
-      );
-      const blob = await new Promise<Blob>((resolve, reject) =>
-        canvas.toBlob(
-          (value) => (value ? resolve(value) : reject(new Error("Image rendering failed."))),
-          "image/png",
-        ),
-      );
+    // Size planning uses peek(), so explicitly start only the actual auxiliary
+    // sources before entering the same painter as the grid.
+    for (const id of getDetailedPictureStyleAssetIds(
+      (props.frameSource?.picture.transform ?? props.transform)?.appearance?.detailedStyle,
+    )) {
+      const url = props.assetUrls?.get(id);
+      if (url) auxiliaryImages.get(url);
+    }
+    if (props.frameSource || props.transform?.appearance || props.transform?.annotations?.length) {
+      const resources = createPicturePaintResources(props.theme, props.assetUrls, auxiliaryImages);
+      const canvas = props.frameSource
+        ? createPictureSourcePresentationCanvas(image, props.frameSource, props.theme, resources)
+        : createPictureCanvas(image, props.transform, 4096, resources);
+      let blob: Blob;
+      try {
+        blob = await new Promise<Blob>((resolve, reject) =>
+          canvas.toBlob(
+            (value) => (value ? resolve(value) : reject(new Error("Image rendering failed."))),
+            "image/png",
+          ),
+        );
+      } finally {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
       if (generation !== presentationGeneration.value) return;
       clearPresentationUrl();
       presentationUrl.value = URL.createObjectURL(blob);
@@ -128,7 +156,15 @@ async function preparePresentation(image: HTMLImageElement): Promise<void> {
 }
 
 watch(
-  () => [props.visible, props.src, props.transform, props.theme, props.assetUrls] as const,
+  () =>
+    [
+      props.visible,
+      props.src,
+      props.transform,
+      props.frameSource,
+      props.theme,
+      props.assetUrls,
+    ] as const,
   () => {
     presentationGeneration.value += 1;
     sourceGeneration.value += 1;
@@ -136,7 +172,9 @@ watch(
     presentationError.value = false;
     decodedSource.value = undefined;
     const retained = new Set<string>();
-    for (const id of getDetailedPictureStyleAssetIds(props.transform?.appearance?.detailedStyle)) {
+    for (const id of getDetailedPictureStyleAssetIds(
+      (props.frameSource?.picture.transform ?? props.transform)?.appearance?.detailedStyle,
+    )) {
       const url = props.assetUrls?.get(id);
       if (url) retained.add(url);
     }
@@ -156,11 +194,13 @@ onBeforeUnmount(() => {
   <img
     v-if="visible && src && hasTransform"
     :key="sourceGeneration"
+    :data-preview-source-generation="sourceGeneration"
     class="sheet-image-preview__probe"
     :src="src"
     alt=""
     aria-hidden="true"
     @load="onPresentationSourceLoad"
+    @error="onPresentationSourceError"
   />
   <TDialog
     v-if="visible && presentationError"

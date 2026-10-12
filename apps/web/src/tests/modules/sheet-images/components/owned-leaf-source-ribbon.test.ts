@@ -98,6 +98,20 @@ describe("actual owned leaf source ribbon", () => {
     expect(f.wrapper.emitted("compress")).toHaveLength(1);
     expect(f.wrapper.emitted("batchSize")).toHaveLength(1);
   });
+  test("owned preview invokes only its current actual source handler", async () => {
+    const f = fixture(),
+      preview = vi.fn(() => true);
+    await f.wrapper.setProps({ canPreview: true, previewHandler: preview });
+    const old = button(f.wrapper, "preview").vm.$.vnode.props!.onActivate as () => void;
+    await button(f.wrapper, "preview").trigger("click");
+    expect(preview).toHaveBeenCalledOnce();
+    await f.wrapper.setProps({ ownerKey: "new-owner" });
+    old();
+    expect(preview).toHaveBeenCalledOnce();
+    await f.wrapper.setProps({ canPreview: false });
+    await button(f.wrapper, "preview").trigger("click");
+    expect(preview).toHaveBeenCalledOnce();
+  });
   test("framed root replacement requires and calls the real source capability; format remains reachable", async () => {
     const replace = vi.fn();
     const wrapper = mount(PictureToolbar, {

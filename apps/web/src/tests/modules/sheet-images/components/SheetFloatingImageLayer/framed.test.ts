@@ -218,6 +218,19 @@ describe("framed picture selection and single-object ownership", () => {
     expect(f.wrapper.findAll('[data-image-resize="s"]')).toHaveLength(1);
     f.wrapper.unmount();
   });
+  test("framed double-click emits the actual source frame and respects the selection-only preference", async () => {
+    const f = fixture();
+    await f.wrapper.get("[data-floating-image-selected]").trigger("dblclick");
+    expect(f.wrapper.emitted("preview")).toHaveLength(1);
+    expect(f.wrapper.emitted("preview")?.[0]?.[0]).toMatchObject({
+      id: f.image.id,
+      frame: f.image.frame,
+    });
+    await f.wrapper.setProps({ previewOnDoubleClick: false });
+    await f.wrapper.get("[data-floating-image-selected]").trigger("dblclick");
+    expect(f.wrapper.emitted("preview")).toHaveLength(1);
+    f.wrapper.unmount();
+  });
   test("read-only frames remain selectable but have no movement cursor or edit handles", async () => {
     const f = fixture();
     await f.wrapper.setProps({ readOnly: true });

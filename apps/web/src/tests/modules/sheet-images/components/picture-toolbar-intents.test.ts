@@ -448,7 +448,10 @@ describe("framed picture ribbon capability boundary", () => {
       exportDisabled: true,
       printDisabled: true,
     });
-    expect(wrapper.getComponent(PictureViewMenu).props("disabled")).toBe(true);
+    expect(wrapper.getComponent(PictureViewMenu).props()).toMatchObject({
+      disabled: false,
+      previewDisabled: true,
+    });
     expect(wrapper.getComponent(PictureRotationMenu).props("disabled")).toBe(false);
     expect(wrapper.getComponent(PictureAppearanceTools).props("disabled")).toBe(false);
     expect(wrapper.getComponent(PictureArrangeTools).props()).toMatchObject({
@@ -485,6 +488,23 @@ describe("framed picture ribbon capability boundary", () => {
     expect(wrapper.emitted("layer")).toEqual([["front"]]);
   });
 
+  test("framed preview uses a captured real-source capability and rejects a later owner", async () => {
+    const wrapper = fixture(framedPicture()),
+      preview = vi.fn(() => true);
+    await wrapper.setProps({ canPreview: true, previewHandler: preview, draftOwnerKey: 1 });
+    const menu = wrapper.getComponent(PictureViewMenu);
+    expect(menu.props("previewDisabled")).toBe(false);
+    const old = menu.vm.$.vnode.props!.onPreview as () => void;
+    menu.vm.$emit("preview");
+    expect(preview).toHaveBeenCalledOnce();
+    await wrapper.setProps({ draftOwnerKey: 2 });
+    old();
+    expect(preview).toHaveBeenCalledOnce();
+    await wrapper.setProps({ canPreview: false });
+    menu.vm.$emit("preview");
+    expect(preview).toHaveBeenCalledOnce();
+    expect(wrapper.emitted("preview")).toBeUndefined();
+  });
   test("retains existing legacy tool availability", async () => {
     const wrapper = fixture({ ...legacyPicture(), groupId: "existing-group" });
     for (const action of ["replace", "convert-to-cell", "crop", "restore", "annotate"])

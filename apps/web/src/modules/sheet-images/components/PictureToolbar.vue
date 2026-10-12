@@ -36,6 +36,8 @@ const props = withDefaults(
     aspectRatioHandler?: (locked: boolean) => boolean;
     replaceHandler?: () => void;
     canReplace?: boolean;
+    canPreview?: boolean;
+    previewHandler?: () => boolean;
     canCrop?: boolean;
     cropHandler?: () => boolean;
     appearanceHandler?: (patch: Partial<ImageAppearance> | undefined) => boolean;
@@ -45,7 +47,7 @@ const props = withDefaults(
     selectionCount: number;
     previewOnDoubleClick: boolean;
   }>(),
-  { canReplace: undefined, canCrop: undefined },
+  { canReplace: undefined, canCrop: undefined, canPreview: undefined },
 );
 // Standalone source tools cannot establish a draft for an owned container.
 requireStandalonePicture(props.image);
@@ -186,6 +188,24 @@ const cropCallback = computed(() => {
     else emit("crop");
   };
 });
+const previewCallback = computed(() => {
+  const image = props.image,
+    owner = props.draftOwnerKey,
+    handler = props.previewHandler;
+  return (): void => {
+    if (
+      props.disabled ||
+      props.selectionCount > 1 ||
+      image !== props.image ||
+      owner !== props.draftOwnerKey ||
+      handler !== props.previewHandler ||
+      (props.canPreview === undefined ? isFramed.value : !props.canPreview)
+    )
+      return;
+    if (handler) handler();
+    else emit("preview");
+  };
+});
 function sourceAction(action: () => void): void {
   requireStandalonePicture(props.image);
   action();
@@ -224,9 +244,12 @@ function sourceAction(action: () => void): void {
       /></RibbonButton>
     </section>
     <PictureViewMenu
-      :disabled="!!busy || isFramed"
+      :disabled="!!busy"
+      :preview-disabled="
+        disabled || selectionCount > 1 || (canPreview === undefined ? isFramed : !canPreview)
+      "
       :preview-on-double-click="previewOnDoubleClick"
-      @preview="sourceAction(() => emit('preview'))"
+      @preview="previewCallback"
       @change="emit('viewSettings', $event)"
     />
     <section class="picture-toolbar__group" role="group" :aria-label="t('image.crop')">
@@ -344,7 +367,7 @@ function sourceAction(action: () => void): void {
       @compress="sourceAction(() => emit('compress'))"
       @batch-size="sourceAction(() => emit('batchSize'))"
       @export="(format, all) => sourceAction(() => emit('export', format, all))"
-      @preview="sourceAction(() => emit('preview'))"
+      @preview="previewCallback"
       @print="sourceAction(() => emit('print'))"
     />
   </RibbonToolbar>

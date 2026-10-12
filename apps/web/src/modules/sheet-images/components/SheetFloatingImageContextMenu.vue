@@ -11,6 +11,7 @@ const props = withDefaults(
     anchor: FloatingReference;
     readOnly?: boolean;
     sourceOperationsDisabled?: boolean;
+    previewDisabled?: boolean;
   }>(),
   {
     readOnly: false,
@@ -65,8 +66,12 @@ function onKeydown(event: KeyboardEvent): void {
     >
       <MenuItem
         data-floating-image-action="preview"
-        :disabled="sourceOperationsDisabled"
-        :title="sourceOperationsDisabled ? t('image.sourceOperationsUnavailable') : undefined"
+        :disabled="previewDisabled ?? sourceOperationsDisabled"
+        :title="
+          (previewDisabled ?? sourceOperationsDisabled)
+            ? t('image.sourceOperationsUnavailable')
+            : undefined
+        "
         @select="emit('preview')"
       >
         {{ t("image.preview") }}

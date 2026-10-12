@@ -127,7 +127,7 @@ const emit = defineEmits<{
   feedback: [key: MessageKey];
   delete: [id: string];
   convertToCell: [id: string];
-  preview: [image: LegacyFloatingImage, trigger?: HTMLElement];
+  preview: [image: FloatingImage, trigger?: HTMLElement];
   copy: [id: string];
   cut: [id: string];
   paste: [id: string];
@@ -950,8 +950,7 @@ function requestPreview(): void {
   const image = currentImages.value.find((entry) => entry.id === contextMenu.value?.imageId);
   const trigger = contextMenu.value?.trigger;
   closeContextMenu(false);
-  if (image && !isFramedPictureObject(image)) emit("preview", image, trigger);
-  else if (image) emit("feedback", "picture.operationFailed");
+  if (image) emit("preview", image, trigger);
 }
 
 function requestClipboard(mode: "copy" | "cut" | "paste"): void {
@@ -969,7 +968,7 @@ function onImageDoubleClick(image: FloatingImage, event: MouseEvent): void {
     applyCrop();
     return;
   }
-  if (props.previewOnDoubleClick && !isFramedPictureObject(image))
+  if (props.previewOnDoubleClick && !props.croppingExternally)
     emit("preview", image, event.currentTarget as HTMLElement);
 }
 
@@ -977,6 +976,7 @@ function onLayerDoubleClick(event: MouseEvent): void {
   // Pointer capture keeps drags alive across frozen panes and retargets clicks to this layer.
   if (
     crop.value ||
+    props.croppingExternally ||
     event.target !== event.currentTarget ||
     gesture.value ||
     lastGestureMode !== "move" ||
@@ -984,7 +984,7 @@ function onLayerDoubleClick(event: MouseEvent): void {
   )
     return;
   const image = currentImages.value.find((entry) => entry.id === props.selectedImageId);
-  if (image && !isFramedPictureObject(image))
+  if (image)
     emit("preview", image, layerRef.value?.querySelector<HTMLElement>(".is-selected") ?? undefined);
 }
 
@@ -1072,7 +1072,7 @@ function handleSurfaceDoubleClick(event: MouseEvent, point: Point): boolean {
   if (isSelectedOverlayTarget(event.target) || crop.value) return false;
   const image = hitTestFloatingImage(point);
   if (!image) return false;
-  if (props.previewOnDoubleClick && !isFramedPictureObject(image))
+  if (props.previewOnDoubleClick && !props.croppingExternally)
     emit("preview", image, layerRef.value ?? undefined);
   return true;
 }
@@ -1518,6 +1518,12 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       :anchor="contextMenu.anchor"
       :read-only="interactionReadOnly"
       :source-operations-disabled="croppingExternally || contextMenuSourceUnsupported"
+      :preview-disabled="
+        croppingExternally ||
+        !assetUrls.has(
+          currentImages.find((image) => image.id === contextMenu?.imageId)?.assetId ?? '',
+        )
+      "
       @convert-to-cell="contextActions.convert"
       @preview="contextActions.preview"
       @copy="contextActions.copy"

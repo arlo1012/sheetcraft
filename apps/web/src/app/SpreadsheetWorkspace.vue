@@ -1940,6 +1940,8 @@ const pictureSourceRibbonOwner = computed(() => {
     key,
     canReplace: imageActions.canReplace(image.id, path),
     canCrop: sheetGridRef.value?.canCropPicture() ?? false,
+    canPreview: sheetGridRef.value?.canPreviewPicture() ?? false,
+    preview: () => current() && (sheetGridRef.value?.previewSelectedPicture() ?? false),
     crop: () => current() && (sheetGridRef.value?.cropImage() ?? false),
     replace: () => {
       if (current()) void imageActions.requestReplace(image.id, path);
@@ -3109,6 +3111,8 @@ const gridInert = computed(
           :appearance-handler="pictureToolbarOwner?.appearance"
           :replace-handler="pictureSourceRibbonOwner?.replace"
           :can-replace="pictureSourceRibbonOwner?.canReplace"
+          :can-preview="pictureSourceRibbonOwner?.canPreview"
+          :preview-handler="pictureSourceRibbonOwner?.preview"
           :can-crop="pictureSourceRibbonOwner?.canCrop"
           :crop-handler="pictureSourceRibbonOwner?.crop"
           @insert-image="imageActions.requestInsert"
@@ -3139,6 +3143,8 @@ const gridInert = computed(
           :replace-handler="pictureSourceRibbonOwner.replace"
           :format-handler="pictureSourceRibbonOwner.format"
           :can-replace="pictureSourceRibbonOwner.canReplace"
+          :can-preview="pictureSourceRibbonOwner.canPreview"
+          :preview-handler="pictureSourceRibbonOwner.preview"
           :can-crop="pictureSourceRibbonOwner.canCrop"
           :crop-handler="pictureSourceRibbonOwner.crop"
           @compress="pictureDialogs.openCompression"
