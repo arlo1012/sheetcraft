@@ -18,8 +18,13 @@ export class UnsupportedShapeFrameDocumentError extends Error {
   }
 }
 function checkDrawings(sheetId: string, drawings: readonly SheetDrawing[] | undefined): void {
-  void sheetId;
-  normalizeSheetDrawings(drawings);
+  const normalized = normalizeSheetDrawings(drawings);
+  const groups = normalized.filter((drawing) => drawing.kind === "shapeGroup");
+  if (groups.length)
+    throw new UnsupportedShapeFrameDocumentError(
+      sheetId,
+      groups.map((drawing) => drawing.id),
+    );
 }
 export function assertWorkbookShapeSupport(workbook: Workbook): void {
   for (const sheet of workbook.sheets.values()) checkDrawings(sheet.id, sheet.drawings);

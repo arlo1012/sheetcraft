@@ -270,6 +270,30 @@
     "./shape-protection": {
       "types": "./dist/shape-protection.d.ts",
       "import": "./dist/shape-protection.js"
+    },
+    "./shape-group": {
+      "types": "./dist/shape-group.d.ts",
+      "import": "./dist/shape-group.js"
+    },
+    "./shape-group-layout": {
+      "types": "./dist/shape-group-layout.d.ts",
+      "import": "./dist/shape-group-layout.js"
+    },
+    "./shape-group-planning": {
+      "types": "./dist/shape-group-planning.d.ts",
+      "import": "./dist/shape-group-planning.js"
+    },
+    "./shape-group-edit": {
+      "types": "./dist/shape-group-edit.d.ts",
+      "import": "./dist/shape-group-edit.js"
+    },
+    "./shape-group-delete": {
+      "types": "./dist/shape-group-delete.d.ts",
+      "import": "./dist/shape-group-delete.js"
+    },
+    "./shape-group-copy": {
+      "types": "./dist/shape-group-copy.d.ts",
+      "import": "./dist/shape-group-copy.js"
     }
   },
   "scripts": {

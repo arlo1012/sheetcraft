@@ -19,7 +19,7 @@ import { cloneCellSparkline } from "../sparklines.js";
 import {
   normalizeSheetDrawings,
   mapDrawingSource,
-  isFramedShapeDrawing,
+  hasShapeObjectFrame,
   type SheetDrawing,
 } from "../sheet-drawings.js";
 import { normalizeSheetProtection } from "../protection.js";
@@ -710,7 +710,7 @@ function transformSheetMetadataForAxis(
   return {
     pivotTables: normalizePivotTables(metadata.pivotTables),
     drawings: normalizeSheetDrawings(metadata.drawings).flatMap<SheetDrawing>((drawing) => {
-      if (isFramedShapeDrawing(drawing)) {
+      if (hasShapeObjectFrame(drawing)) {
         const shapeFrame = transformShapeFrameAxis(
           drawing.shapeFrame,
           { axis, operation, index, count },
@@ -1931,7 +1931,7 @@ function transformSheetMetadataForAxisMove(
   return {
     pivotTables: normalizePivotTables(metadata.pivotTables),
     drawings: normalizeSheetDrawings(metadata.drawings).map((drawing) => {
-      if (isFramedShapeDrawing(drawing)) {
+      if (hasShapeObjectFrame(drawing)) {
         if (drawing.shapeFrame.anchor.mode !== "fixed")
           throw invalidCommandPayload(
             "drawing.shapeFrame.anchor",

@@ -4,6 +4,7 @@ import { collectPictureGroupAssetIds, isPictureGroup } from "@sheetcraft/core/pi
 import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detailed-style";
 import { getShapeStyleAssetIds } from "@sheetcraft/core/shape-style";
 import { getShapeTextAssetIds } from "@sheetcraft/core/shape-text";
+import { collectShapeGroupAssetIds, isShapeGroupDrawing } from "@sheetcraft/core/shape-group";
 import { readEncodedImageSource } from "./readEncodedImageSource";
 import { assertImagePixelBudget } from "./imageAssetValidation";
 import type { ImageAsset, ImageAssetStore } from "./imageAssetStore";
@@ -18,6 +19,8 @@ export function collectWorkbookImageAssetIds(workbook: Workbook): Set<string> {
     if (sheet.pageDecoration?.watermark?.image)
       ids.add(sheet.pageDecoration.watermark.image.assetId);
     for (const drawing of sheet.drawings ?? []) {
+      if (isShapeGroupDrawing(drawing))
+        for (const id of collectShapeGroupAssetIds(drawing)) ids.add(id);
       if (drawing.kind === "shape")
         for (const id of getShapeStyleAssetIds(drawing.shapeStyle)) ids.add(id);
       if (drawing.kind === "shape" || drawing.kind === "textBox")

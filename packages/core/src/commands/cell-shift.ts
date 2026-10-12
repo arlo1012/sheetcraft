@@ -6,7 +6,7 @@ import {
   restorePivotTables,
   transformPivotReferences,
 } from "../pivot-tables.js";
-import { mapDrawingSource, isFramedShapeDrawing, type SheetDrawing } from "../sheet-drawings.js";
+import { mapDrawingSource, hasShapeObjectFrame, type SheetDrawing } from "../sheet-drawings.js";
 import { collectFormulaRanges, transformFormulaReferences } from "../formula/references.js";
 import { conditionalFormatFormulaSources } from "../conditional-formatting.js";
 import {
@@ -437,7 +437,7 @@ export function applyCellShiftCommand(
     );
   if (
     (sheet.drawings ?? []).some(
-      (drawing) => isFramedShapeDrawing(drawing) && drawing.shapeFrame.anchor.mode !== "fixed",
+      (drawing) => hasShapeObjectFrame(drawing) && drawing.shapeFrame.anchor.mode !== "fixed",
     )
   )
     throw invalidCommandPayload(
@@ -452,7 +452,7 @@ export function applyCellShiftCommand(
       previousState.cells.some((cell) => !map(cell.address)) ||
       sheet.floatingImages.some((image) => isLegacyPictureObject(image) && !map(image.anchor)) ||
       (sheet.drawings ?? []).some(
-        (drawing) => !isFramedShapeDrawing(drawing) && !map(drawing.anchor),
+        (drawing) => !hasShapeObjectFrame(drawing) && !map(drawing.anchor),
       );
     if (overflow)
       throw invalidCommandPayload(
@@ -529,7 +529,7 @@ export function applyCellShiftCommand(
     ];
   });
   nextState.drawings = (previousState.drawings ?? []).flatMap<SheetDrawing>((drawing) => {
-    if (isFramedShapeDrawing(drawing)) return [drawing];
+    if (hasShapeObjectFrame(drawing)) return [drawing];
     const anchor = map(drawing.anchor);
     return anchor
       ? [

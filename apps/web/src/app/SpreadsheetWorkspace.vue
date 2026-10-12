@@ -1575,6 +1575,7 @@ function insertPivot(chart: boolean): void {
   else if (!activePivot.value) pivotActions.open(chart);
 }
 function editSheetDrawing(drawing: SheetDrawing): void {
+  if (drawing.kind === "shapeGroup") throw new TypeError("Shape group editing is not yet enabled.");
   if (drawing.kind === "chart") chartActions.edit(drawing);
   else if (drawing.kind === "control") controlActions.open(drawing);
   else if (drawing.kind === "attachment") attachmentActions.viewing.value = drawing;

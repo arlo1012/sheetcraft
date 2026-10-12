@@ -9,6 +9,7 @@ import {
 } from "../sheet-images/picture-document-support";
 import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
 import type { Workbook } from "@sheetcraft/core/workbook";
+import { isShapeGroupDrawing, traverseShapeGroup } from "@sheetcraft/core/shape-group";
 import { prepareImageAsset, MAX_IMAGE_BYTES } from "../image-assets/prepareImageAsset";
 import { collectWorkbookImageAssetIds } from "../image-assets/useImageAssetUrls";
 import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStore";
@@ -121,15 +122,21 @@ function rewriteImageReferences(workbook: Workbook, ids: ReadonlyMap<string, str
     if (watermarkImage)
       watermarkImage.assetId = ids.get(watermarkImage.assetId) ?? watermarkImage.assetId;
     // Shape paint owns validated image assets just as cell and floating pictures do.
-    for (const drawing of sheet.drawings ?? []) {
-      if (drawing.kind !== "shape" && drawing.kind !== "textBox") continue;
-      for (const style of [drawing.shapeStyle, drawing.shapeText?.style]) {
-        const fill = style?.fill;
-        if (fill?.kind === "value" && fill.value.kind === "picture")
-          fill.value.assetId = ids.get(fill.value.assetId) ?? fill.value.assetId;
-        const line = style?.line;
-        if (line?.kind === "value" && line.value.paint.kind === "picture")
-          line.value.paint.assetId = ids.get(line.value.paint.assetId) ?? line.value.paint.assetId;
+    for (const root of sheet.drawings ?? []) {
+      const leaves = isShapeGroupDrawing(root)
+        ? traverseShapeGroup(root).map(({ node }) => node)
+        : [root];
+      for (const drawing of leaves) {
+        if (drawing.kind !== "shape" && drawing.kind !== "textBox") continue;
+        for (const style of [drawing.shapeStyle, drawing.shapeText?.style]) {
+          const fill = style?.fill;
+          if (fill?.kind === "value" && fill.value.kind === "picture")
+            fill.value.assetId = ids.get(fill.value.assetId) ?? fill.value.assetId;
+          const line = style?.line;
+          if (line?.kind === "value" && line.value.paint.kind === "picture")
+            line.value.paint.assetId =
+              ids.get(line.value.paint.assetId) ?? line.value.paint.assetId;
+        }
       }
     }
     for (const cell of sheet.cells.values()) {

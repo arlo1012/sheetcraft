@@ -1,5 +1,12 @@
 import { readPictureDataArray } from "./picture-data-array.js";
 import {
+  collectShapeGroupNodeIds,
+  isShapeGroupDrawing,
+  normalizeShapeGroup,
+  normalizeShapeGroupCollection,
+  type ShapeGroupDrawing,
+} from "./shape-group.js";
+import {
   isShapeLinePreset,
   normalizeShapeLineEnds,
   type ShapeLineEnds,
@@ -102,7 +109,7 @@ export type SheetFramedGraphicDrawing = Omit<
   shapeFrame: ShapeFrame;
   shapeProperties?: ShapeObjectProperties;
 };
-export type SheetDrawing = SheetLegacyDrawing | SheetFramedGraphicDrawing;
+export type SheetDrawing = SheetLegacyDrawing | SheetFramedGraphicDrawing | ShapeGroupDrawing;
 type DrawingAppearance =
   | Omit<SheetGraphicDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">
   | Omit<SheetChartDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">
@@ -110,11 +117,18 @@ type DrawingAppearance =
   | Omit<SheetAttachmentDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">
   | Omit<SheetControlDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">;
 export function isFramedShapeDrawing(value: SheetDrawing): value is SheetFramedGraphicDrawing {
-  return "shapeFrame" in value;
+  const kind: unknown = Object.getOwnPropertyDescriptor(value, "kind")?.value;
+  return (kind === "shape" || kind === "textBox") && "shapeFrame" in value;
+}
+/** Root placement only. Containers do not have leaf geometry, text or paint. */
+export function hasShapeObjectFrame(
+  value: SheetDrawing,
+): value is SheetFramedGraphicDrawing | ShapeGroupDrawing {
+  return isFramedShapeDrawing(value) || isShapeGroupDrawing(value);
 }
 /** Temporary consumer gate; it never drops a frame or invents legacy storage coordinates. */
 export function requireLegacySheetDrawing(value: SheetDrawing): SheetLegacyDrawing {
-  if (isFramedShapeDrawing(value))
+  if (hasShapeObjectFrame(value))
     throw new TypeError("This drawing consumer does not yet support canonical shape frames.");
   return value;
 }
@@ -371,11 +385,18 @@ const shapeFrameFields = [
   "shapeProperties",
 ] as const;
 export function normalizeSheetDrawing(value: SheetFramedGraphicDrawing): SheetFramedGraphicDrawing;
+export function normalizeSheetDrawing(value: ShapeGroupDrawing): ShapeGroupDrawing;
 export function normalizeSheetDrawing(value: SheetLegacyDrawing): SheetLegacyDrawing;
 export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing;
 export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new RangeError("Invalid sheet drawing.");
+  if ("groupFrame" in value)
+    throw new TypeError("Owned shape children cannot use root drawing placement.");
+  if (Object.getOwnPropertyDescriptor(value, "kind")?.value === "shapeGroup")
+    return normalizeShapeGroup(value as ShapeGroupDrawing);
+  if ("shapeFrame" in value && !isFramedShapeDrawing(value))
+    throw new TypeError("Only shapes, text boxes or shape groups may use canonical shape frames.");
   if (isFramedShapeDrawing(value)) {
     const prototype = Object.getPrototypeOf(value);
     if (prototype !== null && prototype !== Object.prototype)
@@ -436,11 +457,20 @@ export function normalizeSheetDrawings(
 ): SheetDrawing[] {
   if (values === undefined) return [];
   if (!Array.isArray(values)) throw new RangeError("Invalid sheet drawings.");
-  const result = readPictureDataArray(values, "sheet drawings", Number.MAX_SAFE_INTEGER).map(
-    normalizeSheetDrawing,
-  );
-  if (new Set(result.map((value) => value.id)).size !== result.length)
-    throw new RangeError("Duplicate drawing IDs.");
+  const source = readPictureDataArray(values, "sheet drawings", Number.MAX_SAFE_INTEGER);
+  // Check ownership across raw trees before detached clones can disguise shared nodes.
+  normalizeShapeGroupCollection(source.filter(isShapeGroupDrawing));
+  const result = source.map(normalizeSheetDrawing);
+  const ids = new Set<string>();
+  for (const drawing of result) {
+    const ownedIds = isShapeGroupDrawing(drawing)
+      ? collectShapeGroupNodeIds(drawing)
+      : [drawing.id];
+    for (const id of ownedIds) {
+      if (ids.has(id)) throw new RangeError("Duplicate drawing IDs.");
+      ids.add(id);
+    }
+  }
   if (
     result.reduce(
       (total, drawing) => total + (drawing.kind === "attachment" ? drawing.attachment.size : 0),

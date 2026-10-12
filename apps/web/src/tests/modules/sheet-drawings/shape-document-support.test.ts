@@ -112,3 +112,33 @@ test("legacy boundary preserves the exposed reactive owner identity for gesture 
   const legacy = reactive([createGraphicDrawing("old", "shape", "Old", { row: 0, column: 0 })]);
   expect(requireLegacySheetDrawings(legacy)[0]).toBe(legacy[0]);
 });
+
+test("owned group documents and commands stay blocked until every live consumer is ready", () => {
+  const workbook = createWorkbook({ id: "group-test", sheetId: "s" }),
+    sheet = getActiveSheet(workbook);
+  const { shapeFrame, ...appearance } = framedShape();
+  sheet.drawings = [
+    {
+      kind: "shapeGroup",
+      id: "g",
+      name: "Group",
+      rotation: 0,
+      shapeFrame,
+      members: [
+        {
+          ...appearance,
+          groupFrame: {
+            kind: "shape-group-local-v1",
+            rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
+          },
+        },
+      ],
+    },
+  ];
+  const before = serializeWorkbook(workbook);
+  expect(() => assertWorkbookShapeSupport(workbook)).toThrow(/not yet enabled/);
+  expect(() =>
+    assertShapeCommandSupport(createSetSheetDrawingsCommand(sheet.id, sheet.drawings!)),
+  ).toThrow(/not yet enabled/);
+  expect(serializeWorkbook(workbook)).toEqual(before);
+});

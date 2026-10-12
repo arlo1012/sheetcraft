@@ -396,3 +396,87 @@ describe("useImageAssetUrls", () => {
     fixture.unmount();
   });
 });
+
+test("nested source-free shape groups retain body and glyph image fills", () => {
+  const workbook = createWorkbook({ id: "shape-assets", sheetId: "s" }),
+    sheet = getActiveSheet(workbook);
+  const paint = (assetId: string) => ({
+    kind: "picture" as const,
+    assetId,
+    opacity: 1,
+    rotateWithShape: true,
+    layout: {
+      kind: "stretch" as const,
+      offsetXRatio: 0,
+      offsetYRatio: 0,
+      widthRatio: 1,
+      heightRatio: 1,
+    },
+  });
+  sheet.drawings = [
+    {
+      kind: "shapeGroup",
+      id: "g",
+      name: "Group",
+      rotation: 0,
+      shapeFrame: {
+        kind: "shape-frame-v1",
+        anchor: { mode: "fixed", x: 0, y: 0, size: { width: 100, height: 100 } },
+      },
+      members: [
+        {
+          kind: "shapeGroup",
+          id: "n",
+          name: "Nested",
+          rotation: 37,
+          groupFrame: {
+            kind: "shape-group-local-v1",
+            rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
+          },
+          members: [
+            {
+              kind: "shape",
+              id: "leaf",
+              name: "Leaf",
+              rotation: 0,
+              text: "text",
+              shape: "rectangle",
+              fill: "#fff",
+              stroke: "#000",
+              strokeWidth: 1,
+              color: "#000",
+              fontSize: 12,
+              bold: false,
+              italic: false,
+              groupFrame: {
+                kind: "shape-group-local-v1",
+                rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
+              },
+              shapeStyle: { fill: { kind: "value", value: paint("body") } },
+              shapeText: {
+                layout: {
+                  blockAlignment: "center",
+                  direction: "horizontal",
+                  lineOrder: "ltr",
+                  marginsPt: { leftPt: 0, rightPt: 0, topPt: 0, bottomPt: 0 },
+                  wrap: true,
+                  overflow: false,
+                  autoFit: "none",
+                  keepFlat: false,
+                },
+                paragraph: {
+                  alignment: "left",
+                  beforePt: 0,
+                  afterPt: 0,
+                  lineSpacing: { kind: "normal" },
+                },
+                style: { fill: { kind: "value", value: paint("glyph") } },
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ];
+  expect([...collectWorkbookImageAssetIds(workbook)]).toEqual(["body", "glyph"]);
+});

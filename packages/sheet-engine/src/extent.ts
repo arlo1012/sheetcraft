@@ -1,4 +1,9 @@
-import { isFramedShapeDrawing } from "@sheetcraft/core/sheet-drawings";
+import { hasShapeObjectFrame } from "@sheetcraft/core/sheet-drawings";
+import { isShapeGroupDrawing } from "@sheetcraft/core/shape-group";
+import {
+  resolveShapeGroup,
+  type ResolvedShapeGroupNode,
+} from "@sheetcraft/core/shape-group-layout";
 import { resolveShapeFrame } from "@sheetcraft/core/shape-frame";
 import { getShapeObjectOriginCell } from "@sheetcraft/core/shape-object-sheet";
 import { isPictureGroup } from "@sheetcraft/core/picture-group";
@@ -79,7 +84,7 @@ export function getSheetContentExtent(sheet: Sheet): GridExtent {
         column: Math.min(MAX_SHEET_COLUMNS - 1, locatePictureAxisPoint(x, metrics.columns).index),
       });
     for (const drawing of sheet.drawings) {
-      if (isFramedShapeDrawing(drawing)) {
+      if (hasShapeObjectFrame(drawing)) {
         include(getShapeObjectOriginCell(drawing, sheet));
         const anchor = drawing.shapeFrame.anchor;
         // Hidden/collapsed markers remain reachable for unhide and history.
@@ -90,6 +95,20 @@ export function getSheetContentExtent(sheet: Sheet): GridExtent {
           });
         const bounds = resolveShapeFrame(drawing.shapeFrame, metrics, drawing.rotation).bounds;
         includeShapeEnd(bounds.x + bounds.width, bounds.y + bounds.height);
+        if (isShapeGroupDrawing(drawing)) {
+          const pending: ResolvedShapeGroupNode[] = [resolveShapeGroup(drawing, metrics)];
+          while (pending.length) {
+            const node = pending.pop()!;
+            if (node.layout) {
+              const childBounds = node.layout.bounds;
+              includeShapeEnd(
+                childBounds.x + childBounds.width,
+                childBounds.y + childBounds.height,
+              );
+            }
+            if ("members" in node) pending.push(...node.members);
+          }
+        }
       } else {
         include(drawing.anchor);
         includeShapeEnd(

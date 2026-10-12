@@ -57,3 +57,36 @@ test("terminal and negative rails remain finite and bounded", () => {
   expect(extent.rowCount).toBeGreaterThan(0);
   expect(extent.columnCount).toBeGreaterThan(0);
 });
+
+test("group descendants beyond the owner's layout remain reachable without promoting storage", () => {
+  const sheet = createSheet("shape", "sheet"),
+    leaf = shape();
+  const { shapeFrame, ...appearance } = leaf;
+  sheet.drawings = [
+    {
+      kind: "shapeGroup",
+      id: "g",
+      name: "Group",
+      rotation: 0,
+      shapeFrame: {
+        ...shapeFrame,
+        anchor: { mode: "fixed", x: 0, y: 0, size: { width: 100, height: 100 } },
+      },
+      members: [
+        {
+          ...appearance,
+          rotation: 0,
+          groupFrame: {
+            kind: "shape-group-local-v1",
+            rect: { xRatio: 100, yRatio: 50, widthRatio: 1, heightRatio: 1 },
+          },
+        },
+      ],
+    },
+  ];
+  const before = JSON.stringify(sheet.drawings),
+    extent = getSheetContentExtent(sheet);
+  expect(extent.columnCount).toBeGreaterThan(100);
+  expect(extent.rowCount).toBeGreaterThan(200);
+  expect(JSON.stringify(sheet.drawings)).toBe(before);
+});

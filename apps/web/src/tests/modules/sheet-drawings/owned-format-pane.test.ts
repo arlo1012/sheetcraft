@@ -174,7 +174,9 @@ test("out-of-Core-range rotation is rejected and independent text controls are a
         f.intent({ type: "set-style", target: "text", category: "fill", value: { kind: "none" } }),
       ),
     ).toBe(true);
-    f.sheet.value.drawings![0]!.text = "text";
+    const target = f.sheet.value.drawings![0]!;
+    if (target.kind === "shapeGroup") throw new Error("Expected the tested shape leaf.");
+    target.text = "text";
     f.revision.value++;
     expect(f.pane.capabilities.value.styles?.shape?.rotation3d?.enabled).toBe(true);
     expect(f.session.history.undoStack).toHaveLength(2);

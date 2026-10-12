@@ -1,4 +1,4 @@
-import { isFramedShapeDrawing } from "@sheetcraft/core/sheet-drawings";
+import { hasShapeObjectFrame } from "@sheetcraft/core/sheet-drawings";
 import { validateImportedCalculatedColumns } from "./table-calculated-columns.js";
 import { readXlsxPivotTables } from "./pivot-tables.js";
 import { collectNativeChartParts } from "./chart-package-parts.js";
@@ -1147,7 +1147,7 @@ export async function encodeWithNativeXlsx(
     throw new RangeError("The XLSX active sheet must identify a visible worksheet.");
   for (const sheet of sheets) {
     for (const drawing of sheet.drawings ?? []) {
-      if (!isFramedShapeDrawing(drawing)) continue;
+      if (!hasShapeObjectFrame(drawing)) continue;
       const issueLocation = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].shapeFrame`;
       throw new XlsxCompatibilityError(
         `Canonical shape placement is not yet supported by XLSX export at ${issueLocation}.`,

@@ -442,3 +442,27 @@ describe("genuine print shape consumer", () => {
     expect(JSON.stringify(source)).toBe(before);
   });
 });
+
+test("model-stage groups cannot silently disappear from print output", () => {
+  const leaf = framed(),
+    { shapeFrame, ...appearance } = leaf;
+  const { sheet } = fixture([
+    {
+      kind: "shapeGroup",
+      id: "g",
+      name: "Group",
+      rotation: 0,
+      shapeFrame,
+      members: [
+        {
+          ...appearance,
+          groupFrame: {
+            kind: "shape-group-local-v1",
+            rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
+          },
+        },
+      ],
+    },
+  ]);
+  expect(() => getPrintableShapeRoots(sheet)).toThrow(/group printing is not yet enabled/);
+});

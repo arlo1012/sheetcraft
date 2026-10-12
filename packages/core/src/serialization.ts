@@ -272,6 +272,7 @@ export type WorkbookSnapshotV57 = Omit<WorkbookSnapshotV56, "version"> & { versi
 export type WorkbookSnapshotV58 = Omit<WorkbookSnapshotV57, "version"> & { version: 58 };
 export type WorkbookSnapshotV59 = Omit<WorkbookSnapshotV58, "version"> & { version: 59 };
 export type WorkbookSnapshotV60 = Omit<WorkbookSnapshotV59, "version"> & { version: 60 };
+export type WorkbookSnapshotV61 = Omit<WorkbookSnapshotV60, "version"> & { version: 61 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -290,7 +291,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV57
   | WorkbookSnapshotV58
   | WorkbookSnapshotV59
-  | WorkbookSnapshotV60;
+  | WorkbookSnapshotV60
+  | WorkbookSnapshotV61;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -367,7 +369,8 @@ type SnapshotVersion =
   | 57
   | 58
   | 59
-  | 60;
+  | 60
+  | 61;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -383,6 +386,14 @@ function asRecord(value: unknown, path: string): UnknownRecord {
     return fail(path, "Expected an object.");
   }
   return value as UnknownRecord;
+}
+
+/** Feature admission never evaluates a drawing discriminator accessor. */
+function hasShapeGroupSnapshotTag(value: UnknownRecord, path: string): boolean {
+  const field = Object.getOwnPropertyDescriptor(value, "kind");
+  if (field && !("value" in field))
+    return fail(`${path}.kind`, "Drawing kind must be an own data field, not an accessor.");
+  return field?.value === "shapeGroup";
 }
 
 /** Detect the field without reading its value, including malformed/accessor payloads. */
@@ -1339,6 +1350,15 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     for (const [index, drawing] of record.drawings.entries()) {
       const item = asRecord(drawing, path);
       if (
+        hasShapeGroupSnapshotTag(item, `${path}.drawings[${index}]`) &&
+        version !== undefined &&
+        version < 61
+      )
+        return fail(
+          `${path}.drawings[${index}]`,
+          "Owned shape groups require snapshot version 61.",
+        );
+      if (
         ("shapeFrame" in item || "shapeProperties" in item) &&
         version !== undefined &&
         version < 60
@@ -1644,6 +1664,11 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       })
     )
       version = 60;
+    if (
+      Array.isArray(record.drawings) &&
+      record.drawings.some((drawing) => hasShapeGroupSnapshotTag(asRecord(drawing, path), path))
+    )
+      version = 61;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -1745,82 +1770,88 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
     // Preserve the existing protocol for documents that do not use the new feature.
     version: sheets.some((sheet) =>
-      sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapeFrame")),
+      sheet.drawings?.some((drawing) => drawing.kind === "shapeGroup"),
     )
-      ? 60
+      ? 61
       : sheets.some((sheet) =>
-            sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapeText")),
+            sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapeFrame")),
           )
-        ? 59
+        ? 60
         : sheets.some((sheet) =>
-              sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapeStyle")),
+              sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapeText")),
             )
-          ? 58
+          ? 59
           : sheets.some((sheet) =>
-                sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapePath")),
+                sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapeStyle")),
               )
-            ? 57
+            ? 58
             : sheets.some((sheet) =>
-                  sheet.drawings?.some(
-                    (drawing) =>
-                      drawing.kind === "shape" &&
-                      (drawing.shapeFlipX === true || drawing.shapeFlipY === true),
-                  ),
+                  sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapePath")),
                 )
-              ? 56
+              ? 57
               : sheets.some((sheet) =>
                     sheet.drawings?.some(
                       (drawing) =>
-                        Object.hasOwn(drawing, "shapeLineEnds") ||
-                        Object.hasOwn(drawing, "textDirection"),
+                        drawing.kind === "shape" &&
+                        (drawing.shapeFlipX === true || drawing.shapeFlipY === true),
                     ),
                   )
-                ? 55
+                ? 56
                 : sheets.some((sheet) =>
-                      sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapeGeometry")),
+                      sheet.drawings?.some(
+                        (drawing) =>
+                          Object.hasOwn(drawing, "shapeLineEnds") ||
+                          Object.hasOwn(drawing, "textDirection"),
+                      ),
                     )
-                  ? 54
-                  : sheets.some((sheet) => sheet.cells.some(hasCellPictureFrameFields))
-                    ? 53
-                    : sheets.some((sheet) => sheet.floatingImages.some(hasPictureCropShapeFields))
-                      ? 52
-                      : sheets.some(
-                            (sheet) =>
-                              sheet.cells.some(hasCellPicturePropertyFields) ||
-                              sheet.floatingImages.some(hasPicturePropertyFields),
-                          )
-                        ? 51
+                  ? 55
+                  : sheets.some((sheet) =>
+                        sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapeGeometry")),
+                      )
+                    ? 54
+                    : sheets.some((sheet) => sheet.cells.some(hasCellPictureFrameFields))
+                      ? 53
+                      : sheets.some((sheet) => sheet.floatingImages.some(hasPictureCropShapeFields))
+                        ? 52
                         : sheets.some(
                               (sheet) =>
-                                sheet.cells.some(hasCellDetailedStyleField) ||
-                                sheet.floatingImages.some(hasPictureDetailedStyleField),
+                                sheet.cells.some(hasCellPicturePropertyFields) ||
+                                sheet.floatingImages.some(hasPicturePropertyFields),
                             )
-                          ? 50
+                          ? 51
                           : sheets.some(
                                 (sheet) =>
-                                  sheet.cells.some(hasCellThemeEffectSuppressionField) ||
-                                  sheet.floatingImages.some(hasPictureThemeEffectSuppressionField),
+                                  sheet.cells.some(hasCellDetailedStyleField) ||
+                                  sheet.floatingImages.some(hasPictureDetailedStyleField),
                               )
-                            ? 49
-                            : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
-                              ? 48
-                              : sheets.some((sheet) =>
-                                    sheet.floatingImages.some(isFramedPictureObject),
-                                  )
-                                ? 47
+                            ? 50
+                            : sheets.some(
+                                  (sheet) =>
+                                    sheet.cells.some(hasCellThemeEffectSuppressionField) ||
+                                    sheet.floatingImages.some(
+                                      hasPictureThemeEffectSuppressionField,
+                                    ),
+                                )
+                              ? 49
+                              : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
+                                ? 48
                                 : sheets.some((sheet) =>
-                                      sheet.cells.some(
-                                        (cell) =>
-                                          cell.content?.kind === "literal" &&
-                                          Boolean(cell.content.fontRuns?.length),
-                                      ),
+                                      sheet.floatingImages.some(isFramedPictureObject),
                                     )
-                                  ? 46
-                                  : calculatedColumns
-                                    ? 45
-                                    : manualOrder
-                                      ? 44
-                                      : 43,
+                                  ? 47
+                                  : sheets.some((sheet) =>
+                                        sheet.cells.some(
+                                          (cell) =>
+                                            cell.content?.kind === "literal" &&
+                                            Boolean(cell.content.fontRuns?.length),
+                                        ),
+                                      )
+                                    ? 46
+                                    : calculatedColumns
+                                      ? 45
+                                      : manualOrder
+                                        ? 44
+                                        : 43,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1912,7 +1943,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 57 &&
     record.version !== 58 &&
     record.version !== 59 &&
-    record.version !== 60
+    record.version !== 60 &&
+    record.version !== 61
   ) {
     throw new WorkbookDomainError(
       {

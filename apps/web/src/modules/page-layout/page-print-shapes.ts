@@ -63,6 +63,11 @@ type Bounds = { left: number; top: number; right: number; bottom: number };
 
 /** Preserve the real owners and their sheet drawing order. Other graphic kinds are separate consumers. */
 export function getPrintableShapeRoots(sheet: Pick<Sheet, "drawings">): PrintableShape[] {
+  if (sheet.drawings?.some((drawing) => drawing.kind === "shapeGroup"))
+    throw new ShapeTextRuntimeError(
+      "unsupported-drawing",
+      "Shape group printing is not yet enabled.",
+    );
   return (sheet.drawings ?? []).filter(
     (drawing): drawing is PrintableShape =>
       (drawing.kind === "shape" || drawing.kind === "textBox") &&

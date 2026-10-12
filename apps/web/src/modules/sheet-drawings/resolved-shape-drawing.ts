@@ -103,6 +103,8 @@ export function resolveShapeDrawing(
   source: SheetDrawing,
   metrics: PictureSheetMetrics,
 ): ResolvedShapeDrawing {
+  if (source.kind === "shapeGroup")
+    throw new TypeError("A shape group requires its owned-tree projection, not a leaf view.");
   if (!isFramedShapeDrawing(source)) {
     const rect = getViewRect(source, metrics);
     return {
