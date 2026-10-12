@@ -1,4 +1,5 @@
 import { isPictureGroup } from "@sheetcraft/core/picture-group";
+import { PICTURE_PROPERTY_KEYS, type PictureProperties } from "@sheetcraft/core/picture-properties";
 import { formatFormulaAddress } from "@sheetcraft/core/formula";
 import { requireLegacyPicture } from "../sheet-images/picture-document-support";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
@@ -66,6 +67,15 @@ function extensionFor(mimeType: string): EncodedImage | undefined {
 }
 
 export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
+  const assertProperties = (image: PictureProperties, ownerLocation: string): void => {
+    const field = PICTURE_PROPERTY_KEYS.find((key) => Object.hasOwn(image, key));
+    if (field === undefined) return;
+    const location = `${ownerLocation}.${field}`;
+    throw new XlsxWorkerFailure(
+      `Picture object properties are not yet supported by XLSX export at ${location}.`,
+      { issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [location] }] },
+    );
+  };
   const assertAppearance = (transform: ImageTransform | undefined, ownerLocation: string): void => {
     if (
       !transform?.appearance ||
@@ -97,6 +107,7 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
           },
         );
       }
+      assertProperties(image, `${sheet.name}.floatingImages[${JSON.stringify(image.id)}]`);
       assertAppearance(
         image.transform,
         `${sheet.name}.floatingImages[${JSON.stringify(image.id)}]`,
@@ -106,6 +117,10 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
       if (cell.content?.kind !== "image") continue;
       const [row, column] = key.split(":").map(Number);
       if (row === undefined || column === undefined) continue;
+      assertProperties(
+        cell.content.image,
+        `${sheet.name}!${formatFormulaAddress({ row, column })}`,
+      );
       assertAppearance(
         cell.content.image.transform,
         `${sheet.name}!${formatFormulaAddress({ row, column })}`,

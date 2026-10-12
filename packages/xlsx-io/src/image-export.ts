@@ -1,3 +1,4 @@
+import { PICTURE_PROPERTY_KEYS, type PictureProperties } from "@sheetcraft/core/picture-properties";
 import { isPictureGroup } from "@sheetcraft/core/picture-group";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { XlsxCompatibilityError } from "./types.js";
@@ -13,9 +14,19 @@ import { nativeDrawingAnchor, type NativeDrawingAnchor } from "./drawing-geometr
 
 /** Reject unencodable appearance intent before normalization or resource registration. */
 export function assertSupportedXlsxImageAppearance(
-  image: Pick<CellImage, "transform">,
+  image: Pick<CellImage, "transform"> & PictureProperties,
   issueLocation: string,
 ): void {
+  const property = PICTURE_PROPERTY_KEYS.find((key) => Object.hasOwn(image, key));
+  if (property) {
+    const issuePath = `${issueLocation}.${property}`;
+    throw new XlsxCompatibilityError(
+      `Picture object properties are not yet supported by XLSX export at ${issuePath}.`,
+      {
+        issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [issuePath] }],
+      },
+    );
+  }
   const appearance = image.transform?.appearance;
   if (
     appearance !== null &&

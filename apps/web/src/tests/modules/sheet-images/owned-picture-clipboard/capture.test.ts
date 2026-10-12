@@ -31,6 +31,28 @@ describe("owned picture clipboard capture", () => {
     expect(f.clipboard.getCurrent()!.sourceForest).toEqual(before);
   });
 
+  test("extracting owned content preserves its title and inherits root locking/printing", () => {
+    const f = fixture(),
+      root = f.sheet.floatingImages[1]!;
+    if (!isPictureGroup(root)) throw Error("Bad fixture");
+    const nested = root.members[1]! as GroupedGroup,
+      leaf = nested.members[0]!;
+    Object.assign(leaf, { altTitle: "叶标题", locked: false, printObject: false });
+    const defaultCopy = f.capture("copy", ["nested-leaf"]).roots[0]!;
+    expect(defaultCopy.altTitle).toBe("叶标题");
+    expect(defaultCopy.locked).toBeUndefined();
+    expect(defaultCopy.printObject).toBeUndefined();
+    Object.assign(root, { locked: false, printObject: false });
+    const unlocked = f.capture("copy", ["nested-group"]).roots[0]!;
+    expect(unlocked).toMatchObject({ locked: false, printObject: false });
+    expect(f.capture("copy", ["nested-leaf"]).roots[0]).toMatchObject({
+      altTitle: "叶标题",
+      locked: false,
+      printObject: false,
+    });
+    expect(f.sheet.floatingImages[1]).toBe(root);
+  });
+
   test("deduplicates validated ancestors and descendants and keeps forest stacking order", () => {
     const f = fixture();
     const current = f.capture("copy", [

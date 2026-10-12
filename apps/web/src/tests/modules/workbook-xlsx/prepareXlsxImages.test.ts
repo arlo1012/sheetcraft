@@ -70,6 +70,45 @@ afterEach(() => {
 });
 
 describe("prepareXlsxImages", () => {
+  test.each(["cell", "floating"] as const)(
+    "%s object properties are blocked before asset preparation",
+    async (kind) => {
+      for (const field of ["altTitle", "locked", "printObject"] as const) {
+        const { workbook, sheet } = imageSnapshot();
+        const image = {
+          id: "p",
+          assetId: "a",
+          altText: "",
+          anchor: { row: 0, column: 0 },
+          offsetX: 0,
+          offsetY: 0,
+          width: 80,
+          height: 40,
+          [field]: field === "altTitle" ? "Title" : false,
+        };
+        if (kind === "cell") setCellContent(sheet, { row: 0, column: 0 }, { kind: "image", image });
+        else sheet.floatingImages = [image];
+        const snapshot = serializeWorkbook(workbook),
+          before = structuredClone(snapshot),
+          assets = store(imageAsset("a"));
+        await expect(prepareXlsxImages(snapshot, assets)).rejects.toMatchObject({
+          name: "XlsxWorkerFailure",
+          report: {
+            issues: [
+              {
+                severity: "block",
+                locations: [
+                  `${kind === "cell" ? "Images!A1" : 'Images.floatingImages["p"]'}.${field}`,
+                ],
+              },
+            ],
+          },
+        });
+        expect(assets.get).not.toHaveBeenCalled();
+        expect(snapshot).toEqual(before);
+      }
+    },
+  );
   test.each([
     ["cell", "suppressThemeEffects"],
     ["floating", "suppressThemeEffects"],

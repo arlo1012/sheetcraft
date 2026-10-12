@@ -85,3 +85,54 @@ test("blocking an own detailed-style accessor never invokes it", () => {
   ).toThrow(XlsxCompatibilityError);
   expect(getter).not.toHaveBeenCalled();
 });
+
+// This safety gate does not add XLSX property encoding capabilities.
+test.each(["altTitle", "locked", "printObject"] as const)(
+  "%s properties block before resources and leave the workbook unchanged",
+  async (field) => {
+    for (const kind of ["cell", "floating"] as const) {
+      const workbook = createWorkbook({ id: "w", sheetId: "s", sheetName: "Synthetic" }),
+        sheet = getActiveSheet(workbook);
+      const value = {
+        ...image(),
+        transform: undefined,
+        [field]: field === "altTitle" ? "Title" : false,
+      };
+      if (kind === "cell") sheet.cells.set("0:0", { content: { kind: "image", image: value } });
+      else sheet.floatingImages = [value];
+      const before = structuredClone(workbook),
+        resources = vi.fn(() => []);
+      await expect(
+        encodeXlsx(workbook, {
+          get images() {
+            return resources();
+          },
+        }),
+      ).rejects.toMatchObject({
+        name: "XlsxCompatibilityError",
+        report: {
+          issues: [
+            {
+              severity: "block",
+              locations: [
+                `${kind === "cell" ? "Synthetic!A1" : 'Synthetic.floatingImages["p"]'}.${field}`,
+              ],
+            },
+          ],
+        },
+      });
+      expect(resources).not.toHaveBeenCalled();
+      expect(workbook).toEqual(before);
+    }
+  },
+);
+test("object property accessors block without invocation in a direct image exporter", () => {
+  const getter = vi.fn(() => false),
+    source = Object.defineProperty({ assetId: "a", altText: "" }, "locked", { get: getter });
+  const target = { addImage: vi.fn(() => 1) };
+  expect(() =>
+    createXlsxImageExporter(target, undefined).registerCellImage(source, "Synthetic!A1"),
+  ).toThrow(XlsxCompatibilityError);
+  expect(getter).not.toHaveBeenCalled();
+  expect(target.addImage).not.toHaveBeenCalled();
+});

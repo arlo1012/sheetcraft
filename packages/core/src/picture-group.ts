@@ -1,3 +1,8 @@
+import {
+  normalizePictureProperties,
+  PICTURE_PROPERTY_KEYS,
+  type PictureProperties,
+} from "./picture-properties.js";
 import { readPictureDataArray } from "./picture-data-array.js";
 import { cloneImageTransform } from "./image-transform.js";
 import { getDetailedPictureStyleAssetIds } from "./picture-detailed-style.js";
@@ -39,7 +44,7 @@ export type PictureGroupMemberFrame = PictureGroupMemberLayout & {
 export type PictureGroupLocalFrame = PictureGroupMemberLayout & {
   kind: "group-local-frame-v1";
 };
-type PictureGroupMetadata = {
+type PictureGroupMetadata = PictureProperties & {
   id: string;
   altText: string;
   hidden?: boolean;
@@ -125,7 +130,15 @@ export function isGroupedGroup(value: unknown): value is GroupedGroup {
   );
 }
 
-const metadataKeys = ["kind", "id", "altText", "hidden", "lockAspectRatio", "frame"] as const;
+const metadataKeys = [
+  ...PICTURE_PROPERTY_KEYS,
+  "kind",
+  "id",
+  "altText",
+  "hidden",
+  "lockAspectRatio",
+  "frame",
+] as const;
 function nodeRecord(value: unknown, root: boolean): Record<string, unknown> {
   if (root && isPictureGroup(value))
     return record(value, [...metadataKeys, "members"], "picture group");
@@ -259,6 +272,7 @@ function metadata(v: Record<string, unknown>): PictureGroupMetadata {
   return {
     id: nonempty(v.id, "Picture group node ID"),
     altText: v.altText,
+    ...normalizePictureProperties(v),
     ...(hidden === undefined ? {} : { hidden }),
     ...(lockAspectRatio === undefined ? {} : { lockAspectRatio }),
   };

@@ -48,3 +48,4 @@ export * from "./picture-group-planning.js";
 export * from "./picture-group-edit.js";
 export * from "./picture-group-copy.js";
 export * from "./picture-group-delete.js";
+export * from "./picture-properties.js";

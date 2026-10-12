@@ -10,6 +10,25 @@ import {
 import { cropOwnerFixture } from "./crop-owner-fixture";
 
 describe("actual source and crop pane owner", () => {
+  test("legacy-to-frame crop promotion retains title, lock and print properties in undo/redo", () => {
+    const f = cropOwnerFixture("legacy"),
+      image = f.sheet.floatingImages[2]!;
+    Object.assign(image, { altTitle: "Title", locked: false, printObject: false });
+    const before = serializeWorkbook(f.session.workbook);
+    expect(f.pane.onIntent(f.field("cropWidthPt", 60))).toBe(true);
+    expect(f.sheet.floatingImages[2]).toMatchObject({
+      altTitle: "Title",
+      locked: false,
+      printObject: false,
+    });
+    expect(isFramedPictureObject(f.sheet.floatingImages[2]!)).toBe(true);
+    const after = serializeWorkbook(f.session.workbook);
+    undoWorkbookCommand(f.session);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+    redoWorkbookCommand(f.session);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(after);
+    f.scope.stop();
+  });
   test("displays eight real fields and enables independent source axes plus signed offsets", () => {
     const f = cropOwnerFixture();
     expect(f.pane.snapshot.value!.values).toMatchObject({

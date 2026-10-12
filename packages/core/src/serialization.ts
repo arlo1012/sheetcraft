@@ -1,5 +1,15 @@
+import {
+  hasPicturePropertiesField,
+  normalizePictureProperties,
+  type PictureProperties,
+} from "./picture-properties.js";
 import { readPictureDataArray } from "./picture-data-array.js";
-import { isPictureGroup, traversePictureGroup } from "./picture-group.js";
+import {
+  isPictureGroup,
+  traversePictureGroup,
+  MAX_PICTURE_GROUP_DEPTH,
+  MAX_PICTURE_GROUP_NODES,
+} from "./picture-group.js";
 import {
   normalizePictureObject,
   isFramedPictureObject,
@@ -246,6 +256,7 @@ export type WorkbookSnapshotV48 = Omit<WorkbookSnapshotV47, "version"> & { versi
 export type WorkbookSnapshotV49 = Omit<WorkbookSnapshotV48, "version"> & { version: 49 };
 /** Complete typed picture appearance is one protocol feature. */
 export type WorkbookSnapshotV50 = Omit<WorkbookSnapshotV49, "version"> & { version: 50 };
+export type WorkbookSnapshotV51 = Omit<WorkbookSnapshotV50, "version"> & { version: 51 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -254,7 +265,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV47
   | WorkbookSnapshotV48
   | WorkbookSnapshotV49
-  | WorkbookSnapshotV50;
+  | WorkbookSnapshotV50
+  | WorkbookSnapshotV51;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -321,7 +333,8 @@ type SnapshotVersion =
   | 47
   | 48
   | 49
-  | 50;
+  | 50
+  | 51;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -377,6 +390,51 @@ function pictureDataField(value: unknown, key: string): unknown {
   if (!("value" in descriptor))
     throw new TypeError(`Picture ${key} must be a data field, not an accessor.`);
   return descriptor.value;
+}
+/** Raw bounded traversal preserves field presence, including default-valued fields of old payloads. */
+function hasPicturePropertyFields(image: unknown): boolean {
+  const pending = [{ node: image, depth: 0 }];
+  const seen = new WeakSet<object>();
+  let count = 0;
+  while (pending.length) {
+    const { node, depth } = pending.pop()!;
+    if (!node || typeof node !== "object") continue;
+    if (depth > MAX_PICTURE_GROUP_DEPTH || ++count > MAX_PICTURE_GROUP_NODES)
+      throw new RangeError("Picture property traversal exceeds ownership budget.");
+    if (seen.has(node)) throw new TypeError("Cyclic or shared picture ownership.");
+    seen.add(node);
+    if (hasPicturePropertiesField(node)) return true;
+    const kind = pictureDataField(node, "kind");
+    if (kind === "picture-group-v1" || kind === "grouped-group-v1") {
+      const members = readPictureDataArray<unknown>(
+        pictureDataField(node, "members") as readonly unknown[],
+        "picture property members",
+        MAX_PICTURE_GROUP_NODES,
+      );
+      for (const member of members) pending.push({ node: member, depth: depth + 1 });
+    }
+  }
+  return false;
+}
+function hasCellPicturePropertyFields(cell: unknown): boolean {
+  const content = pictureDataField(cell, "content");
+  return (
+    pictureDataField(content, "kind") === "image" &&
+    hasPicturePropertiesField(pictureDataField(content, "image"))
+  );
+}
+function parsePictureProperties(
+  value: unknown,
+  path: string,
+  version: SnapshotVersion,
+): PictureProperties {
+  if (version < 51 && hasPicturePropertiesField(value))
+    return fail(path, "Picture object properties require snapshot version 51.");
+  try {
+    return normalizePictureProperties(value);
+  } catch (error) {
+    return fail(path, error instanceof Error ? error.message : "Invalid picture properties.");
+  }
 }
 function hasDetailedPictureStyleField(transform: unknown): boolean {
   const appearance = pictureDataField(transform, "appearance");
@@ -524,6 +582,7 @@ function parseCellContent(value: unknown, path: string, version: SnapshotVersion
       image: {
         assetId: image.assetId,
         altText: image.altText,
+        ...parsePictureProperties(image, `${path}.image`, version),
         ...(transform ? { transform } : {}),
       },
     };
@@ -740,6 +799,15 @@ function parseFilter(value: unknown, path: string, version: SnapshotVersion): Sh
 
 function parseFloatingImage(value: unknown, path: string, version: SnapshotVersion): FloatingImage {
   const record = asRecord(value, path);
+  if (version < 51) {
+    try {
+      if (hasPicturePropertyFields(record))
+        return fail(path, "Picture object properties require snapshot version 51.");
+    } catch (error) {
+      if (error instanceof WorkbookDomainError) throw error;
+      return fail(path, error instanceof Error ? error.message : "Invalid picture properties.");
+    }
+  }
   if (version < 50) {
     try {
       if (hasPictureDetailedStyleField(record))
@@ -809,6 +877,7 @@ function parseFloatingImage(value: unknown, path: string, version: SnapshotVersi
     id: record.id,
     assetId: record.assetId,
     altText: record.altText,
+    ...parsePictureProperties(record, path, version),
     anchor: parseAddress(record.anchor, `${path}.anchor`),
     offsetX: finite(record.offsetX, "offsetX"),
     offsetY: finite(record.offsetY, "offsetY"),
@@ -1360,6 +1429,11 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
         record.floatingImages.some(hasPictureDetailedStyleField))
     )
       version = 50;
+    if (
+      cells.some(hasCellPicturePropertyFields) ||
+      (Array.isArray(record.floatingImages) && record.floatingImages.some(hasPicturePropertyFields))
+    )
+      version = 51;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -1462,32 +1536,38 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     // Preserve the existing protocol for documents that do not use the new feature.
     version: sheets.some(
       (sheet) =>
-        sheet.cells.some(hasCellDetailedStyleField) ||
-        sheet.floatingImages.some(hasPictureDetailedStyleField),
+        sheet.cells.some(hasCellPicturePropertyFields) ||
+        sheet.floatingImages.some(hasPicturePropertyFields),
     )
-      ? 50
+      ? 51
       : sheets.some(
             (sheet) =>
-              sheet.cells.some(hasCellThemeEffectSuppressionField) ||
-              sheet.floatingImages.some(hasPictureThemeEffectSuppressionField),
+              sheet.cells.some(hasCellDetailedStyleField) ||
+              sheet.floatingImages.some(hasPictureDetailedStyleField),
           )
-        ? 49
-        : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
-          ? 48
-          : sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
-            ? 47
-            : sheets.some((sheet) =>
-                  sheet.cells.some(
-                    (cell) =>
-                      cell.content?.kind === "literal" && Boolean(cell.content.fontRuns?.length),
-                  ),
-                )
-              ? 46
-              : calculatedColumns
-                ? 45
-                : manualOrder
-                  ? 44
-                  : 43,
+        ? 50
+        : sheets.some(
+              (sheet) =>
+                sheet.cells.some(hasCellThemeEffectSuppressionField) ||
+                sheet.floatingImages.some(hasPictureThemeEffectSuppressionField),
+            )
+          ? 49
+          : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
+            ? 48
+            : sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
+              ? 47
+              : sheets.some((sheet) =>
+                    sheet.cells.some(
+                      (cell) =>
+                        cell.content?.kind === "literal" && Boolean(cell.content.fontRuns?.length),
+                    ),
+                  )
+                ? 46
+                : calculatedColumns
+                  ? 45
+                  : manualOrder
+                    ? 44
+                    : 43,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1569,7 +1649,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 47 &&
     record.version !== 48 &&
     record.version !== 49 &&
-    record.version !== 50
+    record.version !== 50 &&
+    record.version !== 51
   ) {
     throw new WorkbookDomainError(
       {

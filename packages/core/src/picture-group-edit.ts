@@ -1,3 +1,8 @@
+import {
+  normalizePictureProperties,
+  PICTURE_PROPERTY_KEYS,
+  type PictureProperties,
+} from "./picture-properties.js";
 import type { PictureSheetMetrics } from "./picture-axis-metrics.js";
 import { readPictureDataArray } from "./picture-data-array.js";
 import {
@@ -38,7 +43,7 @@ export type PictureGroupNodeLease =
       /** Ordered leaf paths also identify every intermediate owner and sibling order. */
       readonly sources: readonly PictureGroupLeafSourceLease[];
     };
-export type PictureGroupChildMetadataEdit = {
+export type PictureGroupChildMetadataEdit = PictureProperties & {
   altText?: string;
   hidden?: boolean;
   lockAspectRatio?: boolean;
@@ -219,12 +224,16 @@ function applyMetadata(
   if (value === undefined) return child;
   const metadata = record(
     value,
-    ["altText", "hidden", "lockAspectRatio"],
+    [...PICTURE_PROPERTY_KEYS, "altText", "hidden", "lockAspectRatio"],
     "picture child metadata",
   );
-  // Undefined means retain; clearing optional fields is explicit in a replacement.
+  normalizePictureProperties(metadata);
+  // Undefined means retain; default-valued patches explicitly clear a sparse property.
   return {
     ...child,
+    ...(metadata.altTitle === undefined ? {} : { altTitle: metadata.altTitle as string }),
+    ...(metadata.locked === undefined ? {} : { locked: metadata.locked as boolean }),
+    ...(metadata.printObject === undefined ? {} : { printObject: metadata.printObject as boolean }),
     ...(metadata.altText === undefined ? {} : { altText: metadata.altText as string }),
     ...(metadata.hidden === undefined ? {} : { hidden: metadata.hidden as boolean }),
     ...(metadata.lockAspectRatio === undefined

@@ -1,3 +1,4 @@
+import { normalizePictureProperties } from "../picture-properties.js";
 import { isPictureGroup } from "../picture-group.js";
 import { normalizePictureObjectCollection } from "../picture-object.js";
 import { isFramedPictureObject } from "../picture-object.js";
@@ -174,6 +175,7 @@ export function applyConvertFloatingImageToCellCommand(
     image: {
       assetId: image.assetId,
       altText: image.altText,
+      ...normalizePictureProperties(image),
       ...(image.transform ? { transform: image.transform } : {}),
     },
   });
@@ -206,6 +208,7 @@ export function applyConvertCellImageToFloatingCommand(
     id: command.imageId,
     assetId: content.image.assetId,
     altText: content.image.altText,
+    ...normalizePictureProperties(content.image),
     ...(content.image.transform ? { transform: content.image.transform } : {}),
     anchor: address,
     offsetX: 0,

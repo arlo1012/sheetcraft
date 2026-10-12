@@ -14,6 +14,7 @@ import {
 } from "@sheetcraft/core/picture-object";
 import { isGroupedPicture, type GroupedPicture } from "@sheetcraft/core/picture-group";
 import type { PictureCropEdit } from "@sheetcraft/core/picture-crop-edit";
+import { normalizePictureProperties } from "@sheetcraft/core/picture-properties";
 import type { PictureFormatField, PictureFormatValues } from "./picture-format-pane-model";
 
 const POINTS_PER_PIXEL = 0.75;
@@ -92,6 +93,7 @@ export function applyStandalonePictureCrop(
     id: picture.id,
     assetId: picture.assetId,
     altText: picture.altText,
+    ...normalizePictureProperties(picture),
     ...(picture.hidden === undefined ? {} : { hidden: picture.hidden }),
     ...(picture.groupId === undefined ? {} : { groupId: picture.groupId }),
     ...(picture.lockAspectRatio === undefined ? {} : { lockAspectRatio: picture.lockAspectRatio }),

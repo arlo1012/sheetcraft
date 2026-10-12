@@ -1,3 +1,8 @@
+import {
+  getPictureOwnerBehavior,
+  normalizePictureProperties,
+  type PictureProperties,
+} from "./picture-properties.js";
 import type { PictureSheetMetrics } from "./picture-axis-metrics.js";
 import {
   anchorPictureFrameRect,
@@ -32,6 +37,7 @@ function metadata(image: PictureObject | PictureGroupChild) {
   return {
     id: image.id,
     altText: image.altText,
+    ...normalizePictureProperties(image),
     ...(image.hidden === undefined ? {} : { hidden: image.hidden }),
     ...(image.lockAspectRatio === undefined ? {} : { lockAspectRatio: image.lockAspectRatio }),
   };
@@ -133,6 +139,7 @@ function fromMember(
   member: PictureGroupChild,
   parent: ResolvedPictureLayout,
   inheritedHidden: boolean,
+  ownerProperties: PictureProperties,
   metrics: PictureSheetMetrics,
 ): PictureObject {
   const world = resolvePictureGroupChildLayout(parent, member.frame);
@@ -140,6 +147,7 @@ function fromMember(
     throw new RangeError("Expand a collapsed group before ungrouping.");
   const common = {
     ...metadata(member),
+    ...getPictureOwnerBehavior(ownerProperties),
     ...(inheritedHidden ? { hidden: true } : {}),
   };
   const anchor = anchorPictureFrameRect("move-and-size", world.rect, metrics);
@@ -181,7 +189,7 @@ export function ungroupPictureRoot(
   const result = normalizePictureObjectCollection(
     roots.flatMap((root) =>
       root.id === groupId
-        ? group.members.map((member) => fromMember(member, parent, !!group.hidden, metrics))
+        ? group.members.map((member) => fromMember(member, parent, !!group.hidden, group, metrics))
         : [root],
     ),
   );

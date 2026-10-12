@@ -1,3 +1,8 @@
+import {
+  normalizePictureProperties,
+  arePicturePropertiesEqual,
+  PICTURE_PROPERTY_KEYS,
+} from "./picture-properties.js";
 import { readPictureDataArray } from "./picture-data-array.js";
 import {
   isPictureGroup,
@@ -36,7 +41,15 @@ export type PictureObjectAppearance = Pick<ImageTransform, "appearance" | "annot
 };
 export type FramedFloatingImage = Pick<
   LegacyFloatingImage,
-  "id" | "assetId" | "altText" | "hidden" | "groupId" | "lockAspectRatio"
+  | "id"
+  | "assetId"
+  | "altText"
+  | "hidden"
+  | "groupId"
+  | "lockAspectRatio"
+  | "altTitle"
+  | "locked"
+  | "printObject"
 > & {
   frame: PictureFrame;
   anchor?: never;
@@ -64,6 +77,7 @@ export function normalizePictureObject(image: PictureObject): PictureObject {
   if (isPictureGroup(image)) return normalizePictureGroup(image);
   if (!isFramedPictureObject(image)) return normalizeLegacyFloatingImageForSheet(image);
   const allowed = new Set([
+    ...PICTURE_PROPERTY_KEYS,
     "id",
     "assetId",
     "altText",
@@ -105,6 +119,7 @@ export function normalizePictureObject(image: PictureObject): PictureObject {
     id: image.id,
     assetId: image.assetId,
     altText: image.altText,
+    ...normalizePictureProperties(image),
     frame: normalizePictureFrame(image.frame),
     ...(transform ? { transform } : {}),
     ...(image.hidden === undefined ? {} : { hidden: image.hidden }),
@@ -133,6 +148,7 @@ export function arePictureObjectsEqual(left: PictureObject, right: PictureObject
     left.id === right.id &&
     left.assetId === right.assetId &&
     left.altText === right.altText &&
+    arePicturePropertiesEqual(left, right) &&
     left.hidden === right.hidden &&
     left.groupId === right.groupId &&
     left.lockAspectRatio === right.lockAspectRatio &&

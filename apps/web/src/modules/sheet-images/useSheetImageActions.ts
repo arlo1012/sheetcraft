@@ -1,3 +1,8 @@
+import {
+  arePicturePropertiesEqual,
+  normalizePictureProperties,
+  type PictureProperties,
+} from "@sheetcraft/core/picture-properties";
 import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import type { PictureGroupPath } from "@sheetcraft/core/picture-group";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
@@ -70,13 +75,14 @@ function initialFloatingSize(width: number, height: number): { width: number; he
 function cellImageMatches(
   sheet: Sheet,
   address: CellAddress,
-  image: { assetId: string; altText: string; transform?: ImageTransform },
+  image: PictureProperties & { assetId: string; altText: string; transform?: ImageTransform },
 ): boolean {
   const content = getCellContent(sheet, address);
   return (
     content?.kind === "image" &&
     content.image.assetId === image.assetId &&
     content.image.altText === image.altText &&
+    arePicturePropertiesEqual(content.image, image) &&
     areImageTransformsEqual(content.image.transform, image.transform)
   );
 }
@@ -97,13 +103,15 @@ export function useSheetImageActions(options: {
   getFrameContext?: () => PictureFrameLayoutContext | undefined;
   getAddress: () => CellAddress;
   flushPendingEdits: () => boolean;
-  setCellImage: (payload: {
-    sheetId: string;
-    address: CellAddress;
-    assetId: string;
-    altText: string;
-    transform?: ImageTransform;
-  }) => unknown;
+  setCellImage: (
+    payload: PictureProperties & {
+      sheetId: string;
+      address: CellAddress;
+      assetId: string;
+      altText: string;
+      transform?: ImageTransform;
+    },
+  ) => unknown;
   setFloatingImage: (image: FloatingImage, sheetId: string) => unknown;
   convertCellImageToFloating: (payload: {
     sheetId: string;
@@ -585,6 +593,7 @@ export function useSheetImageActions(options: {
           address: target.address,
           assetId: image.assetId,
           altText: image.altText,
+          ...normalizePictureProperties(image),
           ...(image.transform ? { transform: image.transform } : {}),
         });
         if (accepted === false) throw new Error("Cell image paste was refused.");

@@ -1,3 +1,8 @@
+import {
+  getPictureOwnerBehavior,
+  normalizePictureProperties,
+  type PictureProperties,
+} from "./picture-properties.js";
 import type { PictureSheetMetrics } from "./picture-axis-metrics.js";
 import { readPictureDataArray } from "./picture-data-array.js";
 import {
@@ -107,12 +112,24 @@ function metadata(node: PictureGroup | PictureGroupChild) {
   return {
     id: node.id,
     altText: node.altText,
+    ...normalizePictureProperties(node),
     ...(node.hidden === undefined ? {} : { hidden: node.hidden }),
     ...(node.lockAspectRatio === undefined ? {} : { lockAspectRatio: node.lockAspectRatio }),
   };
 }
-function inheritHidden(child: PlannedChild, hidden: boolean | undefined): PlannedChild {
-  return hidden ? { ...child, node: { ...child.node, hidden: true }, changed: true } : child;
+function inheritOwnerBehavior(
+  child: PlannedChild,
+  owner: PictureProperties & { hidden?: boolean },
+): PlannedChild {
+  return {
+    ...child,
+    node: {
+      ...child.node,
+      ...getPictureOwnerBehavior(owner),
+      ...(owner.hidden ? { hidden: true } : {}),
+    },
+    changed: true,
+  };
 }
 function placeChild(child: PlannedChild, parent: ResolvedPictureLayout): PictureGroupChild {
   const placed = placePictureGroupChild(parent, child.layout);
@@ -287,8 +304,7 @@ export function planDeletePictureGroupNodes(
     const owner = planOwner(resolved);
     if (!owner.changed) return { node: resolved.node, layout: resolved.layout, changed: false };
     if (owner.members.length === 0) return null;
-    if (owner.members.length === 1)
-      return { ...inheritHidden(owner.members[0]!, resolved.node.hidden), changed: true };
+    if (owner.members.length === 1) return inheritOwnerBehavior(owner.members[0]!, resolved.node);
     return {
       node: {
         ...resolved.node,
@@ -311,7 +327,7 @@ export function planDeletePictureGroupNodes(
     const owner = planOwner(resolved);
     if (owner.members.length === 0) continue;
     if (owner.members.length === 1) {
-      next.push(releaseRoot(inheritHidden(owner.members[0]!, resolved.node.hidden), metrics));
+      next.push(releaseRoot(inheritOwnerBehavior(owner.members[0]!, resolved.node), metrics));
       continue;
     }
     next.push({

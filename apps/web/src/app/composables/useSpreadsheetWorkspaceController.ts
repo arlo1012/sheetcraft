@@ -1,4 +1,8 @@
 import {
+  normalizePictureProperties,
+  type PictureProperties,
+} from "@sheetcraft/core/picture-properties";
+import {
   assertWorkbookPictureSupport,
   assertPictureCommandSupport,
 } from "../../modules/sheet-images/picture-document-support";
@@ -737,19 +741,22 @@ export function useSpreadsheetWorkspaceController(
     }
   }
 
-  function setCellImage(payload: {
-    sheetId: string;
-    address: CellAddress;
-    assetId: string;
-    altText: string;
-    transform?: ImageTransform;
-  }): boolean {
+  function setCellImage(
+    payload: PictureProperties & {
+      sheetId: string;
+      address: CellAddress;
+      assetId: string;
+      altText: string;
+      transform?: ImageTransform;
+    },
+  ): boolean {
     return execute(
       createSetCellContentCommand(payload.sheetId, payload.address, {
         kind: "image",
         image: {
           assetId: payload.assetId,
           altText: payload.altText,
+          ...normalizePictureProperties(payload),
           ...(payload.transform ? { transform: payload.transform } : {}),
         },
       }),

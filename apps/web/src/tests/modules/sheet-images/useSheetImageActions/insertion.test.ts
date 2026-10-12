@@ -67,6 +67,26 @@ beforeEach(() => {
   vi.mocked(prepareImageAsset).mockReset();
 });
 describe("sheet image insertion", () => {
+  test("a paste differing only in object metadata is not treated as an unchanged cell image", async () => {
+    const f = fixture(),
+      image = { ...existingImage(), altTitle: "Title", locked: false, printObject: false };
+    const sheet = getActiveSheet(f.getWorkbook());
+    if (isPictureGroup(image) || "frame" in image) throw Error("Bad fixture");
+    await f.store.put({ ...asset, id: image.assetId });
+    setCellContent(
+      sheet,
+      { row: 2, column: 3 },
+      {
+        kind: "image",
+        image: { assetId: image.assetId, altText: image.altText, transform: image.transform },
+      },
+    );
+    await f.actions.pasteFloatingImage(image, "cell");
+    expect(f.setCellImage).toHaveBeenCalledOnce();
+    expect(f.setCellImage).toHaveBeenCalledWith(
+      expect.objectContaining({ altTitle: "Title", locked: false, printObject: false }),
+    );
+  });
   test("replaces a legacy source with centered cover while retaining identity, geometry, and description", async () => {
     vi.mocked(prepareImageAsset).mockResolvedValue(asset);
     const f = fixture();

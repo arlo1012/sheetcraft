@@ -222,6 +222,10 @@
     "./picture-group-delete": {
       "types": "./dist/picture-group-delete.d.ts",
       "import": "./dist/picture-group-delete.js"
+    },
+    "./picture-properties": {
+      "types": "./dist/picture-properties.d.ts",
+      "import": "./dist/picture-properties.js"
     }
   },
   "scripts": {

@@ -1,3 +1,4 @@
+import type { PictureProperties } from "../picture-properties.js";
 export const MAX_FORMULA_ROWS = 1_048_576;
 export const MAX_FORMULA_COLUMNS = 16_384;
 
@@ -52,7 +53,7 @@ export type CellFormula = {
 };
 
 /** A binary image resource owned by the Web storage adapter. */
-export type CellImage = {
+export type CellImage = PictureProperties & {
   assetId: string;
   altText: string;
   transform?: ImageTransform;

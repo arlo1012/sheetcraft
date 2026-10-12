@@ -15,6 +15,11 @@ import {
 } from "@sheetcraft/core/picture-group";
 import { clonePictureRootsForClipboard } from "@sheetcraft/core/picture-group-copy";
 import {
+  getPictureOwnerBehavior,
+  normalizePictureProperties,
+  type PictureProperties,
+} from "@sheetcraft/core/picture-properties";
+import {
   resolvePictureGroup,
   type ResolvedPictureGroupNode,
 } from "@sheetcraft/core/picture-group-layout";
@@ -96,6 +101,7 @@ type OwnedVisit = {
   node: PictureGroupNode | PictureObject;
   path: PictureGroupPath;
   resolved?: ResolvedPictureGroupNode;
+  rootProperties?: PictureProperties;
 };
 
 function counter(value: number): void {
@@ -155,12 +161,12 @@ function validateForest(roots: readonly PictureObject[], metrics: PictureSheetMe
 }
 function visits(roots: readonly PictureObject[], metrics: PictureSheetMetrics): OwnedVisit[] {
   const result: OwnedVisit[] = [];
-  function collect(node: ResolvedPictureGroupNode): void {
-    result.push({ node: node.node, path: node.path, resolved: node });
-    if ("members" in node) for (const child of node.members) collect(child);
+  function collect(node: ResolvedPictureGroupNode, rootProperties: PictureProperties): void {
+    result.push({ node: node.node, path: node.path, resolved: node, rootProperties });
+    if ("members" in node) for (const child of node.members) collect(child, rootProperties);
   }
   for (const root of roots) {
-    if (isPictureGroup(root)) collect(resolvePictureGroup(root, metrics));
+    if (isPictureGroup(root)) collect(resolvePictureGroup(root, metrics), root);
     else {
       layout(root, metrics);
       result.push({ node: root, path: [root.id] });
@@ -202,6 +208,8 @@ function extract(visit: OwnedVisit, metrics: PictureSheetMetrics): PictureObject
   const common = {
     id: node.id,
     altText: node.altText,
+    ...normalizePictureProperties(node),
+    ...getPictureOwnerBehavior(visit.rootProperties!),
     ...(!resolved.visible ? { hidden: true } : node.hidden === undefined ? {} : { hidden: false }),
     ...(node.lockAspectRatio === undefined ? {} : { lockAspectRatio: node.lockAspectRatio }),
   };

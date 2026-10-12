@@ -1,3 +1,8 @@
+import {
+  normalizePictureProperties,
+  arePicturePropertiesEqual,
+  type PictureProperties,
+} from "./picture-properties.js";
 import { assertPictureObjectsForSheet } from "./picture-object-sheet.js";
 import {
   normalizePictureObject,
@@ -350,7 +355,7 @@ export type SheetDuplicateRule = {
 };
 
 /** A positioned image that is anchored to a sheet cell without owning its binary data. */
-export type LegacyFloatingImage = {
+export type LegacyFloatingImage = PictureProperties & {
   id: string;
   assetId: string;
   altText: string;
@@ -2109,6 +2114,7 @@ function normalizeCellContent(content: CellContent | null | undefined): CellCont
       image: {
         assetId: content.image.assetId,
         altText: content.image.altText,
+        ...normalizePictureProperties(content.image),
         ...(normalizeImageTransform(content.image.transform)
           ? { transform: normalizeImageTransform(content.image.transform) }
           : {}),
@@ -2143,6 +2149,7 @@ export function cloneCellContent(content: CellContent): CellContent {
     image: {
       assetId: content.image.assetId,
       altText: content.image.altText,
+      ...normalizePictureProperties(content.image),
       ...(cloneImageTransform(content.image.transform)
         ? { transform: cloneImageTransform(content.image.transform) }
         : {}),
@@ -2170,6 +2177,7 @@ function areCellContentsEqual(
             right.kind === "image" &&
             left.image.assetId === right.image.assetId &&
             left.image.altText === right.image.altText &&
+            arePicturePropertiesEqual(left.image, right.image) &&
             areImageTransformsEqual(left.image.transform, right.image.transform))
   );
 }
@@ -3366,10 +3374,12 @@ export function cloneSheetTable(table: SheetTable): SheetTable {
 }
 
 export function cloneLegacyFloatingImage(image: LegacyFloatingImage): LegacyFloatingImage {
-  const { transform, ...fields } = image;
+  const properties = normalizePictureProperties(image);
+  const { transform, altTitle: _title, locked: _locked, printObject: _print, ...fields } = image;
   const normalizedTransform = cloneImageTransform(transform);
   return {
     ...fields,
+    ...properties,
     anchor: { ...image.anchor },
     ...(normalizedTransform ? { transform: normalizedTransform } : {}),
   };
@@ -3444,6 +3454,7 @@ export function areLegacyFloatingImagesEqual(
     left.id === right.id &&
     left.assetId === right.assetId &&
     left.altText === right.altText &&
+    arePicturePropertiesEqual(left, right) &&
     left.hidden === right.hidden &&
     left.groupId === right.groupId &&
     left.lockAspectRatio === right.lockAspectRatio &&

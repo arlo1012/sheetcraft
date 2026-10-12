@@ -1,3 +1,4 @@
+import { normalizePictureProperties } from "@sheetcraft/core/picture-properties";
 import { computed, getCurrentScope, onScopeDispose, shallowRef, watch } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import {
@@ -264,6 +265,7 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
         id: node.id,
         assetId: node.assetId,
         altText: node.altText,
+        ...normalizePictureProperties(node),
         frame: { ...frame, source: crop.source },
         ...(node.transform?.appearance || node.transform?.annotations
           ? {
