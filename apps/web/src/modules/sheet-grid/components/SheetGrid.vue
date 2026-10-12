@@ -2459,10 +2459,6 @@ function requestOwnedPictureCopy(
   if (owner !== props.sheet) return;
   if (pictureCrop.active.value && !finishPictureCrop()) return;
   if (mode === "cut" && pictureSelectionReadOnly.value) return;
-  if (mode === "cut" && path.length > 1) {
-    emit("imageFeedback", "picture.memberCutUnsupported");
-    return;
-  }
   void ownedClipboard.copy(ownedActionPaths(path), mode);
 }
 async function requestOwnedPicturePaste(path: PictureGroupPath, owner?: object): Promise<void> {
@@ -2553,11 +2549,6 @@ function onImageCut(event: ClipboardEvent): void {
     return;
   }
   event.stopPropagation();
-  if (selectedOwnedPicturePath.value && selectedOwnedPicturePath.value.length > 1) {
-    event.preventDefault();
-    emit("imageFeedback", "picture.memberCutUnsupported");
-    return;
-  }
   if (requiresOwnedClipboard())
     void ownedClipboard.copy(currentOwnedClipboardPaths(), "cut", event);
   else void floatingClipboard.copy(image, "cut", event);
@@ -2567,14 +2558,6 @@ function requestFloatingImageCopy(id: string, mode: "copy" | "cut"): void {
   if (pictureCrop.active.value && (selectedImageId.value !== id || !finishPictureCrop())) return;
   const image = props.sheet.floatingImages.find((entry) => entry.id === id);
   if (image) {
-    if (
-      mode === "cut" &&
-      selectedOwnedPicturePath.value &&
-      selectedOwnedPicturePath.value.length > 1
-    ) {
-      emit("imageFeedback", "picture.memberCutUnsupported");
-      return;
-    }
     if (requiresOwnedClipboard()) void ownedClipboard.copy(currentOwnedClipboardPaths(), mode);
     else void floatingClipboard.copy(image, mode);
   }

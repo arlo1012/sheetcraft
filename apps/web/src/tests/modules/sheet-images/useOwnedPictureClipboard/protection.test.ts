@@ -51,3 +51,22 @@ test("permission refusal after Cut preserves the source and reusable lease", asy
   expect(f.clipboard.paste({ row: 7, column: 6 })).toBe(true);
   expect(f.clipboard.hasPending()).toBe(false);
 });
+
+test("protected unlocked owner's member Cut retains its exact lease after a target command refusal", async () => {
+  const f = fixture();
+  f.sheet.floatingImages[1]!.locked = false;
+  f.sheet.properties.protected = true;
+  await f.clipboard.copy([["owned-group", "nested-group", "nested-leaf"]], "cut");
+  const identity = f.clipboard.getIdentity(),
+    before = serializeWorkbook(f.session.workbook);
+  f.execute.mockReturnValueOnce(false);
+  expect(f.clipboard.paste({ row: 7, column: 6 })).toBe(true);
+  expect(f.clipboard.getIdentity()).toEqual(identity);
+  expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+  expect(f.session.history.undoStack).toHaveLength(0);
+  expect(f.clipboard.paste({ row: 7, column: 6 })).toBe(true);
+  expect(f.clipboard.hasPending()).toBe(false);
+  const moved = f.sheet.floatingImages.find((root) => root.id === "nested-leaf")!;
+  expect(moved.locked).toBe(false);
+  expect(f.session.history.undoStack).toHaveLength(1);
+});

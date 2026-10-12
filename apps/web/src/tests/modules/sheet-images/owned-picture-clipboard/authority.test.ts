@@ -8,50 +8,61 @@ import {
 import { fixture, translateRoots } from "./fixture";
 
 describe("owned picture clipboard authority", () => {
-  test.each(["revision", "generation", "sheet-instance", "sheet-id", "metric-context"] as const)(
-    "stale %s rejects cut without consuming it",
-    (change) => {
-      const f = fixture();
-      const captured = f.capture("cut");
-      const placeRoots = vi.fn(translateRoots);
-      const input = {
-        ...captured,
-        sheet: f.sheet,
-        revision: 7,
-        ownerGeneration: 3,
-        sourceMetrics: f.metrics,
-        destinationMetrics: f.metrics,
-        placeRoots,
-      };
-      if (change === "revision") input.revision += 1;
-      if (change === "generation") input.ownerGeneration += 1;
-      if (change === "sheet-instance") input.sheet = { ...f.sheet };
-      if (change === "sheet-id") f.sheet.id = "renamed-sheet-id";
-      if (change === "metric-context")
-        input.sourceMetrics = input.destinationMetrics = createPictureSheetMetrics(f.sheet);
-      expect(() => f.clipboard.planPaste(input)).toThrow(
-        new OwnedPictureClipboardError("stale-owner"),
-      );
-      expect(placeRoots).not.toHaveBeenCalled();
-      expect(f.clipboard.getCurrent()!.token).toBe(captured.token);
-      expect(f.clipboard.getCurrent()!.generation).toBe(captured.generation);
-    },
-  );
+  test.each(
+    (["revision", "generation", "sheet-instance", "sheet-id", "metric-context"] as const).flatMap(
+      (change) =>
+        ["owned-group", "nested-leaf", "nested-group"].map((selectedId) => ({
+          change,
+          selectedId,
+        })),
+    ),
+  )("stale $change rejects $selectedId Cut without consuming it", ({ change, selectedId }) => {
+    const f = fixture();
+    const captured = f.capture("cut", [selectedId]);
+    const placeRoots = vi.fn(translateRoots);
+    const input = {
+      ...captured,
+      sheet: f.sheet,
+      revision: 7,
+      ownerGeneration: 3,
+      sourceMetrics: f.metrics,
+      destinationMetrics: f.metrics,
+      placeRoots,
+    };
+    if (change === "revision") input.revision += 1;
+    if (change === "generation") input.ownerGeneration += 1;
+    if (change === "sheet-instance") input.sheet = { ...f.sheet };
+    if (change === "sheet-id") f.sheet.id = "renamed-sheet-id";
+    if (change === "metric-context")
+      input.sourceMetrics = input.destinationMetrics = createPictureSheetMetrics(f.sheet);
+    expect(() => f.clipboard.planPaste(input)).toThrow(
+      new OwnedPictureClipboardError("stale-owner"),
+    );
+    expect(placeRoots).not.toHaveBeenCalled();
+    expect(f.clipboard.getCurrent()!.token).toBe(captured.token);
+    expect(f.clipboard.getCurrent()!.generation).toBe(captured.generation);
+  });
 
-  test.each([
-    "hidden-source",
-    "hidden-visibility",
-    "child-path",
-    "child-metadata",
-    "child-geometry",
-    "root-order",
-    "unselected-root",
-    "missing-root",
-  ] as const)(
-    "full captured source forest catches %s edits even without revision change",
-    (change) => {
+  test.each(
+    (
+      [
+        "hidden-source",
+        "hidden-visibility",
+        "child-path",
+        "child-metadata",
+        "child-geometry",
+        "root-order",
+        "unselected-root",
+        "missing-root",
+      ] as const
+    ).flatMap((change) =>
+      ["owned-group", "nested-leaf", "nested-group"].map((selectedId) => ({ change, selectedId })),
+    ),
+  )(
+    "full captured $selectedId source forest catches $change edits even without revision change",
+    ({ change, selectedId }) => {
       const f = fixture();
-      const captured = f.capture("cut");
+      const captured = f.capture("cut", [selectedId]);
       const group = f.sheet.floatingImages[1]!;
       if (!isPictureGroup(group)) throw new Error("Expected group.");
       const nested = group.members[1]! as GroupedGroup;
@@ -74,18 +85,23 @@ describe("owned picture clipboard authority", () => {
     },
   );
 
-  test("failed command retains cut, a successful fresh retry consumes it exactly once", () => {
-    const f = fixture();
-    const captured = f.capture("cut");
-    const rejected = f.paste();
-    expect(f.clipboard.complete(rejected, false)).toBe(false);
-    expect(f.clipboard.getCurrent()!.token).toBe(captured.token);
-    const accepted = f.paste();
-    f.sheet.floatingImages = [...accepted.nextForest];
-    expect(f.clipboard.complete(accepted, true)).toBe(true);
-    expect(f.clipboard.complete(accepted, true)).toBe(false);
-    expect(f.clipboard.getCurrent()).toBeUndefined();
-  });
+  test.each(["owned-group", "nested-leaf", "nested-group"])(
+    "failed command retains $selectedId Cut, a successful fresh retry consumes it exactly once",
+    (selectedId) => {
+      const f = fixture();
+      const before = structuredClone(f.sheet.floatingImages);
+      const captured = f.capture("cut", [selectedId]);
+      const rejected = f.paste();
+      expect(f.clipboard.complete(rejected, false)).toBe(false);
+      expect(f.clipboard.getCurrent()!.token).toBe(captured.token);
+      expect(f.sheet.floatingImages).toEqual(before);
+      const accepted = f.paste();
+      f.sheet.floatingImages = [...accepted.nextForest];
+      expect(f.clipboard.complete(accepted, true)).toBe(true);
+      expect(f.clipboard.complete(accepted, true)).toBe(false);
+      expect(f.clipboard.getCurrent()).toBeUndefined();
+    },
+  );
 
   test("a throwing placement does not consume or mutate the exact pending tree", () => {
     const f = fixture();

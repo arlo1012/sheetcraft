@@ -3,9 +3,14 @@ import {
   anchorPictureFrameRect,
   pictureFrameFromLegacy,
   resolvePictureFrame,
+  type ResolvedPictureLayout,
 } from "@sheetcraft/core/picture-frame";
+import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { isPictureGroup, type PictureGroup } from "@sheetcraft/core/picture-group";
-import { resolvePictureGroup } from "@sheetcraft/core/picture-group-layout";
+import {
+  resolvePictureGroup,
+  type ResolvedPictureGroupNode,
+} from "@sheetcraft/core/picture-group-layout";
 import { isFramedPictureObject, type PictureObject } from "@sheetcraft/core/picture-object";
 import { createSheet, type LegacyFloatingImage } from "@sheetcraft/core/workbook";
 import {
@@ -130,4 +135,23 @@ export function rootLayout(root: PictureObject, input: OwnedPictureClipboardPlac
           : pictureFrameFromLegacy(root, input.destinationMetrics),
         input.destinationMetrics,
       );
+}
+export function forestLayouts(roots: readonly PictureObject[], metrics: PictureSheetMetrics) {
+  const result = new Map<string, ResolvedPictureLayout>();
+  function collect(node: ResolvedPictureGroupNode): void {
+    if (node.layout) result.set(node.node.id, node.layout);
+    if ("members" in node) for (const child of node.members) collect(child);
+  }
+  for (const root of roots) {
+    if (isPictureGroup(root)) collect(resolvePictureGroup(root, metrics));
+    else
+      result.set(
+        root.id,
+        resolvePictureFrame(
+          isFramedPictureObject(root) ? root.frame : pictureFrameFromLegacy(root, metrics),
+          metrics,
+        ),
+      );
+  }
+  return result;
 }

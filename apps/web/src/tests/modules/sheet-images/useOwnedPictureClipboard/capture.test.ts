@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { isPictureGroup, traversePictureGroup } from "@sheetcraft/core/picture-group";
 import { resolvePictureGroup } from "@sheetcraft/core/picture-group-layout";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import { undoWorkbookCommand, redoWorkbookCommand } from "@sheetcraft/core/history";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import { fixture, rect } from "./fixture";
 
@@ -67,16 +68,30 @@ describe("owned clipboard host capture", () => {
     expect(f.sheet.floatingImages[1]).toEqual(root);
   });
 
-  test("member cut is explicitly unsupported without source or native mutations", async () => {
-    const f = fixture();
-    const before = serializeWorkbook(f.session.workbook);
+  test("member Cut captures non-destructively and moves atomically with exact Undo/Redo", async () => {
+    const f = fixture(),
+      before = serializeWorkbook(f.session.workbook);
     await f.clipboard.copy([["owned-group", "nested-group", "nested-leaf"]], "cut");
-    expect(f.write).not.toHaveBeenCalled();
-    expect(f.onCopy).not.toHaveBeenCalled();
+    expect(f.write).toHaveBeenCalledOnce();
+    expect(f.onCopy).toHaveBeenCalledOnce();
     expect(f.execute).not.toHaveBeenCalled();
-    expect(f.clipboard.hasPending()).toBe(false);
-    expect(f.onFeedback).toHaveBeenCalledExactlyOnceWith("image.copyFailed");
+    expect(f.clipboard.hasPending()).toBe(true);
+    expect(f.onFeedback).toHaveBeenLastCalledWith("clipboard.readyToMove");
     expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+    expect(f.clipboard.paste({ row: 7, column: 6 })).toBe(true);
+    expect(f.clipboard.hasPending()).toBe(false);
+    expect(f.sheet.floatingImages.map((root) => root.id)).toEqual([
+      "framed",
+      "first-leaf",
+      "nested-leaf",
+      "legacy",
+    ]);
+    const after = serializeWorkbook(f.session.workbook);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(after);
   });
 
   test.each([{ paths: [] }, { paths: [["missing"]] }, { paths: [["owned-group", "nested-leaf"]] }])(

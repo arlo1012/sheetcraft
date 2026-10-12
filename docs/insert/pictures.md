@@ -394,7 +394,7 @@ GIF 联合范围也考虑 [Wuffs 的首帧画布扩展](https://raw.githubuserco
   视图度量会取消旧预览；失败不留下部分更新。延后聚焦也核对原所有者和精确选择。
 - 本地剪贴板会深克隆整棵树并为每个复制节点生成新的 ID，共享真实源图引用。
   单独复制叶或子组以原世界几何提取，选中祖先与后代时去重。根剪切的失败不消耗令牌，
-  旧完成回调不能清除新剪贴板；组内成员剪切仍未接通，不声称与桌面行为相同。
+  旧完成回调不能清除新剪贴板；组内叶图与子组剪切使用精确路径原子提取。
 - 格式侧栏具有完整中英文名称、单位、坐标语义和五类重置说明；单位选择与数值字段分开。
 
 组合的创建、解组、组内删除、局部尺寸/角度、内部持久化及本地树剪贴板已挂接工作簿。
@@ -404,7 +404,7 @@ GIF 联合范围也考虑 [Wuffs 的首帧画布扩展](https://raw.githubuserco
 
 复制深克隆完整树并为根与后代生成新 ID，共享真实资产。根剪切成功才消耗本地令牌，
 失败保留快照；仅滚动投影变化不撤销剪切，源工作表/修订/代次/有效度量变化会拒绝。
-组内成员复制保留真实世界几何，组内剪切当前明确提示先解组，不静默移除后代。
+组内成员复制和剪切保留真实世界几何；剪切捕获不删除源，成功粘贴时才原子移除和提取，受影响的单成员组递归解组。
 系统剪贴板只写描述和本地令牌，不把树或图片资产新增为外传格式；所有编辑会话共用
 写入顺序，旧的异步写入不会在新复制之后覆盖系统剪贴板。
 
@@ -564,8 +564,8 @@ The previously limited framed-picture conversion entry is now connected to real
 cell content with full local geometry, shared drawing/preview, overwrite
 confirmation, exact Undo/Redo and source/destination protection checks. See
 [picture-cell-conversion.md](picture-cell-conversion.md). Owned leaf embedding is
-an explicit product enhancement; container embedding and owned leaf Cut are not
-advertised as supported. External native/portable packaging remains blocked for
+an explicit product enhancement; container embedding remains unsupported. Owned
+leaf/subgroup Cut uses exact local ownership and an atomic full-forest paste. External native/portable packaging remains blocked for
 these local frames. Source-format support has independent, explicit limits described
 in [picture-source-formats.md](picture-source-formats.md).
 
@@ -588,3 +588,7 @@ codec formats remain limited. See [picture-source-formats.md](picture-source-for
 ### 排列与还原原图
 
 图片新框和真实组合支持共享排列参照、等高/等宽/等尺寸，以及一次对齐网格。新框和组合内真实图片的“还原原图”采用实际资产尺寸，并保持完整可撤销状态。各入口的作用范围见 [图片排列与还原原图](picture-arrangement-and-original-reset.md)。
+
+### 组合成员剪切
+
+组内叶图与子组剪切的延迟移除、世界几何、保护、叠放与撤销规则见 [组合成员剪切](picture-owned-cut.md)。这是明确的本地产品合同，不把未测的桌面 Cut 行为称为已验证兼容。

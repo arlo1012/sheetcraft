@@ -48,7 +48,8 @@ Picture copying is read-only. A Cut lease requires source permission. Moving
 existing unlocked roots on a protected sheet remains possible, while copying
 new root identities still requires object-creation permission. A rejected paste
 retains the source, history and reusable Cut lease; source removal and successful
-paste stay atomic. Owned leaf Cut remains an explicit existing limitation. The
+paste stay atomic. Owned leaf/subgroup Cut retains exact local ownership and
+releases the source only with an accepted atomic full-forest paste. The
 cell clipboard, fill, sorting and internal history clone complete cell content.
 
 Asynchronous image lookup captures the complete cell image, merged range and

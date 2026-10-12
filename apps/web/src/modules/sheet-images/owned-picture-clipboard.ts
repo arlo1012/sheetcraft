@@ -14,6 +14,7 @@ import {
   type PictureGroupPath,
 } from "@sheetcraft/core/picture-group";
 import { clonePictureRootsForClipboard } from "@sheetcraft/core/picture-group-copy";
+import { planDeletePictureGroupNodes } from "@sheetcraft/core/picture-group-delete";
 import {
   getPictureOwnerBehavior,
   normalizePictureProperties,
@@ -78,14 +79,13 @@ export type OwnedPictureClipboardPlan = OwnedPictureClipboardIdentity & {
   readonly revision: number;
   readonly ownerGeneration: number;
   readonly roots: readonly PictureObject[];
-  /** Command input: append copies or replace moved roots in their existing stacking positions. */
+  /** Complete command input; cut releases owned targets beside their surviving source owner. */
   readonly nextForest: readonly PictureObject[];
 };
 export class OwnedPictureClipboardError extends Error {
   constructor(
     readonly reason:
       | "invalid-selection"
-      | "member-cut-unsupported"
       | "collapsed-selection"
       | "stale-session"
       | "stale-owner"
@@ -141,7 +141,7 @@ function validateMetrics(metrics: PictureSheetMetrics): void {
   }
 }
 function samePath(left: PictureGroupPath, right: PictureGroupPath): boolean {
-  return left.length === right.length && left.every((id, index) => id === right[index]);
+  return left.length === right.length && right.every((id, index) => id === left[index]);
 }
 function sameForest(left: readonly PictureObject[], right: readonly PictureObject[]): boolean {
   return (
@@ -187,7 +187,9 @@ function selection(input: OwnedPictureClipboardCapture, all: readonly OwnedVisit
   const selected = new Set<string>();
   for (const value of values) {
     const path = input.selectedIds === undefined ? (value as PictureGroupPath) : undefined;
-    const id = path ? path.at(-1) : value;
+    if (path !== undefined && !Array.isArray(path))
+      throw new OwnedPictureClipboardError("invalid-selection");
+    const id = path ? path[path.length - 1] : value;
     const visit = typeof id === "string" ? byId.get(id) : undefined;
     if (!visit || (path && (!Array.isArray(path) || !samePath(path, visit.path))))
       throw new OwnedPictureClipboardError("invalid-selection");
@@ -271,6 +273,45 @@ function assertPlacement(before: readonly PictureObject[], after: readonly Pictu
       throw new OwnedPictureClipboardError("invalid-placement");
   });
 }
+function planCutForest(
+  forest: readonly PictureObject[],
+  paths: readonly PictureGroupPath[],
+  placed: readonly PictureObject[],
+  metrics: PictureSheetMetrics,
+): PictureObject[] {
+  // Delete validates all exact source paths and preserves survivor world geometry,
+  // recursively dissolving affected singleton owners. Nothing touches the live sheet.
+  const survivors = planDeletePictureGroupNodes(forest, paths, metrics);
+  const originalOwners = new Map<string, string>();
+  for (const root of forest)
+    for (const node of isPictureGroup(root)
+      ? traversePictureGroup(root).map((visit) => visit.node)
+      : [root])
+      originalOwners.set(node.id, root.id);
+  const survivorByOwner = new Map<string, PictureObject>();
+  for (const root of survivors) {
+    const owner = originalOwners.get(root.id);
+    if (!owner || survivorByOwner.has(owner))
+      throw new OwnedPictureClipboardError("invalid-selection");
+    survivorByOwner.set(owner, root);
+  }
+  const movedByOwner = new Map<string, PictureObject[]>();
+  paths.forEach((path, index) => {
+    const owner = path[0]!;
+    const moved = movedByOwner.get(owner) ?? [];
+    moved.push(placed[index]!);
+    movedByOwner.set(owner, moved);
+  });
+  const next: PictureObject[] = [];
+  for (const root of forest) {
+    const survivor = survivorByOwner.get(root.id);
+    if (survivor) next.push(survivor);
+    // Whole-root moves keep their exact slot. Released members sit immediately
+    // above the surviving owner, in original traversal order; unrelated roots keep order.
+    next.push(...(movedByOwner.get(root.id) ?? []));
+  }
+  return next;
+}
 function snapshot(current: Pending): OwnedPictureClipboardSnapshot {
   const { sheet: _sheet, ...value } = current;
   return {
@@ -299,8 +340,6 @@ export function createOwnedPictureClipboardSession(options: {
     validateMetrics(input.sourceMetrics);
     const forest = normalizePictureObjectCollection(input.sheet.floatingImages);
     const selected = selection(input, visits(forest, input.sourceMetrics));
-    if (input.mode === "cut" && selected.some((visit) => visit.path.length !== 1))
-      throw new OwnedPictureClipboardError("member-cut-unsupported");
     const roots = normalizePictureObjectCollection(
       selected.map((visit) => extract(visit, input.sourceMetrics)),
     );
@@ -372,11 +411,10 @@ export function createOwnedPictureClipboardSession(options: {
       }),
     );
     assertPlacement(roots, placed);
-    const replacements = new Map(placed.map((root) => [root.id, root]));
     const nextForest = normalizePictureObjectCollection(
       current.mode === "copy"
         ? [...destination, ...placed]
-        : destination.map((root) => replacements.get(root.id) ?? root),
+        : planCutForest(destination, current.selectedPaths, placed, input.destinationMetrics),
     );
     validateForest(nextForest, input.destinationMetrics);
     // Factories/placement can reenter their owner; never return a superseded command plan.

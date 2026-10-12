@@ -66,22 +66,38 @@ describe("owned picture clipboard capture", () => {
     expect(current.selectedPaths).toEqual([["framed"], ["owned-group"], ["legacy"]]);
   });
 
-  test("validates exact paths before ancestor dedup; invalid capture retains prior clipboard", () => {
-    const f = fixture();
-    const original = f.capture("copy");
-    expect(() =>
-      f.clipboard.capture({
-        sheet: f.sheet,
-        revision: 7,
-        ownerGeneration: 3,
-        sourceMetrics: f.metrics,
-        mode: "copy",
-        selectedPaths: [["owned-group"], ["owned-group", "nested-leaf"]],
-      }),
-    ).toThrow(new OwnedPictureClipboardError("invalid-selection"));
-    expect(f.clipboard.getCurrent()!.token).toBe(original.token);
-    expect(() => f.capture("copy", ["missing"])).toThrow(OwnedPictureClipboardError);
-  });
+  test.each(["copy", "cut"] as const)(
+    "%s validates exact paths before ancestor dedup; invalid capture retains prior clipboard",
+    (mode) => {
+      const f = fixture();
+      const original = f.capture(mode);
+      expect(() =>
+        f.clipboard.capture({
+          sheet: f.sheet,
+          revision: 7,
+          ownerGeneration: 3,
+          sourceMetrics: f.metrics,
+          mode,
+          selectedPaths: [["owned-group"], ["owned-group", "nested-leaf"]],
+        }),
+      ).toThrow(new OwnedPictureClipboardError("invalid-selection"));
+      expect(f.clipboard.getCurrent()!.token).toBe(original.token);
+      expect(() => f.capture(mode, ["missing"])).toThrow(OwnedPictureClipboardError);
+      const sparse = ["owned-group", "nested-group", "nested-leaf"];
+      delete sparse[0];
+      expect(() =>
+        f.clipboard.capture({
+          sheet: f.sheet,
+          revision: 7,
+          ownerGeneration: 3,
+          sourceMetrics: f.metrics,
+          mode,
+          selectedPaths: [sparse],
+        }),
+      ).toThrow(new OwnedPictureClipboardError("invalid-selection"));
+      expect(f.clipboard.getCurrent()).toEqual(original);
+    },
+  );
 
   test("copies a member leaf as a real framed root with full source state and inherited visibility", () => {
     const f = fixture();
@@ -135,14 +151,16 @@ describe("owned picture clipboard capture", () => {
     expect(extracted.members).not.toBe(nested.members);
   });
 
-  test("member-only cut is explicitly unsupported and does not replace a pending cut", () => {
+  test("member-only cut captures an exact detached target without deleting its source", () => {
     const f = fixture();
-    const original = f.capture("cut");
-    expect(() => f.capture("cut", ["nested-group"])).toThrow(
-      new OwnedPictureClipboardError("member-cut-unsupported"),
-    );
-    expect(f.clipboard.getCurrent()!.generation).toBe(original.generation);
-    expect(f.clipboard.getCurrent()!.token).toBe(original.token);
+    const before = structuredClone(f.sheet.floatingImages);
+    const captured = f.capture("cut", ["nested-group", "nested-leaf"]);
+    expect(captured.mode).toBe("cut");
+    expect(captured.selectedPaths).toEqual([["owned-group", "nested-group"]]);
+    expect(captured.roots.map((root) => root.id)).toEqual(["nested-group"]);
+    expect(captured.sourceForest).toEqual(before);
+    expect(f.sheet.floatingImages).toEqual(before);
+    expect(f.clipboard.getCurrent()).toEqual(captured);
   });
 
   test("rejects extraction from a collapsed owner", () => {
