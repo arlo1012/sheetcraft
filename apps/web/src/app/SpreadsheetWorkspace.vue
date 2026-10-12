@@ -88,6 +88,7 @@ import type { SheetWatermark, WatermarkPreset } from "@sheetcraft/core/page-deco
 import { usePictureAssetTools } from "../modules/sheet-images/usePictureAssetTools";
 import { usePictureCellConversion } from "../modules/sheet-images/usePictureCellConversion";
 import PictureCellOverwriteDialog from "../modules/sheet-images/components/PictureCellOverwriteDialog.vue";
+import type { PictureCellOverwriteConfirmation } from "../modules/sheet-images/picture-cell-overwrite-confirmation";
 import PictureCompressDialog from "../modules/sheet-images/components/PictureCompressDialog.vue";
 import PictureBatchSizeDialog from "../modules/sheet-images/components/PictureBatchSizeDialog.vue";
 import { usePictureTools } from "../modules/sheet-images/usePictureTools";
@@ -1218,6 +1219,23 @@ const imageActions = useSheetImageActions({
   },
   convertCellImageToFloating,
 });
+const pictureCellOverwriteConfirmation = computed<PictureCellOverwriteConfirmation | null>(
+  () => imageActions.insertionConfirmation.value ?? pictureCellConversion.confirmation.value,
+);
+watch(
+  imageActions.insertionConfirmation,
+  (confirmation) => {
+    if (confirmation) pictureCellConversion.confirmation.value = null;
+  },
+  { flush: "sync" },
+);
+watch(
+  pictureCellConversion.confirmation,
+  (confirmation) => {
+    if (confirmation) imageActions.cancelPending();
+  },
+  { flush: "sync" },
+);
 function showImageFeedback(key: MessageKey): void {
   if (key === "image.unchanged" || key === "clipboard.readyToMove") {
     void MessagePlugin.info(t(key));
@@ -4554,9 +4572,9 @@ const gridInert = computed(
       @close="pictureAnnotation.close"
     />
     <PictureCellOverwriteDialog
-      v-if="pictureCellConversion.confirmation.value"
-      :key="pictureCellConversion.confirmation.value.key"
-      :confirmation="pictureCellConversion.confirmation.value"
+      v-if="pictureCellOverwriteConfirmation"
+      :key="`${pictureCellOverwriteConfirmation.insertionTargets ? 'insert' : 'convert'}:${pictureCellOverwriteConfirmation.key}`"
+      :confirmation="pictureCellOverwriteConfirmation"
     />
     <PictureCompressDialog
       v-if="pictureCompression"

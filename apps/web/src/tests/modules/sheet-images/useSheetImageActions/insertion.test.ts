@@ -89,6 +89,9 @@ describe("sheet image insertion", () => {
       },
     );
     await f.actions.insertFile(file, "cell");
+    expect(f.setCellImage).not.toHaveBeenCalled();
+    expect(f.actions.insertionConfirmation.value).not.toBeNull();
+    expect(await f.actions.insertionConfirmation.value!.confirm()).toBe(true);
     expect(f.setCellImage).toHaveBeenCalledOnce();
     expect(f.actions.feedback.value).toBe("image.inserted");
   });

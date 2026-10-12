@@ -1789,6 +1789,9 @@ export const zhCN = {
     overwriteTitle: "替换单元格内容",
     overwriteMessage: "将图片嵌入 {cell} 会替换该单元格已有的内容。取消不会更改原图片或单元格。",
     overwriteConfirm: "替换并嵌入",
+    insertOverwriteMessage:
+      "将向下列目标插入 {count} 张图片。其中 {occupied} 个目标区域已有内容，确认后会替换。取消会保留原内容。",
+    insertTargetsChanged: "图片插入目标已变化或无法修改。请取消并重新选择目标；没有插入图片。",
     preview: "图片预览",
     crop: "裁剪",
     rotate: "旋转",

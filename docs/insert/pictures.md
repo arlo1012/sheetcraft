@@ -578,3 +578,9 @@ geometry, source assets and other properties; exact owner/permission checks and
 single-command history apply. See [picture-annotations.md](picture-annotations.md).
 BMP and a bounded static SVG subset are available as local sources; additional
 codec formats remain limited. See [picture-source-formats.md](picture-source-formats.md).
+
+## 本地图片嵌入覆盖安全
+
+单个及批量本地文件嵌入非空单元格前会统一确认实际目标；合并目标、异步解码/存储、
+确认期间的新内容与权限变化均复核，失败不部分插入。明确确认后的整批可一次撤销。
+具体边界见 [本地图片嵌入单元格](picture-cell-insertion.md)。

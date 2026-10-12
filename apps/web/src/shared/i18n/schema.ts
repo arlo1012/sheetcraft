@@ -1768,6 +1768,8 @@ export type MessageSchema = ToolMessageSchema & {
     overwriteTitle: string;
     overwriteMessage: string;
     overwriteConfirm: string;
+    insertOverwriteMessage: string;
+    insertTargetsChanged: string;
     preview: string;
     crop: string;
     rotate: string;

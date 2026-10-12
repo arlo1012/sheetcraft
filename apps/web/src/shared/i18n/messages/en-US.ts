@@ -1838,6 +1838,10 @@ export const enUS = {
     overwriteMessage:
       "Embedding this picture in {cell} will replace its existing content. Cancel keeps the original picture and cell unchanged.",
     overwriteConfirm: "Replace and embed",
+    insertOverwriteMessage:
+      "Insert {count} pictures into the following targets? {occupied} target areas contain existing content and will be replaced. Cancel keeps the existing content.",
+    insertTargetsChanged:
+      "Picture insertion targets changed or cannot be edited. Cancel and choose the targets again; no pictures were inserted.",
     preview: "Image preview",
     crop: "Crop",
     rotate: "Rotate",

@@ -23,6 +23,7 @@ import {
   setCellContent,
 } from "@sheetcraft/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
+import SpreadsheetRibbon from "../../../app/SpreadsheetRibbon.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import SheetSurface from "../../../modules/sheet-grid/components/SheetSurface.vue";
 import type { SheetRenderFrame } from "../../../modules/sheet-grid/rendering/sheet-render-frame";
@@ -39,6 +40,67 @@ const mounted: Array<{ unmount(): void }> = [];
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
   vi.restoreAllMocks();
+});
+
+async function requestLocalCellPicture(wrapper: ReturnType<typeof mount>): Promise<void> {
+  wrapper.getComponent(SpreadsheetRibbon).vm.$emit("insertImage", "cell");
+  await flushPromises();
+  const input = wrapper.get<HTMLInputElement>(".spreadsheet-workspace__image-input");
+  Object.defineProperty(input.element, "files", {
+    configurable: true,
+    value: [new File([new Uint8Array(actualPng)], "synthetic.png", { type: "image/png" })],
+  });
+  await input.trigger("change");
+  await flushPromises();
+}
+
+test("local cell insertion presents overwrite confirmation and cancels without losing content", async () => {
+  const { wrapper, sheet } = await fixture();
+  setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "original" });
+  await triggerCanvasCell(wrapper, { row: 0, column: 0 }, "mousedown", { button: 0 });
+  await requestLocalCellPicture(wrapper);
+  const confirmation = wrapper.getComponent(PictureCellOverwriteDialog).props("confirmation");
+  expect(confirmation.insertionTargets).toEqual([
+    { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+  ]);
+  expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+    kind: "literal",
+    value: "original",
+  });
+  confirmation.cancel();
+  await flushPromises();
+  expect(wrapper.findComponent(PictureCellOverwriteDialog).exists()).toBe(false);
+  expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+    kind: "literal",
+    value: "original",
+  });
+});
+
+test("a local insertion dialog supersedes conversion without accepting its stale callback", async () => {
+  const { wrapper, sheet } = await fixture();
+  await triggerFloatingImage(wrapper, sheet.floatingImages[0]!, "contextmenu");
+  await flushPromises();
+  document
+    .querySelector<HTMLButtonElement>('[data-floating-image-action="convert-to-cell"]')!
+    .click();
+  await flushPromises();
+  const old = wrapper.getComponent(PictureCellOverwriteDialog).props("confirmation");
+  setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "original" });
+  await triggerCanvasCell(wrapper, { row: 0, column: 0 }, "mousedown", { button: 0 });
+  await requestLocalCellPicture(wrapper);
+  const current = wrapper.getComponent(PictureCellOverwriteDialog).props("confirmation");
+  expect(current.insertionTargets).toBeDefined();
+  expect(old.confirm()).toBe(false);
+  old.cancel();
+  expect(await current.confirm()).toBe(true);
+  await flushPromises();
+  expect(sheet.floatingImages).toHaveLength(1);
+  expect(getCellContent(sheet, { row: 0, column: 0 })).toMatchObject({ kind: "image" });
+  await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
+  expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+    kind: "literal",
+    value: "original",
+  });
 });
 async function fixture(cellImage = false, kind?: "framed" | "owned") {
   const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
