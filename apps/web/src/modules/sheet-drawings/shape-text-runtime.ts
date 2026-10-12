@@ -223,6 +223,8 @@ export const SHAPE_TEXT_AUTOFIT_LIMITS = {
 export type PrepareDrawingShapeTextCandidateOptions = DrawingShapeTextRuntimeOptions & {
   /** Set only for an explicit manual height edit, including numeric/drag resizing. */
   manualHeightChange?: boolean;
+  /** Canonical owners validate their disposable views through an exact inverse. */
+  normalizeView?: (drawing: SheetGraphicDrawing) => SheetGraphicDrawing;
 };
 export type PreparedDrawingShapeTextCandidate = {
   drawing: SheetGraphicDrawing;
@@ -249,7 +251,9 @@ export function prepareDrawingShapeTextCandidate(
   options: PrepareDrawingShapeTextCandidateOptions = {},
 ): PreparedDrawingShapeTextCandidate {
   assertTextDrawing(drawing);
-  const normalized = normalizeSheetDrawing(drawing) as SheetGraphicDrawing;
+  const normalized = options.normalizeView
+    ? options.normalizeView(drawing)
+    : (normalizeSheetDrawing(drawing) as SheetGraphicDrawing);
   let candidate = drawing;
   if (options.manualHeightChange && normalized.shapeText?.layout.autoFit === "resize-shape") {
     const text = cloneShapeText(normalized.shapeText)!;
@@ -337,7 +341,9 @@ export function prepareDrawingShapeTextCandidate(
   const final =
     fit.drawing.height === candidate.height
       ? candidate
-      : (normalizeSheetDrawing(fit.drawing) as SheetGraphicDrawing);
+      : options.normalizeView
+        ? options.normalizeView(fit.drawing)
+        : (normalizeSheetDrawing(fit.drawing) as SheetGraphicDrawing);
   return {
     drawing: final,
     layout: fit.layout!,

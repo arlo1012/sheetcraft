@@ -29,7 +29,10 @@ import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer
 import SheetFreeShapeCreationLayer from "../../sheet-drawings/components/SheetFreeShapeCreationLayer.vue";
 import SheetShapeCreationLayer from "../../sheet-drawings/components/SheetShapeCreationLayer.vue";
 import type { ShapeCreationRequest } from "../../sheet-drawings/useShapeCreation";
-import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type {
+  SheetGraphicDrawing,
+  SheetFramedGraphicDrawing,
+} from "@sheetcraft/core/sheet-drawings";
 import { canEditCell, canEditRange, canSelectCell, canUseSheetPermission } from "@sheetcraft/core";
 import {
   computed,
@@ -374,7 +377,7 @@ const emit = defineEmits<{
   updateDrawing: [drawing: SheetDrawing];
   deleteDrawing: [id: string];
   editDrawing: [drawing: SheetDrawing];
-  formatDrawing: [drawing: SheetGraphicDrawing];
+  formatDrawing: [drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing];
   selectedDrawingChange: [id: string | null];
   configurePivot: [id: string];
   updatePivot: [table: SheetPivotTable];
@@ -4143,6 +4146,8 @@ onBeforeUnmount(() => {
 
 defineExpose({
   getDrawingLayout: (sheet: Sheet) => (props.sheet === sheet ? layout.value : undefined),
+  getShapeFrameContext: (sheet: Sheet) =>
+    props.sheet === sheet ? { layout: layout.value, metrics: pictureViewMetrics.value } : undefined,
   getPictureFrameContext: (sheet: Sheet) =>
     props.sheet === sheet ? pictureFrameContext.value : undefined,
   previewSelectedPicture,
@@ -4516,6 +4521,8 @@ defineExpose({
         @control-change="(id, value) => emit('changeControl', id, value)"
         :key="sheet.id"
         :drawings="sheet.drawings ?? []"
+        :metrics="pictureViewMetrics"
+        :page-projection="pageProjection"
         :selected-drawing-id="selectedShapeDrawingId"
         :theme="theme"
         :image-asset-urls="imageAssetUrls"
@@ -4526,7 +4533,7 @@ defineExpose({
         :revision="workbookRevision"
         :layout="layout"
         :scale="scale"
-        :read-only="objectsReadOnly"
+        :read-only="pictureLayerReadOnly"
         :apply-update="applyDrawingUpdate"
         @select="selectFloatingImage(null)"
         @update="emit('updateDrawing', $event)"

@@ -23,6 +23,7 @@ import { materializeDrawingShapeText, withDrawingShapeText } from "../shape-text
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
+  normalizeDrawing?: (drawing: SheetGraphicDrawing) => SheetGraphicDrawing;
   disabled: boolean;
   requestTextBox?: (direction: "horizontal" | "vertical") => boolean;
   confirmDrawing?: (drawing: SheetGraphicDrawing) => boolean;
@@ -31,7 +32,11 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ confirm: [drawing: SheetGraphicDrawing]; close: [] }>();
 const { t, locale } = useAppI18n();
-const draft = ref<SheetGraphicDrawing>(normalizeSheetDrawing(props.drawing) as SheetGraphicDrawing);
+const draft = ref<SheetGraphicDrawing>(
+  props.normalizeDrawing
+    ? props.normalizeDrawing(props.drawing)
+    : (normalizeSheetDrawing(props.drawing) as SheetGraphicDrawing),
+);
 const applyError = ref(false);
 function confirm() {
   if (props.disabled || !validGeometry.value) return;

@@ -143,7 +143,7 @@ describe("standard shape evaluation boundary", () => {
     expect(getStandardShapeGeometry(undefined, 240, 160)).toBeUndefined();
     for (const [width, height] of [
       [0, 1],
-      [0.5, 1],
+      [-0.5, 1],
       [16_385, 1],
       [1, Infinity],
       [NaN, 1],

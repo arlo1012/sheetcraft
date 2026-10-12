@@ -220,7 +220,12 @@ export function anchorShapeFrameRect(
   if (mode !== "fixed" && mode !== "move-only" && mode !== "move-and-size")
     throw new TypeError("Unknown shape anchor mode.");
   const rect = assertRect(value);
-  const size = normalizeShapeFrameSize({ width: rect.width, height: rect.height });
+  // Endpoint geometry may be subpixel or collapsed after visibility projection.
+  // Only modes storing an explicit physical size use the 1px edit minimum.
+  const size =
+    mode === "move-and-size"
+      ? { width: rect.width, height: rect.height }
+      : normalizeShapeFrameSize({ width: rect.width, height: rect.height });
   const previous = preferred === undefined ? undefined : normalizeShapeFrameAnchor(preferred);
   if (mode === "fixed") return { mode, x: rect.x, y: rect.y, size };
   const preferredStart =

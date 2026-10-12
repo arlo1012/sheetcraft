@@ -308,7 +308,7 @@ describe("shape display projection and inverse materialization", () => {
     });
   });
 
-  test("derived subpixel spans are valid but explicit sizes still require one pixel", () => {
+  test("derived subpixel spans reanchor exactly; fixed and move-only sizes still require one pixel", () => {
     const original = frame({
       mode: "move-and-size",
       start: { column: { index: 1, offset: 0.125 }, row: { index: 1, offset: 0.125 } },
@@ -321,9 +321,12 @@ describe("shape display projection and inverse materialization", () => {
       height: 0.375,
     });
     expect(resolveShapeFrame(original, metrics()).collapsed).toBe(false);
-    expect(() =>
-      reanchorShapeFrame(original, resolveShapeFrame(original, metrics()).rect, metrics()),
-    ).toThrow();
+    const rect = resolveShapeFrame(original, metrics()).rect;
+    expect(
+      resolveShapeFrame(reanchorShapeFrame(original, rect, metrics()), metrics()).rect,
+    ).toEqual(rect);
+    for (const mode of ["fixed", "move-only"] as const)
+      expect(() => anchorShapeFrameRect(mode, rect, metrics())).toThrow();
   });
 
   test("large ordinary-cell insets clamp only display, without inheriting legacy offset budgets", () => {
@@ -776,5 +779,22 @@ describe("shape local rotation and numeric resize geometry", () => {
     expect(Object.keys(next)).toEqual(["kind", "anchor"]);
     expect(() => resizeShapeFrame(original, { width: 16385, height: 1 }, m, 37)).toThrow();
     expect(() => resizeShapeFrame(original, { width: 100, height: 100 }, m, NaN)).toThrow();
+  });
+});
+
+// Visibility can produce subpixel endpoint spans; inverse movement must not clamp or reject them.
+test("reanchors a derived subpixel move-size rect without adding explicit size fields", () => {
+  const sheet = createSheet("Subpixel", "sheet");
+  const metrics = createPictureSheetMetrics(sheet);
+  const anchor = anchorShapeFrameRect(
+    "move-and-size",
+    { x: 80, y: 24, width: 0.25, height: 0.5 },
+    metrics,
+  );
+  expect(resolveShapeFrame({ kind: "shape-frame-v1", anchor }, metrics).rect).toEqual({
+    x: 80,
+    y: 24,
+    width: 0.25,
+    height: 0.5,
   });
 });

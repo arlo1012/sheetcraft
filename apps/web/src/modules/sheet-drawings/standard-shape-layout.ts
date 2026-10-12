@@ -25,6 +25,7 @@ export function standardShapeResizeRect(
   delta: Readonly<{ x: number; y: number }>,
   preserveRatio = false,
   minimum = 16,
+  allowLeadingSpace = false,
 ): PictureFrameRect | undefined {
   if (
     !["n", "s", "e", "w", "nw", "ne", "sw", "se"].includes(direction) ||
@@ -71,8 +72,13 @@ export function standardShapeResizeRect(
     vy = (fy - 0.5) * height;
   const x = fixed.x - cos * vx + sin * vy - width / 2,
     y = fixed.y - sin * vx - cos * vy - height / 2;
-  if (x < -1e-7 || y < -1e-7) return;
-  return { x: Math.max(0, x), y: Math.max(0, y), width, height };
+  if (!allowLeadingSpace && (x < -1e-7 || y < -1e-7)) return;
+  return {
+    x: allowLeadingSpace ? x : Math.max(0, x),
+    y: allowLeadingSpace ? y : Math.max(0, y),
+    width,
+    height,
+  };
 }
 export function resizeStandardShapeBy(
   drawing: SheetGraphicDrawing,
@@ -109,14 +115,19 @@ export function getStandardShapeViewportFragments(
   drawing: SheetGraphicDrawing,
   layout: SheetViewportLayout,
   selected = false,
+  includeLegacyView = false,
 ): FloatingImageViewportFragment[] {
   const rect = getFloatingImageSheetRect(drawing, layout);
   if (
     !rect ||
-    (!drawing.shapeGeometry && !drawing.shapePath && !drawing.shapeStyle && !drawing.shapeText)
+    (!includeLegacyView &&
+      !drawing.shapeGeometry &&
+      !drawing.shapePath &&
+      !drawing.shapeStyle &&
+      !drawing.shapeText)
   )
     return [];
-  const shape = getDrawingShapeGeometry(drawing);
+  const shape = getDrawingShapeGeometry(drawing, includeLegacyView);
   const bounds = getStandardShapeWorldBounds(
     shape,
     drawing.shapeStyle || drawing.shapeText
@@ -136,6 +147,18 @@ export function getStandardShapeViewportFragments(
         { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
       ]
     : [];
+  if (includeLegacyView && drawing.text && !drawing.shapeText && !drawing.shapeStyle) {
+    // The original CSS text layer clips within the frame even with no painted
+    // body. Preserve its visibility without materializing a new text model.
+    points.push(
+      ...[
+        { x: 0, y: 0 },
+        { x: drawing.width, y: 0 },
+        { x: drawing.width, y: drawing.height },
+        { x: 0, y: drawing.height },
+      ].map((point) => pictureFrameLocalToWorld(rect, drawing.rotation, point)),
+    );
+  }
   if (drawing.shapeStyle || drawing.shapeText) {
     try {
       const local = detailedShapeLocalBounds(drawing);

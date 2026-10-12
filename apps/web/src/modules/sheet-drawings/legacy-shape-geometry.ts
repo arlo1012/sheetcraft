@@ -13,7 +13,7 @@ export function getLegacyShapeGeometry(
   width: number,
   height: number,
 ): EvaluatedShapePresetGeometry | undefined {
-  if (![width, height].every((n) => Number.isFinite(n) && n >= 1 && n <= 16384)) return;
+  if (![width, height].every((n) => Number.isFinite(n) && n > 0 && n <= 16384)) return;
   const key = JSON.stringify([shape, width, height]);
   const existing = cache.get(key);
   if (existing) {

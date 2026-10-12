@@ -1,5 +1,8 @@
 import type { PictureDetailedStyle } from "@sheetcraft/core/picture-detailed-style";
-import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type {
+  SheetGraphicDrawing,
+  SheetFramedGraphicDrawing,
+} from "@sheetcraft/core/sheet-drawings";
 import type { ShapeLineEnds } from "@sheetcraft/core/shape-line-ends";
 import type { ShapeTextDirection, ShapeTextParagraph } from "@sheetcraft/core/shape-text";
 import type {
@@ -83,7 +86,7 @@ export interface ShapeFormatSnapshot {
   owner: Readonly<ShapeFormatOwner>;
   revision: number;
   /** Actual committed drawing. Never a FloatingImage facsimile or a mutable drawing index. */
-  drawing: Readonly<SheetGraphicDrawing>;
+  drawing: Readonly<SheetGraphicDrawing | SheetFramedGraphicDrawing>;
   values: Readonly<Partial<ShapeFormatValues>>;
   shapeStyle?: Readonly<PictureDetailedStyle>;
   textStyle?: Readonly<PictureDetailedStyle>;

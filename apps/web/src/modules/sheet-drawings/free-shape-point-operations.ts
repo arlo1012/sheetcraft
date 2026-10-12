@@ -14,6 +14,7 @@ import {
   listFreeShapePoints,
   replaceFreeShapeCommands,
   type FreeShapePointPosition,
+  type ShapePointEditOptions,
 } from "./free-shape-point-layout";
 
 type Point = FreeShapePointPosition;
@@ -132,6 +133,7 @@ export function addFreeShapePoint(
   segmentCommandIndex: number,
   layout: SheetViewportLayout,
   t = 0.5,
+  options?: ShapePointEditOptions,
 ): SheetGraphicDrawing | undefined {
   if (!Number.isFinite(t) || t <= 0 || t >= 1) return;
   try {
@@ -165,6 +167,7 @@ export function addFreeShapePoint(
       commands,
       remapPointTypes(prepared.path.pointTypes, indices),
       layout,
+      options,
     );
   } catch {
     return;
@@ -193,6 +196,7 @@ export function deleteFreeShapePoint(
   drawing: SheetGraphicDrawing,
   vertexIndex: number,
   layout: SheetViewportLayout,
+  options?: ShapePointEditOptions,
 ): SheetGraphicDrawing | undefined {
   if (!Number.isSafeInteger(vertexIndex) || vertexIndex < 0) return;
   try {
@@ -240,6 +244,7 @@ export function deleteFreeShapePoint(
       commands,
       remapPointTypes(prepared.path.pointTypes, indices),
       layout,
+      options,
     );
   } catch {
     return;
@@ -250,6 +255,7 @@ function validRect(
   drawing: SheetGraphicDrawing,
   rect: PictureFrameRect,
   layout: SheetViewportLayout,
+  options?: ShapePointEditOptions,
 ): boolean {
   const total = layout.getTotalSize();
   return (
@@ -257,16 +263,20 @@ function validRect(
     drawing.rotation >= -360 &&
     drawing.rotation <= 360 &&
     [drawing.offsetX, drawing.offsetY].every(
-      (value) => Number.isFinite(value) && value >= 0 && value <= 1_000_000,
+      (value) =>
+        Number.isFinite(value) &&
+        (options ? Math.abs(value) <= coordinateBudget : value >= 0 && value <= 1_000_000),
     ) &&
     (drawing.shapeFlipX === undefined || drawing.shapeFlipX === true) &&
     (drawing.shapeFlipY === undefined || drawing.shapeFlipY === true) &&
     finitePoint(rect) &&
-    [total.width, total.height].every(Number.isFinite) &&
-    rect.x >= 0 &&
-    rect.y >= 0 &&
-    rect.x + rect.width <= Math.min(total.width, coordinateBudget) &&
-    rect.y + rect.height <= Math.min(total.height, coordinateBudget)
+    (options
+      ? finitePoint({ x: rect.x + rect.width, y: rect.y + rect.height })
+      : [total.width, total.height].every(Number.isFinite) &&
+        rect.x >= 0 &&
+        rect.y >= 0 &&
+        rect.x + rect.width <= Math.min(total.width, coordinateBudget) &&
+        rect.y + rect.height <= Math.min(total.height, coordinateBudget))
   );
 }
 function squaredDistance(left: Point, right: Point): number {
@@ -345,12 +355,13 @@ export function nearestFreeShapeSegment(
   drawing: SheetGraphicDrawing,
   worldPoint: Point,
   layout: SheetViewportLayout,
+  options?: ShapePointEditOptions,
 ): NearestFreeShapeSegment | undefined {
   if (!finitePoint(worldPoint)) return;
   try {
     const prepared = preparedPath(drawing),
       rect = getFloatingImageSheetRect(drawing, layout);
-    if (!prepared || !rect || !validRect(drawing, rect, layout)) return;
+    if (!prepared || !rect || !validRect(drawing, rect, layout, options)) return;
     const point = pictureFrameWorldToLocal(rect, drawing.rotation, worldPoint);
     const query = {
       x: drawing.shapeFlipX ? drawing.width - point.x : point.x,

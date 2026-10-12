@@ -1,7 +1,14 @@
 import { getCurrentScope, onScopeDispose, shallowRef, watch } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
-import { normalizeSheetDrawing, type SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import {
+  normalizeSheetDrawing,
+  type SheetGraphicDrawing,
+  type SheetFramedGraphicDrawing,
+  type SheetDrawing,
+} from "@sheetcraft/core/sheet-drawings";
+import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import { frameShapeView } from "./shape-view-layout";
 import type { CellAddress, Sheet, Workbook } from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { createGraphicDrawing } from "./drawing-defaults";
@@ -32,7 +39,8 @@ export function useShapeCreation(options: {
   execute: (command: WorkbookCommand) => unknown;
   name?: (choice: ShapeCreationRequest["choice"]) => string;
   onStart?: () => void;
-  onCreated?: (drawing: SheetGraphicDrawing) => void;
+  getMetrics?: () => PictureSheetMetrics | undefined;
+  onCreated?: (drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing) => void;
 }) {
   const idFactory = createBrowserIdFactory();
   const request = shallowRef<ShapeCreationRequest>();
@@ -117,11 +125,28 @@ export function useShapeCreation(options: {
       if (!getDrawingShapeGeometry(drawing)) return false;
     }
     if ((current.sheet.drawings ?? []).some((item) => item.id === drawing.id)) return false;
+    let committed: SheetDrawing = drawing;
+    if (options.getMetrics) {
+      const metrics = options.getMetrics();
+      if (!metrics) return false;
+      try {
+        committed = frameShapeView(drawing, metrics);
+      } catch {
+        return false;
+      }
+      if (
+        !allowed(current) ||
+        options.getRevision?.() !== current.revision ||
+        request.value !== current ||
+        options.getMetrics() !== metrics
+      )
+        return false;
+    }
     let command: ReturnType<typeof createSetSheetDrawingsCommand>;
     try {
       command = createSetSheetDrawingsCommand(current.sheet.id, [
         ...(current.sheet.drawings ?? []),
-        drawing,
+        committed,
       ]);
     } catch {
       return false;
@@ -149,7 +174,7 @@ export function useShapeCreation(options: {
         /* Stop the mode safely if a fresh identity cannot be prepared. */
       }
       try {
-        options.onCreated?.(drawing);
+        options.onCreated?.(committed as SheetGraphicDrawing | SheetFramedGraphicDrawing);
       } catch {
         /* Optional selection failure must not turn success into rejection. */
       }

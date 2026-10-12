@@ -1,6 +1,9 @@
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, expect, test, vi } from "vitest";
 import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
+import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import { isFramedShapeDrawing } from "@sheetcraft/core/sheet-drawings";
+import { frameShapeView } from "../../../modules/sheet-drawings/shape-view-layout";
 import type { createWorkbookSession } from "@sheetcraft/core/history";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
@@ -19,11 +22,18 @@ afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
   document.body.replaceChildren();
 });
-async function fixture() {
+async function fixture(canonical = false) {
   const workbook = createWorkbook({ id: "format-host", sheetId: "shapes" });
   getActiveSheet(workbook).drawings = ["one", "two"].map((id) =>
     createGraphicDrawing(id, "shape", id, { row: 0, column: 0 }),
   );
+  if (canonical) {
+    const sheet = getActiveSheet(workbook),
+      metrics = createPictureSheetMetrics(sheet);
+    sheet.drawings = sheet.drawings!.map((drawing) =>
+      frameShapeView(drawing as ReturnType<typeof createGraphicDrawing>, metrics),
+    );
+  }
   const wrapper = mount(SpreadsheetWorkspace, {
     props: {
       workbookStore: {
@@ -120,4 +130,39 @@ test("old pane callback cannot edit a new selection or a newly protected real wo
     undefined,
     undefined,
   ]);
+});
+
+test("real Workspace admits snapshot60 and keeps canonical Size/Properties edits and history connected", async () => {
+  const { wrapper, state, grid, sheet } = await fixture(true);
+  const source = sheet.drawings![0]!;
+  expect(isFramedShapeDrawing(source)).toBe(true);
+  const before = serializeWorkbook(state.session.workbook);
+  expect(before.version).toBe(60);
+  grid.vm.$emit("formatDrawing", source);
+  await flushPromises();
+  const pane = wrapper.getComponent(ShapeFormatPane),
+    snapshot = pane.props("snapshot")!;
+  expect(snapshot.values.anchor).toBe("move-size");
+  expect(snapshot.values.lockAspectRatio).toBe(false);
+  const intent: ShapeFormatIntent = {
+    owner: { ...snapshot.owner },
+    baseRevision: snapshot.revision,
+    intentId: "canonical-width",
+    type: "set-field",
+    field: "sizeWidthPt",
+    value: 288,
+  };
+  expect(pane.props("onIntent")(intent)).toBe(true);
+  await flushPromises();
+  const changed = sheet.drawings![0]!;
+  expect(isFramedShapeDrawing(changed)).toBe(true);
+  expect(Object.hasOwn(changed, "anchor")).toBe(false);
+  const after = serializeWorkbook(state.session.workbook);
+  expect(state.session.history.undoStack).toHaveLength(1);
+  state.undo();
+  await flushPromises();
+  expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+  state.redo();
+  await flushPromises();
+  expect(serializeWorkbook(state.session.workbook)).toEqual(after);
 });

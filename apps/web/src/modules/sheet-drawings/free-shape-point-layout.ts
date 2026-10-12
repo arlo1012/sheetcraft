@@ -11,13 +11,17 @@ import {
   type ShapeFreePathPointType,
 } from "@sheetcraft/core/shape-free-path";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import {
   getFloatingImageSheetRect,
   reanchorFloatingImageAtSheetRect,
 } from "@sheetcraft/sheet-engine/floating-image-layout";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import { FREE_SHAPE_GEOMETRY_LIMITS, getFreeShapeGeometry } from "./free-shape-geometry";
+import { shapeViewAtRect } from "./shape-view-layout";
 
+/** Opt-in editing of a disposable canonical shape view using its metrics snapshot. */
+export type ShapePointEditOptions = Readonly<{ metrics: PictureSheetMetrics }>;
 export type FreeShapePointPosition = Readonly<{ x: number; y: number }>;
 export type FreeShapePointRole = "vertex" | "control1" | "control2";
 export type FreeShapePointDescriptor = Readonly<{
@@ -115,7 +119,12 @@ function finitePoint(point: FreeShapePointPosition): boolean {
     (value) => Number.isFinite(value) && Math.abs(value) <= coordinateBudget,
   );
 }
-function pointWithinSheet(point: FreeShapePointPosition, layout: SheetViewportLayout): boolean {
+function pointWithinSheet(
+  point: FreeShapePointPosition,
+  layout: SheetViewportLayout,
+  options?: ShapePointEditOptions,
+): boolean {
+  if (options) return finitePoint(point);
   const total = layout.getTotalSize();
   return (
     finitePoint(point) &&
@@ -126,17 +135,23 @@ function pointWithinSheet(point: FreeShapePointPosition, layout: SheetViewportLa
     point.y <= Math.min(total.height, coordinateBudget)
   );
 }
-function rectWithinSheet(rect: PictureFrameRect, layout: SheetViewportLayout): boolean {
+function rectWithinSheet(
+  rect: PictureFrameRect,
+  layout: SheetViewportLayout,
+  options?: ShapePointEditOptions,
+): boolean {
   return (
     [rect.width, rect.height].every(
       (extent) =>
-        Number.isFinite(extent) && extent >= 1 && extent <= FREE_SHAPE_GEOMETRY_LIMITS.extent,
+        Number.isFinite(extent) &&
+        (options ? extent > 0 : extent >= 1) &&
+        extent <= FREE_SHAPE_GEOMETRY_LIMITS.extent,
     ) &&
-    pointWithinSheet(rect, layout) &&
-    pointWithinSheet({ x: rect.x + rect.width, y: rect.y + rect.height }, layout)
+    pointWithinSheet(rect, layout, options) &&
+    pointWithinSheet({ x: rect.x + rect.width, y: rect.y + rect.height }, layout, options)
   );
 }
-function validPlacement(drawing: SheetGraphicDrawing): boolean {
+function validPlacement(drawing: SheetGraphicDrawing, options?: ShapePointEditOptions): boolean {
   return (
     drawing.kind === "shape" &&
     Boolean(drawing.shapePath) &&
@@ -145,7 +160,9 @@ function validPlacement(drawing: SheetGraphicDrawing): boolean {
     drawing.rotation >= -360 &&
     drawing.rotation <= 360 &&
     [drawing.offsetX, drawing.offsetY].every(
-      (value) => Number.isFinite(value) && value >= 0 && value <= 1_000_000,
+      (value) =>
+        Number.isFinite(value) &&
+        (options ? Math.abs(value) <= coordinateBudget : value >= 0 && value <= 1_000_000),
     ) &&
     (drawing.shapeFlipX === undefined || drawing.shapeFlipX === true) &&
     (drawing.shapeFlipY === undefined || drawing.shapeFlipY === true)
@@ -302,20 +319,23 @@ function detachedCommands(value: readonly ShapeFreePathCommand[]): ShapeFreePath
 /**
  * Shared authored-command rebase for explicit node operations. Inputs are actual
  * unflipped local units. Every supplied coordinate retains its old world
- * projection; the new frame is merged-safe, sheet-bounded and never clamped.
+ * projection; the new frame is merged-safe and never clamped. Canonical context
+ * permits signed sheet positions and positive subpixel source frames; legacy
+ * calls retain their sheet bounds and 1px source minimum.
  */
 export function replaceFreeShapeCommands(
   drawing: SheetGraphicDrawing,
   commandsInActualCanonicalLocalUnits: readonly ShapeFreePathCommand[],
   pointTypes: ShapeFreePath["pointTypes"],
   layout: SheetViewportLayout,
+  options?: ShapePointEditOptions,
 ): SheetGraphicDrawing | undefined {
-  if (!validPlacement(drawing)) return;
+  if (!validPlacement(drawing, options)) return;
   try {
     const path = normalizeShapeFreePath(drawing.shapePath);
     const geometry = getFreeShapeGeometry(path, drawing.width, drawing.height);
     const rect = getFloatingImageSheetRect(drawing, layout);
-    if (!geometry || !rect || !rectWithinSheet(rect, layout)) return;
+    if (!geometry || !rect || !rectWithinSheet(rect, layout, options)) return;
     const commands = detachedCommands(commandsInActualCanonicalLocalUnits);
     let minX = Infinity,
       minY = Infinity,
@@ -342,19 +362,21 @@ export function replaceFreeShapeCommands(
       flipPoint(drawing, { x: origin.x + width / 2, y: origin.y + height / 2 }),
     );
     const nextRect = { x: center.x - width / 2, y: center.y - height / 2, width, height };
-    if (!rectWithinSheet(nextRect, layout)) return;
+    if (!rectWithinSheet(nextRect, layout, options)) return;
     const shapePath = normalizeShapeFreePath({
       tool: path.tool,
       viewBox: { width, height },
       commands: commands.map((command) => translatedCommand(command, origin)),
       ...(pointTypes ? { pointTypes } : {}),
     });
-    const next = reanchorFloatingImageAtSheetRect({ ...drawing, shapePath }, nextRect, layout);
-    if (!next || !validPlacement(next)) return;
+    const next = options
+      ? shapeViewAtRect({ ...drawing, shapePath }, nextRect, options.metrics)
+      : reanchorFloatingImageAtSheetRect({ ...drawing, shapePath }, nextRect, layout);
+    if (!next || !validPlacement(next, options)) return;
     const resolved = getFloatingImageSheetRect(next, layout);
     const actual = getFreeShapeGeometry(next.shapePath, next.width, next.height)?.paths[0]
       ?.commands;
-    if (!resolved || !actual || !rectWithinSheet(resolved, layout)) return;
+    if (!resolved || !actual || !rectWithinSheet(resolved, layout, options)) return;
     for (let index = 0; index < commands.length; index++)
       for (let field = 1; field < commands[index]!.length; field += 2) {
         const expected = pictureFrameLocalToWorld(
@@ -399,19 +421,20 @@ export function moveFreeShapePoint(
   descriptor: FreeShapePointDescriptor,
   targetWorldPoint: FreeShapePointPosition,
   layout: SheetViewportLayout,
+  options?: ShapePointEditOptions,
 ): SheetGraphicDrawing | undefined {
   if (
-    !validPlacement(drawing) ||
+    !validPlacement(drawing, options) ||
     !Number.isSafeInteger(descriptor.commandIndex) ||
     descriptor.commandIndex < 0 ||
-    !pointWithinSheet(targetWorldPoint, layout)
+    !pointWithinSheet(targetWorldPoint, layout, options)
   )
     return;
   try {
     const path = normalizeShapeFreePath(drawing.shapePath);
     const geometry = getFreeShapeGeometry(path, drawing.width, drawing.height);
     const rect = getFloatingImageSheetRect(drawing, layout);
-    if (!geometry || !rect || !rectWithinSheet(rect, layout)) return;
+    if (!geometry || !rect || !rectWithinSheet(rect, layout, options)) return;
     const originalCommands = geometry.paths[0]!.commands as readonly ShapeFreePathCommand[];
     const selected = originalCommands[descriptor.commandIndex];
     if (!selected) return;
@@ -464,7 +487,7 @@ export function moveFreeShapePoint(
         }
       }
     }
-    return replaceFreeShapeCommands(drawing, commands, pointTypes, layout);
+    return replaceFreeShapeCommands(drawing, commands, pointTypes, layout, options);
   } catch {
     return;
   }
@@ -532,9 +555,10 @@ export function setFreeShapePointType(
   vertexIndex: number,
   type: FreeShapeVertexType,
   layout: SheetViewportLayout,
+  options?: ShapePointEditOptions,
 ): SheetGraphicDrawing | undefined {
   if (
-    !validPlacement(drawing) ||
+    !validPlacement(drawing, options) ||
     !Number.isSafeInteger(vertexIndex) ||
     vertexIndex < 0 ||
     !["corner", "smooth", "straight"].includes(type)
@@ -544,7 +568,7 @@ export function setFreeShapePointType(
     const path = normalizeShapeFreePath(drawing.shapePath);
     const geometry = getFreeShapeGeometry(path, drawing.width, drawing.height);
     const rect = getFloatingImageSheetRect(drawing, layout);
-    if (!geometry || !rect || !rectWithinSheet(rect, layout)) return;
+    if (!geometry || !rect || !rectWithinSheet(rect, layout, options)) return;
     const original = geometry.paths[0]!.commands as readonly ShapeFreePathCommand[];
     if (!original[vertexIndex] || original[vertexIndex]![0] === "Z") return;
     const index = canonicalVertex(original, vertexIndex),
@@ -603,7 +627,7 @@ export function setFreeShapePointType(
     }
     if (pointTypes[index] === type && equalCommands(commands, original)) return drawing;
     pointTypes[index] = type;
-    return replaceFreeShapeCommands(drawing, commands, pointTypes, layout);
+    return replaceFreeShapeCommands(drawing, commands, pointTypes, layout, options);
   } catch {
     return;
   }
@@ -619,12 +643,13 @@ export function toggleClosedFreeShape(
   closed: boolean,
   layout: SheetViewportLayout,
   vertexIndex = 0,
+  options?: ShapePointEditOptions,
 ): SheetGraphicDrawing | undefined {
-  if (!validPlacement(drawing) || typeof closed !== "boolean") return;
+  if (!validPlacement(drawing, options) || typeof closed !== "boolean") return;
   try {
     const geometry = getFreeShapeGeometry(drawing.shapePath, drawing.width, drawing.height);
     const rect = getFloatingImageSheetRect(drawing, layout);
-    if (!geometry || !rect || !rectWithinSheet(rect, layout)) return;
+    if (!geometry || !rect || !rectWithinSheet(rect, layout, options)) return;
     const path = normalizeShapeFreePath(drawing.shapePath);
     if (isShapeFreePathClosed(path) === closed) return drawing;
     let commands: ShapeFreePathCommand[], pointTypes: Record<string, ShapeFreePathPointType>;

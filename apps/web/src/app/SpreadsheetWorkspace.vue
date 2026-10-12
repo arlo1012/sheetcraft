@@ -111,7 +111,7 @@ import { createPicturePaintAssetSource } from "../modules/sheet-images/picture-p
 import type { PictureFormatLabelKey } from "../modules/sheet-images/picture-format-pane-model";
 import { usePictureToolbarOwner } from "../modules/sheet-images/usePictureToolbarOwner";
 import {
-  isFramedShapeDrawing,
+  type SheetFramedGraphicDrawing,
   type SheetDrawing,
   type SheetGraphicDrawing,
 } from "@sheetcraft/core/sheet-drawings";
@@ -1579,7 +1579,7 @@ function editSheetDrawing(drawing: SheetDrawing): void {
   else if (drawing.kind === "control") controlActions.open(drawing);
   else if (drawing.kind === "attachment") attachmentActions.viewing.value = drawing;
   else if (drawing.kind === "camera") cameraActions.open(drawing);
-  else if (!isFramedShapeDrawing(drawing)) drawingActions.edit(drawing);
+  else drawingActions.edit(drawing);
 }
 const symbolDialog = shallowRef<{
   dialogId: number;
@@ -1796,6 +1796,7 @@ const { busy: xlsxBusy, confirmation: xlsxConfirmation, feedback: xlsxFeedback }
 const shapeTextImages = createCanvasImageCache(() => {});
 onBeforeUnmount(shapeTextImages.dispose);
 const drawingActions = useDrawingActions({
+  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
   getGeneration: () => workbookGeneration.value,
@@ -1829,10 +1830,12 @@ const drawingActions = useDrawingActions({
           },
         },
       },
+      sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
     ),
 });
 const { dialog: drawingDialog, editing: editingDrawing } = drawingActions;
 const shapeFormatPane = useOwnedShapeFormatPane({
+  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
   getGeneration: () => workbookGeneration.value,
@@ -1877,7 +1880,7 @@ watch(
   },
   { immediate: true },
 );
-function openShapeFormat(drawing: SheetGraphicDrawing) {
+function openShapeFormat(drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing) {
   if (shapeFormatPane.open(drawing)) {
     drawingActions.close();
     sheetGridRef.value?.selectDrawing(drawing.id);
@@ -1891,6 +1894,7 @@ function selectedShapeChanged(id: string | null) {
 }
 const shapeInteractionBlocked = ref(false);
 const shapeCreation = useShapeCreation({
+  getMetrics: () => sheetGridRef.value?.getPictureFrameContext?.(activeSheet.value)?.metrics,
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
   getGeneration: () => workbookGeneration.value,
@@ -5046,13 +5050,12 @@ watch(
     v-if="drawingDialog"
     :key="drawingDialog.dialogId"
     :drawing="drawingDialog.initial"
+    :normalize-drawing="drawingActions.normalizeDialogDrawing.value"
     :theme="session.workbook.theme"
     :image-asset-urls="imageAssetUrls"
     :request-text-box="drawingTextBoxHandler"
     :confirm-drawing="drawingConfirmHandler"
-    :disabled="
-      loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
-    "
+    :disabled="!drawingActions.canEditDialog.value"
     @confirm="drawingDialog.confirm"
     @close="drawingDialog.close"
   />

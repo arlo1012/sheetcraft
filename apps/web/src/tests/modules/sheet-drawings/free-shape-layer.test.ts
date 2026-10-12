@@ -569,7 +569,7 @@ describe("free path actual layer cancellation and stale ownership", () => {
     expect(wrapper.find("[data-free-shape-update-rejected]").exists()).toBe(true);
   });
 
-  test("read-only entry is blocked and Core permission revocation rejects an otherwise valid UI update", async () => {
+  test("read-only entry and revoked object permission block an otherwise valid point update before execution", async () => {
     const source = freeDrawing();
     const { wrapper, sheet, workbook, session, updates } = fixture(source, true);
     await enter(wrapper, source);
@@ -579,8 +579,8 @@ describe("free path actual layer cancellation and stale ownership", () => {
     sheet.properties.protected = true;
     const before = serializeWorkbook(workbook);
     await wrapper.get('[data-free-shape-vertex="2"]').trigger("keydown", { key: "ArrowRight" });
-    expect(updates).toHaveLength(1);
-    expect(wrapper.find("[data-free-shape-update-rejected]").exists()).toBe(true);
+    expect(updates).toHaveLength(0);
+    expect(wrapper.find("[data-free-shape-point-selection]").exists()).toBe(false);
     expect(session.history.undoStack).toHaveLength(0);
     expect(serializeWorkbook(workbook)).toEqual(before);
   });

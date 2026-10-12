@@ -1,9 +1,21 @@
 import { computed, shallowRef, watch } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
+import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
+import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import {
+  anchorShapeFrameRect,
+  resizeShapeFrame,
+  type ShapeFrameAnchor,
+} from "@sheetcraft/core/shape-frame";
+import {
+  getShapeObjectProperties,
+  normalizeShapeObjectProperties,
+} from "@sheetcraft/core/shape-object-properties";
 import {
   normalizeSheetDrawing,
   isFramedShapeDrawing,
   type SheetGraphicDrawing,
+  type SheetFramedGraphicDrawing,
   type SheetDrawing,
 } from "@sheetcraft/core/sheet-drawings";
 import { getShapeStyleAssetIds } from "@sheetcraft/core/shape-style";
@@ -33,6 +45,25 @@ import {
   type PreparedDrawingShapeTextCandidate,
 } from "./shape-text-runtime";
 import { planShapeTextPaint, resolveShapeTextPaintStyle } from "./shape-text-paint";
+import { resolveShapeDrawing, updateResolvedShapeDrawing } from "./resolved-shape-drawing";
+
+function anchorMode(value: unknown): ShapeFrameAnchor["mode"] {
+  if (value === "move-size") return "move-and-size";
+  if (value === "move") return "move-only";
+  if (value === "fixed") return "fixed";
+  throw new TypeError("Unknown shape anchor mode.");
+}
+function anchorValue(mode: ShapeFrameAnchor["mode"]) {
+  return mode === "move-and-size" ? "move-size" : mode === "move-only" ? "move" : "fixed";
+}
+const objectFields = new Set<ShapeFormatField>([
+  "lockAspectRatio",
+  "anchor",
+  "printObject",
+  "locked",
+  "altTitle",
+  "altDescription",
+]);
 
 /** Exact committed owner; no drawing index, synthetic picture, or mutable selection callback. */
 export function useOwnedShapeFormatPane(options: {
@@ -40,6 +71,7 @@ export function useOwnedShapeFormatPane(options: {
   getSheet: () => Sheet;
   getGeneration: () => number;
   getRevision: () => number;
+  getMetrics?: () => PictureSheetMetrics | undefined;
   isBusy: () => boolean;
   flush: () => boolean;
   update: (next: SheetDrawing, owner: SheetDrawing) => boolean;
@@ -56,6 +88,8 @@ export function useOwnedShapeFormatPane(options: {
     generation: number;
     id: string;
     sessionId: string;
+    /** WPS scale denominators belong to this selection session, never to saved data. */
+    baseline: { width: number; height: number };
   }>();
   let sequence = 0;
   const acknowledged = shallowRef<{ id: string; drawing: SheetDrawing; revision: number }>();
@@ -70,16 +104,30 @@ export function useOwnedShapeFormatPane(options: {
     )
       return;
     const current = owner.sheet.drawings?.find((d) => d.id === owner.id);
-    return current &&
-      !isFramedShapeDrawing(current) &&
-      (current.kind === "shape" || current.kind === "textBox")
+    return current && (current.kind === "shape" || current.kind === "textBox")
       ? current
       : undefined;
   });
+  const context = computed(() => {
+    const source = drawing.value;
+    if (!source) return;
+    void options.getRevision();
+    const metrics = options.getMetrics?.();
+    if (metrics) {
+      const resolved = resolveShapeDrawing(source, metrics);
+      return { metrics, resolved, view: resolved.view as SheetGraphicDrawing };
+    }
+    if (!isFramedShapeDrawing(source))
+      return { metrics: undefined, resolved: undefined, view: source };
+  });
   const snapshot = computed<ShapeFormatSnapshot | null>(() => {
     const d = drawing.value,
-      owner = selected.value;
-    if (!d || !owner) return null;
+      owner = selected.value,
+      view = context.value?.view;
+    if (!d || !owner || !view) return null;
+    const properties = getShapeObjectProperties(
+      isFramedShapeDrawing(d) ? d.shapeProperties : undefined,
+    );
     const revision = options.getRevision();
     return {
       owner: {
@@ -91,38 +139,73 @@ export function useOwnedShapeFormatPane(options: {
       revision,
       drawing: d,
       values: {
-        sizeWidthPt: d.width * 0.75,
-        sizeHeightPt: d.height * 0.75,
+        sizeWidthPt: view.width * 0.75,
+        sizeHeightPt: view.height * 0.75,
+        scaleWidthPercent:
+          owner.baseline.width > 0 ? (view.width / owner.baseline.width) * 100 : 100,
+        scaleHeightPercent:
+          owner.baseline.height > 0 ? (view.height / owner.baseline.height) * 100 : 100,
+        ...properties,
+        anchor: anchorValue(isFramedShapeDrawing(d) ? d.shapeFrame.anchor.mode : "move-only"),
         rotationDeg: d.rotation,
         fontSizePt: d.fontSize * 0.75,
         textBold: d.bold,
         textItalic: d.italic,
-        ...drawingShapeTextValues(d),
+        ...drawingShapeTextValues(view),
       },
-      shapeStyle: d.kind === "shape" ? resolveShapeDetailedPaintStyle(d) : undefined,
-      textStyle: resolveShapeTextPaintStyle(d),
+      shapeStyle: d.kind === "shape" ? resolveShapeDetailedPaintStyle(view) : undefined,
+      textStyle: resolveShapeTextPaintStyle(view),
       ...(acknowledged.value?.drawing === d && acknowledged.value.revision === revision
         ? { acceptedIntentId: acknowledged.value.id }
         : {}),
     };
   });
   const capabilities = computed<ShapeFormatCapabilities>(() => {
-    const d = drawing.value;
+    const source = drawing.value,
+      d = context.value?.view;
     const enabled =
-      !!d && !options.isBusy() && canUseSheetPermission(options.getSheet(), "editObjects");
+      !!source && !!d && !options.isBusy() && canEditShapeObject(options.getSheet(), source);
     const field = { enabled, reason: enabled ? undefined : options.getUnsupportedReason() };
     const textRect = d && getDrawingShapeTextRect(d);
-    const textEnabled = enabled && !!textRect;
+    const textEnabled = enabled && !!textRect && textRect.width > 0 && textRect.height > 0;
     const textField = {
       enabled: textEnabled,
       reason: textEnabled ? undefined : options.getUnsupportedReason(),
     };
     const minimum =
-      d?.shapePath || (d?.shapeGeometry && isShapeLinePreset(d.shapeGeometry.preset)) ? 1 : 16;
+      (source && isFramedShapeDrawing(source)) ||
+      d?.shapePath ||
+      (d?.shapeGeometry && isShapeLinePreset(d.shapeGeometry.preset))
+        ? 1
+        : 16;
+    const objectField = {
+      ...field,
+      enabled: enabled && !!context.value?.metrics,
+    };
+    const scaleField = (axis: "width" | "height") => {
+      const baseline = selected.value?.baseline[axis] ?? 0;
+      return {
+        ...objectField,
+        enabled: objectField.enabled && baseline > 0,
+        min: baseline > 0 ? 100 / baseline : undefined,
+        max: baseline > 0 ? (16384 / baseline) * 100 : undefined,
+      };
+    };
     const fields: ShapeFormatCapabilities["fields"] = {
       sizeWidthPt: { ...field, min: minimum * 0.75, max: 16384 * 0.75 },
       sizeHeightPt: { ...field, min: minimum * 0.75, max: 16384 * 0.75 },
       rotationDeg: { ...field, min: -360, max: 360 },
+      scaleWidthPercent: scaleField("width"),
+      scaleHeightPercent: scaleField("height"),
+      lockAspectRatio: objectField,
+      anchor: objectField,
+      printObject: objectField,
+      locked: {
+        ...objectField,
+        enabled: objectField.enabled && canUseSheetPermission(options.getSheet(), "editObjects"),
+      },
+      altTitle: objectField,
+      altDescription: objectField,
       fontSizePt: { ...field, min: 0.75, max: 384 },
       textBold: field,
       textItalic: field,
@@ -156,7 +239,15 @@ export function useOwnedShapeFormatPane(options: {
     };
     const bodyField = { ...field, enabled: enabled && d?.kind === "shape" };
     for (const key of Object.keys(fields) as ShapeFormatField[]) {
-      if (key === "sizeWidthPt" || key === "sizeHeightPt" || key === "rotationDeg") continue;
+      if (
+        key === "sizeWidthPt" ||
+        key === "sizeHeightPt" ||
+        key === "rotationDeg" ||
+        key === "scaleWidthPercent" ||
+        key === "scaleHeightPercent" ||
+        objectFields.has(key)
+      )
+        continue;
       fields[key] = {
         ...fields[key],
         enabled: !!fields[key]?.enabled && textEnabled,
@@ -212,10 +303,9 @@ export function useOwnedShapeFormatPane(options: {
   }
   function open(d: SheetDrawing): boolean {
     if (
-      isFramedShapeDrawing(d) ||
       (d.kind !== "shape" && d.kind !== "textBox") ||
       options.isBusy() ||
-      !canUseSheetPermission(options.getSheet(), "editObjects") ||
+      !canEditShapeObject(options.getSheet(), d) ||
       options.getSheet().drawings?.find((item) => item.id === d.id) !== d
     )
       return false;
@@ -230,12 +320,31 @@ export function useOwnedShapeFormatPane(options: {
     )
       return false;
     if (options.getSheet().drawings?.find((item) => item.id === d.id) !== d) return false;
+    let size: { width: number; height: number };
+    try {
+      const metrics = options.getMetrics?.();
+      if (isFramedShapeDrawing(d) && !metrics) return false;
+      const view = metrics ? resolveShapeDrawing(d, metrics).view : (d as SheetGraphicDrawing);
+      size = { width: view.width, height: view.height };
+    } catch {
+      return false;
+    }
+    if (
+      options.getWorkbook() !== workbook ||
+      options.getSheet() !== sheet ||
+      options.getGeneration() !== generation ||
+      options.isBusy() ||
+      sheet.drawings?.find((item) => item.id === d.id) !== d ||
+      !canEditShapeObject(sheet, d)
+    )
+      return false;
     selected.value = {
       workbook: options.getWorkbook(),
       sheet: options.getSheet(),
       generation: options.getGeneration(),
       id: d.id,
       sessionId: `shape-owner-${++sequence}`,
+      baseline: size,
     };
     acknowledged.value = undefined;
     return true;
@@ -248,14 +357,63 @@ export function useOwnedShapeFormatPane(options: {
       shapeFormatOwnerKey(intent.owner) !== shapeFormatOwnerKey(before.owner)
     )
       return false;
-    const current = before.drawing;
-    let next: SheetGraphicDrawing = { ...current };
+    const current = before.drawing,
+      captured = context.value,
+      selection = selected.value;
+    if (
+      !captured ||
+      !selection ||
+      (captured.resolved?.source !== current && isFramedShapeDrawing(current))
+    )
+      return false;
+    const stillCurrent = () => {
+      const live = snapshot.value;
+      return (
+        !!live &&
+        live.drawing === current &&
+        live.revision === before.revision &&
+        shapeFormatOwnerKey(live.owner) === shapeFormatOwnerKey(before.owner) &&
+        context.value === captured &&
+        !options.isBusy() &&
+        canEditShapeObject(options.getSheet(), current) &&
+        (intent.type !== "set-field" ||
+          intent.field !== "locked" ||
+          canUseSheetPermission(options.getSheet(), "editObjects"))
+      );
+    };
+    let next: SheetGraphicDrawing = { ...captured.view };
+    let framed: SheetFramedGraphicDrawing | undefined;
+    const ensureFrame = () => {
+      if (!captured.metrics || !captured.resolved) throw new Error("Shape metrics unavailable.");
+      if (!framed) {
+        if (isFramedShapeDrawing(current)) framed = { ...current };
+        else {
+          const {
+            anchor: _anchor,
+            offsetX: _x,
+            offsetY: _y,
+            width: _w,
+            height: _h,
+            ...appearance
+          } = next;
+          framed = {
+            ...appearance,
+            kind: current.kind as "shape" | "textBox",
+            shapeFrame: {
+              kind: "shape-frame-v1",
+              anchor: anchorShapeFrameRect("move-only", captured.resolved.rect, captured.metrics),
+            },
+          };
+        }
+      }
+      return framed;
+    };
     try {
       if (intent.type === "set-style") {
         if (capabilities.value.styles?.[intent.target]?.[intent.category]?.enabled !== true)
           return false;
-        const text = intent.target === "text" ? materializeDrawingShapeText(current) : undefined;
-        const style = { ...(text ? text.style : current.shapeStyle) };
+        const text = intent.target === "text" ? materializeDrawingShapeText(next) : undefined;
+        const style = { ...(text ? text.style : next.shapeStyle) };
         if (intent.value === undefined) delete style[intent.category];
         else Object.assign(style, { [intent.category]: intent.value });
         next = text
@@ -285,82 +443,182 @@ export function useOwnedShapeFormatPane(options: {
               (cap.max !== undefined && intent.value > cap.max)))
         )
           return false;
-        const fields: Partial<
-          Record<ShapeFormatField, "width" | "height" | "rotation" | "fontSize" | "bold" | "italic">
-        > = {
-          sizeWidthPt: "width",
-          sizeHeightPt: "height",
-          rotationDeg: "rotation",
-          fontSizePt: "fontSize",
-          textBold: "bold",
-          textItalic: "italic",
-        };
-        const key = fields[intent.field];
-        if (key) {
-          Object.assign(next, {
-            [key]:
-              intent.field === "sizeWidthPt" ||
-              intent.field === "sizeHeightPt" ||
-              intent.field === "fontSizePt"
-                ? ((intent.value as number) * 4) / 3
-                : intent.value,
-          });
-          if (
-            intent.field === "sizeHeightPt" &&
-            next.shapeText?.layout.autoFit === "resize-shape"
-          ) {
+        const numericSize = intent.field === "sizeWidthPt" || intent.field === "sizeHeightPt";
+        const scaleSize =
+          intent.field === "scaleWidthPercent" || intent.field === "scaleHeightPercent";
+        if ((numericSize && isFramedShapeDrawing(current)) || scaleSize) {
+          const target = ensureFrame(),
+            metrics = captured.metrics!;
+          const rect = captured.resolved!.rect;
+          const axis =
+            intent.field === "sizeWidthPt" || intent.field === "scaleWidthPercent"
+              ? "width"
+              : "height";
+          const size = numericSize
+            ? ((intent.value as number) * 4) / 3
+            : (selection.baseline[axis] * (intent.value as number)) / 100;
+          const locked = getShapeObjectProperties(target.shapeProperties).lockAspectRatio;
+          const width =
+            axis === "width" ? size : locked ? (rect.width * size) / rect.height : rect.width;
+          const height =
+            axis === "height" ? size : locked ? (rect.height * size) / rect.width : rect.height;
+          framed = {
+            ...target,
+            shapeFrame: resizeShapeFrame(
+              target.shapeFrame,
+              { width, height },
+              metrics,
+              current.rotation,
+            ),
+          };
+          if (height !== rect.height && next.shapeText?.layout.autoFit === "resize-shape") {
             const text = materializeDrawingShapeText(next);
             text.layout.autoFit = "none";
             next = withDrawingShapeText(next, text);
+            framed.shapeText = next.shapeText;
+          }
+        } else if (objectFields.has(intent.field)) {
+          const target = ensureFrame();
+          if (intent.field === "anchor") {
+            framed = {
+              ...target,
+              shapeFrame: {
+                kind: "shape-frame-v1",
+                anchor: anchorShapeFrameRect(
+                  anchorMode(intent.value),
+                  captured.resolved!.rect,
+                  captured.metrics!,
+                  target.shapeFrame.anchor,
+                ),
+              },
+            };
+          } else {
+            const properties = normalizeShapeObjectProperties({
+              ...target.shapeProperties,
+              [intent.field]: intent.value,
+            });
+            const { shapeProperties: _properties, ...base } = target;
+            framed = { ...base, ...(properties ? { shapeProperties: properties } : {}) };
           }
         } else {
-          const edited = editDrawingShapeTextField(next, intent.field, intent.value);
-          if (!edited) return false;
-          next = edited;
+          const fields: Partial<
+            Record<
+              ShapeFormatField,
+              "width" | "height" | "rotation" | "fontSize" | "bold" | "italic"
+            >
+          > = {
+            sizeWidthPt: "width",
+            sizeHeightPt: "height",
+            rotationDeg: "rotation",
+            fontSizePt: "fontSize",
+            textBold: "bold",
+            textItalic: "italic",
+          };
+          const key = fields[intent.field];
+          if (key) {
+            Object.assign(next, {
+              [key]:
+                intent.field === "sizeWidthPt" ||
+                intent.field === "sizeHeightPt" ||
+                intent.field === "fontSizePt"
+                  ? ((intent.value as number) * 4) / 3
+                  : intent.value,
+            });
+            if (
+              intent.field === "sizeHeightPt" &&
+              next.shapeText?.layout.autoFit === "resize-shape"
+            ) {
+              const text = materializeDrawingShapeText(next);
+              text.layout.autoFit = "none";
+              next = withDrawingShapeText(next, text);
+            }
+          } else {
+            const edited = editDrawingShapeTextField(next, intent.field, intent.value);
+            if (!edited) return false;
+            next = edited;
+          }
         }
       } else return false;
-      next = normalizeSheetDrawing(next) as SheetGraphicDrawing;
-      if (next.shapeText && next.text) {
+      const candidate = normalizeSheetDrawing(
+        framed ??
+          (captured.resolved && captured.metrics
+            ? updateResolvedShapeDrawing(captured.resolved, next, captured.metrics)
+            : next),
+      ) as SheetGraphicDrawing | SheetFramedGraphicDrawing;
+      const resolvedCandidate = captured.metrics
+        ? resolveShapeDrawing(candidate, captured.metrics)
+        : undefined;
+      const candidateView = isFramedShapeDrawing(candidate)
+        ? (resolvedCandidate!.view as SheetGraphicDrawing)
+        : (normalizeSheetDrawing(candidate) as SheetGraphicDrawing);
+      let preflight = candidateView;
+      if (
+        !resolvedCandidate?.collapsed &&
+        candidateView.shapeText &&
+        candidateView.text &&
+        getDrawingShapeTextRect(candidateView)
+      ) {
+        const currentView = isFramedShapeDrawing(current)
+          ? (resolveShapeDrawing(current, captured.metrics!).view as SheetGraphicDrawing)
+          : (normalizeSheetDrawing(current) as SheetGraphicDrawing);
         const prepared = options.prepareText
-          ? options.prepareText(next, current)
-          : prepareDrawingShapeTextCandidate(next);
-        // Only preflight the fitted result here. The command owner prepares the
-        // original candidate once, preserving its rotated anchor in that transaction.
+          ? options.prepareText(candidateView, currentView)
+          : prepareDrawingShapeTextCandidate(
+              candidateView,
+              resolvedCandidate && captured.metrics
+                ? {
+                    normalizeView: (view: SheetGraphicDrawing) =>
+                      resolveShapeDrawing(
+                        updateResolvedShapeDrawing(resolvedCandidate, view, captured.metrics!),
+                        captured.metrics!,
+                      ).view as SheetGraphicDrawing,
+                  }
+                : {},
+            );
+
+        // The command owner fits the original candidate once. This detached
+        // view only proves the candidate's text/paint budgets before the CAS.
+        if (!stillCurrent()) return false;
+        if (prepared.drawing.id !== current.id || prepared.drawing.kind !== current.kind)
+          return false;
+        if (resolvedCandidate && captured.metrics)
+          updateResolvedShapeDrawing(resolvedCandidate, prepared.drawing, captured.metrics);
+        else normalizeSheetDrawing(prepared.drawing);
         const textPlan = planShapeTextPaint({
           drawing: prepared.drawing,
           layout: prepared.layout,
           density: 1,
         });
         if (!Number.isFinite(textPlan.estimatedPeakBytes)) return false;
+        preflight = prepared.drawing;
       }
-      if (next.kind === "shape") {
+      if (!resolvedCandidate?.collapsed && preflight.kind === "shape") {
         const geometry =
-          getDrawingShapeGeometry(next) ??
-          (!next.shapeGeometry && !next.shapePath
-            ? getLegacyShapeGeometry(next.shape, next.width, next.height)
+          getDrawingShapeGeometry(preflight) ??
+          (!preflight.shapeGeometry && !preflight.shapePath
+            ? getLegacyShapeGeometry(preflight.shape, preflight.width, preflight.height)
             : undefined);
         if (!geometry) return false;
         const plan = planShapeDetailedPaint({
-          drawing: { ...next, text: "" },
+          drawing: { ...preflight, text: "" },
           geometry,
           density: 1,
         });
         if (!Number.isFinite(plan.estimatedPeakBytes)) return false;
       }
       if (
-        [...getShapeStyleAssetIds(next.shapeStyle), ...getShapeTextAssetIds(next.shapeText)].some(
-          (id) => !options.isAssetAvailable?.(id),
-        )
+        [
+          ...new Set([
+            ...getShapeStyleAssetIds(candidate.shapeStyle),
+            ...getShapeTextAssetIds(candidate.shapeText),
+            ...getShapeStyleAssetIds(preflight.shapeStyle),
+            ...getShapeTextAssetIds(preflight.shapeText),
+          ]),
+        ].some((id) => !options.isAssetAvailable?.(id))
       )
         return false;
-      if (
-        snapshot.value?.drawing !== current ||
-        snapshot.value.revision !== before.revision ||
-        options.isBusy() ||
-        !canUseSheetPermission(options.getSheet(), "editObjects")
-      )
-        return false;
-      if (!options.update(next, current)) return false;
+      if (!stillCurrent()) return false;
+      if (!options.update(candidate, current)) return false;
       const applied = drawing.value;
       if (!applied || applied.id !== current.id) return false;
       acknowledged.value = {

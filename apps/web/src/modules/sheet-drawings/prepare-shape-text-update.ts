@@ -1,8 +1,17 @@
 import {
   requireLegacySheetDrawing,
+  isFramedShapeDrawing,
   type SheetDrawing,
   type SheetGraphicDrawing,
 } from "@sheetcraft/core/sheet-drawings";
+import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import { resizeShapeFrame, resolveShapeFrame } from "@sheetcraft/core/shape-frame";
+import {
+  resolveShapeDrawing,
+  updateResolvedShapeDrawing,
+  type ResolvedShapeDrawing,
+} from "./resolved-shape-drawing";
+import { shapeViewAtRect } from "./shape-view-layout";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import {
   getFloatingImageSheetRect,
@@ -50,15 +59,47 @@ export function prepareShapeTextUpdate(
   paint?: Pick<ShapeTextPaintOptions, "resources"> & {
     preflight?: typeof preflightShapeTextGlyphBudgets;
   },
+  metrics?: PictureSheetMetrics,
 ): SheetDrawing {
+  if (isFramedShapeDrawing(candidate)) {
+    if (!metrics) throw new Error("Shape editing requires current worksheet metrics.");
+    const resolved = resolveShapeDrawing(candidate, metrics);
+    if (resolved.collapsed) return candidate;
+    const owner = source && resolveShapeDrawing(source, metrics).view;
+    const prepared = prepareShapeViewTextUpdate(
+      resolved.view,
+      owner,
+      viewport,
+      measurement,
+      paint,
+      resolved,
+    );
+    return prepared === resolved.view
+      ? candidate
+      : updateResolvedShapeDrawing(resolved, prepared, metrics);
+  }
+  return prepareShapeViewTextUpdate(candidate, source, viewport, measurement, paint);
+}
+function prepareShapeViewTextUpdate(
+  candidate: SheetDrawing,
+  source: SheetDrawing | undefined,
+  viewport: SheetViewportLayout | undefined,
+  measurement?: DrawingShapeTextRuntimeOptions,
+  paint?: Pick<ShapeTextPaintOptions, "resources"> & {
+    preflight?: typeof preflightShapeTextGlyphBudgets;
+  },
+  resolved?: ResolvedShapeDrawing,
+): ReturnType<typeof requireLegacySheetDrawing> {
   const drawing = requireLegacySheetDrawing(candidate);
   const owner = source && requireLegacySheetDrawing(source);
   if (drawing.kind !== "shape" && drawing.kind !== "textBox") return drawing;
+  // Shapes without a text area retain historical text without blocking unrelated properties.
+  if (!getDrawingShapeTextRect(drawing)) return drawing;
   const manualHeightChange =
     !!owner &&
     (owner.kind === "shape" || owner.kind === "textBox") &&
     drawing.height !== owner.height &&
-    drawing.shapeText === owner.shapeText;
+    sameData(drawing.shapeText, owner.shapeText);
   if (!drawing.text) {
     if (manualHeightChange && drawing.shapeText?.layout.autoFit === "resize-shape") {
       const text = materializeDrawingShapeText(drawing);
@@ -103,6 +144,15 @@ export function prepareShapeTextUpdate(
     : prepareDrawingShapeTextCandidate(drawing, {
         ...measurement,
         manualHeightChange,
+        ...(resolved
+          ? {
+              normalizeView: (view: SheetGraphicDrawing) =>
+                resolveShapeDrawing(
+                  updateResolvedShapeDrawing(resolved, view, resolved.metrics),
+                  resolved.metrics,
+                ).view as SheetGraphicDrawing,
+            }
+          : {}),
       });
   if (prepared.drawing.text) {
     const textPlan = planShapeTextPaint({
@@ -122,6 +172,22 @@ export function prepareShapeTextUpdate(
     projectedShapeTextBounds(prepared.drawing, textPlan);
   }
   if (!prepared.resized) return prepared.drawing;
+  if (resolved && isFramedShapeDrawing(resolved.source)) {
+    const frame = resizeShapeFrame(
+      resolved.source.shapeFrame,
+      {
+        width: prepared.drawing.width,
+        height: prepared.drawing.height,
+      },
+      resolved.metrics,
+      prepared.drawing.rotation,
+    );
+    return shapeViewAtRect(
+      prepared.drawing,
+      resolveShapeFrame(frame, resolved.metrics, prepared.drawing.rotation).rect,
+      resolved.metrics,
+    );
+  }
   if (!viewport) throw new Error("Shape AutoFit requires the current worksheet geometry.");
   const frame = getFloatingImageSheetRect(drawing, viewport);
   if (!frame) throw new Error("Shape AutoFit anchor is unavailable.");

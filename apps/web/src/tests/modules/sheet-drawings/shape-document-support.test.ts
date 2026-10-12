@@ -7,7 +7,6 @@ import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft
 import {
   assertShapeCommandSupport,
   assertWorkbookShapeSupport,
-  UnsupportedShapeFrameDocumentError,
 } from "../../../modules/sheet-drawings/shape-document-support";
 import { framedShape } from "./framed-shape-fixture";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
@@ -18,7 +17,7 @@ import {
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 
 describe("canonical shape model admission", () => {
-  test("legacy consumers reject canonical placement instead of guessing or dropping it", () => {
+  test("live admission preserves canonical placement while explicit legacy adapters still reject it", () => {
     const workbook = createWorkbook({ id: "incoming", sheetId: "sheet" }),
       sheet = getActiveSheet(workbook);
     const legacy = createGraphicDrawing("old", "shape", "Old", { row: 0, column: 0 });
@@ -27,11 +26,11 @@ describe("canonical shape model admission", () => {
     expect(requireLegacySheetDrawings(sheet.drawings)[0]).toBe(legacy);
     sheet.drawings.push(framedShape());
     const snapshot = serializeWorkbook(workbook);
-    expect(() => assertWorkbookShapeSupport(workbook)).toThrow(UnsupportedShapeFrameDocumentError);
+    expect(() => assertWorkbookShapeSupport(workbook)).not.toThrow();
     expect(() => requireLegacySheetDrawings(sheet.drawings)).toThrow();
     expect(serializeWorkbook(workbook)).toEqual(snapshot);
   });
-  test("all content-bearing ingress commands reject before mutating the current workbook", () => {
+  test("content-bearing ingress validates without mutation and preserves canonical data", () => {
     const incoming = createWorkbook({ id: "incoming", sheetId: "sheet" }),
       sheet = getActiveSheet(incoming);
     sheet.drawings = [framedShape()];
@@ -54,27 +53,23 @@ describe("canonical shape model admission", () => {
       { type: "restoreTableTransaction", states: [{ sheetId: sheet.id, state }], tableStyles: [] },
     ];
     const before = serializeWorkbook(incoming);
-    for (const command of commands)
-      expect(() => assertShapeCommandSupport(command)).toThrow(UnsupportedShapeFrameDocumentError);
+    for (const command of commands) expect(() => assertShapeCommandSupport(command)).not.toThrow();
     expect(serializeWorkbook(incoming)).toEqual(before);
   });
-  test("plain and bundled recovery reject before registering resources", async () => {
+  test("plain and bundled internal recovery preserve canonical placement", async () => {
     const workbook = createWorkbook({ id: "incoming", sheetId: "sheet" });
     getActiveSheet(workbook).drawings = [framedShape()];
     const snapshot = serializeWorkbook(workbook);
-    expect(() => parseWorkbookJson(JSON.stringify(snapshot))).toThrow(
-      expect.objectContaining({ code: "unsupported-shape-frame" }),
-    );
+    expect(serializeWorkbook(parseWorkbookJson(JSON.stringify(snapshot)))).toEqual(snapshot);
     const assets = createMemoryImageAssetStore();
-    await expect(
-      readWorkbookBundleFile(
-        {
-          text: async () =>
-            JSON.stringify({ format: "sheetcraft-workbook", version: 1, snapshot, images: [] }),
-        },
-        assets,
-      ),
-    ).rejects.toMatchObject({ code: "unsupported-shape-frame" });
+    const recovered = await readWorkbookBundleFile(
+      {
+        text: async () =>
+          JSON.stringify({ format: "sheetcraft-workbook", version: 1, snapshot, images: [] }),
+      },
+      assets,
+    );
+    expect(serializeWorkbook(recovered)).toEqual(snapshot);
   });
 });
 

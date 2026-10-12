@@ -1,3 +1,6 @@
+import { isFramedShapeDrawing } from "@sheetcraft/core/sheet-drawings";
+import { resolveShapeFrame } from "@sheetcraft/core/shape-frame";
+import { getShapeObjectOriginCell } from "@sheetcraft/core/shape-object-sheet";
 import { isPictureGroup } from "@sheetcraft/core/picture-group";
 import {
   resolvePictureGroup,
@@ -68,6 +71,34 @@ export function getSheetContentExtent(sheet: Sheet): GridExtent {
   if (sheet.filter) include(sheet.filter.range.end);
   for (const table of sheet.tables ?? []) include(table.range.end);
   for (const table of sheet.pivotTables ?? []) include(getPivotTableRange(table).end);
+  if (sheet.drawings?.length) {
+    const metrics = createPictureSheetMetrics(sheet);
+    const includeShapeEnd = (x: number, y: number) =>
+      include({
+        row: Math.min(MAX_SHEET_ROWS - 1, locatePictureAxisPoint(y, metrics.rows).index),
+        column: Math.min(MAX_SHEET_COLUMNS - 1, locatePictureAxisPoint(x, metrics.columns).index),
+      });
+    for (const drawing of sheet.drawings) {
+      if (isFramedShapeDrawing(drawing)) {
+        include(getShapeObjectOriginCell(drawing, sheet));
+        const anchor = drawing.shapeFrame.anchor;
+        // Hidden/collapsed markers remain reachable for unhide and history.
+        if (anchor.mode === "move-and-size")
+          include({
+            row: Math.min(MAX_SHEET_ROWS - 1, anchor.end.row.index),
+            column: Math.min(MAX_SHEET_COLUMNS - 1, anchor.end.column.index),
+          });
+        const bounds = resolveShapeFrame(drawing.shapeFrame, metrics, drawing.rotation).bounds;
+        includeShapeEnd(bounds.x + bounds.width, bounds.y + bounds.height);
+      } else {
+        include(drawing.anchor);
+        includeShapeEnd(
+          metrics.columns.visiblePrefix(drawing.anchor.column) + drawing.offsetX + drawing.width,
+          metrics.rows.visiblePrefix(drawing.anchor.row) + drawing.offsetY + drawing.height,
+        );
+      }
+    }
+  }
   if (sheet.floatingImages.length > 0) {
     const geometry = createSheetGeometry({
       rowHeights: sheet.rowHeights,

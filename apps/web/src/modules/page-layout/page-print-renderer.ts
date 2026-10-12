@@ -1,5 +1,12 @@
 import { requireLegacyPictures } from "../sheet-images/picture-document-support";
 import { getPrintablePictureRoots } from "./page-print-pictures";
+import {
+  createPrintShapeMetrics,
+  getPrintableShapeRoots,
+  getPrintShapeContentExtent,
+  paintPrintShapes,
+  preparePrintShapeFonts,
+} from "./page-print-shapes";
 import { getPictureProperties } from "@sheetcraft/core/picture-properties";
 import { isFormulaError, type FormulaValue } from "@sheetcraft/core/formula";
 import {
@@ -58,6 +65,7 @@ export type PrintPreviewDocument = {
   display: ReturnType<typeof createSheetDisplaySnapshot>;
   geometry: ReturnType<typeof createSheetGeometry>;
   rows: ReturnType<typeof createRowVisibilityIndex>;
+  shapeMetrics: ReturnType<typeof createPrintShapeMetrics>;
   sheetName: string;
   fileName: string;
   locale: string;
@@ -205,7 +213,9 @@ export function createPrintPreviewDocument(options: {
     cloneSheetPageSetup(options.setup ?? options.sheet.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
   );
   const baseDisplay = createSheetDisplaySnapshot({
-    sheet: options.sheet,
+    // Grid reachability includes every owned drawing. Print extent is a distinct
+    // read-only projection; only its genuine printable shapes contribute below.
+    sheet: { ...options.sheet, drawings: [] },
     theme: options.theme,
     evaluator: options.evaluator,
     revision: options.revision,
@@ -226,6 +236,7 @@ export function createPrintPreviewDocument(options: {
   }
   const display = {
     ...baseDisplay,
+    sheet: options.sheet,
     getComputedValue: (address: Parameters<typeof baseDisplay.getComputedValue>[0]) =>
       printValue(baseDisplay.getComputedValue(address)),
     getSpill: (address: Parameters<typeof baseDisplay.getSpill>[0]) => {
@@ -233,14 +244,18 @@ export function createPrintPreviewDocument(options: {
       return spill ? { ...spill, value: printValue(spill.value) } : undefined;
     },
   };
+  const shapeMetrics = createPrintShapeMetrics(options.sheet, options.evaluator);
+  const shapeExtent = getPrintShapeContentExtent(options.sheet, shapeMetrics, options.theme);
   const contentRowCount = Math.max(
     1,
     display.contentExtent.rowCount,
+    shapeExtent.rowCount,
     (requested.printArea?.end.row ?? -1) + 1,
   );
   const contentColumnCount = Math.max(
     1,
     display.contentExtent.columnCount,
+    shapeExtent.columnCount,
     (requested.printArea?.end.column ?? -1) + 1,
   );
   const rowCount = Math.max(contentRowCount, (requested.printTitles?.rows?.end ?? -1) + 1);
@@ -312,6 +327,7 @@ export function createPrintPreviewDocument(options: {
     display,
     geometry,
     rows,
+    shapeMetrics,
     sheetName: options.sheetName ?? options.sheet.name,
     fileName: options.fileName ?? "workbook.xlsx",
     locale: options.locale ?? "en-US",
@@ -539,7 +555,11 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
     canvas.style.width = `${paperWidth}px`;
     canvas.style.height = `${paperHeight}px`;
     const context = canvas.getContext("2d");
-    if (!context) return;
+    if (!context) {
+      if (getPrintableShapeRoots(document.sheet).length)
+        throw new Error("Shape print canvas is unavailable.");
+      return;
+    }
     context.setTransform(density, 0, 0, density, 0, 0);
     context.fillStyle = "#fff";
     context.fillRect(0, 0, paperWidth, paperHeight);
@@ -626,6 +646,9 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
       });
       context.save();
       context.translate(x, y);
+      context.beginPath();
+      context.rect(0, 0, viewportSize.width, viewportSize.height);
+      context.clip();
       paintSheetScene(context, scene, layout, {
         palette: { background: "#fff", text: "#202124", gridLine: "#d9d9d9", mutedText: "#666" },
         showGridLines: document.setup.printOptions?.gridLines ?? false,
@@ -668,6 +691,18 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
           effects: getDrawingThemeEffects(options.theme),
           theme: options.theme,
         });
+      paintPrintShapes(context, {
+        sheet: document.sheet,
+        metrics: document.shapeMetrics,
+        viewport: {
+          x: document.geometry.getColumnOffset(columns.start),
+          y: document.rows.getBoundaryOffset(rows.start) ?? 0,
+          ...viewportSize,
+        },
+        theme: options.theme,
+        assetUrls: options.imageAssetUrls,
+        images,
+      });
       context.restore();
     };
     if (page.titleRows && page.titleColumns) paintFragment(page.titleRows, page.titleColumns, 0, 0);
@@ -688,5 +723,8 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
       [...new Set(urls)].flatMap((url) => [images.load(url), floatingImages.load(url)]),
     );
   }
-  return { render, prepareImages, dispose };
+  async function prepareShapes(document: PrintPreviewDocument): Promise<void> {
+    await preparePrintShapeFonts(document.sheet, document.shapeMetrics);
+  }
+  return { render, prepareImages, prepareShapes, dispose };
 }

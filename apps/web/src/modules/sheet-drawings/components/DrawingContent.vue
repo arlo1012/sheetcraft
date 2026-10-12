@@ -26,6 +26,7 @@ const props = defineProps<{
   locale?: string;
   dateSystem?: "1900" | "1904";
   density?: number;
+  legacyHitSurface?: boolean;
 }>();
 const emit = defineEmits<{
   controlChange: [value: unknown];
@@ -60,6 +61,7 @@ const textStyle = computed(() => ({
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
       aria-hidden="true"
+      :style="{ pointerEvents: legacyHitSurface ? 'visiblePainted' : undefined }"
     >
       <g
         :fill="drawing.fill"
@@ -165,6 +167,7 @@ const textStyle = computed(() => ({
       :class="{ 'is-word-art': drawing.kind === 'wordArt' }"
       :style="[
         textStyle,
+        { pointerEvents: legacyHitSurface ? 'auto' : undefined },
         drawing.kind === 'textBox' && drawing.textDirection === 'vertical'
           ? { writingMode: 'vertical-rl', textOrientation: 'mixed' }
           : {},

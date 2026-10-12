@@ -46,7 +46,7 @@ export function getFreeShapeGeometry(
   if (
     !path ||
     ![width, height].every(
-      (value) => Number.isFinite(value) && value >= 1 && value <= FREE_SHAPE_GEOMETRY_LIMITS.extent,
+      (value) => Number.isFinite(value) && value > 0 && value <= FREE_SHAPE_GEOMETRY_LIMITS.extent,
     )
   )
     return;

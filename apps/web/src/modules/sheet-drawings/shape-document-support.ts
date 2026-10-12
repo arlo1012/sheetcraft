@@ -1,10 +1,10 @@
-import { isFramedShapeDrawing, normalizeSheetDrawings } from "@sheetcraft/core/sheet-drawings";
+import { normalizeSheetDrawings } from "@sheetcraft/core/sheet-drawings";
 import { deserializeSheet } from "@sheetcraft/core/serialization";
 import type { WorkbookCommand } from "@sheetcraft/core/commands";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Workbook } from "@sheetcraft/core/workbook";
 
-/** Temporary model-stage admission gate, removed only after every live consumer is connected. */
+/** Kept for old recovery diagnostics; canonical shapes now have live consumers. */
 export class UnsupportedShapeFrameDocumentError extends Error {
   readonly code = "unsupported-shape-frame";
   constructor(
@@ -18,10 +18,8 @@ export class UnsupportedShapeFrameDocumentError extends Error {
   }
 }
 function checkDrawings(sheetId: string, drawings: readonly SheetDrawing[] | undefined): void {
-  const ids = normalizeSheetDrawings(drawings)
-    .filter(isFramedShapeDrawing)
-    .map((drawing) => drawing.id);
-  if (ids.length) throw new UnsupportedShapeFrameDocumentError(sheetId, ids);
+  void sheetId;
+  normalizeSheetDrawings(drawings);
 }
 export function assertWorkbookShapeSupport(workbook: Workbook): void {
   for (const sheet of workbook.sheets.values()) checkDrawings(sheet.id, sheet.drawings);
@@ -55,7 +53,7 @@ function requireOwnDataArray<T extends object>(values: readonly T[]): void {
   }
 }
 
-/** Reject incoming canonical placement before mutations, history, or view consumers. */
+/** Validate incoming data before mutations, history, or view consumers. */
 export function assertShapeCommandSupport(command: WorkbookCommand): void {
   requireOwnDataRecord(command);
   const type = Object.getOwnPropertyDescriptor(command, "type");

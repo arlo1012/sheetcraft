@@ -71,7 +71,7 @@ function extentScale(width: number, height: number): number | undefined {
   if (
     ![width, height].every(
       (value) =>
-        Number.isFinite(value) && value >= 1 && value <= STANDARD_SHAPE_GEOMETRY_LIMITS.extent,
+        Number.isFinite(value) && value > 0 && value <= STANDARD_SHAPE_GEOMETRY_LIMITS.extent,
     )
   )
     return;
@@ -297,11 +297,16 @@ export function getStandardShapeGeometry(
 /** Explicit preset and bounded numeric free paths share paint/hit preparation. */
 export function getDrawingShapeGeometry(
   drawing: SheetGraphicDrawing,
+  includeLegacyView = false,
 ): EvaluatedShapePresetGeometry | undefined {
-  if (drawing.kind === "textBox" && drawing.shapeText)
+  if (drawing.kind === "textBox" && (drawing.shapeText || includeLegacyView))
     return getStandardShapeGeometry({ preset: "rect" }, drawing.width, drawing.height);
   if (drawing.shapeGeometry && drawing.shapePath) return;
-  if (!drawing.shapeGeometry && !drawing.shapePath && (drawing.shapeStyle || drawing.shapeText)) {
+  if (
+    !drawing.shapeGeometry &&
+    !drawing.shapePath &&
+    (drawing.shapeStyle || drawing.shapeText || includeLegacyView)
+  ) {
     const geometry = getLegacyShapeGeometry(drawing.shape, drawing.width, drawing.height);
     if (!geometry) return;
     try {

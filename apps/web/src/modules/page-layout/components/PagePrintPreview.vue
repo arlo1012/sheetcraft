@@ -35,6 +35,7 @@ const emit = defineEmits<{ "update:visible": [value: boolean] }>();
 const { t } = useAppI18n();
 const selected = ref(0);
 const printing = ref(false);
+const renderFailure = ref<string>();
 const thumbnailCanvases = new Map<number, HTMLCanvasElement>();
 const pageCanvas = ref<HTMLCanvasElement>();
 const repaint = ref(0);
@@ -87,6 +88,14 @@ const thumbnailPages = computed(() => {
 });
 
 function render(): void {
+  renderFailure.value = undefined;
+  try {
+    renderPages();
+  } catch (error) {
+    renderFailure.value = error instanceof Error ? error.message : String(error);
+  }
+}
+function renderPages(): void {
   if (!props.visible) return;
   const document = documentPreview.value;
   if (!document) return;
@@ -131,15 +140,50 @@ async function print(): Promise<void> {
   printing.value = true;
   try {
     printWindow.opener = null;
-    const document = documentPreview.value;
-    const assetIds = getPrintPictureAssetIds(document.sheet);
+    let document = documentPreview.value;
+    const sheet = props.sheet,
+      revision = props.workbookRevision,
+      setup = props.setup,
+      evaluator = props.evaluator,
+      theme = props.theme,
+      assetUrls = props.imageAssetUrls,
+      fileName = props.fileName,
+      locale = props.locale,
+      dateSystem = props.dateSystem;
+    const assetIds = getPrintPictureAssetIds(document.sheet, document.shapeMetrics);
     const urls = [...assetIds].map((id) => props.imageAssetUrls?.get(id));
     if (urls.some((url) => !url)) throw new Error("Image assets are not ready.");
     await renderer.prepareImages(urls as string[]);
-    if (!props.visible || printWindow.closed) {
+    await renderer.prepareShapes(document);
+    if (
+      !props.visible ||
+      printWindow.closed ||
+      props.sheet !== sheet ||
+      props.workbookRevision !== revision ||
+      props.setup !== setup ||
+      props.evaluator !== evaluator ||
+      props.theme !== theme ||
+      props.imageAssetUrls !== assetUrls ||
+      props.fileName !== fileName ||
+      props.locale !== locale ||
+      props.dateSystem !== dateSystem
+    ) {
       printWindow.close();
       return;
     }
+    // Font readiness can change overflow/effect extents. Rebuild final pagination
+    // explicitly after the captured source/revision check, without mutating preview data.
+    document = createPrintPreviewDocument({
+      sheet,
+      evaluator,
+      setup,
+      theme,
+      sheetName: sheet.name,
+      fileName,
+      locale,
+      dateSystem,
+      revision,
+    });
     const images = document.pages.map((page) => {
       const canvas = window.document.createElement("canvas");
       renderer.render({
@@ -177,9 +221,10 @@ async function print(): Promise<void> {
       { once: true },
     );
     printDocument.close();
-  } catch {
+  } catch (error) {
     printWindow.close();
-    void MessagePlugin.error(t("pagePrint.failed"));
+    const detail = error instanceof Error ? error.message : String(error);
+    void MessagePlugin.error(`${t("pagePrint.failed")} ${detail}`);
   } finally {
     printing.value = false;
   }
@@ -234,6 +279,7 @@ onBeforeUnmount(() => renderer.dispose());
           {{ t(previewResult.errorKey ?? "pagePrint.invalidRange") }}
         </p>
         <canvas v-else ref="pageCanvas" />
+        <p v-if="renderFailure" role="alert">{{ t("pagePrint.failed") }} {{ renderFailure }}</p>
         <p v-if="activePage">
           {{ t("pagePrint.pageOf", { page: activePage.pageNumber, count: pages.length }) }}
         </p>

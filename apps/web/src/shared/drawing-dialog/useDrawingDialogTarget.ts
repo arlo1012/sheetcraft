@@ -29,6 +29,7 @@ export function useDrawingDialogTarget<T extends SheetDrawing, Args extends unkn
   flush: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
   onReset?: () => void;
+  canEditExisting?: (sheet: Sheet, drawing: SheetDrawing) => boolean;
 }) {
   type Dialog = DrawingDialogTarget<T, Args>;
   const dialog = shallowRef<Dialog>();
@@ -37,8 +38,12 @@ export function useDrawingDialogTarget<T extends SheetDrawing, Args extends unkn
   let dialogId = 0;
   let confirming = false;
   let disposed = false;
-  const allowed = (sheet: Sheet) =>
-    !disposed && !options.isBusy() && canUseSheetPermission(sheet, "editObjects");
+  const allowed = (sheet: Sheet, existing?: SheetDrawing) =>
+    !disposed &&
+    !options.isBusy() &&
+    (existing && options.canEditExisting
+      ? options.canEditExisting(sheet, existing)
+      : canUseSheetPermission(sheet, "editObjects"));
   const valid = (target: DrawingTarget) =>
     !disposed &&
     target.workbook === options.getWorkbook() &&
@@ -71,7 +76,7 @@ export function useDrawingDialogTarget<T extends SheetDrawing, Args extends unkn
       close();
     });
   }
-  function prepare(existing?: T): DrawingTarget | undefined {
+  function prepare(existing?: SheetDrawing): DrawingTarget | undefined {
     if (confirming || disposed) return;
     const target = {
       workbook: options.getWorkbook(),
@@ -81,12 +86,12 @@ export function useDrawingDialogTarget<T extends SheetDrawing, Args extends unkn
       request: ++operation,
     };
     if (
-      !allowed(target.sheet) ||
+      !allowed(target.sheet, target.existing) ||
       !valid(target) ||
       !options.flush() ||
       target.request !== operation ||
       !valid(target) ||
-      !allowed(target.sheet)
+      !allowed(target.sheet, target.existing)
     )
       return;
     return target;
@@ -96,7 +101,8 @@ export function useDrawingDialogTarget<T extends SheetDrawing, Args extends unkn
     initial: T,
     confirm: (target: Dialog, drawing: T, ...args: Args) => void,
   ) {
-    if (target.request !== operation || !valid(target) || !allowed(target.sheet)) return;
+    if (target.request !== operation || !valid(target) || !allowed(target.sheet, target.existing))
+      return;
     const next: Dialog = {
       ...target,
       initial,
@@ -113,7 +119,7 @@ export function useDrawingDialogTarget<T extends SheetDrawing, Args extends unkn
       close(target);
       return;
     }
-    if (!allowed(target.sheet)) return;
+    if (!allowed(target.sheet, target.existing)) return;
     confirming = true;
     try {
       work(target);
@@ -135,7 +141,7 @@ export function useDrawingDialogTarget<T extends SheetDrawing, Args extends unkn
     if (
       dialog.value !== target ||
       !valid(target) ||
-      !allowed(target.sheet) ||
+      !allowed(target.sheet, target.existing) ||
       command.sheetId !== target.sheet.id
     )
       return false;

@@ -15,6 +15,8 @@ import {
   STANDARD_SHAPE_GEOMETRY_LIMITS,
   standardShapeFlipPoint,
 } from "./shape-geometry";
+import type { ShapePointEditOptions } from "./free-shape-point-layout";
+import { shapeViewAtRect } from "./shape-view-layout";
 
 export type ShapeEndpointPoint = Readonly<{ x: number; y: number }>;
 type LineDrawing = Pick<SheetGraphicDrawing, "kind" | "width" | "height" | "shapeGeometry">;
@@ -66,7 +68,16 @@ export function getShapeLineLocalEndpoints(
   }
 }
 
-function pointWithinSheet(point: ShapeEndpointPoint, layout: SheetViewportLayout): boolean {
+function pointWithinSheet(
+  point: ShapeEndpointPoint,
+  layout: SheetViewportLayout,
+  options?: ShapePointEditOptions,
+): boolean {
+  if (options)
+    return [point.x, point.y].every(
+      (value) =>
+        Number.isFinite(value) && Math.abs(value) <= STANDARD_SHAPE_GEOMETRY_LIMITS.coordinate,
+    );
   const total = layout.getTotalSize();
   return (
     [point.x, point.y, total.width, total.height].every(Number.isFinite) &&
@@ -76,14 +87,20 @@ function pointWithinSheet(point: ShapeEndpointPoint, layout: SheetViewportLayout
     point.y <= Math.min(total.height, STANDARD_SHAPE_GEOMETRY_LIMITS.coordinate)
   );
 }
-function rectWithinSheet(rect: PictureFrameRect, layout: SheetViewportLayout): boolean {
+function rectWithinSheet(
+  rect: PictureFrameRect,
+  layout: SheetViewportLayout,
+  options?: ShapePointEditOptions,
+): boolean {
   return (
     [rect.width, rect.height].every(
       (extent) =>
-        Number.isFinite(extent) && extent >= 1 && extent <= STANDARD_SHAPE_GEOMETRY_LIMITS.extent,
+        Number.isFinite(extent) &&
+        (options ? extent > 0 : extent >= 1) &&
+        extent <= STANDARD_SHAPE_GEOMETRY_LIMITS.extent,
     ) &&
-    pointWithinSheet(rect, layout) &&
-    pointWithinSheet({ x: rect.x + rect.width, y: rect.y + rect.height }, layout)
+    pointWithinSheet(rect, layout, options) &&
+    pointWithinSheet({ x: rect.x + rect.width, y: rect.y + rect.height }, layout, options)
   );
 }
 function distance(a: ShapeEndpointPoint, b: ShapeEndpointPoint): number {
@@ -147,6 +164,8 @@ function snappedVector(vector: ShapeEndpointPoint): ShapeEndpointPoint {
  * Persisted axes are at least 1px: symmetric thin-axis expansion can displace
  * each tip by at most 0.5px Euclidean distance. Unrepresentable moves, invalid
  * geometry and out-of-sheet frames return undefined rather than clamp/fallback.
+ * Explicit canonical context accepts signed, coordinate-budgeted positions and
+ * positive subpixel source frames without legacy reanchoring or sheet clamping.
  * A zero-motion request returns the original drawing without reanchoring drift.
  */
 export function moveStandardShapeEndpoint(
@@ -155,6 +174,7 @@ export function moveStandardShapeEndpoint(
   target: ShapeEndpointPoint,
   layout: SheetViewportLayout,
   shiftKey = false,
+  options?: ShapePointEditOptions,
 ): SheetGraphicDrawing | undefined {
   if (
     (index !== 0 && index !== 1) ||
@@ -162,18 +182,22 @@ export function moveStandardShapeEndpoint(
     drawing.rotation < -360 ||
     drawing.rotation > 360 ||
     ![drawing.offsetX, drawing.offsetY].every(
-      (value) => Number.isFinite(value) && value >= 0 && value <= 1_000_000,
+      (value) =>
+        Number.isFinite(value) &&
+        (options
+          ? Math.abs(value) <= STANDARD_SHAPE_GEOMETRY_LIMITS.coordinate
+          : value >= 0 && value <= 1_000_000),
     ) ||
-    !pointWithinSheet(target, layout)
+    !pointWithinSheet(target, layout, options)
   )
     return;
   const endpoints = getShapeLineLocalEndpoints(drawing);
   const rect = getFloatingImageSheetRect(drawing, layout);
-  if (!endpoints || !rect || !rectWithinSheet(rect, layout)) return;
+  if (!endpoints || !rect || !rectWithinSheet(rect, layout, options)) return;
   const signs = canonicalCornerSigns(drawing, endpoints);
   if (!signs) return;
   const current = worldEndpoints(drawing, rect, endpoints);
-  if (!current.every((point) => pointWithinSheet(point, layout))) return;
+  if (!current.every((point) => pointWithinSheet(point, layout, options))) return;
   if (distance(target, current[index]) <= numericalTolerance) return drawing;
 
   const fixed = current[index === 0 ? 1 : 0];
@@ -181,7 +205,7 @@ export function moveStandardShapeEndpoint(
   if (request.x === 0 && request.y === 0) return;
   const vector = shiftKey ? snappedVector(request) : request;
   const moved = { x: fixed.x + vector.x, y: fixed.y + vector.y };
-  if (!pointWithinSheet(moved, layout)) return;
+  if (!pointWithinSheet(moved, layout, options)) return;
   const start = index === 0 ? moved : fixed,
     end = index === 0 ? fixed : moved;
   const radians = (drawing.rotation * Math.PI) / 180,
@@ -212,7 +236,7 @@ export function moveStandardShapeEndpoint(
     width,
     height,
   };
-  if (!rectWithinSheet(nextRect, layout)) return;
+  if (!rectWithinSheet(nextRect, layout, options)) return;
 
   const next = { ...drawing, width, height };
   delete next.shapeFlipX;
@@ -226,19 +250,25 @@ export function moveStandardShapeEndpoint(
   if (flipY) next.shapeFlipY = true;
   const nextEndpoints = getShapeLineLocalEndpoints(next);
   if (!nextEndpoints || !canonicalCornerSigns(next, nextEndpoints)) return;
-  const anchored = reanchorFloatingImageAtSheetRect(next, nextRect, layout);
+  const anchored = options
+    ? shapeViewAtRect(next, nextRect, options.metrics)
+    : reanchorFloatingImageAtSheetRect(next, nextRect, layout);
   if (
     !anchored ||
     ![anchored.offsetX, anchored.offsetY].every(
-      (value) => Number.isFinite(value) && value >= 0 && value <= 1_000_000,
+      (value) =>
+        Number.isFinite(value) &&
+        (options
+          ? Math.abs(value) <= STANDARD_SHAPE_GEOMETRY_LIMITS.coordinate
+          : value >= 0 && value <= 1_000_000),
     )
   )
     return;
   const resolved = getFloatingImageSheetRect(anchored, layout);
-  if (!resolved || !rectWithinSheet(resolved, layout)) return;
+  if (!resolved || !rectWithinSheet(resolved, layout, options)) return;
   const actual = worldEndpoints(anchored, resolved, nextEndpoints);
   if (
-    !actual.every((point) => pointWithinSheet(point, layout)) ||
+    !actual.every((point) => pointWithinSheet(point, layout, options)) ||
     distance(actual[0], start) > endpointError + numericalTolerance ||
     distance(actual[1], end) > endpointError + numericalTolerance
   )
