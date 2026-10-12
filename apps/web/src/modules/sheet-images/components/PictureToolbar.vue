@@ -337,8 +337,10 @@ function sourceAction(action: () => void): void {
       ><Settings2
     /></RibbonButton>
     <PictureAssetTools
-      :disabled="disabled || isFramed"
-      :busy="!!busy || isFramed"
+      :disabled="disabled"
+      :busy="!!busy"
+      :export-disabled="isFramed"
+      :print-disabled="isFramed"
       @compress="sourceAction(() => emit('compress'))"
       @batch-size="sourceAction(() => emit('batchSize'))"
       @export="(format, all) => sourceAction(() => emit('export', format, all))"

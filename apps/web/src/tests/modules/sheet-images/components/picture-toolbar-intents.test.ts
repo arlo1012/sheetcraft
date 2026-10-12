@@ -443,8 +443,10 @@ describe("framed picture ribbon capability boundary", () => {
       await wrapper.get(`[data-picture-tool="${action}"]`).trigger("click");
     }
     expect(wrapper.getComponent(PictureAssetTools).props()).toMatchObject({
-      disabled: true,
-      busy: true,
+      disabled: false,
+      busy: false,
+      exportDisabled: true,
+      printDisabled: true,
     });
     expect(wrapper.getComponent(PictureViewMenu).props("disabled")).toBe(true);
     expect(wrapper.getComponent(PictureRotationMenu).props("disabled")).toBe(false);

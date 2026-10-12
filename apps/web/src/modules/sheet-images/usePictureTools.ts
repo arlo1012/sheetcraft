@@ -1,3 +1,4 @@
+import { planPictureBatchSize } from "./picture-batch-size";
 import {
   canEditPictureRoot,
   canEditPictureSelection,
@@ -14,7 +15,11 @@ import { resolvePictureGroup } from "@sheetcraft/core/picture-group-layout";
 import { traversePictureGroup, type PictureGroupPath } from "@sheetcraft/core/picture-group";
 import { groupPictureRoots, ungroupPictureRoot } from "@sheetcraft/core/picture-group-planning";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
-import { resizePictureTo, type PictureSizeEdit } from "./picture-tool-geometry";
+import {
+  resizePictureTo,
+  pictureToolGeometryIdentity,
+  type PictureSizeEdit,
+} from "./picture-tool-geometry";
 import { requireLegacyPictures, requireStandalonePictures } from "./picture-document-support";
 import { ref, type Ref } from "vue";
 import {
@@ -51,6 +56,7 @@ export function usePictureTools(options: {
   isBusy: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
   getFrameContext?: () => PictureFrameLayoutContext | undefined;
+  getSelectedPath?: () => PictureGroupPath | null;
 }) {
   const paneVisible = ref(false);
   const sizeFeedback = ref<MessageKey>();
@@ -61,6 +67,8 @@ export function usePictureTools(options: {
     sheetId: string;
     forest: FloatingImage[];
     selectedIds: string[];
+    selectedPath: PictureGroupPath | null;
+    geometryIdentity: readonly unknown[];
     context: PictureFrameLayoutContext | undefined;
     metrics: PictureFrameLayoutContext["metrics"] | undefined;
     layout: PictureFrameLayoutContext["layout"] | undefined;
@@ -69,6 +77,8 @@ export function usePictureTools(options: {
     const sheet = options.getSheet();
     const sheetId = sheet.id;
     const selectedIds = [...options.selectedIds.value];
+    const path = options.getSelectedPath?.();
+    const selectedPath = path ? [...path] : null;
     const forest = normalizePictureObjectCollection(sheet.floatingImages);
     const context = options.getFrameContext?.();
     return {
@@ -76,6 +86,8 @@ export function usePictureTools(options: {
       sheetId,
       forest,
       selectedIds,
+      selectedPath,
+      geometryIdentity: pictureToolGeometryIdentity(context),
       context,
       metrics: context?.metrics,
       layout: context?.layout,
@@ -91,8 +103,12 @@ export function usePictureTools(options: {
       context === lease.context &&
       context?.metrics === lease.metrics &&
       context?.layout === lease.layout &&
+      pictureToolGeometryIdentity(context).every(
+        (value, index) => value === lease.geometryIdentity[index],
+      ) &&
       selectedIds.length === lease.selectedIds.length &&
       selectedIds.every((id, index) => id === lease.selectedIds[index]) &&
+      JSON.stringify(options.getSelectedPath?.() ?? null) === JSON.stringify(lease.selectedPath) &&
       areFloatingImageCollectionsEqual(sheet.floatingImages, lease.forest) &&
       !options.isBusy()
     );
@@ -366,42 +382,26 @@ export function usePictureTools(options: {
       sizeFeedback.value = "picture.operationFailed";
       return false;
     }
-    const targets = options
-      .getSheet()
-      .floatingImages.filter((image) => value.all || options.selectedIds.value.includes(image.id));
-    const ids = options.selectedIds.value;
-    if (
-      !canEditPictureSelection(
-        options.getSheet(),
-        targets.map((image) => image.id),
-      ) ||
-      (!value.all && (new Set(ids).size !== ids.length || targets.length !== ids.length)) ||
-      targets.some((image) => isFramedPictureObject(image) || isPictureGroup(image))
-    ) {
-      sizeFeedback.value = "picture.operationFailed";
+    let lease: EditLease;
+    let images: FloatingImage[];
+    try {
+      lease = capture();
+      const ids = value.all ? lease.forest.map((root) => root.id) : lease.selectedIds;
+      if (!canEditPictureSelection(lease.sheet, ids))
+        throw new Error("Protected picture selection.");
+      images = planPictureBatchSize(
+        lease.forest,
+        lease.selectedIds,
+        lease.selectedPath,
+        value,
+        lease.context,
+      );
+    } catch (error) {
+      sizeFeedback.value =
+        error instanceof RangeError ? "picture.invalidSize" : "picture.operationFailed";
       return false;
     }
-    const images = requireLegacyPictures(targets).map((image) => ({
-      ...image,
-      width: value.width,
-      height: value.locked ? (image.height * value.width) / image.width : value.height,
-    }));
-    if (
-      !images.length ||
-      images.some(
-        (image) =>
-          !Number.isFinite(image.width) ||
-          !Number.isFinite(image.height) ||
-          image.width < 1 ||
-          image.width > 10000 ||
-          image.height < 1 ||
-          image.height > 10000,
-      )
-    ) {
-      sizeFeedback.value = "picture.invalidSize";
-      return false;
-    }
-    if (!updateMany(images)) {
+    if (!replace(images, lease)) {
       sizeFeedback.value = "picture.operationFailed";
       return false;
     }

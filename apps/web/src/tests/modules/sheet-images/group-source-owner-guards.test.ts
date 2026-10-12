@@ -17,8 +17,8 @@ import { framedPicture } from "./framed-picture-fixture";
 
 const resize = { width: 400, height: 200, locked: false, all: false };
 const compression = { format: "jpeg" as const, maxSide: 400, quality: 0.8, all: false };
-describe("source-only group dialog owners", () => {
-  test("mixed selections cannot replace existing drafts and all-picture confirms reject atomically", async () => {
+describe("picture source dialog owners", () => {
+  test("mixed selections open source-aware drafts while old instances and changed owners stay inert", async () => {
     const f = fixture();
     const setImage = vi.fn(() => true);
     const compress = vi.fn(async () => true);
@@ -49,8 +49,10 @@ describe("source-only group dialog owners", () => {
     dialogs.openCompression();
     dialogs.openBatchSize();
     expect(dialogs.annotation.value).toBe(annotation);
-    expect(dialogs.compression.value).toBe(compressionDraft);
-    expect(dialogs.batch.value).toBe(batch);
+    const mixedCompression = dialogs.compression.value!;
+    const mixedBatch = dialogs.batch.value!;
+    expect(mixedCompression).not.toBe(compressionDraft);
+    expect(mixedBatch).not.toBe(batch);
     expect(annotation.confirm(f.image)).toBe(false);
     expect(await compressionDraft.confirm(compression)).toBe(false);
     expect(batch.confirm(resize)).toBe(false);
@@ -62,8 +64,12 @@ describe("source-only group dialog owners", () => {
     expect(await compressionDraft.confirm(compression)).toBe(false);
     expect(batch.confirm(resize)).toBe(false);
     expect(annotation.error.value).toBe("picture.operationFailed");
-    expect(compressionDraft.error.value).toBe("picture.operationFailed");
-    expect(batch.error.value).toBe("picture.operationFailed");
+    expect(await mixedCompression.confirm(compression)).toBe(false);
+    expect(mixedBatch.confirm(resize)).toBe(false);
+    expect(mixedCompression.error.value).toBe("picture.operationFailed");
+    expect(mixedBatch.error.value).toBe("picture.operationFailed");
+    expect(compressionDraft.error.value).toBeUndefined();
+    expect(batch.error.value).toBeUndefined();
     expect(setImage).not.toHaveBeenCalled();
     expect(compress).not.toHaveBeenCalled();
     expect(resizeMany).not.toHaveBeenCalled();
@@ -71,7 +77,7 @@ describe("source-only group dialog owners", () => {
     f.sheet.floatingImages[0] = f.image;
     expect(serializeWorkbook(f.session.workbook)).toEqual(before);
   });
-  test("a container never opens a source-only dialog", () => {
+  test("a container can compress real leaf sources but cannot annotate or size without geometry", () => {
     const f = fixture();
     f.selectedIds.value = [f.container.id];
     const hasAsset = vi.fn(() => true);
@@ -92,7 +98,7 @@ describe("source-only group dialog owners", () => {
     dialogs.openCompression();
     dialogs.openBatchSize();
     expect(dialogs.annotation.value).toBeUndefined();
-    expect(dialogs.compression.value).toBeUndefined();
+    expect(dialogs.compression.value).toBeDefined();
     expect(dialogs.batch.value).toBeUndefined();
     expect(hasAsset).not.toHaveBeenCalled();
   });

@@ -43,6 +43,7 @@ import SheetFloatingImageContextMenu from "./SheetFloatingImageContextMenu.vue";
 import SheetFloatingImageSelection from "../../../shared/sheet-objects/SheetObjectSelection.vue";
 import {
   isFramedPictureObject,
+  normalizePictureObjectCollection,
   type StandalonePictureObject as FloatingImage,
 } from "@sheetcraft/core/picture-object";
 import { requireStandalonePicture, requireStandalonePictures } from "../picture-document-support";
@@ -431,7 +432,7 @@ function focusSelectedImageProxy(fallback?: HTMLElement, expectedId = props.sele
     layout = props.layout,
     frameContext = props.frameContext,
     scale = props.scale,
-    source = selectionImages().map(cloneFloatingImage);
+    source = normalizePictureObjectCollection(props.selectionRoots ?? props.images);
   void nextTick(() => {
     if (
       owner !== props.owner ||
@@ -439,7 +440,10 @@ function focusSelectedImageProxy(fallback?: HTMLElement, expectedId = props.sele
       frameContext !== props.frameContext ||
       scale !== props.scale ||
       expectedId !== props.selectedImageId ||
-      !areFloatingImageCollectionsEqual(source, selectionImages())
+      !areFloatingImageCollectionsEqual(
+        source,
+        normalizePictureObjectCollection(props.selectionRoots ?? props.images),
+      )
     )
       return;
     const selected = [
@@ -992,7 +996,9 @@ function requestDelete(): void {
 
 function getPaintState(): FloatingImagePaintState {
   return {
-    images: selectionImages().map(
+    // Publish model state without projecting a transient Vue prop pair during
+    // viewport updates. Gesture and paint consumers still validate their context.
+    images: normalizePictureObjectCollection(props.selectionRoots ?? props.images).map(
       (root) =>
         previewImages.value.find((next) => next.id === root.id) ??
         (previewImage.value?.id === root.id ? previewImage.value : root),

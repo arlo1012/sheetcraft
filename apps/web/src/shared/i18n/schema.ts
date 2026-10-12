@@ -1644,6 +1644,7 @@ export type MessageSchema = ToolMessageSchema & {
     filterVivid: string;
     filterFade: string;
 
+    assetActionTooLarge: string;
     tooMany: string;
     files: string;
     compress: string;

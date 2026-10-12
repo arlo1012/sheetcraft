@@ -74,7 +74,7 @@ beforeEach(() => {
 });
 
 describe("picture asset compression", () => {
-  test("frame selections are rejected before export, print or compression resources", async () => {
+  test("frame downloads stay gated and a missing real source fails compression without writes", async () => {
     const f = await fixture();
     f.sheet.floatingImages[0] = { ...framedPicture(), id: "a" };
     const read = vi.spyOn(f.store, "get"),
@@ -82,8 +82,9 @@ describe("picture asset compression", () => {
       popup = vi.spyOn(window, "open");
     await f.tools.exportPictures("png");
     await f.tools.printPictures();
-    expect(await f.tools.compress(settings)).toBe(false);
     expect(read).not.toHaveBeenCalled();
+    expect(await f.tools.compress(settings)).toBe(false);
+    expect(read).toHaveBeenCalledExactlyOnceWith("asset");
     expect(put).not.toHaveBeenCalled();
     expect(popup).not.toHaveBeenCalled();
     expect(convertPictureBlob).not.toHaveBeenCalled();

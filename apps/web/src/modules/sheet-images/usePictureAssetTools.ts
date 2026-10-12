@@ -1,3 +1,10 @@
+import type { PictureGroupPath } from "@sheetcraft/core/picture-group";
+import {
+  capturePictureSourceSelection,
+  isPictureSourceSelectionCurrent,
+  mapPictureSourceAssets,
+  type PictureSourceSelection,
+} from "./picture-source-selection";
 import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import { requireLegacyPictures } from "./picture-document-support";
 import { getCurrentScope, onScopeDispose, readonly, ref } from "vue";
@@ -29,6 +36,7 @@ export function usePictureAssetTools(options: {
   getSheet: () => Sheet;
   getGeneration?: () => number;
   getSelectedIds: () => readonly string[];
+  getSelectedPath?: () => PictureGroupPath | null;
   assetStore: ImageAssetStore;
   isBusy: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
@@ -130,15 +138,26 @@ export function usePictureAssetTools(options: {
     const workbook = options.getWorkbook();
     const sheet = options.getSheet();
     const generation = options.getGeneration?.() ?? 0;
-    const selected = legacyPictures(settings.all);
-    if (
-      !selected?.length ||
-      !canEditPictureSelection(
-        sheet,
-        selected.map((image) => image.id),
-      )
-    )
+    let selection: PictureSourceSelection;
+    try {
+      selection = capturePictureSourceSelection(
+        sheet.floatingImages,
+        options.getSelectedIds(),
+        options.getSelectedPath?.(),
+        settings.all,
+      );
+    } catch {
+      options.feedback("picture.assetFailed", true);
       return false;
+    }
+    const selected = selection.sources.map((source) => source.node);
+    if (new Set(selected.map((node) => node.assetId)).size > 100) {
+      options.feedback("picture.assetActionTooLarge", true);
+      return false;
+    }
+    const selectedIds = [...options.getSelectedIds()],
+      selectedPath = JSON.stringify(options.getSelectedPath?.() ?? null);
+    if (!canEditPictureSelection(sheet, selection.rootIds)) return false;
     busy.value = true;
     const valid = () =>
       options.getWorkbook() === workbook &&
@@ -147,18 +166,24 @@ export function usePictureAssetTools(options: {
       options.getSheet() === sheet &&
       (options.getGeneration?.() ?? 0) === generation &&
       workbook.sheets.get(sheet.id) === sheet &&
-      canEditPictureSelection(
-        sheet,
-        selected.map((image) => image.id),
-      ) &&
-      sourcesCurrent(sheet, selected, settings.all);
+      canEditPictureSelection(sheet, selection.rootIds) &&
+      JSON.stringify(options.getSelectedIds()) === JSON.stringify(selectedIds) &&
+      JSON.stringify(options.getSelectedPath?.() ?? null) === selectedPath &&
+      (!settings.all || sheet.floatingImages.length === selection.roots.length) &&
+      isPictureSourceSelectionCurrent(selection, sheet.floatingImages);
     try {
       const converted = new Map<string, ImageAsset>();
+      let sourceBytes = 0;
       for (const image of selected) {
         if (converted.has(image.assetId)) continue;
         const source = await options.assetStore.get(image.assetId);
         if (!valid()) return false;
         if (!source) throw new Error("Picture asset unavailable.");
+        sourceBytes += source.blob.size;
+        if (sourceBytes > 64 * 1024 * 1024) {
+          options.feedback("picture.assetActionTooLarge", true);
+          return false;
+        }
         const blob = await convertPictureBlob(
           source.blob,
           undefined,
@@ -177,11 +202,10 @@ export function usePictureAssetTools(options: {
         await options.assetStore.put(asset);
       }
       if (!valid()) return false;
-      const ids = new Set(selected.map((image) => image.id));
-      const next = sheet.floatingImages.map((image) =>
-        ids.has(image.id) && isLegacyPictureObject(image)
-          ? { ...image, assetId: converted.get(image.assetId)!.id }
-          : image,
+      const next = mapPictureSourceAssets(
+        selection,
+        sheet.floatingImages,
+        new Map([...converted].map(([id, asset]) => [id, asset.id])),
       );
       const changed = selected.some((image) => converted.get(image.assetId)!.id !== image.assetId);
       if (

@@ -19,7 +19,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("source-only group resource guards", () => {
   test.each(["single", "mixed", "all"] as const)(
-    "%s export, compression and print reject before reads, conversion, download or popup",
+    "%s export and print reject before reads, conversion, download or popup",
     async (selection) => {
       const f = fixture();
       f.selectedIds.value =
@@ -37,7 +37,6 @@ describe("source-only group resource guards", () => {
       });
       const before = serializeWorkbook(f.session.workbook);
       await tools.exportPictures("png", selection === "all");
-      expect(await tools.compress({ ...settings, all: selection === "all" })).toBe(false);
       await tools.printPictures();
       expect(f.store.get).not.toHaveBeenCalled();
       expect(f.store.put).not.toHaveBeenCalled();

@@ -12,6 +12,30 @@ import {
 import { resizeFramedPictureTo, resizePictureGroupTo } from "@sheetcraft/sheet-engine";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
 
+/** Capture owners and metric callbacks without invoking application-supplied functions. */
+export function pictureToolGeometryIdentity(
+  context?: PictureFrameLayoutContext,
+): readonly unknown[] {
+  const metrics = context?.metrics;
+  return [
+    context,
+    context?.layout,
+    metrics,
+    ...[metrics?.columns, metrics?.rows].flatMap((axis) =>
+      axis
+        ? [
+            axis,
+            axis.count,
+            axis.nominalSize,
+            axis.visibleSize,
+            axis.nominalPrefix,
+            axis.visiblePrefix,
+          ]
+        : [undefined],
+    ),
+  ];
+}
+
 /** Display-only local dimensions; never persist a derived rectangle on a picture. */
 export type PictureToolGeometry = { width: number; height: number; angleDeg: number };
 export type PictureSizeEdit = { axis: "width" | "height"; value: number };

@@ -1662,6 +1662,8 @@ export const zhCN = {
     filterVivid: "鲜艳",
     filterFade: "淡雅",
 
+    assetActionTooLarge:
+      "每次最多压缩 100 个不同图片源，源文件合计不超过 64 MiB。请减少本次选择后重试。",
     tooMany: "每次最多插入 100 张图片。",
     files: "图片文件",
     compress: "图片压缩",

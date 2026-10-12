@@ -1,3 +1,12 @@
+import type { PictureGroupPath } from "@sheetcraft/core/picture-group";
+import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
+import {
+  capturePictureSourceSelection,
+  isPictureSourceSelectionCurrent,
+  type PictureSourceSelection,
+} from "./picture-source-selection";
+import { getPictureToolGeometry, pictureToolGeometryIdentity } from "./picture-tool-geometry";
+import { resolveOwnedPictureNode } from "./picture-group-interaction";
 import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import { getCurrentScope, onScopeDispose, ref, shallowRef, watch, type Ref } from "vue";
 import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
@@ -29,7 +38,7 @@ type AnnotationDialog = Dialog & {
 };
 type CompressionDialog = Dialog & { confirm: (settings: PictureCompression) => Promise<boolean> };
 type BatchDialog = Dialog & {
-  image: LegacyFloatingImage;
+  image: { width: number; height: number };
   confirm: (settings: ResizeSettings) => boolean;
 };
 
@@ -48,6 +57,8 @@ export function usePictureDialogSessions(options: {
   getGeneration: () => number;
   getSelectedImage: () => FloatingImage | undefined;
   getSelectedIds: () => readonly string[];
+  getSelectedPath?: () => PictureGroupPath | null;
+  getFrameContext?: () => PictureFrameLayoutContext | undefined;
   isBusy: () => boolean;
   hasAsset: (id: string) => boolean;
   setImage: (image: FloatingImage, sheetId: string) => boolean;
@@ -176,8 +187,80 @@ export function usePictureDialogSessions(options: {
     };
     annotation.value = dialog;
   }
+  type SourceOwner = {
+    workbook: Workbook;
+    sheet: Sheet;
+    generation: number;
+    selectedIds: string[];
+    selectedPath: string;
+    selected: PictureSourceSelection;
+    all: PictureSourceSelection;
+    context: PictureFrameLayoutContext | undefined;
+    primaryId: string;
+    geometryIdentity: readonly unknown[];
+  };
+  function captureSources(): SourceOwner | undefined {
+    if (disposed || options.isBusy()) return;
+    try {
+      const sheet = options.getSheet(),
+        ids = [...options.getSelectedIds()],
+        image = options.getSelectedImage();
+      if (!image || !ids.includes(image.id) || !canEditPictureSelection(sheet, ids)) return;
+      const context = options.getFrameContext?.();
+      return {
+        workbook: options.getWorkbook(),
+        sheet,
+        generation: options.getGeneration(),
+        selectedIds: ids,
+        selectedPath: JSON.stringify(options.getSelectedPath?.() ?? null),
+        selected: capturePictureSourceSelection(
+          sheet.floatingImages,
+          ids,
+          options.getSelectedPath?.(),
+        ),
+        all: capturePictureSourceSelection(sheet.floatingImages, [], null, true),
+        context,
+        geometryIdentity: pictureToolGeometryIdentity(context),
+        primaryId: image.id,
+      };
+    } catch {
+      return;
+    }
+  }
+  function currentSources(owner: SourceOwner, all = false): boolean {
+    const context = options.getFrameContext?.(),
+      scope = all ? owner.all : owner.selected;
+    return (
+      !disposed &&
+      options.getWorkbook() === owner.workbook &&
+      options.getSheet() === owner.sheet &&
+      owner.workbook.sheets.get(owner.sheet.id) === owner.sheet &&
+      options.getGeneration() === owner.generation &&
+      options.getSelectedImage()?.id === owner.primaryId &&
+      JSON.stringify(options.getSelectedIds()) === JSON.stringify(owner.selectedIds) &&
+      JSON.stringify(options.getSelectedPath?.() ?? null) === owner.selectedPath &&
+      context === owner.context &&
+      pictureToolGeometryIdentity(context).every(
+        (value, index) => value === owner.geometryIdentity[index],
+      ) &&
+      canEditPictureSelection(owner.sheet, scope.rootIds) &&
+      isPictureSourceSelectionCurrent(scope, owner.sheet.floatingImages)
+    );
+  }
+  function sourceGeometry(owner: SourceOwner): { width: number; height: number } | undefined {
+    const path = owner.selected.path;
+    if (path && path.length > 1) {
+      if (!owner.context) return;
+      const node = resolveOwnedPictureNode(owner.selected.roots, path, owner.context);
+      return node?.visible && node.layout && !node.layout.collapsed
+        ? { width: node.layout.rect.width, height: node.layout.rect.height }
+        : undefined;
+    }
+    const root = owner.selected.roots.find((root) => root.id === owner.primaryId);
+    return root ? getPictureToolGeometry(root, owner.context) : undefined;
+  }
   function openCompression(): void {
-    const owner = capture();
+    const owner = captureSources();
     if (!owner) return;
     let working = false;
     const dialog: CompressionDialog = {
@@ -189,12 +272,12 @@ export function usePictureDialogSessions(options: {
       confirm: async (settings) => {
         if (compression.value !== dialog || working) return false;
         dialog.error.value = undefined;
-        if (!current(owner, settings.all) || options.isBusy()) {
+        if (!currentSources(owner, settings.all) || options.isBusy()) {
           dialog.error.value = "picture.operationFailed";
           return false;
         }
         working = true;
-        const valid = () => compression.value === dialog && current(owner, settings.all);
+        const valid = () => compression.value === dialog && currentSources(owner, settings.all);
         try {
           const accepted = await options.compress(settings, valid);
           if (compression.value !== dialog) return false;
@@ -215,11 +298,13 @@ export function usePictureDialogSessions(options: {
     compression.value = dialog;
   }
   function openBatchSize(): void {
-    const owner = capture();
+    const owner = captureSources();
     if (!owner) return;
+    const geometry = sourceGeometry(owner);
+    if (!geometry) return;
     const dialog: BatchDialog = {
       dialogId: idFactory("picture-batch-size"),
-      image: owner.image,
+      image: { width: geometry.width, height: geometry.height },
       error: ref(),
       close: () => {
         if (batch.value === dialog) batch.value = undefined;
@@ -227,7 +312,7 @@ export function usePictureDialogSessions(options: {
       confirm: (settings) => {
         if (batch.value !== dialog) return false;
         dialog.error.value = undefined;
-        if (!current(owner, settings.all) || options.isBusy()) {
+        if (!currentSources(owner, settings.all) || options.isBusy()) {
           dialog.error.value = "picture.operationFailed";
           return false;
         }

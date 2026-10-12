@@ -142,7 +142,7 @@ describe("owned group tool transactions", () => {
     expect(serializeWorkbook(f.session.workbook)).toEqual(before);
   });
 
-  test("group numeric size and aspect lock are real transactions; source-only appearance/batch stay refused", () => {
+  test("group numeric size and aspect lock are transactions; equal batch sizing is a no-op without fake appearance", () => {
     const f = fixture();
     const root = f.owned();
     const before = f.forest();
@@ -163,7 +163,7 @@ describe("owned group tool transactions", () => {
     );
     const resizedSnapshot = serializeWorkbook(f.session.workbook);
     expect(f.tools.applyAppearance({ opacity: 0.5 })).toBe(false);
-    expect(f.tools.resizeMany({ width: 250, height: 80, locked: true, all: false })).toBe(false);
+    expect(f.tools.resizeMany({ width: 250, height: 80, locked: true, all: false })).toBe(true);
     expect(f.selectedIds.value).toEqual([root.id]);
     expect(f.execute).toHaveBeenCalledTimes(2);
     expect(f.session.history.undoStack).toHaveLength(2);

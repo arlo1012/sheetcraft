@@ -10,6 +10,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import PictureRotationMenu from "./PictureRotationMenu.vue";
+import PictureAssetTools from "./PictureAssetTools.vue";
 import PictureArrangeTools from "./PictureArrangeTools.vue";
 import type { PictureAlignment, PictureLayerAction } from "../usePictureTools";
 import type { PictureSizeEdit, PictureToolGeometry } from "../picture-tool-geometry";
@@ -26,6 +27,8 @@ const props = defineProps<{
   aspectRatioHandler?: (locked: boolean) => boolean;
 }>();
 const emit = defineEmits<{
+  compress: [];
+  batchSize: [];
   group: [];
   ungroup: [];
   align: [action: PictureAlignment];
@@ -116,6 +119,8 @@ const actionCallbacks = computed(() => {
     if (!props.disabled && currentOwner()) callback();
   }
   return {
+    compress: () => action(() => emit("compress")),
+    batchSize: () => action(() => emit("batchSize")),
     group: () => {
       if (!props.groupCreateDisabled) action(() => emit("group"));
     },
@@ -196,6 +201,14 @@ const actionCallbacks = computed(() => {
       :disabled="disabled"
       @rotate="actionCallbacks.rotate"
       @flip="actionCallbacks.flip"
+    />
+    <PictureAssetTools
+      :disabled="disabled"
+      :busy="disabled"
+      export-disabled
+      print-disabled
+      @compress="actionCallbacks.compress"
+      @batch-size="actionCallbacks.batchSize"
     />
     <PictureArrangeTools
       :group-create-disabled="groupCreateDisabled"

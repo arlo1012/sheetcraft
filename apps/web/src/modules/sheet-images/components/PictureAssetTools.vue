@@ -8,7 +8,12 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import type { PictureFileFormat } from "../picture-asset-conversion";
-const props = defineProps<{ disabled: boolean; busy: boolean }>();
+const props = defineProps<{
+  disabled: boolean;
+  busy: boolean;
+  exportDisabled?: boolean;
+  printDisabled?: boolean;
+}>();
 const emit = defineEmits<{
   compress: [];
   batchSize: [];
@@ -24,9 +29,10 @@ const menuId = `picture-export-${useId()}`;
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef,
-  disabled: computed(() => props.busy),
+  disabled: computed(() => props.busy || props.exportDisabled),
 });
 function exportImage(format: PictureFileFormat, all = false): void {
+  if (props.busy || props.exportDisabled) return;
   emit("export", format, all);
   dismiss("programmatic", true);
 }
@@ -54,7 +60,7 @@ function exportImage(format: PictureFileFormat, all = false): void {
       variant="tall"
       :label="t('picture.convert')"
       :text="t('picture.convert')"
-      :disabled="busy"
+      :disabled="busy || exportDisabled"
       :expanded="open"
       :menu-id="menuId"
       @activate="toggleMenu"
@@ -65,8 +71,8 @@ function exportImage(format: PictureFileFormat, all = false): void {
       variant="tall"
       :label="t('picture.print')"
       :text="t('picture.print')"
-      :disabled="busy"
-      @activate="emit('print')"
+      :disabled="busy || printDisabled"
+      @activate="!busy && !printDisabled && emit('print')"
       ><Printer
     /></RibbonButton>
     <Teleport to="body">

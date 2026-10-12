@@ -1727,6 +1727,7 @@ const pictureAssetTools = usePictureAssetTools({
   getSheet: () => activeSheet.value,
   getGeneration: () => pictureOwnerGeneration.value,
   getSelectedIds: () => selectedPictureIds.value,
+  getSelectedPath: () => selectedOwnedPicturePath.value,
   assetStore,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageActions.busy.value,
   execute: executeCommand,
@@ -1737,6 +1738,7 @@ const pictureAssetTools = usePictureAssetTools({
 const imageBusy = computed(() => imageActions.busy.value || pictureAssetTools.busy.value);
 const pictureTools = usePictureTools({
   getSheet: () => activeSheet.value,
+  getSelectedPath: () => selectedOwnedPicturePath.value,
   selectedIds: selectedPictureIds,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
   execute: executeCommand,
@@ -1966,6 +1968,8 @@ const pictureDialogs = usePictureDialogSessions({
   getGeneration: () => pictureOwnerGeneration.value,
   getSelectedImage: () => selectedPicture.value ?? undefined,
   getSelectedIds: () => selectedPictureIds.value,
+  getSelectedPath: () => selectedOwnedPicturePath.value,
+  getFrameContext: () => sheetGridRef.value?.getPictureFrameContext(activeSheet.value),
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
   hasAsset: (id) => Boolean(imageAssetUrls.value.get(id)),
   setImage: setFloatingImage,
@@ -3137,6 +3141,8 @@ const gridInert = computed(
           :can-replace="pictureSourceRibbonOwner.canReplace"
           :can-crop="pictureSourceRibbonOwner.canCrop"
           :crop-handler="pictureSourceRibbonOwner.crop"
+          @compress="pictureDialogs.openCompression"
+          @batch-size="pictureDialogs.openBatchSize"
           :disabled="
             loading ||
             fileBusy ||
@@ -3164,6 +3170,8 @@ const gridInert = computed(
           "
           :selection-count="selectedPictureIds.length"
           :group-create-disabled="!canUseSheetPermission(activeSheet, 'editObjects')"
+          @compress="pictureDialogs.openCompression"
+          @batch-size="pictureDialogs.openBatchSize"
           :disabled="
             loading ||
             fileBusy ||

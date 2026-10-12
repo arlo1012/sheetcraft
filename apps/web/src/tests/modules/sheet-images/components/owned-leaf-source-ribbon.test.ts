@@ -1,6 +1,7 @@
 import { mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import PictureOwnedLeafRibbon from "../../../../modules/sheet-images/components/PictureOwnedLeafRibbon.vue";
+import PictureAssetTools from "../../../../modules/sheet-images/components/PictureAssetTools.vue";
 import PictureToolbar from "../../../../modules/sheet-images/components/PictureToolbar.vue";
 import RibbonButton from "../../../../shared/ribbon/RibbonButton.vue";
 import { createAppI18n } from "../../../../shared/i18n";
@@ -71,6 +72,31 @@ describe("actual owned leaf source ribbon", () => {
     expect(newer).not.toHaveBeenCalled();
     await button(f.wrapper, "replace").trigger("click");
     expect(newer).toHaveBeenCalledOnce();
+  });
+  test("source operations are available on the actual leaf and captured intents cannot retarget", async () => {
+    const f = fixture();
+    const tools = f.wrapper.getComponent(PictureAssetTools);
+    expect(tools.props()).toMatchObject({
+      disabled: false,
+      exportDisabled: true,
+      printDisabled: true,
+    });
+    const oldCompress = tools.vm.$.vnode.props!.onCompress as () => void;
+    const oldBatch = tools.vm.$.vnode.props!.onBatchSize as () => void;
+    await f.wrapper.setProps({ ownerKey: "next-leaf-owner" });
+    oldCompress();
+    oldBatch();
+    expect(f.wrapper.emitted("compress")).toBeUndefined();
+    expect(f.wrapper.emitted("batchSize")).toBeUndefined();
+    tools.vm.$emit("compress");
+    tools.vm.$emit("batchSize");
+    expect(f.wrapper.emitted("compress")).toEqual([[]]);
+    expect(f.wrapper.emitted("batchSize")).toEqual([[]]);
+    await f.wrapper.setProps({ disabled: true });
+    tools.vm.$emit("compress");
+    tools.vm.$emit("batchSize");
+    expect(f.wrapper.emitted("compress")).toHaveLength(1);
+    expect(f.wrapper.emitted("batchSize")).toHaveLength(1);
   });
   test("framed root replacement requires and calls the real source capability; format remains reachable", async () => {
     const replace = vi.fn();

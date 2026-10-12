@@ -111,7 +111,7 @@ describe("owned group ribbon context ownership", () => {
 });
 
 describe("owned group ribbon source-free capabilities", () => {
-  test("has group geometry and shared arrangement, with no standalone asset tools", async () => {
+  test("has group geometry and source-aware compression while keeping source-free actions unavailable", async () => {
     const { image, wrapper } = fixture();
     mounted.push(wrapper);
     const before = structuredClone(image);
@@ -128,16 +128,20 @@ describe("owned group ribbon source-free capabilities", () => {
       "false",
     );
     expect(wrapper.getComponent(PictureRotationMenu).props("disabled")).toBe(false);
-    for (const component of [
-      PictureAppearanceTools,
-      PictureAssetTools,
-      PictureViewMenu,
-      ImageInsertMenu,
-    ])
+    for (const component of [PictureAppearanceTools, PictureViewMenu, ImageInsertMenu])
       expect(wrapper.findComponent(component).exists()).toBe(false);
+    expect(wrapper.getComponent(PictureAssetTools).props()).toMatchObject({
+      disabled: false,
+      exportDisabled: true,
+      printDisabled: true,
+    });
     for (const action of ["replace", "convert-to-cell", "crop", "restore", "annotate"])
       expect(wrapper.find(`[data-picture-tool="${action}"]`).exists()).toBe(false);
     expect(wrapper.find("img").exists()).toBe(false);
+    wrapper.getComponent(PictureAssetTools).vm.$emit("compress");
+    wrapper.getComponent(PictureAssetTools).vm.$emit("batchSize");
+    expect(wrapper.emitted("compress")).toEqual([[]]);
+    expect(wrapper.emitted("batchSize")).toEqual([[]]);
     wrapper.getComponent(PictureRotationMenu).vm.$emit("rotate", 1);
     wrapper.getComponent(PictureRotationMenu).vm.$emit("flip", "horizontal");
     wrapper.getComponent(PictureArrangeTools).vm.$emit("align", "grid");

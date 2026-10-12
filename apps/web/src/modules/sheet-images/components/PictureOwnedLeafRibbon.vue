@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { Crop, ImagePlus, Settings2 } from "lucide-vue-next";
 import { isGroupedPicture, type GroupedPicture } from "@sheetcraft/core/picture-group";
 import { useAppI18n } from "../../../shared/i18n";
+import PictureAssetTools from "./PictureAssetTools.vue";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 
@@ -18,6 +19,7 @@ const props = defineProps<{
 }>();
 if (!isGroupedPicture(props.image))
   throw new TypeError("An owned source ribbon requires a real picture leaf.");
+const emit = defineEmits<{ compress: []; batchSize: [] }>();
 const { t } = useAppI18n();
 const callbacks = computed(() => {
   const image = props.image,
@@ -26,6 +28,12 @@ const callbacks = computed(() => {
     format = props.formatHandler,
     crop = props.cropHandler;
   return {
+    compress: () => {
+      if (image === props.image && key === props.ownerKey && !props.disabled) emit("compress");
+    },
+    batchSize: () => {
+      if (image === props.image && key === props.ownerKey && !props.disabled) emit("batchSize");
+    },
     replace: () => {
       if (
         image === props.image &&
@@ -80,6 +88,14 @@ const callbacks = computed(() => {
       @activate="callbacks.crop"
       ><Crop
     /></RibbonButton>
+    <PictureAssetTools
+      :disabled="disabled"
+      :busy="disabled"
+      export-disabled
+      print-disabled
+      @compress="callbacks.compress"
+      @batch-size="callbacks.batchSize"
+    />
     <RibbonButton
       variant="tall"
       :label="t('pictureFormat.paneTitle')"

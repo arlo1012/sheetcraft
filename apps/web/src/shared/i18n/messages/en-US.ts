@@ -1703,6 +1703,8 @@ export const enUS = {
     filterVivid: "Vivid",
     filterFade: "Faded",
 
+    assetActionTooLarge:
+      "Compress up to 100 distinct picture sources and 64 MiB at a time. Select a smaller batch and try again.",
     tooMany: "Insert up to 100 pictures at a time.",
     files: "Picture files",
     compress: "Compress pictures",
