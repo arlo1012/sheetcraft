@@ -267,6 +267,10 @@
       "types": "./dist/shape-connector-layout.d.ts",
       "import": "./dist/shape-connector-layout.js"
     },
+    "./shape-connector-materialize": {
+      "types": "./dist/shape-connector-materialize.d.ts",
+      "import": "./dist/shape-connector-materialize.js"
+    },
     "./shape-connector-route": {
       "types": "./dist/shape-connector-route.d.ts",
       "import": "./dist/shape-connector-route.js"

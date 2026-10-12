@@ -1,3 +1,6 @@
+import { resolveSheetShapeConnections } from "./shape-connector-layout.js";
+import type { PictureSheetMetrics } from "./picture-axis-metrics.js";
+import { materializeShapeConnectorTargets } from "./shape-connector-materialize.js";
 import { readPictureDataArray } from "./picture-data-array.js";
 import {
   isShapeGroupDrawing,
@@ -15,12 +18,10 @@ export type ShapeClipboardCloneOptions = {
   reservedIds?: readonly string[];
 };
 
-/** Deeply detached internal-model copy. All owned IDs are fresh; glyph/body asset references stay shared. */
-export function cloneShapeRootsForClipboard(
-  values: readonly SheetDrawing[],
-  options: ShapeClipboardCloneOptions,
-): SheetDrawing[] {
-  const roots = normalizeShapeDrawingForest(values);
+function readCloneOptions(options: ShapeClipboardCloneOptions): {
+  createId: () => string;
+  reserved: string[];
+} {
   if (!options || typeof options !== "object" || Array.isArray(options))
     throw new TypeError("Invalid shape clipboard clone options.");
   const prototype: unknown = Object.getPrototypeOf(options);
@@ -46,7 +47,24 @@ export function cloneShapeRootsForClipboard(
   );
   if (reserved.some((id) => typeof id !== "string" || !id.trim()))
     throw new TypeError("Reserved shape clipboard IDs must be non-empty strings.");
-  const unavailable = new Set(reserved);
+  return { createId: fields.createId as () => string, reserved };
+}
+
+/** Deeply detached internal-model copy. All owned IDs are fresh; glyph/body asset references stay shared. */
+export function cloneShapeRootsForClipboard(
+  values: readonly SheetDrawing[],
+  options: ShapeClipboardCloneOptions,
+): SheetDrawing[] {
+  const roots = normalizeShapeDrawingForest(values);
+  return cloneNormalizedRoots(roots, readCloneOptions(options));
+}
+
+function cloneNormalizedRoots(
+  roots: SheetDrawing[],
+  { createId, reserved }: ReturnType<typeof readCloneOptions>,
+  sourceUnavailable: readonly string[] = [],
+): SheetDrawing[] {
+  const unavailable = new Set([...reserved, ...sourceUnavailable]);
   const ids: string[] = [];
   for (const root of roots)
     for (const node of isShapeGroupDrawing(root)
@@ -55,7 +73,6 @@ export function cloneShapeRootsForClipboard(
       ids.push(node.id);
       unavailable.add(node.id);
     }
-  const createId = fields.createId as () => string;
   const remapped = new Map<string, string>();
   for (const old of ids) {
     const id = createId();
@@ -86,4 +103,56 @@ export function cloneShapeRootsForClipboard(
     if (isShapeGroupDrawing(root)) for (const child of root.members) remapChild(child);
   }
   return normalizeShapeDrawingForest(roots);
+}
+
+/** Whole source context permits a selected connector's external tips to become free before copying. */
+export function planCloneShapeRootsForClipboard(
+  values: readonly SheetDrawing[],
+  selectedRootIds: readonly string[],
+  metrics: PictureSheetMetrics,
+  options: ShapeClipboardCloneOptions,
+): SheetDrawing[] {
+  let roots = normalizeShapeDrawingForest(values);
+  const { createId, reserved } = readCloneOptions(options);
+  const selected = readPictureDataArray(
+    selectedRootIds,
+    "shape clipboard selection",
+    MAX_SHAPE_GROUP_NODES,
+  );
+  if (
+    selected.some((id) => typeof id !== "string" || !id.trim()) ||
+    new Set(selected).size !== selected.length
+  )
+    throw new TypeError("Shape clipboard selection requires unique non-empty root IDs.");
+  const selectedSet = new Set(selected);
+  const copiedRoots = roots.filter((root) => selectedSet.has(root.id));
+  if (copiedRoots.length !== selectedSet.size)
+    throw new TypeError("Shape clipboard selection must reference current worksheet roots.");
+  const allNodes = roots.flatMap<SheetDrawing | ShapeGroupChild>((root) =>
+    isShapeGroupDrawing(root) ? traverseShapeGroup(root).map(({ node }) => node) : [root],
+  );
+  const copiedNodes = copiedRoots.flatMap<SheetDrawing | ShapeGroupChild>((root) =>
+    isShapeGroupDrawing(root) ? traverseShapeGroup(root).map(({ node }) => node) : [root],
+  );
+  const closure = new Set(copiedNodes.map((node) => node.id));
+  const copiedConnections = copiedNodes.filter(
+    (node) => node.kind === "shape" && node.shapeConnector,
+  );
+  const externalTargets = new Set<string>();
+  for (const node of copiedConnections)
+    if (node.kind === "shape")
+      for (const endpoint of [node.shapeConnector!.begin, node.shapeConnector!.end])
+        if (endpoint.kind === "site" && !closure.has(endpoint.targetId))
+          externalTargets.add(endpoint.targetId);
+  if (externalTargets.size)
+    roots = materializeShapeConnectorTargets(roots, [...externalTargets], metrics, {
+      connectorIds: copiedConnections.map((node) => node.id),
+    });
+  const result = cloneNormalizedRoots(
+    normalizeShapeDrawingForest(roots.filter((root) => selectedSet.has(root.id))),
+    { createId, reserved },
+    allNodes.map((node) => node.id),
+  );
+  if (copiedConnections.length) resolveSheetShapeConnections(result, metrics);
+  return result;
 }

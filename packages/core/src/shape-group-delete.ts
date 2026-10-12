@@ -1,3 +1,5 @@
+import { resolveSheetShapeConnections } from "./shape-connector-layout.js";
+import { materializeShapeConnectorTargets } from "./shape-connector-materialize.js";
 import type { PictureSheetMetrics } from "./picture-axis-metrics.js";
 import { readPictureDataArray } from "./picture-data-array.js";
 import {
@@ -15,6 +17,7 @@ import {
   isShapeGroupDrawing,
   MAX_SHAPE_GROUP_DEPTH,
   MAX_SHAPE_GROUP_NODES,
+  traverseShapeGroup,
   type ShapeGroupChild,
   type ShapeGroupPath,
 } from "./shape-group.js";
@@ -105,21 +108,13 @@ export function planDeleteShapeGroupNodes(
   selectedPaths: readonly ShapeGroupPath[],
   metrics: PictureSheetMetrics,
 ): SheetDrawing[] {
-  const roots = normalizeShapeDrawingForest(values);
+  let roots = normalizeShapeDrawingForest(values);
   assertShapeDrawingForestLayouts(roots, metrics);
-  const groups = new Map<string, ResolvedShapeGroup>();
   const pathsById = new Map<string, ShapeGroupPath>();
-  function collect(resolved: ResolvedShapeGroup | ResolvedShapeGroupChild): void {
-    pathsById.set(resolved.node.id, resolved.path);
-    if ("members" in resolved) for (const child of resolved.members) collect(child);
-  }
-  for (const root of roots) {
-    if (isShapeGroupDrawing(root)) {
-      const resolved = resolveShapeGroup(root, metrics);
-      groups.set(root.id, resolved);
-      collect(resolved);
-    } else pathsById.set(root.id, [root.id]);
-  }
+  for (const root of roots)
+    if (isShapeGroupDrawing(root))
+      for (const { node, path } of traverseShapeGroup(root)) pathsById.set(node.id, path);
+    else pathsById.set(root.id, [root.id]);
   const paths = readPictureDataArray(
     selectedPaths,
     "shape deletion selection",
@@ -135,6 +130,64 @@ export function planDeleteShapeGroupNodes(
       .map((path) => path.at(-1)!),
   );
   const editedRoots = new Set(paths.filter((path) => path.length > 1).map((path) => path[0]!));
+
+  const removalClosure = new Set(
+    [...pathsById].filter(([, path]) => path.some((id) => deletedIds.has(id))).map(([id]) => id),
+  );
+  const survivingConnections = roots
+    .flatMap<SheetDrawing | ShapeGroupChild>((root) =>
+      isShapeGroupDrawing(root) ? traverseShapeGroup(root).map(({ node }) => node) : [root],
+    )
+    .filter((node) => node.kind === "shape" && node.shapeConnector && !removalClosure.has(node.id));
+  const affected = survivingConnections.some(
+    (node) =>
+      node.kind === "shape" &&
+      [node.shapeConnector!.begin, node.shapeConnector!.end].some(
+        (end) => end.kind === "site" && removalClosure.has(end.targetId),
+      ),
+  );
+  const detachedTips: { id: string; end: "begin" | "end"; x: number; y: number; scale: number }[] =
+    [];
+  if (affected) {
+    roots = materializeShapeConnectorTargets(roots, [...removalClosure], metrics, {
+      connectorIds: survivingConnections.map((node) => node.id),
+    });
+    const captured = resolveSheetShapeConnections(roots, metrics);
+    for (const node of survivingConnections) {
+      if (node.kind !== "shape") continue;
+      const connection = captured.getConnector(node.id)!;
+      for (const end of ["begin", "end"] as const) {
+        const original = node.shapeConnector![end];
+        if (original.kind !== "site" || !removalClosure.has(original.targetId)) continue;
+        const tip = connection[end];
+        if (tip.status !== "ready" || tip.kind !== "free" || !connection.carrierLayout)
+          throw new RangeError(
+            `Connector ${node.id} ${end} could not be captured before target deletion.`,
+          );
+        const rect = connection.carrierLayout.rect;
+        detachedTips.push({
+          id: node.id,
+          end,
+          x: tip.position.x,
+          y: tip.position.y,
+          scale: Math.max(
+            1,
+            Math.abs(tip.position.x),
+            Math.abs(tip.position.y),
+            Math.abs(rect.x),
+            Math.abs(rect.y),
+            rect.width,
+            rect.height,
+          ),
+        });
+      }
+    }
+  }
+
+  // Resolve the detached source, not the old nodes whose attached endpoints were removed.
+  const groups = new Map<string, ResolvedShapeGroup>();
+  for (const root of roots)
+    if (isShapeGroupDrawing(root)) groups.set(root.id, resolveShapeGroup(root, metrics));
 
   function planOwner(
     resolved: ResolvedShapeGroup | Extract<ResolvedShapeGroupChild, { members: unknown }>,
@@ -222,5 +275,22 @@ export function planDeleteShapeGroupNodes(
   }
   const result = normalizeShapeDrawingForest(next);
   assertShapeDrawingForestLayouts(result, metrics);
+  if (survivingConnections.length) {
+    const final = resolveSheetShapeConnections(result, metrics);
+    for (const captured of detachedTips) {
+      const tip = final.getConnector(captured.id)?.[captured.end];
+      const tolerance = Number.EPSILON * 64 * captured.scale;
+      if (
+        !tip ||
+        tip.status !== "ready" ||
+        tip.kind !== "free" ||
+        Math.abs(tip.position.x - captured.x) > tolerance ||
+        Math.abs(tip.position.y - captured.y) > tolerance
+      )
+        throw new RangeError(
+          `Connector ${captured.id} ${captured.end} could not preserve its endpoint after owner deletion.`,
+        );
+    }
+  }
   return result;
 }
