@@ -1,3 +1,4 @@
+import { assertNoUnresolvedShapeConnectors } from "./shape-document-support";
 import {
   cloneShapeGroupChild,
   traverseShapeGroup,
@@ -150,6 +151,7 @@ export function resolveShapeGroupProjection(
   sourceRoot: ShapeGroupDrawing,
   metrics: PictureSheetMetrics,
 ): ResolvedShapeGroupProjection {
+  assertNoUnresolvedShapeConnectors("shape-group-projection", [sourceRoot]);
   // Capture the public root first; Core layouts contain detached canonical nodes.
   const resolved = resolveShapeGroup(sourceRoot, metrics);
   const sources = new Map(

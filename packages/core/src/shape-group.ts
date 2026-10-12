@@ -12,11 +12,7 @@ import {
   type ShapeDetailedStyle,
 } from "./shape-style.js";
 import { getShapeTextAssetIds } from "./shape-text.js";
-import {
-  normalizeSheetDrawing,
-  type SheetFramedGraphicDrawing,
-  type SheetGraphicDrawing,
-} from "./sheet-drawings.js";
+import { normalizeSheetDrawing, type SheetFramedGraphicDrawing } from "./sheet-drawings.js";
 
 /** Ownership budgets, not producer-format limits. The worksheet root has depth zero. */
 export const MAX_SHAPE_GROUP_DEPTH = 32;
@@ -147,6 +143,7 @@ const leafKeys = [
   "shapeGeometry",
   "shapePath",
   "shapeLineEnds",
+  "shapeConnector",
   "shapeFlipX",
   "shapeFlipY",
   "shapeStyle",
@@ -246,20 +243,12 @@ function normalizeChildUnchecked(value: ShapeGroupChild): ShapeGroupChild {
   const normalized = normalizeSheetDrawing({
     ...appearance,
     rotation: normalizePictureAngle(source.rotation as number),
-    anchor: { row: 0, column: 0 },
-    offsetX: 0,
-    offsetY: 0,
-    width: 1,
-    height: 1,
-  } as SheetGraphicDrawing) as SheetGraphicDrawing;
-  const {
-    anchor: _anchor,
-    offsetX: _offsetX,
-    offsetY: _offsetY,
-    width: _width,
-    height: _height,
-    ...graphic
-  } = normalized;
+    shapeFrame: {
+      kind: "shape-frame-v1",
+      anchor: { mode: "fixed", x: 0, y: 0, size: { width: 1, height: 1 } },
+    },
+  } as SheetFramedGraphicDrawing) as SheetFramedGraphicDrawing;
+  const { shapeFrame: _frame, ...graphic } = normalized;
   return {
     ...graphic,
     kind: source.kind as "shape" | "textBox",

@@ -2,7 +2,8 @@ import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import { getFreeShapeGeometry } from "./free-shape-geometry";
 import { getLegacyShapeGeometry } from "./legacy-shape-geometry";
 import {
-  evaluateShapePreset,
+  evaluateShapePresetAtDisplaySize,
+  SHAPE_PRESET_DISPLAY_SIZE_LIMITS,
   FREE_SHAPE_PATH_WORK_BUDGET,
   type ShapePathWorkBudget,
   flattenShapePath,
@@ -12,7 +13,6 @@ import {
   shapePresetPathToSvg,
   type EvaluatedShapePresetGeometry,
   type EvaluatedShapePresetPath,
-  type ShapePathCommand,
   type ShapePolyline,
   type ShapePresetBounds,
   type ShapePresetFillMode,
@@ -43,9 +43,7 @@ export type StandardShapeSvgPath = Readonly<{
 }>;
 
 export const STANDARD_SHAPE_GEOMETRY_LIMITS = Object.freeze({
-  extent: 16_384,
-  evaluatorExtent: 10_000,
-  coordinate: 10_000_000,
+  ...SHAPE_PRESET_DISPLAY_SIZE_LIMITS,
   paths: 16,
   commands: 2048,
   points: 16_384,
@@ -77,76 +75,6 @@ function extentScale(width: number, height: number): number | undefined {
     return;
   // One common scale preserves ss/ls and every guide's aspect-dependent calculation.
   return Math.max(1, Math.max(width, height) / STANDARD_SHAPE_GEOMETRY_LIMITS.evaluatorExtent);
-}
-function coordinate(value: number): number {
-  if (!Number.isFinite(value) || Math.abs(value) > STANDARD_SHAPE_GEOMETRY_LIMITS.coordinate)
-    throw new RangeError("Standard shape exceeds its local-coordinate budget.");
-  return value === 0 ? 0 : value;
-}
-function scaledPoint(point: Point, scale: number): Point {
-  return Object.freeze({
-    x: coordinate(point.x * scale),
-    y: coordinate(point.y * scale),
-  });
-}
-function scaledCommand(command: ShapePathCommand, scale: number): ShapePathCommand {
-  if (command[0] === "Z") return Object.freeze(["Z"] as const);
-  // Arc radii and center scale; continuous ellipse angles remain angular quantities.
-  return Object.freeze(
-    command.map((value, index) =>
-      index === 0 || (command[0] === "A" && index >= 5)
-        ? value
-        : coordinate((value as number) * scale),
-    ),
-  ) as ShapePathCommand;
-}
-function detachGeometry(
-  geometry: EvaluatedShapePresetGeometry,
-  width: number,
-  height: number,
-  scale: number,
-): EvaluatedShapePresetGeometry {
-  return Object.freeze({
-    width,
-    height,
-    paths: Object.freeze(
-      geometry.paths.map((path) =>
-        Object.freeze({
-          filled: path.filled,
-          fillMode: path.fillMode,
-          stroke: path.stroke,
-          commands: Object.freeze(path.commands.map((command) => scaledCommand(command, scale))),
-        }),
-      ),
-    ),
-    handles: Object.freeze(
-      geometry.handles.map((handle) =>
-        Object.freeze({
-          kind: handle.kind,
-          position: scaledPoint(handle.position, scale),
-          // Adjustment values/intervals are ratios or angles, not local pixels.
-          fields: Object.freeze(handle.fields.map((field) => Object.freeze({ ...field }))),
-        }),
-      ),
-    ),
-    adjustments: Object.freeze({ ...geometry.adjustments }),
-    textRect: geometry.textRect
-      ? Object.freeze({
-          left: coordinate(geometry.textRect.left * scale),
-          top: coordinate(geometry.textRect.top * scale),
-          right: coordinate(geometry.textRect.right * scale),
-          bottom: coordinate(geometry.textRect.bottom * scale),
-        })
-      : null,
-    connectionSites: Object.freeze(
-      geometry.connectionSites.map((site) =>
-        Object.freeze({
-          position: scaledPoint(site.position, scale),
-          angle: site.angle,
-        }),
-      ),
-    ),
-  });
 }
 function polylineBounds(polylines: readonly ShapePolyline[]): ShapePresetBounds | undefined {
   let left = Infinity,
@@ -278,12 +206,7 @@ export function getStandardShapeGeometry(
       geometryCache.set(key, cached);
       return cached;
     }
-    const geometry = detachGeometry(
-      evaluateShapePreset(normalized, width / scale, height / scale),
-      width,
-      height,
-      scale,
-    );
+    const geometry = evaluateShapePresetAtDisplaySize(normalized, width, height);
     preparedGeometries.set(geometry, prepareGeometry(geometry));
     geometryCache.set(key, geometry);
     if (geometryCache.size > STANDARD_SHAPE_GEOMETRY_LIMITS.cache)

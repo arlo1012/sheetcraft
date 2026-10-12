@@ -822,7 +822,7 @@ export const enUS = {
     unavailable:
       "Local storage is unavailable. Your edits are still here; export a JSON file to keep them.",
     unsupportedShapes:
-      "This document uses canonical shape placement that is not yet supported in this view. The saved document and your current workbook are preserved.",
+      "This document uses shape features that are not yet supported in this view. The saved document and your current workbook are preserved.",
     unsupportedPictures:
       "This document uses picture frames that are not yet supported in this view. The saved document and your current workbook are preserved.",
     invalidSnapshot:

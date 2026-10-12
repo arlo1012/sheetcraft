@@ -12,6 +12,10 @@ export { getShapePresetFillBounds, type ShapePresetBounds } from "./shape-preset
 export { moveShapePresetAdjustment } from "./shape-presets/adjustment.js";
 export { evaluateShapePreset } from "./shape-presets/evaluate.js";
 export {
+  evaluateShapePresetAtDisplaySize,
+  SHAPE_PRESET_DISPLAY_SIZE_LIMITS,
+} from "./shape-presets/display-size.js";
+export {
   flattenShapePath,
   isPointInShapePreset,
   shapePresetPathToSvg,

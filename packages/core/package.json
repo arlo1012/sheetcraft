@@ -255,6 +255,22 @@
       "types": "./dist/shape-presets.d.ts",
       "import": "./dist/shape-presets.js"
     },
+    "./shape-connection-sites": {
+      "types": "./dist/shape-connection-sites.d.ts",
+      "import": "./dist/shape-connection-sites.js"
+    },
+    "./shape-connector": {
+      "types": "./dist/shape-connector.d.ts",
+      "import": "./dist/shape-connector.js"
+    },
+    "./shape-connector-layout": {
+      "types": "./dist/shape-connector-layout.d.ts",
+      "import": "./dist/shape-connector-layout.js"
+    },
+    "./shape-connector-route": {
+      "types": "./dist/shape-connector-route.d.ts",
+      "import": "./dist/shape-connector-route.js"
+    },
     "./shape-frame": {
       "types": "./dist/shape-frame.d.ts",
       "import": "./dist/shape-frame.js"

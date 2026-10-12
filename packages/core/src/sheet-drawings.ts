@@ -1,3 +1,5 @@
+import { normalizeShapeConnector, type ShapeConnector } from "./shape-connector.js";
+import { validateShapeConnectorReferences } from "./shape-connector-layout.js";
 import { readPictureDataArray } from "./picture-data-array.js";
 import {
   collectShapeGroupNodeIds,
@@ -74,6 +76,8 @@ export type SheetGraphicDrawing = DrawingBase & {
   shapePath?: ShapeFreePath;
   /** Endpoint decoration for explicit standard lines or open free paths. */
   shapeLineEnds?: ShapeLineEnds;
+  /** Explicit live endpoints; only canonical shape roots and owned leaves admit this feature. */
+  shapeConnector?: ShapeConnector;
   /** Sparse mirroring of explicit standard or free geometry, before drawing rotation. */
   shapeFlipX?: true;
   shapeFlipY?: true;
@@ -303,6 +307,20 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
   )
     throw new TypeError("Line ends require standard line geometry or an open free shape path.");
   const shapeLineEnds = normalizeShapeLineEnds(endsField?.value);
+  const connectorField = Object.getOwnPropertyDescriptor(value, "shapeConnector");
+  if (!connectorField && "shapeConnector" in value)
+    throw new TypeError("Shape connectors must be own data fields.");
+  if (connectorField && !("value" in connectorField))
+    throw new TypeError("Shape connectors cannot be accessors.");
+  if (
+    connectorField &&
+    (value.kind !== "shape" ||
+      !shapeGeometry ||
+      !isShapeLinePreset(shapeGeometry.preset) ||
+      shapePath)
+  )
+    throw new TypeError("Live connectors require canonical standard line geometry.");
+  const shapeConnector = connectorField ? normalizeShapeConnector(connectorField.value) : undefined;
   const textField = Object.getOwnPropertyDescriptor(value, "shapeText");
   if (!textField && "shapeText" in value)
     throw new TypeError("Shape text must be an own data field.");
@@ -341,6 +359,7 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
     ...(shapeGeometry ? { shapeGeometry } : {}),
     ...(shapePath ? { shapePath } : {}),
     ...(shapeLineEnds ? { shapeLineEnds } : {}),
+    ...(shapeConnector ? { shapeConnector } : {}),
     ...(shapeFlipX ? { shapeFlipX: true as const } : {}),
     ...(shapeFlipY ? { shapeFlipY: true as const } : {}),
     ...(shapeStyle ? { shapeStyle } : {}),
@@ -376,6 +395,7 @@ const shapeFrameFields = [
   "shapeGeometry",
   "shapePath",
   "shapeLineEnds",
+  "shapeConnector",
   "shapeFlipX",
   "shapeFlipY",
   "shapeStyle",
@@ -429,6 +449,8 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
       ...(shapeProperties ? { shapeProperties } : {}),
     };
   }
+  if ("shapeConnector" in value)
+    throw new TypeError("Live shape connectors require a canonical root or owned placement.");
   if ("shapeProperties" in value)
     throw new TypeError("Shape properties require a canonical shape frame.");
   const finite = (n: number, min: number, max: number) =>
@@ -480,5 +502,6 @@ export function normalizeSheetDrawings(
     ) > MAX_SHEET_ATTACHMENT_BYTES
   )
     throw new RangeError("Embedded files exceed sheet limit.");
+  validateShapeConnectorReferences(result);
   return result;
 }

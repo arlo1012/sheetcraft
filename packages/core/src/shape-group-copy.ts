@@ -66,12 +66,23 @@ export function cloneShapeRootsForClipboard(
     unavailable.add(id);
     remapped.set(old, id);
   }
+  function remapConnector(node: SheetDrawing | ShapeGroupChild): void {
+    if (node.kind !== "shape" || !node.shapeConnector) return;
+    for (const endpoint of [node.shapeConnector.begin, node.shapeConnector.end]) {
+      if (endpoint.kind !== "site") continue;
+      const targetId = remapped.get(endpoint.targetId);
+      if (!targetId) throw new TypeError("Copy the full connector target closure before cloning.");
+      endpoint.targetId = targetId;
+    }
+  }
   function remapChild(child: ShapeGroupChild): void {
     child.id = remapped.get(child.id)!;
+    remapConnector(child);
     if (child.kind === "shapeGroup") for (const member of child.members) remapChild(member);
   }
   for (const root of roots) {
     root.id = remapped.get(root.id)!;
+    remapConnector(root);
     if (isShapeGroupDrawing(root)) for (const child of root.members) remapChild(child);
   }
   return normalizeShapeDrawingForest(roots);

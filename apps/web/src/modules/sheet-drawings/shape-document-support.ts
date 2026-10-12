@@ -1,4 +1,5 @@
 import { assertShapeObjectsForSheet } from "@sheetcraft/core/shape-object-sheet";
+import { isShapeGroupDrawing, traverseShapeGroup } from "@sheetcraft/core/shape-group";
 import { normalizeSheetDrawings } from "@sheetcraft/core/sheet-drawings";
 import { deserializeSheet } from "@sheetcraft/core/serialization";
 import type { WorkbookCommand } from "@sheetcraft/core/commands";
@@ -18,8 +19,29 @@ export class UnsupportedShapeFrameDocumentError extends Error {
     this.name = "UnsupportedShapeFrameDocumentError";
   }
 }
-function checkDrawings(_sheetId: string, drawings: readonly SheetDrawing[] | undefined): void {
-  normalizeSheetDrawings(drawings);
+/** Model-only stage: no consumer may paint the carrier as the live connection. */
+export class UnsupportedShapeConnectorDocumentError extends UnsupportedShapeFrameDocumentError {
+  constructor(sheetId: string, drawingIds: readonly string[]) {
+    super(sheetId, drawingIds);
+    this.name = "UnsupportedShapeConnectorDocumentError";
+    this.message = `Live shape connector rendering is not yet enabled (sheet ${sheetId}, objects ${drawingIds.join(", ")}).`;
+  }
+}
+export function assertNoUnresolvedShapeConnectors(
+  sheetId: string,
+  drawings: readonly SheetDrawing[] | undefined,
+): void {
+  const ids: string[] = [];
+  for (const root of drawings ?? [])
+    for (const node of isShapeGroupDrawing(root)
+      ? traverseShapeGroup(root).map(({ node }) => node)
+      : [root])
+      if ("shapeConnector" in node) ids.push(node.id);
+  if (ids.length) throw new UnsupportedShapeConnectorDocumentError(sheetId, ids);
+}
+function checkDrawings(sheetId: string, drawings: readonly SheetDrawing[] | undefined): void {
+  const normalized = normalizeSheetDrawings(drawings);
+  assertNoUnresolvedShapeConnectors(sheetId, normalized);
 }
 export function assertWorkbookShapeSupport(workbook: Workbook): void {
   for (const sheet of workbook.sheets.values()) {

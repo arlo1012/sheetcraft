@@ -1,3 +1,4 @@
+import { assertNoUnresolvedShapeConnectors } from "./shape-document-support";
 import {
   isFramedShapeDrawing,
   normalizeSheetDrawing,
@@ -103,6 +104,7 @@ export function resolveShapeDrawing(
   source: SheetDrawing,
   metrics: PictureSheetMetrics,
 ): ResolvedShapeDrawing {
+  assertNoUnresolvedShapeConnectors("shape-projection", [source]);
   if (source.kind === "shapeGroup")
     throw new TypeError("A shape group requires its owned-tree projection, not a leaf view.");
   if (!isFramedShapeDrawing(source)) {
