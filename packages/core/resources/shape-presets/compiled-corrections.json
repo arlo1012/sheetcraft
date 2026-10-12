@@ -1,0 +1,50 @@
+[
+  {
+    "preset": "circularArrow",
+    "guide": "xB",
+    "source": "+- xH 0 dxB 0",
+    "compiled": "+- xH 0 dxB"
+  },
+  {
+    "preset": "circularArrow",
+    "guide": "yB",
+    "source": "+- yH 0 dyB 0",
+    "compiled": "+- yH 0 dyB"
+  },
+  {
+    "preset": "leftCircularArrow",
+    "guide": "xB",
+    "source": "+- xH 0 dxB 0",
+    "compiled": "+- xH 0 dxB"
+  },
+  {
+    "preset": "leftCircularArrow",
+    "guide": "yB",
+    "source": "+- yH 0 dyB 0",
+    "compiled": "+- yH 0 dyB"
+  },
+  {
+    "preset": "leftRightCircularArrow",
+    "guide": "xB",
+    "source": "+- xH 0 dxB 0",
+    "compiled": "+- xH 0 dxB"
+  },
+  {
+    "preset": "leftRightCircularArrow",
+    "guide": "yB",
+    "source": "+- yH 0 dyB 0",
+    "compiled": "+- yH 0 dyB"
+  },
+  {
+    "preset": "leftRightCircularArrow",
+    "guide": "xJ",
+    "source": "+- xI 0 dxJ 0",
+    "compiled": "+- xI 0 dxJ"
+  },
+  {
+    "preset": "leftRightCircularArrow",
+    "guide": "yJ",
+    "source": "+- yI 0 dyJ 0",
+    "compiled": "+- yI 0 dyJ"
+  }
+]

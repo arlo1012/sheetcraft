@@ -230,6 +230,10 @@
     "./picture-protection": {
       "types": "./dist/picture-protection.d.ts",
       "import": "./dist/picture-protection.js"
+    },
+    "./shape-presets": {
+      "types": "./dist/shape-presets.d.ts",
+      "import": "./dist/shape-presets.js"
     }
   },
   "scripts": {
