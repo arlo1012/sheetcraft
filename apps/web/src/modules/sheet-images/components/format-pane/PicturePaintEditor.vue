@@ -32,6 +32,7 @@ import PictureGradientEditor from "./PictureGradientEditor.vue";
 const props = defineProps<{
   ownerKey: string;
   value?: Choice<PicturePaint>;
+  mixed?: boolean;
   disabled?: boolean;
   t: PictureFormatTranslate;
   sourceAssetId?: string;
@@ -41,13 +42,15 @@ const props = defineProps<{
 }>();
 const paint = computed(() => (props.value?.kind === "value" ? props.value.value : undefined));
 const mode = computed(() =>
-  props.value === undefined
-    ? "inherit"
-    : props.value.kind === "none"
-      ? "none"
-      : ["linear", "radial", "rectangular"].includes(props.value.value.kind)
-        ? "gradient"
-        : props.value.value.kind,
+  props.mixed
+    ? "mixed"
+    : props.value === undefined
+      ? "inherit"
+      : props.value.kind === "none"
+        ? "none"
+        : ["linear", "radial", "rectangular"].includes(props.value.value.kind)
+          ? "gradient"
+          : props.value.value.kind,
 );
 const busy = ref(false),
   sourceError = ref<string>(),
@@ -66,6 +69,7 @@ onUnmounted(() => {
 });
 const disabled = computed(() => props.disabled || busy.value);
 const modes = computed(() => [
+  ...(props.mixed ? [{ value: "mixed", label: props.t("paintMixed"), disabled: true }] : []),
   { value: "inherit", label: props.t("paintInherit") },
   { value: "none", label: props.t(props.paintRole === "line" ? "none" : "paintNone") },
   { value: "solid", label: props.t(props.paintRole === "line" ? "solid" : "paintSolid") },

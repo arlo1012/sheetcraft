@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { PictureFormatLengthUnit } from "../../picture-format-pane-model";
 import type { PictureFormatPaneController } from "./usePictureFormatPane";
 import PictureFormatSection from "./PictureFormatSection.vue";
@@ -11,7 +11,15 @@ import PictureLineEditor from "./PictureLineEditor.vue";
 const props = defineProps<{
   controller: PictureFormatPaneController;
   unit: PictureFormatLengthUnit;
+  initialPaint?: "fill" | "line";
 }>();
+const fillSection = ref<InstanceType<typeof PictureFormatSection> | null>(null);
+const lineSection = ref<InstanceType<typeof PictureFormatSection> | null>(null);
+defineExpose({
+  showCategory: (category: "fill" | "line") => {
+    (category === "fill" ? fillSection.value : lineSection.value)?.expand();
+  },
+});
 const lineModes = computed(() => {
   const supplied = props.controller.options("lineMode");
   return (
@@ -27,11 +35,23 @@ const line = computed(() => props.controller.detailed("line"));
 </script>
 <template>
   <div>
-    <PictureFormatSection :title="controller.t('fillSection')">
+    <p
+      v-if="controller.snapshot.value?.paintScope === 'group-leaves'"
+      role="status"
+      data-group-picture-paint-scope
+    >
+      {{ controller.t("groupMemberPaintScope") }}
+    </p>
+    <PictureFormatSection
+      ref="fillSection"
+      :title="controller.t('fillSection')"
+      :initially-open="initialPaint === 'fill'"
+    >
       <template v-if="controller.hasDetailedCapabilities.value">
         <PicturePaintEditor
           :owner-key="fill.ownerKey"
           :value="fill.value"
+          :mixed="controller.snapshot.value?.mixedDetailed?.includes('fill')"
           :disabled="fill.disabled"
           :t="controller.t"
           :source-asset-id="controller.snapshot.value?.owner.assetId"
@@ -52,11 +72,12 @@ const line = computed(() => props.controller.detailed("line"));
         <PictureFormatChoiceField :controller="controller" field="fillGradientPreset" />
       </template>
     </PictureFormatSection>
-    <PictureFormatSection :title="controller.t('lineSection')" initially-open>
+    <PictureFormatSection ref="lineSection" :title="controller.t('lineSection')" initially-open>
       <template v-if="controller.hasDetailedCapabilities.value">
         <PictureLineEditor
           :owner-key="line.ownerKey"
           :value="line.value"
+          :mixed="controller.snapshot.value?.mixedDetailed?.includes('line')"
           :disabled="line.disabled"
           :t="controller.t"
           :source-asset-id="controller.snapshot.value?.owner.assetId"

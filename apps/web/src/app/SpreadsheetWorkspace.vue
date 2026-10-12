@@ -1826,6 +1826,8 @@ const selectedOwnedPictureLeaf = computed(() => {
   }
 });
 const pictureFormatVisible = ref(false);
+const pictureFormatComponentRef = ref<InstanceType<typeof PictureFormatPane> | null>(null);
+const pictureFormatInitialPaint = ref<"fill" | "line" | undefined>();
 const pictureIntrinsicOwner = computed<readonly unknown[]>((previous) => {
   const next = [
     session.workbook,
@@ -1905,10 +1907,16 @@ onBeforeUnmount(picturePaintAssets.dispose);
 function pictureFormatLabel(key: PictureFormatLabelKey): string {
   return t(`pictureFormat.${key}`);
 }
-function openOwnedPictureFormat(path?: PictureGroupPath, owner = activeSheet.value): void {
+function openOwnedPictureFormat(
+  path?: PictureGroupPath,
+  owner = activeSheet.value,
+  paint?: "fill" | "line",
+): void {
   if (owner !== activeSheet.value) return;
   if (path) selectedOwnedPicturePath.value = [...path];
+  if (!pictureFormatVisible.value) pictureFormatInitialPaint.value = paint;
   pictureFormatVisible.value = true;
+  if (paint) pictureFormatComponentRef.value?.showPaint(paint);
 }
 function closeOwnedPictureFormat(): void {
   pictureFormatVisible.value = false;
@@ -4395,6 +4403,8 @@ const gridInert = computed(
         @settings-open="pivotFieldSettingsOpen = $event"
       />
       <PictureFormatPane
+        ref="pictureFormatComponentRef"
+        :initial-paint="pictureFormatInitialPaint"
         :intrinsic-status="pictureIntrinsic.status.value"
         :retry-intrinsic="pictureIntrinsicRetry"
         v-if="pictureFormatVisible"

@@ -364,7 +364,7 @@ const emit = defineEmits<{
   updateFloatingImage: [image: FloatingImage];
   selectedFloatingImageChange: [id: string | null, ids: string[]];
   selectedOwnedPicturePathChange: [path: PictureGroupPath | null, owner: Sheet];
-  formatOwnedPicture: [path: PictureGroupPath, owner: Sheet];
+  formatOwnedPicture: [path: PictureGroupPath, owner: Sheet, paint?: "fill" | "line"];
   updateFloatingImages: [images: FloatingImage[]];
   groupFloatingImages: [ids: string[]];
   deleteFloatingImages: [ids: string[]];
@@ -2344,14 +2344,15 @@ function ungroupOwnedPicture(rootId: string): void {
     emit("imageFeedback", "picture.operationFailed");
   }
 }
-function formatOwnedPicture(path: PictureGroupPath, owner?: object): void {
+function formatOwnedPicture(path: PictureGroupPath, owner?: object, paint?: "fill" | "line"): void {
   if (owner !== props.sheet || !pictureFrameContext.value) return;
   if (pictureCrop.active.value && !finishPictureCrop()) return;
   try {
     if (
       resolveOwnedPictureNode(props.sheet.floatingImages, path, pictureFrameContext.value)?.visible
     )
-      emit("formatOwnedPicture", [...path], props.sheet);
+      if (paint) emit("formatOwnedPicture", [...path], props.sheet, paint);
+      else emit("formatOwnedPicture", [...path], props.sheet);
   } catch {
     emit("imageFeedback", "picture.operationFailed");
   }

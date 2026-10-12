@@ -128,6 +128,9 @@ export interface PictureFormatSnapshot {
   values: Readonly<Partial<PictureFormatValues>>;
   /** Detached source appearance for real structured editors, not a whole-workbook patch. */
   appearance?: ImageAppearance;
+  /** Explicit member scope; containers have no source or local picture paint. */
+  paintScope?: "group-leaves";
+  mixedDetailed?: readonly ("fill" | "line")[];
   /** Identity of the applied intent, when the host can provide it. */
   acceptedIntentId?: string;
   /** Read-only metadata, not silently used to implement a resize. */
@@ -178,6 +181,7 @@ export const PICTURE_FORMAT_LABEL_KEYS = [
   "sizePropertiesTab",
   "pictureTab",
   "fillSection",
+  "groupMemberPaintScope",
   "lineSection",
   "sizeSection",
   "propertiesSection",

@@ -1,5 +1,6 @@
 export const PICTURE_PAINT_LABEL_KEYS = [
   "paintMode",
+  "paintMixed",
   "paintInherit",
   "paintNone",
   "paintSolid",

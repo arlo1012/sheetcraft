@@ -307,6 +307,12 @@ describe("SheetOwnedPictureGroupLayer real ownership", () => {
     toolbar.querySelector<HTMLButtonElement>("[data-picture-group-action='format']")!.click();
     expect(f.wrapper.emitted("ungroup")).toEqual([[f.group.id]]);
     expect(f.wrapper.emitted("format")).toEqual([[[f.group.id], f.owner]]);
+    toolbar.querySelector<HTMLButtonElement>("[data-picture-group-action='fill']")!.click();
+    toolbar.querySelector<HTMLButtonElement>("[data-picture-group-action='line']")!.click();
+    expect(f.wrapper.emitted("format")?.slice(1)).toEqual([
+      [[f.group.id], f.owner, "fill"],
+      [[f.group.id], f.owner, "line"],
+    ]);
     await f.wrapper.setProps({ selectedPath: [f.group.id, f.group.members[0]!.id] });
     expect(document.querySelector("[data-picture-group-action='ungroup']")).toBeNull();
     f.wrapper.unmount();

@@ -5,6 +5,11 @@ const props = withDefaults(defineProps<{ title: string; initiallyOpen?: boolean 
   initiallyOpen: false,
 });
 const open = ref(props.initiallyOpen);
+defineExpose({
+  expand: () => {
+    open.value = true;
+  },
+});
 const contentId = `picture-format-section-${useId()}`;
 </script>
 <template>

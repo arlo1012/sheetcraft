@@ -2,6 +2,7 @@ import type { PicturePaintLabelKey } from "./picture-paint-labels";
 
 export const picturePaintEnUS = {
   paintMode: "Fill type",
+  paintMixed: "Mixed member settings",
   paintInherit: "Use theme",
   paintNone: "No fill",
   paintSolid: "Solid fill",

@@ -29,6 +29,7 @@ const props = withDefaults(
     options?: PictureFormatOptions;
     loadPaintAsset?: (blob: Blob, texture?: PictureTextureId) => Promise<string | undefined>;
     initialTab?: PictureFormatTab;
+    initialPaint?: "fill" | "line";
     initialUnit?: PictureFormatLengthUnit;
     intrinsicStatus?: PictureIntrinsicSizeStatus;
     retryIntrinsic?: () => void;
@@ -37,7 +38,8 @@ const props = withDefaults(
 );
 const emit = defineEmits<{ close: []; cancel: [] }>();
 const controller = usePictureFormatPane(props);
-const tab = ref<PictureFormatTab>(props.initialTab);
+const tab = ref<PictureFormatTab>(props.initialPaint ? "fill-line" : props.initialTab);
+const fillLineRef = ref<InstanceType<typeof PictureFormatFillLine> | null>(null);
 const unit = ref<PictureFormatLengthUnit>(props.initialUnit);
 const paneId = `picture-format-pane-${useId()}`;
 const tabs = ["fill-line", "effects", "size-properties", "picture"] as const;
@@ -80,7 +82,13 @@ async function tabKeydown(event: KeyboardEvent) {
   await nextTick();
   tabButtons.value[next]?.focus();
 }
-defineExpose({ cancel: controller.cancel });
+defineExpose({
+  cancel: controller.cancel,
+  showPaint: (category: "fill" | "line") => {
+    tab.value = "fill-line";
+    fillLineRef.value?.showCategory(category);
+  },
+});
 </script>
 <template>
   <aside class="picture-format-pane" :aria-label="t('paneTitle')" @keydown="keydown">
@@ -189,7 +197,12 @@ defineExpose({ cancel: controller.cancel });
           role="tabpanel"
           :aria-labelledby="`${paneId}-fill-line-tab`"
         >
-          <PictureFormatFillLine :controller="controller" :unit="unit" />
+          <PictureFormatFillLine
+            ref="fillLineRef"
+            :controller="controller"
+            :unit="unit"
+            :initial-paint="initialPaint"
+          />
         </div>
         <div
           :id="`${paneId}-effects-panel`"

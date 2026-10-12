@@ -2,6 +2,7 @@ import type { PicturePaintLabelKey } from "./picture-paint-labels";
 
 export const picturePaintZhCN = {
   paintMode: "填充方式",
+  paintMixed: "成员设置不一致",
   paintInherit: "使用主题",
   paintNone: "无填充",
   paintSolid: "纯色填充",

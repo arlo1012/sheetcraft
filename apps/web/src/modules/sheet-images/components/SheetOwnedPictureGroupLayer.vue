@@ -94,7 +94,7 @@ const emit = defineEmits<{
   paintStateChange: [state: FloatingImagePaintState];
   ungroup: [rootId: string];
   group: [rootIds: string[]];
-  format: [path: PictureGroupPath, owner?: object];
+  format: [path: PictureGroupPath, owner?: object, paint?: "fill" | "line"];
   copy: [path: PictureGroupPath, owner?: object];
   cut: [path: PictureGroupPath, owner?: object];
   paste: [path: PictureGroupPath, owner?: object];
@@ -907,14 +907,19 @@ function requestUngroup(lease: OwnedPictureSelectionSnapshot, path: PictureGroup
   const target = resolveOwnedPictureNode(props.roots, path, props.frameContext);
   if (target?.visible && target.node.kind === "picture-group-v1") emit("ungroup", path[0]!);
 }
-function requestFormat(lease: OwnedPictureSelectionSnapshot, path: PictureGroupPath): void {
+function requestFormat(
+  lease: OwnedPictureSelectionSnapshot,
+  path: PictureGroupPath,
+  paint?: "fill" | "line",
+): void {
   if (
     gesture.value ||
     !isSelectionSnapshotCurrent(lease) ||
     !resolveOwnedPictureNode(props.roots, path, props.frameContext)?.visible
   )
     return;
-  emit("format", [...path], props.owner);
+  if (paint) emit("format", [...path], props.owner, paint);
+  else emit("format", [...path], props.owner);
 }
 const groupToolbarActions = computed(() => {
   const path = targetPath.value;
@@ -922,6 +927,7 @@ const groupToolbarActions = computed(() => {
   if (!path || !lease) return null;
   return {
     format: () => requestFormat(lease, path),
+    paint: (category: "fill" | "line") => requestFormat(lease, path, category),
     ungroup: () => requestUngroup(lease, path),
     dismiss: () => {
       if (isSelectionSnapshotCurrent(lease)) clearSelection();
@@ -1022,6 +1028,7 @@ defineExpose({
       :can-ungroup="targetPath.length === 1"
       @ungroup="groupToolbarActions.ungroup"
       @format="groupToolbarActions.format"
+      @paint="groupToolbarActions.paint"
       @dismiss="groupToolbarActions.dismiss"
     />
     <SheetPictureSelectionToolbar

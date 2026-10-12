@@ -605,3 +605,44 @@ describe("selected source original-dimension feedback", () => {
     expect(wrapper.find("[data-picture-original-status]").exists()).toBe(false);
   });
 });
+
+test("paint quick entry expands the requested actual section and preserves an unfinished numeric draft", async () => {
+  const { wrapper, onIntent } = fixture();
+  const width = input(wrapper, "sizeWidthPt");
+  await width.trigger("focus");
+  await width.setValue("2");
+  await width.setValue("20");
+  const element = width.element;
+  wrapper.vm.showPaint("fill");
+  await flushPromises();
+  expect(
+    wrapper
+      .findAll('[role="tab"]')
+      .find((tab) => tab.text() === "fillLineTab")!
+      .attributes("aria-selected"),
+  ).toBe("true");
+  expect(
+    wrapper
+      .findAll(".picture-format-section__heading")
+      .find((button) => button.text() === "fillSection")!
+      .attributes("aria-expanded"),
+  ).toBe("true");
+  expect(input(wrapper, "sizeWidthPt").element).toBe(element);
+  expect(input(wrapper, "sizeWidthPt").element.value).toBe("20");
+  expect(onIntent).not.toHaveBeenCalled();
+});
+test("first paint quick entry opens fill-line and fill immediately without a remount", () => {
+  const { wrapper } = fixture({ initialPaint: "fill" });
+  expect(
+    wrapper
+      .findAll('[role="tab"]')
+      .find((tab) => tab.text() === "fillLineTab")!
+      .attributes("aria-selected"),
+  ).toBe("true");
+  expect(
+    wrapper
+      .findAll(".picture-format-section__heading")
+      .find((button) => button.text() === "fillSection")!
+      .attributes("aria-expanded"),
+  ).toBe("true");
+});

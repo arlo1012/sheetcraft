@@ -12,6 +12,8 @@ export const pictureFormatZhCN = {
     sizePropertiesTab: "大小与属性",
     pictureTab: "图片",
     fillSection: "填充",
+    groupMemberPaintScope:
+      "更改将替换此组合内所有图片成员的对应填充或轮廓设置，包含嵌套和隐藏成员；其他组合不受影响。",
     lineSection: "线条",
     sizeSection: "大小",
     propertiesSection: "属性",

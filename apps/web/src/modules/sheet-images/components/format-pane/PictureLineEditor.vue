@@ -14,6 +14,7 @@ import PicturePaintNumber from "./PicturePaintNumber.vue";
 const props = defineProps<{
   ownerKey: string;
   value?: Choice<PictureLine>;
+  mixed?: boolean;
   disabled?: boolean;
   t: PictureFormatTranslate;
   sourceAssetId?: string;
@@ -102,6 +103,7 @@ function select<K extends "compound" | "dash" | "cap" | "join">(
       paint-role="line"
       :owner-key="ownerKey"
       :value="paint"
+      :mixed="mixed"
       :disabled="disabled"
       :t="t"
       :source-asset-id="sourceAssetId"

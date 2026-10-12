@@ -283,3 +283,27 @@ test("slider gestures keep intermediate numbers local and submit once on release
     value: { opacity: 0.8 },
   });
 });
+
+test("mixed member fill is an explicit non-applying placeholder, not the inherited setting", async () => {
+  const onCommit = vi.fn(() => true);
+  const wrapper = mount(PicturePaintEditor, {
+    props: { ownerKey: "group", mixed: true, t: (key) => key, onCommit },
+    global: { stubs: { ColorPaletteSelect: paletteStub } },
+  });
+  wrappers.push(wrapper);
+  const mode = wrapper.getComponent(Select);
+  expect(mode.props("modelValue")).toBe("mixed");
+  expect(mode.props("options")).toContainEqual({
+    value: "mixed",
+    label: "paintMixed",
+    disabled: true,
+  });
+  expect(onCommit).not.toHaveBeenCalled();
+  mode.vm.$emit("change", "mixed");
+  expect(onCommit).not.toHaveBeenCalled();
+  mode.vm.$emit("change", "solid");
+  await flushPromises();
+  expect(onCommit).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ kind: "value", value: expect.objectContaining({ kind: "solid" }) }),
+  );
+});

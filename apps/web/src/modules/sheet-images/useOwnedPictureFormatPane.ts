@@ -74,6 +74,7 @@ import { resizePictureLayoutBy } from "@sheetcraft/sheet-engine/picture-layout-e
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import { resolveOwnedPictureNode } from "./picture-group-interaction";
 import { getPictureToolGeometry, resizePictureTo } from "./picture-tool-geometry";
+import { capturePictureGroupPaint, editPictureGroupPaint } from "./picture-group-paint";
 import {
   samePictureFormatOwner,
   type PictureFormatCapabilities,
@@ -492,7 +493,9 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       !isPictureGroup(node) && !isGroupedGroup(node)
         ? getPictureFormatCropState(node, world, context?.metrics)
         : undefined;
-    const appearance = sourceBearing ? node.transform?.appearance : undefined;
+    const groupPaint =
+      !sourceBearing && isPictureGroup(root) ? capturePictureGroupPaint(root, path) : undefined;
+    const appearance = sourceBearing ? node.transform?.appearance : groupPaint?.appearance;
     const effectiveTheme = resolvePictureThemeEffects(appearance, lease.themeEffects);
     const ownLine = appearance?.border;
     const inheritedLine = (effectiveTheme?.outlineWidth ?? 0) > 0;
@@ -558,6 +561,10 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
               ...(inheritedLine ? { reason: compositeReason } : {}),
             }
           : { enabled: false, reason: inheritedReason };
+      }
+      if (groupPaint) {
+        capabilities.detailed!.fill = { enabled: true };
+        capabilities.detailed!.line = { enabled: true };
       }
       if (geometry) {
         const size = {
@@ -686,7 +693,10 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       },
       revision: lease.revision,
       values,
-      ...(sourceBearing ? { appearance } : {}),
+      ...(sourceBearing || groupPaint ? { appearance } : {}),
+      ...(groupPaint
+        ? { paintScope: "group-leaves" as const, mixedDetailed: groupPaint.mixed }
+        : {}),
       name: node.altText,
       ...(lease.intrinsic
         ? {
@@ -822,6 +832,19 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
   }
   function planAppearance(lease: Lease, intent: PictureFormatIntent): FloatingImage[] {
     const { node, root, path, context, world } = lease;
+    if (
+      (isPictureGroup(node) || isGroupedGroup(node)) &&
+      isPictureGroup(root) &&
+      intent.type === "set-detailed" &&
+      (intent.category === "fill" || intent.category === "line")
+    ) {
+      const next = editPictureGroupPaint(root, path, intent, options.isImageAssetAvailable);
+      const forest = normalizePictureObjectCollection(
+        lease.forest.map((image) => (image.id === root.id ? next : image)),
+      );
+      validateForest(forest, context);
+      return forest;
+    }
     if (isPictureGroup(node) || isGroupedGroup(node))
       throw new TypeError("Appearance belongs to a source-bearing picture.");
     const appearance =

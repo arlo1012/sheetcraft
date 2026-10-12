@@ -33,6 +33,7 @@ import { createPictureViewMetrics } from "@sheetcraft/sheet-engine/picture-frame
 import { useOwnedPictureFormatPane } from "../../../../modules/sheet-images/useOwnedPictureFormatPane";
 import { resolveOwnedPictureNode } from "../../../../modules/sheet-images/picture-group-interaction";
 import {
+  createPictureFormatDetailedIntent,
   createPictureFormatFieldIntent,
   PICTURE_FORMAT_LABEL_KEYS,
   type PictureFormatField,
@@ -521,5 +522,120 @@ describe("real picture format pane document owner", () => {
     branch.members[0]!.assetId = "external-leaf-source";
     expect(f.pane.onIntent(sourceIntent)).toBe(false);
     expect(f.execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("actual group member fill and outline transactions", () => {
+  test("root fill reaches nested and hidden leaves as one reversible Core edit without container pixels", () => {
+    const f = fixture(),
+      group = root(f);
+    group.members[1]!.hidden = true;
+    const before = serializeWorkbook(f.session.workbook);
+    const apply = createPictureFormatDetailedIntent(
+      f.pane.snapshot.value!,
+      "fill",
+      {
+        kind: "value",
+        value: { kind: "solid", color: { kind: "rgb", rgb: "#123456" }, opacity: 1 },
+      },
+      "group-fill",
+    );
+    expect(f.pane.snapshot.value).toMatchObject({ paintScope: "group-leaves", mixedDetailed: [] });
+    expect(f.pane.snapshot.value!.owner).not.toHaveProperty("assetId");
+    expect(f.pane.capabilities.value.detailed?.fill?.enabled).toBe(true);
+    expect(f.pane.capabilities.value.detailed?.line?.enabled).toBe(true);
+    expect(f.pane.capabilities.value.detailed?.shadow?.enabled).toBe(false);
+    expect(f.pane.onIntent(apply)).toBe(true);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    const after = serializeWorkbook(f.session.workbook),
+      next = root(f);
+    expect(next).not.toHaveProperty("transform");
+    const branch = next.members[0]!;
+    if (branch.kind !== "grouped-group-v1") throw new Error("Actual branch required");
+    for (const node of [branch.members[0]!, next.members[1]!]) {
+      if (node.kind !== "grouped-picture-v1") throw new Error("Actual leaf required");
+      expect(node.transform?.appearance?.detailedStyle?.fill).toMatchObject({
+        kind: "value",
+        value: { kind: "solid", color: { kind: "rgb", rgb: "#123456" } },
+      });
+    }
+    expect(next.members[1]!.hidden).toBe(true);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(after);
+    f.scope.stop();
+  });
+  test("nested group outline does not change its sibling or any geometry", () => {
+    const f = fixture("owned-group", ["owned-group", "branch"]),
+      before = root(f),
+      sibling = JSON.stringify(before.members[1]),
+      branch = before.members[0]!;
+    const beforeFrame = JSON.stringify(branch.frame);
+    expect(
+      f.pane.onIntent(
+        createPictureFormatDetailedIntent(
+          f.pane.snapshot.value!,
+          "line",
+          { kind: "none" },
+          "branch-line",
+        ),
+      ),
+    ).toBe(true);
+    const next = root(f).members[0]!;
+    if (next.kind !== "grouped-group-v1" || next.members[0]!.kind !== "grouped-picture-v1")
+      throw new Error("Actual nested leaf required");
+    expect(next.members[0]!.transform?.appearance?.detailedStyle?.line).toEqual({ kind: "none" });
+    expect(JSON.stringify(next.frame)).toBe(beforeFrame);
+    expect(JSON.stringify(root(f).members[1])).toBe(sibling);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    f.scope.stop();
+  });
+  test.each(["rejected", "throw", "generation", "path", "protected"] as const)(
+    "%s group paint retains document and history",
+    (boundary) => {
+      const f = fixture(),
+        apply = createPictureFormatDetailedIntent(
+          f.pane.snapshot.value!,
+          "fill",
+          { kind: "none" },
+          "retained",
+        ),
+        before = serializeWorkbook(f.session.workbook);
+      if (boundary === "rejected") f.reject();
+      if (boundary === "throw") f.throw();
+      if (boundary === "generation") f.generation.value++;
+      if (boundary === "path") f.selectedPath.value = ["owned-group", "branch"];
+      if (boundary === "protected") f.sheet.properties.protected = true;
+      const protectedBefore = serializeWorkbook(f.session.workbook);
+      expect(f.pane.onIntent(apply)).toBe(false);
+      expect(serializeWorkbook(f.session.workbook)).toEqual(
+        boundary === "protected" ? protectedBefore : before,
+      );
+      expect(f.session.history.undoStack).toHaveLength(0);
+      if (boundary === "rejected" || boundary === "throw")
+        expect(f.pane.snapshot.value!.owner.sessionId).toBe(apply.owner.sessionId);
+      f.scope.stop();
+    },
+  );
+  test("an unlocked protected group can paint its members without changing lock settings", () => {
+    const f = fixture();
+    root(f).locked = false;
+    f.sheet.properties.protected = true;
+    f.sheet.protection = { editableRanges: [] };
+    expect(f.pane.capabilities.value.detailed?.fill?.enabled).toBe(true);
+    expect(
+      f.pane.onIntent(
+        createPictureFormatDetailedIntent(
+          f.pane.snapshot.value!,
+          "fill",
+          { kind: "none" },
+          "unlocked",
+        ),
+      ),
+    ).toBe(true);
+    expect(root(f).locked).toBe(false);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    f.scope.stop();
   });
 });

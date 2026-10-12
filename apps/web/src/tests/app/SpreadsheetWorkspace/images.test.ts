@@ -1,3 +1,4 @@
+import PictureFormatPane from "../../../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
 import { framedPicture } from "../../modules/sheet-images/framed-picture-fixture";
 import { pictureGroup } from "../../modules/sheet-images/picture-group-fixture";
 import SheetOwnedPictureGroupLayer from "../../../modules/sheet-images/components/SheetOwnedPictureGroupLayer.vue";
@@ -443,4 +444,42 @@ describe("workspace cell image entry points", () => {
       value: "original",
     });
   });
+});
+
+test("group floating Fill/Outline shortcuts open the actual member pane at the requested section", async () => {
+  const { wrapper, sheet } = await fixture(false, "owned"),
+    grid = wrapper.getComponent(SheetGrid),
+    root = sheet.floatingImages[0]!;
+  grid.vm.selectFloatingImages([root.id]);
+  await flushPromises();
+  const layer = wrapper.getComponent(SheetOwnedPictureGroupLayer);
+  layer.vm.$emit("format", [root.id], sheet, "fill");
+  await flushPromises();
+  const pane = wrapper.getComponent(PictureFormatPane);
+  expect(pane.props("snapshot")).toMatchObject({
+    paintScope: "group-leaves",
+    owner: { pictureId: root.id },
+  });
+  expect(pane.get("[data-group-picture-paint-scope]").text()).toContain("every picture member");
+  expect(
+    pane
+      .findAll('[role="tab"]')
+      .find((tab) => tab.text() === "Fill & Line")!
+      .attributes("aria-selected"),
+  ).toBe("true");
+  expect(
+    pane
+      .findAll(".picture-format-section__heading")
+      .find((button) => button.text() === "Fill")!
+      .attributes("aria-expanded"),
+  ).toBe("true");
+  layer.vm.$emit("format", [root.id], sheet, "line");
+  await flushPromises();
+  expect(wrapper.getComponent(PictureFormatPane).vm.$.uid).toBe(pane.vm.$.uid);
+  expect(
+    pane
+      .findAll(".picture-format-section__heading")
+      .find((button) => button.text() === "Line")!
+      .attributes("aria-expanded"),
+  ).toBe("true");
 });

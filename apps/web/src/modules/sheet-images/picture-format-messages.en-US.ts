@@ -12,6 +12,8 @@ export const pictureFormatEnUS = {
     sizePropertiesTab: "Size & Properties",
     pictureTab: "Picture",
     fillSection: "Fill",
+    groupMemberPaintScope:
+      "Changes replace the corresponding fill or outline settings on every picture member of this group, including nested and hidden members. Other groups are unchanged.",
     lineSection: "Line",
     sizeSection: "Size",
     propertiesSection: "Properties",

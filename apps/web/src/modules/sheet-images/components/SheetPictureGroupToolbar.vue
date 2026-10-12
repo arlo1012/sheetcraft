@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { SlidersHorizontal, Ungroup } from "lucide-vue-next";
+import { PaintBucket, Pencil, SlidersHorizontal, Ungroup } from "lucide-vue-next";
 import {
   useFloatingPanel,
   type FloatingReference,
@@ -11,7 +11,12 @@ const props = defineProps<{
   disabled?: boolean;
   canUngroup?: boolean;
 }>();
-const emit = defineEmits<{ ungroup: []; format: []; dismiss: [] }>();
+const emit = defineEmits<{
+  ungroup: [];
+  format: [];
+  paint: [category: "fill" | "line"];
+  dismiss: [];
+}>();
 const { t } = useAppI18n();
 const toolbarRef = ref<HTMLElement | null>(null);
 const { floatingStyles } = useFloatingPanel(
@@ -65,6 +70,26 @@ function onKeydown(event: KeyboardEvent): void {
         @click="emit('ungroup')"
       >
         <Ungroup />
+      </button>
+      <button
+        type="button"
+        :disabled="disabled"
+        :aria-label="t('pictureFormat.fillSection')"
+        :title="t('pictureFormat.fillSection')"
+        data-picture-group-action="fill"
+        @click="emit('paint', 'fill')"
+      >
+        <PaintBucket />
+      </button>
+      <button
+        type="button"
+        :disabled="disabled"
+        :aria-label="t('pictureFormat.lineSection')"
+        :title="t('pictureFormat.lineSection')"
+        data-picture-group-action="line"
+        @click="emit('paint', 'line')"
+      >
+        <Pencil />
       </button>
       <button
         type="button"
