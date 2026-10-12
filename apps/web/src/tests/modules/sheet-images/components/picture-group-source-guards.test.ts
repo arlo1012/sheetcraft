@@ -2,6 +2,8 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
+import type { FloatingImage } from "@sheetcraft/core/workbook";
+import type { GroupedGroup } from "@sheetcraft/core/picture-group";
 import PictureToolbar from "../../../../modules/sheet-images/components/PictureToolbar.vue";
 import PictureAppearanceTools from "../../../../modules/sheet-images/components/PictureAppearanceTools.vue";
 import PictureAssetTools from "../../../../modules/sheet-images/components/PictureAssetTools.vue";
@@ -21,6 +23,19 @@ afterEach(() => {
 function listener(value: unknown): (...args: unknown[]) => unknown {
   if (typeof value !== "function") throw new TypeError("Expected a rendered event listener.");
   return (...args) => value(...args);
+}
+function localContainer(): GroupedGroup {
+  return {
+    kind: "grouped-group-v1",
+    id: "local-owner",
+    altText: "Nested owned group",
+    frame: {
+      kind: "group-local-frame-v1",
+      rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
+      angleDeg: 0,
+    },
+    members: group().members,
+  };
 }
 
 describe("standalone ribbon owned-group refusal", () => {
@@ -64,6 +79,24 @@ describe("standalone ribbon owned-group refusal", () => {
     expect(() =>
       mount(PictureAppearanceTools, {
         props: { image: container, disabled: false },
+        global: {
+          plugins: [createAppI18n("en-US")],
+          config: { warnHandler: () => {} },
+        },
+      }),
+    ).toThrow(UnsupportedPictureDocumentError);
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    expect(container).toEqual(before);
+    expect(container).not.toHaveProperty("transform");
+    expect(container).not.toHaveProperty("assetId");
+  });
+
+  test("appearance source admission also rejects a nested source-free container", () => {
+    const container = localContainer();
+    const before = structuredClone(container);
+    expect(() =>
+      mount(PictureAppearanceTools, {
+        props: { image: container as unknown as FloatingImage, disabled: false },
         global: {
           plugins: [createAppI18n("en-US")],
           config: { warnHandler: () => {} },
@@ -130,39 +163,42 @@ describe("standalone ribbon owned-group refusal", () => {
     expect(container).toEqual(before);
   });
 
-  test("a container replacement refuses old menu edits and new menu requests", async () => {
-    const errors: unknown[] = [];
-    const wrapper = mount(PictureAppearanceTools, {
-      attachTo: document.body,
-      props: { image: picture(), disabled: false },
-      global: {
-        plugins: [createAppI18n("en-US")],
-        config: { errorHandler: (error) => errors.push(error), warnHandler: () => {} },
-      },
-    });
-    mounted.push(wrapper);
-    await wrapper.get('[aria-label="Transparency"]').trigger("click");
-    await flushPromises();
-    const edit = listener(wrapper.getComponent(InputNumber).vm.$.vnode.props?.onChange);
-    const color = wrapper
-      .findAllComponents(RibbonMenuButton)
-      .find((button) => button.props("label") === "Color")!;
-    const activate = listener(color.vm.$.vnode.props?.onActivate);
-    const keydown = listener(color.vm.$.vnode.props?.onKeydown);
-    const reset = listener(wrapper.getComponent(RibbonButton).vm.$.vnode.props?.onActivate);
-    const container = group("picture");
-    const before = structuredClone(container);
-    await wrapper.setProps({ image: container });
-    expect(errors).toEqual([]);
-    expect(wrapper.find(".picture-appearance").exists()).toBe(false);
-    expect(document.querySelector('[role="menu"]')).toBeNull();
-    expect(() => edit(25)).toThrow(UnsupportedPictureDocumentError);
-    expect(() => reset()).toThrow(UnsupportedPictureDocumentError);
-    expect(() => keydown(new KeyboardEvent("keydown", { key: "ArrowDown" }))).toThrow(
-      UnsupportedPictureDocumentError,
-    );
-    await expect(activate()).rejects.toThrow(UnsupportedPictureDocumentError);
-    expect(wrapper.emitted("change")).toBeUndefined();
-    expect(container).toEqual(before);
-  });
+  test.each(["root", "local"])(
+    "a %s container replacement refuses old menu edits and new menu requests",
+    async (kind) => {
+      const errors: unknown[] = [];
+      const wrapper = mount(PictureAppearanceTools, {
+        attachTo: document.body,
+        props: { image: picture(), disabled: false },
+        global: {
+          plugins: [createAppI18n("en-US")],
+          config: { errorHandler: (error) => errors.push(error), warnHandler: () => {} },
+        },
+      });
+      mounted.push(wrapper);
+      await wrapper.get('[aria-label="Transparency"]').trigger("click");
+      await flushPromises();
+      const edit = listener(wrapper.getComponent(InputNumber).vm.$.vnode.props?.onChange);
+      const color = wrapper
+        .findAllComponents(RibbonMenuButton)
+        .find((button) => button.props("label") === "Color")!;
+      const activate = listener(color.vm.$.vnode.props?.onActivate);
+      const keydown = listener(color.vm.$.vnode.props?.onKeydown);
+      const reset = listener(wrapper.getComponent(RibbonButton).vm.$.vnode.props?.onActivate);
+      const container = kind === "root" ? group("picture") : localContainer();
+      const before = structuredClone(container);
+      await wrapper.setProps({ image: container as FloatingImage });
+      expect(errors).toEqual([]);
+      expect(wrapper.find(".picture-appearance").exists()).toBe(false);
+      expect(document.querySelector('[role="menu"]')).toBeNull();
+      expect(() => edit(25)).toThrow(UnsupportedPictureDocumentError);
+      expect(() => reset()).toThrow(UnsupportedPictureDocumentError);
+      expect(() => keydown(new KeyboardEvent("keydown", { key: "ArrowDown" }))).toThrow(
+        UnsupportedPictureDocumentError,
+      );
+      await expect(activate()).rejects.toThrow(UnsupportedPictureDocumentError);
+      expect(wrapper.emitted("change")).toBeUndefined();
+      expect(container).toEqual(before);
+    },
+  );
 });

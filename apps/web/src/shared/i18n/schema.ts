@@ -1621,6 +1621,7 @@ export type MessageSchema = ToolMessageSchema & {
     doubleClickPreview: string;
     doubleClickSelect: string;
 
+    saveAsPicture: string;
     annotate: string;
     apply: string;
     pen: string;

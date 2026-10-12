@@ -242,3 +242,76 @@ describe("SheetOwnedPictureGroupLayer displayed commands", () => {
     f.wrapper.unmount();
   });
 });
+
+test.each(["replace", "save", "crop", "annotate", "preview"] as const)(
+  "real owned source %s uses the exact path and closed instance cannot retarget",
+  async (action) => {
+    const f = fixture(),
+      path = [f.group.id, f.group.members[0]!.id];
+    await f.wrapper.setProps({
+      selectedPath: path,
+      assetUrls: new Map([["synthetic-asset", "blob:source"]]),
+    });
+    const selected = f.wrapper.get("[data-owned-picture-selected]:not([data-passive-outline])");
+    await selected.trigger("keydown", { key: "ContextMenu" });
+    const old = f.wrapper.getComponent(SheetOwnedPictureContextMenu),
+      key = `on${action[0]!.toUpperCase()}${action.slice(1)}`,
+      callback = old.vm.$.vnode.props![key] as () => void;
+    expect(old.props("canSource")).toBe(true);
+    expect(old.props("sourceUnavailable")).toBe(false);
+    old.vm.$emit("close", false);
+    await f.wrapper.vm.$nextTick();
+    await selected.trigger("keydown", { key: "ContextMenu" });
+    callback();
+    expect(f.wrapper.emitted("sourceAction")).toBeUndefined();
+    f.wrapper.getComponent(SheetOwnedPictureContextMenu).vm.$emit(action);
+    expect(f.wrapper.emitted("sourceAction")).toEqual([[action, path, f.owner]]);
+    f.wrapper.unmount();
+  },
+);
+test("owned container has no source actions and readonly leaf saves without edit permission", async () => {
+  const f = fixture();
+  await f.wrapper.setProps({ assetUrls: new Map([["synthetic-asset", "blob:source"]]) });
+  expect(f.api.handleSurfaceContextMenu(f.menuEvent(), { x: 275, y: 130 })).toBe(true);
+  await f.wrapper.vm.$nextTick();
+  let menu = f.wrapper.getComponent(SheetOwnedPictureContextMenu);
+  expect(menu.props("canSource")).toBe(false);
+  menu.vm.$emit("replace");
+  expect(f.wrapper.emitted("sourceAction")).toBeUndefined();
+  const path = [f.group.id, f.group.members[0]!.id];
+  await f.wrapper.setProps({ selectedPath: path, readOnly: true });
+  await f.wrapper
+    .get("[data-owned-picture-selected]:not([data-passive-outline])")
+    .trigger("keydown", { key: "ContextMenu" });
+  menu = f.wrapper.getComponent(SheetOwnedPictureContextMenu);
+  menu.vm.$emit("crop");
+  expect(f.wrapper.emitted("sourceAction")).toBeUndefined();
+  await f.wrapper
+    .get("[data-owned-picture-selected]:not([data-passive-outline])")
+    .trigger("keydown", { key: "ContextMenu" });
+  f.wrapper.getComponent(SheetOwnedPictureContextMenu).vm.$emit("save");
+  expect(f.wrapper.emitted("sourceAction")).toEqual([["save", path, f.owner]]);
+  f.wrapper.unmount();
+});
+
+test("busy owned-source commands cannot replace an in-flight source operation", async () => {
+  const f = fixture(),
+    path = [f.group.id, f.group.members[0]!.id];
+  await f.wrapper.setProps({
+    selectedPath: path,
+    assetUrls: new Map([["synthetic-asset", "blob:source"]]),
+  });
+  await f.wrapper
+    .get("[data-owned-picture-selected]:not([data-passive-outline])")
+    .trigger("keydown", { key: "ContextMenu" });
+  const menu = f.wrapper.getComponent(SheetOwnedPictureContextMenu);
+  const replace = menu.vm.$.vnode.props!.onReplace as () => void;
+  await f.wrapper.setProps({ sourceToolsDisabled: true });
+  replace();
+  expect(f.wrapper.emitted("sourceAction")).toBeUndefined();
+  expect(f.wrapper.findComponent(SheetOwnedPictureContextMenu).exists()).toBe(true);
+  await f.wrapper.setProps({ sourceToolsDisabled: false });
+  replace();
+  expect(f.wrapper.emitted("sourceAction")).toEqual([["replace", path, f.owner]]);
+  f.wrapper.unmount();
+});

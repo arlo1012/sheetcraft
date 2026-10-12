@@ -1,3 +1,4 @@
+import { isPictureGroup } from "@sheetcraft/core/picture-group";
 import PictureFormatPane from "../../../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
 import PictureCellOverwriteDialog from "../../../modules/sheet-images/components/PictureCellOverwriteDialog.vue";
 import { framedPicture } from "../../modules/sheet-images/framed-picture-fixture";
@@ -607,3 +608,86 @@ test("equal size is one real history transaction using the active picture rather
   await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "y", ctrlKey: true });
   expect(sheet.floatingImages).toEqual(after);
 });
+
+test("owned leaf appearance entry patches its source and preserves exact history with stale owner rejection", async () => {
+  const { wrapper, sheet } = await fixture(false, "owned"),
+    grid = wrapper.getComponent(SheetGrid),
+    root = sheet.floatingImages[0]!;
+  if (!isPictureGroup(root)) throw Error("Expected owner");
+  grid.vm.selectFloatingImages([root.id]);
+  await flushPromises();
+  wrapper
+    .getComponent(SheetOwnedPictureGroupLayer)
+    .vm.$emit("selectPath", [root.id, root.members[0]!.id]);
+  await flushPromises();
+  const ribbon = wrapper.getComponent(PictureOwnedLeafRibbon),
+    old = ribbon.props("appearanceHandler")!,
+    before = sheet.floatingImages.map(cloneFloatingImage);
+  expect(old({ brightness: 0.7, contrast: 1.2, opacity: 0.4, transparentColor: "#123456" })).toBe(
+    true,
+  );
+  await flushPromises();
+  const after = sheet.floatingImages.map(cloneFloatingImage),
+    updated = after[0]!;
+  if (!isPictureGroup(updated) || updated.members[0]!.kind !== "grouped-picture-v1")
+    throw Error("Expected leaf");
+  expect(updated.frame).toEqual(root.frame);
+  expect(updated.members[0]!.frame).toEqual(root.members[0]!.frame);
+  expect(updated.members[0]!.transform?.appearance).toMatchObject({
+    brightness: 0.7,
+    contrast: 1.2,
+    opacity: 0.4,
+    transparentColor: "#123456",
+  });
+  expect(old({ opacity: 0.1 })).toBe(false);
+  expect(sheet.floatingImages).toEqual(after);
+  await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
+  expect(sheet.floatingImages).toEqual(before);
+  await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "y", ctrlKey: true });
+  expect(sheet.floatingImages).toEqual(after);
+});
+
+test("root context format keeps the standalone source owner usable for replacement", async () => {
+  const { wrapper, sheet } = await fixture(false, "framed"),
+    grid = wrapper.getComponent(SheetGrid),
+    root = sheet.floatingImages[0]!;
+  grid.vm.selectFloatingImages([root.id]);
+  await flushPromises();
+  const layer = wrapper.getComponent(SheetOwnedPictureGroupLayer);
+  layer.vm.$emit("format", [root.id], sheet);
+  await flushPromises();
+  expect(wrapper.getComponent(PictureFormatPane).props("snapshot")?.owner.pictureId).toBe(root.id);
+  const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+  const before = sheet.floatingImages.map(cloneFloatingImage);
+  layer.vm.$emit("sourceAction", "replace", [root.id], sheet);
+  await flushPromises();
+  expect(click).toHaveBeenCalledOnce();
+  expect(sheet.floatingImages).toEqual(before);
+});
+
+test.each(["framed", "owned"] as const)(
+  "%s context saves its real source as PNG using the existing source encoder",
+  async (kind) => {
+    const { wrapper, sheet } = await fixture(false, kind),
+      grid = wrapper.getComponent(SheetGrid),
+      root = sheet.floatingImages[0]!;
+    grid.vm.selectFloatingImages([root.id]);
+    await flushPromises();
+    const layer = wrapper.getComponent(SheetOwnedPictureGroupLayer);
+    const path = isPictureGroup(root) ? [root.id, root.members[0]!.id] : [root.id];
+    if (path.length > 1) {
+      layer.vm.$emit("selectPath", path);
+      await flushPromises();
+    }
+    const encode = vi
+        .spyOn(pictureExport, "exportPictureSourceBlob")
+        .mockResolvedValue(new Blob(["encoded"], { type: "image/png" })),
+      save = vi.spyOn(download, "downloadBlob").mockImplementation(() => {}),
+      before = sheet.floatingImages.map(cloneFloatingImage);
+    layer.vm.$emit("sourceAction", "save", path, sheet);
+    await flushPromises();
+    expect(encode).toHaveBeenCalledOnce();
+    expect(save).toHaveBeenCalledOnce();
+    expect(sheet.floatingImages).toEqual(before);
+  },
+);

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { PictureContextSourceAction } from "../modules/sheet-images/picture-context-source-action";
 import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import { getCellContent, getCellStyle } from "@sheetcraft/core/workbook";
 import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
@@ -98,7 +99,7 @@ import {
 import PictureSelectionPane from "../modules/sheet-images/components/PictureSelectionPane.vue";
 import PictureAnnotationDialog from "../modules/sheet-images/components/PictureAnnotationDialog.vue";
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
-import type { Sheet, FloatingImage } from "@sheetcraft/core/workbook";
+import type { Sheet, FloatingImage, ImageAppearance } from "@sheetcraft/core/workbook";
 import PictureGroupRibbon from "../modules/sheet-images/components/PictureGroupRibbon.vue";
 import PictureOwnedLeafRibbon from "../modules/sheet-images/components/PictureOwnedLeafRibbon.vue";
 import { resolveOwnedPictureNode } from "../modules/sheet-images/picture-group-interaction";
@@ -2033,7 +2034,7 @@ function openOwnedPictureFormat(
   paint?: "fill" | "line",
 ): void {
   if (owner !== activeSheet.value) return;
-  if (path) selectedOwnedPicturePath.value = [...path];
+  if (path) selectedOwnedPicturePath.value = path.length > 1 ? [...path] : null;
   if (!pictureFormatVisible.value) pictureFormatInitialPaint.value = paint;
   pictureFormatVisible.value = true;
   if (paint) pictureFormatComponentRef.value?.showPaint(paint);
@@ -2067,6 +2068,13 @@ const pictureSourceRibbonOwner = computed(() => {
     context?.metrics === sheetGridRef.value?.getPictureFrameContext(sheet)?.metrics;
   return {
     key,
+    appearance: (patch: Partial<ImageAppearance> | undefined) => {
+      if (!current() || !beforePictureFormatInteraction()) return false;
+      return pictureTools.applyAppearance(patch);
+    },
+    save: () => {
+      if (current()) void pictureAssetTools.exportPictures("png");
+    },
     canReplace: imageActions.canReplace(image.id, path),
     canAnnotate: pictureDialogs.canAnnotate(),
     annotate: () => current() && pictureDialogs.openAnnotation(),
@@ -2084,6 +2092,31 @@ const pictureSourceRibbonOwner = computed(() => {
     },
   };
 });
+function performPictureContextSourceAction(
+  action: PictureContextSourceAction,
+  path: PictureGroupPath,
+  owner: Sheet,
+): void {
+  if (
+    owner !== activeSheet.value ||
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    imageBusy.value ||
+    selectedPictureIds.value.length !== 1 ||
+    selectedPictureIds.value[0] !== path[0] ||
+    JSON.stringify(path.length > 1 ? path : null) !== JSON.stringify(selectedOwnedPicturePath.value)
+  )
+    return;
+  const source = pictureSourceRibbonOwner.value;
+  if (!source) return;
+  if (action === "replace" && source.canReplace) source.replace();
+  else if (action === "save") source.save();
+  else if (action === "crop" && source.canCrop) source.crop();
+  else if (action === "annotate" && source.canAnnotate) source.annotate();
+  else if (action === "preview" && source.canPreview) source.preview();
+  else if (action === "format") source.format();
+}
 const pictureToolbarOwner = usePictureToolbarOwner({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -3293,6 +3326,7 @@ const gridInert = computed(
           :image="selectedOwnedPictureLeaf.node"
           :busy="loading || fileBusy || xlsxBusy || imageBusy"
           :owner-key="pictureSourceRibbonOwner.key"
+          :appearance-handler="pictureSourceRibbonOwner.appearance"
           :replace-handler="pictureSourceRibbonOwner.replace"
           :format-handler="pictureSourceRibbonOwner.format"
           :can-replace="pictureSourceRibbonOwner.canReplace"
@@ -4398,6 +4432,7 @@ const gridInert = computed(
     >
       <div class="spreadsheet-workspace__sheet">
         <SheetGrid
+          :picture-source-busy="imageBusy || loading || fileBusy || xlsxBusy"
           :restore-picture-original="pictureOriginalResetOwner.apply"
           :can-restore-picture-original="pictureOriginalResetOwner.available"
           :picture-alignment-reference="pictureAlignmentReference"
@@ -4503,6 +4538,7 @@ const gridInert = computed(
           @paste-floating-image="imageActions.pasteFloatingImage"
           @paste-floating-images="imageActions.pasteFloatingImages"
           @image-feedback="showImageFeedback"
+          @picture-source-action="performPictureContextSourceAction"
           :workbook-revision="workbookRevision"
           :apply-paste="pasteCells"
           :apply-axis-move="moveAxis"

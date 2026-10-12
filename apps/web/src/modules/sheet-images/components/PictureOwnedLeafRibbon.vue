@@ -2,8 +2,10 @@
 import { computed } from "vue";
 import { Crop, Eye, ImagePlus, ImageDown, PencilLine, Settings2, RotateCcw } from "lucide-vue-next";
 import { isGroupedPicture, type GroupedPicture } from "@sheetcraft/core/picture-group";
+import type { ImageAppearance } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import PictureAssetTools from "./PictureAssetTools.vue";
+import PictureAppearanceTools from "./PictureAppearanceTools.vue";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import type { PictureFileFormat } from "../picture-asset-conversion";
@@ -26,6 +28,7 @@ const props = defineProps<{
   convertHandler?: () => boolean;
   canConvert?: boolean;
   formatHandler: () => void;
+  appearanceHandler?: (patch: Partial<ImageAppearance> | undefined) => boolean;
   ownerKey: string;
 }>();
 if (!isGroupedPicture(props.image))
@@ -46,7 +49,18 @@ const callbacks = computed(() => {
     convert = props.convertHandler,
     annotate = props.annotateHandler;
   const restore = props.restoreHandler;
+  const appearance = props.appearanceHandler;
   return {
+    appearance: (patch: Partial<ImageAppearance> | undefined) => {
+      if (
+        image === props.image &&
+        isGroupedPicture(props.image) &&
+        key === props.ownerKey &&
+        !props.disabled &&
+        appearance === props.appearanceHandler
+      )
+        appearance?.(patch);
+    },
     restore: () => {
       if (
         image === props.image &&
@@ -200,6 +214,12 @@ const callbacks = computed(() => {
       @compress="callbacks.compress"
       @batch-size="callbacks.batchSize"
       @export="callbacks.export"
+    />
+    <PictureAppearanceTools
+      :key="ownerKey"
+      :image="image"
+      :disabled="disabled || !appearanceHandler"
+      @change="callbacks.appearance"
     />
     <RibbonButton
       variant="tall"

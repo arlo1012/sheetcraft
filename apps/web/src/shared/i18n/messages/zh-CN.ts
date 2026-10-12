@@ -1639,6 +1639,7 @@ export const zhCN = {
     doubleClickPreview: "双击查看大图",
     doubleClickSelect: "双击仅选中图片",
 
+    saveAsPicture: "另存为图片（PNG）",
     annotate: "图片批注",
     apply: "应用",
     pen: "画笔",

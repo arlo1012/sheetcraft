@@ -63,3 +63,75 @@ describe("standalone picture context-menu owner lease", () => {
     expect(f.wrapper.emitted("copy")).toBeUndefined();
   });
 });
+
+test.each(["replace", "save", "crop", "annotate", "format"] as const)(
+  "context %s captures exact root owner and refuses a closed/reopened callback",
+  async (action) => {
+    const f = fixture();
+    await f.wrapper.setProps({ assetUrls: new Map([["synthetic-asset", "blob:source"]]) });
+    await f.open();
+    const menu = f.wrapper.getComponent(SheetFloatingImageContextMenu),
+      key = `on${action[0]!.toUpperCase()}${action.slice(1)}`;
+    const old = menu.vm.$.vnode.props![key] as () => void;
+    menu.vm.$emit("close", false);
+    await nextTick();
+    await f.open();
+    old();
+    expect(f.wrapper.emitted("sourceAction")).toBeUndefined();
+    f.wrapper.getComponent(SheetFloatingImageContextMenu).vm.$emit(action);
+    expect(f.wrapper.emitted("sourceAction")).toEqual([
+      [action, ["legacy"], f.wrapper.props("owner")],
+    ]);
+  },
+);
+
+test("source actions respect readonly and source availability without preventing replacement recovery", async () => {
+  const f = fixture();
+  await f.wrapper.setProps({
+    readOnly: true,
+    assetUrls: new Map([["synthetic-asset", "blob:source"]]),
+  });
+  await f.open();
+  f.wrapper.getComponent(SheetFloatingImageContextMenu).vm.$emit("replace");
+  expect(f.wrapper.emitted("sourceAction")).toBeUndefined();
+  f.wrapper.getComponent(SheetFloatingImageContextMenu).vm.$emit("save");
+  expect(f.wrapper.emitted("sourceAction")?.at(-1)?.[0]).toBe("save");
+  await f.wrapper.setProps({ readOnly: false, assetUrls: new Map() });
+  await f.open();
+  f.wrapper.getComponent(SheetFloatingImageContextMenu).vm.$emit("save");
+  expect(f.wrapper.emitted("sourceAction")).toHaveLength(1);
+  f.wrapper.getComponent(SheetFloatingImageContextMenu).vm.$emit("replace");
+  expect(f.wrapper.emitted("sourceAction")?.at(-1)?.[0]).toBe("replace");
+});
+
+test("busy source tools reject captured commands without closing or changing the owner", async () => {
+  const f = fixture();
+  await f.wrapper.setProps({ assetUrls: new Map([["synthetic-asset", "blob:source"]]) });
+  await f.open();
+  const menu = f.wrapper.getComponent(SheetFloatingImageContextMenu);
+  const crop = menu.vm.$.vnode.props!.onCrop as () => void;
+  await f.wrapper.setProps({ sourceToolsDisabled: true });
+  crop();
+  expect(f.wrapper.emitted("sourceAction")).toBeUndefined();
+  expect(f.wrapper.findComponent(SheetFloatingImageContextMenu).exists()).toBe(true);
+  await f.wrapper.setProps({ sourceToolsDisabled: false });
+  crop();
+  expect(f.wrapper.emitted("sourceAction")).toEqual([
+    ["crop", ["legacy"], f.wrapper.props("owner")],
+  ]);
+});
+
+test("preview observes the same busy guard without changing its original trigger event", async () => {
+  const f = fixture();
+  await f.open();
+  const menu = f.wrapper.getComponent(SheetFloatingImageContextMenu);
+  const preview = menu.vm.$.vnode.props!.onPreview as () => void;
+  await f.wrapper.setProps({ sourceToolsDisabled: true });
+  preview();
+  expect(f.wrapper.emitted("preview")).toBeUndefined();
+  expect(f.wrapper.findComponent(SheetFloatingImageContextMenu).exists()).toBe(true);
+  await f.wrapper.setProps({ sourceToolsDisabled: false });
+  preview();
+  expect(f.wrapper.emitted("preview")).toHaveLength(1);
+  expect(f.wrapper.emitted("preview")![0]![0]).toEqual(legacyPicture());
+});

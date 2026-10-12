@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { PictureContextSourceAction } from "../picture-context-source-action";
 import {
   computed,
   defineAsyncComponent,
@@ -106,6 +107,7 @@ const props = withDefaults(
     selectedImageId?: string | null;
     selectedImageIds?: readonly string[];
     alignmentReference?: PictureAlignmentReference;
+    sourceToolsDisabled?: boolean;
     readOnly?: boolean;
     canConvertToCell?: (id: string) => boolean;
     canEditRoot?: (root: PictureObject) => boolean;
@@ -137,6 +139,7 @@ const emit = defineEmits<{
   paste: [id: string];
   paintStateChange: [state: FloatingImagePaintState];
   reference: [reference: PictureAlignmentReference];
+  sourceAction: [action: PictureContextSourceAction, path: string[], owner?: object];
 }>();
 
 const { t } = useAppI18n();
@@ -918,7 +921,31 @@ function isContextMenuOwnerCurrent(menu: ContextMenuState): boolean {
 const contextActions = computed(() => {
   const menu = contextMenu.value;
   const current = () => !!menu && isContextMenuOwnerCurrent(menu);
+  function sourceAction(action: PictureContextSourceAction): void {
+    if (
+      !current() ||
+      !menu ||
+      props.sourceToolsDisabled ||
+      (action !== "format" && selectedIds.value.size !== 1) ||
+      props.croppingExternally ||
+      (interactionReadOnly.value && !["save", "preview", "format"].includes(action))
+    )
+      return;
+    const image = currentImages.value.find((root) => root.id === menu.imageId);
+    if (
+      !image ||
+      (action !== "replace" && action !== "format" && !props.assetUrls.has(image.assetId))
+    )
+      return;
+    closeContextMenu(false);
+    emit("sourceAction", action, [menu.imageId], menu.owner);
+  }
   return {
+    replace: () => sourceAction("replace"),
+    save: () => sourceAction("save"),
+    crop: () => sourceAction("crop"),
+    annotate: () => sourceAction("annotate"),
+    format: () => sourceAction("format"),
     copy: () => {
       if (current()) requestClipboard("copy");
     },
@@ -951,7 +978,7 @@ function requestConvertToCell(): void {
 }
 
 function requestPreview(): void {
-  if (props.croppingExternally) return;
+  if (props.croppingExternally || props.sourceToolsDisabled) return;
   const image = currentImages.value.find((entry) => entry.id === contextMenu.value?.imageId);
   const trigger = contextMenu.value?.trigger;
   closeContextMenu(false);
@@ -1534,6 +1561,17 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       v-if="contextMenu"
       :anchor="contextMenu.anchor"
       :read-only="interactionReadOnly"
+      :source-unavailable="
+        !assetUrls.has(
+          currentImages.find((image) => image.id === contextMenu?.imageId)?.assetId ?? '',
+        )
+      "
+      :source-tools-disabled="sourceToolsDisabled || croppingExternally || selectedIds.size !== 1"
+      @replace="contextActions.replace"
+      @save="contextActions.save"
+      @crop="contextActions.crop"
+      @annotate="contextActions.annotate"
+      @format="contextActions.format"
       :source-operations-disabled="
         croppingExternally ||
         (contextMenu.imageId ? props.canConvertToCell?.(contextMenu.imageId) === false : true)

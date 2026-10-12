@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { PictureContextSourceAction } from "../picture-context-source-action";
 import {
   computed,
   defineAsyncComponent,
@@ -77,6 +78,8 @@ const props = withDefaults(
     selectedRootId?: string | null;
     selectedRootIds?: readonly string[];
     alignmentReference?: PictureAlignmentReference;
+    sourceToolsDisabled?: boolean;
+    assetUrls?: ReadonlyMap<string, string>;
     selectedPath?: PictureGroupPath | null;
     scale?: number;
     readOnly?: boolean;
@@ -99,6 +102,7 @@ const emit = defineEmits<{
   group: [rootIds: string[]];
   convertToCell: [path: PictureGroupPath, owner?: object];
   format: [path: PictureGroupPath, owner?: object, paint?: "fill" | "line"];
+  sourceAction: [action: PictureContextSourceAction, path: PictureGroupPath, owner?: object];
   copy: [path: PictureGroupPath, owner?: object];
   cut: [path: PictureGroupPath, owner?: object];
   paste: [path: PictureGroupPath, owner?: object];
@@ -113,7 +117,14 @@ const contextMenu = shallowRef<{
   path: PictureGroupPath;
   selection: PictureGroupSelection;
   actions: Record<
-    "copy" | "cut" | "paste" | "delete" | "format" | "ungroup" | "convert",
+    | "copy"
+    | "cut"
+    | "paste"
+    | "delete"
+    | "format"
+    | "ungroup"
+    | "convert"
+    | PictureContextSourceAction,
     () => void
   >;
   close: (restoreFocus: boolean) => void;
@@ -840,6 +851,11 @@ function openContextMenu(
         path: selection.path ? [...selection.path] : null,
       },
       actions: {
+        replace: () => contextAction(menu, "replace"),
+        save: () => contextAction(menu, "save"),
+        crop: () => contextAction(menu, "crop"),
+        annotate: () => contextAction(menu, "annotate"),
+        preview: () => contextAction(menu, "preview"),
         copy: () => contextAction(menu, "copy"),
         cut: () => contextAction(menu, "cut"),
         paste: () => contextAction(menu, "paste"),
@@ -857,6 +873,23 @@ function openContextMenu(
     fail();
   }
 }
+function contextSource(menu: NonNullable<typeof contextMenu.value>) {
+  if (menu.selection.rootIds.length !== 1) return undefined;
+  try {
+    if (menu.path.length === 1) {
+      const root = props.roots.find((root) => root.id === menu.path[0]);
+      return root && !root.hidden && "assetId" in root ? root : undefined;
+    }
+    const resolved = resolveOwnedPictureNode(props.roots, menu.path, props.frameContext),
+      node = resolved?.node;
+    return resolved?.visible && node && "assetId" in node ? node : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const contextSourceNode = computed(() =>
+  contextMenu.value ? contextSource(contextMenu.value) : undefined,
+);
 function isContextMenuCurrent(menu: NonNullable<typeof contextMenu.value>): boolean {
   return isSelectionSnapshotCurrent(menu.lease);
 }
@@ -867,13 +900,46 @@ function closeContextMenu(restoreFocus = false): void {
 }
 function contextAction(
   menu: NonNullable<typeof contextMenu.value>,
-  action: "copy" | "cut" | "paste" | "delete" | "format" | "ungroup" | "convert",
+  action:
+    | "copy"
+    | "cut"
+    | "paste"
+    | "delete"
+    | "format"
+    | "ungroup"
+    | "convert"
+    | PictureContextSourceAction,
 ): void {
   if (contextMenu.value !== menu) return;
+  if (
+    ["replace", "save", "crop", "annotate", "preview", "format"].includes(action) &&
+    (props.sourceToolsDisabled || props.croppingExternally)
+  )
+    return;
   const valid = isContextMenuCurrent(menu);
   closeContextMenu(false);
-  if (!valid || (interactionReadOnly.value && !["copy", "format"].includes(action))) return;
-  if (action === "ungroup") {
+  if (
+    !valid ||
+    (interactionReadOnly.value && !["copy", "format", "preview", "save"].includes(action))
+  )
+    return;
+  if (
+    action === "replace" ||
+    action === "save" ||
+    action === "crop" ||
+    action === "annotate" ||
+    action === "preview"
+  ) {
+    const node = contextSource(menu);
+    if (
+      !node ||
+      props.sourceToolsDisabled ||
+      props.croppingExternally ||
+      (action !== "replace" && !props.assetUrls?.has(node.assetId))
+    )
+      return;
+    emit("sourceAction", action, [...menu.path], props.owner);
+  } else if (action === "ungroup") {
     if (menu.path.length === 1 && menu.selection.rootIds.length === 1)
       emit("ungroup", menu.path[0]!);
   } else if (action === "copy") emit("copy", [...menu.path], props.owner);
@@ -1062,6 +1128,14 @@ defineExpose({
       v-if="contextMenu"
       :anchor="contextMenu.anchor"
       :read-only="interactionReadOnly"
+      :can-source="!!contextSourceNode"
+      :source-unavailable="!contextSourceNode || !assetUrls?.has(contextSourceNode.assetId)"
+      :source-tools-disabled="sourceToolsDisabled || croppingExternally"
+      @replace="contextMenu.actions.replace"
+      @save="contextMenu.actions.save"
+      @crop="contextMenu.actions.crop"
+      @annotate="contextMenu.actions.annotate"
+      @preview="contextMenu.actions.preview"
       :convert-disabled="props.canConvertToCell?.(contextMenu.path) === false"
       :can-ungroup="contextMenu.path.length === 1 && contextMenu.selection.rootIds.length === 1"
       :can-convert="

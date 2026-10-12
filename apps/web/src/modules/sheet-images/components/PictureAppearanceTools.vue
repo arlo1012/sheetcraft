@@ -15,6 +15,11 @@ import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { type FloatingImage, type ImageAppearance } from "@sheetcraft/core/workbook";
 import { isPictureGroup } from "@sheetcraft/core";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
+import {
+  isGroupedGroup,
+  isGroupedPicture,
+  type GroupedPicture,
+} from "@sheetcraft/core/picture-group";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
@@ -32,11 +37,20 @@ import { useWorkbookTheme } from "../../../shared/color/workbook-theme-context";
 import { getPictureOwnDetailedStyle } from "../picture-detailed-style-edit";
 import { pictureOutlineColorPatch, pictureOutlineWidthPatch } from "../picture-outline-edit";
 import { picturePaintColorFromSelection } from "../picture-paint-edit";
-import { requireStandalonePicture } from "../picture-document-support";
-const props = defineProps<{ image: FloatingImage; disabled: boolean }>();
+import {
+  requireStandalonePicture,
+  UnsupportedPictureDocumentError,
+} from "../picture-document-support";
+const props = defineProps<{ image: FloatingImage | GroupedPicture; disabled: boolean }>();
+function requireAppearanceSource(image: FloatingImage | GroupedPicture) {
+  if (isGroupedPicture(image)) return image;
+  if (isGroupedGroup(image))
+    throw new UnsupportedPictureDocumentError("picture-container-consumer", [image.id]);
+  return requireStandalonePicture(image);
+}
 // A container has no appearance source. Reject it before creating menu drafts.
-requireStandalonePicture(props.image);
-const standaloneImage = computed(() => requireStandalonePicture(props.image));
+requireAppearanceSource(props.image);
+const sourceImage = computed(() => requireAppearanceSource(props.image));
 const emit = defineEmits<{
   change: [patch: Partial<ImageAppearance> | undefined];
 }>();
@@ -82,7 +96,7 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   menuSurfaceRef,
   disabled: computed(() => props.disabled),
 });
-const appearance = computed(() => standaloneImage.value.transform?.appearance ?? {});
+const appearance = computed(() => sourceImage.value.transform?.appearance ?? {});
 const workbookTheme = useWorkbookTheme();
 const ownLine = computed(() => getPictureOwnDetailedStyle(appearance.value)?.line);
 const outlineWidth = computed(() =>
@@ -98,15 +112,22 @@ const outlineColor = computed(() => {
       ? resolveThemeColor(workbookTheme?.value ?? DEFAULT_WORKBOOK_THEME, color.reference)
       : "#000000";
 });
-const isFramed = computed(() => isFramedPictureObject(standaloneImage.value));
+const isFramed = computed(() => {
+  const image = sourceImage.value;
+  return isGroupedPicture(image) || isFramedPictureObject(image);
+});
 const label = computed(() => t(`picture.${mode.value}`));
 watch(
-  [() => props.image.id, () => (isPictureGroup(props.image) ? undefined : props.image.assetId)],
+  [
+    () => props.image.id,
+    () =>
+      isPictureGroup(props.image) || isGroupedGroup(props.image) ? undefined : props.image.assetId,
+  ],
   () => dismiss("programmatic", false),
   { flush: "sync" },
 );
 async function toggle(next: Mode): Promise<void> {
-  const image = requireStandalonePicture(props.image);
+  const image = requireAppearanceSource(props.image);
   if (props.disabled) return;
   const id = image.id;
   const assetId = image.assetId;
@@ -115,18 +136,18 @@ async function toggle(next: Mode): Promise<void> {
     mode.value = next;
     await nextTick();
   }
-  const current = requireStandalonePicture(props.image);
+  const current = requireAppearanceSource(props.image);
   if (props.disabled || current.id !== id || current.assetId !== assetId) return;
   toggleMenu();
 }
 function keydown(next: Mode, event: KeyboardEvent): void {
-  requireStandalonePicture(props.image);
+  requireAppearanceSource(props.image);
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
   mode.value = next;
   onTriggerKeydown(event);
 }
 function change(patch: Partial<ImageAppearance>): boolean {
-  requireStandalonePicture(props.image);
+  requireAppearanceSource(props.image);
   if (props.disabled || (isFramed.value && patch.reflection === true)) return false;
   emit("change", patch);
   return true;
@@ -148,14 +169,14 @@ function outlineSelect(rgb: string | null, reference?: ThemeColorReference): voi
   );
 }
 function reset(): void {
-  requireStandalonePicture(props.image);
+  requireAppearanceSource(props.image);
   if (props.disabled) return;
   emit("change", undefined);
 }
 </script>
 <template>
   <section
-    v-if="!isPictureGroup(image)"
+    v-if="!isPictureGroup(image) && !isGroupedGroup(image)"
     class="picture-appearance"
     role="group"
     :aria-label="t('picture.style')"

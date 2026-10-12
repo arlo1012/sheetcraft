@@ -12,6 +12,8 @@ const props = withDefaults(
     readOnly?: boolean;
     sourceOperationsDisabled?: boolean;
     previewDisabled?: boolean;
+    sourceUnavailable?: boolean;
+    sourceToolsDisabled?: boolean;
   }>(),
   {
     readOnly: false,
@@ -20,6 +22,11 @@ const props = withDefaults(
 const emit = defineEmits<{
   convertToCell: [];
   preview: [];
+  replace: [];
+  save: [];
+  crop: [];
+  annotate: [];
+  format: [];
   copy: [];
   cut: [];
   paste: [];
@@ -66,9 +73,9 @@ function onKeydown(event: KeyboardEvent): void {
     >
       <MenuItem
         data-floating-image-action="preview"
-        :disabled="previewDisabled ?? sourceOperationsDisabled"
+        :disabled="sourceToolsDisabled || (previewDisabled ?? sourceOperationsDisabled)"
         :title="
-          (previewDisabled ?? sourceOperationsDisabled)
+          sourceToolsDisabled || (previewDisabled ?? sourceOperationsDisabled)
             ? t('image.sourceOperationsUnavailable')
             : undefined
         "
@@ -76,6 +83,36 @@ function onKeydown(event: KeyboardEvent): void {
       >
         {{ t("image.preview") }}
       </MenuItem>
+      <MenuItem
+        data-floating-image-action="replace"
+        :disabled="readOnly || sourceToolsDisabled"
+        @select="emit('replace')"
+        >{{ t("image.replace") }}</MenuItem
+      >
+      <MenuItem
+        data-floating-image-action="save"
+        :disabled="sourceUnavailable || sourceToolsDisabled"
+        @select="emit('save')"
+        >{{ t("picture.saveAsPicture") }}</MenuItem
+      >
+      <MenuItem
+        data-floating-image-action="crop"
+        :disabled="readOnly || sourceUnavailable || sourceToolsDisabled"
+        @select="emit('crop')"
+        >{{ t("image.crop") }}</MenuItem
+      >
+      <MenuItem
+        data-floating-image-action="annotate"
+        :disabled="readOnly || sourceUnavailable || sourceToolsDisabled"
+        @select="emit('annotate')"
+        >{{ t("picture.annotate") }}</MenuItem
+      >
+      <MenuItem
+        data-floating-image-action="format"
+        :disabled="sourceToolsDisabled"
+        @select="emit('format')"
+        >{{ t("pictureFormat.paneTitle") }}</MenuItem
+      >
       <MenuItem data-floating-image-action="copy" @select="emit('copy')">
         {{ t("cellMenu.copy") }}
         <template #shortcut>{{ t("cellMenu.copyShortcut") }}</template>

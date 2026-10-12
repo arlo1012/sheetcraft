@@ -13,7 +13,13 @@ import {
 } from "@sheetcraft/core/picture-object";
 import { pictureFrameFromLegacy, resolvePictureFrame } from "@sheetcraft/core/picture-frame";
 import { resolvePictureGroup } from "@sheetcraft/core/picture-group-layout";
-import { traversePictureGroup, type PictureGroupPath } from "@sheetcraft/core/picture-group";
+import {
+  traversePictureGroup,
+  normalizePictureGroup,
+  findPictureGroupNode,
+  isGroupedPicture,
+  type PictureGroupPath,
+} from "@sheetcraft/core/picture-group";
 import { groupPictureRoots, ungroupPictureRoot } from "@sheetcraft/core/picture-group-planning";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import {
@@ -414,6 +420,43 @@ export function usePictureTools(options: {
   function applyAppearance(patch: Partial<ImageAppearance> | undefined): boolean {
     operationFeedback.value = undefined;
     sizeFeedback.value = undefined;
+    const path = options.getSelectedPath?.();
+    if (path && path.length > 1) {
+      try {
+        const lease = capture();
+        if (
+          lease.selectedIds.length !== 1 ||
+          path[0] !== lease.selectedIds[0] ||
+          patch?.reflection === true
+        )
+          throw new Error("Invalid owned appearance target.");
+        const root = lease.forest.find((image) => image.id === path[0]);
+        if (!root || !isPictureGroup(root)) throw new Error("Missing appearance owner.");
+        const copy = normalizePictureGroup(root),
+          target = findPictureGroupNode(copy, path)?.node;
+        if (!target || !isGroupedPicture(target))
+          throw new Error("Appearance requires a real leaf.");
+        const normalized = normalizeImageTransform({
+          annotations: target.transform?.annotations,
+          appearance: patch
+            ? patchPictureAppearance(target.transform?.appearance, patch)
+            : resetPictureAppearance(),
+        });
+        target.transform = normalized
+          ? { annotations: normalized.annotations, appearance: normalized.appearance }
+          : undefined;
+        if (!patch) delete target.frame.cropShape;
+        const accepted = replace(
+          lease.forest.map((image) => (image.id === root.id ? copy : image)),
+          lease,
+        );
+        if (!accepted) operationFeedback.value = "picture.operationFailed";
+        return accepted;
+      } catch {
+        operationFeedback.value = "picture.operationFailed";
+        return false;
+      }
+    }
     const ids = options.selectedIds.value;
     const targets = options.getSheet().floatingImages.filter((image) => ids.includes(image.id));
     if (

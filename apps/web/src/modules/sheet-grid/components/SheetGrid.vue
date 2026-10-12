@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { PictureContextSourceAction } from "../../sheet-images/picture-context-source-action";
 import { captureCellPictureSourcePresentation } from "../../sheet-images/cell-picture-presentation";
 import { isFramedCellImage } from "@sheetcraft/core/cell-picture-frame";
 import type { Point } from "@sheetcraft/sheet-engine/geometry";
@@ -289,6 +290,7 @@ const props = withDefaults(
     imageAssetUrls?: ReadonlyMap<string, string>;
     imagePreviewOnDoubleClick?: boolean;
     pictureAlignmentReference?: PictureAlignmentReference;
+    pictureSourceBusy?: boolean;
     restorePictureOriginal?: () => boolean;
     canRestorePictureOriginal?: boolean;
     loadingImageAssetIds?: ReadonlySet<string>;
@@ -388,6 +390,7 @@ const emit = defineEmits<{
   updateNoteBox: [payload: { address: CellAddress; box: CellNoteBox }];
   imageFeedback: [key: MessageKey];
   pictureAlignmentReference: [reference: PictureAlignmentReference];
+  pictureSourceAction: [action: PictureContextSourceAction, path: PictureGroupPath, owner: Sheet];
   pasteImageFile: [file: File, mode: ImageInsertMode, address?: CellAddress];
   pasteFloatingImage: [image: FloatingImage, mode: ImageInsertMode, address?: CellAddress];
   pasteFloatingImages: [images: readonly FloatingImage[], address: CellAddress];
@@ -2442,11 +2445,50 @@ function formatOwnedPicture(path: PictureGroupPath, owner?: object, paint?: "fil
   if (owner !== props.sheet || !pictureFrameContext.value) return;
   if (pictureCrop.active.value && !finishPictureCrop()) return;
   try {
-    if (
-      resolveOwnedPictureNode(props.sheet.floatingImages, path, pictureFrameContext.value)?.visible
-    )
+    const visible =
+      path.length === 1
+        ? props.sheet.floatingImages.some((root) => root.id === path[0] && !root.hidden)
+        : resolveOwnedPictureNode(props.sheet.floatingImages, path, pictureFrameContext.value)
+            ?.visible;
+    if (visible)
       if (paint) emit("formatOwnedPicture", [...path], props.sheet, paint);
       else emit("formatOwnedPicture", [...path], props.sheet);
+  } catch {
+    emit("imageFeedback", "picture.operationFailed");
+  }
+}
+function requestPictureSourceAction(
+  action: PictureContextSourceAction,
+  path: PictureGroupPath,
+  owner?: object,
+): void {
+  if (owner !== props.sheet || props.pictureSourceBusy) return;
+  if (action === "format") {
+    formatOwnedPicture(path, owner);
+    return;
+  }
+  if (
+    selectedImageIds.value.length !== 1 ||
+    selectedImageIds.value[0] !== path[0] ||
+    JSON.stringify(path.length > 1 ? path : null) !==
+      JSON.stringify(selectedOwnedPicturePath.value) ||
+    (!(["save", "preview"] as string[]).includes(action) && pictureSelectionReadOnly.value)
+  )
+    return;
+  if (pictureCrop.active.value && !finishPictureCrop()) return;
+  try {
+    const context = pictureFrameContext.value,
+      resolved =
+        path.length > 1 && context
+          ? resolveOwnedPictureNode(props.sheet.floatingImages, path, context)
+          : undefined,
+      node =
+        path.length === 1
+          ? props.sheet.floatingImages.find((root) => root.id === path[0])
+          : resolved?.node,
+      visible = path.length === 1 ? !!node && !node.hidden : resolved?.visible;
+    if (!visible || !node || !("assetId" in node)) return;
+    emit("pictureSourceAction", action, [...path], props.sheet);
   } catch {
     emit("imageFeedback", "picture.operationFailed");
   }
@@ -4380,6 +4422,7 @@ defineExpose({
         @edit="emit('editDrawing', $event)"
       />
       <SheetFloatingImageLayer
+        :source-tools-disabled="pictureSourceBusy"
         :restore-original-handler="restorePictureOriginal"
         :can-restore-original="canRestorePictureOriginal"
         :alignment-reference="pictureAlignmentReference"
@@ -4417,13 +4460,17 @@ defineExpose({
         @copy="requestFloatingImageCopy($event, 'copy')"
         @cut="requestFloatingImageCopy($event, 'cut')"
         @paste="requestFloatingImagePaste"
+        @source-action="requestPictureSourceAction"
       />
       <SheetOwnedPictureGroupLayer
+        :source-tools-disabled="pictureSourceBusy"
         :alignment-reference="pictureAlignmentReference"
         @reference="emit('pictureAlignmentReference', $event)"
         v-if="pictureFrameContext"
         ref="ownedImageLayerRef"
         :roots="sheet.floatingImages"
+        :asset-urls="resolvedImageUrls"
+        @source-action="requestPictureSourceAction"
         :cropping-externally="pictureCrop.active.value"
         :owner="sheet"
         :revision="workbookRevision ?? 0"

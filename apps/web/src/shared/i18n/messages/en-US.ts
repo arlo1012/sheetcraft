@@ -1679,6 +1679,7 @@ export const enUS = {
     doubleClickPreview: "Double-click to preview",
     doubleClickSelect: "Double-click to select only",
 
+    saveAsPicture: "Save as Picture (PNG)",
     annotate: "Annotate picture",
     apply: "Apply",
     pen: "Pen",

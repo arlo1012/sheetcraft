@@ -12,8 +12,16 @@ const props = defineProps<{
   canUngroup: boolean;
   canConvert?: boolean;
   convertDisabled?: boolean;
+  canSource?: boolean;
+  sourceUnavailable?: boolean;
+  sourceToolsDisabled?: boolean;
 }>();
 const emit = defineEmits<{
+  replace: [];
+  save: [];
+  crop: [];
+  annotate: [];
+  preview: [];
   copy: [];
   cut: [];
   paste: [];
@@ -67,6 +75,38 @@ function onKeydown(event: KeyboardEvent): void {
       @keydown.stop="onKeydown"
       @contextmenu.prevent.stop
     >
+      <template v-if="canSource">
+        <MenuItem
+          data-owned-picture-action="preview"
+          :disabled="sourceUnavailable || sourceToolsDisabled"
+          @select="emit('preview')"
+          >{{ t("image.preview") }}</MenuItem
+        >
+        <MenuItem
+          data-owned-picture-action="replace"
+          :disabled="readOnly || sourceToolsDisabled"
+          @select="emit('replace')"
+          >{{ t("image.replace") }}</MenuItem
+        >
+        <MenuItem
+          data-owned-picture-action="save"
+          :disabled="sourceUnavailable || sourceToolsDisabled"
+          @select="emit('save')"
+          >{{ t("picture.saveAsPicture") }}</MenuItem
+        >
+        <MenuItem
+          data-owned-picture-action="crop"
+          :disabled="readOnly || sourceUnavailable || sourceToolsDisabled"
+          @select="emit('crop')"
+          >{{ t("image.crop") }}</MenuItem
+        >
+        <MenuItem
+          data-owned-picture-action="annotate"
+          :disabled="readOnly || sourceUnavailable || sourceToolsDisabled"
+          @select="emit('annotate')"
+          >{{ t("picture.annotate") }}</MenuItem
+        >
+      </template>
       <MenuItem data-owned-picture-action="copy" @select="emit('copy')">
         {{ t("cellMenu.copy") }}<template #shortcut>{{ t("cellMenu.copyShortcut") }}</template>
       </MenuItem>
@@ -92,7 +132,11 @@ function onKeydown(event: KeyboardEvent): void {
         @select="emit('convertToCell')"
         >{{ t("image.convertToCell") }}</MenuItem
       >
-      <MenuItem data-owned-picture-action="format" @select="emit('format')">
+      <MenuItem
+        data-owned-picture-action="format"
+        :disabled="sourceToolsDisabled"
+        @select="emit('format')"
+      >
         {{ t("pictureFormat.paneTitle") }}
       </MenuItem>
       <MenuItem
