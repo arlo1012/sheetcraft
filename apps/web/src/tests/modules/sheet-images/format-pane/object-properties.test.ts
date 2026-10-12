@@ -64,3 +64,24 @@ test("protected Edit objects allows changing Locked, while a denied or malformed
   expect(f.session.history.undoStack).toHaveLength(history);
   f.scope.stop();
 });
+
+test("unlocked protected roots and their leaves can edit normal fields, but Locked remains permission-gated", () => {
+  for (const path of [null, ["owned-group", "owned-leaf"]] as const) {
+    const f = cropOwnerFixture(path ? "owned-group" : "framed", path ? [...path] : null),
+      root = f.sheet.floatingImages.find((root) => root.id === (path ? "owned-group" : "framed"))!;
+    root.locked = false;
+    f.sheet.properties.protected = true;
+    f.sheet.protection = { editableRanges: [] };
+    expect(f.pane.capabilities.value.fields.sizeWidthPt?.enabled).toBe(true);
+    expect(f.pane.capabilities.value.fields.locked?.enabled).toBe(false);
+    expect(f.pane.capabilities.value.fields.locked?.reason).toBeTruthy();
+    expect(f.pane.onIntent(f.field("altTitle", "Protected but unlocked"))).toBe(true);
+    expect(f.pane.onIntent(f.field("sizeWidthPt", 72))).toBe(true);
+    const before = serializeWorkbook(f.session.workbook),
+      history = f.session.history.undoStack.length;
+    expect(f.pane.onIntent(f.field("locked", true))).toBe(false);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+    expect(f.session.history.undoStack).toHaveLength(history);
+    f.scope.stop();
+  }
+});

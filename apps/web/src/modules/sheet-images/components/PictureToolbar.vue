@@ -40,6 +40,7 @@ const props = withDefaults(
     cropHandler?: () => boolean;
     appearanceHandler?: (patch: Partial<ImageAppearance> | undefined) => boolean;
     disabled: boolean;
+    groupCreateDisabled?: boolean;
     busy?: boolean;
     selectionCount: number;
     previewOnDoubleClick: boolean;
@@ -298,13 +299,14 @@ function sourceAction(action: () => void): void {
       @flip="(axis) => sourceAction(() => emit('flip', axis))"
     />
     <PictureArrangeTools
+      :group-create-disabled="groupCreateDisabled"
       :disabled="disabled"
       :group-disabled="false"
       :alignment-disabled="false"
       :grid-disabled="isFramed"
       :count="selectionCount"
       :grouped="!!standaloneImage.groupId"
-      @group="sourceAction(() => emit('group'))"
+      @group="!groupCreateDisabled && sourceAction(() => emit('group'))"
       @ungroup="sourceAction(() => emit('ungroup'))"
       @align="(action) => sourceAction(() => emit('align', action))"
       @layer="(action) => sourceAction(() => emit('layer', action))"

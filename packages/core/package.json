@@ -226,6 +226,10 @@
     "./picture-properties": {
       "types": "./dist/picture-properties.d.ts",
       "import": "./dist/picture-properties.js"
+    },
+    "./picture-protection": {
+      "types": "./dist/picture-protection.d.ts",
+      "import": "./dist/picture-protection.js"
     }
   },
   "scripts": {

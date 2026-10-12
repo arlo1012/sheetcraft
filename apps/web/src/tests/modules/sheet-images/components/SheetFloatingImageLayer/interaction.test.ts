@@ -313,3 +313,21 @@ describe("SheetFloatingImageLayer", () => {
     expect(wrapper.emitted("delete")).toEqual([["image-1"]]);
   });
 });
+
+test("protected-root availability gates pointer selection independently of ordinary read-only preview", async () => {
+  const wrapper = mountLayer();
+  await wrapper.setProps({ canEditRoot: () => false });
+  const fragment = wrapper.get('[data-floating-image-id="image-1"]');
+  await fragment.trigger("pointerdown", { button: 0, pointerId: 4, clientX: 10, clientY: 10 });
+  await fragment.trigger("dblclick", { button: 0 });
+  expect(wrapper.emitted("select")).toBeUndefined();
+  expect(wrapper.emitted("preview")).toBeUndefined();
+  await wrapper.setProps({ canEditRoot: () => true });
+  await fragment.trigger("pointerdown", { button: 0, pointerId: 5, clientX: 10, clientY: 10 });
+  expect(wrapper.emitted("select")).toBeDefined();
+  await wrapper.setProps({ canEditRoot: () => false });
+  await fragment.trigger("pointerup", { pointerId: 5 });
+  expect(wrapper.emitted("update")).toBeUndefined();
+  expect(wrapper.emitted("updateMany")).toBeUndefined();
+  wrapper.unmount();
+});

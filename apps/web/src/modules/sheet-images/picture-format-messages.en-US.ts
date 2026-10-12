@@ -128,6 +128,7 @@ export const pictureFormatEnUS = {
     perspectiveDeg: "Perspective",
     distanceFromGroundPt: "Distance from ground",
     capabilityReasons: {
+      lockPermission: "Changing Locked on a protected sheet requires Edit objects permission.",
       inheritedProperties:
         "Positioning, locking and printing follow the outer picture group. Select the group to change them.",
       inheritedLine:

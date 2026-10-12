@@ -89,3 +89,14 @@ describe("picture multiselection floating shortcuts", () => {
     expect(document.querySelector("[data-picture-selection-reference]")).toBeNull();
   });
 });
+
+test("denying new grouping leaves existing selection alignment usable", async () => {
+  const wrapper = fixture(3);
+  await wrapper.setProps({ canGroup: false });
+  expect(button("group").disabled).toBe(true);
+  expect(button("left").disabled).toBe(false);
+  button("group").click();
+  expect(wrapper.emitted("group")).toBeUndefined();
+  button("left").click();
+  expect(wrapper.emitted("align")).toEqual([["left", "selection", "owner:selection"]]);
+});

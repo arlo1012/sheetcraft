@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { canEditPictureRoot, canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import { isPictureGroup, type PictureGroupPath } from "@sheetcraft/core/picture-group";
 import { arePictureObjectsEqual, isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import {
@@ -869,6 +870,15 @@ const objectsReadOnly = computed(
     props.readOnly &&
     (!props.sheet.properties.protected || !canUseSheetPermission(props.sheet, "editObjects")),
 );
+const pictureLayerReadOnly = computed(() => props.readOnly && !props.sheet.properties.protected);
+function pictureRootAvailable(root: FloatingImage): boolean {
+  void props.workbookRevision;
+  const live = props.sheet.floatingImages.find((image) => image.id === root.id);
+  return !!live && canEditPictureRoot(props.sheet, live);
+}
+const pictureSelectionReadOnly = computed(
+  () => pictureLayerReadOnly.value || !canEditPictureSelection(props.sheet, selectedImageIds.value),
+);
 const filterReadOnly = computed(
   () =>
     props.readOnly &&
@@ -1207,7 +1217,7 @@ const pictureCrop = usePictureCropSession({
   getContext: () => pictureFrameContext.value,
   getSelectedIds: () => selectedImageIds.value,
   getSelectedPath: () => selectedOwnedPicturePath.value,
-  isReadOnly: () => objectsReadOnly.value,
+  isReadOnly: () => pictureSelectionReadOnly.value,
   execute: (roots) => props.applyPictureCollectionChange?.(roots) === true,
   onFailure: () => emit("imageFeedback", "picture.operationFailed"),
 });
@@ -2140,6 +2150,7 @@ function expandFloatingImageSelection(ids: readonly string[]): string[] {
 }
 function selectFloatingImage(id: string | null, additive = false): void {
   if (isComposing.value) return;
+  if (id && !canEditPictureSelection(props.sheet, expandFloatingImageSelection([id]))) return;
   selectedOwnedPicturePath.value = null;
   if (isEditing.value) finishEdit(undefined, false);
   stopDragSelection();
@@ -2172,7 +2183,12 @@ function selectOwnedPicturePath(path: PictureGroupPath | null): void {
     return;
   }
   const context = pictureFrameContext.value;
-  if (!context || selectedImageIds.value.length !== 1 || selectedImageIds.value[0] !== path[0])
+  if (
+    !context ||
+    !canEditPictureSelection(props.sheet, [path[0]!]) ||
+    selectedImageIds.value.length !== 1 ||
+    selectedImageIds.value[0] !== path[0]
+  )
     return;
   try {
     if (resolveOwnedPictureNode(props.sheet.floatingImages, path, context)?.visible)
@@ -2187,7 +2203,7 @@ function ownedActionPaths(path: PictureGroupPath): PictureGroupPath[] {
     : [[...path]];
 }
 function deleteOwnedPicture(path: PictureGroupPath, owner?: object): void {
-  if (objectsReadOnly.value || owner !== props.sheet) return;
+  if (pictureSelectionReadOnly.value || owner !== props.sheet) return;
   if (pictureCrop.active.value && !finishPictureCrop()) return;
   try {
     if (!props.applyOwnedPictureDelete?.(ownedActionPaths(path), props.sheet))
@@ -2197,7 +2213,7 @@ function deleteOwnedPicture(path: PictureGroupPath, owner?: object): void {
   }
 }
 function ungroupOwnedPicture(rootId: string): void {
-  if (objectsReadOnly.value) return;
+  if (pictureSelectionReadOnly.value) return;
   try {
     const ids = selectedImageIds.value.includes(rootId) ? selectedImageIds.value : [rootId];
     if (!props.applyPictureUngroup?.(ids, props.sheet))
@@ -2258,7 +2274,7 @@ function currentOwnedClipboardPaths(): PictureGroupPath[] {
 }
 function deleteSelectedFloatingImage(id: string): void {
   if (pictureCrop.active.value && (selectedImageId.value !== id || !finishPictureCrop())) return;
-  if (objectsReadOnly.value) return;
+  if (pictureSelectionReadOnly.value) return;
   if (props.applyOwnedPictureDelete) {
     deleteOwnedPicture([id], props.sheet);
     return;
@@ -3796,6 +3812,8 @@ defineExpose({
     else if (image) emit("imageFeedback", "picture.operationFailed");
   },
   selectFloatingImages: (ids: string[]) => {
+    if (ids.length && !canEditPictureSelection(props.sheet, expandFloatingImageSelection(ids)))
+      return;
     selectedOwnedPicturePath.value = null;
     selectedImageIds.value = expandFloatingImageSelection(ids);
     selectedImageId.value =
@@ -4157,7 +4175,9 @@ defineExpose({
         @update-many="emit('updateFloatingImages', $event)"
         @group="emit('groupFloatingImages', $event)"
         @feedback="emit('imageFeedback', $event)"
-        :read-only="objectsReadOnly"
+        :read-only="pictureLayerReadOnly"
+        :can-edit-root="pictureRootAvailable"
+        :can-group="canUseSheetPermission(sheet, 'editObjects')"
         @select="selectFloatingImage"
         @update="emit('updateFloatingImage', $event)"
         @delete="deleteSelectedFloatingImage"
@@ -4180,7 +4200,9 @@ defineExpose({
         :selected-root-id="selectedImageId"
         :selected-root-ids="selectedImageIds"
         :selected-path="selectedOwnedPicturePath"
-        :read-only="objectsReadOnly"
+        :read-only="pictureLayerReadOnly"
+        :can-edit-root="pictureRootAvailable"
+        :can-group="canUseSheetPermission(sheet, 'editObjects')"
         :apply-update-many="applyPictureCollectionChange"
         @paint-state-change="acceptPicturePaintState('owned', $event)"
         @select="selectFloatingImage"

@@ -1,6 +1,6 @@
 import { getPictureProperties, type PictureProperties } from "@sheetcraft/core/picture-properties";
 import { computed, getCurrentScope, onScopeDispose, ref, watch } from "vue";
-import { canUseSheetPermission } from "@sheetcraft/core";
+import { canEditPictureRoot, canChangePictureLock } from "@sheetcraft/core/picture-protection";
 import {
   getDrawingThemeEffects,
   resolvePictureThemeEffects,
@@ -183,6 +183,8 @@ export interface OwnedPictureFormatPaneOptions {
   getInheritedLineReason?: () => string;
   getCompositeLineReason?: () => string;
   getInheritedPropertiesReason?: () => string;
+  getProtectedReason?: () => string;
+  getLockPermissionReason?: () => string;
   /** Current, validated resource registry; callers never gain access by supplying an arbitrary ID. */
   isImageAssetAvailable?: (assetId: string) => boolean;
 }
@@ -531,7 +533,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
     if (!inner && (isPictureGroup(root) || isFramedPictureObject(root)))
       values.anchor = anchorValue(root.frame.anchor.mode);
     else if (!inner) values.anchor = "move";
-    if (!options.isBusy() && canUseSheetPermission(lease.sheet, "editObjects")) {
+    if (!options.isBusy() && canEditPictureRoot(lease.sheet, lease.root)) {
       if (sourceBearing) {
         capabilities.detailed = Object.fromEntries(
           PICTURE_DETAILED_CATEGORIES.map((category) => [category, { enabled: true }]),
@@ -576,7 +578,14 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         capabilities.fields.altTitle = { enabled: true };
       }
       if (!inner) {
-        capabilities.fields.locked = { enabled: true };
+        capabilities.fields.locked = canChangePictureLock(lease.sheet)
+          ? { enabled: true }
+          : {
+              enabled: false,
+              reason:
+                options.getLockPermissionReason?.() ??
+                "Changing Locked requires Edit objects permission on this protected sheet.",
+            };
         capabilities.fields.printObject = { enabled: true };
       }
       if (
@@ -658,6 +667,13 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
         capabilities.fields[field] = { enabled: false, reason };
       capabilities.resets!["reset-crop"] = { enabled: false, reason };
       capabilities.resets!["reset-size"] = { enabled: false, reason };
+    }
+    if (!canEditPictureRoot(lease.sheet, lease.root)) {
+      const reason = options.getProtectedReason?.() ?? "This picture is protected from editing.";
+      for (const field of fields) capabilities.fields[field] = { enabled: false, reason };
+      for (const category of PICTURE_DETAILED_CATEGORIES)
+        capabilities.detailed![category] = { enabled: false, reason };
+      for (const reset of resets) capabilities.resets![reset] = { enabled: false, reason };
     }
     const snapshot: PictureFormatSnapshot = {
       owner: {
@@ -1008,7 +1024,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
           ? view.capabilities.detailed?.[intent.category]?.enabled !== true
           : view.capabilities.resets?.[intent.type]?.enabled !== true) ||
       options.isBusy() ||
-      !canUseSheetPermission(lease.sheet, "editObjects")
+      !canEditPictureRoot(lease.sheet, lease.root)
     )
       return false;
     try {

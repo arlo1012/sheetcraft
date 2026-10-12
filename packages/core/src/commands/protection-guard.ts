@@ -1,4 +1,5 @@
 import { areCellTextFontRunsEqual, replaceCellTextByDiff } from "../text-font-runs.js";
+import { canEditPictureForest } from "../picture-protection.js";
 import { getSheetFilters } from "./filter.js";
 import { WorkbookDomainError } from "../errors.js";
 import { MAX_SHEET_ROWS, MAX_SHEET_COLUMNS } from "../sheet-limits.js";
@@ -203,13 +204,23 @@ export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookC
       reject(sheet.id);
     return true;
   }
-  if (
-    command.type === "setFloatingImage" ||
-    command.type === "deleteFloatingImage" ||
-    command.type === "setSheetFloatingImages" ||
-    command.type === "setSheetDrawings"
-  )
-    return Boolean(sheet.protection?.editObjects);
+  if (command.type === "setSheetFloatingImages") return canEditPictureForest(sheet, command.images);
+  if (command.type === "deleteFloatingImage")
+    return canEditPictureForest(
+      sheet,
+      sheet.floatingImages.filter((root) => root.id !== command.id),
+    );
+  if (command.type === "setFloatingImage") {
+    const index = sheet.floatingImages.findIndex((root) => root.id === command.image.id);
+    const next = sheet.floatingImages.slice();
+    if (index < 0) next.splice(command.index ?? next.length, 0, command.image);
+    else {
+      next.splice(index, 1);
+      next.splice(command.index ?? index, 0, command.image);
+    }
+    return canEditPictureForest(sheet, next);
+  }
+  if (command.type === "setSheetDrawings") return Boolean(sheet.protection?.editObjects);
   if (command.type === "applyCellStyle" && "unlocked" in command.patch) reject(sheet.id);
   if (
     command.type === "applyCellFormat" &&

@@ -79,10 +79,12 @@ const props = withDefaults(
     selectedPath?: PictureGroupPath | null;
     scale?: number;
     readOnly?: boolean;
+    canEditRoot?: (root: FloatingImage) => boolean;
+    canGroup?: boolean;
     croppingExternally?: boolean;
     applyUpdateMany?: (roots: readonly FloatingImage[]) => boolean;
   }>(),
-  { scale: 1, readOnly: false },
+  { scale: 1, readOnly: false, canGroup: true },
 );
 const emit = defineEmits<{
   select: [rootId: string | null, additive?: boolean];
@@ -116,6 +118,24 @@ const selectedIds = computed(() => [
     ...(props.selectedRootId ? [props.selectedRootId] : []),
   ]),
 ]);
+function isRootAvailable(id: string): boolean {
+  const root = props.roots.find((root) => root.id === id);
+  return !!root && props.canEditRoot?.(root) !== false;
+}
+const interactionReadOnly = computed(
+  () =>
+    props.readOnly ||
+    selectedIds.value.some(
+      (id) => props.roots.some((root) => root.id === id) && !isRootAvailable(id),
+    ),
+);
+function hitInteractiveRoot(...args: Parameters<typeof hitPictureRootAt>) {
+  const hit = hitPictureRootAt(...args);
+  return hit &&
+    isRootAvailable(hit.kind === "legacy" || hit.kind === "framed" ? hit.image.id : hit.rootId)
+    ? hit
+    : undefined;
+}
 const selectedGroupRoots = computed(() =>
   props.roots.filter((root) => isPictureGroup(root) && selectedIds.value.includes(root.id)),
 );
@@ -209,7 +229,7 @@ function currentContext(): PictureGroupInteractionContext {
     layout: props.layout,
     frameContext: props.frameContext,
     scale: props.scale,
-    readOnly: props.readOnly,
+    readOnly: interactionReadOnly.value,
   };
 }
 function currentSelection(): PictureGroupSelection {
@@ -238,7 +258,12 @@ function applySelectionPlan(
   snapshot: OwnedPictureSelectionSnapshot | null,
   plan: (lease: OwnedPictureSelectionSnapshot) => FloatingImage[],
 ): boolean {
-  if (props.readOnly || gesture.value || !snapshot || !isSelectionSnapshotCurrent(snapshot))
+  if (
+    interactionReadOnly.value ||
+    gesture.value ||
+    !snapshot ||
+    !isSelectionSnapshotCurrent(snapshot)
+  )
     return false;
   const apply = props.applyUpdateMany;
   try {
@@ -347,7 +372,12 @@ const selectionToolbar = computed(() => {
           arrangeSelection(lease.selection.rootIds, action, reference, lease);
       },
       group: (selectedKey: string) => {
-        if (selectedKey === key && !props.readOnly && current())
+        if (
+          selectedKey === key &&
+          props.canGroup !== false &&
+          !interactionReadOnly.value &&
+          current()
+        )
           emit("group", [...lease.selection.rootIds]);
       },
       dismiss: (selectedKey: string) => {
@@ -447,7 +477,7 @@ function finishGesture(commit: boolean): void {
 }
 /** No optimistic success: an emit-only owner must feed its accepted roots back as props. */
 function commitRoots(next: readonly FloatingImage[]): boolean {
-  if (props.readOnly) return false;
+  if (interactionReadOnly.value) return false;
   if (areFloatingImageCollectionsEqual(props.roots, next)) return true;
   if (!props.applyUpdateMany) {
     emit("updateMany", [...next]);
@@ -474,14 +504,21 @@ function beginGesture(
   paneId: FrozenPaneId,
   expectedSelection = currentSelection(),
 ): void {
-  if (props.readOnly) return;
+  if (props.readOnly || rootIds.some((id) => !isRootAvailable(id))) return;
   finishGesture(false);
   try {
     if (mode === "rotate" && rootIds.length > 1) {
       fail();
       return;
     }
-    const snapshot = capturePictureGroupInteraction(currentContext(), path, rootIds);
+    const snapshot = capturePictureGroupInteraction(
+      {
+        ...currentContext(),
+        readOnly: props.readOnly || rootIds.some((id) => !isRootAvailable(id)),
+      },
+      path,
+      rootIds,
+    );
     const translation = getPicturePaneTranslation(paneId, props.layout);
     const active: Gesture = {
       snapshot,
@@ -539,7 +576,7 @@ function moveGestureAt(active: Gesture, point: Point): void {
 }
 function selectBodyHit(event: PointerEvent, point: Point): boolean {
   if (event.button !== 0) return false;
-  const hit = hitPictureRootAt(
+  const hit = hitInteractiveRoot(
     props.roots,
     point,
     props.layout,
@@ -568,7 +605,7 @@ function selectBodyHit(event: PointerEvent, point: Point): boolean {
 function onOverlayMove(overlay: SelectionOverlay, event: PointerEvent): void {
   const point = pointFor(event);
   // Always consult global stacking, even when a selected parent's SVG received the event.
-  const hit = hitPictureRootAt(
+  const hit = hitInteractiveRoot(
     props.roots,
     point,
     props.layout,
@@ -650,7 +687,7 @@ function onKeydown(event: KeyboardEvent, overlayPath?: PictureGroupPath): void {
   }
   if ((event.ctrlKey || event.metaKey) && !event.altKey) {
     const key = event.key.toLowerCase();
-    if (key === "c" || ((key === "x" || key === "v") && !props.readOnly)) {
+    if (key === "c" || ((key === "x" || key === "v") && !interactionReadOnly.value)) {
       event.preventDefault();
       event.stopPropagation();
       if (key === "c") emit("copy", [...path], props.owner);
@@ -659,7 +696,7 @@ function onKeydown(event: KeyboardEvent, overlayPath?: PictureGroupPath): void {
     }
     return;
   }
-  if (props.readOnly || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (interactionReadOnly.value || event.altKey || event.ctrlKey || event.metaKey) return;
   if (event.key === "Delete" || event.key === "Backspace") {
     event.preventDefault();
     event.stopPropagation();
@@ -727,7 +764,7 @@ function handleSurfacePointerCancel(event: PointerEvent): boolean {
 function handleSurfaceDoubleClick(_event: MouseEvent, point: Point): boolean {
   // Child selection is deliberately single-click. A double click never fabricates a source preview.
   try {
-    const hit = hitPictureRootAt(
+    const hit = hitInteractiveRoot(
       props.roots,
       point,
       props.layout,
@@ -742,7 +779,13 @@ function handleSurfaceDoubleClick(_event: MouseEvent, point: Point): boolean {
 function handleSurfaceContextMenu(event: MouseEvent, point: Point): boolean {
   let hit;
   try {
-    hit = hitPictureRootAt(props.roots, point, props.layout, props.frameContext, selectedIds.value);
+    hit = hitInteractiveRoot(
+      props.roots,
+      point,
+      props.layout,
+      props.frameContext,
+      selectedIds.value,
+    );
   } catch {
     fail();
     return false;
@@ -817,7 +860,7 @@ function contextAction(
   if (contextMenu.value !== menu) return;
   const valid = isContextMenuCurrent(menu);
   closeContextMenu(false);
-  if (!valid || (props.readOnly && !["copy", "format"].includes(action))) return;
+  if (!valid || (interactionReadOnly.value && !["copy", "format"].includes(action))) return;
   if (action === "ungroup") {
     if (menu.path.length === 1 && menu.selection.rootIds.length === 1)
       emit("ungroup", menu.path[0]!);
@@ -829,9 +872,9 @@ function contextAction(
 }
 
 function getSurfaceCursor(point: Point): "move" | undefined {
-  if (props.readOnly) return undefined;
+  if (interactionReadOnly.value) return undefined;
   try {
-    const hit = hitPictureRootAt(
+    const hit = hitInteractiveRoot(
       props.roots,
       point,
       props.layout,
@@ -854,7 +897,12 @@ function overlayStyle(fragment: PictureSelectionFrameFragment): CSSProperties {
   };
 }
 function requestUngroup(lease: OwnedPictureSelectionSnapshot, path: PictureGroupPath): void {
-  if (props.readOnly || gesture.value || !isSelectionSnapshotCurrent(lease) || path.length !== 1)
+  if (
+    interactionReadOnly.value ||
+    gesture.value ||
+    !isSelectionSnapshotCurrent(lease) ||
+    path.length !== 1
+  )
     return;
   const target = resolveOwnedPictureNode(props.roots, path, props.frameContext);
   if (target?.visible && target.node.kind === "picture-group-v1") emit("ungroup", path[0]!);
@@ -888,7 +936,7 @@ watch(
     props.layout,
     props.frameContext,
     props.scale,
-    props.readOnly,
+    interactionReadOnly.value,
     props.selectedRootId,
     props.selectedRootIds,
     props.selectedPath,
@@ -958,7 +1006,7 @@ defineExpose({
       <SheetFramedPictureSelection
         :fragment="overlay.fragment"
         :layout="layout"
-        :read-only="readOnly"
+        :read-only="interactionReadOnly"
         :passive-outline="overlay.passive"
         :rotatable="!overlay.passive"
         :body-interactive="false"
@@ -970,7 +1018,7 @@ defineExpose({
     <SheetPictureGroupToolbar
       v-if="!croppingExternally && toolbarAnchor && targetPath && groupToolbarActions"
       :anchor="toolbarAnchor"
-      :disabled="readOnly"
+      :disabled="interactionReadOnly"
       :can-ungroup="targetPath.length === 1"
       @ungroup="groupToolbarActions.ungroup"
       @format="groupToolbarActions.format"
@@ -981,8 +1029,9 @@ defineExpose({
       :key="selectionToolbar.key"
       :anchor="selectionToolbar.anchor"
       :selection-key="selectionToolbar.key"
+      :can-group="canGroup"
       :count="selectionToolbar.count"
-      :disabled="readOnly"
+      :disabled="interactionReadOnly"
       @align="selectionToolbar.align"
       @group="selectionToolbar.group"
       @dismiss="selectionToolbar.dismiss"
@@ -990,7 +1039,7 @@ defineExpose({
     <SheetOwnedPictureContextMenu
       v-if="contextMenu"
       :anchor="contextMenu.anchor"
-      :read-only="readOnly"
+      :read-only="interactionReadOnly"
       :can-ungroup="contextMenu.path.length === 1 && contextMenu.selection.rootIds.length === 1"
       @copy="contextMenu.actions.copy"
       @cut="contextMenu.actions.cut"

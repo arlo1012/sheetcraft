@@ -1,3 +1,8 @@
+import {
+  canEditPictureRoot,
+  canEditPictureSelection,
+  canEditPictureForest,
+} from "@sheetcraft/core/picture-protection";
 import { patchPictureAppearance, resetPictureAppearance } from "./picture-appearance-edit";
 import {
   arePictureObjectsEqual,
@@ -16,11 +21,7 @@ import {
   createSetSheetFloatingImagesCommand,
   type WorkbookCommand,
 } from "@sheetcraft/core/commands";
-import {
-  canUseSheetPermission,
-  isPictureGroup,
-  planDeletePictureGroupNodes,
-} from "@sheetcraft/core";
+import { isPictureGroup, planDeletePictureGroupNodes } from "@sheetcraft/core";
 import {
   normalizeImageTransform,
   areFloatingImageCollectionsEqual,
@@ -93,8 +94,7 @@ export function usePictureTools(options: {
       selectedIds.length === lease.selectedIds.length &&
       selectedIds.every((id, index) => id === lease.selectedIds[index]) &&
       areFloatingImageCollectionsEqual(sheet.floatingImages, lease.forest) &&
-      !options.isBusy() &&
-      canUseSheetPermission(sheet, "editObjects")
+      !options.isBusy()
     );
   }
   function validateForest(images: readonly FloatingImage[], lease: EditLease): void {
@@ -114,11 +114,11 @@ export function usePictureTools(options: {
   }
   /** One detached complete-forest plan; no selection or draft changes before acceptance. */
   function replace(images: readonly FloatingImage[], lease: EditLease): boolean {
-    if (!isCurrent(lease)) return false;
+    if (!isCurrent(lease) || !canEditPictureForest(lease.sheet, images)) return false;
     validateForest(lease.forest, lease);
     const command = createSetSheetFloatingImagesCommand(lease.sheetId, images);
     validateForest(command.images, lease);
-    if (!isCurrent(lease)) return false;
+    if (!isCurrent(lease) || !canEditPictureForest(lease.sheet, command.images)) return false;
     if (areFloatingImageCollectionsEqual(lease.forest, command.images)) return true;
     return options.execute(command) !== false;
   }
@@ -153,7 +153,7 @@ export function usePictureTools(options: {
     sizeFeedback.value = undefined;
     operationFeedback.value = undefined;
     const target = currentSingle(source);
-    if (!target || options.isBusy() || !canUseSheetPermission(options.getSheet(), "editObjects")) {
+    if (!target || options.isBusy() || !canEditPictureRoot(options.getSheet(), target)) {
       sizeFeedback.value = "picture.operationFailed";
       return false;
     }
@@ -362,7 +362,7 @@ export function usePictureTools(options: {
     all: boolean;
   }): boolean {
     sizeFeedback.value = undefined;
-    if (options.isBusy() || !canUseSheetPermission(options.getSheet(), "editObjects")) {
+    if (options.isBusy()) {
       sizeFeedback.value = "picture.operationFailed";
       return false;
     }
@@ -371,6 +371,10 @@ export function usePictureTools(options: {
       .floatingImages.filter((image) => value.all || options.selectedIds.value.includes(image.id));
     const ids = options.selectedIds.value;
     if (
+      !canEditPictureSelection(
+        options.getSheet(),
+        targets.map((image) => image.id),
+      ) ||
       (!value.all && (new Set(ids).size !== ids.length || targets.length !== ids.length)) ||
       targets.some((image) => isFramedPictureObject(image) || isPictureGroup(image))
     ) {

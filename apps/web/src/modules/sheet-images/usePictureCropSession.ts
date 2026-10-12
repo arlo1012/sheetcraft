@@ -1,6 +1,6 @@
 import { normalizePictureProperties } from "@sheetcraft/core/picture-properties";
 import { computed, getCurrentScope, onScopeDispose, shallowRef, watch } from "vue";
-import { canUseSheetPermission } from "@sheetcraft/core";
+import { canEditPictureRoot, canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import {
   areFloatingImageCollectionsEqual,
   type FloatingImage,
@@ -124,7 +124,7 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
       context = options.getContext();
     const ids = options.getSelectedIds(),
       selectedPath = options.getSelectedPath() ?? null;
-    if (!context || !canUseSheetPermission(sheet, "editObjects") || ids.length !== 1) return;
+    if (!context || ids.length !== 1) return;
     const revision = options.getRevision();
     if (!Number.isSafeInteger(revision) || revision < 0) return;
     const path = selectedPath ? [...selectedPath] : [ids[0]!];
@@ -132,7 +132,7 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
     const rootsReference = sheet.floatingImages;
     const roots = normalizePictureObjectCollection(rootsReference);
     const root = roots.find((entry) => entry.id === path[0]);
-    if (!root || root.hidden) return;
+    if (!root || root.hidden || !canEditPictureRoot(sheet, root)) return;
     const resolved = isPictureGroup(root)
       ? resolveOwnedPictureNode(roots, path, context)
       : undefined;
@@ -181,7 +181,7 @@ export function usePictureCropSession(options: PictureCropSessionOptions) {
       options.getSelectedIds().length !== 1 ||
       options.getSelectedIds()[0] !== lease.path[0] ||
       !samePictureGroupPath(options.getSelectedPath(), lease.selectedPath) ||
-      !canUseSheetPermission(lease.sheet, "editObjects") ||
+      !canEditPictureSelection(lease.sheet, [lease.path[0]!]) ||
       !lease.geometryFunctions.every((value, index) => value === functions(context.metrics)[index])
     )
       return false;

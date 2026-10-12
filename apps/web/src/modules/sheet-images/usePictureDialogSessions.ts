@@ -1,6 +1,6 @@
 import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import { getCurrentScope, onScopeDispose, ref, shallowRef, watch, type Ref } from "vue";
-import { canUseSheetPermission } from "@sheetcraft/core";
+import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import {
   cloneFloatingImage,
   normalizeImageTransform,
@@ -78,7 +78,7 @@ export function usePictureDialogSessions(options: {
       selected.length !== selectedIds.length ||
       selected.some((entry) => !isLegacyPictureObject(entry)) ||
       options.isBusy() ||
-      !canUseSheetPermission(sheet, "editObjects")
+      !canEditPictureSelection(sheet, selectedIds)
     )
       return;
     return {
@@ -98,7 +98,10 @@ export function usePictureDialogSessions(options: {
       options.getSheet() === owner.sheet &&
       owner.workbook.sheets.get(owner.sheet.id) === owner.sheet &&
       options.getGeneration() === owner.generation &&
-      canUseSheetPermission(owner.sheet, "editObjects") &&
+      canEditPictureSelection(
+        owner.sheet,
+        all ? owner.sheet.floatingImages.map((root) => root.id) : owner.selectedIds,
+      ) &&
       selected !== undefined &&
       sameLegacySource(selected, owner.image) &&
       JSON.stringify(options.getSelectedIds()) === JSON.stringify(owner.selectedIds) &&

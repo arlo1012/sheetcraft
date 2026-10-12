@@ -36,3 +36,42 @@ describe("picture pane group selection", () => {
     wrapper.unmount();
   });
 });
+
+test("per-root permission leaves editable rows usable without enabling locked rows or stale callbacks", async () => {
+  const images = ["unlocked", "locked"].map((id) => ({
+    id,
+    assetId: "a",
+    altText: id,
+    anchor: { row: 0, column: 0 },
+    offsetX: 0,
+    offsetY: 0,
+    width: 100,
+    height: 50,
+  }));
+  let allowed = true;
+  const wrapper = mount(PictureSelectionPane, {
+    props: {
+      images,
+      selectedIds: [],
+      disabled: false,
+      canEditImage: (image) => allowed && image.id === "unlocked",
+    },
+    global: { plugins: [createAppI18n("en-US")] },
+  });
+  const unlocked = wrapper
+    .findAllComponents(TCheckbox)
+    .find((checkbox) => checkbox.attributes("aria-label") === "unlocked")!;
+  const locked = wrapper
+    .findAllComponents(TCheckbox)
+    .find((checkbox) => checkbox.attributes("aria-label") === "locked")!;
+  expect(unlocked.props("disabled")).toBe(false);
+  expect(locked.props("disabled")).toBe(true);
+  locked.vm.$emit("change", true);
+  expect(wrapper.emitted("select")).toBeUndefined();
+  unlocked.vm.$emit("change", true);
+  expect(wrapper.emitted("select")).toEqual([[["unlocked"]]]);
+  allowed = false;
+  unlocked.vm.$emit("change", true);
+  expect(wrapper.emitted("select")).toHaveLength(1);
+  wrapper.unmount();
+});

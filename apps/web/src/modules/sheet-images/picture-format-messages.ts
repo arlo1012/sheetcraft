@@ -12,6 +12,7 @@ export const PICTURE_FORMAT_CAPABILITY_REASON_KEYS = [
   "inheritedLine",
   "compositeLine",
   "inheritedProperties",
+  "lockPermission",
 ] as const;
 export type PictureFormatCapabilityReasonKey =
   (typeof PICTURE_FORMAT_CAPABILITY_REASON_KEYS)[number];

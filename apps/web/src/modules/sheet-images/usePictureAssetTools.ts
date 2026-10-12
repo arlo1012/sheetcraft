@@ -1,7 +1,7 @@
 import { isLegacyPictureObject } from "@sheetcraft/core/picture-object";
 import { requireLegacyPictures } from "./picture-document-support";
 import { getCurrentScope, onScopeDispose, readonly, ref } from "vue";
-import { canUseSheetPermission } from "@sheetcraft/core";
+import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import {
   createSetSheetFloatingImagesCommand,
   type WorkbookCommand,
@@ -130,9 +130,15 @@ export function usePictureAssetTools(options: {
     const workbook = options.getWorkbook();
     const sheet = options.getSheet();
     const generation = options.getGeneration?.() ?? 0;
-    if (!canUseSheetPermission(sheet, "editObjects")) return false;
     const selected = legacyPictures(settings.all);
-    if (!selected?.length) return false;
+    if (
+      !selected?.length ||
+      !canEditPictureSelection(
+        sheet,
+        selected.map((image) => image.id),
+      )
+    )
+      return false;
     busy.value = true;
     const valid = () =>
       options.getWorkbook() === workbook &&
@@ -141,7 +147,10 @@ export function usePictureAssetTools(options: {
       options.getSheet() === sheet &&
       (options.getGeneration?.() ?? 0) === generation &&
       workbook.sheets.get(sheet.id) === sheet &&
-      canUseSheetPermission(sheet, "editObjects") &&
+      canEditPictureSelection(
+        sheet,
+        selected.map((image) => image.id),
+      ) &&
       sourcesCurrent(sheet, selected, settings.all);
     try {
       const converted = new Map<string, ImageAsset>();

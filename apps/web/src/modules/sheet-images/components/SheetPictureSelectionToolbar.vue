@@ -22,12 +22,16 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { PictureAlignment, PictureAlignmentReference } from "../usePictureTools";
-const props = defineProps<{
-  anchor: FloatingReference;
-  selectionKey: string;
-  count: number;
-  disabled: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    anchor: FloatingReference;
+    selectionKey: string;
+    count: number;
+    disabled: boolean;
+    canGroup?: boolean;
+  }>(),
+  { canGroup: true },
+);
 const emit = defineEmits<{
   align: [action: PictureAlignment, reference: PictureAlignmentReference, selectionKey: string];
   group: [selectionKey: string];
@@ -216,11 +220,11 @@ watch(
       <span class="sheet-picture-selection-toolbar__separator" aria-hidden="true" />
       <button
         type="button"
-        :disabled="disabled || count < 2"
+        :disabled="disabled || canGroup === false || count < 2"
         :aria-label="t('picture.group')"
         :title="t('picture.group')"
         data-picture-selection-action="group"
-        @click="emit('group', selectionKey)"
+        @click="!disabled && canGroup !== false && emit('group', selectionKey)"
       >
         <Group />
       </button>

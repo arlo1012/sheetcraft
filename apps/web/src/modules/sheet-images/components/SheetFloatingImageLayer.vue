@@ -105,12 +105,14 @@ const props = withDefaults(
     selectedImageId?: string | null;
     selectedImageIds?: readonly string[];
     readOnly?: boolean;
+    canEditRoot?: (root: PictureObject) => boolean;
+    canGroup?: boolean;
     previewOnDoubleClick?: boolean;
     scale?: number;
     cropHandler?: () => boolean;
     croppingExternally?: boolean;
   }>(),
-  { readOnly: false, scale: 1, previewOnDoubleClick: true },
+  { readOnly: false, canGroup: true, scale: 1, previewOnDoubleClick: true },
 );
 
 // The prepared standalone layer refuses the whole container collection before paint or gestures.
@@ -133,6 +135,8 @@ const emit = defineEmits<{
 
 const { t } = useAppI18n();
 function commitImages(nextImages: PictureObject[]): boolean {
+  if (interactionReadOnly.value || nextImages.some((root) => !isRootAvailable(root.id)))
+    return false;
   try {
     requireStandalonePictures(props.images);
     selectionImages();
@@ -208,6 +212,17 @@ const selectedIds = computed(
       ...(props.selectedImageIds ?? []),
       ...(props.selectedImageId ? [props.selectedImageId] : []),
     ]),
+);
+function isRootAvailable(id: string): boolean {
+  const root = selectionImages().find((image) => image.id === id);
+  return !!root && props.canEditRoot?.(root) !== false;
+}
+const interactionReadOnly = computed(
+  () =>
+    props.readOnly ||
+    [...selectedIds.value].some(
+      (id) => selectionImages().some((root) => root.id === id) && !isRootAvailable(id),
+    ),
 );
 const layerRef = ref<HTMLElement | null>(null);
 const contextMenu = shallowRef<ContextMenuState>();
@@ -447,7 +462,7 @@ function startGesture(
   event: PointerEvent,
   startPoint = getLayerPoint(event),
 ): void {
-  if (event.button !== 0 || crop.value) return;
+  if (event.button !== 0 || crop.value || !isRootAvailable(image.id)) return;
   try {
     planStartGesture(image, mode, event, startPoint);
   } catch {
@@ -481,6 +496,7 @@ function planStartGesture(
     emit("feedback", "picture.operationFailed");
     return;
   }
+  if (group.some((root) => !isRootAvailable(root.id))) return;
   emit("select", image.id);
   focusSelectedImageProxy(focusTarget, image.id);
   if (props.readOnly) return;
@@ -638,10 +654,11 @@ function planGestureAt(activeGesture: Gesture, point: Point): void {
 function startCrop(): void {
   if (props.cropHandler) {
     closeContextMenu(false);
-    if (!props.readOnly && !props.cropHandler()) emit("feedback", "picture.operationFailed");
+    if (!interactionReadOnly.value && !props.cropHandler())
+      emit("feedback", "picture.operationFailed");
     return;
   }
-  if (!props.readOnly) {
+  if (!interactionReadOnly.value) {
     if (selectedImage.value && isFramedPictureObject(selectedImage.value))
       emit("feedback", "picture.operationFailed");
     else startCropEdit();
@@ -654,7 +671,7 @@ function cancelCrop(restoreFocus = true): void {
 }
 
 function applyCrop(): void {
-  if (!props.readOnly) {
+  if (!interactionReadOnly.value) {
     if (applyCropEdit()) cancelPointerSession();
   }
 }
@@ -667,7 +684,7 @@ function rotateImage(turns: -1 | 1 | 2): void {
   }
 }
 function planRotateImage(turns: -1 | 1 | 2): void {
-  if (props.readOnly) return;
+  if (interactionReadOnly.value) return;
   const images = currentImages.value.filter((image) => selectedIds.value.has(image.id));
   if (images.length !== selectedIds.value.size) {
     emit("feedback", "picture.operationFailed");
@@ -696,7 +713,7 @@ function flipImage(axis: "horizontal" | "vertical"): void {
   }
 }
 function planFlipImage(axis: "horizontal" | "vertical"): void {
-  if (props.readOnly) return;
+  if (interactionReadOnly.value) return;
   const images = currentImages.value.filter((image) => selectedIds.value.has(image.id));
   if (images.length !== selectedIds.value.size) {
     emit("feedback", "picture.operationFailed");
@@ -716,7 +733,7 @@ function planFlipImage(axis: "horizontal" | "vertical"): void {
 }
 
 function restoreImage(): void {
-  if (!props.readOnly) {
+  if (!interactionReadOnly.value) {
     if (selectedImage.value && isFramedPictureObject(selectedImage.value))
       emit("feedback", "picture.operationFailed");
     else restoreImageEdit();
@@ -724,7 +741,7 @@ function restoreImage(): void {
 }
 
 function startCropGesture(direction: ImageCropGesture, event: PointerEvent): void {
-  if (props.readOnly) return;
+  if (interactionReadOnly.value) return;
   cancelPointerSession();
   startCropGestureEdit(direction, event);
   const target = layerRef.value;
@@ -768,7 +785,7 @@ function isCurrentGesture(active: Gesture): boolean {
     active.layout === props.layout &&
     active.frameContext === props.frameContext &&
     active.scale === props.scale &&
-    !props.readOnly &&
+    !interactionReadOnly.value &&
     current.every((image) => image !== undefined) &&
     areFloatingImageCollectionsEqual(current as PictureObject[], active.images)
   );
@@ -834,7 +851,7 @@ function openContextMenu(
   trigger: HTMLElement,
   anchor: FloatingReference = trigger,
 ): void {
-  if (gesture.value || crop.value) return;
+  if (gesture.value || crop.value || !isRootAvailable(image.id)) return;
   emit("select", image.id);
   trigger.focus({ preventScroll: true });
   contextMenu.value = {
@@ -856,6 +873,7 @@ function openContextMenu(
 }
 
 function onImageContextMenu(image: FloatingImage, event: MouseEvent): void {
+  if (!isRootAvailable(image.id)) return;
   event.preventDefault();
   event.stopPropagation();
   const trigger = event.currentTarget as HTMLElement;
@@ -920,7 +938,7 @@ function requestConvertToCell(): void {
   if (props.croppingExternally || contextMenuSourceUnsupported.value) return;
   const imageId = contextMenu.value?.imageId;
   closeContextMenu(false);
-  if (imageId && !props.readOnly) emit("convertToCell", imageId);
+  if (imageId && !interactionReadOnly.value) emit("convertToCell", imageId);
 }
 
 function requestPreview(): void {
@@ -937,11 +955,12 @@ function requestClipboard(mode: "copy" | "cut" | "paste"): void {
   closeContextMenu(true);
   if (!imageId) return;
   if (mode === "copy") emit("copy", imageId);
-  else if (mode === "cut" && !props.readOnly) emit("cut", imageId);
-  else if (mode === "paste" && !props.readOnly) emit("paste", imageId);
+  else if (mode === "cut" && !interactionReadOnly.value) emit("cut", imageId);
+  else if (mode === "paste" && !interactionReadOnly.value) emit("paste", imageId);
 }
 
 function onImageDoubleClick(image: FloatingImage, event: MouseEvent): void {
+  if (!isRootAvailable(image.id)) return;
   if (crop.value) {
     applyCrop();
     return;
@@ -968,7 +987,7 @@ function onLayerDoubleClick(event: MouseEvent): void {
 function requestDelete(): void {
   const imageId = contextMenu.value?.imageId;
   closeContextMenu(false);
-  if (imageId && !props.readOnly) emit("delete", imageId);
+  if (imageId && !interactionReadOnly.value) emit("delete", imageId);
 }
 
 function getPaintState(): FloatingImagePaintState {
@@ -992,7 +1011,8 @@ function hitTestFloatingImage(point: Point): FloatingImage | undefined {
   if (props.selectionRoots) {
     const hit = hitPictureViewportPoint(selectionImages(), point, props.layout, props.frameContext);
     if (!hit || hit.kind === "group-leaf") return undefined;
-    return currentImages.value.find((image) => image.id === pictureFragmentRootId(hit));
+    const image = currentImages.value.find((image) => image.id === pictureFragmentRootId(hit));
+    return image && isRootAvailable(image.id) ? image : undefined;
   }
   for (let index = fragments.value.length - 1; index >= 0; index -= 1) {
     const fragment = fragments.value[index];
@@ -1005,7 +1025,7 @@ function hitTestFloatingImage(point: Point): FloatingImage | undefined {
       point.y < rect.y + rect.height &&
       (fragment.kind === "legacy" || pictureFrameContainsPoint(fragment.geometry, point))
     )
-      return fragment.image;
+      return isRootAvailable(fragment.image.id) ? fragment.image : undefined;
   }
   return undefined;
 }
@@ -1062,7 +1082,9 @@ function handleSurfaceContextMenu(event: MouseEvent, point: Point): boolean {
 }
 
 function getSurfaceCursor(point: Point): "move" | undefined {
-  return !props.readOnly && !crop.value && hitTestFloatingImage(point) ? "move" : undefined;
+  return !interactionReadOnly.value && !crop.value && hitTestFloatingImage(point)
+    ? "move"
+    : undefined;
 }
 
 watch(
@@ -1148,7 +1170,7 @@ watch(
 );
 
 watch(
-  () => props.readOnly,
+  () => interactionReadOnly.value,
   (readOnly) => {
     if (!readOnly) return;
     finishGesture(false);
@@ -1176,7 +1198,7 @@ function arrangeImages(
   action: PictureAlignment,
   reference: PictureAlignmentReference = "selection",
 ): void {
-  if (props.readOnly) return;
+  if (interactionReadOnly.value) return;
   if (currentImages.value.some((image) => ids.includes(image.id) && isFramedPictureObject(image))) {
     emit("feedback", "picture.operationFailed");
     return;
@@ -1263,7 +1285,13 @@ function alignSelection(
     arrangeImages([...selectedIds.value], action, reference);
 }
 function groupSelection(key: string): void {
-  if (key === selectionKey.value && !props.readOnly && !gesture.value && !crop.value)
+  if (
+    key === selectionKey.value &&
+    props.canGroup !== false &&
+    !interactionReadOnly.value &&
+    !gesture.value &&
+    !crop.value
+  )
     emit("group", [...selectedIds.value]);
 }
 function dismissSelection(key: string): void {
@@ -1343,12 +1371,12 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     event.preventDefault();
     return;
   }
-  if (!props.readOnly && (event.key === "Delete" || event.key === "Backspace")) {
+  if (!interactionReadOnly.value && (event.key === "Delete" || event.key === "Backspace")) {
     emit("delete", image.id);
     event.preventDefault();
     return;
   }
-  if (props.readOnly) return;
+  if (interactionReadOnly.value) return;
   const distance = event.shiftKey ? 10 : 1;
   const offset = {
     ArrowLeft: { x: -distance, y: 0 },
@@ -1412,7 +1440,7 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
         @start="startCropGesture"
       />
       <SheetFloatingImageSelection
-        v-if="fragment.kind === 'legacy' && !selectedGroup && !crop && !readOnly"
+        v-if="fragment.kind === 'legacy' && !selectedGroup && !crop && !interactionReadOnly"
         :fragment="fragment"
         @resize="(direction, event) => startGesture(fragment.image, direction, event)"
       />
@@ -1420,12 +1448,12 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
         v-if="fragment.kind === 'framed' && !crop"
         :fragment="fragment"
         :layout="layout"
-        :read-only="readOnly"
+        :read-only="interactionReadOnly"
         @move="startGesture(fragment.image, 'move', $event)"
         @resize="(direction, event) => startGesture(fragment.image, direction, event)"
       />
     </div>
-    <template v-if="!croppingExternally && !crop && !readOnly && selectedImage">
+    <template v-if="!croppingExternally && !crop && !interactionReadOnly && selectedImage">
       <div
         v-for="fragment in groupFragments"
         :key="`group-${fragment.paneId}`"
@@ -1452,8 +1480,9 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       :key="selectionKey"
       :anchor="selectionToolbarAnchor"
       :selection-key="selectionKey"
+      :can-group="canGroup"
       :count="selectedIds.size"
-      :disabled="readOnly"
+      :disabled="interactionReadOnly"
       @align="alignSelection"
       @group="groupSelection"
       @dismiss="dismissSelection"
@@ -1481,7 +1510,7 @@ function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     <SheetFloatingImageContextMenu
       v-if="contextMenu"
       :anchor="contextMenu.anchor"
-      :read-only="readOnly"
+      :read-only="interactionReadOnly"
       :source-operations-disabled="croppingExternally || contextMenuSourceUnsupported"
       @convert-to-cell="contextActions.convert"
       @preview="contextActions.preview"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import { getCellContent, getCellStyle } from "@sheetcraft/core/workbook";
 import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
 import { useWordProofreading } from "../modules/text-proofreading/useWordProofreading";
@@ -1766,6 +1767,10 @@ watch(
   },
   { flush: "sync" },
 );
+function picturePaneImageAvailable(image: FloatingImage): boolean {
+  void workbookRevision.value;
+  return canEditPictureSelection(activeSheet.value, [image.id]);
+}
 const picturePaneHandlers = computed(() => {
   const workbook = session.workbook;
   const sheet = activeSheet.value;
@@ -1782,7 +1787,7 @@ const picturePaneHandlers = computed(() => {
     rename: (image: FloatingImage, name: string) => current() && pictureTools.rename(image, name),
     visibility: (image: FloatingImage) => current() && pictureTools.toggleVisibility(image),
     select: (ids: string[]) => {
-      if (!current()) return false;
+      if (!current() || (ids.length && !canEditPictureSelection(sheet, ids))) return false;
       sheetGridRef.value?.selectFloatingImages(ids);
       return true;
     },
@@ -1886,6 +1891,8 @@ const pictureFormatPane = useOwnedPictureFormatPane({
   getInheritedLineReason: () => t("pictureFormat.capabilityReasons.inheritedLine"),
   getCompositeLineReason: () => t("pictureFormat.capabilityReasons.compositeLine"),
   getInheritedPropertiesReason: () => t("pictureFormat.capabilityReasons.inheritedProperties"),
+  getProtectedReason: () => t("pictureFormat.capabilityReasons.protectedObject"),
+  getLockPermissionReason: () => t("pictureFormat.capabilityReasons.lockPermission"),
 });
 const picturePaintAssets = createPicturePaintAssetSource({
   getSnapshot: () => pictureFormatPane.snapshot.value,
@@ -3080,6 +3087,7 @@ const gridInert = computed(
                 : undefined
           "
           :selection-count="selectedPictureIds.length"
+          :group-create-disabled="!canUseSheetPermission(activeSheet, 'editObjects')"
           :preview-on-double-click="picturePreviewOnDoubleClick"
           @view-settings="picturePreviewOnDoubleClick = $event"
           :busy="loading || fileBusy || xlsxBusy || imageBusy"
@@ -3090,7 +3098,7 @@ const gridInert = computed(
             imageBusy ||
             attachmentBusy ||
             captureBusy ||
-            !canUseSheetPermission(activeSheet, 'editObjects')
+            !canEditPictureSelection(activeSheet, selectedPictureIds)
           "
           :resize-handler="pictureToolbarOwner?.resize"
           :aspect-ratio-handler="pictureToolbarOwner?.aspectRatio"
@@ -3134,7 +3142,7 @@ const gridInert = computed(
             fileBusy ||
             xlsxBusy ||
             imageBusy ||
-            !canUseSheetPermission(activeSheet, 'editObjects')
+            !canEditPictureSelection(activeSheet, selectedPictureIds)
           "
         />
         <PictureGroupRibbon
@@ -3155,12 +3163,13 @@ const gridInert = computed(
                 : undefined
           "
           :selection-count="selectedPictureIds.length"
+          :group-create-disabled="!canUseSheetPermission(activeSheet, 'editObjects')"
           :disabled="
             loading ||
             fileBusy ||
             xlsxBusy ||
             imageBusy ||
-            !canUseSheetPermission(activeSheet, 'editObjects')
+            !canEditPictureSelection(activeSheet, selectedPictureIds)
           "
           :resize-handler="pictureToolbarOwner?.resize"
           :aspect-ratio-handler="pictureToolbarOwner?.aspectRatio"
@@ -4397,13 +4406,8 @@ const gridInert = computed(
         v-if="pictureTools.paneVisible.value"
         :images="activeSheet.floatingImages"
         :selected-ids="selectedPictureIds"
-        :disabled="
-          loading ||
-          fileBusy ||
-          xlsxBusy ||
-          imageBusy ||
-          !canUseSheetPermission(activeSheet, 'editObjects')
-        "
+        :disabled="loading || fileBusy || xlsxBusy || imageBusy"
+        :can-edit-image="picturePaneImageAvailable"
         :rename-handler="picturePaneHandlers.rename"
         :visibility-handler="picturePaneHandlers.visibility"
         :select-handler="picturePaneHandlers.select"

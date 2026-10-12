@@ -437,3 +437,24 @@ describe("SheetOwnedPictureGroupLayer real ownership", () => {
     f.wrapper.unmount();
   });
 });
+
+test("a root permission controls a grouped leaf; denied roots are not selected and a permission loss cancels edits", async () => {
+  const f = fixture(false),
+    allowed = { value: false };
+  await f.wrapper.setProps({ canEditRoot: () => allowed.value });
+  const point = { x: 120, y: 100 };
+  expect(f.api.handleSurfacePointerDown(f.event("pointerdown"), point)).toBe(false);
+  expect(f.wrapper.emitted("select")).toBeUndefined();
+  expect(f.apply).not.toHaveBeenCalled();
+  allowed.value = true;
+  await f.wrapper.setProps({ canEditRoot: () => allowed.value });
+  expect(f.api.handleSurfacePointerDown(f.event("pointerdown"), point)).toBe(true);
+  await f.wrapper.setProps({ selectedRootId: f.group.id });
+  await nextTick();
+  f.api.handleSurfacePointerMove(f.event("pointermove"), { x: point.x + 30, y: point.y + 20 });
+  allowed.value = false;
+  await f.wrapper.setProps({ canEditRoot: () => allowed.value });
+  f.api.handleSurfacePointerUp(f.event("pointerup"));
+  expect(f.apply).not.toHaveBeenCalled();
+  f.wrapper.unmount();
+});

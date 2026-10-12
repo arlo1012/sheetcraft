@@ -502,3 +502,19 @@ describe("framed picture ribbon capability boundary", () => {
     });
   });
 });
+
+test("group creation permission is independent of existing ungroup and arrangement", async () => {
+  const wrapper = fixture({ ...legacyPicture(), groupId: "existing-group" });
+  await wrapper.setProps({ selectionCount: 2, groupCreateDisabled: true });
+  expect(wrapper.get('.picture-arrange [aria-label="Group"]').attributes("aria-disabled")).toBe(
+    "true",
+  );
+  for (const label of ["Ungroup", "Align", "Bring to front"])
+    expect(
+      wrapper.get(`.picture-arrange [aria-label="${label}"]`).attributes("aria-disabled"),
+    ).toBe("false");
+  wrapper.getComponent(PictureArrangeTools).vm.$emit("group");
+  expect(wrapper.emitted("group")).toBeUndefined();
+  await wrapper.get('.picture-arrange [aria-label="Ungroup"]').trigger("click");
+  expect(wrapper.emitted("ungroup")).toEqual([[]]);
+});

@@ -12,6 +12,7 @@ const props = defineProps<{
   images: readonly FloatingImage[];
   selectedIds: readonly string[];
   disabled: boolean;
+  canEditImage?: (image: FloatingImage) => boolean;
   renameHandler?: (image: FloatingImage, name: string) => boolean;
   visibilityHandler?: (image: FloatingImage) => boolean;
   selectHandler?: (ids: string[]) => boolean;
@@ -24,9 +25,13 @@ const emit = defineEmits<{
   close: [];
 }>();
 const { t } = useAppI18n();
+function available(image: FloatingImage): boolean {
+  const current = props.images.find((entry) => entry.id === image.id);
+  return !!current && props.canEditImage?.(current) !== false;
+}
 function toggle(id: string): void {
   const image = props.images.find((entry) => entry.id === id);
-  if (!image) return;
+  if (!image || !available(image)) return;
   // Owned groups are root selections; groupId only relates standalone pictures.
   const groupId = isPictureGroup(image) ? undefined : image.groupId;
   const members = groupId
@@ -49,17 +54,21 @@ const callbacks = computed(() => {
   const close = props.closeHandler;
   return {
     rename: (image: FloatingImage, name: string) => {
-      if (props.disabled || rename !== props.renameHandler) return;
+      if (props.disabled || !available(image) || rename !== props.renameHandler) return;
       if (rename) rename(cloneFloatingImage(image), name);
       else emit("rename", image, name);
     },
     visibility: (image: FloatingImage) => {
-      if (props.disabled || visibility !== props.visibilityHandler) return;
+      if (props.disabled || !available(image) || visibility !== props.visibilityHandler) return;
       if (visibility) visibility(cloneFloatingImage(image));
       else emit("visibility", image);
     },
     select: (ids: string[]) => {
-      if (select !== props.selectHandler) return;
+      if (
+        select !== props.selectHandler ||
+        ids.some((id) => !props.images.some((image) => image.id === id && available(image)))
+      )
+        return;
       if (select) select(ids);
       else emit("select", ids);
     },
@@ -73,7 +82,7 @@ const callbacks = computed(() => {
 const closeAction = computed(() => callbacks.value.close);
 const selectAllAction = computed(() => {
   const owner = callbacks.value;
-  const ids = props.images.map((image) => image.id);
+  const ids = props.images.filter(available).map((image) => image.id);
   return () => owner.select(ids);
 });
 function select(ids: string[]): void {
@@ -114,6 +123,7 @@ const rows = computed(() => {
         :class="{ 'is-selected': selectedIds.includes(row.image.id) }"
       >
         <TCheckbox
+          :disabled="!available(row.image)"
           :model-value="selectedIds.includes(row.image.id)"
           :aria-label="row.image.altText || row.image.id"
           @change="row.select"
@@ -122,7 +132,7 @@ const rows = computed(() => {
           :key="row.image.id + row.image.altText"
           :default-value="row.image.altText || row.image.id"
           size="small"
-          :disabled="disabled"
+          :disabled="disabled || !available(row.image)"
           :aria-label="t('picture.name')"
           @blur="row.rename"
         />
@@ -130,7 +140,7 @@ const rows = computed(() => {
           size="small"
           variant="text"
           shape="square"
-          :disabled="disabled"
+          :disabled="disabled || !available(row.image)"
           :aria-label="t(row.image.hidden ? 'picture.show' : 'picture.hide')"
           @click="row.visibility"
           ><EyeOff v-if="row.image.hidden" :size="16" /><Eye v-else :size="16"

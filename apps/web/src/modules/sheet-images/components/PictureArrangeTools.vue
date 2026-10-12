@@ -17,6 +17,7 @@ import { useMenu } from "../../../shared/menu/useMenu";
 import type { PictureAlignment, PictureLayerAction } from "../usePictureTools";
 const props = defineProps<{
   disabled: boolean;
+  groupCreateDisabled?: boolean;
   count: number;
   grouped: boolean;
   groupDisabled?: boolean;
@@ -52,8 +53,10 @@ function align(action: PictureAlignment): void {
       <RibbonButton
         :label="t('picture.group')"
         :text="t('picture.group')"
-        :disabled="disabled || groupDisabled || count < 2"
-        @activate="emit('group')"
+        :disabled="disabled || groupDisabled || groupCreateDisabled || count < 2"
+        @activate="
+          !disabled && !groupDisabled && !groupCreateDisabled && count >= 2 && emit('group')
+        "
         ><Group
       /></RibbonButton>
       <RibbonButton

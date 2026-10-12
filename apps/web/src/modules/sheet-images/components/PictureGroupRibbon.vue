@@ -20,6 +20,7 @@ const props = defineProps<{
   draftOwnerKey?: number;
   error?: string;
   disabled: boolean;
+  groupCreateDisabled?: boolean;
   selectionCount: number;
   resizeHandler?: (edit: PictureSizeEdit) => boolean;
   aspectRatioHandler?: (locked: boolean) => boolean;
@@ -115,7 +116,9 @@ const actionCallbacks = computed(() => {
     if (!props.disabled && currentOwner()) callback();
   }
   return {
-    group: () => action(() => emit("group")),
+    group: () => {
+      if (!props.groupCreateDisabled) action(() => emit("group"));
+    },
     ungroup: () => action(() => emit("ungroup")),
     align: (alignment: PictureAlignment) => action(() => emit("align", alignment)),
     layer: (layer: PictureLayerAction) => action(() => emit("layer", layer)),
@@ -195,6 +198,7 @@ const actionCallbacks = computed(() => {
       @flip="actionCallbacks.flip"
     />
     <PictureArrangeTools
+      :group-create-disabled="groupCreateDisabled"
       :grid-disabled="true"
       :key="`${image.id}:${draftOwnerKey}:arrange`"
       :disabled="disabled"

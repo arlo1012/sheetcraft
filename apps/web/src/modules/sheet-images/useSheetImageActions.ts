@@ -1,3 +1,4 @@
+import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import {
   arePicturePropertiesEqual,
   normalizePictureProperties,
@@ -52,6 +53,7 @@ type ImageTarget = {
   address: CellAddress;
   generation: number;
   operation: number;
+  replacementRootId?: string;
 };
 class ImagePlacementError extends Error {}
 function initialFloatingSize(width: number, height: number): { width: number; height: number } {
@@ -149,11 +151,14 @@ export function useSheetImageActions(options: {
   function captureTarget(
     address = options.getAddress(),
     mode: ImageInsertMode = "floating",
+    replacementRootId?: string,
   ): ImageTarget | undefined {
     if (disposed) return;
     if (
       mode === "floating"
-        ? !canUseSheetPermission(options.getSheet(), "editObjects")
+        ? !(replacementRootId
+            ? canEditPictureSelection(options.getSheet(), [replacementRootId])
+            : canUseSheetPermission(options.getSheet(), "editObjects"))
         : !canEditCell(options.getSheet(), address)
     )
       return;
@@ -165,6 +170,7 @@ export function useSheetImageActions(options: {
       sheetId: sheet.id,
       generation: options.getGeneration?.() ?? 0,
       operation,
+      ...(replacementRootId ? { replacementRootId } : {}),
       address: {
         ...(getMergedCellAnchor(sheet.mergedCells, address) ?? address),
       },
@@ -187,7 +193,9 @@ export function useSheetImageActions(options: {
     return (
       isOwnerCurrent(target) &&
       (mode === "floating"
-        ? canUseSheetPermission(sheet, "editObjects")
+        ? target.replacementRootId
+          ? canEditPictureSelection(sheet, [target.replacementRootId])
+          : canUseSheetPermission(sheet, "editObjects")
         : canEditCell(sheet, target.address))
     );
   }
@@ -236,11 +244,10 @@ export function useSheetImageActions(options: {
   }
 
   function canReplace(imageId: string, path?: PictureGroupPath | null): boolean {
-    if (disposed || busy.value || !canUseSheetPermission(options.getSheet(), "editObjects"))
-      return false;
+    if (disposed || busy.value) return false;
     try {
-      replacementSource(imageId, path);
-      return true;
+      const replacement = replacementSource(imageId, path);
+      return canEditPictureSelection(options.getSheet(), [replacement.source.rootId]);
     } catch {
       return false;
     }
@@ -251,6 +258,7 @@ export function useSheetImageActions(options: {
     snapshot: PictureSourceReplacementSnapshot,
   ): boolean {
     return (
+      target.replacementRootId === snapshot.source.rootId &&
       isCurrent(target) &&
       selectionMatches(snapshot.source.path) &&
       isPictureSourceReplacementCurrent(
@@ -274,7 +282,7 @@ export function useSheetImageActions(options: {
       return;
     }
     cancelPending();
-    const target = captureTarget();
+    const target = captureTarget(options.getAddress(), "floating", replacement.source.rootId);
     if (!target) return;
     // Flushing an editor may itself change the requested source. Never recapture a
     // different source under the already-approved picker request.
@@ -334,7 +342,7 @@ export function useSheetImageActions(options: {
         return;
       }
       if (replaceAssetId !== undefined && replaceAssetId !== replacement.source.assetId) return;
-      target ??= captureTarget();
+      target ??= captureTarget(options.getAddress(), "floating", replacement.source.rootId);
       if (
         !target ||
         target.sheet !== sourceSheet ||
@@ -345,7 +353,7 @@ export function useSheetImageActions(options: {
       return replaceFile(file, target, replacement);
     }
     target ??= captureTarget(options.getAddress(), mode);
-    if (!target || !isCurrent(target, mode) || busy.value) return;
+    if (!target || target.replacementRootId || !isCurrent(target, mode) || busy.value) return;
     const owner = target;
     const valid = () => isCurrent(owner, mode);
     if (!valid()) return;
@@ -446,7 +454,14 @@ export function useSheetImageActions(options: {
     target = captureTarget(options.getAddress(), mode),
   ): Promise<void> {
     if (files.length === 1) return insertFile(files[0]!, mode, target);
-    if (!files.length || !target || busy.value || !options.execute || !isCurrent(target, mode))
+    if (
+      !files.length ||
+      !target ||
+      target.replacementRootId ||
+      busy.value ||
+      !options.execute ||
+      !isCurrent(target, mode)
+    )
       return;
     feedback.value = undefined;
     if (files.length > 100) {

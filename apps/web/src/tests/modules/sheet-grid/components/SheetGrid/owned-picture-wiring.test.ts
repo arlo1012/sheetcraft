@@ -133,3 +133,43 @@ describe("SheetGrid owned picture routes", () => {
     }
   });
 });
+
+test("protected picture layers consume live outer-root permissions while other drawings remain read-only", async () => {
+  const group = pictureGroup(),
+    legacy = legacyPicture();
+  group.locked = false;
+  const f = mountSheetGrid({
+    beforeMount: (sheet) => {
+      sheet.floatingImages = [group, legacy];
+      sheet.properties.protected = true;
+      sheet.protection = { editableRanges: [] };
+    },
+  });
+  try {
+    await f.wrapper.setProps({ readOnly: true });
+    const api = f.wrapper.vm as unknown as GridPictureApi;
+    api.selectFloatingImages([group.id]);
+    await f.wrapper.vm.$nextTick();
+    const owned = f.wrapper.getComponent(SheetOwnedPictureGroupLayer),
+      ordinary = f.wrapper.getComponent(SheetFloatingImageLayer);
+    expect(owned.props("readOnly")).toBe(false);
+    expect(owned.props("canGroup")).toBe(false);
+    expect((owned.props("canEditRoot") as (root: typeof group) => boolean)(group)).toBe(true);
+    expect((ordinary.props("canEditRoot") as (root: typeof legacy) => boolean)(legacy)).toBe(false);
+    expect(owned.props("selectedRootIds")).toEqual([group.id]);
+    api.selectFloatingImages([legacy.id]);
+    await f.wrapper.vm.$nextTick();
+    expect(owned.props("selectedRootIds")).toEqual([group.id]);
+    delete f.sheet.floatingImages[0]!.locked;
+    expect((owned.props("canEditRoot") as (root: typeof group) => boolean)(group)).toBe(false);
+    // The predicate resolves the actual root, never a caller-supplied unlocked flag.
+    expect(
+      (ordinary.props("canEditRoot") as (root: typeof legacy) => boolean)({
+        ...legacy,
+        locked: false,
+      }),
+    ).toBe(false);
+  } finally {
+    f.wrapper.unmount();
+  }
+});
