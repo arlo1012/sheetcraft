@@ -1753,6 +1753,36 @@ async function insertScreenCapture(): Promise<void> {
     captureBusy.value = false;
   }
 }
+const persistence = useWorkbookPersistence({
+  store: props.workbookStore ?? createIndexedDbWorkbookStore(),
+  getWorkbook: () => session.workbook,
+  getRevision: () => workbookRevision.value,
+  replaceWorkbook,
+});
+const { loading, status: saveStatus, error: saveError } = persistence;
+const fileActions = useWorkbookFileActions({
+  persistence,
+  assetStore,
+  getWorkbook: () => session.workbook,
+  flushPendingEdits: () => cellEditSession.finish() && flushPendingGridEdit(),
+  hasPendingEdits: () => cellEditSession.hasPendingEdit() || hasPendingGridEdit(),
+  isBlocked: () =>
+    xlsxActions.busy.value ||
+    xlsxActions.passwordRequired.value ||
+    xlsxActions.confirmation.value !== undefined,
+});
+const { busy: fileBusy, confirmation, feedback } = fileActions;
+const xlsxActions = useWorkbookXlsxActions({
+  assetStore,
+  persistence,
+  getWorkbook: () => session.workbook,
+  getRevision: () => workbookRevision.value,
+  flushPendingEdits: () => cellEditSession.finish() && flushPendingGridEdit(),
+  hasPendingEdits: () => cellEditSession.hasPendingEdit() || hasPendingGridEdit(),
+  isBlocked: () => fileBusy.value || confirmation.value !== undefined || imageBusy.value,
+});
+const { busy: xlsxBusy, confirmation: xlsxConfirmation, feedback: xlsxFeedback } = xlsxActions;
+
 const drawingActions = useDrawingActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -2189,36 +2219,6 @@ const {
 watch(selectedPictureId, (id) => {
   if (!id) pictureDialogs.closeBatchSize();
 });
-
-const persistence = useWorkbookPersistence({
-  store: props.workbookStore ?? createIndexedDbWorkbookStore(),
-  getWorkbook: () => session.workbook,
-  getRevision: () => workbookRevision.value,
-  replaceWorkbook,
-});
-const { loading, status: saveStatus, error: saveError } = persistence;
-const fileActions = useWorkbookFileActions({
-  persistence,
-  assetStore,
-  getWorkbook: () => session.workbook,
-  flushPendingEdits: () => cellEditSession.finish() && flushPendingGridEdit(),
-  hasPendingEdits: () => cellEditSession.hasPendingEdit() || hasPendingGridEdit(),
-  isBlocked: () =>
-    xlsxActions.busy.value ||
-    xlsxActions.passwordRequired.value ||
-    xlsxActions.confirmation.value !== undefined,
-});
-const { busy: fileBusy, confirmation, feedback } = fileActions;
-const xlsxActions = useWorkbookXlsxActions({
-  assetStore,
-  persistence,
-  getWorkbook: () => session.workbook,
-  getRevision: () => workbookRevision.value,
-  flushPendingEdits: () => cellEditSession.finish() && flushPendingGridEdit(),
-  hasPendingEdits: () => cellEditSession.hasPendingEdit() || hasPendingGridEdit(),
-  isBlocked: () => fileBusy.value || confirmation.value !== undefined || imageBusy.value,
-});
-const { busy: xlsxBusy, confirmation: xlsxConfirmation, feedback: xlsxFeedback } = xlsxActions;
 
 const encryptDocumentVisible = ref(false);
 function openDocumentEncryption(): void {
