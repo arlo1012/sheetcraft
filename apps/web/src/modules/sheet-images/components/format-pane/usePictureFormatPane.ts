@@ -1,4 +1,9 @@
 import { computed, onUnmounted, ref, useId, watch, type ComputedRef } from "vue";
+import type { PictureDetailedStyle } from "@sheetcraft/core/picture-detailed-style";
+import {
+  getPictureOwnDetailedStyle,
+  type PictureDetailedCategory,
+} from "../../picture-detailed-style-edit";
 import {
   PICTURE_FORMAT_GEOMETRY_FIELDS,
   canApplyPictureFormatIntent,
@@ -6,6 +11,7 @@ import {
   cancelPictureFormatDraft,
   createPictureFormatDraftState,
   createPictureFormatFieldIntent,
+  createPictureFormatDetailedIntent,
   editPictureFormatDraft,
   focusPictureFormatDraft,
   pictureFormatDisplayNumber,
@@ -36,6 +42,7 @@ export interface PictureFormatPaneInputs {
   onIntent: PictureFormatIntentHandler;
   t: PictureFormatTranslate;
   options?: PictureFormatOptions;
+  loadPaintAsset?: (blob: Blob) => Promise<string | undefined>;
 }
 export interface PictureFormatDraftBinding {
   text: string;
@@ -68,6 +75,14 @@ export interface PictureFormatResetBinding {
   error?: string;
   activate: () => void;
 }
+export interface PictureFormatDetailedBinding<K extends PictureDetailedCategory> {
+  ownerKey: string;
+  value: PictureDetailedStyle[K];
+  disabled: boolean;
+  reason?: string;
+  error?: string;
+  apply: (value: PictureDetailedStyle[K] | undefined) => boolean;
+}
 export interface PictureFormatPaneController {
   snapshot: ComputedRef<PictureFormatSnapshot | null>;
   t: PictureFormatTranslate;
@@ -82,6 +97,9 @@ export interface PictureFormatPaneController {
   ) => PictureFormatChoiceBinding;
   boolean: (field: PictureFormatBooleanField) => PictureFormatBooleanBinding;
   reset: (type: PictureFormatReset) => PictureFormatResetBinding;
+  detailed: <K extends PictureDetailedCategory>(category: K) => PictureFormatDetailedBinding<K>;
+  hasDetailedCapabilities: ComputedRef<boolean>;
+  loadPaintAsset?: (blob: Blob) => Promise<string | undefined>;
   options: (
     field: PictureFormatChoiceField,
   ) => readonly { value: string; label: string; disabled?: boolean }[] | undefined;
@@ -93,9 +111,11 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
   const prefix = `picture-format-${useId()}`;
   const state = ref(createPictureFormatDraftState(props.snapshot));
   const bindingGeneration = ref(0);
+  const detailedErrors = ref<Partial<Record<PictureDetailedCategory, string>>>({});
   function cancel() {
     bindingGeneration.value += 1;
     state.value = cancelPictureFormatDraft(state.value);
+    detailedErrors.value = {};
   }
   onUnmounted(cancel);
   const snapshot = computed(() => props.snapshot);
@@ -107,8 +127,10 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
         !next ||
         !state.value.owner ||
         pictureFormatOwnerKey(next.owner) !== pictureFormatOwnerKey(state.value.owner)
-      )
+      ) {
         bindingGeneration.value += 1;
+        detailedErrors.value = {};
+      }
       state.value = reconcilePictureFormatDraftState(state.value, next);
     },
     { deep: true, flush: "sync" },
@@ -298,6 +320,8 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
   return {
     snapshot,
     t,
+    loadPaintAsset: props.loadPaintAsset,
+    hasDetailedCapabilities: computed(() => props.capabilities.detailed !== undefined),
     number: (field, unit) => draftBinding(field, unit),
     text: (field) => draftBinding(field),
     choice: (field, optionsAvailable = true) => {
@@ -352,6 +376,35 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
             intentId: nextId(),
           };
           if (!dispatch(intent) && owned()) setError(type, "applyRejected");
+        },
+      };
+    },
+    detailed: (category) => {
+      const capability = props.capabilities.detailed?.[category];
+      const owned = identity();
+      return {
+        ownerKey: props.snapshot ? pictureFormatOwnerKey(props.snapshot.owner) : "",
+        value: getPictureOwnDetailedStyle(props.snapshot?.appearance)?.[category],
+        disabled: !props.snapshot || capability?.enabled !== true,
+        reason: capability?.reason,
+        error: detailedErrors.value[category],
+        apply: (value) => {
+          if (
+            !owned() ||
+            !props.snapshot ||
+            props.capabilities.detailed?.[category]?.enabled !== true
+          )
+            return false;
+          const accepted = dispatch(
+            createPictureFormatDetailedIntent(props.snapshot, category, value, nextId()),
+          );
+          if (owned()) {
+            const errors = { ...detailedErrors.value };
+            if (accepted) delete errors[category];
+            else errors[category] = t("applyRejected");
+            detailedErrors.value = errors;
+          }
+          return accepted;
         },
       };
     },

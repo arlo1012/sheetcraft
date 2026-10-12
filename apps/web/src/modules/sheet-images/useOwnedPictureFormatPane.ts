@@ -10,6 +10,12 @@ import {
   resetPictureAppearance,
   type PictureOwnAppearanceEdit,
 } from "./picture-appearance-edit";
+import {
+  editPictureDetailedCategory,
+  PICTURE_DETAILED_CATEGORIES,
+} from "./picture-detailed-style-edit";
+import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detailed-style";
+import { assertPicturePaintSupport } from "./picture-paint-effects";
 import { assertImagePixelBudget } from "../image-assets/imageAssetValidation";
 import type { PictureIntrinsicSize } from "./usePictureIntrinsicSize";
 import {
@@ -175,6 +181,8 @@ export interface OwnedPictureFormatPaneOptions {
   getOriginalSizeLimitReason?: () => string;
   getInheritedLineReason?: () => string;
   getCompositeLineReason?: () => string;
+  /** Current, validated resource registry; callers never gain access by supplying an arbitrary ID. */
+  isImageAssetAvailable?: (assetId: string) => boolean;
 }
 type Lease = {
   workbook: Workbook;
@@ -307,7 +315,11 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       clear();
     });
 
-  function validateForest(forest: readonly FloatingImage[], context: Lease["context"]): void {
+  function validateForest(
+    forest: readonly FloatingImage[],
+    context: Lease["context"],
+    admit = true,
+  ): void {
     for (const root of forest) {
       if (isPictureGroup(root)) {
         if (!context) throw new TypeError("Group geometry requires current worksheet metrics.");
@@ -318,6 +330,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       } else if (context)
         resolvePictureFrame(pictureFrameFromLegacy(root, context.metrics), context.metrics);
     }
+    if (admit) assertPicturePaintSupport(forest, currentThemeEffects(), context?.metrics);
   }
   function capture(): Lease | undefined {
     if (options.isOpen?.() === false) return undefined;
@@ -339,7 +352,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
     const context = options.getContext();
     const forestReference = sheet.floatingImages;
     const forest = normalizePictureObjectCollection(forestReference);
-    validateForest(forest, context);
+    validateForest(forest, context, false);
     const root = forest.find((image) => image.id === path[0]);
     if (!root) return undefined;
     let node: Lease["node"] = root,
@@ -426,6 +439,9 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       options.getDisabledReason?.() ?? "This setting is not available for this object.";
     return {
       fields: Object.fromEntries(fields.map((field) => [field, { enabled: false, reason }])),
+      detailed: Object.fromEntries(
+        PICTURE_DETAILED_CATEGORIES.map((category) => [category, { enabled: false, reason }]),
+      ),
       resets: Object.fromEntries(resets.map((reset) => [reset, { enabled: false, reason }])),
     };
   }
@@ -501,6 +517,9 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
     else if (!inner) values.anchor = "move";
     if (!options.isBusy() && canUseSheetPermission(lease.sheet, "editObjects")) {
       if (sourceBearing) {
+        capabilities.detailed = Object.fromEntries(
+          PICTURE_DETAILED_CATEGORIES.map((category) => [category, { enabled: true }]),
+        );
         capabilities.fields.lineMode = { enabled: true };
         capabilities.fields.shadowPreset = { enabled: true };
         capabilities.resets!["reset-picture"] = { enabled: true };
@@ -629,6 +648,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       },
       revision: lease.revision,
       values,
+      ...(sourceBearing ? { appearance } : {}),
       name: node.altText,
       ...(lease.intrinsic
         ? {
@@ -757,18 +777,35 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
     return forest;
   }
   function planAppearance(lease: Lease, intent: PictureFormatIntent): FloatingImage[] {
-    const { node, root, path, context } = lease;
+    const { node, root, path, context, world } = lease;
     if (isPictureGroup(node) || isGroupedGroup(node))
       throw new TypeError("Appearance belongs to a source-bearing picture.");
     const appearance =
       intent.type === "reset-picture"
         ? resetPictureAppearance()
-        : intent.type === "set-field"
-          ? editPictureOwnAppearance(node.transform?.appearance, {
-              field: intent.field,
-              value: intent.value,
-            } as PictureOwnAppearanceEdit)
-          : undefined;
+        : intent.type === "set-detailed"
+          ? editPictureDetailedCategory(node.transform?.appearance, intent)
+          : intent.type === "set-field"
+            ? editPictureOwnAppearance(node.transform?.appearance, {
+                field: intent.field,
+                value: intent.value,
+              } as PictureOwnAppearanceEdit)
+            : undefined;
+    if (intent.type === "set-detailed") {
+      const previousIds = new Set([
+        node.assetId,
+        ...getDetailedPictureStyleAssetIds(node.transform?.appearance?.detailedStyle),
+      ]);
+      for (const id of getDetailedPictureStyleAssetIds(appearance?.detailedStyle))
+        if (!previousIds.has(id) && options.isImageAssetAvailable?.(id) !== true)
+          throw new TypeError("Picture paint asset is not available to this workbook.");
+      if (
+        world?.collapsed &&
+        (intent.category === "format3d" || intent.category === "rotation3d") &&
+        intent.value?.kind === "value"
+      )
+        throw new TypeError("Expand the picture before adjusting its projected geometry.");
+    }
     let next: FloatingImage;
     if (path.length > 1) {
       if (!isPictureGroup(root)) throw new TypeError("Missing appearance owner tree.");
@@ -929,6 +966,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       !snapshot ||
       mutation ||
       (intent.type !== "set-field" &&
+        intent.type !== "set-detailed" &&
         intent.type !== "reset-crop" &&
         intent.type !== "reset-size" &&
         intent.type !== "reset-picture") ||
@@ -938,7 +976,9 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       !intent.intentId ||
       (intent.type === "set-field"
         ? view.capabilities.fields[intent.field]?.enabled !== true
-        : view.capabilities.resets?.[intent.type]?.enabled !== true) ||
+        : intent.type === "set-detailed"
+          ? view.capabilities.detailed?.[intent.category]?.enabled !== true
+          : view.capabilities.resets?.[intent.type]?.enabled !== true) ||
       options.isBusy() ||
       !canUseSheetPermission(lease.sheet, "editObjects")
     )
@@ -987,7 +1027,7 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       const next =
         intent.type === "set-field"
           ? plan(lease, intent)
-          : intent.type === "reset-picture"
+          : intent.type === "reset-picture" || intent.type === "set-detailed"
             ? planAppearance(lease, intent)
             : planCrop(lease, intent);
       if (!current(lease)) {

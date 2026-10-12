@@ -1,7 +1,9 @@
+import { picturePaintEnUS } from "./picture-paint-messages.en-US";
 import type { PictureFormatMessageSchema } from "./picture-format-messages";
 
 export const pictureFormatEnUS = {
   pictureFormat: {
+    ...picturePaintEnUS,
     paneTitle: "Format picture",
     close: "Close picture formatting",
     noSelection: "Select a picture to format.",

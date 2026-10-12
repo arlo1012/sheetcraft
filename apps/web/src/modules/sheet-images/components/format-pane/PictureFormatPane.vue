@@ -26,6 +26,7 @@ const props = withDefaults(
     onIntent: PictureFormatIntentHandler;
     t: PictureFormatTranslate;
     options?: PictureFormatOptions;
+    loadPaintAsset?: (blob: Blob) => Promise<string | undefined>;
     initialTab?: PictureFormatTab;
     initialUnit?: PictureFormatLengthUnit;
     intrinsicStatus?: PictureIntrinsicSizeStatus;

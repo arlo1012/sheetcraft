@@ -23,6 +23,15 @@ import MenuItem from "../../../shared/menu/MenuItem.vue";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
+import {
+  DEFAULT_WORKBOOK_THEME,
+  resolveThemeColor,
+  type ThemeColorReference,
+} from "@sheetcraft/core/workbook-theme";
+import { useWorkbookTheme } from "../../../shared/color/workbook-theme-context";
+import { getPictureOwnDetailedStyle } from "../picture-detailed-style-edit";
+import { pictureOutlineColorPatch, pictureOutlineWidthPatch } from "../picture-outline-edit";
+import { picturePaintColorFromSelection } from "../picture-paint-edit";
 import { requireStandalonePicture } from "../picture-document-support";
 const props = defineProps<{ image: FloatingImage; disabled: boolean }>();
 // A container has no appearance source. Reject it before creating menu drafts.
@@ -74,6 +83,21 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   disabled: computed(() => props.disabled),
 });
 const appearance = computed(() => standaloneImage.value.transform?.appearance ?? {});
+const workbookTheme = useWorkbookTheme();
+const ownLine = computed(() => getPictureOwnDetailedStyle(appearance.value)?.line);
+const outlineWidth = computed(() =>
+  ownLine.value?.kind === "value" ? ownLine.value.value.widthPt / 0.75 : 0,
+);
+const outlineColor = computed(() => {
+  const line = ownLine.value;
+  if (line?.kind !== "value" || line.value.paint.kind !== "solid") return undefined;
+  const color = line.value.paint.color;
+  return color.kind === "rgb"
+    ? color.rgb
+    : color.kind === "theme"
+      ? resolveThemeColor(workbookTheme?.value ?? DEFAULT_WORKBOOK_THEME, color.reference)
+      : "#000000";
+});
 const isFramed = computed(() => isFramedPictureObject(standaloneImage.value));
 const label = computed(() => t(`picture.${mode.value}`));
 watch(
@@ -116,7 +140,12 @@ function preset(patch: Partial<ImageAppearance>): void {
 }
 function borderWidth(value: unknown): void {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 20) return;
-  change({ border: { color: appearance.value.border?.color ?? "#000000", width: value } });
+  change(pictureOutlineWidthPatch(appearance.value, value));
+}
+function outlineSelect(rgb: string | null, reference?: ThemeColorReference): void {
+  change(
+    pictureOutlineColorPatch(appearance.value, picturePaintColorFromSelection(rgb, reference)),
+  );
 }
 function reset(): void {
   requireStandalonePicture(props.image);
@@ -286,14 +315,7 @@ function reset(): void {
             </GallerySection>
           </template>
           <GallerySection v-else-if="mode === 'border'" :title="t('picture.border')">
-            <ColorPalette
-              :model-value="appearance.border?.color ?? '#000000'"
-              @select="
-                change({
-                  border: { color: $event ?? '#000000', width: appearance.border?.width ?? 1 },
-                })
-              "
-            />
+            <ColorPalette :model-value="outlineColor" @select="outlineSelect" />
             <div
               class="picture-appearance__field"
               role="group"
@@ -301,7 +323,7 @@ function reset(): void {
             >
               <span>{{ t("picture.borderWidth") }}</span
               ><TInputNumber
-                :model-value="appearance.border?.width ?? 0"
+                :model-value="outlineWidth"
                 :min="0"
                 :max="20"
                 theme="column"

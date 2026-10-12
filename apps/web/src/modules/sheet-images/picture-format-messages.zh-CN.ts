@@ -1,7 +1,9 @@
+import { picturePaintZhCN } from "./picture-paint-messages.zh-CN";
 import type { PictureFormatMessageSchema } from "./picture-format-messages";
 
 export const pictureFormatZhCN = {
   pictureFormat: {
+    ...picturePaintZhCN,
     paneTitle: "设置图片格式",
     close: "关闭图片格式窗格",
     noSelection: "请选择要设置格式的图片。",

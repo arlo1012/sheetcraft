@@ -19,6 +19,7 @@ import {
   resolvePictureGroup,
   type ResolvedPictureGroupChild,
 } from "@sheetcraft/core/picture-group-layout";
+import { planPictureDetailedPaint } from "../../shared/images/picture-detailed-render";
 import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 import { resolvePictureThemeEffects, type DrawingThemeEffects } from "./drawing-theme-effects";
 
@@ -42,6 +43,8 @@ export function assertPicturePaintSupport(
   for (const image of canonical) {
     if (isFramedPictureObject(image)) {
       assertSourceBearingPicturePaintSupport(image, effects);
+      if (metrics)
+        assertDetailedGeometry(image, resolvePictureFrame(image.frame, metrics), effects);
       if (resolvePictureThemeEffects(image.transform?.appearance, effects)?.reflection && metrics)
         assertPictureReflectionGeometry(resolvePictureFrame(image.frame, metrics));
     } else if (isPictureGroup(image)) {
@@ -49,6 +52,15 @@ export function assertPicturePaintSupport(
       for (const { node } of traversePictureGroup(image))
         if (node.kind === "grouped-picture-v1")
           assertSourceBearingPicturePaintSupport(node, effects);
+      if (metrics) {
+        const visitDetails = (children: readonly ResolvedPictureGroupChild[]): void => {
+          for (const child of children) {
+            if ("members" in child) visitDetails(child.members);
+            else if (child.layout) assertDetailedGeometry(child.node, child.layout, effects);
+          }
+        };
+        visitDetails(resolvePictureGroup(image, metrics).members);
+      }
       if (effects?.reflection && metrics) {
         const visit = (children: readonly ResolvedPictureGroupChild[]): void => {
           for (const child of children) {
@@ -62,8 +74,38 @@ export function assertPicturePaintSupport(
         };
         visit(resolvePictureGroup(image, metrics).members);
       }
+    } else if (image.transform?.appearance?.detailedStyle) {
+      const height =
+        image.height /
+        (image.transform.appearance.reflection &&
+        image.transform.appearance.detailedStyle.reflection === undefined
+          ? 1.25
+          : 1);
+      planPictureDetailedPaint({
+        width: image.width,
+        height,
+        density: 1,
+        appearance: image.transform.appearance,
+        inherited: effects,
+      });
     }
   }
+}
+
+function assertDetailedGeometry(
+  picture: FramedFloatingImage | GroupedPicture,
+  geometry: ResolvedPictureFrame,
+  effects: DrawingThemeEffects | undefined,
+): void {
+  if (!geometry.collapsed && picture.transform?.appearance?.detailedStyle)
+    planPictureDetailedPaint({
+      width: geometry.rect.width,
+      height: geometry.rect.height,
+      density: 1,
+      appearance: picture.transform.appearance,
+      inherited: effects,
+      angleDeg: geometry.angleDeg,
+    });
 }
 
 /** The picture has already passed its strict standalone/owned normalizer. */

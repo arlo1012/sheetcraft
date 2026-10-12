@@ -98,6 +98,8 @@ import { resolveOwnedPictureNode } from "../modules/sheet-images/picture-group-i
 import PictureFormatPane from "../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
 import { usePictureIntrinsicSize } from "../modules/sheet-images/usePictureIntrinsicSize";
 import { useOwnedPictureFormatPane } from "../modules/sheet-images/useOwnedPictureFormatPane";
+import { onBeforeUnmount } from "vue";
+import { createPicturePaintAssetSource } from "../modules/sheet-images/picture-paint-asset-source";
 import type { PictureFormatLabelKey } from "../modules/sheet-images/picture-format-pane-model";
 import { usePictureToolbarOwner } from "../modules/sheet-images/usePictureToolbarOwner";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
@@ -1866,6 +1868,8 @@ const pictureFormatPane = useOwnedPictureFormatPane({
   execute: pictureTools.replaceAll,
   getDisabledReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
   getUnsupportedCropReason: () => t("picture.groupReflectionUnsupported"),
+  isImageAssetAvailable: (assetId) =>
+    imageAssetUrls.value.has(assetId) || picturePaintAssets.has(assetId),
   getIntrinsicSize: (assetId) => {
     const size = pictureIntrinsic.size.value;
     return size?.assetId === assetId && imageAssetUrls.value.get(assetId) === size.url
@@ -1882,6 +1886,11 @@ const pictureFormatPane = useOwnedPictureFormatPane({
   getInheritedLineReason: () => t("pictureFormat.capabilityReasons.inheritedLine"),
   getCompositeLineReason: () => t("pictureFormat.capabilityReasons.compositeLine"),
 });
+const picturePaintAssets = createPicturePaintAssetSource({
+  getSnapshot: () => pictureFormatPane.snapshot.value,
+  store: assetStore,
+});
+onBeforeUnmount(picturePaintAssets.dispose);
 function pictureFormatLabel(key: PictureFormatLabelKey): string {
   return t(`pictureFormat.${key}`);
 }
@@ -4365,6 +4374,7 @@ const gridInert = computed(
         :snapshot="pictureFormatPane.snapshot.value"
         :capabilities="pictureFormatPane.capabilities.value"
         :on-intent="pictureFormatPane.onIntent"
+        :load-paint-asset="picturePaintAssets.load"
         :options="{
           lineMode: [
             { value: 'inherit', label: t('pictureFormat.options.inheritLine') },

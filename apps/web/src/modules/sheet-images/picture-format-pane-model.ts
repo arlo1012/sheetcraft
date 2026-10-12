@@ -1,3 +1,7 @@
+import { PICTURE_PAINT_LABEL_KEYS } from "./picture-paint-labels";
+import type { ImageAppearance } from "@sheetcraft/core/workbook";
+import type { PictureDetailedStyle } from "@sheetcraft/core/picture-detailed-style";
+import type { PictureDetailedCategory } from "./picture-detailed-style-edit";
 /**
  * Runtime-neutral, field-level contract for the picture format pane.
  * Lengths are points (72 pt/in), angles degrees, percentages 0–100 where stated.
@@ -115,12 +119,15 @@ export interface PictureFormatCapability {
 }
 export interface PictureFormatCapabilities {
   fields: Partial<Record<PictureFormatField, PictureFormatCapability>>;
+  detailed?: Partial<Record<PictureDetailedCategory, PictureFormatCapability>>;
   resets?: Partial<Record<PictureFormatReset, PictureFormatCapability>>;
 }
 export interface PictureFormatSnapshot {
   owner: PictureFormatOwner;
   revision: number;
   values: Readonly<Partial<PictureFormatValues>>;
+  /** Detached source appearance for real structured editors, not a whole-workbook patch. */
+  appearance?: ImageAppearance;
   /** Identity of the applied intent, when the host can provide it. */
   acceptedIntentId?: string;
   /** Read-only metadata, not silently used to implement a resize. */
@@ -139,7 +146,15 @@ export type PictureFormatEditIntent = {
     value: PictureFormatValues[F];
   };
 }[PictureFormatField];
+export type PictureFormatDetailedIntent = {
+  [K in PictureDetailedCategory]: PictureFormatIntentIdentity & {
+    type: "set-detailed";
+    category: K;
+    value: PictureDetailedStyle[K] | undefined;
+  };
+}[PictureDetailedCategory];
 export type PictureFormatIntent =
+  | PictureFormatDetailedIntent
   | PictureFormatEditIntent
   | (PictureFormatIntentIdentity & { type: PictureFormatReset });
 /** true means accepted for this exact owner; false must leave the draft intact. */
@@ -154,6 +169,7 @@ export type PictureFormatOptions = Partial<
   Record<PictureFormatChoiceField, readonly PictureFormatOption[]>
 >;
 export const PICTURE_FORMAT_LABEL_KEYS = [
+  ...PICTURE_PAINT_LABEL_KEYS,
   "paneTitle",
   "close",
   "noSelection",
@@ -505,7 +521,9 @@ export function canApplyPictureFormatIntent(
   return (
     (intent.type === "set-field"
       ? capabilities.fields[intent.field]
-      : capabilities.resets?.[intent.type]
+      : intent.type === "set-detailed"
+        ? capabilities.detailed?.[intent.category]
+        : capabilities.resets?.[intent.type]
     )?.enabled === true
   );
 }
@@ -547,3 +565,19 @@ export const PICTURE_FORMAT_RESET_CONTRACT: Readonly<
   "reset-3d-format": ["reset-3d-format-only", "retain-2d-geometry", "retain-other-appearance"],
   "reset-3d-rotation": ["reset-3d-rotation-only", "retain-2d-geometry", "retain-other-appearance"],
 };
+
+export function createPictureFormatDetailedIntent<K extends PictureDetailedCategory>(
+  snapshot: PictureFormatSnapshot,
+  category: K,
+  value: PictureDetailedStyle[K] | undefined,
+  intentId: string,
+): Extract<PictureFormatDetailedIntent, { category: K }> {
+  return {
+    type: "set-detailed",
+    owner: clonePictureFormatOwner(snapshot.owner),
+    baseRevision: snapshot.revision,
+    intentId,
+    category,
+    value,
+  } as Extract<PictureFormatDetailedIntent, { category: K }>;
+}
