@@ -35,6 +35,8 @@ export const drawingsEnUS = {
   "drawing.changeRejected": "Could not switch this editor. Your draft is preserved.",
   "drawing.geometryUnavailable": "This shape geometry cannot be displayed.",
   "drawing.adjustShape": "Adjust shape {index}",
+  "drawing.lineStart": "Line start (arrow keys move, Shift for larger steps)",
+  "drawing.lineEnd": "Line end (arrow keys move, Shift for larger steps)",
   "drawing.rotateShape": "Rotate shape",
   "drawing.rectangle": "Rectangle",
   "drawing.roundedRectangle": "Rounded rectangle",

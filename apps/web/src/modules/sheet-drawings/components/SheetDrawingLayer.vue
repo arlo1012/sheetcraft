@@ -14,11 +14,14 @@ import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import type { SheetDrawing, SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   getFloatingImageViewportFragments,
+  getFloatingImageSheetRect,
   moveFloatingImageBy,
   resizeFloatingImageBy,
   type FloatingImageResizeDirection,
   type FloatingImageViewportFragment,
 } from "@sheetcraft/sheet-engine/floating-image-layout";
+import { getPicturePaneTranslation } from "@sheetcraft/sheet-engine/picture-frame-layout";
+import { pictureFrameLocalToWorld } from "@sheetcraft/core/picture-frame";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import {
   startPointerSession,
@@ -33,6 +36,7 @@ import {
   standardShapeFlipPoint,
 } from "../shape-geometry";
 import { getStandardShapeViewportFragments, resizeStandardShapeBy } from "../standard-shape-layout";
+import { getShapeLineLocalEndpoints, moveStandardShapeEndpoint } from "../shape-endpoint-layout";
 import DrawingContent from "./DrawingContent.vue";
 import { shapeDrawingContainsWorldPoint } from "../shape-line-paint";
 const props = defineProps<{
@@ -134,10 +138,12 @@ function start(
   fragment: DrawingFragment,
   event: PointerEvent,
   direction?: FloatingImageResizeDirection,
-  mode: "move" | "rotate" | "adjust" = "move",
+  mode: "move" | "rotate" | "adjust" | "endpoint" = "move",
   index?: number,
 ): void {
   const drawing = fragment.drawing;
+  const owner = props.drawings.find((item) => item.id === drawing.id);
+  if (!owner || owner !== drawing) return;
   if (event.button !== 0 || (!direction && mode === "move" && !hits(fragment, event))) return;
   event.preventDefault();
   event.stopPropagation();
@@ -145,7 +151,6 @@ function start(
   emit("select");
   (event.currentTarget as HTMLElement)?.focus?.();
   if (props.readOnly) return;
-  const owner = props.drawings.find((item) => item.id === drawing.id);
   const sheet = props.sheet,
     revision = props.revision,
     layout = props.layout,
@@ -162,6 +167,19 @@ function start(
     x: fragment.rect.x + drawing.width / 2,
     y: fragment.rect.y + drawing.height / 2,
   };
+  const endpoint =
+    isStandard(drawing) && mode === "endpoint" && (index === 0 || index === 1)
+      ? getShapeLineLocalEndpoints(drawing)?.[index]
+      : undefined;
+  const endpointOrigin =
+    endpoint && isStandard(drawing)
+      ? pictureFrameLocalToWorld(
+          fragment.rect,
+          drawing.rotation,
+          standardShapeFlipPoint(drawing, endpoint),
+        )
+      : undefined;
+  const paneTranslation = getPicturePaneTranslation(fragment.paneId, layout);
   const initialAngle = Math.atan2(origin.y - center.y, origin.x - center.x);
   const update = (point: PointerEvent | MouseEvent) => {
     if (!valid()) {
@@ -177,6 +195,22 @@ function start(
       if (point.shiftKey) rotation = Math.round(rotation / 15) * 15;
       rotation = ((((rotation + 180) % 360) + 360) % 360) - 180;
       preview.value = { ...drawing, rotation };
+    } else if (
+      isStandard(drawing) &&
+      mode === "endpoint" &&
+      endpointOrigin &&
+      (index === 0 || index === 1)
+    ) {
+      preview.value = moveStandardShapeEndpoint(
+        drawing,
+        index,
+        {
+          x: endpointOrigin.x + delta.x - paneTranslation.x,
+          y: endpointOrigin.y + delta.y - paneTranslation.y,
+        },
+        layout,
+        point.shiftKey,
+      );
     } else if (isStandard(drawing) && mode === "adjust" && index !== undefined) {
       const local = standardShapeFlipPoint(
         drawing,
@@ -216,6 +250,7 @@ function start(
   });
 }
 function edit(fragment: DrawingFragment, event: MouseEvent): void {
+  if (props.drawings.find((item) => item.id === fragment.drawing.id) !== fragment.drawing) return;
   if ((props.readOnly && fragment.drawing.kind !== "attachment") || !hits(fragment, event)) return;
   event.preventDefault();
   event.stopPropagation();
@@ -242,12 +277,37 @@ function nudgeAdjustment(
   );
   if (geometry) emit("update", { ...drawing, shapeGeometry: geometry });
 }
+function nudgeEndpoint(
+  drawing: SheetGraphicDrawing,
+  index: 0 | 1,
+  delta: { x: number; y: number },
+): void {
+  if (props.readOnly || props.drawings.find((item) => item.id === drawing.id) !== drawing) return;
+  const position = getShapeLineLocalEndpoints(drawing)?.[index];
+  const rect = getFloatingImageSheetRect(drawing, props.layout);
+  if (!position || !rect) return;
+  const origin = pictureFrameLocalToWorld(
+    rect,
+    drawing.rotation,
+    standardShapeFlipPoint(drawing, position),
+  );
+  const next = moveStandardShapeEndpoint(
+    drawing,
+    index,
+    { x: origin.x + delta.x, y: origin.y + delta.y },
+    props.layout,
+  );
+  if (next) emit("update", next);
+}
 function nudgeRotation(drawing: SheetGraphicDrawing, degrees: number): void {
   if (props.readOnly || props.drawings.find((item) => item.id === drawing.id) !== drawing) return;
   const rotation = ((((drawing.rotation + degrees + 180) % 360) + 360) % 360) - 180;
   emit("update", { ...drawing, rotation });
 }
 function keydown(drawing: SheetDrawing, event: KeyboardEvent) {
+  if (props.drawings.find((item) => item.id === drawing.id) !== drawing) return;
+  if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey)
+    return;
   if (event.key === "Escape") {
     selectedId.value = null;
     event.stopPropagation();
@@ -363,6 +423,11 @@ watch(
         :pane-clip="layout.panes[fragment.paneId].clip"
         @resize="(direction, event) => start(fragment, event, direction)"
         @rotate="(event) => start(fragment, event, undefined, 'rotate')"
+        @endpoint="(index, event) => start(fragment, event, undefined, 'endpoint', index)"
+        @nudge-endpoint="
+          (index, delta) =>
+            isStandard(fragment.drawing) && nudgeEndpoint(fragment.drawing, index, delta)
+        "
         @adjust="(index, event) => start(fragment, event, undefined, 'adjust', index)"
         @nudge-adjustment="
           (index, delta) =>

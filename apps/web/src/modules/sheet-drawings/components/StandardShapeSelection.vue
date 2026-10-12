@@ -8,6 +8,7 @@ import type {
 } from "@sheetcraft/sheet-engine/floating-image-layout";
 import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 import { getStandardShapeGeometry, standardShapeFlipPoint } from "../shape-geometry";
+import { getShapeLineLocalEndpoints } from "../shape-endpoint-layout";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
@@ -17,6 +18,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   resize: [direction: FloatingImageResizeDirection, event: PointerEvent];
   rotate: [event: PointerEvent];
+  endpoint: [index: 0 | 1, event: PointerEvent];
+  nudgeEndpoint: [index: 0 | 1, delta: { x: number; y: number }];
   adjust: [index: number, event: PointerEvent];
   nudgeAdjustment: [index: number, delta: { x: number; y: number }];
   nudgeRotation: [degrees: number];
@@ -63,6 +66,16 @@ const sizes = computed(() =>
     }))
     .filter((h) => owns(h.point)),
 );
+const lineEndpoints = computed(() => getShapeLineLocalEndpoints(props.drawing));
+const endpoints = computed(
+  () =>
+    lineEndpoints.value
+      ?.map((p, index) => ({
+        index: index as 0 | 1,
+        point: point(standardShapeFlipPoint(props.drawing, p)),
+      }))
+      .filter((h) => owns(h.point)) ?? [],
+);
 const rotation = computed(() => point({ x: props.drawing.width / 2, y: -24 }));
 const adjustments = computed(
   () =>
@@ -74,7 +87,7 @@ const adjustments = computed(
       )
       .filter((h) => owns(h.point)) ?? [],
 );
-function adjustKey(index: number, event: KeyboardEvent): void {
+function handleKey(index: number, event: KeyboardEvent, endpoint = false): void {
   if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
   const d = event.shiftKey ? 10 : 1;
   const delta = {
@@ -86,7 +99,8 @@ function adjustKey(index: number, event: KeyboardEvent): void {
   if (!delta) return;
   event.preventDefault();
   event.stopPropagation();
-  emit("nudgeAdjustment", index, delta);
+  if (endpoint) emit("nudgeEndpoint", index as 0 | 1, delta);
+  else emit("nudgeAdjustment", index, delta);
 }
 function rotateKey(event: KeyboardEvent): void {
   if (
@@ -107,11 +121,11 @@ function rotateKey(event: KeyboardEvent): void {
 </script>
 <template>
   <div class="standard-shape-selection" data-standard-shape-selection>
-    <div class="standard-shape-selection__outline" :style="outlineStyle">
+    <div v-if="!lineEndpoints" class="standard-shape-selection__outline" :style="outlineStyle">
       <span class="standard-shape-selection__stem" />
     </div>
     <button
-      v-for="h in sizes"
+      v-for="h in lineEndpoints ? [] : sizes"
       :key="h.direction"
       type="button"
       tabindex="-1"
@@ -123,7 +137,7 @@ function rotateKey(event: KeyboardEvent): void {
       @dblclick.prevent.stop
     />
     <button
-      v-if="owns(rotation)"
+      v-if="!lineEndpoints && owns(rotation)"
       type="button"
       class="standard-shape-selection__handle is-rotation"
       :style="style(rotation)"
@@ -131,6 +145,18 @@ function rotateKey(event: KeyboardEvent): void {
       data-shape-rotate
       @pointerdown.prevent.stop="emit('rotate', $event)"
       @keydown="rotateKey"
+      @dblclick.prevent.stop
+    />
+    <button
+      v-for="h in endpoints"
+      :key="`endpoint-${h.index}`"
+      type="button"
+      class="standard-shape-selection__handle is-endpoint"
+      :style="style(h.point)"
+      :aria-label="t(h.index === 0 ? 'drawing.lineStart' : 'drawing.lineEnd')"
+      :data-shape-endpoint="h.index"
+      @pointerdown.prevent.stop="emit('endpoint', h.index, $event)"
+      @keydown="handleKey(h.index, $event, true)"
       @dblclick.prevent.stop
     />
     <button
@@ -142,7 +168,7 @@ function rotateKey(event: KeyboardEvent): void {
       :aria-label="t('drawing.adjustShape', { index: h.index + 1 })"
       :data-shape-adjustment="h.index"
       @pointerdown.prevent.stop="emit('adjust', h.index, $event)"
-      @keydown="adjustKey(h.index, $event)"
+      @keydown="handleKey(h.index, $event)"
       @dblclick.prevent.stop
     />
   </div>

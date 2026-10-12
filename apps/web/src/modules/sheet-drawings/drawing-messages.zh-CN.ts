@@ -31,6 +31,8 @@ export const drawingsZhCN = {
   "drawing.changeRejected": "无法切换编辑器，当前草稿已保留。",
   "drawing.geometryUnavailable": "无法显示此形状的几何。",
   "drawing.adjustShape": "调整形状 {index}",
+  "drawing.lineStart": "线条起点（方向键微调，Shift 加大步长）",
+  "drawing.lineEnd": "线条终点（方向键微调，Shift 加大步长）",
   "drawing.rotateShape": "旋转形状",
   "drawing.rectangle": "矩形",
   "drawing.roundedRectangle": "圆角矩形",

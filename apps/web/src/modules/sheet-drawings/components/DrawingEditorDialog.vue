@@ -14,7 +14,8 @@ import { useAppI18n } from "../../../shared/i18n";
 import DrawingContent from "./DrawingContent.vue";
 import ShapeGallery from "./ShapeGallery.vue";
 import { SHAPE_GALLERY, type ShapeGalleryChoice } from "../shape-gallery";
-import { isShapeLinePreset } from "@sheetcraft/core/shape-line-ends";
+import { isShapeLinePreset, type ShapeLineEnds } from "@sheetcraft/core/shape-line-ends";
+import ShapeLineEndsControls from "./ShapeLineEndsControls.vue";
 import { getStandardShapeGeometry } from "../shape-geometry";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
@@ -64,6 +65,18 @@ function chooseShape(choice: ShapeGalleryChoice): void {
 const lineGeometry = computed(
   () => !!draft.value.shapeGeometry && isShapeLinePreset(draft.value.shapeGeometry.preset),
 );
+const lineEndsHandler = computed(() => {
+  const sourceGeometry = draft.value.shapeGeometry;
+  return (ends: ShapeLineEnds | undefined): boolean => {
+    if (props.disabled || !lineGeometry.value || draft.value.shapeGeometry !== sourceGeometry)
+      return false;
+    const next = { ...draft.value };
+    if (ends) next.shapeLineEnds = ends;
+    else delete next.shapeLineEnds;
+    draft.value = next;
+    return true;
+  };
+});
 const previewScale = computed(() => Math.min(1, 400 / draft.value.width, 160 / draft.value.height));
 const shapes: DrawingShape[] = [
   "rectangle",
@@ -123,7 +136,7 @@ const shapes: DrawingShape[] = [
             <DrawingContent :drawing="{ ...draft, shape, text: '', rotation: 0 }" />
           </button>
         </div>
-        <label
+        <label v-if="!lineGeometry"
           >{{ t(drawing.kind === "equation" ? "drawing.equationSource" : "drawing.text")
           }}<Textarea
             v-model="draft.text"
@@ -161,7 +174,14 @@ const shapes: DrawingShape[] = [
               size="small"
           /></label>
         </div>
-        <div class="drawing-editor__row">
+        <ShapeLineEndsControls
+          v-if="lineGeometry"
+          :ends="draft.shapeLineEnds"
+          :disabled="disabled"
+          :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
+          :handler="lineEndsHandler"
+        />
+        <div v-if="!lineGeometry" class="drawing-editor__row">
           <label>{{ t("drawing.color") }}<input v-model="draft.color" type="color" /></label>
           <label
             >{{ t("drawing.fontSize")
@@ -185,7 +205,7 @@ const shapes: DrawingShape[] = [
             }}<InputNumber
               class="drawing-editor__number"
               v-model="draft.width"
-              :min="16"
+              :min="lineGeometry ? 1 : 16"
               :max="16384"
               size="small"
           /></label>
@@ -194,7 +214,7 @@ const shapes: DrawingShape[] = [
             }}<InputNumber
               class="drawing-editor__number"
               v-model="draft.height"
-              :min="16"
+              :min="lineGeometry ? 1 : 16"
               :max="16384"
               size="small"
           /></label>

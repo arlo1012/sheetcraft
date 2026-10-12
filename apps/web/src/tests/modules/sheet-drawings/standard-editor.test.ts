@@ -4,6 +4,10 @@ import { describe, expect, test, vi } from "vitest";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import DrawingEditorDialog from "../../../modules/sheet-drawings/components/DrawingEditorDialog.vue";
+import ShapeLineEndsControls from "../../../modules/sheet-drawings/components/ShapeLineEndsControls.vue";
+import { Select } from "tdesign-vue-next/es/select";
+import { InputNumber } from "tdesign-vue-next/es/input-number";
+import { Textarea } from "tdesign-vue-next/es/textarea";
 import ShapeGallery from "../../../modules/sheet-drawings/components/ShapeGallery.vue";
 import { SHAPE_GALLERY } from "../../../modules/sheet-drawings/shape-gallery";
 import { createAppI18n } from "../../../shared/i18n";
@@ -69,6 +73,59 @@ describe("standard gallery editor intent and draft integrity", () => {
     expect(saved.shapeGeometry).toEqual({ preset: "ellipse" });
     expect(saved.shapeLineEnds).toBeUndefined();
     expect(saved.text).toBe("label");
+    w.unmount();
+  });
+  test("line editor changes both actual ends, permits thin dimensions, hides ineffective text and preserves stored text", async () => {
+    const w = fixture({
+      ...shape,
+      height: 1,
+      shapeGeometry: { preset: "line" },
+      shapeLineEnds: { end: { kind: "triangle" } },
+    });
+    expect(w.findComponent(Textarea).exists()).toBe(false);
+    expect(w.findAllComponents(InputNumber).map((c) => c.props("min"))).toEqual([0, 1, 1, -360]);
+    const controls = w.getComponent(ShapeLineEndsControls);
+    const ends = {
+      begin: { kind: "diamond" as const, width: "large" as const },
+      end: { kind: "open" as const, length: "small" as const },
+    };
+    expect(controls.props("handler")(ends)).toBe(true);
+    await nextTick();
+    w.getComponent(Dialog).vm.$emit("confirm");
+    expect(w.emitted("confirm")![0]![0]).toMatchObject({
+      shapeLineEnds: ends,
+      text: "label",
+      height: 1,
+    });
+    expect(shape.shapeLineEnds).toBeUndefined();
+    expect(controls.props("handler")(undefined)).toBe(true);
+    await nextTick();
+    w.getComponent(Dialog).vm.$emit("confirm");
+    expect((w.emitted("confirm")![1]![0] as SheetGraphicDrawing).shapeLineEnds).toBeUndefined();
+    w.unmount();
+  });
+  test("old arrowless line callback cannot retarget a newly selected connector", async () => {
+    const w = fixture({ ...shape, shapeGeometry: { preset: "line" } });
+    const oldTypeAction = w
+      .getComponent(ShapeLineEndsControls)
+      .findAllComponents(Select)[0]!
+      .props("onChange") as (value: string) => void;
+    w.getComponent(ShapeGallery).vm.$emit("choose", choice("elbowConnector"));
+    oldTypeAction("diamond");
+    await nextTick();
+    w.getComponent(Dialog).vm.$emit("confirm");
+    const result = w.emitted("confirm")![0]![0] as SheetGraphicDrawing;
+    expect(result.shapeGeometry?.preset).toBe("bentConnector3");
+    expect(result.shapeLineEnds).toBeUndefined();
+    w.unmount();
+  });
+  test("disabled line-end edit cannot mutate or commit the dialog draft", async () => {
+    const w = fixture({ ...shape, shapeGeometry: { preset: "line" } });
+    const handler = w.getComponent(ShapeLineEndsControls).props("handler");
+    await w.setProps({ disabled: true });
+    expect(handler({ end: { kind: "oval" } })).toBe(false);
+    w.getComponent(Dialog).vm.$emit("confirm");
+    expect(w.emitted("confirm")).toBeUndefined();
     w.unmount();
   });
   test("old shape remains old until explicit selection", async () => {

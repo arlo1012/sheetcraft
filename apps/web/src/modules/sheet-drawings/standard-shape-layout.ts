@@ -1,3 +1,4 @@
+import { getShapeLineLocalEndpoints } from "./shape-endpoint-layout";
 import { isShapeLinePreset } from "@sheetcraft/core/shape-line-ends";
 import { pictureFrameLocalToWorld, type PictureFrameRect } from "@sheetcraft/core/picture-frame";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
@@ -134,13 +135,18 @@ export function getStandardShapeViewportFragments(
     );
   }
   if (selected) {
+    const endpoints = getShapeLineLocalEndpoints(drawing);
     points.push(
       ...[
-        { x: 0, y: 0 },
-        { x: drawing.width, y: 0 },
-        { x: drawing.width, y: drawing.height },
-        { x: 0, y: drawing.height },
-        { x: drawing.width / 2, y: -24 },
+        ...(endpoints
+          ? endpoints.map((p) => standardShapeFlipPoint(drawing, p))
+          : [
+              { x: 0, y: 0 },
+              { x: drawing.width, y: 0 },
+              { x: drawing.width, y: drawing.height },
+              { x: 0, y: drawing.height },
+              { x: drawing.width / 2, y: -24 },
+            ]),
         ...shape.handles.map((h) => standardShapeFlipPoint(drawing, h.position)),
       ].map((p) => pictureFrameLocalToWorld(rect, drawing.rotation, p)),
     );
