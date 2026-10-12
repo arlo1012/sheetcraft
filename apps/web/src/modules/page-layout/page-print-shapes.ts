@@ -63,6 +63,11 @@ import {
   resizeShapePresentationCanvas,
   releaseShapePresentationCanvas,
 } from "../sheet-drawings/shape-detailed-presentation";
+import {
+  hasActiveShapeGroupShadow,
+  planShapeGroupPaint,
+  prepareShapeGroupPaint,
+} from "../sheet-drawings/shape-group-paint";
 
 type PrintableShape = SheetGraphicDrawing | SheetFramedGraphicDrawing | ShapeGroupDrawing;
 type Bounds = { left: number; top: number; right: number; bottom: number };
@@ -153,6 +158,17 @@ export function* getPrintableShapeLeaves(
       drawing: resolved.view as SheetGraphicDrawing,
       rect: resolved.rect,
     };
+  }
+}
+
+function* printablePaintEntries(sheet: Pick<Sheet, "drawings">, metrics: PictureSheetMetrics) {
+  for (const root of getPrintableShapeRoots(sheet)) {
+    if (root.kind === "shapeGroup" && checked(root.id, () => hasActiveShapeGroupShadow(root))) {
+      yield { kind: "group" as const, root };
+    } else {
+      for (const leaf of getPrintableShapeLeaves({ drawings: [root] }, metrics))
+        yield { kind: "leaf" as const, leaf };
+    }
   }
 }
 
@@ -249,6 +265,20 @@ function union(left: Bounds, right: Bounds): Bounds {
     bottom: Math.max(left.bottom, right.bottom),
   };
 }
+function groupWorldBounds(rect: ShapeFrameRect, angle: number, local: Bounds): Bounds {
+  const points = [
+    { x: local.left, y: local.top },
+    { x: local.right, y: local.top },
+    { x: local.right, y: local.bottom },
+    { x: local.left, y: local.bottom },
+  ].map((point) => shapeFrameLocalToWorld(rect, angle, point));
+  return {
+    left: Math.min(...points.map((point) => point.x)),
+    top: Math.min(...points.map((point) => point.y)),
+    right: Math.max(...points.map((point) => point.x)),
+    bottom: Math.max(...points.map((point) => point.y)),
+  };
+}
 function axisCount(position: number, metrics: PictureAxisMetrics): number {
   let low = 0,
     high = metrics.count;
@@ -267,11 +297,45 @@ export function getPrintShapeContentExtent(
   sheet: Sheet,
   metrics: PictureSheetMetrics,
   theme?: WorkbookTheme,
+  resources?: PicturePaintResources,
+  requireReadyGroupPaint = false,
 ) {
   let rowCount = 0,
     columnCount = 0;
+  const activeRoots = new Set<ShapeGroupDrawing>();
+  for (const entry of printablePaintEntries(sheet, metrics)) {
+    if (entry.kind !== "group") continue;
+    checked(entry.root.id, () => {
+      const plan = planShapeGroupPaint({
+        root: entry.root,
+        metrics,
+        density: 1,
+        resources: { ...resources, theme },
+      });
+      if (plan.kind === "unavailable") {
+        if (requireReadyGroupPaint)
+          throw new Error("Complete group bounds require ready fonts and paint resources.");
+        return;
+      }
+      activeRoots.add(entry.root);
+      if (plan.layout.collapsed) return;
+      const bounds = groupWorldBounds(
+        plan.layout.rect,
+        plan.layout.angleDeg,
+        union(plan.logicalBounds, {
+          left: 0,
+          top: 0,
+          right: plan.layout.rect.width,
+          bottom: plan.layout.rect.height,
+        }),
+      );
+      columnCount = Math.max(columnCount, axisCount(bounds.right, metrics.columns));
+      rowCount = Math.max(rowCount, axisCount(bounds.bottom, metrics.rows));
+    });
+  }
   for (const leaf of getPrintableShapeLeaves(sheet, metrics))
     checked(leaf.drawingId, () => {
+      if (leaf.sourceRoot.kind === "shapeGroup" && activeRoots.has(leaf.sourceRoot)) return;
       const { drawing, rect } = leaf;
       const plan = planShapeDetailedPaint({
         drawing,
@@ -347,7 +411,48 @@ export function paintPrintShapes(
     context.beginPath();
     context.rect(0, 0, options.viewport.width, options.viewport.height);
     context.clip();
-    for (const leaf of getPrintableShapeLeaves(options.sheet, options.metrics))
+    for (const entry of printablePaintEntries(options.sheet, options.metrics)) {
+      if (entry.kind === "group") {
+        checked(entry.root.id, () => {
+          const result = prepareShapeGroupPaint({
+            root: entry.root,
+            metrics: options.metrics,
+            density,
+            resources,
+            interactive: false,
+          });
+          if (result.kind !== "ready")
+            throw new Error("The complete group appearance is unavailable for printing.");
+          try {
+            if (result.layout.collapsed) return;
+            const rect = result.layout.rect;
+            const bounds = groupWorldBounds(rect, result.layout.angleDeg, result.logicalBounds);
+            if (
+              bounds.right <= options.viewport.x ||
+              bounds.bottom <= options.viewport.y ||
+              bounds.left >= options.viewport.x + options.viewport.width ||
+              bounds.top >= options.viewport.y + options.viewport.height
+            )
+              return;
+            context.save();
+            try {
+              context.translate(
+                rect.x + rect.width / 2 - options.viewport.x,
+                rect.y + rect.height / 2 - options.viewport.y,
+              );
+              context.rotate((result.layout.angleDeg * Math.PI) / 180);
+              context.translate(-rect.width / 2, -rect.height / 2);
+              drawRaster(context, result.canvas, result.logicalBounds, result.actualDensity);
+            } finally {
+              context.restore();
+            }
+          } finally {
+            result.dispose();
+          }
+        });
+        continue;
+      }
+      const leaf = entry.leaf;
       checked(leaf.drawingId, () => {
         const { drawing, rect, sourceIdentity } = leaf;
         const bodyOptions = {
@@ -410,6 +515,7 @@ export function paintPrintShapes(
           context.restore();
         }
       });
+    }
   } finally {
     context.restore();
   }

@@ -33,6 +33,7 @@ import {
 } from "./shape-text-paint";
 import { projectedShapeTextBounds } from "./shape-text-projection";
 import { materializeDrawingShapeText, withDrawingShapeText } from "./shape-text-options";
+import { hasActiveShapeGroupShadow, preflightShapeGroupPaint } from "./shape-group-paint";
 
 function sameData(a: unknown, b: unknown) {
   return a === b || JSON.stringify(a) === JSON.stringify(b);
@@ -72,6 +73,17 @@ export function prepareShapeTextUpdate(
       measurement,
     );
     preflightShapeGroupText(prepared, metrics, measurement, paint);
+    if (hasActiveShapeGroupShadow(prepared)) {
+      const proof = preflightShapeGroupPaint({
+        root: prepared,
+        metrics,
+        density: 1,
+        resources: paint?.resources,
+        textRuntimeOptions: measurement,
+      });
+      if (proof.kind !== "ready")
+        throw new Error("Shape group appearance is not ready; the draft has been preserved.");
+    }
     return prepared;
   }
   if (isFramedShapeDrawing(candidate)) {

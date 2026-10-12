@@ -497,23 +497,47 @@ describe("genuine descendant fill/line and text batches", () => {
     expect(JSON.stringify(f.root)).toBe(before);
   });
 
-  test("body group effects and unverified text effects reject rather than invent leaf effects", () => {
+  test("unverified body and text effects reject rather than invent leaf effects", () => {
     const f = fixture();
     const before = JSON.stringify(f.root);
     for (const target of ["shape", "text"] as const)
-      for (const category of [
-        "shadow",
-        "reflection",
-        "glow",
-        "softEdges",
-        "format3d",
-        "rotation3d",
-      ] as const)
-        if (!(target === "text" && category === "shadow"))
-          expect(() =>
-            apply(f, ["root"], { type: "set-style", target, category, value: { kind: "none" } }),
-          ).toThrow(/group effect model/);
+      for (const category of ["reflection", "glow", "softEdges", "format3d", "rotation3d"] as const)
+        expect(() =>
+          apply(f, ["root"], { type: "set-style", target, category, value: { kind: "none" } }),
+        ).toThrow(/group effect model/);
     expect(JSON.stringify(f.root)).toBe(before);
+  });
+
+  test("body shadow edits only the selected real owner and never aggregates descendant shadows", () => {
+    const f = fixture();
+    f.a.shapeStyle = { shadow: { kind: "none" } };
+    const before = JSON.stringify(f.root);
+    const initial = aggregateShapeGroupFormatSnapshot(
+      resolveShapeGroupFormatContext(f.root, ["root", "inner"], f.metrics),
+      { width: 160, height: 80 },
+    );
+    expect(initial.shapeStyle.shadow).toBeUndefined();
+    expect(initial.mixedStyleCategories.shape).not.toContain("shadow");
+    const result = apply(f, ["root", "inner"], {
+      type: "set-style",
+      target: "shape",
+      category: "shadow",
+      value: { kind: "none" },
+    });
+    expect(result.affectedPaths).toEqual([["root", "inner"]]);
+    expect(findShapeGroupNode(result.root, ["root", "inner"])!.node).toHaveProperty(
+      "groupEffects.shadow.kind",
+      "none",
+    );
+    expect(result.root.groupEffects).toBeUndefined();
+    expect(node(result.root, ["root", "inner", "a"]).shapeStyle).toEqual(f.a.shapeStyle);
+    const aggregate = aggregateShapeGroupFormatSnapshot(
+      resolveShapeGroupFormatContext(result.root, ["root", "inner"], f.metrics),
+      { width: 160, height: 80 },
+    );
+    expect(aggregate.shapeStyle.shadow).toEqual({ kind: "none" });
+    expect(JSON.stringify(f.root)).toBe(before);
+    expect(f.inner).not.toHaveProperty("groupEffects");
   });
 
   test("text shadow batches only eligible real leaves without inventing a container style", () => {

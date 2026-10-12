@@ -48,6 +48,7 @@ const previewResult = computed<{
   document?: PrintPreviewDocument;
   errorKey?: "pagePrint.unsupportedPictures" | "pagePrint.invalidRange";
 }>(() => {
+  void repaint.value;
   try {
     const result = createPrintPreviewDocument({
       theme: props.theme,
@@ -59,6 +60,7 @@ const previewResult = computed<{
       locale: props.locale,
       dateSystem: props.dateSystem,
       revision: props.workbookRevision,
+      shapePaintResources: renderer.getShapePaintResources(props.theme, props.imageAssetUrls),
     });
     return { document: result };
   } catch (error) {
@@ -183,6 +185,8 @@ async function print(): Promise<void> {
       locale,
       dateSystem,
       revision,
+      shapePaintResources: renderer.getShapePaintResources(theme, assetUrls),
+      requireReadyGroupPaint: true,
     });
     const images = document.pages.map((page) => {
       const canvas = window.document.createElement("canvas");
@@ -246,7 +250,35 @@ watch(
   },
   { immediate: true, flush: "post" },
 );
-onBeforeUnmount(() => renderer.dispose());
+let resourceGeneration = 0;
+watch(
+  () => [props.visible, props.sheet, props.workbookRevision, props.imageAssetUrls, props.theme],
+  async () => {
+    const request = ++resourceGeneration;
+    if (!props.visible) return;
+    const document = documentPreview.value;
+    if (!document) return;
+    const urls = [...getPrintPictureAssetIds(document.sheet, document.shapeMetrics)].map((id) =>
+      props.imageAssetUrls?.get(id),
+    );
+    try {
+      if (urls.some((url) => !url)) throw new Error("Print paint resources are unavailable.");
+      await Promise.all([
+        renderer.prepareImages(urls as string[]),
+        renderer.prepareShapes(document),
+      ]);
+      if (request === resourceGeneration && props.visible) repaint.value++;
+    } catch (error) {
+      if (request === resourceGeneration && props.visible)
+        renderFailure.value = error instanceof Error ? error.message : String(error);
+    }
+  },
+  { immediate: true },
+);
+onBeforeUnmount(() => {
+  resourceGeneration++;
+  renderer.dispose();
+});
 </script>
 
 <template>

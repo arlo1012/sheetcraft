@@ -20,6 +20,11 @@ import { normalizeCellTextFontRuns } from "./text-font-runs.js";
 import { normalizePivotTables, type SheetPivotTable } from "./pivot-tables.js";
 import { normalizeCellSparkline, type CellSparkline } from "./sparklines.js";
 import { normalizeSheetDrawings, type SheetDrawing } from "./sheet-drawings.js";
+import {
+  normalizeShapeGroupEffects,
+  traverseShapeGroup,
+  type ShapeGroupDrawing,
+} from "./shape-group.js";
 import { normalizeProtectionPassword, type ProtectionPassword } from "./protection-password.js";
 import { normalizeSheetProtection, type SheetProtection } from "./protection.js";
 import { WorkbookDomainError } from "./errors.js";
@@ -273,6 +278,8 @@ export type WorkbookSnapshotV58 = Omit<WorkbookSnapshotV57, "version"> & { versi
 export type WorkbookSnapshotV59 = Omit<WorkbookSnapshotV58, "version"> & { version: 59 };
 export type WorkbookSnapshotV60 = Omit<WorkbookSnapshotV59, "version"> & { version: 60 };
 export type WorkbookSnapshotV61 = Omit<WorkbookSnapshotV60, "version"> & { version: 61 };
+/** Document-owned shape group body shadows remain an internal snapshot-only feature. */
+export type WorkbookSnapshotV62 = Omit<WorkbookSnapshotV61, "version"> & { version: 62 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -292,7 +299,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV58
   | WorkbookSnapshotV59
   | WorkbookSnapshotV60
-  | WorkbookSnapshotV61;
+  | WorkbookSnapshotV61
+  | WorkbookSnapshotV62;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -370,7 +378,8 @@ type SnapshotVersion =
   | 58
   | 59
   | 60
-  | 61;
+  | 61
+  | 62;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -394,6 +403,27 @@ function hasShapeGroupSnapshotTag(value: UnknownRecord, path: string): boolean {
   if (field && !("value" in field))
     return fail(`${path}.kind`, "Drawing kind must be an own data field, not an accessor.");
   return field?.value === "shapeGroup";
+}
+
+/** Raw admission is bounded and descriptor-safe, including nested malformed owner graphs. */
+function inspectShapeGroupSnapshotEffects(
+  value: ShapeGroupDrawing,
+  path: string,
+): { hasField: boolean; hasEffects: boolean } {
+  let hasField = false;
+  let hasEffects = false;
+  try {
+    for (const { node } of traverseShapeGroup(value)) {
+      if (node.kind !== "shapeGroup") continue;
+      const field = Object.getOwnPropertyDescriptor(node, "groupEffects");
+      if (!field) continue;
+      hasField = true;
+      if (normalizeShapeGroupEffects(field.value)) hasEffects = true;
+    }
+  } catch (error) {
+    return fail(path, error instanceof Error ? error.message : "Invalid shape group effects.");
+  }
+  return { hasField, hasEffects };
 }
 
 /** Detect the field without reading its value, including malformed/accessor payloads. */
@@ -1345,6 +1375,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       );
     }
   }
+  let hasShapeGroupEffects = false;
   // Inspect presence before old protocols can silently drop a shape-only feature.
   if (Array.isArray(record.drawings)) {
     for (const [index, drawing] of record.drawings.entries()) {
@@ -1358,6 +1389,18 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
           `${path}.drawings[${index}]`,
           "Owned shape groups require snapshot version 61.",
         );
+      if (hasShapeGroupSnapshotTag(item, `${path}.drawings[${index}]`)) {
+        const effects = inspectShapeGroupSnapshotEffects(
+          item as ShapeGroupDrawing,
+          `${path}.drawings[${index}]`,
+        );
+        if (effects.hasField && version !== undefined && version < 62)
+          return fail(
+            `${path}.drawings[${index}].groupEffects`,
+            "Owned shape group effects require snapshot version 62.",
+          );
+        hasShapeGroupEffects ||= effects.hasEffects;
+      }
       if (
         ("shapeFrame" in item || "shapeProperties" in item) &&
         version !== undefined &&
@@ -1669,6 +1712,8 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       record.drawings.some((drawing) => hasShapeGroupSnapshotTag(asRecord(drawing, path), path))
     )
       version = 61;
+    // Infer last so root and nested owner effects cannot be downgraded by older features.
+    if (hasShapeGroupEffects) version = 62;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -1767,12 +1812,21 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
       table.columns.some((column) => column.calculatedColumnFormula !== undefined),
     ),
   );
+  const shapeGroupVersion = sheets.some((sheet) =>
+    sheet.drawings?.some(
+      (drawing) =>
+        drawing.kind === "shapeGroup" &&
+        inspectShapeGroupSnapshotEffects(drawing, "$.drawings").hasEffects,
+    ),
+  )
+    ? 62
+    : 61;
   return {
     // Preserve the existing protocol for documents that do not use the new feature.
     version: sheets.some((sheet) =>
       sheet.drawings?.some((drawing) => drawing.kind === "shapeGroup"),
     )
-      ? 61
+      ? shapeGroupVersion
       : sheets.some((sheet) =>
             sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapeFrame")),
           )
@@ -1944,7 +1998,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 58 &&
     record.version !== 59 &&
     record.version !== 60 &&
-    record.version !== 61
+    record.version !== 61 &&
+    record.version !== 62
   ) {
     throw new WorkbookDomainError(
       {

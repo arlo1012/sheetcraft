@@ -44,6 +44,8 @@ import {
   paintFloatingImages,
 } from "../sheet-images/floating-image-painter";
 import { getDrawingThemeEffects } from "../sheet-images/drawing-theme-effects";
+import { createPicturePaintResources } from "../../shared/images/picture-paint-resources";
+import type { PicturePaintResources } from "../../shared/images/picture-detailed-render";
 import { paintWatermarkInRect } from "../page-decorations/page-decoration-painter";
 import { previewHeaderFooterRuns, type HeaderFooterRun } from "./header-footer-text";
 
@@ -206,6 +208,8 @@ export function createPrintPreviewDocument(options: {
   locale?: string;
   dateSystem?: "1900" | "1904";
   revision?: number;
+  shapePaintResources?: PicturePaintResources;
+  requireReadyGroupPaint?: boolean;
 }): PrintPreviewDocument {
   requireLegacyPictures(getPrintablePictureRoots(options.sheet));
   const requested = pageSetupForPrint(
@@ -245,7 +249,13 @@ export function createPrintPreviewDocument(options: {
     },
   };
   const shapeMetrics = createPrintShapeMetrics(options.sheet, options.evaluator);
-  const shapeExtent = getPrintShapeContentExtent(options.sheet, shapeMetrics, options.theme);
+  const shapeExtent = getPrintShapeContentExtent(
+    options.sheet,
+    shapeMetrics,
+    options.theme,
+    options.shapePaintResources,
+    options.requireReadyGroupPaint,
+  );
   const contentRowCount = Math.max(
     1,
     display.contentExtent.rowCount,
@@ -726,5 +736,8 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
   async function prepareShapes(document: PrintPreviewDocument): Promise<void> {
     await preparePrintShapeFonts(document.sheet, document.shapeMetrics);
   }
-  return { render, prepareImages, prepareShapes, dispose };
+  function getShapePaintResources(theme?: WorkbookTheme, urls?: ReadonlyMap<string, string>) {
+    return createPicturePaintResources(theme, urls, images);
+  }
+  return { render, prepareImages, prepareShapes, getShapePaintResources, dispose };
 }

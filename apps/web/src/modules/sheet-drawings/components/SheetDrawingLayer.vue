@@ -108,6 +108,12 @@ import {
 } from "../free-shape-point-layout";
 import { addFreeShapePoint, deleteFreeShapePoint } from "../free-shape-point-operations";
 import DrawingContent from "./DrawingContent.vue";
+import ShapeGroupDetailedContent from "./ShapeGroupDetailedContent.vue";
+import {
+  hasActiveShapeGroupShadow,
+  hitShapeGroupPaint,
+  type ShapeGroupPaintResult,
+} from "../shape-group-paint";
 import { shapeDrawingContainsWorldPoint } from "../shape-line-paint";
 import {
   detailedShapeContainsWorldPoint,
@@ -431,6 +437,160 @@ type DrawingFragment = FloatingImageViewportFragment & {
 };
 const preview = shallowRef<SheetDrawing>();
 let session: PointerSession | undefined;
+type GroupPaintEntry = {
+  source: ShapeGroupDrawing;
+  displayed: ShapeGroupDrawing;
+  metrics: PictureSheetMetrics;
+  stackIndex: number;
+};
+const groupPaintEntries = computed<GroupPaintEntry[]>(() => {
+  const m = metrics.value;
+  if (!m) return [];
+  return props.drawings.flatMap((source, stackIndex) => {
+    if (!isShapeGroupDrawing(source)) return [];
+    let displayed = rootsPreview.value?.find((root) => root.id === source.id) ?? source;
+    if (!isShapeGroupDrawing(displayed)) return [];
+    if (preview.value) {
+      const leaf = resolveShapeGroupProjection(displayed, m).leaves.find(
+        (leaf) => leaf.sourceNode.id === preview.value?.id,
+      );
+      if (leaf && (preview.value.kind === "shape" || preview.value.kind === "textBox"))
+        displayed = updateResolvedShapeGroupLeaf(leaf, preview.value, m);
+    }
+    return hasActiveShapeGroupShadow(displayed) &&
+      !resolveShapeGroupProjection(displayed, m).layout.collapsed
+      ? [{ source, displayed, metrics: m, stackIndex }]
+      : [];
+  });
+});
+const groupPresentations = new Map<string, Extract<ShapeGroupPaintResult, { kind: "ready" }>>();
+function groupPaintEntry(drawing: SheetDrawing): GroupPaintEntry | undefined {
+  const source = sourceOwner(drawing);
+  return groupPaintEntries.value.find((entry) => entry.source === source);
+}
+function acceptGroupPaint(
+  entry: GroupPaintEntry,
+  result: Extract<ShapeGroupPaintResult, { kind: "ready" }> | undefined,
+): void {
+  if (
+    !groupPaintEntries.value.some(
+      (current) =>
+        current.source === entry.source &&
+        current.displayed === entry.displayed &&
+        current.metrics === entry.metrics,
+    )
+  )
+    return;
+  if (result?.sourceRoot === entry.displayed && result.metrics === entry.metrics)
+    groupPresentations.set(entry.source.id, result);
+  else groupPresentations.delete(entry.source.id);
+}
+watch(groupPaintEntries, (entries) => {
+  for (const [id, result] of groupPresentations)
+    if (
+      !entries.some(
+        (entry) =>
+          entry.source.id === id &&
+          entry.displayed === result.sourceRoot &&
+          entry.metrics === result.metrics,
+      )
+    )
+      groupPresentations.delete(id);
+});
+function drawingStackStyle(drawing: SheetDrawing): CSSProperties {
+  const source = sourceOwner(drawing);
+  return {
+    zIndex:
+      Math.max(
+        0,
+        props.drawings.findIndex((root) => root === source),
+      ) *
+        3 +
+      1,
+  };
+}
+function groupHit(entry: GroupPaintEntry, fragment: ShapeGroupFrameFragment, event: MouseEvent) {
+  const result = groupPresentations.get(entry.source.id);
+  if (!result || result.sourceRoot !== entry.displayed || result.metrics !== entry.metrics) return;
+  return hitShapeGroupPaint(
+    result,
+    standardShapeWorldToLocal(fragment.rect, entry.displayed.rotation, viewportPoint(event)),
+  );
+}
+function groupLeafFragment(
+  entry: GroupPaintEntry,
+  fragment: ShapeGroupFrameFragment,
+  id: string,
+): DrawingFragment | undefined {
+  return fragments.value.find(
+    (candidate) =>
+      candidate.drawing.id === id &&
+      sourceOwner(candidate.drawing) === entry.source &&
+      candidate.paneId === fragment.paneId &&
+      candidate.pageKey === fragment.pageKey,
+  );
+}
+function startGroupPixels(
+  entry: GroupPaintEntry,
+  fragment: ShapeGroupFrameFragment,
+  event: PointerEvent,
+): void {
+  const hit = groupHit(entry, fragment, event);
+  if (!hit) {
+    if (event.target instanceof Element && event.target.closest('[role="status"]'))
+      startGroupFrame(entry.source, fragment, event);
+    else emit("backgroundPointer", event);
+    return;
+  }
+  if (hit.kind === "owner" && (event.ctrlKey || event.metaKey || event.shiftKey)) {
+    event.preventDefault();
+    event.stopPropagation();
+    const selected = selectedRoots.value.filter((id) =>
+      props.drawings.some((root) => root.id === id && isShapeGroupEligibleRoot(root)),
+    );
+    selectRoots(
+      selected.includes(entry.source.id)
+        ? selected.filter((id) => id !== entry.source.id)
+        : [...selected, entry.source.id],
+    );
+    emit("select");
+    return;
+  }
+  if (hit.kind === "leaf") {
+    const target = groupLeafFragment(entry, fragment, hit.path.at(-1)!);
+    if (target) start(target, event);
+    return;
+  }
+  startGroupFrame(entry.source, fragment, event, undefined, "move", hit.path);
+}
+function editGroupPixels(
+  entry: GroupPaintEntry,
+  fragment: ShapeGroupFrameFragment,
+  event: MouseEvent,
+): void {
+  const hit = groupHit(entry, fragment, event);
+  if (!hit) return;
+  if (hit.kind === "owner") formatGroup(entry.source, hit.path);
+  else {
+    const target = groupLeafFragment(entry, fragment, hit.path.at(-1)!);
+    if (target) edit(target, event);
+  }
+}
+function groupPixelContext(
+  entry: GroupPaintEntry,
+  fragment: ShapeGroupFrameFragment,
+  event: MouseEvent,
+): void {
+  const hit = groupHit(entry, fragment, event);
+  if (!hit) return;
+  if (hit.kind === "leaf") {
+    const target = groupLeafFragment(entry, fragment, hit.path.at(-1)!);
+    if (target) pointContext(target, event);
+  } else {
+    event.preventDefault();
+    formatGroup(entry.source, hit.path);
+  }
+}
 const fragments = computed<DrawingFragment[]>(
   () => (
     void cellTextFontRevision.value,
@@ -1077,6 +1237,25 @@ function viewportPoint(event: { clientX: number; clientY: number }): {
   };
 }
 function hits(fragment: DrawingFragment, event: MouseEvent): boolean {
+  const composed = groupPaintEntry(fragment.drawing);
+  if (composed) {
+    const result = groupPresentations.get(composed.source.id);
+    if (!result || result.sourceRoot !== composed.displayed) return false;
+    const translation = {
+      x: fragment.rect.x - (resolvedOwner(fragment.drawing)?.rect?.x ?? fragment.rect.x),
+      y: fragment.rect.y - (resolvedOwner(fragment.drawing)?.rect?.y ?? fragment.rect.y),
+    };
+    const frame = {
+      ...result.layout.rect,
+      x: result.layout.rect.x + translation.x,
+      y: result.layout.rect.y + translation.y,
+    };
+    const hit = hitShapeGroupPaint(
+      result,
+      standardShapeWorldToLocal(frame, composed.displayed.rotation, viewportPoint(event)),
+    );
+    return hit?.kind === "leaf" && hit.path.at(-1) === fragment.drawing.id;
+  }
   if (!fragment.standard) return true;
   if (!isStandard(fragment.drawing)) return false;
   const shape = drawingGeometry(fragment.drawing);
@@ -1688,6 +1867,7 @@ function clearOutside(event: PointerEvent) {
 onMounted(() => document.addEventListener("pointerdown", clearOutside));
 onBeforeUnmount(() => {
   detailedPresentations.clear();
+  groupPresentations.clear();
   session?.cancel();
   document.removeEventListener("pointerdown", clearOutside);
 });
@@ -1821,9 +2001,12 @@ watch(
       v-for="fragment in fragments"
       :key="`${fragment.drawing.id}-${fragment.pageKey ?? fragment.paneId}`"
       class="sheet-drawing-layer__object"
-      :class="{ 'is-standard': fragment.standard }"
+      :class="{
+        'is-standard': fragment.standard,
+        'is-composed-group-leaf': !!groupPaintEntry(fragment.drawing),
+      }"
       :data-sheet-drawing-id="fragment.drawing.id"
-      :style="fragmentStyle(fragment)"
+      :style="[fragmentStyle(fragment), drawingStackStyle(fragment.drawing)]"
       tabindex="0"
       role="group"
       :aria-label="
@@ -1848,6 +2031,7 @@ watch(
       <div class="sheet-drawing-layer__clip">
         <div class="sheet-drawing-layer__content" :style="contentStyle(fragment)">
           <DrawingContent
+            v-if="!groupPaintEntry(fragment.drawing)"
             @detailed-paint="acceptDetailedPaint(fragment, $event)"
             @control-change="emit('controlChange', fragment.drawing.id, $event)"
             :drawing="fragment.drawing"
@@ -1896,13 +2080,33 @@ watch(
         @resize="(direction, event) => start(fragment, event, direction)"
       />
     </div>
+    <ShapeGroupDetailedContent
+      v-for="entry in groupPaintEntries"
+      :key="entry.source.id"
+      :root="entry.displayed"
+      :metrics="entry.metrics"
+      :layout="layout"
+      :page-projection="pageProjection"
+      :density="rasterDensity"
+      :theme="theme"
+      :asset-urls="imageAssetUrls"
+      :stack-index="entry.stackIndex"
+      @paint="acceptGroupPaint(entry, $event)"
+      @pointerdown="(fragment, event) => startGroupPixels(entry, fragment, event)"
+      @doubleclick="(fragment, event) => editGroupPixels(entry, fragment, event)"
+      @contextmenu="(fragment, event) => groupPixelContext(entry, fragment, event)"
+      @keydown="groupKeydown(entry.source, $event)"
+    />
     <div
       v-for="item in groupFragments"
       :key="`group-${item.owner.sourceNode.id}-${item.fragment.pageKey ?? item.fragment.paneId}`"
       class="sheet-drawing-layer__group"
       :data-sheet-drawing-id="item.owner.sourceNode.id"
       :data-shape-group-id="item.owner.sourceNode.id"
-      :style="fragmentStyle(item.fragment)"
+      :style="[
+        fragmentStyle(item.fragment),
+        { zIndex: props.drawings.indexOf(item.source) * 3 + 2 },
+      ]"
       tabindex="0"
       role="group"
       :aria-label="item.owner.sourceNode.name"
@@ -1991,6 +2195,9 @@ watch(
     outline: none;
     cursor: move;
     touch-action: none;
+    &.is-composed-group-leaf {
+      pointer-events: none;
+    }
     &.is-standard {
       pointer-events: none;
       overflow: hidden;

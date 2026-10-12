@@ -321,3 +321,77 @@ test("opening a nested pane warms sibling glyph assets required by whole-root pr
   await flushPromises();
   expect(cache.retain).toHaveBeenLastCalledWith(new Set());
 });
+
+test("snapshot62 container Shadow starts the real Workspace and the pane clears only its owner effect", async () => {
+  const workbook = createWorkbook({ id: "group-shadow-startup", sheetId: "shadow-sheet" });
+  const sheet = getActiveSheet(workbook),
+    a = framedShape(),
+    b = framedShape();
+  a.id = "a";
+  b.id = "b";
+  a.text = b.text = "";
+  a.rotation = b.rotation = 0;
+  a.shapeGeometry = b.shapeGeometry = { preset: "rect" };
+  b.shapeFrame.anchor = { mode: "fixed", x: 350, y: 30, size: { width: 100, height: 60 } };
+  const roots = groupShapeRoots(
+    [a, b],
+    ["a", "b"],
+    { id: "group", name: "Group" },
+    createPictureSheetMetrics(sheet),
+  );
+  const group = roots[0]!;
+  if (!isShapeGroupDrawing(group)) throw Error("Expected actual group");
+  group.groupEffects = {
+    shadow: {
+      kind: "value",
+      value: {
+        kind: "outer",
+        color: { kind: "rgb", rgb: "#000000" },
+        opacity: 0.6,
+        blurPt: 4,
+        distancePt: 3,
+        angleDeg: 45,
+        scale: 1,
+        anchor: "center",
+      },
+    },
+  };
+  sheet.drawings = roots;
+  const snapshot = serializeWorkbook(workbook);
+  expect(snapshot.version).toBe(62);
+  const wrapper = fixture(async () => ({ revision: 1, savedAt: 1, snapshot }));
+  await flushPromises();
+  const state = setupState(wrapper),
+    current = getActiveSheet(state.session.workbook);
+  const owner = current.drawings![0]!;
+  if (!isShapeGroupDrawing(owner)) throw Error("Expected restored owner");
+  expect(serializeWorkbook(state.session.workbook)).toEqual(snapshot);
+  const layer = wrapper.getComponent(SheetDrawingLayer);
+  expect(layer.findAll('[data-shape-group-paint="group"]')).toHaveLength(1);
+  layer.vm.$emit("formatGroup", owner, [owner.id]);
+  await flushPromises();
+  const pane = wrapper.getComponent(ShapeFormatPane),
+    control = state.shapeGroupFormatPane;
+  expect(pane.props("snapshot")?.drawing).toBe(owner);
+  expect(control.capabilities.value.styles?.shape?.shadow?.enabled).toBe(true);
+  const beforeLeaves = JSON.parse(JSON.stringify(owner.members));
+  const selection = control.snapshot.value!;
+  expect(
+    control.onIntent({
+      type: "set-style",
+      target: "shape",
+      category: "shadow",
+      value: { kind: "none" },
+      owner: selection.owner,
+      baseRevision: selection.revision,
+      intentId: "startup-clear-group-shadow",
+    }),
+  ).toBe(true);
+  await flushPromises();
+  const updated = current.drawings![0]!;
+  expect(updated).toHaveProperty("groupEffects.shadow.kind", "none");
+  if (!isShapeGroupDrawing(updated)) throw Error("Expected owner retained");
+  expect(updated.members).toEqual(beforeLeaves);
+  expect(layer.findAll('[data-shape-group-paint="group"]')).toHaveLength(0);
+  expect(serializeWorkbook(state.session.workbook).version).toBe(62);
+});

@@ -11,6 +11,12 @@ export type ShapeGroupFrameFragment = FloatingImageViewportFragment & {
   pageKey?: string;
   pageClip?: FloatingImageViewportFragment["rect"];
 };
+export type ShapeGroupPaintBounds = Readonly<{
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}>;
 /** Containers project geometry only. Their leaves independently paint/hit/overflow. */
 export function getShapeGroupFrameFragments(
   frame: ResolvedShapeFrame,
@@ -31,6 +37,57 @@ export function getShapeGroupFrameFragments(
     width: Math.max(...points.map((p) => p.x)) - x + 8,
     height: Math.max(...points.map((p) => p.y)) - y + 8,
   };
+  return projectBounds(frame, bounds, viewport, metrics, projection);
+}
+
+/** Paint overflow belongs to the continuous source, before any frozen/page clip.
+ * Selection handles are deliberately absent from these raster fragments. */
+export function getShapeGroupPaintFragments(
+  frame: ResolvedShapeFrame,
+  ink: ShapeGroupPaintBounds,
+  viewport: SheetViewportLayout,
+  metrics: PictureSheetMetrics,
+  projection?: PageLayoutProjection,
+): ShapeGroupFrameFragment[] {
+  if (frame.collapsed) return [];
+  if (
+    ![ink.left, ink.top, ink.right, ink.bottom].every(Number.isFinite) ||
+    Math.max(Math.abs(ink.left), Math.abs(ink.top), Math.abs(ink.right), Math.abs(ink.bottom)) >
+      10_000_000 ||
+    ink.right < ink.left ||
+    ink.bottom < ink.top
+  )
+    throw new RangeError("Shape group ink bounds exceed their finite coordinate budget.");
+  if (ink.right === ink.left || ink.bottom === ink.top) return [];
+  const points = [
+    { x: ink.left, y: ink.top },
+    { x: ink.right, y: ink.top },
+    { x: ink.right, y: ink.bottom },
+    { x: ink.left, y: ink.bottom },
+  ].map((point) => shapeFrameLocalToWorld(frame.rect, frame.angleDeg, point));
+  const x = Math.min(...points.map((point) => point.x)),
+    y = Math.min(...points.map((point) => point.y));
+  return projectBounds(
+    frame,
+    {
+      x,
+      y,
+      width: Math.max(...points.map((point) => point.x)) - x,
+      height: Math.max(...points.map((point) => point.y)) - y,
+    },
+    viewport,
+    metrics,
+    projection,
+  );
+}
+
+function projectBounds(
+  frame: ResolvedShapeFrame,
+  bounds: { x: number; y: number; width: number; height: number },
+  viewport: SheetViewportLayout,
+  metrics: PictureSheetMetrics,
+  projection?: PageLayoutProjection,
+): ShapeGroupFrameFragment[] {
   const bands = projection
     ? getShapePageProjectionBands(viewport, projection, metrics).map((b) => ({
         paneId: "body" as const,

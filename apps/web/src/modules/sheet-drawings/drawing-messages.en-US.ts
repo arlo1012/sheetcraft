@@ -4,7 +4,10 @@ export const drawingsEnUS = {
   "drawing.equalSize": "Equal size",
   "drawing.formatGroup": "Format group",
   "drawing.groupFormatScope":
-    "Size and properties belong to this group. Body and text changes apply to eligible members ({body}/{count} body, {text}/{count} text).",
+    "Size, properties and body Shadow belong to this group. Fill, outline and text changes apply to eligible members ({body}/{count} body, {text}/{count} text).",
+  "drawing.groupLoading": "Preparing the complete group…",
+  "drawing.groupRenderingUnavailable":
+    "This group cannot be fully displayed with the current fonts, resources or raster budget. Its objects are preserved.",
   "drawing.groupName": "Group",
   "drawing.selectionShortcuts": "Shape selection shortcuts",
   "drawing.collectionRejected":

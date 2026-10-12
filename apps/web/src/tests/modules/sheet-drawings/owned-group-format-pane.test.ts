@@ -414,14 +414,13 @@ describe("exact-owner actual shape group format pane", () => {
     expect(f.session.history.undoStack).toHaveLength(1);
     const before = f.state();
     expect(f.pane.onIntent(f.intent({ type: "set-line-ends", value: undefined }))).toBe(false);
-    for (const category of ["shadow", "reflection", "glow", "softEdges", "format3d", "rotation3d"])
+    for (const category of ["reflection", "glow", "softEdges", "format3d", "rotation3d"])
       for (const target of ["shape", "text"])
-        if (!(target === "text" && category === "shadow"))
-          expect(
-            f.pane.onIntent(
-              f.intent({ type: "set-style", target, category, value: { kind: "none" } }),
-            ),
-          ).toBe(false);
+        expect(
+          f.pane.onIntent(
+            f.intent({ type: "set-style", target, category, value: { kind: "none" } }),
+          ),
+        ).toBe(false);
     expect(f.state()).toEqual(before);
     expect(f.session.history.undoStack).toHaveLength(1);
   });
@@ -429,7 +428,7 @@ describe("exact-owner actual shape group format pane", () => {
     const f = fixture();
     expect(f.open()).toBe(true);
     expect(f.pane.capabilities.value.styles?.text?.shadow?.enabled).toBe(true);
-    expect(f.pane.capabilities.value.styles?.shape?.shadow?.enabled).toBe(false);
+    expect(f.pane.capabilities.value.styles?.shape?.shadow?.enabled).toBe(true);
     const before = f.state();
     expect(
       f.pane.onIntent(
@@ -451,6 +450,56 @@ describe("exact-owner actual shape group format pane", () => {
     expect(f.state()).toEqual(before);
     expect(redoWorkbookCommand(f.session)).toBe(true);
     expect(f.state()).toEqual(after);
+  });
+
+  test("body Shadow is one nested-container transaction and explicit None remains durable", () => {
+    const f = fixture();
+    expect(f.open(["root", "inner"])).toBe(true);
+    expect(f.pane.capabilities.value.styles?.shape?.shadow?.enabled).toBe(true);
+    const before = f.state();
+    const edit = () =>
+      f.pane.onIntent(
+        f.intent({
+          type: "set-style",
+          target: "shape",
+          category: "shadow",
+          value: { kind: "none" },
+        }),
+      );
+    expect(edit()).toBe(true);
+    expect(f.node("inner")).toHaveProperty("groupEffects.shadow.kind", "none");
+    expect(f.source().groupEffects).toBeUndefined();
+    for (const id of ["a", "b", "text", "line"]) expect(f.graphic(id).shapeStyle).toBeUndefined();
+    const after = f.state();
+    expect(after.version).toBe(62);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    expect(edit()).toBe(true);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(f.state()).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    expect(f.state()).toEqual(after);
+  });
+
+  test("a textBox-only container has a real body Shadow owner without eligible shape leaves", () => {
+    const root = group();
+    root.members = [leaf("text-only", "textBox")];
+    const f = fixture(root);
+    expect(f.open()).toBe(true);
+    expect(f.pane.capabilities.value.styles?.shape?.fill?.enabled).toBe(false);
+    expect(f.pane.capabilities.value.styles?.shape?.shadow?.enabled).toBe(true);
+    expect(
+      f.pane.onIntent(
+        f.intent({
+          type: "set-style",
+          target: "shape",
+          category: "shadow",
+          value: { kind: "none" },
+        }),
+      ),
+    ).toBe(true);
+    expect(f.source()).toHaveProperty("groupEffects.shadow.kind", "none");
+    expect(f.graphic("text-only")).not.toHaveProperty("shapeStyle");
   });
 
   test("zero eligible leaf styles/text stay disabled while real container metadata remains active", () => {

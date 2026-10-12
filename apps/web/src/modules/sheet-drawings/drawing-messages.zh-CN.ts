@@ -4,7 +4,9 @@ export const drawingsZhCN = {
   "drawing.equalSize": "等尺寸",
   "drawing.formatGroup": "组合格式",
   "drawing.groupFormatScope":
-    "大小和属性属于此组合；主体与文字设置应用到对应成员（主体 {body}/{count}，文字 {text}/{count}）。",
+    "大小、属性和主体阴影属于此组合；填充、轮廓与文字设置应用到对应成员（主体 {body}/{count}，文字 {text}/{count}）。",
+  "drawing.groupLoading": "正在准备完整组合…",
+  "drawing.groupRenderingUnavailable": "当前字体、资源或像素预算无法完整显示此组合，原对象已保留。",
   "drawing.groupName": "组合",
   "drawing.selectionShortcuts": "形状多选快捷操作",
   "drawing.collectionRejected":

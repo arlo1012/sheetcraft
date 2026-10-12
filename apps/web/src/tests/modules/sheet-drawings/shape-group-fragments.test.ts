@@ -12,7 +12,10 @@ import { createSheetGeometry, type Rect } from "@sheetcraft/sheet-engine/geometr
 import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import { resolveShapeGroupProjection } from "../../../modules/sheet-drawings/resolved-shape-group";
-import { getShapeGroupFrameFragments } from "../../../modules/sheet-drawings/shape-group-fragments";
+import {
+  getShapeGroupFrameFragments,
+  getShapeGroupPaintFragments,
+} from "../../../modules/sheet-drawings/shape-group-fragments";
 import { framedShape } from "./framed-shape-fixture";
 import { shapePageFixture } from "./shape-page-fixture";
 
@@ -282,3 +285,90 @@ test.each(["row", "column"] as const)(
     );
   },
 );
+
+test("composite ink uses its full rotated overflow in every frozen pane without selection padding", () => {
+  const f = frozenFixture();
+  const root = group({ x: 80, y: 40, width: 240, height: 160 }, f.metrics);
+  const frame = resolveShapeGroupProjection(root, f.metrics).layout;
+  const ink = { left: -100, top: -60, right: 400, bottom: 240 };
+  const rad = (frame.angleDeg * Math.PI) / 180;
+  const points = [
+    [ink.left, ink.top],
+    [ink.right, ink.top],
+    [ink.right, ink.bottom],
+    [ink.left, ink.bottom],
+  ].map(([x, y]) => ({
+    x:
+      frame.rect.x +
+      frame.rect.width / 2 +
+      (x! - frame.rect.width / 2) * Math.cos(rad) -
+      (y! - frame.rect.height / 2) * Math.sin(rad),
+    y:
+      frame.rect.y +
+      frame.rect.height / 2 +
+      (x! - frame.rect.width / 2) * Math.sin(rad) +
+      (y! - frame.rect.height / 2) * Math.cos(rad),
+  }));
+  const bounds = {
+    x: Math.min(...points.map((p) => p.x)),
+    y: Math.min(...points.map((p) => p.y)),
+    width: Math.max(...points.map((p) => p.x)) - Math.min(...points.map((p) => p.x)),
+    height: Math.max(...points.map((p) => p.y)) - Math.min(...points.map((p) => p.y)),
+  };
+  const viewport = f.layout();
+  const fragments = getShapeGroupPaintFragments(frame, ink, viewport, f.metrics);
+  expect(fragments.map((fragment) => fragment.paneId)).toEqual(["topLeft", "top", "left", "body"]);
+  for (const fragment of fragments) {
+    const dx = fragment.rect.x - frame.rect.x,
+      dy = fragment.rect.y - frame.rect.y;
+    expectRect(
+      fragment.clippedRect,
+      intersection(viewport.panes[fragment.paneId].clip, {
+        ...bounds,
+        x: bounds.x + dx,
+        y: bounds.y + dy,
+      })!,
+    );
+  }
+  expect(() =>
+    getShapeGroupPaintFragments(frame, { ...ink, right: Infinity }, viewport, f.metrics),
+  ).toThrow(/finite coordinate/);
+  expect(
+    getShapeGroupPaintFragments(
+      frame,
+      { left: 0, top: 0, right: 0, bottom: 0 },
+      viewport,
+      f.metrics,
+    ),
+  ).toEqual([]);
+});
+
+test("composite shadow overflow is clipped to paper content bands, never to its own frame", () => {
+  const f = shapePageFixture(true),
+    first = f.projection.getPage(0, 0)!;
+  const root = group(
+    { x: first.sheetRect.width - 50, y: first.sheetRect.height - 50, width: 30, height: 30 },
+    f.metrics,
+  );
+  root.rotation = 0;
+  const frame = resolveShapeGroupProjection(root, f.metrics).layout;
+  const fragments = getShapeGroupPaintFragments(
+    frame,
+    { left: -10, top: -10, right: 150, bottom: 150 },
+    f.viewport,
+    f.metrics,
+    f.projection,
+  );
+  expect(fragments.map((fragment) => fragment.pageKey)).toEqual(["0:0", "0:1", "1:0", "1:1"]);
+  for (const fragment of fragments) {
+    const clip = fragment.pageClip!;
+    expect(fragment.clippedRect.x).toBeGreaterThanOrEqual(clip.x);
+    expect(fragment.clippedRect.y).toBeGreaterThanOrEqual(clip.y);
+    expect(fragment.clippedRect.x + fragment.clippedRect.width).toBeLessThanOrEqual(
+      clip.x + clip.width,
+    );
+    expect(fragment.clippedRect.y + fragment.clippedRect.height).toBeLessThanOrEqual(
+      clip.y + clip.height,
+    );
+  }
+});

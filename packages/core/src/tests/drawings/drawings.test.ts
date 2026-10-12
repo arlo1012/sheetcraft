@@ -42,6 +42,19 @@ function drawing(id = "drawing"): SheetDrawing {
 }
 
 describe("sheet drawings", () => {
+  test("legacy leaves reject container effects rather than silently discarding them", () => {
+    const source = { ...drawing(), groupEffects: { shadow: { kind: "none" } } };
+    expect(() => normalizeSheetDrawing(source)).toThrow(/genuine shape group owner/);
+    let reads = 0;
+    Object.defineProperty(source, "groupEffects", {
+      get() {
+        reads++;
+        return undefined;
+      },
+    });
+    expect(() => normalizeSheetDrawing(source)).toThrow(/genuine shape group owner/);
+    expect(reads).toBe(0);
+  });
   test("clones normalized values and isolates command input and sheet state", () => {
     const original = drawing();
     const normalized = normalizeSheetDrawing(original);

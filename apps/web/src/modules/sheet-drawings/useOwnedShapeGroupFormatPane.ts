@@ -285,11 +285,12 @@ export function useOwnedShapeGroupFormatPane(options: {
     for (const target of ["shape", "text"] as const)
       for (const category of styleCategories)
         styles[target]![category] = capability(
-          (category === "fill" ||
-            category === "line" ||
-            (target === "text" && category === "shadow")) &&
-            !!captured &&
-            getShapeGroupFormatEligibleLeaves(captured, target, category).length > 0,
+          !!captured &&
+            ((target === "shape" && category === "shadow" && !captured.collapsed) ||
+              ((category === "fill" ||
+                category === "line" ||
+                (target === "text" && category === "shadow")) &&
+                getShapeGroupFormatEligibleLeaves(captured, target, category).length > 0)),
         );
     return { fields, styles, lineEnds: capability(false) };
   });

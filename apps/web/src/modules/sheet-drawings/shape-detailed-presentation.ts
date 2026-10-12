@@ -41,6 +41,10 @@ export function combineShapePresentations(
 export const SHAPE_PRESENTATION_BYTE_LIMIT = 64 * 1024 * 1024;
 const presentationBytes = new WeakMap<HTMLCanvasElement, number>();
 let allocatedBytes = 0;
+/** Read-only accounting for consumers sharing the bounded presentation pool. */
+export function getShapePresentationAllocatedBytes() {
+  return allocatedBytes;
+}
 /** Aggregate viewport/preview presentation copies stay bounded independently of the paint cache. */
 export function resizeShapePresentationCanvas(
   canvas: HTMLCanvasElement,

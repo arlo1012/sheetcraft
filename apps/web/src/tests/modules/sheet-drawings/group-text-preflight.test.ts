@@ -16,6 +16,7 @@ import {
   type ShapeTextPaintOptions,
 } from "../../../modules/sheet-drawings/shape-text-paint";
 import type { DrawingShapeTextRuntimeOptions } from "../../../modules/sheet-drawings/shape-text-runtime";
+import * as groupPaint from "../../../modules/sheet-drawings/shape-group-paint";
 
 const measurement: DrawingShapeTextRuntimeOptions = {
   measurer: {
@@ -82,6 +83,93 @@ function fixture() {
 }
 
 describe("owned shape group text preflight", () => {
+  test("active nested container effects require complete actual root pixels with the exact resources", () => {
+    const f = fixture();
+    const nested = f.root.members[1]!;
+    if (nested.kind !== "shapeGroup") throw Error("Expected nested owner");
+    nested.groupEffects = {
+      shadow: {
+        kind: "value",
+        value: {
+          kind: "outer",
+          color: { kind: "rgb", rgb: "#000000" },
+          opacity: 0.6,
+          blurPt: 4,
+          distancePt: 3,
+          angleDeg: 45,
+          scale: 1,
+          anchor: "center",
+        },
+      },
+    };
+    const before = structuredClone(f.root),
+      resources = { getAssetSize: () => undefined };
+    const proof = vi
+      .spyOn(groupPaint, "preflightShapeGroupPaint")
+      .mockImplementation((options) => ({
+        ...groupPaint.planShapeGroupPaint(options),
+        kind: "unavailable",
+        reason: "asset-unavailable",
+        missingAssetIds: ["body-texture"],
+      }));
+    try {
+      expect(() =>
+        prepareShapeTextUpdate(f.root, undefined, undefined, measurement, { resources }, f.metrics),
+      ).toThrow(/appearance.*draft/);
+      expect(proof).toHaveBeenCalledTimes(1);
+      const options = proof.mock.calls[0]![0];
+      expect(options.root).toBe(f.root);
+      expect(options.metrics).toBe(f.metrics);
+      expect(options.resources).toBe(resources);
+      expect(options.textRuntimeOptions).toBe(measurement);
+      expect(f.root).toEqual(before);
+    } finally {
+      proof.mockRestore();
+    }
+  });
+  test("late container raster budget failure leaves every original member unchanged", () => {
+    const f = fixture();
+    f.root.groupEffects = {
+      shadow: {
+        kind: "value",
+        value: {
+          kind: "outer",
+          color: { kind: "rgb", rgb: "#000000" },
+          opacity: 1,
+          blurPt: 1,
+          distancePt: 1,
+          angleDeg: 0,
+          scale: 1,
+          anchor: "center",
+        },
+      },
+    };
+    const before = structuredClone(f.root);
+    const proof = vi.spyOn(groupPaint, "preflightShapeGroupPaint").mockImplementation(() => {
+      throw new RangeError("Actual composed alpha budget");
+    });
+    try {
+      expect(() =>
+        prepareShapeTextUpdate(f.root, undefined, undefined, measurement, undefined, f.metrics),
+      ).toThrow(/composed alpha budget/);
+      expect(f.root).toEqual(before);
+    } finally {
+      proof.mockRestore();
+    }
+  });
+  test("explicit owner None does not create a raster dependency for an otherwise unchanged group", () => {
+    const f = fixture();
+    f.root.groupEffects = { shadow: { kind: "none" } };
+    const proof = vi.spyOn(groupPaint, "preflightShapeGroupPaint");
+    try {
+      expect(
+        prepareShapeTextUpdate(f.root, undefined, undefined, measurement, undefined, f.metrics),
+      ).toBe(f.root);
+      expect(proof).not.toHaveBeenCalled();
+    } finally {
+      proof.mockRestore();
+    }
+  });
   test("uses complete genuine leaf layouts and preserves AutoFit/fonts/geometry/placement exactly", () => {
     const f = fixture(),
       before = structuredClone(f.root);

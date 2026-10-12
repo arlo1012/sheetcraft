@@ -395,6 +395,8 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     throw new TypeError("Owned shape children cannot use root drawing placement.");
   if (Object.getOwnPropertyDescriptor(value, "kind")?.value === "shapeGroup")
     return normalizeShapeGroup(value as ShapeGroupDrawing);
+  if ("groupEffects" in value)
+    throw new TypeError("Container effects require a genuine shape group owner.");
   if ("shapeFrame" in value && !isFramedShapeDrawing(value))
     throw new TypeError("Only shapes, text boxes or shape groups may use canonical shape frames.");
   if (isFramedShapeDrawing(value)) {

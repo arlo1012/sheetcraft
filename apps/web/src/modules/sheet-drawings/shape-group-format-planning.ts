@@ -13,6 +13,7 @@ import {
 import {
   findShapeGroupNode,
   normalizeShapeGroup,
+  normalizeShapeGroupEffects,
   traverseShapeGroup,
   type ShapeGroupDrawing,
   type ShapeGroupedGroup,
@@ -472,6 +473,19 @@ export function planShapeGroupFormatIntent(
     });
   }
   if (intent.type === "set-style") {
+    if (intent.target === "shape" && intent.category === "shadow") {
+      const root = normalizeShapeGroup(context.sourceRoot);
+      const owner = findShapeGroupNode(root, context.path)?.node;
+      if (!owner || owner.kind !== "shapeGroup")
+        throw new TypeError("A container shadow requires its exact group owner.");
+      const effects =
+        intent.value === undefined
+          ? undefined
+          : normalizeShapeGroupEffects({ shadow: intent.value });
+      if (effects) owner.groupEffects = effects;
+      else delete owner.groupEffects;
+      return checkedResult(context, root, [context.path]);
+    }
     // Reference behavior has a separate group-level effect owner. Do not turn a
     // group shadow into per-member shadows, or invent a container bitmap source.
     if (
@@ -588,6 +602,12 @@ export function aggregateShapeGroupFormatSnapshot(
   }
   const shape = styles("shape"),
     glyph = styles("text");
+  // Body Shadow belongs to this selected container, even when all leaves are
+  // text boxes. It never impersonates a mixed aggregate of member shadows.
+  delete shape.style.shadow;
+  shape.mixed = shape.mixed.filter((category) => category !== "shadow");
+  if (context.sourceNode.groupEffects?.shadow)
+    shape.style.shadow = context.sourceNode.groupEffects.shadow;
   return {
     values,
     mixedFields,

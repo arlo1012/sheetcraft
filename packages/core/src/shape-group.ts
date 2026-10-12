@@ -6,7 +6,11 @@ import {
   normalizeShapeObjectProperties,
   type ShapeObjectProperties,
 } from "./shape-object-properties.js";
-import { getShapeStyleAssetIds } from "./shape-style.js";
+import {
+  getShapeStyleAssetIds,
+  normalizeShapeStyle,
+  type ShapeDetailedStyle,
+} from "./shape-style.js";
 import { getShapeTextAssetIds } from "./shape-text.js";
 import {
   normalizeSheetDrawing,
@@ -18,6 +22,10 @@ import {
 export const MAX_SHAPE_GROUP_DEPTH = 32;
 export const MAX_SHAPE_GROUP_NODES = 10_000;
 
+/** Document-owned body effects only; containers do not own fill, line or theme styles. */
+export type ShapeGroupEffects = {
+  shadow?: ShapeDetailedStyle["shadow"];
+};
 export type ShapeGroupLocalRect = {
   xRatio: number;
   yRatio: number;
@@ -40,6 +48,7 @@ export type ShapeGroupedGroup = {
   /** Relative to the immediate owner, in clockwise screen coordinates. */
   rotation: number;
   shapeProperties?: ShapeObjectProperties;
+  groupEffects?: ShapeGroupEffects;
   /** Bottom-to-top sibling order; this array is the only ownership relation. */
   members: ShapeGroupChild[];
 };
@@ -51,6 +60,7 @@ export type ShapeGroupDrawing = {
   shapeFrame: ShapeFrame;
   rotation: number;
   shapeProperties?: ShapeObjectProperties;
+  groupEffects?: ShapeGroupEffects;
   members: ShapeGroupChild[];
 };
 export type ShapeGroupNode = ShapeGroupDrawing | ShapeGroupChild;
@@ -79,6 +89,12 @@ function record(value: unknown, keys: readonly string[], name: string): Record<s
   }
   return result;
 }
+/** Reuse the exact shape shadow contract after rejecting every other effect category. */
+export function normalizeShapeGroupEffects(value: unknown): ShapeGroupEffects | undefined {
+  if (value === undefined) return undefined;
+  const style = normalizeShapeStyle(record(value, ["shadow"], "shape group effects"));
+  return style?.shadow ? { shadow: style.shadow } : undefined;
+}
 function nonempty(value: unknown, name: string): string {
   if (typeof value !== "string" || !value.trim()) throw new TypeError(`${name} must be non-empty.`);
   return value;
@@ -105,7 +121,15 @@ export function isShapeGroupNode(value: unknown): value is ShapeGroupNode {
   );
 }
 
-const groupKeys = ["kind", "id", "name", "rotation", "shapeProperties", "members"] as const;
+const groupKeys = [
+  "kind",
+  "id",
+  "name",
+  "rotation",
+  "shapeProperties",
+  "groupEffects",
+  "members",
+] as const;
 const leafKeys = [
   "kind",
   "id",
@@ -194,11 +218,13 @@ export function normalizeShapeGroupLocalFrame(value: ShapeGroupLocalFrame): Shap
 function metadata(source: Record<string, unknown>) {
   if (typeof source.name !== "string") throw new TypeError("Shape group name must be a string.");
   const shapeProperties = normalizeShapeObjectProperties(source.shapeProperties);
+  const groupEffects = normalizeShapeGroupEffects(source.groupEffects);
   return {
     id: nonempty(source.id, "Shape group node ID"),
     name: source.name,
     rotation: normalizePictureAngle(source.rotation as number),
     ...(shapeProperties ? { shapeProperties } : {}),
+    ...(groupEffects ? { groupEffects } : {}),
   };
 }
 function normalizeChildUnchecked(value: ShapeGroupChild): ShapeGroupChild {
