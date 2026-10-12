@@ -3,15 +3,26 @@ import { SHAPE_PRESET_DEFAULTS } from "./catalog.js";
 import { normalizeShapePresetParameters } from "./contract.js";
 import { evaluateShapeGuide, readShapeGuide, shapeGuideVariables } from "./formula.js";
 import type {
-  PictureCropShape,
+  EvaluatedShapePresetGeometry,
+  EvaluatedShapePresetPath,
   ShapeAdjustmentHandle,
   ShapePathCommand,
-  ShapePresetGeometry,
-  ShapePresetPath,
+  ShapePresetConnectionSite,
+  ShapePresetFillMode,
+  ShapePresetParameters,
+  ShapePresetTextRect,
 } from "./types.js";
 
 const TURN = 2 * Math.PI;
 const ANGLE_RADIAN = Math.PI / 10_800_000;
+const FILL_MODES: ReadonlySet<ShapePresetFillMode> = new Set([
+  "norm",
+  "none",
+  "lighten",
+  "lightenLess",
+  "darken",
+  "darkenLess",
+]);
 function coordinate(value: number): number {
   if (!Number.isFinite(value) || Math.abs(value) > 10_000_000)
     throw new RangeError("Preset geometry exceeds its logical-coordinate budget.");
@@ -25,10 +36,10 @@ function ellipseParameter(angle: number, rx: number, ry: number): number {
 }
 
 export function evaluateShapePreset(
-  input: PictureCropShape | undefined,
+  input: ShapePresetParameters | undefined,
   width: number,
   height: number,
-): ShapePresetGeometry {
+): EvaluatedShapePresetGeometry {
   if (![width, height].every((value) => Number.isFinite(value) && value > 0 && value <= 10_000))
     throw new RangeError("Preset extents must be positive and at most 10,000 pixels.");
   const shape = normalizeShapePresetParameters(input) ?? { preset: "rect" as const };
@@ -36,7 +47,8 @@ export function evaluateShapePreset(
   if (
     definition.guides.length > 512 ||
     definition.paths.length > 16 ||
-    definition.handles.length > 16
+    definition.handles.length > 16 ||
+    definition.connectionSites.length > 16
   )
     throw new RangeError("Preset definition exceeds its work budget.");
   const adjustments = { ...SHAPE_PRESET_DEFAULTS[shape.preset], ...shape.adjustments };
@@ -45,7 +57,8 @@ export function evaluateShapePreset(
     variables[guide[0]!] = evaluateShapeGuide(guide.slice(1), variables);
   const read = (token: string) => readShapeGuide(token, variables);
   let commandCount = 0;
-  const paths: ShapePresetPath[] = definition.paths.map((path) => {
+  const paths: EvaluatedShapePresetPath[] = definition.paths.map((path) => {
+    if (!FILL_MODES.has(path.fillMode)) throw new TypeError("Invalid preset path fill mode.");
     const sx = path.width ? width / read(path.width) : 1;
     const sy = path.height ? height / read(path.height) : 1;
     if (![sx, sy].every((value) => Number.isFinite(value) && value > 0))
@@ -112,7 +125,12 @@ export function evaluateShapePreset(
         y = startY;
       } else throw new TypeError("Unknown preset path command.");
     }
-    return { filled: path.fill !== "none", stroke: path.stroke, commands };
+    return {
+      filled: path.fillMode !== "none",
+      fillMode: path.fillMode,
+      stroke: path.stroke,
+      commands,
+    };
   });
   const handles: ShapeAdjustmentHandle[] = definition.handles.map((handle) => {
     const refs =
@@ -157,5 +175,27 @@ export function evaluateShapePreset(
       fields,
     };
   });
-  return { width, height, paths, handles, adjustments };
+  let textRect: ShapePresetTextRect | null = null;
+  if (definition.textRect !== null) {
+    if (definition.textRect.length !== 4) throw new TypeError("Invalid preset text rectangle.");
+    const [left, top, right, bottom] = definition.textRect;
+    textRect = {
+      left: coordinate(read(left)),
+      top: coordinate(read(top)),
+      right: coordinate(read(right)),
+      bottom: coordinate(read(bottom)),
+    };
+  }
+  const connectionSites: ShapePresetConnectionSite[] = definition.connectionSites.map((site) => {
+    if (site.position.length !== 2) throw new TypeError("Invalid preset connection position.");
+    const angle = read(site.angle);
+    // Angles use DrawingML units, not the logical-coordinate budget (270° is 16,200,000).
+    if (Math.abs(angle) > 2_147_483_647)
+      throw new RangeError("Preset connection angle exceeds its angular budget.");
+    return {
+      position: { x: coordinate(read(site.position[0])), y: coordinate(read(site.position[1])) },
+      angle: angle === 0 ? 0 : angle,
+    };
+  });
+  return { width, height, paths, handles, adjustments, textRect, connectionSites };
 }

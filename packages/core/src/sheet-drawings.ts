@@ -1,3 +1,5 @@
+import { normalizeShapePresetParameters } from "./shape-presets/contract.js";
+import type { ShapePresetParameters } from "./shape-presets/types.js";
 import { normalizeFormControl, type SheetFormControl } from "./form-controls.js";
 import {
   normalizeSheetAttachment,
@@ -37,7 +39,13 @@ type DrawingBase = {
   italic: boolean;
   rotation: number;
 };
-export type SheetGraphicDrawing = DrawingBase & { kind: SheetGraphicKind };
+/** Explicit standard geometry is opt-in; missing geometry preserves the legacy nine shapes. */
+export type SheetShapeGeometry = ShapePresetParameters;
+export type SheetGraphicDrawing = DrawingBase & {
+  kind: SheetGraphicKind;
+  /** Only kind=shape may carry this feature. Other drawing kinds retain their own contracts. */
+  shapeGeometry?: SheetShapeGeometry;
+};
 export type SheetChartDrawing = DrawingBase & { kind: "chart"; chart: SheetChart };
 export type SheetCameraDrawing = DrawingBase & {
   kind: "camera";
@@ -130,6 +138,14 @@ const shapes = new Set([
   "star",
   "heart",
 ]);
+export function normalizeSheetShapeGeometry(
+  value: SheetShapeGeometry | undefined,
+): SheetShapeGeometry | undefined {
+  if (value === undefined) return;
+  // Unlike a picture mask, an explicit standard rectangle is not legacy geometry.
+  return normalizeShapePresetParameters(value) ?? { preset: "rect" };
+}
+
 export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   const finite = (n: number, min: number, max: number) =>
     typeof n === "number" && Number.isFinite(n) && n >= min && n <= max;
@@ -165,6 +181,12 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   }
   if (value.kind === "camera" && (!value.camera || typeof value.camera.gridLines !== "boolean"))
     throw new RangeError("Invalid camera.");
+  const geometryField = Object.getOwnPropertyDescriptor(value, "shapeGeometry");
+  if (geometryField && (geometryField.get || geometryField.set))
+    throw new TypeError("Shape geometry cannot be an accessor.");
+  if (geometryField && value.kind !== "shape")
+    throw new TypeError("Only a shape drawing may carry standard shape geometry.");
+  const shapeGeometry = normalizeSheetShapeGeometry(geometryField?.value);
   return {
     id: value.id,
     ...(value.kind === "chart"
@@ -185,6 +207,7 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
           : value.kind === "control"
             ? ({ kind: "control", control: normalizeFormControl(value.control) } as const)
             : { kind: value.kind }),
+    ...(shapeGeometry ? { shapeGeometry } : {}),
     name: value.name,
     anchor: { ...value.anchor },
     offsetX: value.offsetX,

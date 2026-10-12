@@ -265,6 +265,7 @@ export type WorkbookSnapshotV50 = Omit<WorkbookSnapshotV49, "version"> & { versi
 export type WorkbookSnapshotV51 = Omit<WorkbookSnapshotV50, "version"> & { version: 51 };
 export type WorkbookSnapshotV52 = Omit<WorkbookSnapshotV51, "version"> & { version: 52 };
 export type WorkbookSnapshotV53 = Omit<WorkbookSnapshotV52, "version"> & { version: 53 };
+export type WorkbookSnapshotV54 = Omit<WorkbookSnapshotV53, "version"> & { version: 54 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -276,7 +277,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV50
   | WorkbookSnapshotV51
   | WorkbookSnapshotV52
-  | WorkbookSnapshotV53;
+  | WorkbookSnapshotV53
+  | WorkbookSnapshotV54;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -346,7 +348,8 @@ type SnapshotVersion =
   | 50
   | 51
   | 52
-  | 53;
+  | 53
+  | 54;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -1313,6 +1316,17 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       );
     }
   }
+  // Inspect presence before old protocols can silently drop a shape-only feature.
+  if (Array.isArray(record.drawings)) {
+    for (const [index, drawing] of record.drawings.entries()) {
+      if (!Object.hasOwn(asRecord(drawing, path), "shapeGeometry")) continue;
+      if (version !== undefined && version < 54)
+        return fail(
+          `${path}.drawings[${index}].shapeGeometry`,
+          "Standard shape geometry requires snapshot version 54.",
+        );
+    }
+  }
   // Validate new geometry before older inference paths can read appearance fields.
   try {
     if (Array.isArray(record.cells)) {
@@ -1523,6 +1537,11 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       version = 52;
     // Infer last so unrelated older features cannot lower the cell-frame protocol.
     if (cells.some(hasCellPictureFrameFields)) version = 53;
+    if (
+      Array.isArray(record.drawings) &&
+      record.drawings.some((drawing) => Object.hasOwn(asRecord(drawing, path), "shapeGeometry"))
+    )
+      version = 54;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -1623,45 +1642,49 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   );
   return {
     // Preserve the existing protocol for documents that do not use the new feature.
-    version: sheets.some((sheet) => sheet.cells.some(hasCellPictureFrameFields))
-      ? 53
-      : sheets.some((sheet) => sheet.floatingImages.some(hasPictureCropShapeFields))
-        ? 52
-        : sheets.some(
-              (sheet) =>
-                sheet.cells.some(hasCellPicturePropertyFields) ||
-                sheet.floatingImages.some(hasPicturePropertyFields),
-            )
-          ? 51
+    version: sheets.some((sheet) =>
+      sheet.drawings?.some((drawing) => Object.hasOwn(drawing, "shapeGeometry")),
+    )
+      ? 54
+      : sheets.some((sheet) => sheet.cells.some(hasCellPictureFrameFields))
+        ? 53
+        : sheets.some((sheet) => sheet.floatingImages.some(hasPictureCropShapeFields))
+          ? 52
           : sheets.some(
                 (sheet) =>
-                  sheet.cells.some(hasCellDetailedStyleField) ||
-                  sheet.floatingImages.some(hasPictureDetailedStyleField),
+                  sheet.cells.some(hasCellPicturePropertyFields) ||
+                  sheet.floatingImages.some(hasPicturePropertyFields),
               )
-            ? 50
+            ? 51
             : sheets.some(
                   (sheet) =>
-                    sheet.cells.some(hasCellThemeEffectSuppressionField) ||
-                    sheet.floatingImages.some(hasPictureThemeEffectSuppressionField),
+                    sheet.cells.some(hasCellDetailedStyleField) ||
+                    sheet.floatingImages.some(hasPictureDetailedStyleField),
                 )
-              ? 49
-              : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
-                ? 48
-                : sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
-                  ? 47
-                  : sheets.some((sheet) =>
-                        sheet.cells.some(
-                          (cell) =>
-                            cell.content?.kind === "literal" &&
-                            Boolean(cell.content.fontRuns?.length),
-                        ),
-                      )
-                    ? 46
-                    : calculatedColumns
-                      ? 45
-                      : manualOrder
-                        ? 44
-                        : 43,
+              ? 50
+              : sheets.some(
+                    (sheet) =>
+                      sheet.cells.some(hasCellThemeEffectSuppressionField) ||
+                      sheet.floatingImages.some(hasPictureThemeEffectSuppressionField),
+                  )
+                ? 49
+                : sheets.some((sheet) => sheet.floatingImages.some(isPictureGroup))
+                  ? 48
+                  : sheets.some((sheet) => sheet.floatingImages.some(isFramedPictureObject))
+                    ? 47
+                    : sheets.some((sheet) =>
+                          sheet.cells.some(
+                            (cell) =>
+                              cell.content?.kind === "literal" &&
+                              Boolean(cell.content.fontRuns?.length),
+                          ),
+                        )
+                      ? 46
+                      : calculatedColumns
+                        ? 45
+                        : manualOrder
+                          ? 44
+                          : 43,
     ...(workbook.structureProtected ? { structureProtected: true } : {}),
     ...(workbook.structurePassword
       ? { structurePassword: normalizeProtectionPassword(workbook.structurePassword) }
@@ -1746,7 +1769,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 50 &&
     record.version !== 51 &&
     record.version !== 52 &&
-    record.version !== 53
+    record.version !== 53 &&
+    record.version !== 54
   ) {
     throw new WorkbookDomainError(
       {

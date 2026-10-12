@@ -13,6 +13,7 @@ export function shapeGuideVariables(width: number, height: number): Record<strin
     ss: shortest,
     ls: Math.max(width, height),
     cd2: 10_800_000,
+    cd3: 7_200_000,
     cd4: 5_400_000,
     cd8: 2_700_000,
     "3cd4": 16_200_000,

@@ -2,6 +2,7 @@
 from pathlib import Path
 import hashlib
 import json
+import re
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -14,6 +15,13 @@ ns = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
 def tag(e): return e.tag.split("}")[-1]
 def json_data(value): return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 operators = {"*/", "+-", "+/", "?:", "abs", "at2", "cat2", "cos", "max", "min", "mod", "pin", "sat2", "sin", "sqrt", "tan", "val"}
+fill_modes = {"norm", "none", "lighten", "lightenLess", "darken", "darkenLess"}
+base_variables = {"w", "h", "l", "t", "r", "b", "hc", "vc", "ss", "ls", "cd2", "cd3", "cd4", "cd8", "3cd4", "3cd8", "5cd8", "7cd8"}
+base_variables.update(f"{prefix}{divisor}" for prefix in ["wd", "hd", "ssd"] for divisor in [2, 3, 4, 5, 6, 8, 10, 12, 16, 32])
+def metadata_token(value, variables):
+    assert isinstance(value, str) and 0 < len(value) <= 128
+    assert re.fullmatch(r"-?\d+(?:\.\d+)?", value) or value in variables, f"Unknown metadata guide: {value}"
+    return value
 corrections = []
 allowed_trailing_zeros = {("circularArrow", "xB"), ("circularArrow", "yB"), ("leftCircularArrow", "xB"), ("leftCircularArrow", "yB"), ("leftRightCircularArrow", "xB"), ("leftRightCircularArrow", "yB"), ("leftRightCircularArrow", "xJ"), ("leftRightCircularArrow", "yJ")}
 def guides(elements, preset):
@@ -54,14 +62,28 @@ for shape in root:
             elif kind == "arcTo": commands.append([kind, *(c.attrib[k] for k in ["wR", "hR", "stAng", "swAng"])])
             elif kind == "close": commands.append([kind])
             else: raise ValueError(kind)
-        paths.append({"fill": p.attrib.get("fill", "norm"), "stroke": p.attrib.get("stroke", "true") != "false", "width": p.attrib.get("w"), "height": p.attrib.get("h"), "commands": commands})
+        fill_mode = p.attrib.get("fill", "norm")
+        assert fill_mode in fill_modes
+        assert p.attrib.get("stroke", "true") in {"true", "false"}
+        paths.append({"fillMode": fill_mode, "stroke": p.attrib.get("stroke", "true") != "false", "width": p.attrib.get("w"), "height": p.attrib.get("h"), "commands": commands})
     gd = guides(shape.findall("a:gdLst/a:gd", ns), name)
-    assert len(gd) <= 512 and len(paths) <= 16 and sum(len(p["commands"]) for p in paths) <= 1024 and len(handles) <= 16
-    definitions[name] = {"guides": gd, "handles": handles, "paths": paths}
+    variables = base_variables | set(defaults[name]) | {g[0] for g in gd}
+    rect = shape.find("a:rect", ns)
+    text_rect = None
+    if rect is not None:
+        assert set(rect.attrib) == {"l", "t", "r", "b"}
+        text_rect = [metadata_token(rect.attrib[k], variables) for k in ["l", "t", "r", "b"]]
+    connection_sites = []
+    for cxn in shape.findall("a:cxnLst/a:cxn", ns):
+        pos = cxn.find("a:pos", ns)
+        assert set(cxn.attrib) == {"ang"} and pos is not None and set(pos.attrib) == {"x", "y"}
+        connection_sites.append({"angle": metadata_token(cxn.attrib["ang"], variables), "position": [metadata_token(pos.attrib[k], variables) for k in ["x", "y"]]})
+    assert len(gd) <= 512 and len(paths) <= 16 and sum(len(p["commands"]) for p in paths) <= 1024 and len(handles) <= 16 and len(connection_sites) <= 16
+    definitions[name] = {"guides": gd, "handles": handles, "paths": paths, "textRect": text_rect, "connectionSites": connection_sites}
 assert len(definitions) == 187
 assert len(corrections) == 8
 (ROOT / "packages/core/resources/shape-presets/compiled-corrections.json").write_text(json.dumps(corrections, indent=2) + "\n")
-filled = [name for name, definition in definitions.items() if any(path["fill"] != "none" and len(path["commands"]) > 2 for path in definition["paths"])]
+filled = [name for name, definition in definitions.items() if any(path["fillMode"] != "none" and len(path["commands"]) > 2 for path in definition["paths"])]
 header = "// Generated from the pinned licensed source; do not edit by hand.\n"
 OUT.mkdir(parents=True, exist_ok=True)
 (OUT / "catalog.ts").write_text(header + "export const SHAPE_PRESET_NAMES = " + json_data(list(definitions)) + " as const;\nexport type ShapePresetName = typeof SHAPE_PRESET_NAMES[number];\nexport const SHAPE_PRESET_DEFAULTS: Readonly<Record<ShapePresetName, Readonly<Record<string, number>>>> = " + json_data(defaults) + ";\nexport const SHAPE_PRESET_FILLED_NAMES = " + json_data(filled) + " as const;\n")

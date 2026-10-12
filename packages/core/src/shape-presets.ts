@@ -18,9 +18,15 @@ export {
   type ShapePolyline,
 } from "./shape-presets/path.js";
 export type {
+  EvaluatedShapePresetGeometry,
+  EvaluatedShapePresetPath,
   PictureCropShape,
   ShapeAdjustmentHandle,
   ShapePathCommand,
   ShapePresetGeometry,
+  ShapePresetConnectionSite,
+  ShapePresetFillMode,
   ShapePresetPath,
+  ShapePresetParameters,
+  ShapePresetTextRect,
 } from "./shape-presets/types.js";

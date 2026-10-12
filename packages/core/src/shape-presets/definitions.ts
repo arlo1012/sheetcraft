@@ -37,7 +37,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -50,14 +50,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "x1", "t"], ["close"], ["lnTo", "x1", "b"]],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -66,6 +66,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x2", "y2"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   accentBorderCallout2: {
@@ -117,7 +124,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -130,14 +137,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "x1", "t"], ["close"], ["lnTo", "x1", "b"]],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -147,6 +154,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x3", "y3"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   accentBorderCallout3: {
@@ -212,7 +226,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -225,14 +239,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "x1", "t"], ["close"], ["lnTo", "x1", "b"]],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -243,6 +257,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x4", "y4"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   accentCallout1: {
@@ -280,7 +301,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -293,14 +314,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "x1", "t"], ["close"], ["lnTo", "x1", "b"]],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -309,6 +330,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x2", "y2"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   accentCallout2: {
@@ -360,7 +388,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -373,14 +401,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "x1", "t"], ["close"], ["lnTo", "x1", "b"]],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -390,6 +418,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x3", "y3"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   accentCallout3: {
@@ -455,7 +490,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -468,14 +503,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "x1", "t"], ["close"], ["lnTo", "x1", "b"]],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -486,6 +521,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x4", "y4"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   actionButtonBackPrevious: {
@@ -499,7 +541,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -516,7 +558,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darken",
+        fillMode: "darken",
         stroke: false,
         width: null,
         height: null,
@@ -528,7 +570,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -540,7 +582,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -552,6 +594,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   actionButtonBeginning: {
@@ -570,7 +619,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -592,7 +641,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darken",
+        fillMode: "darken",
         stroke: false,
         width: null,
         height: null,
@@ -609,7 +658,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -626,7 +675,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -639,13 +688,20 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
+    ],
   },
   actionButtonBlank: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -657,6 +713,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   actionButtonDocument: {
@@ -674,7 +737,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -693,7 +756,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -708,7 +771,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darken",
+        fillMode: "darken",
         stroke: false,
         width: null,
         height: null,
@@ -720,7 +783,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -737,7 +800,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -749,6 +812,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   actionButtonEnd: {
@@ -767,7 +837,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -789,7 +859,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darken",
+        fillMode: "darken",
         stroke: false,
         width: null,
         height: null,
@@ -806,7 +876,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -823,7 +893,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -835,6 +905,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   actionButtonForwardNext: {
@@ -848,7 +925,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -865,7 +942,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darken",
+        fillMode: "darken",
         stroke: false,
         width: null,
         height: null,
@@ -877,7 +954,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -889,7 +966,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -901,6 +978,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   actionButtonHelp: {
@@ -930,7 +1014,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -957,7 +1041,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darken",
+        fillMode: "darken",
         stroke: false,
         width: null,
         height: null,
@@ -979,7 +1063,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1001,7 +1085,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1013,6 +1097,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   actionButtonHome: {
@@ -1047,7 +1138,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -1072,7 +1163,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -1094,7 +1185,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darken",
+        fillMode: "darken",
         stroke: false,
         width: null,
         height: null,
@@ -1111,7 +1202,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1139,7 +1230,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1151,6 +1242,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   actionButtonInformation: {
@@ -1181,7 +1279,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -1197,7 +1295,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darken",
+        fillMode: "darken",
         stroke: false,
         width: null,
         height: null,
@@ -1221,7 +1319,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "lighten",
+        fillMode: "lighten",
         stroke: false,
         width: null,
         height: null,
@@ -1242,7 +1340,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1266,7 +1364,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1278,6 +1376,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   actionButtonMovie: {
@@ -1327,7 +1432,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -1360,7 +1465,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darken",
+        fillMode: "darken",
         stroke: false,
         width: null,
         height: null,
@@ -1388,7 +1493,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1416,7 +1521,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1428,6 +1533,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   actionButtonReturn: {
@@ -1456,7 +1568,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -1485,7 +1597,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darken",
+        fillMode: "darken",
         stroke: false,
         width: null,
         height: null,
@@ -1509,7 +1621,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1533,7 +1645,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1545,6 +1657,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   actionButtonSound: {
@@ -1572,7 +1691,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -1592,7 +1711,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darken",
+        fillMode: "darken",
         stroke: false,
         width: null,
         height: null,
@@ -1607,7 +1726,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1628,7 +1747,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1640,6 +1759,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   arc: {
@@ -1701,7 +1827,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -1713,7 +1839,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1722,6 +1848,12 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["arcTo", "wd2", "hd2", "stAng", "swAng"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "cang1", position: ["x1", "y1"] },
+      { angle: "cang3", position: ["hc", "vc"] },
+      { angle: "cang2", position: ["x2", "y2"] },
     ],
   },
   bentArrow: {
@@ -1766,7 +1898,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -1786,13 +1918,20 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x4", "t"] },
+      { angle: "cd4", position: ["x4", "y4"] },
+      { angle: "cd4", position: ["th2", "b"] },
+      { angle: "0", position: ["r", "aw2"] },
+    ],
   },
   bentConnector2: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1803,6 +1942,8 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [],
   },
   bentConnector3: {
     guides: [["x1", "*/", "w", "adj1", "100000"]],
@@ -1815,7 +1956,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1827,6 +1968,8 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [],
   },
   bentConnector4: {
     guides: [
@@ -1849,7 +1992,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1862,6 +2005,8 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [],
   },
   bentConnector5: {
     guides: [
@@ -1891,7 +2036,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -1905,6 +2050,8 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [],
   },
   bentUpArrow: {
     guides: [
@@ -1936,7 +2083,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -1954,6 +2101,15 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "y2", "x4", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x3", "t"] },
+      { angle: "cd2", position: ["x1", "y1"] },
+      { angle: "cd2", position: ["l", "y3"] },
+      { angle: "cd4", position: ["x0", "b"] },
+      { angle: "0", position: ["x4", "y15"] },
+      { angle: "0", position: ["r", "y1"] },
+    ],
   },
   bevel: {
     guides: [
@@ -1967,7 +2123,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -1980,7 +2136,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "lightenLess",
+        fillMode: "lightenLess",
         stroke: false,
         width: null,
         height: null,
@@ -1993,7 +2149,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -2006,7 +2162,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "lighten",
+        fillMode: "lighten",
         stroke: false,
         width: null,
         height: null,
@@ -2019,7 +2175,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darken",
+        fillMode: "darken",
         stroke: false,
         width: null,
         height: null,
@@ -2032,7 +2188,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -2057,6 +2213,17 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x2", "y2"],
         ],
       },
+    ],
+    textRect: ["x1", "x1", "x2", "y2"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "0", position: ["x2", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["hc", "y2"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd2", position: ["x1", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["hc", "x1"] },
     ],
   },
   blockArc: {
@@ -2154,7 +2321,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -2166,6 +2333,12 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "cang1", position: ["x5", "y5"] },
+      { angle: "cang2", position: ["x6", "y6"] },
+      { angle: "cang3", position: ["hc", "vc"] },
     ],
   },
   borderCallout1: {
@@ -2203,7 +2376,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -2216,7 +2389,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -2225,6 +2398,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x2", "y2"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   borderCallout2: {
@@ -2276,7 +2456,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -2289,7 +2469,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -2299,6 +2479,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x3", "y3"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   borderCallout3: {
@@ -2364,7 +2551,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -2377,7 +2564,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -2388,6 +2575,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x4", "y4"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   bracePair: {
@@ -2410,7 +2604,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -2433,7 +2627,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -2455,6 +2649,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["il", "il", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   bracketPair: {
     guides: [
@@ -2471,7 +2672,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -2488,7 +2689,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -2503,6 +2704,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["arcTo", "x1", "x1", "0", "cd4"],
         ],
       },
+    ],
+    textRect: ["il", "il", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   callout1: {
@@ -2540,7 +2748,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -2553,7 +2761,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -2562,6 +2770,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x2", "y2"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   callout2: {
@@ -2613,7 +2828,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -2626,7 +2841,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -2636,6 +2851,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x3", "y3"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   callout3: {
@@ -2701,7 +2923,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -2714,7 +2936,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -2725,6 +2947,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x4", "y4"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   can: {
@@ -2744,7 +2973,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -2757,7 +2986,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "lighten",
+        fillMode: "lighten",
         stroke: false,
         width: null,
         height: null,
@@ -2769,7 +2998,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -2783,13 +3012,21 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "y2", "r", "y3"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "y2"] },
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   chartPlus: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "10",
         height: "10",
@@ -2801,7 +3038,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: "10",
         height: "10",
@@ -2814,13 +3051,15 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: null,
+    connectionSites: [],
   },
   chartStar: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "10",
         height: "10",
@@ -2834,7 +3073,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: "10",
         height: "10",
@@ -2847,13 +3086,15 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: null,
+    connectionSites: [],
   },
   chartX: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "10",
         height: "10",
@@ -2865,7 +3106,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: "10",
         height: "10",
@@ -2878,6 +3119,8 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: null,
+    connectionSites: [],
   },
   chevron: {
     guides: [
@@ -2895,7 +3138,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -2909,6 +3152,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "t", "ir", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x3", "t"] },
+      { angle: "cd2", position: ["x1", "vc"] },
+      { angle: "cd4", position: ["x3", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   chord: {
@@ -2955,12 +3205,18 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "x1", "y1"], ["arcTo", "wd2", "hd2", "stAng", "swAng"], ["close"]],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "stAng", position: ["x1", "y1"] },
+      { angle: "enAng", position: ["x2", "y2"] },
+      { angle: "midAng", position: ["x3", "y3"] },
     ],
   },
   circularArrow: {
@@ -3189,7 +3445,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -3204,6 +3460,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "aI", position: ["xI", "yI"] },
+      { angle: "ptAng", position: ["xGp", "yGp"] },
+      { angle: "aA", position: ["xA", "yA"] },
+      { angle: "aB", position: ["xBp", "yBp"] },
     ],
   },
   cloud: {
@@ -3220,7 +3483,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "43200",
         height: "43200",
@@ -3241,7 +3504,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "43200",
         height: "43200",
@@ -3270,6 +3533,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["arcTo", "6753", "9190", "9459261", "711490"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "0", position: ["g29", "vc"] },
+      { angle: "cd4", position: ["hc", "g28"] },
+      { angle: "cd2", position: ["g27", "vc"] },
+      { angle: "3cd4", position: ["hc", "g30"] },
     ],
   },
   cloudCallout: {
@@ -3334,7 +3604,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "43200",
         height: "43200",
@@ -3355,28 +3625,28 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "x23", "yPos"], ["arcTo", "g26", "g26", "0", "21600000"], ["close"]],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "x24", "g17"], ["arcTo", "g25", "g25", "0", "21600000"], ["close"]],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "x25", "g24"], ["arcTo", "g12", "g12", "0", "21600000"], ["close"]],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "43200",
         height: "43200",
@@ -3405,6 +3675,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["arcTo", "6753", "9190", "9459261", "711490"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "cd2", position: ["g27", "vc"] },
+      { angle: "cd4", position: ["hc", "g28"] },
+      { angle: "0", position: ["g29", "vc"] },
+      { angle: "3cd4", position: ["hc", "g30"] },
+      { angle: "pang", position: ["xPos", "yPos"] },
     ],
   },
   corner: {
@@ -3436,7 +3714,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -3451,6 +3729,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "it", "ir", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "cy1"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["cx1", "t"] },
+    ],
   },
   cornerTabs: {
     guides: [
@@ -3462,33 +3747,48 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "l", "t"], ["lnTo", "dx", "t"], ["lnTo", "l", "dx"], ["close"]],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "l", "y1"], ["lnTo", "dx", "b"], ["lnTo", "l", "b"], ["close"]],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "x1", "t"], ["lnTo", "r", "t"], ["lnTo", "r", "dx"], ["close"]],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "r", "y1"], ["lnTo", "r", "b"], ["lnTo", "x1", "b"], ["close"]],
       },
+    ],
+    textRect: ["dx", "dx", "x1", "y1"],
+    connectionSites: [
+      { angle: "cd2", position: ["l", "t"] },
+      { angle: "cd2", position: ["l", "dx"] },
+      { angle: "cd2", position: ["l", "y1"] },
+      { angle: "cd2", position: ["l", "b"] },
+      { angle: "3cd4", position: ["dx", "t"] },
+      { angle: "3cd4", position: ["x1", "t"] },
+      { angle: "cd4", position: ["dx", "b"] },
+      { angle: "cd4", position: ["x1", "b"] },
+      { angle: "0", position: ["r", "t"] },
+      { angle: "0", position: ["r", "dx"] },
+      { angle: "0", position: ["r", "y1"] },
+      { angle: "0", position: ["r", "b"] },
     ],
   },
   cube: {
@@ -3507,7 +3807,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -3520,7 +3820,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -3533,7 +3833,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "lightenLess",
+        fillMode: "lightenLess",
         stroke: false,
         width: null,
         height: null,
@@ -3546,7 +3846,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -3566,13 +3866,22 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "y1", "x4", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x3", "t"] },
+      { angle: "3cd4", position: ["x2", "y1"] },
+      { angle: "cd2", position: ["l", "y3"] },
+      { angle: "cd4", position: ["x2", "b"] },
+      { angle: "0", position: ["x4", "y3"] },
+      { angle: "0", position: ["r", "y2"] },
+    ],
   },
   curvedConnector2: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -3582,6 +3891,8 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [],
   },
   curvedConnector3: {
     guides: [
@@ -3599,7 +3910,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -3610,6 +3921,8 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [],
   },
   curvedConnector4: {
     guides: [
@@ -3638,7 +3951,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -3650,6 +3963,8 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [],
   },
   curvedConnector5: {
     guides: [
@@ -3687,7 +4002,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -3700,6 +4015,8 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [],
   },
   curvedDownArrow: {
     guides: [
@@ -3760,7 +4077,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -3776,7 +4093,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -3789,7 +4106,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -3807,6 +4124,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["arcTo", "wR", "h", "stAng", "mswAng"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["ix", "t"] },
+      { angle: "cd4", position: ["q12", "b"] },
+      { angle: "cd4", position: ["x4", "y1"] },
+      { angle: "cd4", position: ["x6", "b"] },
+      { angle: "0", position: ["x8", "y1"] },
     ],
   },
   curvedLeftArrow: {
@@ -3867,7 +4192,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -3882,7 +4207,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -3895,7 +4220,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -3913,6 +4238,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["arcTo", "w", "hR", "swAng", "swAng2"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "cd2", position: ["l", "q12"] },
+      { angle: "cd2", position: ["x1", "y4"] },
+      { angle: "cd3", position: ["l", "y6"] },
+      { angle: "cd4", position: ["x1", "y8"] },
+      { angle: "0", position: ["r", "iy"] },
     ],
   },
   curvedRightArrow: {
@@ -3974,7 +4307,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -3990,7 +4323,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -4002,7 +4335,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -4020,6 +4353,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["arcTo", "w", "hR", "3cd4", "swAng2"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "cd2", position: ["l", "iy"] },
+      { angle: "cd4", position: ["x1", "y8"] },
+      { angle: "0", position: ["r", "y6"] },
+      { angle: "0", position: ["x1", "y4"] },
+      { angle: "0", position: ["r", "q12"] },
     ],
   },
   curvedUpArrow: {
@@ -4082,7 +4423,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -4097,7 +4438,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -4110,7 +4451,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -4128,6 +4469,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["arcTo", "wR", "h", "cd2", "-5400000"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x6", "t"] },
+      { angle: "3cd4", position: ["x4", "y1"] },
+      { angle: "3cd4", position: ["q12", "t"] },
+      { angle: "cd4", position: ["ix", "b"] },
+      { angle: "0", position: ["x8", "y1"] },
     ],
   },
   decagon: {
@@ -4149,7 +4498,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -4168,6 +4517,19 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["x1", "y2", "x4", "y3"],
+    connectionSites: [
+      { angle: "0", position: ["x4", "y2"] },
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "0", position: ["x4", "y3"] },
+      { angle: "cd4", position: ["x3", "y4"] },
+      { angle: "cd4", position: ["x2", "y4"] },
+      { angle: "cd2", position: ["x1", "y3"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd2", position: ["x1", "y2"] },
+      { angle: "3cd4", position: ["x2", "y1"] },
+      { angle: "3cd4", position: ["x3", "y1"] },
+    ],
   },
   diagStripe: {
     guides: [
@@ -4184,7 +4546,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -4197,6 +4559,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "x3", "y3"],
+    connectionSites: [
+      { angle: "0", position: ["hc", "vc"] },
+      { angle: "cd2", position: ["l", "y3"] },
+      { angle: "cd2", position: ["x1", "y1"] },
+      { angle: "3cd4", position: ["x3", "t"] },
+    ],
   },
   diamond: {
     guides: [
@@ -4206,7 +4575,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -4218,6 +4587,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["wd4", "hd4", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   dodecagon: {
@@ -4234,7 +4610,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -4254,6 +4630,21 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x1", "y1", "x4", "y4"],
+    connectionSites: [
+      { angle: "0", position: ["x4", "y1"] },
+      { angle: "0", position: ["r", "y2"] },
+      { angle: "0", position: ["r", "y3"] },
+      { angle: "0", position: ["x4", "y4"] },
+      { angle: "cd4", position: ["x3", "b"] },
+      { angle: "cd4", position: ["x2", "b"] },
+      { angle: "cd2", position: ["x1", "y4"] },
+      { angle: "cd2", position: ["l", "y3"] },
+      { angle: "cd2", position: ["l", "y2"] },
+      { angle: "cd2", position: ["x1", "y1"] },
+      { angle: "3cd4", position: ["x2", "t"] },
+      { angle: "3cd4", position: ["x3", "t"] },
     ],
   },
   donut: {
@@ -4278,7 +4669,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -4297,6 +4688,17 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["il", "it"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["il", "ib"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["ir", "ib"] },
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "3cd4", position: ["ir", "it"] },
     ],
   },
   doubleWave: {
@@ -4348,7 +4750,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -4362,6 +4764,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "cd4", position: ["x12", "y1"] },
+      { angle: "cd2", position: ["x1", "vc"] },
+      { angle: "3cd4", position: ["x5", "y4"] },
+      { angle: "0", position: ["x16", "vc"] },
     ],
   },
   downArrow: {
@@ -4391,7 +4800,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -4406,6 +4815,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x1", "t", "x2", "y2"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "y1"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "y1"] },
     ],
   },
   downArrowCallout: {
@@ -4454,7 +4870,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -4474,6 +4890,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "y2"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "y1"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "y1"] },
+    ],
   },
   ellipse: {
     guides: [
@@ -4487,7 +4910,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -4500,6 +4923,17 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["il", "it"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["il", "ib"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["ir", "ib"] },
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "3cd4", position: ["ir", "it"] },
     ],
   },
   ellipseRibbon: {
@@ -4567,7 +5001,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -4590,7 +5024,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -4606,7 +5040,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -4636,6 +5070,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x4", "y1"],
         ],
       },
+    ],
+    textRect: ["x2", "q1", "x5", "y6"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "q1"] },
+      { angle: "cd2", position: ["wd8", "y2"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["x6", "y2"] },
     ],
   },
   ellipseRibbon2: {
@@ -4713,7 +5154,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -4736,7 +5177,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -4752,7 +5193,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -4784,6 +5225,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["x2", "y6", "x5", "rh"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["wd8", "y2"] },
+      { angle: "cd4", position: ["hc", "rh"] },
+      { angle: "0", position: ["x6", "y2"] },
+    ],
   },
   flowChartAlternateProcess: {
     guides: [
@@ -4796,7 +5244,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -4813,6 +5261,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["il", "il", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartCollate: {
     guides: [
@@ -4822,7 +5277,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "2",
         height: "2",
@@ -4837,6 +5292,12 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["wd4", "hd4", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["hc", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+    ],
   },
   flowChartConnector: {
     guides: [
@@ -4850,7 +5311,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -4864,6 +5325,17 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["il", "it"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["il", "ib"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["ir", "ib"] },
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "3cd4", position: ["ir", "it"] },
+    ],
   },
   flowChartDecision: {
     guides: [
@@ -4873,7 +5345,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "2",
         height: "2",
@@ -4885,6 +5357,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["wd4", "hd4", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   flowChartDelay: {
@@ -4898,7 +5377,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -4911,13 +5390,20 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartDisplay: {
     guides: [["x2", "*/", "w", "5", "6"]],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "6",
         height: "6",
@@ -4931,6 +5417,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["wd6", "t", "x2", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartDocument: {
     guides: [
@@ -4940,7 +5433,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "21600",
         height: "21600",
@@ -4953,18 +5446,32 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "y1"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "y2"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartExtract: {
     guides: [["x2", "*/", "w", "3", "4"]],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "2",
         height: "2",
         commands: [["moveTo", "0", "2"], ["lnTo", "1", "0"], ["lnTo", "2", "2"], ["close"]],
       },
+    ],
+    textRect: ["wd4", "vc", "x2", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["wd4", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["x2", "vc"] },
     ],
   },
   flowChartInputOutput: {
@@ -4977,7 +5484,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "5",
         height: "5",
@@ -4990,13 +5497,22 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["wd5", "t", "x5", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x4", "t"] },
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["wd10", "vc"] },
+      { angle: "cd4", position: ["x3", "b"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["x6", "vc"] },
+    ],
   },
   flowChartInternalStorage: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: "1",
         height: "1",
@@ -5009,7 +5525,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "8",
         height: "8",
@@ -5021,7 +5537,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "1",
         height: "1",
@@ -5034,13 +5550,20 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["wd8", "hd8", "r", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartMagneticDisk: {
     guides: [["y3", "*/", "h", "5", "6"]],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: "6",
         height: "6",
@@ -5053,7 +5576,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "6",
         height: "6",
@@ -5063,7 +5586,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "6",
         height: "6",
@@ -5076,13 +5599,21 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "hd3", "r", "y3"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "hd3"] },
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartMagneticDrum: {
     guides: [["x2", "*/", "w", "2", "3"]],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: "6",
         height: "6",
@@ -5096,7 +5627,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "6",
         height: "6",
@@ -5106,7 +5637,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "6",
         height: "6",
@@ -5119,6 +5650,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["wd6", "t", "x2", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["x2", "vc"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   flowChartMagneticTape: {
@@ -5134,7 +5673,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -5150,13 +5689,20 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartManualInput: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "5",
         height: "5",
@@ -5169,6 +5715,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "hd5", "r", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "hd10"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartManualOperation: {
     guides: [
@@ -5178,7 +5731,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "5",
         height: "5",
@@ -5191,18 +5744,32 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["wd5", "t", "x3", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["wd10", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["x4", "vc"] },
+    ],
   },
   flowChartMerge: {
     guides: [["x2", "*/", "w", "3", "4"]],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "2",
         height: "2",
         commands: [["moveTo", "0", "0"], ["lnTo", "2", "0"], ["lnTo", "1", "2"], ["close"]],
       },
+    ],
+    textRect: ["wd4", "t", "x2", "vc"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["wd4", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["x2", "vc"] },
     ],
   },
   flowChartMultidocument: {
@@ -5216,7 +5783,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: "21600",
         height: "21600",
@@ -5243,7 +5810,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "21600",
         height: "21600",
@@ -5266,7 +5833,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: false,
         width: "21600",
         height: "21600",
@@ -5287,20 +5854,27 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "y2", "x5", "y8"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x4", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["x3", "y8"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartOfflineStorage: {
     guides: [["x4", "*/", "w", "3", "4"]],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: "2",
         height: "2",
         commands: [["moveTo", "0", "0"], ["lnTo", "2", "0"], ["lnTo", "1", "2"], ["close"]],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "5",
         height: "5",
@@ -5310,12 +5884,19 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "2",
         height: "2",
         commands: [["moveTo", "0", "0"], ["lnTo", "2", "0"], ["lnTo", "1", "2"], ["close"]],
       },
+    ],
+    textRect: ["wd4", "t", "x4", "vc"],
+    connectionSites: [
+      { angle: "0", position: ["x4", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["wd4", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   flowChartOffpageConnector: {
@@ -5323,7 +5904,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "10",
         height: "10",
@@ -5337,13 +5918,20 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "y1"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartOnlineStorage: {
     guides: [["x2", "*/", "w", "5", "6"]],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "6",
         height: "6",
@@ -5356,6 +5944,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["wd6", "t", "x2", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["x2", "vc"] },
     ],
   },
   flowChartOr: {
@@ -5370,7 +5965,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -5384,7 +5979,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -5396,7 +5991,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -5410,13 +6005,24 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["il", "it"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["il", "ib"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["ir", "ib"] },
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "3cd4", position: ["ir", "it"] },
+    ],
   },
   flowChartPredefinedProcess: {
     guides: [["x2", "*/", "w", "7", "8"]],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: "1",
         height: "1",
@@ -5429,7 +6035,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "8",
         height: "8",
@@ -5441,7 +6047,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "1",
         height: "1",
@@ -5454,13 +6060,20 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["wd8", "t", "x2", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartPreparation: {
     guides: [["x2", "*/", "w", "4", "5"]],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "10",
         height: "10",
@@ -5475,13 +6088,20 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["wd5", "t", "x2", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartProcess: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "1",
         height: "1",
@@ -5494,13 +6114,20 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartPunchedCard: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "5",
         height: "5",
@@ -5514,6 +6141,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "hd5", "r", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartPunchedTape: {
     guides: [
@@ -5523,7 +6157,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "20",
         height: "20",
@@ -5538,6 +6172,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "hd5", "r", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "hd10"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "y2"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   flowChartSort: {
     guides: [
@@ -5547,7 +6188,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: "2",
         height: "2",
@@ -5560,7 +6201,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "2",
         height: "2",
@@ -5570,7 +6211,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: "2",
         height: "2",
@@ -5582,6 +6223,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["wd4", "hd4", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   flowChartSummingJunction: {
@@ -5596,7 +6244,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -5610,7 +6258,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -5622,7 +6270,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -5636,6 +6284,17 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["il", "it"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["il", "ib"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["ir", "ib"] },
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "3cd4", position: ["ir", "it"] },
+    ],
   },
   flowChartTerminator: {
     guides: [
@@ -5647,7 +6306,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "21600",
         height: "21600",
@@ -5660,6 +6319,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   foldedCorner: {
@@ -5677,7 +6343,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -5691,14 +6357,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
         commands: [["moveTo", "x1", "b"], ["lnTo", "x2", "y1"], ["lnTo", "r", "y2"], ["close"]],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -5714,6 +6380,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "y2"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   frame: {
     guides: [
@@ -5727,7 +6400,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -5744,6 +6417,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x1", "x1", "x4", "y4"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   funnel: {
@@ -5783,7 +6463,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -5799,6 +6479,8 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [],
   },
   gear6: {
     guides: [
@@ -5924,7 +6606,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -5957,6 +6639,15 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["xD5", "yA1", "xA1", "yD2"],
+    connectionSites: [
+      { angle: "19800000", position: ["xCxn1", "yCxn1"] },
+      { angle: "1800000", position: ["xCxn1", "yCxn2"] },
+      { angle: "cd4", position: ["hc", "yB3"] },
+      { angle: "9000000", position: ["xCxn4", "yCxn2"] },
+      { angle: "12600000", position: ["xCxn4", "yCxn1"] },
+      { angle: "3cd4", position: ["hc", "yC6"] },
     ],
   },
   gear9: {
@@ -6218,7 +6909,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -6264,6 +6955,18 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["xA8", "yD1", "xD1", "yD3"],
+    connectionSites: [
+      { angle: "18600000", position: ["xCxn1", "yCxn1"] },
+      { angle: "21000000", position: ["xCxn2", "yCxn2"] },
+      { angle: "1800000", position: ["xCxn3", "yCxn3"] },
+      { angle: "4200000", position: ["xCxn4", "yCxn4"] },
+      { angle: "6600000", position: ["xCxn5", "yCxn4"] },
+      { angle: "9000000", position: ["xCxn6", "yCxn3"] },
+      { angle: "11400000", position: ["xCxn7", "yCxn2"] },
+      { angle: "13800000", position: ["xCxn8", "yCxn1"] },
+      { angle: "3cd4", position: ["hc", "yC9"] },
+    ],
   },
   halfFrame: {
     guides: [
@@ -6298,7 +7001,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -6312,6 +7015,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["cx2", "cy2"] },
+      { angle: "cd4", position: ["cx1", "cy1"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   heart: {
@@ -6330,7 +7040,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -6341,6 +7051,11 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "hd4", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "hd4"] },
+      { angle: "cd4", position: ["hc", "b"] },
     ],
   },
   heptagon: {
@@ -6368,7 +7083,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -6383,6 +7098,16 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x2", "y1", "x5", "ib"],
+    connectionSites: [
+      { angle: "0", position: ["x5", "y1"] },
+      { angle: "0", position: ["x6", "y2"] },
+      { angle: "cd4", position: ["x4", "y3"] },
+      { angle: "cd4", position: ["x3", "y3"] },
+      { angle: "cd2", position: ["x1", "y2"] },
+      { angle: "cd2", position: ["x2", "y1"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   hexagon: {
@@ -6413,7 +7138,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -6427,6 +7152,15 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["x2", "y2"] },
+      { angle: "cd4", position: ["x1", "y2"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["x1", "y1"] },
+      { angle: "3cd4", position: ["x2", "y1"] },
     ],
   },
   homePlate: {
@@ -6443,7 +7177,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -6456,6 +7190,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "ir", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x2", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["x1", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   horizontalScroll: {
@@ -6477,7 +7218,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -6502,7 +7243,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -6518,7 +7259,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -6549,6 +7290,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["ch", "ch", "x4", "y6"],
+    connectionSites: [
+      { angle: "cd4", position: ["hc", "ch"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "y6"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   irregularSeal1: {
     guides: [
@@ -6564,7 +7312,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "21600",
         height: "21600",
@@ -6597,6 +7345,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["x5", "y3", "x21", "y9"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x24", "t"] },
+      { angle: "cd2", position: ["l", "y6"] },
+      { angle: "cd4", position: ["x12", "b"] },
+      { angle: "0", position: ["r", "y18"] },
+    ],
   },
   irregularSeal2: {
     guides: [
@@ -6615,7 +7370,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "21600",
         height: "21600",
@@ -6652,6 +7407,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["x5", "y3", "x19", "y17"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x2", "y2"] },
+      { angle: "cd2", position: ["l", "y8"] },
+      { angle: "cd4", position: ["x16", "y16"] },
+      { angle: "0", position: ["r", "y24"] },
+    ],
   },
   leftArrow: {
     guides: [
@@ -6680,7 +7442,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -6695,6 +7457,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x1", "y1", "r", "y2"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x2", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["x2", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   leftArrowCallout: {
@@ -6743,7 +7512,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -6762,6 +7531,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x2", "t", "r", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x3", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["x3", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   leftBrace: {
@@ -6795,7 +7571,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -6811,7 +7587,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -6825,6 +7601,12 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["arcTo", "wd2", "y1", "cd2", "cd4"],
         ],
       },
+    ],
+    textRect: ["il", "it", "r", "ib"],
+    connectionSites: [
+      { angle: "cd4", position: ["r", "t"] },
+      { angle: "cd2", position: ["l", "y3"] },
+      { angle: "3cd4", position: ["r", "b"] },
     ],
   },
   leftBracket: {
@@ -6844,7 +7626,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -6857,7 +7639,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -6868,6 +7650,12 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["arcTo", "w", "y1", "cd2", "cd4"],
         ],
       },
+    ],
+    textRect: ["il", "it", "r", "ib"],
+    connectionSites: [
+      { angle: "cd4", position: ["r", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["r", "b"] },
     ],
   },
   leftCircularArrow: {
@@ -7109,7 +7897,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -7125,6 +7913,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "aI", position: ["xI", "yI"] },
+      { angle: "ptAng", position: ["xGp", "yGp"] },
+      { angle: "aA", position: ["xA", "yA"] },
+      { angle: "aB", position: ["xBp", "yBp"] },
     ],
   },
   leftRightArrow: {
@@ -7155,7 +7950,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -7173,6 +7968,15 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x1", "y1", "x4", "y2"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["x3", "b"] },
+      { angle: "cd4", position: ["x2", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["x2", "t"] },
+      { angle: "3cd4", position: ["x3", "t"] },
     ],
   },
   leftRightArrowCallout: {
@@ -7222,7 +8026,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -7248,6 +8052,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x2", "t", "x3", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   leftRightCircularArrow: {
@@ -7514,7 +8325,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -7532,6 +8343,15 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "aL", position: ["xL", "yL"] },
+      { angle: "lptAng", position: ["xKp", "yKp"] },
+      { angle: "ptAng", position: ["xGp", "yGp"] },
+      { angle: "aA", position: ["xA", "yA"] },
+      { angle: "aB", position: ["xBp", "yBp"] },
+      { angle: "aJ", position: ["xJp", "yJp"] },
     ],
   },
   leftRightRibbon: {
@@ -7579,7 +8399,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -7604,7 +8424,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -7617,7 +8437,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -7645,6 +8465,15 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x2", "ly3"],
         ],
       },
+    ],
+    textRect: ["x1", "ly1", "x4", "ry4"],
+    connectionSites: [
+      { angle: "0", position: ["r", "ry3"] },
+      { angle: "cd4", position: ["x4", "b"] },
+      { angle: "cd4", position: ["x1", "ly4"] },
+      { angle: "cd2", position: ["l", "ly2"] },
+      { angle: "3cd4", position: ["x1", "t"] },
+      { angle: "3cd4", position: ["x4", "ry1"] },
     ],
   },
   leftRightUpArrow: {
@@ -7686,7 +8515,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -7711,6 +8540,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "y3", "ir", "y5"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "y4"] },
+      { angle: "cd4", position: ["hc", "y5"] },
+      { angle: "0", position: ["r", "y4"] },
     ],
   },
   leftUpArrow: {
@@ -7751,7 +8587,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -7771,6 +8607,17 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "y3", "x4", "y5"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x4", "t"] },
+      { angle: "cd2", position: ["x2", "x1"] },
+      { angle: "3cd4", position: ["x1", "y2"] },
+      { angle: "cd2", position: ["l", "y4"] },
+      { angle: "cd4", position: ["x1", "b"] },
+      { angle: "cd4", position: ["cx1", "y5"] },
+      { angle: "0", position: ["x5", "cy1"] },
+      { angle: "0", position: ["r", "x1"] },
     ],
   },
   lightningBolt: {
@@ -7793,7 +8640,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: "21600",
         height: "21600",
@@ -7813,13 +8660,23 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["x4", "y4", "x9", "y10"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x3", "t"] },
+      { angle: "3cd4", position: ["l", "y1"] },
+      { angle: "cd2", position: ["x1", "y6"] },
+      { angle: "cd2", position: ["x5", "y11"] },
+      { angle: "cd4", position: ["r", "b"] },
+      { angle: "0", position: ["x11", "y7"] },
+      { angle: "0", position: ["x8", "y2"] },
+    ],
   },
   line: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -7829,13 +8686,18 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: null,
+    connectionSites: [
+      { angle: "cd4", position: ["l", "t"] },
+      { angle: "3cd4", position: ["r", "b"] },
+    ],
   },
   lineInv: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -7844,6 +8706,11 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "r", "t"],
         ],
       },
+    ],
+    textRect: null,
+    connectionSites: [
+      { angle: "cd4", position: ["l", "b"] },
+      { angle: "3cd4", position: ["r", "t"] },
     ],
   },
   mathDivide: {
@@ -7890,7 +8757,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -7908,6 +8775,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x1", "y3", "x3", "y4"],
+    connectionSites: [
+      { angle: "0", position: ["x3", "vc"] },
+      { angle: "cd4", position: ["hc", "y5"] },
+      { angle: "cd2", position: ["x1", "vc"] },
+      { angle: "3cd4", position: ["hc", "y1"] },
     ],
   },
   mathEqual: {
@@ -7934,7 +8808,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -7951,6 +8825,15 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x1", "y1", "x2", "y4"],
+    connectionSites: [
+      { angle: "0", position: ["x2", "yC1"] },
+      { angle: "0", position: ["x2", "yC2"] },
+      { angle: "cd4", position: ["hc", "y4"] },
+      { angle: "cd2", position: ["x1", "yC1"] },
+      { angle: "cd2", position: ["x1", "yC2"] },
+      { angle: "3cd4", position: ["hc", "y1"] },
     ],
   },
   mathMinus: {
@@ -7972,7 +8855,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -7984,6 +8867,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x1", "y1", "x2", "y2"],
+    connectionSites: [
+      { angle: "0", position: ["x2", "vc"] },
+      { angle: "cd4", position: ["hc", "y2"] },
+      { angle: "cd2", position: ["x1", "vc"] },
+      { angle: "3cd4", position: ["hc", "y1"] },
     ],
   },
   mathMultiply: {
@@ -8025,7 +8915,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8045,6 +8935,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["xA", "yB", "xE", "yH"],
+    connectionSites: [
+      { angle: "cd2", position: ["xM", "yM"] },
+      { angle: "3cd4", position: ["xC2", "yM"] },
+      { angle: "0", position: ["xC2", "yC3"] },
+      { angle: "cd4", position: ["xM", "yC3"] },
     ],
   },
   mathNotEqual: {
@@ -8120,7 +9017,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8149,6 +9046,15 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["x1", "y1", "x8", "y4"],
+    connectionSites: [
+      { angle: "0", position: ["x8", "yC2"] },
+      { angle: "0", position: ["x8", "yC3"] },
+      { angle: "cd4", position: ["xC2", "yC4"] },
+      { angle: "cd2", position: ["x1", "yC2"] },
+      { angle: "cd2", position: ["x1", "yC3"] },
+      { angle: "3cd4", position: ["xC1", "yC1"] },
+    ],
   },
   mathPlus: {
     guides: [
@@ -8170,7 +9076,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8190,6 +9096,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x1", "y2", "x4", "y3"],
+    connectionSites: [
+      { angle: "0", position: ["x4", "vc"] },
+      { angle: "cd4", position: ["hc", "y4"] },
+      { angle: "cd2", position: ["x1", "vc"] },
+      { angle: "3cd4", position: ["hc", "y1"] },
     ],
   },
   moon: {
@@ -8238,7 +9151,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8249,6 +9162,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["g12w", "g15h", "g0w", "g16h"],
+    connectionSites: [
+      { angle: "3cd4", position: ["r", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["r", "b"] },
+      { angle: "0", position: ["g0w", "vc"] },
     ],
   },
   nonIsoscelesTrapezoid: {
@@ -8281,7 +9201,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8293,6 +9213,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "b"],
+    connectionSites: [
+      { angle: "0", position: ["x4", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["x1", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   noSmoking: {
@@ -8339,7 +9266,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8358,6 +9285,17 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["il", "it"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["il", "ib"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["ir", "ib"] },
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "3cd4", position: ["ir", "it"] },
     ],
   },
   notchedRightArrow: {
@@ -8387,7 +9325,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8403,6 +9341,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x1", "y1", "x3", "y2"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x2", "t"] },
+      { angle: "cd2", position: ["x1", "vc"] },
+      { angle: "cd4", position: ["x2", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   octagon: {
@@ -8420,7 +9365,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8436,6 +9381,17 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "il", "ir", "ib"],
+    connectionSites: [
+      { angle: "0", position: ["r", "x1"] },
+      { angle: "0", position: ["r", "y2"] },
+      { angle: "cd4", position: ["x2", "b"] },
+      { angle: "cd4", position: ["x1", "b"] },
+      { angle: "cd2", position: ["l", "y2"] },
+      { angle: "cd2", position: ["l", "x1"] },
+      { angle: "3cd4", position: ["x1", "t"] },
+      { angle: "3cd4", position: ["x2", "t"] },
     ],
   },
   parallelogram: {
@@ -8464,7 +9420,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8476,6 +9432,15 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "y2"] },
+      { angle: "3cd4", position: ["x4", "t"] },
+      { angle: "0", position: ["x6", "vc"] },
+      { angle: "cd4", position: ["x3", "b"] },
+      { angle: "cd4", position: ["hc", "y1"] },
+      { angle: "cd2", position: ["x1", "vc"] },
     ],
   },
   pentagon: {
@@ -8498,7 +9463,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8511,6 +9476,15 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x2", "it", "x3", "y2"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["x1", "y1"] },
+      { angle: "cd4", position: ["x2", "y2"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["x3", "y2"] },
+      { angle: "0", position: ["x4", "y1"] },
     ],
   },
   pie: {
@@ -8553,7 +9527,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8564,6 +9538,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "ir", "it", "ib"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   pieWedge: {
@@ -8576,7 +9557,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8587,6 +9568,11 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x1", "y1", "r", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
     ],
   },
   plaque: {
@@ -8604,7 +9590,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8621,6 +9607,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["il", "il", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   plaqueTabs: {
     guides: [
@@ -8632,7 +9625,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8644,7 +9637,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8656,7 +9649,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8668,7 +9661,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8679,6 +9672,21 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["dx", "dx", "x1", "y1"],
+    connectionSites: [
+      { angle: "cd2", position: ["l", "t"] },
+      { angle: "cd2", position: ["l", "dx"] },
+      { angle: "cd2", position: ["l", "y1"] },
+      { angle: "cd2", position: ["l", "b"] },
+      { angle: "3cd4", position: ["dx", "t"] },
+      { angle: "3cd4", position: ["x1", "t"] },
+      { angle: "cd4", position: ["dx", "b"] },
+      { angle: "cd4", position: ["x1", "b"] },
+      { angle: "0", position: ["r", "t"] },
+      { angle: "0", position: ["r", "dx"] },
+      { angle: "0", position: ["r", "y1"] },
+      { angle: "0", position: ["r", "b"] },
     ],
   },
   plus: {
@@ -8698,7 +9706,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8718,6 +9726,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   quadArrow: {
@@ -8759,7 +9774,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8791,6 +9806,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "y3", "ir", "y4"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   quadArrowCallout: {
@@ -8843,7 +9865,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8884,13 +9906,20 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["x2", "y2", "x7", "y7"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   rect: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -8902,6 +9931,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   ribbon: {
@@ -8940,7 +9976,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -8969,7 +10005,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -8989,7 +10025,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -9025,6 +10061,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "x9", "y4"],
         ],
       },
+    ],
+    textRect: ["x2", "y2", "x9", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "y2"] },
+      { angle: "cd2", position: ["wd8", "y3"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["x10", "y3"] },
     ],
   },
   ribbon2: {
@@ -9065,7 +10108,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -9094,7 +10137,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -9114,7 +10157,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -9152,6 +10195,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["x2", "t", "x9", "y2"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["wd8", "y3"] },
+      { angle: "cd4", position: ["hc", "y2"] },
+      { angle: "0", position: ["x10", "y3"] },
+    ],
   },
   rightArrow: {
     guides: [
@@ -9180,7 +10230,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9195,6 +10245,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "y1", "x2", "y2"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x1", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["x1", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   rightArrowCallout: {
@@ -9243,7 +10300,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9262,6 +10319,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "x2", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x1", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["x1", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   rightBrace: {
@@ -9296,7 +10360,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -9312,7 +10376,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -9326,6 +10390,12 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["arcTo", "wd2", "y1", "0", "cd4"],
         ],
       },
+    ],
+    textRect: ["l", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "cd4", position: ["l", "t"] },
+      { angle: "cd2", position: ["r", "y3"] },
+      { angle: "3cd4", position: ["l", "b"] },
     ],
   },
   rightBracket: {
@@ -9345,7 +10415,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -9358,7 +10428,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -9369,6 +10439,12 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["arcTo", "w", "y1", "0", "cd4"],
         ],
       },
+    ],
+    textRect: ["l", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "cd4", position: ["l", "t"] },
+      { angle: "3cd4", position: ["l", "b"] },
+      { angle: "cd2", position: ["r", "vc"] },
     ],
   },
   round1Rect: {
@@ -9384,7 +10460,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9397,6 +10473,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "ir", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   round2DiagRect: {
@@ -9421,7 +10504,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9438,6 +10521,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["dx", "dx", "ir", "ib"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   round2SameRect: {
@@ -9470,7 +10560,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9488,6 +10578,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["il", "tdx", "ir", "ib"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
+    ],
   },
   roundRect: {
     guides: [
@@ -9504,7 +10601,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9521,6 +10618,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["il", "il", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   rtTriangle: {
     guides: [
@@ -9531,12 +10635,21 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "l", "b"], ["lnTo", "l", "t"], ["lnTo", "r", "b"], ["close"]],
       },
+    ],
+    textRect: ["wd12", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["l", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["l", "b"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["r", "b"] },
+      { angle: "0", position: ["hc", "vc"] },
     ],
   },
   smileyFace: {
@@ -9571,14 +10684,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
         commands: [["moveTo", "l", "vc"], ["arcTo", "wd2", "hd2", "cd2", "21600000"], ["close"]],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: true,
         width: null,
         height: null,
@@ -9590,7 +10703,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -9600,12 +10713,23 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "l", "vc"], ["arcTo", "wd2", "hd2", "cd2", "21600000"], ["close"]],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["il", "it"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["il", "ib"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["ir", "ib"] },
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "3cd4", position: ["ir", "it"] },
     ],
   },
   snip1Rect: {
@@ -9621,7 +10745,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9634,6 +10758,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "it", "ir", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   snip2DiagRect: {
@@ -9666,7 +10797,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9682,6 +10813,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "il", "ir", "ib"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   snip2SameRect: {
@@ -9714,7 +10852,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9730,6 +10868,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   snipRoundRect: {
@@ -9748,7 +10893,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9764,6 +10909,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["il", "il", "ir", "b"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["hc", "t"] },
+    ],
   },
   squareTabs: {
     guides: [
@@ -9775,7 +10927,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     handles: [],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9788,7 +10940,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9801,7 +10953,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9814,7 +10966,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9826,6 +10978,25 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["dx", "dx", "x1", "y1"],
+    connectionSites: [
+      { angle: "cd2", position: ["l", "t"] },
+      { angle: "cd2", position: ["l", "dx"] },
+      { angle: "cd2", position: ["l", "y1"] },
+      { angle: "cd2", position: ["l", "b"] },
+      { angle: "cd2", position: ["dx", "dx"] },
+      { angle: "cd2", position: ["dx", "x1"] },
+      { angle: "3cd4", position: ["dx", "t"] },
+      { angle: "3cd4", position: ["x1", "t"] },
+      { angle: "cd4", position: ["dx", "b"] },
+      { angle: "cd4", position: ["x1", "b"] },
+      { angle: "0", position: ["r", "t"] },
+      { angle: "0", position: ["r", "dx"] },
+      { angle: "0", position: ["r", "y1"] },
+      { angle: "0", position: ["r", "b"] },
+      { angle: "0", position: ["x1", "dx"] },
+      { angle: "0", position: ["x1", "y1"] },
     ],
   },
   star10: {
@@ -9871,7 +11042,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9899,6 +11070,19 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["sx2", "sy2", "sx5", "sy3"],
+    connectionSites: [
+      { angle: "0", position: ["x4", "y2"] },
+      { angle: "0", position: ["x4", "y3"] },
+      { angle: "cd4", position: ["x3", "y4"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["x2", "y4"] },
+      { angle: "cd2", position: ["x1", "y3"] },
+      { angle: "cd2", position: ["x1", "y2"] },
+      { angle: "3cd4", position: ["x2", "y1"] },
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["x3", "y1"] },
     ],
   },
   star12: {
@@ -9943,7 +11127,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -9975,6 +11159,21 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["sx2", "sy2", "sx5", "sy5"],
+    connectionSites: [
+      { angle: "0", position: ["x4", "hd4"] },
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "0", position: ["x4", "y3"] },
+      { angle: "cd4", position: ["x3", "y4"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["wd4", "y4"] },
+      { angle: "cd2", position: ["x1", "y3"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd2", position: ["x1", "hd4"] },
+      { angle: "3cd4", position: ["wd4", "y1"] },
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["x3", "y1"] },
     ],
   },
   star16: {
@@ -10041,7 +11240,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -10081,6 +11280,25 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "0", position: ["x5", "y2"] },
+      { angle: "0", position: ["x6", "y3"] },
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "0", position: ["x6", "y4"] },
+      { angle: "0", position: ["x5", "y5"] },
+      { angle: "cd4", position: ["x4", "y6"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["x3", "y6"] },
+      { angle: "cd2", position: ["x2", "y5"] },
+      { angle: "cd2", position: ["x1", "y4"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd2", position: ["x1", "y3"] },
+      { angle: "cd2", position: ["x2", "y2"] },
+      { angle: "3cd4", position: ["x3", "y1"] },
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["x4", "y1"] },
     ],
   },
   star24: {
@@ -10171,7 +11389,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -10227,6 +11445,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   star32: {
@@ -10341,7 +11566,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -10414,6 +11639,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+    ],
   },
   star4: {
     guides: [
@@ -10437,7 +11669,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -10453,6 +11685,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["sx1", "sy1", "sx2", "sy2"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   star5: {
@@ -10495,7 +11734,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -10513,6 +11752,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["sx1", "sy1", "sx4", "sy3"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["x1", "y1"] },
+      { angle: "cd4", position: ["x2", "y2"] },
+      { angle: "cd4", position: ["x3", "y2"] },
+      { angle: "0", position: ["x4", "y1"] },
     ],
   },
   star6: {
@@ -10544,7 +11791,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -10564,6 +11811,15 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["sx1", "sy1", "sx4", "sy2"],
+    connectionSites: [
+      { angle: "0", position: ["x2", "hd4"] },
+      { angle: "0", position: ["x2", "y2"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["x1", "y2"] },
+      { angle: "cd2", position: ["x1", "hd4"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   star7: {
@@ -10616,7 +11872,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -10638,6 +11894,16 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["sx2", "sy1", "sx5", "sy3"],
+    connectionSites: [
+      { angle: "0", position: ["x5", "y1"] },
+      { angle: "0", position: ["x6", "y2"] },
+      { angle: "cd4", position: ["x4", "y3"] },
+      { angle: "cd4", position: ["x3", "y3"] },
+      { angle: "cd2", position: ["x1", "y2"] },
+      { angle: "cd2", position: ["x2", "y1"] },
+      { angle: "3cd4", position: ["hc", "t"] },
     ],
   },
   star8: {
@@ -10674,7 +11940,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -10699,13 +11965,24 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["sx1", "sy1", "sx4", "sy4"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["x2", "y2"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["x1", "y2"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["x1", "y1"] },
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["x2", "y1"] },
+    ],
   },
   straightConnector1: {
     guides: [],
     handles: [],
     paths: [
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -10715,6 +11992,8 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [],
   },
   stripedRightArrow: {
     guides: [
@@ -10744,7 +12023,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -10769,6 +12048,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x4", "y1", "x6", "y2"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x5", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["x5", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   sun: {
@@ -10830,7 +12116,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -10872,6 +12158,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x9", "y9", "x8", "y8"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   swooshArrow: {
@@ -10916,7 +12209,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -10931,6 +12224,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "cd4", position: ["l", "b"] },
+      { angle: "3cd4", position: ["xC", "t"] },
+      { angle: "0", position: ["r", "yD"] },
+      { angle: "cd4", position: ["xE", "yE"] },
     ],
   },
   teardrop: {
@@ -10959,7 +12259,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -10973,6 +12273,17 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["ir", "ib"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["il", "ib"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "3cd4", position: ["il", "it"] },
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["x1", "y1"] },
     ],
   },
   trapezoid: {
@@ -10992,7 +12303,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -11004,6 +12315,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["x1", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["x4", "vc"] },
     ],
   },
   triangle: {
@@ -11018,12 +12336,21 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
         commands: [["moveTo", "l", "b"], ["lnTo", "x2", "t"], ["lnTo", "r", "b"], ["close"]],
       },
+    ],
+    textRect: ["x1", "vc", "x3", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["x2", "t"] },
+      { angle: "cd2", position: ["x1", "vc"] },
+      { angle: "cd4", position: ["l", "b"] },
+      { angle: "cd4", position: ["x2", "b"] },
+      { angle: "cd4", position: ["r", "b"] },
+      { angle: "0", position: ["x3", "vc"] },
     ],
   },
   upArrowCallout: {
@@ -11072,7 +12399,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -11091,6 +12418,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "y2", "r", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "y2"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "y2"] },
     ],
   },
   upDownArrow: {
@@ -11121,7 +12455,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -11139,6 +12473,17 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x1", "y1", "x2", "y4"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "y2"] },
+      { angle: "cd2", position: ["x1", "vc"] },
+      { angle: "cd2", position: ["l", "y3"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "y3"] },
+      { angle: "0", position: ["x2", "vc"] },
+      { angle: "0", position: ["r", "y2"] },
     ],
   },
   upArrow: {
@@ -11168,7 +12513,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -11183,6 +12528,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["x1", "y1", "x2", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "y2"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "y2"] },
     ],
   },
   upDownArrowCallout: {
@@ -11232,7 +12584,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -11258,6 +12610,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "y2", "r", "y3"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
     ],
   },
   uturnArrow: {
@@ -11320,7 +12679,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -11344,6 +12703,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
     ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "cd4", position: ["x6", "y4"] },
+      { angle: "cd4", position: ["x8", "y5"] },
+      { angle: "0", position: ["r", "y4"] },
+      { angle: "3cd4", position: ["cx", "t"] },
+      { angle: "cd4", position: ["th2", "b"] },
+    ],
   },
   verticalScroll: {
     guides: [
@@ -11364,7 +12731,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: false,
         width: null,
         height: null,
@@ -11389,7 +12756,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "darkenLess",
+        fillMode: "darkenLess",
         stroke: false,
         width: null,
         height: null,
@@ -11405,7 +12772,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
         ],
       },
       {
-        fill: "none",
+        fillMode: "none",
         stroke: true,
         width: null,
         height: null,
@@ -11435,6 +12802,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["lnTo", "ch", "y3"],
         ],
       },
+    ],
+    textRect: ["ch", "ch", "x6", "y4"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "0", position: ["ch", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd2", position: ["x6", "vc"] },
     ],
   },
   wave: {
@@ -11480,7 +12854,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -11492,6 +12866,13 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "cd4", position: ["xAdj2", "y1"] },
+      { angle: "cd2", position: ["x1", "vc"] },
+      { angle: "3cd4", position: ["xAdj", "y4"] },
+      { angle: "0", position: ["x9", "vc"] },
     ],
   },
   wedgeEllipseCallout: {
@@ -11541,7 +12922,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -11552,6 +12933,17 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "it", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "3cd4", position: ["il", "it"] },
+      { angle: "cd4", position: ["il", "ib"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "cd4", position: ["ir", "ib"] },
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "3cd4", position: ["ir", "it"] },
+      { angle: "pang", position: ["xPos", "yPos"] },
     ],
   },
   wedgeRectCallout: {
@@ -11607,7 +12999,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -11631,6 +13023,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["l", "t", "r", "b"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["xPos", "yPos"] },
     ],
   },
   wedgeRoundRectCallout: {
@@ -11690,7 +13090,7 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
     ],
     paths: [
       {
-        fill: "norm",
+        fillMode: "norm",
         stroke: true,
         width: null,
         height: null,
@@ -11718,6 +13118,14 @@ export const SHAPE_PRESET_DEFINITIONS: Readonly<Record<ShapePresetName, ShapePre
           ["close"],
         ],
       },
+    ],
+    textRect: ["il", "il", "ir", "ib"],
+    connectionSites: [
+      { angle: "3cd4", position: ["hc", "t"] },
+      { angle: "cd2", position: ["l", "vc"] },
+      { angle: "cd4", position: ["hc", "b"] },
+      { angle: "0", position: ["r", "vc"] },
+      { angle: "cd4", position: ["xPos", "yPos"] },
     ],
   },
 };
