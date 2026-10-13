@@ -38,7 +38,7 @@ import {
 } from "./shape-text-paint";
 import { projectedShapeTextBounds } from "./shape-text-projection";
 import { materializeDrawingShapeText, withDrawingShapeText } from "./shape-text-options";
-import { hasActiveShapeGroupShadow, preflightShapeGroupPaint } from "./shape-group-paint";
+import { hasActiveShapeGroupEffects, preflightShapeGroupPaint } from "./shape-group-paint";
 import { resolveShapeForestForRender } from "./resolved-shape-render-source";
 
 export type ShapeTextForestContext = {
@@ -158,7 +158,7 @@ export function prepareShapeTextUpdate(
       forestContext,
     );
     preflightShapeGroupText(prepared, metrics, measurement, paint, forestContext);
-    if (hasActiveShapeGroupShadow(prepared)) {
+    if (hasActiveShapeGroupEffects(prepared)) {
       const proof = preflightShapeGroupPaint({
         root: prepared,
         metrics,

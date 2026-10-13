@@ -413,17 +413,77 @@ describe("exact-owner actual shape group format pane", () => {
       expect(f.graphic(id).shapeText!.layout.marginsPt).toEqual(value);
     expect(f.session.history.undoStack).toHaveLength(1);
     const before = f.state();
-    expect(f.pane.onIntent(f.intent({ type: "set-line-ends", value: undefined }))).toBe(false);
     for (const category of ["reflection", "glow", "softEdges", "format3d", "rotation3d"])
-      for (const target of ["shape", "text"])
+      for (const target of ["shape", "text"]) {
+        if (target === "shape" && (category === "reflection" || category === "glow")) continue;
         expect(
           f.pane.onIntent(
             f.intent({ type: "set-style", target, category, value: { kind: "none" } }),
           ),
         ).toBe(false);
+      }
     expect(f.state()).toEqual(before);
     expect(f.session.history.undoStack).toHaveLength(1);
   });
+  test.each(["reflection", "glow"] as const)(
+    "container %s is an atomic owned edit with exact Undo/Redo",
+    (category) => {
+      const f = fixture();
+      expect(f.open(["root", "inner"])).toBe(true);
+      expect(f.pane.capabilities.value.styles?.shape?.[category]?.enabled).toBe(true);
+      const before = f.state();
+      expect(
+        f.pane.onIntent(
+          f.intent({ type: "set-style", target: "shape", category, value: { kind: "none" } }),
+        ),
+      ).toBe(true);
+      const after = f.state();
+      expect(after.version).toBe(65);
+      expect(f.node("inner")).toHaveProperty(`groupEffects.${category}.kind`, "none");
+      expect(f.graphic("b").shapeStyle?.[category]).toBeUndefined();
+      expect(f.session.history.undoStack).toHaveLength(1);
+      expect(undoWorkbookCommand(f.session)).toBe(true);
+      expect(f.state()).toEqual(before);
+      expect(redoWorkbookCommand(f.session)).toBe(true);
+      expect(f.state()).toEqual(after);
+    },
+  );
+
+  test("connected root and nested panes apply one endpoint without dropping the other binding or decoration", () => {
+    const initial = group();
+    const bound = initial.members[1]! as SheetGroupedGraphicDrawing;
+    bound.rotation = 0;
+    bound.shapeConnector = {
+      kind: "shape-connector-v1",
+      begin: { kind: "free", xRatio: 0, yRatio: 0 },
+      end: { kind: "free", xRatio: 1, yRatio: 1 },
+    };
+    bound.shapeLineEnds = { end: { kind: "diamond", width: "large" } };
+    const f = fixture(initial);
+    expect(f.open()).toBe(true);
+    expect(f.pane.capabilities.value.lineEnds?.enabled).toBe(true);
+    const before = f.state();
+    expect(
+      f.pane.onIntent(
+        f.intent({ type: "set-line-end", endpoint: "begin", value: { kind: "open" } }),
+      ),
+    ).toBe(true);
+    expect(f.graphic("line").shapeConnector).toEqual(bound.shapeConnector);
+    expect(f.graphic("line").shapeLineEnds).toEqual({
+      begin: { kind: "open" },
+      end: bound.shapeLineEnds.end,
+    });
+    const after = f.state();
+    expect(f.session.history.undoStack).toHaveLength(1);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(f.state()).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    expect(f.state()).toEqual(after);
+    expect(f.open(["root", "inner"])).toBe(true);
+    expect(f.pane.capabilities.value.lineEnds?.enabled).toBe(false);
+    expect(f.pane.capabilities.value.styles?.shape?.fill?.enabled).toBe(true);
+  });
+
   test("text shadow is a genuine atomic descendant edit with exact history", () => {
     const f = fixture();
     expect(f.open()).toBe(true);

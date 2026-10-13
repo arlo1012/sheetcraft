@@ -3,7 +3,7 @@ import type {
   SheetGraphicDrawing,
   SheetFramedGraphicDrawing,
 } from "@sheetcraft/core/sheet-drawings";
-import type { ShapeLineEnds } from "@sheetcraft/core/shape-line-ends";
+import type { ShapeLineEnds, ShapeLineEnd } from "@sheetcraft/core/shape-line-ends";
 import type { ShapeGroupNode } from "@sheetcraft/core/shape-group";
 import type { ShapeTextDirection, ShapeTextParagraph } from "@sheetcraft/core/shape-text";
 import type {
@@ -95,6 +95,9 @@ export interface ShapeFormatSnapshot {
   scopeDescription?: string;
   shapeStyle?: Readonly<PictureDetailedStyle>;
   textStyle?: Readonly<PictureDetailedStyle>;
+  /** Common arrowheads across actual line descendants; omitted mixed endpoints are explicit. */
+  lineEnds?: Readonly<ShapeLineEnds>;
+  mixedLineEnds?: readonly ("begin" | "end")[];
   /** Mixed categories are not represented by an arbitrary leaf's style. */
   mixedStyleCategories?: Readonly<
     Partial<Record<ShapeFormatMode, readonly ShapeFormatStyleCategory[]>>
@@ -139,7 +142,12 @@ export type ShapeFormatIntent =
   | (ShapeFormatIntentIdentity & { type: "set-text-margins"; value: ShapeFormatTextMargins })
   | ShapeFormatFieldIntent
   | ShapeFormatStyleIntent
-  | (ShapeFormatIntentIdentity & { type: "set-line-ends"; value: ShapeLineEnds | undefined });
+  | (ShapeFormatIntentIdentity & { type: "set-line-ends"; value: ShapeLineEnds | undefined })
+  | (ShapeFormatIntentIdentity & {
+      type: "set-line-end";
+      endpoint: "begin" | "end";
+      value: ShapeLineEnd | undefined;
+    });
 /** false or throw rejects this edit. The pane retains its draft and reports feedback. */
 export type ShapeFormatIntentHandler = (intent: ShapeFormatIntent) => boolean;
 export interface ShapeFormatOption {
@@ -276,17 +284,21 @@ export function createShapeFormatSession(source: {
   function lineEndsAction() {
     const token = capture();
     return (value: ShapeLineEnds | undefined): boolean =>
-      send(
-        token,
-        source.snapshot()?.drawing.kind === "shapeGroup"
-          ? { enabled: false }
-          : source.capabilities().lineEnds,
-        (identity) => ({
-          ...identity,
-          type: "set-line-ends",
-          value,
-        }),
-      );
+      send(token, source.capabilities().lineEnds, (identity) => ({
+        ...identity,
+        type: "set-line-ends",
+        value,
+      }));
+  }
+  function lineEndAction() {
+    const token = capture();
+    return (endpoint: "begin" | "end", value: ShapeLineEnd | undefined): boolean =>
+      send(token, source.capabilities().lineEnds, (identity) => ({
+        ...identity,
+        type: "set-line-end",
+        endpoint,
+        value,
+      }));
   }
   function marginsAction() {
     const token = capture();
@@ -325,6 +337,7 @@ export function createShapeFormatSession(source: {
     fieldAction,
     styleAction,
     lineEndsAction,
+    lineEndAction,
     marginsAction,
     cancel: () => {
       generation++;

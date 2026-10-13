@@ -164,7 +164,19 @@ const emptyBounds = (): PictureEffectBounds => ({ left: 0, top: 0, right: 1, bot
 const identityMatrix: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 const key = (path: ShapeGroupPath) => JSON.stringify(path);
 
-/** Value includes an opacity-zero shadow. Core validates dormant and collapsed descendants too. */
+/** Value choices include zero-opacity effects. Core validates dormant and collapsed descendants too.
+ * Only visible owners require the completed subtree raster; leaf effects use their own consumer. */
+export function hasActiveShapeGroupEffects(root: ShapeGroupDrawing): boolean {
+  return traverseShapeGroupVisibility(cloneShapeGroup(root)).some(
+    ({ node, visible }) =>
+      visible &&
+      node.kind === "shapeGroup" &&
+      (node.groupEffects?.shadow?.kind === "value" ||
+        node.groupEffects?.reflection?.kind === "value" ||
+        node.groupEffects?.glow?.kind === "value"),
+  );
+}
+/** Shadow-only compatibility query; effect consumers use hasActiveShapeGroupEffects. */
 export function hasActiveShapeGroupShadow(root: ShapeGroupDrawing): boolean {
   return traverseShapeGroupVisibility(cloneShapeGroup(root)).some(
     ({ node, visible }) =>
@@ -425,9 +437,15 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
         style: {
           fill: { kind: "none" },
           line: { kind: "none" },
+          // Owners have no body fill or outline. Effects see the completed ordered
+          // subtree source pixels, including transparent holes and nested effects.
           ...(snapshot.node.groupEffects?.shadow
             ? { shadow: snapshot.node.groupEffects.shadow }
             : {}),
+          ...(snapshot.node.groupEffects?.reflection
+            ? { reflection: snapshot.node.groupEffects.reflection }
+            : {}),
+          ...(snapshot.node.groupEffects?.glow ? { glow: snapshot.node.groupEffects.glow } : {}),
         },
       };
       // A hidden owner suppresses its entire subtree before any leaf/resource/font preflight.
@@ -538,8 +556,8 @@ function contextOf(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   return context;
 }
 
-/** Recursive containers shadow their real completed ordered child pixels, including holes,
- * glyph effects and nested shadows. Every temporary output is released in a finally block. */
+/** Recursive containers apply effects to their real completed ordered child pixels, including holes,
+ * glyph effects and nested owner effects. Every temporary output is released in a finally block. */
 export function prepareShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroupPaintResult {
   let requestedDensity = options.density;
   for (let attempt = 0; attempt < SHAPE_GROUP_PAINT_LIMITS.replans; attempt++) {
@@ -855,7 +873,8 @@ export function preflightShapeGroupPaint(options: ShapeGroupPaintOptions): Shape
 }
 
 /** Root alpha gates every hit; reverse sibling order preserves real occlusion. An owner
- * shadow-only pixel selects that exact owner path, while transparent gaps reach the grid. */
+ * effect-only pixel selects that exact owner path, while transparent gaps reach the grid.
+ * Reflected pixels never acquire a mirrored descendant path. */
 export function hitShapeGroupPaint(
   result: ShapeGroupPaintResult,
   rootLocalPoint: Point,

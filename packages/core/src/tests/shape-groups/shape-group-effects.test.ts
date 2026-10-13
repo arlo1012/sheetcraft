@@ -97,8 +97,6 @@ describe("owned shape group body shadows", () => {
     for (const key of [
       "fill",
       "line",
-      "reflection",
-      "glow",
       "softEdges",
       "format3d",
       "rotation3d",

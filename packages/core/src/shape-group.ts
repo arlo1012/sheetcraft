@@ -17,8 +17,11 @@ import { MAX_SHAPE_GROUP_DEPTH, MAX_SHAPE_GROUP_NODES } from "./shape-group-limi
 export { MAX_SHAPE_GROUP_DEPTH, MAX_SHAPE_GROUP_NODES } from "./shape-group-limits.js";
 
 /** Document-owned body effects only; containers do not own fill, line or theme styles. */
+export const SHAPE_GROUP_EFFECT_CATEGORIES = ["shadow", "reflection", "glow"] as const;
 export type ShapeGroupEffects = {
   shadow?: ShapeDetailedStyle["shadow"];
+  reflection?: ShapeDetailedStyle["reflection"];
+  glow?: ShapeDetailedStyle["glow"];
 };
 export type ShapeGroupLocalRect = {
   xRatio: number;
@@ -87,11 +90,10 @@ function record(value: unknown, keys: readonly string[], name: string): Record<s
   }
   return result;
 }
-/** Reuse the exact shape shadow contract after rejecting every other effect category. */
+/** Reuse the exact shape body-effect contracts after rejecting every other category. */
 export function normalizeShapeGroupEffects(value: unknown): ShapeGroupEffects | undefined {
   if (value === undefined) return undefined;
-  const style = normalizeShapeStyle(record(value, ["shadow"], "shape group effects"));
-  return style?.shadow ? { shadow: style.shadow } : undefined;
+  return normalizeShapeStyle(record(value, SHAPE_GROUP_EFFECT_CATEGORIES, "shape group effects"));
 }
 function nonempty(value: unknown, name: string): string {
   if (typeof value !== "string" || !value.trim()) throw new TypeError(`${name} must be non-empty.`);

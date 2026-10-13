@@ -15,6 +15,8 @@ import {
   type ShapeGroupPath,
   type SheetGroupedGraphicDrawing,
 } from "@sheetcraft/core/shape-group";
+import { framedShape } from "./framed-shape-fixture";
+import { resolveShapeForestForRender } from "../../../modules/sheet-drawings/resolved-shape-render-source";
 import { createSheet } from "@sheetcraft/core/workbook";
 import type { ShapePaint } from "@sheetcraft/core/shape-style";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
@@ -501,12 +503,43 @@ describe("genuine descendant fill/line and text batches", () => {
     const f = fixture();
     const before = JSON.stringify(f.root);
     for (const target of ["shape", "text"] as const)
-      for (const category of ["reflection", "glow", "softEdges", "format3d", "rotation3d"] as const)
+      for (const category of [
+        "reflection",
+        "glow",
+        "softEdges",
+        "format3d",
+        "rotation3d",
+      ] as const) {
+        if (target === "shape" && (category === "reflection" || category === "glow")) continue;
         expect(() =>
           apply(f, ["root"], { type: "set-style", target, category, value: { kind: "none" } }),
         ).toThrow(/group effect model/);
+      }
     expect(JSON.stringify(f.root)).toBe(before);
   });
+
+  test.each(["reflection", "glow"] as const)(
+    "body %s is a selected-container effect and preserves every member",
+    (category) => {
+      const f = fixture();
+      const before = normalizeShapeGroup(f.root);
+      const result = apply(f, ["root", "inner"], {
+        type: "set-style",
+        target: "shape",
+        category,
+        value: { kind: "none" },
+      });
+      expect(result.affectedPaths).toEqual([["root", "inner"]]);
+      expect(findShapeGroupNode(result.root, ["root", "inner"])!.node).toHaveProperty(
+        `groupEffects.${category}.kind`,
+        "none",
+      );
+      expect(node(result.root, ["root", "inner", "a"])).toEqual(f.a);
+      expect(node(result.root, ["root", "inner", "b"])).toEqual(f.b);
+      expect(result.root.groupEffects).toBeUndefined();
+      expect(f.root).toEqual(before);
+    },
+  );
 
   test("body shadow edits only the selected real owner and never aggregates descendant shadows", () => {
     const f = fixture();
@@ -538,6 +571,114 @@ describe("genuine descendant fill/line and text batches", () => {
     expect(aggregate.shapeStyle.shadow).toEqual({ kind: "none" });
     expect(JSON.stringify(f.root)).toBe(before);
     expect(f.inner).not.toHaveProperty("groupEffects");
+  });
+
+  test("container category edits preserve other owner effects and never impersonate leaf values", () => {
+    const f = fixture();
+    f.inner.groupEffects = {
+      shadow: { kind: "none" },
+      reflection: { kind: "none" },
+      glow: { kind: "none" },
+    };
+    f.a.shapeStyle = { reflection: { kind: "none" } };
+    const result = apply(f, ["root", "inner"], {
+      type: "set-style",
+      target: "shape",
+      category: "shadow",
+      value: undefined,
+    });
+    expect(findShapeGroupNode(result.root, ["root", "inner"])!.node).toHaveProperty(
+      "groupEffects",
+      { reflection: { kind: "none" }, glow: { kind: "none" } },
+    );
+    const aggregate = aggregateShapeGroupFormatSnapshot(
+      resolveShapeGroupFormatContext(result.root, ["root", "inner"], f.metrics),
+      { width: 160, height: 80 },
+    );
+    expect(aggregate.shapeStyle.reflection).toEqual({ kind: "none" });
+    expect(aggregate.shapeStyle.glow).toEqual({ kind: "none" });
+    expect(aggregate.mixedStyleCategories.shape).not.toContain("reflection");
+    expect(result.root.members[0]).toEqual(f.root.members[0]);
+    expect(node(result.root, ["root", "inner", "a"])).toEqual(f.a);
+  });
+
+  test("whole-forest connected formatting preserves ordered bindings, placement and mixed opposite ends", () => {
+    const f = fixture();
+    const external = framedShape();
+    external.id = "external";
+    external.shapeGeometry = { preset: "ellipse" };
+    external.text = "";
+    const line = leaf("bound");
+    line.text = "";
+    line.shapeGeometry = { preset: "bentConnector3" };
+    line.shapeConnector = {
+      kind: "shape-connector-v1",
+      begin: { kind: "site", targetId: "external", preset: "ellipse", siteIndex: 0 },
+      end: { kind: "free", xRatio: 1, yRatio: 1 },
+    };
+    line.shapeLineEnds = { begin: { kind: "open" }, end: { kind: "diamond", width: "large" } };
+    const other = leaf("other-line");
+    other.text = "";
+    other.shapeGeometry = { preset: "line" };
+    other.shapeLineEnds = { end: { kind: "oval", length: "large" } };
+    f.inner.members.push(line, other);
+    const forest = [f.root, external],
+      pass = resolveShapeForestForRender({ drawings: forest, metrics: f.metrics, revision: 0 });
+    const context = resolveShapeGroupFormatContext(f.root, ["root", "inner"], f.metrics, pass);
+    const initial = aggregateShapeGroupFormatSnapshot(context, { width: 160, height: 80 });
+    expect(initial.lineEligibleCount).toBe(2);
+    expect(initial.mixedLineEnds).toEqual(["begin", "end"]);
+    const before = normalizeShapeGroup(f.root);
+    const plan = planShapeGroupFormatIntent(
+      context,
+      { type: "set-line-end", endpoint: "begin", value: { kind: "triangle" } },
+      { width: 160, height: 80 },
+    );
+    const bound = node(plan.root, ["root", "inner", "bound"]);
+    expect(bound.shapeConnector).toEqual(line.shapeConnector);
+    expect(bound.groupFrame).toEqual(line.groupFrame);
+    expect(bound.rotation).toBe(line.rotation);
+    expect(bound.shapeLineEnds).toEqual({
+      begin: { kind: "triangle" },
+      end: line.shapeLineEnds.end,
+    });
+    expect(node(plan.root, ["root", "inner", "other-line"]).shapeLineEnds).toEqual({
+      begin: { kind: "triangle" },
+      end: other.shapeLineEnds.end,
+    });
+    expect(node(plan.root, ["root", "inner", "a"])).toEqual(f.a);
+    const fillPlan = planShapeGroupFormatIntent(
+      context,
+      { type: "set-style", target: "shape", category: "fill", value: { kind: "none" } },
+      { width: 160, height: 80 },
+    );
+    expect(node(fillPlan.root, ["root", "inner", "bound"])).toEqual(line);
+    const linePlan = planShapeGroupFormatIntent(
+      context,
+      { type: "set-style", target: "shape", category: "line", value: { kind: "none" } },
+      { width: 160, height: 80 },
+    );
+    expect(node(linePlan.root, ["root", "inner", "bound"]).shapeConnector).toEqual(
+      line.shapeConnector,
+    );
+    expect(node(linePlan.root, ["root", "inner", "bound"]).shapeStyle?.line).toEqual({
+      kind: "none",
+    });
+    expect(f.root).toEqual(before);
+    external.shapeFrame.anchor = {
+      mode: "fixed",
+      x: 200,
+      y: 80,
+      size: { width: 240, height: 120 },
+    };
+    expect(isShapeGroupFormatContextCurrent(context, f.root)).toBe(false);
+    expect(() =>
+      planShapeGroupFormatIntent(
+        context,
+        { type: "set-line-end", endpoint: "end", value: undefined },
+        { width: 160, height: 80 },
+      ),
+    ).toThrow(/stale/);
   });
 
   test("text shadow batches only eligible real leaves without inventing a container style", () => {

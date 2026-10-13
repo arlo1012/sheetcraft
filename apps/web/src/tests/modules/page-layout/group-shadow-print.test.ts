@@ -16,6 +16,8 @@ import * as groupPaint from "../../../modules/sheet-drawings/shape-group-paint";
 import * as textPaint from "../../../modules/sheet-drawings/shape-text-paint";
 import * as textRuntime from "../../../modules/sheet-drawings/shape-text-runtime";
 import { createCanvasImageCache } from "../../../modules/sheet-grid/canvas/image-painter";
+import { resolveShapeForestForRender } from "../../../modules/sheet-drawings/resolved-shape-render-source";
+import { framedShape } from "../sheet-drawings/framed-shape-fixture";
 import { resolveShapeGroupProjection } from "../../../modules/sheet-drawings/resolved-shape-group";
 import { getPrintPictureAssetIds } from "../../../modules/page-layout/page-print-pictures";
 import {
@@ -67,6 +69,18 @@ function shadow(distancePt = 120): ShapeGroupDrawing["groupEffects"] {
       },
     },
   };
+}
+function effectOnly(kind: "reflection" | "glow"): ShapeGroupDrawing["groupEffects"] {
+  return kind === "reflection"
+    ? {
+        reflection: { kind: "value", value: { opacity: 0.75, size: 1, distancePt: 30, blurPt: 0 } },
+      }
+    : {
+        glow: {
+          kind: "value",
+          value: { color: { kind: "rgb", rgb: "#00FF00" }, opacity: 0.75, sizePt: 30 },
+        },
+      };
 }
 function group(
   id = "root",
@@ -199,6 +213,130 @@ afterEach(() => {
 });
 
 describe("owned container Shadow print integration", () => {
+  test.each(["reflection", "glow"] as const)(
+    "%s-only roots use one complete rotated raster, exact effect pagination and root print policy",
+    (effect) => {
+      const nested: ShapeGroupedGroup = {
+        kind: "shapeGroup",
+        id: "nested",
+        name: "Nested",
+        rotation: 13,
+        groupFrame: local(0.1, 0.2, 0.7, 0.6),
+        shapeProperties: { printObject: false },
+        groupEffects: effectOnly(effect === "reflection" ? "glow" : "reflection"),
+        members: [leaf("private", { text: "", shapeProperties: { printObject: false } })],
+      };
+      const root = group("effect-owner", [nested]);
+      root.groupEffects = effectOnly(effect);
+      const nonprinting = group("no-object", [leaf("hidden", { text: "Missing font" })]);
+      nonprinting.groupEffects = effectOnly(effect);
+      nonprinting.shapeProperties = { printObject: false };
+      const { sheet, metrics } = fixture([root, nonprinting]),
+        snapshot = JSON.stringify(sheet.drawings),
+        plan = groupPaint.planShapeGroupPaint({ root, metrics, density: 1 });
+      expect(groupPaint.hasActiveShapeGroupEffects(root)).toBe(true);
+      expect(groupPaint.hasActiveShapeGroupShadow(root)).toBe(false);
+      expect(
+        [...getPrintableShapeLeaves(sheet, metrics)].map((leaf) => leaf.sourceNode.id),
+      ).toEqual(["private"]);
+      const bounds = {
+        left: Math.min(0, plan.logicalBounds.left),
+        top: Math.min(0, plan.logicalBounds.top),
+        right: Math.max(plan.layout.rect.width, plan.logicalBounds.right),
+        bottom: Math.max(plan.layout.rect.height, plan.logicalBounds.bottom),
+      };
+      expect(getPrintShapeContentExtent(sheet, metrics, undefined, undefined, true)).toEqual(
+        extent(plan.layout.rect, plan.layout.angleDeg, bounds, metrics),
+      );
+      const result = readyGroup(root, metrics),
+        prepareGroup = vi.spyOn(groupPaint, "prepareShapeGroupPaint").mockReturnValue(result),
+        prepareBody = vi.spyOn(bodyPaint, "prepareShapeDetailedPaint"),
+        target = paint(sheet, metrics);
+      expect(prepareGroup).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ root, metrics, density: 2, interactive: false }),
+      );
+      expect(prepareBody).not.toHaveBeenCalled();
+      expect(vi.mocked(target.drawImage)).toHaveBeenCalledExactlyOnceWith(
+        result.canvas,
+        result.logicalBounds.left,
+        result.logicalBounds.top,
+        result.canvas.width / result.actualDensity,
+        result.canvas.height / result.actualDensity,
+      );
+      expect(target.rotate).toHaveBeenCalledWith((37 * Math.PI) / 180);
+      expect(result.dispose).toHaveBeenCalledOnce();
+      expect(JSON.stringify(sheet.drawings)).toBe(snapshot);
+    },
+  );
+  test.each(["reflection", "glow"] as const)(
+    "%s group print keeps the whole-sheet bound connector route and its nonprinting target",
+    (effect) => {
+      const connector = leaf("connector", {
+        text: "",
+        groupFrame: local(0.1, 0.2, 0.4, 0.3),
+        shapeGeometry: { preset: "bentConnector3" },
+        shapeConnector: {
+          kind: "shape-connector-v1",
+          begin: { kind: "site", targetId: "outside", preset: "rect", siteIndex: 3 },
+          end: { kind: "free", xRatio: 1, yRatio: 1 },
+        },
+      });
+      const root = group("routed-owner", [connector]);
+      root.groupEffects = effectOnly(effect);
+      const outside = framedShape();
+      outside.id = "outside";
+      outside.text = "";
+      outside.shapeGeometry = { preset: "rect" };
+      outside.shapeProperties = { printObject: false };
+      const { sheet, metrics } = fixture([outside, root]),
+        renderPass = resolveShapeForestForRender({
+          drawings: sheet.drawings!,
+          metrics,
+          revision: 4,
+        }),
+        route = renderPass.getLeaf(connector.id)!.connector;
+      if (route?.status !== "ready") throw Error("Expected actual bound route");
+      const [printed] = [...getPrintableShapeLeaves(sheet, metrics, renderPass)];
+      expect(printed?.sourceNode).toBe(connector);
+      expect(printed?.connectorRoute).toBe(route.route);
+      expect(printed?.drawing).toBe(route.paintView);
+      const plan = groupPaint.planShapeGroupPaint({
+        root,
+        metrics,
+        renderPass,
+        density: 2,
+        interactive: false,
+      });
+      if (plan.kind !== "ready") throw Error("Expected complete routed group plan");
+      const result = {
+        ...plan,
+        canvas: { width: plan.widthRaster, height: plan.heightRaster } as HTMLCanvasElement,
+        dispose: vi.fn(),
+      };
+      const prepare = vi.spyOn(groupPaint, "prepareShapeGroupPaint").mockReturnValue(result),
+        target = context();
+      paintPrintShapes(target, {
+        sheet,
+        metrics,
+        renderPass,
+        viewport: { x: 0, y: 0, width: 2000, height: 2000 },
+        density: 2,
+        images: createCanvasImageCache(() => {}),
+      });
+      expect(prepare).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ root, metrics, renderPass, interactive: false }),
+      );
+      expect(target.drawImage).toHaveBeenCalledOnce();
+      expect(result.dispose).toHaveBeenCalledOnce();
+      expect(() =>
+        getPrintShapeContentExtent(sheet, metrics, undefined, undefined, true, renderPass),
+      ).not.toThrow();
+      outside.rotation = 20;
+      expect(() =>
+        getPrintShapeContentExtent(sheet, metrics, undefined, undefined, true, renderPass),
+      ).toThrow(/outdated/);
+    },
+  );
   test("hidden far-off owner subtrees retain geometry and assets without expanding printed group ink or loading fonts", async () => {
     const hidden: ShapeGroupedGroup = {
       kind: "shapeGroup",

@@ -473,6 +473,71 @@ function savedConnectorFixture(group = false, preset: "line" | "bentConnector3" 
     );
   return workbook;
 }
+test("snapshot65 group effects and connected group endpoint formatting use the real Workspace startup and history", async () => {
+  const initial = savedConnectorFixture(true, "bentConnector3");
+  const initialSheet = getActiveSheet(initial),
+    owner = initialSheet.drawings!.find((item) => item.id === "group")!;
+  if (!isShapeGroupDrawing(owner)) throw Error("Expected real group");
+  owner.groupEffects = { reflection: { kind: "none" }, glow: { kind: "none" } };
+  const snapshot = serializeWorkbook(initial);
+  expect(snapshot.version).toBe(65);
+  const wrapper = fixture(async () => ({ revision: 1, savedAt: 1, snapshot }));
+  await flushPromises();
+  const state = setupState(wrapper),
+    sheet = getActiveSheet(state.session.workbook),
+    root = sheet.drawings!.find((item) => item.id === "group")!;
+  if (!isShapeGroupDrawing(root)) throw Error("Expected owner retained");
+  expect(state.shapeGroupFormatPane.open(root)).toBe(true);
+  const control = state.shapeGroupFormatPane;
+  expect(control.capabilities.value.styles?.shape?.reflection?.enabled).toBe(true);
+  expect(control.capabilities.value.styles?.shape?.glow?.enabled).toBe(true);
+  expect(control.capabilities.value.lineEnds?.enabled).toBe(true);
+  await nextTick();
+  const pane = wrapper.getComponent(ShapeFormatPane),
+    ends = pane.getComponent(ShapeLineEndsControls);
+  expect(ends.props("disabled")).toBe(false);
+  const before = serializeWorkbook(state.session.workbook);
+  expect(ends.props("endpointHandler")!("end", { kind: "diamond" })).toBe(true);
+  await flushPromises();
+  const after = serializeWorkbook(state.session.workbook);
+  expect(after).not.toEqual(before);
+  const pass = resolveSheetShapeConnections(
+    sheet.drawings!,
+    wrapper.getComponent(SheetDrawingLayer).props("metrics")!,
+  );
+  const binding = pass.getConnector("connector")!;
+  expect(binding.begin).toMatchObject({
+    status: "ready",
+    kind: "site",
+    targetId: "a",
+    identity: { preset: "rect", index: 3 },
+  });
+  expect(binding.end).toMatchObject({
+    status: "ready",
+    kind: "site",
+    targetId: "b",
+    identity: { preset: "ellipse", index: 0 },
+  });
+  const appliedRoot = sheet.drawings!.find((item) => item.id === "group")!;
+  expect(appliedRoot).toHaveProperty("groupEffects", {
+    reflection: { kind: "none" },
+    glow: { kind: "none" },
+  });
+  if (!isShapeGroupDrawing(appliedRoot)) throw Error("Expected group retained");
+  const connector = appliedRoot.members.find((item) => item.id === "connector");
+  expect(connector).toHaveProperty("shapeConnector", {
+    kind: "shape-connector-v1",
+    begin: { kind: "site", targetId: "a", preset: "rect", siteIndex: 3 },
+    end: { kind: "site", targetId: "b", preset: "ellipse", siteIndex: 0 },
+  });
+  state.undo();
+  await flushPromises();
+  expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+  state.redo();
+  await flushPromises();
+  expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+});
+
 function connectorInput(
   layer: {
     props: () => {

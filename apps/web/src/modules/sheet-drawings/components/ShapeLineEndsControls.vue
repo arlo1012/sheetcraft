@@ -6,6 +6,7 @@ import {
   type ShapeLineEndDimension,
   type ShapeLineEndKind,
   type ShapeLineEnds,
+  type ShapeLineEnd,
 } from "@sheetcraft/core/shape-line-ends";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import { getShapeEndPaint } from "../shape-line-paint";
@@ -24,12 +25,14 @@ type Labels = Readonly<{
   length: string;
   noneHint: string;
   rejected: string;
+  mixed: string;
   types: Readonly<Record<EndType, string>>;
   dimensions: Readonly<Record<ShapeLineEndDimension, string>>;
 }>;
 const LABELS: Readonly<Record<"en-US" | "zh-CN", Labels>> = {
   "en-US": {
     group: "Line arrowheads",
+    mixed: "Mixed values",
     begin: "Begin Arrow",
     end: "End Arrow",
     type: "Type",
@@ -50,6 +53,7 @@ const LABELS: Readonly<Record<"en-US" | "zh-CN", Labels>> = {
   },
   "zh-CN": {
     group: "线条箭头",
+    mixed: "多个不同值",
     begin: "起点箭头",
     end: "终点箭头",
     type: "类型",
@@ -81,6 +85,9 @@ const props = withDefaults(
     disabled?: boolean;
     locale?: "en-US" | "zh-CN";
     handler: (next: ShapeLineEnds | undefined) => boolean;
+    /** Container edits change one ordered endpoint, retaining each leaf's opposite decoration. */
+    endpointHandler?: (side: Endpoint, next: ShapeLineEnd | undefined) => boolean;
+    mixed?: readonly Endpoint[];
   }>(),
   { disabled: false, locale: "en-US" },
 );
@@ -155,6 +162,8 @@ function capture() {
     ends: props.ends,
     value: normalizeShapeLineEnds(props.ends),
     handler: props.handler,
+    endpointHandler: props.endpointHandler,
+    mixed: props.mixed,
     generation,
     disabled: props.disabled,
   };
@@ -166,14 +175,20 @@ function isCurrent(source: Captured): boolean {
     !props.disabled &&
     source.generation === generation &&
     source.ends === props.ends &&
-    source.handler === props.handler
+    source.handler === props.handler &&
+    source.endpointHandler === props.endpointHandler &&
+    source.mixed === props.mixed
   );
 }
-function apply(source: Captured, next: ShapeLineEnds): void {
+function apply(source: Captured, next: ShapeLineEnds, side: Endpoint): void {
   if (!isCurrent(source)) return;
   let accepted = false;
   try {
-    accepted = source.handler(normalizeShapeLineEnds(next)) === true;
+    const normalized = normalizeShapeLineEnds(next);
+    accepted =
+      (source.endpointHandler
+        ? source.endpointHandler(side, normalized?.[side])
+        : source.handler(normalized)) === true;
   } catch {
     // Rejection never changes the controlled values or the owner's draft.
   }
@@ -187,7 +202,7 @@ function typeAction(side: Endpoint) {
     const next = normalizeShapeLineEnds(source.value) ?? {};
     if (value === "none") delete next[side];
     else next[side] = { ...next[side], kind: value as ShapeLineEndKind };
-    apply(source, next);
+    apply(source, next, side);
   };
 }
 function sizeAction(side: Endpoint, size: SizeChoice) {
@@ -197,7 +212,7 @@ function sizeAction(side: Endpoint, size: SizeChoice) {
     if (!isCurrent(source) || !end) return;
     const next = normalizeShapeLineEnds(source.value) ?? {};
     next[side] = { kind: end.kind, ...size };
-    apply(source, next);
+    apply(source, next, side);
   };
 }
 function onGridKeydown(side: Endpoint, event: KeyboardEvent): void {
@@ -241,7 +256,13 @@ function onGridKeydown(side: Endpoint, event: KeyboardEvent): void {
   buttons[next]?.focus();
 }
 watch(
-  [() => props.ends, () => props.handler, () => props.disabled],
+  [
+    () => props.ends,
+    () => props.handler,
+    () => props.endpointHandler,
+    () => props.mixed,
+    () => props.disabled,
+  ],
   () => {
     generation++;
     rejected.value = false;
@@ -267,7 +288,8 @@ onUnmounted(() => {
       <div class="shape-line-ends__type">
         <span>{{ labels.type }}</span>
         <TSelect
-          :model-value="current?.[side]?.kind ?? 'none'"
+          :model-value="mixed?.includes(side) ? undefined : (current?.[side]?.kind ?? 'none')"
+          :placeholder="mixed?.includes(side) ? labels.mixed : undefined"
           :options="typeOptions"
           :disabled="disabled"
           size="small"

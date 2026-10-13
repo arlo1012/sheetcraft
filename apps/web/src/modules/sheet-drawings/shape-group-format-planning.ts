@@ -14,6 +14,7 @@ import {
   findShapeGroupNode,
   normalizeShapeGroup,
   normalizeShapeGroupEffects,
+  SHAPE_GROUP_EFFECT_CATEGORIES,
   traverseShapeGroup,
   type ShapeGroupDrawing,
   type ShapeGroupedGroup,
@@ -30,6 +31,7 @@ import {
   type ResolvedShapeGroupNode,
 } from "@sheetcraft/core/shape-group-layout";
 import { isShapeFreePathClosed } from "@sheetcraft/core/shape-free-path";
+import { normalizeShapeLineEnds, type ShapeLineEnds } from "@sheetcraft/core/shape-line-ends";
 import { isShapeLinePreset } from "@sheetcraft/core/shape-line-ends";
 import {
   getShapeObjectProperties,
@@ -41,6 +43,7 @@ import {
   type ResolvedShapeGroupLeaf,
   type ResolvedShapeGroupProjection,
 } from "./resolved-shape-group";
+import type { ResolvedShapeForestForRender } from "./resolved-shape-render-source";
 import { resolveShapeDetailedPaintStyle } from "./shape-detailed-paint";
 import type {
   ShapeFormatField,
@@ -69,6 +72,7 @@ export type ShapeGroupFormatContext = {
   readonly collapsed: boolean;
   readonly leaves: readonly ResolvedShapeGroupLeaf[];
   readonly projection: ResolvedShapeGroupProjection;
+  readonly renderPass?: ResolvedShapeForestForRender;
   readonly rootLease: ShapeGroupNodeLease;
   readonly targetLease: ShapeGroupNodeLease;
   /** Worksheet behavior always belongs to the outermost root. */
@@ -94,6 +98,9 @@ export type ShapeGroupFormatAggregate = {
   readonly bodyEligibleCount: number;
   readonly textEligibleCount: number;
   readonly descendantCount: number;
+  readonly lineEnds?: ShapeLineEnds;
+  readonly mixedLineEnds: readonly ("begin" | "end")[];
+  readonly lineEligibleCount: number;
 };
 type WithoutIdentity<T> = T extends ShapeFormatIntent
   ? Omit<T, "owner" | "baseRevision" | "intentId">
@@ -145,8 +152,14 @@ export function resolveShapeGroupFormatContext(
   root: ShapeGroupDrawing,
   path: ShapeGroupPath,
   metrics: PictureSheetMetrics,
+  renderPass?: ResolvedShapeForestForRender,
 ): ShapeGroupFormatContext {
-  const projection = resolveShapeGroupProjection(root, metrics);
+  renderPass?.assertCurrent(renderPass.sourceForest, metrics, renderPass.revision);
+  const projection = renderPass
+    ? renderPass.getGroup(root.id)
+    : resolveShapeGroupProjection(root, metrics);
+  if (!projection || projection.sourceRoot !== root || projection.metrics !== metrics)
+    throw new TypeError("Shape group formatting requires its exact whole-forest projection.");
   // Core's path reader rejects malformed arrays and paths before owner lookup.
   const targetLease = leaseShapeGroupNode(root, path);
   const owner = projection.owners.find((entry) => samePath(entry.path, targetLease.path));
@@ -161,6 +174,7 @@ export function resolveShapeGroupFormatContext(
     collapsed: owner.collapsed,
     leaves: projection.leaves.filter((leaf) => beneath(leaf.path, targetLease.path)),
     projection,
+    ...(renderPass ? { renderPass } : {}),
     rootLease,
     targetLease,
     locked: projection.locked,
@@ -179,6 +193,11 @@ export function isShapeGroupFormatContextCurrent(
 ): boolean {
   if (root !== context.sourceRoot || !samePath(path, context.path)) return false;
   try {
+    context.renderPass?.assertCurrent(
+      context.renderPass.sourceForest,
+      context.metrics,
+      context.renderPass.revision,
+    );
     return (
       findShapeGroupNode(root, path)?.node === context.sourceNode &&
       JSON.stringify(leaseShapeGroupNode(root, [root.id])) === contextSnapshots.get(context)
@@ -198,7 +217,7 @@ function isLine(view: SheetGraphicDrawing): boolean {
   );
 }
 function hasText(leaf: ResolvedShapeGroupLeaf): boolean {
-  if (!leaf.view || leaf.collapsed) return false;
+  if (!leaf.view || leaf.collapsed || leaf.sourceNode.shapeConnector) return false;
   const rect = getDrawingShapeTextRect(leaf.view);
   return (
     !!rect &&
@@ -227,6 +246,16 @@ export function getShapeGroupFormatEligibleLeaves(
       !(isLine(view) || (view.shapePath && !isShapeFreePathClosed(view.shapePath)))
     );
   });
+}
+/** Arrowheads belong to real open line descendants, never the container itself. */
+export function getShapeGroupLineEligibleLeaves(
+  context: ShapeGroupFormatContext,
+): readonly ResolvedShapeGroupLeaf[] {
+  return getShapeGroupFormatEligibleLeaves(context, "shape").filter(
+    (leaf) =>
+      isLine(leaf.view!) ||
+      !!(leaf.view!.shapePath && !isShapeFreePathClosed(leaf.view!.shapePath)),
+  );
 }
 /** Conditional text fields retain the same genuine per-leaf semantics as ordinary shapes. */
 export function getShapeGroupFormatFieldEligibleLeaves(
@@ -400,6 +429,7 @@ function replaceLeafAppearance(
     rotation: previous.rotation,
     groupFrame: previous.groupFrame,
     ...(previous.shapeProperties ? { shapeProperties: previous.shapeProperties } : {}),
+    ...(previous.shapeConnector ? { shapeConnector: previous.shapeConnector } : {}),
   };
 }
 function batchPlan(
@@ -473,15 +503,18 @@ export function planShapeGroupFormatIntent(
     });
   }
   if (intent.type === "set-style") {
-    if (intent.target === "shape" && intent.category === "shadow") {
+    if (
+      intent.target === "shape" &&
+      SHAPE_GROUP_EFFECT_CATEGORIES.some((category) => category === intent.category)
+    ) {
       const root = normalizeShapeGroup(context.sourceRoot);
       const owner = findShapeGroupNode(root, context.path)?.node;
       if (!owner || owner.kind !== "shapeGroup")
-        throw new TypeError("A container shadow requires its exact group owner.");
-      const effects =
-        intent.value === undefined
-          ? undefined
-          : normalizeShapeGroupEffects({ shadow: intent.value });
+        throw new TypeError("A container effect requires its exact group owner.");
+      const draft = { ...owner.groupEffects };
+      if (intent.value === undefined) delete draft[intent.category as keyof typeof draft];
+      else Object.assign(draft, { [intent.category]: intent.value });
+      const effects = normalizeShapeGroupEffects(draft);
       if (effects) owner.groupEffects = effects;
       else delete owner.groupEffects;
       return checkedResult(context, root, [context.path]);
@@ -511,21 +544,21 @@ export function planShapeGroupFormatIntent(
       text.layout.marginsPt = { ...intent.value };
       return withDrawingShapeText(view, text);
     });
-  if (intent.type === "set-line-ends")
-    return batchPlan(
-      context,
-      getShapeGroupFormatEligibleLeaves(context, "shape").filter(
-        (leaf) =>
-          isLine(leaf.view!) ||
-          (leaf.view!.shapePath && !isShapeFreePathClosed(leaf.view!.shapePath)),
-      ),
-      (view) => {
-        const next = { ...view };
-        if (intent.value) next.shapeLineEnds = intent.value;
-        else delete next.shapeLineEnds;
-        return next;
-      },
-    );
+  if (intent.type === "set-line-ends" || intent.type === "set-line-end")
+    return batchPlan(context, getShapeGroupLineEligibleLeaves(context), (view) => {
+      const next = { ...view };
+      const ends = intent.type === "set-line-end" ? { ...view.shapeLineEnds } : intent.value;
+      if (intent.type === "set-line-end") {
+        if (intent.endpoint !== "begin" && intent.endpoint !== "end")
+          throw new TypeError("Unknown shape line endpoint.");
+        if (intent.value) Object.assign(ends!, { [intent.endpoint]: intent.value });
+        else delete ends![intent.endpoint];
+      }
+      const normalized = normalizeShapeLineEnds(ends);
+      if (normalized) next.shapeLineEnds = normalized;
+      else delete next.shapeLineEnds;
+      return next;
+    });
   throw new TypeError("Unsupported shape group format intent.");
 }
 
@@ -604,10 +637,22 @@ export function aggregateShapeGroupFormatSnapshot(
     glyph = styles("text");
   // Body Shadow belongs to this selected container, even when all leaves are
   // text boxes. It never impersonates a mixed aggregate of member shadows.
-  delete shape.style.shadow;
-  shape.mixed = shape.mixed.filter((category) => category !== "shadow");
-  if (context.sourceNode.groupEffects?.shadow)
-    shape.style.shadow = context.sourceNode.groupEffects.shadow;
+  for (const category of SHAPE_GROUP_EFFECT_CATEGORIES) {
+    delete shape.style[category];
+    shape.mixed = shape.mixed.filter((entry) => entry !== category);
+    const value = context.sourceNode.groupEffects?.[category];
+    if (value) Object.assign(shape.style, { [category]: value });
+  }
+  const lineLeaves = getShapeGroupLineEligibleLeaves(context);
+  const ends: ShapeLineEnds = {};
+  const mixedLineEnds: ("begin" | "end")[] = [];
+  for (const endpoint of ["begin", "end"] as const) {
+    const first = lineLeaves[0]?.sourceNode.shapeLineEnds?.[endpoint];
+    if (lineLeaves.some((leaf) => !sameValue(leaf.sourceNode.shapeLineEnds?.[endpoint], first)))
+      mixedLineEnds.push(endpoint);
+    else if (first) ends[endpoint] = first;
+  }
+  const lineEnds = normalizeShapeLineEnds(ends);
   return {
     values,
     mixedFields,
@@ -617,5 +662,8 @@ export function aggregateShapeGroupFormatSnapshot(
     bodyEligibleCount: body.length,
     textEligibleCount: text.length,
     descendantCount: context.leaves.length,
+    ...(lineEnds ? { lineEnds } : {}),
+    mixedLineEnds,
+    lineEligibleCount: lineLeaves.length,
   };
 }

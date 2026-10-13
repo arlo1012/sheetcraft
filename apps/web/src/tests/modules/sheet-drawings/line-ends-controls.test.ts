@@ -74,6 +74,22 @@ const dimensions = ["small", "medium", "large"] as const;
 const sizes = dimensions.flatMap((width) => dimensions.map((length) => ({ width, length })));
 
 describe("concrete line endpoint controls", () => {
+  test("mixed container endpoint edits use the guarded side callback without replacing opposite ends", async () => {
+    const f = fixture(undefined);
+    const patch = vi.fn(() => true);
+    await f.wrapper.setProps({ mixed: ["begin", "end"], endpointHandler: patch });
+    expect(select(f.wrapper, "begin").props("modelValue")).toBeUndefined();
+    expect(select(f.wrapper, "begin").props("placeholder")).toBe("Mixed values");
+    const stale = typeCallback(f.wrapper, "begin");
+    await chooseType(f.wrapper, "begin", "triangle");
+    expect(patch).toHaveBeenCalledExactlyOnceWith("begin", { kind: "triangle" });
+    expect(f.handler).not.toHaveBeenCalled();
+    await f.wrapper.setProps({ endpointHandler: vi.fn(() => true) });
+    stale("oval");
+    expect(patch).toHaveBeenCalledTimes(1);
+    expect(f.wrapper.props("endpointHandler")).not.toHaveBeenCalled();
+  });
+
   test("both type controls have all six choices and display controlled, independent values", async () => {
     const ends: ShapeLineEnds = {
       begin: { kind: "stealth", width: "large", length: "small" },

@@ -52,7 +52,7 @@ describe("internal shape group effects snapshot62", () => {
     expect(serializeWorkbook(restored).version).toBe(62);
     delete child.groupEffects;
     expect(serializeWorkbook(restored).version).toBe(61);
-    expect(() => deserializeWorkbook({ ...before, version: 65 })).toThrow(/Unsupported/);
+    expect(() => deserializeWorkbook({ ...before, version: 66 })).toThrow(/Unsupported/);
   });
 
   test("a nested shadow or explicit none alone selects62 without adding effects to its owners", () => {
@@ -129,7 +129,7 @@ describe("internal shape group effects snapshot62", () => {
       null,
       [],
       { fill: { kind: "none" } },
-      { reflection: { kind: "none" } },
+      { softEdges: { kind: "none" } },
       { shadow: { kind: "value", value: { kind: "outer" } } },
       { shadow: { kind: "none", value: {} } },
     ]) {

@@ -20,6 +20,7 @@ import type {
   ShapeLeafPixelsResult,
 } from "../../../modules/sheet-drawings/shape-leaf-pixels";
 import {
+  hasActiveShapeGroupEffects,
   hasActiveShapeGroupShadow,
   hitShapeGroupPaint,
   planShapeGroupPaint,
@@ -42,7 +43,7 @@ vi.mock("../../../modules/sheet-drawings/shape-leaf-pixels", () => ({
 }));
 type Matrix = [number, number, number, number, number, number];
 /** Tiny deterministic Canvas boundary. The real shared compositor owns all shadow,
- * inner-shadow and alpha composition math; leaves provide known real local pixels. */
+ * reflection, glow and alpha composition math; leaves provide known real local pixels. */
 class MemoryCanvas {
   private w = 0;
   private h = 0;
@@ -168,6 +169,15 @@ function shadow(kind: "outer" | "inner" = "outer", distancePt = 3): ShapeDetaile
     },
   };
 }
+function reflection(distancePt = 3): ShapeDetailedStyle["reflection"] {
+  return { kind: "value", value: { opacity: 1, size: 1, distancePt, blurPt: 0 } };
+}
+function glow(sizePt = 1.5): ShapeDetailedStyle["glow"] {
+  return {
+    kind: "value",
+    value: { color: { kind: "rgb", rgb: "#00FF00" }, opacity: 1, sizePt },
+  };
+}
 function leaf(id: string, x = 0, y = 0, w = 0.4, h = 0.4): SheetGroupedGraphicDrawing {
   const {
     anchor: _a,
@@ -289,6 +299,113 @@ afterEach(() => {
 });
 
 describe("real recursive owned group source pixels", () => {
+  test("reflection preserves the completed source colors, holes and gaps with exact owner-only hits", () => {
+    const root = group(
+      [leaf("ring", 2 / 30, 2 / 12, 8 / 30, 8 / 12), leaf("blue", 20 / 30, 2 / 12, 4 / 30, 8 / 12)],
+      30,
+      12,
+    );
+    root.groupEffects = { reflection: reflection() };
+    const before = structuredClone(root),
+      result = prepare(root);
+    expect(sample(result, 2.5, 18.5).slice(0, 3)).toEqual([255, 255, 255]);
+    expect(sample(result, 20.5, 18.5).slice(0, 3)).toEqual([0, 0, 255]);
+    expect(sample(result, 2.5, 18.5)[3]).toBeGreaterThan(1);
+    expect(sample(result, 2.5, 18.5)[3]).toBeLessThan(255);
+    expect(sample(result, 6.5, 22.5)[3]).toBe(0);
+    expect(sample(result, 15.5, 18.5)[3]).toBe(0);
+    expect(hitShapeGroupPaint(result, { x: 6.5, y: 22.5 })).toBeUndefined();
+    expect(hitShapeGroupPaint(result, { x: 15.5, y: 18.5 })).toBeUndefined();
+    expect(hitShapeGroupPaint(result, { x: 2.5, y: 18.5 })).toEqual({
+      kind: "owner",
+      path: ["root"],
+    });
+    expect(hitShapeGroupPaint(result, { x: 2.5, y: 5.5 })).toEqual({
+      kind: "leaf",
+      path: ["root", "ring"],
+    });
+    expect(root).toEqual(before);
+    expect(result.snapshotRoot.groupEffects).toEqual(root.groupEffects);
+  });
+  test("glow follows subtree alpha without filling its central hole or empty inter-member gap", () => {
+    const root = group(
+      [leaf("ring", 2 / 30, 2 / 12, 8 / 30, 8 / 12), leaf("blue", 20 / 30, 2 / 12, 4 / 30, 8 / 12)],
+      30,
+      12,
+    );
+    root.groupEffects = { glow: glow() };
+    const result = prepare(root);
+    expect(sample(result, 10.5, 5.5).slice(0, 3)).toEqual([0, 255, 0]);
+    expect(sample(result, 10.5, 5.5)[3]).toBeGreaterThan(1);
+    expect(sample(result, 10.5, 5.5)[3]).toBeLessThan(255);
+    expect(hitShapeGroupPaint(result, { x: 10.5, y: 5.5 })).toEqual({
+      kind: "owner",
+      path: ["root"],
+    });
+    expect(sample(result, 6.5, 6.5)[3]).toBe(0);
+    expect(sample(result, 15.5, 5.5)[3]).toBe(0);
+    expect(hitShapeGroupPaint(result, { x: 6.5, y: 6.5 })).toBeUndefined();
+    expect(hitShapeGroupPaint(result, { x: 15.5, y: 5.5 })).toBeUndefined();
+    expect(sample(result, 2.5, 5.5)).toEqual([255, 255, 255, 255]);
+  });
+  test("parent reflection consumes a completed nested glow while reflected ink keeps the parent owner path", () => {
+    const nested: ShapeGroupedGroup = {
+      kind: "shapeGroup",
+      id: "nested",
+      name: "Nested",
+      rotation: 0,
+      groupFrame: {
+        kind: "shape-group-local-v1",
+        rect: { xRatio: 0, yRatio: 0, widthRatio: 0.5, heightRatio: 1 },
+      },
+      groupEffects: { glow: glow() },
+      members: [leaf("red", 0.3, 0.2, 0.4, 0.4)],
+    };
+    const root = group([nested], 20, 10);
+    root.groupEffects = { reflection: reflection(0) };
+    const result = prepare(root);
+    expect(sample(result, 2.5, 4.5).slice(0, 3)).toEqual([0, 255, 0]);
+    expect(hitShapeGroupPaint(result, { x: 2.5, y: 4.5 })).toEqual({
+      kind: "owner",
+      path: ["root", "nested"],
+    });
+    expect(sample(result, 2.5, 21.5).slice(0, 3)).toEqual([0, 255, 0]);
+    expect(sample(result, 2.5, 21.5)[3]).toBeGreaterThan(1);
+    expect(hitShapeGroupPaint(result, { x: 2.5, y: 21.5 })).toEqual({
+      kind: "owner",
+      path: ["root"],
+    });
+  });
+  test("nested glow stays at its real sibling position and respects completed effect occlusion", () => {
+    const nested: ShapeGroupedGroup = {
+      kind: "shapeGroup",
+      id: "nested",
+      name: "Nested",
+      rotation: 0,
+      groupFrame: {
+        kind: "shape-group-local-v1",
+        rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
+      },
+      groupEffects: { glow: glow(3) },
+      members: [leaf("red")],
+    };
+    const root = group([nested, leaf("blue", 0.4, 0)], 10, 10);
+    delete root.groupEffects;
+    const result = prepare(root);
+    expect(sample(result, 5.5, 1.5)).toEqual([0, 0, 255, 255]);
+    expect(hitShapeGroupPaint(result, { x: 5.5, y: 1.5 })).toEqual({
+      kind: "leaf",
+      path: ["root", "blue"],
+    });
+    root.members.reverse();
+    const reversed = prepare(root);
+    expect(sample(reversed, 5.5, 1.5)[1]).toBeGreaterThan(0);
+    expect(sample(reversed, 5.5, 1.5)[2]).toBeLessThan(255);
+    expect(hitShapeGroupPaint(reversed, { x: 5.5, y: 1.5 })).toEqual({
+      kind: "owner",
+      path: ["root", "nested"],
+    });
+  });
   test("hidden descendants retain assets and geometry but never enter leaf preflight, pixels or hits", () => {
     const hidden = leaf("blue", 0, 0, 1, 1);
     hidden.text = "Unavailable font";
@@ -320,11 +437,11 @@ describe("real recursive owned group source pixels", () => {
         kind: "shape-group-local-v1",
         rect: { xRatio: 0.6, yRatio: 0, widthRatio: 0.4, heightRatio: 0.4 },
       },
-      groupEffects: { shadow: shadow() },
+      groupEffects: { shadow: shadow(), reflection: reflection(), glow: glow() },
       members: [hidden],
     };
     const root = group([leaf("red"), nested]);
-    root.groupEffects = { shadow: { kind: "none" } };
+    root.groupEffects = { shadow: { kind: "none" }, reflection: reflection(), glow: glow() };
     const before = structuredClone(root),
       opts = options(root),
       canonical = resolveShapeGroupProjection(root, opts.metrics),
@@ -465,6 +582,7 @@ describe("real recursive owned group source pixels", () => {
       },
     };
     const root = group([connector, leaf("blue", 0.6, 0.6)], 20, 20);
+    root.groupEffects = { reflection: reflection(), glow: glow() };
     root.rotation = 37;
     const outside = {
       ...framedShape(),
@@ -776,6 +894,7 @@ describe("complete group budgets, resources and ownership", () => {
   });
   test("validates every collapsed descendant, but does not request dormant fonts or images", () => {
     const root = group();
+    root.groupEffects = { shadow: shadow(), reflection: reflection(), glow: glow() };
     root.shapeFrame = {
       kind: "shape-frame-v1",
       anchor: {
@@ -875,6 +994,69 @@ describe("complete group budgets, resources and ownership", () => {
     expect(proof).not.toHaveProperty("canvas");
     expect(leafCalls.prepare).toHaveBeenCalledTimes(1);
     expect(created.every((c) => c.width === 0)).toBe(true);
+  });
+  test.each(["reflection", "glow"] as const)(
+    "%s-only dispatch is sparse, explicit-none aware and visibility aware without expanding the shadow API",
+    (effect) => {
+      const root = group();
+      delete root.groupEffects;
+      expect(hasActiveShapeGroupEffects(root)).toBe(false);
+      root.groupEffects = { [effect]: { kind: "none" } };
+      expect(hasActiveShapeGroupEffects(root)).toBe(false);
+      const choice = effect === "reflection" ? reflection() : glow();
+      root.groupEffects = { [effect]: choice };
+      expect(hasActiveShapeGroupEffects(root)).toBe(true);
+      expect(hasActiveShapeGroupShadow(root)).toBe(false);
+      root.hidden = true;
+      expect(hasActiveShapeGroupEffects(root)).toBe(false);
+      delete root.hidden;
+      const nested: ShapeGroupedGroup = {
+        kind: "shapeGroup",
+        id: "nested",
+        name: "Nested",
+        rotation: 0,
+        groupFrame: {
+          kind: "shape-group-local-v1",
+          rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
+        },
+        groupEffects: root.groupEffects,
+        members: root.members,
+      };
+      root.members = [nested];
+      delete root.groupEffects;
+      expect(hasActiveShapeGroupEffects(root)).toBe(true);
+      nested.hidden = true;
+      expect(hasActiveShapeGroupEffects(root)).toBe(false);
+      if (choice?.kind !== "value") throw Error("Expected effect value");
+      choice.value.opacity = NaN;
+      expect(() => hasActiveShapeGroupEffects(root)).toThrow();
+      expect(created).toHaveLength(0);
+    },
+  );
+  test("shadow, reflection and glow share the bounded complete-tree plan and print ownership", () => {
+    const root = group([leaf("red", 0, 0, 1, 1), leaf("blue", 0.5, 0.5, 0.5, 0.5)], 1000, 1000);
+    root.groupEffects = { shadow: shadow(), reflection: reflection(100), glow: glow(100) };
+    const before = structuredClone(root),
+      plan = planShapeGroupPaint({ ...options(root), density: 64 });
+    expect(plan.actualDensity).toBeLessThan(1);
+    expect(plan.estimatedPeakBytes).toBeLessThanOrEqual(SHAPE_GROUP_PAINT_LIMITS.memoryBytes);
+    expect(plan.widthRaster).toBeLessThanOrEqual(SHAPE_GROUP_PAINT_LIMITS.side);
+    expect(plan.heightRaster).toBeLessThanOrEqual(SHAPE_GROUP_PAINT_LIMITS.side);
+    expect(plan.widthRaster * plan.heightRaster).toBeLessThanOrEqual(
+      SHAPE_GROUP_PAINT_LIMITS.pixels,
+    );
+    expect(created).toHaveLength(0);
+    root.shapeFrame.anchor = { mode: "fixed", x: 12, y: 24, size: { width: 10, height: 10 } };
+    root.groupEffects = { shadow: shadow(), reflection: reflection(), glow: glow() };
+    const result = prepare(root, false);
+    if (result.kind !== "ready") throw Error("Expected complete print effect pixels");
+    expect(result.ownedBytes).toBe(result.canvas.width * result.canvas.height * 4);
+    expect(hitShapeGroupPaint(result, { x: 1.5, y: 1.5 })).toBeUndefined();
+    expect(created.filter((canvas) => canvas.width > 0)).toHaveLength(1);
+    result.dispose();
+    result.dispose();
+    expect(created.every((canvas) => canvas.width === 0 && canvas.height === 0)).toBe(true);
+    expect(plan.snapshotRoot).toEqual(before);
   });
   test("active shadow dispatch validates the real tree and recognizes nested value versus none", () => {
     const root = group();

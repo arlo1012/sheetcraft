@@ -171,7 +171,7 @@ describe("shape-owned canonical format contract", () => {
     ).toBe(true);
     expect(f.handler).toHaveBeenCalledTimes(2);
   });
-  test("actual group owners accept field intents but never container line-end intents", () => {
+  test("actual group owners route line-end intents only through the explicit host capability", () => {
     const f = fixture();
     f.snapshot = {
       ...f.snapshot!,
@@ -212,9 +212,19 @@ describe("shape-owned canonical format contract", () => {
     expect(f.handler).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ owner: f.snapshot.owner, field: "sizeWidthPt", value: 300 }),
     );
+    expect(f.session.lineEndAction()("begin", { kind: "open" })).toBe(true);
+    expect(f.handler).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: "set-line-end",
+        endpoint: "begin",
+        value: { kind: "open" },
+        owner: f.snapshot.owner,
+      }),
+    );
+    f.capabilities.lineEnds = { enabled: false };
     expect(f.session.lineEndsAction()(undefined)).toBe(false);
     expect(f.failures.at(-1)).toBe("unsupported");
-    expect(f.handler).toHaveBeenCalledTimes(1);
+    expect(f.handler).toHaveBeenCalledTimes(2);
   });
   test("text paint remains independent and the layout KeepFlat field has one identity", () => {
     const f = fixture();

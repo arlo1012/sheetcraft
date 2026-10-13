@@ -413,7 +413,7 @@ describe("shape format pane desktop reference surface", () => {
 });
 
 describe("actual shape group aggregate controls", () => {
-  test("the genuine group header and scope retain root values and suppress container line ends", async () => {
+  test("the genuine group header and scope expose host-enabled descendant line ends", async () => {
     const source = groupSnapshot();
     const { wrapper } = fixture({
       snapshot: source,
@@ -431,7 +431,7 @@ describe("actual shape group aggregate controls", () => {
     expect(wrapper.get("[data-shape-format-group-scope]").text()).toContain(
       source.scopeDescription,
     );
-    expect(wrapper.findComponent(ShapeLineEndsControls).exists()).toBe(false);
+    expect(wrapper.findComponent(ShapeLineEndsControls).exists()).toBe(true);
     expect(wrapper.findAll('[role="tabpanel"]')).toHaveLength(6);
     const fill = wrapper.findAllComponents(PicturePaintEditor)[0]!;
     expect(fill.props("mixed")).toBe(true);
@@ -446,6 +446,27 @@ describe("actual shape group aggregate controls", () => {
     const font = wrapper.get<HTMLInputElement>('[data-shape-format-field="fontFamily"] input');
     expect(font.element.value).toBe("");
     expect(font.attributes("placeholder")).toBe("Mixed values");
+  });
+  test("group endpoint controls dispatch a single side intent against the real owner and expose mixed values", async () => {
+    const source = { ...groupSnapshot(), mixedLineEnds: ["begin", "end"] as const };
+    const { wrapper, onIntent } = fixture({
+      snapshot: source,
+      capabilities: { ...capabilities, lineEnds: { enabled: true } },
+    });
+    const controls = wrapper.getComponent(ShapeLineEndsControls);
+    expect(controls.props("mixed")).toEqual(["begin", "end"]);
+    expect(controls.props("endpointHandler")!("begin", { kind: "open" })).toBe(true);
+    expect(onIntent).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        type: "set-line-end",
+        endpoint: "begin",
+        value: { kind: "open" },
+        owner: source.owner,
+      }),
+    );
+    expect(wrapper.props("snapshot")!.drawing.kind).toBe("shapeGroup");
+    await wrapper.setProps({ capabilities: { ...capabilities, lineEnds: { enabled: false } } });
+    expect(controls.props("disabled")).toBe(true);
   });
   test("mixed numeric fields start blank and preserve full digits until one explicit canonical commit", async () => {
     const { wrapper, onIntent } = fixture({

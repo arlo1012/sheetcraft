@@ -72,7 +72,7 @@ import {
   releaseShapePresentationCanvas,
 } from "../sheet-drawings/shape-detailed-presentation";
 import {
-  hasActiveShapeGroupShadow,
+  hasActiveShapeGroupEffects,
   planShapeGroupPaint,
   prepareShapeGroupPaint,
 } from "../sheet-drawings/shape-group-paint";
@@ -239,7 +239,7 @@ function* printablePaintEntries(
 ) {
   assertPrintShapeRenderPass(sheet, metrics, renderPass);
   for (const root of getPrintableShapeRoots(sheet)) {
-    if (root.kind === "shapeGroup" && checked(root.id, () => hasActiveShapeGroupShadow(root))) {
+    if (root.kind === "shapeGroup" && checked(root.id, () => hasActiveShapeGroupEffects(root))) {
       if ([...printableShapeLeavesForRoot(root, metrics, renderPass)].length)
         yield { kind: "group" as const, root };
     } else {

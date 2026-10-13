@@ -118,6 +118,16 @@ function root(id = "g", x = 80, y = 40, width = 160, height = 100): ShapeGroupDr
   };
   return grouped;
 }
+function effectOnly(kind: "reflection" | "glow"): ShapeGroupDrawing["groupEffects"] {
+  return kind === "reflection"
+    ? { reflection: { kind: "value", value: { opacity: 0.75, size: 1, distancePt: 3, blurPt: 0 } } }
+    : {
+        glow: {
+          kind: "value",
+          value: { color: { kind: "rgb", rgb: "#00FF00" }, opacity: 0.75, sizePt: 3 },
+        },
+      };
+}
 function metrics() {
   return createPictureSheetMetrics(createSheet("Groups", "s"));
 }
@@ -205,6 +215,71 @@ afterEach(() => {
 });
 
 describe("owned group Shadow component presentation", () => {
+  test.each(["reflection", "glow"] as const)(
+    "%s-only owners publish complete rotated pane pixels, react to sparse effect edits and release retired canvases",
+    async (effect) => {
+      const source = reactive(root());
+      source.rotation = 37;
+      source.groupEffects = effectOnly(effect);
+      const originalFrame = JSON.stringify(source.shapeFrame),
+        wrapper = render(source, { layout: layout(true) });
+      await settle();
+      const first = latest(wrapper)!;
+      expect(groupPaint.hasActiveShapeGroupEffects(source)).toBe(true);
+      expect(groupPaint.hasActiveShapeGroupShadow(source)).toBe(false);
+      expect(boundary.prepare).toHaveBeenCalledOnce();
+      expect(first.snapshotRoot.groupEffects).toEqual(source.groupEffects);
+      if (effect === "reflection") expect(first.logicalBounds.bottom).toBeGreaterThan(100);
+      else expect(first.logicalBounds.left).toBeLessThan(0);
+      const copies = wrapper.findAll("canvas").map((node) => node.element as HTMLCanvasElement);
+      expect(copies.length).toBeGreaterThan(1);
+      for (const canvas of copies) {
+        expect([canvas.width, canvas.height]).toEqual([first.canvas.width, first.canvas.height]);
+        expect(surface(canvas).data).toEqual(surface(first.canvas).data);
+        expect(canvas.style.left).toBe(`${first.logicalBounds.left}px`);
+      }
+      expect(
+        wrapper
+          .findAll(".shape-group-pixels__source")
+          .every((node) => (node.element as HTMLElement).style.transform === "rotate(37deg)"),
+      ).toBe(true);
+      source.groupEffects = { [effect]: { kind: "none" } };
+      await settle();
+      const second = latest(wrapper)!;
+      expect(boundary.prepare).toHaveBeenCalledTimes(2);
+      expect(first.dispose).toHaveBeenCalledOnce();
+      expect(groupPaint.hasActiveShapeGroupEffects(source)).toBe(false);
+      expect(second.snapshotRoot.groupEffects).toEqual({ [effect]: { kind: "none" } });
+      if (effect === "reflection")
+        expect(second.logicalBounds.bottom).toBeLessThan(first.logicalBounds.bottom);
+      else expect(second.logicalBounds.left).toBeGreaterThan(first.logicalBounds.left);
+      delete source.groupEffects;
+      await settle();
+      expect(boundary.prepare).toHaveBeenCalledTimes(3);
+      expect(second.dispose).toHaveBeenCalledOnce();
+      expect(latest(wrapper)!.snapshotRoot).not.toHaveProperty("groupEffects");
+      expect(JSON.stringify(source.shapeFrame)).toBe(originalFrame);
+      unmount(wrapper);
+      expect(copies.every((canvas) => canvas.width === 0 && canvas.height === 0)).toBe(true);
+    },
+  );
+  test.each(["reflection", "glow"] as const)(
+    "%s pane copies lower the complete owner density when the shared presentation budget requires it",
+    async (effect) => {
+      vi.spyOn(groupPaint, "getShapeGroupPaintAvailableBytes")
+        .mockReturnValueOnce(0)
+        .mockReturnValue(64 * 1024 * 1024);
+      const source = root();
+      source.groupEffects = effectOnly(effect);
+      const wrapper = render(source, { layout: layout(true) });
+      await settle();
+      expect(boundary.prepare).toHaveBeenCalledTimes(2);
+      expect(boundary.prepare.mock.calls[1]![0].density).toBeLessThan(1);
+      expect(rasters[0]!.dispose).toHaveBeenCalledOnce();
+      expect(latest(wrapper)).toBe(rasters[1]);
+      expect(latest(wrapper)?.snapshotRoot.groupEffects).toEqual(source.groupEffects);
+    },
+  );
   test("hidden owner subtrees retain canonical resources while loading only visible sibling fonts and assets", async () => {
     const source = root(),
       child = source.members[0]!;

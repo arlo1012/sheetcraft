@@ -4,6 +4,7 @@ import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import {
   collectShapeGroupAssetIds,
+  SHAPE_GROUP_EFFECT_CATEGORIES,
   findShapeGroupNode,
   isShapeGroupDrawing,
   type ShapeGroupDrawing,
@@ -24,9 +25,12 @@ import {
   aggregateShapeGroupFormatSnapshot,
   getShapeGroupFormatEligibleLeaves,
   getShapeGroupFormatFieldEligibleLeaves,
+  getShapeGroupLineEligibleLeaves,
   planShapeGroupFormatIntent,
   resolveShapeGroupFormatContext,
 } from "./shape-group-format-planning";
+
+import { resolveShapeForestForRender } from "./resolved-shape-render-source";
 
 export type ShapeGroupFormatScope = {
   descendantCount: number;
@@ -134,7 +138,12 @@ export function useOwnedShapeGroupFormatPane(options: {
       metrics = options.getMetrics?.();
     if (!source || !owner || !metrics) return;
     try {
-      return resolveShapeGroupFormatContext(source, owner.path, metrics);
+      const pass = resolveShapeForestForRender({
+        drawings: owner.sheet.drawings ?? [],
+        metrics,
+        revision: options.getRevision(),
+      });
+      return resolveShapeGroupFormatContext(source, owner.path, metrics, pass);
     } catch {
       return;
     }
@@ -184,6 +193,8 @@ export function useOwnedShapeGroupFormatPane(options: {
       mixedFields: values.mixedFields,
       shapeStyle: values.shapeStyle,
       textStyle: values.textStyle,
+      lineEnds: values.lineEnds,
+      mixedLineEnds: values.mixedLineEnds,
       mixedStyleCategories: values.mixedStyleCategories,
       ...(options.getScopeDescription
         ? {
@@ -286,13 +297,19 @@ export function useOwnedShapeGroupFormatPane(options: {
       for (const category of styleCategories)
         styles[target]![category] = capability(
           !!captured &&
-            ((target === "shape" && category === "shadow" && !captured.collapsed) ||
+            ((target === "shape" &&
+              SHAPE_GROUP_EFFECT_CATEGORIES.some((entry) => entry === category) &&
+              !captured.collapsed) ||
               ((category === "fill" ||
                 category === "line" ||
                 (target === "text" && category === "shadow")) &&
                 getShapeGroupFormatEligibleLeaves(captured, target, category).length > 0)),
         );
-    return { fields, styles, lineEnds: capability(false) };
+    return {
+      fields,
+      styles,
+      lineEnds: capability(!!captured && getShapeGroupLineEligibleLeaves(captured).length > 0),
+    };
   });
 
   function close() {
@@ -329,7 +346,8 @@ export function useOwnedShapeGroupFormatPane(options: {
       const revision = options.getRevision(),
         expected = [...(sheet.drawings ?? [])],
         forest = JSON.stringify(normalizeSheetDrawings(expected)),
-        resolved = resolveShapeGroupFormatContext(source, requestedPath, metrics);
+        pass = resolveShapeForestForRender({ drawings: sheet.drawings ?? [], metrics, revision }),
+        resolved = resolveShapeGroupFormatContext(source, requestedPath, metrics, pass);
       if (
         options.getWorkbook() !== workbook ||
         options.getSheet() !== sheet ||
@@ -449,6 +467,8 @@ export function useOwnedShapeGroupFormatPane(options: {
           })
         )
           return false;
+      } else if (intent.type === "set-line-ends" || intent.type === "set-line-end") {
+        if (capabilities.value.lineEnds?.enabled !== true) return false;
       } else return false;
       if (!stillCurrent() || !options.flush() || !stillCurrent()) return false;
       const planned = planShapeGroupFormatIntent(captured, intent, selection.baseline);

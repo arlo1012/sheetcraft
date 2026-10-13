@@ -24,6 +24,11 @@ const endsCapability = computed(
     },
 );
 const endsAction = computed(() => props.controller.session.lineEndsAction());
+const endpointAction = computed(() => props.controller.session.lineEndAction());
+const group = computed(() => props.controller.props.snapshot?.drawing.kind === "shapeGroup");
+const ends = computed(() =>
+  group.value ? props.controller.props.snapshot?.lineEnds : leaf.value?.shapeLineEnds,
+);
 const leaf = computed(() => {
   const drawing = props.controller.props.snapshot?.drawing;
   return drawing?.kind === "shape" || drawing?.kind === "textBox" ? drawing : undefined;
@@ -82,9 +87,13 @@ defineExpose({
       >
         {{ lineCapability.reason }}
       </p>
-      <template v-if="target === 'shape' && leaf && controller.props.capabilities.lineEnds">
+      <template
+        v-if="target === 'shape' && (leaf || group) && controller.props.capabilities.lineEnds"
+      >
         <ShapeLineEndsControls
-          :ends="leaf.shapeLineEnds"
+          :ends="ends"
+          :mixed="group ? controller.props.snapshot?.mixedLineEnds : undefined"
+          :endpoint-handler="group ? endpointAction : undefined"
           :disabled="!endsCapability.enabled"
           :locale="controller.props.locale"
           :handler="endsAction"
