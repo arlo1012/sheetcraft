@@ -16,6 +16,7 @@ import PicturePaintEditor from "../../../../modules/sheet-images/components/form
 import PictureLineEditor from "../../../../modules/sheet-images/components/format-pane/PictureLineEditor.vue";
 import PictureFormat3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureFormat3dEditor.vue";
 import PictureRotation3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureRotation3dEditor.vue";
+import { framedShape } from "../framed-shape-fixture";
 import type {
   ShapeFormatCapabilities,
   ShapeFormatIntent,
@@ -184,6 +185,45 @@ async function textMode(wrapper: VueWrapper) {
   await wrapper.get(".shape-format-pane__modes button:nth-child(2)").trigger("click");
 }
 describe("shape format pane desktop reference surface", () => {
+  test("live connectors expose actual line and endpoint controls without phantom fill, text or carrier geometry", async () => {
+    const source = framedShape();
+    source.text = "";
+    source.shapeGeometry = { preset: "bentConnector3" };
+    source.shapeConnector = {
+      kind: "shape-connector-v1",
+      begin: { kind: "free", xRatio: 0, yRatio: 0 },
+      end: { kind: "free", xRatio: 1, yRatio: 1 },
+    };
+    const state = { ...snapshot(), drawing: source };
+    const { wrapper, onIntent } = fixture({
+      snapshot: state,
+      capabilities: { ...capabilities, lineEnds: { enabled: true } },
+      initialMode: "text",
+      initialTab: "text-box",
+    });
+    expect(wrapper.findAll(".shape-format-pane__modes button")).toHaveLength(1);
+    expect(wrapper.findAll('[role="tabpanel"]')).toHaveLength(3);
+    expect(wrapper.find("[data-shape-format-units]").exists()).toBe(false);
+    expect(wrapper.findAllComponents(ShapeFormatNumberField)).toHaveLength(0);
+    expect(wrapper.findAllComponents(ShapeFormatChoiceField)).toHaveLength(0);
+    expect(wrapper.findAllComponents(PictureFormat3dEditor)).toHaveLength(0);
+    expect(wrapper.findAllComponents(PictureRotation3dEditor)).toHaveLength(0);
+    expect(wrapper.findAllComponents(PictureLineEditor)).toHaveLength(1);
+    expect(wrapper.findAllComponents(PicturePaintEditor)).toHaveLength(1); // The real outline paint only.
+    expect(wrapper.get("[data-shape-connector-size-limit]").text()).toContain("actual shape sites");
+    const selects = wrapper.getComponent(ShapeLineEndsControls).findAllComponents(Select);
+    selects[1]!.vm.$emit("change", "oval");
+    await flushPromises();
+    expect(onIntent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "set-line-ends",
+        value: { end: { kind: "oval" } },
+      }),
+    );
+    await wrapper.setProps({ snapshot: snapshot(), initialMode: "shape" });
+    expect(wrapper.findAll(".shape-format-pane__modes button")).toHaveLength(2);
+    expect(wrapper.findAll('[role="tabpanel"]')).toHaveLength(6);
+  });
   test("two real modes each expose three tabs, six concrete panels and generic structured editors", async () => {
     const { wrapper } = fixture();
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([

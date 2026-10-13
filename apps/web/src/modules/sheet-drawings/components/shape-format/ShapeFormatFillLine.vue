@@ -28,6 +28,7 @@ const leaf = computed(() => {
   const drawing = props.controller.props.snapshot?.drawing;
   return drawing?.kind === "shape" || drawing?.kind === "textBox" ? drawing : undefined;
 });
+const isConnector = computed(() => leaf.value?.kind === "shape" && !!leaf.value.shapeConnector);
 const fillRef = ref<InstanceType<typeof PictureFormatSection>>(),
   lineRef = ref<InstanceType<typeof PictureFormatSection>>();
 defineExpose({
@@ -38,6 +39,7 @@ defineExpose({
 <template>
   <div class="shape-format-fill-line">
     <PictureFormatSection
+      v-if="!isConnector"
       ref="fillRef"
       :title="
         target === 'shape' ? controller.props.t('fillSection') : controller.s.value('textFill')

@@ -14,7 +14,12 @@ import {
 import { shapeFrameLocalToWorld, shapeFrameWorldToLocal } from "./shape-frame.js";
 import { normalizeShapeDrawingForest } from "./shape-group-planning.js";
 import type { ShapeGroupChild, ShapeGroupPath } from "./shape-group.js";
+import { moveShapePresetAdjustment } from "./shape-presets/adjustment.js";
 import type { ShapePresetName } from "./shape-presets/catalog.js";
+import {
+  evaluateShapePresetAtDisplaySize,
+  SHAPE_PRESET_DISPLAY_SIZE_LIMITS,
+} from "./shape-presets/display-size.js";
 import type { SheetDrawing } from "./sheet-drawings.js";
 
 /** Current ID and ownership identity; callers own any gesture/revision lease. */
@@ -333,4 +338,102 @@ export function planShapeConnectorBodyTranslation(
     end: freeEndpoint(node, original, expected.end),
   };
   return finish(roots, node, relation, expected, original, metrics);
+}
+
+/** Match the route's exact cardinal axes without a padded-frame subtraction. */
+function routeRotation(angle: number): ShapeConnectorPoint {
+  const turn = ((angle % 360) + 360) % 360;
+  if (turn === 0) return { x: 1, y: 0 };
+  if (turn === 90) return { x: 0, y: 1 };
+  if (turn === 180) return { x: -1, y: 0 };
+  if (turn === 270) return { x: 0, y: -1 };
+  const radians = (turn * Math.PI) / 180;
+  return { x: Math.cos(radians), y: Math.sin(radians) };
+}
+
+/**
+ * Move a declared preset route handle through the actual ordered endpoint span.
+ * Only canonical source adjustments change: bindings, carrier geometry, flips,
+ * appearance and ownership remain intact. A collapsed or unreliable declared
+ * axis cannot be inverted using disposable paint padding as a replacement span.
+ */
+export function planShapeConnectorRouteAdjustment(
+  forest: readonly SheetDrawing[],
+  sourceValue: ShapeConnectorEditSource,
+  handleIndex: number,
+  worldPosition: ShapeConnectorPoint,
+  metrics: PictureSheetMetrics,
+): SheetDrawing[] {
+  const selected = source(sourceValue);
+  if (!Number.isSafeInteger(handleIndex) || handleIndex < 0)
+    throw new RangeError("Unknown shape connector route adjustment handle.");
+  const position = point(worldPosition, "Connector route adjustment target");
+  const roots = normalizeShapeDrawingForest(forest);
+  const node = sourceNode(index(roots), selected);
+  const original = ready(resolveSheetShapeConnections(roots, metrics).getConnector(node.id)!);
+  const carrier = original.carrierLayout!;
+  const geometry = evaluateShapePresetAtDisplaySize(
+    node.shapeGeometry,
+    carrier.rect.width,
+    carrier.rect.height,
+  );
+  const handle = geometry.handles[handleIndex];
+  if (!handle) throw new RangeError("Unknown shape connector route adjustment handle.");
+  const fields = handle.fields.filter((field) => !field.disabled && field.maximum > field.minimum);
+  if (handle.kind !== "xy" || fields.some((field) => field.axis !== "x" && field.axis !== "y"))
+    throw new TypeError("Connector route adjustment requires declared Cartesian handle axes.");
+  const expected = tips(original);
+  if (!fields.length) return finish(roots, node, node.shapeConnector, expected, original, metrics);
+
+  // resolveShapeConnectorRoute has already validated this one open opposite-corner
+  // path. Its source coordinates, not the paint bounds, define the inverse map.
+  const commands = geometry.paths[0]!.commands;
+  const firstCommand = commands[0]!,
+    lastCommand = commands.at(-1)!;
+  const first = { x: firstCommand[1] as number, y: firstCommand[2] as number };
+  const last = {
+    x: lastCommand[lastCommand.length - 2] as number,
+    y: lastCommand[lastCommand.length - 1] as number,
+  };
+  const rotation = routeRotation(carrier.angleDeg);
+  const inverse = (value: ShapeConnectorPoint): ShapeConnectorPoint => ({
+    x: value.x * rotation.x + value.y * rotation.y,
+    y: -value.x * rotation.y + value.y * rotation.x,
+  });
+  const span = {
+    x: expected.end.x - expected.begin.x,
+    y: expected.end.y - expected.begin.y,
+  };
+  const axisSpan = inverse(span);
+  const axisPosition = inverse({
+    x: position.x - expected.begin.x,
+    y: position.y - expected.begin.y,
+  });
+  // A residual at ordinary transform roundoff of the complete span is not
+  // evidence of an invertible adjustment axis, including inherited cardinal
+  // rotations whose resolved free tips may retain trigonometric roundoff.
+  const axisRoundoff = 8 * Number.EPSILON * Math.max(Math.abs(span.x), Math.abs(span.y));
+  const target = { ...handle.position };
+  for (const axis of ["x", "y"] as const) {
+    if (!fields.some((field) => field.axis === axis)) continue;
+    if (!Number.isFinite(axisSpan[axis]) || Math.abs(axisSpan[axis]) <= axisRoundoff)
+      throw new RangeError("Connector route adjustment axis has no reliably representable span.");
+    target[axis] = first[axis] + (axisPosition[axis] / axisSpan[axis]) * (last[axis] - first[axis]);
+  }
+  const checkedTarget = point(target, "Connector source adjustment target");
+  // The low-level inverse shares the evaluator's 10,000-pixel extent budget.
+  // One common scale preserves the source aspect ratio and all guide formulas.
+  const scale = Math.max(
+    1,
+    Math.max(carrier.rect.width, carrier.rect.height) /
+      SHAPE_PRESET_DISPLAY_SIZE_LIMITS.evaluatorExtent,
+  );
+  node.shapeGeometry = moveShapePresetAdjustment(
+    node.shapeGeometry!,
+    carrier.rect.width / scale,
+    carrier.rect.height / scale,
+    handleIndex,
+    { x: checkedTarget.x / scale, y: checkedTarget.y / scale },
+  );
+  return finish(roots, node, node.shapeConnector, expected, original, metrics);
 }

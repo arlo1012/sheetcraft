@@ -53,6 +53,7 @@ export function collectWorkbookImageAssetIds(workbook: Workbook): Set<string> {
 
 export function useImageAssetUrls(getWorkbook: () => Workbook, store: ImageAssetStore) {
   const urls = ref(new Map<string, string>());
+  const sizes = ref(new Map<string, Readonly<{ width: number; height: number }>>());
   const loading = ref(new Set<string>());
   const missing = ref(new Set<string>());
   let generation = 0;
@@ -65,7 +66,12 @@ export function useImageAssetUrls(getWorkbook: () => Workbook, store: ImageAsset
       if (!asset) return;
       assertImagePixelBudget(asset.width, asset.height);
       const source = await readEncodedImageSource(asset.blob);
-      return { ...asset, blob: source.blob };
+      return {
+        ...asset,
+        width: source.header.width,
+        height: source.header.height,
+        blob: source.blob,
+      };
     })().finally(() => {
       if (reading.get(id) === pending) reading.delete(id);
     });
@@ -77,9 +83,13 @@ export function useImageAssetUrls(getWorkbook: () => Workbook, store: ImageAsset
     const current = ++generation;
     const ids = collectWorkbookImageAssetIds(getWorkbook());
     const retained = new Map<string, string>();
+    const retainedSizes = new Map<string, Readonly<{ width: number; height: number }>>();
     for (const [id, url] of urls.value) {
-      if (ids.has(id)) retained.set(id, url);
-      else URL.revokeObjectURL(url);
+      if (ids.has(id)) {
+        retained.set(id, url);
+        const size = sizes.value.get(id);
+        if (size) retainedSizes.set(id, size);
+      } else URL.revokeObjectURL(url);
     }
     loading.value = new Set([...ids].filter((id) => !retained.has(id)));
     missing.value = new Set();
@@ -101,6 +111,7 @@ export function useImageAssetUrls(getWorkbook: () => Workbook, store: ImageAsset
               return;
             }
             retained.set(id, url);
+            retainedSizes.set(id, Object.freeze({ width: asset.width, height: asset.height }));
           } else {
             missing.value = new Set([...missing.value, id]);
           }
@@ -113,6 +124,7 @@ export function useImageAssetUrls(getWorkbook: () => Workbook, store: ImageAsset
     await Promise.all([load(), load()]);
     if (current === generation) {
       urls.value = new Map(retained);
+      sizes.value = retainedSizes;
       loading.value = new Set();
     } else {
       for (const url of createdUrls) URL.revokeObjectURL(url);
@@ -135,6 +147,8 @@ export function useImageAssetUrls(getWorkbook: () => Workbook, store: ImageAsset
   });
   return {
     urls: readonly(urls),
+    /** Validated encoded-header metadata, published under the same URL generation. */
+    sizes: readonly(sizes),
     loading: readonly(loading),
     missing: readonly(missing),
     refresh,

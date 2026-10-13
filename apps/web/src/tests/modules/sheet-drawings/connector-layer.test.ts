@@ -522,7 +522,7 @@ describe("exact connector layer consumer and atomic gestures", () => {
     expect(f.sheet.drawings).toEqual(before);
     expect(f.w.find("[data-shape-connector-operation-unavailable]").exists()).toBe(true);
   });
-  test("generic connector angle/resize/format calls refuse without an inverse update", async () => {
+  test("generic connector angle/resize refuse while format opens the exact canonical owner", async () => {
     const f = fixture();
     await nextTick();
     const selection = f.w.getComponent(StandardShapeSelection);
@@ -533,8 +533,42 @@ describe("exact connector layer consumer and atomic gestures", () => {
     await f.w.get("[data-shape-format-trigger]").trigger("click");
     expect(f.apply).not.toHaveBeenCalled();
     expect(f.applyOne).not.toHaveBeenCalled();
-    expect(f.w.emitted("format")).toBeUndefined();
-    expect(f.w.find("[data-shape-connector-operation-unavailable]").exists()).toBe(true);
+    expect(f.w.emitted("format")?.[0]).toEqual([
+      f.sheet.drawings!.find((d) => d.id === "connector"),
+    ]);
+    expect(f.w.find("[data-shape-connector-operation-unavailable]").exists()).toBe(false);
+  });
+  test("yellow route gesture preserves both exact tips, bindings and grab offset", async () => {
+    const f = fixture(),
+      before = serializeWorkbook(f.workbook),
+      original = f.route();
+    const handle = shapeFrameLocalToWorld(
+      original.paintLayout.rect,
+      original.paintLayout.angleDeg,
+      original.geometry.handles[0]!.position,
+    );
+    const at = f.viewport(handle),
+      grab = { x: 3, y: -2 },
+      target = { x: at.x + 40, y: at.y + 25 };
+    f.w
+      .get('[data-shape-adjustment="0"]')
+      .element.dispatchEvent(f.pointer("pointerdown", { x: at.x + grab.x, y: at.y + grab.y }));
+    window.dispatchEvent(f.pointer("pointermove", { x: target.x + grab.x, y: target.y + grab.y }));
+    await nextTick();
+    expect(f.apply).not.toHaveBeenCalled();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    window.dispatchEvent(f.pointer("pointerup", { x: target.x + grab.x, y: target.y + grab.y }));
+    await nextTick();
+    expect(f.apply).toHaveBeenCalledOnce();
+    expect(f.applyOne).not.toHaveBeenCalled();
+    const next = nextConnector(f);
+    if (next.status !== "ready") throw Error("Expected route");
+    expect(next.route.begin).toEqual(original.begin);
+    expect(next.route.end).toEqual(original.end);
+    expect(next.connection.begin.kind).toBe("site");
+    expect(next.connection.end.kind).toBe("site");
+    expect(next.route.geometry.paths).not.toEqual(original.geometry.paths);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
   });
   test("real Core endpoint edit restores complete bindings in Undo and Redo", async () => {
     const f = fixture();

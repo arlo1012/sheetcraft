@@ -21,6 +21,11 @@ const glow = computed(() => props.controller.styleBinding(props.target, "glow"))
 const softEdges = computed(() => props.controller.styleBinding(props.target, "softEdges"));
 const format3d = computed(() => props.controller.styleBinding(props.target, "format3d"));
 const rotation3d = computed(() => props.controller.styleBinding(props.target, "rotation3d"));
+const isConnector = computed(
+  () =>
+    props.controller.props.snapshot?.drawing.kind === "shape" &&
+    !!props.controller.props.snapshot.drawing.shapeConnector,
+);
 function reason(category: ShapeFormatStyleCategory): string | undefined {
   const c = props.controller.styleCapability(props.target, category);
   return c.enabled ? undefined : c.reason;
@@ -72,7 +77,7 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
         {{ reason("softEdges") }}
       </p>
     </PictureFormatSection>
-    <PictureFormatSection :title="controller.props.t('format3dSection')">
+    <PictureFormatSection v-if="!isConnector" :title="controller.props.t('format3dSection')">
       <ShapeFormatMixedEffect
         v-if="controller.isMixedStyle(target, 'format3d')"
         :controller="controller"
@@ -82,7 +87,7 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
       <PictureFormat3dEditor v-else v-bind="format3d" />
       <p v-if="reason('format3d')" class="shape-format-effects__reason">{{ reason("format3d") }}</p>
     </PictureFormatSection>
-    <PictureFormatSection :title="controller.props.t('rotation3dSection')">
+    <PictureFormatSection v-if="!isConnector" :title="controller.props.t('rotation3dSection')">
       <ShapeFormatMixedEffect
         v-if="controller.isMixedStyle(target, 'rotation3d')"
         :controller="controller"

@@ -75,6 +75,8 @@ const en = {
   right: "Right",
   justify: "Justify",
   unsupported: "This field is not supported for this drawing yet.",
+  connectorSizeReason:
+    "Use the endpoints or yellow route handles to edit this connector. Numeric size and rotation are not enabled here; bound ends stay on their actual shape sites.",
   missingValue: "The selected drawing does not supply this value.",
   relativeOriginal: "Relative to original picture size",
   relativeOriginalReason: "Shapes do not have an original picture size.",
@@ -93,6 +95,8 @@ const en = {
 export type ShapeFormatLabelKey = keyof typeof en;
 export type ShapeFormatTranslate = (key: ShapeFormatLabelKey) => string;
 const zh: Record<ShapeFormatLabelKey, string> = {
+  connectorSizeReason:
+    "请用端点或黄色路线调整柄编辑连接线。此处暂不开放数值尺寸与旋转，绑定端始终位于形状的实际连接点。",
   paneTitle: "设置形状格式",
   groupPaneTitle: "设置组合格式",
   groupScope: "所选组合",

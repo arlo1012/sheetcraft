@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import PictureFormatSection from "../../../sheet-images/components/format-pane/PictureFormatSection.vue";
 import type { PictureFormatLengthUnit } from "../../../sheet-images/picture-format-pane-model";
@@ -8,11 +9,20 @@ import ShapeFormatChoiceField from "./ShapeFormatChoiceField.vue";
 import ShapeFormatTextField from "./ShapeFormatTextField.vue";
 import ShapeFormatTextBox from "./ShapeFormatTextBox.vue";
 import type { ShapeFormatController } from "./useShapeFormatPane";
-defineProps<{ controller: ShapeFormatController; unit: PictureFormatLengthUnit }>();
+const props = defineProps<{ controller: ShapeFormatController; unit: PictureFormatLengthUnit }>();
+const isConnector = computed(
+  () =>
+    props.controller.props.snapshot?.drawing.kind === "shape" &&
+    !!props.controller.props.snapshot.drawing.shapeConnector,
+);
 </script>
 <template>
   <div class="shape-format-size-properties">
-    <PictureFormatSection :title="controller.props.t('sizeSection')" initially-open>
+    <PictureFormatSection
+      v-if="!isConnector"
+      :title="controller.props.t('sizeSection')"
+      initially-open
+    >
       <ShapeFormatNumberField :controller="controller" field="sizeHeightPt" :unit="unit" />
       <ShapeFormatNumberField :controller="controller" field="sizeWidthPt" :unit="unit" />
       <ShapeFormatNumberField :controller="controller" field="rotationDeg" />
@@ -28,12 +38,20 @@ defineProps<{ controller: ShapeFormatController; unit: PictureFormatLengthUnit }
         </p>
       </div>
     </PictureFormatSection>
+    <p v-else class="shape-format-size-properties__reason" data-shape-connector-size-limit>
+      {{ controller.s.value("connectorSizeReason") }}
+    </p>
     <PictureFormatSection :title="controller.props.t('propertiesSection')" initially-open>
-      <ShapeFormatChoiceField :controller="controller" field="anchor" />
+      <ShapeFormatChoiceField v-if="!isConnector" :controller="controller" field="anchor" />
       <ShapeFormatCheckbox :controller="controller" field="printObject" />
       <ShapeFormatCheckbox :controller="controller" field="locked" />
     </PictureFormatSection>
-    <ShapeFormatTextBox :controller="controller" :unit="unit" :include-font="false" />
+    <ShapeFormatTextBox
+      v-if="!isConnector"
+      :controller="controller"
+      :unit="unit"
+      :include-font="false"
+    />
     <PictureFormatSection :title="controller.props.t('altTextSection')">
       <ShapeFormatTextField :controller="controller" field="altTitle" />
       <ShapeFormatTextField :controller="controller" field="altDescription" multiline />

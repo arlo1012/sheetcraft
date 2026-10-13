@@ -22,7 +22,10 @@ import {
   type ShapeGroupDrawing,
   type ShapeGroupPath,
 } from "@sheetcraft/core/shape-group";
-import { resolveShapeForestForRender } from "./resolved-shape-render-source";
+import {
+  resolveShapeForestForRender,
+  type ResolvedShapeForestForRender,
+} from "./resolved-shape-render-source";
 import { planDeleteShapeGroupNodes } from "@sheetcraft/core/shape-group-delete";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { frameShapeView } from "./shape-view-layout";
@@ -54,6 +57,8 @@ export function useDrawingActions(options: {
     owner?: SheetDrawing,
     forest?: readonly SheetDrawing[],
   ) => SheetDrawing;
+  /** Actual final route appearance, after every changed root has been prepared. */
+  preflightConnectedCollection?: (pass: ResolvedShapeForestForRender) => boolean;
 }) {
   const idFactory = createBrowserIdFactory();
   const targets = useDrawingDialogTarget<SheetGraphicDrawing, []>({
@@ -306,11 +311,12 @@ export function useDrawingActions(options: {
       );
       if (connected) {
         if (!binding.metrics) return false;
-        resolveShapeForestForRender({
+        const pass = resolveShapeForestForRender({
           drawings: command.drawings,
           metrics: binding.metrics,
           revision: binding.revision ?? 0,
         });
+        if (options.preflightConnectedCollection?.(pass) === false) return false;
       }
       if (
         !currentCollection(binding) ||

@@ -31,10 +31,12 @@ import { normalizeSheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   planShapeConnectorBodyTranslation,
   planShapeConnectorEndpointChange,
+  planShapeConnectorRouteAdjustment,
   type ShapeConnectorEditSource,
   type ShapeConnectorEndpointEdit,
 } from "@sheetcraft/core/shape-connector-editing";
 import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
+import { shapeFrameLocalToWorld } from "@sheetcraft/core/shape-frame";
 import {
   resolveShapeForestForRender,
   type ResolvedShapeForestForRender,
@@ -870,7 +872,9 @@ const formatTarget = computed(() => {
     (f) =>
       isSelectedView(f.drawing) &&
       selectedRoots.value.length === 1 &&
-      !projectionById(f.drawing)?.groupLeaf &&
+      (!projectionById(f.drawing)?.groupLeaf ||
+        (selectedOwnedId.value === f.drawing.id &&
+          !!projectionById(f.drawing)?.renderLeaf?.connector)) &&
       (f.drawing.kind === "shape" || f.drawing.kind === "textBox") &&
       f.drawing.id !== pointEditingId.value,
   );
@@ -891,7 +895,7 @@ const formatTriggerStyle = computed(() => {
 function formatSelected() {
   const d = formatTarget.value?.drawing;
   if (d && projectionById(d)?.renderLeaf?.connector) {
-    connectorFailure.value = true;
+    formatConnector(d);
     return;
   }
   if (
@@ -901,6 +905,29 @@ function formatSelected() {
   ) {
     const source = sourceOwner(d);
     if (source && (source.kind === "shape" || source.kind === "textBox")) emit("format", source);
+  }
+}
+function formatConnector(drawing: SheetDrawing): boolean {
+  const pass = renderPass.value,
+    leaf = pass?.getLeaf(drawing.id);
+  if (
+    !pass ||
+    leaf?.connector?.status !== "ready" ||
+    !canChange(drawing) ||
+    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing
+  )
+    return false;
+  try {
+    pass.assertCurrent(props.drawings, metrics.value!, props.revision ?? 0);
+    selectRoots([leaf.sourceRoot.id], leaf.path.length > 1 ? drawing.id : null);
+    if (isShapeGroupDrawing(leaf.sourceRoot)) emit("formatGroup", leaf.sourceRoot, leaf.path);
+    else if (leaf.sourceRoot.kind === "shape") emit("format", leaf.sourceRoot);
+    else return false;
+    connectorFailure.value = false;
+    return true;
+  } catch {
+    connectorFailure.value = true;
+    return false;
   }
 }
 function commitUpdate(next: SheetDrawing, owner: SheetDrawing): boolean {
@@ -1127,6 +1154,16 @@ function selectedContainerPath(source: ShapeGroupDrawing): ShapeGroupPath {
 }
 function formatGroup(source: ShapeGroupDrawing, path: ShapeGroupPath): void {
   if (props.drawings.find((d) => d.id === source.id) !== source || selectionDisabled.value) return;
+  const selectedLeaf = renderPass.value?.getLeaf(path.at(-1)!);
+  if (
+    selectedLeaf?.connector &&
+    selectedLeaf.sourceRoot === source &&
+    JSON.stringify(selectedLeaf.path) === JSON.stringify(path)
+  ) {
+    const view = legacyDrawings.value.find((drawing) => drawing.id === selectedLeaf.sourceNode.id);
+    if (view) formatConnector(view);
+    return;
+  }
   if (
     renderPass.value?.leaves.some(
       (leaf) =>
@@ -1707,7 +1744,7 @@ function commitConnectorPlan(
 function startConnectorGesture(
   fragment: DrawingFragment,
   event: PointerEvent,
-  mode: "move" | "endpoint",
+  mode: "move" | "endpoint" | "adjust",
   index?: number,
 ): void {
   const drawing = fragment.drawing;
@@ -1725,7 +1762,8 @@ function startConnectorGesture(
     !props.applyCollection ||
     selectionDisabled.value ||
     !canChange(drawing) ||
-    (mode === "endpoint" && index !== 0 && index !== 1)
+    (mode === "endpoint" && index !== 0 && index !== 1) ||
+    (mode === "adjust" && (!Number.isSafeInteger(index) || !route.geometry.handles[index!]))
   )
     return;
   const key = selectionKey.value;
@@ -1761,6 +1799,14 @@ function startConnectorGesture(
   const origin = sample(event);
   if (!origin || !valid()) return;
   const tip = index === 0 ? route.begin : route.end;
+  const adjustment =
+    mode === "adjust"
+      ? shapeFrameLocalToWorld(
+          route.paintLayout.rect,
+          route.paintLayout.angleDeg,
+          route.geometry.handles[index!]!.position,
+        )
+      : undefined;
   let planned: readonly SourceSheetDrawing[] | undefined;
   let changed = false;
   const update = (point: MouseEvent) => {
@@ -1798,6 +1844,16 @@ function startConnectorGesture(
               source,
               index === 0 ? "begin" : "end",
               endpoint,
+              pass.metrics,
+            )
+          : undefined;
+      } else if (mode === "adjust") {
+        planned = changed
+          ? planShapeConnectorRouteAdjustment(
+              pass.sourceForest,
+              source,
+              index!,
+              { x: adjustment!.x + delta.x, y: adjustment!.y + delta.y },
               pass.metrics,
             )
           : undefined;
@@ -1864,7 +1920,7 @@ function start(
   (event.currentTarget as HTMLElement)?.focus?.();
   if (!canChange(drawing)) return;
   const connector = projectionById(drawing)?.renderLeaf?.connector;
-  if (connector && (direction || !["move", "endpoint"].includes(mode))) {
+  if (connector && (direction || !["move", "endpoint", "adjust"].includes(mode))) {
     connectorFailure.value = true;
     return;
   }
@@ -1873,7 +1929,7 @@ function start(
     selectedRoots.value.length === 1 &&
     (!projectionById(drawing)?.groupLeaf || selectedOwnedId.value === drawing.id)
   ) {
-    startConnectorGesture(fragment, event, mode as "move" | "endpoint", index);
+    startConnectorGesture(fragment, event, mode as "move" | "endpoint" | "adjust", index);
     return;
   }
   if (
@@ -2062,7 +2118,7 @@ function edit(fragment: DrawingFragment, event: MouseEvent): void {
   event.preventDefault();
   event.stopPropagation();
   if (projectionById(fragment.drawing)?.renderLeaf?.connector) {
-    connectorFailure.value = true;
+    formatConnector(fragment.drawing);
     return;
   }
   if (isStandard(fragment.drawing) && fragment.drawing.shapePath) {
@@ -2233,6 +2289,28 @@ function nudgeAdjustment(
     return;
   const shape = drawingGeometry(drawing);
   const position = shape?.handles[index]?.position;
+  const source = connectorEditSource(drawing),
+    pass = renderPass.value,
+    route = connectorRoute(drawing);
+  if (source && pass && route && position) {
+    try {
+      const target = shapeFrameLocalToWorld(route.paintLayout.rect, route.paintLayout.angleDeg, {
+        x: position.x + delta.x,
+        y: position.y + delta.y,
+      });
+      const next = planShapeConnectorRouteAdjustment(
+        pass.sourceForest,
+        source,
+        index,
+        target,
+        pass.metrics,
+      );
+      commitConnectorPlan(pass, drawing, next, selectionKey.value);
+    } catch {
+      selectionFailure.value = true;
+    }
+    return;
+  }
   if (!position || !drawing.shapeGeometry) return;
   const geometry = moveStandardShapeAdjustment(
     drawing.shapeGeometry,
@@ -2362,7 +2440,7 @@ function keydown(drawing: SheetDrawing, event: KeyboardEvent) {
     event.preventDefault();
     event.stopPropagation();
     if (projectionById(drawing)?.renderLeaf?.connector) {
-      connectorFailure.value = true;
+      formatConnector(drawing);
       return;
     }
     const source = sourceOwner(drawing),
@@ -2586,8 +2664,8 @@ watch(
     >
       {{
         locale === "zh-CN"
-          ? "此连接线操作暂不可用。请拖动端点或移动线身；连接关系已保留。"
-          : "This connector operation is unavailable. Drag an endpoint or move its body. Connections are preserved."
+          ? "此连接线操作暂不可用。请使用端点、路线调整柄或格式窗格；连接关系已保留。"
+          : "This connector operation is unavailable. Use endpoints, route handles or the format pane. Connections are preserved."
       }}
     </div>
     <div

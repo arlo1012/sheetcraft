@@ -161,6 +161,8 @@ import { prepareShapeTextUpdate } from "../modules/sheet-drawings/prepare-shape-
 import DrawingEditorDialog from "../modules/sheet-drawings/components/DrawingEditorDialog.vue";
 import ShapeFormatPane from "../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
 import { useOwnedShapeGroupFormatPane } from "../modules/sheet-drawings/useOwnedShapeGroupFormatPane";
+import { useOwnedShapeConnectorFormatPane } from "../modules/sheet-drawings/useOwnedShapeConnectorFormatPane";
+import { preflightShapeConnectorPaint } from "../modules/sheet-drawings/shape-connector-paint-preflight";
 import {
   traverseShapeGroup,
   type ShapeGroupDrawing,
@@ -1186,6 +1188,7 @@ watch(decorationFeedback, (feedback) => {
 
 const {
   urls: imageAssetUrls,
+  sizes: imageAssetSizes,
   loading: loadingImageAssetIds,
   missing: missingImageAssetIds,
 } = useImageAssetUrls(() => session.workbook, assetStore);
@@ -1805,7 +1808,24 @@ const { busy: xlsxBusy, confirmation: xlsxConfirmation, feedback: xlsxFeedback }
 
 const shapeTextImages = createCanvasImageCache(() => {});
 onBeforeUnmount(shapeTextImages.dispose);
+function getShapePaintAssetSize(id: string) {
+  const size = imageAssetSizes.value.get(id);
+  if (size) return size;
+  const image =
+    shapePaintAssets.getAssetImage(id) ??
+    (imageAssetUrls.value.get(id)
+      ? shapeTextImages.peek?.(imageAssetUrls.value.get(id)!)
+      : undefined);
+  return image ? { width: image.naturalWidth, height: image.naturalHeight } : undefined;
+}
 const drawingActions = useDrawingActions({
+  preflightConnectedCollection: (pass) => {
+    preflightShapeConnectorPaint(pass, {
+      theme: session.workbook.theme,
+      getAssetSize: getShapePaintAssetSize,
+    });
+    return true;
+  },
   getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1830,14 +1850,7 @@ const drawingActions = useDrawingActions({
             (imageAssetUrls.value.get(id)
               ? shapeTextImages.get(imageAssetUrls.value.get(id)!)
               : undefined),
-          getAssetSize: (id) => {
-            const image =
-              shapePaintAssets.getAssetImage(id) ??
-              (imageAssetUrls.value.get(id)
-                ? shapeTextImages.peek?.(imageAssetUrls.value.get(id)!)
-                : undefined);
-            return image ? { width: image.naturalWidth, height: image.naturalHeight } : undefined;
-          },
+          getAssetSize: getShapePaintAssetSize,
         },
       },
       sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
@@ -1881,14 +1894,52 @@ const shapeGroupFormatPane = useOwnedShapeGroupFormatPane({
       text: scope.textEligibleCount,
     }),
 });
+const shapeConnectorFormatPane = useOwnedShapeConnectorFormatPane({
+  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+  replaceCollection: drawingActions.replaceCollection,
+  isAssetAvailable: (id) => imageAssetUrls.value.has(id) || shapePaintAssets.has(id),
+  getUnsupportedReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
+  getPaintResources: () => ({
+    theme: session.workbook.theme,
+    getAssetSize: getShapePaintAssetSize,
+  }),
+});
 function openShapeGroupFormat(root: ShapeGroupDrawing, path: ShapeGroupPath) {
+  const selected = traverseShapeGroup(root).find(
+    ({ path: current }) => JSON.stringify(current) === JSON.stringify(path),
+  )?.node;
+  if (selected?.kind === "shape" && selected.shapeConnector) {
+    if (shapeConnectorFormatPane.open(root, path)) {
+      shapeGroupFormatPane.close();
+      shapeFormatPane.close();
+      drawingActions.close();
+      sheetGridRef.value?.selectDrawing(root.id);
+    }
+    return;
+  }
   if (shapeGroupFormatPane.open(root, path)) {
+    shapeConnectorFormatPane.close();
     shapeFormatPane.close();
     drawingActions.close();
     sheetGridRef.value?.selectDrawing(root.id);
   }
 }
 function selectedShapeGroupChanged(rootId: string | null, path: ShapeGroupPath | null) {
+  const connectorRoot = shapeConnectorFormatPane.root.value;
+  if (
+    connectorRoot?.kind === "shapeGroup" &&
+    (connectorRoot.id !== rootId ||
+      JSON.stringify(shapeConnectorFormatPane.path.value) !== JSON.stringify(path))
+  ) {
+    shapeConnectorFormatPane.close();
+    shapePaintAssets.cancel();
+  }
   if (
     shapeGroupFormatPane.root.value &&
     (shapeGroupFormatPane.root.value.id !== rootId ||
@@ -1899,7 +1950,10 @@ function selectedShapeGroupChanged(rootId: string | null, path: ShapeGroupPath |
   }
 }
 const shapePaintAssets = createShapePaintAssetSource({
-  getSnapshot: () => shapeGroupFormatPane.snapshot.value ?? shapeFormatPane.snapshot.value,
+  getSnapshot: () =>
+    shapeConnectorFormatPane.snapshot.value ??
+    shapeGroupFormatPane.snapshot.value ??
+    shapeFormatPane.snapshot.value,
   store: assetStore,
   preparePixels: async (asset) => {
     if (asset.width * asset.height * 4 > 64 * 1024 * 1024) return;
@@ -1943,13 +1997,27 @@ watch(
   { immediate: true },
 );
 function openShapeFormat(drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing) {
+  if (drawing.kind === "shape" && drawing.shapeConnector) {
+    if (shapeConnectorFormatPane.open(drawing)) {
+      shapeFormatPane.close();
+      shapeGroupFormatPane.close();
+      drawingActions.close();
+      sheetGridRef.value?.selectDrawing(drawing.id);
+    }
+    return;
+  }
   if (shapeFormatPane.open(drawing)) {
+    shapeConnectorFormatPane.close();
     shapeGroupFormatPane.close();
     drawingActions.close();
     sheetGridRef.value?.selectDrawing(drawing.id);
   }
 }
 function selectedShapeChanged(id: string | null) {
+  if (shapeConnectorFormatPane.root.value && shapeConnectorFormatPane.root.value.id !== id) {
+    shapeConnectorFormatPane.close();
+    shapePaintAssets.cancel();
+  }
   if (shapeGroupFormatPane.root.value && shapeGroupFormatPane.root.value.id !== id) {
     shapeGroupFormatPane.close();
     shapePaintAssets.cancel();
@@ -4845,17 +4913,29 @@ watch(
         @close="closeOwnedPictureFormat"
       />
       <ShapeFormatPane
-        v-if="shapeGroupFormatPane.snapshot.value || shapeFormatPane.snapshot.value"
-        :snapshot="shapeGroupFormatPane.snapshot.value ?? shapeFormatPane.snapshot.value"
+        v-if="
+          shapeConnectorFormatPane.snapshot.value ||
+          shapeGroupFormatPane.snapshot.value ||
+          shapeFormatPane.snapshot.value
+        "
+        :snapshot="
+          shapeConnectorFormatPane.snapshot.value ??
+          shapeGroupFormatPane.snapshot.value ??
+          shapeFormatPane.snapshot.value
+        "
         :capabilities="
-          shapeGroupFormatPane.snapshot.value
-            ? shapeGroupFormatPane.capabilities.value
-            : shapeFormatPane.capabilities.value
+          shapeConnectorFormatPane.snapshot.value
+            ? shapeConnectorFormatPane.capabilities.value
+            : shapeGroupFormatPane.snapshot.value
+              ? shapeGroupFormatPane.capabilities.value
+              : shapeFormatPane.capabilities.value
         "
         :on-intent="
-          shapeGroupFormatPane.snapshot.value
-            ? shapeGroupFormatPane.onIntent
-            : shapeFormatPane.onIntent
+          shapeConnectorFormatPane.snapshot.value
+            ? shapeConnectorFormatPane.onIntent
+            : shapeGroupFormatPane.snapshot.value
+              ? shapeGroupFormatPane.onIntent
+              : shapeFormatPane.onIntent
         "
         :load-paint-asset="shapePaintAssets.load"
         :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
@@ -4864,6 +4944,7 @@ watch(
         @close="
           shapeFormatPane.close();
           shapeGroupFormatPane.close();
+          shapeConnectorFormatPane.close();
           shapePaintAssets.cancel();
         "
       />

@@ -109,6 +109,25 @@ const asset = (id: string) => ({
 });
 afterEach(() => vi.unstubAllGlobals());
 describe("useImageAssetUrls", () => {
+  test("publishes validated encoded sizes with URL identity rather than trusting stale stored dimensions", async () => {
+    const workbook = ref(imageWorkbook("asset"));
+    const saved = { ...asset("asset"), width: 128, height: 64 };
+    const put = vi.fn(async () => {});
+    vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:asset"), revokeObjectURL: vi.fn() });
+    const fixture = mount(workbook, { get: async () => saved, put });
+    await fixture.value.refresh();
+    expect(fixture.value.urls.value.get("asset")).toBe("blob:asset");
+    expect(fixture.value.sizes.value.get("asset")).toEqual({ width: 8, height: 4 });
+    expect(saved.width).toBe(128);
+    expect(put).not.toHaveBeenCalled();
+    await fixture.value.refresh();
+    expect(fixture.value.sizes.value.get("asset")).toEqual({ width: 8, height: 4 });
+    getActiveSheet(workbook.value).cells.clear();
+    await fixture.value.refresh();
+    expect(fixture.value.urls.value.size).toBe(0);
+    expect(fixture.value.sizes.value.size).toBe(0);
+    fixture.unmount();
+  });
   test("collects nested hidden group leaves alongside all existing image references", () => {
     const workbook = imageWorkbook("shared");
     workbook.watermarkPresets = [
@@ -262,6 +281,7 @@ describe("useImageAssetUrls", () => {
     pending.resolve(asset("old"));
     await stale;
     expect(fixture.value.urls.value).toEqual(new Map([["new", "blob:new"]]));
+    expect(fixture.value.sizes.value).toEqual(new Map([["new", { width: 8, height: 4 }]]));
     expect(fixture.value.loading.value).toEqual(new Set());
     expect(fixture.value.missing.value).toEqual(new Set());
     expect(get.mock.calls).toEqual([["old"], ["new"]]);
@@ -364,6 +384,7 @@ describe("useImageAssetUrls", () => {
       });
       await fixture.value.refresh();
       expect(create).not.toHaveBeenCalled();
+      expect(fixture.value.sizes.value.size).toBe(0);
       expect(fixture.value.missing.value.has("bad")).toBe(true);
       fixture.unmount();
     },

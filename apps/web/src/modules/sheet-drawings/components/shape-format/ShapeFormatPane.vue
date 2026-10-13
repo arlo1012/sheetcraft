@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useId } from "vue";
+import { computed, nextTick, ref, useId, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { PaintBucket, Ruler, Sparkles, Type, X } from "lucide-vue-next";
@@ -25,6 +25,16 @@ const emit = defineEmits<{ close: []; cancel: [] }>();
 const controller = useShapeFormatPane(props);
 const mode = ref<ShapeFormatMode>(
   props.initialTab.startsWith("text-") ? "text" : props.initialMode,
+);
+const isConnector = computed(
+  () => props.snapshot?.drawing.kind === "shape" && !!props.snapshot.drawing.shapeConnector,
+);
+watch(
+  isConnector,
+  (value) => {
+    if (value) mode.value = "shape";
+  },
+  { immediate: true },
 );
 const shapeTab = ref<ShapeFormatTab>(
   props.initialTab.startsWith("text-") ? "size-properties" : props.initialTab,
@@ -123,6 +133,7 @@ function guardClick(event: MouseEvent) {
 defineExpose({
   cancel: controller.cancel,
   showPaint: (target: ShapeFormatMode, category: "fill" | "line") => {
+    if (isConnector.value && target === "text") return;
     mode.value = target;
     tab.value = target === "shape" ? "fill-line" : "text-fill-line";
     (target === "shape" ? shapeFillRef.value : textFillRef.value)?.showCategory(category);
@@ -160,7 +171,12 @@ defineExpose({
       <button type="button" :aria-pressed="mode === 'shape'" @click="mode = 'shape'">
         {{ controller.s.value("shapeOptions") }}
       </button>
-      <button type="button" :aria-pressed="mode === 'text'" @click="mode = 'text'">
+      <button
+        v-if="!isConnector"
+        type="button"
+        :aria-pressed="mode === 'text'"
+        @click="mode = 'text'"
+      >
         {{ controller.s.value("textOptions") }}
       </button>
     </div>
@@ -229,7 +245,7 @@ defineExpose({
         }}</span>
       </button>
     </div>
-    <div v-if="snapshot" class="shape-format-pane__units">
+    <div v-if="snapshot && !isConnector" class="shape-format-pane__units">
       <span>{{ t("units") }}</span
       ><TSelect
         :model-value="unit"
@@ -294,6 +310,7 @@ defineExpose({
           <ShapeFormatSizeProperties :controller="controller" :unit="unit" />
         </div>
         <div
+          v-if="!isConnector"
           :id="`${paneId}-text-fill-line-panel`"
           v-show="tab === 'text-fill-line' && mode === 'text'"
           role="tabpanel"
@@ -302,6 +319,7 @@ defineExpose({
           <ShapeFormatFillLine ref="textFillRef" :controller="controller" target="text" />
         </div>
         <div
+          v-if="!isConnector"
           :id="`${paneId}-text-effects-panel`"
           v-show="tab === 'text-effects' && mode === 'text'"
           role="tabpanel"
@@ -310,6 +328,7 @@ defineExpose({
           <ShapeFormatEffects :controller="controller" target="text" />
         </div>
         <div
+          v-if="!isConnector"
           :id="`${paneId}-text-box-panel`"
           v-show="tab === 'text-box' && mode === 'text'"
           role="tabpanel"

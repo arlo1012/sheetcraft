@@ -1,7 +1,9 @@
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { nextTick } from "vue";
+import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { resolveSheetShapeConnections } from "@sheetcraft/core/shape-connector-layout";
+import { planShapeConnectorRouteAdjustment } from "@sheetcraft/core/shape-connector-editing";
 import { shapeFrameLocalToWorld } from "@sheetcraft/core/shape-frame";
 import { getPicturePaneTranslation } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
@@ -11,7 +13,9 @@ import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics
 import { framedShape } from "../../modules/sheet-drawings/framed-shape-fixture";
 import SheetDrawingLayer from "../../../modules/sheet-drawings/components/SheetDrawingLayer.vue";
 import ShapeFormatPane from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
+import ShapeLineEndsControls from "../../../modules/sheet-drawings/components/ShapeLineEndsControls.vue";
 import { isFramedShapeDrawing } from "@sheetcraft/core/sheet-drawings";
+import { normalizeSheetDrawings } from "@sheetcraft/core/sheet-drawings";
 import SheetShapeCreationLayer from "../../../modules/sheet-drawings/components/SheetShapeCreationLayer.vue";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
@@ -24,6 +28,7 @@ import { materializeDrawingShapeText } from "../../../modules/sheet-drawings/sha
 import type { useShapeCreation } from "../../../modules/sheet-drawings/useShapeCreation";
 import { SHAPE_GALLERY } from "../../../modules/sheet-drawings/shape-gallery";
 import { createAppI18n } from "../../../shared/i18n";
+import { actualPng } from "../../modules/image-assets/image-header-fixtures";
 
 const mounted: VueWrapper[] = [];
 afterEach(() => {
@@ -45,6 +50,12 @@ function setupState(wrapper: VueWrapper) {
     >;
     shapeGroupFormatPane: ReturnType<
       typeof import("../../../modules/sheet-drawings/useOwnedShapeGroupFormatPane").useOwnedShapeGroupFormatPane
+    >;
+    shapeConnectorFormatPane: ReturnType<
+      typeof import("../../../modules/sheet-drawings/useOwnedShapeConnectorFormatPane").useOwnedShapeConnectorFormatPane
+    >;
+    shapePaintAssets: ReturnType<
+      typeof import("../../../modules/sheet-drawings/shape-paint-asset-source").createShapePaintAssetSource
     >;
     setViewMode: (mode: "page-layout") => void;
     fileActions: ReturnType<
@@ -406,7 +417,7 @@ test("snapshot62 container Shadow starts the real Workspace and the pane clears 
   expect(serializeWorkbook(state.session.workbook).version).toBe(62);
 });
 
-function savedConnectorFixture(group = false) {
+function savedConnectorFixture(group = false, preset: "line" | "bentConnector3" = "line") {
   const workbook = createWorkbook({ id: "saved-bindings", sheetId: "binding-sheet" });
   const sheet = getActiveSheet(workbook),
     a = framedShape(),
@@ -419,7 +430,7 @@ function savedConnectorFixture(group = false) {
   a.rotation = b.rotation = connector.rotation = 0;
   a.shapeGeometry = { preset: "rect" };
   b.shapeGeometry = { preset: "ellipse" };
-  connector.shapeGeometry = { preset: "line" };
+  connector.shapeGeometry = { preset };
   a.shapeFrame.anchor = { mode: "fixed", x: 80, y: 40, size: { width: 80, height: 60 } };
   b.shapeFrame.anchor = { mode: "fixed", x: 280, y: 180, size: { width: 80, height: 60 } };
   connector.shapeFrame.anchor = { mode: "fixed", x: 30, y: 25, size: { width: 80, height: 70 } };
@@ -544,5 +555,298 @@ test.each([false, true])(
     state.undo();
     await flushPromises();
     expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+  },
+);
+
+test.each([false, true])(
+  "real Workspace connector format opens its canonical owner, commits arrowheads and restores exact history (owned=%s)",
+  async (group) => {
+    const initial = savedConnectorFixture(group),
+      snapshot = serializeWorkbook(initial);
+    const wrapper = fixture(async () => ({ revision: 1, savedAt: 1, snapshot }));
+    await flushPromises();
+    const state = setupState(wrapper),
+      sheet = getActiveSheet(state.session.workbook),
+      layer = wrapper.getComponent(SheetDrawingLayer),
+      connection = resolveSheetShapeConnections(
+        sheet.drawings!,
+        layer.props("metrics")!,
+      ).getConnector("connector")!;
+    if (connection.status !== "ready" || connection.route.status !== "ready")
+      throw Error("Expected exact visible connector");
+    const route = connection.route,
+      commands = route.geometry.paths[0]!.commands,
+      first = commands[0]!,
+      last = commands[1]!;
+    if (first[0] !== "M" || last[0] !== "L") throw Error("Expected ordered line");
+    const origin = shapeFrameLocalToWorld(route.paintLayout.rect, route.paintLayout.angleDeg, {
+      x: (first[1] + last[1]) / 2,
+      y: (first[2] + last[2]) / 2,
+    });
+    const object = layer.get('[data-sheet-drawing-id="connector"]').element;
+    for (let count = 0; count < (group ? 2 : 1); count++) {
+      object.dispatchEvent(connectorInput(layer, "pointerdown", origin));
+      window.dispatchEvent(connectorInput(layer, "pointerup", origin));
+      await nextTick();
+    }
+    await layer.get("[data-shape-format-trigger]").trigger("click");
+    await flushPromises();
+    const pane = wrapper.getComponent(ShapeFormatPane),
+      control = state.shapeConnectorFormatPane,
+      canonical = control.drawing.value!;
+    expect(canonical.id).toBe("connector");
+    expect(pane.props("snapshot")?.drawing).toBe(canonical);
+    expect(pane.find("[data-shape-connector-size-limit]").text()).toContain("bound ends");
+    expect(pane.find("[data-shape-format-units]").exists()).toBe(false);
+    expect(pane.findAll(".shape-format-pane__modes button")).toHaveLength(1);
+    expect(pane.find('[id$="-text-box-panel"]').exists()).toBe(false);
+    const before = serializeWorkbook(state.session.workbook);
+    const tabs = pane.findAll('[role="tab"]');
+    await tabs[0]!.trigger("click");
+    const ends = pane.getComponent(ShapeLineEndsControls),
+      selects = ends.findAllComponents(TSelect),
+      obsolete = ends.props("handler");
+    expect(ends.props("disabled")).toBe(false);
+    selects[1]!.vm.$emit("change", "triangle");
+    await flushPromises();
+    await pane.get('[data-line-end-size="end-large-small"]').trigger("click");
+    await flushPromises();
+    const updated = control.drawing.value!,
+      changed = serializeWorkbook(state.session.workbook);
+    expect(updated.shapeLineEnds?.end).toEqual({
+      kind: "triangle",
+      width: "large",
+      length: "small",
+    });
+    expect(updated.shapeConnector).toEqual(canonical.shapeConnector);
+    expect(updated.rotation).toBe(canonical.rotation);
+    expect("groupFrame" in updated ? updated.groupFrame : updated.shapeFrame).toEqual(
+      "groupFrame" in canonical ? canonical.groupFrame : canonical.shapeFrame,
+    );
+    const proof = resolveSheetShapeConnections(
+      sheet.drawings!,
+      layer.props("metrics")!,
+    ).getConnector("connector")!;
+    expect(proof.begin).toEqual(connection.begin);
+    expect(proof.end).toEqual(connection.end);
+    state.undo();
+    await flushPromises();
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.redo();
+    await flushPromises();
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(changed);
+    expect(obsolete({ begin: { kind: "diamond" } })).toBe(false);
+    expect(serializeWorkbook(state.session.workbook)).toEqual(changed);
+  },
+);
+
+test.each([false, true])(
+  "real Workspace yellow route drag commits only adjustments with exact Undo/Redo (owned=%s)",
+  async (group) => {
+    const initial = savedConnectorFixture(group, "bentConnector3"),
+      snapshot = serializeWorkbook(initial);
+    const wrapper = fixture(async () => ({ revision: 1, savedAt: 1, snapshot }));
+    await flushPromises();
+    const state = setupState(wrapper),
+      sheet = getActiveSheet(state.session.workbook),
+      layer = wrapper.getComponent(SheetDrawingLayer);
+    const resolve = () => {
+      const value = resolveSheetShapeConnections(
+        sheet.drawings!,
+        layer.props("metrics")!,
+      ).getConnector("connector")!;
+      if (value.status !== "ready" || value.route.status !== "ready") throw Error("Expected route");
+      return value.route;
+    };
+    const route = resolve(),
+      handle = shapeFrameLocalToWorld(
+        route.paintLayout.rect,
+        route.paintLayout.angleDeg,
+        route.geometry.handles[0]!.position,
+      ),
+      object = layer.get('[data-sheet-drawing-id="connector"]').element;
+    for (let count = 0; count < (group ? 2 : 1); count++) {
+      object.dispatchEvent(connectorInput(layer, "pointerdown", handle));
+      window.dispatchEvent(connectorInput(layer, "pointerup", handle));
+      await nextTick();
+    }
+    const before = serializeWorkbook(state.session.workbook),
+      destination = { x: handle.x + 30, y: handle.y + 20 };
+    layer
+      .get('[data-shape-adjustment="0"]')
+      .element.dispatchEvent(connectorInput(layer, "pointerdown", handle));
+    window.dispatchEvent(connectorInput(layer, "pointermove", destination));
+    await nextTick();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    window.dispatchEvent(connectorInput(layer, "pointerup", destination));
+    await flushPromises();
+    const after = serializeWorkbook(state.session.workbook),
+      changed = resolve();
+    expect(after).not.toEqual(before);
+    expect(changed.begin).toEqual(route.begin);
+    expect(changed.end).toEqual(route.end);
+    expect(changed.geometry.paths).not.toEqual(route.geometry.paths);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+  },
+);
+
+test.each([false, true])(
+  "real Workspace refuses a yellow route exceeding actual dash paint budget with no document or history changes (owned=%s)",
+  async (group) => {
+    const initial = savedConnectorFixture(group, "bentConnector3"),
+      initialSheet = getActiveSheet(initial);
+    const source = group
+      ? initialSheet
+          .drawings!.find((d) => d.kind === "shapeGroup")!
+          .members.find((d) => d.id === "connector")!
+      : initialSheet.drawings!.find((d) => d.id === "connector")!;
+    if (source.kind !== "shape") throw Error("Expected connector");
+    source.shapeStyle = {
+      line: {
+        kind: "value",
+        value: {
+          paint: { kind: "solid", color: { kind: "rgb", rgb: "#000000" }, opacity: 1 },
+          widthPt: 0.01,
+          compound: "single",
+          dash: "dash",
+          cap: "butt",
+          join: "round",
+          miterLimit: 4,
+        },
+      },
+    };
+    const snapshot = serializeWorkbook(initial),
+      wrapper = fixture(async () => ({ revision: 1, savedAt: 1, snapshot }));
+    await flushPromises();
+    const state = setupState(wrapper),
+      sheet = getActiveSheet(state.session.workbook),
+      layer = wrapper.getComponent(SheetDrawingLayer),
+      connection = resolveSheetShapeConnections(
+        sheet.drawings!,
+        layer.props("metrics")!,
+      ).getConnector("connector")!;
+    if (connection.status !== "ready" || connection.route.status !== "ready")
+      throw Error("Expected route");
+    const route = connection.route,
+      handle = shapeFrameLocalToWorld(
+        route.paintLayout.rect,
+        route.paintLayout.angleDeg,
+        route.geometry.handles[0]!.position,
+      );
+    const before = serializeWorkbook(state.session.workbook),
+      destination = { x: handle.x + 500, y: handle.y };
+    const next = planShapeConnectorRouteAdjustment(
+      sheet.drawings!,
+      {
+        connectorId: "connector",
+        path: group ? ["group", "connector"] : ["connector"],
+      },
+      0,
+      destination,
+      layer.props("metrics")!,
+    );
+    expect(
+      state.drawingActions.replaceCollection(next, sheet.drawings!, layer.props("metrics")!),
+    ).toBe(false);
+    // Even when only a target changes, the final route of an unchanged connector must be checked.
+    const movedTarget = normalizeSheetDrawings(sheet.drawings!);
+    const target = movedTarget.find((d) => d.id === "b")!;
+    if (!isFramedShapeDrawing(target)) throw Error("Expected framed target");
+    target.shapeFrame.anchor = { mode: "fixed", x: 5000, y: 180, size: { width: 80, height: 60 } };
+    expect(
+      state.drawingActions.replaceCollection(movedTarget, sheet.drawings!, layer.props("metrics")!),
+    ).toBe(false);
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+  },
+);
+
+test.each([false, true])(
+  "real Workspace can first-reference an explicitly prepared connector texture before workbook URL metadata publishes (owned=%s)",
+  async (group) => {
+    const assets = createMemoryImageAssetStore();
+    await assets.put({
+      id: "new-route-texture",
+      width: 8,
+      height: 4,
+      mimeType: "image/png",
+      blob: new Blob([actualPng], { type: "image/png" }),
+    });
+    const initial = savedConnectorFixture(group, "bentConnector3"),
+      wrapper = fixture(
+        async () => ({ revision: 1, savedAt: 1, snapshot: serializeWorkbook(initial) }),
+        assets,
+      );
+    await flushPromises();
+    const state = setupState(wrapper),
+      sheet = getActiveSheet(state.session.workbook),
+      layer = wrapper.getComponent(SheetDrawingLayer),
+      next = normalizeSheetDrawings(sheet.drawings!);
+    const root = next.find((d) => d.id === (group ? "group" : "connector"))!;
+    const source = isShapeGroupDrawing(root)
+      ? root.members.find((d) => d.id === "connector")!
+      : root;
+    if (source.kind !== "shape") throw Error("Expected connector");
+    // HappyDOM has no pixel decoder. Supply only the already prepared native image
+    // metadata; initialization, final planner, command and history stay genuine.
+    vi.spyOn(state.shapePaintAssets, "getAssetImage").mockImplementation((id) =>
+      id === "new-route-texture"
+        ? ({ naturalWidth: 8, naturalHeight: 4 } as HTMLImageElement)
+        : undefined,
+    );
+    source.shapeStyle = {
+      line: {
+        kind: "value",
+        value: {
+          paint: {
+            kind: "picture",
+            assetId: "new-route-texture",
+            opacity: 1,
+            rotateWithShape: true,
+            layout: {
+              kind: "stretch",
+              offsetXRatio: 0,
+              offsetYRatio: 0,
+              widthRatio: 1,
+              heightRatio: 1,
+            },
+          },
+          widthPt: 2,
+          compound: "single",
+          dash: "solid",
+          cap: "butt",
+          join: "round",
+          miterLimit: 4,
+        },
+      },
+    };
+    const before = serializeWorkbook(state.session.workbook);
+    expect(
+      state.drawingActions.replaceCollection(next, sheet.drawings!, layer.props("metrics")!),
+    ).toBe(true);
+    const after = serializeWorkbook(state.session.workbook);
+    expect(after).not.toEqual(before);
+    await flushPromises();
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(after);
   },
 );
