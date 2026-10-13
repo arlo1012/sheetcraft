@@ -234,6 +234,7 @@ export function useOwnedShapeGroupFormatPane(options: {
       mixedFields: values.mixedFields,
       shapeStyle: values.shapeStyle,
       textStyle: values.textStyle,
+      independentTextCameraCount: values.independentTextCameraCount,
       lineEnds: values.lineEnds,
       mixedLineEnds: values.mixedLineEnds,
       mixedStyleCategories: values.mixedStyleCategories,
@@ -380,6 +381,9 @@ export function useOwnedShapeGroupFormatPane(options: {
         ...(!valueEnabled ? { reason: options.getCameraUnsupportedReason?.() ?? reason } : {}),
       };
     }
+    // Text Options edits the same validated body scene, including the complete
+    // owner scope and unsupported projected-port feedback.
+    styles.text!.rotation3d = { ...styles.shape!.rotation3d! };
     return {
       fields,
       styles,
@@ -523,7 +527,6 @@ export function useOwnedShapeGroupFormatPane(options: {
         if (capabilities.value.styles?.[intent.target]?.[intent.category]?.enabled !== true)
           return false;
         if (
-          intent.target === "shape" &&
           intent.category === "rotation3d" &&
           intent.value?.kind === "value" &&
           !allowsCameraValue(captured, intent.value)

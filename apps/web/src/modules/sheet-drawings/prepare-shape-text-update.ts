@@ -40,6 +40,7 @@ import { projectedShapeTextBounds } from "./shape-text-projection";
 import { materializeDrawingShapeText, withDrawingShapeText } from "./shape-text-options";
 import { requiresShapeGroupPaint, preflightShapeGroupPaint } from "./shape-group-paint";
 import { resolveShapeForestForRender } from "./resolved-shape-render-source";
+import { planShapeLeafPixels } from "./shape-leaf-pixels";
 
 export type ShapeTextForestContext = {
   candidateForest: readonly SheetDrawing[];
@@ -360,6 +361,36 @@ function prepareShapeViewTextUpdate(
   const drawing = requireLegacySheetDrawing(candidate);
   const owner = source && requireLegacySheetDrawing(source);
   if (drawing.kind !== "shape" && drawing.kind !== "textBox") return drawing;
+  // Genuine legacy TextBoxes keep their CSS layout and never materialize a
+  // second text model merely because a body camera/depth was edited.
+  if (
+    drawing.kind === "textBox" &&
+    !drawing.shapeText &&
+    (drawing.shapeStyle?.rotation3d?.kind === "value" ||
+      drawing.shapeStyle?.format3d?.kind === "value")
+  ) {
+    const leaf = planShapeLeafPixels({
+      drawing,
+      density: 1,
+      resources: paint?.resources,
+      textRuntimeOptions: measurement,
+    });
+    if (leaf.kind !== "ready")
+      throw new Error(
+        "TextBox body and text paint resources are not ready; the draft has been preserved.",
+      );
+    if (leaf.textLayout && leaf.textPlan) {
+      const proof = (paint?.preflight ?? preflightShapeTextGlyphBudgets)({
+        drawing,
+        layout: leaf.textLayout,
+        density: leaf.actualDensity,
+        resources: paint?.resources,
+      });
+      if (proof.kind !== "ready")
+        throw new Error("TextBox paint pixels are not ready; the draft has been preserved.");
+    }
+    return drawing;
+  }
   // Shapes without a text area retain historical text without blocking unrelated properties.
   if (!getDrawingShapeTextRect(drawing)) return drawing;
   const manualHeightChange =

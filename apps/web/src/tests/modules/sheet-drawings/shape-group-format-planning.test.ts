@@ -701,27 +701,17 @@ describe("genuine descendant fill/line and text batches", () => {
     expect(JSON.stringify(f.root)).toBe(before);
   });
 
-  test("unverified body and text effects reject rather than invent leaf effects", () => {
-    const f = fixture();
-    const before = JSON.stringify(f.root);
-    for (const target of ["shape", "text"] as const)
-      for (const category of [
-        "reflection",
-        "glow",
-        "softEdges",
-        "format3d",
-        "rotation3d",
-      ] as const) {
-        if (
-          target === "shape" &&
-          ["reflection", "glow", "format3d", "rotation3d"].includes(category)
-        )
-          continue;
-        if (target === "text" && category === "glow") continue;
-        expect(() =>
-          apply(f, ["root"], { type: "set-style", target, category, value: { kind: "none" } }),
-        ).toThrow(/group effect model/);
-      }
+  test("container body SoftEdges remains unsupported without inventing leaf effects", () => {
+    const f = fixture(),
+      before = JSON.stringify(f.root);
+    expect(() =>
+      apply(f, ["root"], {
+        type: "set-style",
+        target: "shape",
+        category: "softEdges",
+        value: { kind: "none" },
+      }),
+    ).toThrow(/group effect model/);
     expect(JSON.stringify(f.root)).toBe(before);
   });
 
@@ -1050,4 +1040,69 @@ test("selected rich leaf and all-mixed subtree expose suppressed character value
       expect.arrayContaining(["fontSizePt", "textBold", "textUnderline"]),
     );
   }
+});
+
+describe("group text effects and shared camera alias", () => {
+  test.each(["reflection", "softEdges", "format3d"] as const)(
+    "text %s edits genuine glyph descendants without inventing container/body effects",
+    (category) => {
+      const f = fixture(),
+        before = normalizeShapeGroup(f.root);
+      const result = apply(f, ["root", "inner"], {
+        type: "set-style",
+        target: "text",
+        category,
+        value: { kind: "none" },
+      });
+      expect(result.affectedPaths).toEqual([
+        ["root", "inner", "a"],
+        ["root", "inner", "b"],
+      ]);
+      for (const id of ["a", "b"]) {
+        const edited = node(result.root, ["root", "inner", id]);
+        expect(edited.shapeText?.style?.[category]).toEqual({ kind: "none" });
+        expect(edited.text).toBe(node(before, ["root", "inner", id]).text);
+        expect(edited.shapeStyle).toEqual(node(before, ["root", "inner", id]).shapeStyle);
+      }
+      expect(result.root.groupEffects).toBeUndefined();
+      expect(result.root.group3d).toBeUndefined();
+      expect(result.root.members[0]).toEqual(before.members[0]);
+      expect(f.root).toEqual(before);
+    },
+  );
+  test.each([["root"], ["root", "inner", "a"]])(
+    "Text Rotation uses the actual shared camera owner and preserves old independent glyph source (%j)",
+    (...parts) => {
+      const f = fixture(),
+        path = parts as ShapeGroupPath;
+      f.root.group3d = { rotation3d: camera(45) };
+      f.a.shapeText = { ...createDefaultShapeText(), style: { rotation3d: camera(12) } };
+      const before = normalizeShapeGroup(f.root),
+        context = resolveShapeGroupFormatContext(f.root, path, f.metrics);
+      const aggregate = aggregateShapeGroupFormatSnapshot(context, { width: 320, height: 160 });
+      expect(aggregate.textStyle.rotation3d).toEqual(camera(45));
+      expect(aggregate.mixedStyleCategories.text).not.toContain("rotation3d");
+      expect(aggregate.independentTextCameraCount).toBe(1);
+      const result = apply(f, path, {
+        type: "set-style",
+        target: "text",
+        category: "rotation3d",
+        value: camera(30),
+      });
+      expect(result.root.group3d?.rotation3d).toEqual(camera(30));
+      expect(result.eligibleCount).toBe(4);
+      expect(node(result.root, ["root", "inner", "a"]).shapeText).toEqual(f.a.shapeText);
+      expect(node(result.root, ["root", "inner", "b"]).shapeText).toEqual(f.b.shapeText);
+      expect(f.root).toEqual(before);
+      f.root = result.root;
+      const cleared = apply(f, path, {
+        type: "set-style",
+        target: "text",
+        category: "rotation3d",
+        value: { kind: "none" },
+      });
+      expect(cleared.root.group3d?.rotation3d).toEqual({ kind: "none" });
+      expect(node(cleared.root, ["root", "inner", "a"]).shapeText).toEqual(f.a.shapeText);
+    },
+  );
 });

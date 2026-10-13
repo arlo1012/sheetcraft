@@ -15,6 +15,7 @@ import PicturePaintNumber from "../../../../modules/sheet-images/components/form
 import PicturePaintEditor from "../../../../modules/sheet-images/components/format-pane/PicturePaintEditor.vue";
 import PictureLineEditor from "../../../../modules/sheet-images/components/format-pane/PictureLineEditor.vue";
 import PictureFormat3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureFormat3dEditor.vue";
+import ShapeFormatEffects from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatEffects.vue";
 import PictureRotation3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureRotation3dEditor.vue";
 import { framedShape } from "../framed-shape-fixture";
 import type {
@@ -185,6 +186,41 @@ async function textMode(wrapper: VueWrapper) {
   await wrapper.get(".shape-format-pane__modes button:nth-child(2)").trigger("click");
 }
 describe("shape format pane desktop reference surface", () => {
+  test("Text Rotation clearly shares the body camera, retains saved-glyph warning and edits the same Keep Flat field", async () => {
+    const state = { ...snapshot(), independentTextCameraCount: 1 };
+    const { wrapper, onIntent } = fixture({
+      snapshot: state,
+      capabilities: {
+        ...capabilities,
+        fields: { ...capabilities.fields, shapeKeepTextFlat: { enabled: true } },
+        styles: { text: { rotation3d: { enabled: true } } },
+      },
+    });
+    await textMode(wrapper);
+    const effects = wrapper
+      .findAllComponents(ShapeFormatEffects)
+      .find((component) => component.props("target") === "text")!;
+    expect(effects.text()).toContain("Text and shape use the same body 3-D scene");
+    expect(effects.get("[data-independent-text-camera]").text()).toContain(
+      "still applied and kept",
+    );
+    expect(effects.get("[data-independent-text-camera]").text()).toContain("(1)");
+    expect(effects.text()).toContain("Text soft edges are a Sheetcraft extension");
+    expect(effects.getComponent(ShapeFormatCheckbox).props("field")).toBe("shapeKeepTextFlat");
+    const value = { kind: "none" as const };
+    expect(effects.getComponent(PictureRotation3dEditor).props("onCommit")(value)).toBe(true);
+    expect(onIntent).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        type: "set-style",
+        target: "text",
+        category: "rotation3d",
+        value,
+        owner: state.owner,
+      }),
+    );
+    await wrapper.setProps({ snapshot: { ...state, independentTextCameraCount: 0 } });
+    expect(wrapper.find("[data-independent-text-camera]").exists()).toBe(false);
+  });
   test("live connectors expose actual line and endpoint controls without phantom fill, text or carrier geometry", async () => {
     const source = framedShape();
     source.text = "";
@@ -298,7 +334,7 @@ describe("shape format pane desktop reference surface", () => {
     expect(wrapper.text()).toContain("Relative to original picture size");
     expect(wrapper.text()).toContain("Shapes do not have an original picture size");
     expect(wrapper.text()).toContain("Closed shape has no arrowheads");
-    expect(wrapper.findAll('[data-shape-format-field="shapeKeepTextFlat"]')).toHaveLength(1);
+    expect(wrapper.findAll('[data-shape-format-field="shapeKeepTextFlat"]')).toHaveLength(2);
     expect(wrapper.find('[data-shape-format-field="textKeepTextFlat"]').exists()).toBe(false);
     await textMode(wrapper);
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([

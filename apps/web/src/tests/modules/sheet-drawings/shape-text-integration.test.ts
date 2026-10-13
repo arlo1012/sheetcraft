@@ -17,6 +17,8 @@ import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-lay
 import { getFloatingImageSheetRect } from "@sheetcraft/sheet-engine/floating-image-layout";
 import { normalizeSheetDrawing, type SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
+import { planShapeLeafPixels } from "../../../modules/sheet-drawings/shape-leaf-pixels";
+import type { ShapeTextPaintOptions } from "../../../modules/sheet-drawings/shape-text-paint";
 import { prepareShapeTextUpdate } from "../../../modules/sheet-drawings/prepare-shape-text-update";
 import { useDrawingActions } from "../../../modules/sheet-drawings/useDrawingActions";
 import { useOwnedShapeFormatPane } from "../../../modules/sheet-drawings/useOwnedShapeFormatPane";
@@ -363,4 +365,79 @@ describe("explicit text fields and desktop flip consumers", () => {
     expect(layout.runs.every((r) => r.angle === 180)).toBe(true);
     expect(v.rotation).toBe(0);
   });
+});
+
+test("legacy TextBox body camera owner preflight uses the actual CSS inside-border glyph layout and united leaf budget", () => {
+  const f = fixture();
+  try {
+    const { shapeText: _text, ...appearance } = f.owner;
+    const owner: SheetGraphicDrawing = {
+      ...appearance,
+      strokeWidth: 3,
+      width: 80,
+      height: 60,
+    };
+    const next: SheetGraphicDrawing = {
+      ...owner,
+      shapeStyle: {
+        rotation3d: {
+          kind: "value",
+          value: { projection: "parallel", xDeg: 45, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+        },
+      },
+    };
+    const expected = planShapeLeafPixels({
+      drawing: next,
+      density: 1,
+      textRuntimeOptions: measurement,
+    });
+    expect(expected.kind).toBe("ready");
+    expect(expected.renderPolicy).toBe("legacy-text-box");
+    const proof = vi.fn((_options: ShapeTextPaintOptions) => ({
+      kind: "ready" as const,
+      proof: "numeric-source" as const,
+      actualDensity: 1,
+      estimatedPeakBytes: 0,
+      contourCount: 0,
+      edgeCount: 0,
+      pointCount: 0,
+      glyphCommandCount: 0,
+    }));
+    const before = structuredClone(owner);
+    expect(
+      prepareShapeTextUpdate(next, owner, viewport, measurement, { preflight: proof }),
+    ).toEqual(next);
+    expect(proof).toHaveBeenCalledOnce();
+    expect(proof.mock.calls[0]?.[0]).toMatchObject({
+      layout: expected.textLayout,
+      density: expected.actualDensity,
+    });
+    expect(next.shapeText).toBeUndefined();
+    expect(owner).toEqual(before);
+    const failed = vi.fn(() => ({
+      kind: "unavailable" as const,
+      reason: "asset-pixels-unavailable" as const,
+      missingAssetIds: [],
+    }));
+    expect(() =>
+      prepareShapeTextUpdate(next, owner, viewport, measurement, { preflight: failed }),
+    ).toThrow(/preserved/);
+    expect(owner).toEqual(before);
+    expect(f.session.history.undoStack).toHaveLength(0);
+    proof.mockClear();
+    const unchanged = prepareShapeTextUpdate(
+      { ...owner, color: "#ff0000" },
+      owner,
+      viewport,
+      measurement,
+      {
+        preflight: proof,
+      },
+    );
+    expect(requireLegacySheetDrawing(unchanged).kind).toBe("textBox");
+    expect(requireLegacySheetDrawing(unchanged)).not.toHaveProperty("shapeText");
+    expect(proof).not.toHaveBeenCalled();
+  } finally {
+    f.scope.stop();
+  }
 });

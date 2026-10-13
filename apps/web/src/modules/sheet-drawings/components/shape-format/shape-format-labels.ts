@@ -20,6 +20,12 @@ const en = {
   textOptions: "Text Options",
   textFillOutline: "Text Fill & Outline",
   textEffects: "Text Effects",
+  textCameraSharedHelp:
+    "Text and shape use the same body 3-D scene. Keep text flat leaves text in its original 2-D placement.",
+  textCameraLegacyHelp:
+    "Saved independent text cameras are still applied and kept. This control changes only the shared body scene.",
+  textSoftEdgesHelp:
+    "Text soft edges are a Sheetcraft extension and apply to each member’s glyphs.",
   textBox: "Text Box",
   textFill: "Text Fill",
   textOutline: "Text Outline",
@@ -131,6 +137,9 @@ const zh: Record<ShapeFormatLabelKey, string> = {
   textOptions: "文本选项",
   textFillOutline: "文本填充与轮廓",
   textEffects: "文本效果",
+  textCameraSharedHelp: "文字与形状主体共用同一三维场景。保持文字平面会保留文字原有的二维位置。",
+  textCameraLegacyHelp: "已保存的独立文字三维来源仍保留并生效；此处仅调整与主体共用的场景。",
+  textSoftEdgesHelp: "文字柔化是 Sheetcraft 的扩展效果，分别作用于各成员的字形。",
   textBox: "文本框",
   textFill: "文本填充",
   textOutline: "文本轮廓",

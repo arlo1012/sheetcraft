@@ -111,6 +111,7 @@ export type ShapeGroupFormatAggregate = {
   readonly bodyEligibleCount: number;
   readonly textEligibleCount: number;
   readonly descendantCount: number;
+  readonly independentTextCameraCount: number;
   readonly rotation3dAffectedCount: number;
   readonly rotation3dInherited: boolean;
   readonly rotation3dShared: boolean;
@@ -142,7 +143,12 @@ export function isShapeGroupMemberStyleCategory(
     category === "fill" ||
     category === "line" ||
     (target === "shape" && category === "format3d") ||
-    (target === "text" && (category === "shadow" || category === "glow"))
+    (target === "text" &&
+      (category === "shadow" ||
+        category === "reflection" ||
+        category === "glow" ||
+        category === "softEdges" ||
+        category === "format3d"))
   );
 }
 const objectFields = new Set<ShapeFormatField>([
@@ -529,7 +535,7 @@ export function planShapeGroupFormatIntent(
     });
   }
   if (intent.type === "set-style") {
-    if (intent.target === "shape" && intent.category === "rotation3d") {
+    if (intent.category === "rotation3d") {
       // This edit may be initiated by one leaf but belongs to the complete shared
       // camera authority. Never bake the camera into descendant appearance.
       const edited = applyShapeGroup3dRotationEdit(
@@ -711,6 +717,15 @@ export function aggregateShapeGroupFormatSnapshot(
   shape.mixed = shape.mixed.filter((category) => category !== "rotation3d");
   if (context.rotation3dSource.rotation3d)
     shape.style.rotation3d = context.rotation3dSource.rotation3d;
+  // Desktop Text Rotation is another entry to the same body camera owner, not
+  // a glyph camera. Stored independent glyph sources are deliberately untouched.
+  delete glyph.style.rotation3d;
+  glyph.mixed = glyph.mixed.filter((category) => category !== "rotation3d");
+  if (shape.style.rotation3d) glyph.style.rotation3d = shape.style.rotation3d;
+  const independentTextCameraCount = context.rotation3dSource.affectedLeafPaths.filter((path) => {
+    const node = findShapeGroupNode(context.sourceRoot, path)?.node;
+    return node?.kind !== "shapeGroup" && node?.shapeText?.style?.rotation3d?.kind === "value";
+  }).length;
   const lineLeaves = getShapeGroupLineEligibleLeaves(context);
   const ends: ShapeLineEnds = {};
   const mixedLineEnds: ("begin" | "end")[] = [];
@@ -730,6 +745,7 @@ export function aggregateShapeGroupFormatSnapshot(
     bodyEligibleCount: body.length,
     textEligibleCount: text.length,
     descendantCount: context.leaves.length,
+    independentTextCameraCount,
     rotation3dAffectedCount: context.rotation3dSource.affectedLeafPaths.length,
     rotation3dInherited: context.rotation3dSource.inherited,
     rotation3dShared:

@@ -32,6 +32,8 @@ import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
 import { framedShape } from "./framed-shape-fixture";
+import { createDefaultShapeText } from "../../../modules/sheet-drawings/shape-text-options";
+import type { ShapeGroupFormatEdit } from "../../../modules/sheet-drawings/shape-group-format-planning";
 import type { ShapeFormatIntent } from "../../../modules/sheet-drawings/shape-format-pane-model";
 import { useDrawingActions } from "../../../modules/sheet-drawings/useDrawingActions";
 import {
@@ -740,20 +742,18 @@ describe("exact-owner actual shape group format pane", () => {
       expect(f.graphic(id).shapeText!.layout.marginsPt).toEqual(value);
     expect(f.session.history.undoStack).toHaveLength(1);
     const before = f.state();
-    for (const category of ["reflection", "glow", "softEdges", "format3d", "rotation3d"])
-      for (const target of ["shape", "text"]) {
-        if (
-          target === "shape" &&
-          ["reflection", "glow", "format3d", "rotation3d"].includes(category)
-        )
-          continue;
-        if (target === "text" && category === "glow") continue;
-        expect(
-          f.pane.onIntent(
-            f.intent({ type: "set-style", target, category, value: { kind: "none" } }),
-          ),
-        ).toBe(false);
-      }
+    // Container soft edges are not a supported body effect. Text effects and
+    // the shared body camera have their own actual consumers below.
+    expect(
+      f.pane.onIntent(
+        f.intent({
+          type: "set-style",
+          target: "shape",
+          category: "softEdges",
+          value: { kind: "none" },
+        }),
+      ),
+    ).toBe(false);
     expect(f.state()).toEqual(before);
     expect(f.session.history.undoStack).toHaveLength(1);
   });
@@ -1202,4 +1202,126 @@ test("explicit ordinary leaf pane keeps canonical owner, sibling styles and exac
   expect(undoWorkbookCommand(f.session)).toBe(true);
   f.revision.value++;
   expect(f.state()).toEqual(before);
+});
+
+describe("group glyph effects and actual Text Rotation source", () => {
+  const edits: ShapeGroupFormatEdit[] = [
+    {
+      type: "set-style",
+      target: "text",
+      category: "reflection",
+      value: { kind: "value", value: { size: 0.85, opacity: 0.55, blurPt: 0.5, distancePt: 0 } },
+    },
+    {
+      type: "set-style",
+      target: "text",
+      category: "softEdges",
+      value: { kind: "value", value: { sizePt: 0.75 } },
+    },
+    { type: "set-style", target: "text", category: "format3d", value: body3d(12) },
+  ];
+  for (const nested of [false, true])
+    test.each(edits)(`glyph $category is atomic and scoped (nested=${nested})`, (edit) => {
+      if (edit.type !== "set-style") throw new Error("Missing style fixture");
+      const f = fixture(),
+        path = nested ? ["root", "inner"] : ["root"];
+      expect(f.open(path)).toBe(true);
+      expect(f.pane.capabilities.value.styles?.text?.[edit.category]?.enabled).toBe(true);
+      const before = f.state(),
+        captured = f.intent(edit);
+      expect(f.pane.onIntent(captured)).toBe(true);
+      for (const id of nested ? ["b", "text"] : ["a", "b", "text"])
+        expect(f.graphic(id).shapeText?.style?.[edit.category]).toEqual(edit.value);
+      expect(f.graphic("line").shapeText?.style).toBeUndefined();
+      expect(f.source().groupEffects).toBeUndefined();
+      expect(f.source().group3d).toBeUndefined();
+      expect(f.graphic("a").shapeStyle?.format3d).toBeUndefined();
+      expect(f.session.history.undoStack).toHaveLength(1);
+      const after = f.state();
+      expect(f.pane.onIntent(captured)).toBe(false);
+      expect(f.state()).toEqual(after);
+      expect(undoWorkbookCommand(f.session)).toBe(true);
+      expect(f.state()).toEqual(before);
+      expect(redoWorkbookCommand(f.session)).toBe(true);
+      expect(f.state()).toEqual(after);
+      expect(f.open(path)).toBe(true);
+      f.prepare.mockImplementation(() => {
+        throw new Error("Glyph budget rejected");
+      });
+      expect(
+        f.pane.onIntent(
+          f.intent({
+            type: "set-style",
+            target: "text",
+            category: edit.category,
+            value: { kind: "none" },
+          }),
+        ),
+      ).toBe(false);
+      expect(f.state()).toEqual(after);
+      expect(f.session.history.undoStack).toHaveLength(1);
+    });
+  test("owned Text Rotation writes the complete shared body camera and never migrates an independent glyph camera", () => {
+    const initial = group();
+    initial.group3d = { rotation3d: camera(45) };
+    const a = initial.members[0] as SheetGroupedGraphicDrawing;
+    a.shapeText = { ...createDefaultShapeText(), style: { rotation3d: camera(12) } };
+    const f = fixture(initial);
+    expect(f.open(["root", "a"])).toBe(true);
+    expect(f.pane.snapshot.value?.textStyle?.rotation3d).toEqual(camera(45));
+    expect(f.pane.snapshot.value?.independentTextCameraCount).toBe(1);
+    expect(f.pane.capabilities.value.styles?.text?.rotation3d).toEqual(
+      f.pane.capabilities.value.styles?.shape?.rotation3d,
+    );
+    const before = f.state(),
+      captured = f.intent({
+        type: "set-style",
+        target: "text",
+        category: "rotation3d",
+        value: camera(30),
+      });
+    expect(f.pane.onIntent(captured)).toBe(true);
+    expect(f.source().group3d?.rotation3d).toEqual(camera(30));
+    expect(f.graphic("a").shapeText?.style?.rotation3d).toEqual(camera(12));
+    expect(f.pane.snapshot.value?.textStyle?.rotation3d).toEqual(camera(30));
+    expect(f.pane.snapshot.value?.independentTextCameraCount).toBe(1);
+    const after = f.state();
+    expect(f.session.history.undoStack).toHaveLength(1);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(f.state()).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    expect(f.state()).toEqual(after);
+  });
+  test("Text Rotation cannot bypass the exact projected-connector safety gate", () => {
+    const initial = group(),
+      line = initial.members[1] as SheetGroupedGraphicDrawing;
+    line.rotation = 0;
+    line.shapeConnector = {
+      kind: "shape-connector-v1",
+      begin: { kind: "free", xRatio: 0, yRatio: 0 },
+      end: { kind: "free", xRatio: 1, yRatio: 1 },
+    };
+    const f = fixture(initial);
+    expect(f.open()).toBe(true);
+    expect(f.pane.capabilities.value.styles?.text?.rotation3d?.valueEnabled).toBe(false);
+    const before = f.state();
+    expect(
+      f.pane.onIntent(
+        f.intent({ type: "set-style", target: "text", category: "rotation3d", value: camera(45) }),
+      ),
+    ).toBe(false);
+    expect(f.state()).toEqual(before);
+    expect(f.session.history.undoStack).toHaveLength(0);
+    expect(
+      f.pane.onIntent(
+        f.intent({
+          type: "set-style",
+          target: "text",
+          category: "rotation3d",
+          value: { kind: "none" },
+        }),
+      ),
+    ).toBe(true);
+    expect(f.source().group3d).toEqual({ rotation3d: { kind: "none" } });
+  });
 });

@@ -99,6 +99,8 @@ export interface ShapeFormatSnapshot {
   connectorBindings?: readonly { endpoint: "begin" | "end"; targetName: string }[];
   shapeStyle?: Readonly<PictureDetailedStyle>;
   textStyle?: Readonly<PictureDetailedStyle>;
+  /** Saved independent glyph cameras are kept; pane rotation edits the body scene. */
+  independentTextCameraCount?: number;
   /** Common arrowheads across actual line descendants; omitted mixed endpoints are explicit. */
   lineEnds?: Readonly<ShapeLineEnds>;
   mixedLineEnds?: readonly ("begin" | "end")[];

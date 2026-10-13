@@ -73,6 +73,9 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
         category="softEdges"
       />
       <PictureSoftEdgesEditor v-else v-bind="softEdges" />
+      <p v-if="target === 'text'" class="shape-format-effects__reason">
+        {{ controller.s.value("textSoftEdgesHelp") }}
+      </p>
       <p v-if="reason('softEdges')" class="shape-format-effects__reason">
         {{ reason("softEdges") }}
       </p>
@@ -95,14 +98,22 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
         category="rotation3d"
       />
       <PictureRotation3dEditor v-else v-bind="rotation3d" />
+      <p v-if="target === 'text'" class="shape-format-effects__reason">
+        {{ controller.s.value("textCameraSharedHelp") }}
+      </p>
+      <p
+        v-if="target === 'text' && controller.props.snapshot?.independentTextCameraCount"
+        class="shape-format-effects__reason"
+        data-independent-text-camera
+      >
+        {{ controller.s.value("textCameraLegacyHelp") }} ({{
+          controller.props.snapshot.independentTextCameraCount
+        }})
+      </p>
       <p v-if="reason('rotation3d')" class="shape-format-effects__reason">
         {{ reason("rotation3d") }}
       </p>
-      <ShapeFormatCheckbox
-        v-if="target === 'shape'"
-        :controller="controller"
-        field="shapeKeepTextFlat"
-      />
+      <ShapeFormatCheckbox :controller="controller" field="shapeKeepTextFlat" />
     </PictureFormatSection>
   </div>
 </template>

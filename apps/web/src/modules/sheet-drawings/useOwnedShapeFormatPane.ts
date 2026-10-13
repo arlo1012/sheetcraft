@@ -135,6 +135,12 @@ export function useOwnedShapeFormatPane(options: {
     const properties = getShapeObjectProperties(
       isFramedShapeDrawing(d) ? d.shapeProperties : undefined,
     );
+    const bodyStyle = resolveShapeDetailedPaintStyle(view),
+      textStyle = resolveShapeTextPaintStyle(view);
+    // WPS's two rotation sections edit one body camera. Saved independent
+    // glyph cameras remain on shapeText and in their existing paint consumer.
+    if (bodyStyle.rotation3d) textStyle.rotation3d = bodyStyle.rotation3d;
+    else delete textStyle.rotation3d;
     const revision = options.getRevision();
     return {
       owner: {
@@ -158,8 +164,14 @@ export function useOwnedShapeFormatPane(options: {
         ...drawingShapeTextValues(view),
       },
       mixedFields: drawingShapeTextCharacterValues(view).mixedFields,
-      shapeStyle: d.kind === "shape" ? resolveShapeDetailedPaintStyle(view) : undefined,
-      textStyle: resolveShapeTextPaintStyle(view),
+      shapeStyle:
+        d.kind === "shape"
+          ? bodyStyle
+          : bodyStyle.rotation3d
+            ? { rotation3d: bodyStyle.rotation3d }
+            : {},
+      textStyle,
+      independentTextCameraCount: view.shapeText?.style?.rotation3d?.kind === "value" ? 1 : 0,
       ...(acknowledged.value?.drawing === d && acknowledged.value.revision === revision
         ? { acceptedIntentId: acknowledged.value.id }
         : {}),
@@ -278,7 +290,7 @@ export function useOwnedShapeFormatPane(options: {
           glow: bodyField,
           softEdges: bodyField,
           format3d: bodyField,
-          rotation3d: bodyField,
+          rotation3d: field,
         },
         text: {
           fill: textField,
@@ -288,7 +300,7 @@ export function useOwnedShapeFormatPane(options: {
           glow: textField,
           softEdges: textField,
           format3d: textField,
-          rotation3d: textField,
+          rotation3d: field,
         },
       },
       lineEnds: {
@@ -421,13 +433,19 @@ export function useOwnedShapeFormatPane(options: {
           return false;
         if (intent.target === "text" && intent.category === "fill")
           next = withoutDrawingShapeTextCharacterProperties(next, ["color"]);
-        const text = intent.target === "text" ? materializeDrawingShapeText(next) : undefined;
+        const text =
+          intent.target === "text" && intent.category !== "rotation3d"
+            ? materializeDrawingShapeText(next)
+            : undefined;
         const style = { ...(text ? text.style : next.shapeStyle) };
         if (intent.value === undefined) delete style[intent.category];
         else Object.assign(style, { [intent.category]: intent.value });
-        next = text
-          ? withDrawingShapeText(next, { ...text, style })
-          : { ...next, shapeStyle: style };
+        if (text) next = withDrawingShapeText(next, { ...text, style });
+        else if (Object.keys(style).length) next = { ...next, shapeStyle: style };
+        else {
+          const { shapeStyle: _style, ...base } = next;
+          next = base;
+        }
       } else if (intent.type === "set-text-margins") {
         if (
           ["textMarginLeftPt", "textMarginRightPt", "textMarginTopPt", "textMarginBottomPt"].some(
@@ -598,9 +616,15 @@ export function useOwnedShapeFormatPane(options: {
         if (!Number.isFinite(textPlan.estimatedPeakBytes)) return false;
         preflight = prepared.drawing;
       }
-      if (!resolvedCandidate?.collapsed && preflight.kind === "shape") {
+      if (
+        !resolvedCandidate?.collapsed &&
+        (preflight.kind === "shape" ||
+          (preflight.kind === "textBox" &&
+            (preflight.shapeStyle?.rotation3d?.kind === "value" ||
+              preflight.shapeStyle?.format3d?.kind === "value")))
+      ) {
         const geometry =
-          getDrawingShapeGeometry(preflight) ??
+          getDrawingShapeGeometry(preflight, preflight.kind === "textBox") ??
           (!preflight.shapeGeometry && !preflight.shapePath
             ? getLegacyShapeGeometry(preflight.shape, preflight.width, preflight.height)
             : undefined);

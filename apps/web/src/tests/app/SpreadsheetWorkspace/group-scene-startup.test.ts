@@ -160,7 +160,11 @@ test("real Workspace restores snapshot67 and applies shared-camera, depth, Keep 
     expect(pane.props("snapshot")?.drawing.id).toBe("leaf-0");
     expect(pane.props("snapshot")?.scopeDescription).toContain("2");
     expect(
-      pane.getComponent(PictureRotation3dEditor).props("onCommit")({
+      pane
+        .findAllComponents(ShapeFormatEffects)
+        .find((component) => component.props("target") === "text")!
+        .getComponent(PictureRotation3dEditor)
+        .props("onCommit")({
         kind: "value",
         value: { ...rotation, xDeg: 30 },
       }),
@@ -171,6 +175,12 @@ test("real Workspace restores snapshot67 and applies shared-camera, depth, Keep 
     expect(newRoot.group3d?.rotation3d).toMatchObject({ kind: "value", value: { xDeg: 30 } });
     expect(newRoot.members[0]).toHaveProperty("shapeStyle.rotation3d.value.xDeg", 20);
     expect(newRoot.members[1]).toHaveProperty("shapeStyle.rotation3d.value.xDeg", 20);
+    expect(
+      newRoot.members.every(
+        (member) =>
+          member.kind !== "shapeGroup" && member.shapeText?.style?.rotation3d === undefined,
+      ),
+    ).toBe(true);
     state.undo();
     await flushPromises();
     expect(serializeWorkbook(state.session.workbook)).toEqual(original);
@@ -205,16 +215,42 @@ test("real Workspace restores snapshot67 and applies shared-camera, depth, Keep 
     ).toBe(true);
     await flushPromises();
     const layered = serializeWorkbook(state.session.workbook),
-      layer = wrapper.getComponent(SheetDrawingLayer),
-      forest = layer.props("drawings"),
-      metrics = layer.props("metrics")!;
+      layer = wrapper.getComponent(SheetDrawingLayer);
     expect(
       (sheet.drawings![0] as ShapeGroupDrawing).members.every(
         (member) => member.kind !== "shapeGroup" && member.shapeStyle?.format3d?.kind === "value",
       ),
     ).toBe(true);
+    // The other visible Effects mode edits glyph depth, never body depth or
+    // a second camera. Its actual owner/history must remain wired after restore.
+    const textEffects = wrapper
+      .findAllComponents(ShapeFormatEffects)
+      .find((component) => component.props("target") === "text")!;
+    const textDepth = createPictureFormat3d();
+    textDepth.depthPt = 12;
+    expect(
+      textEffects.getComponent(PictureFormat3dEditor).props("onCommit")({
+        kind: "value",
+        value: textDepth,
+      }),
+    ).toBe(true);
+    await flushPromises();
+    for (const member of (sheet.drawings![0] as ShapeGroupDrawing).members) {
+      expect(member).toHaveProperty("shapeText.style.format3d.value.depthPt", 12);
+      expect(member).toHaveProperty("shapeStyle.format3d.value.depthPt", 24);
+      expect(member).not.toHaveProperty("shapeText.style.rotation3d");
+    }
+    const textLayered = serializeWorkbook(state.session.workbook);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(layered);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(textLayered);
     state.shapeGroupFormatPane.close();
     await flushPromises();
+    const forest = layer.props("drawings"),
+      metrics = layer.props("metrics")!;
     const next = ungroupShapeRoot(forest, "group", metrics);
     expect(layer.props("applyCollection")!(next, forest, metrics)).toBe(true);
     await flushPromises();
@@ -224,7 +260,7 @@ test("real Workspace restores snapshot67 and applies shared-camera, depth, Keep 
     const released = serializeWorkbook(state.session.workbook);
     state.undo();
     await flushPromises();
-    expect(serializeWorkbook(state.session.workbook)).toEqual(layered);
+    expect(serializeWorkbook(state.session.workbook)).toEqual(textLayered);
     state.redo();
     await flushPromises();
     expect(serializeWorkbook(state.session.workbook)).toEqual(released);
