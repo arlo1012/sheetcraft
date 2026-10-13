@@ -203,8 +203,9 @@ export function createShapeDrawingFromChoice(
   if (choice.kind === "textBox") {
     drawing.kind = "textBox";
     drawing.shape = "rectangle";
-    drawing.fill = "transparent";
-    drawing.strokeWidth = 0;
+    drawing.fill = "#ffffff";
+    drawing.stroke = "#bcbcbc";
+    drawing.strokeWidth = 1;
     if (drawing.shapeText) {
       drawing.shapeText = {
         ...drawing.shapeText,

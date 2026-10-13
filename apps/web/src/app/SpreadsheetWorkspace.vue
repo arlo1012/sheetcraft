@@ -2095,6 +2095,7 @@ function selectedShapeChanged(id: string | null) {
   }
 }
 const shapeInteractionBlocked = ref(false);
+let shapeCreationEditorIntent = 0;
 const shapeCreation = useShapeCreation({
   getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
   getWorkbook: () => session.workbook,
@@ -2105,13 +2106,44 @@ const shapeCreation = useShapeCreation({
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || shapeInteractionBlocked.value,
   flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
   name: (choice) => choice.label[locale.value === "zh-CN" ? "zh-CN" : "en-US"],
+  getTextBoxFontFamily: () => session.workbook.theme.bodyFont,
   onStart: () => {
+    shapeCreationEditorIntent++;
     drawingActions.close();
     sheetGridRef.value?.selectDrawing(null);
   },
   execute: executeCommand,
-  onCreated: (drawing) => {
-    if (!shapeCreation.request.value) sheetGridRef.value?.selectDrawing(drawing.id);
+  onCreated: (drawing, request) => {
+    const token = ++shapeCreationEditorIntent;
+    if (request.continuous) return;
+    if (drawing.kind !== "textBox") {
+      sheetGridRef.value?.selectDrawing(drawing.id);
+      return;
+    }
+    // Core normalizes the creation payload again: edit only the durable root,
+    // after the updated worksheet metrics have reached the grid.
+    const root = request.sheet.drawings?.find((node) => node.id === drawing.id);
+    const revision = workbookRevision.value;
+    if (!root || root.kind !== "textBox") return;
+    void nextTick(() => {
+      if (
+        token !== shapeCreationEditorIntent ||
+        session.workbook !== request.workbook ||
+        activeSheet.value !== request.sheet ||
+        workbookGeneration.value !== request.generation ||
+        workbookRevision.value !== revision ||
+        loading.value ||
+        fileBusy.value ||
+        xlsxBusy.value ||
+        shapeInteractionBlocked.value ||
+        shapeCreation.request.value ||
+        shapeTextEdit.snapshot.value ||
+        !request.sheet.drawings?.includes(root) ||
+        !sheetGridRef.value?.selectShapeObjects([[root.id]])
+      )
+        return;
+      startShapeTextEdit({ root, selection: "end" });
+    });
   },
 });
 const selectedShapeObjectPaths = shallowRef<readonly ShapeGroupPath[]>([]);

@@ -45,9 +45,13 @@ export function useShapeCreation(options: {
   flush: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
   name?: (choice: ShapeCreationRequest["choice"]) => string;
+  getTextBoxFontFamily?: () => string;
   onStart?: () => void;
   getMetrics?: () => PictureSheetMetrics | undefined;
-  onCreated?: (drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing) => void;
+  onCreated?: (
+    drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing,
+    request: ShapeCreationRequest,
+  ) => void;
 }) {
   const idFactory = createBrowserIdFactory();
   const request = shallowRef<ShapeCreationRequest>();
@@ -79,6 +83,15 @@ export function useShapeCreation(options: {
     continuous: boolean,
   ): ShapeCreationRequest {
     const kind = choice.kind === "textBox" ? "textBox" : "shape";
+    const base = createGraphicDrawing(
+      idFactory("drawing"),
+      kind,
+      options.name?.(choice) ?? choice.label["en-US"],
+      options.getAddress(),
+      choice.kind === "textBox" ? choice.direction : undefined,
+    );
+    if (kind === "textBox" && base.shapeText && options.getTextBoxFontFamily)
+      base.shapeText = { ...base.shapeText, fontFamily: options.getTextBoxFontFamily() };
     const created: ShapeCreationRequest = {
       ...owner,
       requestId: ++generation,
@@ -86,13 +99,7 @@ export function useShapeCreation(options: {
       choice,
       continuous,
       base: {
-        ...createGraphicDrawing(
-          idFactory("drawing"),
-          kind,
-          options.name?.(choice) ?? choice.label["en-US"],
-          options.getAddress(),
-          choice.kind === "textBox" ? choice.direction : undefined,
-        ),
+        ...base,
         text: "",
       },
     };
@@ -214,7 +221,7 @@ export function useShapeCreation(options: {
         /* Stop the mode safely if a fresh identity cannot be prepared. */
       }
       try {
-        options.onCreated?.(committed as SheetGraphicDrawing | SheetFramedGraphicDrawing);
+        options.onCreated?.(committed as SheetGraphicDrawing | SheetFramedGraphicDrawing, current);
       } catch {
         /* Optional selection failure must not turn success into rejection. */
       }

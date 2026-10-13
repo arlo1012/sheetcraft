@@ -8,6 +8,7 @@ import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import WordArtInsertMenu from "../../sheet-drawings/components/WordArtInsertMenu.vue";
 import type { WordArtStylePreset } from "../../sheet-drawings/wordart-style-presets";
 import ShapeInsertMenu from "../../sheet-drawings/components/ShapeInsertMenu.vue";
+import TextBoxInsertMenu from "../../sheet-drawings/components/TextBoxInsertMenu.vue";
 import type { ShapeGalleryChoice } from "../../sheet-drawings/shape-gallery";
 import {
   Camera,
@@ -166,7 +167,15 @@ const { t } = useAppI18n();
         @activate="emit('insertDrawing', 'wordArt')"
         ><ALargeSmall
       /></RibbonButton>
+      <TextBoxInsertMenu
+        v-if="insertShapeHandler"
+        :disabled="imageDisabled"
+        :owner-id="shapeOwnerId"
+        :edit-session-id="editSessionId"
+        :handler="insertShapeHandler"
+      />
       <RibbonButton
+        v-else
         variant="tall"
         :label="t('drawing.textBox')"
         :text="t('drawing.textBox')"

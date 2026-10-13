@@ -192,8 +192,9 @@ describe("choice-to-drawing creation", () => {
       expect(drawing.shapeLineEnds).toBeUndefined();
       if (drawing.kind === "textBox") {
         expect(drawing.shapeGeometry).toBeUndefined();
-        expect(drawing.fill).toBe("transparent");
-        expect(drawing.strokeWidth).toBe(0);
+        expect(drawing.fill).toBe("#ffffff");
+        expect(drawing.stroke).toBe("#bcbcbc");
+        expect(drawing.strokeWidth).toBe(1);
         expect(drawing.textDirection).toBe(id === "verticalTextBox" ? "vertical" : undefined);
       } else expect(drawing.textDirection).toBeUndefined();
     }

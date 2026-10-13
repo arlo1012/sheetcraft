@@ -64,6 +64,21 @@ export type ShapeGalleryGroup = Readonly<{
 function label(en: string, zh: string): ShapeGalleryLabel {
   return { "en-US": en, "zh-CN": zh };
 }
+export const TEXT_BOX_CHOICES: Readonly<Record<"horizontal" | "vertical", ShapeTextBoxChoice>> =
+  Object.freeze({
+    horizontal: {
+      id: "textBox",
+      kind: "textBox",
+      direction: "horizontal",
+      label: label("Horizontal Text Box", "横排文本框"),
+    },
+    vertical: {
+      id: "verticalTextBox",
+      kind: "textBox",
+      direction: "vertical",
+      label: label("Vertical Text Box", "竖排文本框"),
+    },
+  });
 function line(
   tool: ShapeLineTool,
   en: string,
@@ -140,22 +155,7 @@ export const SHAPE_GALLERY: readonly ShapeGalleryGroup[] = [
     id: group.id,
     label: group.label,
     items: [
-      ...(group.id === "basic"
-        ? [
-            {
-              id: "textBox",
-              kind: "textBox",
-              direction: "horizontal",
-              label: label("Text Box", "横排文本框"),
-            } as const,
-            {
-              id: "verticalTextBox",
-              kind: "textBox",
-              direction: "vertical",
-              label: label("Vertical Text Box", "竖排文本框"),
-            } as const,
-          ]
-        : []),
+      ...(group.id === "basic" ? [TEXT_BOX_CHOICES.horizontal, TEXT_BOX_CHOICES.vertical] : []),
       ...group.items.map((item): ShapePresetChoice => ({
         id: item.preset,
         kind: "preset",

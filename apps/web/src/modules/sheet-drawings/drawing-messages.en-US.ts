@@ -27,6 +27,9 @@ export const drawingsEnUS = {
 
   "drawing.shape": "Shapes",
   "drawing.textBox": "Text box",
+  "drawing.textBoxDrawingHint":
+    "Choose a direction, then drag on the sheet and type. Press Esc to stop drawing.",
+  "drawing.textBoxSelectionRejected": "The text box could not be selected. Try again.",
   "drawing.wordArt": "WordArt",
   "drawing.icon": "Icons",
   "drawing.equation": "Equation",

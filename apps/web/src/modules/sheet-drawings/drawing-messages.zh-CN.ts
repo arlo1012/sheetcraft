@@ -24,6 +24,8 @@ export const drawingsZhCN = {
 
   "drawing.shape": "形状",
   "drawing.textBox": "文本框",
+  "drawing.textBoxDrawingHint": "选择方向后，在工作表中拖动并输入文字。按 Esc 退出绘制。",
+  "drawing.textBoxSelectionRejected": "暂时无法选择此文本框，请重试。",
   "drawing.wordArt": "艺术字",
   "drawing.icon": "图标",
   "drawing.equation": "公式",

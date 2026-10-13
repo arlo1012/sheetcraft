@@ -40,11 +40,16 @@ export function createGraphicDrawing(
           },
         }
       : {}),
-    fill: kind === "shape" || kind === "icon" ? "#dbeafe" : "transparent",
-    stroke: "#2563eb",
-    strokeWidth: kind === "textBox" ? 0 : 1,
-    color: "#1e3a8a",
-    fontSize: kind === "wordArt" ? 36 : 20,
+    fill:
+      kind === "textBox"
+        ? "#ffffff"
+        : kind === "shape" || kind === "icon"
+          ? "#dbeafe"
+          : "transparent",
+    stroke: kind === "textBox" ? "#bcbcbc" : "#2563eb",
+    strokeWidth: 1,
+    color: kind === "textBox" ? "#000000" : "#1e3a8a",
+    fontSize: kind === "textBox" ? (11 * 96) / 72 : kind === "wordArt" ? 36 : 20,
     bold: kind === "wordArt",
     italic: false,
     rotation: 0,
