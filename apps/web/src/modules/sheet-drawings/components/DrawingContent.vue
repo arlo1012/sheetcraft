@@ -2,8 +2,12 @@
 import { computed, defineAsyncComponent } from "vue";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
-import type { SheetLegacyDrawing as SheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import type {
+  SheetGraphicDrawing,
+  SheetLegacyDrawing as SheetDrawing,
+} from "@sheetcraft/core/sheet-drawings";
 import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
+import ShapeLeafPixelContent from "./ShapeLeafPixelContent.vue";
 import StandardShapeContent from "./StandardShapeContent.vue";
 import type { ShapeDetailedPresentation } from "../shape-detailed-presentation";
 import { standardShapeSvgTransform } from "../shape-geometry";
@@ -36,6 +40,15 @@ const emit = defineEmits<{
   controlChange: [value: unknown];
   detailedPaint: [presentation: ShapeDetailedPresentation | undefined];
 }>();
+const projectedLegacyTextBox = computed<SheetGraphicDrawing | undefined>(() => {
+  const drawing = props.drawing;
+  return drawing.kind === "textBox" &&
+    !drawing.shapeText &&
+    (drawing.shapeStyle?.rotation3d?.kind === "value" ||
+      drawing.shapeStyle?.format3d?.kind === "value")
+    ? drawing
+    : undefined;
+});
 const textStyle = computed(() => ({
   color: props.drawing.color,
   fontSize: `${props.drawing.fontSize}px`,
@@ -59,8 +72,16 @@ const legacyBodyTransform = computed(() =>
 </script>
 <template>
   <div class="drawing-content" :style="{ transform: `rotate(${drawing.rotation}deg)` }">
+    <ShapeLeafPixelContent
+      v-if="projectedLegacyTextBox"
+      :drawing="projectedLegacyTextBox"
+      :theme="theme"
+      :density="density"
+      :hide-text="hideText"
+      @paint="emit('detailedPaint', $event)"
+    />
     <StandardShapeContent
-      v-if="
+      v-else-if="
         (drawing.kind === 'shape' &&
           (connectorRoute ||
             drawing.shapeConnector ||
@@ -177,6 +198,7 @@ const legacyBodyTransform = computed(() =>
     <div
       v-else
       v-show="
+        !projectedLegacyTextBox &&
         !hideText &&
         !(
           (drawing.kind === 'shape' &&

@@ -2,6 +2,11 @@ import { computed, effectScope, ref, shallowRef } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createWorkbook, createSheet, getActiveSheet } from "@sheetcraft/core/workbook";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import type {
+  Choice,
+  PictureFormat3d,
+  PictureRotation3d,
+} from "@sheetcraft/core/picture-detailed-style";
 import {
   findShapeGroupNode,
   isShapeGroupDrawing,
@@ -26,9 +31,13 @@ import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
+import { framedShape } from "./framed-shape-fixture";
 import type { ShapeFormatIntent } from "../../../modules/sheet-drawings/shape-format-pane-model";
 import { useDrawingActions } from "../../../modules/sheet-drawings/useDrawingActions";
-import { useOwnedShapeGroupFormatPane } from "../../../modules/sheet-drawings/useOwnedShapeGroupFormatPane";
+import {
+  useOwnedShapeGroupFormatPane,
+  type ShapeGroupFormatScope,
+} from "../../../modules/sheet-drawings/useOwnedShapeGroupFormatPane";
 
 const cleanup: (() => void)[] = [];
 afterEach(() =>
@@ -103,6 +112,26 @@ function pictureFill() {
     },
   };
 }
+function camera(xDeg: number): Choice<PictureRotation3d> {
+  return {
+    kind: "value",
+    value: { projection: "parallel", xDeg, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+  };
+}
+function body3d(depthPt: number): Choice<PictureFormat3d> {
+  return {
+    kind: "value",
+    value: {
+      depthPt,
+      depthColor: { kind: "rgb", rgb: "#336699" },
+      contourPt: 0,
+      contourColor: { kind: "rgb", rgb: "#112233" },
+      material: "matte",
+      lighting: "three-point",
+      lightingAngleDeg: 0,
+    },
+  };
+}
 function fixture(initial = group()) {
   const workbook = ref(createWorkbook({ id: "group-pane", sheetId: "sheet" })),
     sheet = ref(getActiveSheet(workbook.value)),
@@ -142,6 +171,10 @@ function fixture(initial = group()) {
     }),
   )!;
   const replace = vi.fn(actions.replaceCollection);
+  const describeScope = vi.fn(
+    (scope: ShapeGroupFormatScope) =>
+      `${scope.nested ? "Nested" : "Root"}: ${scope.descendantCount} leaves; ${scope.bodyEligibleCount} shapes; ${scope.textEligibleCount} text frames; camera affects ${scope.rotation3dAffectedCount} leaves`,
+  );
   const pane = scope.run(() =>
     useOwnedShapeGroupFormatPane({
       getWorkbook: () => workbook.value,
@@ -154,8 +187,8 @@ function fixture(initial = group()) {
       replaceCollection: replace,
       isAssetAvailable: assets,
       getUnsupportedReason: () => "Unavailable",
-      getScopeDescription: ({ descendantCount, bodyEligibleCount, textEligibleCount, nested }) =>
-        `${nested ? "Nested" : "Root"}: ${descendantCount} leaves; ${bodyEligibleCount} shapes; ${textEligibleCount} text frames`,
+      getCameraUnsupportedReason: () => "Camera with connector bindings is unavailable",
+      getScopeDescription: describeScope,
     }),
   )!;
   cleanup.push(() => scope.stop());
@@ -217,8 +250,302 @@ function fixture(initial = group()) {
     open,
     state,
     layout,
+    describeScope,
   };
 }
+
+describe("shared group body camera pane", () => {
+  test("an internal connector blocks camera values only in its actual subtree and keeps reset choices usable", () => {
+    const initial = group();
+    const line = initial.members[1]! as SheetGroupedGraphicDrawing;
+    line.rotation = 0;
+    line.shapeConnector = {
+      kind: "shape-connector-v1",
+      begin: { kind: "free", xRatio: 0, yRatio: 0 },
+      end: { kind: "free", xRatio: 1, yRatio: 1 },
+    };
+    const f = fixture(initial);
+    expect(f.open()).toBe(true);
+    expect(f.pane.capabilities.value.styles?.shape?.rotation3d).toEqual({
+      enabled: true,
+      valueEnabled: false,
+      reason: "Camera with connector bindings is unavailable",
+    });
+    const before = f.state();
+    expect(
+      f.pane.onIntent(
+        f.intent({
+          type: "set-style",
+          target: "shape",
+          category: "rotation3d",
+          value: camera(45),
+        }),
+      ),
+    ).toBe(false);
+    expect(f.state()).toEqual(before);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(
+      f.pane.onIntent(
+        f.intent({
+          type: "set-style",
+          target: "shape",
+          category: "rotation3d",
+          value: { kind: "none" },
+        }),
+      ),
+    ).toBe(true);
+    expect(f.source().group3d).toEqual({ rotation3d: { kind: "none" } });
+    expect(f.open(["root", "inner"])).toBe(true);
+    expect(f.pane.capabilities.value.styles?.shape?.rotation3d).toEqual({
+      enabled: true,
+      valueEnabled: true,
+      reason: undefined,
+    });
+    expect(
+      f.pane.onIntent(
+        f.intent({
+          type: "set-style",
+          target: "shape",
+          category: "rotation3d",
+          value: camera(30),
+        }),
+      ),
+    ).toBe(true);
+    expect(f.node("inner")).toHaveProperty("group3d.rotation3d", camera(30));
+    expect(f.graphic("line").shapeConnector).toEqual(line.shapeConnector);
+  });
+
+  test.each(["group", "leaf"] as const)(
+    "external bindings into the camera's affected target block %s camera values",
+    (selection) => {
+      const f = fixture();
+      const connector = framedShape();
+      connector.id = "external";
+      connector.name = "External";
+      connector.text = "";
+      connector.rotation = 0;
+      connector.shape = "line";
+      connector.shapeGeometry = { preset: "line" };
+      connector.shapeConnector = {
+        kind: "shape-connector-v1",
+        begin: { kind: "site", targetId: "b", preset: "rect", siteIndex: 0 },
+        end: { kind: "free", xRatio: 1, yRatio: 1 },
+      };
+      f.sheet.value.drawings!.push(connector);
+      expect(f.open(selection === "group" ? ["root", "inner"] : ["root", "inner", "b"])).toBe(true);
+      expect(f.pane.capabilities.value.styles?.shape?.rotation3d?.reason).toBe(
+        "Camera with connector bindings is unavailable",
+      );
+      const before = f.state();
+      expect(
+        f.pane.onIntent(
+          f.intent({
+            type: "set-style",
+            target: "shape",
+            category: "rotation3d",
+            value: camera(45),
+          }),
+        ),
+      ).toBe(false);
+      expect(f.state()).toEqual(before);
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(
+        f.pane.onIntent(
+          f.intent({
+            type: "set-style",
+            target: "shape",
+            category: "rotation3d",
+            value: undefined,
+          }),
+        ),
+      ).toBe(true);
+      expect(f.state()).toEqual(before);
+      expect(f.session.history.undoStack).toHaveLength(0);
+    },
+  );
+
+  test("an unrelated external connector leaves a shared camera available and its bindings intact", () => {
+    const f = fixture();
+    const connector = framedShape();
+    connector.id = "external";
+    connector.name = "External";
+    connector.text = "";
+    connector.rotation = 0;
+    connector.shape = "line";
+    connector.shapeGeometry = { preset: "line" };
+    connector.shapeConnector = {
+      kind: "shape-connector-v1",
+      begin: { kind: "site", targetId: "sibling", preset: "rect", siteIndex: 0 },
+      end: { kind: "free", xRatio: 1, yRatio: 1 },
+    };
+    const target = framedShape();
+    target.id = "sibling";
+    f.sheet.value.drawings![1] = target;
+    f.sheet.value.drawings!.push(connector);
+    expect(f.open()).toBe(true);
+    expect(f.pane.capabilities.value.styles?.shape?.rotation3d).toEqual({
+      enabled: true,
+      valueEnabled: true,
+      reason: undefined,
+    });
+    expect(
+      f.pane.onIntent(
+        f.intent({
+          type: "set-style",
+          target: "shape",
+          category: "rotation3d",
+          value: camera(45),
+        }),
+      ),
+    ).toBe(true);
+    expect(f.source().group3d?.rotation3d).toEqual(camera(45));
+    expect(f.sheet.value.drawings!.find((drawing) => drawing.id === "external")).toHaveProperty(
+      "shapeConnector",
+      connector.shapeConnector,
+    );
+    expect(f.session.history.undoStack).toHaveLength(1);
+  });
+
+  test("selected leaf reads and commits its inherited camera with full scope and exact Undo/Redo", () => {
+    const initial = group();
+    initial.group3d = { rotation3d: camera(45) };
+    const a = initial.members[0]! as SheetGroupedGraphicDrawing;
+    a.shapeStyle = { rotation3d: camera(12), format3d: body3d(24) };
+    const f = fixture(initial);
+    expect(f.open(["root", "a"])).toBe(true);
+    const before = f.state(),
+      oldMembers = normalizeShapeGroup(f.source()).members;
+    expect(f.pane.snapshot.value!.shapeStyle?.rotation3d).toEqual(camera(45));
+    expect(f.pane.snapshot.value!.shapeStyle?.format3d).toEqual(body3d(24));
+    expect(f.pane.snapshot.value!.scopeDescription).toContain("camera affects 4 leaves");
+    expect(f.describeScope).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        descendantCount: 1,
+        rotation3dAffectedCount: 4,
+        rotation3dInherited: true,
+        rotation3dShared: true,
+      }),
+    );
+    expect(f.pane.capabilities.value.styles?.shape?.rotation3d?.enabled).toBe(true);
+    const edit = f.intent({
+      type: "set-style",
+      target: "shape",
+      category: "rotation3d",
+      value: camera(30),
+    });
+    expect(f.pane.onIntent(edit)).toBe(true);
+    expect(f.source().group3d?.rotation3d).toEqual(camera(30));
+    expect(f.source().members).toEqual(oldMembers);
+    expect(f.pane.snapshot.value!.shapeStyle?.rotation3d).toEqual(camera(30));
+    expect(f.pane.snapshot.value!.acceptedIntentId).toBe(edit.intentId);
+    const after = f.state();
+    expect(after.version).toBe(67);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    expect(f.pane.onIntent(edit)).toBe(false);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(f.state()).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    expect(f.state()).toEqual(after);
+  });
+
+  test.each([false, true])(
+    "nested reset clears the effective owner while preserving own leaf depth/camera (inherit=%s)",
+    (inherit) => {
+      const initial = group();
+      initial.group3d = { rotation3d: camera(45) };
+      (initial.members[0]! as SheetGroupedGraphicDrawing).shapeStyle = {
+        rotation3d: camera(12),
+        format3d: body3d(24),
+      };
+      const f = fixture(initial);
+      expect(f.open(["root", "inner"])).toBe(true);
+      expect(f.pane.capabilities.value.styles?.shape?.rotation3d?.enabled).toBe(true);
+      const before = f.state();
+      expect(
+        f.pane.onIntent(
+          f.intent({
+            type: "set-style",
+            target: "shape",
+            category: "rotation3d",
+            value: inherit ? undefined : { kind: "none" },
+          }),
+        ),
+      ).toBe(true);
+      expect(f.source().group3d).toEqual(inherit ? undefined : { rotation3d: { kind: "none" } });
+      expect(f.node("inner")).not.toHaveProperty("group3d");
+      expect(f.graphic("a").shapeStyle).toEqual({ rotation3d: camera(12), format3d: body3d(24) });
+      expect(f.open(["root", "a"])).toBe(true);
+      expect(f.pane.snapshot.value!.shapeStyle?.rotation3d).toEqual(camera(12));
+      expect(f.pane.snapshot.value!.scopeDescription).toContain("camera affects 1 leaves");
+      expect(f.describeScope).toHaveBeenLastCalledWith(
+        expect.objectContaining({ rotation3dShared: false, rotation3dInherited: false }),
+      );
+      const after = f.state();
+      expect(f.session.history.undoStack).toHaveLength(1);
+      expect(undoWorkbookCommand(f.session)).toBe(true);
+      expect(f.state()).toEqual(before);
+      expect(redoWorkbookCommand(f.session)).toBe(true);
+      expect(f.state()).toEqual(after);
+    },
+  );
+
+  test("root depth edits existing leaf appearance and Keep Flat edits existing layouts", () => {
+    const initial = group();
+    initial.group3d = { rotation3d: camera(45) };
+    const f = fixture(initial);
+    expect(f.open()).toBe(true);
+    const before = f.state();
+    expect(f.pane.capabilities.value.styles?.shape?.format3d?.enabled).toBe(true);
+    expect(
+      f.pane.onIntent(
+        f.intent({
+          type: "set-style",
+          target: "shape",
+          category: "format3d",
+          value: body3d(24),
+        }),
+      ),
+    ).toBe(true);
+    for (const id of ["a", "b", "line"])
+      expect(f.graphic(id).shapeStyle?.format3d).toEqual(body3d(24));
+    expect(f.graphic("text").shapeStyle?.format3d).toEqual(body3d(24));
+    expect(f.source().group3d).toEqual(initial.group3d);
+    expect(f.source()).not.toHaveProperty("shapeStyle");
+    expect(f.open(["root", "inner", "b"])).toBe(true);
+    expect(f.pane.snapshot.value!.shapeStyle?.format3d).toEqual(body3d(24));
+    expect(f.open()).toBe(true);
+    expect(f.field("shapeKeepTextFlat", true)).toBe(true);
+    for (const id of ["a", "b", "text"])
+      expect(f.graphic(id).shapeText?.layout.keepFlat).toBe(true);
+    expect(f.graphic("line").shapeText?.layout.keepFlat).toBe(false);
+    expect(f.session.history.undoStack).toHaveLength(2);
+    const after = f.state();
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(f.state()).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    expect(f.state()).toEqual(after);
+  });
+
+  test("a stale unselected camera sibling rejects the leaf callback without a command", () => {
+    const initial = group();
+    initial.group3d = { rotation3d: camera(45) };
+    const f = fixture(initial);
+    expect(f.open(["root", "inner", "b"])).toBe(true);
+    const edit = f.intent({
+      type: "set-style",
+      target: "shape",
+      category: "rotation3d",
+      value: camera(30),
+    });
+    f.graphic("a").shapeStyle = { format3d: body3d(24) };
+    expect(f.pane.onIntent(edit)).toBe(false);
+    expect(f.source().group3d?.rotation3d).toEqual(camera(45));
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.session.history.undoStack).toHaveLength(0);
+  });
+});
 
 describe("exact-owner actual shape group format pane", () => {
   test("root/nested snapshots expose real containers and common descendant fields without read history", () => {
@@ -415,7 +742,11 @@ describe("exact-owner actual shape group format pane", () => {
     const before = f.state();
     for (const category of ["reflection", "glow", "softEdges", "format3d", "rotation3d"])
       for (const target of ["shape", "text"]) {
-        if (target === "shape" && (category === "reflection" || category === "glow")) continue;
+        if (
+          target === "shape" &&
+          ["reflection", "glow", "format3d", "rotation3d"].includes(category)
+        )
+          continue;
         if (target === "text" && category === "glow") continue;
         expect(
           f.pane.onIntent(

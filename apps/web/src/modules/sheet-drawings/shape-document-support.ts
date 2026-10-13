@@ -1,5 +1,9 @@
 import { assertShapeObjectsForSheet } from "@sheetcraft/core/shape-object-sheet";
-import { isShapeGroupDrawing, traverseShapeGroup } from "@sheetcraft/core/shape-group";
+import {
+  isShapeGroupDrawing,
+  traverseShapeGroup,
+  type SheetGroupedGraphicDrawing,
+} from "@sheetcraft/core/shape-group";
 import { normalizeSheetDrawings } from "@sheetcraft/core/sheet-drawings";
 import { deserializeSheet } from "@sheetcraft/core/serialization";
 import type { WorkbookCommand } from "@sheetcraft/core/commands";
@@ -27,7 +31,7 @@ export class UnsupportedShapeConnectorDocumentError extends UnsupportedShapeFram
     this.message = `Live shape connector rendering requires a complete worksheet relation pass (sheet ${sheetId}, objects ${drawingIds.join(", ")}).`;
   }
 }
-/** Source-only stage: a shared camera must never be rendered as independent leaf cameras. */
+/** A scene relation must never silently fall back to unprojected connector sites. */
 export class UnsupportedShapeGroup3dDocumentError extends UnsupportedShapeFrameDocumentError {
   constructor(sheetId: string, drawingIds: readonly string[]) {
     super(sheetId, drawingIds);
@@ -47,11 +51,63 @@ export function assertNoUnresolvedShapeGroup3d(
   }
   if (ids.length) throw new UnsupportedShapeGroup3dDocumentError(sheetId, ids);
 }
+/** A shared body camera does not yet project connector ports/routes. Inspect the
+ * complete forest, including external bindings into hidden or nested scene members. */
+export function assertSupportedShapeGroupScenes(
+  sheetId: string,
+  drawings: readonly SheetDrawing[] | undefined,
+): void {
+  const affected = new Set<string>();
+  const connectors: (SheetDrawing | SheetGroupedGraphicDrawing)[] = [];
+  for (const root of drawings ?? []) {
+    if (!isShapeGroupDrawing(root)) {
+      if ("shapeConnector" in root) connectors.push(root);
+      if (
+        (root.kind === "shape" || root.kind === "textBox") &&
+        !root.shapeConnector &&
+        root.shapeStyle?.rotation3d?.kind === "value"
+      )
+        affected.add(root.id);
+      continue;
+    }
+    const activePaths = new Map<string, boolean>();
+    for (const { node, path, parentPath } of traverseShapeGroup(root)) {
+      const inherited = parentPath && activePaths.get(JSON.stringify(parentPath));
+      const active =
+        !!inherited || (node.kind === "shapeGroup" && node.group3d?.rotation3d.kind === "value");
+      activePaths.set(JSON.stringify(path), active);
+      if (active) affected.add(node.id);
+      if (
+        node.kind !== "shapeGroup" &&
+        !node.shapeConnector &&
+        node.shapeStyle?.rotation3d?.kind === "value"
+      )
+        affected.add(node.id);
+      if ("shapeConnector" in node) connectors.push(node);
+    }
+  }
+  const blocked = connectors.filter((node) => {
+    if (!("shapeConnector" in node) || !node.shapeConnector) return false;
+    return (
+      affected.has(node.id) ||
+      [node.shapeConnector.begin, node.shapeConnector.end].some(
+        (endpoint) => endpoint.kind === "site" && affected.has(endpoint.targetId),
+      )
+    );
+  });
+  if (blocked.length) {
+    const error = new UnsupportedShapeGroup3dDocumentError(
+      sheetId,
+      blocked.map((node) => node.id),
+    );
+    error.message = `Shape 3D projection cannot currently include a connector or a bound connector target (sheet ${sheetId}, connectors ${blocked.map((node) => node.id).join(", ")}).`;
+    throw error;
+  }
+}
 export function assertNoUnresolvedShapeConnectors(
   sheetId: string,
   drawings: readonly SheetDrawing[] | undefined,
 ): void {
-  assertNoUnresolvedShapeGroup3d(sheetId, drawings);
   const ids: string[] = [];
   for (const root of drawings ?? [])
     for (const node of isShapeGroupDrawing(root)
@@ -63,7 +119,7 @@ export function assertNoUnresolvedShapeConnectors(
 function checkDrawings(sheetId: string, drawings: readonly SheetDrawing[] | undefined): void {
   // Whole-forest normalization validates every reference before history or replacement.
   // Raw carrier projectors retain their independent explicit rejection above.
-  assertNoUnresolvedShapeGroup3d(sheetId, normalizeSheetDrawings(drawings));
+  assertSupportedShapeGroupScenes(sheetId, normalizeSheetDrawings(drawings));
 }
 export function assertWorkbookShapeSupport(workbook: Workbook): void {
   for (const sheet of workbook.sheets.values()) {

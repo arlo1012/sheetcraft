@@ -3,6 +3,11 @@ import { createDefaultShapeText } from "../../../modules/sheet-drawings/shape-te
 import { describe, expect, test } from "vitest";
 import { reactive } from "vue";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import type {
+  Choice,
+  PictureFormat3d,
+  PictureRotation3d,
+} from "@sheetcraft/core/picture-detailed-style";
 import { anchorShapeFrameRect, shapeFrameLocalToWorld } from "@sheetcraft/core/shape-frame";
 import {
   collectShapeGroupAssetIds,
@@ -106,6 +111,26 @@ function closePoint(actual: { x: number; y: number }, expected: { x: number; y: 
   expect(actual.x).toBeCloseTo(expected.x, 9);
   expect(actual.y).toBeCloseTo(expected.y, 9);
 }
+function camera(xDeg: number): Choice<PictureRotation3d> {
+  return {
+    kind: "value",
+    value: { projection: "parallel", xDeg, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+  };
+}
+function body3d(depthPt: number): Choice<PictureFormat3d> {
+  return {
+    kind: "value",
+    value: {
+      depthPt,
+      depthColor: { kind: "rgb", rgb: "#336699" },
+      contourPt: 0,
+      contourColor: { kind: "rgb", rgb: "#112233" },
+      material: "warm-matte",
+      lighting: "three-point",
+      lightingAngleDeg: 0,
+    },
+  };
+}
 
 describe("actual container formatting context", () => {
   test("exposes exact reactive root and nested owners, full world geometry and real leaves", () => {
@@ -180,6 +205,179 @@ describe("actual container formatting context", () => {
     expect(() => resolveShapeGroupFormatContext(f.root, ["root"], f.metrics)).toThrow(
       /node budget/,
     );
+  });
+});
+
+describe("shared body camera formatting", () => {
+  test("an explicitly selected leaf reads and edits the actual ancestor camera with its full scope", () => {
+    const f = fixture();
+    f.root.group3d = { rotation3d: camera(45) };
+    f.a.shapeStyle = { rotation3d: camera(12), format3d: body3d(24) };
+    f.inner.groupEffects = { glow: { kind: "none" } };
+    const before = normalizeShapeGroup(f.root);
+    const path = ["root", "inner", "a"];
+    const context = resolveShapeGroupFormatContext(f.root, path, f.metrics);
+    const aggregate = aggregateShapeGroupFormatSnapshot(context, { width: 80, height: 40 });
+    expect(context.leaves).toHaveLength(1);
+    expect(context.rotation3dLease.cameraOwner.path).toEqual(["root"]);
+    expect(aggregate.shapeStyle.rotation3d).toEqual(camera(45));
+    expect(aggregate.shapeStyle.format3d).toEqual(body3d(24));
+    expect(aggregate.rotation3dAffectedCount).toBe(4);
+    expect(aggregate.rotation3dInherited).toBe(true);
+    expect(aggregate.rotation3dShared).toBe(true);
+    const result = planShapeGroupFormatIntent(
+      context,
+      {
+        type: "set-style",
+        target: "shape",
+        category: "rotation3d",
+        value: camera(30),
+      },
+      { width: 80, height: 40 },
+    );
+    expect(result.root.group3d?.rotation3d).toEqual(camera(30));
+    expect(result.eligibleCount).toBe(4);
+    expect(result.descendantCount).toBe(4);
+    expect(result.affectedPaths).toEqual([
+      ["root", "first"],
+      ["root", "inner", "a"],
+      ["root", "inner", "b"],
+      ["root", "last"],
+    ]);
+    expect(node(result.root, path).shapeStyle).toEqual(f.a.shapeStyle);
+    expect(result.root.members).toEqual(before.members);
+    expect(f.root).toEqual(before);
+  });
+
+  test.each([false, true])(
+    "nested reset changes the actual camera owner and retains dormant leaf styles (inherit=%s)",
+    (inherit) => {
+      const f = fixture();
+      f.root.group3d = { rotation3d: camera(45) };
+      f.a.shapeStyle = { rotation3d: camera(12), format3d: body3d(24) };
+      const result = apply(f, ["root", "inner"], {
+        type: "set-style",
+        target: "shape",
+        category: "rotation3d",
+        value: inherit ? undefined : { kind: "none" },
+      });
+      expect(result.root.group3d).toEqual(inherit ? undefined : { rotation3d: { kind: "none" } });
+      expect(findShapeGroupNode(result.root, ["root", "inner"])!.node).not.toHaveProperty(
+        "group3d",
+      );
+      expect(node(result.root, ["root", "inner", "a"]).shapeStyle).toEqual(f.a.shapeStyle);
+      const leafAggregate = aggregateShapeGroupFormatSnapshot(
+        resolveShapeGroupFormatContext(result.root, ["root", "inner", "a"], f.metrics),
+        { width: 80, height: 40 },
+      );
+      expect(leafAggregate.shapeStyle.rotation3d).toEqual(camera(12));
+      expect(leafAggregate.rotation3dInherited).toBe(false);
+      expect(leafAggregate.rotation3dAffectedCount).toBe(1);
+      expect(leafAggregate.rotation3dShared).toBe(false);
+      const rootAggregate = aggregateShapeGroupFormatSnapshot(
+        resolveShapeGroupFormatContext(result.root, ["root"], f.metrics),
+        { width: 320, height: 160 },
+      );
+      expect(rootAggregate.shapeStyle.rotation3d).toEqual(inherit ? undefined : { kind: "none" });
+      expect(rootAggregate.mixedStyleCategories.shape).not.toContain("rotation3d");
+    },
+  );
+
+  test("an absent root camera does not impersonate dormant own leaf cameras", () => {
+    const f = fixture();
+    f.a.shapeStyle = { rotation3d: camera(12) };
+    const root = aggregateShapeGroupFormatSnapshot(
+      resolveShapeGroupFormatContext(f.root, ["root"], f.metrics),
+      { width: 320, height: 160 },
+    );
+    expect(root.shapeStyle.rotation3d).toBeUndefined();
+    expect(root.rotation3dShared).toBe(true);
+    expect(root.mixedStyleCategories.shape).not.toContain("rotation3d");
+    const result = apply(f, ["root", "inner", "a"], {
+      type: "set-style",
+      target: "shape",
+      category: "rotation3d",
+      value: undefined,
+    });
+    expect(node(result.root, ["root", "inner", "a"]).shapeStyle).toBeUndefined();
+    expect(result.root).not.toHaveProperty("group3d");
+    expect(result.affectedPaths).toEqual([["root", "inner", "a"]]);
+  });
+
+  test("a shared camera edit rejects a stale unselected sibling in its captured authority", () => {
+    const f = fixture();
+    f.root.group3d = { rotation3d: camera(45) };
+    const context = resolveShapeGroupFormatContext(f.root, ["root", "inner", "a"], f.metrics);
+    f.root.members[2]!.name = "Changed camera sibling";
+    expect(() =>
+      planShapeGroupFormatIntent(
+        context,
+        {
+          type: "set-style",
+          target: "shape",
+          category: "rotation3d",
+          value: camera(30),
+        },
+        { width: 80, height: 40 },
+      ),
+    ).toThrow(/stale/);
+    expect(f.root.group3d.rotation3d).toEqual(camera(45));
+  });
+
+  test("container body depth uses real eligible leaf styles and stays durable after Ungroup", () => {
+    const f = fixture();
+    f.root.group3d = { rotation3d: camera(30) };
+    const result = apply(f, ["root"], {
+      type: "set-style",
+      target: "shape",
+      category: "format3d",
+      value: body3d(24),
+    });
+    expect(result.eligibleCount).toBe(4);
+    expect(result.root.group3d).toEqual(f.root.group3d);
+    expect(result.root).not.toHaveProperty("format3d");
+    for (const path of [
+      ["root", "first"],
+      ["root", "inner", "a"],
+      ["root", "last"],
+    ])
+      expect(node(result.root, path).shapeStyle).toEqual({ format3d: body3d(24) });
+    expect(node(result.root, ["root", "inner", "b"]).shapeStyle).toEqual({ format3d: body3d(24) });
+    const leafAggregate = aggregateShapeGroupFormatSnapshot(
+      resolveShapeGroupFormatContext(result.root, ["root", "first"], f.metrics),
+      { width: 160, height: 80 },
+    );
+    expect(leafAggregate.shapeStyle.format3d).toEqual(body3d(24));
+    const released = ungroupShapeRoot([result.root], "root", f.metrics);
+    expect(released.find((drawing) => drawing.id === "first")).toHaveProperty("shapeStyle", {
+      format3d: body3d(24),
+      rotation3d: camera(30),
+    });
+    f.root = result.root;
+    const own = apply(f, ["root", "inner", "a"], {
+      type: "set-style",
+      target: "shape",
+      category: "format3d",
+      value: body3d(8),
+    });
+    expect(node(own.root, ["root", "first"]).shapeStyle?.format3d).toEqual(body3d(24));
+    expect(node(own.root, ["root", "inner", "a"]).shapeStyle?.format3d).toEqual(body3d(8));
+    expect(own.root.group3d).toEqual(result.root.group3d);
+  });
+
+  test("group Keep Flat edits the existing descendant layout flags without camera metadata", () => {
+    const f = fixture();
+    f.root.group3d = { rotation3d: camera(45) };
+    const result = apply(f, ["root"], {
+      type: "set-field",
+      field: "shapeKeepTextFlat",
+      value: true,
+    });
+    for (const entry of traverseShapeGroup(result.root))
+      if (entry.node.kind !== "shapeGroup")
+        expect(entry.node.shapeText?.layout.keepFlat).toBe(true);
+    expect(result.root.group3d).toEqual(f.root.group3d);
+    expect(result.root).not.toHaveProperty("shapeText");
   });
 });
 
@@ -514,7 +712,11 @@ describe("genuine descendant fill/line and text batches", () => {
         "format3d",
         "rotation3d",
       ] as const) {
-        if (target === "shape" && (category === "reflection" || category === "glow")) continue;
+        if (
+          target === "shape" &&
+          ["reflection", "glow", "format3d", "rotation3d"].includes(category)
+        )
+          continue;
         if (target === "text" && category === "glow") continue;
         expect(() =>
           apply(f, ["root"], { type: "set-style", target, category, value: { kind: "none" } }),

@@ -15,6 +15,7 @@ import {
   type ShapeFormatOptions,
   type ShapeFormatSnapshot,
   type ShapeFormatStyleCategory,
+  type ShapeFormatStyleCapability,
   type ShapeFormatFailure,
 } from "../../shape-format-pane-model";
 import {
@@ -107,7 +108,7 @@ export function useShapeFormatPane(props: ShapeFormatPaneInput) {
   function styleCapability(
     target: ShapeFormatMode,
     category: ShapeFormatStyleCategory,
-  ): PictureFormatCapability {
+  ): ShapeFormatStyleCapability {
     return props.snapshot
       ? (props.capabilities.styles?.[target]?.[category] ?? {
           enabled: false,
@@ -130,6 +131,7 @@ export function useShapeFormatPane(props: ShapeFormatPaneInput) {
       value: isMixedStyle(target, category) ? undefined : style(target)?.[category],
       mixed: isMixedStyle(target, category),
       disabled: !capability.enabled,
+      ...(category === "rotation3d" ? { valueDisabled: capability.valueEnabled === false } : {}),
       t,
       onCommit: session.styleAction(target, category),
     };

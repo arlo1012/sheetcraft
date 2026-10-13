@@ -4,7 +4,11 @@ export const drawingsEnUS = {
   "drawing.equalSize": "Equal size",
   "drawing.formatGroup": "Format group",
   "drawing.groupFormatScope":
-    "Size, properties and body Shadow belong to this group. Fill, outline and text changes apply to eligible members ({body}/{count} body, {text}/{count} text).",
+    "Size and properties apply to the selected object. Group shadow, reflection and glow affect the combined content. Fill, outline, body depth and text changes apply to eligible members ({body}/{count} body, {text}/{count} text).",
+  "drawing.groupCameraScope":
+    "3D rotation changes one shared scene for {count} members, including when a member is selected. Keep text flat leaves the text in its original 2D position.",
+  "drawing.groupCameraConnectorUnavailable":
+    "3D rotation cannot yet project this scene's connectors or attached ports. You can remove the current 3D rotation or disconnect the affected bindings before applying a new rotation.",
   "drawing.groupLoading": "Preparing the complete group…",
   "drawing.groupRenderingUnavailable":
     "This group cannot be fully displayed with the current fonts, resources or raster budget. Its objects are preserved.",

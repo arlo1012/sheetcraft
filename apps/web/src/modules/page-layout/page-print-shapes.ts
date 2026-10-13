@@ -72,10 +72,23 @@ import {
   releaseShapePresentationCanvas,
 } from "../sheet-drawings/shape-detailed-presentation";
 import {
-  hasActiveShapeGroupEffects,
+  requiresShapeGroupPaint,
   planShapeGroupPaint,
   prepareShapeGroupPaint,
 } from "../sheet-drawings/shape-group-paint";
+
+import { planShapeLeafPixels, prepareShapeLeafPixels } from "../sheet-drawings/shape-leaf-pixels";
+
+/** A released legacy text box keeps its CSS border/plain glyph source. Only its
+ * explicit 3D invokes the united leaf surface; ordinary old print paths stay intact. */
+function projectedLegacyTextBox(drawing: SheetGraphicDrawing): boolean {
+  return (
+    drawing.kind === "textBox" &&
+    !drawing.shapeText &&
+    (drawing.shapeStyle?.rotation3d?.kind === "value" ||
+      drawing.shapeStyle?.format3d?.kind === "value")
+  );
+}
 
 type PrintableShape = SheetGraphicDrawing | SheetFramedGraphicDrawing | ShapeGroupDrawing;
 type Bounds = { left: number; top: number; right: number; bottom: number };
@@ -239,7 +252,7 @@ function* printablePaintEntries(
 ) {
   assertPrintShapeRenderPass(sheet, metrics, renderPass);
   for (const root of getPrintableShapeRoots(sheet)) {
-    if (root.kind === "shapeGroup" && checked(root.id, () => hasActiveShapeGroupEffects(root))) {
+    if (root.kind === "shapeGroup" && checked(root.id, () => requiresShapeGroupPaint(root))) {
       if ([...printableShapeLeavesForRoot(root, metrics, renderPass)].length)
         yield { kind: "group" as const, root };
     } else {
@@ -416,6 +429,22 @@ export function getPrintShapeContentExtent(
     checked(leaf.drawingId, () => {
       if (leaf.sourceRoot.kind === "shapeGroup" && activeRoots.has(leaf.sourceRoot)) return;
       const { drawing, rect } = leaf;
+      if (projectedLegacyTextBox(drawing)) {
+        const plan = planShapeLeafPixels({
+          drawing,
+          density: 1,
+          resources: { theme },
+          sourceIdentity: leaf.sourceIdentity,
+        });
+        if (plan.kind !== "ready") {
+          if (plan.reason === "text-unavailable" && !requireReadyGroupPaint) return;
+          throw new Error("The projected text box appearance is unavailable for print bounds.");
+        }
+        const bounds = worldBounds(drawing, rect, plan.logicalBounds, false);
+        columnCount = Math.max(columnCount, axisCount(bounds.right, metrics.columns));
+        rowCount = Math.max(rowCount, axisCount(bounds.bottom, metrics.rows));
+        return;
+      }
       const plan = planShapeDetailedPaint({
         drawing,
         geometry: leaf.connectorRoute?.geometry ?? geometryFor(drawing),
@@ -542,6 +571,36 @@ export function paintPrintShapes(
       const leaf = entry.leaf;
       checked(leaf.drawingId, () => {
         const { drawing, rect, sourceIdentity } = leaf;
+        if (projectedLegacyTextBox(drawing)) {
+          const result = prepareShapeLeafPixels({ drawing, density, resources, sourceIdentity });
+          if (result.kind !== "ready")
+            throw new Error("The projected text box appearance is unavailable for printing.");
+          try {
+            const bounds = worldBounds(drawing, rect, result.logicalBounds, false);
+            if (
+              bounds.right <= options.viewport.x ||
+              bounds.bottom <= options.viewport.y ||
+              bounds.left >= options.viewport.x + options.viewport.width ||
+              bounds.top >= options.viewport.y + options.viewport.height
+            )
+              return;
+            context.save();
+            try {
+              context.translate(
+                rect.x + drawing.width / 2 - options.viewport.x,
+                rect.y + drawing.height / 2 - options.viewport.y,
+              );
+              context.rotate((drawing.rotation * Math.PI) / 180);
+              context.translate(-drawing.width / 2, -drawing.height / 2);
+              drawRaster(context, result.canvas, result.logicalBounds, result.actualDensity);
+            } finally {
+              context.restore();
+            }
+          } finally {
+            result.dispose();
+          }
+          return;
+        }
         const bodyOptions = {
           drawing,
           geometry: leaf.connectorRoute?.geometry ?? geometryFor(drawing),

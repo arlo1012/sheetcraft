@@ -4,29 +4,45 @@ import { getPictureRasterProjection } from "../../shared/images/picture-detailed
 import type { PictureEffectBounds } from "../../shared/images/picture-effect-geometry";
 import type { PictureRasterLayer } from "../../shared/images/picture-effect-raster";
 import type { ShapeTextPaintPlan, ShapeTextPaintReady } from "./shape-text-paint";
+import type { ShapeGroupSceneProjection } from "./shape-group-scene";
 
 /** KeepFlat bypasses only the body's front-plane 3D map. The owning drawing's
  * ordinary 2D rotation/flip remains outside this independent text layer. */
-export function shapeTextFollowsBodyProjection(drawing: SheetGraphicDrawing): boolean {
+export function shapeTextFollowsBodyProjection(
+  drawing: SheetGraphicDrawing,
+  groupScene?: ShapeGroupSceneProjection,
+): boolean {
   return (
-    drawing.kind === "shape" &&
+    (drawing.kind === "shape" || drawing.kind === "textBox") &&
     drawing.shapeText?.layout.keepFlat !== true &&
-    drawing.shapeStyle?.rotation3d?.kind === "value"
+    (!!groupScene || drawing.shapeStyle?.rotation3d?.kind === "value")
   );
 }
-function projection(drawing: SheetGraphicDrawing, theme?: WorkbookTheme) {
+function projection(
+  drawing: SheetGraphicDrawing,
+  theme?: WorkbookTheme,
+  groupScene?: ShapeGroupSceneProjection,
+) {
   return getPictureRasterProjection(
-    { rotation3d: drawing.shapeStyle?.rotation3d },
+    {
+      rotation3d: groupScene
+        ? { kind: "value", value: groupScene.rotation3d }
+        : drawing.shapeStyle?.rotation3d,
+    },
     theme ?? DEFAULT_WORKBOOK_THEME,
+    undefined,
+    undefined,
+    groupScene?.scene,
   );
 }
 export function projectedShapeTextBounds(
   drawing: SheetGraphicDrawing,
   plan: ShapeTextPaintPlan,
   theme?: WorkbookTheme,
+  groupScene?: ShapeGroupSceneProjection,
 ): PictureEffectBounds {
-  if (!shapeTextFollowsBodyProjection(drawing)) return { ...plan.logicalBounds };
-  const resolver = projection(drawing, theme).projectedBounds;
+  if (!shapeTextFollowsBodyProjection(drawing, groupScene)) return { ...plan.logicalBounds };
+  const resolver = projection(drawing, theme, groupScene).projectedBounds;
   if (typeof resolver !== "function") throw new Error("Shape front-plane bounds unavailable.");
   const raster = resolver(plan.actualDensity, plan.outputBoundsRaster, {
     width: drawing.width * plan.actualDensity,
@@ -52,10 +68,11 @@ export function projectShapeTextSurface(
   drawing: SheetGraphicDrawing,
   text: ShapeTextPaintReady,
   theme?: WorkbookTheme,
+  groupScene?: ShapeGroupSceneProjection,
 ): PictureRasterLayer {
   // Preflight before reading native pixels. Extrusion belongs to the real glyph
   // silhouette in text-own 3D, never this depth-zero body front-plane transform.
-  projectedShapeTextBounds(drawing, text, theme);
+  projectedShapeTextBounds(drawing, text, theme, groupScene);
   const context = text.canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("Shape text pixel processing unavailable.");
   const input = {
@@ -67,8 +84,8 @@ export function projectShapeTextSurface(
       data: context.getImageData(0, 0, text.canvas.width, text.canvas.height).data,
     },
   };
-  if (!shapeTextFollowsBodyProjection(drawing)) return input;
-  const projector = projection(drawing, theme).projectSurface;
+  if (!shapeTextFollowsBodyProjection(drawing, groupScene)) return input;
+  const projector = projection(drawing, theme, groupScene).projectSurface;
   if (!projector) throw new Error("Shape front-plane projector unavailable.");
   return projector(input, text.actualDensity, {
     widthPx: drawing.width * text.actualDensity,

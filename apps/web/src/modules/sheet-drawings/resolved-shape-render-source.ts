@@ -31,7 +31,12 @@ import {
   type ResolvedShapeGroupProjection,
 } from "./resolved-shape-group";
 import { prepareResolvedShapeGeometry } from "./shape-geometry";
-import { assertNoUnresolvedShapeGroup3d } from "./shape-document-support";
+import { assertSupportedShapeGroupScenes } from "./shape-document-support";
+import {
+  createShapeGroupSceneProjection,
+  type ShapeGroupSceneProjection,
+} from "./shape-group-scene";
+import type { PictureRotation3d } from "@sheetcraft/core/picture-detailed-style";
 
 type GraphicSource = SheetGraphicDrawing | SheetFramedGraphicDrawing | SheetGroupedGraphicDrawing;
 export type ShapeConnectorRenderSource =
@@ -59,6 +64,7 @@ export type ResolvedShapeRenderLeaf = Readonly<{
   /** Editing continues to use this genuine carrier projection, never the paint view. */
   carrierRoot?: ResolvedShapeDrawing;
   carrierLeaf?: ResolvedShapeGroupLeaf;
+  groupScene?: ShapeGroupSceneProjection;
   connector?: ShapeConnectorRenderSource;
 }>;
 export type ResolvedShapeForestForRender = Readonly<{
@@ -232,7 +238,7 @@ export function resolveShapeForestForRender(options: {
     throw new RangeError("A shape render pass requires a non-negative safe revision.");
   const snapshot = detachedSnapshot(normalizeSheetDrawings(drawings));
   // Both static and connector relation branches must share source-stage admission.
-  assertNoUnresolvedShapeGroup3d("shape-render-pass", snapshot);
+  assertSupportedShapeGroupScenes("shape-render-pass", snapshot);
   const sourceRoots = [...drawings];
   const sourceNodes = sourceRoots.map((root) =>
     root.kind === "shapeGroup"
@@ -289,12 +295,22 @@ export function resolveShapeForestForRender(options: {
       roots.push(projection);
       groups.set(sourceRoot.id, projection);
       for (const leaf of projection.leaves)
-        addLeaf({ sourceRoot, sourceNode: leaf.sourceNode, path: leaf.path, carrierLeaf: leaf });
+        addLeaf({
+          sourceRoot,
+          sourceNode: leaf.sourceNode,
+          path: leaf.path,
+          carrierLeaf: leaf,
+          ...(leaf.groupScene ? { groupScene: leaf.groupScene } : {}),
+        });
       continue;
     }
     const currentNodes = new Map(traverseShapeGroup(sourceRoot).map(({ node }) => [node.id, node]));
     const ownedLeaves: ResolvedShapeGroupLeaf[] = [];
     const owners: ResolvedShapeGroupOwner[] = [];
+    const cameraOwners = new Map<
+      string,
+      { path: ShapeGroupPath; layout: ResolvedShapeFrame | null; rotation3d: PictureRotation3d }
+    >();
     for (const { node, path } of traverseShapeGroup(captured)) {
       const current = currentNodes.get(node.id);
       const resolved = connections.getNodeAtPath(path);
@@ -306,6 +322,12 @@ export function resolveShapeForestForRender(options: {
       const parentLayout = parent ? carrierFrame(parent) : null;
       const collapsed = !layout || layout.collapsed;
       if (node.kind === "shapeGroup" && current.kind === "shapeGroup") {
+        if (node.group3d?.rotation3d.kind === "value")
+          cameraOwners.set(JSON.stringify(path), {
+            path,
+            layout,
+            rotation3d: node.group3d.rotation3d.value,
+          });
         owners.push({
           sourceRoot,
           sourceNode: current,
@@ -320,6 +342,13 @@ export function resolveShapeForestForRender(options: {
       if (node.kind === "shapeGroup" || current.kind === "shapeGroup" || !parentPath)
         throw new TypeError("A shape render leaf requires its immediate owner.");
       let lease: ResolvedShapeGroupLeaf["lease"] | undefined;
+      let camera: ReturnType<typeof cameraOwners.get>;
+      for (let length = 1; length < path.length && !camera; length++)
+        camera = cameraOwners.get(JSON.stringify(path.slice(0, length)));
+      const groupScene =
+        camera?.layout && layout && !collapsed
+          ? createShapeGroupSceneProjection(camera.path, camera.layout, layout, camera.rotation3d)
+          : undefined;
       const leaf: ResolvedShapeGroupLeaf = {
         sourceRoot,
         sourceNode: current,
@@ -333,6 +362,7 @@ export function resolveShapeForestForRender(options: {
           return (lease ??= leaseShapeGroupNode(captured, path));
         },
         view: resolved.carrierLayout ? graphicView(node, resolved.carrierLayout, metrics) : null,
+        ...(groupScene ? { groupScene } : {}),
       };
       ownedLeaves.push(leaf);
       const connector = connectorSource(node, connections, metrics);
@@ -341,6 +371,7 @@ export function resolveShapeForestForRender(options: {
         sourceNode: current,
         path,
         carrierLeaf: leaf,
+        ...(groupScene ? { groupScene } : {}),
         ...(connector ? { connector } : {}),
       });
     }

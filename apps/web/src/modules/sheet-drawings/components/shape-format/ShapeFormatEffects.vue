@@ -28,7 +28,7 @@ const isConnector = computed(
 );
 function reason(category: ShapeFormatStyleCategory): string | undefined {
   const c = props.controller.styleCapability(props.target, category);
-  return c.enabled ? undefined : c.reason;
+  return c.reason;
 }
 </script>
 <template>

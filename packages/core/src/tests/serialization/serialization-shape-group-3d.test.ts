@@ -116,7 +116,8 @@ describe("internal shared group body camera snapshot67", () => {
           else check.toThrow();
         }
       }
-    expect(() => deserializeWorkbook(rawSnapshot(group(), 68))).toThrow(/Unsupported/);
+    expect(() => deserializeWorkbook(rawSnapshot(group(), 68))).not.toThrow();
+    expect(() => deserializeWorkbook(rawSnapshot(group(), 69))).toThrow(/Unsupported/);
   });
 
   test("67 and standalone inputs reject malformed details and nested active composition without invoking getters", () => {

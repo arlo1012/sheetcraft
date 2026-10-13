@@ -147,6 +147,7 @@ function paintTexture(
   input: PictureRasterLayer,
   inverse: PictureProjectiveHomography,
   lighting: ResolvedPictureMaterialLighting,
+  scene = false,
   depthTest?: Readonly<{
     visible: (x: number, y: number, index: number) => boolean;
     opaque: (x: number, y: number, index: number) => void;
@@ -159,7 +160,7 @@ function paintTexture(
       const px = x + origin.x + 0.5,
         py = y + origin.y + 0.5;
       const w = inverse[6] * px + inverse[7] * py + inverse[8];
-      if (!Number.isFinite(w) || Math.abs(w) < 1e-12) continue;
+      if (!Number.isFinite(w) || (scene ? w <= 0 : Math.abs(w) < 1e-12)) continue;
       const sx = (inverse[0] * px + inverse[1] * py + inverse[2]) / w - input.left - 0.5;
       const sy = (inverse[3] * px + inverse[4] * py + inverse[5]) / w - input.top - 0.5;
       if (
@@ -225,9 +226,10 @@ function coordinates(
   inverse: PictureProjectiveHomography,
   x: number,
   y: number,
+  scene = false,
 ): PictureProjectivePoint | undefined {
   const w = inverse[6] * x + inverse[7] * y + inverse[8];
-  if (!Number.isFinite(w) || Math.abs(w) < 1e-12) return undefined;
+  if (!Number.isFinite(w) || (scene ? w <= 0 : Math.abs(w) < 1e-12)) return undefined;
   const px = (inverse[0] * x + inverse[1] * y + inverse[2]) / w;
   const py = (inverse[3] * x + inverse[4] * y + inverse[5]) / w;
   return Number.isFinite(px) && Number.isFinite(py) ? { x: px, y: py } : undefined;
@@ -369,7 +371,12 @@ function paintShapeRaster(
               x < Math.min(rasterWidth, Math.ceil(crossing.x - bounds.left - 0.5));
               x++
             ) {
-              const source = coordinates(inverse, bounds.left + x + 0.5, py);
+              const source = coordinates(
+                inverse,
+                bounds.left + x + 0.5,
+                py,
+                geometry.isSceneProjection,
+              );
               if (source)
                 write(
                   x,
@@ -404,10 +411,15 @@ function paintShapeRaster(
           let coverage = 0;
           for (let sx = 0; sx < 2; sx++)
             for (let sy = 0; sy < 2; sy++) {
-              const uv = coordinates(side.inverse, px + 0.25 + sx * 0.5, py + 0.25 + sy * 0.5);
+              const uv = coordinates(
+                side.inverse,
+                px + 0.25 + sx * 0.5,
+                py + 0.25 + sy * 0.5,
+                geometry.isSceneProjection,
+              );
               if (uv && uv.x >= 0 && uv.x <= 1 && uv.y >= 0 && uv.y <= 1) coverage += 0.25;
             }
-          const uv = coordinates(side.inverse, px + 0.5, py + 0.5);
+          const uv = coordinates(side.inverse, px + 0.5, py + 0.5, geometry.isSceneProjection);
           if (uv && coverage > 0)
             write(
               x,
@@ -433,6 +445,7 @@ function paintShapeRaster(
       input,
       geometry.front.inverseHomography,
       resolvePictureMaterialLighting(material, normal),
+      geometry.isSceneProjection,
       {
         visible: (x, y, index) => depthAt(x, y, 0) >= depths[index]! - 1e-8,
         opaque: (x, y, index) => {
@@ -571,7 +584,14 @@ export function createPictureProjectiveRaster(
     origin = { x: bounds.left, y: bounds.top };
   for (const { face, lighting, color } of prepared) {
     if (face.kind === "front" && geometry.front.inverseHomography && !wireframe)
-      paintTexture(output, origin, input, geometry.front.inverseHomography, lighting);
+      paintTexture(
+        output,
+        origin,
+        input,
+        geometry.front.inverseHomography,
+        lighting,
+        geometry.isSceneProjection,
+      );
     else if (!wireframe) {
       const box = boundsOf(face.corners);
       for (

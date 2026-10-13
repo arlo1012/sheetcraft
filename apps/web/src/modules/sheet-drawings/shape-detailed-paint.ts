@@ -29,6 +29,7 @@ import {
   type PictureShapeSourceProfile,
 } from "../../shared/images/picture-shape-mask";
 import { getShapeEndPaint } from "./shape-line-paint";
+import type { ShapeGroupSceneProjection } from "./shape-group-scene";
 
 export type ShapePaintResources = PicturePaintResources;
 export type ShapeDetailedPaintOptions = Readonly<{
@@ -43,6 +44,8 @@ export type ShapeDetailedPaintOptions = Readonly<{
   resources?: ShapePaintResources;
   /** World angle includes the existing outer drawing rotation, without baking it into paths. */
   angleDeg?: number;
+  /** Effective common body camera, kept separate from the editable own appearance. */
+  groupScene?: ShapeGroupSceneProjection;
 }>;
 export type ShapeDetailedPaintPlan = PictureDetailedRasterPlan &
   Readonly<{
@@ -129,6 +132,10 @@ function prepareSource(options: ShapeDetailedPaintOptions) {
   const { drawing, geometry } = options;
   const explicit = normalizeShapeStyle(options.style ?? drawing.shapeStyle);
   const style = resolveShapeDetailedPaintStyle(drawing, explicit);
+  // A shared camera selects one body projection. Dormant own values remain on
+  // the source drawing, while actual per-contour depth/material stay effective.
+  if (options.groupScene)
+    style.rotation3d = { kind: "value", value: { ...options.groupScene.rotation3d } };
   if (options.connectorRoute) {
     if (
       options.angleDeg !== undefined &&
@@ -240,6 +247,7 @@ export function planShapeDetailedPaint(options: ShapeDetailedPaintOptions): Shap
         theme,
         source.effectiveGeometry,
         source.sourceProfile,
+        options.groupScene?.scene,
       ),
       getAssetSize: options.resources?.getAssetSize,
     });
@@ -301,6 +309,7 @@ export function prepareShapeDetailedPaint(
       plan.effectiveGeometry,
       plan.sourceProfile,
       plan.effectiveStyle,
+      options.groupScene ?? null,
       options.density,
       options.angleDeg ?? options.drawing.rotation,
       theme,
@@ -330,6 +339,7 @@ export function prepareShapeDetailedPaint(
         theme,
         plan.effectiveGeometry,
         plan.sourceProfile,
+        options.groupScene?.scene,
       ),
       sourcePainter: options.sourcePainter ?? (() => {}),
       getAssetImage: (id) => images.get(id),

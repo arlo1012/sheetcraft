@@ -2,6 +2,8 @@ import { computed, shallowRef, watch } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import type { Choice, PictureRotation3d } from "@sheetcraft/core/picture-detailed-style";
+import { applyShapeGroup3dRotationEdit } from "@sheetcraft/core/shape-group-edit";
 import {
   collectShapeGroupAssetIds,
   SHAPE_GROUP_EFFECT_CATEGORIES,
@@ -30,7 +32,9 @@ import {
   isShapeGroupMemberStyleCategory,
   planShapeGroupFormatIntent,
   resolveShapeGroupFormatContext,
+  type ShapeGroupFormatContext,
 } from "./shape-group-format-planning";
+import { assertSupportedShapeGroupScenes } from "./shape-document-support";
 
 import { resolveShapeForestForRender } from "./resolved-shape-render-source";
 
@@ -38,6 +42,9 @@ export type ShapeGroupFormatScope = {
   descendantCount: number;
   bodyEligibleCount: number;
   textEligibleCount: number;
+  rotation3dAffectedCount: number;
+  rotation3dInherited: boolean;
+  rotation3dShared: boolean;
   nested: boolean;
 };
 
@@ -76,6 +83,7 @@ export function useOwnedShapeGroupFormatPane(options: {
   isAssetAvailable?: (id: string) => boolean;
   assetAvailable?: (id: string) => boolean;
   getUnsupportedReason?: () => string;
+  getCameraUnsupportedReason?: () => string;
   getScopeDescription?: (scope: ShapeGroupFormatScope) => string;
 }) {
   const selected = shallowRef<{
@@ -162,6 +170,28 @@ export function useOwnedShapeGroupFormatPane(options: {
       return;
     }
   });
+  function allowsCameraValue(
+    captured: ShapeGroupFormatContext,
+    value: Choice<PictureRotation3d>,
+  ): boolean {
+    try {
+      const sheet = options.getSheet(),
+        forest = sheet.drawings ?? [];
+      if (!forest.some((root) => root === captured.sourceRoot)) return false;
+      const preview = applyShapeGroup3dRotationEdit(
+        captured.sourceRoot,
+        captured.rotation3dLease,
+        value,
+      );
+      assertSupportedShapeGroupScenes(
+        sheet.id,
+        forest.map((root) => (root === captured.sourceRoot ? preview.root : root)),
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
   const snapshot = computed<ShapeFormatSnapshot | null>(() => {
     const source = root.value,
       target = drawing.value,
@@ -213,6 +243,9 @@ export function useOwnedShapeGroupFormatPane(options: {
               descendantCount: values.descendantCount,
               bodyEligibleCount: values.bodyEligibleCount,
               textEligibleCount: values.textEligibleCount,
+              rotation3dAffectedCount: values.rotation3dAffectedCount,
+              rotation3dInherited: values.rotation3dInherited,
+              rotation3dShared: values.rotation3dShared,
               nested: owner.path.length > 1,
             }),
           }
@@ -313,11 +346,40 @@ export function useOwnedShapeGroupFormatPane(options: {
               getShapeGroupFormatEligibleLeaves(captured, target, category).length > 0) ||
               (captured.sourceNode.kind === "shapeGroup" &&
                 target === "shape" &&
+                category === "rotation3d" &&
+                !captured.collapsed &&
+                captured.rotation3dSource.affectedLeafPaths.length > 0) ||
+              (captured.sourceNode.kind === "shapeGroup" &&
+                target === "shape" &&
                 SHAPE_GROUP_EFFECT_CATEGORIES.some((entry) => entry === category) &&
                 !captured.collapsed) ||
               (isShapeGroupMemberStyleCategory(target, category) &&
                 getShapeGroupFormatEligibleLeaves(captured, target, category).length > 0)),
         );
+    if (captured && styles.shape?.rotation3d?.enabled) {
+      const effective = captured.rotation3dSource.rotation3d;
+      const preview: Choice<PictureRotation3d> =
+        effective?.kind === "value"
+          ? effective
+          : {
+              kind: "value",
+              value: {
+                projection: "parallel",
+                xDeg: 0,
+                yDeg: 0,
+                zDeg: 0,
+                distanceFromGroundPt: 0,
+              },
+            };
+      // Shared and own cameras must preserve every port relation. A separate
+      // value capability keeps None and Inherit usable when projection is blocked.
+      const valueEnabled = allowsCameraValue(captured, preview);
+      styles.shape.rotation3d = {
+        ...styles.shape.rotation3d,
+        valueEnabled,
+        ...(!valueEnabled ? { reason: options.getCameraUnsupportedReason?.() ?? reason } : {}),
+      };
+    }
     return {
       fields,
       styles,
@@ -460,6 +522,13 @@ export function useOwnedShapeGroupFormatPane(options: {
       } else if (intent.type === "set-style") {
         if (capabilities.value.styles?.[intent.target]?.[intent.category]?.enabled !== true)
           return false;
+        if (
+          intent.target === "shape" &&
+          intent.category === "rotation3d" &&
+          intent.value?.kind === "value" &&
+          !allowsCameraValue(captured, intent.value)
+        )
+          return false;
       } else if (intent.type === "set-text-margins") {
         const lengths = [
           intent.value.leftPt,
@@ -507,9 +576,10 @@ export function useOwnedShapeGroupFormatPane(options: {
       )
         return false;
       const live = selection.sheet.drawings ?? [],
-        applied = currentRoot();
-      if (nextForest !== forest && JSON.stringify(normalizeSheetDrawings(live)) === forest)
-        return false;
+        applied = currentRoot(),
+        canonicalLive = normalizeSheetDrawings(live),
+        canonicalBefore = JSON.parse(forest) as readonly SheetDrawing[];
+      if (nextForest !== forest && JSON.stringify(canonicalLive) === forest) return false;
       if (
         !applied ||
         live.length !== expected.length ||
@@ -519,8 +589,9 @@ export function useOwnedShapeGroupFormatPane(options: {
             item.id !== original.id ||
             item.kind !== original.kind ||
             (original !== source &&
-              JSON.stringify(normalizeSheetDrawings([item])) !==
-                JSON.stringify(normalizeSheetDrawings([original])))
+              // Bindings can refer across roots or into this group's descendants.
+              // Compare entries from complete validated forests, never isolated roots.
+              JSON.stringify(canonicalLive[index]) !== JSON.stringify(canonicalBefore[index]))
           );
         })
       )

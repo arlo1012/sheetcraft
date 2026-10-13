@@ -179,6 +179,22 @@ export function projectPictureShapePoint(
   const x = (matrix[0] * point.x + matrix[1] * point.y + matrix[2] * z + matrix[3]) / w;
   const y = (matrix[4] * point.x + matrix[5] * point.y + matrix[6] * z + matrix[7]) / w;
   const depth = model[8] * point.x + model[9] * point.y + model[10] * z + model[11];
+  if (geometry.isSceneProjection) {
+    const placement = geometry.sourceToSceneMatrix,
+      common = geometry.sourceToSceneScreenMatrix;
+    finite(placement[0] * point.x + placement[1] * point.y + placement[3], "scene source X");
+    finite(placement[4] * point.x + placement[5] * point.y + placement[7], "scene source Y");
+    finite(
+      (common[0] * point.x + common[1] * point.y + common[2] * z + common[3]) / w,
+      "scene projected X",
+    );
+    finite(
+      (common[4] * point.x + common[5] * point.y + common[6] * z + common[7]) / w,
+      "scene projected Y",
+    );
+    finite(model[0] * point.x + model[1] * point.y + model[2] * z + model[3], "world X");
+    finite(model[4] * point.x + model[5] * point.y + model[6] * z + model[7], "world Y");
+  }
   finite(x, "projected X");
   finite(y, "projected Y");
   finite(depth, "world depth");
@@ -355,11 +371,14 @@ function boundaryEdges(paths: readonly (readonly ShapePolyline[])[]): Edge[] {
   }
   return result;
 }
-function invert(h: PictureProjectiveHomography): PictureProjectiveHomography | null {
+function invert(h: PictureProjectiveHomography, scene = false): PictureProjectiveHomography | null {
   const [a, b, c, d, e, f, g, i, j] = h;
   const det = a * (e * j - f * i) - b * (d * j - f * g) + c * (d * i - e * g);
-  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) return null;
-  return [
+  if (!Number.isFinite(det) || (scene ? det === 0 : Math.abs(det) < 1e-12)) {
+    if (scene) throw new RangeError("Picture shape scene side inverse is singular.");
+    return null;
+  }
+  const inverse = [
     e * j - f * i,
     c * i - b * j,
     b * f - c * e,
@@ -369,7 +388,15 @@ function invert(h: PictureProjectiveHomography): PictureProjectiveHomography | n
     d * i - e * g,
     b * g - a * i,
     a * e - b * d,
-  ].map((value) => value / det) as unknown as PictureProjectiveHomography;
+  ].map((value) => value / det);
+  if (scene) {
+    if (inverse.some((value) => !Number.isFinite(value)))
+      throw new RangeError("Picture shape scene side inverse is not finite.");
+    const scale = Math.max(...inverse.map(Math.abs));
+    if (scale > PICTURE_PROJECTIVE_LIMITS.coordinatePx)
+      return inverse.map((value) => value / scale) as unknown as PictureProjectiveHomography;
+  }
+  return inverse as unknown as PictureProjectiveHomography;
 }
 function sideOf(
   geometry: PictureProjectiveGeometry,
@@ -392,28 +419,47 @@ function sideOf(
     area +=
       (p.x - corners[0].x) * (q.y - corners[0].y) - (q.x - corners[0].x) * (p.y - corners[0].y);
   }
-  if (area <= 1e-10) return undefined;
+  const extent = Math.max(
+    ...corners.flatMap((point) => [
+      Math.abs(point.x - corners[0].x),
+      Math.abs(point.y - corners[0].y),
+    ]),
+  );
+  const tolerance = geometry.isSceneProjection
+    ? PICTURE_PROJECTIVE_LIMITS.degeneracy * extent * extent
+    : 1e-10;
+  if (area * geometry.projectedOrientation <= tolerance) return undefined;
   const s = geometry.sourceToScreenMatrix,
     m = geometry.sourceToWorldMatrix;
-  const inverse = invert([
-    s[0] * dx + s[1] * dy,
-    -depth * s[2],
-    s[0] * a.x + s[1] * a.y + s[3],
-    s[4] * dx + s[5] * dy,
-    -depth * s[6],
-    s[4] * a.x + s[5] * a.y + s[7],
-    s[12] * dx + s[13] * dy,
-    -depth * s[14],
-    s[12] * a.x + s[13] * a.y + s[15],
-  ]);
+  const inverse = invert(
+    [
+      s[0] * dx + s[1] * dy,
+      -depth * s[2],
+      s[0] * a.x + s[1] * a.y + s[3],
+      s[4] * dx + s[5] * dy,
+      -depth * s[6],
+      s[4] * a.x + s[5] * a.y + s[7],
+      s[12] * dx + s[13] * dy,
+      -depth * s[14],
+      s[12] * a.x + s[13] * a.y + s[15],
+    ],
+    geometry.isSceneProjection,
+  );
   if (!inverse) return undefined;
   const length = Math.hypot(dx, dy),
     nx = dy / length,
     ny = -dx / length;
+  const n = geometry.sourceNormalToWorldMatrix;
+  const normal = { x: n[0] * nx + n[1] * ny, y: n[4] * nx + n[5] * ny, z: n[8] * nx + n[9] * ny };
+  const normalLength = Math.hypot(normal.x, normal.y, normal.z);
+  if (!Number.isFinite(normalLength) || normalLength === 0)
+    throw new RangeError("Picture shape side normal is invalid.");
   return {
     corners,
     inverse,
-    normal: { x: m[0] * nx + m[1] * ny, y: m[4] * nx + m[5] * ny, z: m[8] * nx + m[9] * ny },
+    normal: geometry.isSceneProjection
+      ? { x: normal.x / normalLength, y: normal.y / normalLength, z: normal.z / normalLength }
+      : normal,
     depthOrigin: m[8] * a.x + m[9] * a.y + m[11],
     depthU: m[8] * dx + m[9] * dy,
     depthV: -depth * m[10],
@@ -640,7 +686,12 @@ export function createPictureShapeExtrusion(
     geometry.heightPx,
     geometry.depthPx,
     geometry.sourceToWorldMatrix,
+    geometry.sourceNormalToWorldMatrix,
+    geometry.sourceToSceneMatrix,
+    geometry.sourceToSceneScreenMatrix,
     geometry.sourceToScreenMatrix,
+    geometry.isSceneProjection,
+    geometry.projectedOrientation,
     scaled.paths,
   ]);
   const previous = extrusionCache.get(key);

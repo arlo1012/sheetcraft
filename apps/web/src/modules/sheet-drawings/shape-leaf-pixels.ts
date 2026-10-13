@@ -41,6 +41,7 @@ import {
   projectShapeTextSurface,
   shapeTextFollowsBodyProjection,
 } from "./shape-text-projection";
+import type { ShapeGroupSceneProjection } from "./shape-group-scene";
 
 export const SHAPE_LEAF_PIXELS_LIMITS = Object.freeze({
   side: 4096,
@@ -66,6 +67,8 @@ export type ShapeLeafPixelsOptions = Readonly<{
   resolvedText?: ResolvedDrawingShapeText;
   /** A live editor replaces this leaf's glyph surface; source text stays untouched. */
   hideText?: boolean;
+  /** Complete canonical leaf-to-camera placement, independent of own appearance. */
+  groupScene?: ShapeGroupSceneProjection;
 }>;
 type LeafBase = Readonly<{
   renderPolicy: ShapeLeafRenderPolicy;
@@ -167,7 +170,14 @@ function source(options: ShapeLeafPixelsOptions) {
   if (!geometry) throw new RangeError("The actual shape leaf geometry is unavailable.");
   const style = resolveShapeDetailedPaintStyle(
     drawing,
-    renderPolicy === "legacy-text-box" ? {} : drawing.shapeStyle,
+    renderPolicy === "legacy-text-box"
+      ? {
+          // Keep its real CSS inside-border and plain glyph branch. Explicit
+          // body 3D is a contour consumer, including after shared-scene release.
+          ...(drawing.shapeStyle?.format3d ? { format3d: drawing.shapeStyle.format3d } : {}),
+          ...(drawing.shapeStyle?.rotation3d ? { rotation3d: drawing.shapeStyle.rotation3d } : {}),
+        }
+      : drawing.shapeStyle,
   );
   let cssBorderRects: readonly ShapeTextRect[] | undefined;
   let effectiveGeometry: EvaluatedShapePresetGeometry = geometry;
@@ -241,6 +251,47 @@ function bodyDrawing(
   return renderPolicy === "standard"
     ? options.drawing
     : { ...options.drawing, shapeLineEnds: undefined };
+}
+/** Body source reflection belongs before the common camera. The final leaf
+ * compositor still applies F, so its adapter is F*B and its physical map A*F.
+ * Readable glyph pixels already contain their H-position/V180 layout contract
+ * and use the original unreflected scene instead. */
+function bodyGroupScene(options: ShapeLeafPixelsOptions): ShapeGroupSceneProjection | undefined {
+  const group = options.groupScene,
+    drawing = options.drawing;
+  if (!group || (!drawing.shapeFlipX && !drawing.shapeFlipY)) return group;
+  const sx = drawing.shapeFlipX ? -1 : 1,
+    sy = drawing.shapeFlipY ? -1 : 1,
+    tx = drawing.shapeFlipX ? drawing.width : 0,
+    ty = drawing.shapeFlipY ? drawing.height : 0,
+    a = group.scene.sourceToScene,
+    b = group.scene.sceneToOutput;
+  return {
+    ...group,
+    scene: {
+      ...group.scene,
+      sourceToScene: {
+        a: a.a * sx,
+        b: a.b * sx,
+        c: a.c * sy,
+        d: a.d * sy,
+        e: a.a * tx + a.c * ty + a.e,
+        f: a.b * tx + a.d * ty + a.f,
+      },
+      ...(b
+        ? {
+            sceneToOutput: {
+              a: sx * b.a,
+              b: sy * b.b,
+              c: sx * b.c,
+              d: sy * b.d,
+              e: sx * b.e + tx,
+              f: sy * b.f + ty,
+            },
+          }
+        : {}),
+    },
+  };
 }
 function plainTextRect(
   options: ShapeLeafPixelsOptions,
@@ -320,7 +371,9 @@ function textProjectionDrawing(
   options: ShapeLeafPixelsOptions,
   richText: boolean,
 ): SheetGraphicDrawing {
-  return richText ? options.drawing : { ...options.drawing, shapeStyle: undefined };
+  return richText || options.drawing.kind === "textBox"
+    ? options.drawing
+    : { ...options.drawing, shapeStyle: undefined };
 }
 function textResourcePreflight(
   options: ShapeLeafPixelsOptions,
@@ -358,19 +411,40 @@ export function planShapeLeafPixels(options: ShapeLeafPixelsOptions): ShapeLeafP
   )
     throw new RangeError("Shape leaf native text source exceeds its numeric budget.");
   const prepared = source(options);
+  const bodyScene = bodyGroupScene(options),
+    textDrawing = textProjectionDrawing(options, prepared.richText),
+    textFollowsBodyProjection = shapeTextFollowsBodyProjection(textDrawing, options.groupScene);
   let density = options.density;
   let layout: ShapeTextLayoutResult | undefined;
   let resolvedLayout = false;
   for (let attempt = 0; attempt < SHAPE_LEAF_PIXELS_LIMITS.replans; attempt++) {
-    const bodyPlan = planShapeDetailedPaint({
-      drawing: bodyDrawing(options, prepared.renderPolicy),
-      geometry: prepared.geometry,
-      connectorRoute: options.connectorRoute,
-      style: prepared.style,
-      density,
-      resources: options.resources,
-      angleDeg: options.angleDeg,
-    });
+    let bodyPlan: ShapeDetailedPaintPlan;
+    try {
+      bodyPlan = planShapeDetailedPaint({
+        drawing: bodyDrawing(options, prepared.renderPolicy),
+        geometry: prepared.geometry,
+        connectorRoute: options.connectorRoute,
+        style: prepared.style,
+        density,
+        resources: options.resources,
+        angleDeg: options.angleDeg,
+        groupScene: bodyScene,
+      });
+    } catch (error) {
+      // The contour projector must reject an oversized individual scratch before
+      // allocating it. A whole-leaf replan can satisfy that exact raster budget;
+      // singular/near-plane/invalid-source failures never become affine fallbacks.
+      if (
+        !(error instanceof RangeError) ||
+        ![
+          "Picture projected raster exceeds the 4096-side/4MP rendering budget.",
+          "Picture shape projection exceeds its simultaneous memory budget.",
+        ].includes(error.message)
+      )
+        throw error;
+      density *= 0.5;
+      continue;
+    }
     const missingText = textResourcePreflight(options, prepared.visibleText);
     const baseBounds = flipBounds(
       bodyPlan.logicalBounds,
@@ -393,8 +467,7 @@ export function planShapeLeafPixels(options: ShapeLeafPixelsOptions): ShapeLeafP
         textPlan,
         textLayout: layout,
         actualDensity,
-        textFollowsBodyProjection:
-          prepared.richText && shapeTextFollowsBodyProjection(options.drawing),
+        textFollowsBodyProjection,
         logicalBounds: {
           left: output.left / actualDensity,
           top: output.top / actualDensity,
@@ -462,9 +535,10 @@ export function planShapeLeafPixels(options: ShapeLeafPixelsOptions): ShapeLeafP
         bounds = union(
           bounds,
           projectedShapeTextBounds(
-            textProjectionDrawing(options, prepared.richText),
+            textDrawing,
             textPlan,
             options.resources?.theme,
+            options.groupScene,
           ),
         );
       } catch (error) {
@@ -483,9 +557,7 @@ export function planShapeLeafPixels(options: ShapeLeafPixelsOptions): ShapeLeafP
     const bodyBytes = bodyPlan.widthRaster * bodyPlan.heightRaster * 4,
       textBytes = textPlan ? textPlan.widthRaster * textPlan.heightRaster * 4 : 0,
       projectionBytes =
-        textPlan && prepared.richText && shapeTextFollowsBodyProjection(options.drawing)
-          ? width * height * 32 + textBytes * 2
-          : 0;
+        textPlan && textFollowsBodyProjection ? width * height * 32 + textBytes * 2 : 0;
     const peak =
       bodyPlan.estimatedPeakBytes +
       (textPlan?.estimatedPeakBytes ?? 0) +
@@ -601,6 +673,7 @@ export function prepareShapeLeafPixels(options: ShapeLeafPixelsOptions): ShapeLe
         resources,
         angleDeg: options.angleDeg,
         sourceIdentity: options.sourceIdentity,
+        groupScene: bodyGroupScene(options),
         sourcePainter: cssSourcePainter(options, plan),
         // A factory makes the body transient and explicitly ours. Cached bodies, if used
         // by other consumers, are never released or modified by this adapter.
@@ -643,6 +716,7 @@ export function prepareShapeLeafPixels(options: ShapeLeafPixelsOptions): ShapeLe
             textProjectionDrawing(options, plan.richText),
             text,
             options.resources?.theme,
+            options.groupScene,
           )
         : undefined;
       let actualBounds = union(

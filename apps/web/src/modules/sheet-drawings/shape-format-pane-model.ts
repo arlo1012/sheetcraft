@@ -109,10 +109,12 @@ export interface ShapeFormatSnapshot {
   /** Exact intent acknowledgement allows other active drafts to survive our own accepted edit. */
   acceptedIntentId?: string;
 }
+/** Applying an effect value can be unavailable while clearing its current source remains safe. */
+export type ShapeFormatStyleCapability = PictureFormatCapability & { valueEnabled?: boolean };
 export interface ShapeFormatCapabilities {
   fields: Partial<Record<ShapeFormatField, PictureFormatCapability>>;
   styles?: Partial<
-    Record<ShapeFormatMode, Partial<Record<ShapeFormatStyleCategory, PictureFormatCapability>>>
+    Record<ShapeFormatMode, Partial<Record<ShapeFormatStyleCategory, ShapeFormatStyleCapability>>>
   >;
   lineEnds?: PictureFormatCapability;
   disconnectConnector?: PictureFormatCapability;
@@ -279,13 +281,19 @@ export function createShapeFormatSession(source: {
   }
   function styleAction<K extends ShapeFormatStyleCategory>(target: ShapeFormatMode, category: K) {
     const token = capture();
-    return (value: PictureDetailedStyle[K]): boolean =>
-      send(
+    return (value: PictureDetailedStyle[K]): boolean => {
+      const capability = source.capabilities().styles?.[target]?.[category];
+      if (value?.kind === "value" && capability?.valueEnabled === false) {
+        source.feedback("unsupported");
+        return false;
+      }
+      return send(
         token,
         source.capabilities().styles?.[target]?.[category],
         (identity) =>
           ({ ...identity, type: "set-style", target, category, value }) as ShapeFormatStyleIntent,
       );
+    };
   }
   function lineEndsAction() {
     const token = capture();

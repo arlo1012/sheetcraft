@@ -235,6 +235,11 @@ export function normalizeSheetShapeGeometry(
 }
 
 function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance {
+  if (value && typeof value === "object" && "shapeStyle" in value) {
+    const discriminator = Object.getOwnPropertyDescriptor(value, "kind");
+    if (!discriminator || !("value" in discriminator))
+      throw new TypeError("Shape body styles require an own data drawing kind.");
+  }
   const finite = (n: number, min: number, max: number) =>
     typeof n === "number" && Number.isFinite(n) && n >= min && n <= max;
   const color = (s: string) => typeof s === "string" && /^(#[0-9a-f]{6}|transparent)$/i.test(s);
@@ -265,9 +270,18 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
     throw new TypeError("Shape styles must be own data fields.");
   if (styleField && !("value" in styleField))
     throw new TypeError("Shape styles cannot be accessors.");
-  if (styleField && value.kind !== "shape")
-    throw new TypeError("Only a shape drawing may carry a shape style.");
+  if (styleField && value.kind !== "shape" && value.kind !== "textBox")
+    throw new TypeError("Only a shape drawing or a text box body may carry a shape style.");
   const shapeStyle = normalizeShapeStyle(styleField?.value);
+  // Old text boxes retain their CSS/plain-text rendering. Explicit body 3D is
+  // required when releasing a shared group scene, and has real pixel consumers.
+  if (
+    value.kind === "textBox" &&
+    styleField &&
+    (!shapeStyle ||
+      Object.keys(shapeStyle).some((key) => key !== "rotation3d" && key !== "format3d"))
+  )
+    throw new TypeError("Only a shape drawing may carry empty or non-3D body styles.");
   const geometryField = Object.getOwnPropertyDescriptor(value, "shapeGeometry");
   if (geometryField && (geometryField.get || geometryField.set))
     throw new TypeError("Shape geometry cannot be an accessor.");

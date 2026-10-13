@@ -22,10 +22,18 @@ import {
   type SheetGroupedGraphicDrawing,
 } from "@sheetcraft/core/shape-group";
 import {
+  applyShapeGroup3dRotationEdit,
   applyShapeGroupChildWorldEdit,
+  leaseShapeGroup3dRotation,
   leaseShapeGroupNode,
+  type ShapeGroup3dRotationLease,
   type ShapeGroupNodeLease,
 } from "@sheetcraft/core/shape-group-edit";
+import {
+  resolveShapeGroup3dSource,
+  type ResolvedShapeGroup3dSource,
+} from "@sheetcraft/core/shape-group-3d";
+import { normalizeShapeStyle } from "@sheetcraft/core/shape-style";
 import {
   resolveShapeGroup,
   type ResolvedShapeGroupNode,
@@ -77,6 +85,9 @@ export type ShapeGroupFormatContext = {
   readonly renderPass?: ResolvedShapeForestForRender;
   readonly rootLease: ShapeGroupNodeLease;
   readonly targetLease: ShapeGroupNodeLease;
+  /** Effective source ownership is captured separately from the selected subtree. */
+  readonly rotation3dSource: ResolvedShapeGroup3dSource;
+  readonly rotation3dLease: ShapeGroup3dRotationLease;
   /** Worksheet behavior always belongs to the outermost root. */
   readonly locked: boolean;
   readonly printObject: boolean;
@@ -100,6 +111,9 @@ export type ShapeGroupFormatAggregate = {
   readonly bodyEligibleCount: number;
   readonly textEligibleCount: number;
   readonly descendantCount: number;
+  readonly rotation3dAffectedCount: number;
+  readonly rotation3dInherited: boolean;
+  readonly rotation3dShared: boolean;
   readonly lineEnds?: ShapeLineEnds;
   readonly mixedLineEnds: readonly ("begin" | "end")[];
   readonly lineEligibleCount: number;
@@ -127,6 +141,7 @@ export function isShapeGroupMemberStyleCategory(
   return (
     category === "fill" ||
     category === "line" ||
+    (target === "shape" && category === "format3d") ||
     (target === "text" && (category === "shadow" || category === "glow"))
   );
 }
@@ -195,6 +210,8 @@ export function resolveShapeGroupFormatContext(
     ...(renderPass ? { renderPass } : {}),
     rootLease,
     targetLease,
+    rotation3dSource: resolveShapeGroup3dSource(root, targetLease.path),
+    rotation3dLease: leaseShapeGroup3dRotation(root, targetLease.path),
     locked: projection.locked,
     printObject: projection.printObject,
     anchor: anchorValue(root.shapeFrame.anchor.mode),
@@ -258,6 +275,8 @@ export function getShapeGroupFormatEligibleLeaves(
     const view = leaf.view;
     if (!view || leaf.collapsed) return false;
     if (target === "text") return hasText(leaf);
+    if (view.kind === "textBox" && (category === "format3d" || category === "rotation3d"))
+      return true;
     if (view.kind !== "shape") return false;
     return (
       category !== "fill" ||
@@ -510,6 +529,30 @@ export function planShapeGroupFormatIntent(
     });
   }
   if (intent.type === "set-style") {
+    if (intent.target === "shape" && intent.category === "rotation3d") {
+      // This edit may be initiated by one leaf but belongs to the complete shared
+      // camera authority. Never bake the camera into descendant appearance.
+      const edited = applyShapeGroup3dRotationEdit(
+        context.sourceRoot,
+        context.rotation3dLease,
+        intent.value ?? { kind: "none" },
+      );
+      if (intent.value === undefined) {
+        // Inherit removes the exact validated source; None retains an explicit
+        // disabled choice. Both leave dormant descendant camera values intact.
+        const owner = findShapeGroupNode(edited.root, edited.ownerPath)!.node;
+        if (owner.kind === "shapeGroup") delete owner.group3d;
+        else {
+          const style = { ...owner.shapeStyle };
+          delete style.rotation3d;
+          const normalized = normalizeShapeStyle(style);
+          if (normalized) owner.shapeStyle = normalized;
+          else delete owner.shapeStyle;
+        }
+      }
+      const result = checkedResult(context, edited.root, edited.affectedLeafPaths);
+      return { ...result, descendantCount: edited.affectedLeafPaths.length };
+    }
     if (
       context.sourceNode.kind === "shapeGroup" &&
       intent.target === "shape" &&
@@ -662,6 +705,12 @@ export function aggregateShapeGroupFormatSnapshot(
         : undefined;
     if (value) Object.assign(shape.style, { [category]: value });
   }
+  // Camera readback follows the actual source owner, including an active ancestor
+  // of an explicitly selected leaf. Per-leaf camera values stay dormant there.
+  delete shape.style.rotation3d;
+  shape.mixed = shape.mixed.filter((category) => category !== "rotation3d");
+  if (context.rotation3dSource.rotation3d)
+    shape.style.rotation3d = context.rotation3dSource.rotation3d;
   const lineLeaves = getShapeGroupLineEligibleLeaves(context);
   const ends: ShapeLineEnds = {};
   const mixedLineEnds: ("begin" | "end")[] = [];
@@ -681,6 +730,12 @@ export function aggregateShapeGroupFormatSnapshot(
     bodyEligibleCount: body.length,
     textEligibleCount: text.length,
     descendantCount: context.leaves.length,
+    rotation3dAffectedCount: context.rotation3dSource.affectedLeafPaths.length,
+    rotation3dInherited: context.rotation3dSource.inherited,
+    rotation3dShared:
+      context.sourceNode.kind === "shapeGroup" ||
+      (context.rotation3dSource.source === "group" &&
+        context.rotation3dSource.rotation3d?.kind === "value"),
     ...(lineEnds ? { lineEnds } : {}),
     mixedLineEnds,
     lineEligibleCount: lineLeaves.length,

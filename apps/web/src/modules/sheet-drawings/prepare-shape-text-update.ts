@@ -38,7 +38,7 @@ import {
 } from "./shape-text-paint";
 import { projectedShapeTextBounds } from "./shape-text-projection";
 import { materializeDrawingShapeText, withDrawingShapeText } from "./shape-text-options";
-import { hasActiveShapeGroupEffects, preflightShapeGroupPaint } from "./shape-group-paint";
+import { requiresShapeGroupPaint, preflightShapeGroupPaint } from "./shape-group-paint";
 import { resolveShapeForestForRender } from "./resolved-shape-render-source";
 
 export type ShapeTextForestContext = {
@@ -159,7 +159,7 @@ export function prepareShapeTextUpdate(
       forestContext,
     );
     preflightShapeGroupText(prepared, metrics, measurement, paint, forestContext);
-    if (hasActiveShapeGroupEffects(prepared)) {
+    if (requiresShapeGroupPaint(prepared)) {
       const proof = preflightShapeGroupPaint({
         root: prepared,
         metrics,
@@ -343,7 +343,7 @@ function preflightShapeGroupText(
     const proof = (paint?.preflight ?? preflightShapeTextGlyphBudgets)(options);
     if (proof.kind !== "ready")
       throw new Error("Shape group text paint pixels are not ready; the draft has been preserved.");
-    projectedShapeTextBounds(drawing, plan, paint?.resources?.theme);
+    projectedShapeTextBounds(drawing, plan, paint?.resources?.theme, leaf.groupScene);
   }
 }
 

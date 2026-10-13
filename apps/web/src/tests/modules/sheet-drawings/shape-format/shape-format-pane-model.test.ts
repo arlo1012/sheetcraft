@@ -288,3 +288,24 @@ describe("shape-owned canonical format contract", () => {
     expect(createShapeFormatTranslate("en-US")("textMarginLeftPt")).toBe("Left margin");
   });
 });
+
+test("a value-only scene restriction rejects projection without trapping None or Inherit", () => {
+  const f = fixture();
+  f.capabilities = {
+    fields: {},
+    styles: {
+      shape: { rotation3d: { enabled: true, valueEnabled: false, reason: "Related connector" } },
+    },
+  };
+  const action = f.session.styleAction("shape", "rotation3d");
+  expect(
+    action({
+      kind: "value",
+      value: { projection: "parallel", xDeg: 30, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+    }),
+  ).toBe(false);
+  expect(f.handler).not.toHaveBeenCalled();
+  expect(action({ kind: "none" })).toBe(true);
+  expect(action(undefined)).toBe(true);
+  expect(f.handler).toHaveBeenCalledTimes(2);
+});

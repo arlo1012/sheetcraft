@@ -293,6 +293,8 @@ export type WorkbookSnapshotV65 = Omit<WorkbookSnapshotV64, "version"> & { versi
 export type WorkbookSnapshotV66 = Omit<WorkbookSnapshotV65, "version"> & { version: 66 };
 /** Shared group body camera source; no runtime projection data is persisted. */
 export type WorkbookSnapshotV67 = Omit<WorkbookSnapshotV66, "version"> & { version: 67 };
+/** Explicit text-box body 3D, including a released group camera. */
+export type WorkbookSnapshotV68 = Omit<WorkbookSnapshotV67, "version"> & { version: 68 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -318,7 +320,11 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV64
   | WorkbookSnapshotV65
   | WorkbookSnapshotV66
-  | WorkbookSnapshotV67;
+  | WorkbookSnapshotV67
+  | WorkbookSnapshotV68;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV68, "version"> & {
+  version: WorkbookSnapshot["version"];
+};
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -402,7 +408,8 @@ type SnapshotVersion =
   | 64
   | 65
   | 66
-  | 67;
+  | 67
+  | 68;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -433,8 +440,9 @@ function inspectShapeGroupSnapshot3d(
   value: SheetDrawing,
   path: string,
   version?: SnapshotVersion,
-): boolean {
-  let hasScene = false;
+): { hasScene: boolean; hasTextBox3d: boolean } {
+  let hasScene = false,
+    hasTextBox3d = false;
   const pending: { value: unknown; depth: number }[] = [{ value, depth: 0 }];
   const seen = new WeakSet<object>();
   let count = 0;
@@ -457,6 +465,19 @@ function inspectShapeGroupSnapshot3d(
         const scene = normalizeShapeGroup3d(field.value);
         hasScene ||= scene !== undefined;
       }
+      const kindField = Object.getOwnPropertyDescriptor(node, "kind");
+      if (kindField && !("value" in kindField))
+        return fail(path, "Drawing kind must be an own data field.");
+      if ("shapeStyle" in node && (!kindField || !("value" in kindField)))
+        return fail(path, "Shape body styles require an own data drawing kind.");
+      if (kindField?.value === "textBox" && "shapeStyle" in node) {
+        if (version !== undefined && version < 68)
+          return fail(path, "Text box body 3D requires snapshot version 68.");
+        const styleField = Object.getOwnPropertyDescriptor(node, "shapeStyle");
+        if (!styleField || !("value" in styleField))
+          return fail(path, "Text box body 3D must be an own data field.");
+        hasTextBox3d = true;
+      }
       if (!hasShapeGroupSnapshotTag(node, path)) continue;
       const members = Object.getOwnPropertyDescriptor(node, "members");
       if (!members || !("value" in members))
@@ -477,7 +498,7 @@ function inspectShapeGroupSnapshot3d(
     if (error instanceof WorkbookDomainError) throw error;
     return fail(path, error instanceof Error ? error.message : "Invalid shape group 3D.");
   }
-  return hasScene;
+  return { hasScene, hasTextBox3d };
 }
 
 /** Raw admission is bounded and descriptor-safe, including nested malformed owner graphs. */
@@ -1569,6 +1590,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   let hasShapeControlsState = false;
   let hasShapeCharacterRuns = false;
   let hasShapeGroup3d = false;
+  let hasTextBoxBody3d = false;
   // Inspect presence before old protocols can silently drop a shape-only feature.
   if (Array.isArray(record.drawings)) {
     for (const [index, drawing] of record.drawings.entries()) {
@@ -1578,7 +1600,8 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
         `${path}.drawings[${index}]`,
         version,
       );
-      hasShapeGroup3d ||= scene;
+      hasShapeGroup3d ||= scene.hasScene;
+      hasTextBoxBody3d ||= scene.hasTextBox3d;
       const oldTextField = Object.getOwnPropertyDescriptor(item, "shapeText");
       if (
         "shapeText" in item &&
@@ -1965,6 +1988,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     // Independent final inference preserves attributed root and nested leaf ranges.
     if (hasShapeCharacterRuns) version = 66;
     if (hasShapeGroup3d) version = 67;
+    if (hasTextBoxBody3d) version = 68;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -2079,10 +2103,12 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
         inspectShapeGroupSnapshotEffects(drawing, "$.drawings").hasExtendedEffects,
     ),
   );
-  return {
+  const snapshot: WorkbookWritePayload = {
     // Preserve the existing protocol for documents that do not use the new feature.
     version: sheets.some((sheet) =>
-      sheet.drawings?.some((drawing) => inspectShapeGroupSnapshot3d(drawing, "$.drawings")),
+      sheet.drawings?.some(
+        (drawing) => inspectShapeGroupSnapshot3d(drawing, "$.drawings").hasScene,
+      ),
     )
       ? 67
       : sheets.some((sheet) =>
@@ -2223,6 +2249,18 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     cellStyles: (workbook.cellStyles ?? []).map(cloneCellStyleDefinition),
     watermarkPresets: cloneWatermarkPresets(workbook.watermarkPresets),
   };
+  // Infer this independent feature last, preserving every earlier protocol.
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeGroupSnapshot3d(drawing, "$.drawings").hasTextBox3d,
+      ),
+    )
+  )
+    snapshot.version = 68;
+  // Current write envelopes have the same statically checked payload; this
+  // preserves the public discriminated union past large-union contextual limits.
+  return snapshot as WorkbookSnapshot;
 }
 
 export function deserializeWorkbook(value: unknown): Workbook {
@@ -2294,7 +2332,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 64 &&
     record.version !== 65 &&
     record.version !== 66 &&
-    record.version !== 67
+    record.version !== 67 &&
+    record.version !== 68
   ) {
     throw new WorkbookDomainError(
       {

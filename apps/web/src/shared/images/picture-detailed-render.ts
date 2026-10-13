@@ -10,7 +10,10 @@ import {
   type PictureDetailedRasterPlanOptions,
   type PictureDetailedRasterUnavailable,
 } from "./picture-detailed-compositor";
-import { createPictureProjectiveGeometry } from "./picture-projective-geometry";
+import {
+  createPictureProjectiveGeometry,
+  type PictureProjectiveScene,
+} from "./picture-projective-geometry";
 import {
   createPictureProjectiveRaster,
   getPictureProjectivePaintBounds,
@@ -42,10 +45,11 @@ export function getPictureRasterProjection(
   theme: WorkbookTheme,
   shapeGeometry?: ShapePresetGeometry,
   shapeSource?: PictureShapeSourceProfile,
+  scene?: PictureProjectiveScene,
 ) {
   const format = style.format3d?.kind === "value" ? style.format3d.value : undefined;
   const rotation = style.rotation3d?.kind === "value" ? style.rotation3d.value : undefined;
-  if (!format && !rotation) return {};
+  if (!format && !rotation && !scene) return {};
   const geometry = (density: number, width: number, height: number) =>
     createPictureProjectiveGeometry({
       widthPx: width,
@@ -54,6 +58,27 @@ export function getPictureRasterProjection(
       rotation: rotation
         ? { ...rotation, distanceFromGroundPx: ((rotation.distanceFromGroundPt * 4) / 3) * density }
         : { projection: "parallel", xDeg: 0, yDeg: 0, zDeg: 0, distanceFromGroundPx: 0 },
+      scene: scene
+        ? {
+            widthPx: scene.widthPx * density,
+            heightPx: scene.heightPx * density,
+            pivot: scene.pivot
+              ? { x: scene.pivot.x * density, y: scene.pivot.y * density }
+              : undefined,
+            sourceToScene: {
+              ...scene.sourceToScene,
+              e: scene.sourceToScene.e * density,
+              f: scene.sourceToScene.f * density,
+            },
+            sceneToOutput: scene.sceneToOutput
+              ? {
+                  ...scene.sceneToOutput,
+                  e: scene.sceneToOutput.e * density,
+                  f: scene.sceneToOutput.f * density,
+                }
+              : undefined,
+          }
+        : undefined,
     });
   const projection: Pick<PictureDetailedRasterPlanOptions, "projectedBounds" | "projectSurface"> = {
     projectedBounds: (density, frontBounds, frame) =>

@@ -7,6 +7,8 @@ import {
 } from "@sheetcraft/core/sheet-drawings";
 import type { ShapeGroupDrawing } from "@sheetcraft/core/shape-group";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
+import * as groupPaint from "../../../modules/sheet-drawings/shape-group-paint";
+import * as leafPixels from "../../../modules/sheet-drawings/shape-leaf-pixels";
 import * as bodyPaint from "../../../modules/sheet-drawings/shape-detailed-paint";
 import * as textPaint from "../../../modules/sheet-drawings/shape-text-paint";
 import * as textRuntime from "../../../modules/sheet-drawings/shape-text-runtime";
@@ -541,4 +543,98 @@ test("a genuine source-free group reaches the exact supported shape print consum
     }),
   );
   expect(target.drawImage).toHaveBeenCalledExactlyOnceWith(body.canvas, -10, -10, 120, 80);
+});
+
+test("an active shared camera without container effects prints the united actual group surface", () => {
+  const { shapeFrame, ...appearance } = framed("leaf");
+  const root: ShapeGroupDrawing = {
+    kind: "shapeGroup",
+    id: "scene",
+    name: "Scene",
+    rotation: 37,
+    shapeFrame,
+    group3d: {
+      rotation3d: {
+        kind: "value",
+        value: { projection: "parallel", xDeg: 30, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+      },
+    },
+    members: [0, 1].map((index) => ({
+      ...appearance,
+      id: `member-${index}`,
+      text: "",
+      groupFrame: {
+        kind: "shape-group-local-v1",
+        rect: { xRatio: index / 2, yRatio: 0, widthRatio: 0.5, heightRatio: 1 },
+      },
+    })),
+  };
+  const { sheet, metrics } = fixture([root]),
+    canvas = { width: 200, height: 120 } as HTMLCanvasElement;
+  const plan = groupPaint.planShapeGroupPaint({ root, metrics, density: 2 });
+  if (plan.kind !== "ready") throw Error("Expected actual scene planning");
+  const dispose = vi.fn(),
+    prepare = vi
+      .spyOn(groupPaint, "prepareShapeGroupPaint")
+      .mockReturnValue({ ...plan, canvas, dispose });
+  const single = vi.spyOn(bodyPaint, "prepareShapeDetailedPaint");
+  const before = JSON.stringify(root),
+    target = paint(sheet, metrics);
+  expect(prepare).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ root, metrics, interactive: false }),
+  );
+  expect(single).not.toHaveBeenCalled();
+  expect(target.drawImage).toHaveBeenCalledExactlyOnceWith(
+    canvas,
+    plan.logicalBounds.left,
+    plan.logicalBounds.top,
+    100,
+    60,
+  );
+  expect(dispose).toHaveBeenCalledOnce();
+  const planner = vi.spyOn(groupPaint, "planShapeGroupPaint");
+  getPrintShapeContentExtent(sheet, metrics);
+  expect(planner).toHaveBeenCalledOnce();
+  expect(JSON.stringify(root)).toBe(before);
+});
+
+test("a released legacy text box with explicit 3D prints its CSS-body and glyph union exactly once", () => {
+  const { shapeGeometry: _geometry, shapeText: _text, ...source } = framed("legacy-text");
+  const drawing = normalizeSheetDrawing({
+    ...source,
+    kind: "textBox",
+    text: "",
+    shapeStyle: {
+      rotation3d: {
+        kind: "value",
+        value: { projection: "parallel", xDeg: 30, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+      },
+    },
+  });
+  const { sheet, metrics } = fixture([drawing]),
+    view = resolveShapeDrawing(drawing, metrics).view as SheetGraphicDrawing;
+  const plan = leafPixels.planShapeLeafPixels({ drawing: view, density: 2 });
+  if (plan.kind !== "ready") throw Error("Expected genuine legacy 3D planning");
+  expect(plan.renderPolicy).toBe("legacy-text-box");
+  const canvas = { width: plan.widthRaster, height: plan.heightRaster } as HTMLCanvasElement,
+    dispose = vi.fn();
+  const prepare = vi
+    .spyOn(leafPixels, "prepareShapeLeafPixels")
+    .mockReturnValue({ ...plan, canvas, dispose });
+  const single = vi.spyOn(bodyPaint, "prepareShapeDetailedPaint"),
+    text = vi.spyOn(textPaint, "prepareShapeTextPaint");
+  const before = JSON.stringify(drawing),
+    target = paint(sheet, metrics);
+  expect(prepare).toHaveBeenCalledOnce();
+  expect(single).not.toHaveBeenCalled();
+  expect(text).not.toHaveBeenCalled();
+  expect(target.drawImage).toHaveBeenCalledExactlyOnceWith(
+    canvas,
+    plan.logicalBounds.left,
+    plan.logicalBounds.top,
+    canvas.width / 2,
+    canvas.height / 2,
+  );
+  expect(dispose).toHaveBeenCalledOnce();
+  expect(JSON.stringify(drawing)).toBe(before);
 });

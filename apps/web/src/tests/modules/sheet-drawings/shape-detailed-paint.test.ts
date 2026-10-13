@@ -22,6 +22,7 @@ import {
   planDetailedPictureRaster,
 } from "../../../shared/images/picture-detailed-compositor";
 import * as compositor from "../../../shared/images/picture-detailed-compositor";
+import type { ShapeGroupSceneProjection } from "../../../modules/sheet-drawings/shape-group-scene";
 import { preparePictureShapeGeometry } from "../../../shared/images/picture-shape-mask";
 function drawing(): SheetGraphicDrawing {
   return {
@@ -450,4 +451,54 @@ test("body 3D preflight is independent of the separately rendered glyph layer", 
   expect(JSON.stringify(o.drawing)).toBe(before);
   o.drawing.shapeStyle.rotation3d = { kind: "none" };
   expect(() => planShapeDetailedPaint(o)).not.toThrow();
+});
+
+test("common scene cache identity includes camera owner and complete placement without mutating own style", () => {
+  const o = options();
+  o.drawing.shapeStyle = {
+    rotation3d: {
+      kind: "value",
+      value: { projection: "parallel", xDeg: 10, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+    },
+  };
+  const before = structuredClone(o.drawing),
+    groupScene: ShapeGroupSceneProjection = {
+      ownerPath: ["camera-owner"],
+      rotation3d: { projection: "parallel", xDeg: 45, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+      scene: {
+        widthPx: 200,
+        heightPx: 100,
+        pivot: { x: 100, y: 50 },
+        sourceToScene: { a: 1, b: 0, c: 0, d: 1, e: 10, f: 10 },
+      },
+    };
+  const kernel = vi.spyOn(compositor, "createDetailedPictureRaster").mockImplementation((input) => {
+    const plan = planDetailedPictureRaster(input),
+      canvas = new PolygonCanvas();
+    canvas.width = plan.widthRaster;
+    canvas.height = plan.heightRaster;
+    return { ...plan, kind: "ready", canvas: canvas as unknown as HTMLCanvasElement };
+  });
+  const first = prepareShapeDetailedPaint({ ...o, groupScene }),
+    same = prepareShapeDetailedPaint({ ...o, groupScene: structuredClone(groupScene) });
+  expect(first.kind).toBe("ready");
+  expect(same).toBe(first);
+  expect(first.effectiveStyle.rotation3d).toEqual({ kind: "value", value: groupScene.rotation3d });
+  expect(kernel).toHaveBeenCalledOnce();
+  const moved = prepareShapeDetailedPaint({
+    ...o,
+    groupScene: {
+      ...groupScene,
+      scene: { ...groupScene.scene, sourceToScene: { ...groupScene.scene.sourceToScene, e: 60 } },
+    },
+  });
+  expect(moved).not.toBe(first);
+  expect(kernel).toHaveBeenCalledTimes(2);
+  const reowned = prepareShapeDetailedPaint({
+    ...o,
+    groupScene: { ...groupScene, ownerPath: ["other-camera"] },
+  });
+  expect(reowned).not.toBe(first);
+  expect(kernel).toHaveBeenCalledTimes(3);
+  expect(o.drawing).toEqual(before);
 });

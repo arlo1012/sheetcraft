@@ -19,6 +19,10 @@ import {
   SHAPE_LEAF_PIXELS_LIMITS,
 } from "../../../modules/sheet-drawings/shape-leaf-pixels";
 import type { ShapeDetailedStyle } from "@sheetcraft/core/shape-style";
+import type { ShapeGroupSceneProjection } from "../../../modules/sheet-drawings/shape-group-scene";
+import { projectedShapeTextBounds } from "../../../modules/sheet-drawings/shape-text-projection";
+import * as textProjection from "../../../modules/sheet-drawings/shape-text-projection";
+import * as fontResources from "../../../shared/cell-text/font-resources";
 vi.mock("../../../shared/cell-text/font-resources", () => ({
   getCellFontResourceFamilies: () => [],
   getCellFontResourceStatus: () => ({ state: "ready" }),
@@ -419,6 +423,44 @@ function drawing(changes: Partial<SheetGraphicDrawing> = {}): SheetGraphicDrawin
 function options(source = drawing()) {
   return { drawing: source, density: 1, textRuntimeOptions: native };
 }
+function sharedScene(e = 20): ShapeGroupSceneProjection {
+  return {
+    ownerPath: [],
+    rotation3d: {
+      projection: "parallel",
+      xDeg: 45,
+      yDeg: 0,
+      zDeg: 0,
+      distanceFromGroundPt: 0,
+    },
+    scene: {
+      widthPx: 300,
+      heightPx: 100,
+      sourceToScene: { a: 1, b: 0, c: 0, d: 1, e, f: 20 },
+    },
+  };
+}
+function inkBounds(result: Extract<ReturnType<typeof prepareShapeLeafPixels>, { kind: "ready" }>) {
+  const canvas = result.canvas as unknown as MemoryCanvas;
+  let left = canvas.width,
+    top = canvas.height,
+    right = 0,
+    bottom = 0;
+  for (let y = 0; y < canvas.height; y++)
+    for (let x = 0; x < canvas.width; x++)
+      if (canvas.data[(y * canvas.width + x) * 4 + 3]! > 0) {
+        left = Math.min(left, x);
+        top = Math.min(top, y);
+        right = Math.max(right, x + 1);
+        bottom = Math.max(bottom, y + 1);
+      }
+  return {
+    left: left / result.actualDensity + result.logicalBounds.left,
+    top: top / result.actualDensity + result.logicalBounds.top,
+    right: right / result.actualDensity + result.logicalBounds.left,
+    bottom: bottom / result.actualDensity + result.logicalBounds.top,
+  };
+}
 function alpha(
   result: Extract<ReturnType<typeof prepareShapeLeafPixels>, { kind: "ready" }>,
   x: number,
@@ -624,7 +666,7 @@ describe("actual leaf branch and layout policy", () => {
     expect(flat.textLayout!.runs.every((run) => run.angle === 180)).toBe(true);
     expect(projected.estimatedPeakBytes).toBeLessThanOrEqual(SHAPE_LEAF_PIXELS_LIMITS.memoryBytes);
   });
-  test("plain CSS textBox keeps native normal lineheight and border-consuming padding despite ignored old3D", () => {
+  test("plain CSS textBox keeps native normal lineheight and border-consuming padding with actual own3D", () => {
     const source = drawing({
       kind: "textBox",
       stroke: "#000000",
@@ -642,8 +684,8 @@ describe("actual leaf branch and layout policy", () => {
     expect(plan.renderPolicy).toBe("legacy-text-box");
     expect(plan.bodyFlipY).toBe(true);
     expect(plan.richText).toBe(false);
-    expect(plan.textFollowsBodyProjection).toBe(false);
-    expect(plan.bodyPlan.isProjected).toBe(false);
+    expect(plan.textFollowsBodyProjection).toBe(true);
+    expect(plan.bodyPlan.isProjected).toBe(true);
     expect(plan.bodyPlan.effectiveGeometry.paths.every((p) => !p.stroke)).toBe(true);
     expect(plan.cssBorderRects).toEqual([
       { x: 0, y: 0, width: 80, height: 3 },
@@ -697,6 +739,451 @@ describe("actual leaf branch and layout policy", () => {
     );
     expect(line.bodyPlan.sourceProfile.lineDecorations!.length).toBe(1);
     expect(line.bodyPlan.effectiveGeometry.paths.every((p) => !p.filled)).toBe(true);
+  });
+});
+describe("actual leaves in a common body scene", () => {
+  test("legacy textBox consumes genuine depth and released own camera without migrating its border/glyph branch", () => {
+    const groupScene = sharedScene(),
+      source = drawing({
+        kind: "textBox",
+        stroke: "#111111",
+        strokeWidth: 3,
+        shapeStyle: {
+          rotation3d: { kind: "value", value: { ...groupScene.rotation3d, xDeg: 12 } },
+          format3d: {
+            kind: "value",
+            value: {
+              depthPt: 24,
+              contourPt: 0,
+              depthColor: { kind: "rgb", rgb: "#777777" },
+              contourColor: { kind: "rgb", rgb: "#000000" },
+              material: "plastic",
+              lighting: "flat",
+              lightingAngleDeg: 0,
+            },
+          },
+          fill: { kind: "none" },
+          glow: {
+            kind: "value",
+            value: { color: { kind: "rgb", rgb: "#ff0000" }, opacity: 1, sizePt: 20 },
+          },
+        },
+      }),
+      before = structuredClone(source),
+      grouped = planShapeLeafPixels({ ...options(source), groupScene }),
+      releasedSource = {
+        ...source,
+        shapeStyle: {
+          ...source.shapeStyle,
+          rotation3d: { kind: "value" as const, value: groupScene.rotation3d },
+        },
+      },
+      released = planShapeLeafPixels(options(releasedSource));
+    expect(grouped.renderPolicy).toBe("legacy-text-box");
+    expect(released.renderPolicy).toBe("legacy-text-box");
+    expect(grouped.cssBorderRects).toEqual(released.cssBorderRects);
+    expect(grouped.textLayout).toEqual(released.textLayout);
+    expect(released.bodyPlan.isProjected).toBe(true);
+    expect(released.textFollowsBodyProjection).toBe(true);
+    expect(released.bodyPlan.effectiveStyle.rotation3d).toEqual({
+      kind: "value",
+      value: groupScene.rotation3d,
+    });
+    expect(released.bodyPlan.effectiveStyle.format3d!.kind).toBe("value");
+    expect(released.bodyPlan.effectiveStyle.format3d).toEqual(
+      grouped.bodyPlan.effectiveStyle.format3d,
+    );
+    expect(released.bodyPlan.effectiveStyle.glow).toBeUndefined();
+    expect(released.bodyPlan.effectiveStyle.fill).toEqual({ kind: "none" });
+    expect(grouped.bodyPlan.logicalBounds).not.toEqual(released.bodyPlan.logicalBounds);
+    expect(source).toEqual(before);
+    expect(source.shapeText).toBeUndefined();
+    expect(releasedSource.shapeText).toBeUndefined();
+    const boundary = factory(),
+      result = prepareShapeLeafPixels({ ...options(releasedSource), canvasFactory: boundary.make });
+    expect(result.kind).toBe("ready");
+    if (result.kind !== "ready") return;
+    expect(
+      boundary.canvases.flatMap((c) => c.context.rectCalls).filter((r) => r.color === "#111111"),
+    ).toEqual(
+      released.cssBorderRects!.map((r) => ({
+        x: r.x,
+        y: r.y,
+        w: r.width,
+        h: r.height,
+        color: "#111111",
+      })),
+    );
+    result.dispose();
+  });
+  test("common pivot compresses member center spacing and keeps own camera/depth/source untouched", () => {
+    const source = drawing({
+        text: "",
+        shapeGeometry: { preset: "donut" },
+        shapeStyle: {
+          rotation3d: {
+            kind: "value",
+            value: { projection: "parallel", xDeg: 12, yDeg: 15, zDeg: 9, distanceFromGroundPt: 0 },
+          },
+          format3d: {
+            kind: "value",
+            value: {
+              depthPt: 24,
+              contourPt: 0,
+              depthColor: { kind: "rgb", rgb: "#777777" },
+              contourColor: { kind: "rgb", rgb: "#000000" },
+              material: "plastic",
+              lighting: "flat",
+              lightingAngleDeg: 0,
+            },
+          },
+        },
+      }),
+      before = structuredClone(source);
+    const first = planShapeLeafPixels({ ...options(source), groupScene: sharedScene(20) }),
+      second = planShapeLeafPixels({ ...options(source), groupScene: sharedScene(200) });
+    const center = (plan: typeof first, e: number) =>
+      e + (plan.bodyPlan.logicalBounds.left + plan.bodyPlan.logicalBounds.right) / 2;
+    expect(center(second, 200) - center(first, 20)).toBeCloseTo(180 / Math.SQRT2, 0);
+    expect(first.bodyPlan.effectiveStyle.rotation3d).toEqual({
+      kind: "value",
+      value: sharedScene().rotation3d,
+    });
+    expect(first.bodyPlan.effectiveStyle.format3d).toEqual(source.shapeStyle!.format3d);
+    expect(
+      first.bodyPlan.effectiveGeometry.paths[0]!.commands.filter((c) => c[0] === "Z"),
+    ).toHaveLength(2);
+    expect(first.bodyPlan.isProjected).toBe(true);
+    expect(source).toEqual(before);
+  });
+  test.each(["shape", "textBox"] as const)(
+    "%s glyphs follow common positions and widths; KeepFlat restores the real preprojection footprint",
+    (kind) => {
+      const shapeText = createDefaultShapeText();
+      const source = drawing({
+        kind,
+        shapeGeometry: { preset: "rect" },
+        shapeText,
+        fill: "transparent",
+        text: "abc",
+      });
+      const input = { ...options(source), groupScene: sharedScene() },
+        projected = planShapeLeafPixels(input),
+        projectedBounds = projectedShapeTextBounds(
+          source,
+          projected.textPlan!,
+          undefined,
+          input.groupScene,
+        ),
+        ownBounds = projected.textPlan!.logicalBounds;
+      expect(projected.textFollowsBodyProjection).toBe(true);
+      expect(projectedBounds.left).toBeGreaterThan(ownBounds.left + 20);
+      expect(projectedBounds.right - projectedBounds.left).toBeLessThan(
+        ownBounds.right - ownBounds.left,
+      );
+      shapeText.layout.keepFlat = true;
+      const flat = planShapeLeafPixels(input);
+      expect(flat.textFollowsBodyProjection).toBe(false);
+      expect(projectedShapeTextBounds(source, flat.textPlan!, undefined, input.groupScene)).toEqual(
+        flat.textPlan!.logicalBounds,
+      );
+      expect(flat.textLayout).toEqual(projected.textLayout);
+      const boundary = factory(),
+        ordinary = prepareShapeLeafPixels({ ...options(source), canvasFactory: boundary.make }),
+        sceneFlat = prepareShapeLeafPixels({ ...input, canvasFactory: boundary.make });
+      expect(ordinary.kind).toBe("ready");
+      expect(sceneFlat.kind).toBe("ready");
+      if (ordinary.kind !== "ready" || sceneFlat.kind !== "ready") return;
+      expect(inkBounds(sceneFlat)).toEqual(inkBounds(ordinary));
+      ordinary.dispose();
+      sceneFlat.dispose();
+      expect(boundary.canvases.every((canvas) => canvas.width === 0 && canvas.height === 0)).toBe(
+        true,
+      );
+    },
+  );
+  test.each(["legacy-svg", "legacy-text-box", "standard"] as const)(
+    "%s plain glyphs join the scene without replacing their actual layout policy",
+    (renderPolicy) => {
+      const source = drawing({
+          ...(renderPolicy === "legacy-text-box" ? { kind: "textBox" } : {}),
+          ...(renderPolicy === "standard" ? { shapeGeometry: { preset: "triangle" } } : {}),
+          shapeFlipX: true,
+          shapeFlipY: true,
+        }),
+        own = planShapeLeafPixels(options(source)),
+        scene = planShapeLeafPixels({ ...options(source), groupScene: sharedScene() });
+      expect(scene.renderPolicy).toBe(renderPolicy);
+      expect(scene.richText).toBe(false);
+      expect(scene.textFollowsBodyProjection).toBe(true);
+      expect(scene.textLayout).toEqual(own.textLayout);
+      expect(scene.textLayout!.runs.every((run) => run.angle === 180)).toBe(true);
+    },
+  );
+  test.each([
+    [true, false],
+    [false, true],
+    [true, true],
+  ] as const)(
+    "body H=%s V=%s reflection stays before the common camera and glyphs keep their readable map",
+    (shapeFlipX, shapeFlipY) => {
+      const source = drawing({
+          text: "abc",
+          shapeGeometry: { preset: "rightArrow" },
+          shapeText: createDefaultShapeText(),
+          ...(shapeFlipX ? { shapeFlipX: true } : {}),
+          ...(shapeFlipY ? { shapeFlipY: true } : {}),
+        }),
+        groupScene = sharedScene(),
+        spy = vi.spyOn(detailed, "planShapeDetailedPaint"),
+        plan = planShapeLeafPixels({ ...options(source), groupScene });
+      const reflected = spy.mock.calls[0]![0].groupScene!.scene.sourceToScene;
+      expect(reflected).toEqual({
+        a: shapeFlipX ? -1 : 1,
+        b: shapeFlipX ? -0 : 0,
+        c: shapeFlipY ? -0 : 0,
+        d: shapeFlipY ? -1 : 1,
+        e: 20 + (shapeFlipX ? 80 : 0),
+        f: 20 + (shapeFlipY ? 60 : 0),
+      });
+      expect(plan.textLayout!.runs.every((run) => run.angle === (shapeFlipY ? 180 : 0))).toBe(true);
+      const bodyLeft = shapeFlipX
+        ? source.width - plan.bodyPlan.logicalBounds.right
+        : plan.bodyPlan.logicalBounds.left;
+      expect(bodyLeft).toBeGreaterThan(30);
+      const boundary = factory(),
+        result = prepareShapeLeafPixels({
+          ...options(source),
+          groupScene,
+          canvasFactory: boundary.make,
+        });
+      expect(result.kind).toBe("ready");
+      if (result.kind !== "ready") return;
+      expect(
+        boundary
+          .calls()
+          .every((call) =>
+            shapeFlipY
+              ? call.matrix[0] < 0 && call.matrix[3] < 0
+              : call.matrix[0] > 0 && call.matrix[3] > 0,
+          ),
+      ).toBe(true);
+      expect(inkBounds(result).left).toBeGreaterThan(30);
+      result.dispose();
+    },
+  );
+  test("explicit scene output adapter receives the matching final body flip compensation", () => {
+    const groupScene = sharedScene();
+    const explicit = {
+      ...groupScene,
+      scene: { ...groupScene.scene, sceneToOutput: { a: 1, b: 0, c: 0, d: 1, e: -20, f: -20 } },
+    };
+    const spy = vi.spyOn(detailed, "planShapeDetailedPaint");
+    planShapeLeafPixels({
+      ...options(drawing({ text: "", shapeFlipX: true, shapeFlipY: true })),
+      groupScene: explicit,
+    });
+    expect(spy.mock.calls[0]![0].groupScene!.scene.sceneToOutput).toEqual({
+      a: -1,
+      b: -0,
+      c: -0,
+      d: -1,
+      e: 100,
+      f: 80,
+    });
+    expect(explicit.scene.sceneToOutput).toEqual({ a: 1, b: 0, c: 0, d: 1, e: -20, f: -20 });
+  });
+  test("KeepFlat preserves text-own 3D, attributed native runs, overflow, and V180", () => {
+    const shapeText = createDefaultShapeText();
+    shapeText.layout.keepFlat = true;
+    shapeText.layout.overflow = true;
+    shapeText.layout.wrap = false;
+    shapeText.layout.marginsPt = { leftPt: 0, rightPt: 0, topPt: 0, bottomPt: 0 };
+    shapeText.characterRuns = [{ start: 1, end: 3, fontSize: 24, bold: true, color: "#ff0000" }];
+    shapeText.style = {
+      rotation3d: {
+        kind: "value",
+        value: { projection: "parallel", xDeg: 20, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+      },
+    };
+    const source = drawing({
+        shapeGeometry: { preset: "rect" },
+        width: 15,
+        text: "abcdefghij",
+        fill: "transparent",
+        shapeText,
+        shapeFlipY: true,
+      }),
+      before = structuredClone(source),
+      input = {
+        ...options(source),
+        textRuntimeOptions: {
+          ...native,
+          resolveNormalLineMetrics: () => native.normalLineMetrics!,
+        },
+      },
+      plan = planShapeLeafPixels({ ...input, groupScene: sharedScene() });
+    expect(plan.textPlan!.requiresGlyphProjection).toBe(true);
+    expect(plan.textFollowsBodyProjection).toBe(false);
+    expect(plan.textPlan!.overflow).toBe(true);
+    expect(
+      plan.textLayout!.runs.some((run) => run.font.size === 24 && run.font.weight === 700),
+    ).toBe(true);
+    expect(plan.textLayout!.runs.every((run) => run.angle === 180)).toBe(true);
+    expect(projectedShapeTextBounds(source, plan.textPlan!, undefined, sharedScene())).toEqual(
+      plan.textPlan!.logicalBounds,
+    );
+    const boundary = factory(),
+      own = prepareShapeLeafPixels({ ...input, canvasFactory: boundary.make }),
+      flat = prepareShapeLeafPixels({
+        ...input,
+        groupScene: sharedScene(),
+        canvasFactory: boundary.make,
+      });
+    expect(own.kind).toBe("ready");
+    expect(flat.kind).toBe("ready");
+    if (own.kind !== "ready" || flat.kind !== "ready") return;
+    expect(inkBounds(flat)).toEqual(inkBounds(own));
+    expect(
+      boundary.calls().some((call) => call.font.includes("700") && call.font.includes("24px")),
+    ).toBe(true);
+    expect(source).toEqual(before);
+    own.dispose();
+    flat.dispose();
+  });
+  test("scene errors fail before native pixels and missing fonts stay explicit unless the editor hides glyphs", () => {
+    const source = drawing({
+        shapeGeometry: { preset: "rect" },
+        shapeText: createDefaultShapeText(),
+      }),
+      make = vi.fn(),
+      group = sharedScene(),
+      singular = {
+        ...group,
+        scene: { ...group.scene, sourceToScene: { a: 0, b: 0, c: 0, d: 1, e: 20, f: 20 } },
+      };
+    expect(() =>
+      prepareShapeLeafPixels({ ...options(source), groupScene: singular, canvasFactory: make }),
+    ).toThrow(/singular/);
+    expect(make).not.toHaveBeenCalled();
+    const families = vi
+      .spyOn(fontResources, "getCellFontResourceFamilies")
+      .mockReturnValue(["missing-scene-font"]);
+    vi.spyOn(fontResources, "getCellFontResourceStatus").mockReturnValue({
+      family: "missing-scene-font",
+      kind: "managed",
+      state: "loading",
+    });
+    expect(
+      prepareShapeLeafPixels({ ...options(source), groupScene: group, canvasFactory: make }),
+    ).toMatchObject({ kind: "unavailable", reason: "text-unavailable" });
+    expect(make).not.toHaveBeenCalled();
+    families.mockClear();
+    const hidden = planShapeLeafPixels({ ...options(source), groupScene: group, hideText: true });
+    expect(hidden.kind).toBe("ready");
+    expect(hidden.textPlan).toBeUndefined();
+    expect(hidden.bodyPlan.isProjected).toBe(true);
+    expect(families).not.toHaveBeenCalled();
+  });
+  test.each([true, false])(
+    "KeepFlat=%s body-glyph union includes scene scratch in the aggregate replan",
+    (keepFlat) => {
+      const shapeText = createDefaultShapeText();
+      shapeText.layout.keepFlat = keepFlat;
+      const plan = planShapeLeafPixels({
+        ...options(
+          drawing({ width: 1200, height: 600, shapeGeometry: { preset: "rect" }, shapeText }),
+        ),
+        groupScene: {
+          ...sharedScene(),
+          scene: { ...sharedScene().scene, widthPx: 6000, heightPx: 1000 },
+        },
+        density: 16,
+      });
+      expect(plan.kind).toBe("ready");
+      expect(plan.actualDensity).toBeLessThan(16);
+      expect(Math.max(plan.widthRaster, plan.heightRaster)).toBeLessThanOrEqual(
+        SHAPE_LEAF_PIXELS_LIMITS.side,
+      );
+      expect(plan.widthRaster * plan.heightRaster).toBeLessThanOrEqual(
+        SHAPE_LEAF_PIXELS_LIMITS.pixels,
+      );
+      expect(plan.estimatedPeakBytes).toBeLessThanOrEqual(SHAPE_LEAF_PIXELS_LIMITS.memoryBytes);
+    },
+  );
+  test("a failed scene glyph projection releases every transient body/glyph canvas", () => {
+    const boundary = factory(),
+      source = drawing({ shapeGeometry: { preset: "rect" }, shapeText: createDefaultShapeText() });
+    vi.spyOn(textProjection, "projectShapeTextSurface").mockImplementation(() => {
+      throw new Error("projected native pixel failure");
+    });
+    expect(() =>
+      prepareShapeLeafPixels({
+        ...options(source),
+        groupScene: sharedScene(),
+        canvasFactory: boundary.make,
+      }),
+    ).toThrow("projected native pixel failure");
+    expect(boundary.canvases.length).toBeGreaterThan(1);
+    expect(boundary.canvases.every((canvas) => canvas.width === 0 && canvas.height === 0)).toBe(
+      true,
+    );
+    expect(getShapeLeafPixelsOwnedBytes()).toBe(0);
+  });
+  test("active scene missing body/glyph assets return typed unavailability before decoding or allocating", () => {
+    const texture: ShapeDetailedStyle = {
+      fill: {
+        kind: "value",
+        value: {
+          kind: "picture",
+          assetId: "scene-paint",
+          opacity: 1,
+          rotateWithShape: true,
+          layout: {
+            kind: "tile",
+            scaleX: 1,
+            scaleY: 1,
+            offsetXPt: 0,
+            offsetYPt: 0,
+            flip: "none",
+            anchor: "center",
+          },
+        },
+      },
+    };
+    const shapeText = createDefaultShapeText(),
+      source = drawing({ shapeGeometry: { preset: "rect" }, shapeText }),
+      make = vi.fn(),
+      decode = vi.fn(),
+      input = {
+        ...options(source),
+        groupScene: sharedScene(),
+        canvasFactory: make,
+        resources: { getAssetImage: decode },
+      };
+    source.shapeStyle = texture;
+    expect(prepareShapeLeafPixels(input)).toMatchObject({
+      kind: "unavailable",
+      reason: "asset-unavailable",
+      missingAssetIds: ["scene-paint"],
+    });
+    source.shapeStyle = undefined;
+    shapeText.style = texture;
+    expect(prepareShapeLeafPixels(input)).toMatchObject({
+      kind: "unavailable",
+      reason: "asset-unavailable",
+      missingAssetIds: ["scene-paint"],
+    });
+    expect(decode).not.toHaveBeenCalled();
+    expect(make).not.toHaveBeenCalled();
+    expect(
+      prepareShapeLeafPixels({
+        ...input,
+        resources: { getAssetSize: () => ({ width: 4, height: 4 }), getAssetImage: decode },
+      }),
+    ).toMatchObject({ kind: "unavailable", reason: "asset-unavailable" });
+    expect(decode).toHaveBeenCalledOnce();
+    expect(make).not.toHaveBeenCalled();
   });
 });
 describe("resource and aggregate preflight", () => {

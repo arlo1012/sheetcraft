@@ -56,76 +56,86 @@ function sceneGroup(nested: boolean, value: Choice<PictureRotation3d>): ShapeGro
   };
 }
 
-describe("group scene source stage admission", () => {
+function relatedScene() {
+  const root = sceneGroup(false, rotation),
+    connector = framedShape();
+  connector.id = "related-connector";
+  connector.text = "";
+  connector.shapeGeometry = { preset: "bentConnector3" };
+  connector.shapeConnector = {
+    kind: "shape-connector-v1",
+    begin: { kind: "site", targetId: "leaf-0", preset: "rect", siteIndex: 1 },
+    end: { kind: "free", xRatio: 1, yRatio: 1 },
+  };
+  return [root, connector];
+}
+
+describe("live group scene admission", () => {
   test.each([false, true])(
-    "unconsumed scene source is preserved and explicitly blocked (nested=%s)",
+    "complete scene sources retain snapshots and command/relation admission (nested=%s)",
     (nested) => {
       for (const value of [rotation, { kind: "none" } as const]) {
-        const workbook = createWorkbook({ id: "scene-stage", sheetId: "s" }),
-          sheet = getActiveSheet(workbook),
-          root = sceneGroup(nested, value);
-        sheet.drawings = [root];
-        const before = serializeWorkbook(workbook);
+        const workbook = createWorkbook({ id: "live-scene", sheetId: "s" }),
+          sheet = getActiveSheet(workbook);
+        sheet.drawings = [sceneGroup(nested, value)];
+        const before = serializeWorkbook(workbook),
+          metrics = createPictureSheetMetrics(sheet);
         expect(before.version).toBe(67);
         expect(serializeWorkbook(deserializeWorkbook(before))).toEqual(before);
-        expect(() => assertWorkbookShapeSupport(workbook)).toThrow(
-          UnsupportedShapeGroup3dDocumentError,
-        );
-        const state = createSheetSparseState(sheet),
-          snapshot = serializeSheet(sheet);
-        const commands: WorkbookCommand[] = [
-          createSetSheetDrawingsCommand(sheet.id, sheet.drawings),
-          { type: "addSheet", sheet: snapshot, index: 0, activeSheetId: sheet.id },
-          { type: "restoreSheetState", sheetId: sheet.id, state },
-          {
-            type: "restoreCellShift",
-            sheetId: sheet.id,
-            state,
-            direction: "right",
-            range: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
-            operation: "insert",
-            workbookFormulaSources: [],
-            definedNames: [],
-          },
-          {
-            type: "restoreTableTransaction",
-            states: [{ sheetId: sheet.id, state }],
-            tableStyles: [],
-          },
-        ];
-        for (const command of commands)
-          expect(() => assertShapeCommandSupport(command)).toThrow(
-            UnsupportedShapeGroup3dDocumentError,
-          );
-        const metrics = createPictureSheetMetrics(sheet);
-        expect(() => resolveShapeGroupProjection(root, metrics)).toThrow(
-          UnsupportedShapeGroup3dDocumentError,
-        );
+        expect(() => assertWorkbookShapeSupport(workbook)).not.toThrow();
         expect(() =>
-          resolveShapeForestForRender({ drawings: [root], metrics, revision: 0 }),
-        ).toThrow(UnsupportedShapeGroup3dDocumentError);
-        const connection: ReturnType<typeof framedShape> = {
-          ...framedShape(),
-          id: "unrelated-connection",
-          text: "",
-          shapeGeometry: { preset: "bentConnector3" },
-          shapeConnector: {
-            kind: "shape-connector-v1" as const,
-            begin: { kind: "free" as const, xRatio: 0, yRatio: 0 },
-            end: { kind: "free" as const, xRatio: 1, yRatio: 1 },
-          },
-        };
-        // A worksheet relation pass takes a different group branch. It must not
-        // silently bypass the source-stage camera gate for an unrelated connector.
-        expect(() =>
-          resolveShapeForestForRender({ drawings: [root, connection], metrics, revision: 0 }),
-        ).toThrow(UnsupportedShapeGroup3dDocumentError);
+          assertShapeCommandSupport(createSetSheetDrawingsCommand(sheet.id, sheet.drawings ?? [])),
+        ).not.toThrow();
+        expect(
+          resolveShapeGroupProjection(sheet.drawings[0] as ShapeGroupDrawing, metrics).leaves,
+        ).toHaveLength(2);
+        expect(
+          resolveShapeForestForRender({ drawings: sheet.drawings ?? [], metrics, revision: 0 })
+            .leaves,
+        ).toHaveLength(2);
         expect(serializeWorkbook(workbook)).toEqual(before);
       }
     },
   );
 
-  test("the source-stage camera gate leaves existing groups and their real consumers open", () => {
+  test("a scene with a related connector stays atomically blocked through all restoring commands", () => {
+    const workbook = createWorkbook({ id: "related-scene", sheetId: "s" }),
+      sheet = getActiveSheet(workbook);
+    sheet.drawings = relatedScene();
+    const before = serializeWorkbook(workbook),
+      state = createSheetSparseState(sheet),
+      snapshot = serializeSheet(sheet);
+    const commands: WorkbookCommand[] = [
+      createSetSheetDrawingsCommand(sheet.id, sheet.drawings ?? []),
+      { type: "addSheet", sheet: snapshot, index: 0, activeSheetId: sheet.id },
+      { type: "restoreSheetState", sheetId: sheet.id, state },
+      {
+        type: "restoreCellShift",
+        sheetId: sheet.id,
+        state,
+        direction: "right",
+        range: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+        operation: "insert",
+        workbookFormulaSources: [],
+        definedNames: [],
+      },
+      { type: "restoreTableTransaction", states: [{ sheetId: sheet.id, state }], tableStyles: [] },
+    ];
+    expect(() => assertWorkbookShapeSupport(workbook)).toThrow(
+      UnsupportedShapeGroup3dDocumentError,
+    );
+    for (const command of commands)
+      expect(() => assertShapeCommandSupport(command)).toThrow(
+        UnsupportedShapeGroup3dDocumentError,
+      );
+    const metrics = createPictureSheetMetrics(sheet);
+    expect(() =>
+      resolveShapeForestForRender({ drawings: sheet.drawings ?? [], metrics, revision: 0 }),
+    ).toThrow(UnsupportedShapeGroup3dDocumentError);
+    expect(serializeWorkbook(workbook)).toEqual(before);
+  });
+
+  test("scene admission leaves existing groups and their real consumers open", () => {
     const workbook = createWorkbook({ id: "old-group", sheetId: "s" }),
       sheet = getActiveSheet(workbook),
       root = sceneGroup(false, rotation);
@@ -147,7 +157,7 @@ describe("group scene source stage admission", () => {
 
   test("unsupported scene recovery cannot be overwritten by autosave, manual save or reset", async () => {
     const saved = createWorkbook({ id: "stored-scene", sheetId: "stored" });
-    getActiveSheet(saved).drawings = [sceneGroup(false, rotation)];
+    getActiveSheet(saved).drawings = relatedScene();
     const snapshot = serializeWorkbook(saved),
       current = createWorkbook({ id: "current", sheetId: "current" }),
       original = serializeWorkbook(current),

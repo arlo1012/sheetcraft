@@ -176,6 +176,18 @@ export function hasActiveShapeGroupEffects(root: ShapeGroupDrawing): boolean {
         node.groupEffects?.glow?.kind === "value"),
   );
 }
+/** Common camera changes member positions as well as contours, even without an alpha effect. */
+export function requiresShapeGroupPaint(root: ShapeGroupDrawing): boolean {
+  return traverseShapeGroupVisibility(cloneShapeGroup(root)).some(
+    ({ node, visible }) =>
+      visible &&
+      node.kind === "shapeGroup" &&
+      (node.group3d?.rotation3d.kind === "value" ||
+        node.groupEffects?.shadow?.kind === "value" ||
+        node.groupEffects?.reflection?.kind === "value" ||
+        node.groupEffects?.glow?.kind === "value"),
+  );
+}
 /** Shadow-only compatibility query; effect consumers use hasActiveShapeGroupEffects. */
 export function hasActiveShapeGroupShadow(root: ShapeGroupDrawing): boolean {
   return traverseShapeGroupVisibility(cloneShapeGroup(root)).some(
@@ -396,6 +408,7 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
         if (leaf.collapsed || !drawing || !paintLayout) return result;
         const leafOptions: ShapeLeafPixelsOptions = {
           drawing,
+          ...(leaf.groupScene ? { groupScene: leaf.groupScene } : {}),
           ...(connector?.status === "ready" ? { connectorRoute: connector.route } : {}),
           density,
           resources: options.resources,

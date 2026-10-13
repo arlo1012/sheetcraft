@@ -148,7 +148,7 @@ import type { FreeShapePointAction as PointAction } from "../free-shape-edit-act
 import DrawingContent from "./DrawingContent.vue";
 import ShapeGroupDetailedContent from "./ShapeGroupDetailedContent.vue";
 import {
-  hasActiveShapeGroupEffects,
+  requiresShapeGroupPaint,
   hitShapeGroupPaint,
   type ShapeGroupPaintResult,
 } from "../shape-group-paint";
@@ -698,7 +698,7 @@ const groupPaintEntries = computed<GroupPaintEntry[]>(() => {
       if (leaf && (preview.value.kind === "shape" || preview.value.kind === "textBox"))
         displayed = updateResolvedShapeGroupLeaf(leaf, preview.value, m);
     }
-    return hasActiveShapeGroupEffects(displayed) && !groupProjection(displayed, m).layout.collapsed
+    return requiresShapeGroupPaint(displayed) && !groupProjection(displayed, m).layout.collapsed
       ? [{ source, displayed, metrics: m, stackIndex, renderPass: pass }]
       : [];
   });

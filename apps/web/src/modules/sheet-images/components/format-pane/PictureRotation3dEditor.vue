@@ -20,6 +20,8 @@ const props = defineProps<{
   ownerKey: string;
   value?: Choice<PictureRotation3d>;
   disabled?: boolean;
+  /** Block projection values without trapping a safe None/Inherit reset. */
+  valueDisabled?: boolean;
   t: PictureFormatTranslate;
   onCommit: (value: Choice<PictureRotation3d> | undefined) => boolean;
 }>();
@@ -34,21 +36,25 @@ const mode = computed(() =>
 const modes = computed(() => [
   { value: "inherit", label: props.t("effectInherit") },
   { value: "none", label: props.t("effectNone") },
-  { value: "parallel", label: props.t("projectionParallel") },
-  { value: "perspective", label: props.t("projectionPerspective") },
-  { value: "oblique", label: props.t("projectionOblique") },
+  { value: "parallel", label: props.t("projectionParallel"), disabled: props.valueDisabled },
+  { value: "perspective", label: props.t("projectionPerspective"), disabled: props.valueDisabled },
+  { value: "oblique", label: props.t("projectionOblique"), disabled: props.valueDisabled },
 ]);
 function choose(value: unknown) {
   if (props.disabled) return;
   if (value === "inherit") props.onCommit(undefined);
   else if (value === "none") props.onCommit({ kind: "none" });
-  else if (value === "parallel" || value === "perspective" || value === "oblique")
+  else if (
+    !props.valueDisabled &&
+    (value === "parallel" || value === "perspective" || value === "oblique")
+  )
     props.onCommit({ kind: "value", value: createPictureRotation3d(value, rotation.value) });
 }
 function update(patch: Partial<PictureRotation3d>) {
   return (
     !!rotation.value &&
     !props.disabled &&
+    !props.valueDisabled &&
     props.onCommit({ kind: "value", value: { ...rotation.value, ...patch } as PictureRotation3d })
   );
 }
@@ -66,7 +72,7 @@ function numberProps(
     onCommit,
     min,
     max,
-    disabled: props.disabled,
+    disabled: props.disabled || props.valueDisabled,
     invalidMessage: props.t("outOfRange"),
     rejectedMessage: props.t("applyRejected"),
   };
@@ -75,7 +81,7 @@ const presetGroups = getPictureEffectPresetGroups("rotation3d");
 const presetId = computed(() => findPictureEffectPresetId("rotation3d", props.value));
 function selectPreset(id: string) {
   const value = getPictureEffectPreset("rotation3d", id);
-  return !props.disabled && value !== undefined && props.onCommit(value);
+  return !props.disabled && !props.valueDisabled && value !== undefined && props.onCommit(value);
 }
 </script>
 <template>
@@ -84,7 +90,7 @@ function selectPreset(id: string) {
       :owner-key="ownerKey"
       :groups="presetGroups"
       :selected-id="presetId"
-      :disabled="disabled"
+      :disabled="disabled || valueDisabled"
       :t="t"
       :on-select="selectPreset"
       :columns="4"

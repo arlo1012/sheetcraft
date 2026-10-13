@@ -693,3 +693,57 @@ describe("actual shape group aggregate controls", () => {
     );
   });
 });
+
+test("a related-connector restriction disables camera values, explains why, and keeps resets discoverable", async () => {
+  const current = snapshot();
+  current.shapeStyle = {
+    ...current.shapeStyle,
+    rotation3d: {
+      kind: "value",
+      value: { projection: "parallel", xDeg: 30, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+    },
+  };
+  const { wrapper, onIntent } = fixture({
+    snapshot: current,
+    capabilities: {
+      ...capabilities,
+      styles: {
+        shape: {
+          ...capabilities.styles?.shape,
+          rotation3d: {
+            enabled: true,
+            valueEnabled: false,
+            reason: "Bound connector projection unavailable",
+          },
+        },
+      },
+    },
+  });
+  const editor = wrapper.getComponent(PictureRotation3dEditor),
+    select = editor.getComponent(Select);
+  expect(editor.props("disabled")).toBe(false);
+  expect(editor.props("valueDisabled")).toBe(true);
+  expect(
+    select
+      .props("options")
+      ?.filter(
+        (item) =>
+          "value" in item && ["parallel", "perspective", "oblique"].includes(String(item.value)),
+      )
+      .every((item) => "disabled" in item && item.disabled),
+  ).toBe(true);
+  expect(wrapper.text()).toContain("Bound connector projection unavailable");
+  select.vm.$emit("change", "perspective");
+  await flushPromises();
+  expect(onIntent).not.toHaveBeenCalled();
+  select.vm.$emit("change", "none");
+  await flushPromises();
+  expect(onIntent).toHaveBeenLastCalledWith(
+    expect.objectContaining({ category: "rotation3d", value: { kind: "none" } }),
+  );
+  select.vm.$emit("change", "inherit");
+  await flushPromises();
+  expect(onIntent).toHaveBeenLastCalledWith(
+    expect.objectContaining({ category: "rotation3d", value: undefined }),
+  );
+});

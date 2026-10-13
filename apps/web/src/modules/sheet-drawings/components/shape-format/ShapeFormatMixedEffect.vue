@@ -22,7 +22,11 @@ const capability = computed(() => props.controller.styleCapability(props.target,
 const options = computed(() => [
   { value: "none", label: props.controller.s.value("mixedEffectNone") },
   { value: "inherit", label: props.controller.s.value("mixedEffectInherit") },
-  { value: "default", label: props.controller.s.value("mixedEffectDefault") },
+  {
+    value: "default",
+    label: props.controller.s.value("mixedEffectDefault"),
+    disabled: capability.value.valueEnabled === false,
+  },
 ]);
 const action = computed(() => {
   const category = props.category,
@@ -30,7 +34,7 @@ const action = computed(() => {
   return (value: unknown) => {
     if (value === "none") return apply({ kind: "none" });
     if (value === "inherit") return apply(undefined);
-    if (value !== "default") return false;
+    if (value !== "default" || capability.value.valueEnabled === false) return false;
     // Only an explicit choice creates a default effect. No leaf's effect is
     // presented as the committed aggregate of a mixed category.
     switch (category) {

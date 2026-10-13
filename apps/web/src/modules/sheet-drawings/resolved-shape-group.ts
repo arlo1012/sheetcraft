@@ -27,6 +27,11 @@ import {
 } from "@sheetcraft/core/shape-frame";
 import { getShapeObjectProperties } from "@sheetcraft/core/shape-object-properties";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { PictureRotation3d } from "@sheetcraft/core/picture-detailed-style";
+import {
+  createShapeGroupSceneProjection,
+  type ShapeGroupSceneProjection,
+} from "./shape-group-scene";
 
 /** Exact public ownership is separate from each disposable, world-space view. */
 export type ResolvedShapeGroupLeaf = {
@@ -42,6 +47,8 @@ export type ResolvedShapeGroupLeaf = {
   readonly lease: ShapeGroupNodeLease;
   /** Null only when a collapsed ancestor has no child world placement. */
   readonly view: SheetGraphicDrawing | null;
+  /** Transient effective paint authority, never copied into the editable view. */
+  readonly groupScene?: ShapeGroupSceneProjection;
 };
 
 /** Containers expose geometry for outlines, never synthetic leaf appearance. */
@@ -164,6 +171,11 @@ export function resolveShapeGroupProjection(
     entry: ResolvedShapeGroupNode,
     parentPath: ShapeGroupPath | null,
     parentLayout: ResolvedShapeFrame | null,
+    camera?: {
+      path: ShapeGroupPath;
+      layout: ResolvedShapeFrame | null;
+      rotation3d: PictureRotation3d;
+    },
   ): void {
     const sourceNode = sources.get(JSON.stringify(entry.path));
     if (!sourceNode || sourceNode.kind !== entry.node.kind)
@@ -175,7 +187,11 @@ export function resolveShapeGroupProjection(
       if (!("members" in entry))
         throw new TypeError("A resolved shape group owner requires its complete child tree.");
       owners.push({ sourceRoot, sourceNode, path, parentPath, parentLayout, layout, collapsed });
-      for (const child of entry.members) visit(child, path, layout);
+      const ownCamera =
+        entry.node.kind === "shapeGroup" ? entry.node.group3d?.rotation3d : undefined;
+      const nextCamera =
+        ownCamera?.kind === "value" ? { path, layout, rotation3d: ownCamera.value } : camera;
+      for (const child of entry.members) visit(child, path, layout, nextCamera);
       return;
     }
     if (!parentPath || entry.node.kind === "shapeGroup")
@@ -197,6 +213,16 @@ export function resolveShapeGroupProjection(
         return (lease ??= leaseShapeGroupNode(resolved.node, leasePath));
       },
       view: layout ? worldView(entry.node, layout, metrics) : null,
+      ...(camera?.layout && layout && !collapsed
+        ? {
+            groupScene: createShapeGroupSceneProjection(
+              camera.path,
+              camera.layout,
+              layout,
+              camera.rotation3d,
+            ),
+          }
+        : {}),
     });
   }
   visit(resolved, null, null);

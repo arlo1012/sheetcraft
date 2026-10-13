@@ -9,7 +9,12 @@ import {
   type ShapePresetGeometry,
 } from "@sheetcraft/core/shape-presets";
 import type { PictureRasterLayer } from "../../../shared/images/picture-effect-raster";
-import { mapPictureProjectivePoint } from "../../../shared/images/picture-projective-geometry";
+import {
+  hitPictureProjectiveFront,
+  mapPictureProjectivePoint,
+  type PictureProjectiveGeometry,
+  type PictureProjectiveHomography,
+} from "../../../shared/images/picture-projective-geometry";
 import { createPictureProjectiveGeometry } from "../../../shared/images/picture-projective-geometry";
 import {
   createPictureProjectiveRaster,
@@ -542,4 +547,139 @@ test("pure bounds preflights actual union intersections before asset work", () =
   expect(() =>
     getPictureProjectivePaintBounds(g, { left: 0, top: 0, right: 64, bottom: 64 }, 0, shape, 1),
   ).toThrow(/intersection split budget/);
+});
+
+function lowDenominatorScene(
+  ground: number,
+  depth: number,
+  source: { x: number; y: number; z: number },
+  target = { x: 8.5, y: -7.5 },
+): PictureProjectiveGeometry {
+  const input = {
+    widthPx: 65_536,
+    heightPx: 65_536,
+    depthPx: depth,
+    rotation: {
+      projection: "perspective" as const,
+      xDeg: -45,
+      yDeg: 0,
+      zDeg: 45,
+      perspectiveDeg: 120,
+      distanceFromGroundPx: ground,
+    },
+    scene: {
+      widthPx: 1e-6,
+      heightPx: 1e-6,
+      pivot: { x: 0, y: 0 },
+      sourceToScene: { a: 1, b: 0, c: 0, d: 1, e: 9_000_000, f: 0 },
+      sceneToOutput: { a: 10_000_000, b: 0, c: 0, d: 10_000_000, e: 0, f: 0 },
+    },
+  };
+  const initial = createPictureProjectiveGeometry(input),
+    m = initial.sourceToScreenMatrix;
+  const w = m[12] * source.x + m[13] * source.y + m[14] * source.z + m[15];
+  const q = {
+    x: (m[0] * source.x + m[1] * source.y + m[2] * source.z + m[3]) / w,
+    y: (m[4] * source.x + m[5] * source.y + m[6] * source.z + m[7]) / w,
+  };
+  return createPictureProjectiveGeometry({
+    ...input,
+    scene: {
+      ...input.scene,
+      sceneToOutput: { ...input.scene.sceneToOutput, e: target.x - q.x, f: target.y - q.y },
+    },
+  });
+}
+function positiveSmallDenominator(
+  inverse: PictureProjectiveHomography,
+  target: { x: number; y: number },
+): void {
+  const w = inverse[6] * target.x + inverse[7] * target.y + inverse[8];
+  expect(w).toBeGreaterThan(0);
+  expect(w).toBeLessThan(1e-12);
+}
+function sourcePatch(): PictureRasterLayer {
+  return {
+    left: 32_768,
+    top: 32_768,
+    surface: { width: 1, height: 1, data: new Uint8ClampedArray([255, 255, 255, 255]) },
+  };
+}
+function largeSourceRectangle(): ShapePresetGeometry {
+  return {
+    width: 65_536,
+    height: 65_536,
+    handles: [],
+    adjustments: {},
+    paths: [
+      {
+        filled: true,
+        stroke: false,
+        commands: [["M", 0, 0], ["L", 65_536, 0], ["L", 65_536, 65_536], ["L", 0, 65_536], ["Z"]],
+      },
+    ],
+  };
+}
+test("scene front texture samples a positive low inverse denominator using a one-pixel source patch", () => {
+  const source = { x: 32_768.5, y: 32_768.5, z: 0 },
+    target = { x: 8.5, y: -7.5 };
+  const geometry = lowDenominatorScene(-65_536, 0, source, target);
+  positiveSmallDenominator(geometry.front.inverseHomography!, target);
+  const hit = hitPictureProjectiveFront(geometry, target)!;
+  expect(Math.abs(hit.x - source.x)).toBeLessThan(1 / 1024);
+  expect(Math.abs(hit.y - source.y)).toBeLessThan(1 / 1024);
+  const input = sourcePatch();
+  const result = createPictureProjectiveRaster({
+    geometry,
+    input,
+    density: 1,
+    theme: DEFAULT_WORKBOOK_THEME,
+    format: format(),
+  });
+  expect(result.surface.width * result.surface.height).toBeLessThan(25);
+  expect(pixel(result, target.x, target.y)[3]).toBeGreaterThan(0);
+  expect(Array.from(input.surface.data)).toEqual([255, 255, 255, 255]);
+});
+test("scene shape back caps sample finite positive inverse denominators below the ordinary cutoff", () => {
+  const target = { x: 8.5, y: -7.5 };
+  const geometry = lowDenominatorScene(65_536, 8, { x: 32_768.5, y: 32_768.5, z: -8 }, target);
+  expect(geometry.front.facing).toBe("back");
+  expect(geometry.back!.facing).toBe("front");
+  positiveSmallDenominator(geometry.back!.inverseHomography!, target);
+  const result = createPictureProjectiveRaster({
+    geometry,
+    input: sourcePatch(),
+    shapeGeometry: largeSourceRectangle(),
+    density: 1,
+    theme: DEFAULT_WORKBOOK_THEME,
+    format: format(),
+  });
+  expect(result.surface.width * result.surface.height).toBeLessThan(25);
+  expect(pixel(result, target.x, target.y)).toEqual([255, 0, 0, 255]);
+});
+test("scene contour sides retain low-denominator quarter-pixel coverage without large source allocation", () => {
+  const target = { x: 8.25, y: -7.75 };
+  const geometry = lowDenominatorScene(-65_536, 65_536, { x: 0, y: 32_768, z: -32_768 }, target);
+  const shapeGeometry = largeSourceRectangle(),
+    input = sourcePatch();
+  const plan = preflightPictureShapeProjectiveRaster(
+    geometry,
+    { left: input.left, top: input.top, right: input.left + 1, bottom: input.top + 1 },
+    0,
+    shapeGeometry,
+    1,
+  );
+  expect(plan.shape.sides).toHaveLength(1);
+  positiveSmallDenominator(plan.shape.sides[0]!.inverse, target);
+  const result = createPictureProjectiveRaster({
+    geometry,
+    input,
+    shapeGeometry,
+    density: 1,
+    theme: DEFAULT_WORKBOOK_THEME,
+    format: format(),
+  });
+  expect(result.surface.width * result.surface.height).toBeLessThan(25);
+  expect(pixel(result, 8.5, -7.5)[3]).toBeGreaterThan(0);
+  expect(pixel(result, 8.5, -7.5).slice(0, 3)).toEqual([255, 0, 0]);
 });

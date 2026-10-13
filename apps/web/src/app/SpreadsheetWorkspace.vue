@@ -1894,12 +1894,17 @@ const shapeGroupFormatPane = useOwnedShapeGroupFormatPane({
   replaceCollection: drawingActions.replaceCollection,
   isAssetAvailable: (id) => imageAssetUrls.value.has(id) || shapePaintAssets.has(id),
   getUnsupportedReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
-  getScopeDescription: (scope) =>
-    t("drawing.groupFormatScope", {
+  getCameraUnsupportedReason: () => t("drawing.groupCameraConnectorUnavailable"),
+  getScopeDescription: (scope) => {
+    const description = t("drawing.groupFormatScope", {
       count: scope.descendantCount,
       body: scope.bodyEligibleCount,
       text: scope.textEligibleCount,
-    }),
+    });
+    return scope.rotation3dShared
+      ? `${description} ${t("drawing.groupCameraScope", { count: scope.rotation3dAffectedCount })}`
+      : description;
+  },
 });
 const shapeConnectorFormatPane = useOwnedShapeConnectorFormatPane({
   getLocale: () => (locale.value === "zh-CN" ? "zh-CN" : "en-US"),

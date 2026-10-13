@@ -4,7 +4,11 @@ export const drawingsZhCN = {
   "drawing.equalSize": "等尺寸",
   "drawing.formatGroup": "组合格式",
   "drawing.groupFormatScope":
-    "大小、属性和主体阴影属于此组合；填充、轮廓与文字设置应用到对应成员（主体 {body}/{count}，文字 {text}/{count}）。",
+    "大小和属性应用到当前对象；组合阴影、映像和发光作用于组合整体内容。填充、轮廓、主体深度与文字设置应用到对应成员（主体 {body}/{count}，文字 {text}/{count}）。",
+  "drawing.groupCameraScope":
+    "三维旋转会调整 {count} 个成员的共享场景，选中单个成员时也会影响同场景成员。“保持文字平面”让文字留在原二维位置。",
+  "drawing.groupCameraConnectorUnavailable":
+    "当前尚不能同时投影此场景的连接线和绑定连接点。可以移除现有三维旋转，或先断开受影响的绑定，再应用新的旋转。",
   "drawing.groupLoading": "正在准备完整组合…",
   "drawing.groupRenderingUnavailable": "当前字体、资源或像素预算无法完整显示此组合，原对象已保留。",
   "drawing.groupName": "组合",
