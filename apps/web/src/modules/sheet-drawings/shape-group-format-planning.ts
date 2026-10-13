@@ -119,6 +119,17 @@ const styleCategories: readonly ShapeFormatStyleCategory[] = [
   "format3d",
   "rotation3d",
 ];
+/** Member glyph effects are distinct from the container's completed-alpha effects. */
+export function isShapeGroupMemberStyleCategory(
+  target: ShapeFormatMode,
+  category: ShapeFormatStyleCategory,
+): boolean {
+  return (
+    category === "fill" ||
+    category === "line" ||
+    (target === "text" && (category === "shadow" || category === "glow"))
+  );
+}
 const objectFields = new Set<ShapeFormatField>([
   "lockAspectRatio",
   "anchor",
@@ -520,9 +531,7 @@ export function planShapeGroupFormatIntent(
     // group shadow into per-member shadows, or invent a container bitmap source.
     if (
       context.sourceNode.kind === "shapeGroup" &&
-      intent.category !== "fill" &&
-      intent.category !== "line" &&
-      !(intent.target === "text" && intent.category === "shadow")
+      !isShapeGroupMemberStyleCategory(intent.target, intent.category)
     )
       throw new TypeError(
         "Group-level effects require an independently supported group effect model.",

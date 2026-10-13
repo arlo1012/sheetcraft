@@ -27,6 +27,7 @@ import {
   getShapeGroupFormatEligibleLeaves,
   getShapeGroupFormatFieldEligibleLeaves,
   getShapeGroupLineEligibleLeaves,
+  isShapeGroupMemberStyleCategory,
   planShapeGroupFormatIntent,
   resolveShapeGroupFormatContext,
 } from "./shape-group-format-planning";
@@ -167,10 +168,10 @@ export function useOwnedShapeGroupFormatPane(options: {
       owner = selected.value,
       values = aggregate.value;
     if (!source || !target || !owner || !values) return null;
-    const revision = options.getRevision();
+    const revision = options.getRevision(),
+      metrics = options.getMetrics?.();
+    if (!metrics) return null;
     if (owner.lease.revision !== revision) {
-      const metrics = options.getMetrics?.();
-      if (!metrics) return null;
       try {
         const expected = [...(owner.sheet.drawings ?? [])];
         owner.lease = {
@@ -182,6 +183,13 @@ export function useOwnedShapeGroupFormatPane(options: {
       } catch {
         return null;
       }
+    } else if (owner.lease.metrics !== metrics) {
+      // Grid publication can rebuild immutable metrics after our own command.
+      // Publish a fresh action owner, rather than either accepting old callbacks
+      // against new geometry or leaving every subsequent form edit unusable.
+      if (!sameCollection(owner.lease.expected, owner.lease.forest, owner.sheet)) return null;
+      owner.lease = { ...owner.lease, metrics };
+      owner.sessionId = `shape-group-owner-${++sequence}`;
     }
     return {
       owner: {
@@ -307,9 +315,7 @@ export function useOwnedShapeGroupFormatPane(options: {
                 target === "shape" &&
                 SHAPE_GROUP_EFFECT_CATEGORIES.some((entry) => entry === category) &&
                 !captured.collapsed) ||
-              ((category === "fill" ||
-                category === "line" ||
-                (target === "text" && category === "shadow")) &&
+              (isShapeGroupMemberStyleCategory(target, category) &&
                 getShapeGroupFormatEligibleLeaves(captured, target, category).length > 0)),
         );
     return {

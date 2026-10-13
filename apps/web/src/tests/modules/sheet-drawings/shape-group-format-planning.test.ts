@@ -19,6 +19,7 @@ import {
 import { framedShape } from "./framed-shape-fixture";
 import { resolveShapeForestForRender } from "../../../modules/sheet-drawings/resolved-shape-render-source";
 import { createSheet } from "@sheetcraft/core/workbook";
+import { ungroupShapeRoot } from "@sheetcraft/core/shape-group-planning";
 import type { ShapePaint } from "@sheetcraft/core/shape-style";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
 import {
@@ -514,6 +515,7 @@ describe("genuine descendant fill/line and text batches", () => {
         "rotation3d",
       ] as const) {
         if (target === "shape" && (category === "reflection" || category === "glow")) continue;
+        if (target === "text" && category === "glow") continue;
         expect(() =>
           apply(f, ["root"], { type: "set-style", target, category, value: { kind: "none" } }),
         ).toThrow(/group effect model/);
@@ -706,6 +708,50 @@ describe("genuine descendant fill/line and text batches", () => {
     expect(node(result.root, ["root", "first"]).shapeText?.style).toBeUndefined();
     expect(result.root).not.toHaveProperty("shapeStyle");
     expect(JSON.stringify(f.root)).toBe(before);
+  });
+
+  test("text Glow belongs to exact eligible leaf glyphs, preserves other styles and survives Ungroup", () => {
+    const f = fixture(),
+      glow = {
+        kind: "value",
+        value: { color: { kind: "rgb", rgb: "#FF8000" }, opacity: 0.4, sizePt: 11 },
+      } as const;
+    f.a.shapeText = createDefaultShapeText();
+    f.a.shapeText.characterRuns = [{ start: 0, end: 1, bold: true }];
+    f.a.shapeText.style = { shadow: { kind: "none" } };
+    f.root.groupEffects = { glow: { kind: "none" } };
+    const before = structuredClone(f.root);
+    const result = apply(f, ["root", "inner"], {
+      type: "set-style",
+      target: "text",
+      category: "glow",
+      value: glow,
+    });
+    expect(result.affectedPaths).toEqual([
+      ["root", "inner", "a"],
+      ["root", "inner", "b"],
+    ]);
+    expect(node(result.root, ["root", "inner", "a"]).shapeText?.style).toEqual({
+      shadow: { kind: "none" },
+      glow,
+    });
+    expect(node(result.root, ["root", "inner", "a"]).shapeText?.characterRuns).toEqual(
+      f.a.shapeText.characterRuns,
+    );
+    expect(node(result.root, ["root", "inner", "b"]).shapeText?.style?.glow).toEqual(glow);
+    expect(node(result.root, ["root", "first"])).toEqual(node(before, ["root", "first"]));
+    expect(result.root.groupEffects).toEqual(before.groupEffects);
+    const released = ungroupShapeRoot(
+      ungroupShapeRoot([result.root], "root", f.metrics),
+      "inner",
+      f.metrics,
+    );
+    for (const id of ["a", "b"])
+      expect(released.find((entry) => entry.id === id)).toHaveProperty(
+        "shapeText.style.glow",
+        glow,
+      );
+    expect(f.root).toEqual(before);
   });
 
   test("aggregates common text and genuine per-category styles, exposing explicit mixed fields", () => {

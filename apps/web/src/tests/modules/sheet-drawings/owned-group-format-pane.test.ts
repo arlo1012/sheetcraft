@@ -416,6 +416,7 @@ describe("exact-owner actual shape group format pane", () => {
     for (const category of ["reflection", "glow", "softEdges", "format3d", "rotation3d"])
       for (const target of ["shape", "text"]) {
         if (target === "shape" && (category === "reflection" || category === "glow")) continue;
+        if (target === "text" && category === "glow") continue;
         expect(
           f.pane.onIntent(
             f.intent({ type: "set-style", target, category, value: { kind: "none" } }),
@@ -511,6 +512,53 @@ describe("exact-owner actual shape group format pane", () => {
     expect(redoWorkbookCommand(f.session)).toBe(true);
     expect(f.state()).toEqual(after);
   });
+
+  test.each([false, true])(
+    "text Glow uses the selected owner and one exact history transaction (nested=%s)",
+    (nested) => {
+      const path = nested ? ["root", "inner"] : ["root"];
+      const f = fixture(),
+        glow = {
+          kind: "value",
+          value: { color: { kind: "rgb", rgb: "#FF8000" }, opacity: 0.4, sizePt: 11 },
+        } as const;
+      expect(f.open(path)).toBe(true);
+      expect(f.pane.capabilities.value.styles?.text?.glow?.enabled).toBe(true);
+      const before = f.state(),
+        old = f.intent({ type: "set-style", target: "text", category: "glow", value: glow });
+      expect(f.pane.onIntent(old)).toBe(true);
+      for (const id of path.length === 1 ? ["a", "b", "text"] : ["b", "text"])
+        expect(f.graphic(id).shapeText?.style?.glow).toEqual(glow);
+      expect(f.graphic("line").shapeText?.style).toBeUndefined();
+      expect(f.source().groupEffects).toBeUndefined();
+      expect(f.session.history.undoStack).toHaveLength(1);
+      const after = f.state();
+      expect(f.pane.onIntent(old)).toBe(false);
+      expect(f.state()).toEqual(after);
+      expect(undoWorkbookCommand(f.session)).toBe(true);
+      expect(f.state()).toEqual(before);
+      expect(redoWorkbookCommand(f.session)).toBe(true);
+      expect(f.state()).toEqual(after);
+      expect(f.open(path)).toBe(true);
+      f.prepare.mockClear();
+      f.prepare.mockImplementation(() => {
+        throw new Error("Glyph budget rejected");
+      });
+      expect(
+        f.pane.onIntent(
+          f.intent({
+            type: "set-style",
+            target: "text",
+            category: "glow",
+            value: { kind: "none" },
+          }),
+        ),
+      ).toBe(false);
+      expect(f.prepare).toHaveBeenCalledOnce();
+      expect(f.state()).toEqual(after);
+      expect(f.session.history.undoStack).toHaveLength(1);
+    },
+  );
 
   test("body Shadow is one nested-container transaction and explicit None remains durable", () => {
     const f = fixture();
@@ -682,6 +730,23 @@ describe("exact-owner actual shape group format pane", () => {
       expect(f.session.history.undoStack).toEqual([]);
     },
   );
+  test("rebuilt grid metrics publish a fresh owner without admitting a previously exposed callback", () => {
+    const f = fixture();
+    expect(f.open()).toBe(true);
+    expect(f.field("textBold", true)).toBe(true);
+    const after = f.state(),
+      stale = f.intent({ type: "set-field", field: "textItalic", value: true });
+    f.metrics.value = createPictureSheetMetrics(f.sheet.value);
+    const refreshed = f.pane.snapshot.value!;
+    expect(refreshed.owner.sessionId).not.toBe(stale.owner.sessionId);
+    expect(f.pane.onIntent(stale)).toBe(false);
+    expect(f.state()).toEqual(after);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    expect(f.field("textItalic", true)).toBe(true);
+    expect(f.session.history.undoStack).toHaveLength(2);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(f.state()).toEqual(after);
+  });
   test("asset failure/new selection/epoch/reentrant intent reject before atomic replacement", () => {
     const f = fixture();
     expect(f.open()).toBe(true);

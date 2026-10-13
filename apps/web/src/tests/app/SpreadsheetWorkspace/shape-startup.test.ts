@@ -23,6 +23,8 @@ import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics
 import { framedShape } from "../../modules/sheet-drawings/framed-shape-fixture";
 import SheetDrawingLayer from "../../../modules/sheet-drawings/components/SheetDrawingLayer.vue";
 import ShapeFormatPane from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
+import ShapeFormatEffects from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatEffects.vue";
+import PictureGlowEditor from "../../../modules/sheet-images/components/format-pane/PictureGlowEditor.vue";
 import ShapeFormatNumberField from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatNumberField.vue";
 import PicturePaintNumber from "../../../modules/sheet-images/components/format-pane/PicturePaintNumber.vue";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -1114,6 +1116,83 @@ function directTextWorkbook(owned: boolean) {
     : [a, b];
   return workbook;
 }
+
+test("real Workspace group Text Glow controls update actual member glyph styles with reversible history", async () => {
+  installNativeTextMeasurement();
+  const wrapper = fixture(
+    async () => ({
+      revision: 1,
+      savedAt: 1,
+      snapshot: serializeWorkbook(directTextWorkbook(true)),
+    }),
+    createMemoryImageAssetStore(),
+    true,
+  );
+  await flushPromises();
+  const state = setupState(wrapper);
+  expect(state.sheetGridRef.selectShapeObjects([["text-group"]])).toBe(true);
+  await flushPromises();
+  await wrapper
+    .getComponent(ShapeToolsToolbar)
+    .get('[data-shape-control="format"]')
+    .trigger("click");
+  await flushPromises();
+  const pane = wrapper.getComponent(ShapeFormatPane);
+  await pane.get(".shape-format-pane__modes").findAll("button")[1]!.trigger("click");
+  await pane.get(".shape-format-pane__tabs").findAll("button")[1]!.trigger("click");
+  const textEffects = pane
+    .findAllComponents(ShapeFormatEffects)
+    .find((entry) => entry.props("target") === "text")!;
+  const heading = textEffects
+    .findAll(".picture-format-section__heading")
+    .find((entry) => entry.text() === "Glow")!;
+  await heading.trigger("click");
+  const glow = textEffects.getComponent(PictureGlowEditor);
+  expect(glow.props("disabled")).toBe(false);
+  const before = serializeWorkbook(state.session.workbook);
+  glow.getComponent(TSelect).vm.$emit("change", "value");
+  await flushPromises();
+  const size = glow
+    .findAllComponents(PicturePaintNumber)
+    .find((entry) => entry.props("unit") === "pt")!;
+  size.getComponent(TInput).vm.$emit("change", "11");
+  await nextTick();
+  expect(size.getComponent(TInput).props("modelValue")).toBe("11");
+  size
+    .getComponent(TInput)
+    .vm.$emit("enter", "11", { e: new KeyboardEvent("keydown", { key: "Enter" }) });
+  await flushPromises();
+  const opacity = glow
+    .findAllComponents(PicturePaintNumber)
+    .find((entry) => entry.props("unit") === "%")!;
+  opacity.getComponent(TInput).vm.$emit("change", "60");
+  await nextTick();
+  expect(opacity.getComponent(TInput).props("modelValue")).toBe("60");
+  opacity
+    .getComponent(TInput)
+    .vm.$emit("enter", "60", { e: new KeyboardEvent("keydown", { key: "Enter" }) });
+  await flushPromises();
+  const owner = getActiveSheet(state.session.workbook).drawings!.find(isShapeGroupDrawing)!;
+  for (const leaf of owner.members) {
+    if (leaf.kind === "shapeGroup") throw Error("Expected actual text leaf");
+    expect(leaf.shapeText?.style?.glow).toMatchObject({
+      kind: "value",
+      value: { sizePt: 11, opacity: 0.4 },
+    });
+  }
+  expect(owner.groupEffects).toBeUndefined();
+  const after = serializeWorkbook(state.session.workbook);
+  for (let i = 0; i < 3; i++) {
+    state.undo();
+    await flushPromises();
+  }
+  expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+  for (let i = 0; i < 3; i++) {
+    state.redo();
+    await flushPromises();
+  }
+  expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+});
 function installNativeTextMeasurement() {
   // Supply only native glyph metrics absent from HappyDOM. Initialization,
   // real layout/AutoFit, exact collection commands and history remain genuine.
