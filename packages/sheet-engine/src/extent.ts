@@ -5,6 +5,7 @@ import {
   type ResolvedShapeGroupNode,
 } from "@sheetcraft/core/shape-group-layout";
 import { resolveShapeFrame } from "@sheetcraft/core/shape-frame";
+import { resolveSheetShapeConnections } from "@sheetcraft/core/shape-connector-layout";
 import { getShapeObjectOriginCell } from "@sheetcraft/core/shape-object-sheet";
 import { isPictureGroup } from "@sheetcraft/core/picture-group";
 import {
@@ -78,12 +79,14 @@ export function getSheetContentExtent(sheet: Sheet): GridExtent {
   for (const table of sheet.pivotTables ?? []) include(getPivotTableRange(table).end);
   if (sheet.drawings?.length) {
     const metrics = createPictureSheetMetrics(sheet);
+    let hasConnector = false;
     const includeShapeEnd = (x: number, y: number) =>
       include({
         row: Math.min(MAX_SHEET_ROWS - 1, locatePictureAxisPoint(y, metrics.rows).index),
         column: Math.min(MAX_SHEET_COLUMNS - 1, locatePictureAxisPoint(x, metrics.columns).index),
       });
     for (const drawing of sheet.drawings) {
+      hasConnector ||= drawing.kind === "shape" && "shapeConnector" in drawing;
       if (hasShapeObjectFrame(drawing)) {
         include(getShapeObjectOriginCell(drawing, sheet));
         const anchor = drawing.shapeFrame.anchor;
@@ -99,6 +102,7 @@ export function getSheetContentExtent(sheet: Sheet): GridExtent {
           const pending: ResolvedShapeGroupNode[] = [resolveShapeGroup(drawing, metrics)];
           while (pending.length) {
             const node = pending.pop()!;
+            hasConnector ||= node.node.kind === "shape" && "shapeConnector" in node.node;
             if (node.layout) {
               const childBounds = node.layout.bounds;
               includeShapeEnd(
@@ -115,6 +119,22 @@ export function getSheetContentExtent(sheet: Sheet): GridExtent {
           metrics.columns.visiblePrefix(drawing.anchor.column) + drawing.offsetX + drawing.width,
           metrics.rows.visiblePrefix(drawing.anchor.row) + drawing.offsetY + drawing.height,
         );
+      }
+    }
+    // Carrier bounds do not contain live endpoints or preset route controls.
+    // Resolve the complete forest once; connector-free sheets keep their old admission budgets.
+    if (hasConnector) {
+      const connections = resolveSheetShapeConnections(sheet.drawings, metrics);
+      for (const connector of connections.connectors) {
+        if (connector.status === "suspended") continue;
+        const route = connector.route;
+        if (route.status === "ready") {
+          const bounds = route.worldBounds;
+          includeShapeEnd(bounds.x + bounds.width, bounds.y + bounds.height);
+        } else {
+          includeShapeEnd(route.begin.x, route.begin.y);
+          includeShapeEnd(route.end.x, route.end.y);
+        }
       }
     }
   }

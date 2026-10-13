@@ -1,5 +1,9 @@
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { nextTick } from "vue";
+import { resolveSheetShapeConnections } from "@sheetcraft/core/shape-connector-layout";
+import { shapeFrameLocalToWorld } from "@sheetcraft/core/shape-frame";
+import { getPicturePaneTranslation } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
 import { isShapeGroupDrawing } from "@sheetcraft/core/shape-group";
 import { groupShapeRoots, ungroupShapeRoot } from "@sheetcraft/core/shape-group-planning";
@@ -33,6 +37,12 @@ function setupState(wrapper: VueWrapper) {
   return (wrapper.vm.$ as unknown as { setupState: unknown }).setupState as {
     shapeCreation: ReturnType<typeof useShapeCreation>;
     shapeInteractionBlocked: boolean;
+    sheetGridRef: { selectDrawing: (id: string | null) => void };
+    undo: () => void;
+    redo: () => void;
+    drawingActions: ReturnType<
+      typeof import("../../../modules/sheet-drawings/useDrawingActions").useDrawingActions
+    >;
     shapeGroupFormatPane: ReturnType<
       typeof import("../../../modules/sheet-drawings/useOwnedShapeGroupFormatPane").useOwnedShapeGroupFormatPane
     >;
@@ -395,3 +405,144 @@ test("snapshot62 container Shadow starts the real Workspace and the pane clears 
   expect(layer.findAll('[data-shape-group-paint="group"]')).toHaveLength(0);
   expect(serializeWorkbook(state.session.workbook).version).toBe(62);
 });
+
+function savedConnectorFixture(group = false) {
+  const workbook = createWorkbook({ id: "saved-bindings", sheetId: "binding-sheet" });
+  const sheet = getActiveSheet(workbook),
+    a = framedShape(),
+    b = framedShape(),
+    connector = framedShape();
+  a.id = "a";
+  b.id = "b";
+  connector.id = "connector";
+  a.text = b.text = connector.text = "";
+  a.rotation = b.rotation = connector.rotation = 0;
+  a.shapeGeometry = { preset: "rect" };
+  b.shapeGeometry = { preset: "ellipse" };
+  connector.shapeGeometry = { preset: "line" };
+  a.shapeFrame.anchor = { mode: "fixed", x: 80, y: 40, size: { width: 80, height: 60 } };
+  b.shapeFrame.anchor = { mode: "fixed", x: 280, y: 180, size: { width: 80, height: 60 } };
+  connector.shapeFrame.anchor = { mode: "fixed", x: 30, y: 25, size: { width: 80, height: 70 } };
+  connector.shapeConnector = {
+    kind: "shape-connector-v1",
+    begin: { kind: "site", targetId: "a", preset: "rect", siteIndex: 3 },
+    end: { kind: "site", targetId: "b", preset: "ellipse", siteIndex: 0 },
+  };
+  sheet.drawings = [a, b, connector];
+  if (group)
+    sheet.drawings = groupShapeRoots(
+      sheet.drawings,
+      ["a", "connector"],
+      { id: "group", name: "Group" },
+      createPictureSheetMetrics(sheet),
+    );
+  return workbook;
+}
+function connectorInput(
+  layer: {
+    props: () => {
+      layout: import("@sheetcraft/sheet-engine/viewport-layout").SheetViewportLayout;
+      scale: number;
+    };
+    element: Element;
+  },
+  type: string,
+  world: { x: number; y: number },
+) {
+  const layout = layer.props().layout,
+    scale = layer.props().scale,
+    translation = getPicturePaneTranslation("body", layout),
+    box = layer.element.getBoundingClientRect();
+  const input = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    clientX: box.left + (world.x + translation.x) * scale,
+    clientY: box.top + (world.y + translation.y) * scale,
+  });
+  Object.defineProperty(input, "pointerId", { value: 73 });
+  return input;
+}
+test.each([false, true])(
+  "saved snapshot63 starts real Workspace; actual connector body drag, exact Undo and target Delete commit (owned=%s)",
+  async (group) => {
+    const initial = savedConnectorFixture(group),
+      snapshot = serializeWorkbook(initial);
+    expect(snapshot.version).toBe(63);
+    const wrapper = fixture(async () => ({ revision: 1, savedAt: 1, snapshot }));
+    await flushPromises();
+    const state = setupState(wrapper),
+      sheet = getActiveSheet(state.session.workbook);
+    expect(sheet.id).toBe("binding-sheet");
+    const layer = wrapper.getComponent(SheetDrawingLayer);
+    const route = () => {
+      const connection = resolveSheetShapeConnections(
+        sheet.drawings!,
+        layer.props("metrics")!,
+      ).getConnector("connector")!;
+      if (connection.status !== "ready" || connection.route.status !== "ready")
+        throw Error("Expected exact visible route");
+      return connection.route;
+    };
+    const before = serializeWorkbook(state.session.workbook),
+      original = route();
+    const commands = original.geometry.paths[0]!.commands,
+      m = commands[0]!,
+      l = commands[1]!;
+    if (m[0] !== "M" || l[0] !== "L") throw Error("Expected ordered line");
+    const origin = shapeFrameLocalToWorld(
+      original.paintLayout.rect,
+      original.paintLayout.angleDeg,
+      { x: (m[1] + l[1]) / 2, y: (m[2] + l[2]) / 2 },
+    );
+    const object = layer.get('[data-sheet-drawing-id="connector"]').element;
+    // First click selects a root. A second stationary click enters its owned member.
+    object.dispatchEvent(connectorInput(layer, "pointerdown", origin));
+    window.dispatchEvent(connectorInput(layer, "pointerup", origin));
+    await nextTick();
+    if (group) {
+      object.dispatchEvent(connectorInput(layer, "pointerdown", origin));
+      window.dispatchEvent(connectorInput(layer, "pointerup", origin));
+      await nextTick();
+      expect(layer.findAll("[data-shape-endpoint]")).toHaveLength(2);
+    }
+    object.dispatchEvent(connectorInput(layer, "pointerdown", origin));
+    const destination = { x: origin.x + 30, y: origin.y + 20 };
+    window.dispatchEvent(connectorInput(layer, "pointermove", destination));
+    window.dispatchEvent(connectorInput(layer, "pointerup", destination));
+    await flushPromises();
+    const changed = serializeWorkbook(state.session.workbook);
+    expect(changed).not.toEqual(before);
+    const next = resolveSheetShapeConnections(
+      sheet.drawings!,
+      layer.props("metrics")!,
+    ).getConnector("connector")!;
+    expect(next.begin.kind).toBe("free");
+    expect(next.end.kind).toBe("free");
+    expect(route().begin.x).toBeCloseTo(original.begin.x + 30, 9);
+    expect(route().begin.y).toBeCloseTo(original.begin.y + 20, 9);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(changed);
+    state.undo();
+    await flushPromises();
+    // Single-root Delete also materializes a surviving connector's removed target.
+    expect(state.drawingActions.remove("b")).toBe(true);
+    await flushPromises();
+    expect(sheet.drawings!.some((drawing) => drawing.id === "b")).toBe(false);
+    const detached = resolveSheetShapeConnections(
+      sheet.drawings!,
+      layer.props("metrics")!,
+    ).getConnector("connector")!;
+    expect(detached.begin.kind).toBe("site");
+    expect(detached.end.kind).toBe("free");
+    expect(route().end.x).toBeCloseTo(original.end.x, 9);
+    expect(route().end.y).toBeCloseTo(original.end.y, 9);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+  },
+);

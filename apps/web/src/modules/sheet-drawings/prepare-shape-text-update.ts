@@ -4,7 +4,12 @@ import {
   type SheetDrawing,
   type SheetGraphicDrawing,
 } from "@sheetcraft/core/sheet-drawings";
-import { isShapeGroupDrawing, type ShapeGroupDrawing } from "@sheetcraft/core/shape-group";
+import {
+  isShapeGroupDrawing,
+  traverseShapeGroup,
+  type ShapeGroupDrawing,
+  type ShapeGroupNode,
+} from "@sheetcraft/core/shape-group";
 import { updateResolvedShapeGroupLeaf, resolveShapeGroupProjection } from "./resolved-shape-group";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { resizeShapeFrame, resolveShapeFrame } from "@sheetcraft/core/shape-frame";
@@ -34,6 +39,83 @@ import {
 import { projectedShapeTextBounds } from "./shape-text-projection";
 import { materializeDrawingShapeText, withDrawingShapeText } from "./shape-text-options";
 import { hasActiveShapeGroupShadow, preflightShapeGroupPaint } from "./shape-group-paint";
+import { resolveShapeForestForRender } from "./resolved-shape-render-source";
+
+export type ShapeTextForestContext = {
+  candidateForest: readonly SheetDrawing[];
+  sourceForest: readonly SheetDrawing[];
+  revision: number;
+};
+
+function forestWithRoot(
+  root: SheetDrawing,
+  forest: readonly SheetDrawing[],
+): readonly SheetDrawing[] {
+  if (!forest.some((value) => value.id === root.id))
+    throw new TypeError("Shape text preparation requires its complete source forest.");
+  return forest.map((value) => (value.id === root.id ? root : value));
+}
+function renderPass(
+  root: SheetDrawing,
+  metrics: PictureSheetMetrics,
+  forest?: readonly SheetDrawing[],
+  revision = 0,
+) {
+  return resolveShapeForestForRender({
+    drawings: forest ? forestWithRoot(root, forest) : [root],
+    metrics,
+    revision,
+  });
+}
+function projectGroup(
+  root: ShapeGroupDrawing,
+  metrics: PictureSheetMetrics,
+  forest?: readonly SheetDrawing[],
+  revision = 0,
+) {
+  if (!forest) return resolveShapeGroupProjection(root, metrics);
+  const group = renderPass(root, metrics, forest, revision).getGroup(root.id);
+  if (!group || group.sourceRoot !== root)
+    throw new TypeError("Shape text preparation requires its exact group owner.");
+  return group;
+}
+function assertConnectorTextUnchanged(
+  candidate: SheetDrawing,
+  source: SheetDrawing | undefined,
+  sourceForest?: readonly SheetDrawing[],
+): void {
+  const roots = sourceForest ?? (source ? [source] : []);
+  const before = new Map(
+    roots
+      .flatMap<SheetDrawing | ShapeGroupNode>((root) =>
+        isShapeGroupDrawing(root) ? traverseShapeGroup(root).map(({ node }) => node) : [root],
+      )
+      .map((node) => [node.id, node] as const),
+  );
+  for (const node of isShapeGroupDrawing(candidate)
+    ? traverseShapeGroup(candidate).map(({ node }) => node)
+    : [candidate]) {
+    if (node.kind !== "shape" || !node.shapeConnector) continue;
+    const old = before.get(node.id);
+    if (old && old.kind !== "shape")
+      throw new TypeError("A connector cannot replace a text-bearing object.");
+    if (
+      node.text !== (old?.kind === "shape" ? old.text : "") ||
+      !sameData(node.shapeText, old?.kind === "shape" ? old.shapeText : undefined)
+    )
+      throw new TypeError(
+        "Connector text editing is unavailable; its original data has been preserved.",
+      );
+    for (const key of ["rotation3d", "format3d"] as const)
+      if (
+        node.shapeStyle?.[key]?.kind === "value" &&
+        !sameData(node.shapeStyle[key], old?.kind === "shape" ? old.shapeStyle?.[key] : undefined)
+      )
+        throw new TypeError(
+          "Connector 3D editing is unavailable; its original data has been preserved.",
+        );
+  }
+}
 
 function sameData(a: unknown, b: unknown) {
   return a === b || JSON.stringify(a) === JSON.stringify(b);
@@ -63,7 +145,9 @@ export function prepareShapeTextUpdate(
     preflight?: typeof preflightShapeTextGlyphBudgets;
   },
   metrics?: PictureSheetMetrics,
+  forestContext?: ShapeTextForestContext,
 ): SheetDrawing {
+  assertConnectorTextUnchanged(candidate, source, forestContext?.sourceForest);
   if (isShapeGroupDrawing(candidate)) {
     if (!metrics) throw new Error("Shape group editing requires current worksheet metrics.");
     const prepared = prepareOwnedGroupTextEdits(
@@ -71,8 +155,9 @@ export function prepareShapeTextUpdate(
       source && isShapeGroupDrawing(source) ? source : undefined,
       metrics,
       measurement,
+      forestContext,
     );
-    preflightShapeGroupText(prepared, metrics, measurement, paint);
+    preflightShapeGroupText(prepared, metrics, measurement, paint, forestContext);
     if (hasActiveShapeGroupShadow(prepared)) {
       const proof = preflightShapeGroupPaint({
         root: prepared,
@@ -80,6 +165,16 @@ export function prepareShapeTextUpdate(
         density: 1,
         resources: paint?.resources,
         textRuntimeOptions: measurement,
+        ...(forestContext
+          ? {
+              renderPass: renderPass(
+                prepared,
+                metrics,
+                forestContext.candidateForest,
+                forestContext.revision,
+              ),
+            }
+          : {}),
       });
       if (proof.kind !== "ready")
         throw new Error("Shape group appearance is not ready; the draft has been preserved.");
@@ -88,6 +183,10 @@ export function prepareShapeTextUpdate(
   }
   if (isFramedShapeDrawing(candidate)) {
     if (!metrics) throw new Error("Shape editing requires current worksheet metrics.");
+    if (candidate.kind === "shape" && candidate.shapeConnector) {
+      renderPass(candidate, metrics, forestContext?.candidateForest, forestContext?.revision);
+      return candidate;
+    }
     const resolved = resolveShapeDrawing(candidate, metrics);
     if (resolved.collapsed) return candidate;
     const owner = source && resolveShapeDrawing(source, metrics).view;
@@ -112,19 +211,25 @@ function prepareOwnedGroupTextEdits(
   source: ShapeGroupDrawing | undefined,
   metrics: PictureSheetMetrics,
   measurement: DrawingShapeTextRuntimeOptions | undefined,
+  forestContext: ShapeTextForestContext | undefined,
 ): ShapeGroupDrawing {
   if (!source) return candidate;
   const before = new Map(
-    resolveShapeGroupProjection(source, metrics).leaves.map((leaf) => [
-      JSON.stringify(leaf.path),
-      leaf,
-    ]),
+    projectGroup(source, metrics, forestContext?.sourceForest, forestContext?.revision).leaves.map(
+      (leaf) => [JSON.stringify(leaf.path), leaf],
+    ),
   );
-  const edits = resolveShapeGroupProjection(candidate, metrics).leaves.filter((leaf) => {
+  const edits = projectGroup(
+    candidate,
+    metrics,
+    forestContext?.candidateForest,
+    forestContext?.revision,
+  ).leaves.filter((leaf) => {
     const old = before.get(JSON.stringify(leaf.path)),
       d = leaf.view,
       owner = old?.view;
     if (
+      "shapeConnector" in leaf.sourceNode ||
       !d ||
       !owner ||
       !leaf.layout ||
@@ -153,9 +258,12 @@ function prepareOwnedGroupTextEdits(
   });
   let result = candidate;
   for (const edit of edits) {
-    const current = resolveShapeGroupProjection(result, metrics).leaves.find(
-      (leaf) => JSON.stringify(leaf.path) === JSON.stringify(edit.path),
-    );
+    const current = projectGroup(
+      result,
+      metrics,
+      forestContext?.candidateForest,
+      forestContext?.revision,
+    ).leaves.find((leaf) => JSON.stringify(leaf.path) === JSON.stringify(edit.path));
     const old = before.get(JSON.stringify(edit.path));
     if (!current?.view || !current.layout || !old?.view || !old.layout)
       throw new Error("Shape member text owner is unavailable.");
@@ -169,9 +277,12 @@ function prepareOwnedGroupTextEdits(
       manualHeightChange: manualHeight,
       normalizeView: (view) => {
         const root = updateResolvedShapeGroupLeaf(current, view, metrics);
-        const leaf = resolveShapeGroupProjection(root, metrics).leaves.find(
-          (item) => JSON.stringify(item.path) === JSON.stringify(current.path),
-        );
+        const leaf = projectGroup(
+          root,
+          metrics,
+          forestContext?.candidateForest,
+          forestContext?.revision,
+        ).leaves.find((item) => JSON.stringify(item.path) === JSON.stringify(current.path));
         if (!leaf?.view) throw new Error("Shape member text view is unavailable.");
         return leaf.view;
       },
@@ -203,11 +314,24 @@ function preflightShapeGroupText(
   metrics: PictureSheetMetrics,
   measurement: DrawingShapeTextRuntimeOptions | undefined,
   paint: Parameters<typeof prepareShapeTextUpdate>[4],
+  forestContext: ShapeTextForestContext | undefined,
 ): void {
-  const projection = resolveShapeGroupProjection(candidate, metrics);
+  const projection = projectGroup(
+    candidate,
+    metrics,
+    forestContext?.candidateForest,
+    forestContext?.revision,
+  );
   for (const leaf of projection.leaves) {
     const drawing = leaf.view;
-    if (!drawing || leaf.collapsed || !drawing.text || !getDrawingShapeTextRect(drawing)) continue;
+    if (
+      "shapeConnector" in leaf.sourceNode ||
+      !drawing ||
+      leaf.collapsed ||
+      !drawing.text ||
+      !getDrawingShapeTextRect(drawing)
+    )
+      continue;
     const layout = layoutDrawingShapeText(drawing, measurement);
     const options = { drawing, layout, density: 1, resources: paint?.resources };
     const plan = planShapeTextPaint(options);

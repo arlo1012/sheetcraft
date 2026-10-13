@@ -19,12 +19,12 @@ export class UnsupportedShapeFrameDocumentError extends Error {
     this.name = "UnsupportedShapeFrameDocumentError";
   }
 }
-/** Model-only stage: no consumer may paint the carrier as the live connection. */
+/** Raw leaf/group consumers still require an explicit whole-worksheet render pass. */
 export class UnsupportedShapeConnectorDocumentError extends UnsupportedShapeFrameDocumentError {
   constructor(sheetId: string, drawingIds: readonly string[]) {
     super(sheetId, drawingIds);
     this.name = "UnsupportedShapeConnectorDocumentError";
-    this.message = `Live shape connector rendering is not yet enabled (sheet ${sheetId}, objects ${drawingIds.join(", ")}).`;
+    this.message = `Live shape connector rendering requires a complete worksheet relation pass (sheet ${sheetId}, objects ${drawingIds.join(", ")}).`;
   }
 }
 export function assertNoUnresolvedShapeConnectors(
@@ -39,9 +39,10 @@ export function assertNoUnresolvedShapeConnectors(
       if ("shapeConnector" in node) ids.push(node.id);
   if (ids.length) throw new UnsupportedShapeConnectorDocumentError(sheetId, ids);
 }
-function checkDrawings(sheetId: string, drawings: readonly SheetDrawing[] | undefined): void {
-  const normalized = normalizeSheetDrawings(drawings);
-  assertNoUnresolvedShapeConnectors(sheetId, normalized);
+function checkDrawings(_sheetId: string, drawings: readonly SheetDrawing[] | undefined): void {
+  // Whole-forest normalization validates every reference before history or replacement.
+  // Raw carrier projectors retain their independent explicit rejection above.
+  normalizeSheetDrawings(drawings);
 }
 export function assertWorkbookShapeSupport(workbook: Workbook): void {
   for (const sheet of workbook.sheets.values()) {

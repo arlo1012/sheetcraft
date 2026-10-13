@@ -15,6 +15,7 @@ import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
   connectorRoute?: ReadyShapeConnectorRoute;
+  boundEndpoints?: readonly [boolean, boolean];
   fragment: FloatingImageViewportFragment;
   paneClip: Rect;
 }>();
@@ -164,9 +165,11 @@ function rotateKey(event: KeyboardEvent): void {
       :key="`endpoint-${h.index}`"
       type="button"
       class="standard-shape-selection__handle is-endpoint"
+      :class="{ 'is-bound': connectorRoute && boundEndpoints?.[h.index] }"
       :style="style(h.point)"
       :aria-label="t(h.index === 0 ? 'drawing.lineStart' : 'drawing.lineEnd')"
       :data-shape-endpoint="h.index"
+      :data-shape-endpoint-bound="connectorRoute ? (boundEndpoints?.[h.index] ?? false) : undefined"
       @pointerdown.prevent.stop="emit('endpoint', h.index, $event)"
       @keydown="handleKey(h.index, $event, true)"
       @dblclick.prevent.stop
@@ -233,6 +236,10 @@ function rotateKey(event: KeyboardEvent): void {
       transform: rotate(45deg);
       background: #ffd438;
       border-color: #795b00;
+    }
+    &.is-bound::after {
+      background: #f6a623;
+      border-color: #ac5400;
     }
     &:hover::after {
       box-shadow: 0 0 0 2px var(--sheetcraft-surface-hover);

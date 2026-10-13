@@ -1,7 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { describe, expect, test, vi } from "vitest";
-import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
 import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
 import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
@@ -10,7 +9,10 @@ import creationLayerSource from "../../../modules/sheet-drawings/components/Shee
 import SheetShapeCreationLayer from "../../../modules/sheet-drawings/components/SheetShapeCreationLayer.vue";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
 import { SHAPE_GALLERY } from "../../../modules/sheet-drawings/shape-gallery";
-import type { ShapeCreationRequest } from "../../../modules/sheet-drawings/useShapeCreation";
+import type {
+  ShapeCreationRequest,
+  ShapeCreationDraft,
+} from "../../../modules/sheet-drawings/useShapeCreation";
 import { createAppI18n } from "../../../shared/i18n";
 function layout() {
   return createSheetViewportLayout({
@@ -40,7 +42,7 @@ function fixture() {
     continuous: false,
     base: createGraphicDrawing("new", "shape", "Rectangle", { row: 0, column: 0 }),
   };
-  const commit = vi.fn((_request: ShapeCreationRequest, _drawing: SheetGraphicDrawing) => true),
+  const commit = vi.fn((_request: ShapeCreationRequest, _drawing: ShapeCreationDraft) => true),
     cancel = vi.fn();
   const w = mount(SheetShapeCreationLayer, {
     attachTo: document.body,

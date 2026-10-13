@@ -1726,6 +1726,9 @@ export function applySheetAxisCommand(
     sheet.name,
     createPictureSheetMetrics(nextMetricSheet),
   );
+  // Removing a root can invalidate a surviving connector's target reference.
+  // Normalize the complete planned forest before cells or dimensions are moved.
+  nextMetadata.drawings = normalizeSheetDrawings(nextMetadata.drawings);
   assertShapeObjectsForSheet(nextMetadata.drawings, nextMetricSheet);
   let inherited: import("./contracts.js").CellContentChange[] = [];
   if (

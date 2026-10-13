@@ -3,16 +3,22 @@ import { canUseSheetPermission } from "@sheetcraft/core";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import {
   normalizeSheetDrawing,
+  isFramedShapeDrawing,
   type SheetGraphicDrawing,
   type SheetFramedGraphicDrawing,
   type SheetDrawing,
 } from "@sheetcraft/core/sheet-drawings";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import { resolveSheetShapeConnections } from "@sheetcraft/core/shape-connector-layout";
 import { frameShapeView } from "./shape-view-layout";
 import type { CellAddress, Sheet, Workbook } from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { createGraphicDrawing } from "./drawing-defaults";
 import { getDrawingShapeGeometry } from "./shape-geometry";
+import {
+  resolveShapeForestForRender,
+  type ResolvedShapeForestForRender,
+} from "./resolved-shape-render-source";
 import type { ShapeGalleryChoice } from "./shape-gallery";
 
 export type ShapeCreationOwner = Readonly<{
@@ -20,6 +26,7 @@ export type ShapeCreationOwner = Readonly<{
   sheet: Sheet;
   generation?: number;
 }>;
+export type ShapeCreationDraft = SheetGraphicDrawing | SheetFramedGraphicDrawing;
 export type ShapeCreationRequest = ShapeCreationOwner &
   Readonly<{
     requestId: number;
@@ -44,6 +51,7 @@ export function useShapeCreation(options: {
 }) {
   const idFactory = createBrowserIdFactory();
   const request = shallowRef<ShapeCreationRequest>();
+  const sourceLeases = new WeakMap<ShapeCreationRequest, ResolvedShapeForestForRender>();
   let generation = 0,
     disposed = false,
     committing = false;
@@ -71,7 +79,7 @@ export function useShapeCreation(options: {
     continuous: boolean,
   ): ShapeCreationRequest {
     const kind = choice.kind === "textBox" ? "textBox" : "shape";
-    return {
+    const created: ShapeCreationRequest = {
       ...owner,
       requestId: ++generation,
       revision: options.getRevision?.(),
@@ -88,6 +96,17 @@ export function useShapeCreation(options: {
         text: "",
       },
     };
+    const metrics = choice.kind === "line" ? options.getMetrics?.() : undefined;
+    if (metrics)
+      sourceLeases.set(
+        created,
+        resolveShapeForestForRender({
+          drawings: owner.sheet.drawings ?? [],
+          metrics,
+          revision: created.revision ?? 0,
+        }),
+      );
+    return created;
   }
   function start(choice: ShapeGalleryChoice, continuous: boolean, owner = captureOwner()): boolean {
     if (committing || !allowed(owner)) return false;
@@ -95,10 +114,15 @@ export function useShapeCreation(options: {
     if (!options.flush() || token !== generation || !allowed(owner)) return false;
     options.onStart?.();
     if (token !== generation || !allowed(owner)) return false;
-    request.value = makeRequest(owner, choice, continuous);
+    try {
+      request.value = makeRequest(owner, choice, continuous);
+    } catch {
+      request.value = undefined;
+      return false;
+    }
     return true;
   }
-  function commit(current: ShapeCreationRequest, value: SheetGraphicDrawing): boolean {
+  function commit(current: ShapeCreationRequest, value: ShapeCreationDraft): boolean {
     if (
       committing ||
       request.value !== current ||
@@ -108,9 +132,11 @@ export function useShapeCreation(options: {
       value.kind !== current.base.kind
     )
       return false;
-    let drawing: SheetGraphicDrawing;
+    let drawing: ShapeCreationDraft;
     try {
-      drawing = normalizeSheetDrawing(value) as SheetGraphicDrawing;
+      const normalized = normalizeSheetDrawing(value);
+      if (normalized.kind !== "shape" && normalized.kind !== "textBox") return false;
+      drawing = normalized as ShapeCreationDraft;
     } catch {
       return false;
     }
@@ -122,15 +148,29 @@ export function useShapeCreation(options: {
         (drawing.shapeGeometry?.preset !== current.choice.preset || drawing.shapePath)
       )
         return false;
-      if (!getDrawingShapeGeometry(drawing)) return false;
+      if (isFramedShapeDrawing(drawing)) {
+        if (!drawing.shapeConnector || current.choice.kind !== "line" || drawing.text !== "")
+          return false;
+      } else if (!getDrawingShapeGeometry(drawing)) return false;
     }
     if ((current.sheet.drawings ?? []).some((item) => item.id === drawing.id)) return false;
+    if (isFramedShapeDrawing(drawing) && !options.getMetrics) return false;
     let committed: SheetDrawing = drawing;
     if (options.getMetrics) {
       const metrics = options.getMetrics();
       if (!metrics) return false;
       try {
-        committed = frameShapeView(drawing, metrics);
+        if (isFramedShapeDrawing(drawing)) {
+          const lease = sourceLeases.get(current);
+          if (!lease) return false;
+          lease.assertCurrent(
+            current.sheet.drawings ?? lease.sourceForest,
+            metrics,
+            current.revision ?? 0,
+          );
+          resolveSheetShapeConnections([...(current.sheet.drawings ?? []), drawing], metrics);
+          committed = drawing;
+        } else committed = frameShapeView(drawing, metrics);
       } catch {
         return false;
       }

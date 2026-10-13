@@ -16,7 +16,14 @@ import {
   canEditShapeObject,
   canEditSheetDrawingCollection,
 } from "@sheetcraft/core/shape-protection";
-import type { ShapeGroupDrawing, ShapeGroupPath } from "@sheetcraft/core/shape-group";
+import {
+  isShapeGroupDrawing,
+  traverseShapeGroup,
+  type ShapeGroupDrawing,
+  type ShapeGroupPath,
+} from "@sheetcraft/core/shape-group";
+import { resolveShapeForestForRender } from "./resolved-shape-render-source";
+import { planDeleteShapeGroupNodes } from "@sheetcraft/core/shape-group-delete";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { frameShapeView } from "./shape-view-layout";
 import {
@@ -42,7 +49,11 @@ export function useDrawingActions(options: {
   isBusy: () => boolean;
   name: (kind: SheetGraphicKind) => string;
   getMetrics?: () => PictureSheetMetrics | undefined;
-  prepareDrawing?: (drawing: SheetDrawing, owner?: SheetDrawing) => SheetDrawing;
+  prepareDrawing?: (
+    drawing: SheetDrawing,
+    owner?: SheetDrawing,
+    forest?: readonly SheetDrawing[],
+  ) => SheetDrawing;
 }) {
   const idFactory = createBrowserIdFactory();
   const targets = useDrawingDialogTarget<SheetGraphicDrawing, []>({
@@ -149,6 +160,7 @@ export function useDrawingActions(options: {
   function edit(drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing) {
     // Flushing an active cell can change worksheet geometry. Capture the view
     // only after target preparation has verified the surviving source owner.
+    if ("shapeConnector" in drawing) return;
     const target = targets.prepare(drawing);
     if (!target) return;
     const metrics = options.getMetrics?.();
@@ -279,12 +291,27 @@ export function useDrawingActions(options: {
           !!owner &&
           (drawing === owner ||
             canonicalOwners.get(id) === JSON.stringify(normalizeSheetDrawing(drawing)));
-        const candidate = unchanged ? owner : (options.prepareDrawing?.(drawing, owner) ?? drawing);
+        const candidate = unchanged
+          ? owner
+          : (options.prepareDrawing?.(drawing, owner, proposed) ?? drawing);
         if (candidate.id !== id || candidate.kind !== kind || !currentCollection(binding))
           return false;
         prepared.push(candidate);
       }
       const command = createSetSheetDrawingsCommand(binding.sheet.id, prepared);
+      const connected = command.drawings.some((root) =>
+        isShapeGroupDrawing(root)
+          ? traverseShapeGroup(root).some(({ node }) => "shapeConnector" in node)
+          : "shapeConnector" in root,
+      );
+      if (connected) {
+        if (!binding.metrics) return false;
+        resolveShapeForestForRender({
+          drawings: command.drawings,
+          metrics: binding.metrics,
+          revision: binding.revision ?? 0,
+        });
+      }
       if (
         !currentCollection(binding) ||
         !canEditSheetDrawingCollection(binding.sheet, command.drawings) ||
@@ -393,10 +420,21 @@ export function useDrawingActions(options: {
   function remove(id: string) {
     const current = options.getSheet().drawings ?? [];
     if (!current.some((drawing) => drawing.id === id)) return;
-    replaceCollection(
-      current.filter((drawing) => drawing.id !== id),
-      current,
-    );
+    const metrics = options.getMetrics?.();
+    try {
+      const connected = current.some((root) =>
+        isShapeGroupDrawing(root)
+          ? traverseShapeGroup(root).some(({ node }) => "shapeConnector" in node)
+          : "shapeConnector" in root,
+      );
+      const next =
+        metrics && connected
+          ? planDeleteShapeGroupNodes(current, [[id]], metrics)
+          : current.filter((drawing) => drawing.id !== id);
+      return replaceCollection(next, current, metrics);
+    } catch {
+      return false;
+    }
   }
   return {
     dialog,

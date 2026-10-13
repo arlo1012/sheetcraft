@@ -1816,7 +1816,7 @@ const drawingActions = useDrawingActions({
   execute: executeCommand,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   name: (kind) => t(`drawing.${kind}`),
-  prepareDrawing: (next, owner) =>
+  prepareDrawing: (next, owner, forest) =>
     prepareShapeTextUpdate(
       next,
       owner,
@@ -1841,6 +1841,13 @@ const drawingActions = useDrawingActions({
         },
       },
       sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
+      forest
+        ? {
+            candidateForest: forest,
+            sourceForest: activeSheet.value.drawings ?? [],
+            revision: workbookRevision.value,
+          }
+        : undefined,
     ),
 });
 const { dialog: drawingDialog, editing: editingDrawing } = drawingActions;

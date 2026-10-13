@@ -5,8 +5,10 @@ import { executeWorkbookCommand } from "@sheetcraft/core/history";
 import { mountSheetGrid } from "./fixture";
 import { SHAPE_GALLERY } from "../../../../../modules/sheet-drawings/shape-gallery";
 import { createGraphicDrawing } from "../../../../../modules/sheet-drawings/drawing-defaults";
-import type { ShapeCreationRequest } from "../../../../../modules/sheet-drawings/useShapeCreation";
-import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type {
+  ShapeCreationRequest,
+  ShapeCreationDraft,
+} from "../../../../../modules/sheet-drawings/useShapeCreation";
 
 test("creation mode routes workbook history, finish restores editor focus without stealing a dialog", async () => {
   const f = mountSheetGrid({ attachTo: document.body });
@@ -23,7 +25,7 @@ test("creation mode routes workbook history, finish restores editor focus withou
     continuous: true,
     base,
   };
-  const commit = vi.fn((_request: ShapeCreationRequest, drawing: SheetGraphicDrawing) =>
+  const commit = vi.fn((_request: ShapeCreationRequest, drawing: ShapeCreationDraft) =>
     executeWorkbookCommand(f.session, createSetSheetDrawingsCommand(f.sheet.id, [drawing])),
   );
   await f.wrapper.setProps({

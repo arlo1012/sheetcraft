@@ -8,7 +8,11 @@ import {
   watch,
   type CSSProperties,
 } from "vue";
-import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import { isFramedShapeDrawing } from "@sheetcraft/core/sheet-drawings";
+import {
+  resolveSheetShapeConnections,
+  type ResolvedSheetShapeConnections,
+} from "@sheetcraft/core/shape-connector-layout";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import type { PageLayoutProjection } from "@sheetcraft/sheet-engine/page-layout";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
@@ -20,13 +24,25 @@ import {
   startPointerSession,
   type PointerSession,
 } from "../../../shared/sheet-input/pointer-session";
-import type { ShapeCreationRequest } from "../useShapeCreation";
+import type { ShapeCreationRequest, ShapeCreationDraft } from "../useShapeCreation";
+import { createShapeConnectorDrawing } from "../create-shape-connector";
+import { resolveShapeForestForRender } from "../resolved-shape-render-source";
+import {
+  pickNearestShapeConnectorSite,
+  type ShapeConnectorSiteCandidate,
+} from "../shape-connector-site-picking";
 import {
   createShapeDrawingFromChoice,
   shapeCreationPointFromViewport,
 } from "../shape-creation-geometry";
 import { getStandardShapeViewportFragments } from "../standard-shape-layout";
-import { getShapePageFragments, shapePagePointFromViewport } from "../shape-page-layout";
+import {
+  getShapePageFragments,
+  shapePagePointFromViewport,
+  getShapePageProjectionBands,
+} from "../shape-page-layout";
+import { getPicturePaneTranslation } from "@sheetcraft/sheet-engine/picture-frame-layout";
+import { shapeFrameWorldToLocal } from "@sheetcraft/core/shape-frame";
 import { shapeViewLayout } from "../shape-view-layout";
 import DrawingContent from "./DrawingContent.vue";
 
@@ -39,13 +55,142 @@ const props = defineProps<{
   readOnly: boolean;
   revision?: number;
   locale?: string;
-  commit: (request: ShapeCreationRequest, drawing: SheetGraphicDrawing) => boolean;
+  commit: (request: ShapeCreationRequest, drawing: ShapeCreationDraft) => boolean;
   cancel: (request: ShapeCreationRequest) => void;
 }>();
 const root = ref<HTMLElement>();
-const preview = shallowRef<SheetGraphicDrawing>();
+const preview = shallowRef<ShapeCreationDraft>();
+const hoverSites = shallowRef<readonly ShapeConnectorSiteCandidate[]>([]);
+const emptyForest = Object.freeze([]);
+const previewPresentation = computed(() => {
+  const source = preview.value;
+  if (!source) return;
+  if (!isFramedShapeDrawing(source)) return { drawing: source, route: undefined };
+  if (!props.metrics || !source.shapeConnector) return;
+  if (previewLease && !previewLease()) return;
+  const forest = [...(props.request.sheet.drawings ?? emptyForest), source];
+  try {
+    const pass = resolveShapeForestForRender({
+      drawings: forest,
+      metrics: props.metrics,
+      revision: props.revision ?? 0,
+    });
+    const connector = pass.getLeaf(source.id)?.connector;
+    if (connector?.status === "ready")
+      return { drawing: connector.paintView, route: connector.route };
+  } catch {
+    // A stale target/derived metric may invalidate a retained draft before the next pointer event.
+    return;
+  }
+});
+const creationConnections = computed(() => {
+  if (props.request.choice.kind !== "line" || !props.metrics) return;
+  void props.revision;
+  try {
+    return resolveSheetShapeConnections(props.request.sheet.drawings ?? emptyForest, props.metrics);
+  } catch {
+    return;
+  }
+});
+function showSites(
+  context: ResolvedSheetShapeConnections,
+  point: { x: number; y: number },
+  near?: ShapeConnectorSiteCandidate,
+) {
+  let target = near ? context.getTarget(near.targetId) : undefined;
+  if (!target) {
+    for (let index = context.targets.length - 1; index >= 0; index--) {
+      const candidate = context.targets[index]!;
+      const carrier = context.getNode(candidate.nodeId)?.carrierLayout;
+      if (candidate.status !== "ready" || !carrier || carrier.collapsed) continue;
+      const local = shapeFrameWorldToLocal(carrier.rect, carrier.angleDeg, point);
+      if (
+        local.x >= 0 &&
+        local.y >= 0 &&
+        local.x <= carrier.rect.width &&
+        local.y <= carrier.rect.height
+      ) {
+        target = candidate;
+        break;
+      }
+    }
+  }
+  hoverSites.value =
+    target?.sites.map((site) => ({
+      targetId: target.nodeId,
+      rootId: target.rootId,
+      path: target.path,
+      preset: site.identity.preset,
+      siteIndex: site.identity.index,
+      identity: site.identity,
+      position: site.position,
+      direction: site.direction,
+      distance: Math.hypot(point.x - site.position.x, point.y - site.position.y),
+    })) ?? [];
+}
+const visibleSites = computed(() => {
+  if (!props.metrics) return [];
+  const bands = props.pageProjection
+    ? getShapePageProjectionBands(props.layout, props.pageProjection, props.metrics)
+    : (["topLeft", "top", "left", "body"] as const).map((paneId) => ({
+        pageKey: paneId,
+        clip: props.layout.panes[paneId].clip,
+        translation: getPicturePaneTranslation(paneId, props.layout),
+      }));
+  return hoverSites.value.flatMap((site) =>
+    bands.flatMap((band) => {
+      const point = {
+        x: site.position.x + band.translation.x,
+        y: site.position.y + band.translation.y,
+      };
+      const clip = band.clip;
+      return point.x >= clip.x &&
+        point.y >= clip.y &&
+        point.x < clip.x + clip.width &&
+        point.y < clip.y + clip.height
+        ? [
+            {
+              key: `${site.targetId}:${site.siteIndex}:${band.pageKey}`,
+              point,
+              targetId: site.targetId,
+              siteIndex: site.siteIndex,
+            },
+          ]
+        : [];
+    }),
+  );
+});
+function hover(event: PointerEvent) {
+  if (
+    session?.active ||
+    props.readOnly ||
+    props.request.choice.kind !== "line" ||
+    !creationConnections.value
+  )
+    return;
+  const position = props.pageProjection
+    ? props.metrics &&
+      shapePagePointFromViewport(
+        point(event, props.scale),
+        props.layout,
+        props.pageProjection,
+        props.metrics,
+      )
+    : shapeCreationPointFromViewport(point(event, props.scale), props.layout);
+  if (!position) {
+    hoverSites.value = [];
+    return;
+  }
+  const context = creationConnections.value;
+  showSites(
+    context,
+    position.point,
+    pickNearestShapeConnectorSite(context, position.point, 10 / props.scale),
+  );
+}
 const failure = ref<"invalid" | "rejected">();
 let session: PointerSession | undefined;
+let previewLease: (() => boolean) | undefined;
 const labels = computed(() =>
   props.locale === "zh-CN"
     ? {
@@ -66,14 +211,22 @@ const labels = computed(() =>
       },
 );
 const fragments = computed(() => {
-  const value = preview.value;
-  if (!value) return [];
+  const presentation = previewPresentation.value;
+  if (!presentation) return [];
+  const value = presentation.drawing;
   if (props.pageProjection)
     return props.metrics
-      ? getShapePageFragments(value, props.layout, props.pageProjection, props.metrics)
+      ? getShapePageFragments(
+          value,
+          props.layout,
+          props.pageProjection,
+          props.metrics,
+          false,
+          presentation.route,
+        )
       : [];
   return value.kind === "shape"
-    ? getStandardShapeViewportFragments(value, props.layout)
+    ? getStandardShapeViewportFragments(value, props.layout, false, false, presentation.route)
     : getFloatingImageViewportFragments(value, props.layout);
 });
 function fragmentKey(fragment: FloatingImageViewportFragment & { pageKey?: string }): string {
@@ -103,11 +256,11 @@ function point(event: MouseEvent, scale: number) {
   };
 }
 function retry(): void {
-  if (props.readOnly || !preview.value) return;
+  if (props.readOnly || !preview.value || (previewLease && !previewLease())) return;
   const value = preview.value;
   attemptCommit(props.request, value);
 }
-function attemptCommit(request: ShapeCreationRequest, value: SheetGraphicDrawing): void {
+function attemptCommit(request: ShapeCreationRequest, value: ShapeCreationDraft): void {
   let success = false;
   try {
     success = props.commit(request, value);
@@ -116,6 +269,8 @@ function attemptCommit(request: ShapeCreationRequest, value: SheetGraphicDrawing
   }
   if (success) {
     preview.value = undefined;
+    hoverSites.value = [];
+    previewLease = undefined;
     failure.value = undefined;
   } else if (props.request === request && preview.value === value) failure.value = "rejected";
 }
@@ -136,6 +291,7 @@ function start(event: PointerEvent): void {
     workbook = request.workbook,
     sheet = request.sheet,
     generation = request.generation;
+  const sourceForest = sheet.drawings ?? emptyForest;
   const choice = request.choice;
   if (
     choice.kind === "drawingTool" ||
@@ -149,22 +305,54 @@ function start(event: PointerEvent): void {
     ? shapePagePointFromViewport(point(event, scale), layout, pageProjection, metrics!)
     : shapeCreationPointFromViewport(point(event, scale), layout);
   if (!startPoint) return;
+  let connectionContext: ResolvedSheetShapeConnections | undefined;
+  let beginSite: ShapeConnectorSiteCandidate | undefined;
+  let sourcePass: ReturnType<typeof resolveShapeForestForRender> | undefined;
+  if (choice.kind === "line" && metrics) {
+    try {
+      connectionContext = creationConnections.value;
+      if (!connectionContext) throw new Error("The complete connection targets are unavailable.");
+      sourcePass = resolveShapeForestForRender({
+        drawings: sourceForest,
+        metrics,
+        revision: revision ?? 0,
+      });
+      beginSite = pickNearestShapeConnectorSite(connectionContext, startPoint.point, 10 / scale);
+    } catch {
+      failure.value = "invalid";
+      return;
+    }
+  }
   event.preventDefault();
   event.stopPropagation();
   root.value?.focus();
   failure.value = undefined;
   preview.value = undefined;
-  const valid = () =>
-    props.request === request &&
-    props.request.workbook === workbook &&
-    props.request.sheet === sheet &&
-    props.request.generation === generation &&
-    props.layout === layout &&
-    props.metrics === metrics &&
-    props.pageProjection === pageProjection &&
-    props.scale === scale &&
-    props.revision === revision &&
-    !props.readOnly;
+  const valid = () => {
+    if (
+      !(
+        props.request === request &&
+        props.request.workbook === workbook &&
+        props.request.sheet === sheet &&
+        props.request.generation === generation &&
+        props.layout === layout &&
+        props.metrics === metrics &&
+        props.pageProjection === pageProjection &&
+        props.scale === scale &&
+        props.revision === revision &&
+        (sheet.drawings ?? emptyForest) === sourceForest &&
+        !props.readOnly
+      )
+    )
+      return false;
+    try {
+      if (metrics) sourcePass?.assertCurrent(sourceForest, metrics, revision ?? 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  previewLease = valid;
   let moved = false;
   const update = (next: MouseEvent) => {
     if (!valid()) {
@@ -175,6 +363,35 @@ function start(event: PointerEvent): void {
     const end = pageProjection
       ? shapePagePointFromViewport(point(next, scale), layout, pageProjection, metrics!)
       : shapeCreationPointFromViewport(point(next, scale), layout, startPoint.paneId);
+    if (choice.kind === "line" && metrics && connectionContext) {
+      if (!end) {
+        preview.value = undefined;
+        hoverSites.value = [];
+        return;
+      }
+      const endSite = moved
+        ? pickNearestShapeConnectorSite(connectionContext, end.point, 10 / scale)
+        : undefined;
+      showSites(connectionContext, end.point, endSite);
+      preview.value =
+        createShapeConnectorDrawing({
+          base: request.base,
+          choice,
+          start: startPoint.point,
+          end: moved
+            ? end.point
+            : {
+                x: startPoint.point.x + 120,
+                y: startPoint.point.y + (choice.preset === "line" ? 0 : 80),
+              },
+          beginSite,
+          endSite,
+          shiftKey: next.shiftKey,
+          forest: sourceForest,
+          metrics,
+        }) ?? undefined;
+      return;
+    }
     preview.value = end
       ? (createShapeDrawingFromChoice({
           base: request.base,
@@ -207,6 +424,8 @@ function start(event: PointerEvent): void {
     },
     onCancel: () => {
       preview.value = undefined;
+      hoverSites.value = [];
+      previewLease = undefined;
       failure.value = undefined;
     },
   });
@@ -214,6 +433,8 @@ function start(event: PointerEvent): void {
 function cancel(): void {
   session?.cancel();
   preview.value = undefined;
+  hoverSites.value = [];
+  previewLease = undefined;
   failure.value = undefined;
   props.cancel(props.request);
 }
@@ -254,6 +475,8 @@ watch(
   () => {
     session?.cancel();
     preview.value = undefined;
+    hoverSites.value = [];
+    previewLease = undefined;
     failure.value = undefined;
   },
   { flush: "sync" },
@@ -266,6 +489,7 @@ watch(
     tabindex="-1"
     data-shape-creation-layer
     @pointerdown="start"
+    @pointermove="hover"
   >
     <div class="shape-creation-layer__controls" data-shape-creation-controls>
       <span>{{ request.choice.label[locale === "zh-CN" ? "zh-CN" : "en-US"] }}</span>
@@ -292,9 +516,22 @@ watch(
       :style="fragmentStyle(fragment)"
     >
       <div class="shape-creation-layer__preview" :style="contentStyle(fragment)">
-        <DrawingContent v-if="preview" :drawing="preview" />
+        <DrawingContent
+          v-if="previewPresentation"
+          :drawing="previewPresentation.drawing"
+          :connector-route="previewPresentation.route"
+        />
       </div>
     </div>
+    <span
+      v-for="site in visibleSites"
+      :key="site.key"
+      class="shape-creation-layer__site"
+      :style="{ left: `${site.point.x}px`, top: `${site.point.y}px` }"
+      :data-shape-connection-target="site.targetId"
+      :data-shape-connection-site="site.siteIndex"
+      aria-hidden="true"
+    />
   </div>
 </template>
 <style scoped lang="scss">
@@ -364,6 +601,16 @@ watch(
     color: var(--sheetcraft-text-secondary);
     background: var(--sheetcraft-surface-default);
     font-size: 12px;
+    pointer-events: none;
+  }
+  &__site {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border: 1px solid #666;
+    border-radius: 50%;
+    background: #bbb;
+    transform: translate(-50%, -50%);
     pointer-events: none;
   }
 }

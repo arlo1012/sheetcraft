@@ -1,7 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { defineComponent, h, nextTick } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
 import { DEFAULT_SHEET_PAGE_SETUP } from "@sheetcraft/core/page-setup";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
@@ -16,9 +15,16 @@ import SheetShapeCreationLayer from "../../../modules/sheet-drawings/components/
 import SheetFreeShapeCreationLayer from "../../../modules/sheet-drawings/components/SheetFreeShapeCreationLayer.vue";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
 import { SHAPE_GALLERY } from "../../../modules/sheet-drawings/shape-gallery";
-import type { ShapeCreationRequest } from "../../../modules/sheet-drawings/useShapeCreation";
+import type {
+  ShapeCreationRequest,
+  ShapeCreationDraft,
+} from "../../../modules/sheet-drawings/useShapeCreation";
 import { createAppI18n } from "../../../shared/i18n";
 
+function legacyDraft(drawing: ShapeCreationDraft) {
+  if (!("anchor" in drawing)) throw new Error("Expected unchanged static shape fixture.");
+  return drawing;
+}
 type Tool = "shape" | "textBox" | "curve" | "freeform" | "scribble";
 const cleanup: Array<() => void> = [];
 afterEach(() => {
@@ -80,7 +86,7 @@ function fixture(
       column: 0,
     }),
   };
-  const commit = vi.fn((_request: ShapeCreationRequest, _drawing: SheetGraphicDrawing) => true);
+  const commit = vi.fn((_request: ShapeCreationRequest, _drawing: ShapeCreationDraft) => true);
   const cancel = vi.fn();
   const props = {
     request,
@@ -208,9 +214,9 @@ describe("page-layout canvas shape creation", () => {
       expect(distinctPositions.size).toBe(fragments.length);
       f.up(end);
       expect(f.commit).toHaveBeenCalledTimes(1);
-      expect(f.commit.mock.calls[0]![1].width).toBeCloseTo(b.x - a.x);
-      expect(f.commit.mock.calls[0]![1].height).toBeCloseTo(b.y - a.y);
-      expect(f.commit.mock.calls[0]![1].anchor).toEqual({ column: 0, row: 2 });
+      expect(legacyDraft(f.commit.mock.calls[0]![1]).width).toBeCloseTo(b.x - a.x);
+      expect(legacyDraft(f.commit.mock.calls[0]![1]).height).toBeCloseTo(b.y - a.y);
+      expect(legacyDraft(f.commit.mock.calls[0]![1]).anchor).toEqual({ column: 0, row: 2 });
     },
   );
   test.each(["margin", "gap"] as const)(
@@ -242,7 +248,7 @@ describe("page-layout canvas shape creation", () => {
     f.up(end);
     const a = f.sheetPoint(start),
       b = f.sheetPoint(end);
-    expect(f.commit.mock.calls[0]![1].height).toBeCloseTo(b.y - a.y);
+    expect(legacyDraft(f.commit.mock.calls[0]![1]).height).toBeCloseTo(b.y - a.y);
   });
   test.each(["shape", "textBox"] as const)(
     "%s starts and previews on blank editable cells beyond an A1-only print range",
@@ -256,8 +262,8 @@ describe("page-layout canvas shape creation", () => {
       expect(f.w.findAll(".shape-creation-layer__fragment").length).toBeGreaterThan(1);
       f.up(end);
       expect(f.commit).toHaveBeenCalledTimes(1);
-      expect(f.commit.mock.calls[0]![1].anchor).toEqual({ column: 2, row: 8 });
-      expect(f.commit.mock.calls[0]![1].height).toBeCloseTo(
+      expect(legacyDraft(f.commit.mock.calls[0]![1]).anchor).toEqual({ column: 2, row: 8 });
+      expect(legacyDraft(f.commit.mock.calls[0]![1]).height).toBeCloseTo(
         f.sheetPoint(end).y - f.sheetPoint(start).y,
       );
     },
@@ -270,7 +276,7 @@ describe("page-layout canvas shape creation", () => {
     f.down(f.paperPoint());
     f.up(f.paperPoint(1, 0, 150, 150));
     await nextTick();
-    const value = f.commit.mock.calls[0]![1];
+    const value = legacyDraft(f.commit.mock.calls[0]![1]);
     expect(f.w.find("[data-creation-preview]").exists()).toBe(true);
     expect(f.w.get('[role="status"]').text()).toContain("preserved");
     const retry = f.w.findAll("button").find((button) => button.text() === "Retry insertion")!;
@@ -301,8 +307,10 @@ describe("page-layout free-drawing creation", () => {
       expect(f.w.findAll(".free-shape-creation-layer__fragment").length).toBeGreaterThan(1);
       finish(f.el);
       expect(f.commit).toHaveBeenCalledTimes(1);
-      expect(f.commit.mock.calls[0]![1].anchor.row).toBe(Math.floor(f.sheetPoint(first).y / 24));
-      expect(f.commit.mock.calls[0]![1].shapePath?.commands.length).toBe(2);
+      expect(legacyDraft(f.commit.mock.calls[0]![1]).anchor.row).toBe(
+        Math.floor(f.sheetPoint(first).y / 24),
+      );
+      expect(legacyDraft(f.commit.mock.calls[0]![1]).shapePath?.commands.length).toBe(2);
     },
   );
   test.each(["freeform", "scribble"] as const)(
@@ -324,7 +332,7 @@ describe("page-layout free-drawing creation", () => {
       if (tool !== "scribble") finish(f.el);
       await nextTick();
       expect(f.commit).toHaveBeenCalledTimes(1);
-      const value = f.commit.mock.calls[0]![1];
+      const value = legacyDraft(f.commit.mock.calls[0]![1]);
       const a = f.sheetPoint(start),
         b = f.sheetPoint(end);
       expect(value.width).toBeCloseTo(b.x - a.x);
@@ -357,9 +365,9 @@ describe("page-layout free-drawing creation", () => {
     expect(f.commit).not.toHaveBeenCalled();
     finish(f.el);
     expect(f.commit).toHaveBeenCalledTimes(1);
-    expect(f.commit.mock.calls[0]![1].width).toBeCloseTo(100);
-    expect(f.commit.mock.calls[0]![1].height).toBeCloseTo(70);
-    expect(f.commit.mock.calls[0]![1].shapePath?.commands).toHaveLength(2);
+    expect(legacyDraft(f.commit.mock.calls[0]![1]).width).toBeCloseTo(100);
+    expect(legacyDraft(f.commit.mock.calls[0]![1]).height).toBeCloseTo(70);
+    expect(legacyDraft(f.commit.mock.calls[0]![1]).shapePath?.commands).toHaveLength(2);
   });
   test("nearby continuous points on opposite page edges do not close the first node", async () => {
     const f = fixture("freeform");
@@ -394,7 +402,7 @@ describe("page-layout free-drawing creation", () => {
     f.el.dispatchEvent(f.event("dblclick", end));
     await nextTick();
     expect(f.commit).toHaveBeenCalledTimes(1);
-    expect(f.commit.mock.calls[0]![1].shapePath?.commands).toHaveLength(3);
+    expect(legacyDraft(f.commit.mock.calls[0]![1]).shapePath?.commands).toHaveLength(3);
   });
   test("freeform nodes on blank layout-only pages project outside the print range", async () => {
     const f = fixture("freeform", 1, { x: 0, y: 0 }, "blank");
@@ -409,7 +417,9 @@ describe("page-layout free-drawing creation", () => {
     f.click(f.paperPoint(1, 0, 250, 200));
     finish(f.el);
     expect(f.commit).toHaveBeenCalledTimes(1);
-    expect(f.commit.mock.calls[0]![1].anchor.row).toBe(Math.floor(f.sheetPoint(first).y / 24));
+    expect(legacyDraft(f.commit.mock.calls[0]![1]).anchor.row).toBe(
+      Math.floor(f.sheetPoint(first).y / 24),
+    );
   });
   test("double-clicking paper whitespace cannot finish an existing valid freeform draft", async () => {
     const f = fixture("freeform");

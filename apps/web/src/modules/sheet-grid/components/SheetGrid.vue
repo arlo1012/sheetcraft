@@ -311,7 +311,10 @@ const props = withDefaults(
       metrics?: import("@sheetcraft/core/picture-axis-metrics").PictureSheetMetrics,
       guard?: () => boolean,
     ) => boolean;
-    shapeCreationCommit?: (request: ShapeCreationRequest, drawing: SheetGraphicDrawing) => boolean;
+    shapeCreationCommit?: (
+      request: ShapeCreationRequest,
+      drawing: import("../../sheet-drawings/useShapeCreation").ShapeCreationDraft,
+    ) => boolean;
     shapeCreationCancel?: (request: ShapeCreationRequest) => void;
     gridId?: string;
     externalHorizontalScrollbar?: boolean;

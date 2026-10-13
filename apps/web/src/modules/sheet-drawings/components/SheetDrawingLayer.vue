@@ -17,6 +17,7 @@ import {
 } from "@sheetcraft/core/picture-axis-metrics";
 import {
   isShapeGroupDrawing,
+  traverseShapeGroup,
   type ShapeGroupDrawing,
   type ShapeGroupPath,
 } from "@sheetcraft/core/shape-group";
@@ -27,6 +28,22 @@ import {
 } from "@sheetcraft/core/shape-group-planning";
 import { planDeleteShapeGroupNodes } from "@sheetcraft/core/shape-group-delete";
 import { normalizeSheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import {
+  planShapeConnectorBodyTranslation,
+  planShapeConnectorEndpointChange,
+  type ShapeConnectorEditSource,
+  type ShapeConnectorEndpointEdit,
+} from "@sheetcraft/core/shape-connector-editing";
+import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
+import {
+  resolveShapeForestForRender,
+  type ResolvedShapeForestForRender,
+  type ResolvedShapeRenderLeaf,
+} from "../resolved-shape-render-source";
+import {
+  getShapeConnectorSiteCandidates,
+  type ShapeConnectorSiteCandidate,
+} from "../shape-connector-site-picking";
 import {
   resolveShapeGroupProjection,
   updateResolvedShapeGroupLeaf,
@@ -77,7 +94,11 @@ import {
 import { getPicturePaneTranslation } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import { pictureFrameLocalToWorld } from "@sheetcraft/core/picture-frame";
 import type { PageLayoutProjection } from "@sheetcraft/sheet-engine/page-layout";
-import { getShapePageFragments, shapePagePointFromViewport } from "../shape-page-layout";
+import {
+  getShapePageFragments,
+  projectShapePointToViewport,
+  shapePagePointFromViewport,
+} from "../shape-page-layout";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import {
   startPointerSession,
@@ -160,6 +181,7 @@ const createId = createBrowserIdFactory();
 const selectedRoots = shallowRef<string[]>([]);
 const selectedOwnedId = ref<string | null>(null);
 const selectionFailure = ref(false);
+const connectorFailure = ref(false);
 const alignmentReference = ref<ShapeAlignmentReference>("selection");
 const selectionEpoch = ref(0);
 const rootsPreview = shallowRef<readonly SourceSheetDrawing[]>();
@@ -220,6 +242,34 @@ const metrics = computed(() => {
   void props.revision;
   return props.metrics ?? (props.sheet ? createPictureSheetMetrics(props.sheet) : undefined);
 });
+// Resolve the complete relation forest before any group, pane or visibility filter.
+// Static documents retain their existing resolution and admission budgets.
+const renderState = computed(() => {
+  const connected = props.drawings.some((root) =>
+    isShapeGroupDrawing(root)
+      ? traverseShapeGroup(root).some(({ node }) => "shapeConnector" in node)
+      : "shapeConnector" in root,
+  );
+  if (!connected) return { pass: undefined, unavailable: false };
+  try {
+    if (!metrics.value) throw new TypeError("Connector placement requires worksheet metrics.");
+    return {
+      pass: resolveShapeForestForRender({
+        drawings: props.drawings,
+        metrics: metrics.value,
+        revision: props.revision ?? 0,
+      }),
+      unavailable: false,
+    };
+  } catch {
+    // Effective filter/outline/AutoFit metrics may differ from the persisted
+    // worksheet metrics. Refuse this whole pass; never paint source carriers.
+    return { pass: undefined, unavailable: true };
+  }
+});
+const renderPass = computed(() => renderState.value.pass);
+const renderUnavailable = computed(() => renderState.value.unavailable);
+
 type DrawingProjection = {
   source: SourceSheetDrawing;
   view: SheetDrawing;
@@ -227,9 +277,28 @@ type DrawingProjection = {
   rect?: { x: number; y: number; width: number; height: number };
   collapsed: boolean;
   groupLeaf?: ResolvedShapeGroupLeaf;
+  renderLeaf?: ResolvedShapeRenderLeaf;
 };
 const resolvedDrawings = computed<DrawingProjection[]>(() => {
+  if (renderUnavailable.value) return [];
   const currentMetrics = metrics.value;
+  const pass = renderPass.value;
+  if (pass)
+    return pass.leaves.flatMap((leaf): DrawingProjection[] => {
+      const carrier = leaf.carrierLeaf ?? leaf.carrierRoot;
+      if (!carrier?.view) return [];
+      return [
+        {
+          source: leaf.sourceRoot,
+          view: leaf.connector?.status === "ready" ? leaf.connector.paintView : carrier.view,
+          metrics: currentMetrics,
+          rect: leaf.carrierLeaf?.layout?.rect ?? leaf.carrierRoot?.rect,
+          collapsed: carrier.collapsed,
+          groupLeaf: leaf.carrierLeaf,
+          renderLeaf: leaf,
+        },
+      ];
+    });
   return props.drawings.flatMap((source): DrawingProjection[] => {
     if (isShapeGroupDrawing(source)) {
       if (!currentMetrics) throw new Error("Shape group placement requires worksheet metrics.");
@@ -258,9 +327,57 @@ const resolvedDrawings = computed<DrawingProjection[]>(() => {
   });
 });
 const legacyDrawings = computed(() => resolvedDrawings.value.map((item) => item.view));
+function candidateForView(next: SheetDrawing, resolved: DrawingProjection): SourceSheetDrawing {
+  if (resolved.renderLeaf?.connector)
+    throw new TypeError("Connector paint views cannot enter carrier update inverses.");
+  return resolved.groupLeaf && resolved.metrics
+    ? updateResolvedShapeGroupLeaf(
+        resolved.groupLeaf,
+        next as SheetGraphicDrawing,
+        resolved.metrics,
+      )
+    : resolved.metrics && resolved.rect
+      ? updateResolvedShapeDrawing(
+          resolved as Parameters<typeof updateResolvedShapeDrawing>[0],
+          next,
+          resolved.metrics,
+        )
+      : next;
+}
+const displayedRenderPass = computed(() => {
+  const base = renderPass.value;
+  if (!base) return undefined;
+  let forest = rootsPreview.value ?? props.drawings;
+  if (!rootsPreview.value && preview.value) {
+    const owner = projectionById(preview.value);
+    if (owner) {
+      const next = candidateForView(preview.value, owner);
+      forest = props.drawings.map((root) => (root === owner.source ? next : root));
+    }
+  }
+  return forest === props.drawings
+    ? base
+    : resolveShapeForestForRender({
+        drawings: forest,
+        metrics: base.metrics,
+        revision: base.revision,
+      });
+});
 const previewViews = computed(() => {
   const output = new Map<string, SheetDrawing>();
+  if (renderUnavailable.value) return output;
   const m = metrics.value;
+  const pass = displayedRenderPass.value;
+  if (pass) {
+    for (const leaf of pass.leaves) {
+      const view =
+        leaf.connector?.status === "ready"
+          ? leaf.connector.paintView
+          : (leaf.carrierLeaf?.view ?? leaf.carrierRoot?.view);
+      if (view) output.set(view.id, view);
+    }
+    return output;
+  }
   if (!rootsPreview.value || !m) return output;
   for (const root of rootsPreview.value) {
     if (isShapeGroupDrawing(root)) {
@@ -278,7 +395,10 @@ function projectionById(drawing: SheetDrawing) {
 }
 function canonicalOwner(drawing: SheetDrawing): boolean {
   const item = projectionById(drawing);
-  return !!item && (!!item.groupLeaf || isFramedShapeDrawing(item.source));
+  return (
+    !!item &&
+    (!!item.renderLeaf?.connector || !!item.groupLeaf || isFramedShapeDrawing(item.source))
+  );
 }
 function hasContinuousView(drawing: SheetDrawing): boolean {
   return (
@@ -302,6 +422,7 @@ function selectRoots(ids: string[], owned: string | null = null) {
   selectedId.value = ids.at(-1) ?? null;
   pointEditingId.value = null;
   selectionFailure.value = false;
+  connectorFailure.value = false;
 }
 function chooseDrawing(
   drawing: SheetDrawing,
@@ -348,7 +469,21 @@ function legacyHitSurface(drawing: SheetDrawing): boolean {
   );
 }
 function drawingGeometry(drawing: SheetGraphicDrawing) {
-  return getDrawingShapeGeometry(drawing, hasContinuousView(drawing));
+  return getDrawingShapeGeometry(
+    drawing,
+    hasContinuousView(drawing),
+    connectorRoute(drawing)?.geometry,
+  );
+}
+function connectorRoute(drawing: SheetDrawing): ReadyShapeConnectorRoute | undefined {
+  const connector = (displayedRenderPass.value ?? renderPass.value)?.getLeaf(drawing.id)?.connector;
+  return connector?.status === "ready" ? connector.route : undefined;
+}
+function connectorBoundState(drawing: SheetDrawing): readonly [boolean, boolean] | undefined {
+  const connector = displayedRenderPass.value?.getLeaf(drawing.id)?.connector;
+  return connector?.status === "ready"
+    ? [connector.connection.begin.kind === "site", connector.connection.end.kind === "site"]
+    : undefined;
 }
 function sourceOwner(drawing: SheetDrawing): SourceSheetDrawing | undefined {
   return projectionById(drawing)?.source;
@@ -425,6 +560,16 @@ function acceptDetailedPaint(
   fragment: DrawingFragment,
   presentation: ShapeDetailedPresentation | undefined,
 ) {
+  if (
+    !fragments.value.some(
+      (current) =>
+        current.drawing === fragment.drawing &&
+        current.paneId === fragment.paneId &&
+        current.pageKey === fragment.pageKey,
+    ) ||
+    !passIsCurrent(fragment.renderPass)
+  )
+    return;
   const key = `${fragment.drawing.id}:${fragment.pageKey ?? fragment.paneId}`;
   if (presentation?.drawing === fragment.drawing) detailedPresentations.set(key, presentation);
   else detailedPresentations.delete(key);
@@ -434,32 +579,98 @@ type DrawingFragment = FloatingImageViewportFragment & {
   standard: boolean;
   pageKey?: string;
   pageClip?: FloatingImageViewportFragment["rect"];
+  connectorRoute?: ReadyShapeConnectorRoute;
+  renderPass?: ResolvedShapeForestForRender;
 };
 const preview = shallowRef<SheetDrawing>();
 let session: PointerSession | undefined;
+function passIsCurrent(pass: ResolvedShapeForestForRender | undefined): boolean {
+  if (!pass) return true;
+  try {
+    const base = renderPass.value;
+    base?.assertCurrent(props.drawings, metrics.value!, props.revision ?? 0);
+    if (pass !== displayedRenderPass.value) return false;
+    pass.assertCurrent(pass.sourceForest, metrics.value!, props.revision ?? 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function groupProjection(root: ShapeGroupDrawing, m: PictureSheetMetrics) {
+  const sourcePass = renderPass.value;
+  if (!sourcePass) return resolveShapeGroupProjection(root, m);
+  const displayed = displayedRenderPass.value?.getGroup(root.id);
+  const source = sourcePass.getGroup(root.id);
+  const group =
+    displayed?.sourceRoot === root ? displayed : source?.sourceRoot === root ? source : undefined;
+  if (!group || group.metrics !== m)
+    throw new TypeError("Group placement requires its exact full-forest pass.");
+  return group;
+}
+function groupContainer(root: ShapeGroupDrawing, path: ShapeGroupPath, m: PictureSheetMetrics) {
+  if (!renderPass.value) return resolveShapeGroupFormatContext(root, path, m);
+  const owner = groupProjection(root, m).owners.find(
+    (candidate) =>
+      candidate.path.length === path.length && candidate.path.every((id, i) => id === path[i]),
+  );
+  if (!owner) throw new TypeError("Group editing requires its exact owner path.");
+  return owner;
+}
+function setRootsPreview(next: readonly SourceSheetDrawing[] | undefined): void {
+  if (next && renderPass.value)
+    resolveShapeForestForRender({
+      drawings: next,
+      metrics: metrics.value!,
+      revision: props.revision ?? 0,
+    });
+  rootsPreview.value = next;
+}
+function setViewPreview(next: SheetDrawing | undefined): void {
+  try {
+    if (next && renderPass.value) {
+      const owner = projectionById(next);
+      if (!owner) throw new TypeError("Drawing preview requires its source owner.");
+      const candidate = candidateForView(next, owner);
+      resolveShapeForestForRender({
+        drawings: props.drawings.map((root) => (root === owner.source ? candidate : root)),
+        metrics: metrics.value!,
+        revision: props.revision ?? 0,
+      });
+    }
+    preview.value = next;
+  } catch {
+    preview.value = undefined;
+    selectionFailure.value = true;
+  }
+}
 type GroupPaintEntry = {
   source: ShapeGroupDrawing;
   displayed: ShapeGroupDrawing;
   metrics: PictureSheetMetrics;
   stackIndex: number;
+  renderPass?: ResolvedShapeForestForRender;
 };
 const groupPaintEntries = computed<GroupPaintEntry[]>(() => {
+  if (renderUnavailable.value) return [];
   const m = metrics.value;
   if (!m) return [];
+  const pass = displayedRenderPass.value;
   return props.drawings.flatMap((source, stackIndex) => {
     if (!isShapeGroupDrawing(source)) return [];
-    let displayed = rootsPreview.value?.find((root) => root.id === source.id) ?? source;
+    let displayed =
+      pass?.sourceForest.find((root) => root.id === source.id) ??
+      rootsPreview.value?.find((root) => root.id === source.id) ??
+      source;
     if (!isShapeGroupDrawing(displayed)) return [];
-    if (preview.value) {
+    if (preview.value && !pass) {
       const leaf = resolveShapeGroupProjection(displayed, m).leaves.find(
         (leaf) => leaf.sourceNode.id === preview.value?.id,
       );
       if (leaf && (preview.value.kind === "shape" || preview.value.kind === "textBox"))
         displayed = updateResolvedShapeGroupLeaf(leaf, preview.value, m);
     }
-    return hasActiveShapeGroupShadow(displayed) &&
-      !resolveShapeGroupProjection(displayed, m).layout.collapsed
-      ? [{ source, displayed, metrics: m, stackIndex }]
+    return hasActiveShapeGroupShadow(displayed) && !groupProjection(displayed, m).layout.collapsed
+      ? [{ source, displayed, metrics: m, stackIndex, renderPass: pass }]
       : [];
   });
 });
@@ -477,11 +688,17 @@ function acceptGroupPaint(
       (current) =>
         current.source === entry.source &&
         current.displayed === entry.displayed &&
-        current.metrics === entry.metrics,
+        current.metrics === entry.metrics &&
+        current.renderPass === entry.renderPass,
     )
   )
     return;
-  if (result?.sourceRoot === entry.displayed && result.metrics === entry.metrics)
+  if (
+    result?.sourceRoot === entry.displayed &&
+    result.metrics === entry.metrics &&
+    result.renderPass === entry.renderPass &&
+    passIsCurrent(entry.renderPass)
+  )
     groupPresentations.set(entry.source.id, result);
   else groupPresentations.delete(entry.source.id);
 }
@@ -492,7 +709,8 @@ watch(groupPaintEntries, (entries) => {
         (entry) =>
           entry.source.id === id &&
           entry.displayed === result.sourceRoot &&
-          entry.metrics === result.metrics,
+          entry.metrics === result.metrics &&
+          entry.renderPass === result.renderPass,
       )
     )
       groupPresentations.delete(id);
@@ -511,7 +729,14 @@ function drawingStackStyle(drawing: SheetDrawing): CSSProperties {
 }
 function groupHit(entry: GroupPaintEntry, fragment: ShapeGroupFrameFragment, event: MouseEvent) {
   const result = groupPresentations.get(entry.source.id);
-  if (!result || result.sourceRoot !== entry.displayed || result.metrics !== entry.metrics) return;
+  if (
+    !result ||
+    result.sourceRoot !== entry.displayed ||
+    result.metrics !== entry.metrics ||
+    result.renderPass !== entry.renderPass ||
+    !passIsCurrent(entry.renderPass)
+  )
+    return;
   return hitShapeGroupPaint(
     result,
     standardShapeWorldToLocal(fragment.rect, entry.displayed.rotation, viewportPoint(event)),
@@ -596,10 +821,14 @@ const fragments = computed<DrawingFragment[]>(
     void cellTextFontRevision.value,
     legacyDrawings.value.flatMap((original) => {
       if (resolvedOwner(original)?.collapsed) return [];
+      const pass = displayedRenderPass.value;
+      const leaf = pass?.getLeaf(original.id);
+      if (leaf?.connector && leaf.connector.status !== "ready") return [];
       const drawing =
-        preview.value?.id === original.id
+        !pass && preview.value?.id === original.id
           ? preview.value
           : (previewViews.value.get(original.id) ?? original);
+      const route = leaf?.connector?.status === "ready" ? leaf.connector.route : undefined;
       const currentLayout = viewLayout(drawing);
       const standard = isStandard(drawing);
       const shape = standard && drawingGeometry(drawing);
@@ -615,6 +844,7 @@ const fragments = computed<DrawingFragment[]>(
               props.pageProjection,
               resolved.metrics,
               isSelectedView(drawing),
+              route,
             )
           : standard && shape
             ? getStandardShapeViewportFragments(
@@ -622,9 +852,16 @@ const fragments = computed<DrawingFragment[]>(
                 currentLayout,
                 isSelectedView(drawing),
                 hasContinuousView(drawing),
+                route,
               )
             : getFloatingImageViewportFragments(drawing, currentLayout);
-      return projected.map((fragment) => ({ ...fragment, drawing, standard }));
+      return projected.map((fragment) => ({
+        ...fragment,
+        drawing,
+        standard,
+        connectorRoute: route,
+        renderPass: pass,
+      }));
     })
   ),
 );
@@ -653,6 +890,10 @@ const formatTriggerStyle = computed(() => {
 });
 function formatSelected() {
   const d = formatTarget.value?.drawing;
+  if (d && projectionById(d)?.renderLeaf?.connector) {
+    connectorFailure.value = true;
+    return;
+  }
   if (
     (d?.kind === "shape" || d?.kind === "textBox") &&
     canChange(d) &&
@@ -663,6 +904,10 @@ function formatSelected() {
   }
 }
 function commitUpdate(next: SheetDrawing, owner: SheetDrawing): boolean {
+  if (projectionById(owner)?.renderLeaf?.connector) {
+    connectorFailure.value = true;
+    return false;
+  }
   if (
     !canChange(owner) ||
     legacyDrawings.value.find((item) => item.id === owner.id) !== owner ||
@@ -678,20 +923,15 @@ function commitUpdate(next: SheetDrawing, owner: SheetDrawing): boolean {
     const resolved = resolvedOwner(owner);
     const source = resolved?.source;
     if (!source) return false;
-    const candidate =
-      resolved?.groupLeaf && resolved.metrics
-        ? updateResolvedShapeGroupLeaf(
-            resolved.groupLeaf,
-            next as SheetGraphicDrawing,
-            resolved.metrics,
-          )
-        : resolved && resolved.metrics && resolved.rect
-          ? updateResolvedShapeDrawing(
-              resolved as Parameters<typeof updateResolvedShapeDrawing>[0],
-              next,
-              resolved.metrics,
-            )
-          : next;
+    const pass = renderPass.value;
+    pass?.assertCurrent(props.drawings, metrics.value!, props.revision ?? 0);
+    const candidate = candidateForView(next, resolved!);
+    if (pass)
+      resolveShapeForestForRender({
+        drawings: props.drawings.map((root) => (root === source ? candidate : root)),
+        metrics: pass.metrics,
+        revision: pass.revision,
+      });
     if (props.applyUpdate) accepted = props.applyUpdate(candidate, source) === true;
     else {
       emit("update", candidate);
@@ -709,6 +949,7 @@ const selectionKey = computed(
 );
 const selectionDisabled = computed(
   () =>
+    renderUnavailable.value ||
     !props.applyCollection ||
     !metrics.value ||
     props.readOnly ||
@@ -722,13 +963,17 @@ const selectionDisabled = computed(
     }),
 );
 const groupFragments = computed(() => {
+  if (renderUnavailable.value) return [];
   const m = metrics.value;
   if (!m) return [];
   return props.drawings.flatMap((source) => {
     if (!isShapeGroupDrawing(source) || !selectedRoots.value.includes(source.id)) return [];
-    const displayed = rootsPreview.value?.find((d) => d.id === source.id) ?? source;
+    const displayed =
+      displayedRenderPass.value?.sourceForest.find((d) => d.id === source.id) ??
+      rootsPreview.value?.find((d) => d.id === source.id) ??
+      source;
     if (!isShapeGroupDrawing(displayed)) return [];
-    const projected = resolveShapeGroupProjection(displayed, m);
+    const projected = groupProjection(displayed, m);
     return projected.owners.flatMap((owner) =>
       owner.layout
         ? getShapeGroupFrameFragments(owner.layout, props.layout, m, props.pageProjection).map(
@@ -745,11 +990,11 @@ watch(
       selectedRoots.value.length === 1
         ? props.drawings.find((d) => d.id === selectedRoots.value[0])
         : undefined;
-    if (!root || !isShapeGroupDrawing(root) || !metrics.value) {
+    if (renderUnavailable.value || !root || !isShapeGroupDrawing(root) || !metrics.value) {
       emit("groupSelectionChange", null, null);
       return;
     }
-    const projection = resolveShapeGroupProjection(root, metrics.value);
+    const projection = groupProjection(root, metrics.value);
     const node = selectedOwnedId.value
       ? [...projection.owners, ...projection.leaves].find(
           (n) => n.sourceNode.id === selectedOwnedId.value,
@@ -790,13 +1035,25 @@ function runSelectionPlan(
   if (key !== selectionKey.value || selectionDisabled.value || !m || !props.applyCollection)
     return false;
   const expected = [...props.drawings];
+  const pass = renderPass.value;
+  const current = () => {
+    try {
+      pass?.assertCurrent(props.drawings, m, props.revision ?? 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
   try {
+    if (!current()) return false;
     const next = plan();
+    if (pass) resolveShapeForestForRender({ drawings: next, metrics: m, revision: pass.revision });
     if (
       key !== selectionKey.value ||
       metrics.value !== m ||
       props.drawings.length !== expected.length ||
-      props.drawings.some((d, i) => d !== expected[i])
+      props.drawings.some((d, i) => d !== expected[i]) ||
+      !current()
     )
       return false;
     const accepted =
@@ -808,6 +1065,7 @@ function runSelectionPlan(
           key === selectionKey.value &&
           metrics.value === m &&
           !selectionDisabled.value &&
+          current() &&
           props.drawings.length === expected.length &&
           props.drawings.every((d, i) => d === expected[i]),
       ) === true;
@@ -823,6 +1081,10 @@ function alignSelected(
   reference: ShapeAlignmentReference,
   key: string,
 ): void {
+  if (selectedRoots.value.some((id) => renderPass.value?.getLeaf(id)?.connector)) {
+    connectorFailure.value = true;
+    return;
+  }
   if (metrics.value)
     runSelectionPlan(
       () =>
@@ -837,6 +1099,10 @@ function alignSelected(
     );
 }
 function equalizeSelected(action: EqualShapeDimensionsAction, key: string): void {
+  if (selectedRoots.value.some((id) => renderPass.value?.getLeaf(id)?.connector)) {
+    connectorFailure.value = true;
+    return;
+  }
   if (metrics.value)
     runSelectionPlan(
       () =>
@@ -854,13 +1120,24 @@ function selectedContainerPath(source: ShapeGroupDrawing): ShapeGroupPath {
   const own =
     selectedOwnedId.value &&
     metrics.value &&
-    resolveShapeGroupProjection(source, metrics.value).owners.find(
+    groupProjection(source, metrics.value).owners.find(
       (o) => o.sourceNode.id === selectedOwnedId.value,
     );
   return own ? own.path : [source.id];
 }
 function formatGroup(source: ShapeGroupDrawing, path: ShapeGroupPath): void {
   if (props.drawings.find((d) => d.id === source.id) !== source || selectionDisabled.value) return;
+  if (
+    renderPass.value?.leaves.some(
+      (leaf) =>
+        leaf.sourceRoot === source &&
+        leaf.connector &&
+        path.every((id, index) => leaf.path[index] === id),
+    )
+  ) {
+    connectorFailure.value = true;
+    return;
+  }
   selectRoots([source.id], path.length > 1 ? path.at(-1)! : null);
   emit("formatGroup", source, path);
 }
@@ -923,6 +1200,12 @@ function deleteSelected(): void {
 }
 function rotateRootSelection(degrees: number): readonly SourceSheetDrawing[] {
   const ids = new Set(selectedRoots.value);
+  if (
+    props.drawings.some((root) => ids.has(root.id) && root.kind === "shape" && root.shapeConnector)
+  ) {
+    connectorFailure.value = true;
+    throw new TypeError("Connector rotation requires an endpoint edit.");
+  }
   return props.drawings.map((root) =>
     ids.has(root.id)
       ? normalizeSheetDrawing({
@@ -951,6 +1234,17 @@ function startRootGesture(
     event.button !== 0
   )
     return;
+  if (
+    props.drawings.some(
+      (drawing) =>
+        selectedRoots.value.includes(drawing.id) &&
+        drawing.kind === "shape" &&
+        drawing.shapeConnector,
+    )
+  ) {
+    connectorFailure.value = true;
+    return;
+  }
   event.preventDefault();
   event.stopPropagation();
   const expected = [...props.drawings],
@@ -962,6 +1256,15 @@ function startRootGesture(
     viewport = props.layout,
     projection = props.pageProjection,
     scale = props.scale;
+  const pass = renderPass.value;
+  const current = () => {
+    try {
+      pass?.assertCurrent(props.drawings, m, props.revision ?? 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
   const valid = () =>
     key === selectionKey.value &&
     !selectionDisabled.value &&
@@ -971,6 +1274,7 @@ function startRootGesture(
     props.layout === viewport &&
     props.pageProjection === projection &&
     props.scale === scale &&
+    current() &&
     props.drawings.length === expected.length &&
     props.drawings.every((d, i) => d === expected[i]) &&
     JSON.stringify(props.drawings) === expectedData;
@@ -988,8 +1292,8 @@ function startRootGesture(
   };
   const groupLayout = isShapeGroupDrawing(root)
     ? ownedPath
-      ? resolveShapeGroupFormatContext(root, ownedPath, m).layout
-      : resolveShapeGroupProjection(root, m).layout
+      ? groupContainer(root, ownedPath, m).layout
+      : groupProjection(root, m).layout
     : undefined;
   const centerRect =
     groupLayout?.rect ?? resolvedDrawings.value.find((d) => d.source === root)?.rect ?? worldRect;
@@ -1022,7 +1326,7 @@ function startRootGesture(
             Math.PI;
           if (point.shiftKey) angle = Math.round(angle / 15) * 15;
         } else if (direction) {
-          const node = resolveShapeGroupFormatContext(root, ownedPath, m).sourceNode;
+          const node = groupContainer(root, ownedPath, m).sourceNode;
           const resized = standardShapeResizeRect(
             rect,
             angle,
@@ -1039,7 +1343,7 @@ function startRootGesture(
           rect.y += delta.y;
         }
         const next = updateOwnedShapeContainer(root, ownedPath, { rect, angleDeg: angle }, m);
-        rootsPreview.value = expected.map((d) => (d === root ? next : d));
+        setRootsPreview(expected.map((d) => (d === root ? next : d)));
       } else if (mode === "rotate") {
         let degrees =
           ((Math.atan2(nextPoint.y - center.y, nextPoint.x - center.x) - initialAngle) * 180) /
@@ -1047,18 +1351,22 @@ function startRootGesture(
         if (point.shiftKey)
           degrees = Math.round((root.rotation + degrees) / 15) * 15 - root.rotation;
         const ids = new Set(selected);
-        rootsPreview.value = expected.map((d) =>
-          ids.has(d.id)
-            ? normalizeSheetDrawing({
-                ...d,
-                rotation: ((((d.rotation + degrees + 180) % 360) + 360) % 360) - 180,
-              })
-            : d,
+        setRootsPreview(
+          expected.map((d) =>
+            ids.has(d.id)
+              ? normalizeSheetDrawing({
+                  ...d,
+                  rotation: ((((d.rotation + degrees + 180) % 360) + 360) % 360) - 180,
+                })
+              : d,
+          ),
         );
       } else
-        rootsPreview.value = direction
-          ? resizeSelectedShapeRoots(expected, selected, id, direction, delta, m, point.shiftKey)
-          : moveSelectedShapeRoots(expected, selected, delta, m);
+        setRootsPreview(
+          direction
+            ? resizeSelectedShapeRoots(expected, selected, id, direction, delta, m, point.shiftKey)
+            : moveSelectedShapeRoots(expected, selected, delta, m),
+        );
       rejected = false;
     } catch {
       rootsPreview.value = undefined;
@@ -1163,7 +1471,7 @@ function groupKeydown(
     event.stopPropagation();
     if (path.length > 1)
       runSelectionPlan(() => {
-        const layout = resolveShapeGroupFormatContext(source, path, metrics.value!).layout;
+        const layout = groupContainer(source, path, metrics.value!).layout;
         if (!layout) throw new RangeError("Nested group is collapsed.");
         const next = updateOwnedShapeContainer(
           source,
@@ -1198,6 +1506,7 @@ watch(
     selectionEpoch.value++;
     session?.cancel();
     rootsPreview.value = undefined;
+    connectorSites.value = [];
   },
   { flush: "sync" },
 );
@@ -1237,13 +1546,25 @@ function viewportPoint(event: { clientX: number; clientY: number }): {
   };
 }
 function hits(fragment: DrawingFragment, event: MouseEvent): boolean {
+  if (!passIsCurrent(fragment.renderPass)) return false;
   const composed = groupPaintEntry(fragment.drawing);
   if (composed) {
     const result = groupPresentations.get(composed.source.id);
-    if (!result || result.sourceRoot !== composed.displayed) return false;
+    if (
+      !result ||
+      result.sourceRoot !== composed.displayed ||
+      result.renderPass !== composed.renderPass ||
+      !passIsCurrent(composed.renderPass)
+    )
+      return false;
+    const displayedLeaf = composed.renderPass?.getLeaf(fragment.drawing.id);
+    const rect =
+      displayedLeaf?.connector?.status === "ready"
+        ? displayedLeaf.connector.route.paintLayout.rect
+        : (displayedLeaf?.carrierLeaf?.layout?.rect ?? resolvedOwner(fragment.drawing)?.rect);
     const translation = {
-      x: fragment.rect.x - (resolvedOwner(fragment.drawing)?.rect?.x ?? fragment.rect.x),
-      y: fragment.rect.y - (resolvedOwner(fragment.drawing)?.rect?.y ?? fragment.rect.y),
+      x: fragment.rect.x - (rect?.x ?? fragment.rect.x),
+      y: fragment.rect.y - (rect?.y ?? fragment.rect.y),
     };
     const frame = {
       ...result.layout.rect,
@@ -1289,7 +1610,227 @@ function hits(fragment: DrawingFragment, event: MouseEvent): boolean {
     shape,
     fragment.rect,
     viewportPoint(event),
+    fragment.connectorRoute,
   );
+}
+const connectorSites = shallowRef<readonly ShapeConnectorSiteCandidate[]>([]);
+const connectorSitePorts = computed(() => {
+  const m = metrics.value;
+  if (!m) return [];
+  return connectorSites.value.flatMap((site) => {
+    if (props.pageProjection) {
+      const projected = projectShapePointToViewport(
+        site.position,
+        props.layout,
+        props.pageProjection,
+        m,
+      );
+      return projected
+        ? [
+            {
+              site,
+              point: projected.point,
+              key: `${site.targetId}:${site.siteIndex}:${projected.pageKey}`,
+            },
+          ]
+        : [];
+    }
+    return (Object.keys(props.layout.panes) as DrawingFragment["paneId"][]).flatMap((paneId) => {
+      const translation = getPicturePaneTranslation(paneId, props.layout);
+      const point = { x: site.position.x + translation.x, y: site.position.y + translation.y };
+      const clip = props.layout.panes[paneId].clip;
+      return point.x >= clip.x &&
+        point.x < clip.x + clip.width &&
+        point.y >= clip.y &&
+        point.y < clip.y + clip.height
+        ? [{ site, point, key: `${site.targetId}:${site.siteIndex}:${paneId}` }]
+        : [];
+    });
+  });
+});
+const unavailableConnectors = computed(
+  () =>
+    displayedRenderPass.value?.leaves.flatMap((leaf) =>
+      leaf.connector && leaf.connector.status !== "ready"
+        ? [
+            {
+              id: leaf.sourceNode.id,
+              status: leaf.connector.status,
+              reason: leaf.connector.status === "unavailable" ? leaf.connector.reason : undefined,
+            },
+          ]
+        : [],
+    ) ?? [],
+);
+function connectorEditSource(drawing: SheetDrawing): ShapeConnectorEditSource | undefined {
+  const leaf = renderPass.value?.getLeaf(drawing.id);
+  return leaf?.connector?.status === "ready"
+    ? { connectorId: leaf.sourceNode.id, path: leaf.path }
+    : undefined;
+}
+function commitConnectorPlan(
+  pass: ResolvedShapeForestForRender,
+  drawing: SheetDrawing,
+  next: readonly SourceSheetDrawing[],
+  key: string,
+  gestureValid: () => boolean = () => true,
+): boolean {
+  const root = pass.getLeaf(drawing.id)?.sourceRoot;
+  const valid = () => {
+    try {
+      pass.assertCurrent(props.drawings, metrics.value!, props.revision ?? 0);
+      return (
+        gestureValid() &&
+        key === selectionKey.value &&
+        renderPass.value === pass &&
+        canChange(drawing) &&
+        !selectionDisabled.value &&
+        !!root &&
+        props.drawings.find((item) => item.id === root.id) === root
+      );
+    } catch {
+      return false;
+    }
+  };
+  if (!valid() || !props.applyCollection) return false;
+  try {
+    resolveShapeForestForRender({ drawings: next, metrics: pass.metrics, revision: pass.revision });
+    const accepted =
+      props.applyCollection(next, [...pass.sourceForest], pass.metrics, valid) === true;
+    selectionFailure.value = !accepted;
+    return accepted;
+  } catch {
+    selectionFailure.value = true;
+    return false;
+  }
+}
+function startConnectorGesture(
+  fragment: DrawingFragment,
+  event: PointerEvent,
+  mode: "move" | "endpoint",
+  index?: number,
+): void {
+  const drawing = fragment.drawing;
+  const pass = renderPass.value;
+  const source = connectorEditSource(drawing);
+  const route = fragment.connectorRoute;
+  if (!props.applyCollection) {
+    connectorFailure.value = true;
+    return;
+  }
+  if (
+    !pass ||
+    !source ||
+    !route ||
+    !props.applyCollection ||
+    selectionDisabled.value ||
+    !canChange(drawing) ||
+    (mode === "endpoint" && index !== 0 && index !== 1)
+  )
+    return;
+  const key = selectionKey.value;
+  const sheet = props.sheet,
+    revision = props.revision,
+    viewport = props.layout,
+    page = props.pageProjection,
+    scale = props.scale;
+  const valid = () => {
+    try {
+      pass.assertCurrent(props.drawings, metrics.value!, props.revision ?? 0);
+      return (
+        key === selectionKey.value &&
+        renderPass.value === pass &&
+        canChange(drawing) &&
+        !selectionDisabled.value &&
+        props.sheet === sheet &&
+        props.revision === revision &&
+        props.layout === viewport &&
+        props.pageProjection === page &&
+        props.scale === scale &&
+        legacyDrawings.value.includes(drawing)
+      );
+    } catch {
+      return false;
+    }
+  };
+  const translation = getPicturePaneTranslation(fragment.paneId, viewport);
+  const sample = (point: MouseEvent) =>
+    page
+      ? shapePagePointFromViewport(viewportPoint(point), viewport, page, pass.metrics)?.point
+      : { x: viewportPoint(point).x - translation.x, y: viewportPoint(point).y - translation.y };
+  const origin = sample(event);
+  if (!origin || !valid()) return;
+  const tip = index === 0 ? route.begin : route.end;
+  let planned: readonly SourceSheetDrawing[] | undefined;
+  let changed = false;
+  const update = (point: MouseEvent) => {
+    if (!valid()) {
+      session?.cancel();
+      return;
+    }
+    const target = sample(point);
+    if (!target) {
+      planned = undefined;
+      rootsPreview.value = undefined;
+      connectorSites.value = [];
+      return;
+    }
+    const delta = { x: target.x - origin.x, y: target.y - origin.y };
+    changed = delta.x !== 0 || delta.y !== 0;
+    try {
+      if (mode === "endpoint") {
+        const position = { x: tip.x + delta.x, y: tip.y + delta.y };
+        const nearby = getShapeConnectorSiteCandidates(pass.connections!, position, 12 / scale);
+        connectorSites.value = nearby;
+        const site = nearby[0];
+        const endpoint: ShapeConnectorEndpointEdit = site
+          ? {
+              kind: "site",
+              targetId: site.targetId,
+              targetPath: site.path,
+              preset: site.preset,
+              siteIndex: site.siteIndex,
+            }
+          : { kind: "free", position };
+        planned = changed
+          ? planShapeConnectorEndpointChange(
+              pass.sourceForest,
+              source,
+              index === 0 ? "begin" : "end",
+              endpoint,
+              pass.metrics,
+            )
+          : undefined;
+      } else {
+        planned = changed
+          ? planShapeConnectorBodyTranslation(pass.sourceForest, source, delta, pass.metrics)
+          : undefined;
+      }
+      setRootsPreview(planned);
+      selectionFailure.value = false;
+    } catch {
+      planned = undefined;
+      rootsPreview.value = undefined;
+      connectorSites.value = [];
+      selectionFailure.value = true;
+    }
+  };
+  session = startPointerSession({
+    event,
+    captureTarget: layerElement.value,
+    onMove: update,
+    onEnd: (point) => {
+      update(point);
+      const next = planned;
+      rootsPreview.value = undefined;
+      connectorSites.value = [];
+      if (next && changed && valid()) commitConnectorPlan(pass, drawing, next, key, valid);
+    },
+    onCancel: () => {
+      rootsPreview.value = undefined;
+      connectorSites.value = [];
+    },
+  });
 }
 function start(
   fragment: DrawingFragment,
@@ -1322,6 +1863,19 @@ function start(
   emit("select");
   (event.currentTarget as HTMLElement)?.focus?.();
   if (!canChange(drawing)) return;
+  const connector = projectionById(drawing)?.renderLeaf?.connector;
+  if (connector && (direction || !["move", "endpoint"].includes(mode))) {
+    connectorFailure.value = true;
+    return;
+  }
+  if (
+    connector &&
+    selectedRoots.value.length === 1 &&
+    (!projectionById(drawing)?.groupLeaf || selectedOwnedId.value === drawing.id)
+  ) {
+    startConnectorGesture(fragment, event, mode as "move" | "endpoint", index);
+    return;
+  }
   if (
     (selectedRoots.value.length > 1 ||
       (projectionById(drawing)?.groupLeaf && !selectedOwnedId.value)) &&
@@ -1343,6 +1897,15 @@ function start(
     return;
   }
   const gestureKey = selectionKey.value;
+  const pass = renderPass.value;
+  const current = () => {
+    try {
+      pass?.assertCurrent(props.drawings, metrics.value!, props.revision ?? 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
   const sheet = props.sheet,
     revision = props.revision,
     layout = props.layout,
@@ -1361,6 +1924,7 @@ function start(
     props.pageProjection === currentProjection &&
     metrics.value === currentMetrics &&
     props.scale === scale &&
+    current() &&
     legacyDrawings.value.find((item) => item.id === drawing.id) === owner;
   const gesturePoint = (next: MouseEvent) =>
     projection
@@ -1416,20 +1980,21 @@ function start(
       return;
     }
     const delta = { x: target.x - origin.x, y: target.y - origin.y };
+    let nextView: SheetDrawing | undefined;
     if (isStandard(drawing) && mode === "rotate") {
       let rotation =
         drawing.rotation +
         ((Math.atan2(target.y - center.y, target.x - center.x) - initialAngle) * 180) / Math.PI;
       if (point.shiftKey) rotation = Math.round(rotation / 15) * 15;
       rotation = ((((rotation + 180) % 360) + 360) % 360) - 180;
-      preview.value = { ...drawing, rotation };
+      nextView = { ...drawing, rotation };
     } else if (
       isStandard(drawing) &&
       mode === "endpoint" &&
       endpointOrigin &&
       (index === 0 || index === 1)
     ) {
-      preview.value = moveStandardShapeEndpoint(
+      nextView = moveStandardShapeEndpoint(
         drawing,
         index,
         {
@@ -1441,7 +2006,7 @@ function start(
         pointEditOptions(drawing),
       );
     } else if (isStandard(drawing) && mode === "point" && freePoint && freeOrigin) {
-      preview.value = moveFreeShapePoint(
+      nextView = moveFreeShapePoint(
         drawing,
         freePoint,
         {
@@ -1463,11 +2028,12 @@ function start(
         index,
         local,
       );
-      preview.value = geometry ? { ...drawing, shapeGeometry: geometry } : undefined;
+      nextView = geometry ? { ...drawing, shapeGeometry: geometry } : undefined;
     } else
-      preview.value = direction
+      nextView = direction
         ? (resizeView(drawing, direction, delta, point.shiftKey) ?? undefined)
         : (moveView(drawing, delta) ?? undefined);
+    setViewPreview(nextView);
   };
   session = startPointerSession({
     event,
@@ -1495,6 +2061,10 @@ function edit(fragment: DrawingFragment, event: MouseEvent): void {
     return;
   event.preventDefault();
   event.stopPropagation();
+  if (projectionById(fragment.drawing)?.renderLeaf?.connector) {
+    connectorFailure.value = true;
+    return;
+  }
   if (isStandard(fragment.drawing) && fragment.drawing.shapePath) {
     selectRoots(
       [sourceOwner(fragment.drawing)!.id],
@@ -1686,6 +2256,30 @@ function nudgeEndpoint(
     legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing
   )
     return;
+  const source = connectorEditSource(drawing);
+  const pass = renderPass.value;
+  if (source && pass) {
+    if (!props.applyCollection) {
+      connectorFailure.value = true;
+      return;
+    }
+    const connector = pass.getLeaf(drawing.id)!.connector!;
+    if (connector.status !== "ready") return;
+    const tip = index === 0 ? connector.route.begin : connector.route.end;
+    try {
+      const next = planShapeConnectorEndpointChange(
+        pass.sourceForest,
+        source,
+        index === 0 ? "begin" : "end",
+        { kind: "free", position: { x: tip.x + delta.x, y: tip.y + delta.y } },
+        pass.metrics,
+      );
+      commitConnectorPlan(pass, drawing, next, selectionKey.value);
+    } catch {
+      selectionFailure.value = true;
+    }
+    return;
+  }
   const position = getShapeLineLocalEndpoints(drawing)?.[index];
   const rect = getFloatingImageSheetRect(drawing, viewLayout(drawing));
   if (!position || !rect) return;
@@ -1767,6 +2361,10 @@ function keydown(drawing: SheetDrawing, event: KeyboardEvent) {
   if (event.key === "Enter" || event.key === "F2") {
     event.preventDefault();
     event.stopPropagation();
+    if (projectionById(drawing)?.renderLeaf?.connector) {
+      connectorFailure.value = true;
+      return;
+    }
     const source = sourceOwner(drawing),
       owned = resolvedOwner(drawing)?.groupLeaf;
     if (owned && selectedOwnedId.value === drawing.id)
@@ -1782,12 +2380,41 @@ function keydown(drawing: SheetDrawing, event: KeyboardEvent) {
       x: event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0,
       y: event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0,
     };
+    const source = connectorEditSource(drawing);
+    const pass = renderPass.value;
+    if (
+      source &&
+      pass &&
+      selectedRoots.value.length === 1 &&
+      (!projectionById(drawing)?.groupLeaf || selectedOwnedId.value === drawing.id)
+    ) {
+      if (!props.applyCollection) {
+        connectorFailure.value = true;
+        return;
+      }
+      try {
+        const next = planShapeConnectorBodyTranslation(
+          pass.sourceForest,
+          source,
+          delta,
+          pass.metrics,
+        );
+        commitConnectorPlan(pass, drawing, next, selectionKey.value);
+      } catch {
+        selectionFailure.value = true;
+      }
+      return;
+    }
     if (
       metrics.value &&
       props.applyCollection &&
       (selectedRoots.value.length > 1 ||
         (resolvedOwner(drawing)?.groupLeaf && !selectedOwnedId.value))
     ) {
+      if (selectedRoots.value.some((id) => renderPass.value?.getLeaf(id)?.connector)) {
+        connectorFailure.value = true;
+        return;
+      }
       runSelectionPlan(() =>
         moveSelectedShapeRoots(props.drawings, selectedRoots.value, delta, metrics.value!),
       );
@@ -1922,15 +2549,16 @@ watch(
     if (surviving.length !== selectedRoots.value.length) selectRoots(surviving);
     if (
       selectedOwnedId.value &&
-      !legacyDrawings.value.some((d) => d.id === selectedOwnedId.value) &&
-      !props.drawings.some(
-        (d) =>
-          isShapeGroupDrawing(d) &&
-          metrics.value &&
-          resolveShapeGroupProjection(d, metrics.value).owners.some(
-            (o) => o.sourceNode.id === selectedOwnedId.value,
-          ),
-      )
+      (renderUnavailable.value ||
+        (!legacyDrawings.value.some((d) => d.id === selectedOwnedId.value) &&
+          !props.drawings.some(
+            (d) =>
+              isShapeGroupDrawing(d) &&
+              metrics.value &&
+              groupProjection(d, metrics.value).owners.some(
+                (o) => o.sourceNode.id === selectedOwnedId.value,
+              ),
+          )))
     )
       selectedOwnedId.value = null;
   },
@@ -1938,6 +2566,62 @@ watch(
 </script>
 <template>
   <div ref="layerElement" class="sheet-drawing-layer">
+    <div
+      v-if="renderUnavailable"
+      role="status"
+      class="sheet-drawing-layer__connector-status"
+      data-shape-connector-layout-unavailable
+    >
+      {{
+        locale === "zh-CN"
+          ? "当前连接布局超出安全绘制范围，形状暂未显示。数据已保留，请撤销尺寸或可见性变化。"
+          : "This connected layout cannot be rendered safely. Shapes are temporarily hidden and all data is preserved. Undo the size or visibility change."
+      }}
+    </div>
+    <div
+      v-if="connectorFailure"
+      role="status"
+      class="sheet-drawing-layer__point-feedback"
+      data-shape-connector-operation-unavailable
+    >
+      {{
+        locale === "zh-CN"
+          ? "此连接线操作暂不可用。请拖动端点或移动线身；连接关系已保留。"
+          : "This connector operation is unavailable. Drag an endpoint or move its body. Connections are preserved."
+      }}
+    </div>
+    <div
+      v-for="connector in unavailableConnectors"
+      :key="`connector-status-${connector.id}`"
+      role="status"
+      class="sheet-drawing-layer__connector-status"
+      :data-shape-connector-status="connector.status"
+      :data-shape-connector-id="connector.id"
+      :data-shape-connector-unavailable-reason="connector.reason"
+    >
+      {{
+        locale === "zh-CN"
+          ? connector.status === "suspended"
+            ? "连接线暂停：请展开其对象或目标。"
+            : connector.status === "degenerate"
+              ? "连接线端点重合，暂无可见线段。"
+              : "连接线文字或三维显示暂不可用。原始数据已保留。"
+          : connector.status === "suspended"
+            ? "Connector suspended. Expand its carrier or target."
+            : connector.status === "degenerate"
+              ? "Connector endpoints coincide. There is no visible segment."
+              : "Connector text or 3D presentation is unavailable. Source data is preserved."
+      }}
+    </div>
+    <span
+      v-for="port in connectorSitePorts"
+      :key="port.key"
+      class="sheet-drawing-layer__connector-port"
+      :data-shape-connector-target="port.site.targetId"
+      :data-shape-connector-site="port.site.siteIndex"
+      :style="{ left: `${port.point.x}px`, top: `${port.point.y}px` }"
+      aria-hidden="true"
+    />
     <SheetShapeSelectionToolbar
       v-if="toolbarAnchor"
       :anchor="toolbarAnchor"
@@ -2035,6 +2719,7 @@ watch(
             @detailed-paint="acceptDetailedPaint(fragment, $event)"
             @control-change="emit('controlChange', fragment.drawing.id, $event)"
             :drawing="fragment.drawing"
+            :connector-route="fragment.connectorRoute"
             :legacy-hit-surface="legacyHitSurface(fragment.drawing)"
             :density="rasterDensity"
             :sheet="sheet"
@@ -2070,6 +2755,8 @@ watch(
           isStandard(fragment.drawing)
         "
         :drawing="fragment.drawing"
+        :connector-route="fragment.connectorRoute"
+        :bound-endpoints="connectorBoundState(fragment.drawing)"
         :fragment="fragment"
         :pane-clip="fragment.pageClip ?? layout.panes[fragment.paneId].clip"
         v-on="standardSelectionHandlers(fragment)"
@@ -2085,6 +2772,7 @@ watch(
       :key="entry.source.id"
       :root="entry.displayed"
       :metrics="entry.metrics"
+      :render-pass="entry.renderPass"
       :layout="layout"
       :page-projection="pageProjection"
       :density="rasterDensity"
@@ -2151,11 +2839,7 @@ watch(
           (degrees) =>
             runSelectionPlan(() => {
               if (item.owner.path.length === 1) return rotateRootSelection(degrees);
-              const layout = resolveShapeGroupFormatContext(
-                item.source,
-                item.owner.path,
-                metrics!,
-              ).layout!;
+              const layout = groupContainer(item.source, item.owner.path, metrics!).layout!;
               const next = updateOwnedShapeContainer(
                 item.source,
                 item.owner.path,
@@ -2176,6 +2860,26 @@ watch(
   position: absolute;
   inset: 0;
   pointer-events: none;
+  &__connector-port {
+    position: absolute;
+    z-index: var(--sheetcraft-layer-toolbar);
+    width: 6px;
+    height: 6px;
+    border: 1px solid #727b86;
+    border-radius: 50%;
+    background: var(--sheetcraft-surface-default);
+    transform: translate(-50%, -50%);
+  }
+  &__connector-status {
+    position: relative;
+    width: fit-content;
+    max-width: min(420px, calc(100% - 24px));
+    margin: 4px 12px;
+    padding: 4px 8px;
+    color: var(--sheetcraft-text-secondary);
+    background: var(--sheetcraft-surface-panel);
+    font-size: 12px;
+  }
   &__format {
     position: absolute;
     z-index: var(--sheetcraft-layer-toolbar);
