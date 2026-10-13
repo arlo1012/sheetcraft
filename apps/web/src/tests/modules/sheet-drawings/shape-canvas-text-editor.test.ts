@@ -3,6 +3,9 @@ import { nextTick } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import ShapeCanvasTextEditor from "../../../modules/sheet-drawings/components/ShapeCanvasTextEditor.vue";
+import ShapeRichTextInput from "../../../modules/sheet-drawings/components/ShapeRichTextInput.vue";
+import { createDefaultShapeText } from "../../../modules/sheet-drawings/shape-text-options";
+import { DEFAULT_WORKBOOK_THEME } from "@sheetcraft/core/workbook-theme";
 
 type EditorProps = InstanceType<typeof ShapeCanvasTextEditor>["$props"];
 const mounted: VueWrapper[] = [];
@@ -96,6 +99,56 @@ function listen(type: string) {
 }
 
 describe("owner-scoped plain-text shape canvas editor", () => {
+  test("rich source preview discloses advanced appearance and receives theme and scale", async () => {
+    const target = drawing();
+    target.shapeText = {
+      ...createDefaultShapeText(),
+      style: {
+        fill: {
+          kind: "value",
+          value: {
+            kind: "pattern",
+            preset: "pct50",
+            foreground: { kind: "rgb", rgb: "#ff0000" },
+            background: { kind: "rgb", rgb: "#0000ff" },
+            opacity: 1,
+            rotateWithShape: true,
+          },
+        },
+      },
+    };
+    const wrapper = mount(ShapeCanvasTextEditor, {
+      attachTo: document.body,
+      props: {
+        drawing: target,
+        sessionId: 42,
+        draft: target.text,
+        rich: true,
+        theme: DEFAULT_WORKBOOK_THEME,
+        scale: 2,
+        update: () => true,
+        updateRich: () => true,
+        composition: () => true,
+        commit: () => true,
+        cancel: () => {},
+      },
+    });
+    mounted.push(wrapper);
+    await nextTick();
+    await nextTick();
+    expect(wrapper.findComponent(ShapeRichTextInput).props("theme")).toEqual(
+      DEFAULT_WORKBOOK_THEME,
+    );
+    expect(wrapper.findComponent(ShapeRichTextInput).props("scale")).toBe(2);
+    expect(document.querySelector("[data-shape-text-source-preview-note]")?.textContent).toContain(
+      "Applied text keeps its full appearance",
+    );
+    expect(wrapper.get("[data-shape-rich-text-input]").element.textContent).toBe(target.text);
+    await wrapper.setProps({ locale: "zh-CN" });
+    expect(document.querySelector("[data-shape-text-source-preview-note]")?.textContent).toContain(
+      "应用后保留完整外观",
+    );
+  });
   test("keeps one native textarea through continuous draft echoes and failure props", async () => {
     const f = await fixture();
     await write(f.input, "first draft");

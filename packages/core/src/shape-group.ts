@@ -170,6 +170,7 @@ const leafKeys = [
   "hidden",
   "shapeStyle",
   "shapeText",
+  "wordArt",
   "textDirection",
   "shapeProperties",
   "groupFrame",
@@ -177,6 +178,8 @@ const leafKeys = [
 function nodeRecord(value: unknown, root: boolean): Record<string, unknown> {
   if (value && typeof value === "object" && "hidden" in value && !Object.hasOwn(value, "hidden"))
     throw new TypeError("Shape visibility must be an own data field.");
+  if (value && typeof value === "object" && "wordArt" in value && !Object.hasOwn(value, "wordArt"))
+    throw new TypeError("WordArt semantics must be an own data field.");
   if (root && kind(value) === "shapeGroup")
     return record(value, [...groupKeys, "shapeFrame"], "root shape group");
   if (!root && kind(value) === "shapeGroup")

@@ -43,6 +43,7 @@ import {
 } from "./resolved-shape-group";
 import { useDrawingDialogTarget } from "../../shared/drawing-dialog/useDrawingDialogTarget";
 import type { Workbook, Sheet, CellAddress } from "@sheetcraft/core/workbook";
+import type { ShapeTextPreparationMode } from "./prepare-shape-text-update";
 /** Strip only the newly owned visibility metadata from already normalized trees. */
 function withoutShapeVisibility(node: SheetDrawing | ShapeGroupNode): unknown {
   if (node.kind !== "shape" && node.kind !== "textBox" && node.kind !== "shapeGroup") return node;
@@ -67,6 +68,7 @@ export function useDrawingActions(options: {
     drawing: SheetDrawing,
     owner?: SheetDrawing,
     forest?: readonly SheetDrawing[],
+    mode?: ShapeTextPreparationMode,
   ) => SheetDrawing;
   /** Actual final route appearance, after every changed root has been prepared. */
   preflightConnectedCollection?: (pass: ResolvedShapeForestForRender) => boolean;
@@ -277,6 +279,7 @@ export function useDrawingActions(options: {
     next: readonly SheetDrawing[],
     binding: CollectionBinding,
     visibilityOnly = false,
+    preparationMode?: ShapeTextPreparationMode,
   ): boolean {
     if (replacing) return false;
     replacing = true;
@@ -320,7 +323,9 @@ export function useDrawingActions(options: {
             canonicalOwners.get(id) === JSON.stringify(normalizeSheetDrawing(drawing)));
         const candidate = unchanged
           ? owner
-          : (options.prepareDrawing?.(drawing, owner, proposed) ?? drawing);
+          : ((preparationMode
+              ? options.prepareDrawing?.(drawing, owner, proposed, preparationMode)
+              : options.prepareDrawing?.(drawing, owner, proposed)) ?? drawing);
         if (candidate.id !== id || candidate.kind !== kind || !currentCollection(binding))
           return false;
         prepared.push(candidate);
@@ -377,6 +382,21 @@ export function useDrawingActions(options: {
     try {
       const binding = bindCollection(expected, expectedMetrics, guard);
       return !!binding && applyCollection(next, binding);
+    } catch {
+      return false;
+    }
+  }
+  /** Placement/ownership transfers retain their captured geometry and AutoFit.
+   * Changed/new roots still pass genuine text/layout/paint preparation and CAS. */
+  function replaceCollectionPreservingGeometry(
+    next: readonly SheetDrawing[],
+    expected: readonly SheetDrawing[],
+    expectedMetrics?: PictureSheetMetrics,
+    guard?: () => boolean,
+  ): boolean {
+    try {
+      const binding = bindCollection(expected, expectedMetrics, guard);
+      return !!binding && applyCollection(next, binding, false, "preserve-geometry");
     } catch {
       return false;
     }
@@ -496,6 +516,7 @@ export function useDrawingActions(options: {
     editGroupLeaf,
     update,
     replaceCollection,
+    replaceCollectionPreservingGeometry,
     replaceVisibilityCollection,
     confirm,
     remove,

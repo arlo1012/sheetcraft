@@ -87,6 +87,8 @@ export type SheetGraphicDrawing = DrawingBase & {
   shapeStyle?: ShapeDetailedStyle;
   /** Explicit shape/text-box layout, paragraph and glyph appearance, independent of body style. */
   shapeText?: ShapeText;
+  /** Modern WordArt semantics on an ordinary text-bearing shape; legacy kind=wordArt is separate. */
+  wordArt?: true;
   /** Sparse opt-in vertical text boxes; existing drawings retain horizontal text. */
   textDirection?: "vertical";
 };
@@ -358,6 +360,24 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
   if (textField && directionField)
     throw new TypeError("Shape text and legacy text direction are mutually exclusive.");
   const shapeText = normalizeShapeText(textField?.value, value.text);
+  const wordArtField = Object.getOwnPropertyDescriptor(value, "wordArt");
+  if (!wordArtField && "wordArt" in value)
+    throw new TypeError("WordArt semantics must be an own data field.");
+  if (wordArtField) {
+    if (!("value" in wordArtField) || wordArtField.value !== true)
+      throw new TypeError("WordArt semantics require an own true data field.");
+    if (
+      value.kind !== "shape" ||
+      !shapeText ||
+      shapeConnector ||
+      (shapeGeometry
+        ? isShapeLinePreset(shapeGeometry.preset)
+        : shapePath
+          ? !isShapeFreePathClosed(shapePath) && shapePath.openArea !== true
+          : value.shape === "line")
+    )
+      throw new TypeError("Modern WordArt requires an ordinary text-bearing shape.");
+  }
   if (directionField && (directionField.get || directionField.set))
     throw new TypeError("Text direction cannot be an accessor.");
   if (directionField && (value.kind !== "textBox" || directionField.value !== "vertical"))
@@ -391,6 +411,7 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
     ...(hidden ? { hidden: true as const } : {}),
     ...(shapeStyle ? { shapeStyle } : {}),
     ...(shapeText ? { shapeText } : {}),
+    ...(wordArtField ? { wordArt: true as const } : {}),
     ...(directionField ? { textDirection: "vertical" as const } : {}),
     name: value.name,
     text: value.text,
@@ -428,6 +449,7 @@ const shapeFrameFields = [
   "hidden",
   "shapeStyle",
   "shapeText",
+  "wordArt",
   "textDirection",
   "shapeFrame",
   "shapeProperties",
@@ -445,7 +467,8 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     textModelField && "value" in textModelField ? textModelField.value : undefined;
   const hasCharacterRuns =
     !!rawTextModel && typeof rawTextModel === "object" && "characterRuns" in rawTextModel;
-  if (hasCharacterRuns)
+  const hasWordArt = "wordArt" in value;
+  if (hasCharacterRuns || hasWordArt)
     for (const key of [
       "id",
       "kind",
@@ -474,7 +497,7 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
         (Object.getOwnPropertyDescriptor(value, "shapeGeometry")?.value === undefined &&
           Object.getOwnPropertyDescriptor(value, "shapePath")?.value === undefined)));
   if (
-    (hasNewControls || hasCharacterRuns) &&
+    (hasNewControls || hasCharacterRuns || hasWordArt) &&
     ownKind?.value !== "shapeGroup" &&
     !("shapeFrame" in value)
   ) {

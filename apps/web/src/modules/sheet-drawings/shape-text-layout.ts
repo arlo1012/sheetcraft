@@ -1,3 +1,10 @@
+import {
+  normalizeShapeStyle,
+  type ShapeChoice,
+  type ShapeDetailedStyle,
+  type ShapeLine,
+  type ShapePaint,
+} from "@sheetcraft/core/shape-style";
 import type {
   ShapeTextLayout as ShapeTextLayoutOptions,
   ShapeTextParagraph,
@@ -37,6 +44,9 @@ export type ShapeTextCharacterSegment = {
   strike: boolean;
   /** Absence inherits the actual uniform glyph fill, including advanced paint. */
   color?: string;
+  /** Sparse glyph appearance; absence inherits uniform text style, None removes it. */
+  fill?: ShapeChoice<ShapePaint>;
+  line?: ShapeChoice<ShapeLine>;
 };
 export type ShapeTextLayoutInput = {
   text: string;
@@ -66,6 +76,9 @@ export type ShapeTextRun = {
   underline?: boolean;
   strike?: boolean;
   color?: string;
+  /** Sparse glyph appearance; absence inherits uniform text style, None removes it. */
+  fill?: ShapeChoice<ShapePaint>;
+  line?: ShapeChoice<ShapeLine>;
   font: ShapeTextFont;
   direction: "ltr" | "rtl";
   /** Native left-aligned, alphabetic baseline; rotate around this origin. */
@@ -149,6 +162,9 @@ type Piece = {
   underline: boolean;
   strike: boolean;
   color?: string;
+  /** Sparse glyph appearance; absence inherits uniform text style, None removes it. */
+  fill?: ShapeChoice<ShapePaint>;
+  line?: ShapeChoice<ShapeLine>;
   direction: "ltr" | "rtl";
   metrics: Metrics;
   inlineAdvance: number;
@@ -422,6 +438,7 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
     return detached;
   };
   const segments: ShapeTextCharacterSegment[] = [];
+  const appearanceKeys = new WeakMap<ShapeTextCharacterSegment, string>();
   if (input.characterSegments !== undefined) {
     if (
       !Array.isArray(input.characterSegments) ||
@@ -451,17 +468,29 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
           "invalid-input",
           "Attributed text requires ordered full grapheme-safe effective coverage.",
         );
-      segmentBytes += 512 + segment.font.family.length * 2;
+      let appearance: ShapeDetailedStyle | undefined;
+      try {
+        appearance = normalizeShapeStyle({
+          ...(segment.fill !== undefined ? { fill: segment.fill } : {}),
+          ...(segment.line !== undefined ? { line: segment.line } : {}),
+        });
+      } catch {
+        fail("invalid-input", "Attributed glyph fill/outline is invalid.");
+      }
+      const appearanceKey = JSON.stringify(appearance ?? {});
+      segmentBytes += 512 + segment.font.family.length * 2 + appearanceKey.length * 2;
       if (segmentBytes > SHAPE_TEXT_LAYOUT_LIMITS.segmentBytes)
         fail("layout-budget", "Attributed text exceeds its bounded numeric-segment memory budget.");
-      const copy = { ...segment, font: { ...segment.font } };
+      const copy = { ...segment, ...appearance, font: { ...segment.font } };
+      appearanceKeys.set(copy, appearanceKey);
       const previous = segments.at(-1);
       if (
         previous &&
         fontKey(previous.font) === fontKey(copy.font) &&
         previous.underline === copy.underline &&
         previous.strike === copy.strike &&
-        previous.color === copy.color
+        previous.color === copy.color &&
+        appearanceKeys.get(previous) === appearanceKey
       )
         previous.end = copy.end;
       else segments.push(copy);
@@ -577,6 +606,8 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
           underline: segment.underline,
           strike: segment.strike,
           ...(segment.color !== undefined ? { color: segment.color } : {}),
+          ...(segment.fill !== undefined ? { fill: segment.fill } : {}),
+          ...(segment.line !== undefined ? { line: segment.line } : {}),
           direction,
           metrics,
           inlineAdvance: upright ? resolvedNormal.lineAdvance : metrics.width,
@@ -924,6 +955,8 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
         underline: piece.underline,
         strike: piece.strike,
         ...(piece.color !== undefined ? { color: piece.color } : {}),
+        ...(piece.fill !== undefined ? { fill: piece.fill } : {}),
+        ...(piece.line !== undefined ? { line: piece.line } : {}),
         direction: piece.direction,
         x,
         y,

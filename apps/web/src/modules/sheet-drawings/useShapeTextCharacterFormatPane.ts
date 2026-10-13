@@ -10,6 +10,7 @@ import {
   drawingShapeTextBaseCharacterFormat,
   drawingShapeTextCharacterSource,
   drawingShapeTextValues,
+  shapeTextCharacterColorValue,
 } from "./shape-text-options";
 import {
   shapeFormatOwnerKey,
@@ -18,6 +19,10 @@ import {
   type ShapeFormatIntent,
   type ShapeFormatField,
 } from "./shape-format-pane-model";
+
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import type { ShapeDetailedStyle } from "@sheetcraft/core/shape-style";
+import { resolveShapeTextPaintStyle } from "./shape-text-paint";
 
 const characters = {
   fontFamily: "fontFamily",
@@ -53,6 +58,7 @@ export function useShapeTextCharacterFormatPane(options: {
   getWorkbookId: () => string;
   getSheetId: () => string;
   getLocale: () => "en-US" | "zh-CN";
+  getTheme?: () => WorkbookTheme;
 }) {
   const visible = shallowRef(true),
     acknowledged = shallowRef<{ revision: number; id: string }>();
@@ -63,9 +69,13 @@ export function useShapeTextCharacterFormatPane(options: {
       source = drawingShapeTextCharacterSource(drawing),
       base = drawingShapeTextBaseCharacterFormat(drawing);
     const { start, end } = state.selection;
+    const caretOverride = state.pendingFormat ?? getShapeTextCharacterOverride(source, start);
+    const caretBase = { ...base };
+    if (caretOverride.fill !== undefined && caretOverride.color === undefined)
+      delete caretBase.color;
     const candidates: ShapeTextCharacterFormat[] =
       start === end
-        ? [{ ...base, ...(state.pendingFormat ?? getShapeTextCharacterOverride(source, start)) }]
+        ? [{ ...caretBase, ...caretOverride }]
         : getShapeTextCharacterSegments(source, base).filter(
             (segment) => segment.start < end && segment.end > start,
           );
@@ -75,8 +85,12 @@ export function useShapeTextCharacterFormatPane(options: {
       keyof typeof characters,
       ShapeTextCharacterProperty,
     ][]) {
-      const first = candidates[0]?.[property];
-      if (!candidates.every((entry) => entry[property] === first)) {
+      const readValue = (entry: ShapeTextCharacterFormat) =>
+        field === "textColor"
+          ? shapeTextCharacterColorValue(entry, options.getTheme?.())
+          : entry[property];
+      const first = candidates[0] ? readValue(candidates[0]) : undefined;
+      if (!candidates.every((entry) => readValue(entry) === first)) {
         delete values[field];
         mixedFields.push(field);
       } else
@@ -88,6 +102,31 @@ export function useShapeTextCharacterFormatPane(options: {
                 ? (drawing.shapeText?.fontFamily ?? "")
                 : first,
         });
+    }
+    const textStyle: ShapeDetailedStyle = { ...resolveShapeTextPaintStyle(drawing) };
+    const mixedStyles: ("fill" | "line")[] = [];
+    for (const category of ["fill", "line"] as const) {
+      const effective = candidates.map((entry) =>
+        category === "fill" && entry.color !== undefined
+          ? entry.color === "transparent"
+            ? { kind: "none" as const }
+            : {
+                kind: "value" as const,
+                value: {
+                  kind: "solid" as const,
+                  color: { kind: "rgb" as const, rgb: entry.color.toUpperCase() },
+                  opacity: 1,
+                },
+              }
+          : (entry[category] ?? textStyle[category]),
+      );
+      const first = effective[0];
+      if (effective.every((entry) => JSON.stringify(entry) === JSON.stringify(first)))
+        Object.assign(textStyle, { [category]: first });
+      else {
+        delete textStyle[category];
+        mixedStyles.push(category);
+      }
     }
     const chinese = options.getLocale() === "zh-CN";
     return {
@@ -102,9 +141,10 @@ export function useShapeTextCharacterFormatPane(options: {
       values,
       mixedFields,
       scopeDescription: chinese
-        ? `${start === end ? "字体设置用于光标处新输入的文字" : "字体设置仅用于选中的文字"}；段落和文本框设置请先应用文字，再修改。`
-        : `${start === end ? "Font settings apply to new text at the caret" : "Font settings apply only to selected characters"}. Apply the text before changing paragraph or text-box settings.`,
-      textStyle: drawing.shapeText?.style,
+        ? `${start === end ? "字体、文字填充和轮廓用于光标处新输入的文字" : "字体、文字填充和轮廓仅用于选中的文字"}；段落和文本框设置请先应用文字，再修改。`
+        : `${start === end ? "Font, text fill and outline apply to new text at the caret" : "Font, text fill and outline apply only to selected characters"}. Apply the text before changing paragraph or text-box settings.`,
+      textStyle,
+      ...(mixedStyles.length ? { mixedStyleCategories: { text: mixedStyles } } : {}),
       ...(acknowledged.value?.revision === state.formatRevision
         ? { acceptedIntentId: acknowledged.value.id }
         : {}),
@@ -163,7 +203,13 @@ export function useShapeTextCharacterFormatPane(options: {
             "softEdges",
             "format3d",
             "rotation3d",
-          ].map((category) => [category, { enabled: false, reason }]),
+          ].map((category) => [
+            category,
+            {
+              enabled: enabled && (category === "fill" || category === "line"),
+              reason: enabled && (category === "fill" || category === "line") ? undefined : reason,
+            },
+          ]),
         ),
       },
       lineEnds: { enabled: false, reason },
@@ -183,12 +229,24 @@ export function useShapeTextCharacterFormatPane(options: {
     )
       return false;
     const accepted =
-      intent.type === "set-field" && capabilities.value.fields[intent.field]?.enabled === true
-        ? callbacks.editField(intent.field, intent.value)
-        : intent.type === "set-text-margins" &&
-            capabilities.value.fields.textMarginLeftPt?.enabled === true
-          ? callbacks.setMargins(intent.value)
-          : false;
+      intent.type === "set-style" &&
+      intent.target === "text" &&
+      capabilities.value.styles?.text?.[intent.category]?.enabled === true
+        ? intent.category === "fill"
+          ? intent.value === undefined
+            ? callbacks.format({}, ["fill", "color"])
+            : callbacks.format({ fill: intent.value }, ["color"])
+          : intent.category === "line"
+            ? intent.value === undefined
+              ? callbacks.format({}, ["line"])
+              : callbacks.format({ line: intent.value })
+            : false
+        : intent.type === "set-field" && capabilities.value.fields[intent.field]?.enabled === true
+          ? callbacks.editField(intent.field, intent.value)
+          : intent.type === "set-text-margins" &&
+              capabilities.value.fields.textMarginLeftPt?.enabled === true
+            ? callbacks.setMargins(intent.value)
+            : false;
     if (!accepted) return false;
     const next = options.getSnapshot();
     if (next?.sessionId === state.sessionId)

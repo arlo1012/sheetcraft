@@ -433,3 +433,49 @@ describe("attributed shape-text runtime and native AutoFit", () => {
     expect(result.runs[0]!.underline).toBe(true);
   });
 });
+
+describe("modern WordArt natural no-wrap AutoFit", () => {
+  test("fits natural source width and height without changing font or wrapping", () => {
+    const shapeText = createDefaultShapeText();
+    shapeText.layout.wrap = false;
+    shapeText.layout.overflow = true;
+    shapeText.layout.autoFit = "resize-shape";
+    const source = drawing({
+      kind: "shape",
+      wordArt: true,
+      shapeGeometry: { preset: "rect" },
+      shapeText,
+      text: "abcdefghijklmnopqrst",
+      width: 100,
+      height: 100,
+    });
+    const before = structuredClone(source);
+    const result = prepareDrawingShapeTextCandidate(source, native);
+    expect(result.layout.fits).toBe(true);
+    expect(result.drawing.width).toBeCloseTo(219.2, 5);
+    expect(result.drawing.height).toBeCloseTo(29.6, 1);
+    expect(result.drawing.fontSize).toBe(20);
+    expect(result.drawing.shapeText?.layout.wrap).toBe(false);
+    expect(result.resized).toBe(true);
+    expect(source).toEqual(before);
+  });
+  test("ordinary no-wrap shapes keep fixed-width rejection; explicit WordArt width disables AutoFit", () => {
+    const shapeText = createDefaultShapeText();
+    shapeText.layout.wrap = false;
+    shapeText.layout.overflow = true;
+    shapeText.layout.autoFit = "resize-shape";
+    const source = drawing({
+      kind: "shape",
+      shapeGeometry: { preset: "rect" },
+      shapeText,
+      text: "abcdefghijklmnopqrst",
+      width: 100,
+      height: 100,
+    });
+    expect(() => prepareDrawingShapeTextCandidate(source, native)).toThrow(/fixed-width/);
+    const modern = { ...source, wordArt: true as const };
+    const result = prepareDrawingShapeTextCandidate(modern, { ...native, manualWidthChange: true });
+    expect(result.drawing.width).toBe(100);
+    expect(result.drawing.shapeText?.layout.autoFit).toBe("none");
+  });
+});

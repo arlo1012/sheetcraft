@@ -46,6 +46,7 @@ import {
   normalizeShapeObjectProperties,
 } from "@sheetcraft/core/shape-object-properties";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import {
   resolveShapeGroupProjection,
   type ResolvedShapeGroupLeaf,
@@ -62,6 +63,7 @@ import type {
 } from "./shape-format-pane-model";
 import {
   drawingShapeTextValues,
+  drawingShapeTextPaintValues,
   drawingShapeTextCharacterValues,
   editDrawingShapeTextField,
   materializeDrawingShapeText,
@@ -591,7 +593,9 @@ export function planShapeGroupFormatIntent(
     const leaves = getShapeGroupFormatEligibleLeaves(context, intent.target, intent.category);
     return batchPlan(context, leaves, (view) => {
       if (intent.target === "text" && intent.category === "fill")
-        view = withoutDrawingShapeTextCharacterProperties(view, ["color"]);
+        view = withoutDrawingShapeTextCharacterProperties(view, ["color", "fill"]);
+      if (intent.target === "text" && intent.category === "line")
+        view = withoutDrawingShapeTextCharacterProperties(view, ["line"]);
       const text = intent.target === "text" ? materializeDrawingShapeText(view) : undefined;
       const style = { ...(text ? text.style : view.shapeStyle) };
       if (intent.value === undefined) delete style[intent.category];
@@ -630,6 +634,7 @@ function sameValue(left: unknown, right: unknown): boolean {
 export function aggregateShapeGroupFormatSnapshot(
   context: ShapeGroupFormatContext,
   baseline: ShapeGroupFormatBaseline,
+  theme: WorkbookTheme = DEFAULT_WORKBOOK_THEME,
 ): ShapeGroupFormatAggregate {
   const body = getShapeGroupFormatEligibleLeaves(context, "shape");
   const text = getShapeGroupFormatEligibleLeaves(context, "text");
@@ -654,11 +659,11 @@ export function aggregateShapeGroupFormatSnapshot(
     });
   const mixedFields: ShapeFormatField[] = [];
   const textValues = text.map((leaf) => ({
-    ...drawingShapeTextValues(leaf.view!),
+    ...drawingShapeTextValues(leaf.view!, theme),
   }));
   const fields = new Set([
     ...textValues.flatMap((entry) => Object.keys(entry) as ShapeFormatField[]),
-    ...text.flatMap((leaf) => drawingShapeTextCharacterValues(leaf.view!).mixedFields),
+    ...text.flatMap((leaf) => drawingShapeTextCharacterValues(leaf.view!, theme).mixedFields),
   ]);
   for (const field of fields) {
     const eligible =
@@ -671,7 +676,7 @@ export function aggregateShapeGroupFormatSnapshot(
     const first = eligible[0]![field as keyof (typeof textValues)[number]];
     if (
       !text.some((leaf) =>
-        drawingShapeTextCharacterValues(leaf.view!).mixedFields.includes(field),
+        drawingShapeTextCharacterValues(leaf.view!, theme).mixedFields.includes(field),
       ) &&
       eligible.every((entry) => sameValue(entry[field as keyof typeof entry], first))
     )
@@ -692,8 +697,17 @@ export function aggregateShapeGroupFormatSnapshot(
           ? resolveShapeDetailedPaintStyle(leaf.view!)
           : resolveShapeTextPaintStyle(leaf.view!),
       );
-      const first = entries[0]![category];
-      if (entries.every((entry) => sameValue(entry[category], first))) {
+      const glyphs =
+        target === "text" && (category === "fill" || category === "line")
+          ? leaves.map((leaf, index) => drawingShapeTextPaintValues(leaf.view!, entries[index]!))
+          : undefined;
+      const first = glyphs ? glyphs[0]!.style[category] : entries[0]![category];
+      if (
+        !glyphs?.some((value) => value.mixed.includes(category as "fill" | "line")) &&
+        (glyphs ? glyphs.map((value) => value.style) : entries).every((entry) =>
+          sameValue(entry[category], first),
+        )
+      ) {
         if (first !== undefined) Object.assign(style, { [category]: first });
       } else mixed.push(category);
     }

@@ -48,6 +48,7 @@ const appearanceFields = [
   "shapeFlipY",
   "shapeStyle",
   "shapeText",
+  "wordArt",
   "textDirection",
 ] as const;
 const viewFields: readonly string[] = [

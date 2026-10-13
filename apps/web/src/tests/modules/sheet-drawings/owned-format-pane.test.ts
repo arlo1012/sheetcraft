@@ -11,6 +11,7 @@ import { createSetSheetDrawingsCommand } from "@sheetcraft/core/commands";
 import { serializeWorkbook, deserializeWorkbook } from "@sheetcraft/core/serialization";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
 import { useOwnedShapeFormatPane } from "../../../modules/sheet-drawings/useOwnedShapeFormatPane";
+import { createDefaultShapeText } from "../../../modules/sheet-drawings/shape-text-options";
 import { requireLegacySheetDrawing, type SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
@@ -65,6 +66,55 @@ function fixture(legacy = false) {
     }) as ShapeFormatIntent;
   return { wb, sheet, revision, generation, busy, session, update, scope, pane, intent };
 }
+test("object text swatch compares live custom theme fill with matching RGB runs", () => {
+  const f = fixture();
+  try {
+    const drawing = f.sheet.value.drawings![0]!;
+    if (drawing.kind !== "shape") throw new Error("Expected fixture shape.");
+    f.wb.value.theme.accentColors[0] = "#abcdef";
+    drawing.text = "alpha beta";
+    drawing.shapeText = {
+      ...createDefaultShapeText(),
+      style: {
+        fill: {
+          kind: "value",
+          value: {
+            kind: "solid",
+            color: { kind: "theme", reference: { slot: "accent1" } },
+            opacity: 1,
+          },
+        },
+      },
+      characterRuns: [
+        {
+          start: 0,
+          end: 6,
+          fill: {
+            kind: "value",
+            value: {
+              kind: "solid",
+              color: { kind: "rgb", rgb: "#ABCDEF" },
+              opacity: 1,
+            },
+          },
+        },
+      ],
+    };
+    f.revision.value++;
+    const before = JSON.stringify(drawing);
+    expect(f.pane.snapshot.value?.values.textColor).toBe("#abcdef");
+    expect(f.pane.snapshot.value?.mixedFields).not.toContain("textColor");
+    expect(JSON.stringify(drawing)).toBe(before);
+    // Theme changes are live readback dependencies, without replacing the selected owner.
+    f.wb.value.theme.accentColors[0] = "#fedcba";
+    expect(f.pane.snapshot.value?.values.textColor).toBeUndefined();
+    expect(f.pane.snapshot.value?.mixedFields).toContain("textColor");
+    expect(JSON.stringify(drawing)).toBe(before);
+    expect(f.session.history.undoStack).toHaveLength(0);
+  } finally {
+    f.scope.stop();
+  }
+});
 test.each([false, true])(
   "actual style command/Undo/Redo/internal58 snapshot preserves owner and data; legacy%s",
   (legacy) => {

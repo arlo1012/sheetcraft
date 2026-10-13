@@ -47,6 +47,9 @@ export type ShapeTextForestContext = {
   sourceForest: readonly SheetDrawing[];
   revision: number;
 };
+/** Clipboard/ownership proposals already contain the intended world geometry.
+ * Validate their actual text and paint without treating transfer as a text edit. */
+export type ShapeTextPreparationMode = "edit" | "preserve-geometry";
 
 function forestWithRoot(
   root: SheetDrawing,
@@ -148,17 +151,21 @@ export function prepareShapeTextUpdate(
   },
   metrics?: PictureSheetMetrics,
   forestContext?: ShapeTextForestContext,
+  mode: ShapeTextPreparationMode = "edit",
 ): SheetDrawing {
   assertConnectorTextUnchanged(candidate, source, forestContext?.sourceForest);
   if (isShapeGroupDrawing(candidate)) {
     if (!metrics) throw new Error("Shape group editing requires current worksheet metrics.");
-    const prepared = prepareOwnedGroupTextEdits(
-      candidate,
-      source && isShapeGroupDrawing(source) ? source : undefined,
-      metrics,
-      measurement,
-      forestContext,
-    );
+    const prepared =
+      mode === "preserve-geometry"
+        ? candidate
+        : prepareOwnedGroupTextEdits(
+            candidate,
+            source && isShapeGroupDrawing(source) ? source : undefined,
+            metrics,
+            measurement,
+            forestContext,
+          );
     preflightShapeGroupText(prepared, metrics, measurement, paint, forestContext);
     if (requiresShapeGroupPaint(prepared)) {
       const proof = preflightShapeGroupPaint({
@@ -199,12 +206,21 @@ export function prepareShapeTextUpdate(
       measurement,
       paint,
       resolved,
+      mode,
     );
     return prepared === resolved.view
       ? candidate
       : updateResolvedShapeDrawing(resolved, prepared, metrics);
   }
-  return prepareShapeViewTextUpdate(candidate, source, viewport, measurement, paint);
+  return prepareShapeViewTextUpdate(
+    candidate,
+    source,
+    viewport,
+    measurement,
+    paint,
+    undefined,
+    mode,
+  );
 }
 /** Group transforms preserve typography. An explicit member text/layout edit
  * still consumes that member's existing AutoFit setting and pinned local top edge. */
@@ -277,6 +293,9 @@ function prepareOwnedGroupTextEdits(
     const prepared = prepareDrawingShapeTextCandidate(current.view, {
       ...measurement,
       manualHeightChange: manualHeight,
+      manualWidthChange:
+        current.view.width !== old.view.width &&
+        sameData(current.view.shapeText, old.view.shapeText),
       normalizeView: (view) => {
         const root = updateResolvedShapeGroupLeaf(current, view, metrics);
         const leaf = projectGroup(
@@ -292,12 +311,16 @@ function prepareOwnedGroupTextEdits(
     let view = prepared.drawing;
     if (prepared.resized) {
       const delta = view.height - current.view.height,
+        deltaWidth = view.width - current.view.width,
         angle = (current.layout.angleDeg * Math.PI) / 180;
       const rect = standardShapeResizeRect(
         current.layout.rect,
         current.layout.angleDeg,
-        "s",
-        { x: -Math.sin(angle) * delta, y: Math.cos(angle) * delta },
+        deltaWidth ? "se" : "s",
+        {
+          x: Math.cos(angle) * deltaWidth - Math.sin(angle) * delta,
+          y: Math.sin(angle) * deltaWidth + Math.cos(angle) * delta,
+        },
         false,
         1,
         true,
@@ -357,6 +380,7 @@ function prepareShapeViewTextUpdate(
     preflight?: typeof preflightShapeTextGlyphBudgets;
   },
   resolved?: ResolvedShapeDrawing,
+  mode: ShapeTextPreparationMode = "edit",
 ): ReturnType<typeof requireLegacySheetDrawing> {
   const drawing = requireLegacySheetDrawing(candidate);
   const owner = source && requireLegacySheetDrawing(source);
@@ -394,12 +418,22 @@ function prepareShapeViewTextUpdate(
   // Shapes without a text area retain historical text without blocking unrelated properties.
   if (!getDrawingShapeTextRect(drawing)) return drawing;
   const manualHeightChange =
+    mode !== "preserve-geometry" &&
     !!owner &&
     (owner.kind === "shape" || owner.kind === "textBox") &&
     drawing.height !== owner.height &&
     sameData(drawing.shapeText, owner.shapeText);
+  const manualWidthChange =
+    mode !== "preserve-geometry" &&
+    !!owner &&
+    (owner.kind === "shape" || owner.kind === "textBox") &&
+    drawing.width !== owner.width &&
+    sameData(drawing.shapeText, owner.shapeText);
   if (!drawing.text) {
-    if (manualHeightChange && drawing.shapeText?.layout.autoFit === "resize-shape") {
+    if (
+      (manualHeightChange || (drawing.wordArt && manualWidthChange)) &&
+      drawing.shapeText?.layout.autoFit === "resize-shape"
+    ) {
       const text = materializeDrawingShapeText(drawing);
       text.layout.autoFit = "none";
       return withDrawingShapeText(drawing, text);
@@ -421,6 +455,7 @@ function prepareShapeViewTextUpdate(
     sameData(drawing.shapePath, owner.shapePath) &&
     sameData(autoFitInputs(drawing), autoFitInputs(owner));
   if (
+    mode !== "preserve-geometry" &&
     unchangedLayout &&
     drawing.kind === owner.kind &&
     drawing.color === owner.color &&
@@ -433,25 +468,27 @@ function prepareShapeViewTextUpdate(
     return drawing;
   // Paint-only rotation/color/body changes require genuine alpha proof, but
   // cannot silently resize an already fitted frame a second time.
-  const prepared = unchangedLayout
-    ? {
-        drawing,
-        layout: layoutDrawingShapeText(drawing, measurement),
-        resized: false,
-      }
-    : prepareDrawingShapeTextCandidate(drawing, {
-        ...measurement,
-        manualHeightChange,
-        ...(resolved
-          ? {
-              normalizeView: (view: SheetGraphicDrawing) =>
-                resolveShapeDrawing(
-                  updateResolvedShapeDrawing(resolved, view, resolved.metrics),
-                  resolved.metrics,
-                ).view as SheetGraphicDrawing,
-            }
-          : {}),
-      });
+  const prepared =
+    unchangedLayout || mode === "preserve-geometry"
+      ? {
+          drawing,
+          layout: layoutDrawingShapeText(drawing, measurement),
+          resized: false,
+        }
+      : prepareDrawingShapeTextCandidate(drawing, {
+          ...measurement,
+          manualHeightChange,
+          manualWidthChange,
+          ...(resolved
+            ? {
+                normalizeView: (view: SheetGraphicDrawing) =>
+                  resolveShapeDrawing(
+                    updateResolvedShapeDrawing(resolved, view, resolved.metrics),
+                    resolved.metrics,
+                  ).view as SheetGraphicDrawing,
+              }
+            : {}),
+        });
   if (prepared.drawing.text) {
     const textPlan = planShapeTextPaint({
       drawing: prepared.drawing,
@@ -459,6 +496,8 @@ function prepareShapeViewTextUpdate(
       density: 1,
       resources: paint?.resources,
     });
+    if (textPlan.kind !== "ready")
+      throw new Error("Shape text paint resources are not ready; the draft has been preserved.");
     const proof = (paint?.preflight ?? preflightShapeTextGlyphBudgets)({
       drawing: prepared.drawing,
       layout: prepared.layout,
@@ -490,12 +529,16 @@ function prepareShapeViewTextUpdate(
   const frame = getFloatingImageSheetRect(drawing, viewport);
   if (!frame) throw new Error("Shape AutoFit anchor is unavailable.");
   const delta = prepared.drawing.height - drawing.height;
+  const deltaWidth = prepared.drawing.width - drawing.width;
   const radians = (drawing.rotation * Math.PI) / 180;
   const rect = standardShapeResizeRect(
     frame,
     drawing.rotation,
-    "s",
-    { x: -Math.sin(radians) * delta, y: Math.cos(radians) * delta },
+    deltaWidth ? "se" : "s",
+    {
+      x: Math.cos(radians) * deltaWidth - Math.sin(radians) * delta,
+      y: Math.sin(radians) * deltaWidth + Math.cos(radians) * delta,
+    },
     false,
     1,
   );

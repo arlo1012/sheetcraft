@@ -14,6 +14,14 @@ export type ShapeRichTextSnapshot = {
 };
 export const SHAPE_RICH_TEXT_HISTORY_LIMIT = 100;
 const HISTORY_UNIT_LIMIT = 4_000_000;
+function snapshotUnits(snapshot: ShapeRichTextSnapshot): number {
+  return (
+    snapshot.source.text.length +
+    JSON.stringify(snapshot.source.characterRuns ?? []).length +
+    JSON.stringify(snapshot.pendingFormat ?? {}).length +
+    16
+  );
+}
 
 function graphemeEdges(text: string): number[] {
   if (text.length > 100000) throw new RangeError("Shape text cannot exceed 100000 characters.");
@@ -212,17 +220,13 @@ export class ShapeRichTextInputHistory {
     this.entries.splice(this.cursor + 1);
     this.entries.push(next);
     this.cursor++;
-    let units = this.entries.reduce(
-      (sum, entry) =>
-        sum + entry.source.text.length + (entry.source.characterRuns?.length ?? 0) * 32 + 16,
-      0,
-    );
+    let units = this.entries.reduce((sum, entry) => sum + snapshotUnits(entry), 0);
     while (
       this.entries.length > 1 &&
       (this.entries.length > SHAPE_RICH_TEXT_HISTORY_LIMIT || units > HISTORY_UNIT_LIMIT)
     ) {
       const dropped = this.entries.shift()!;
-      units -= dropped.source.text.length + (dropped.source.characterRuns?.length ?? 0) * 32 + 16;
+      units -= snapshotUnits(dropped);
       this.cursor--;
     }
     return true;

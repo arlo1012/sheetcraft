@@ -1472,3 +1472,256 @@ describe("attributed actual glyph and decoration pixels", () => {
     expect(() => planShapeTextPaint(input)).toThrow(/raster-span work budget/);
   });
 });
+
+describe("run-local modern WordArt glyph appearance", () => {
+  const line = (rgb = "#0000ff", widthPt = 1.5) => ({
+    kind: "value" as const,
+    value: {
+      paint: solid(rgb),
+      widthPt,
+      compound: "single" as const,
+      dash: "solid" as const,
+      cap: "butt" as const,
+      join: "round" as const,
+      miterLimit: 4,
+    },
+  });
+  const separatedRuns = (): ShapeTextRun[] => [
+    {
+      ...run("alpha"),
+      fill: { kind: "value", value: solid("#ff0000") },
+      line: line(),
+      underline: true,
+    },
+    { ...run("beta"), x: 30, inkBounds: { x: 30, y: 2, width: 16, height: 5 } },
+  ];
+  const at = (result: ReturnType<typeof paint>, x: number, y: number) =>
+    pixel(
+      result.canvas,
+      Math.floor((x - result.logicalBounds.left) * result.actualDensity),
+      Math.floor((y - result.logicalBounds.top) * result.actualDensity),
+    );
+  test("selected fill and native outline paint only their authored whole run and decorations", () => {
+    const input = options(),
+      native = factory();
+    input.drawing.width = 50;
+    input.layout = layout(separatedRuns());
+    const result = paint(input, native.make);
+    expect(at(result, 5, 3)).toEqual([255, 0, 0, 255]);
+    expect(at(result, 1, 3)).toEqual([0, 0, 255, 255]);
+    expect(at(result, 5, 7)).toEqual([0, 0, 255, 255]);
+    expect(at(result, 31, 3)).toEqual([18, 52, 86, 255]);
+    expect(at(result, 29, 3)[3]).toBe(0);
+    expect(
+      native
+        .calls()
+        .filter((call) => call.mode === "stroke")
+        .map((call) => call.text),
+    ).toEqual(["alpha"]);
+    expect(native.calls().every((call) => ["alpha", "beta"].includes(call.text))).toBe(true);
+  });
+  test("direct RGB wins over run paint; explicit None removes inherited fill and line", () => {
+    const input = options();
+    input.drawing.width = 50;
+    input.layout = layout([
+      { ...run("a"), color: "#00ff00", fill: { kind: "none" }, line: { kind: "none" } },
+      {
+        ...run("b"),
+        x: 30,
+        inkBounds: { x: 30, y: 2, width: 4, height: 5 },
+        fill: { kind: "none" },
+        line: { kind: "none" },
+      },
+    ]);
+    const result = paint({ ...input, style: { line: line() } }, factory().make);
+    expect(at(result, 3, 3)).toEqual([0, 255, 0, 255]);
+    expect(at(result, 1, 3)[3]).toBe(0);
+    expect(at(result, 31, 3)[3]).toBe(0);
+    expect(result.sourceBounds.right).toBeLessThan(30);
+  });
+  test("effective run picture resources fail before native allocation and unused inherited assets do not", () => {
+    const input = options(),
+      make = vi.fn(),
+      decode = vi.fn();
+    const picture: ShapePaint = {
+      kind: "picture",
+      assetId: "selected-glyph",
+      opacity: 1,
+      rotateWithShape: true,
+      layout: { kind: "stretch", offsetXRatio: 0, offsetYRatio: 0, widthRatio: 1, heightRatio: 1 },
+    };
+    input.layout.runs[0]!.fill = { kind: "value", value: picture };
+    expect(
+      prepareShapeTextPaint({
+        ...input,
+        canvasFactory: make,
+        resources: { getAssetImage: decode },
+      }),
+    ).toMatchObject({ kind: "unavailable", missingAssetIds: ["selected-glyph"] });
+    expect(make).not.toHaveBeenCalled();
+    expect(decode).not.toHaveBeenCalled();
+    input.layout.runs[0]!.color = "#ff0000";
+    expect(
+      planShapeTextPaint({ ...input, style: { fill: { kind: "value", value: picture } } }).assetIds,
+    ).toEqual([]);
+  });
+  test("run outline participates in source bounds and captured painted alpha", () => {
+    const input = options();
+    input.layout = layout([{ ...run("a"), fill: { kind: "none" }, line: line("#0000ff", 1.5) }]);
+    const result = ready(
+      prepareShapeTextPaint({ ...input, captureSilhouette: true, canvasFactory: factory().make }),
+    );
+    owned.push(result);
+    expect(result.sourceBounds.left).toBeLessThan(2);
+    expect(result.silhouette?.contours[0]?.area).toBeGreaterThan(16);
+    expect(result.silhouette?.contours.some((contour) => contour.area < 0)).toBe(true);
+  });
+  test("selected gradient sampling retains the uniform drawing coordinate system", () => {
+    const input = options();
+    input.layout = layout([
+      { ...run("a"), line: { kind: "none" } },
+      { ...run("b"), x: 10, inkBounds: { x: 10, y: 2, width: 4, height: 5 } },
+    ]);
+    const gradient: ShapePaint = {
+      kind: "linear",
+      opacity: 1,
+      rotateWithShape: true,
+      angleDeg: 0,
+      stops: [
+        { offset: 0, color: { kind: "rgb", rgb: "#ff0000" }, opacity: 1, brightness: 0 },
+        { offset: 1, color: { kind: "rgb", rgb: "#0000ff" }, opacity: 1, brightness: 0 },
+      ],
+    };
+    const uniform = paint(
+      { ...input, style: { fill: { kind: "value", value: gradient } } },
+      factory().make,
+    );
+    input.layout.runs[1]!.fill = { kind: "value", value: gradient };
+    const selected = paint(input, factory().make);
+    expect(at(selected, 11, 3)).toEqual(at(uniform, 11, 3));
+    expect(at(selected, 13, 3)).toEqual(at(uniform, 13, 3));
+    expect(at(selected, 3, 3)).toEqual([18, 52, 86, 255]);
+  });
+  test("selected picture fill and picture outline decode their own real assets", () => {
+    const input = options(),
+      native = factory(),
+      image = new MemoryCanvas();
+    image.width = 1;
+    image.height = 1;
+    image.data.set([255, 0, 255, 255]);
+    const picture: ShapePaint = {
+      kind: "picture",
+      assetId: "selected-texture",
+      opacity: 1,
+      rotateWithShape: true,
+      layout: { kind: "stretch", offsetXRatio: 0, offsetYRatio: 0, widthRatio: 1, heightRatio: 1 },
+    };
+    input.layout = layout([
+      { ...run("a"), fill: { kind: "value", value: picture } },
+      {
+        ...run("b"),
+        x: 10,
+        inkBounds: { x: 10, y: 2, width: 4, height: 5 },
+        line: { ...line(), value: { ...line().value, paint: picture } },
+      },
+    ]);
+    const result = paint(
+      {
+        ...input,
+        resources: {
+          getAssetSize: () => ({ width: 1, height: 1 }),
+          getAssetImage: () => image as unknown as HTMLCanvasElement,
+        },
+      },
+      native.make,
+    );
+    expect(result.assetIds).toEqual(["selected-texture"]);
+    expect(at(result, 3, 3)).toEqual([255, 0, 255, 255]);
+    expect(at(result, 9, 3)).toEqual([255, 0, 255, 255]);
+    expect(at(result, 11, 3)).toEqual([18, 52, 86, 255]);
+  });
+  test("run fill/outline content changes invalidate otherwise identical paint cache keys", () => {
+    const input = options(),
+      native = factory();
+    vi.stubGlobal("document", { createElement: () => native.make() });
+    input.layout.runs[0]!.fill = { kind: "value", value: solid("#ff0000") };
+    input.layout.runs[0]!.line = line("#0000ff");
+    const first = ready(prepareShapeTextPaint({ ...input, key: "same-font-owner" }));
+    owned.push(first);
+    const calls = native.calls().length;
+    input.layout.runs[0]!.fill = { kind: "value", value: solid("#00ff00") };
+    input.layout.runs[0]!.line = line("#ff0000");
+    const second = ready(prepareShapeTextPaint({ ...input, key: "same-font-owner" }));
+    owned.push(second);
+    expect(native.calls().length).toBeGreaterThan(calls);
+    expect(at(first, 5, 3)).toEqual([255, 0, 0, 255]);
+    expect(at(second, 5, 3)).toEqual([0, 255, 0, 255]);
+    expect(at(second, 1, 3)).toEqual([255, 0, 0, 255]);
+  });
+  test("uniform glow consumes selected outline-only alpha with no body plate", () => {
+    const input = options();
+    input.layout = layout([{ ...run("a"), fill: { kind: "none" }, line: line() }]);
+    const result = paint(
+      {
+        ...input,
+        style: {
+          glow: {
+            kind: "value",
+            value: { color: { kind: "rgb", rgb: "#ff0000" }, opacity: 1, sizePt: 1.5 },
+          },
+        },
+      },
+      factory().make,
+    );
+    expect(at(result, 1, 3)).toEqual([0, 0, 255, 255]);
+    expect(at(result, 0, 3)[3]).toBeGreaterThan(0);
+    expect(at(result, 0, 3)[0]).toBeGreaterThan(0);
+    expect(at(result, 18, 14)[3]).toBe(0);
+  });
+  test("local outline changes have real projected glyph geometry", () => {
+    const input = options();
+    input.layout = layout([{ ...run("a"), fill: { kind: "none" }, line: line() }]);
+    const result = paint({ ...input, style: glyph3dStyle() }, factory().make);
+    expect(result.requiresGlyphProjection).toBe(true);
+    expect(result.glyphGeometry?.paths[0]?.commands.length).toBeGreaterThan(0);
+    expect(result.glyphGeometry?.paths[0]?.commands).not.toEqual([
+      ["M", 0, 0],
+      ["L", 20, 0],
+      ["L", 20, 16],
+      ["L", 0, 16],
+      ["Z"],
+    ]);
+  });
+  test("local outline spans and nested paint data have explicit aggregate preflight bounds", () => {
+    const input = options(),
+      localLine = line();
+    input.layout.runs[0]!.line = localLine;
+    const detached = planShapeTextPaint(input);
+    localLine.value.widthPt = 12;
+    localLine.value.paint.opacity = 0;
+    expect(detached.runs[0]!.line).toMatchObject({
+      value: { widthPt: 1.5, paint: { opacity: 1 } },
+    });
+    expect(Object.isFrozen(detached.runs[0]!.line)).toBe(true);
+    input.drawing.width = 1024;
+    input.drawing.height = 1024;
+    input.layout = layout(
+      Array.from({ length: 100 }, (_, index) => ({
+        ...run("x"),
+        line: line(index % 2 ? "#ff0000" : "#0000ff"),
+        inkBounds: { x: 0, y: 0, width: 1024, height: 1024 },
+      })),
+    );
+    expect(() => planShapeTextPaint(input)).toThrow(/raster-span work budget/);
+  });
+  test("local compound outline preflight traces only selected glyphs", () => {
+    const input = options(),
+      native = factory();
+    const selected = separatedRuns();
+    selected[0]!.line = { ...line(), value: { ...line().value, compound: "double", dash: "dash" } };
+    input.layout = layout(selected);
+    const proof = preflightShapeTextGlyphBudgets({ ...input, canvasFactory: native.make });
+    expect(proof).toMatchObject({ kind: "ready", proof: "native-alpha-outline", contourCount: 1 });
+    expect(native.calls().map((call) => call.text)).toEqual(["alpha"]);
+  });
+});

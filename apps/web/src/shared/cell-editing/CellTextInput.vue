@@ -35,6 +35,7 @@ const emit = defineEmits<{
   compositionStart: [event: CompositionEvent];
   compositionEnd: [value: string, event: CompositionEvent];
   fontError: [family: string];
+  clipboardCopy: [];
 }>();
 const root = ref<HTMLDivElement>();
 let composing = false;
@@ -257,6 +258,7 @@ function onCopy(event: ClipboardEvent, cut = false): void {
     selection.end,
   );
   if (!writeCellTextClipboard(event.clipboardData, document)) return;
+  emit("clipboardCopy");
   if (cut && editable()) applyText("", document.start, document.end, "deleteByCut");
 }
 

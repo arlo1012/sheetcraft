@@ -35,6 +35,7 @@ import {
 } from "./shape-format-pane-model";
 import {
   drawingShapeTextValues,
+  drawingShapeTextPaintValues,
   drawingShapeTextCharacterValues,
   editDrawingShapeTextField,
   materializeDrawingShapeText,
@@ -132,11 +133,13 @@ export function useOwnedShapeFormatPane(options: {
       owner = selected.value,
       view = context.value?.view;
     if (!d || !owner || !view) return null;
+    const theme = owner.workbook.theme;
     const properties = getShapeObjectProperties(
       isFramedShapeDrawing(d) ? d.shapeProperties : undefined,
     );
     const bodyStyle = resolveShapeDetailedPaintStyle(view),
-      textStyle = resolveShapeTextPaintStyle(view);
+      glyph = drawingShapeTextPaintValues(view, resolveShapeTextPaintStyle(view)),
+      textStyle = glyph.style;
     // WPS's two rotation sections edit one body camera. Saved independent
     // glyph cameras remain on shapeText and in their existing paint consumer.
     if (bodyStyle.rotation3d) textStyle.rotation3d = bodyStyle.rotation3d;
@@ -161,9 +164,9 @@ export function useOwnedShapeFormatPane(options: {
         ...properties,
         anchor: anchorValue(isFramedShapeDrawing(d) ? d.shapeFrame.anchor.mode : "move-only"),
         rotationDeg: d.rotation,
-        ...drawingShapeTextValues(view),
+        ...drawingShapeTextValues(view, theme),
       },
-      mixedFields: drawingShapeTextCharacterValues(view).mixedFields,
+      mixedFields: drawingShapeTextCharacterValues(view, theme).mixedFields,
       shapeStyle:
         d.kind === "shape"
           ? bodyStyle
@@ -171,6 +174,7 @@ export function useOwnedShapeFormatPane(options: {
             ? { rotation3d: bodyStyle.rotation3d }
             : {},
       textStyle,
+      ...(glyph.mixed.length ? { mixedStyleCategories: { text: glyph.mixed } } : {}),
       independentTextCameraCount: view.shapeText?.style?.rotation3d?.kind === "value" ? 1 : 0,
       ...(acknowledged.value?.drawing === d && acknowledged.value.revision === revision
         ? { acceptedIntentId: acknowledged.value.id }
@@ -432,7 +436,9 @@ export function useOwnedShapeFormatPane(options: {
         if (capabilities.value.styles?.[intent.target]?.[intent.category]?.enabled !== true)
           return false;
         if (intent.target === "text" && intent.category === "fill")
-          next = withoutDrawingShapeTextCharacterProperties(next, ["color"]);
+          next = withoutDrawingShapeTextCharacterProperties(next, ["color", "fill"]);
+        if (intent.target === "text" && intent.category === "line")
+          next = withoutDrawingShapeTextCharacterProperties(next, ["line"]);
         const text =
           intent.target === "text" && intent.category !== "rotation3d"
             ? materializeDrawingShapeText(next)

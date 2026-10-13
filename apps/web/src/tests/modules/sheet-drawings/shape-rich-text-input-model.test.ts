@@ -179,4 +179,64 @@ describe("shape rich text input model", () => {
     expect(empty.source).toEqual({ text: "" });
     expect(shapeRichTextSourcesEqual(snapshot().source, { text: "abcd" })).toBe(false);
   });
+  test("local fill and outline inherit through typing and IME as detached data", () => {
+    const state = snapshot({
+      source: {
+        text: "ab",
+        characterRuns: [
+          {
+            start: 0,
+            end: 1,
+            fill: {
+              kind: "value",
+              value: { kind: "solid", color: { kind: "rgb", rgb: "#ff0000" }, opacity: 0.5 },
+            },
+            line: { kind: "none" },
+          },
+        ],
+      },
+      selection: { start: 1, end: 1, direction: "none" },
+    });
+    const typed = replaceShapeRichTextSelection(state, state.selection, "X");
+    expect(typed.source.characterRuns).toEqual([{ ...state.source.characterRuns![0], end: 2 }]);
+    expect(reconcileShapeRichTextComposition(state, "a中b").source.characterRuns).toEqual(
+      typed.source.characterRuns,
+    );
+    const fill = typed.source.characterRuns![0]!.fill;
+    if (fill?.kind !== "value" || fill.value.kind !== "solid" || fill.value.color.kind !== "rgb")
+      throw Error("solid");
+    fill.value.color.rgb = "#ffffff";
+    expect(state.source.characterRuns![0]!.fill).toMatchObject({
+      value: { color: { rgb: "#FF0000" } },
+    });
+  });
+  test("same-text appearance Undo and pending format copies include nested paint trees", () => {
+    const first = snapshot(),
+      styled = snapshot({
+        source: {
+          text: "abcd",
+          characterRuns: [{ start: 0, end: 4, fill: { kind: "none" }, line: { kind: "none" } }],
+        },
+        pendingFormat: {
+          fill: {
+            kind: "value",
+            value: { kind: "solid", color: { kind: "rgb", rgb: "#ff0000" }, opacity: 1 },
+          },
+          line: { kind: "none" },
+        },
+      });
+    const history = new ShapeRichTextInputHistory(first);
+    history.record(styled);
+    expect(history.step("undo")).toEqual(first);
+    const restored = history.step("redo")!;
+    expect(restored).toEqual(styled);
+    const fill = restored.pendingFormat!.fill;
+    if (fill?.kind !== "value" || fill.value.kind !== "solid" || fill.value.color.kind !== "rgb")
+      throw Error("solid");
+    fill.value.color.rgb = "#ffffff";
+    expect(history.current.pendingFormat!.fill).toMatchObject({
+      value: { color: { rgb: "#FF0000" } },
+    });
+    expect(shapeRichTextSourcesEqual(first.source, styled.source)).toBe(false);
+  });
 });

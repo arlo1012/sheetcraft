@@ -28,6 +28,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  clipboardCopy: [];
   "update:modelValue": [value: string];
   keydown: [event: KeyboardEvent];
   blur: [event: FocusEvent];
@@ -338,6 +339,7 @@ defineExpose({
     @dblclick.stop
   >
     <CellTextInput
+      @clipboard-copy="emit('clipboardCopy')"
       v-if="useRichText && editSession"
       ref="richInputRef"
       class="cell-editor is-editing"

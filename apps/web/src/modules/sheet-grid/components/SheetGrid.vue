@@ -321,6 +321,15 @@ const props = withDefaults(
       drawing: import("../../sheet-drawings/useShapeCreation").ShapeCreationDraft,
     ) => boolean;
     shapeCreationCancel?: (request: ShapeCreationRequest) => void;
+    copyShapeObjects?: (
+      paths: readonly import("@sheetcraft/core/shape-group").ShapeGroupPath[],
+    ) => boolean;
+    cutShapeObjects?: (
+      paths: readonly import("@sheetcraft/core/shape-group").ShapeGroupPath[],
+    ) => boolean;
+    pasteShapeObjects?: () => boolean;
+    canPasteShapeObjects?: boolean;
+    captureClipboardCopy?: () => () => void;
     shapeTextEditSnapshot?: ShapeTextEditSnapshot | null;
     shapeTextEditCallbacks?: ShapeTextEditCallbacks;
     shapeTextEditStart?: (request: ShapeCanvasTextEditRequest) => boolean;
@@ -449,6 +458,7 @@ const emit = defineEmits<{
   commitCell: [payload: CellEditCommit];
   clearCells: [range: CellRange];
   clipboardFeedback: [feedback: GridClipboardFeedback];
+  clipboardCopy: [];
   resizeDimension: [payload: { axis: SheetDimensionAxis; index: number; size: number }];
   insertAxis: [payload: { axis: SheetDimensionAxis; index: number; count: number }];
   deleteAxis: [payload: { axis: SheetDimensionAxis; index: number; count: number }];
@@ -2296,6 +2306,7 @@ const {
     floatingClipboard.observeTransfer(transfer);
     ownedClipboard.observeTransfer(transfer, ownedClipboard.getIdentity());
   },
+  capturePreparedSelection: () => props.captureClipboardCopy?.(),
   onPreparedSelection: () => {
     floatingClipboard.clear();
     ownedClipboard.clear();
@@ -2369,6 +2380,7 @@ const floatingClipboard = useFloatingImageClipboard({
   getRevision: () => props.workbookRevision ?? 0,
   clipboardPort: browserClipboard,
   onCopy: () => {
+    emit("clipboardCopy");
     clearPendingClipboard();
     ownedClipboard.clear();
   },
@@ -2384,6 +2396,7 @@ const ownedClipboard = useOwnedPictureClipboard({
   clipboardPort: browserClipboard,
   execute: (roots) => props.applyPictureCollectionChange?.(roots) === true,
   onCopy: () => {
+    emit("clipboardCopy");
     clearPendingClipboard();
     floatingClipboard.clear();
   },
@@ -4216,6 +4229,8 @@ defineExpose({
   selectShapeObjects: (paths: readonly import("@sheetcraft/core/shape-group").ShapeGroupPath[]) =>
     shapeDrawingLayerRef.value?.selectObjectPaths(paths) ?? false,
   getSelectedShapeObjects: () => shapeDrawingLayerRef.value?.getObjectSelectionPaths() ?? [],
+  getShapeObjectSelectionRevision: () =>
+    shapeDrawingLayerRef.value?.getObjectSelectionRevision() ?? 0,
   getDrawingLayout: (sheet: Sheet) => (props.sheet === sheet ? layout.value : undefined),
   getShapeFrameContext: (sheet: Sheet) =>
     props.sheet === sheet ? { layout: layout.value, metrics: pictureViewMetrics.value } : undefined,
@@ -4363,6 +4378,7 @@ defineExpose({
     >
       <template #active-cell="{ cellRect }">
         <CellEditor
+          @clipboard-copy="emit('clipboardCopy')"
           :scale="scale"
           ref="editorRef"
           :model-value="editingValue"
@@ -4593,6 +4609,11 @@ defineExpose({
     >
       <SheetDrawingLayer
         ref="shapeDrawingLayerRef"
+        @clipboard-copy="emit('clipboardCopy')"
+        :copy-objects="copyShapeObjects"
+        :cut-objects="cutShapeObjects"
+        :paste-objects="pasteShapeObjects"
+        :can-paste-objects="canPasteShapeObjects"
         :text-edit-snapshot="shapeTextEditSnapshot"
         :text-edit-callbacks="shapeTextEditCallbacks"
         :start-text-edit="shapeTextEditStart"

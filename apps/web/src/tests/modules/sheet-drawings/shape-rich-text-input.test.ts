@@ -2,6 +2,7 @@ import { mount, type VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { ShapeTextCharacterSource } from "@sheetcraft/core/shape-text-character-runs";
+import { DEFAULT_WORKBOOK_THEME } from "@sheetcraft/core/workbook-theme";
 import ShapeRichTextInput from "../../../modules/sheet-drawings/components/ShapeRichTextInput.vue";
 import type { ShapeRichTextSnapshot } from "../../../modules/sheet-drawings/shape-rich-text-input-model";
 import {
@@ -113,6 +114,115 @@ function savedHandler(wrapper: VueWrapper, name: string): (event: Event) => void
 }
 
 describe("controlled shape rich text surface", () => {
+  test("projects local solid red fill and blue outline with untouched black beta", async () => {
+    const f = await fixture({
+      source: {
+        text: "alpha beta",
+        characterRuns: [
+          {
+            start: 0,
+            end: 6,
+            fill: {
+              kind: "value",
+              value: { kind: "solid", color: { kind: "rgb", rgb: "#ff0000" }, opacity: 1 },
+            },
+            line: {
+              kind: "value",
+              value: {
+                paint: { kind: "solid", color: { kind: "rgb", rgb: "#0000ff" }, opacity: 1 },
+                widthPt: 0.75,
+                compound: "single",
+                dash: "solid",
+                cap: "butt",
+                join: "round",
+                miterLimit: 4,
+              },
+            },
+          },
+        ],
+      },
+      scale: 2,
+      selection: { start: 0, end: 6, direction: "backward" },
+    });
+    const alpha = f.input.children[0] as HTMLElement,
+      beta = f.input.children[1] as HTMLElement;
+    expect(alpha.style.color).toBe("rgba(255, 0, 0, 1)");
+    expect(alpha.style.getPropertyValue("-webkit-text-stroke-color")).toBe("rgba(0, 0, 255, 1)");
+    expect(alpha.style.getPropertyValue("-webkit-text-stroke-width")).toBe("2px");
+    expect(beta.style.color).toBe("#000000");
+    expect(beta.style.getPropertyValue("-webkit-text-stroke-width")).toBe("0px");
+    expect(readTextDomSelection(f.input)).toEqual({ start: 0, end: 6, direction: "backward" });
+    expect(f.input.textContent).toBe("alpha beta");
+    expect(f.update).not.toHaveBeenCalled();
+    expect(f.wrapper.emitted("preview")?.at(-1)).toEqual([false]);
+  });
+  test("theme changes repaint source without editing history or replacing its text", async () => {
+    const f = await fixture({
+      source: {
+        text: "safe <b>",
+        characterRuns: [
+          {
+            start: 0,
+            end: 8,
+            fill: {
+              kind: "value",
+              value: {
+                kind: "solid",
+                color: { kind: "theme", reference: { slot: "accent1" } },
+                opacity: 1,
+              },
+            },
+            line: { kind: "none" },
+          },
+        ],
+      },
+      selection: { start: 0, end: 8, direction: "forward" },
+    });
+    await f.wrapper.setProps({
+      theme: {
+        ...DEFAULT_WORKBOOK_THEME,
+        accentColors: [
+          "#abcdef",
+          ...DEFAULT_WORKBOOK_THEME.accentColors.slice(1),
+        ] as typeof DEFAULT_WORKBOOK_THEME.accentColors,
+      },
+    });
+    expect((f.input.firstElementChild as HTMLElement).style.color).toBe("rgba(171, 205, 239, 1)");
+    expect(f.input.querySelector("b")).toBeNull();
+    expect(f.input.textContent).toBe("safe <b>");
+    expect(f.update).not.toHaveBeenCalled();
+    expect(readTextDomSelection(f.input)?.end).toBe(8);
+  });
+  test("advanced source appearance is explicitly tagged as a preview", async () => {
+    const f = await fixture({
+      source: {
+        text: "preview",
+        characterRuns: [
+          {
+            start: 0,
+            end: 7,
+            fill: {
+              kind: "value",
+              value: {
+                kind: "pattern",
+                preset: "pct50",
+                foreground: { kind: "rgb", rgb: "#ff0000" },
+                background: { kind: "rgb", rgb: "#0000ff" },
+                opacity: 1,
+                rotateWithShape: true,
+              },
+            },
+          },
+        ],
+      },
+    });
+    expect((f.input.firstElementChild as HTMLElement).dataset.shapeTextSourcePreview).toBe(
+      "approximate",
+    );
+    expect(f.wrapper.emitted("preview")?.at(-1)).toEqual([true]);
+    expect(f.input.textContent).toBe("preview");
+    expect(f.update).not.toHaveBeenCalled();
+  });
   test("renders effective safe text-only spans with relative fonts and exact selection", async () => {
     const f = await fixture({ selection: { start: 0, end: 4, direction: "backward" } });
     expect(f.input.textContent).toBe("abCD");

@@ -201,6 +201,8 @@ export function resolveDrawingShapeText(
         underline: segment.underline!,
         strike: segment.strike!,
         ...(segment.color !== undefined ? { color: segment.color } : {}),
+        ...(segment.fill !== undefined ? { fill: segment.fill } : {}),
+        ...(segment.line !== undefined ? { line: segment.line } : {}),
       }))
     : undefined;
   const normal = options.normalLineMetrics
@@ -306,6 +308,8 @@ export const SHAPE_TEXT_AUTOFIT_LIMITS = {
 export type PrepareDrawingShapeTextCandidateOptions = DrawingShapeTextRuntimeOptions & {
   /** Set only for an explicit manual height edit, including numeric/drag resizing. */
   manualHeightChange?: boolean;
+  /** Modern source-editable WordArt turns off AutoFit after an explicit manual width change. */
+  manualWidthChange?: boolean;
   /** Canonical owners validate their disposable views through an exact inverse. */
   normalizeView?: (drawing: SheetGraphicDrawing) => SheetGraphicDrawing;
 };
@@ -319,8 +323,9 @@ export type PreparedDrawingShapeTextCandidate = {
 /**
  * One pure, synchronous candidate for the owning Core command. It never writes
  * document state/history, starts loading, or watches/changes height during paint.
- * Width and sheet anchor stay fixed. The owner preserves its rotated local top
- * edge in sheet coordinates before committing this height and every text edit
+ * Ordinary shapes keep their width. Modern rectangular no-wrap WordArt can
+ * also fit its natural width. The owner preserves its rotated local top-left
+ * point before committing fitted geometry and every text edit
  * together under the same owner CAS/history entry.
  *
  * Search samples the current height then doubles/halves to find a real fitting
@@ -338,18 +343,41 @@ export function prepareDrawingShapeTextCandidate(
     ? options.normalizeView(drawing)
     : (normalizeSheetDrawing(drawing) as SheetGraphicDrawing);
   let candidate = drawing;
-  if (options.manualHeightChange && normalized.shapeText?.layout.autoFit === "resize-shape") {
+  if (
+    (options.manualHeightChange || (normalized.wordArt && options.manualWidthChange)) &&
+    normalized.shapeText?.layout.autoFit === "resize-shape"
+  ) {
     const text = cloneShapeText(normalized.shapeText, normalized.text)!;
     text.layout.autoFit = "none";
     candidate = withDrawingShapeText(normalized, text);
   }
   // A validated unchanged source keeps its object identity. Core owns canonical
   // storage; normalizing for validation must not migrate a read-only old drawing.
-  const initial = resolveDrawingShapeText(candidate, options);
+  let initial = resolveDrawingShapeText(candidate, options);
   if (candidate.shapeText?.layout.autoFit !== "resize-shape")
     return { drawing: candidate, layout: resolvedLayout(initial), resized: false, evaluations: 1 };
 
   let evaluations = 1;
+  // Modern no-wrap rectangular WordArt fits its natural glyph advance in both
+  // axes. Ordinary shapes keep their established fixed-width AutoFit contract.
+  if (
+    candidate.wordArt &&
+    candidate.shapeGeometry?.preset === "rect" &&
+    initial.layoutOptions.direction === "horizontal" &&
+    !initial.layoutOptions.wrap
+  ) {
+    const width = Math.max(1, resolvedLayout(initial).requiredExtent.width);
+    if (!Number.isFinite(width) || width > SHAPE_TEXT_AUTOFIT_LIMITS.extentPx)
+      throw new ShapeTextRuntimeError(
+        "autofit-budget",
+        "WordArt source text exceeds the 16384px natural-width budget.",
+      );
+    if (width !== candidate.width) {
+      candidate = { ...candidate, width };
+      initial = resolveDrawingShapeText(candidate, options);
+      evaluations++;
+    }
+  }
   type Evaluation = { drawing: SheetGraphicDrawing; layout: ShapeTextLayoutResult | null };
   const atRect = (next: SheetGraphicDrawing, rect: ShapeTextRect | undefined): Evaluation => {
     // Tiny geometry/margins can yield no positive rectangle. This is a sampled
@@ -430,7 +458,7 @@ export function prepareDrawingShapeTextCandidate(
   return {
     drawing: final,
     layout: fit.layout!,
-    resized: final.height !== drawing.height,
+    resized: final.height !== drawing.height || final.width !== drawing.width,
     evaluations,
   };
 }

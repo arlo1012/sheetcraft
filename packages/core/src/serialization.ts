@@ -17,6 +17,7 @@ import {
   type PictureObject,
 } from "./picture-object.js";
 import { normalizeCellTextFontRuns } from "./text-font-runs.js";
+import { SHAPE_TEXT_CHARACTER_LIMITS } from "./shape-text-character-runs.js";
 import { normalizePivotTables, type SheetPivotTable } from "./pivot-tables.js";
 import { normalizeCellSparkline, type CellSparkline } from "./sparklines.js";
 import { normalizeSheetDrawings, type SheetDrawing } from "./sheet-drawings.js";
@@ -297,6 +298,8 @@ export type WorkbookSnapshotV67 = Omit<WorkbookSnapshotV66, "version"> & { versi
 export type WorkbookSnapshotV68 = Omit<WorkbookSnapshotV67, "version"> & { version: 68 };
 /** Retained free-path fill and text area independent of the open stroke contour. */
 export type WorkbookSnapshotV69 = Omit<WorkbookSnapshotV68, "version"> & { version: 69 };
+/** Modern ordinary-shape WordArt semantics and local glyph fill/outline choices. */
+export type WorkbookSnapshotV70 = Omit<WorkbookSnapshotV69, "version"> & { version: 70 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -324,8 +327,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV66
   | WorkbookSnapshotV67
   | WorkbookSnapshotV68
-  | WorkbookSnapshotV69;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV69, "version"> & {
+  | WorkbookSnapshotV69
+  | WorkbookSnapshotV70;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV70, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -413,7 +417,8 @@ type SnapshotVersion =
   | 66
   | 67
   | 68
-  | 69;
+  | 69
+  | 70;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -444,10 +449,11 @@ function inspectShapeSnapshotFeatures(
   value: SheetDrawing,
   path: string,
   version?: SnapshotVersion,
-): { hasScene: boolean; hasTextBox3d: boolean; hasOpenArea: boolean } {
+): { hasScene: boolean; hasTextBox3d: boolean; hasOpenArea: boolean; hasModernWordArt: boolean } {
   let hasScene = false,
     hasTextBox3d = false,
-    hasOpenArea = false;
+    hasOpenArea = false,
+    hasModernWordArt = false;
   const pending: { value: unknown; depth: number }[] = [{ value, depth: 0 }];
   const seen = new WeakSet<object>();
   let count = 0;
@@ -459,6 +465,33 @@ function inspectShapeSnapshotFeatures(
       const node = asRecord(entry.value, path);
       if (seen.has(node)) throw new TypeError("Cyclic or shared shape group ownership.");
       seen.add(node);
+      if ("wordArt" in node) {
+        if (version !== undefined && version < 70)
+          return fail(path, "Modern WordArt semantics require snapshot version 70.");
+        hasModernWordArt ||= Object.getOwnPropertyDescriptor(node, "wordArt")?.value === true;
+      }
+      const textField = Object.getOwnPropertyDescriptor(node, "shapeText");
+      const textModel: unknown = textField && "value" in textField ? textField.value : undefined;
+      if (textModel && typeof textModel === "object") {
+        const runsField = Object.getOwnPropertyDescriptor(textModel, "characterRuns");
+        const rawRuns: unknown = runsField && "value" in runsField ? runsField.value : undefined;
+        if (Array.isArray(rawRuns)) {
+          const runs = readPictureDataArray(
+            rawRuns,
+            "snapshot shape character runs",
+            SHAPE_TEXT_CHARACTER_LIMITS.runs,
+          );
+          for (const run of runs) {
+            if (!run || typeof run !== "object" || (!("fill" in run) && !("line" in run))) continue;
+            if (version !== undefined && version < 70)
+              return fail(
+                path,
+                "Local shape character fill and outline require snapshot version 70.",
+              );
+            hasModernWordArt = true;
+          }
+        }
+      }
       const shapePath = Object.getOwnPropertyDescriptor(node, "shapePath");
       const rawPath: unknown = shapePath && "value" in shapePath ? shapePath.value : undefined;
       if (rawPath && typeof rawPath === "object" && "openArea" in rawPath) {
@@ -510,7 +543,7 @@ function inspectShapeSnapshotFeatures(
     if (error instanceof WorkbookDomainError) throw error;
     return fail(path, error instanceof Error ? error.message : "Invalid shape group 3D.");
   }
-  return { hasScene, hasTextBox3d, hasOpenArea };
+  return { hasScene, hasTextBox3d, hasOpenArea, hasModernWordArt };
 }
 
 /** Raw admission is bounded and descriptor-safe, including nested malformed owner graphs. */
@@ -1604,6 +1637,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   let hasShapeGroup3d = false;
   let hasTextBoxBody3d = false;
   let hasOpenShapeArea = false;
+  let hasModernWordArt = false;
   // Inspect presence before old protocols can silently drop a shape-only feature.
   if (Array.isArray(record.drawings)) {
     for (const [index, drawing] of record.drawings.entries()) {
@@ -1616,6 +1650,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       hasShapeGroup3d ||= scene.hasScene;
       hasTextBoxBody3d ||= scene.hasTextBox3d;
       hasOpenShapeArea ||= scene.hasOpenArea;
+      hasModernWordArt ||= scene.hasModernWordArt;
       const oldTextField = Object.getOwnPropertyDescriptor(item, "shapeText");
       if (
         "shapeText" in item &&
@@ -2004,6 +2039,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasShapeGroup3d) version = 67;
     if (hasTextBoxBody3d) version = 68;
     if (hasOpenShapeArea) version = 69;
+    if (hasModernWordArt) version = 70;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -2282,6 +2318,14 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 69;
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasModernWordArt,
+      ),
+    )
+  )
+    snapshot.version = 70;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -2358,7 +2402,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 66 &&
     record.version !== 67 &&
     record.version !== 68 &&
-    record.version !== 69
+    record.version !== 69 &&
+    record.version !== 70
   ) {
     throw new WorkbookDomainError(
       {

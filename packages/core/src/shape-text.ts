@@ -218,5 +218,13 @@ export function areShapeTextsEqual(
   );
 }
 export function getShapeTextAssetIds(value: ShapeText | undefined, ownerText?: string): string[] {
-  return getShapeStyleAssetIds(normalizeShapeText(value, ownerText)?.style);
+  const normalized = normalizeShapeText(value, ownerText);
+  const ids = new Set(getShapeStyleAssetIds(normalized?.style));
+  for (const run of normalized?.characterRuns ?? [])
+    for (const id of getShapeStyleAssetIds({
+      ...(run.fill ? { fill: run.fill } : {}),
+      ...(run.line ? { line: run.line } : {}),
+    }))
+      ids.add(id);
+  return [...ids];
 }

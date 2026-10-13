@@ -217,6 +217,7 @@ export function useGridClipboard(options: {
     kind: GridPasteKind,
   ) => boolean;
   onPreparedSelection?: () => void;
+  capturePreparedSelection?: () => (() => void) | undefined;
 }) {
   const clipboardPort = options.clipboardPort ?? createBrowserGridClipboardPort();
   const pendingClipboard = shallowRef<PendingClipboard | null>(null);
@@ -351,7 +352,8 @@ export function useGridClipboard(options: {
     };
   }
 
-  function commitPreparedSelection(prepared: PendingClipboard): void {
+  function commitPreparedSelection(prepared: PendingClipboard, accepted?: () => void): void {
+    accepted?.();
     options.onPreparedSelection?.();
     pendingClipboard.value = prepared;
     options.onFeedback(prepared.mode === "cut" ? "readyToMove" : "copied");
@@ -372,10 +374,11 @@ export function useGridClipboard(options: {
       return;
     }
 
+    const accepted = options.capturePreparedSelection?.();
     event.clipboardData.setData("text/plain", prepared.text);
     event.clipboardData.setData(SHEETCRAFT_CLIPBOARD_TYPE, prepared.token);
     clipboardOperation += 1;
-    commitPreparedSelection({ ...prepared, localTokenWritten: true });
+    commitPreparedSelection({ ...prepared, localTokenWritten: true }, accepted);
     // Native MIME data is not exposed by every browser's Async Clipboard API.
     // Keep the successful event payload if the optional rich write is unsupported.
     nativeWrite = clipboardPort
@@ -388,6 +391,7 @@ export function useGridClipboard(options: {
     if (!prepared) {
       return;
     }
+    const accepted = options.capturePreparedSelection?.();
     const operation = ++clipboardOperation;
     const sheetId = options.getSheet().id;
     let localTokenWritten: boolean;
@@ -401,7 +405,7 @@ export function useGridClipboard(options: {
     } catch {
       if (operation === clipboardOperation && options.getSheet().id === sheetId) {
         // Browser clipboard denial must not discard the in-memory menu copy/cut.
-        commitPreparedSelection(prepared);
+        commitPreparedSelection(prepared, accepted);
       }
       return;
     }
@@ -412,11 +416,14 @@ export function useGridClipboard(options: {
       options.onFeedback("documentChanged");
       return;
     }
-    commitPreparedSelection({
-      ...prepared,
-      mode,
-      localTokenWritten,
-    });
+    commitPreparedSelection(
+      {
+        ...prepared,
+        mode,
+        localTokenWritten,
+      },
+      accepted,
+    );
   }
 
   function onCopy(event: ClipboardEvent): void {

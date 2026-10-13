@@ -41,6 +41,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  clipboardCopy: [];
   navigate: [address: string];
   commitCell: [payload: CellEditCommit];
   traverse: [
@@ -505,6 +506,7 @@ defineExpose({
           }}
         </span>
         <CellTextInput
+          @clipboard-copy="emit('clipboardCopy')"
           v-if="useRichText"
           ref="richInputRef"
           class="workbook-formula-bar__rich-input"

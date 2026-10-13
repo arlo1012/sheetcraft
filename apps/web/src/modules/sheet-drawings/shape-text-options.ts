@@ -1,6 +1,7 @@
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   getShapeTextCharacterSegments,
+  normalizeShapeTextCharacterFormat,
   stripShapeTextCharacterProperties,
   type ShapeTextCharacterFormat,
   type ShapeTextCharacterSource,
@@ -8,6 +9,8 @@ import {
 } from "@sheetcraft/core/shape-text-character-runs";
 import type { ShapeFormatField, ShapeFormatValues } from "./shape-format-pane-model";
 import { cloneShapeText, normalizeShapeText, type ShapeText } from "@sheetcraft/core/shape-text";
+import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import { resolvePictureColor } from "../../shared/images/picture-paint-color";
 
 /** This is the existing application text stack, not a claimed available font face. */
 export const INHERITED_SHAPE_FONT_FAMILY =
@@ -83,15 +86,29 @@ export function drawingShapeTextCharacterSource(
 export function drawingShapeTextBaseCharacterFormat(
   drawing: SheetGraphicDrawing,
 ): ShapeTextCharacterFormat {
-  return {
+  const style = drawing.shapeText?.style;
+  return normalizeShapeTextCharacterFormat({
     fontFamily: getDrawingShapeTextFamily(drawing),
     fontSize: drawing.fontSize,
     bold: drawing.bold,
     italic: drawing.italic,
     underline: drawing.shapeText?.underline === true,
     strike: drawing.shapeText?.strike === true,
-    color: drawing.color,
-  };
+    ...(style?.fill !== undefined ? { fill: style.fill } : { color: drawing.color }),
+    line: style?.line ?? { kind: "none" },
+  });
+}
+
+/** Basic color swatch readback; advanced fill is not a fabricated solid color. */
+export function shapeTextCharacterColorValue(
+  format: ShapeTextCharacterFormat,
+  theme: WorkbookTheme = DEFAULT_WORKBOOK_THEME,
+): string {
+  if (format.color !== undefined) return format.color;
+  if (format.fill?.kind === "none") return "transparent";
+  if (format.fill?.kind !== "value" || format.fill.value.kind !== "solid") return "";
+  const rgb = resolvePictureColor(format.fill.value.color, theme);
+  return `#${rgb.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
 }
 const characterFields = {
   fontFamily: "fontFamily",
@@ -103,7 +120,10 @@ const characterFields = {
   textColor: "color",
 } as const;
 /** Empty text still exposes its uniform insertion format. Mixed values are never a first-run impersonation. */
-export function drawingShapeTextCharacterValues(drawing: SheetGraphicDrawing): {
+export function drawingShapeTextCharacterValues(
+  drawing: SheetGraphicDrawing,
+  theme: WorkbookTheme = DEFAULT_WORKBOOK_THEME,
+): {
   values: Partial<ShapeFormatValues>;
   mixedFields: ShapeFormatField[];
 } {
@@ -116,8 +136,10 @@ export function drawingShapeTextCharacterValues(drawing: SheetGraphicDrawing): {
     keyof typeof characterFields,
     ShapeTextCharacterProperty,
   ][]) {
-    const first = candidates[0]![property];
-    if (!candidates.every((candidate) => candidate[property] === first)) mixedFields.push(field);
+    const value = (candidate: ShapeTextCharacterFormat) =>
+      field === "textColor" ? shapeTextCharacterColorValue(candidate, theme) : candidate[property];
+    const first = value(candidates[0]!);
+    if (!candidates.every((candidate) => value(candidate) === first)) mixedFields.push(field);
     else
       Object.assign(values, {
         [field]:
@@ -130,6 +152,43 @@ export function drawingShapeTextCharacterValues(drawing: SheetGraphicDrawing): {
   }
   return { values, mixedFields };
 }
+/** Read glyph categories across the actual attributed source, without selecting an arbitrary run. */
+export function drawingShapeTextPaintValues(
+  drawing: SheetGraphicDrawing,
+  uniform: import("@sheetcraft/core/shape-style").ShapeDetailedStyle,
+) {
+  const base = drawingShapeTextBaseCharacterFormat(drawing);
+  const source = drawingShapeTextCharacterSource(drawing);
+  const segments = getShapeTextCharacterSegments(source, base);
+  const candidates = segments.length ? segments : [base];
+  const style = { ...uniform };
+  const mixed: ("fill" | "line")[] = [];
+  for (const category of ["fill", "line"] as const) {
+    const entries = candidates.map((format) =>
+      category === "fill" && format.color !== undefined
+        ? format.color === "transparent"
+          ? { kind: "none" as const }
+          : {
+              kind: "value" as const,
+              value: {
+                kind: "solid" as const,
+                color: { kind: "rgb" as const, rgb: format.color.toUpperCase() },
+                opacity: 1,
+              },
+            }
+        : (format[category] ?? uniform[category]),
+    );
+    const first = entries[0];
+    if (entries.every((entry) => JSON.stringify(entry) === JSON.stringify(first)))
+      Object.assign(style, { [category]: first });
+    else {
+      delete style[category];
+      mixed.push(category);
+    }
+  }
+  return { style, mixed };
+}
+
 /** A whole-object command broadcasts only the named property, retaining unrelated range overrides. */
 export function withoutDrawingShapeTextCharacterProperties(
   drawing: SheetGraphicDrawing,
@@ -146,7 +205,10 @@ export function withoutDrawingShapeTextCharacterProperties(
   return withDrawingShapeText(drawing, model);
 }
 
-export function drawingShapeTextValues(drawing: SheetGraphicDrawing): Partial<ShapeFormatValues> {
+export function drawingShapeTextValues(
+  drawing: SheetGraphicDrawing,
+  theme: WorkbookTheme = DEFAULT_WORKBOOK_THEME,
+): Partial<ShapeFormatValues> {
   const model = materializeDrawingShapeText(drawing);
   const layout = model.layout;
   return {
@@ -166,7 +228,7 @@ export function drawingShapeTextValues(drawing: SheetGraphicDrawing): Partial<Sh
     textResizeToFit: layout.autoFit === "resize-shape",
     textOverflow: layout.overflow,
     textWrap: layout.wrap,
-    ...drawingShapeTextCharacterValues(drawing).values,
+    ...drawingShapeTextCharacterValues(drawing, theme).values,
     paragraphAlignment: model.paragraph.alignment,
     paragraphBeforePt: model.paragraph.beforePt,
     paragraphAfterPt: model.paragraph.afterPt,
@@ -186,7 +248,10 @@ export function editDrawingShapeTextField<K extends ShapeFormatField>(
 ): SheetGraphicDrawing | undefined {
   const characterProperty = characterFields[field as keyof typeof characterFields];
   drawing = characterProperty
-    ? withoutDrawingShapeTextCharacterProperties(drawing, [characterProperty])
+    ? withoutDrawingShapeTextCharacterProperties(
+        drawing,
+        characterProperty === "color" ? ["color", "fill"] : [characterProperty],
+      )
     : drawing;
   const model = materializeDrawingShapeText(drawing);
   const layout = model.layout;

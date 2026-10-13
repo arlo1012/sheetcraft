@@ -663,6 +663,39 @@ describe("attributed native shape text layout", () => {
     );
     return result;
   }
+  test("run glyph fill/outline stay distinct on equal native font tuples", () => {
+    const source = attributed("alpha beta");
+    const fill = {
+      kind: "value" as const,
+      value: {
+        kind: "solid" as const,
+        color: { kind: "rgb" as const, rgb: "#FF0000" },
+        opacity: 1,
+      },
+    };
+    const line = { kind: "none" as const };
+    source.characterSegments = [
+      { start: 0, end: 6, font: baseFont, underline: false, strike: false, fill, line },
+      { start: 6, end: 10, font: baseFont, underline: false, strike: false },
+    ];
+    const result = layoutShapeText(source);
+    expect(
+      result.runs.map((run) => [run.text, run.sourceStart, run.sourceEnd, run.fill, run.line]),
+    ).toEqual([
+      ["alpha ", 0, 6, fill, line],
+      ["beta", 6, 10, undefined, undefined],
+    ]);
+    fill.value.color.rgb = "#00ff00";
+    expect(result.runs[0]!.fill).toMatchObject({ value: { color: { rgb: "#FF0000" } } });
+  });
+  test("local glyph appearance keeps complex shaping failure explicit", () => {
+    const source = attributed("אב");
+    source.characterSegments = [
+      { start: 0, end: 1, font: baseFont, underline: false, strike: false, line: { kind: "none" } },
+      { start: 1, end: 2, font: baseFont, underline: false, strike: false },
+    ];
+    expect(errorCode(source)).toBe("unavailable-script");
+  });
   test("same text is measured separately for full resolved font tuples", () => {
     const result = layoutShapeText(attributed());
     expect(result.runs.map((run) => run.advancePx)).toEqual([30, 10]);

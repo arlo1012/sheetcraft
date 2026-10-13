@@ -1,4 +1,10 @@
 import { readPictureDataArray } from "./picture-data-array.js";
+import {
+  normalizeShapeStyle,
+  type ShapeChoice,
+  type ShapeLine,
+  type ShapePaint,
+} from "./shape-style.js";
 
 /** Missing fields inherit the drawing's uniform typography and resolved glyph fill. */
 export type ShapeTextCharacterFormat = {
@@ -9,8 +15,12 @@ export type ShapeTextCharacterFormat = {
   italic?: boolean;
   underline?: boolean;
   strike?: boolean;
-  /** A direct solid glyph override; absence inherits the complete uniform glyph fill. */
+  /** A direct solid glyph override, stronger than fill; absence inherits glyph appearance. */
   color?: string;
+  /** Sparse local glyph paint; explicit None suppresses the inherited uniform fill. */
+  fill?: ShapeChoice<ShapePaint>;
+  /** Sparse local glyph outline; explicit None suppresses the inherited uniform outline. */
+  line?: ShapeChoice<ShapeLine>;
 };
 export type ShapeTextCharacterProperty = keyof ShapeTextCharacterFormat;
 /** Half-open UTF-16 ranges in the authoritative drawing.text, never duplicate content. */
@@ -28,6 +38,8 @@ export const SHAPE_TEXT_CHARACTER_PROPERTIES = [
   "underline",
   "strike",
   "color",
+  "fill",
+  "line",
 ] as const;
 export const SHAPE_TEXT_CHARACTER_LIMITS = {
   textUnits: 100000,
@@ -92,6 +104,10 @@ function format(source: Record<string, unknown>): ShapeTextCharacterFormat {
       if (typeof value !== "string" || !/^(#[0-9a-f]{6}|transparent)$/i.test(value))
         throw new TypeError("Shape character color must be RGB or transparent.");
       result.color = value.toLowerCase();
+    } else if (key === "fill" || key === "line") {
+      const normalized = normalizeShapeStyle({ [key]: value })!;
+      if (key === "fill") result.fill = normalized.fill!;
+      else result.line = normalized.line!;
     } else {
       if (typeof value !== "boolean") throw new TypeError(`Invalid shape character ${key}.`);
       result[key] = value;
@@ -101,7 +117,52 @@ function format(source: Record<string, unknown>): ShapeTextCharacterFormat {
 }
 /** Retains explicit false and explicit values equal to the current uniform fallback. */
 export function normalizeShapeTextCharacterFormat(value: unknown): ShapeTextCharacterFormat {
-  return format(record(value, SHAPE_TEXT_CHARACTER_PROPERTIES, "character format"));
+  const source = record(value, SHAPE_TEXT_CHARACTER_PROPERTIES, "character format");
+  formatWork(source);
+  return format(source);
+}
+
+/** Charge bounded paint trees before cloning; no accessor or inherited value is read. */
+function appearanceWork(value: unknown, remaining: number): number {
+  let work = 0;
+  const pending = [{ value, depth: 0 }];
+  while (pending.length) {
+    const entry = pending.pop()!;
+    if (entry.depth > 16) throw new TypeError("Invalid shape character appearance depth.");
+    work++;
+    if (typeof entry.value === "string") work += entry.value.length;
+    else if (entry.value && typeof entry.value === "object") {
+      if (Array.isArray(entry.value)) {
+        const entries = readPictureDataArray(entry.value, "shape character paint stops", 16);
+        for (const value of entries) pending.push({ value, depth: entry.depth + 1 });
+      } else {
+        const keys = Reflect.ownKeys(entry.value);
+        if (keys.length > 32) throw new TypeError("Invalid shape character appearance fields.");
+        for (const key of keys) {
+          const field = Object.getOwnPropertyDescriptor(entry.value, key)!;
+          if (!("value" in field))
+            throw new TypeError(
+              "Shape character appearance requires own data fields, not accessors.",
+            );
+          work++;
+          pending.push({ value: field.value as unknown, depth: entry.depth + 1 });
+        }
+      }
+    }
+    if (work > remaining)
+      throw new RangeError("Shape character normalization work budget exceeded.");
+  }
+  return work;
+}
+function formatWork(
+  source: Record<string, unknown>,
+  remaining: number = SHAPE_TEXT_CHARACTER_LIMITS.workUnits,
+): number {
+  let work = typeof source.fontFamily === "string" ? source.fontFamily.length : 0;
+  for (const key of ["fill", "line"] as const)
+    if (Object.hasOwn(source, key)) work += appearanceWork(source[key], remaining - work);
+  if (work > remaining) throw new RangeError("Shape character normalization work budget exceeded.");
+  return work;
 }
 function text(value: unknown): string {
   if (typeof value !== "string") throw new TypeError("Shape character ranges require source text.");
@@ -144,16 +205,25 @@ function range(value: string, start: number, end: number, edges: Set<number>): v
 }
 function sameFormat(left: ShapeTextCharacterFormat, right: ShapeTextCharacterFormat): boolean {
   return SHAPE_TEXT_CHARACTER_PROPERTIES.every(
-    (key) => Object.hasOwn(left, key) === Object.hasOwn(right, key) && left[key] === right[key],
+    (key) =>
+      Object.hasOwn(left, key) === Object.hasOwn(right, key) &&
+      (key === "fill" || key === "line"
+        ? JSON.stringify(left[key]) === JSON.stringify(right[key])
+        : left[key] === right[key]),
   );
 }
 /** Trusted mutation output still uses the exact canonical property order. */
 function copyFormat(value: ShapeTextCharacterFormat): ShapeTextCharacterFormat {
   const result: Record<string, unknown> = {};
   for (const key of SHAPE_TEXT_CHARACTER_PROPERTIES)
-    if (Object.hasOwn(value, key)) result[key] = value[key];
+    if (Object.hasOwn(value, key))
+      result[key] =
+        key === "fill" || key === "line"
+          ? normalizeShapeStyle({ [key]: value[key] })![key]
+          : value[key];
   return result as ShapeTextCharacterFormat;
 }
+const appendedWork = new WeakMap<ShapeTextCharacterRun[], number>();
 function append(
   result: ShapeTextCharacterRun[],
   start: number,
@@ -163,7 +233,16 @@ function append(
   if (start >= end || Object.keys(override).length === 0) return;
   const previous = result.at(-1);
   if (previous && previous.end === start && sameFormat(previous, override)) previous.end = end;
-  else result.push({ start, end, ...copyFormat(override) });
+  else {
+    const work =
+      (appendedWork.get(result) ?? 0) +
+      SHAPE_TEXT_CHARACTER_PROPERTIES.length +
+      formatWork(override as Record<string, unknown>);
+    if (work > SHAPE_TEXT_CHARACTER_LIMITS.workUnits)
+      throw new RangeError("Shape character normalization work budget exceeded.");
+    appendedWork.set(result, work);
+    result.push({ start, end, ...copyFormat(override) });
+  }
 }
 function normalizedRuns(
   value: string,
@@ -191,10 +270,10 @@ function normalizedRuns(
     range(value, start, end, edges);
     if (start === end || start < previousEnd)
       throw new RangeError("Shape character runs must be ordered, nonempty and non-overlapping.");
-    const override = format(source);
-    work += override.fontFamily?.length ?? 0;
+    work += formatWork(source, SHAPE_TEXT_CHARACTER_LIMITS.workUnits - work);
     if (work > SHAPE_TEXT_CHARACTER_LIMITS.workUnits)
       throw new RangeError("Shape character normalization work budget exceeded.");
+    const override = format(source);
     append(result, start === 0 ? 0 : start, end, override);
     previousEnd = end;
   }
@@ -246,7 +325,11 @@ function projection(value: string, runs: ShapeTextCharacterRun[]): ShapeTextChar
   if (runs.length > SHAPE_TEXT_CHARACTER_LIMITS.runs)
     throw new RangeError("Shape character run budget exceeded.");
   let work = value.length + runs.length * SHAPE_TEXT_CHARACTER_PROPERTIES.length;
-  for (const run of runs) work += run.fontFamily?.length ?? 0;
+  for (const run of runs)
+    work += formatWork(
+      run as Record<string, unknown>,
+      SHAPE_TEXT_CHARACTER_LIMITS.workUnits - work,
+    );
   if (work > SHAPE_TEXT_CHARACTER_LIMITS.workUnits)
     throw new RangeError("Shape character normalization work budget exceeded.");
   return { text: value, ...(runs.length ? { characterRuns: runs } : {}) };
@@ -294,16 +377,22 @@ export function getShapeTextCharacterSegments(
   const result: ShapeTextCharacterRun[] = [];
   let offset = 0;
   for (const run of state.runs) {
-    if (offset < run.start) result.push({ start: offset, end: run.start, ...fallback });
+    if (offset < run.start) result.push({ start: offset, end: run.start, ...copyFormat(fallback) });
+    const override = format(run as Record<string, unknown>);
+    const inherited = { ...fallback };
+    // A selected advanced fill replaces the uniform editor color fallback. An
+    // authored local color remains the stronger solid override over local fill.
+    if (Object.hasOwn(override, "fill") && !Object.hasOwn(override, "color"))
+      delete inherited.color;
     result.push({
       start: run.start,
       end: run.end,
-      ...copyFormat({ ...fallback, ...format(run as Record<string, unknown>) }),
+      ...copyFormat({ ...inherited, ...override }),
     });
     offset = run.end;
   }
   if (offset < state.text.length)
-    result.push({ start: offset, end: state.text.length, ...fallback });
+    result.push({ start: offset, end: state.text.length, ...copyFormat(fallback) });
   return result;
 }
 function properties(value: readonly ShapeTextCharacterProperty[]): ShapeTextCharacterProperty[] {

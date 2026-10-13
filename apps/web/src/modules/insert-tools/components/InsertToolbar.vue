@@ -5,6 +5,8 @@ import PivotInsertTools from "../../pivot-tables/components/PivotInsertTools.vue
 import ChartInsertTools from "../../charts/components/ChartInsertTools.vue";
 import type { ChartType } from "@sheetcraft/core/sheet-charts";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import WordArtInsertMenu from "../../sheet-drawings/components/WordArtInsertMenu.vue";
+import type { WordArtStylePreset } from "../../sheet-drawings/wordart-style-presets";
 import ShapeInsertMenu from "../../sheet-drawings/components/ShapeInsertMenu.vue";
 import type { ShapeGalleryChoice } from "../../sheet-drawings/shape-gallery";
 import {
@@ -42,6 +44,7 @@ defineProps<{
   insertSymbolTextHandler?: (payload: SymbolInsertion) => boolean;
   insertShapeHandler?: (choice: ShapeGalleryChoice, continuous: boolean) => boolean;
   shapeOwnerId?: string | number;
+  insertWordArtHandler?: (choice: WordArtStylePreset) => boolean | Promise<boolean>;
 }>();
 const emit = defineEmits<{
   insertPivot: [chart: boolean];
@@ -146,7 +149,15 @@ const { t } = useAppI18n();
         @activate="emit('insertDrawing', 'icon')"
         ><Star
       /></RibbonButton>
+      <WordArtInsertMenu
+        v-if="insertWordArtHandler"
+        :disabled="imageDisabled"
+        :owner-id="shapeOwnerId"
+        :edit-session-id="editSessionId"
+        :handler="insertWordArtHandler"
+      />
       <RibbonButton
+        v-else
         variant="tall"
         :label="t('drawing.wordArt')"
         :text="t('drawing.wordArt')"

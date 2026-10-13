@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   getShapeTextCharacterSegments,
+  normalizeShapeTextCharacterFormat,
   type ShapeTextCharacterFormat,
   type ShapeTextCharacterSource,
 } from "@sheetcraft/core/shape-text-character-runs";
@@ -22,11 +23,15 @@ import {
   ShapeRichTextInputHistory,
   type ShapeRichTextSnapshot,
 } from "../shape-rich-text-input-model";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import { shapeRichTextSourceStyle } from "../shape-rich-text-source-style";
 
 const props = defineProps<{
   sessionId: number;
   source: ShapeTextCharacterSource;
   baseFormat: ShapeTextCharacterFormat;
+  theme?: WorkbookTheme;
+  scale?: number;
   pendingFormat?: ShapeTextCharacterFormat;
   selection?: Pick<TextDomSelection, "start" | "end"> &
     Partial<Pick<TextDomSelection, "direction">>;
@@ -38,6 +43,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   selection: [snapshot: { selection: TextDomSelection; pendingFormat?: ShapeTextCharacterFormat }];
   error: [message: string | undefined];
+  preview: [differs: boolean];
+  clipboardCopy: [];
 }>();
 const root = ref<HTMLElement>();
 const failure = ref<string>();
@@ -94,7 +101,9 @@ function notifySelection(): void {
   propPendingKey = JSON.stringify(props.pendingFormat);
   emit("selection", {
     selection: { ...state.selection },
-    ...(state.pendingFormat !== undefined ? { pendingFormat: { ...state.pendingFormat } } : {}),
+    ...(state.pendingFormat !== undefined
+      ? { pendingFormat: normalizeShapeTextCharacterFormat(state.pendingFormat) }
+      : {}),
   });
 }
 function captureSelection(): TextDomSelection {
@@ -117,6 +126,7 @@ function render(restoreSelection = true): void {
   if (!element || composing.value || disposed) return;
   const ownerDocument = element.ownerDocument;
   const content = ownerDocument.createDocumentFragment();
+  let previewDiffers = false;
   for (const run of getShapeTextCharacterSegments(state.source, props.baseFormat)) {
     const span = ownerDocument.createElement("span");
     if (run.fontFamily) span.style.fontFamily = run.fontFamily;
@@ -128,13 +138,22 @@ function render(restoreSelection = true): void {
       [run.underline ? "underline" : "", run.strike ? "line-through" : ""]
         .filter(Boolean)
         .join(" ") || "none";
-    if (run.color) span.style.color = run.color;
+    const appearance = shapeRichTextSourceStyle(run, props.theme, props.scale);
+    for (const [property, value] of Object.entries(appearance.style))
+      if (value !== undefined)
+        span.style.setProperty(
+          property.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`),
+          String(value),
+        );
+    previewDiffers ||= appearance.previewDiffers;
+    span.dataset.shapeTextSourcePreview = appearance.previewDiffers ? "approximate" : "solid";
     span.appendChild(ownerDocument.createTextNode(state.source.text.slice(run.start, run.end)));
     content.appendChild(span);
   }
   // A real empty text node supports a zero-length caret without persistent runs.
   if (!content.childNodes.length) content.appendChild(ownerDocument.createTextNode(""));
   element.replaceChildren(content);
+  emit("preview", previewDiffers);
   if (restoreSelection && ownerDocument.activeElement === element)
     writeTextDomSelection(element, state.selection);
 }
@@ -199,7 +218,15 @@ function reset(): void {
 }
 watch(() => props.sessionId, reset, { flush: "sync" });
 watch(
-  () => [props.source, props.selection, props.pendingFormat, props.baseFormat] as const,
+  () =>
+    [
+      props.source,
+      props.selection,
+      props.pendingFormat,
+      props.baseFormat,
+      props.theme,
+      props.scale,
+    ] as const,
   () => {
     const sourceKey = JSON.stringify(props.source);
     const selectionKey = JSON.stringify(props.selection);
@@ -470,6 +497,7 @@ const events = computed(() => {
         state.source.text.slice(selection.start, selection.end),
       );
       event.preventDefault();
+      if (selection.start !== selection.end) emit("clipboardCopy");
     },
     cut: (event: ClipboardEvent) => {
       stop(event);
@@ -480,6 +508,7 @@ const events = computed(() => {
         "text/plain",
         state.source.text.slice(selection.start, selection.end),
       );
+      if (selection.start !== selection.end) emit("clipboardCopy");
       if (!props.readOnly && selection.start !== selection.end) {
         replace(selection, "");
         clipboardMutation = "cut";

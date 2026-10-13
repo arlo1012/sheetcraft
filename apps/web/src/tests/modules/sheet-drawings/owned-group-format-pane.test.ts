@@ -256,6 +256,64 @@ function fixture(initial = group()) {
   };
 }
 
+test("group and selected leaf text swatches resolve matching RGB runs against the live theme", () => {
+  const f = fixture();
+  f.workbook.value.theme.accentColors[0] = "#abcdef";
+  for (const id of ["b", "text"]) {
+    const drawing = f.graphic(id);
+    drawing.text = "alpha beta";
+    drawing.shapeText = {
+      ...createDefaultShapeText(),
+      style: {
+        fill: {
+          kind: "value",
+          value: {
+            kind: "solid",
+            color: { kind: "theme", reference: { slot: "accent1" } },
+            opacity: 1,
+          },
+        },
+      },
+      ...(id === "b"
+        ? {
+            characterRuns: [
+              {
+                start: 0,
+                end: 6,
+                fill: {
+                  kind: "value" as const,
+                  value: {
+                    kind: "solid" as const,
+                    color: { kind: "rgb" as const, rgb: "#ABCDEF" },
+                    opacity: 1,
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+  }
+  f.revision.value++;
+  const before = JSON.stringify(f.source());
+  for (const path of [
+    ["root", "inner", "b"],
+    ["root", "inner"],
+  ]) {
+    expect(f.open(path)).toBe(true);
+    expect(f.pane.snapshot.value?.values.textColor).toBe("#abcdef");
+    expect(f.pane.snapshot.value?.mixedFields).not.toContain("textColor");
+  }
+  f.workbook.value.theme.accentColors[0] = "#fedcba";
+  expect(f.pane.snapshot.value?.values.textColor).toBeUndefined();
+  expect(f.pane.snapshot.value?.mixedFields).toContain("textColor");
+  expect(f.open(["root", "inner", "text"])).toBe(true);
+  expect(f.pane.snapshot.value?.values.textColor).toBe("#fedcba");
+  expect(f.pane.snapshot.value?.mixedFields).not.toContain("textColor");
+  expect(JSON.stringify(f.source())).toBe(before);
+  expect(f.session.history.undoStack).toHaveLength(0);
+});
+
 describe("shared group body camera pane", () => {
   test("an internal connector blocks camera values only in its actual subtree and keeps reset choices usable", () => {
     const initial = group();

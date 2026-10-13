@@ -28,7 +28,10 @@ import {
   getPictureRasterProjection,
   type PicturePaintResources,
 } from "../../shared/images/picture-detailed-render";
-import type { PictureEffectBounds } from "../../shared/images/picture-effect-geometry";
+import {
+  getPictureLineDashIntervals,
+  type PictureEffectBounds,
+} from "../../shared/images/picture-effect-geometry";
 import {
   createPictureRgbaSurface,
   softenPictureEdges,
@@ -73,6 +76,13 @@ export type ShapeTextPaintOptions = Readonly<{
   /** Capture quantized native alpha loops for an explicitly owned projection consumer. */
   captureSilhouette?: boolean;
 }>;
+type ShapeTextFillSpan = Readonly<{
+  start: number;
+  end: number;
+  color?: string;
+  fill?: ShapePaint;
+}>;
+type ShapeTextLineSpan = Readonly<{ start: number; end: number; line?: ShapeLine }>;
 type ShapeTextPaintSource = Readonly<{
   runs: readonly Readonly<ShapeTextRun>[];
   clipRect: Readonly<ShapeTextRect> | null;
@@ -80,6 +90,11 @@ type ShapeTextPaintSource = Readonly<{
   underline: boolean;
   strike: boolean;
   effectiveStyle: ShapeDetailedStyle;
+  /** Contiguous native-run ranges; all paints retain the one drawing/frame coordinate system. */
+  fillSpans: readonly ShapeTextFillSpan[];
+  lineSpans: readonly ShapeTextLineSpan[];
+  attributedFill: boolean;
+  attributedLine: boolean;
   /** Conservative visible glyph/decoration envelope, before glyph effects or body projection. */
   sourceBounds: PictureEffectBounds;
   /** Effects contain no fill/line/body categories. Native glyph paint is a separate source. */
@@ -245,6 +260,17 @@ export function resolveShapeTextPaintStyle(
   if (result.line === undefined) result.line = { kind: "none" };
   return normalizeShapeStyle(result)!;
 }
+function visibleLine(line: ShapeLine | undefined): line is ShapeLine {
+  return !!line && line.widthPt > 0 && line.paint.opacity > 0;
+}
+function richLine(line: ShapeLine | undefined): boolean {
+  return visibleLine(line) && (line.compound !== "single" || line.dash !== "solid");
+}
+function freezeAppearance<T extends object>(value: T): T {
+  for (const child of Object.values(value))
+    if (child && typeof child === "object") freezeAppearance(child);
+  return Object.freeze(value);
+}
 function prepareSource(options: ShapeTextPaintOptions) {
   const style = resolveShapeTextPaintStyle(options.drawing, options.style);
   const requiresGlyphProjection =
@@ -256,11 +282,22 @@ function prepareSource(options: ShapeTextPaintOptions) {
     throw new TypeError("Glyph layout overflow and clip ownership conflict.");
   if (layout.clipRect) checkRect(layout.clipRect);
   let units = 0,
+    appearanceBytes = 0,
     source: PictureEffectBounds | undefined;
+  const attributedFill = layout.runs.some(
+      (run) => run.color !== undefined || run.fill !== undefined,
+    ),
+    attributedLine = layout.runs.some((run) => run.line !== undefined),
+    hasRunAppearance = layout.runs.some((run) => run.fill !== undefined || run.line !== undefined),
+    fillSpans: ShapeTextFillSpan[] = [],
+    lineSpans: ShapeTextLineSpan[] = [];
+  let previousFillKey: string | undefined,
+    previousLineKey: string | undefined,
+    contourRequired = false;
   const underline = options.drawing.shapeText?.underline === true,
     strike = options.drawing.shapeText?.strike === true;
   const runs = Object.freeze(
-    layout.runs.map((run) => {
+    layout.runs.map((run, index) => {
       units += typeof run.text === "string" ? run.text.length : Infinity;
       if (
         units > SHAPE_TEXT_PAINT_LIMITS.textUnits ||
@@ -291,35 +328,71 @@ function prepareSource(options: ShapeTextPaintOptions) {
         throw new TypeError("Glyph layout requires a valid resolved native font.");
       shapeTextCanvasFont(run.font);
       checkRect(run.inkBounds);
-      source = union(source, bounds(run.inkBounds));
-      if (run.underline ?? underline)
-        source = union(source, transformedDecoration(run, decoration(run, "underline")));
-      if (run.strike ?? strike)
-        source = union(source, transformedDecoration(run, decoration(run, "strike")));
+      const appearance =
+        normalizeShapeStyle({
+          ...(run.fill !== undefined ? { fill: run.fill } : {}),
+          ...(run.line !== undefined ? { line: run.line } : {}),
+        }) ?? {};
+      freezeAppearance(appearance);
+      appearanceBytes += JSON.stringify(appearance).length * 8;
+      if (appearanceBytes > SHAPE_TEXT_PAINT_LIMITS.memoryBytes / 4)
+        throw new ShapeTextPaintPreflightError(
+          "Glyph run appearance exceeds its numeric memory budget.",
+        );
+      const fillChoice = appearance.fill ?? style.fill,
+        fill =
+          run.color === undefined && fillChoice?.kind === "value" ? fillChoice.value : undefined,
+        lineChoice = appearance.line ?? style.line,
+        line = lineChoice?.kind === "value" ? lineChoice.value : undefined,
+        fillKey = JSON.stringify([run.color, fill]),
+        lineKey = JSON.stringify(line);
+      const previousFill = fillSpans.at(-1),
+        previousLine = lineSpans.at(-1);
+      if (previousFill && previousFillKey === fillKey)
+        fillSpans[fillSpans.length - 1] = { ...previousFill, end: index + 1 };
+      else
+        fillSpans.push({
+          start: index,
+          end: index + 1,
+          ...(run.color !== undefined ? { color: run.color } : {}),
+          ...(fill ? { fill } : {}),
+        });
+      if (previousLine && previousLineKey === lineKey)
+        lineSpans[lineSpans.length - 1] = { ...previousLine, end: index + 1 };
+      else lineSpans.push({ start: index, end: index + 1, ...(line ? { line } : {}) });
+      previousFillKey = fillKey;
+      previousLineKey = lineKey;
+      contourRequired ||= richLine(line);
+      if (
+        !hasRunAppearance ||
+        (run.color !== undefined ? run.color !== "transparent" : !!fill && fill.opacity > 0) ||
+        visibleLine(line)
+      ) {
+        let runBounds = bounds(run.inkBounds);
+        if (run.underline ?? underline)
+          runBounds = union(runBounds, transformedDecoration(run, decoration(run, "underline")));
+        if (run.strike ?? strike)
+          runBounds = union(runBounds, transformedDecoration(run, decoration(run, "strike")));
+        if (visibleLine(line)) {
+          const radius = (line.widthPt * 4) / 3 / 2,
+            padding = radius * Math.max(line.miterLimit, line.cap === "square" ? Math.SQRT2 : 1);
+          runBounds = {
+            left: runBounds.left - padding,
+            top: runBounds.top - padding,
+            right: runBounds.right + padding,
+            bottom: runBounds.bottom + padding,
+          };
+        }
+        source = union(source, runBounds);
+      }
       return Object.freeze({
         ...run,
+        ...appearance,
         font: Object.freeze({ ...run.font }),
         inkBounds: Object.freeze({ ...run.inkBounds }),
       });
     }),
   );
-  const line = style.line?.kind === "value" ? style.line.value : undefined;
-  const contourRequired =
-    !!line &&
-    line.widthPt > 0 &&
-    line.paint.opacity > 0 &&
-    (line.compound !== "single" || line.dash !== "solid");
-  if (source && line && line.widthPt > 0 && line.paint.opacity > 0) {
-    const radius = (line.widthPt * 4) / 3 / 2;
-    // Compound offset miters and square caps are bounded conservatively.
-    const padding = radius * Math.max(line.miterLimit, line.cap === "square" ? Math.SQRT2 : 1);
-    source = {
-      left: source.left - padding,
-      top: source.top - padding,
-      right: source.right + padding,
-      bottom: source.bottom + padding,
-    };
-  }
   // Rich-outline contours must see original glyph alpha, rather than inventing
   // an outline along a clipped rectangle edge. Clip their final paint instead.
   if (
@@ -347,11 +420,15 @@ function prepareSource(options: ShapeTextPaintOptions) {
     overflow: layout.overflow,
     clipRect: layout.clipRect ? Object.freeze({ ...layout.clipRect }) : null,
     effectiveStyle: style,
+    fillSpans: Object.freeze(fillSpans.map((span) => Object.freeze(span))),
+    lineSpans: Object.freeze(lineSpans.map((span) => Object.freeze(span))),
+    attributedFill,
+    attributedLine,
     effectStyle,
     sourceBounds: source,
     contourRequired,
     requiresGlyphProjection,
-    sourceNumericBytes: runs.length * 512 + units * 4 + 8192,
+    sourceNumericBytes: runs.length * 640 + units * 4 + appearanceBytes + 8192,
   };
 }
 
@@ -482,7 +559,18 @@ function conservativeGlyphProjection(
 /** Pure preflight: no Canvas, font lookup, image decoding or paint callbacks. */
 export function planShapeTextPaint(options: ShapeTextPaintOptions): ShapeTextPaintPlan {
   const source = prepareSource(options),
-    assetIds = getShapeStyleAssetIds(source.effectiveStyle),
+    assetIds = [
+      ...new Set([
+        ...source.fillSpans.flatMap((span) =>
+          getShapeStyleAssetIds(span.fill ? { fill: { kind: "value", value: span.fill } } : {}),
+        ),
+        ...source.lineSpans.flatMap((span) =>
+          getShapeStyleAssetIds(
+            visibleLine(span.line) ? { line: { kind: "value", value: span.line } } : {},
+          ),
+        ),
+      ]),
+    ],
     missingAssetIds: string[] = [];
   for (const id of assetIds) {
     const size = options.resources?.getAssetSize?.(id);
@@ -573,21 +661,19 @@ export function planShapeTextPaint(options: ShapeTextPaintOptions): ShapeTextPai
         "Glyph contour reconstruction cannot fit its conservative bounds budget.",
       );
   }
-  if (source.runs.some((run) => run.color !== undefined)) {
-    let spans = 0,
-      previousColor: string | undefined,
-      first = true;
-    for (const run of source.runs) {
-      if (first || run.color !== previousColor) spans++;
-      first = false;
-      previousColor = run.color;
-    }
+  if (source.attributedFill || source.attributedLine) {
+    // Bound every span clear/read/sample/mask/compose and contour scan. Scratch
+    // surfaces are reused, so appearance diversity increases work, not live pixels.
+    const scans =
+      4 +
+      (source.attributedFill ? source.fillSpans.length * 8 : 0) +
+      source.lineSpans.filter((span) => visibleLine(span.line)).length * 12;
     if (
-      raster.frontWidthRaster * raster.frontHeightRaster * (4 + spans * 4) >
+      raster.frontWidthRaster * raster.frontHeightRaster * scans >
       SHAPE_TEXT_PAINT_LIMITS.rasterWork
     )
       throw new ShapeTextPaintPreflightError(
-        "Attributed glyph fill exceeds its bounded raster-span work budget.",
+        "Attributed glyph fill/outline exceeds its bounded raster-span work budget.",
       );
   }
   const sourceScratchBytes =
@@ -660,6 +746,35 @@ function nativeMask(
     }
   } finally {
     context.restore();
+  }
+}
+type OutlineContourTotals = { contours: number; edges: number; points: number; intervals: number };
+function addOutlineContourWork(
+  totals: OutlineContourTotals,
+  silhouette: ShapeGlyphSilhouette,
+  line: ShapeLine,
+  density: number,
+): void {
+  totals.contours += silhouette.contours.length;
+  totals.edges += silhouette.edgeCount;
+  totals.points += silhouette.pointCount;
+  if (totals.contours > SHAPE_GLYPH_CONTOUR_LIMITS.contours)
+    throw new ShapeTextGlyphContourBudgetError("Glyph alpha contour exceeds its component budget.");
+  if (totals.edges > SHAPE_GLYPH_CONTOUR_LIMITS.edges)
+    throw new ShapeTextGlyphContourBudgetError(
+      "Glyph alpha contour exceeds its boundary edge budget.",
+    );
+  if (totals.points > SHAPE_GLYPH_CONTOUR_LIMITS.points)
+    throw new ShapeTextGlyphContourBudgetError(
+      "Glyph alpha contour exceeds its simplified point budget.",
+    );
+  const width = (line.widthPt * 4 * density) / 3;
+  for (const contour of silhouette.contours) {
+    totals.intervals += getPictureLineDashIntervals(contour.length, width, line.dash).length;
+    if (totals.intervals > SHAPE_GLYPH_CONTOUR_LIMITS.intervals)
+      throw new ShapeTextPaintPreflightError(
+        "Glyph contour outline exceeds its aggregate dash interval budget.",
+      );
   }
 }
 function context2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
@@ -994,13 +1109,9 @@ function prepareShapeTextPaintAtDensity(
     );
     const glyphMask = read(maskCanvas),
       silhouette =
-        plan.contourRequired || (options.captureSilhouette && !plan.requiresGlyphProjection)
-          ? traceGlyphSilhouette(glyphMask)
-          : undefined,
+        plan.contourRequired && !plan.attributedLine ? traceGlyphSilhouette(glyphMask) : undefined,
       fill =
-        plan.effectiveStyle.fill?.kind === "value" ? plan.effectiveStyle.fill.value : undefined,
-      line =
-        plan.effectiveStyle.line?.kind === "value" ? plan.effectiveStyle.line.value : undefined;
+        plan.effectiveStyle.fill?.kind === "value" ? plan.effectiveStyle.fill.value : undefined;
     if (plan.contourRequired || (options.captureSilhouette && !plan.requiresGlyphProjection))
       clipMask(glyphMask, plan);
     const paintSurface = (paint: ShapePaint) =>
@@ -1017,45 +1128,61 @@ function prepareShapeTextPaintAtDensity(
         limits: { memoryBytes: SHAPE_TEXT_PAINT_LIMITS.memoryBytes },
       });
     let source: PictureRgbaSurface;
-    if (!plan.runs.some((run) => run.color !== undefined)) {
+    const emptyMask = createPictureRgbaSurface(glyphMask.width, glyphMask.height);
+    if (!plan.attributedFill) {
       if (fill) {
         source = paintSurface(fill);
         masked(source, glyphMask);
       } else source = createPictureRgbaSurface(glyphMask.width, glyphMask.height);
     } else {
-      // Keep the original aggregate mask for the one uniform outline/effect pass.
-      // Reuse its Canvas for contiguous front-fill spans in source painter order.
       source = createPictureRgbaSurface(glyphMask.width, glyphMask.height);
-      const inheritedFill = fill ? paintSurface(fill) : undefined;
-      const emptyMask = createPictureRgbaSurface(glyphMask.width, glyphMask.height);
-      let start = 0;
-      while (start < plan.runs.length) {
-        let end = start + 1;
-        const color = plan.runs[start]!.color;
-        while (end < plan.runs.length && plan.runs[end]!.color === color) end++;
-        if (color !== "transparent" && (color !== undefined || inheritedFill)) {
-          write(maskCanvas, emptyMask);
-          nativeMask(maskContext, plan, undefined, true, plan.runs.slice(start, end));
-          overMaskedFill(source, read(maskCanvas), inheritedFill, color);
-        }
-        start = end;
+      // Each authored whole run is drawn with native shaping intact. Only the
+      // mask changes; gradient/pattern/picture sampling shares the same frame.
+      for (const span of plan.fillSpans) {
+        if (span.color === "transparent" || (span.color === undefined && !span.fill)) continue;
+        write(maskCanvas, emptyMask);
+        nativeMask(maskContext, plan, undefined, true, plan.runs.slice(span.start, span.end));
+        overMaskedFill(
+          source,
+          read(maskCanvas),
+          span.fill ? paintSurface(span.fill) : undefined,
+          span.color,
+        );
       }
     }
-    if (line && line.widthPt > 0 && line.paint.opacity > 0) {
+    const outlineSpans = plan.lineSpans.filter((span) => visibleLine(span.line));
+    if (outlineSpans.length) {
       const outlineCanvas = make(plan.frontWidthRaster, plan.frontHeightRaster),
-        outlineContext = context2d(outlineCanvas);
-      if (plan.contourRequired) {
-        strokeShapeGlyphSilhouette(outlineContext, silhouette!, line, plan.actualDensity);
-      } else {
-        outlineContext.translate(-plan.frontBoundsRaster.left, -plan.frontBoundsRaster.top);
-        outlineContext.scale(plan.actualDensity, plan.actualDensity);
-        nativeMask(outlineContext, plan, line);
+        outlineContext = context2d(outlineCanvas),
+        totals: OutlineContourTotals = { contours: 0, edges: 0, points: 0, intervals: 0 };
+      for (const span of outlineSpans) {
+        const line = span.line!;
+        write(outlineCanvas, emptyMask);
+        if (richLine(line)) {
+          let localSilhouette = silhouette;
+          if (plan.attributedLine) {
+            write(maskCanvas, emptyMask);
+            nativeMask(maskContext, plan, undefined, false, plan.runs.slice(span.start, span.end));
+            localSilhouette = traceGlyphSilhouette(read(maskCanvas));
+          }
+          addOutlineContourWork(totals, localSilhouette!, line, plan.actualDensity);
+          strokeShapeGlyphSilhouette(outlineContext, localSilhouette!, line, plan.actualDensity);
+        } else {
+          outlineContext.save();
+          try {
+            outlineContext.translate(-plan.frontBoundsRaster.left, -plan.frontBoundsRaster.top);
+            outlineContext.scale(plan.actualDensity, plan.actualDensity);
+            nativeMask(outlineContext, plan, line, true, plan.runs.slice(span.start, span.end));
+          } finally {
+            outlineContext.restore();
+          }
+        }
+        const outline = paintSurface(line.paint),
+          outlineMask = read(outlineCanvas);
+        if (richLine(line)) clipMask(outlineMask, plan);
+        masked(outline, outlineMask);
+        over(source, outline);
       }
-      const outline = paintSurface(line.paint),
-        outlineMask = read(outlineCanvas);
-      if (plan.contourRequired) clipMask(outlineMask, plan);
-      masked(outline, outlineMask);
-      over(source, outline);
       release(outlineCanvas);
     }
     // Match the compositor's order: soft edges first, then text-own3D, then
@@ -1064,17 +1191,19 @@ function prepareShapeTextPaintAtDensity(
       plan.effectStyle.softEdges?.kind === "value" ? plan.effectStyle.softEdges.value : undefined;
     if (plan.requiresGlyphProjection && softEdges && softEdges.sizePt > 0)
       source = softenPictureEdges(source, (softEdges.sizePt * 4 * plan.actualDensity) / 3);
-    const composedSilhouette = plan.requiresGlyphProjection
-      ? traceGlyphSilhouette(source)
-      : undefined;
-    const actualGlyphGeometry = composedSilhouette
-      ? createGlyphGeometry(
-          options.drawing,
-          composedSilhouette,
-          plan.frontBoundsRaster,
-          plan.actualDensity,
-        )
-      : undefined;
+    const composedSilhouette =
+      plan.requiresGlyphProjection || options.captureSilhouette
+        ? traceGlyphSilhouette(source)
+        : undefined;
+    const actualGlyphGeometry =
+      plan.requiresGlyphProjection && composedSilhouette
+        ? createGlyphGeometry(
+            options.drawing,
+            composedSilhouette,
+            plan.frontBoundsRaster,
+            plan.actualDensity,
+          )
+        : undefined;
     const baseProjection = plan.requiresGlyphProjection
       ? getPictureRasterProjection(
           plan.effectStyle,
@@ -1175,7 +1304,7 @@ function prepareShapeTextPaintAtDensity(
     const result = ownedResult(
       renderedPlan,
       resultCanvas,
-      options.captureSilhouette ? (composedSilhouette ?? silhouette) : undefined,
+      options.captureSilhouette ? composedSilhouette : undefined,
       actualGlyphGeometry,
     );
     returned = true;
@@ -1216,7 +1345,7 @@ export function preflightShapeTextGlyphBudgets(
     commands = 0,
     density = plan.actualDensity,
     peakBytes = plan.estimatedPeakBytes,
-  ): ShapeTextGlyphBudgetPreflight => ({
+  ): Extract<ShapeTextGlyphBudgetPreflight, { kind: "ready" }> => ({
     kind: "ready",
     proof,
     actualDensity: density,
@@ -1264,14 +1393,27 @@ export function preflightShapeTextGlyphBudgets(
       maskContext = context2d(maskCanvas);
     maskContext.translate(-plan.frontBoundsRaster.left, -plan.frontBoundsRaster.top);
     maskContext.scale(plan.actualDensity, plan.actualDensity);
-    // Same unclipped native mask as rich-outline rendering, never a frame box.
-    nativeMask(maskContext, plan, undefined, false);
-    const silhouette = traceGlyphSilhouette(read(maskCanvas)),
-      line = plan.effectiveStyle.line;
-    if (line?.kind !== "value")
-      throw new TypeError("Native glyph outline proof requires a detailed line.");
-    strokeShapeGlyphSilhouette(context2d(make()), silhouette, line.value, plan.actualDensity);
-    return summary("native-alpha-outline", silhouette);
+    const outlineCanvas = make(),
+      outlineContext = context2d(outlineCanvas),
+      emptyMask = createPictureRgbaSurface(plan.frontWidthRaster, plan.frontHeightRaster),
+      totals: OutlineContourTotals = { contours: 0, edges: 0, points: 0, intervals: 0 };
+    for (const span of plan.lineSpans) {
+      if (!richLine(span.line)) continue;
+      // Same selected unclipped whole-run native alpha as rendering. A line on
+      // another range must neither invent a contour nor consume this span's proof.
+      write(maskCanvas, emptyMask);
+      nativeMask(maskContext, plan, undefined, false, plan.runs.slice(span.start, span.end));
+      const silhouette = traceGlyphSilhouette(read(maskCanvas));
+      addOutlineContourWork(totals, silhouette, span.line!, plan.actualDensity);
+      write(outlineCanvas, emptyMask);
+      strokeShapeGlyphSilhouette(outlineContext, silhouette, span.line!, plan.actualDensity);
+    }
+    return {
+      ...summary("native-alpha-outline"),
+      contourCount: totals.contours,
+      edgeCount: totals.edges,
+      pointCount: totals.points,
+    };
   } finally {
     for (const canvas of canvases) release(canvas);
   }

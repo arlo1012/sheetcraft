@@ -180,6 +180,10 @@ const props = defineProps<{
   layout: SheetViewportLayout;
   scale: number;
   readOnly: boolean;
+  copyObjects?: (paths: readonly ShapeGroupPath[]) => boolean;
+  cutObjects?: (paths: readonly ShapeGroupPath[]) => boolean;
+  pasteObjects?: () => boolean;
+  canPasteObjects?: boolean;
   textEditSnapshot?: ShapeTextEditSnapshot | null;
   textEditCallbacks?: ShapeTextEditCallbacks;
   startTextEdit?: (request: ShapeCanvasTextEditRequest) => boolean;
@@ -198,10 +202,12 @@ const emit = defineEmits<{
   format: [drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing];
   backgroundPointer: [event: PointerEvent];
   controlChange: [id: string, value: unknown];
+  clipboardCopy: [];
 }>();
 const { t } = useAppI18n();
 const createId = createBrowserIdFactory();
 const selectedRoots = shallowRef<string[]>([]);
+let selectionRevision = 0;
 const selectedOwnedId = ref<string | null>(null);
 const selectionFailure = ref(false);
 const connectorFailure = ref(false);
@@ -441,7 +447,8 @@ function isSelectedView(drawing: SheetDrawing): boolean {
         selectedOwnedId.value === drawing.id
     : selectedRoots.value.includes(drawing.id);
 }
-function selectRoots(ids: string[], owned: string | null = null) {
+function selectRoots(ids: string[], owned: string | null = null, explicit = true) {
+  if (explicit) selectionRevision++;
   selectedRoots.value = ids;
   selectedOwnedId.value = owned;
   selectedId.value = ids.at(-1) ?? null;
@@ -847,8 +854,7 @@ function groupPixelContext(
     const target = groupLeafFragment(entry, fragment, hit.path.at(-1)!);
     if (target) shapeContext(target, event);
   } else {
-    event.preventDefault();
-    formatGroup(entry.source, hit.path);
+    groupClipboardContext(entry.source, hit.path, event);
   }
 }
 const fragments = computed<DrawingFragment[]>(
@@ -1194,7 +1200,11 @@ function selectObjectPaths(pathValues: readonly ShapeGroupPath[]): boolean {
     return false;
   }
 }
-defineExpose({ selectObjectPaths, getObjectSelectionPaths: objectSelectionPaths });
+defineExpose({
+  selectObjectPaths,
+  getObjectSelectionPaths: objectSelectionPaths,
+  getObjectSelectionRevision: () => selectionRevision,
+});
 const groupFragments = computed(() => {
   if (
     renderUnavailable.value ||
@@ -2402,13 +2412,16 @@ function pointContext(fragment: DrawingFragment, event: MouseEvent): void {
 const shapeTextMenu = shallowRef<{
   key: string;
   canText: boolean;
-  kind: "shape" | "textBox";
+  kind: "shape" | "textBox" | "shapeGroup";
   canObject: boolean;
   actions: {
     object: () => boolean;
     text: () => boolean;
     format: () => boolean;
     points?: () => boolean;
+    copy?: () => boolean;
+    cut?: () => boolean;
+    paste?: () => boolean;
   };
 }>();
 const shapeTextMenuAnchor = shallowRef<FloatingReference | null>(null);
@@ -2422,6 +2435,78 @@ const { floatingStyles: shapeTextMenuStyles, dismiss: dismissShapeTextMenu } = u
     shapeTextMenu.value = undefined;
   },
 });
+function clipboardMenuActions(paths: readonly ShapeGroupPath[], valid: () => boolean) {
+  const copy = props.copyObjects,
+    cut = props.cutObjects,
+    paste = props.pasteObjects;
+  const captured = paths.map((path) => [...path]);
+  const run = (callback: (() => boolean) | undefined): boolean => {
+    if (!valid() || !callback || !finishCanvasText() || !valid()) return false;
+    const accepted = callback();
+    if (accepted) dismissShapeTextMenu("programmatic", false);
+    else selectionFailure.value = true;
+    return accepted;
+  };
+  return {
+    ...(copy ? { copy: () => copy === props.copyObjects && run(() => copy(captured)) } : {}),
+    ...(cut ? { cut: () => cut === props.cutObjects && run(() => cut(captured)) } : {}),
+    ...(paste
+      ? {
+          paste: () => paste === props.pasteObjects && props.canPasteObjects === true && run(paste),
+        }
+      : {}),
+  };
+}
+function groupClipboardContext(
+  root: ShapeGroupDrawing,
+  path: ShapeGroupPath,
+  event: MouseEvent,
+): void {
+  if (
+    !props.drawings.includes(root) ||
+    !props.sheet ||
+    !canEditShapeObject(props.sheet, root) ||
+    props.readOnly
+  )
+    return;
+  event.preventDefault();
+  event.stopPropagation();
+  selectRoots([root.id], path.length > 1 ? path.at(-1)! : null);
+  const key = selectionKey.value,
+    m = metrics.value,
+    rev = props.revision;
+  const menu: NonNullable<typeof shapeTextMenu.value> = {
+    key,
+    kind: "shapeGroup",
+    canObject: false,
+    canText: false,
+    actions: {
+      object: () => false,
+      text: () => false,
+      format: () => {
+        if (!valid()) return false;
+        formatGroup(root, path);
+        dismissShapeTextMenu("programmatic", false);
+        return true;
+      },
+      ...clipboardMenuActions([path], valid),
+    },
+  };
+  function valid(): boolean {
+    return (
+      shapeTextMenu.value === menu &&
+      key === selectionKey.value &&
+      metrics.value === m &&
+      props.revision === rev &&
+      props.drawings.includes(root) &&
+      !props.readOnly &&
+      !!props.sheet &&
+      canEditShapeObject(props.sheet, root)
+    );
+  }
+  shapeTextMenuAnchor.value = createContextMenuPoint(event, event.currentTarget as Element | null);
+  shapeTextMenu.value = menu;
+}
 function shapeContext(fragment: DrawingFragment, event: MouseEvent | KeyboardEvent): void {
   const drawing = fragment.drawing;
   if (!props.startTextEdit) {
@@ -2440,7 +2525,12 @@ function shapeContext(fragment: DrawingFragment, event: MouseEvent | KeyboardEve
   if (!source) return;
   event.preventDefault();
   event.stopPropagation();
-  selectRoots([source.id], owned ? drawing.id : null);
+  if (
+    !selectedRoots.value.includes(source.id) ||
+    (selectedOwnedId.value && selectedOwnedId.value !== drawing.id)
+  )
+    selectRoots([source.id], owned ? drawing.id : null);
+  const capturedPaths = objectSelectionPaths();
   const key = selectionKey.value,
     m = metrics.value,
     rev = props.revision;
@@ -2455,6 +2545,7 @@ function shapeContext(fragment: DrawingFragment, event: MouseEvent | KeyboardEve
       textRect.width > 0 &&
       textRect.height > 0,
     actions: {
+      ...clipboardMenuActions(capturedPaths, valid),
       object: () => {
         if (!valid() || !menu.canObject || !finishCanvasText() || !valid()) return false;
         if (owned) emit("editOwned", owned.sourceRoot, owned.path);
@@ -3025,7 +3116,7 @@ watch(
     )
       activeVertex.value = 0;
     const surviving = selectedRoots.value.filter((id) => props.drawings.some((d) => d.id === id));
-    if (surviving.length !== selectedRoots.value.length) selectRoots(surviving);
+    if (surviving.length !== selectedRoots.value.length) selectRoots(surviving, null, false);
     if (
       selectedOwnedId.value &&
       (renderUnavailable.value ||
@@ -3345,12 +3436,26 @@ watch(
         :style="shapeTextMenuStyles"
         :label="locale === 'zh-CN' ? '形状操作' : 'Shape actions'"
       >
+        <MenuItem v-if="shapeTextMenu.actions.copy" v-on="{ select: shapeTextMenu.actions.copy }">{{
+          t("cellMenu.copy")
+        }}</MenuItem>
+        <MenuItem v-if="shapeTextMenu.actions.cut" v-on="{ select: shapeTextMenu.actions.cut }">{{
+          t("cellMenu.cut")
+        }}</MenuItem>
         <MenuItem
+          v-if="shapeTextMenu.actions.paste"
+          :disabled="!canPasteObjects"
+          v-on="{ select: shapeTextMenu.actions.paste }"
+          >{{ t("cellMenu.paste") }}</MenuItem
+        >
+        <MenuItem
+          v-if="shapeTextMenu.kind !== 'shapeGroup'"
           :disabled="!shapeTextMenu.canText"
           v-on="{ select: shapeTextMenu.actions.text }"
           >{{ locale === "zh-CN" ? "编辑文本" : "Edit Text" }}</MenuItem
         >
         <MenuItem
+          v-if="shapeTextMenu.kind !== 'shapeGroup'"
           :disabled="!shapeTextMenu.canObject"
           v-on="{ select: shapeTextMenu.actions.object }"
           >{{
@@ -3382,6 +3487,7 @@ watch(
         ref="canvasTextEditor"
         :key="textEditSnapshot.sessionId"
         :drawing="textEditSnapshot.draftView"
+        :theme="theme"
         :session-id="textEditSnapshot.sessionId"
         :draft="textEditSnapshot.draftText"
         :rich="textEditSnapshot.rich"
@@ -3408,7 +3514,10 @@ watch(
         :commit="canvasTextOwnerActions.commit"
         :escape="canvasTextOwnerActions.escape"
         :cancel="canvasTextOwnerActions.cancel"
-        v-on="{ requestCommit: canvasTextOwnerActions.blur }"
+        v-on="{
+          requestCommit: canvasTextOwnerActions.blur,
+          clipboardCopy: () => emit('clipboardCopy'),
+        }"
       />
     </div>
   </div>

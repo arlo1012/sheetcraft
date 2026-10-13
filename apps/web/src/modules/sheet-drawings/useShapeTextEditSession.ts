@@ -546,8 +546,12 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
       textColor: "color",
     };
     const property = formats[field];
+    if (property === "color")
+      return value === ""
+        ? format(sessionId, {}, ["color", "fill"])
+        : format(sessionId, { color: value as string }, ["fill"]);
     if (property)
-      return (property === "fontFamily" || property === "color") && value === ""
+      return property === "fontFamily" && value === ""
         ? format(sessionId, {}, [property])
         : format(sessionId, {
             [property]: field === "fontSizePt" ? ((value as number) * 4) / 3 : value,

@@ -11,6 +11,7 @@ import { shapeTextDraftSource } from "../shape-text-edit-model";
 import { drawingShapeTextBaseCharacterFormat } from "../shape-text-options";
 import ShapeRichTextInput from "./ShapeRichTextInput.vue";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import { materializeDrawingShapeText } from "../shape-text-options";
@@ -36,6 +37,7 @@ const props = withDefaults(
     textareaStyle?: CSSProperties;
     toolbarStyle?: CSSProperties;
     scale?: number;
+    theme?: WorkbookTheme;
     update: (text: string) => boolean;
     rich?: boolean;
     pendingFormat?: ShapeTextCharacterFormat;
@@ -57,7 +59,7 @@ const props = withDefaults(
   }>(),
   { locale: "en-US", disabled: false, composing: false, stale: false, scale: 1 },
 );
-const emit = defineEmits<{ requestCommit: [reason: "blur"] }>();
+const emit = defineEmits<{ requestCommit: [reason: "blur"]; clipboardCopy: [] }>();
 const root = ref<HTMLElement>();
 const input = ref<HTMLTextAreaElement>();
 const richInput = ref<InstanceType<typeof ShapeRichTextInput>>();
@@ -74,6 +76,7 @@ const errorId = `shape-canvas-text-error-${useId()}`;
 const localDraft = ref(props.draft);
 const localComposing = ref(false);
 const localFailure = ref<string>();
+const sourcePreviewDiffers = ref(false);
 const readOnly = computed(() => props.disabled || props.stale);
 const composing = computed(() => localComposing.value || props.composing);
 const textOptions = computed(() => materializeDrawingShapeText(props.drawing));
@@ -104,6 +107,7 @@ const labels = computed(() =>
         cancel: "取消",
         rejected: "无法应用更改。已保留你的文本。",
         stale: "此形状或选区已更改。你可以复制保留的文本。",
+        sourcePreview: "编辑时，渐变、图案、图片填充和复杂轮廓使用源文本预览。应用后保留完整外观。",
       }
     : {
         text: "Edit shape text",
@@ -112,6 +116,8 @@ const labels = computed(() =>
         cancel: "Cancel",
         rejected: "The change could not be applied. Your text has been kept.",
         stale: "The shape or selection changed. You can copy the retained text.",
+        sourcePreview:
+          "While editing, gradients, patterns, image fills and detailed outlines use a source text preview. Applied text keeps its full appearance.",
       },
 );
 const failure = computed(
@@ -175,6 +181,7 @@ function reset(): void {
   localDraft.value = props.draft;
   lastPublished = props.draft;
   localFailure.value = undefined;
+  sourcePreviewDiffers.value = false;
   localComposing.value = false;
   blurPending = false;
   selection = props.initialSelection
@@ -187,6 +194,7 @@ watch(() => props.sessionId, reset);
 watch(
   () => props.rich,
   () => {
+    if (!props.rich) sourcePreviewDiffers.value = false;
     const id = props.sessionId;
     void nextTick(() => focus(id));
   },
@@ -218,6 +226,9 @@ const richActions = computed(() => {
     },
     error: (message: string | undefined) => {
       if (current()) localFailure.value = message;
+    },
+    preview: (differs: boolean) => {
+      if (current()) sourcePreviewDiffers.value = differs;
     },
   };
 });
@@ -461,6 +472,8 @@ defineExpose({ focus });
       :session-id="sessionId"
       :source="shapeTextDraftSource(drawing)"
       :base-format="drawingShapeTextBaseCharacterFormat(drawing)"
+      :theme="theme"
+      :scale="scale"
       :pending-format="pendingFormat"
       :selection="
         initialSelection
@@ -478,7 +491,12 @@ defineExpose({ focus });
       data-shape-canvas-text-input
       :update="richActions.update"
       :composition="richActions.composition"
-      v-on="{ selection: richActions.selection, error: richActions.error }"
+      v-on="{
+        selection: richActions.selection,
+        error: richActions.error,
+        preview: richActions.preview,
+        clipboardCopy: () => emit('clipboardCopy'),
+      }"
     />
     <textarea
       v-else
@@ -549,6 +567,13 @@ defineExpose({ focus });
       <p v-if="failure" :id="errorId" class="shape-canvas-text-editor__failure" role="alert">
         {{ failure }}
       </p>
+      <p
+        v-if="sourcePreviewDiffers"
+        class="shape-canvas-text-editor__preview"
+        data-shape-text-source-preview-note
+      >
+        {{ labels.sourcePreview }}
+      </p>
     </FloatingPanelSurface>
   </Teleport>
 </template>
@@ -591,6 +616,13 @@ defineExpose({ focus });
     max-width: 280px;
     margin: var(--sheetcraft-space-2) 0 0;
     color: var(--sheetcraft-text-primary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
+  }
+  &__preview {
+    max-width: 280px;
+    margin: var(--sheetcraft-space-2) 0 0;
+    color: var(--sheetcraft-text-secondary);
     font-size: var(--sheetcraft-font-size-body-small);
     line-height: var(--sheetcraft-line-height-body-small);
   }

@@ -165,7 +165,7 @@ export function useOwnedShapeGroupFormatPane(options: {
       owner = selected.value;
     if (!captured || !owner) return;
     try {
-      return aggregateShapeGroupFormatSnapshot(captured, owner.baseline);
+      return aggregateShapeGroupFormatSnapshot(captured, owner.baseline, owner.workbook.theme);
     } catch {
       return;
     }

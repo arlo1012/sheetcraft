@@ -169,10 +169,14 @@ import { useShapeTextEditSession } from "../modules/sheet-drawings/useShapeTextE
 import type { ShapeCanvasTextEditRequest } from "../modules/sheet-drawings/shape-canvas-text-edit-contract";
 import { preflightShapeConnectorPaint } from "../modules/sheet-drawings/shape-connector-paint-preflight";
 import {
+  isShapeGroupDrawing,
   traverseShapeGroup,
   type ShapeGroupDrawing,
   type ShapeGroupPath,
 } from "@sheetcraft/core/shape-group";
+import { useWordArtActions } from "../modules/sheet-drawings/useWordArtActions";
+import { useShapeClipboard } from "../modules/sheet-drawings/useShapeClipboard";
+import type { ShapeClipboardFailure } from "../modules/sheet-drawings/shape-clipboard-planning";
 import { useShapeTextCharacterFormatPane } from "../modules/sheet-drawings/useShapeTextCharacterFormatPane";
 import { useOwnedShapeFormatPane } from "../modules/sheet-drawings/useOwnedShapeFormatPane";
 import { createShapePaintAssetSource } from "../modules/sheet-drawings/shape-paint-asset-source";
@@ -1843,7 +1847,7 @@ const drawingActions = useDrawingActions({
   execute: executeCommand,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   name: (kind) => t(`drawing.${kind}`),
-  prepareDrawing: (next, owner, forest) =>
+  prepareDrawing: (next, owner, forest, preparationMode) =>
     prepareShapeTextUpdate(
       next,
       owner,
@@ -1868,6 +1872,7 @@ const drawingActions = useDrawingActions({
             revision: workbookRevision.value,
           }
         : undefined,
+      preparationMode,
     ),
 });
 const { dialog: drawingDialog, editing: editingDrawing } = drawingActions;
@@ -1940,6 +1945,7 @@ const shapeTextEditCallbacks = computed(() => {
 });
 const shapeTextCharacterPane = useShapeTextCharacterFormatPane({
   getSnapshot: () => shapeTextEdit.snapshot.value,
+  getTheme: () => session.workbook.theme,
   getCallbacks: () => shapeTextEditCallbacks.value,
   getWorkbookId: () => session.workbook.id,
   getSheetId: () => activeSheet.value.id,
@@ -2009,6 +2015,7 @@ function selectedShapeGroupChanged(rootId: string | null, path: ShapeGroupPath |
 }
 const shapePaintAssets = createShapePaintAssetSource({
   getSnapshot: () =>
+    shapeTextCharacterPane.snapshot.value ??
     shapeConnectorFormatPane.snapshot.value ??
     shapeGroupFormatPane.snapshot.value ??
     shapeFormatPane.snapshot.value,
@@ -2033,16 +2040,17 @@ watch(
       shapeFormatPane.drawing.value,
       drawingDialog.value?.initial,
       shapeGroupFormatPane.root.value,
+      shapeTextEdit.snapshot.value?.draftView,
       imageAssetUrls.value,
     ] as const,
-  ([selected, edited, group, urls]) => {
+  ([selected, edited, group, draft, urls]) => {
     const retained = new Set<string>();
     const groupText = group
       ? traverseShapeGroup(group).flatMap((visit) =>
           visit.node.kind !== "shapeGroup" ? [visit.node] : [],
         )
       : [];
-    for (const textOwner of [selected, edited, ...groupText])
+    for (const textOwner of [selected, edited, draft, ...groupText])
       for (const id of getShapeTextAssetIds(textOwner?.shapeText, textOwner?.text)) {
         const url = urls.get(id);
         if (url) {
@@ -2149,6 +2157,176 @@ watch(
     shapeObjectControls.paneVisible.value = false;
   },
 );
+const shapeClipboardEpoch = ref(0);
+const shapeClipboard = useShapeClipboard({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  getMetrics: () => sheetGridRef.value?.getShapeFrameContext(activeSheet.value)?.metrics,
+  getSelectedPaths: () =>
+    sheetGridRef.value?.getSelectedShapeObjects() ?? selectedShapeObjectPaths.value,
+  getTargetAddress: () => activeAddress.value,
+  replaceCollection: drawingActions.replaceCollectionPreservingGeometry,
+  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || !!shapeTextEdit.snapshot.value,
+  onSelect: (paths) => {
+    const workbook = session.workbook,
+      sheet = activeSheet.value,
+      generation = workbookGeneration.value,
+      revision = workbookRevision.value,
+      address = { ...activeAddress.value },
+      selectionRevision = sheetGridRef.value?.getShapeObjectSelectionRevision(),
+      previous = sheetGridRef.value?.getSelectedShapeObjects() ?? [],
+      selection = paths.map((path) => [...path]),
+      roots = selection.map((path) => sheet.drawings?.find((root) => root.id === path[0]));
+    shapeClipboardEpoch.value++;
+    // Collection commits update the grid's drawings and metrics on the next Vue tick.
+    void nextTick(() => {
+      if (
+        session.workbook !== workbook ||
+        activeSheet.value !== sheet ||
+        workbookGeneration.value !== generation ||
+        workbookRevision.value !== revision ||
+        activeAddress.value.row !== address.row ||
+        activeAddress.value.column !== address.column ||
+        shapeTextEdit.snapshot.value ||
+        sheetGridRef.value?.getShapeObjectSelectionRevision() !== selectionRevision ||
+        roots.some((root) => !root || !sheet.drawings?.includes(root))
+      )
+        return;
+      const current = sheetGridRef.value?.getSelectedShapeObjects() ?? [];
+      if (JSON.stringify(current) !== JSON.stringify(previous)) {
+        // A cut can remove the old selection while the grid refreshes. Any surviving
+        // or explicitly selected replacement must retain the user's newer selection.
+        const surviving = new Set(
+          (sheet.drawings ?? []).flatMap((root) =>
+            isShapeGroupDrawing(root)
+              ? traverseShapeGroup(root).map(({ path }) => JSON.stringify(path))
+              : [JSON.stringify([root.id])],
+          ),
+        );
+        if (current.length || previous.some((path) => surviving.has(JSON.stringify(path)))) return;
+      }
+      sheetGridRef.value?.selectShapeObjects(selection);
+    });
+  },
+  onCopy: () => {
+    shapeClipboardEpoch.value++;
+  },
+  onFeedback: (reason: ShapeClipboardFailure) => {
+    const owningGroup =
+      reason === "unsupported-group-scene" || reason === "unsupported-owner-effects";
+    void MessagePlugin.warning(
+      locale.value === "zh-CN"
+        ? owningGroup
+          ? "此成员继承组的三维场景或组合效果。请复制所属组以保留完整外观。"
+          : reason === "cross-sheet-cut"
+            ? "暂不支持跨工作表剪切形状。请使用复制；原对象已保留。"
+            : "无法复制、剪切或粘贴此形状。请检查对象权限及当前选区，原对象和剪贴板已保留。"
+        : owningGroup
+          ? "Copy the owning group to retain its shared 3D scene and composited effects."
+          : reason === "cross-sheet-cut"
+            ? "Cross-sheet shape cut is not supported yet. Use Copy; the original is kept."
+            : "The shape clipboard action was not applied. Check permissions and selection; the original and clipboard are kept.",
+    );
+  },
+});
+const canPasteShapeObjects = computed(() => {
+  void shapeClipboardEpoch.value;
+  return shapeClipboard.hasPending();
+});
+const shapeClipboardHandlers = computed(() => {
+  const workbook = session.workbook,
+    sheet = activeSheet.value,
+    generation = workbookGeneration.value,
+    revision = workbookRevision.value,
+    metrics = sheetGridRef.value?.getShapeFrameContext(sheet)?.metrics,
+    address = { ...activeAddress.value };
+  const valid = () =>
+    session.workbook === workbook &&
+    activeSheet.value === sheet &&
+    generation === workbookGeneration.value &&
+    revision === workbookRevision.value &&
+    metrics === sheetGridRef.value?.getShapeFrameContext(sheet)?.metrics &&
+    address.row === activeAddress.value.row &&
+    address.column === activeAddress.value.column;
+  return {
+    copy: (paths: readonly ShapeGroupPath[]) => valid() && shapeClipboard.copy(paths),
+    cut: (paths: readonly ShapeGroupPath[]) => valid() && shapeClipboard.cut(paths),
+    paste: () => {
+      if (!valid()) return false;
+      const accepted = shapeClipboard.paste(address);
+      shapeClipboardEpoch.value++;
+      return accepted;
+    },
+  };
+});
+function clearCompetingShapeClipboard(): void {
+  if (shapeClipboard.clear()) shapeClipboardEpoch.value++;
+}
+function captureCompetingShapeClipboardCopy(): () => void {
+  const identity = shapeClipboard.getIdentity(),
+    workbook = session.workbook,
+    generation = workbookGeneration.value;
+  return () => {
+    if (
+      identity &&
+      session.workbook === workbook &&
+      workbookGeneration.value === generation &&
+      shapeClipboard.clear(identity)
+    )
+      shapeClipboardEpoch.value++;
+  };
+}
+watch(workbookGeneration, clearCompetingShapeClipboard);
+
+const wordArtActions = useWordArtActions({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  getMetrics: () => sheetGridRef.value?.getShapeFrameContext(activeSheet.value)?.metrics,
+  getAddress: () => activeAddress.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || shapeInteractionBlocked.value,
+  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+  replaceCollection: drawingActions.replaceCollection,
+  name: () => t("drawing.wordArt"),
+  placeholder: () => (locale.value === "zh-CN" ? "请输入文字" : "Your text here"),
+  getFontFamily: () => session.workbook.theme.bodyFont,
+  prepareFont: (drawing) => ensureCellFontResource(drawing.shapeText!.fontFamily!),
+  onInserted: (root) => {
+    const workbook = session.workbook,
+      sheet = activeSheet.value,
+      generation = workbookGeneration.value,
+      revision = workbookRevision.value;
+    // The insertion command invalidates grid metric objects. Start the editor
+    // only after its stored root and current worksheet metrics reach the grid.
+    void nextTick(() => {
+      if (
+        session.workbook !== workbook ||
+        activeSheet.value !== sheet ||
+        workbookGeneration.value !== generation ||
+        workbookRevision.value !== revision ||
+        !sheet.drawings?.includes(root) ||
+        shapeTextEdit.snapshot.value ||
+        !sheetGridRef.value?.selectShapeObjects([[root.id]])
+      )
+        return;
+      startShapeTextEdit({ root, selection: "all" });
+    });
+  },
+});
+const wordArtInsertHandler = computed(() => {
+  void workbookGeneration.value;
+  void activeSheet.value;
+  void workbookRevision.value;
+  void activeAddress.value.row;
+  void activeAddress.value.column;
+  return wordArtActions.createInsertHandler();
+});
+onBeforeUnmount(wordArtActions.cancelPending);
+
 const shapeInsertHandler = computed(() => {
   const owner = shapeCreation.captureOwner();
   void workbookRevision.value;
@@ -3290,6 +3468,33 @@ function onWorkspaceShapeTextOutsideAction(event: PointerEvent | MouseEvent): vo
     event.stopImmediatePropagation();
   }
 }
+function onWorkspaceNativeTextCopy(event: ClipboardEvent): void {
+  const target = event.target;
+  if (
+    !(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) ||
+    target.closest("[data-shape-canvas-text-editor]")
+  )
+    return;
+  if (
+    target.selectionStart === null ||
+    target.selectionEnd === null ||
+    target.selectionStart === target.selectionEnd
+  )
+    return;
+  const identity = shapeClipboard.getIdentity(),
+    workbook = session.workbook,
+    generation = workbookGeneration.value;
+  void Promise.resolve().then(() => {
+    if (
+      identity &&
+      !event.defaultPrevented &&
+      session.workbook === workbook &&
+      workbookGeneration.value === generation &&
+      shapeClipboard.clear(identity)
+    )
+      shapeClipboardEpoch.value++;
+  });
+}
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (
     event.target instanceof Element &&
@@ -3327,6 +3532,37 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
   const genericInput =
     target?.closest("input, textarea, [contenteditable]") &&
     !target?.closest("[data-cell-edit-surface]");
+  if (
+    !genericInput &&
+    !event.defaultPrevented &&
+    !event.repeat &&
+    !event.isComposing &&
+    !cellEditSession.state.active &&
+    !cellEditSession.state.composing &&
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    !target?.closest('[role="dialog"],[role="menu"],[role="listbox"]')
+  ) {
+    const key = event.key.toLowerCase();
+    const paths = sheetGridRef.value?.getSelectedShapeObjects() ?? [];
+    if (
+      ((key === "c" || key === "x") && paths.length) ||
+      (key === "v" && shapeClipboard.hasPending())
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (key === "c") shapeClipboard.copy(paths);
+      else if (key === "x") shapeClipboard.cut(paths);
+      else shapeClipboard.paste();
+      shapeClipboardEpoch.value++;
+      return;
+    }
+    if (key === "c" || key === "x") {
+      shapeClipboard.clear();
+      shapeClipboardEpoch.value++;
+    }
+  }
   if (
     !gridInert.value &&
     !genericInput &&
@@ -3487,6 +3723,8 @@ watch(
     :aria-label="t('workspace.editor')"
     :aria-busy="loading || fileBusy || imageBusy || xlsxBusy"
     @keydown.capture="onWorkspaceKeydown"
+    @copy.capture="onWorkspaceNativeTextCopy"
+    @cut.capture="onWorkspaceNativeTextCopy"
     @pointerdown.capture="onWorkspaceShapeTextOutsideAction"
     @click.capture="onWorkspaceShapeTextOutsideAction"
     @wheel.capture="onWorkspaceWheel"
@@ -3844,6 +4082,7 @@ watch(
           @insert-attachment="attachmentActions.requestInsert"
           @insert-drawing="drawingActions.insert"
           :insert-shape-handler="shapeInsertHandler"
+          :insert-word-art-handler="wordArtInsertHandler"
           :shape-owner-id="`${workbookGeneration}:${activeSheet.id}:${workbookRevision}`"
           @insert-camera="cameraActions.open()"
           @insert-chart="chartActions.insert"
@@ -4724,6 +4963,7 @@ watch(
       />
     </div>
     <WorkbookFormulaBar
+      @clipboard-copy="clearCompetingShapeClipboard"
       v-show="showFormulaBar"
       :read-only="formulaReadOnly"
       :key="workbookGeneration"
@@ -4949,6 +5189,12 @@ watch(
           :shape-creation-cancel="shapeCreation.cancel"
           :apply-drawing-update="drawingActions.update"
           :apply-drawing-collection="drawingActions.replaceCollection"
+          :copy-shape-objects="shapeClipboardHandlers.copy"
+          :cut-shape-objects="shapeClipboardHandlers.cut"
+          :paste-shape-objects="shapeClipboardHandlers.paste"
+          :can-paste-shape-objects="canPasteShapeObjects"
+          :capture-clipboard-copy="captureCompetingShapeClipboardCopy"
+          @clipboard-copy="clearCompetingShapeClipboard"
           @update-drawing="drawingActions.update"
           @delete-drawing="drawingActions.remove"
           @edit-drawing="editSheetDrawing"
@@ -5108,7 +5354,14 @@ watch(
         :load-paint-asset="shapePaintAssets.load"
         :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
         :t="pictureFormatLabel"
-        :initial-tab="shapeTextCharacterPane.snapshot.value ? 'text-box' : 'fill-line'"
+        :initial-tab="
+          shapeTextCharacterPane.snapshot.value
+            ? shapeTextCharacterPane.snapshot.value.drawing.kind === 'shape' &&
+              shapeTextCharacterPane.snapshot.value.drawing.wordArt
+              ? 'text-fill-line'
+              : 'text-box'
+            : 'fill-line'
+        "
         :data-shape-text-edit-session="shapeTextEdit.snapshot.value?.sessionId"
         @close="
           shapeTextCharacterPane.close();
