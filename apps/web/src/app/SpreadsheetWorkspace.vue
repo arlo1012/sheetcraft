@@ -179,6 +179,10 @@ import {
 } from "@sheetcraft/core/shape-group";
 import { useWordArtActions } from "../modules/sheet-drawings/useWordArtActions";
 import { useShapeClipboard } from "../modules/sheet-drawings/useShapeClipboard";
+import { useShapeDrawingTransfer } from "../modules/sheet-drawings/useShapeDrawingTransfer";
+import ShapeClipboardTransferDialog from "../modules/sheet-drawings/components/ShapeClipboardTransferDialog.vue";
+import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import type { ShapeTextPreparationMode } from "../modules/sheet-drawings/prepare-shape-text-update";
 import type { ShapeClipboardFailure } from "../modules/sheet-drawings/shape-clipboard-planning";
 import { useShapeTextCharacterFormatPane } from "../modules/sheet-drawings/useShapeTextCharacterFormatPane";
 import { useOwnedShapeFormatPane } from "../modules/sheet-drawings/useOwnedShapeFormatPane";
@@ -1840,6 +1844,42 @@ const textBoxReferenceResolver = computed(() => {
     locale: locale.value,
   });
 });
+function prepareWorkspaceDrawing(
+  sheet: Sheet,
+  metrics: PictureSheetMetrics | undefined,
+  next: SheetDrawing,
+  owner: SheetDrawing | undefined,
+  forest?: readonly SheetDrawing[],
+  preparationMode?: ShapeTextPreparationMode,
+): SheetDrawing {
+  return prepareTextBoxReferenceUpdate(
+    textBoxReferenceResolver.value,
+    next,
+    owner,
+    sheetGridRef.value?.getDrawingLayout(sheet),
+    undefined,
+    {
+      resources: {
+        theme: session.workbook.theme,
+        getAssetImage: (id) =>
+          shapePaintAssets.getAssetImage(id) ??
+          (imageAssetUrls.value.get(id)
+            ? shapeTextImages.get(imageAssetUrls.value.get(id)!)
+            : undefined),
+        getAssetSize: getShapePaintAssetSize,
+      },
+    },
+    metrics,
+    forest
+      ? {
+          candidateForest: forest,
+          sourceForest: sheet.drawings ?? [],
+          revision: workbookRevision.value,
+        }
+      : undefined,
+    preparationMode,
+  );
+}
 const drawingActions = useDrawingActions({
   preflightConnectedCollection: (pass) => {
     preflightShapeConnectorPaint(pass, {
@@ -1859,31 +1899,12 @@ const drawingActions = useDrawingActions({
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   name: (kind) => t(`drawing.${kind}`),
   prepareDrawing: (next, owner, forest, preparationMode) =>
-    prepareTextBoxReferenceUpdate(
-      textBoxReferenceResolver.value,
+    prepareWorkspaceDrawing(
+      activeSheet.value,
+      sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
       next,
       owner,
-      sheetGridRef.value?.getDrawingLayout(activeSheet.value),
-      undefined,
-      {
-        resources: {
-          theme: session.workbook.theme,
-          getAssetImage: (id) =>
-            shapePaintAssets.getAssetImage(id) ??
-            (imageAssetUrls.value.get(id)
-              ? shapeTextImages.get(imageAssetUrls.value.get(id)!)
-              : undefined),
-          getAssetSize: getShapePaintAssetSize,
-        },
-      },
-      sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
-      forest
-        ? {
-            candidateForest: forest,
-            sourceForest: activeSheet.value.drawings ?? [],
-            revision: workbookRevision.value,
-          }
-        : undefined,
+      forest,
       preparationMode,
     ),
 });
@@ -2242,17 +2263,36 @@ watch(
     shapeObjectControls.paneVisible.value = false;
   },
 );
+const shapeDrawingTransfer = useShapeDrawingTransfer({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || !!shapeTextEdit.snapshot.value,
+  execute: executeCommand,
+  prepareDrawing: (sheet, metrics, next, owner, forest) =>
+    prepareWorkspaceDrawing(sheet, metrics, next, owner, forest, "preserve-geometry"),
+  preflightConnectedCollection: (pass) => {
+    preflightShapeConnectorPaint(pass, {
+      theme: session.workbook.theme,
+      getAssetSize: getShapePaintAssetSize,
+    });
+    return true;
+  },
+});
 const shapeClipboardEpoch = ref(0);
 const shapeClipboard = useShapeClipboard({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
   getGeneration: () => workbookGeneration.value,
   getRevision: () => workbookRevision.value,
+  getDocumentRevision: () => session.history.revision,
   getMetrics: () => sheetGridRef.value?.getShapeFrameContext(activeSheet.value)?.metrics,
   getSelectedPaths: () =>
     sheetGridRef.value?.getSelectedShapeObjects() ?? selectedShapeObjectPaths.value,
   getTargetAddress: () => activeAddress.value,
   replaceCollection: drawingActions.replaceCollectionPreservingGeometry,
+  replaceCollections: shapeDrawingTransfer.replaceCollections,
   flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || !!shapeTextEdit.snapshot.value,
   onSelect: (paths) => {
@@ -2317,6 +2357,7 @@ const shapeClipboard = useShapeClipboard({
     );
   },
 });
+const { confirmation: shapeClipboardTransferConfirmation } = shapeClipboard;
 const canPasteShapeObjects = computed(() => {
   void shapeClipboardEpoch.value;
   return shapeClipboard.hasPending();
@@ -3781,6 +3822,7 @@ const gridInert = computed(
     !!viewingAttachment.value ||
     !!editingDrawing.value ||
     (!!textBoxReferenceDialog.value && !pickingTextBoxReference.value) ||
+    !!shapeClipboardTransferConfirmation.value ||
     symbolVisible.value ||
     (!!editingChart.value && !pickingChartRange.value) ||
     (!!sparklineDraft.value && !pickingSparklineRange.value) ||
@@ -3884,6 +3926,7 @@ watch(
         !!viewingAttachment ||
         !!editingDrawing ||
         !!textBoxReferenceDialog ||
+        !!shapeClipboardTransferConfirmation ||
         symbolVisible ||
         (!!editingChart && !pickingChartRange) ||
         (!!sparklineDraft && !pickingSparklineRange) ||
@@ -5076,6 +5119,7 @@ watch(
         !!viewingAttachment ||
         !!editingDrawing ||
         !!textBoxReferenceDialog ||
+        !!shapeClipboardTransferConfirmation ||
         symbolVisible ||
         (!!editingChart && !pickingChartRange) ||
         (!!sparklineDraft && !pickingSparklineRange) ||
@@ -5741,6 +5785,11 @@ watch(
       @unlock="protectionActions.unlock"
     />
   </section>
+  <ShapeClipboardTransferDialog
+    v-if="shapeClipboardTransferConfirmation"
+    :key="shapeClipboardTransferConfirmation.sessionId"
+    :request="shapeClipboardTransferConfirmation"
+  />
   <TextBoxReferenceDialog
     v-if="textBoxReferenceDialog"
     :key="textBoxReferenceDialog.sessionId"

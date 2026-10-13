@@ -1,4 +1,12 @@
 export const drawingsZhCN = {
+  "drawing.crossSheetCutTitle": "跨工作表移动对象",
+  "drawing.crossSheetCutConfirm": "断开跨表连接并移动",
+  "drawing.crossSheetCutMessage":
+    "从“{source}”移动到“{target}”会断开选区内外的 {count} 个连接端点。",
+  "drawing.crossSheetCutDetails":
+    "其中 {moved} 个端点随所选对象移动，{remaining} 个端点留在源工作表。",
+  "drawing.crossSheetCutHint":
+    "源侧端点原位变成自由端点，移动侧端点变成自由端点并随对象平移；选区内部的连接仍保持绑定。取消保留所有对象和剪贴板；撤销同时恢复两张工作表及连接。",
   "drawing.textBoxReferenceTitle": "文本框引用单元格",
   "drawing.textBoxReferenceSheet": "来源工作表",
   "drawing.textBoxReferenceSource": "来源单元格",

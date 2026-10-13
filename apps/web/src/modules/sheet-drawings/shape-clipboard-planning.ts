@@ -334,3 +334,60 @@ export function planShapeClipboardPaste(options: {
   assertShapeDrawingForestLayouts(nextForest, options.targetMetrics);
   return { roots: placed, nextForest };
 }
+
+export type ShapeClipboardCrossSheetPlan = {
+  roots: SheetDrawing[];
+  sourceForest: SheetDrawing[];
+  targetForest: SheetDrawing[];
+  /** Endpoint counts, not object counts. These associations cannot cross sheets. */
+  disconnectedEndpoints: { moved: number; remaining: number; total: number };
+};
+
+/** A detached two-forest proposal. Only the host's atomic command can remove the source. */
+export function planCrossSheetShapeClipboardCut(options: {
+  selection: ShapeClipboardSelection;
+  targetForest: readonly SheetDrawing[];
+  sourceMetrics: PictureSheetMetrics;
+  targetMetrics: PictureSheetMetrics;
+  address: CellAddress;
+  createId: () => string;
+}): ShapeClipboardCrossSheetPlan {
+  const source = normalizeShapeDrawingForest(options.selection.sourceForest);
+  const visits = source.flatMap<SourceVisit>((root) =>
+    isShapeGroupDrawing(root)
+      ? traverseShapeGroup(root).map(({ node, path }) => ({ node, path, root }))
+      : [{ node: root, path: [root.id], root }],
+  );
+  const selected = new Set(options.selection.selectedPaths.map((path) => path.at(-1)!));
+  const moved = new Set(
+    visits.filter(({ path }) => path.some((id) => selected.has(id))).map(({ node }) => node.id),
+  );
+  let movedEndpoints = 0;
+  let remainingEndpoints = 0;
+  for (const { node } of visits) {
+    if (node.kind !== "shape" || !node.shapeConnector) continue;
+    for (const endpoint of [node.shapeConnector.begin, node.shapeConnector.end]) {
+      if (endpoint.kind !== "site" || moved.has(node.id) === moved.has(endpoint.targetId)) continue;
+      if (moved.has(node.id)) movedEndpoints++;
+      else remainingEndpoints++;
+    }
+  }
+  // Capture already free-materialized moved tips at the full source context.
+  // Deletion separately materializes surviving tips and contracts/dissolves owners.
+  const sourceForest = planDeleteShapeGroupNodes(
+    source,
+    options.selection.selectedPaths,
+    options.sourceMetrics,
+  );
+  const pasted = planShapeClipboardPaste({ ...options, mode: "copy" });
+  return {
+    roots: pasted.roots,
+    sourceForest,
+    targetForest: pasted.nextForest,
+    disconnectedEndpoints: {
+      moved: movedEndpoints,
+      remaining: remainingEndpoints,
+      total: movedEndpoints + remainingEndpoints,
+    },
+  };
+}

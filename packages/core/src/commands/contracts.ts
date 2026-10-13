@@ -558,6 +558,19 @@ export type SetSheetDrawingsCommand = {
   drawings: SheetDrawing[];
 };
 
+export type SheetDrawingCollectionReplacement = {
+  sheetId: string;
+  /** The complete canonical forest the caller planned against. */
+  expectedDrawings: SheetDrawing[];
+  drawings: SheetDrawing[];
+};
+
+/** One bounded same-workbook transaction, including its full history inverse. */
+export type ReplaceSheetDrawingCollectionsCommand = {
+  type: "replaceSheetDrawingCollections";
+  collections: [SheetDrawingCollectionReplacement, SheetDrawingCollectionReplacement];
+};
+
 export type SetSheetFloatingImagesCommand = {
   type: "setSheetFloatingImages";
   sheetId: string;
@@ -932,6 +945,7 @@ export type WorkbookCommand =
   | ClearSheetOutlineCommand
   | UngroupSheetRangeCommand
   | SetSheetDrawingsCommand
+  | ReplaceSheetDrawingCollectionsCommand
   | SetSheetFloatingImagesCommand
   | SetFloatingImageCommand
   | DeleteFloatingImageCommand
@@ -1003,6 +1017,9 @@ export type WorkbookOperation =
   | "history.restore";
 
 export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperation {
+  const discriminator = Object.getOwnPropertyDescriptor(command, "type");
+  if (!discriminator || !("value" in discriminator))
+    throw new TypeError("Workbook commands require an own type data field.");
   switch (command.type) {
     case "setWorkbookStructureProtection":
     case "setSheetProtection":
@@ -1118,6 +1135,7 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "ungroupSheetRange":
       return "data.outline";
     case "setSheetDrawings":
+    case "replaceSheetDrawingCollections":
     case "setSheetFloatingImages":
     case "setFloatingImage":
       return "images.floating.set";

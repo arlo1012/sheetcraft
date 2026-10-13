@@ -6,7 +6,10 @@ import {
 } from "@sheetcraft/core/shape-group";
 import { normalizeSheetDrawings } from "@sheetcraft/core/sheet-drawings";
 import { deserializeSheet } from "@sheetcraft/core/serialization";
-import type { WorkbookCommand } from "@sheetcraft/core/commands";
+import {
+  normalizeReplaceSheetDrawingCollectionsCommand,
+  type WorkbookCommand,
+} from "@sheetcraft/core/commands";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Workbook } from "@sheetcraft/core/workbook";
 
@@ -191,6 +194,14 @@ export function assertShapeCommandSupport(command: WorkbookCommand): void {
     case "setSheetDrawings":
       checkDrawings(command.sheetId, command.drawings);
       break;
+    case "replaceSheetDrawingCollections": {
+      const normalized = normalizeReplaceSheetDrawingCollectionsCommand(command);
+      for (const collection of normalized.collections) {
+        checkDrawings(collection.sheetId, collection.expectedDrawings);
+        checkDrawings(collection.sheetId, collection.drawings);
+      }
+      break;
+    }
     case "addSheet": {
       requireOwnDataRecord(command.sheet);
       const sheet = deserializeSheet(command.sheet);

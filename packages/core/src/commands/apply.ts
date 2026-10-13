@@ -2,7 +2,12 @@ import { assertPivotResultsAreWritable } from "./pivot-result-guard.js";
 import { prepareTableCalculatedColumnEdit } from "../table-calculated-columns.js";
 import { applySetPivotTableCommand, applyRemovePivotTableCommand } from "./pivot-tables.js";
 import { applySetCellSparklinesCommand } from "./sparklines.js";
-import { applySetSheetDrawingsCommand } from "./drawings.js";
+import {
+  applySetSheetDrawingsCommand,
+  applyReplaceSheetDrawingCollectionsCommand,
+  normalizeReplaceSheetDrawingCollectionsCommand,
+} from "./drawings.js";
+import { invalidCommandPayload } from "./helpers.js";
 import {
   applySetSheetProtectionCommand,
   applySetWorkbookStructureProtectionCommand,
@@ -199,9 +204,11 @@ function assertCommandDoesNotModifyProtectedSheet(
           ? command.states.map((state) => state.sheetId)
           : command.type === "setSheetsWatermark"
             ? command.sheetIds
-            : "sheetId" in command
-              ? [command.sheetId]
-              : [];
+            : command.type === "replaceSheetDrawingCollections"
+              ? command.collections.map((entry) => entry.sheetId)
+              : "sheetId" in command
+                ? [command.sheetId]
+                : [];
   const blocked = sheetIds.find((sheetId) => workbook.sheets.get(sheetId)?.properties.protected);
   if (!blocked) return;
   switch (command.type) {
@@ -262,6 +269,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "clearSheetOutline":
     case "ungroupSheetRange":
     case "setSheetDrawings":
+    case "replaceSheetDrawingCollections":
     case "setSheetFloatingImages":
     case "setFloatingImage":
     case "deleteFloatingImage":
@@ -290,6 +298,17 @@ export function applyWorkbookCommand(
   options: { fromHistory?: boolean } = {},
 ): WorkbookCommand | null {
   try {
+    const discriminator = Object.getOwnPropertyDescriptor(command, "type");
+    if (!discriminator || !("value" in discriminator))
+      throw invalidCommandPayload(
+        "type",
+        null,
+        "Workbook commands require an own type data field.",
+      );
+    if (discriminator.value === "replaceSheetDrawingCollections")
+      command = normalizeReplaceSheetDrawingCollectionsCommand(
+        command as Extract<WorkbookCommand, { type: "replaceSheetDrawingCollections" }>,
+      );
     const calculatedColumnPlan =
       !options.fromHistory && command.type === "setCellContents"
         ? prepareTableCalculatedColumnEdit(workbook, command)
@@ -444,6 +463,8 @@ export function applyWorkbookCommand(
         return applyUngroupSheetRangeCommand(workbook, command);
       case "setSheetDrawings":
         return applySetSheetDrawingsCommand(workbook, command);
+      case "replaceSheetDrawingCollections":
+        return applyReplaceSheetDrawingCollectionsCommand(workbook, command);
       case "setSheetFloatingImages":
         return applySetSheetFloatingImagesCommand(workbook, command);
       case "setFloatingImage":

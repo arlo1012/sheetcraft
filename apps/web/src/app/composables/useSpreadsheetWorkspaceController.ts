@@ -473,6 +473,8 @@ export function useSpreadsheetWorkspaceController(
       sheetIds.add(command.sheet.id);
     } else if (command.type === "restoreTableTransaction") {
       for (const state of command.states) sheetIds.add(state.sheetId);
+    } else if (command.type === "replaceSheetDrawingCollections") {
+      for (const collection of command.collections) sheetIds.add(collection.sheetId);
     } else if ("sheetId" in command) {
       sheetIds.add(command.sheetId);
     }

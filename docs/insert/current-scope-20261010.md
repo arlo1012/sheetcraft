@@ -98,3 +98,7 @@
 - 各能力在 `apps/web/src/modules/<feature>` 有具体 owner，回归在对应
   `apps/web/src/tests/modules/<feature>`；跨入口真实命令测试为
   `apps/web/src/tests/app/SpreadsheetWorkspace/insert-entrypoints.test.ts`。
+
+### 同工作簿对象跨表剪切
+
+形状、文本框、现代艺术字和完整组合现可跨工作表剪切。源不预删，两表原子转移、一次撤销；资源和文本框绝对来源保持。跨选区连接需明确确认断开，不能定位或权限不足则整批拒绝。捕获后的文档修改会使旧剪切失效。具体范围见 [文本框范围](textbox-current-scope.md#同工作簿跨表剪切)。

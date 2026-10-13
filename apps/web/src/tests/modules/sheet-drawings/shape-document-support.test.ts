@@ -3,7 +3,11 @@ import { describe, expect, test, vi } from "vitest";
 import { createWorkbook, getActiveSheet, createSheetSparseState } from "@sheetcraft/core/workbook";
 import { serializeWorkbook, serializeSheet } from "@sheetcraft/core/serialization";
 import { requireLegacySheetDrawings } from "@sheetcraft/core/sheet-drawings";
-import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import {
+  createSetSheetDrawingsCommand,
+  createReplaceSheetDrawingCollectionsCommand,
+  type WorkbookCommand,
+} from "@sheetcraft/core/commands";
 import {
   assertShapeCommandSupport,
   assertWorkbookShapeSupport,
@@ -181,4 +185,43 @@ test("owned group documents and commands pass the complete live admission withou
     assertShapeCommandSupport(createSetSheetDrawingsCommand(sheet.id, sheet.drawings!)),
   ).not.toThrow();
   expect(serializeWorkbook(workbook)).toEqual(before);
+});
+
+test("two-sheet drawing replacements admit both forests and reject unsupported scene candidates before command consumers", () => {
+  const target = framedShape();
+  target.id = "target";
+  target.shapeGeometry = { preset: "rect" };
+  const line = framedShape();
+  line.id = "connector";
+  line.text = "";
+  line.shapeGeometry = { preset: "line" };
+  line.shapeConnector = {
+    kind: "shape-connector-v1",
+    begin: { kind: "site", targetId: "target", preset: "rect", siteIndex: 3 },
+    end: { kind: "free", xRatio: 1, yRatio: 1 },
+  };
+  const command = createReplaceSheetDrawingCollectionsCommand([
+    { sheetId: "source", expectedDrawings: [target, line], drawings: [] },
+    { sheetId: "destination", expectedDrawings: [], drawings: [target, line] },
+  ]);
+  expect(() => assertShapeCommandSupport(command)).not.toThrow();
+  for (const field of ["expectedDrawings", "drawings"] as const) {
+    const invalid = structuredClone(command);
+    const node = invalid.collections[1][field];
+    if (!node.length) node.push(target, line);
+    const shape = node[0]!;
+    if (shape.kind !== "shape") throw Error("Expected shape");
+    shape.shapeStyle = {
+      rotation3d: {
+        kind: "value",
+        value: { xDeg: 45, yDeg: 0, zDeg: 0, projection: "parallel", distanceFromGroundPt: 0 },
+      },
+    };
+    expect(() => assertShapeCommandSupport(invalid)).toThrow(/3D projection/);
+  }
+  const getter = vi.fn(() => []);
+  const invalid = { ...command, collections: command.collections.map((entry) => ({ ...entry })) };
+  Object.defineProperty(invalid.collections[0], "drawings", { get: getter });
+  expect(() => assertShapeCommandSupport(invalid as WorkbookCommand)).toThrow();
+  expect(getter).not.toHaveBeenCalled();
 });

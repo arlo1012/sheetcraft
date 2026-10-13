@@ -15,6 +15,8 @@ import {
   type CellAddress,
 } from "../workbook.js";
 import { createSetSheetFloatingImagesCommand } from "./images.js";
+import { normalizeReplaceSheetDrawingCollectionsCommand } from "./drawings.js";
+import { getSheetOrThrow } from "./helpers.js";
 import type { WorkbookCommand } from "./contracts.js";
 
 function reject(sheetId: string): never {
@@ -43,6 +45,14 @@ export function assertWorkbookStructureProtection(
 
 /** Handles exceptions to whole-sheet protection; all other mutations use the existing guard. */
 export function allowProtectedCellCommand(workbook: Workbook, command: WorkbookCommand): boolean {
+  if (command.type === "replaceSheetDrawingCollections") {
+    const next = normalizeReplaceSheetDrawingCollectionsCommand(command);
+    for (const entry of next.collections) {
+      const sheet = getSheetOrThrow(workbook, entry.sheetId);
+      if (!canEditSheetDrawingCollection(sheet, entry.drawings)) reject(sheet.id);
+    }
+    return true;
+  }
   const mergeResolvers = new Map<string, MergedCellRangeResolver>();
   function targetAddress(sheet: Sheet, address: CellAddress): CellAddress {
     let resolver = mergeResolvers.get(sheet.id);

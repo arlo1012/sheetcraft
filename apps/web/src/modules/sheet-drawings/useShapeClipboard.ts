@@ -1,4 +1,5 @@
 import { canUseSheetPermission } from "@sheetcraft/core";
+import { shallowRef } from "vue";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import {
   isShapeGroupDrawing,
@@ -13,10 +14,12 @@ import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory"
 import {
   captureShapeClipboardSelection,
   planShapeClipboardPaste,
+  planCrossSheetShapeClipboardCut,
   ShapeClipboardError,
   type ShapeClipboardFailure,
   type ShapeClipboardSelection,
 } from "./shape-clipboard-planning";
+import type { ShapeDrawingTransferCollection } from "./useShapeDrawingTransfer";
 
 export type ShapeClipboardIdentity = Readonly<{ token: string; generation: number }>;
 export type ShapeClipboardOptions = {
@@ -24,6 +27,8 @@ export type ShapeClipboardOptions = {
   getSheet: () => Sheet;
   getGeneration: () => number;
   getRevision: () => number;
+  /** A document history revision: worksheet navigation must not invalidate Cut. */
+  getDocumentRevision?: () => number;
   getMetrics: () => PictureSheetMetrics | undefined;
   getSelectedPaths: () => readonly ShapeGroupPath[];
   getTargetAddress: () => CellAddress;
@@ -32,6 +37,10 @@ export type ShapeClipboardOptions = {
     next: readonly SheetDrawing[],
     expected: readonly SheetDrawing[],
     metrics: PictureSheetMetrics,
+    guard: () => boolean,
+  ) => boolean;
+  replaceCollections?: (
+    collections: readonly [ShapeDrawingTransferCollection, ShapeDrawingTransferCollection],
     guard: () => boolean,
   ) => boolean;
   createId?: () => string;
@@ -48,10 +57,36 @@ type Owner = {
   sheetId: string;
   generation: number;
   revision: number;
+  documentRevision: number;
   metrics: PictureSheetMetrics;
   expected: readonly SheetDrawing[];
   fingerprint: string;
+  geometryFingerprint: string;
 };
+
+export type ShapeClipboardTransferConfirmation = {
+  sessionId: number;
+  sourceSheetName: string;
+  targetSheetName: string;
+  disconnectedEndpoints: { moved: number; remaining: number; total: number };
+  confirm: () => boolean;
+  cancel: () => void;
+  isCurrent: () => boolean;
+};
+
+function geometryFingerprint(sheet: Sheet): string {
+  return JSON.stringify({
+    defaultColumnWidth: sheet.defaultColumnWidth,
+    rowHeights: [...sheet.rowHeights],
+    columnWidths: [...sheet.columnWidths],
+    hiddenRows: [...(sheet.hiddenRows ?? [])],
+    hiddenColumns: [...(sheet.hiddenColumns ?? [])],
+    filter: sheet.filter,
+    tables: sheet.tables,
+    outlineGroups: sheet.outlineGroups,
+    mergedCells: sheet.mergedCells,
+  });
+}
 type Pending = {
   identity: ShapeClipboardIdentity;
   mode: "copy" | "cut";
@@ -67,6 +102,8 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
   let generation = 0;
   let operation = 0;
   let working = false;
+  let confirmationId = 0;
+  const confirmation = shallowRef<ShapeClipboardTransferConfirmation>();
 
   function feedback(reason: ShapeClipboardFailure): void {
     try {
@@ -81,13 +118,16 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
     const metrics = options.getMetrics();
     const generation = options.getGeneration();
     const revision = options.getRevision();
+    const documentRevision = options.getDocumentRevision?.() ?? revision;
     if (
       !metrics ||
       workbook.sheets.get(sheet.id) !== sheet ||
       !Number.isSafeInteger(generation) ||
       generation < 0 ||
       !Number.isSafeInteger(revision) ||
-      revision < 0
+      revision < 0 ||
+      !Number.isSafeInteger(documentRevision) ||
+      documentRevision < 0
     )
       return undefined;
     const source = sheet.drawings ?? [];
@@ -98,10 +138,28 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
       sheetId: sheet.id,
       generation,
       revision,
+      documentRevision,
       metrics,
       expected: [...source],
       fingerprint,
+      geometryFingerprint: geometryFingerprint(sheet),
     };
+  }
+  function currentCutSource(expected: Owner): boolean {
+    if (!options.getDocumentRevision) return currentOwner(expected);
+    const forest = expected.sheet.drawings ?? [];
+    return (
+      !options.isBusy?.() &&
+      options.getWorkbook() === expected.workbook &&
+      expected.sheet.id === expected.sheetId &&
+      expected.workbook.sheets.get(expected.sheetId) === expected.sheet &&
+      options.getGeneration() === expected.generation &&
+      (options.getDocumentRevision?.() ?? options.getRevision()) === expected.documentRevision &&
+      geometryFingerprint(expected.sheet) === expected.geometryFingerprint &&
+      forest.length === expected.expected.length &&
+      forest.every((root, index) => root === expected.expected[index]) &&
+      JSON.stringify(normalizeShapeDrawingForest(forest)) === expected.fingerprint
+    );
   }
   function currentOwner(expected: Owner): boolean {
     const current = expected.sheet.drawings ?? [];
@@ -157,6 +215,7 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
   function clear(identity = pending?.identity): boolean {
     if (!identity || !sameIdentity(identity)) return false;
     pending = undefined;
+    confirmation.value = undefined;
     operation++;
     generation++;
     return true;
@@ -187,6 +246,7 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
       if (operation !== started || !currentOwner(source))
         throw new ShapeClipboardError("stale-owner");
       pending = next;
+      confirmation.value = undefined;
       generation++;
       operation++;
       try {
@@ -204,7 +264,7 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
   }
   function paste(address?: CellAddress): boolean {
     const captured = pending;
-    if (!captured || working || options.isBusy?.()) return false;
+    if (!captured || working || confirmation.value || options.isBusy?.()) return false;
     working = true;
     const started = operation;
     try {
@@ -216,20 +276,96 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
         target.generation !== captured.owner.generation
       )
         throw new ShapeClipboardError("stale-owner");
-      if (captured.mode === "cut" && target.sheet !== captured.owner.sheet)
+      const crossSheet = captured.mode === "cut" && target.sheet !== captured.owner.sheet;
+      if (crossSheet && (!options.replaceCollections || !options.getDocumentRevision))
         throw new ShapeClipboardError("cross-sheet-cut");
-      if (captured.mode === "cut" && !currentOwner(captured.owner))
+      if (captured.mode === "cut" && !currentCutSource(captured.owner))
         throw new ShapeClipboardError("stale-owner");
       if (!sourceAllowed(captured)) throw new ShapeClipboardError("source-protected");
       if (!canUseSheetPermission(target.sheet, "editObjects"))
         throw new ShapeClipboardError("target-protected");
+      const navigationAddress = { ...options.getTargetAddress() };
       const guard = () =>
         operation === started &&
         pending === captured &&
         currentOwner(target) &&
-        (captured.mode !== "cut" || currentOwner(captured.owner)) &&
+        options.getTargetAddress().row === navigationAddress.row &&
+        options.getTargetAddress().column === navigationAddress.column &&
+        (captured.mode !== "cut" || currentCutSource(captured.owner)) &&
         sourceAllowed(captured) &&
         canUseSheetPermission(target.sheet, "editObjects");
+      const complete = () => {
+        if (captured.mode === "cut" && pending === captured) clear(captured.identity);
+        try {
+          options.onSelect?.(placedPaths);
+        } catch {
+          // The atomic document transaction has already succeeded.
+        }
+      };
+      let placedPaths: readonly ShapeGroupPath[] = [];
+      if (crossSheet) {
+        const plan = planCrossSheetShapeClipboardCut({
+          selection: captured.selection,
+          targetForest: target.expected,
+          sourceMetrics: captured.owner.metrics,
+          targetMetrics: target.metrics,
+          address: address ?? options.getTargetAddress(),
+          createId,
+        });
+        placedPaths = plan.roots.map((root) => [root.id]);
+        const collections = [
+          {
+            sheet: captured.owner.sheet,
+            expected: captured.owner.expected,
+            next: plan.sourceForest,
+            metrics: captured.owner.metrics,
+          },
+          {
+            sheet: target.sheet,
+            expected: target.expected,
+            next: plan.targetForest,
+            metrics: target.metrics,
+          },
+        ] as const;
+        const commit = () => {
+          if (!guard()) throw new ShapeClipboardError("stale-owner");
+          if (!options.replaceCollections!(collections, guard))
+            throw new ShapeClipboardError("command-rejected");
+          complete();
+          return true;
+        };
+        if (!guard()) throw new ShapeClipboardError("stale-owner");
+        if (!plan.disconnectedEndpoints.total) return commit();
+        const request: ShapeClipboardTransferConfirmation = {
+          sessionId: ++confirmationId,
+          sourceSheetName: captured.owner.sheet.name,
+          targetSheetName: target.sheet.name,
+          disconnectedEndpoints: { ...plan.disconnectedEndpoints },
+          isCurrent: () => confirmation.value === request && guard(),
+          cancel: () => {
+            if (confirmation.value !== request) return;
+            confirmation.value = undefined;
+            operation++;
+          },
+          confirm: () => {
+            if (confirmation.value !== request || working) return false;
+            working = true;
+            try {
+              const accepted = commit();
+              if (confirmation.value === request) confirmation.value = undefined;
+              return accepted;
+            } catch (error) {
+              if (confirmation.value === request) confirmation.value = undefined;
+              feedback(error instanceof ShapeClipboardError ? error.reason : "command-rejected");
+              return false;
+            } finally {
+              working = false;
+            }
+          },
+        };
+        confirmation.value = request;
+        return false;
+      }
       const plan = planShapeClipboardPaste({
         selection: captured.selection,
         mode: captured.mode,
@@ -239,18 +375,14 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
         address: address ?? options.getTargetAddress(),
         createId,
       });
+      placedPaths = plan.roots.map((root) => [root.id]);
       if (!guard()) throw new ShapeClipboardError("stale-owner");
       // Cut removal and insertion are in this one proposal; a failed command consumes nothing.
       if (
         options.replaceCollection(plan.nextForest, target.expected, target.metrics, guard) !== true
       )
         throw new ShapeClipboardError("command-rejected");
-      if (captured.mode === "cut" && pending === captured) clear(captured.identity);
-      try {
-        options.onSelect?.(plan.roots.map((root) => [root.id]));
-      } catch {
-        // The atomic document transaction has already succeeded.
-      }
+      complete();
       return true;
     } catch (error) {
       feedback(error instanceof ShapeClipboardError ? error.reason : "command-rejected");
@@ -269,5 +401,6 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
       pending ? Object.freeze({ ...pending.identity }) : undefined,
     clear,
     clearCut: (identity = pending?.identity) => pending?.mode === "cut" && clear(identity),
+    confirmation,
   };
 }

@@ -21,7 +21,7 @@ export function collectWorkbookImageAssetIds(workbook: Workbook): Set<string> {
     for (const drawing of sheet.drawings ?? []) {
       if (isShapeGroupDrawing(drawing))
         for (const id of collectShapeGroupAssetIds(drawing)) ids.add(id);
-      if (drawing.kind === "shape")
+      if (drawing.kind === "shape" || drawing.kind === "textBox")
         for (const id of getShapeStyleAssetIds(drawing.shapeStyle)) ids.add(id);
       if (drawing.kind === "shape" || drawing.kind === "textBox")
         for (const id of getShapeTextAssetIds(drawing.shapeText, drawing.text)) ids.add(id);

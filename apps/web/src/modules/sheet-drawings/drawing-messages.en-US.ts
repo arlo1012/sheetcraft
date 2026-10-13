@@ -1,4 +1,12 @@
 export const drawingsEnUS = {
+  "drawing.crossSheetCutTitle": "Move objects to another sheet",
+  "drawing.crossSheetCutConfirm": "Disconnect cross-sheet connections and move",
+  "drawing.crossSheetCutMessage":
+    "Moving from {source} to {target} will disconnect {count} connection endpoints across the selection boundary.",
+  "drawing.crossSheetCutDetails":
+    "{moved} endpoints move with the selected objects; {remaining} endpoints remain on the source sheet.",
+  "drawing.crossSheetCutHint":
+    "Source-side endpoints remain in place; moved endpoints become free and travel with their objects. Connections inside the moved selection stay attached. Cancel keeps all objects and the clipboard. Undo restores both sheets and their connections.",
   "drawing.textBoxReferenceTitle": "Link text box to a cell",
   "drawing.textBoxReferenceSheet": "Source sheet",
   "drawing.textBoxReferenceSource": "Source cell",
