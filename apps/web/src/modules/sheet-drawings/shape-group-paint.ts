@@ -389,7 +389,16 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
             kind: "leaf",
             leaf,
           };
-        const connector = pass?.getLeaf(leaf.sourceNode.id)?.connector;
+        const passLeaf = pass?.getLeaf(leaf.sourceNode.id);
+        if (
+          leaf.sourceNode.kind === "textBox" &&
+          leaf.sourceNode.textReference &&
+          (passLeaf?.textReference?.status !== "ready" || (leaf.view && !passLeaf.paintView))
+        )
+          throw new TypeError(
+            `Linked shape text is unavailable: ${passLeaf?.textReference?.status === "unavailable" ? passLeaf.textReference.message : "workbook display resolver missing"}.`,
+          );
+        const connector = passLeaf?.connector;
         if (connector?.status === "unavailable")
           throw new TypeError(`Shape connector paint is unavailable: ${connector.reason}.`);
         const suspended = connector?.status === "suspended" || connector?.status === "degenerate";
@@ -404,7 +413,8 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
           result.collapsed = true;
           return result;
         }
-        const drawing = connector?.status === "ready" ? connector.paintView : leaf.view;
+        const drawing =
+          connector?.status === "ready" ? connector.paintView : (passLeaf?.paintView ?? leaf.view);
         if (leaf.collapsed || !drawing || !paintLayout) return result;
         const leafOptions: ShapeLeafPixelsOptions = {
           drawing,

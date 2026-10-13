@@ -1,4 +1,25 @@
 export const drawingsEnUS = {
+  "drawing.textBoxReferenceTitle": "Link text box to a cell",
+  "drawing.textBoxReferenceSheet": "Source sheet",
+  "drawing.textBoxReferenceSource": "Source cell",
+  "drawing.textBoxReferenceApply": "Link cell",
+  "drawing.textBoxReferenceReplace": "Replace text and link",
+  "drawing.textBoxReferenceHint":
+    "Choose one cell, for example A1 or Sheet2!A1. Contents update automatically; the frame keeps its current size, including when Resize to fit text is enabled. Source cell fonts and colors are not copied.",
+  "drawing.textBoxReferenceOverwrite":
+    "Linking replaces the current text and local character formatting. Object typography and appearance are kept. Undo restores the original text.",
+  "drawing.textBoxReferenceInvalid":
+    "Enter a single valid cell. Ranges and expressions are not supported.",
+  "drawing.textBoxReferenceBlank": "(Empty cell)",
+  "drawing.textBoxReferenceStale":
+    "The document or selected object changed. Close and reopen this dialog. Nothing was replaced.",
+  "drawing.textBoxReferenceUnavailable":
+    "The source cannot be displayed with the current calculation or text resources. The object is unchanged.",
+  "drawing.textBoxReferenceUnlink": "Unlink and keep displayed text",
+  "drawing.textBoxReferenceMenu": "Insert referenced cell…",
+  "drawing.textBoxReferenceReadonly":
+    "This text box displays a cell. Change the source cell or unlink it to edit the text.",
+
   "drawing.equalHeight": "Equal height",
   "drawing.equalWidth": "Equal width",
   "drawing.equalSize": "Equal size",

@@ -113,6 +113,46 @@ test("legacy boundary preserves the exposed reactive owner identity for gesture 
   expect(requireLegacySheetDrawings(legacy)[0]).toBe(legacy[0]);
 });
 
+test("external reference restoration admits dense ordinary arrays and rejects wrappers without invoking getters", () => {
+  const workbook = createWorkbook({ id: "external-reference", sheetId: "s" });
+  const state = createSheetSparseState(getActiveSheet(workbook));
+  const command = {
+    type: "restoreSheetState",
+    sheetId: "s",
+    state,
+    externalDrawingCollections: [{ sheetId: "other", drawings: [framedShape()] }],
+  } as const;
+  expect(() => assertShapeCommandSupport(command as unknown as WorkbookCommand)).not.toThrow();
+  expect(() =>
+    assertShapeCommandSupport({
+      ...command,
+      externalDrawingCollections: [],
+    } as unknown as WorkbookCommand),
+  ).not.toThrow();
+  const getter = vi.fn(() => [framedShape()]);
+  const inherited = Object.create({
+    get drawings() {
+      return getter();
+    },
+  }) as { sheetId: string; drawings: ReturnType<typeof framedShape>[] };
+  inherited.sheetId = "other";
+  expect(() =>
+    assertShapeCommandSupport({
+      ...command,
+      externalDrawingCollections: [inherited],
+    } as unknown as WorkbookCommand),
+  ).toThrow();
+  const accessor = { sheetId: "other" };
+  Object.defineProperty(accessor, "drawings", { get: getter });
+  expect(() =>
+    assertShapeCommandSupport({
+      ...command,
+      externalDrawingCollections: [accessor],
+    } as unknown as WorkbookCommand),
+  ).toThrow();
+  expect(getter).not.toHaveBeenCalled();
+});
+
 test("owned group documents and commands pass the complete live admission without changing data", () => {
   const workbook = createWorkbook({ id: "group-test", sheetId: "s" }),
     sheet = getActiveSheet(workbook);

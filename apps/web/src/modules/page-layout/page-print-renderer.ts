@@ -13,6 +13,7 @@ import {
   resolveShapeForestForRender,
   type ResolvedShapeForestForRender,
 } from "../sheet-drawings/resolved-shape-render-source";
+import type { TextBoxReferenceResolver } from "../sheet-drawings/textbox-reference-display";
 import { getPictureProperties } from "@sheetcraft/core/picture-properties";
 import { isFormulaError, type FormulaValue } from "@sheetcraft/core/formula";
 import {
@@ -217,6 +218,7 @@ export function createPrintPreviewDocument(options: {
   revision?: number;
   shapePaintResources?: PicturePaintResources;
   requireReadyGroupPaint?: boolean;
+  textBoxReferenceResolver?: TextBoxReferenceResolver;
 }): PrintPreviewDocument {
   requireLegacyPictures(getPrintablePictureRoots(options.sheet));
   const requested = pageSetupForPrint(
@@ -262,6 +264,7 @@ export function createPrintPreviewDocument(options: {
     drawings: getPrintShapeSourceDrawings(options.sheet),
     metrics: shapeMetrics,
     revision: options.revision ?? 0,
+    textBoxReferenceResolver: options.textBoxReferenceResolver,
   });
   const shapeExtent = getPrintShapeContentExtent(
     options.sheet,

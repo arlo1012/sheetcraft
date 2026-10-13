@@ -1,3 +1,4 @@
+import { mapSheetDrawingTextReferences } from "../text-box-reference.js";
 import {
   capturePivotTables,
   restorePivotTables,
@@ -191,6 +192,11 @@ export function createDuplicateSheetCommand(
   assertSheetNameAvailable(workbook, name);
   const sheetId = resolveSheetId(workbook, options);
   const sheet = serializeSheet(source);
+  if (sheet.drawings?.length)
+    sheet.drawings = mapSheetDrawingTextReferences(sheet.drawings, (reference) => ({
+      ...reference,
+      sheetId: reference.sheetId === sourceSheetId ? sheetId : reference.sheetId,
+    }));
   const usedTableIds = new Set(
     [...workbook.sheets.values()].flatMap((entry) => (entry.tables ?? []).map((table) => table.id)),
   );

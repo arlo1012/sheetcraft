@@ -36,6 +36,11 @@ import {
   createShapeGroupSceneProjection,
   type ShapeGroupSceneProjection,
 } from "./shape-group-scene";
+import { SHAPE_TEXT_CHARACTER_LIMITS } from "@sheetcraft/core/shape-text-character-runs";
+import type {
+  TextBoxReferenceDisplay,
+  TextBoxReferenceResolver,
+} from "./textbox-reference-display";
 import type { PictureRotation3d } from "@sheetcraft/core/picture-detailed-style";
 
 type GraphicSource = SheetGraphicDrawing | SheetFramedGraphicDrawing | SheetGroupedGraphicDrawing;
@@ -66,6 +71,11 @@ export type ResolvedShapeRenderLeaf = Readonly<{
   carrierLeaf?: ResolvedShapeGroupLeaf;
   groupScene?: ShapeGroupSceneProjection;
   connector?: ShapeConnectorRenderSource;
+  /** Paint-only current linked glyph source. Carriers above stay canonical and editable. */
+  paintView?: SheetGraphicDrawing;
+  /** Exact carrier ownership plus this pass/current display for raster caches. */
+  paintIdentity?: object;
+  textReference?: TextBoxReferenceDisplay;
 }>;
 export type ResolvedShapeForestForRender = Readonly<{
   sourceForest: readonly SheetDrawing[];
@@ -232,8 +242,17 @@ export function resolveShapeForestForRender(options: {
   drawings: readonly SheetDrawing[];
   metrics: PictureSheetMetrics;
   revision: number;
+  textBoxReferenceResolver?: TextBoxReferenceResolver;
 }): ResolvedShapeForestForRender {
   const { drawings, metrics, revision } = options;
+  let referenceResolver: TextBoxReferenceResolver | undefined;
+  let resolverFailure: unknown;
+  try {
+    referenceResolver =
+      options.textBoxReferenceResolver?.createPass?.() ?? options.textBoxReferenceResolver;
+  } catch (error) {
+    resolverFailure = error;
+  }
   if (!Number.isSafeInteger(revision) || revision < 0)
     throw new RangeError("A shape render pass requires a non-negative safe revision.");
   const snapshot = detachedSnapshot(normalizeSheetDrawings(drawings));
@@ -255,8 +274,57 @@ export function resolveShapeForestForRender(options: {
   const leaves: ResolvedShapeRenderLeaf[] = [];
   const groups = new Map<string, ResolvedShapeGroupProjection>();
   const leafIndex = new Map<string, ResolvedShapeRenderLeaf>();
+  const contextIdentity = Object.freeze({});
   function addLeaf(leaf: ResolvedShapeRenderLeaf): void {
-    const value = Object.freeze(leaf);
+    let linked: {
+      paintView?: SheetGraphicDrawing;
+      paintIdentity?: object;
+      textReference?: TextBoxReferenceDisplay;
+    } = {};
+    if (leaf.sourceNode.kind === "textBox" && leaf.sourceNode.textReference) {
+      let display: TextBoxReferenceDisplay;
+      try {
+        if (resolverFailure) throw resolverFailure;
+        display = referenceResolver
+          ? referenceResolver.resolve(leaf.sourceNode.textReference)
+          : Object.freeze({
+              status: "unavailable",
+              reason: "evaluator-unavailable",
+              message: "Linked text requires its workbook display resolver.",
+            });
+        if (
+          display.status === "ready" &&
+          display.text.length > SHAPE_TEXT_CHARACTER_LIMITS.textUnits
+        )
+          display = Object.freeze({
+            status: "unavailable",
+            reason: "display-budget",
+            message: "Linked text exceeds the shape text-unit budget.",
+          });
+      } catch (error) {
+        display = Object.freeze({
+          status: "unavailable",
+          reason: "evaluation-failed",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      linked = { textReference: display };
+      const view = leaf.carrierLeaf?.view ?? leaf.carrierRoot?.view;
+      if (display.status === "ready" && view?.kind === "textBox") {
+        const { textReference: _reference, ...appearance } = view;
+        // Detach before freezing: legacy carrier views may be the user's actual
+        // drawing, and no paint pass may freeze or change its nested fields.
+        linked.paintView = detachedSnapshot({ ...appearance, text: display.text });
+        linked.paintIdentity = Object.freeze({
+          sourceRoot: leaf.sourceRoot,
+          sourceNode: leaf.sourceNode,
+          path: leaf.path,
+          contextIdentity,
+          display,
+        });
+      }
+    }
+    const value = Object.freeze({ ...leaf, ...linked });
     leaves.push(value);
     leafIndex.set(leaf.sourceNode.id, value);
   }
@@ -395,7 +463,7 @@ export function resolveShapeForestForRender(options: {
     sourceSnapshot: snapshot,
     metrics,
     revision,
-    contextIdentity: Object.freeze({}),
+    contextIdentity,
     connections,
     roots: Object.freeze(roots),
     leaves: Object.freeze(leaves),

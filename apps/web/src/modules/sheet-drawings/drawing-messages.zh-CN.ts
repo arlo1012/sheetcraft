@@ -1,4 +1,22 @@
 export const drawingsZhCN = {
+  "drawing.textBoxReferenceTitle": "文本框引用单元格",
+  "drawing.textBoxReferenceSheet": "来源工作表",
+  "drawing.textBoxReferenceSource": "来源单元格",
+  "drawing.textBoxReferenceApply": "引用单元格",
+  "drawing.textBoxReferenceReplace": "替换文字并引用",
+  "drawing.textBoxReferenceHint":
+    "请选择一个单元格，例如 A1 或 Sheet2!A1。内容自动更新，框尺寸保持，即使已开启“根据文字调整大小”。不复制来源单元格的字体和颜色。",
+  "drawing.textBoxReferenceOverwrite":
+    "引用后将替换现有文字和局部字符格式，保留对象的统一字体与外观。撤销可恢复原文字。",
+  "drawing.textBoxReferenceInvalid": "请输入一个有效单元格，暂不支持区域或表达式。",
+  "drawing.textBoxReferenceBlank": "（空单元格）",
+  "drawing.textBoxReferenceStale": "文档或所选对象已改变，请关闭后重新打开。未替换任何内容。",
+  "drawing.textBoxReferenceUnavailable": "当前计算或文字资源无法显示来源内容，对象未改变。",
+  "drawing.textBoxReferenceUnlink": "解除引用并保留当前显示文字",
+  "drawing.textBoxReferenceMenu": "插入引用单元格…",
+  "drawing.textBoxReferenceReadonly":
+    "此文本框正在显示单元格内容。请修改来源单元格，或解除引用后编辑文字。",
+
   "drawing.equalHeight": "等高",
   "drawing.equalWidth": "等宽",
   "drawing.equalSize": "等尺寸",

@@ -7,6 +7,11 @@ import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { ChevronLeft, ChevronRight, Printer } from "lucide-vue-next";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
+import {
+  TextBoxReferenceUnavailableError,
+  type TextBoxReferenceResolver,
+} from "../../sheet-drawings/textbox-reference-display";
+import { ShapePrintError } from "../page-print-shapes";
 import type { SheetPageSetup } from "@sheetcraft/core/page-setup";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { useAppI18n } from "../../../shared/i18n";
@@ -26,6 +31,7 @@ const props = withDefaults(
     locale?: string;
     dateSystem?: "1900" | "1904";
     workbookRevision?: number;
+    textBoxReferenceResolver?: TextBoxReferenceResolver;
     imageAssetUrls?: ReadonlyMap<string, string>;
     theme?: WorkbookTheme;
   }>(),
@@ -46,7 +52,10 @@ const renderer = createPrintPreviewRenderer(() => {
 
 const previewResult = computed<{
   document?: PrintPreviewDocument;
-  errorKey?: "pagePrint.unsupportedPictures" | "pagePrint.invalidRange";
+  errorKey?:
+    | "pagePrint.unsupportedPictures"
+    | "pagePrint.invalidRange"
+    | "drawing.textBoxReferenceUnavailable";
 }>(() => {
   void repaint.value;
   try {
@@ -60,6 +69,7 @@ const previewResult = computed<{
       locale: props.locale,
       dateSystem: props.dateSystem,
       revision: props.workbookRevision,
+      textBoxReferenceResolver: props.textBoxReferenceResolver,
       shapePaintResources: renderer.getShapePaintResources(props.theme, props.imageAssetUrls),
     });
     return { document: result };
@@ -68,7 +78,10 @@ const previewResult = computed<{
       errorKey:
         error instanceof UnsupportedPictureDocumentError
           ? "pagePrint.unsupportedPictures"
-          : "pagePrint.invalidRange",
+          : error instanceof ShapePrintError &&
+              error.cause instanceof TextBoxReferenceUnavailableError
+            ? "drawing.textBoxReferenceUnavailable"
+            : "pagePrint.invalidRange",
     };
   }
 });
@@ -151,7 +164,8 @@ async function print(): Promise<void> {
       assetUrls = props.imageAssetUrls,
       fileName = props.fileName,
       locale = props.locale,
-      dateSystem = props.dateSystem;
+      dateSystem = props.dateSystem,
+      textBoxReferenceResolver = props.textBoxReferenceResolver;
     const assetIds = getPrintPictureAssetIds(
       document.sheet,
       document.shapeMetrics,
@@ -172,7 +186,8 @@ async function print(): Promise<void> {
       props.imageAssetUrls !== assetUrls ||
       props.fileName !== fileName ||
       props.locale !== locale ||
-      props.dateSystem !== dateSystem
+      props.dateSystem !== dateSystem ||
+      props.textBoxReferenceResolver !== textBoxReferenceResolver
     ) {
       printWindow.close();
       return;
@@ -191,6 +206,7 @@ async function print(): Promise<void> {
       revision,
       shapePaintResources: renderer.getShapePaintResources(theme, assetUrls),
       requireReadyGroupPaint: true,
+      textBoxReferenceResolver,
     });
     const images = document.pages.map((page) => {
       const canvas = window.document.createElement("canvas");
@@ -256,7 +272,17 @@ watch(
 );
 let resourceGeneration = 0;
 watch(
-  () => [props.visible, props.sheet, props.workbookRevision, props.imageAssetUrls, props.theme],
+  () => [
+    props.visible,
+    props.sheet,
+    props.workbookRevision,
+    props.imageAssetUrls,
+    props.theme,
+    props.evaluator,
+    props.textBoxReferenceResolver,
+    props.locale,
+    props.dateSystem,
+  ],
   async () => {
     const request = ++resourceGeneration;
     if (!props.visible) return;

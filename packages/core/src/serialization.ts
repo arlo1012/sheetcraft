@@ -306,6 +306,8 @@ export type WorkbookSnapshotV71 = Omit<WorkbookSnapshotV70, "version"> & { versi
 export type WorkbookSnapshotV72 = Omit<WorkbookSnapshotV71, "version"> & { version: 72 };
 /** Explicit text-box body paint, line and non-3D effects, paired with owned shape text. */
 export type WorkbookSnapshotV73 = Omit<WorkbookSnapshotV72, "version"> & { version: 73 };
+/** Conditional envelope for TextBox single-cell references. */
+export type WorkbookSnapshotV74 = Omit<WorkbookSnapshotV73, "version"> & { version: 74 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -337,8 +339,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV70
   | WorkbookSnapshotV71
   | WorkbookSnapshotV72
-  | WorkbookSnapshotV73;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV73, "version"> & {
+  | WorkbookSnapshotV73
+  | WorkbookSnapshotV74;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV74, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -430,7 +433,8 @@ type SnapshotVersion =
   | 70
   | 71
   | 72
-  | 73;
+  | 73
+  | 74;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -465,6 +469,7 @@ function inspectShapeSnapshotFeatures(
   hasScene: boolean;
   hasTextBox3d: boolean;
   hasTextBoxBodyStyle: boolean;
+  hasTextReference: boolean;
   hasOpenArea: boolean;
   hasModernWordArt: boolean;
   hasTextWarp: boolean;
@@ -473,6 +478,7 @@ function inspectShapeSnapshotFeatures(
   let hasScene = false,
     hasTextBox3d = false,
     hasTextBoxBodyStyle = false,
+    hasTextReference = false,
     hasOpenArea = false,
     hasModernWordArt = false,
     hasTextWarp = false,
@@ -488,6 +494,14 @@ function inspectShapeSnapshotFeatures(
       const node = asRecord(entry.value, path);
       if (seen.has(node)) throw new TypeError("Cyclic or shared shape group ownership.");
       seen.add(node);
+      if ("textReference" in node) {
+        if (version !== undefined && version < 74)
+          return fail(`${path}.textReference`, "Text box references require snapshot version 74.");
+        const referenceField = Object.getOwnPropertyDescriptor(node, "textReference");
+        if (!referenceField || !("value" in referenceField))
+          return fail(`${path}.textReference`, "Text box references must be own data fields.");
+        hasTextReference = true;
+      }
       const textField = Object.getOwnPropertyDescriptor(node, "shapeText");
       const textModel: unknown = textField && "value" in textField ? textField.value : undefined;
       if (textModel && typeof textModel === "object" && "warp" in textModel) {
@@ -601,6 +615,7 @@ function inspectShapeSnapshotFeatures(
     hasScene,
     hasTextBox3d,
     hasTextBoxBodyStyle,
+    hasTextReference,
     hasOpenArea,
     hasModernWordArt,
     hasTextWarp,
@@ -1699,6 +1714,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   let hasShapeGroup3d = false;
   let hasTextBoxBody3d = false;
   let hasTextBoxBodyStyle = false;
+  let hasTextReference = false;
   let hasOpenShapeArea = false;
   let hasModernWordArt = false;
   let hasTextWarp = false;
@@ -1715,6 +1731,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       hasShapeGroup3d ||= scene.hasScene;
       hasTextBoxBody3d ||= scene.hasTextBox3d;
       hasTextBoxBodyStyle ||= scene.hasTextBoxBodyStyle;
+      hasTextReference ||= scene.hasTextReference;
       hasOpenShapeArea ||= scene.hasOpenArea;
       hasModernWordArt ||= scene.hasModernWordArt;
       hasTextWarp ||= scene.hasTextWarp;
@@ -2112,6 +2129,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasShapeCharacterEffects) version = 72;
     // Infer last so unrelated earlier features cannot lower the text-box body protocol.
     if (hasTextBoxBodyStyle) version = 73;
+    if (hasTextReference) version = 74;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -2424,6 +2442,14 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 73;
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasTextReference,
+      ),
+    )
+  )
+    snapshot.version = 74;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -2504,7 +2530,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 70 &&
     record.version !== 71 &&
     record.version !== 72 &&
-    record.version !== 73
+    record.version !== 73 &&
+    record.version !== 74
   ) {
     throw new WorkbookDomainError(
       {

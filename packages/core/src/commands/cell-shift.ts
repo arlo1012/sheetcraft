@@ -1,3 +1,11 @@
+import {
+  prepareExternalDrawingCollections,
+  readExternalDrawingCollections,
+  planExternalTextReferenceChanges,
+  commitExternalDrawingCollections,
+  mapLocalTextReferences,
+  preflightTextReferenceSparseState,
+} from "./text-references.js";
 import { isPictureGroup } from "../picture-group.js";
 import { isLegacyPictureObject } from "../picture-object.js";
 import { isFramedPictureObject } from "../picture-object.js";
@@ -578,6 +586,9 @@ export function applyCellShiftCommand(
   const nextPivots = transformPivotReferences(pivotTables, sheet.id, map, (source) =>
     transformFormulaRange(source, map, range, command.direction),
   );
+  nextState.drawings = mapLocalTextReferences(nextState.drawings, sheet.id, map);
+  const externalDrawings = planExternalTextReferenceChanges(workbook, sheet.id, map);
+  preflightTextReferenceSparseState(sheet, nextState);
   const stateChanged = validateCommandPayload("range", command.range, () =>
     replaceSheetSparseState(sheet, nextState),
   );
@@ -591,16 +602,22 @@ export function applyCellShiftCommand(
   workbook.definedNames.clear();
   for (const definition of transformedNames) workbook.definedNames.set(definition.id, definition);
   const pivotsChanged = restorePivotTables(workbook, nextPivots);
+  const drawingReferencesChanged = commitExternalDrawingCollections(workbook, externalDrawings);
   const externalChanged =
+    drawingReferencesChanged ||
     workbookFormulaSources.some((formula) => {
       const current = workbook.sheets
         .get(formula.sheetId)
         ?.cells.get(createCellKey(formula.address))?.content;
       return current?.kind === "formula" && current.formula.source !== formula.source;
-    }) || JSON.stringify(definedNames) !== JSON.stringify(transformedNames);
+    }) ||
+    JSON.stringify(definedNames) !== JSON.stringify(transformedNames);
   return stateChanged || externalChanged || pivotsChanged || templatesChanged
     ? {
         type: "restoreCellShift",
+        ...(externalDrawings.previous.length
+          ? { externalDrawingCollections: externalDrawings.previous }
+          : {}),
         pivotTables,
         sheetId: sheet.id,
         state: previousState,
@@ -640,6 +657,13 @@ export function applyRestoreCellShiftCommand(
   });
   const namesChanged =
     JSON.stringify(cloneDefinedNames(workbook)) !== JSON.stringify(command.definedNames);
+  const externalDrawings = prepareExternalDrawingCollections(
+    workbook,
+    sheet.id,
+    readExternalDrawingCollections(command),
+    { direction: "restore", mapCell: createMap(validate(original), original.direction) },
+  );
+  preflightTextReferenceSparseState(sheet, command.state);
   const changed = validateCommandPayload("state", command.state, () =>
     replaceSheetSparseState(sheet, command.state),
   );
@@ -660,7 +684,13 @@ export function applyRestoreCellShiftCommand(
     workbook,
     command.tableCalculatedColumnFormulaSources ?? [],
   );
-  return changed || formulaChanged || namesChanged || pivotsChanged || templatesChanged
+  const externalChanged = commitExternalDrawingCollections(workbook, externalDrawings);
+  return changed ||
+    formulaChanged ||
+    namesChanged ||
+    pivotsChanged ||
+    templatesChanged ||
+    externalChanged
     ? original
     : null;
 }

@@ -40,11 +40,13 @@ import {
   createSheetHiddenColumnIntervals,
   createSheetHiddenRowIntervals,
 } from "../sheet-grid/data-visibility";
+import { TextBoxReferenceUnavailableError } from "../sheet-drawings/textbox-reference-display";
 import { resolveShapeDrawing } from "../sheet-drawings/resolved-shape-drawing";
 import { resolveShapeGroupProjection } from "../sheet-drawings/resolved-shape-group";
 import type {
   ResolvedShapeForestForRender,
   ShapeConnectorRenderSource,
+  ResolvedShapeRenderLeaf,
 } from "../sheet-drawings/resolved-shape-render-source";
 import {
   getDrawingShapeGeometry,
@@ -183,6 +185,19 @@ function connectorPaintSource(connector: ShapeConnectorRenderSource | undefined)
     throw new Error(`The actual connector appearance is unavailable: ${connector.reason}.`);
   return connector?.status === "ready" ? connector : undefined;
 }
+function requireLinkedTextPaint(
+  source: SheetGraphicDrawing | SheetFramedGraphicDrawing | SheetGroupedGraphicDrawing,
+  leaf: ResolvedShapeRenderLeaf | undefined,
+): SheetGraphicDrawing | undefined {
+  if (source.kind !== "textBox" || !source.textReference) return;
+  if (leaf?.textReference?.status !== "ready")
+    throw new TextBoxReferenceUnavailableError(
+      leaf?.textReference?.status === "unavailable" ? leaf.textReference : undefined,
+    );
+  // A collapsed group leaf may have no world placement, but its text status
+  // must still be checked before culling. Its canonical carrier remains intact.
+  return leaf.paintView;
+}
 function* printableShapeLeavesForRoot(
   sourceRoot: PrintableShape,
   metrics: PictureSheetMetrics,
@@ -205,17 +220,22 @@ function* printableShapeLeavesForRoot(
     for (const leaf of projection.leaves) {
       // Hidden members remain valid relation targets, but never enter connector/font/paint preflight.
       if (!visibleIds.has(leaf.sourceNode.id)) continue;
-      const connector = renderPass?.getLeaf(leaf.sourceNode.id)?.connector;
+      const passLeaf = renderPass?.getLeaf(leaf.sourceNode.id);
+      const textPaint = checked(leaf.path.join("/"), () =>
+        requireLinkedTextPaint(leaf.sourceNode, passLeaf),
+      );
+      const connector = passLeaf?.connector;
       if (connector?.status === "suspended" || connector?.status === "degenerate") continue;
       const paint = checked(leaf.path.join("/"), () => connectorPaintSource(connector));
       if (!paint && (leaf.collapsed || !leaf.view || !leaf.layout)) continue;
       yield {
         sourceRoot,
         sourceNode: leaf.sourceNode,
-        sourceIdentity: groupedPrintIdentity(sourceRoot, leaf.sourceNode, leaf.path),
+        sourceIdentity:
+          passLeaf?.paintIdentity ?? groupedPrintIdentity(sourceRoot, leaf.sourceNode, leaf.path),
         path: leaf.path,
         drawingId: leaf.path.join("/"),
-        drawing: paint?.paintView ?? leaf.view!,
+        drawing: paint?.paintView ?? textPaint ?? leaf.view!,
         rect: paint?.route.paintLayout.rect ?? leaf.layout!.rect,
         ...(paint ? { connectorRoute: paint.route } : {}),
       };
@@ -229,6 +249,7 @@ function* printableShapeLeavesForRoot(
       throw new TypeError("Printing requires the exact shape owner of its whole-sheet pass.");
     return passLeaf.carrierRoot;
   });
+  const textPaint = checked(sourceRoot.id, () => requireLinkedTextPaint(sourceRoot, passLeaf));
   const connector = passLeaf?.connector;
   if (connector?.status === "suspended" || connector?.status === "degenerate") return;
   const paint = checked(sourceRoot.id, () => connectorPaintSource(connector));
@@ -236,10 +257,10 @@ function* printableShapeLeavesForRoot(
   yield {
     sourceRoot,
     sourceNode: sourceRoot,
-    sourceIdentity: sourceRoot,
+    sourceIdentity: passLeaf?.paintIdentity ?? sourceRoot,
     path: [sourceRoot.id],
     drawingId: sourceRoot.id,
-    drawing: paint?.paintView ?? (resolved.view as SheetGraphicDrawing),
+    drawing: paint?.paintView ?? textPaint ?? (resolved.view as SheetGraphicDrawing),
     rect: paint?.route.paintLayout.rect ?? resolved.rect,
     ...(paint ? { connectorRoute: paint.route } : {}),
   };

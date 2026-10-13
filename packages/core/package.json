@@ -331,6 +331,10 @@
     "./shape-group-copy": {
       "types": "./dist/shape-group-copy.d.ts",
       "import": "./dist/shape-group-copy.js"
+    },
+    "./text-box-reference": {
+      "types": "./dist/text-box-reference.d.ts",
+      "import": "./dist/text-box-reference.js"
     }
   },
   "scripts": {

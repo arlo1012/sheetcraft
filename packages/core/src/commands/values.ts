@@ -1,3 +1,9 @@
+import {
+  planExternalTextReferenceChanges,
+  commitExternalDrawingCollections,
+  mapLocalTextReferences,
+} from "./text-references.js";
+import { assertShapeObjectsForSheet } from "../shape-object-sheet.js";
 import { normalizeCellTextCaption } from "../text-font-runs.js";
 import {
   capturePivotTables,
@@ -968,6 +974,11 @@ export function applyMoveCellRangeCommand(
     const address = parseCellKey(key);
     if (isIn(address, source) || isIn(address, destination)) affected.set(key, address);
   }
+  const nextDrawings = mapLocalTextReferences(previous.drawings, sheet.id, moveAddress);
+  const localDrawingReferencesChanged =
+    JSON.stringify(nextDrawings) !== JSON.stringify(previous.drawings ?? []);
+  assertShapeObjectsForSheet(nextDrawings, sheet);
+  const externalDrawings = planExternalTextReferenceChanges(workbook, sheet.id, moveAddress);
   // Sparse clear gives blank source cells overwrite semantics without iterating the rectangle.
   for (const address of affected.values()) {
     setCellContent(sheet, address, null);
@@ -1023,6 +1034,8 @@ export function applyMoveCellRangeCommand(
       getCellNamedStyle(sheet, address),
     ),
   );
+  if (localDrawingReferencesChanged) sheet.drawings = nextDrawings;
+  const drawingReferencesChanged = commitExternalDrawingCollections(workbook, externalDrawings);
   sheet.conditionalFormats = conditionalFormats;
   rewriteConditionalFormatQualifiedReferencesForSheet(
     workbook,
@@ -1033,6 +1046,7 @@ export function applyMoveCellRangeCommand(
   const current = createSheetSparseState(sheet);
   if (
     !pivotsChanged &&
+    !drawingReferencesChanged &&
     JSON.stringify(current) === JSON.stringify(previous) &&
     JSON.stringify(getConditionalFormatFormulaSources(workbook, sheet.id)) ===
       JSON.stringify(conditionalFormatFormulaSources)
@@ -1042,6 +1056,22 @@ export function applyMoveCellRangeCommand(
     type: "restoreSheetState",
     sheetId: command.sheetId,
     state: previous,
+    ...(externalDrawings.previous.length
+      ? {
+          textReferenceTransform: {
+            sheetId: sheet.id,
+            direction: "restore" as const,
+            operation: {
+              type: "moveCellRange" as const,
+              source: { start: { ...source.start }, end: { ...source.end } },
+              destination: { ...command.destination },
+            },
+          },
+        }
+      : {}),
+    ...(externalDrawings.previous.length
+      ? { externalDrawingCollections: externalDrawings.previous }
+      : {}),
     pivotTables,
     ...(conditionalFormatFormulaSources.length ? { conditionalFormatFormulaSources } : {}),
   };

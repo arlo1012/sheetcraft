@@ -1,3 +1,5 @@
+import type { TextReferenceTransform } from "./text-references.js";
+import type { TextReferenceDrawingState } from "../text-box-reference.js";
 import type { SheetPivotTable, PivotTablesSnapshot } from "../pivot-tables.js";
 import type { CellSparkline } from "../sparklines.js";
 import type { SheetDrawing } from "../sheet-drawings.js";
@@ -173,6 +175,8 @@ export type DeleteCellsCommand = {
 
 /** Internal lossless inverse for a rectangular cell shift. */
 export type RestoreCellShiftCommand = {
+  /** Exact changed external owners; structural maintenance alters linked cells only. */
+  externalDrawingCollections?: TextReferenceDrawingState[];
   pivotTables?: PivotTablesSnapshot;
   type: "restoreCellShift";
   sheetId: string;
@@ -719,6 +723,10 @@ export type MoveSheetAxisCommand = {
 };
 
 export type RestoreFullSheetStateCommand = {
+  /** Internal original movement and direction for exact external-reference inverse association. */
+  textReferenceTransform?: TextReferenceTransform;
+  /** Exact changed external owners; structural maintenance alters linked cells only. */
+  externalDrawingCollections?: TextReferenceDrawingState[];
   pivotTables?: PivotTablesSnapshot;
   type: "restoreSheetState";
   sheetId: string;
@@ -777,6 +785,8 @@ export type ClearSheetConditionalFormatsCommand = {
 };
 
 export type SheetAxisSparseSlice = {
+  /** Exact changed external owners; structural maintenance alters linked cells only. */
+  externalDrawingCollections?: TextReferenceDrawingState[];
   pivotTables?: PivotTablesSnapshot;
   cells: SheetSparseCell[];
   dimensions: SheetSparseDimension[];

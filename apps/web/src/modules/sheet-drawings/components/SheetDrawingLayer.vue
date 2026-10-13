@@ -162,6 +162,7 @@ import {
   detailedShapeContainsWorldPoint,
   type ShapeDetailedPresentation,
 } from "../shape-detailed-presentation";
+import type { TextBoxReferenceResolver } from "../textbox-reference-display";
 const props = defineProps<{
   drawings: readonly SourceSheetDrawing[];
   applyUpdate?: (drawing: SourceSheetDrawing, expected: SourceSheetDrawing) => boolean;
@@ -192,6 +193,8 @@ const props = defineProps<{
   textEditCallbacks?: ShapeTextEditCallbacks;
   startTextEdit?: (request: ShapeCanvasTextEditRequest) => boolean;
   textEditSelection?: { start: number; end: number };
+  textBoxReferenceResolver?: TextBoxReferenceResolver;
+  openTextBoxReference?: (root: SourceSheetDrawing, path?: ShapeGroupPath) => boolean;
 }>();
 const emit = defineEmits<{
   update: [drawing: SourceSheetDrawing];
@@ -282,8 +285,10 @@ const metrics = computed(() => {
 const renderState = computed(() => {
   const connected = props.drawings.some((root) =>
     isShapeGroupDrawing(root)
-      ? traverseShapeGroup(root).some(({ node }) => "shapeConnector" in node)
-      : "shapeConnector" in root,
+      ? traverseShapeGroup(root).some(
+          ({ node }) => "shapeConnector" in node || "textReference" in node,
+        )
+      : "shapeConnector" in root || "textReference" in root,
   );
   if (!connected) return { pass: undefined, unavailable: false };
   try {
@@ -293,6 +298,7 @@ const renderState = computed(() => {
         drawings: props.drawings,
         metrics: metrics.value,
         revision: props.revision ?? 0,
+        textBoxReferenceResolver: props.textBoxReferenceResolver,
       }),
       unavailable: false,
     };
@@ -396,6 +402,7 @@ const displayedRenderPass = computed(() => {
         drawings: forest,
         metrics: base.metrics,
         revision: base.revision,
+        textBoxReferenceResolver: props.textBoxReferenceResolver,
       });
 });
 const previewViews = computed(() => {
@@ -607,7 +614,9 @@ function acceptDetailedPaint(
   )
     return;
   const key = `${fragment.drawing.id}:${fragment.pageKey ?? fragment.paneId}`;
-  if (presentation?.drawing === fragment.drawing) detailedPresentations.set(key, presentation);
+  const paintDrawing =
+    fragment.renderPass?.getLeaf(fragment.drawing.id)?.paintView ?? fragment.drawing;
+  if (presentation?.drawing === paintDrawing) detailedPresentations.set(key, presentation);
   else detailedPresentations.delete(key);
 }
 type DrawingFragment = FloatingImageViewportFragment & {
@@ -874,6 +883,7 @@ const fragments = computed<DrawingFragment[]>(
           ? preview.value
           : (previewViews.value.get(original.id) ?? original);
       const route = leaf?.connector?.status === "ready" ? leaf.connector.route : undefined;
+      const paintDrawing = leaf?.paintView ?? drawing;
       const currentLayout = viewLayout(drawing);
       const standard = isStandard(drawing);
       const shape = standard && drawingGeometry(drawing);
@@ -884,7 +894,7 @@ const fragments = computed<DrawingFragment[]>(
         resolved?.metrics &&
         (drawing.kind === "shape" || drawing.kind === "textBox")
           ? getShapePageFragments(
-              drawing as SheetGraphicDrawing,
+              paintDrawing as SheetGraphicDrawing,
               props.layout,
               props.pageProjection,
               resolved.metrics,
@@ -893,7 +903,7 @@ const fragments = computed<DrawingFragment[]>(
             )
           : standard && shape
             ? getStandardShapeViewportFragments(
-                drawing,
+                paintDrawing as SheetGraphicDrawing,
                 currentLayout,
                 isSelectedView(drawing),
                 hasContinuousView(drawing),
@@ -963,6 +973,8 @@ function beginCanvasText(drawing: SheetDrawing, selection: "all" | "end", text?:
     source = sourceOwner(drawing);
   if (!owner || !source || legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing)
     return false;
+  if (drawing.kind === "textBox" && drawing.textReference)
+    return props.openTextBoxReference?.(source, owner.groupLeaf?.path) === true;
   selectRoots([source.id], owner.groupLeaf ? drawing.id : null);
   pointEditingId.value = null;
   session?.cancel();
@@ -1877,7 +1889,7 @@ function hits(fragment: DrawingFragment, event: MouseEvent): boolean {
     )
       return true;
     const glyphOrDetailedHit = detailedShapeContainsWorldPoint(
-      fragment.drawing,
+      fragment.renderPass?.getLeaf(fragment.drawing.id)?.paintView ?? fragment.drawing,
       fragment.rect,
       viewportPoint(event),
       detailedPresentations.get(`${fragment.drawing.id}:${fragment.pageKey ?? fragment.paneId}`),
@@ -2432,6 +2444,7 @@ const shapeTextMenu = shallowRef<{
     copy?: () => boolean;
     cut?: () => boolean;
     paste?: () => boolean;
+    reference?: () => boolean;
   };
 }>();
 const shapeTextMenuAnchor = shallowRef<FloatingReference | null>(null);
@@ -2551,6 +2564,7 @@ function shapeContext(fragment: DrawingFragment, event: MouseEvent | KeyboardEve
     canObject: !projectionById(drawing)?.renderLeaf?.connector,
     canText:
       !projectionById(drawing)?.renderLeaf?.connector &&
+      !(drawing.kind === "textBox" && drawing.textReference) &&
       !!textRect &&
       textRect.width > 0 &&
       textRect.height > 0,
@@ -2578,6 +2592,16 @@ function shapeContext(fragment: DrawingFragment, event: MouseEvent | KeyboardEve
         dismissShapeTextMenu("programmatic", false);
         return true;
       },
+      ...(drawing.kind === "textBox" && props.openTextBoxReference
+        ? {
+            reference: () => {
+              if (!valid() || !finishCanvasText() || !valid()) return false;
+              const opened = props.openTextBoxReference?.(source, owned?.path) === true;
+              if (opened) dismissShapeTextMenu("programmatic", false);
+              return opened;
+            },
+          }
+        : {}),
       ...(drawing.kind === "shape" && drawing.shapePath
         ? {
             points: () => {
@@ -3323,6 +3347,11 @@ watch(
             @detailed-paint="acceptDetailedPaint(fragment, $event)"
             @control-change="emit('controlChange', fragment.drawing.id, $event)"
             :drawing="fragment.drawing"
+            :paint-drawing="displayedRenderPass?.getLeaf(fragment.drawing.id)?.paintView"
+            :text-reference-unavailable="
+              displayedRenderPass?.getLeaf(fragment.drawing.id)?.textReference?.status ===
+              'unavailable'
+            "
             :hide-text="hideCanvasText(fragment.drawing)"
             :connector-route="fragment.connectorRoute"
             :legacy-hit-surface="legacyHitSurface(fragment.drawing)"
@@ -3481,6 +3510,11 @@ watch(
           :disabled="!canPasteObjects"
           v-on="{ select: shapeTextMenu.actions.paste }"
           >{{ t("cellMenu.paste") }}</MenuItem
+        >
+        <MenuItem
+          v-if="shapeTextMenu.actions.reference"
+          v-on="{ select: shapeTextMenu.actions.reference }"
+          >{{ t("drawing.textBoxReferenceMenu") }}</MenuItem
         >
         <MenuItem
           v-if="shapeTextMenu.kind !== 'shapeGroup'"

@@ -16,6 +16,8 @@ import {
 import { normalizeShapePresetParameters } from "./shape-presets/contract.js";
 import type { ShapePresetParameters } from "./shape-presets/types.js";
 import { normalizeShapeStyle, type ShapeDetailedStyle } from "./shape-style.js";
+import { normalizeTextBoxTextReference, type TextBoxTextReference } from "./text-box-reference.js";
+export type { TextBoxTextReference } from "./text-box-reference.js";
 import { normalizeShapeText, type ShapeText } from "./shape-text.js";
 import { normalizeShapeFrame, type ShapeFrame } from "./shape-frame.js";
 import {
@@ -87,6 +89,8 @@ export type SheetGraphicDrawing = DrawingBase & {
   shapeStyle?: ShapeDetailedStyle;
   /** Explicit shape/text-box layout, paragraph and glyph appearance, independent of body style. */
   shapeText?: ShapeText;
+  /** TextBox-only absolute single-cell link; absence owns literal text, null cell owns #REF. */
+  textReference?: TextBoxTextReference;
   /** Modern WordArt semantics on an ordinary text-bearing shape; legacy kind=wordArt is separate. */
   wordArt?: true;
   /** Sparse opt-in vertical text boxes; existing drawings retain horizontal text. */
@@ -349,6 +353,22 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
     throw new TypeError("Shape text cannot be an accessor.");
   if (textField && value.kind !== "shape" && value.kind !== "textBox")
     throw new TypeError("Only shape or text box drawings may carry shape text.");
+  const referenceField = Object.getOwnPropertyDescriptor(value, "textReference");
+  if (!referenceField && "textReference" in value)
+    throw new TypeError("Text box references must be own data fields.");
+  if (referenceField && (!("value" in referenceField) || value.kind !== "textBox"))
+    throw new TypeError("Only text boxes may own text reference data fields.");
+  const textReference = referenceField
+    ? normalizeTextBoxTextReference(referenceField.value)
+    : undefined;
+  if (
+    textReference &&
+    (value.text !== "" ||
+      (textField?.value &&
+        typeof textField.value === "object" &&
+        "characterRuns" in textField.value))
+  )
+    throw new TypeError("Linked text boxes require empty literal text and no character runs.");
   const directionField = Object.getOwnPropertyDescriptor(value, "textDirection");
   if (textField && directionField)
     throw new TypeError("Shape text and legacy text direction are mutually exclusive.");
@@ -415,6 +435,7 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
     ...(hidden ? { hidden: true as const } : {}),
     ...(shapeStyle ? { shapeStyle } : {}),
     ...(shapeText ? { shapeText } : {}),
+    ...(textReference ? { textReference } : {}),
     ...(wordArtField ? { wordArt: true as const } : {}),
     ...(directionField ? { textDirection: "vertical" as const } : {}),
     name: value.name,
@@ -453,6 +474,7 @@ const shapeFrameFields = [
   "hidden",
   "shapeStyle",
   "shapeText",
+  "textReference",
   "wordArt",
   "textDirection",
   "shapeFrame",
@@ -473,7 +495,8 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     !!rawTextModel && typeof rawTextModel === "object" && "characterRuns" in rawTextModel;
   const hasTextWarp = !!rawTextModel && typeof rawTextModel === "object" && "warp" in rawTextModel;
   const hasWordArt = "wordArt" in value;
-  if (hasCharacterRuns || hasTextWarp || hasWordArt)
+  const hasTextReference = "textReference" in value;
+  if (hasCharacterRuns || hasTextWarp || hasWordArt || hasTextReference)
     for (const key of [
       "id",
       "kind",
@@ -511,6 +534,7 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
         )));
   const hasNewControls =
     hasTextBoxBodyStyle ||
+    hasTextReference ||
     "hidden" in value ||
     (("shapeFlipX" in value || "shapeFlipY" in value) &&
       (ownKind?.value === "textBox" ||
@@ -535,10 +559,13 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     for (const key of Reflect.ownKeys(value)) {
       if (typeof key !== "string" || !fields.includes(key))
         throw new TypeError("Unknown shape control drawing field.");
-      if (!("value" in Object.getOwnPropertyDescriptor(value, key)!))
+      const field = Object.getOwnPropertyDescriptor(value, key)!;
+      if (!("value" in field))
         throw new TypeError("Shape controls require own data fields, not accessors.");
+      if (hasTextReference && field.value === undefined)
+        throw new TypeError("Linked text box fields cannot be undefined.");
     }
-    if (hasTextBoxBodyStyle) {
+    if (hasTextBoxBodyStyle || hasTextReference) {
       for (const key of [
         "id",
         "kind",
@@ -569,6 +596,12 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
       const anchorPrototype = Object.getPrototypeOf(anchor);
       if (anchorPrototype !== null && anchorPrototype !== Object.prototype)
         throw new TypeError("Text box body anchors must be ordinary data records.");
+      if (hasTextReference)
+        for (const key of Reflect.ownKeys(anchor)) {
+          const field = Object.getOwnPropertyDescriptor(anchor, key)!;
+          if ((key !== "row" && key !== "column") || !("value" in field))
+            throw new TypeError("Linked text box anchors require only own row and column data.");
+        }
       for (const key of ["row", "column"] as const) {
         const field = Object.getOwnPropertyDescriptor(anchor, key);
         if (!field || !("value" in field))
@@ -593,8 +626,11 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     for (const key of Reflect.ownKeys(value)) {
       if (typeof key !== "string" || !(shapeFrameFields as readonly string[]).includes(key))
         throw new TypeError("Unknown or conflicting canonical shape field.");
-      if (!("value" in Object.getOwnPropertyDescriptor(value, key)!))
+      const field = Object.getOwnPropertyDescriptor(value, key)!;
+      if (!("value" in field))
         throw new TypeError("Canonical shapes must contain own data fields, not accessors.");
+      if (hasTextReference && field.value === undefined)
+        throw new TypeError("Linked text box fields cannot be undefined.");
     }
     if (value.kind !== "shape" && value.kind !== "textBox")
       throw new TypeError("Only shapes or text boxes may use canonical shape frames.");

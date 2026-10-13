@@ -7,6 +7,7 @@ import type {
   SheetLegacyDrawing as SheetDrawing,
 } from "@sheetcraft/core/sheet-drawings";
 import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
+import { useAppI18n } from "../../../shared/i18n";
 import ShapeLeafPixelContent from "./ShapeLeafPixelContent.vue";
 import StandardShapeContent from "./StandardShapeContent.vue";
 import type { ShapeDetailedPresentation } from "../shape-detailed-presentation";
@@ -24,6 +25,9 @@ const ChartContent = defineAsyncComponent(() => import("../../charts/components/
 const EquationContent = defineAsyncComponent(() => import("./EquationContent.vue"));
 const props = defineProps<{
   drawing: SheetDrawing;
+  /** Disposable glyph projection; drawing remains the actual editable carrier. */
+  paintDrawing?: SheetGraphicDrawing;
+  textReferenceUnavailable?: boolean;
   connectorRoute?: ReadyShapeConnectorRoute;
   sheet?: Sheet;
   evaluator?: SheetEvaluator;
@@ -40,8 +44,16 @@ const emit = defineEmits<{
   controlChange: [value: unknown];
   detailedPaint: [presentation: ShapeDetailedPresentation | undefined];
 }>();
+const { t } = useAppI18n();
+const paintSource = computed(() => props.paintDrawing ?? props.drawing);
+const referenceUnavailable = computed(
+  () =>
+    props.drawing.kind === "textBox" &&
+    Boolean(props.drawing.textReference) &&
+    (props.textReferenceUnavailable || !props.paintDrawing),
+);
 const projectedLegacyTextBox = computed<SheetGraphicDrawing | undefined>(() => {
-  const drawing = props.drawing;
+  const drawing = paintSource.value;
   return drawing.kind === "textBox" &&
     !drawing.shapeText &&
     (drawing.shapeStyle?.rotation3d?.kind === "value" ||
@@ -50,30 +62,33 @@ const projectedLegacyTextBox = computed<SheetGraphicDrawing | undefined>(() => {
     : undefined;
 });
 const textStyle = computed(() => ({
-  color: props.drawing.color,
-  fontSize: `${props.drawing.fontSize}px`,
-  fontWeight: props.drawing.bold ? "700" : "400",
-  fontStyle: props.drawing.italic ? "italic" : "normal",
-  ...((props.drawing.kind === "shape" || props.drawing.kind === "textBox") &&
-  props.drawing.shapeFlipY
+  color: paintSource.value.color,
+  fontSize: `${paintSource.value.fontSize}px`,
+  fontWeight: paintSource.value.bold ? "700" : "400",
+  fontStyle: paintSource.value.italic ? "italic" : "normal",
+  ...((paintSource.value.kind === "shape" || paintSource.value.kind === "textBox") &&
+  paintSource.value.shapeFlipY
     ? { transform: "rotate(180deg)", transformOrigin: "50% 50%" }
     : {}),
 }));
 const legacyBodyTransform = computed(() =>
-  props.drawing.kind === "shape"
+  paintSource.value.kind === "shape"
     ? standardShapeSvgTransform({
         width: 100,
         height: 100,
-        shapeFlipX: props.drawing.shapeFlipX,
-        shapeFlipY: props.drawing.shapeFlipY,
+        shapeFlipX: paintSource.value.shapeFlipX,
+        shapeFlipY: paintSource.value.shapeFlipY,
       })
     : undefined,
 );
 </script>
 <template>
-  <div class="drawing-content" :style="{ transform: `rotate(${drawing.rotation}deg)` }">
+  <div class="drawing-content" :style="{ transform: `rotate(${paintSource.rotation}deg)` }">
+    <span v-if="referenceUnavailable" class="drawing-content__unavailable" role="status">
+      {{ t("drawing.textBoxReferenceUnavailable") }}
+    </span>
     <ShapeLeafPixelContent
-      v-if="projectedLegacyTextBox"
+      v-else-if="projectedLegacyTextBox"
       :drawing="projectedLegacyTextBox"
       :theme="theme"
       :density="density"
@@ -82,16 +97,16 @@ const legacyBodyTransform = computed(() =>
     />
     <StandardShapeContent
       v-else-if="
-        (drawing.kind === 'shape' &&
+        (paintSource.kind === 'shape' &&
           (connectorRoute ||
-            drawing.shapeConnector ||
-            drawing.shapeGeometry ||
-            drawing.shapePath ||
-            drawing.shapeStyle ||
-            drawing.shapeText)) ||
-        (drawing.kind === 'textBox' && drawing.shapeText)
+            paintSource.shapeConnector ||
+            paintSource.shapeGeometry ||
+            paintSource.shapePath ||
+            paintSource.shapeStyle ||
+            paintSource.shapeText)) ||
+        (paintSource.kind === 'textBox' && paintSource.shapeText)
       "
-      :drawing="drawing"
+      :drawing="paintSource"
       :connector-route="connectorRoute"
       :theme="theme"
       :asset-urls="imageAssetUrls"
@@ -100,7 +115,7 @@ const legacyBodyTransform = computed(() =>
       @paint="emit('detailedPaint', $event)"
     />
     <svg
-      v-else-if="drawing.kind === 'shape' || drawing.kind === 'icon'"
+      v-else-if="paintSource.kind === 'shape' || paintSource.kind === 'icon'"
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
       aria-hidden="true"
@@ -108,22 +123,22 @@ const legacyBodyTransform = computed(() =>
     >
       <g
         :transform="legacyBodyTransform"
-        :fill="drawing.fill"
-        :stroke="drawing.stroke"
-        :stroke-width="drawing.strokeWidth"
+        :fill="paintSource.fill"
+        :stroke="paintSource.stroke"
+        :stroke-width="paintSource.strokeWidth"
         stroke-linejoin="round"
       >
         <rect
-          v-if="drawing.shape === 'rectangle' || drawing.shape === 'roundedRectangle'"
+          v-if="paintSource.shape === 'rectangle' || paintSource.shape === 'roundedRectangle'"
           x="2"
           y="2"
           width="96"
           height="96"
-          :rx="drawing.shape === 'roundedRectangle' ? 12 : 0"
+          :rx="paintSource.shape === 'roundedRectangle' ? 12 : 0"
           vector-effect="non-scaling-stroke"
         />
         <ellipse
-          v-else-if="drawing.shape === 'ellipse'"
+          v-else-if="paintSource.shape === 'ellipse'"
           cx="50"
           cy="50"
           rx="48"
@@ -131,33 +146,33 @@ const legacyBodyTransform = computed(() =>
           vector-effect="non-scaling-stroke"
         />
         <path
-          v-else-if="drawing.shape === 'triangle'"
+          v-else-if="paintSource.shape === 'triangle'"
           d="M50 2 L98 98 H2 Z"
           vector-effect="non-scaling-stroke"
         />
         <path
-          v-else-if="drawing.shape === 'diamond'"
+          v-else-if="paintSource.shape === 'diamond'"
           d="M50 2 L98 50 L50 98 L2 50 Z"
           vector-effect="non-scaling-stroke"
         />
         <path
-          v-else-if="drawing.shape === 'arrow'"
+          v-else-if="paintSource.shape === 'arrow'"
           d="M2 32 H60 V2 L98 50 L60 98 V68 H2 Z"
           vector-effect="non-scaling-stroke"
         />
         <path
-          v-else-if="drawing.shape === 'line'"
+          v-else-if="paintSource.shape === 'line'"
           d="M2 98 L98 2"
           fill="none"
           vector-effect="non-scaling-stroke"
         />
         <path
-          v-else-if="drawing.shape === 'star'"
+          v-else-if="paintSource.shape === 'star'"
           d="M50 2 L62 35 L98 37 L70 60 L80 96 L50 75 L20 96 L30 60 L2 37 L38 35 Z"
           vector-effect="non-scaling-stroke"
         />
         <path
-          v-else-if="drawing.shape === 'heart'"
+          v-else-if="paintSource.shape === 'heart'"
           d="M50 94 C-30 40 8 -20 50 20 C92 -20 130 40 50 94 Z"
           vector-effect="non-scaling-stroke"
         />
@@ -198,6 +213,7 @@ const legacyBodyTransform = computed(() =>
     <div
       v-else
       v-show="
+        !referenceUnavailable &&
         !projectedLegacyTextBox &&
         !hideText &&
         !(
@@ -228,7 +244,7 @@ const legacyBodyTransform = computed(() =>
           : {},
       ]"
     >
-      {{ drawing.text }}
+      {{ paintSource.text }}
     </div>
   </div>
 </template>
@@ -242,6 +258,15 @@ const legacyBodyTransform = computed(() =>
     inset: 0;
     width: 100%;
     height: 100%;
+  }
+  &__unavailable {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    color: var(--color-text-secondary, #666);
+    font-size: 12px;
   }
   &__text {
     position: absolute;

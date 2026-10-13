@@ -50,3 +50,5 @@ export * from "./picture-group-copy.js";
 export * from "./picture-group-delete.js";
 export * from "./picture-properties.js";
 export * from "./picture-protection.js";
+
+export * from "./text-box-reference.js";

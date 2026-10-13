@@ -32,6 +32,7 @@ const appearanceFields = [
   "name",
   "hidden",
   "text",
+  "textReference",
   "shape",
   "fill",
   "stroke",
@@ -168,6 +169,14 @@ export function updateResolvedShapeDrawing(
   );
   if (nextView.id !== source.id || nextView.kind !== source.kind)
     throw new TypeError("A shape view edit must retain its source identity and kind.");
+  if (
+    source.kind === "textBox" &&
+    source.textReference &&
+    (nextView.text !== "" ||
+      nextView.kind !== "textBox" ||
+      JSON.stringify(nextView.textReference) !== JSON.stringify(source.textReference))
+  )
+    throw new TypeError("A linked text box paint view cannot edit or remove its source reference.");
   if (!isFramedShapeDrawing(source)) {
     normalizeSheetDrawing(nextView);
     return nextView;

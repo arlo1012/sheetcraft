@@ -128,11 +128,17 @@ export function assertWorkbookShapeSupport(workbook: Workbook): void {
   }
 }
 
-function requireOwnDataRecord(value: object): void {
+function requireOwnDataDescriptors(value: object): void {
   for (const key of Reflect.ownKeys(value)) {
     if (!("value" in Object.getOwnPropertyDescriptor(value, key)!))
       throw new TypeError("Shape admission requires data payloads without accessors.");
   }
+}
+function requireOwnDataRecord(value: object): void {
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null)
+    throw new TypeError("Shape admission requires ordinary data records.");
+  requireOwnDataDescriptors(value);
 }
 function checkState(sheetId: string, state: { drawings?: SheetDrawing[] }): void {
   requireOwnDataRecord(state);
@@ -141,7 +147,7 @@ function checkState(sheetId: string, state: { drawings?: SheetDrawing[] }): void
 function requireOwnDataArray<T extends object>(values: readonly T[]): void {
   if (!Array.isArray(values) || Object.getPrototypeOf(values) !== Array.prototype)
     throw new TypeError("Shape admission requires an ordinary dense data array.");
-  requireOwnDataRecord(values);
+  requireOwnDataDescriptors(values);
   for (const key of Reflect.ownKeys(values)) {
     if (
       key !== "length" &&
@@ -153,6 +159,26 @@ function requireOwnDataArray<T extends object>(values: readonly T[]): void {
     const descriptor = Object.getOwnPropertyDescriptor(values, String(index));
     if (!descriptor || !("value" in descriptor)) throw new TypeError("Sparse command payload.");
     requireOwnDataRecord(descriptor.value as object);
+  }
+}
+
+function checkExternalDrawingCollections(
+  values: readonly { sheetId: string; drawings: SheetDrawing[] }[],
+): void {
+  requireOwnDataArray(values);
+  for (const state of values) {
+    const sheetId = Object.getOwnPropertyDescriptor(state, "sheetId");
+    const drawings = Object.getOwnPropertyDescriptor(state, "drawings");
+    if (
+      !sheetId ||
+      !("value" in sheetId) ||
+      typeof sheetId.value !== "string" ||
+      !sheetId.value.trim() ||
+      !drawings ||
+      !("value" in drawings)
+    )
+      throw new TypeError("Reference maintenance requires own sheetId and drawings data.");
+    checkDrawings(sheetId.value as string, drawings.value as SheetDrawing[]);
   }
 }
 
@@ -172,13 +198,23 @@ export function assertShapeCommandSupport(command: WorkbookCommand): void {
       break;
     }
     case "restoreCellShift":
+      if (command.externalDrawingCollections) {
+        checkExternalDrawingCollections(command.externalDrawingCollections);
+      }
       checkState(command.sheetId, command.state);
       break;
     case "restoreSheetState":
-      if ("state" in command) checkState(command.sheetId, command.state);
-      else {
+      if ("state" in command) {
+        if (command.externalDrawingCollections) {
+          checkExternalDrawingCollections(command.externalDrawingCollections);
+        }
+        checkState(command.sheetId, command.state);
+      } else {
         requireOwnDataRecord(command.slice);
         checkState(command.sheetId, command.slice.metadata);
+        if (command.slice.externalDrawingCollections) {
+          checkExternalDrawingCollections(command.slice.externalDrawingCollections);
+        }
       }
       break;
     case "restoreTableTransaction":

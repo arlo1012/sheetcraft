@@ -157,7 +157,10 @@ import { captureScreen } from "../modules/insert-tools/captureScreen";
 import { useShapeCreation } from "../modules/sheet-drawings/useShapeCreation";
 import type { ShapeGalleryChoice } from "../modules/sheet-drawings/shape-gallery";
 import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
-import { prepareShapeTextUpdate } from "../modules/sheet-drawings/prepare-shape-text-update";
+import { prepareTextBoxReferenceUpdate } from "../modules/sheet-drawings/prepare-textbox-reference-update";
+import { createTextBoxReferenceResolver } from "../modules/sheet-drawings/textbox-reference-display";
+import { useTextBoxReference } from "../modules/sheet-drawings/useTextBoxReference";
+import TextBoxReferenceDialog from "../modules/sheet-drawings/components/TextBoxReferenceDialog.vue";
 import DrawingEditorDialog from "../modules/sheet-drawings/components/DrawingEditorDialog.vue";
 import ShapeFormatPane from "../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
 import ShapeToolsToolbar from "../modules/sheet-drawings/components/ShapeToolsToolbar.vue";
@@ -1829,6 +1832,14 @@ function getShapePaintAssetSize(id: string) {
       : undefined);
   return image ? { width: image.naturalWidth, height: image.naturalHeight } : undefined;
 }
+const textBoxReferenceResolver = computed(() => {
+  void workbookRevision.value;
+  return createTextBoxReferenceResolver({
+    workbook: session.workbook,
+    evaluator: activeSheetEvaluator.value,
+    locale: locale.value,
+  });
+});
 const drawingActions = useDrawingActions({
   preflightConnectedCollection: (pass) => {
     preflightShapeConnectorPaint(pass, {
@@ -1848,7 +1859,8 @@ const drawingActions = useDrawingActions({
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   name: (kind) => t(`drawing.${kind}`),
   prepareDrawing: (next, owner, forest, preparationMode) =>
-    prepareShapeTextUpdate(
+    prepareTextBoxReferenceUpdate(
+      textBoxReferenceResolver.value,
       next,
       owner,
       sheetGridRef.value?.getDrawingLayout(activeSheet.value),
@@ -1975,6 +1987,46 @@ function startShapeTextEdit(request: ShapeCanvasTextEditRequest): boolean {
   drawingActions.close();
   return true;
 }
+const textBoxReferenceActions = useTextBoxReference({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
+  getResolver: () => textBoxReferenceResolver.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () =>
+    (sheetGridRef.value?.flushPendingShapeTextEdit() ?? true) && cellEditSession.finish(),
+  replaceCollection: drawingActions.replaceCollectionPreservingGeometry,
+});
+const { dialog: textBoxReferenceDialog } = textBoxReferenceActions;
+const textBoxReferencePicker = useRangeReferencePicker(() => activeSheet.value.name, {
+  singleCell: true,
+});
+const { active: pickingTextBoxReference, reference: pickedTextBoxReference } =
+  textBoxReferencePicker;
+watch(textBoxReferenceDialog, () => textBoxReferencePicker.cancel(), { flush: "sync" });
+const selectTextBoxReference = computed(() => {
+  const request = textBoxReferenceDialog.value;
+  return async (current: string): Promise<string | undefined> => {
+    if (!request?.isCurrent()) return undefined;
+    const selected = await textBoxReferencePicker.selectReference(current, { singleCell: true });
+    return request.isCurrent() ? selected : undefined;
+  };
+});
+const textBoxReferencePickerCallbacks = computed(() => {
+  const request = textBoxReferenceDialog.value;
+  return {
+    confirm: () => {
+      if (textBoxReferenceDialog.value !== request) return;
+      if (request?.isCurrent()) textBoxReferencePicker.confirm();
+      else textBoxReferencePicker.cancel();
+    },
+    cancel: () => {
+      if (textBoxReferenceDialog.value === request) textBoxReferencePicker.cancel();
+    },
+  };
+});
 function openShapeGroupFormat(root: ShapeGroupDrawing, path: ShapeGroupPath) {
   const selected = traverseShapeGroup(root).find(
     ({ path: current }) => JSON.stringify(current) === JSON.stringify(path),
@@ -3422,6 +3474,7 @@ watch(protectionDialog, (dialog) => {
 const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
 const activeRangePicker = computed(() => {
+  if (pickingTextBoxReference.value) return textBoxReferencePicker;
   if (pickingProtectionRange.value) return protectionRangePicker;
   if (pickingTableRange.value) return tableRangePicker;
   if (pickingPivotRange.value) return pivotRangePicker;
@@ -3727,6 +3780,7 @@ const gridInert = computed(
     !!pictureAnnotation.value ||
     !!viewingAttachment.value ||
     !!editingDrawing.value ||
+    (!!textBoxReferenceDialog.value && !pickingTextBoxReference.value) ||
     symbolVisible.value ||
     (!!editingChart.value && !pickingChartRange.value) ||
     (!!sparklineDraft.value && !pickingSparklineRange.value) ||
@@ -3829,6 +3883,7 @@ watch(
         !!pictureAnnotation ||
         !!viewingAttachment ||
         !!editingDrawing ||
+        !!textBoxReferenceDialog ||
         symbolVisible ||
         (!!editingChart && !pickingChartRange) ||
         (!!sparklineDraft && !pickingSparklineRange) ||
@@ -5020,6 +5075,7 @@ watch(
         !!pictureAnnotation ||
         !!viewingAttachment ||
         !!editingDrawing ||
+        !!textBoxReferenceDialog ||
         symbolVisible ||
         (!!editingChart && !pickingChartRange) ||
         (!!sparklineDraft && !pickingSparklineRange) ||
@@ -5222,6 +5278,8 @@ watch(
           :shape-text-edit-callbacks="shapeTextEditCallbacks"
           :shape-text-edit-start="startShapeTextEdit"
           :shape-text-edit-selection="shapeTextEditSelection"
+          :text-box-reference-resolver="textBoxReferenceResolver"
+          :open-text-box-reference="textBoxReferenceActions.open"
           :shape-creation-commit="shapeCreation.commit"
           :shape-creation-cancel="shapeCreation.cancel"
           :apply-drawing-update="drawingActions.update"
@@ -5507,6 +5565,7 @@ watch(
       v-model:visible="printPreviewVisible"
       :sheet="activeSheet"
       :evaluator="activeSheetEvaluator"
+      :text-box-reference-resolver="textBoxReferenceResolver"
       :setup="activePageSetup"
       :workbook-revision="workbookRevision"
       :image-asset-urls="imageAssetUrls"
@@ -5682,11 +5741,30 @@ watch(
       @unlock="protectionActions.unlock"
     />
   </section>
+  <TextBoxReferenceDialog
+    v-if="textBoxReferenceDialog"
+    :key="textBoxReferenceDialog.sessionId"
+    :request="textBoxReferenceDialog"
+    :disabled="textBoxReferenceActions.disabled.value"
+    :busy="textBoxReferenceActions.busy.value"
+    :error="textBoxReferenceActions.error.value"
+    :suspended="pickingTextBoxReference"
+    :select-reference="selectTextBoxReference"
+  />
+  <RangeReferencePicker
+    v-if="pickingTextBoxReference"
+    :reference="pickedTextBoxReference"
+    :title="t('drawing.textBoxReferenceSource')"
+    :hint="t('drawing.textBoxReferenceHint')"
+    @confirm="textBoxReferencePickerCallbacks.confirm"
+    @cancel="textBoxReferencePickerCallbacks.cancel"
+  />
   <DrawingEditorDialog
     v-if="drawingDialog"
     :key="drawingDialog.dialogId"
     :drawing="drawingDialog.initial"
     :normalize-drawing="drawingActions.normalizeDialogDrawing.value"
+    :text-box-reference-resolver="textBoxReferenceResolver"
     :theme="session.workbook.theme"
     :image-asset-urls="imageAssetUrls"
     :request-text-box="drawingTextBoxHandler"

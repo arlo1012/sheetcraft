@@ -178,7 +178,10 @@ function sourceAt(root: SheetDrawing, path: ShapeGroupPath) {
 }
 function textSource(node: ReturnType<typeof sourceAt>): node is TextSource {
   return (
-    !!node && (node.kind === "shape" || node.kind === "textBox") && !("shapeConnector" in node)
+    !!node &&
+    (node.kind === "shape" || node.kind === "textBox") &&
+    !("shapeConnector" in node) &&
+    !node.textReference
   );
 }
 /** Clone only the canonical content and its ownership chain. Inverse world geometry is

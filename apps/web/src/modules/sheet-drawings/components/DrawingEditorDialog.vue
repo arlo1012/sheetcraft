@@ -12,6 +12,7 @@ import {
 } from "@sheetcraft/core/sheet-drawings";
 import { useAppI18n } from "../../../shared/i18n";
 import DrawingContent from "./DrawingContent.vue";
+import type { TextBoxReferenceResolver } from "../textbox-reference-display";
 import ShapeGallery from "./ShapeGallery.vue";
 import { SHAPE_GALLERY, type ShapeGalleryChoice } from "../shape-gallery";
 import { isShapeLinePreset, type ShapeLineEnds } from "@sheetcraft/core/shape-line-ends";
@@ -38,6 +39,7 @@ const props = defineProps<{
   confirmDrawing?: (drawing: SheetGraphicDrawing) => boolean;
   theme?: WorkbookTheme;
   imageAssetUrls?: ReadonlyMap<string, string>;
+  textBoxReferenceResolver?: TextBoxReferenceResolver;
 }>();
 const emit = defineEmits<{ confirm: [drawing: SheetGraphicDrawing]; close: [] }>();
 const { t, locale } = useAppI18n();
@@ -46,6 +48,16 @@ const draft = ref<SheetGraphicDrawing>(
     ? props.normalizeDrawing(props.drawing)
     : (normalizeSheetDrawing(props.drawing) as SheetGraphicDrawing),
 );
+const referencedDisplay = computed(
+  () =>
+    draft.value.textReference && props.textBoxReferenceResolver?.resolve(draft.value.textReference),
+);
+const referencedPaint = computed(() => {
+  const display = referencedDisplay.value;
+  if (!draft.value.textReference || display?.status !== "ready") return undefined;
+  const { textReference: _reference, ...appearance } = draft.value;
+  return { ...appearance, text: display.text };
+});
 const applyError = ref(false);
 function confirm() {
   if (props.disabled || !validGeometry.value) return;
@@ -72,7 +84,7 @@ function setAppearance(field: "fill" | "stroke" | "strokeWidth", value: string |
   if (!props.disabled) draft.value = editShapeBasicAppearance(draft.value, field, value);
 }
 function setText(value: string) {
-  if (props.disabled) return;
+  if (props.disabled || draft.value.textReference) return;
   try {
     draft.value = withShapeTextDraftSource(
       draft.value,
@@ -238,11 +250,17 @@ const shapes: DrawingShape[] = [
         <label v-if="!lineGeometry"
           >{{ t(drawing.kind === "equation" ? "drawing.equationSource" : "drawing.text")
           }}<Textarea
-            :model-value="draft.text"
+            :model-value="
+              referencedDisplay?.status === 'ready' ? referencedDisplay.text : draft.text
+            "
+            :disabled="disabled || !!draft.textReference"
             @update:model-value="setText"
             :maxlength="100000"
             :autosize="{ minRows: 2, maxRows: 5 }"
         /></label>
+        <p v-if="draft.textReference" class="drawing-editor__hint">
+          {{ t("drawing.textBoxReferenceReadonly") }}
+        </p>
         <p v-if="drawing.kind === 'equation'" class="drawing-editor__hint">
           {{ t("drawing.equationHint") }}
         </p>
@@ -365,7 +383,12 @@ const shapes: DrawingShape[] = [
                 transformOrigin: 'top left',
               }"
             >
-              <DrawingContent :drawing="draft" :theme="theme" :image-asset-urls="imageAssetUrls" />
+              <DrawingContent
+                :drawing="draft"
+                :paint-drawing="referencedPaint"
+                :theme="theme"
+                :image-asset-urls="imageAssetUrls"
+              />
             </div>
           </div>
         </div>

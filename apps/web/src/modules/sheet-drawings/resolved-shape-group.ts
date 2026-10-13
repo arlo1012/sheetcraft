@@ -80,6 +80,7 @@ const appearanceFields = [
   "name",
   "hidden",
   "text",
+  "textReference",
   "shape",
   "fill",
   "stroke",
@@ -277,6 +278,13 @@ export function updateResolvedShapeGroupLeaf(
   const fields = readDataRecord(nextView, viewFields);
   if (fields.id !== leaf.sourceNode.id || fields.kind !== leaf.sourceNode.kind)
     throw new TypeError("A shape group view edit must retain its source identity and kind.");
+  if (
+    leaf.sourceNode.kind === "textBox" &&
+    leaf.sourceNode.textReference &&
+    (fields.text !== "" ||
+      JSON.stringify(fields.textReference) !== JSON.stringify(leaf.sourceNode.textReference))
+  )
+    throw new TypeError("A linked text box paint view cannot edit or remove its source reference.");
   const rect = readViewRect(fields, metrics);
   if (leaf.collapsed || !leaf.layout || !leaf.parentLayout)
     throw new RangeError("Expand a collapsed group before editing an owned leaf.");

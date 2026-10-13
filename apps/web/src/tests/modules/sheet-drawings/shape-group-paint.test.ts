@@ -1,6 +1,12 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { createSheet } from "@sheetcraft/core/workbook";
+import {
+  createSheet,
+  createWorkbook,
+  createWorkbookEvaluator,
+  getActiveSheet,
+} from "@sheetcraft/core/workbook";
+import { createTextBoxReferenceResolver } from "../../../modules/sheet-drawings/textbox-reference-display";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import {
   collectShapeGroupAssetIds,
@@ -299,6 +305,95 @@ afterEach(() => {
 });
 
 describe("real recursive owned group source pixels", () => {
+  test("linked text uses the same current paint view under complete group effects and a shared 3D camera", () => {
+    const workbook = createWorkbook({ id: "linked-group", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    sheet.cells.set("0:0", { content: { kind: "literal", value: "Current glyphs" } });
+    const member = leaf("linked");
+    member.kind = "textBox";
+    member.text = "";
+    delete member.shapeGeometry;
+    member.textReference = { sheetId: sheet.id, cell: { row: 0, column: 0 } };
+    const root = group([member], 30, 20);
+    root.group3d = {
+      rotation3d: {
+        kind: "value",
+        value: {
+          projection: "parallel",
+          xDeg: 15,
+          yDeg: 10,
+          zDeg: 0,
+          distanceFromGroundPt: 0,
+        },
+      },
+    };
+    sheet.drawings = [root];
+    const before = JSON.stringify(root);
+    const config = options(root);
+    const resolver = createTextBoxReferenceResolver({
+      workbook,
+      evaluator: createWorkbookEvaluator(workbook, sheet.id),
+      locale: "en-US",
+    });
+    const render = () =>
+      resolveShapeForestForRender({
+        drawings: sheet.drawings!,
+        metrics: config.metrics,
+        revision: 0,
+        textBoxReferenceResolver: resolver,
+      });
+    const first = render();
+    const plan = planShapeGroupPaint({ ...config, renderPass: first });
+    expect(plan.kind).toBe("ready");
+    expect(leafCalls.plan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        drawing: first.getLeaf("linked")!.paintView,
+        groupScene: first.getLeaf("linked")!.carrierLeaf!.groupScene,
+        sourceIdentity: expect.objectContaining({
+          sourceRoot: root,
+          sourceNode: member,
+          contextIdentity: first.contextIdentity,
+        }),
+      }),
+    );
+    expect(first.getLeaf("linked")!.paintView!.text).toBe("Current glyphs");
+    expect(first.getLeaf("linked")!.paintView!.textReference).toBeUndefined();
+    sheet.cells.set("0:0", { content: { kind: "literal", value: "Recalculated glyphs" } });
+    const second = render();
+    planShapeGroupPaint({ ...config, renderPass: second });
+    expect(leafCalls.plan).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        drawing: expect.objectContaining({ text: "Recalculated glyphs" }),
+        sourceIdentity: expect.objectContaining({ contextIdentity: second.contextIdentity }),
+      }),
+    );
+    expect(JSON.stringify(root)).toBe(before);
+    expect(created).toHaveLength(0);
+  });
+
+  test("group paint cannot silently drop visible linked text when no display resolver exists", () => {
+    const member = leaf("linked");
+    member.kind = "textBox";
+    member.text = "";
+    delete member.shapeGeometry;
+    member.textReference = { sheetId: "sheet", cell: { row: 0, column: 0 } };
+    const root = group([member]);
+    const config = options(root);
+    expect(() => planShapeGroupPaint(config)).toThrow(/Linked shape text is unavailable/);
+    const pass = resolveShapeForestForRender({
+      drawings: [root],
+      metrics: config.metrics,
+      revision: 0,
+    });
+    expect(() => planShapeGroupPaint({ ...config, renderPass: pass })).toThrow(
+      /Linked shape text is unavailable/,
+    );
+    member.hidden = true;
+    expect(planShapeGroupPaint(config)).toMatchObject({ kind: "ready", empty: true });
+    expect(leafCalls.plan).not.toHaveBeenCalled();
+    expect(created).toHaveLength(0);
+  });
+
   test("reflection preserves the completed source colors, holes and gaps with exact owner-only hits", () => {
     const root = group(
       [leaf("ring", 2 / 30, 2 / 12, 8 / 30, 8 / 12), leaf("blue", 20 / 30, 2 / 12, 4 / 30, 8 / 12)],

@@ -1,3 +1,12 @@
+import {
+  readExternalDrawingCollections,
+  prepareExternalDrawingCollections,
+  planExternalTextReferenceChanges,
+  commitExternalDrawingCollections,
+  mapLocalTextReferences,
+  preflightTextReferenceSparseState,
+  readTextReferenceTransform,
+} from "./text-references.js";
 import { isPictureGroup, clonePictureGroup } from "../picture-group.js";
 import { transformPictureAnchorAxis } from "../picture-frame-axis-edit.js";
 import { assertPictureObjectsForSheet } from "../picture-object-sheet.js";
@@ -230,7 +239,9 @@ function setAxisIndex(
 }
 
 function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
+  const externalDrawingCollections = readExternalDrawingCollections(slice);
   return {
+    ...(externalDrawingCollections ? { externalDrawingCollections } : {}),
     ...(slice.tableCalculatedColumnFormulaSources
       ? {
           tableCalculatedColumnFormulaSources: slice.tableCalculatedColumnFormulaSources.map(
@@ -1368,6 +1379,7 @@ function validateSheetAxisSlice(
   maximum: number,
   sheet: Sheet,
 ): void {
+  readExternalDrawingCollections(command.slice);
   if (!command.slice.metadata) {
     throw invalidCommandPayload("slice.metadata", command.slice.metadata);
   }
@@ -1562,6 +1574,20 @@ function validateSheetAxisSlice(
     createPictureSheetMetrics(originalMetricSheet),
     createPictureSheetMetrics(sheet),
   );
+  expectedMetadata.drawings = mapLocalTextReferences(
+    expectedMetadata.drawings,
+    sheet.id,
+    (address) => {
+      const target = transformAxisIndex(
+        address[command.axis],
+        command.index,
+        command.count,
+        maximum,
+        command.operation,
+      );
+      return target === null ? null : { ...address, [command.axis]: target };
+    },
+  );
   if (command.slice.pivotTables)
     expectedMetadata.pivotTables =
       transformPivotReferences(
@@ -1633,6 +1659,24 @@ export function applyRestoreSheetStateCommand(
     assertShapeObjectsForSheet(command.slice.metadata.drawings, restoredMetricSheet);
     if (command.slice.floatingImageState !== undefined)
       assertPictureObjectsForSheet(command.slice.floatingImageState, restoredMetricSheet);
+    const externalDrawings = prepareExternalDrawingCollections(
+      workbook,
+      sheet.id,
+      readExternalDrawingCollections(command.slice),
+      {
+        direction: "restore",
+        mapCell: (address) => {
+          const target = transformAxisIndex(
+            address[command.axis],
+            command.index,
+            command.count,
+            maximum,
+            command.operation,
+          );
+          return target === null ? null : { ...address, [command.axis]: target };
+        },
+      },
+    );
     const transformed = transformSheetAxis(
       sheet,
       command.axis,
@@ -1673,7 +1717,9 @@ export function applyRestoreSheetStateCommand(
         });
     }
     const pivotsRestored = restorePivotTables(workbook, command.slice.pivotTables);
-    if (!transformed && !restored && !pivotsRestored && !templatesRestored) return null;
+    const externalChanged = commitExternalDrawingCollections(workbook, externalDrawings);
+    if (!transformed && !restored && !pivotsRestored && !templatesRestored && !externalChanged)
+      return null;
     return command.operation === "insert"
       ? createInsertSheetAxisCommand(command.sheetId, command.axis, command.index, command.count)
       : createDeleteSheetAxisCommand(command.sheetId, command.axis, command.index, command.count);
@@ -1712,6 +1758,22 @@ export function applyRestoreSheetStateCommand(
         },
       }))
     : undefined;
+  const referenceTransform = readTextReferenceTransform(command, sheet.id);
+  const externalDrawings = prepareExternalDrawingCollections(
+    workbook,
+    sheet.id,
+    readExternalDrawingCollections(command),
+    referenceTransform
+      ? { mapCell: referenceTransform.mapCell, direction: referenceTransform.transform.direction }
+      : undefined,
+  );
+  if (!referenceTransform && externalDrawings.next.length)
+    throw invalidCommandPayload(
+      "textReferenceTransform",
+      undefined,
+      "Changed external references require an associated movement inverse.",
+    );
+  preflightTextReferenceSparseState(sheet, command.state);
   const changed = validateCommandPayload("state", command.state, () =>
     replaceSheetSparseState(sheet, command.state),
   );
@@ -1721,7 +1783,8 @@ export function applyRestoreSheetStateCommand(
     !command.conditionalFormatFormulaSources &&
     !command.tableCalculatedColumnFormulaSources &&
     !command.definedNames &&
-    !command.pivotTables
+    !command.pivotTables &&
+    externalDrawings.next.length === 0
   )
     return null;
   for (const formula of command.workbookFormulaSources ?? []) {
@@ -1751,8 +1814,23 @@ export function applyRestoreSheetStateCommand(
       });
   }
   restorePivotTables(workbook, command.pivotTables);
+  commitExternalDrawingCollections(workbook, externalDrawings);
   return {
     type: "restoreSheetState",
+    ...(referenceTransform
+      ? {
+          textReferenceTransform: {
+            ...referenceTransform.transform,
+            direction:
+              referenceTransform.transform.direction === "restore"
+                ? ("reapply" as const)
+                : ("restore" as const),
+          },
+        }
+      : {}),
+    ...(externalDrawings.previous.length
+      ? { externalDrawingCollections: externalDrawings.previous }
+      : {}),
     ...(pivotTables ? { pivotTables } : {}),
     sheetId: command.sheetId,
     state: previousState,
@@ -1845,6 +1923,20 @@ export function applySheetAxisCommand(
     createPictureSheetMetrics(nextMetricSheet),
     sheet,
   );
+  const mapReferenceCell = (address: CellAddress): CellAddress | null => {
+    const target = transformAxisIndex(
+      address[command.axis],
+      command.index,
+      command.count,
+      maximum,
+      operation,
+    );
+    return target === null ? null : { ...address, [command.axis]: target };
+  };
+  nextMetadata.drawings = mapLocalTextReferences(nextMetadata.drawings, sheet.id, mapReferenceCell);
+  const externalDrawings = planExternalTextReferenceChanges(workbook, sheet.id, mapReferenceCell);
+  if (externalDrawings.previous.length)
+    slice.externalDrawingCollections = externalDrawings.previous;
   // Validate the complete detached/transformed forest before cells or dimensions
   // are moved, including route budgets under the next worksheet metrics.
   nextMetadata.drawings = normalizeSheetDrawings(nextMetadata.drawings);
@@ -1956,7 +2048,9 @@ export function applySheetAxisCommand(
   }
   const pivotsChanged = restorePivotTables(workbook, nextPivots);
   for (const change of inherited) setCellContent(sheet, change.address, change.content);
+  const drawingReferencesChanged = commitExternalDrawingCollections(workbook, externalDrawings);
   const externalChanged =
+    drawingReferencesChanged ||
     templatesChanged ||
     (slice.workbookFormulaSources ?? []).some((formula) => {
       const current = workbook.sheets
@@ -2443,9 +2537,13 @@ export function applyMoveSheetAxisCommand(
       return { ...image, anchor: mapAddress(image.anchor) };
     }),
   };
+  state.drawings = mapLocalTextReferences(state.drawings, sheet.id, mapAddress);
+  const externalDrawings = planExternalTextReferenceChanges(workbook, sheet.id, mapAddress);
+  preflightTextReferenceSparseState(sheet, state);
   const stateChanged = replaceSheetSparseState(sheet, state);
+  const externalChanged = commitExternalDrawingCollections(workbook, externalDrawings);
   const pivotsChanged = restorePivotTables(workbook, nextPivots);
-  if (!stateChanged && !pivotsChanged) return null;
+  if (!stateChanged && !pivotsChanged && !externalChanged) return null;
   rewriteConditionalFormatQualifiedReferencesForSheet(workbook, command.sheetId, (address) =>
     command.axis === "row"
       ? { row: mapIndex(address.row), column: address.column }
@@ -2453,6 +2551,24 @@ export function applyMoveSheetAxisCommand(
   );
   return {
     ...createRestoreSheetStateCommand(command.sheetId, previousState),
+    ...(externalDrawings.previous.length
+      ? {
+          textReferenceTransform: {
+            sheetId: sheet.id,
+            direction: "restore" as const,
+            operation: {
+              type: "moveSheetAxis" as const,
+              axis: command.axis,
+              index: command.index,
+              count: command.count,
+              toIndex: command.toIndex,
+            },
+          },
+        }
+      : {}),
+    ...(externalDrawings.previous.length
+      ? { externalDrawingCollections: externalDrawings.previous }
+      : {}),
     pivotTables,
     ...(conditionalFormatFormulaSources.length ? { conditionalFormatFormulaSources } : {}),
   };

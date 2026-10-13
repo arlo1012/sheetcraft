@@ -1,3 +1,5 @@
+import { hasWorkbookTextReferencesToSheet } from "./text-references.js";
+import { createCalculatedColumnPlanningWorkbook } from "../table-calculated-columns.js";
 import { applyWorkbookCommand } from "./apply.js";
 import type {
   BatchDeleteSheetAxesCommand,
@@ -51,6 +53,14 @@ export function applyBatchDeleteSheetAxesCommand(
       command.commands,
       "Only deletes and their structural inverses are supported in this batch.",
     );
+  }
+
+  if (hasWorkbookTextReferencesToSheet(workbook, command.sheetId)) {
+    // The strict planning clone deeply detaches sheet state and names. Axis commands
+    // never write shared workbook theme/style catalogs. Admit the entire referenced
+    // batch before the first live cell, dimension, metadata or owner assignment.
+    const planning = createCalculatedColumnPlanningWorkbook(workbook);
+    for (const nested of command.commands) applyWorkbookCommand(planning, nested);
   }
 
   const inverses: Array<DeleteSheetAxisCommand | RestoreSheetAxisSliceCommand> = [];

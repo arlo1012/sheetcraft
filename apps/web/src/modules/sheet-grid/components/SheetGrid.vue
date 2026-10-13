@@ -25,6 +25,7 @@ import PivotReportFilters from "../../pivot-tables/components/PivotReportFilters
 import { isPivotValueCell, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import PivotEmptyReports from "../../pivot-tables/components/PivotEmptyReports.vue";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { TextBoxReferenceResolver } from "../../sheet-drawings/textbox-reference-display";
 import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer.vue";
 import SheetFreeShapeCreationLayer from "../../sheet-drawings/components/SheetFreeShapeCreationLayer.vue";
 import SheetShapeCreationLayer from "../../sheet-drawings/components/SheetShapeCreationLayer.vue";
@@ -334,6 +335,11 @@ const props = withDefaults(
     shapeTextEditCallbacks?: ShapeTextEditCallbacks;
     shapeTextEditStart?: (request: ShapeCanvasTextEditRequest) => boolean;
     shapeTextEditSelection?: { start: number; end: number };
+    textBoxReferenceResolver?: TextBoxReferenceResolver;
+    openTextBoxReference?: (
+      root: SheetDrawing,
+      path?: import("@sheetcraft/core/shape-group").ShapeGroupPath,
+    ) => boolean;
     gridId?: string;
     externalHorizontalScrollbar?: boolean;
     zoom?: number;
@@ -4618,6 +4624,8 @@ defineExpose({
         :text-edit-callbacks="shapeTextEditCallbacks"
         :start-text-edit="shapeTextEditStart"
         :text-edit-selection="shapeTextEditSelection"
+        :text-box-reference-resolver="textBoxReferenceResolver"
+        :open-text-box-reference="openTextBoxReference"
         @selection-change="selectedShapeDrawingId = $event"
         @format="emit('formatDrawing', $event)"
         @background-pointer="onSurfacePointerDown"
