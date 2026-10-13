@@ -5,6 +5,7 @@ import type {
   PictureFormatTranslate,
 } from "../../../sheet-images/picture-format-pane-model";
 import type { PictureTextureId } from "../../../sheet-images/picture-texture";
+import type { WordArtStylePreset } from "../../wordart-style-presets";
 import type {
   WordArtTransformPreset,
   WordArtTransformSelectionContext,
@@ -160,6 +161,44 @@ export function useShapeFormatPane(props: ShapeFormatPaneInput) {
         context.isCurrent() && apply(choice.warp),
     };
   }
+  const hasWordArtStyleScope = computed(() => {
+    const snapshot = props.snapshot;
+    if (!snapshot) return false;
+    const drawing = snapshot.drawing;
+    return (
+      !!props.capabilities.wordArtStyle ||
+      !!props.capabilities.clearWordArtEffects ||
+      (snapshot.wordArtStyleScope?.eligibleCount ?? 0) > 0 ||
+      ((drawing.kind === "shape" || drawing.kind === "textBox") &&
+        !drawing.shapeConnector &&
+        !!drawing.shapeText &&
+        drawing.wordArt === true)
+    );
+  });
+  function wordArtStyleCapability(): PictureFormatCapability {
+    return props.snapshot
+      ? (props.capabilities.wordArtStyle ?? { enabled: false, reason: s.value("unsupported") })
+      : { enabled: false, reason: s.value("missingSelection") };
+  }
+  function clearWordArtEffectsCapability(): PictureFormatCapability {
+    return props.snapshot
+      ? (props.capabilities.clearWordArtEffects ?? {
+          enabled: false,
+          reason: s.value("unsupported"),
+        })
+      : { enabled: false, reason: s.value("missingSelection") };
+  }
+  function wordArtStyleBinding() {
+    const capability = wordArtStyleCapability();
+    const apply = session.wordArtStyleAction();
+    return {
+      ownerId: `${ownerKey.value}:wordart-style:${props.snapshot?.revision ?? "none"}`,
+      selectedId: props.snapshot?.mixedWordArtStyle ? undefined : props.snapshot?.wordArtStyleId,
+      locale: props.locale ?? "en-US",
+      disabled: !capability.enabled,
+      onSelect: (choice: WordArtStylePreset) => apply(choice.id),
+    };
+  }
   function assetLoader(target: ShapeFormatMode, category: "fill" | "line") {
     const token = session.capture(),
       loader = props.loadPaintAsset;
@@ -217,6 +256,10 @@ export function useShapeFormatPane(props: ShapeFormatPaneInput) {
     styleBinding,
     textWarpCapability,
     textWarpBinding,
+    hasWordArtStyleScope,
+    wordArtStyleCapability,
+    clearWordArtEffectsCapability,
+    wordArtStyleBinding,
     assetLoader,
   };
 }

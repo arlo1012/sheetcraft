@@ -134,7 +134,7 @@ function body3d(depthPt: number): Choice<PictureFormat3d> {
     },
   };
 }
-function fixture(initial = group()) {
+function fixture(initial = group(), preservingWriter = true) {
   const workbook = ref(createWorkbook({ id: "group-pane", sheetId: "sheet" })),
     sheet = ref(getActiveSheet(workbook.value)),
     revision = ref(0),
@@ -150,7 +150,14 @@ function fixture(initial = group()) {
   });
   const flush = vi.fn(() => true),
     assets = vi.fn((_id: string) => true),
-    prepare = vi.fn((next: SheetDrawing, _owner?: SheetDrawing) => next),
+    prepare = vi.fn(
+      (
+        next: SheetDrawing,
+        _owner?: SheetDrawing,
+        _forest?: readonly SheetDrawing[],
+        _mode?: "edit" | "preserve-geometry",
+      ) => next,
+    ),
     execute = vi.fn((command: Parameters<typeof executeWorkbookCommand>[1]) => {
       const changed = executeWorkbookCommand(session, command);
       if (changed) revision.value++;
@@ -187,6 +194,9 @@ function fixture(initial = group()) {
       isBusy: () => busy.value,
       flush,
       replaceCollection: replace,
+      ...(preservingWriter
+        ? { replaceCollectionPreservingGeometry: actions.replaceCollectionPreservingGeometry }
+        : {}),
       isAssetAvailable: assets,
       getUnsupportedReason: () => "Unavailable",
       getCameraUnsupportedReason: () => "Camera with connector bindings is unavailable",
@@ -1447,4 +1457,91 @@ test("warp batch rejects unsupported, failed and stale transactions without hist
   f.generation.value++;
   expect(f.pane.onIntent(old)).toBe(false);
   expect(f.state()).toEqual(before);
+});
+
+test("WordArt recipe root batch and owned Clear preserve genuine member frames, typography and history", () => {
+  const initial = group();
+  for (const { node } of traverseShapeGroup(initial)) {
+    if (node.id !== "a" && node.id !== "b") continue;
+    if (node.kind !== "shape") throw Error("shape");
+    node.wordArt = true;
+    node.text = "alpha beta";
+    node.shapeText = {
+      ...createDefaultShapeText(),
+      warp: { preset: "textWave1" },
+      characterRuns: [
+        {
+          start: 0,
+          end: 6,
+          fontSize: 24,
+          bold: false,
+          italic: true,
+          color: "#FF0000",
+          line: { kind: "none" },
+        },
+      ],
+    };
+  }
+  const f = fixture(normalizeShapeGroup(initial)),
+    before = f.state();
+  const untouched = JSON.parse(JSON.stringify(f.graphic("text")));
+  expect(f.open()).toBe(true);
+  expect(f.pane.snapshot.value?.wordArtStyleScope).toEqual({
+    eligibleCount: 2,
+    descendantCount: 4,
+  });
+  const captured = f.intent({ type: "set-wordart-style", presetId: "accent3-solid" });
+  expect(f.pane.onIntent(captured)).toBe(true);
+  expect(f.pane.onIntent(captured)).toBe(false);
+  expect(f.pane.snapshot.value?.wordArtStyleId).toBe("accent3-solid");
+  expect(f.pane.snapshot.value?.mixedWordArtStyle).toBe(false);
+  expect(f.graphic("text")).toEqual(untouched);
+  for (const id of ["a", "b"]) {
+    const current = f.graphic(id);
+    const old = traverseShapeGroup(initial).find(({ node }) => node.id === id)!.node;
+    expect({
+      ...current,
+      shapeText: old.kind !== "shapeGroup" ? old.shapeText : undefined,
+    }).toEqual(old);
+    expect(current.shapeText!.characterRuns).toEqual([
+      { start: 0, end: 6, fontSize: 24, bold: false, italic: true },
+    ]);
+    expect(current.shapeText!.warp).toEqual({ preset: "textWave1" });
+  }
+  expect(f.prepare.mock.calls.some((call) => call[3] === "preserve-geometry")).toBe(true);
+  const applied = f.state();
+  expect(f.open(["root", "inner", "b"])).toBe(true);
+  const sibling = JSON.parse(JSON.stringify(f.graphic("a")));
+  expect(f.pane.onIntent(f.intent({ type: "clear-wordart-effects" }))).toBe(true);
+  expect(f.graphic("b").shapeText).not.toHaveProperty("warp");
+  expect(f.graphic("a")).toEqual(sibling);
+  expect(f.graphic("b").rotation).toBe(
+    traverseShapeGroup(initial).find((entry) => entry.node.id === "b")!.node.rotation,
+  );
+  expect(f.session.history.undoStack).toHaveLength(2);
+  expect(undoWorkbookCommand(f.session)).toBe(true);
+  f.revision.value++;
+  expect(f.state()).toEqual(applied);
+  expect(undoWorkbookCommand(f.session)).toBe(true);
+  f.revision.value++;
+  expect(f.state()).toEqual(before);
+});
+
+test("WordArt reapply fails closed if a host lacks the geometry-preserving writer", () => {
+  const initial = group(),
+    art = initial.members[0]!;
+  if (art.kind !== "shape") throw Error("Expected leaf");
+  art.wordArt = true;
+  art.shapeText = createDefaultShapeText();
+  const f = fixture(normalizeShapeGroup(initial), false);
+  expect(f.open()).toBe(true);
+  expect(f.pane.capabilities.value.wordArtStyle?.enabled).toBe(false);
+  expect(f.pane.capabilities.value.clearWordArtEffects?.enabled).toBe(true);
+  const before = f.state();
+  expect(f.pane.onIntent(f.intent({ type: "set-wordart-style", presetId: "neutral-solid" }))).toBe(
+    false,
+  );
+  expect(f.state()).toEqual(before);
+  expect(f.session.history.undoStack).toHaveLength(0);
+  expect(f.replace).not.toHaveBeenCalled();
 });

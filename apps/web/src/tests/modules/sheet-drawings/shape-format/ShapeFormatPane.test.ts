@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { Select } from "tdesign-vue-next/es/select";
+import { Button } from "tdesign-vue-next/es/button";
 import { createAppI18n } from "../../../../shared/i18n";
 import ShapeFormatPane from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
 import ShapeFormatNumberField from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatNumberField.vue";
@@ -16,6 +17,8 @@ import PicturePaintEditor from "../../../../modules/sheet-images/components/form
 import PictureLineEditor from "../../../../modules/sheet-images/components/format-pane/PictureLineEditor.vue";
 import PictureFormat3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureFormat3dEditor.vue";
 import WordArtTransformGallery from "../../../../modules/sheet-drawings/components/WordArtTransformGallery.vue";
+import WordArtStyleGallery from "../../../../modules/sheet-drawings/components/WordArtStyleGallery.vue";
+import { WORDART_STYLE_PRESETS } from "../../../../modules/sheet-drawings/wordart-style-presets";
 import ShapeFormatEffects from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatEffects.vue";
 import PictureRotation3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureRotation3dEditor.vue";
 import { framedShape } from "../framed-shape-fixture";
@@ -849,4 +852,219 @@ test("unsupported transform exposes the apply-text-first reason without an edita
   expect(gallery.props("disabledReason")).toContain("Apply the text");
   expect(wrapper.get("[data-text-transform-section]").text()).toContain("Apply the text");
   expect(onIntent).not.toHaveBeenCalled();
+});
+
+describe("existing WordArt style and clear controls", () => {
+  function wordArtSnapshot(): ShapeFormatSnapshot {
+    const state = snapshot();
+    return {
+      ...state,
+      drawing: { ...framedShape(), id: "shape", wordArt: true },
+      wordArtStyleId: WORDART_STYLE_PRESETS[0]!.id,
+      wordArtStyleScope: { eligibleCount: 1, descendantCount: 1 },
+    };
+  }
+  const wordArtCapabilities = {
+    ...capabilities,
+    wordArtStyle: { enabled: true },
+    clearWordArtEffects: { enabled: true },
+  } satisfies ShapeFormatCapabilities;
+
+  test("Text Fill/Outline reuses all 25 styles and dispatches only a canonical owner-bound preset ID", async () => {
+    const state = wordArtSnapshot();
+    const { wrapper, onIntent } = fixture({
+      snapshot: state,
+      capabilities: wordArtCapabilities,
+      initialTab: "text-fill-line",
+    });
+    const section = wrapper.get("[data-wordart-style-section]");
+    expect(section.text()).toContain("WordArt styles");
+    expect(section.get("[data-wordart-style-help]").text()).toContain("glyph 3-D effects");
+    expect(section.get("[data-wordart-style-help]").text()).toContain("shared body camera");
+    expect(section.findAll("[data-wordart-style-choice]")).toHaveLength(25);
+    const gallery = wrapper.getComponent(WordArtStyleGallery);
+    expect(gallery.props("selectedId")).toBe(state.wordArtStyleId);
+    expect(gallery.props("ownerId")).toContain(":wordart-style:2");
+    const choice = WORDART_STYLE_PRESETS[3]!;
+    await gallery.get(`[data-wordart-style-choice="${choice.id}"]`).trigger("click");
+    await flushPromises();
+    expect(onIntent).toHaveBeenCalledExactlyOnceWith({
+      type: "set-wordart-style",
+      presetId: choice.id,
+      owner: state.owner,
+      baseRevision: 2,
+      intentId: expect.any(String),
+    });
+    expect(gallery.emitted("applied")).toHaveLength(1);
+    expect(gallery.props("selectedId")).toBe(state.wordArtStyleId);
+  });
+
+  test("Clear WordArt effects is a distinct recipe-free intent with visible preservation help", async () => {
+    const state = wordArtSnapshot();
+    const { wrapper, onIntent } = fixture({
+      snapshot: state,
+      capabilities: wordArtCapabilities,
+      initialTab: "text-fill-line",
+    });
+    const button = wrapper.get("[data-clear-wordart-effects]");
+    expect(button.text()).toBe("Clear WordArt effects");
+    const help = wrapper.get("[data-clear-wordart-effects-help]").text();
+    expect(help).toContain("black text");
+    expect(help).toContain("remove the text transform");
+    expect(help).toContain("2-D angle");
+    expect(help).toContain("auto-fit");
+    await button.trigger("click");
+    expect(onIntent).toHaveBeenCalledExactlyOnceWith({
+      type: "clear-wordart-effects",
+      owner: state.owner,
+      baseRevision: 2,
+      intentId: expect.any(String),
+    });
+  });
+
+  test("mixed groups show exact WordArt-only scope and never highlight an arbitrary member", () => {
+    const state = {
+      ...groupSnapshot(),
+      mixedWordArtStyle: true,
+      wordArtStyleId: WORDART_STYLE_PRESETS[0]!.id,
+      wordArtStyleScope: { eligibleCount: 2, descendantCount: 5 },
+    };
+    const { wrapper, onIntent } = fixture({
+      snapshot: state,
+      capabilities: wordArtCapabilities,
+      initialTab: "text-fill-line",
+    });
+    expect(wrapper.get("[data-wordart-style-scope]").text()).toContain(
+      "2 WordArt members of 5 members",
+    );
+    expect(wrapper.get("[data-wordart-style-mixed]").text()).toContain("different styles");
+    const gallery = wrapper.getComponent(WordArtStyleGallery);
+    expect(gallery.props("selectedId")).toBeUndefined();
+    expect(gallery.findAll('[data-wordart-style-choice][aria-pressed="true"]')).toHaveLength(0);
+    expect(gallery.props("onSelect")!(WORDART_STYLE_PRESETS[0]!)).toBe(true);
+    expect(onIntent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "set-wordart-style", owner: state.owner }),
+    );
+  });
+
+  test("ordinary text hides WordArt controls unless the host supplies an explicit capability", async () => {
+    const { wrapper } = fixture({ initialTab: "text-fill-line" });
+    expect(wrapper.find("[data-wordart-style-section]").exists()).toBe(false);
+    await wrapper.setProps({
+      snapshot: wordArtSnapshot(),
+      capabilities: { fields: {} },
+    });
+    expect(wrapper.getComponent(WordArtStyleGallery).props("disabled")).toBe(true);
+    expect(wrapper.get("[data-clear-wordart-effects]").attributes("disabled")).toBeDefined();
+    await wrapper.setProps({
+      snapshot: snapshot(),
+      capabilities: { fields: {}, wordArtStyle: { enabled: false, reason: "Unsupported scope" } },
+    });
+    expect(wrapper.get("[data-wordart-style-disabled-reason]").text()).toBe("Unsupported scope");
+  });
+
+  test("source-edit Apply-first disables both commands and old enabled callbacks cannot change the whole object", async () => {
+    const state = wordArtSnapshot();
+    const { wrapper, onIntent } = fixture({
+      snapshot: state,
+      capabilities: wordArtCapabilities,
+      initialTab: "text-fill-line",
+    });
+    const oldChoose = wrapper.getComponent(WordArtStyleGallery).props("onSelect")!;
+    const reason = "Apply the text before changing advanced text effects.";
+    await wrapper.setProps({
+      capabilities: {
+        ...wordArtCapabilities,
+        wordArtStyle: { enabled: false, reason },
+        clearWordArtEffects: { enabled: false, reason },
+      },
+    });
+    const gallery = wrapper.getComponent(WordArtStyleGallery);
+    expect(gallery.props("disabled")).toBe(true);
+    expect(gallery.findAll("button[disabled]")).toHaveLength(25);
+    expect(wrapper.get("[data-wordart-style-disabled-reason]").text()).toBe(reason);
+    expect(wrapper.get("[data-clear-wordart-effects-disabled-reason]").text()).toBe(reason);
+    expect(wrapper.get("[data-clear-wordart-effects]").attributes("disabled")).toBeDefined();
+    expect(oldChoose(WORDART_STYLE_PRESETS[1]!)).toBe(false);
+    const clear = wrapper
+      .findAllComponents(Button)
+      .find((button) => button.attributes("data-clear-wordart-effects") !== undefined)!;
+    clear.vm.$emit("click");
+    await flushPromises();
+    expect(onIntent).not.toHaveBeenCalled();
+  });
+
+  test("retained gallery callbacks reject changed owner, revision, handler and explicit cancellation", async () => {
+    for (const change of ["owner", "revision", "handler", "cancel"] as const) {
+      const state = wordArtSnapshot();
+      const { wrapper, onIntent } = fixture({
+        snapshot: state,
+        capabilities: wordArtCapabilities,
+        initialTab: "text-fill-line",
+      });
+      const gallery = wrapper.getComponent(WordArtStyleGallery);
+      const choose = gallery.props("onSelect")!;
+      const ownerId = gallery.props("ownerId");
+      const replacement = vi.fn(() => true);
+      if (change === "owner")
+        await wrapper.setProps({
+          snapshot: { ...state, owner: { ...state.owner, sessionId: "new" } },
+        });
+      if (change === "revision") await wrapper.setProps({ snapshot: { ...state, revision: 3 } });
+      if (change === "handler") await wrapper.setProps({ onIntent: replacement });
+      if (change === "cancel") (wrapper.vm as unknown as { cancel: () => void }).cancel();
+      expect(choose(WORDART_STYLE_PRESETS[1]!)).toBe(false);
+      await flushPromises();
+      expect(onIntent).not.toHaveBeenCalled();
+      expect(replacement).not.toHaveBeenCalled();
+      expect(gallery.props("ownerId")).not.toBe(ownerId);
+      expect(wrapper.get('[role="alert"]').text()).toContain("selection or drawing changed");
+    }
+  });
+
+  test("rejected style and clear commands retain selected readback and surface retry feedback", async () => {
+    const state = wordArtSnapshot();
+    const onIntent = vi.fn(() => false);
+    const { wrapper } = fixture({
+      snapshot: state,
+      capabilities: wordArtCapabilities,
+      onIntent,
+      initialTab: "text-fill-line",
+    });
+    const gallery = wrapper.getComponent(WordArtStyleGallery);
+    await gallery
+      .get(`[data-wordart-style-choice="${WORDART_STYLE_PRESETS[1]!.id}"]`)
+      .trigger("click");
+    await flushPromises();
+    expect(gallery.props("selectedId")).toBe(state.wordArtStyleId);
+    expect(gallery.emitted("applied")).toBeUndefined();
+    expect(gallery.emitted("failed")).toHaveLength(1);
+    expect(gallery.text()).toContain("could not be applied. Try again");
+    expect(wrapper.get('[role="alert"]').text()).toContain("could not be applied");
+    await wrapper.get("[data-clear-wordart-effects]").trigger("click");
+    expect(onIntent).toHaveBeenCalledTimes(2);
+    expect(gallery.props("selectedId")).toBe(state.wordArtStyleId);
+    expect(wrapper.get('[role="alert"]').text()).toContain("could not be applied");
+  });
+
+  test("Chinese controls explain reapply, Clear and the exact eligible scope", () => {
+    const state = {
+      ...groupSnapshot(),
+      mixedWordArtStyle: true,
+      wordArtStyleScope: { eligibleCount: 2, descendantCount: 5 },
+    };
+    const { wrapper } = fixture({
+      snapshot: state,
+      capabilities: wordArtCapabilities,
+      locale: "zh-CN",
+      initialTab: "text-fill-line",
+    });
+    expect(wrapper.get("[data-wordart-style-section]").text()).toContain("艺术字样式");
+    expect(wrapper.get("[data-clear-wordart-effects]").text()).toBe("清除艺术字效果");
+    expect(wrapper.get("[data-wordart-style-help]").text()).toContain("保留文字、字体、字号");
+    expect(wrapper.get("[data-wordart-style-scope]").text()).toContain(
+      "2 个艺术字成员（共 5 个成员）",
+    );
+    expect(wrapper.get("[data-clear-wordart-effects-help]").text()).toContain("二维角度");
+  });
 });

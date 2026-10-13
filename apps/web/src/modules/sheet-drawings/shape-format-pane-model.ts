@@ -7,6 +7,7 @@ import type { ShapeLineEnds, ShapeLineEnd } from "@sheetcraft/core/shape-line-en
 import type { ShapeGroupNode } from "@sheetcraft/core/shape-group";
 import type { ShapeTextDirection, ShapeTextParagraph } from "@sheetcraft/core/shape-text";
 import { normalizeShapeTextWarp, type ShapeTextWarp } from "@sheetcraft/core/text-warps";
+import { getWordArtStylePreset } from "./wordart-style-presets";
 import type {
   PictureFormatCapability,
   PictureFormatLengthUnit,
@@ -115,6 +116,11 @@ export interface ShapeFormatSnapshot {
   mixedTextWarp?: boolean;
   /** Actual modern WordArt or retained-warp text leaves in the selected scope. */
   textWarpScope?: Readonly<{ eligibleCount: number; descendantCount: number }>;
+  /** Exact canonical preset readback; omitted when customized or mixed. */
+  wordArtStyleId?: string;
+  mixedWordArtStyle?: boolean;
+  /** Only actual modern WordArt leaves are eligible for preset reapply and clear. */
+  wordArtStyleScope?: Readonly<{ eligibleCount: number; descendantCount: number }>;
   /** Exact intent acknowledgement allows other active drafts to survive our own accepted edit. */
   acceptedIntentId?: string;
 }
@@ -126,6 +132,8 @@ export interface ShapeFormatCapabilities {
     Record<ShapeFormatMode, Partial<Record<ShapeFormatStyleCategory, ShapeFormatStyleCapability>>>
   >;
   textWarp?: PictureFormatCapability;
+  wordArtStyle?: PictureFormatCapability;
+  clearWordArtEffects?: PictureFormatCapability;
   lineEnds?: PictureFormatCapability;
   disconnectConnector?: PictureFormatCapability;
 }
@@ -159,6 +167,8 @@ export type ShapeFormatIntent =
   | (ShapeFormatIntentIdentity & { type: "disconnect-connector" })
   | (ShapeFormatIntentIdentity & { type: "set-text-margins"; value: ShapeFormatTextMargins })
   | (ShapeFormatIntentIdentity & { type: "set-text-warp"; value?: ShapeTextWarp })
+  | (ShapeFormatIntentIdentity & { type: "set-wordart-style"; presetId: string })
+  | (ShapeFormatIntentIdentity & { type: "clear-wordart-effects" })
   | ShapeFormatFieldIntent
   | ShapeFormatStyleIntent
   | (ShapeFormatIntentIdentity & { type: "set-line-ends"; value: ShapeLineEnds | undefined })
@@ -337,6 +347,29 @@ export function createShapeFormatSession(source: {
       }));
     };
   }
+  function wordArtStyleAction() {
+    const token = capture();
+    return (presetId: string): boolean => {
+      const preset = getWordArtStylePreset(presetId);
+      if (!preset) {
+        source.feedback("out-of-range");
+        return false;
+      }
+      return send(token, source.capabilities().wordArtStyle, (identity) => ({
+        ...identity,
+        type: "set-wordart-style",
+        presetId: preset.id,
+      }));
+    };
+  }
+  function clearWordArtEffectsAction() {
+    const token = capture();
+    return (): boolean =>
+      send(token, source.capabilities().clearWordArtEffects, (identity) => ({
+        ...identity,
+        type: "clear-wordart-effects",
+      }));
+  }
   function lineEndsAction() {
     const token = capture();
     return (value: ShapeLineEnds | undefined): boolean =>
@@ -401,6 +434,8 @@ export function createShapeFormatSession(source: {
     fieldAction,
     styleAction,
     textWarpAction,
+    wordArtStyleAction,
+    clearWordArtEffectsAction,
     lineEndsAction,
     lineEndAction,
     disconnectConnectorAction,

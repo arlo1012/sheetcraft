@@ -30,6 +30,7 @@ import {
   getShapeGroupFormatFieldEligibleLeaves,
   getShapeGroupLineEligibleLeaves,
   getShapeGroupTextWarpEligibleLeaves,
+  getShapeGroupWordArtStyleEligibleLeaves,
   isShapeGroupMemberStyleCategory,
   planShapeGroupFormatIntent,
   resolveShapeGroupFormatContext,
@@ -77,6 +78,12 @@ export function useOwnedShapeGroupFormatPane(options: {
   isBusy: () => boolean;
   flush: () => boolean;
   replaceCollection: (
+    next: readonly SheetDrawing[],
+    expected: readonly SheetDrawing[],
+    metrics: PictureSheetMetrics,
+    guard?: () => boolean,
+  ) => boolean;
+  replaceCollectionPreservingGeometry?: (
     next: readonly SheetDrawing[],
     expected: readonly SheetDrawing[],
     metrics: PictureSheetMetrics,
@@ -241,6 +248,12 @@ export function useOwnedShapeGroupFormatPane(options: {
       mixedLineEnds: values.mixedLineEnds,
       mixedStyleCategories: values.mixedStyleCategories,
       ...(values.textWarp ? { textWarp: values.textWarp } : {}),
+      wordArtStyleId: values.wordArtStyleId,
+      mixedWordArtStyle: values.mixedWordArtStyle,
+      wordArtStyleScope: {
+        eligibleCount: values.wordArtStyleEligibleCount,
+        descendantCount: values.descendantCount,
+      },
       mixedTextWarp: values.mixedTextWarp,
       textWarpScope: {
         eligibleCount: values.textWarpEligibleCount,
@@ -396,6 +409,12 @@ export function useOwnedShapeGroupFormatPane(options: {
     return {
       fields,
       styles,
+      ...(captured && getShapeGroupWordArtStyleEligibleLeaves(captured).length > 0
+        ? {
+            wordArtStyle: capability(!!options.replaceCollectionPreservingGeometry),
+            clearWordArtEffects: capability(true),
+          }
+        : {}),
       textWarp: capability(!!captured && getShapeGroupTextWarpEligibleLeaves(captured).length > 0),
       lineEnds: capability(!!captured && getShapeGroupLineEligibleLeaves(captured).length > 0),
     };
@@ -542,6 +561,10 @@ export function useOwnedShapeGroupFormatPane(options: {
           !allowsCameraValue(captured, intent.value)
         )
           return false;
+      } else if (intent.type === "set-wordart-style") {
+        if (capabilities.value.wordArtStyle?.enabled !== true) return false;
+      } else if (intent.type === "clear-wordart-effects") {
+        if (capabilities.value.clearWordArtEffects?.enabled !== true) return false;
       } else if (intent.type === "set-text-warp") {
         if (capabilities.value.textWarp?.enabled !== true) return false;
       } else if (intent.type === "set-text-margins") {
@@ -577,7 +600,11 @@ export function useOwnedShapeGroupFormatPane(options: {
         const available = options.isAssetAvailable ?? options.assetAvailable;
         for (const id of collectShapeGroupAssetIds(planned.root))
           if (!available?.(id) || !stillCurrent()) return false;
-        if (!stillCurrent() || !options.replaceCollection(next, expected, metrics, stillCurrent))
+        const replace =
+          intent.type === "set-wordart-style"
+            ? options.replaceCollectionPreservingGeometry
+            : options.replaceCollection;
+        if (!replace || !stillCurrent() || !replace(next, expected, metrics, stillCurrent))
           return false;
       }
       // Preflight may fit leaf text. The command owner is responsible for that

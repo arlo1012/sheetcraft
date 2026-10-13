@@ -10,6 +10,7 @@ import { isFramedShapeDrawing } from "@sheetcraft/core/sheet-drawings";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetDrawingLayer from "../../../modules/sheet-drawings/components/SheetDrawingLayer.vue";
 import ShapeFormatPane from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
+import WordArtStyleGallery from "../../../modules/sheet-drawings/components/WordArtStyleGallery.vue";
 import WordArtTransformGallery from "../../../modules/sheet-drawings/components/WordArtTransformGallery.vue";
 import ShapeCanvasTextEditor from "../../../modules/sheet-drawings/components/ShapeCanvasTextEditor.vue";
 import { createModernWordArtDrawing } from "../../../modules/sheet-drawings/modern-wordart-insertion";
@@ -456,3 +457,112 @@ test("real restored Workspace leaf gallery owns one group path and rejects its c
   expect(state.session.history.undoStack).toHaveLength(1);
   expect(state.sheetGridRef.getSelectedShapeObjects()).toEqual([["group", "sibling"]]);
 });
+
+async function wordArtStyles(wrapper: VueWrapper) {
+  const pane = wrapper.getComponent(ShapeFormatPane);
+  await pane.get(".shape-format-pane__modes button:nth-child(2)").trigger("click");
+  await pane.get('[role="tab"][id$="text-fill-line-tab"]').trigger("click");
+  const gallery = pane.getComponent(WordArtStyleGallery);
+  expect(gallery.findAll("[data-wordart-style-choice]")).toHaveLength(25);
+  return { pane, gallery };
+}
+
+test.each(["root", "owned"] as const)(
+  "real Workspace %s WordArt reapplies all-object appearance and clears effects with exact history and owner",
+  async (ownership) => {
+    const fixture = storedWordArt(),
+      source = fixture.drawing;
+    source.rotation = 37;
+    source.shapeText!.layout.autoFit = "resize-shape";
+    source.shapeText!.warp = { preset: "textSlantUp" };
+    source.shapeText!.characterRuns = [
+      {
+        start: 0,
+        end: 4,
+        fontSize: 32,
+        bold: false,
+        italic: true,
+        underline: true,
+        color: "#FF0000",
+        line: { kind: "none" },
+      },
+    ];
+    const sibling = { ...source, id: "sibling", name: "Sibling", text: "Other art" };
+    sibling.shapeFrame = {
+      kind: "shape-frame-v1",
+      anchor: { mode: "fixed", x: 350, y: 24, size: { width: 180, height: 100 } },
+    };
+    if (ownership === "owned")
+      fixture.sheet.drawings = groupShapeRoots(
+        [source, sibling],
+        ["art", "sibling"],
+        { id: "group", name: "WordArt group" },
+        fixture.metrics,
+      );
+    const { wrapper, state, sheet, snapshot } = await workspace(fixture.workbook),
+      path = ownership === "root" ? ["art"] : ["group", "art"];
+    function target() {
+      const root = sheet.drawings![0]!;
+      const drawing = isShapeGroupDrawing(root) ? root.members[0]! : root;
+      if (drawing.kind !== "shape" || !drawing.wordArt) throw Error("Expected WordArt target");
+      return drawing;
+    }
+    const before = JSON.parse(JSON.stringify(target())),
+      originalGroup = JSON.parse(JSON.stringify(sheet.drawings![0]!));
+    expect(state.sheetGridRef.selectShapeObjects([path])).toBe(true);
+    await flushPromises();
+    if (ownership === "root")
+      await wrapper
+        .getComponent(SheetDrawingLayer)
+        .get("[data-shape-format-trigger]")
+        .trigger("click");
+    else wrapper.getComponent(SheetDrawingLayer).vm.$emit("formatGroup", sheet.drawings![0]!, path);
+    await flushPromises();
+    const { pane, gallery } = await wordArtStyles(wrapper);
+    expect(gallery.props("disabled")).toBe(false);
+    expect(pane.props("snapshot")!.owner.drawingId).toBe("art");
+    await gallery.get('[data-wordart-style-choice="neutral-solid"]').trigger("click");
+    await flushPromises();
+    const styled = target();
+    expect(styled.text).toBe(before.text);
+    expect(styled.rotation).toBe(37);
+    expect(styled.shapeText!.warp).toEqual(before.shapeText.warp);
+    expect(styled.shapeText!.characterRuns).toEqual([
+      { start: 0, end: 4, fontSize: 32, bold: false, italic: true, underline: true },
+    ]);
+    expect({ ...styled, shapeText: before.shapeText }).toEqual(before);
+    expect(styled.shapeText!.style).toEqual(
+      WORDART_STYLE_PRESETS.find((p) => p.id === "neutral-solid")!.style,
+    );
+    if (isShapeGroupDrawing(sheet.drawings![0]!)) {
+      const group = sheet.drawings![0]!;
+      if (!isShapeGroupDrawing(group)) throw Error("Group");
+      expect(group.members[1]).toEqual(originalGroup.members[1]);
+      expect(group.shapeFrame).toEqual(originalGroup.shapeFrame);
+    }
+    expect(state.session.history.undoStack).toHaveLength(1);
+    const reapplied = serializeWorkbook(state.session.workbook);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(snapshot);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(reapplied);
+    await pane.get("[data-clear-wordart-effects]").trigger("click");
+    await flushPromises();
+    expect(target().shapeText).not.toHaveProperty("warp");
+    expect(target().text).toBe(before.text);
+    expect(target().shapeText!.characterRuns).toEqual(styled.shapeText!.characterRuns);
+    expect(target().rotation).toBe(37);
+    expect(target().shapeText!.style!.shadow).toEqual({ kind: "none" });
+    expect(state.session.history.undoStack).toHaveLength(2);
+    const cleared = serializeWorkbook(state.session.workbook);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(reapplied);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(cleared);
+  },
+  15_000,
+);

@@ -13,6 +13,7 @@ import {
   createShapeFormatTranslate,
   SHAPE_FORMAT_LABELS,
 } from "../../../../modules/sheet-drawings/components/shape-format/shape-format-labels";
+import { WORDART_STYLE_PRESETS } from "../../../../modules/sheet-drawings/wordart-style-presets";
 function snapshot(): ShapeFormatSnapshot {
   return {
     owner: { workbookId: "book", sheetId: "sheet", drawingId: "shape", sessionId: "session" },
@@ -366,5 +367,106 @@ describe("exact-owner text transform actions", () => {
     expect(f.failures.at(-1)).toBe("apply-rejected");
     expect(f.snapshot.textWarp).toEqual({ preset: "textPlain" });
     expect(f.accepted).toEqual([]);
+  });
+});
+
+describe("exact-owner WordArt preset and clear actions", () => {
+  test("only the 25 approved canonical IDs can dispatch, without accepting caller recipes", () => {
+    const f = fixture();
+    f.capabilities.wordArtStyle = { enabled: true };
+    const apply = f.session.wordArtStyleAction();
+    expect(WORDART_STYLE_PRESETS).toHaveLength(25);
+    for (const preset of WORDART_STYLE_PRESETS) expect(apply(preset.id)).toBe(true);
+    expect(f.handler).toHaveBeenCalledTimes(25);
+    for (const [index, call] of vi.mocked(f.handler).mock.calls.entries()) {
+      expect(call[0]).toEqual({
+        type: "set-wordart-style",
+        presetId: WORDART_STYLE_PRESETS[index]!.id,
+        owner: f.snapshot!.owner,
+        baseRevision: 2,
+        intentId: expect.any(String),
+      });
+    }
+    for (const id of ["", "Black fill, soft shadow", "unapproved", "BLACK-SOFT-SHADOW"])
+      expect(apply(id)).toBe(false);
+    expect(f.handler).toHaveBeenCalledTimes(25);
+    expect(f.failures.at(-1)).toBe("out-of-range");
+  });
+  test("clear dispatches only its owner identity and remains independent from style capability", () => {
+    const f = fixture();
+    f.capabilities.wordArtStyle = { enabled: false };
+    f.capabilities.clearWordArtEffects = { enabled: true };
+    expect(f.session.wordArtStyleAction()(WORDART_STYLE_PRESETS[0]!.id)).toBe(false);
+    expect(f.session.clearWordArtEffectsAction()()).toBe(true);
+    expect(f.handler).toHaveBeenCalledExactlyOnceWith({
+      type: "clear-wordart-effects",
+      owner: f.snapshot!.owner,
+      baseRevision: 2,
+      intentId: expect.any(String),
+    });
+    expect(f.accepted).toHaveLength(1);
+  });
+  test("old callbacks cannot retarget after owner, revision, handler, drawing or cancellation changes", () => {
+    for (const kind of ["style", "clear"] as const) {
+      for (const change of ["owner", "revision", "handler", "drawing", "cancel"] as const) {
+        const f = fixture();
+        f.capabilities.wordArtStyle = { enabled: true };
+        f.capabilities.clearWordArtEffects = { enabled: true };
+        const apply = f.session.wordArtStyleAction();
+        const clear = f.session.clearWordArtEffectsAction();
+        const original = f.handler;
+        if (change === "owner")
+          f.snapshot = { ...f.snapshot!, owner: { ...f.snapshot!.owner, sessionId: "new" } };
+        if (change === "revision") f.snapshot = { ...f.snapshot!, revision: 3 };
+        if (change === "handler") f.handler = vi.fn(() => true);
+        if (change === "drawing")
+          f.snapshot = { ...f.snapshot!, drawing: { ...f.snapshot!.drawing } };
+        if (change === "cancel") f.session.cancel();
+        expect(kind === "style" ? apply(WORDART_STYLE_PRESETS[0]!.id) : clear()).toBe(false);
+        expect(original).not.toHaveBeenCalled();
+        expect(f.handler).not.toHaveBeenCalled();
+        expect(f.accepted).toEqual([]);
+        expect(f.failures.at(-1)).toBe("stale-owner");
+      }
+    }
+  });
+  test("missing and disabled capabilities block both commands, including controls disabled after capture", () => {
+    const f = fixture();
+    expect(f.session.wordArtStyleAction()(WORDART_STYLE_PRESETS[0]!.id)).toBe(false);
+    expect(f.session.clearWordArtEffectsAction()()).toBe(false);
+    f.capabilities.wordArtStyle = { enabled: true };
+    f.capabilities.clearWordArtEffects = { enabled: true };
+    const apply = f.session.wordArtStyleAction();
+    const clear = f.session.clearWordArtEffectsAction();
+    f.capabilities.wordArtStyle = { enabled: false };
+    f.capabilities.clearWordArtEffects = { enabled: false };
+    expect(apply(WORDART_STYLE_PRESETS[0]!.id)).toBe(false);
+    expect(clear()).toBe(false);
+    expect(f.failures.at(-1)).toBe("unsupported");
+    expect(f.handler).not.toHaveBeenCalled();
+    expect(f.accepted).toEqual([]);
+  });
+  test("missing selection and rejected or throwing transactions report meaningful feedback", () => {
+    const f = fixture();
+    f.capabilities.wordArtStyle = { enabled: true };
+    f.capabilities.clearWordArtEffects = { enabled: true };
+    f.snapshot = null;
+    expect(f.session.wordArtStyleAction()(WORDART_STYLE_PRESETS[0]!.id)).toBe(false);
+    expect(f.session.clearWordArtEffectsAction()()).toBe(false);
+    expect(f.failures.at(-1)).toBe("missing-selection");
+    for (const handler of [
+      vi.fn(() => false),
+      vi.fn(() => {
+        throw Error("transaction failed");
+      }),
+    ]) {
+      f.snapshot = { ...snapshot(), wordArtStyleId: WORDART_STYLE_PRESETS[1]!.id };
+      f.handler = handler;
+      expect(f.session.wordArtStyleAction()(WORDART_STYLE_PRESETS[0]!.id)).toBe(false);
+      expect(f.session.clearWordArtEffectsAction()()).toBe(false);
+      expect(f.failures.at(-1)).toBe("apply-rejected");
+      expect(f.snapshot.wordArtStyleId).toBe(WORDART_STYLE_PRESETS[1]!.id);
+      expect(f.accepted).toEqual([]);
+    }
   });
 });

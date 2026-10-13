@@ -1,3 +1,4 @@
+import { layoutDrawingShapeText } from "../../../modules/sheet-drawings/shape-text-runtime";
 import { effectScope, ref } from "vue";
 import { expect, test, vi } from "vitest";
 import { createWorkbook, getActiveSheet, createSheet } from "@sheetcraft/core/workbook";
@@ -23,7 +24,7 @@ import {
   createPictureRotation3d,
 } from "../../../modules/sheet-images/picture-effect-edit";
 import type { ShapeFormatIntent } from "../../../modules/sheet-drawings/shape-format-pane-model";
-function fixture(legacy = false) {
+function fixture(legacy = false, measuredText = false) {
   const wb = ref(createWorkbook({ id: "w", sheetId: "s" })),
     sheet = ref(getActiveSheet(wb.value)),
     revision = ref(0),
@@ -58,6 +59,32 @@ function fixture(legacy = false) {
       update,
       isAssetAvailable: () => true,
       getUnsupportedReason: () => "Pending",
+      ...(measuredText
+        ? {
+            prepareText: (
+              candidate: import("@sheetcraft/core/sheet-drawings").SheetGraphicDrawing,
+            ) => ({
+              drawing: candidate,
+              layout: layoutDrawingShapeText(candidate, {
+                measurer: {
+                  measure: (text: string) => text.length * 8,
+                  measureMetrics: (text: string) => ({
+                    width: text.length * 8,
+                    ascent: 12,
+                    descent: 4,
+                    inkLeft: 0,
+                    inkRight: text.length * 8,
+                  }),
+                },
+                normalLineMetrics: { ascent: 12, descent: 4, lineAdvance: 16 },
+                resolveNormalLineMetrics: () => ({ ascent: 12, descent: 4, lineAdvance: 16 }),
+                normalLineMetricPolicy: "provided-native" as const,
+              }),
+              resized: false,
+              evaluations: 1,
+            }),
+          }
+        : {}),
     }),
   )!;
   expect(pane.open(sheet.value.drawings![0]!)).toBe(true);
@@ -387,6 +414,98 @@ test("ordinary retained warp reads and clears without tagging; untagged and lega
     const legacy = createGraphicDrawing("old", "wordArt", "Old", { row: 0, column: 0 });
     expect(f.pane.open(legacy)).toBe(false);
     expect(f.session.history.undoStack).toHaveLength(1);
+  } finally {
+    f.scope.stop();
+  }
+});
+
+test("reapply and Clear use one exact modern owner, preserve typography, and Undo complete appearance", () => {
+  const f = fixture(false, true);
+  try {
+    const source = requireLegacySheetDrawing(f.sheet.value.drawings![0]!);
+    if (source.kind !== "shape") throw Error("shape");
+    source.wordArt = true;
+    source.text = "alpha beta";
+    source.rotation = 37;
+    source.shapeText = {
+      ...createDefaultShapeText(),
+      warp: { preset: "textWave1" },
+      characterRuns: [
+        {
+          start: 0,
+          end: 6,
+          fontSize: 64,
+          bold: false,
+          italic: true,
+          underline: true,
+          color: "#FF0000",
+          line: { kind: "none" },
+        },
+      ],
+    };
+    f.sheet.value.drawings = [normalizeSheetDrawing(source)];
+    f.revision.value++;
+    const before = serializeWorkbook(f.wb.value);
+    expect(f.pane.capabilities.value.wordArtStyle?.enabled).toBe(true);
+    const stale = f.intent({ type: "set-wordart-style", presetId: "accent3-solid" });
+    expect(f.pane.onIntent(stale)).toBe(true);
+    expect(f.update).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      "preserve-geometry",
+    );
+    expect(f.pane.onIntent(stale)).toBe(false);
+    const applied = serializeWorkbook(f.wb.value);
+    expect(f.pane.snapshot.value?.wordArtStyleId).toBe("accent3-solid");
+    const next = requireLegacySheetDrawing(f.sheet.value.drawings![0]!);
+    if (next.kind !== "shape") throw Error("shape");
+    expect({ ...next, shapeText: source.shapeText }).toEqual(source);
+    expect(next.shapeText!.characterRuns).toEqual([
+      { start: 0, end: 6, fontSize: 64, bold: false, italic: true, underline: true },
+    ]);
+    expect(f.pane.onIntent(f.intent({ type: "clear-wordart-effects" }))).toBe(true);
+    const cleared = requireLegacySheetDrawing(f.sheet.value.drawings![0]!);
+    if (cleared.kind !== "shape") throw Error("shape");
+    expect(cleared.shapeText).not.toHaveProperty("warp");
+    expect(cleared.shapeText!.characterRuns).toEqual(next.shapeText!.characterRuns);
+    expect(cleared.rotation).toBe(37);
+    expect(cleared.bold).toBe(source.bold);
+    expect(f.session.history.undoStack).toHaveLength(2);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.wb.value)).toEqual(applied);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.wb.value)).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.wb.value)).toEqual(applied);
+  } finally {
+    f.scope.stop();
+  }
+});
+test("reapply refusal, unknown preset and protected owner keep snapshot and history", () => {
+  const f = fixture();
+  try {
+    expect(f.pane.capabilities.value.wordArtStyle).toBeUndefined();
+    expect(
+      f.pane.onIntent(f.intent({ type: "set-wordart-style", presetId: "accent3-solid" })),
+    ).toBe(false);
+    const source = requireLegacySheetDrawing(f.sheet.value.drawings![0]!);
+    if (source.kind !== "shape") throw Error("shape");
+    source.wordArt = true;
+    source.shapeText = createDefaultShapeText();
+    f.revision.value++;
+    const before = serializeWorkbook(f.wb.value);
+    expect(f.pane.onIntent(f.intent({ type: "set-wordart-style", presetId: "unknown" }))).toBe(
+      false,
+    );
+    f.update.mockReturnValueOnce(false);
+    expect(
+      f.pane.onIntent(f.intent({ type: "set-wordart-style", presetId: "accent3-solid" })),
+    ).toBe(false);
+    expect(serializeWorkbook(f.wb.value)).toEqual(before);
+    expect(f.session.history.undoStack).toHaveLength(0);
+    f.busy.value = true;
+    expect(f.pane.onIntent(f.intent({ type: "clear-wordart-effects" }))).toBe(false);
+    expect(serializeWorkbook(f.wb.value)).toEqual(before);
   } finally {
     f.scope.stop();
   }

@@ -52,6 +52,13 @@ import {
 } from "./shape-text-runtime";
 import { planShapeTextPaint, resolveShapeTextPaintStyle } from "./shape-text-paint";
 import { resolveShapeDrawing, updateResolvedShapeDrawing } from "./resolved-shape-drawing";
+import {
+  applyWordArtStylePreset,
+  clearWordArtEffects,
+  getAppliedWordArtStyleId,
+  isWordArtStyleTarget,
+} from "./wordart-style-application";
+import type { ShapeTextPreparationMode } from "./prepare-shape-text-update";
 
 function anchorMode(value: unknown): ShapeFrameAnchor["mode"] {
   if (value === "move-size") return "move-and-size";
@@ -80,7 +87,11 @@ export function useOwnedShapeFormatPane(options: {
   getMetrics?: () => PictureSheetMetrics | undefined;
   isBusy: () => boolean;
   flush: () => boolean;
-  update: (next: SheetDrawing, owner: SheetDrawing) => boolean;
+  update: (
+    next: SheetDrawing,
+    owner: SheetDrawing,
+    preparationMode?: ShapeTextPreparationMode,
+  ) => boolean;
   isAssetAvailable?: (id: string) => boolean;
   getUnsupportedReason: () => string;
   prepareText?: (
@@ -182,6 +193,12 @@ export function useOwnedShapeFormatPane(options: {
         eligibleCount: isShapeFormatTextWarpTarget(view) ? 1 : 0,
         descendantCount: 1,
       },
+      ...(isWordArtStyleTarget(view)
+        ? {
+            wordArtStyleId: getAppliedWordArtStyleId(view),
+            wordArtStyleScope: { eligibleCount: 1, descendantCount: 1 },
+          }
+        : {}),
       ...(glyph.mixed.length ? { mixedStyleCategories: { text: glyph.mixed } } : {}),
       independentTextCameraCount: view.shapeText?.style?.rotation3d?.kind === "value" ? 1 : 0,
       ...(acknowledged.value?.drawing === d && acknowledged.value.revision === revision
@@ -315,6 +332,9 @@ export function useOwnedShapeFormatPane(options: {
           rotation3d: field,
         },
       },
+      ...(d && isWordArtStyleTarget(d)
+        ? { wordArtStyle: textField, clearWordArtEffects: textField }
+        : {}),
       textWarp: {
         enabled: textEnabled && !!d && isShapeFormatTextWarpTarget(d),
         reason:
@@ -447,7 +467,13 @@ export function useOwnedShapeFormatPane(options: {
       return framed;
     };
     try {
-      if (intent.type === "set-text-warp") {
+      if (intent.type === "set-wordart-style") {
+        if (capabilities.value.wordArtStyle?.enabled !== true) return false;
+        next = applyWordArtStylePreset(next, intent.presetId);
+      } else if (intent.type === "clear-wordart-effects") {
+        if (capabilities.value.clearWordArtEffects?.enabled !== true) return false;
+        next = clearWordArtEffects(next);
+      } else if (intent.type === "set-text-warp") {
         if (capabilities.value.textWarp?.enabled !== true || !isShapeFormatTextWarpTarget(next))
           return false;
         const warp = normalizeShapeTextWarp(intent.value);
@@ -617,7 +643,7 @@ export function useOwnedShapeFormatPane(options: {
           : (normalizeSheetDrawing(current) as SheetGraphicDrawing);
         const prepared = options.prepareText
           ? options.prepareText(candidateView, currentView)
-          : intent.type === "set-text-warp"
+          : intent.type === "set-text-warp" || intent.type === "set-wordart-style"
             ? {
                 drawing: candidateView,
                 layout: layoutDrawingShapeText(candidateView),
@@ -685,7 +711,14 @@ export function useOwnedShapeFormatPane(options: {
       )
         return false;
       if (!stillCurrent()) return false;
-      if (!options.update(candidate, current)) return false;
+      if (
+        !options.update(
+          candidate,
+          current,
+          intent.type === "set-wordart-style" ? "preserve-geometry" : undefined,
+        )
+      )
+        return false;
       const applied = drawing.value;
       if (!applied || applied.id !== current.id) return false;
       acknowledged.value = {

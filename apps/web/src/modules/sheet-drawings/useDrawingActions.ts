@@ -423,11 +423,19 @@ export function useDrawingActions(options: {
       return false;
     }
   }
-  function update(drawing: SheetDrawing, expected?: SheetDrawing): boolean {
+  function update(
+    drawing: SheetDrawing,
+    expected?: SheetDrawing,
+    preparationMode?: ShapeTextPreparationMode,
+  ): boolean {
     const current = options.getSheet().drawings ?? [];
     const owner = current.find((item) => item.id === drawing.id);
     if (!owner || (expected && owner !== expected) || drawing.kind !== owner.kind) return false;
-    return replaceCollection(
+    const replace =
+      preparationMode === "preserve-geometry"
+        ? replaceCollectionPreservingGeometry
+        : replaceCollection;
+    return replace(
       current.map((item) => (item === owner ? drawing : item)),
       current,
     );

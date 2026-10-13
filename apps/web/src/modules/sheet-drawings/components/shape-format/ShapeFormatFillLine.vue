@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import PictureFormatSection from "../../../sheet-images/components/format-pane/PictureFormatSection.vue";
 import PicturePaintEditor from "../../../sheet-images/components/format-pane/PicturePaintEditor.vue";
 import PictureLineEditor from "../../../sheet-images/components/format-pane/PictureLineEditor.vue";
 import ShapeLineEndsControls from "../ShapeLineEndsControls.vue";
+import WordArtStyleGallery from "../WordArtStyleGallery.vue";
+import {
+  WORDART_STYLE_APPLICATION_LABELS,
+  wordArtStyleApplicationScope,
+} from "./wordart-style-application-labels";
 import type { ShapeFormatMode } from "../../shape-format-pane-model";
 import type { ShapeFormatController } from "./useShapeFormatPane";
 const props = withDefaults(
@@ -16,6 +22,22 @@ const fillAssetLoader = computed(() => props.controller.assetLoader(props.target
 const lineAssetLoader = computed(() => props.controller.assetLoader(props.target, "line"));
 const fillCapability = computed(() => props.controller.styleCapability(props.target, "fill"));
 const lineCapability = computed(() => props.controller.styleCapability(props.target, "line"));
+const wordArtStyle = computed(() => props.controller.wordArtStyleBinding());
+const wordArtStyleCapability = computed(() => props.controller.wordArtStyleCapability());
+const clearWordArtCapability = computed(() => props.controller.clearWordArtEffectsCapability());
+const clearWordArtAction = computed(() => props.controller.session.clearWordArtEffectsAction());
+const wordArtLabels = computed(
+  () => WORDART_STYLE_APPLICATION_LABELS[props.controller.props.locale ?? "en-US"],
+);
+const wordArtScope = computed(() => {
+  const snapshot = props.controller.props.snapshot;
+  return snapshot?.drawing.kind === "shapeGroup" && snapshot.wordArtStyleScope
+    ? wordArtStyleApplicationScope(
+        props.controller.props.locale ?? "en-US",
+        snapshot.wordArtStyleScope,
+      )
+    : undefined;
+});
 const endsCapability = computed(
   () =>
     props.controller.props.capabilities.lineEnds ?? {
@@ -43,6 +65,53 @@ defineExpose({
 </script>
 <template>
   <div class="shape-format-fill-line">
+    <PictureFormatSection
+      v-if="target === 'text' && controller.hasWordArtStyleScope.value"
+      :title="wordArtLabels.title"
+      initially-open
+      data-wordart-style-section
+    >
+      <p class="shape-format-fill-line__reason" data-wordart-style-help>
+        {{ wordArtLabels.reapplyHelp }}
+      </p>
+      <p v-if="wordArtScope" class="shape-format-fill-line__reason" data-wordart-style-scope>
+        {{ wordArtScope }}
+      </p>
+      <p
+        v-if="controller.props.snapshot?.mixedWordArtStyle"
+        class="shape-format-fill-line__reason"
+        data-wordart-style-mixed
+      >
+        {{ wordArtLabels.mixed }}
+      </p>
+      <WordArtStyleGallery v-bind="wordArtStyle" />
+      <p
+        v-if="!wordArtStyleCapability.enabled && wordArtStyleCapability.reason"
+        class="shape-format-fill-line__reason"
+        data-wordart-style-disabled-reason
+      >
+        {{ wordArtStyleCapability.reason }}
+      </p>
+      <TButton
+        variant="outline"
+        size="small"
+        :disabled="!clearWordArtCapability.enabled"
+        data-clear-wordart-effects
+        @click="clearWordArtAction()"
+      >
+        {{ wordArtLabels.clear }}
+      </TButton>
+      <p class="shape-format-fill-line__reason" data-clear-wordart-effects-help>
+        {{ wordArtLabels.clearHelp }}
+      </p>
+      <p
+        v-if="!clearWordArtCapability.enabled && clearWordArtCapability.reason"
+        class="shape-format-fill-line__reason"
+        data-clear-wordart-effects-disabled-reason
+      >
+        {{ clearWordArtCapability.reason }}
+      </p>
+    </PictureFormatSection>
     <PictureFormatSection
       v-if="!isConnector"
       ref="fillRef"

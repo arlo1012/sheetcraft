@@ -1897,6 +1897,7 @@ const shapeGroupFormatPane = useOwnedShapeGroupFormatPane({
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
   replaceCollection: drawingActions.replaceCollection,
+  replaceCollectionPreservingGeometry: drawingActions.replaceCollectionPreservingGeometry,
   isAssetAvailable: (id) => imageAssetUrls.value.has(id) || shapePaintAssets.has(id),
   getUnsupportedReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
   getCameraUnsupportedReason: () => t("drawing.groupCameraConnectorUnavailable"),

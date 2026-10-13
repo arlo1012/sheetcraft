@@ -1,3 +1,4 @@
+import { getAppliedWordArtStyleId, isWordArtStyleTarget } from "./wordart-style-application";
 import { computed, shallowRef } from "vue";
 import {
   getShapeTextCharacterSegments,
@@ -144,6 +145,12 @@ export function useShapeTextCharacterFormatPane(options: {
         ? `${start === end ? "字体、文字填充和轮廓用于光标处新输入的文字" : "字体、文字填充和轮廓仅用于选中的文字"}；段落、文本框和文字转换设置请先应用文字，再修改。`
         : `${start === end ? "Font, text fill and outline apply to new text at the caret" : "Font, text fill and outline apply only to selected characters"}. Apply the text before changing paragraph, text-box or text-transform settings.`,
       textStyle,
+      ...(isWordArtStyleTarget(drawing)
+        ? {
+            wordArtStyleId: getAppliedWordArtStyleId(drawing),
+            wordArtStyleScope: { eligibleCount: 1, descendantCount: 1 },
+          }
+        : {}),
       ...(drawing.shapeText?.warp ? { textWarp: drawing.shapeText.warp } : {}),
       ...(mixedStyles.length ? { mixedStyleCategories: { text: mixedStyles } } : {}),
       ...(acknowledged.value?.revision === state.formatRevision
@@ -213,6 +220,12 @@ export function useShapeTextCharacterFormatPane(options: {
           ]),
         ),
       },
+      ...(state && isWordArtStyleTarget(state.draftView)
+        ? {
+            wordArtStyle: { enabled: false, reason },
+            clearWordArtEffects: { enabled: false, reason },
+          }
+        : {}),
       textWarp: { enabled: false, reason },
       lineEnds: { enabled: false, reason },
     };

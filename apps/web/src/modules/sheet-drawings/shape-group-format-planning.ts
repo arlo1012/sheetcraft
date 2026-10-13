@@ -74,6 +74,12 @@ import {
 } from "./shape-text-options";
 import { resolveShapeTextPaintStyle } from "./shape-text-paint";
 import { getDrawingShapeTextRect } from "./shape-text-runtime";
+import {
+  applyWordArtStylePreset,
+  clearWordArtEffects,
+  getAppliedWordArtStyleId,
+  isWordArtStyleTarget,
+} from "./wordart-style-application";
 
 export type ShapeGroupFormatBaseline = Readonly<{ width: number; height: number }>;
 /** Selection ownership is the exact container or explicitly selected ordinary leaf. */
@@ -125,6 +131,9 @@ export type ShapeGroupFormatAggregate = {
   readonly textWarp?: ShapeTextWarp;
   readonly mixedTextWarp: boolean;
   readonly textWarpEligibleCount: number;
+  readonly wordArtStyleId?: string;
+  readonly mixedWordArtStyle: boolean;
+  readonly wordArtStyleEligibleCount: number;
 };
 type WithoutIdentity<T> = T extends ShapeFormatIntent
   ? Omit<T, "owner" | "baseRevision" | "intentId">
@@ -306,6 +315,14 @@ export function getShapeGroupTextWarpEligibleLeaves(
 ): readonly ResolvedShapeGroupLeaf[] {
   return context.leaves.filter(
     (leaf) => hasText(leaf) && !!leaf.view && isShapeFormatTextWarpTarget(leaf.view),
+  );
+}
+/** Recipe/reset batches only affect exact genuine modern WordArt leaves. */
+export function getShapeGroupWordArtStyleEligibleLeaves(
+  context: ShapeGroupFormatContext,
+): readonly ResolvedShapeGroupLeaf[] {
+  return context.leaves.filter(
+    (leaf) => hasText(leaf) && !!leaf.view && isWordArtStyleTarget(leaf.view),
   );
 }
 /** Arrowheads belong to real open line descendants, never the container itself. */
@@ -616,6 +633,13 @@ export function planShapeGroupFormatIntent(
       return text ? withDrawingShapeText(view, { ...text, style }) : { ...view, shapeStyle: style };
     });
   }
+  if (intent.type === "set-wordart-style" || intent.type === "clear-wordart-effects") {
+    return batchPlan(context, getShapeGroupWordArtStyleEligibleLeaves(context), (view) =>
+      intent.type === "set-wordart-style"
+        ? applyWordArtStylePreset(view, intent.presetId)
+        : clearWordArtEffects(view),
+    );
+  }
   if (intent.type === "set-text-warp") {
     const warp = normalizeShapeTextWarp(intent.value);
     return batchPlan(context, getShapeGroupTextWarpEligibleLeaves(context), (view) => {
@@ -781,6 +805,14 @@ export function aggregateShapeGroupFormatSnapshot(
   const mixedTextWarp = warpLeaves.some(
     (leaf) => !sameValue(leaf.sourceNode.shapeText?.warp, firstWarp),
   );
+  const wordArtLeaves = getShapeGroupWordArtStyleEligibleLeaves(context);
+  const wordArtStyles = wordArtLeaves.map((leaf) => {
+    const model = materializeDrawingShapeText(leaf.view!);
+    const local = model.characterRuns
+      ?.map(({ start, end, color, fill, line }) => ({ start, end, color, fill, line }))
+      .filter((run) => run.color !== undefined || run.fill !== undefined || run.line !== undefined);
+    return JSON.stringify({ style: model.style, runs: local?.length ? local : undefined });
+  });
   return {
     values,
     mixedFields,
@@ -802,6 +834,11 @@ export function aggregateShapeGroupFormatSnapshot(
     lineEligibleCount: lineLeaves.length,
     ...(!mixedTextWarp && firstWarp ? { textWarp: normalizeShapeTextWarp(firstWarp) } : {}),
     mixedTextWarp,
+    wordArtStyleId: wordArtLeaves[0]?.view
+      ? getAppliedWordArtStyleId(wordArtLeaves[0].view)
+      : undefined,
+    mixedWordArtStyle: new Set(wordArtStyles).size > 1,
+    wordArtStyleEligibleCount: wordArtLeaves.length,
     textWarpEligibleCount: warpLeaves.length,
   };
 }
