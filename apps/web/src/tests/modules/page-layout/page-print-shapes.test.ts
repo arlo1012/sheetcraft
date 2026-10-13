@@ -219,6 +219,68 @@ describe("genuine print shape consumer", () => {
     expect(getPrintPictureAssetIds(sheet).size).toBe(0);
   });
 
+  test("hidden canonical and legacy objects skip font and missing-asset preflight without blocking visible siblings", async () => {
+    const hidden = framed("hidden", {
+      hidden: true,
+      text: "Unavailable hidden font",
+      shapeText: {
+        ...createGraphicDrawing("x", "shape", "", { row: 0, column: 0 }).shapeText!,
+        fontFamily: "Noto Sans",
+      },
+      shapeFrame: {
+        kind: "shape-frame-v1",
+        anchor: { mode: "fixed", x: 8000, y: 8000, size: { width: 100, height: 60 } },
+      },
+      shapeStyle: {
+        fill: {
+          kind: "value",
+          value: {
+            kind: "picture",
+            assetId: "hidden-texture",
+            opacity: 1,
+            rotateWithShape: true,
+            layout: {
+              kind: "stretch",
+              offsetXRatio: 0,
+              offsetYRatio: 0,
+              widthRatio: 1,
+              heightRatio: 1,
+            },
+          },
+        },
+      },
+    });
+    const legacy = createGraphicDrawing("hidden-legacy", "textBox", "Legacy", {
+      row: 300,
+      column: 30,
+    });
+    legacy.hidden = true;
+    legacy.text = "Hidden legacy font";
+    const visible = framed("visible", { text: "" }),
+      { sheet, metrics } = fixture([hidden, legacy, visible]),
+      snapshot = JSON.stringify(sheet.drawings),
+      view = resolveShapeDrawing(visible, metrics).view as SheetGraphicDrawing,
+      prepare = vi.spyOn(bodyPaint, "prepareShapeDetailedPaint").mockReturnValue(readyBody(view)),
+      fonts = vi.spyOn(textRuntime, "ensureDrawingShapeTextFont");
+    expect(resolveShapeDrawing(hidden, metrics).collapsed).toBe(false);
+    expect(getPrintableShapeRoots(sheet)).toEqual([visible]);
+    expect([...getPrintableShapeLeaves(sheet, metrics)].map((leaf) => leaf.sourceNode)).toEqual([
+      visible,
+    ]);
+    expect(getPrintPictureAssetIds(sheet, metrics)).toEqual(new Set());
+    const target = paint(sheet, metrics);
+    await preparePrintShapeFonts(sheet, metrics);
+    expect(prepare).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ sourceIdentity: visible }),
+    );
+    expect(target.drawImage).toHaveBeenCalledOnce();
+    expect(fonts).not.toHaveBeenCalled();
+    const extent = getPrintShapeContentExtent(sheet, metrics);
+    expect(metrics.rows.visiblePrefix(extent.rowCount)).toBeLessThan(300);
+    expect(metrics.columns.visiblePrefix(extent.columnCount)).toBeLessThan(500);
+    expect(JSON.stringify(sheet.drawings)).toBe(snapshot);
+  });
+
   test("missing real font fails explicitly even when its shape is outside the current page clip", () => {
     const source = framed("missing-font", {
       text: "No fallback",

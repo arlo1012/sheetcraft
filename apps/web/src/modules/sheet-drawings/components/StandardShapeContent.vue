@@ -75,6 +75,9 @@ const textStyle = computed<CSSProperties | undefined>(() => {
     fontSize: `${props.drawing.fontSize}px`,
     fontWeight: props.drawing.bold ? "700" : "400",
     fontStyle: props.drawing.italic ? "italic" : "normal",
+    ...(props.drawing.shapeFlipY
+      ? { transform: "rotate(180deg)", transformOrigin: "50% 50%" }
+      : {}),
   };
 });
 </script>

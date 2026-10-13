@@ -66,6 +66,7 @@ function visitCandidates(
   pointValue: ShapeConnectorPoint,
   worldTolerance: number,
   visit: (value: RankedCandidate) => void,
+  visibleNodeIds?: ReadonlySet<string>,
 ): void {
   const point = queryPoint(pointValue);
   if (
@@ -93,7 +94,8 @@ function visitCandidates(
       (siteWork += target.sites.length) > MAX_SITE_WORK
     )
       throw new RangeError("Connector site picking exceeds its target-site work budget.");
-    if (target.status !== "ready") continue;
+    if (target.status !== "ready" || (visibleNodeIds && !visibleNodeIds.has(target.nodeId)))
+      continue;
     for (const site of target.sites) {
       const distance = Math.hypot(site.position.x - point.x, site.position.y - point.y);
       if (distance > worldTolerance) continue;
@@ -125,9 +127,16 @@ export function getShapeConnectorSiteCandidates(
   context: ResolvedSheetShapeConnections,
   worldPoint: ShapeConnectorPoint,
   worldTolerance: number,
+  visibleNodeIds?: ReadonlySet<string>,
 ): readonly ShapeConnectorSiteCandidate[] {
   const ranked: RankedCandidate[] = [];
-  visitCandidates(context, worldPoint, worldTolerance, (candidate) => ranked.push(candidate));
+  visitCandidates(
+    context,
+    worldPoint,
+    worldTolerance,
+    (candidate) => ranked.push(candidate),
+    visibleNodeIds,
+  );
   ranked.sort(compare);
   return Object.freeze(ranked.map(({ candidate }) => candidate));
 }
@@ -137,10 +146,17 @@ export function pickNearestShapeConnectorSite(
   context: ResolvedSheetShapeConnections,
   worldPoint: ShapeConnectorPoint,
   worldTolerance: number,
+  visibleNodeIds?: ReadonlySet<string>,
 ): ShapeConnectorSiteCandidate | undefined {
   let nearest: RankedCandidate | undefined;
-  visitCandidates(context, worldPoint, worldTolerance, (candidate) => {
-    if (!nearest || compare(candidate, nearest) < 0) nearest = candidate;
-  });
+  visitCandidates(
+    context,
+    worldPoint,
+    worldTolerance,
+    (candidate) => {
+      if (!nearest || compare(candidate, nearest) < 0) nearest = candidate;
+    },
+    visibleNodeIds,
+  );
   return nearest?.candidate;
 }

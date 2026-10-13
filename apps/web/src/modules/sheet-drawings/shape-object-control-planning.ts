@@ -207,16 +207,15 @@ function assertFlippable(node: SheetDrawing | ShapeGroupNode): void {
     for (const member of node.members) assertFlippable(member);
     return;
   }
-  if (node.kind !== "shape" || (!node.shapeGeometry && !node.shapePath))
-    throw new TypeError(
-      "Shape flips require explicit standard or free geometry; legacy shapes and text boxes are not yet supported.",
-    );
-  if (node.shapeConnector)
+  if (node.kind !== "shape" && node.kind !== "textBox")
+    throw new TypeError("Shape flips require a shape or text box.");
+  if (node.kind === "shape" && node.shapeConnector)
     throw new TypeError("A live connector cannot use ordinary shape flip geometry.");
 }
 
 function toggleFlip(node: SheetDrawing | ShapeGroupNode, axis: FlipAxis): void {
-  if (node.kind !== "shape") throw new TypeError("Only explicit shape leaves have flip flags.");
+  if (node.kind !== "shape" && node.kind !== "textBox")
+    throw new TypeError("Only shape or text box leaves have flip flags.");
   if (node[axis]) delete node[axis];
   else node[axis] = true;
 }
@@ -227,8 +226,8 @@ function toggleFlip(node: SheetDrawing | ShapeGroupNode, axis: FlipAxis): void {
  * Diagonal owner scaling commutes with F, so dimensions remain orthogonal
  * even in nonuniformly scaled, rotated groups. No world AABB or shear is
  * persisted. Ungroup retains this world visual result rather than changing
- * the reflected member angle back. Connector and text-box descendants remain
- * gated until their own flip semantics are supported.
+ * the reflected member angle back. Live connector descendants remain gated
+ * rather than being rewritten as ordinary leaf geometry.
  */
 function reflectMember(member: ShapeGroupChild, axis: FlipAxis): void {
   const rect = member.groupFrame.rect;

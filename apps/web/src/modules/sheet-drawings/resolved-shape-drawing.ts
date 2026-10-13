@@ -30,6 +30,7 @@ const appearanceFields = [
   "id",
   "kind",
   "name",
+  "hidden",
   "text",
   "shape",
   "fill",

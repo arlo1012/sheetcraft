@@ -1,6 +1,7 @@
 import { mount, type VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import ShapeToolsToolbar from "../../../modules/sheet-drawings/components/ShapeToolsToolbar.vue";
 import ShapeSelectionPane from "../../../modules/sheet-drawings/components/ShapeSelectionPane.vue";
@@ -301,7 +302,8 @@ describe("recursive shape selection and ordering pane", () => {
     expect(f.wrapper.get("aside").attributes("aria-label")).toBe("选择窗格");
     expect(f.wrapper.find('[type="checkbox"]').exists()).toBe(false);
     expect(f.wrapper.find("[data-picture-selection-pane]").exists()).toBe(false);
-    expect(f.wrapper.text()).not.toContain("隐藏");
+    expect(f.wrapper.findAll("[data-shape-pane-visibility]")).toHaveLength(initialRows.length);
+    expect(f.wrapper.get("[data-shape-pane-hide-all]").attributes("disabled")).toBeDefined();
   });
 
   test("ordinary click selects exclusively and Ctrl/Meta click requests additive selection", async () => {
@@ -539,5 +541,65 @@ describe("recursive shape selection and ordering pane", () => {
     expect(f.wrapper.text()).toContain("No drawing objects on this sheet.");
     expect(f.wrapper.findAll("[data-shape-pane-path]")).toHaveLength(0);
     expect(f.wrapper.find('[aria-label*="Hide"]').exists()).toBe(false);
+  });
+});
+
+describe("selection pane genuine visibility controls", () => {
+  test("row eyes send hide/show intent; inherited hidden row explains parent and remains disabled", async () => {
+    const visibilityHandler = vi.fn(() => true);
+    const rows = initialRows.map((row, index) => ({
+      ...row,
+      visible: index === 0,
+      hiddenByAncestor: index === 2,
+      canToggleVisibility: index !== 2,
+    }));
+    const f = paneFixture({ rows, visibilityHandler });
+    const buttons = f.wrapper.findAll("[data-shape-pane-visibility]");
+    expect(buttons[0]!.attributes("aria-label")).toBe("Hide object: Group 1");
+    await buttons[0]!.trigger("click");
+    await buttons[1]!.trigger("click");
+    expect(visibilityHandler.mock.calls).toEqual([
+      [rows[0]!.path, true],
+      [rows[1]!.path, false],
+    ]);
+    expect(buttons[2]!.attributes("disabled")).toBeDefined();
+    expect(buttons[2]!.attributes("title")).toBe("Show the parent group first.");
+    await buttons[2]!.trigger("click");
+    expect(visibilityHandler).toHaveBeenCalledTimes(2);
+    expect(f.selectHandler).not.toHaveBeenCalled();
+  });
+  test("failure is visible and bulk Show/Hide All have exact boolean intents", async () => {
+    const visibilityHandler = vi.fn(() => false),
+      allVisibilityHandler = vi.fn(() => true);
+    const f = paneFixture({
+      visibilityHandler,
+      allVisibilityHandler,
+      canToggleAllVisibility: true,
+      rows: initialRows.map((row) => ({ ...row, visible: true, canToggleVisibility: true })),
+    });
+    await f.wrapper.findAll("[data-shape-pane-visibility]")[0]!.trigger("click");
+    expect(f.wrapper.get("[data-shape-pane-failure]").text()).toBe(
+      "Couldn't change object visibility.",
+    );
+    await f.wrapper.get("[data-shape-pane-show-all]").trigger("click");
+    await f.wrapper.get("[data-shape-pane-hide-all]").trigger("click");
+    expect(allVisibilityHandler.mock.calls).toEqual([[false], [true]]);
+  });
+  test("captured eye callback retires when owner/handler/row identity changes", async () => {
+    const visibilityHandler = vi.fn(() => true);
+    const f = paneFixture({
+      visibilityHandler,
+      rows: initialRows.map((row) => ({ ...row, canToggleVisibility: true, visible: true })),
+    });
+    const old = f.wrapper
+      .findAllComponents(TButton)
+      .find((button) => button.attributes("data-shape-pane-visibility") !== undefined)?.vm.$.vnode
+      .props?.onClick as ((event: MouseEvent) => void) | undefined;
+    expect(old).toBeTypeOf("function");
+    const next = vi.fn(() => true);
+    await f.wrapper.setProps({ ownerKey: "another-owner", visibilityHandler: next });
+    old!(new MouseEvent("click"));
+    expect(visibilityHandler).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
   });
 });

@@ -487,3 +487,23 @@ describe("flush ordering and final command boundary", () => {
     }
   });
 });
+
+test.each([false, true])(
+  "hidden root/ancestor cannot create a fallback inline text editor (%s)",
+  (owned) => {
+    const root = owned ? deepRoot() : textRoot();
+    root.hidden = true;
+    const f = fixture([root]);
+    try {
+      const before = serializeWorkbook(f.workbook);
+      expect(
+        f.editor.begin(f.sheet.drawings![0]!, owned ? ["outer", "nested", "target"] : undefined),
+      ).toBe(false);
+      expect(f.editor.snapshot.value).toBeUndefined();
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+    } finally {
+      f.scope.stop();
+    }
+  },
+);

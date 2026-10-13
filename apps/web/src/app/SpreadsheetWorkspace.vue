@@ -2121,6 +2121,7 @@ const shapeObjectControls = useShapeObjectControls({
   select: (paths) => sheetGridRef.value?.selectShapeObjects(paths) ?? false,
   format: formatShapeObjectPath,
   replaceCollection: drawingActions.replaceCollection,
+  replaceVisibilityCollection: drawingActions.replaceVisibilityCollection,
 });
 watch(
   () => [activeSheet.value, workbookGeneration.value],
@@ -5094,6 +5095,9 @@ watch(
         :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
         :select-handler="shapeObjectControls.snapshot.value.selectHandler"
         :rename-handler="shapeObjectControls.snapshot.value.renameHandler"
+        :visibility-handler="shapeObjectControls.snapshot.value.visibilityHandler"
+        :all-visibility-handler="shapeObjectControls.snapshot.value.allVisibilityHandler"
+        :can-toggle-all-visibility="shapeObjectControls.snapshot.value.canToggleAllVisibility"
         :order-handler="shapeObjectControls.snapshot.value.actionHandler"
         :close-handler="shapeObjectControls.snapshot.value.closeHandler"
       />

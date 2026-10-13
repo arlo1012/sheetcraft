@@ -4,7 +4,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createSheet } from "@sheetcraft/core/workbook";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { groupShapeRoots } from "@sheetcraft/core/shape-group-planning";
-import { isShapeGroupDrawing, type ShapeGroupDrawing } from "@sheetcraft/core/shape-group";
+import {
+  collectShapeGroupAssetIds,
+  isShapeGroupDrawing,
+  type ShapeGroupDrawing,
+  type ShapeGroupedGroup,
+} from "@sheetcraft/core/shape-group";
 import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
 import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
@@ -24,6 +29,7 @@ import { framedShape } from "./framed-shape-fixture";
 import { shapePageFixture } from "./shape-page-fixture";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
 import { resolveShapeForestForRender } from "../../../modules/sheet-drawings/resolved-shape-render-source";
+import * as textRuntime from "../../../modules/sheet-drawings/shape-text-runtime";
 
 const boundary = vi.hoisted(() => ({ prepare: vi.fn(), images: vi.fn(), font: vi.fn() }));
 vi.mock("../../../modules/sheet-drawings/shape-group-paint", async (original) => ({
@@ -199,6 +205,97 @@ afterEach(() => {
 });
 
 describe("owned group Shadow component presentation", () => {
+  test("hidden owner subtrees retain canonical resources while loading only visible sibling fonts and assets", async () => {
+    const source = root(),
+      child = source.members[0]!;
+    if (child.kind === "shapeGroup") throw Error("Expected graphic member");
+    child.text = "Missing hidden font";
+    child.shapeStyle = {
+      fill: {
+        kind: "value",
+        value: {
+          kind: "picture",
+          assetId: "hidden-texture",
+          opacity: 1,
+          rotateWithShape: true,
+          layout: {
+            kind: "stretch",
+            offsetXRatio: 0,
+            offsetYRatio: 0,
+            widthRatio: 1,
+            heightRatio: 1,
+          },
+        },
+      },
+    };
+    const nested: ShapeGroupedGroup = {
+      kind: "shapeGroup",
+      id: "hidden-owner",
+      name: "Hidden owner",
+      hidden: true,
+      rotation: 0,
+      groupFrame: child.groupFrame,
+      members: [
+        {
+          ...child,
+          groupFrame: {
+            kind: "shape-group-local-v1",
+            rect: { xRatio: 0, yRatio: 0, widthRatio: 1, heightRatio: 1 },
+          },
+        },
+      ],
+    };
+    source.members[0] = nested;
+    const sibling = source.members[1]!;
+    if (sibling.kind === "shapeGroup") throw Error("Expected visible graphic member");
+    sibling.text = "Visible sibling";
+    // Font loading and numeric group orchestration are the boundaries under test.
+    // Native glyph fidelity belongs to the text raster tests.
+    vi.spyOn(textRuntime, "layoutDrawingShapeText").mockReturnValue({
+      runs: [],
+      overflow: false,
+      clipRect: null,
+    } as unknown as ReturnType<typeof textRuntime.layoutDrawingShapeText>);
+    const wrapper = render(source);
+    await settle();
+    expect(boundary.prepare).toHaveBeenCalledOnce();
+    expect(boundary.font).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: sibling.id }),
+    );
+    expect(caches[0]!.retain).toHaveBeenCalledWith(new Set());
+    expect(caches[0]!.load).not.toHaveBeenCalled();
+    expect(collectShapeGroupAssetIds(source)).toEqual(new Set(["hidden-texture"]));
+    expect(wrapper.find('[role="status"]').exists()).toBe(false);
+    expect(latest(wrapper)?.visible).toBe(true);
+  });
+
+  test.each(["root", "members"] as const)(
+    "%s hiding removes pane overlays and releases published pixels without collapsing source placement",
+    async (target) => {
+      const source = reactive(root()),
+        before = JSON.stringify(source.shapeFrame),
+        wrapper = render(source);
+      await settle();
+      const first = latest(wrapper)!;
+      if (target === "root") source.hidden = true;
+      else for (const child of source.members) child.hidden = true;
+      await settle();
+      expect(first.dispose).toHaveBeenCalledOnce();
+      expect(boundary.prepare).toHaveBeenCalledOnce();
+      expect(latest(wrapper)).toBeUndefined();
+      expect(wrapper.find("[data-shape-group-paint]").exists()).toBe(false);
+      expect(wrapper.find('[role="status"]').exists()).toBe(false);
+      expect(caches[0]!.retain).toHaveBeenLastCalledWith(new Set());
+      expect(JSON.stringify(source.shapeFrame)).toBe(before);
+      if (target === "root") delete source.hidden;
+      else for (const child of source.members) delete child.hidden;
+      await settle();
+      expect(boundary.prepare).toHaveBeenCalledTimes(2);
+      expect(latest(wrapper)?.sourceRoot).toBe(source);
+      expect(wrapper.find("[data-shape-group-paint]").exists()).toBe(true);
+    },
+  );
+
   test("watches the whole-sheet pass by identity without reading unrelated camera extras", async () => {
     let reads = 0;
     const extra = Object.defineProperty({}, "probe", {

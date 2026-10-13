@@ -76,6 +76,7 @@ function fixture(owned = false) {
     select,
     format,
     replaceCollection: drawings.replaceCollection,
+    replaceVisibilityCollection: drawings.replaceVisibilityCollection,
   });
   const state = () => controller.snapshot.value!;
   const target = () => {
@@ -239,6 +240,79 @@ describe("shape object controls exact owner session", () => {
     expect(f.state().renameHandler(["a"], " ")).toBe(false);
     expect(f.state().renameHandler(["a"], "x".repeat(201))).toBe(false);
     expect(f.state().renameHandler(["missing"], "X")).toBe(false);
+    expect(f.core.history.undoStack).toHaveLength(0);
+  });
+});
+
+describe("shape controls persistent visibility", () => {
+  test.each([false, true])(
+    "eye toggle uses one history transaction and preserves canonical data (%s)",
+    (owned) => {
+      const f = fixture(owned),
+        before = serializeWorkbook(f.core.workbook),
+        target = structuredClone(f.target());
+      const path = owned ? ["g", "a"] : ["a"];
+      expect(f.state().visibilityHandler(path, true)).toBe(true);
+      expect(f.target()).toEqual({ ...target, hidden: true });
+      expect(f.state().rows.find((row) => row.path.at(-1) === "a")).toMatchObject({
+        visible: false,
+        canToggleVisibility: true,
+      });
+      expect(serializeWorkbook(f.core.workbook).version).toBe(64);
+      undoWorkbookCommand(f.core);
+      f.revision.value++;
+      expect(serializeWorkbook(f.core.workbook)).toEqual(before);
+      redoWorkbookCommand(f.core);
+      f.revision.value++;
+      expect(f.target()).toEqual({ ...target, hidden: true });
+      expect(f.state().visibilityHandler(path, false)).toBe(true);
+      expect(f.target()).toEqual(target);
+    },
+  );
+  test("hidden owner keeps rows and prevents child eye from promising to bypass its owner; Show All clears all levels atomically", () => {
+    const f = fixture(true);
+    expect(f.state().visibilityHandler(["g", "a"], true)).toBe(true);
+    expect(f.state().visibilityHandler(["g"], true)).toBe(true);
+    const before = serializeWorkbook(f.core.workbook);
+    expect(f.state().rows).toHaveLength(3);
+    expect(f.state().rows.find((row) => row.path.at(-1) === "b")).toMatchObject({
+      visible: false,
+      hiddenByAncestor: true,
+      canToggleVisibility: false,
+    });
+    expect(f.state().visibilityHandler(["g", "b"], false)).toBe(false);
+    expect(serializeWorkbook(f.core.workbook)).toEqual(before);
+    expect(f.state().allVisibilityHandler(false)).toBe(true);
+    expect(f.state().rows.every((row) => row.visible)).toBe(true);
+    expect(JSON.stringify(f.sheet.drawings)).not.toContain('"hidden"');
+    undoWorkbookCommand(f.core);
+    f.revision.value++;
+    expect(serializeWorkbook(f.core.workbook)).toEqual(before);
+  });
+  test("hidden objects remain explicitly pane-selectable without a false format action", () => {
+    const f = fixture();
+    expect(f.state().visibilityHandler(["a"], true)).toBe(true);
+    expect(f.state().selectHandler(["a"], false)).toBe(true);
+    expect(f.paths.value).toEqual([["a"]]);
+    expect(f.state().canFormat).toBe(false);
+    expect(f.state().formatHandler()).toBe(false);
+    expect(f.state().visibilityHandler(["a"], false)).toBe(true);
+    expect(f.state().canFormat).toBe(true);
+  });
+  test("stale visibility callbacks, rejected flush and protected roots do not alter objects/history", () => {
+    const f = fixture(),
+      old = f.state().visibilityHandler;
+    f.generation.value++;
+    const before = serializeWorkbook(f.core.workbook);
+    expect(old(["a"], true)).toBe(false);
+    f.flush.mockReturnValue(false);
+    expect(f.state().allVisibilityHandler(true)).toBe(false);
+    expect(serializeWorkbook(f.core.workbook)).toEqual(before);
+    f.flush.mockReturnValue(true);
+    f.sheet.properties.protected = true;
+    f.revision.value++;
+    expect(f.state().visibilityHandler(["a"], true)).toBe(false);
+    expect(f.state().canToggleAllVisibility).toBe(false);
     expect(f.core.history.undoStack).toHaveLength(0);
   });
 });

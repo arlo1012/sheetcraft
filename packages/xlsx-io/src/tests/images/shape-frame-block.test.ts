@@ -99,3 +99,43 @@ test("owned shape groups block native output before asset access without flatten
   expect(readImages).not.toHaveBeenCalled();
   expect(serializeWorkbook(workbook)).toEqual(before);
 });
+
+test.each([{ hidden: true }, { shapeFlipX: true }, { shapeFlipY: true }] as const)(
+  "new legacy shape state explicitly blocks before image access (%j)",
+  async (state) => {
+    const workbook = createWorkbook({ id: "w", sheetId: "s", sheetName: "Synthetic" });
+    getActiveSheet(workbook).drawings = [
+      normalizeSheetDrawing({
+        id: "legacy",
+        kind: "shape",
+        name: "Original",
+        anchor: { row: 0, column: 0 },
+        offsetX: 0,
+        offsetY: 0,
+        width: 240,
+        height: 120,
+        text: "Original",
+        shape: "arrow",
+        fill: "#123456",
+        stroke: "#000000",
+        strokeWidth: 1,
+        color: "#000000",
+        fontSize: 12,
+        bold: false,
+        italic: false,
+        rotation: 37,
+        ...state,
+      }),
+    ];
+    const before = serializeWorkbook(workbook),
+      readImages = vi.fn(() => []);
+    await expect(
+      encodeXlsx(workbook, Object.defineProperty({}, "images", { get: readImages })),
+    ).rejects.toMatchObject({
+      name: "XlsxCompatibilityError",
+      report: { issues: [{ code: "feature-omitted", severity: "block" }] },
+    });
+    expect(readImages).not.toHaveBeenCalled();
+    expect(serializeWorkbook(workbook)).toEqual(before);
+  },
+);

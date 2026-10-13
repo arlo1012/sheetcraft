@@ -1,6 +1,6 @@
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { nextTick } from "vue";
+import { nextTick, toRaw } from "vue";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import DrawingEditorDialog from "../../../modules/sheet-drawings/components/DrawingEditorDialog.vue";
 import ShapeGallery from "../../../modules/sheet-drawings/components/ShapeGallery.vue";
@@ -1567,4 +1567,144 @@ test("a real drawing layer publishes an initialized selected object without anot
   mounted.push(layer);
   await flushPromises();
   expect(layer.emitted("objectSelectionChange")).toEqual([[[["text-target"]]]]);
+});
+
+test.each([false, true])(
+  "real Workspace eye hides root/owned pixels without deleting data, survives snapshot reopen and shows with Undo (%s)",
+  async (owned) => {
+    installNativeTextMeasurement();
+    const wrapper = fixture(
+      async () => ({
+        revision: 1,
+        savedAt: 1,
+        snapshot: serializeWorkbook(directTextWorkbook(owned)),
+      }),
+      createMemoryImageAssetStore(),
+      true,
+    );
+    await flushPromises();
+    const state = setupState(wrapper),
+      path = owned ? ["text-group", "text-target"] : ["text-target"];
+    expect(state.sheetGridRef.selectShapeObjects([path])).toBe(true);
+    await flushPromises();
+    await wrapper
+      .getComponent(ShapeToolsToolbar)
+      .get('[data-shape-control="selection-pane"]')
+      .trigger("click");
+    await flushPromises();
+    const before = serializeWorkbook(state.session.workbook),
+      original = structuredClone(toRaw(directSource(state)));
+    const row = () =>
+      wrapper
+        .getComponent(ShapeSelectionPane)
+        .findAll("[data-shape-pane-path]")
+        .find((entry) => entry.attributes("data-shape-pane-path") === JSON.stringify(path))!;
+    await row().get("[data-shape-pane-visibility]").trigger("pointerdown", { button: 0 });
+    await row().get("[data-shape-pane-visibility]").trigger("click");
+    await flushPromises();
+    expect(directSource(state)).toEqual({ ...original, hidden: true });
+    expect(
+      wrapper
+        .getComponent(SheetDrawingLayer)
+        .find('[data-sheet-drawing-id="text-target"]')
+        .exists(),
+    ).toBe(false);
+    expect(wrapper.findComponent(ShapeCanvasTextEditor).exists()).toBe(false);
+    expect(row().get("[data-shape-pane-visibility]").attributes("aria-label")).toContain(
+      "Show object",
+    );
+    const after = serializeWorkbook(state.session.workbook);
+    expect(after.version).toBe(64);
+    const reopened = fixture(async () => ({ revision: 1, savedAt: 1, snapshot: after }));
+    await flushPromises();
+    expect(directSource(setupState(reopened))).toEqual({ ...original, hidden: true });
+    expect(
+      reopened
+        .getComponent(SheetDrawingLayer)
+        .find('[data-sheet-drawing-id="text-target"]')
+        .exists(),
+    ).toBe(false);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    expect(
+      wrapper
+        .getComponent(SheetDrawingLayer)
+        .find('[data-sheet-drawing-id="text-target"]')
+        .exists(),
+    ).toBe(true);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+    await row().get("[data-shape-pane-visibility]").trigger("click");
+    await flushPromises();
+    expect(directSource(state)).toEqual(original);
+    expect(
+      wrapper
+        .getComponent(SheetDrawingLayer)
+        .find('[data-sheet-drawing-id="text-target"]')
+        .exists(),
+    ).toBe(true);
+  },
+);
+
+test("real Workspace can Hide All and Show All when a group text texture is unavailable, without re-layout or dropping its asset", async () => {
+  installNativeTextMeasurement();
+  const initial = directTextWorkbook(true),
+    source = getActiveSheet(initial).drawings![0]!;
+  if (!isShapeGroupDrawing(source)) throw Error("Expected group");
+  const target = source.members.find((node) => node.id === "text-target")!;
+  if (target.kind !== "shape") throw Error("Expected text leaf");
+  target.shapeText = materializeDrawingShapeText({
+    ...target,
+    anchor: { row: 0, column: 0 },
+    offsetX: 0,
+    offsetY: 0,
+    width: 240,
+    height: 120,
+  });
+  target.shapeText.style = {
+    fill: {
+      kind: "value",
+      value: {
+        kind: "picture",
+        assetId: "unavailable-text-glyph-texture",
+        opacity: 1,
+        rotateWithShape: true,
+        layout: {
+          kind: "stretch",
+          offsetXRatio: 0,
+          offsetYRatio: 0,
+          widthRatio: 1,
+          heightRatio: 1,
+        },
+      },
+    },
+  };
+  const wrapper = fixture(
+    async () => ({ revision: 1, savedAt: 1, snapshot: serializeWorkbook(initial) }),
+    createMemoryImageAssetStore(),
+    true,
+  );
+  await flushPromises();
+  const state = setupState(wrapper),
+    before = serializeWorkbook(state.session.workbook);
+  expect(state.sheetGridRef.selectShapeObjects([["text-group"]])).toBe(true);
+  await flushPromises();
+  await wrapper
+    .getComponent(ShapeToolsToolbar)
+    .get('[data-shape-control="selection-pane"]')
+    .trigger("click");
+  await flushPromises();
+  await wrapper.getComponent(ShapeSelectionPane).get("[data-shape-pane-hide-all]").trigger("click");
+  await flushPromises();
+  const hidden = getActiveSheet(state.session.workbook).drawings![0]!;
+  expect(hidden).toEqual({ ...source, hidden: true });
+  expect(
+    wrapper.getComponent(SheetDrawingLayer).find('[data-sheet-drawing-id="text-target"]').exists(),
+  ).toBe(false);
+  await wrapper.getComponent(ShapeSelectionPane).get("[data-shape-pane-show-all]").trigger("click");
+  await flushPromises();
+  expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+  expect(directSource(state).shapeText?.style?.fill).toEqual(target.shapeText.style.fill);
 });

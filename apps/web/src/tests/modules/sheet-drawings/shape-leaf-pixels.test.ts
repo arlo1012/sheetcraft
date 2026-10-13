@@ -1,10 +1,15 @@
 // @vitest-environment node
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
-import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { DrawingShape, SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { DrawingShapeTextRuntimeOptions } from "../../../modules/sheet-drawings/shape-text-runtime";
 import { createDefaultShapeText } from "../../../modules/sheet-drawings/shape-text-options";
-import { getDrawingShapeGeometry } from "../../../modules/sheet-drawings/shape-geometry";
+import {
+  getDrawingShapeGeometry,
+  standardShapeFlipPoint,
+  standardShapeLocalToWorld,
+  standardShapeWorldToLocal,
+} from "../../../modules/sheet-drawings/shape-geometry";
 import { getLegacyShapeGeometry } from "../../../modules/sheet-drawings/legacy-shape-geometry";
 import * as detailed from "../../../modules/sheet-drawings/shape-detailed-paint";
 import {
@@ -150,6 +155,22 @@ class MemoryContext {
     const point = this.transformed(x, y);
     this.points.push(point);
     this.contours.at(-1)?.push(point);
+  }
+  bezierCurveTo(cx1: number, cy1: number, cx2: number, cy2: number, x: number, y: number) {
+    const start = this.points.at(-1)!,
+      a = this.transformed(cx1, cy1),
+      b = this.transformed(cx2, cy2),
+      end = this.transformed(x, y);
+    for (let index = 1; index <= 80; index++) {
+      const t = index / 80,
+        u = 1 - t,
+        point = {
+          x: u ** 3 * start.x + 3 * u ** 2 * t * a.x + 3 * u * t ** 2 * b.x + t ** 3 * end.x,
+          y: u ** 3 * start.y + 3 * u ** 2 * t * a.y + 3 * u * t ** 2 * b.y + t ** 3 * end.y,
+        };
+      this.points.push(point);
+      this.contours.at(-1)!.push(point);
+    }
   }
   closePath() {
     if (this.points[0]) this.points.push(this.points[0]);
@@ -406,6 +427,7 @@ function alpha(
   const canvas = result.canvas as unknown as MemoryCanvas;
   const px = Math.floor((x - result.logicalBounds.left) * result.actualDensity),
     py = Math.floor((y - result.logicalBounds.top) * result.actualDensity);
+  if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) return 0;
   return canvas.data[(py * canvas.width + px) * 4 + 3]!;
 }
 afterEach(() => {
@@ -524,16 +546,16 @@ describe("actual leaf branch and layout policy", () => {
     expect(plan.bodyPlan.effectiveStyle.line).toMatchObject({
       value: { widthPt: 2.25, cap: "butt", join: "round" },
     });
-    expect(plan.bodyFlipX).toBe(false);
-    expect(plan.bodyFlipY).toBe(false);
+    expect(plan.bodyFlipX).toBe(true);
+    expect(plan.bodyFlipY).toBe(true);
     expect(plan.textLayout!.contentRect).toEqual({ x: 6, y: 6, width: 138, height: 58 });
     expect(plan.textLayout!.clipRect).toEqual({ x: 0, y: 0, width: 150, height: 70 });
     expect(plan.textLayout!.lines.map((line) => line.blockAdvance)).toEqual([20, 20]);
-    expect(plan.textLayout!.runs.every((run) => run.angle === 0)).toBe(true);
+    expect(plan.textLayout!.runs.every((run) => run.angle === 180)).toBe(true);
     expect(source).toEqual(before);
     expect(source.shapeText).toBeUndefined();
   });
-  test("standard plain text uses flipped actual asymmetric textRect, zero padding, exact20 and readable glyphs", () => {
+  test("standard plain text uses flipped actual asymmetric textRect, zero padding, exact20 and V180 glyphs", () => {
     const source = drawing({
       shapeGeometry: { preset: "triangle" },
       shapeFlipX: true,
@@ -552,7 +574,7 @@ describe("actual leaf branch and layout policy", () => {
       height: rect.bottom - rect.top,
     });
     expect(plan.textLayout!.lines.every((line) => line.blockAdvance === 20)).toBe(true);
-    expect(plan.textLayout!.runs.every((run) => run.angle === 0)).toBe(true);
+    expect(plan.textLayout!.runs.every((run) => run.angle === 180)).toBe(true);
     expect(plan.richText).toBe(false);
     expect(source.shapeText).toBeUndefined();
   });
@@ -618,7 +640,7 @@ describe("actual leaf branch and layout policy", () => {
     });
     const plan = planShapeLeafPixels(options(source));
     expect(plan.renderPolicy).toBe("legacy-text-box");
-    expect(plan.bodyFlipY).toBe(false);
+    expect(plan.bodyFlipY).toBe(true);
     expect(plan.richText).toBe(false);
     expect(plan.textFollowsBodyProjection).toBe(false);
     expect(plan.bodyPlan.isProjected).toBe(false);
@@ -630,7 +652,10 @@ describe("actual leaf branch and layout policy", () => {
       { x: 77, y: 3, width: 3, height: 54 },
     ]);
     expect(plan.textLayout!.contentRect).toEqual({ x: 9, y: 9, width: 62, height: 42 });
-    expect(plan.textLayout!.runs.every((run) => run.angle !== 180)).toBe(true);
+    const original = planShapeLeafPixels(options({ ...source, shapeFlipY: undefined }));
+    expect(plan.textLayout!.runs.map((run) => run.angle)).toEqual(
+      original.textLayout!.runs.map((run) => (run.angle + 180) % 360),
+    );
     expect(source.shapeText).toBeUndefined();
   });
   test("holes, tails and end markers are real body geometry; true flipped extents enlarge union without frame clipping", () => {
@@ -825,6 +850,205 @@ describe("resource and aggregate preflight", () => {
   });
 });
 describe("owned actual source pixels", () => {
+  test.each([
+    "rectangle",
+    "roundedRectangle",
+    "ellipse",
+    "triangle",
+    "diamond",
+    "arrow",
+    "line",
+    "star",
+    "heart",
+  ] satisfies DrawingShape[])(
+    "legacy %s retains its actual source and mirrors local pixels before outer37deg",
+    (shape) => {
+      const source = drawing({
+          shape,
+          width: 100,
+          height: 100,
+          rotation: 37,
+          text: "",
+          stroke: "#111111",
+          strokeWidth: 2,
+        }),
+        before = structuredClone(source),
+        baseline = prepareShapeLeafPixels({
+          ...options(source),
+          canvasFactory: factory().make,
+          angleDeg: 37,
+        });
+      expect(baseline.kind).toBe("ready");
+      if (baseline.kind !== "ready") return;
+      try {
+        for (const flags of [
+          { shapeFlipX: true },
+          { shapeFlipY: true },
+          { shapeFlipX: true, shapeFlipY: true },
+        ] as const) {
+          const flipped = prepareShapeLeafPixels({
+            ...options({ ...source, ...flags }),
+            canvasFactory: factory().make,
+            angleDeg: 37,
+          });
+          expect(flipped.kind).toBe("ready");
+          if (flipped.kind !== "ready") continue;
+          try {
+            expect(flipped.bodyPlan.effectiveGeometry.paths).toEqual(
+              getLegacyShapeGeometry(shape, 100, 100)!.paths,
+            );
+            expect(flipped.bodyPlan.outerAngleDeg).toBe(37);
+            const actual: number[] = [],
+              expected: number[] = [];
+            for (let y = 0; y < 100; y++)
+              for (let x = 0; x < 100; x++) {
+                actual.push(alpha(flipped, x + 0.5, y + 0.5));
+                expected.push(
+                  alpha(
+                    baseline,
+                    "shapeFlipX" in flags ? 99.5 - x : x + 0.5,
+                    "shapeFlipY" in flags ? 99.5 - y : y + 0.5,
+                  ),
+                );
+              }
+            expect(actual).toEqual(expected);
+          } finally {
+            flipped.dispose();
+          }
+        }
+        expect(source).toEqual(before);
+        expect(source.shapeGeometry).toBeUndefined();
+        expect(source.shapeText).toBeUndefined();
+      } finally {
+        baseline.dispose();
+      }
+    },
+  );
+  test.each([
+    ["legacy SVG", {}],
+    ["old horizontal textBox", { kind: "textBox" }],
+    ["old vertical textBox", { kind: "textBox", textDirection: "vertical" }],
+    ["styled legacy", { shapeStyle: {} }],
+    ["detailed legacy text", { shapeText: createDefaultShapeText() }],
+    [
+      "detailed vertical legacy text",
+      {
+        shapeText: {
+          ...createDefaultShapeText(),
+          layout: { ...createDefaultShapeText().layout, direction: "vertical-rl" },
+        },
+      },
+    ],
+    ["standard plain", { shapeGeometry: { preset: "triangle" } }],
+  ] satisfies readonly (readonly [string, Partial<SheetGraphicDrawing>])[])(
+    "%s preserves readable H glyph pixels and applies V180 without migrating its source",
+    (_branch, changes) => {
+      const source = drawing({
+          ...changes,
+          width: 100,
+          height: 80,
+          rotation: 37,
+          text: "L",
+          fill: "transparent",
+        }),
+        before = structuredClone(source),
+        nativeGlyph: DrawingShapeTextRuntimeOptions = {
+          measurer: {
+            measure: () => 8,
+            measureMetrics: () => ({ width: 8, ascent: 8, descent: 0, inkLeft: 0, inkRight: 8 }),
+          },
+          normalLineMetrics: { ascent: 8, descent: 0, lineAdvance: 12 },
+        },
+        baselineBoundary = factory(),
+        baseline = prepareShapeLeafPixels({
+          ...options(source),
+          textRuntimeOptions: nativeGlyph,
+          canvasFactory: baselineBoundary.make,
+        });
+      expect(baseline.kind).toBe("ready");
+      if (baseline.kind !== "ready") return;
+      try {
+        for (const flags of [
+          { shapeFlipX: true },
+          { shapeFlipY: true },
+          { shapeFlipX: true, shapeFlipY: true },
+        ] as const) {
+          const boundary = factory(),
+            flipped = prepareShapeLeafPixels({
+              ...options({ ...source, ...flags }),
+              textRuntimeOptions: nativeGlyph,
+              canvasFactory: boundary.make,
+            });
+          expect(flipped.kind).toBe("ready");
+          if (flipped.kind !== "ready") continue;
+          try {
+            expect(boundary.calls().map((call) => call.text)).toEqual(["L"]);
+            expect(flipped.textPlan!.outerAngleDeg).toBe(37);
+            const originalMatrix = baselineBoundary.calls()[0]!.matrix.slice(0, 4),
+              matrix = boundary.calls()[0]!.matrix.slice(0, 4),
+              vertical = "shapeFlipY" in flags;
+            for (let index = 0; index < 4; index++)
+              expect(matrix[index]).toBeCloseTo(originalMatrix[index]! * (vertical ? -1 : 1), 10);
+            if (_branch !== "standard plain") {
+              const actual: number[] = [],
+                expected: number[] = [];
+              for (let y = 0; y < 80; y++)
+                for (let x = 0; x < 100; x++) {
+                  actual.push(alpha(flipped, x + 0.5, y + 0.5));
+                  expected.push(
+                    alpha(baseline, vertical ? 99.5 - x : x + 0.5, vertical ? 79.5 - y : y + 0.5),
+                  );
+                }
+              expect(actual).toEqual(expected);
+            }
+            expect(flipped.textLayout!.runs.map((run) => run.angle)).toEqual(
+              baseline.textLayout!.runs.map((run) => (run.angle + (vertical ? 180 : 0)) % 360),
+            );
+          } finally {
+            flipped.dispose();
+          }
+        }
+        expect(source).toEqual(before);
+      } finally {
+        baseline.dispose();
+      }
+    },
+  );
+  test("legacy H/V transparent hits use the known local reflection inverse after outer37deg", () => {
+    const frame = { x: 120, y: 80, width: 100, height: 80 };
+    for (const flags of [
+      { shapeFlipX: true },
+      { shapeFlipY: true },
+      { shapeFlipX: true, shapeFlipY: true },
+    ] as const) {
+      const source = drawing({
+          ...flags,
+          shape: "arrow",
+          width: frame.width,
+          height: frame.height,
+          rotation: 37,
+          text: "",
+        }),
+        result = prepareShapeLeafPixels({ ...options(source), canvasFactory: factory().make });
+      expect(result.kind).toBe("ready");
+      if (result.kind !== "ready") continue;
+      try {
+        for (const [point, expectedAlpha] of [
+          [{ x: 20.5, y: 40.5 }, 255],
+          [{ x: 20.5, y: 5.5 }, 0],
+        ] as const) {
+          const world = standardShapeLocalToWorld(frame, 37, standardShapeFlipPoint(source, point)),
+            local = standardShapeWorldToLocal(frame, 37, world),
+            inverse = standardShapeFlipPoint(source, local);
+          expect(inverse.x).toBeCloseTo(point.x, 10);
+          expect(inverse.y).toBeCloseTo(point.y, 10);
+          expect(alpha(result, local.x, local.y)).toBe(expectedAlpha);
+        }
+      } finally {
+        result.dispose();
+      }
+    }
+  });
   test("hiding active-editor glyph pixels keeps the real body border and saved text", () => {
     const source = drawing({
         shapeGeometry: { preset: "rect" },
@@ -952,7 +1176,7 @@ describe("owned actual source pixels", () => {
     if (result.kind !== "ready") return;
     const calls = boundary.calls();
     expect(calls.some((call) => call.text === "abc")).toBe(true);
-    expect(calls.every((call) => call.matrix[0] > 0 && call.matrix[3] > 0)).toBe(true);
+    expect(calls.every((call) => call.matrix[0] < 0 && call.matrix[3] < 0)).toBe(true);
     expect(alpha(result, 75, 55)).toBe(255);
     expect(alpha(result, 3, 3)).toBe(0);
     result.dispose();

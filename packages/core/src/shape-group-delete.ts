@@ -49,12 +49,20 @@ function readPath(value: ShapeGroupPath): string[] {
 function samePath(left: ShapeGroupPath, right: ShapeGroupPath): boolean {
   return left.length === right.length && left.every((id, index) => id === right[index]);
 }
-function inheritOwner(child: PlannedChild, owner: ShapeObjectProperties | undefined): PlannedChild {
+function inheritOwner(
+  child: PlannedChild,
+  owner: ShapeObjectProperties | undefined,
+  ownerHidden: boolean | undefined,
+): PlannedChild {
   const { shapeProperties: _properties, ...node } = child.node;
   const shapeProperties = inheritShapeGroupOwnerProperties(child.node.shapeProperties, owner);
   return {
     ...child,
-    node: { ...node, ...(shapeProperties ? { shapeProperties } : {}) },
+    node: {
+      ...node,
+      ...(ownerHidden === true ? { hidden: true as const } : {}),
+      ...(shapeProperties ? { shapeProperties } : {}),
+    },
     changed: true,
   };
 }
@@ -221,7 +229,7 @@ export function planDeleteShapeGroupNodes(
     if (!owner.changed) return { node: resolved.node, layout: resolved.layout, changed: false };
     if (!owner.members.length) return null;
     if (owner.members.length === 1)
-      return inheritOwner(owner.members[0]!, resolved.node.shapeProperties);
+      return inheritOwner(owner.members[0]!, resolved.node.shapeProperties, resolved.node.hidden);
     return {
       node: {
         ...resolved.node,
@@ -243,13 +251,18 @@ export function planDeleteShapeGroupNodes(
     const owner = planOwner(resolved);
     if (!owner.members.length) continue;
     if (owner.members.length === 1) {
-      const survivor = inheritOwner(owner.members[0]!, resolved.node.shapeProperties);
+      const survivor = inheritOwner(
+        owner.members[0]!,
+        resolved.node.shapeProperties,
+        resolved.node.hidden,
+      );
       next.push(
         releaseShapeGroupChild(
           survivor.node,
           survivor.layout,
           metrics,
           resolved.node.shapeProperties,
+          resolved.node.hidden,
         ),
       );
       continue;

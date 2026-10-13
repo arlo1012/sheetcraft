@@ -6,6 +6,7 @@ import type { SheetLegacyDrawing as SheetDrawing } from "@sheetcraft/core/sheet-
 import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import StandardShapeContent from "./StandardShapeContent.vue";
 import type { ShapeDetailedPresentation } from "../shape-detailed-presentation";
+import { standardShapeSvgTransform } from "../shape-geometry";
 const FormControlContent = defineAsyncComponent(
   () => import("../../form-controls/components/FormControlContent.vue"),
 );
@@ -40,7 +41,21 @@ const textStyle = computed(() => ({
   fontSize: `${props.drawing.fontSize}px`,
   fontWeight: props.drawing.bold ? "700" : "400",
   fontStyle: props.drawing.italic ? "italic" : "normal",
+  ...((props.drawing.kind === "shape" || props.drawing.kind === "textBox") &&
+  props.drawing.shapeFlipY
+    ? { transform: "rotate(180deg)", transformOrigin: "50% 50%" }
+    : {}),
 }));
+const legacyBodyTransform = computed(() =>
+  props.drawing.kind === "shape"
+    ? standardShapeSvgTransform({
+        width: 100,
+        height: 100,
+        shapeFlipX: props.drawing.shapeFlipX,
+        shapeFlipY: props.drawing.shapeFlipY,
+      })
+    : undefined,
+);
 </script>
 <template>
   <div class="drawing-content" :style="{ transform: `rotate(${drawing.rotation}deg)` }">
@@ -71,6 +86,7 @@ const textStyle = computed(() => ({
       :style="{ pointerEvents: legacyHitSurface ? 'visiblePainted' : undefined }"
     >
       <g
+        :transform="legacyBodyTransform"
         :fill="drawing.fill"
         :stroke="drawing.stroke"
         :stroke-width="drawing.strokeWidth"

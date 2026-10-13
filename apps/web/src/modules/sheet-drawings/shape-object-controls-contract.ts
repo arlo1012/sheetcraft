@@ -22,6 +22,9 @@ export type ShapeSelectionPaneRow = {
   readonly depth: number;
   readonly selected: boolean;
   readonly canEdit: boolean;
+  readonly visible?: boolean;
+  readonly hiddenByAncestor?: boolean;
+  readonly canToggleVisibility?: boolean;
   /** Optional exact object data identity for retaining unrelated name drafts safely. */
   readonly sourceKey?: string;
 };
@@ -57,6 +60,12 @@ const en = {
   selectRejected: "Couldn't select this object.",
   renameRejected: "Couldn't rename this object. Your edit is kept.",
   nameRequired: "Enter an object name.",
+  hide: "Hide object",
+  show: "Show object",
+  showAll: "Show All",
+  hideAll: "Hide All",
+  inheritedHidden: "Show the parent group first.",
+  visibilityRejected: "Couldn't change object visibility.",
 };
 
 const zh: typeof en = {
@@ -86,6 +95,12 @@ const zh: typeof en = {
   selectRejected: "无法选择此对象。",
   renameRejected: "无法重命名，已保留输入内容。",
   nameRequired: "请输入对象名称。",
+  hide: "隐藏对象",
+  show: "显示对象",
+  showAll: "全部显示",
+  hideAll: "全部隐藏",
+  inheritedHidden: "请先显示上级组合。",
+  visibilityRejected: "无法更改对象可见性。",
 };
 
 export function shapeObjectControlsLabels(locale: ShapeObjectControlsLocale = "en-US") {

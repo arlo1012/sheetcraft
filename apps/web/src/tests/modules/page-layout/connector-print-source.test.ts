@@ -151,6 +151,43 @@ function groupFixture(withShadow: boolean) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("internal print connector whole-sheet source", () => {
+  test("hidden bound targets retain exact routes while hidden unavailable connector siblings skip print preflight", async () => {
+    const f = fixture();
+    f.target.hidden = true;
+    delete f.target.shapeProperties;
+    const hiddenConnector: SheetFramedGraphicDrawing = {
+      ...f.connector,
+      id: "hidden-connector",
+      hidden: true,
+      text: "Unsupported hidden label",
+    };
+    f.sheet.drawings!.push(hiddenConnector);
+    const input = passFor(f.sheet),
+      snapshot = JSON.stringify(f.sheet.drawings),
+      prepare = prepareBodyBoundary(),
+      fonts = vi.spyOn(textRuntime, "ensureDrawingShapeTextFont");
+    expect(input.renderPass.sourceSnapshot).toHaveLength(3);
+    expect(input.renderPass.getLeaf("target")!.carrierRoot!.collapsed).toBe(false);
+    expect(input.renderPass.getLeaf(hiddenConnector.id)!.connector?.status).toBe("unavailable");
+    const [leaf] = getPrintableShapeLeaves(f.sheet, input.metrics, input.renderPass),
+      source = input.renderPass.getLeaf("connector")!.connector;
+    if (source?.status !== "ready" || !leaf) throw Error("Expected visible connector route");
+    expect(getPrintableShapeRoots(f.sheet)).toEqual([f.connector]);
+    expect(leaf.sourceNode).toBe(f.connector);
+    expect(leaf.connectorRoute).toBe(source.route);
+    const context = paint(f.sheet, input);
+    await preparePrintShapeFonts(f.sheet, input.metrics, input.renderPass);
+    expect(prepare).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        sourceIdentity: f.connector,
+        connectorRoute: source.route,
+      }),
+    );
+    expect(context.drawImage).toHaveBeenCalledOnce();
+    expect(fonts).not.toHaveBeenCalled();
+    expect(JSON.stringify(f.sheet.drawings)).toBe(snapshot);
+  });
+
   test("production pagination captures one full forest before filtering nonprinting targets", () => {
     const f = fixture(),
       before = JSON.stringify(f.sheet.drawings);

@@ -1147,7 +1147,31 @@ export async function encodeWithNativeXlsx(
     throw new RangeError("The XLSX active sheet must identify a visible worksheet.");
   for (const sheet of sheets) {
     for (const drawing of sheet.drawings ?? []) {
-      if (!hasShapeObjectFrame(drawing)) continue;
+      if (!hasShapeObjectFrame(drawing)) {
+        if (
+          (drawing.kind === "shape" || drawing.kind === "textBox") &&
+          (drawing.hidden ||
+            (!drawing.shapeGeometry &&
+              !drawing.shapePath &&
+              (drawing.shapeFlipX || drawing.shapeFlipY)))
+        ) {
+          const issueLocation = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].${drawing.hidden ? "hidden" : "shapeFlip"}`;
+          throw new XlsxCompatibilityError(
+            `Shape visibility and legacy flips are not yet supported by XLSX export at ${issueLocation}.`,
+            {
+              issues: [
+                {
+                  code: "feature-omitted",
+                  severity: "block",
+                  count: 1,
+                  locations: [issueLocation],
+                },
+              ],
+            },
+          );
+        }
+        continue;
+      }
       const issueLocation = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].shapeFrame`;
       throw new XlsxCompatibilityError(
         `Canonical shape placement is not yet supported by XLSX export at ${issueLocation}.`,

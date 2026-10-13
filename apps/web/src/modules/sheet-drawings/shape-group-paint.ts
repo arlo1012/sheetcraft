@@ -1,6 +1,6 @@
 import {
   cloneShapeGroup,
-  traverseShapeGroup,
+  traverseShapeGroupVisibility,
   type ShapeGroupDrawing,
   type ShapeGroupPath,
 } from "@sheetcraft/core/shape-group";
@@ -76,6 +76,10 @@ type GroupPlanBase = Readonly<{
   /** Retained root canvas and, for interactive paint, all compact node masks. */
   ownedBytes: number;
   interactive: boolean;
+  /** Object visibility is independent of the canonical resolved geometry. */
+  visible: boolean;
+  /** A visible owner may have no visible, paintable descendants. */
+  empty: boolean;
   collapsed: boolean;
 }>;
 export type ShapeGroupPaintPlan = GroupPlanBase &
@@ -106,6 +110,8 @@ type NodeBase = {
   canvasBytes: number;
   maskBytes: number;
   peakBytes: number;
+  visible: boolean;
+  empty: boolean;
   collapsed: boolean;
 };
 type LeafPlan = NodeBase & {
@@ -160,8 +166,9 @@ const key = (path: ShapeGroupPath) => JSON.stringify(path);
 
 /** Value includes an opacity-zero shadow. Core validates dormant and collapsed descendants too. */
 export function hasActiveShapeGroupShadow(root: ShapeGroupDrawing): boolean {
-  return traverseShapeGroup(cloneShapeGroup(root)).some(
-    ({ node }) => node.kind === "shapeGroup" && node.groupEffects?.shadow?.kind === "value",
+  return traverseShapeGroupVisibility(cloneShapeGroup(root)).some(
+    ({ node, visible }) =>
+      visible && node.kind === "shapeGroup" && node.groupEffects?.shadow?.kind === "value",
   );
 }
 function freezeSnapshot(root: ShapeGroupDrawing): ShapeGroupDrawing {
@@ -262,7 +269,7 @@ function availableBytes(pendingPresentationBytes = 0): number {
     throw new RangeError("Live shape group presentations exhaust their 64MiB budget.");
   return bytes;
 }
-function baseNode(path: ShapeGroupPath, layout: PaintLayout | null): NodeBase {
+function baseNode(path: ShapeGroupPath, layout: PaintLayout | null, visible: boolean): NodeBase {
   return {
     path: Object.freeze([...path]),
     layout,
@@ -273,6 +280,8 @@ function baseNode(path: ShapeGroupPath, layout: PaintLayout | null): NodeBase {
     canvasBytes: 0,
     maskBytes: 0,
     peakBytes: 0,
+    visible,
+    empty: true,
     collapsed: !layout || layout.collapsed,
   };
 }
@@ -299,6 +308,8 @@ function rootMetadata(
     estimatedPeakBytes: Math.max(tree.peakBytes, tree.canvasBytes + tree.maskBytes + pixels * 4),
     ownedBytes: pixels * 4 + tree.maskBytes,
     interactive: options.interactive !== false,
+    visible: tree.visible,
+    empty: tree.empty,
     collapsed: tree.collapsed,
   };
 }
@@ -318,7 +329,7 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
     throw new TypeError("Shape group paint requires the exact owner of its whole-sheet pass.");
   const snapshotRoot = freezeSnapshot(cloneShapeGroup(options.root));
   const snapshots = new Map(
-    traverseShapeGroup(snapshotRoot).map((visit) => [key(visit.path), visit.node]),
+    traverseShapeGroupVisibility(snapshotRoot).map((visit) => [key(visit.path), visit]),
   );
   const owners = new Map(projection.owners.map((owner) => [key(owner.path), owner]));
   const leaves = new Map(projection.leaves.map((leaf) => [key(leaf.path), leaf]));
@@ -341,17 +352,30 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
     let minimumDensity = density;
     const unavailable: Extract<ShapeLeafPixelsPlan, { kind: "unavailable" }>[] = [];
     function visit(path: ShapeGroupPath): NodePlan {
+      const snapshot = snapshots.get(key(path));
+      if (!snapshot) throw new TypeError("Shape group paint lost its canonical member snapshot.");
       const owner = owners.get(key(path));
       if (!owner) {
         const leaf = leaves.get(key(path));
         if (!leaf) throw new TypeError("Shape group paint requires its exact genuine member path.");
+        // Preserve the carrier's geometry, but never inspect a hidden connector or leaf appearance.
+        if (!snapshot.visible)
+          return {
+            ...baseNode(path, leaf.layout, false),
+            kind: "leaf",
+            leaf,
+          };
         const connector = pass?.getLeaf(leaf.sourceNode.id)?.connector;
         if (connector?.status === "unavailable")
           throw new TypeError(`Shape connector paint is unavailable: ${connector.reason}.`);
         const suspended = connector?.status === "suspended" || connector?.status === "degenerate";
         const paintLayout =
           connector?.status === "ready" ? connector.route.paintLayout : leaf.layout;
-        const result: LeafPlan = { ...baseNode(path, paintLayout), kind: "leaf", leaf };
+        const result: LeafPlan = {
+          ...baseNode(path, paintLayout, true),
+          kind: "leaf",
+          leaf,
+        };
         if (suspended) {
           result.collapsed = true;
           return result;
@@ -387,23 +411,27 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
             paint.estimatedPeakBytes,
             paint.ownedBytes + (interactive ? pixels * 5 : 0),
           ),
+          empty: false,
         });
         return result;
       }
-      const snapshot = snapshots.get(key(path));
-      if (!snapshot || snapshot.kind !== "shapeGroup")
+      if (snapshot.node.kind !== "shapeGroup")
         throw new TypeError("Shape group paint lost its canonical container snapshot.");
       const result: OwnerPlan = {
-        ...baseNode(path, owner.layout),
+        ...baseNode(path, owner.layout, snapshot.visible),
         kind: "owner",
         owner,
         children: [],
         style: {
           fill: { kind: "none" },
           line: { kind: "none" },
-          ...(snapshot.groupEffects?.shadow ? { shadow: snapshot.groupEffects.shadow } : {}),
+          ...(snapshot.node.groupEffects?.shadow
+            ? { shadow: snapshot.node.groupEffects.shadow }
+            : {}),
         },
       };
+      // A hidden owner suppresses its entire subtree before any leaf/resource/font preflight.
+      if (!result.visible) return result;
       // Actual immediate source members, in their durable bottom-to-top sibling order.
       for (const member of owner.sourceNode.members) {
         const child = visit([...path, member.id]);
@@ -416,9 +444,13 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
         });
       }
       if (owner.collapsed || !owner.layout) return result;
-      const visible = result.children.filter(({ node }) => !node.collapsed);
-      if (pass?.connections && !visible.length) {
-        result.collapsed = true;
+      const visible = result.children.filter(
+        ({ node }) => node.visible && !node.collapsed && !node.empty,
+      );
+      if (!visible.length) {
+        // Keep the existing suspended/degenerate route behavior, without collapsing hidden geometry.
+        if (pass?.connections && result.children.every(({ node }) => node.collapsed))
+          result.collapsed = true;
         return result;
       }
       const sourceBounds = sourceUnion(
@@ -461,6 +493,7 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
         canvasBytes: pixels * 4,
         maskBytes: retainedMasks + ownMask,
         peakBytes: peak,
+        empty: false,
       });
       return result;
     }
@@ -516,6 +549,7 @@ export function prepareShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGr
     const images = new Map<string, DecodedPicturePaintImage>();
     const assetIds = new Set<string>();
     function collect(node: NodePlan): void {
+      if (!node.visible || node.empty || node.collapsed) return;
       if (node.kind === "owner") node.children.forEach(({ node: child }) => collect(child));
       else if (node.paint) {
         node.paint.bodyPlan.assetIds.forEach((id) => assetIds.add(id));
@@ -628,7 +662,7 @@ export function prepareShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGr
       retainedBytes += pixels;
     }
     function paintNode(node: NodePlan): OwnedNode | undefined {
-      if (node.collapsed) return;
+      if (!node.visible || node.empty || node.collapsed) return;
       if (node.kind === "leaf") {
         if (!node.options || !node.paint)
           throw new TypeError("A placed shape leaf requires its real numeric paint plan.");

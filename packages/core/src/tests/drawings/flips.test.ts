@@ -185,17 +185,12 @@ describe("standard shape flips", () => {
     expect(normalizeSheetDrawing(input)).toEqual({ ...standard(), [field]: true });
   });
 
-  test.each(flipFields)("rejects %s on legacy or nonshape drawings, including false", (field) => {
-    for (const value of [true, false]) {
-      for (const input of [legacy(), { ...standard(), shapeGeometry: undefined }])
-        expect(() => normalizeSheetDrawing({ ...input, [field]: value } as SheetDrawing)).toThrow(
-          /standard shape geometry/,
-        );
-      for (const kind of ["textBox", "wordArt", "icon", "equation"] as const)
+  test.each(flipFields)("rejects %s on unrelated graphic kinds, including false", (field) => {
+    for (const value of [true, false])
+      for (const kind of ["wordArt", "icon", "equation"] as const)
         expect(() =>
           normalizeSheetDrawing({ ...legacy(), kind, [field]: value } as SheetDrawing),
-        ).toThrow(/standard shape geometry/);
-    }
+        ).toThrow(/shapes or text boxes/);
   });
 
   test.each([43, 54, 55])(

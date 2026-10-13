@@ -78,9 +78,11 @@ export type SheetGraphicDrawing = DrawingBase & {
   shapeLineEnds?: ShapeLineEnds;
   /** Explicit live endpoints; only canonical shape roots and owned leaves admit this feature. */
   shapeConnector?: ShapeConnector;
-  /** Sparse mirroring of explicit standard or free geometry, before drawing rotation. */
+  /** Sparse shape/text-box mirroring, before drawing rotation. Existing connectors retain route flips. */
   shapeFlipX?: true;
   shapeFlipY?: true;
+  /** Sparse Selection Pane state. Ownership, assets and connector relations remain intact. */
+  hidden?: true;
   /** Shape-only sparse paint, line and effects; absent categories keep the legacy appearance. */
   shapeStyle?: ShapeDetailedStyle;
   /** Explicit shape/text-box layout, paragraph and glyph appearance, independent of body style. */
@@ -289,13 +291,23 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
       return false;
     }
     if (!("value" in field)) throw new TypeError("Shape flips cannot be accessors.");
-    if (value.kind !== "shape" || (!shapeGeometry && !shapePath))
-      throw new TypeError("Shape flips require standard shape geometry or a free shape path.");
+    if (value.kind !== "shape" && value.kind !== "textBox")
+      throw new TypeError("Only shapes or text boxes may carry shape flips.");
     if (typeof field.value !== "boolean") throw new TypeError("Shape flips must be booleans.");
     return field.value;
   };
   const shapeFlipX = normalizeFlip("shapeFlipX"),
     shapeFlipY = normalizeFlip("shapeFlipY");
+  const hiddenField = Object.getOwnPropertyDescriptor(value, "hidden");
+  if (!hiddenField && "hidden" in value)
+    throw new TypeError("Shape visibility must be an own data field.");
+  if (hiddenField && !("value" in hiddenField))
+    throw new TypeError("Shape visibility cannot be an accessor.");
+  if (hiddenField && value.kind !== "shape" && value.kind !== "textBox")
+    throw new TypeError("Only shapes or text boxes may carry shape visibility.");
+  if (hiddenField && typeof hiddenField.value !== "boolean")
+    throw new TypeError("Shape visibility must be a boolean.");
+  const hidden = hiddenField?.value === true;
   const endsField = Object.getOwnPropertyDescriptor(value, "shapeLineEnds");
   if (endsField && (endsField.get || endsField.set))
     throw new TypeError("Shape line ends cannot be accessors.");
@@ -362,6 +374,7 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
     ...(shapeConnector ? { shapeConnector } : {}),
     ...(shapeFlipX ? { shapeFlipX: true as const } : {}),
     ...(shapeFlipY ? { shapeFlipY: true as const } : {}),
+    ...(hidden ? { hidden: true as const } : {}),
     ...(shapeStyle ? { shapeStyle } : {}),
     ...(shapeText ? { shapeText } : {}),
     ...(directionField ? { textDirection: "vertical" as const } : {}),
@@ -398,6 +411,7 @@ const shapeFrameFields = [
   "shapeConnector",
   "shapeFlipX",
   "shapeFlipY",
+  "hidden",
   "shapeStyle",
   "shapeText",
   "textDirection",
@@ -411,6 +425,33 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing;
 export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new RangeError("Invalid sheet drawing.");
+  // Newly admitted legacy controls must be data records before any appearance read.
+  const ownKind = Object.getOwnPropertyDescriptor(value, "kind");
+  const hasNewControls =
+    "hidden" in value ||
+    (("shapeFlipX" in value || "shapeFlipY" in value) &&
+      (ownKind?.value === "textBox" ||
+        (Object.getOwnPropertyDescriptor(value, "shapeGeometry")?.value === undefined &&
+          Object.getOwnPropertyDescriptor(value, "shapePath")?.value === undefined)));
+  if (hasNewControls && ownKind?.value !== "shapeGroup" && !("shapeFrame" in value)) {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== null && prototype !== Object.prototype)
+      throw new TypeError("Shape controls require ordinary records with own data fields.");
+    const fields: readonly string[] = [
+      ...shapeFrameFields.filter((key) => key !== "shapeFrame" && key !== "shapeProperties"),
+      "anchor",
+      "offsetX",
+      "offsetY",
+      "width",
+      "height",
+    ];
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== "string" || !fields.includes(key))
+        throw new TypeError("Unknown shape control drawing field.");
+      if (!("value" in Object.getOwnPropertyDescriptor(value, key)!))
+        throw new TypeError("Shape controls require own data fields, not accessors.");
+    }
+  }
   if ("groupFrame" in value)
     throw new TypeError("Owned shape children cannot use root drawing placement.");
   if (Object.getOwnPropertyDescriptor(value, "kind")?.value === "shapeGroup")
@@ -467,8 +508,9 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     !finite(value.height, 1, 16384)
   )
     throw new RangeError("Invalid legacy drawing placement.");
+  const appearance = normalizeDrawingAppearance(value);
   return {
-    ...normalizeDrawingAppearance(value),
+    ...appearance,
     anchor: { ...value.anchor },
     offsetX: value.offsetX,
     offsetY: value.offsetY,
@@ -504,4 +546,19 @@ export function normalizeSheetDrawings(
     throw new RangeError("Embedded files exceed sheet limit.");
   validateShapeConnectorReferences(result);
   return result;
+}
+
+/** Root visibility only. Group descendants must also honor every owning group. */
+export function isSheetDrawingVisible(value: SheetDrawing): boolean {
+  const field = Object.getOwnPropertyDescriptor(value, "hidden");
+  if (!field) {
+    if ("hidden" in value) throw new TypeError("Shape visibility must be an own data field.");
+    return true;
+  }
+  if (!("value" in field)) throw new TypeError("Shape visibility cannot be an accessor.");
+  const kind = Object.getOwnPropertyDescriptor(value, "kind")?.value;
+  if (kind !== "shape" && kind !== "textBox" && kind !== "shapeGroup")
+    throw new TypeError("Only shapes, text boxes or shape groups may carry shape visibility.");
+  if (typeof field.value !== "boolean") throw new TypeError("Shape visibility must be a boolean.");
+  return field.value !== true;
 }

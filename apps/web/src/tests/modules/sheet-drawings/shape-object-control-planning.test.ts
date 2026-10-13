@@ -547,12 +547,19 @@ describe("pure shape object controls", () => {
     }
   });
 
-  test("legacy nine-shape flip remains explicitly gated without preset promotion; rotation and order stay legacy", () => {
+  test("legacy nine-shape flip preserves its original geometry without preset promotion", () => {
     const value = legacy("old"),
       m = metrics(),
       before = structuredClone(value);
-    for (const action of ["flip-horizontal", "flip-vertical"] as const)
-      expect(() => planShapeObjectControlAction([value], [["old"]], action, m)).toThrow(/legacy/);
+    for (const [action, flag] of [
+      ["flip-horizontal", "shapeFlipX"],
+      ["flip-vertical", "shapeFlipY"],
+    ] as const) {
+      const flipped = planShapeObjectControlAction([value], [["old"]], action, m)[0]!;
+      expect(flipped).toEqual({ ...before, [flag]: true });
+      expect(flipped).not.toHaveProperty("shapeGeometry");
+      expect(flipped).not.toHaveProperty("shapeFrame");
+    }
     const next = planShapeObjectControlAction([value], [["old"]], "rotate-right", m)[0]!;
     expect(hasShapeObjectFrame(next)).toBe(false);
     expect(next).not.toHaveProperty("shapeGeometry");
@@ -560,22 +567,27 @@ describe("pure shape object controls", () => {
     expect(value).toEqual(before);
   });
 
-  test("text box flip and groups with legacy leaves reject; text boxes still rotate", () => {
+  test("text box and legacy group leaves flip without changing text or upgrading legacy data", () => {
     const textbox = { ...shape("text"), kind: "textBox" as const };
     delete textbox.shapeGeometry;
     const m = metrics();
-    expect(() => planShapeObjectControlAction([textbox], [["text"]], "flip-horizontal", m)).toThrow(
-      /text boxes/,
-    );
+    expect(
+      planShapeObjectControlAction([textbox], [["text"]], "flip-horizontal", m)[0],
+    ).toMatchObject({ kind: "textBox", shapeFlipX: true, text: textbox.text });
     expect(planShapeObjectControlAction([textbox], [["text"]], "rotate-left", m)[0]!.rotation).toBe(
       307,
     );
     const oldLeaf = leaf("legacy");
     delete oldLeaf.shapeGeometry;
     const owner = group("g", [leaf("supported"), oldLeaf]);
-    expect(() => planShapeObjectControlAction([owner], [["g"]], "flip-horizontal", m)).toThrow(
-      /legacy/,
-    );
+    const flipped = planShapeObjectControlAction(
+      [owner],
+      [["g"]],
+      "flip-horizontal",
+      m,
+    )[0] as ShapeGroupDrawing;
+    expect(flipped.members[1]).toMatchObject({ id: "legacy", shapeFlipX: true });
+    expect(flipped.members[1]).not.toHaveProperty("shapeGeometry");
   });
 
   test("missing, stale, duplicate, overlapping, and mixed-owner paths are rejected", () => {

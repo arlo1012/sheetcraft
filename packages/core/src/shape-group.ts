@@ -43,6 +43,8 @@ export type ShapeGroupedGroup = {
   rotation: number;
   shapeProperties?: ShapeObjectProperties;
   groupEffects?: ShapeGroupEffects;
+  /** Sparse Selection Pane state, inherited by descendants without changing ownership. */
+  hidden?: true;
   /** Bottom-to-top sibling order; this array is the only ownership relation. */
   members: ShapeGroupChild[];
 };
@@ -55,6 +57,8 @@ export type ShapeGroupDrawing = {
   rotation: number;
   shapeProperties?: ShapeObjectProperties;
   groupEffects?: ShapeGroupEffects;
+  /** Sparse Selection Pane state, inherited by descendants without changing ownership. */
+  hidden?: true;
   members: ShapeGroupChild[];
 };
 export type ShapeGroupNode = ShapeGroupDrawing | ShapeGroupChild;
@@ -122,6 +126,7 @@ const groupKeys = [
   "rotation",
   "shapeProperties",
   "groupEffects",
+  "hidden",
   "members",
 ] as const;
 const leafKeys = [
@@ -144,6 +149,7 @@ const leafKeys = [
   "shapeConnector",
   "shapeFlipX",
   "shapeFlipY",
+  "hidden",
   "shapeStyle",
   "shapeText",
   "textDirection",
@@ -151,6 +157,8 @@ const leafKeys = [
   "groupFrame",
 ] as const;
 function nodeRecord(value: unknown, root: boolean): Record<string, unknown> {
+  if (value && typeof value === "object" && "hidden" in value && !Object.hasOwn(value, "hidden"))
+    throw new TypeError("Shape visibility must be an own data field.");
   if (root && kind(value) === "shapeGroup")
     return record(value, [...groupKeys, "shapeFrame"], "root shape group");
   if (!root && kind(value) === "shapeGroup")
@@ -214,12 +222,15 @@ function metadata(source: Record<string, unknown>) {
   if (typeof source.name !== "string") throw new TypeError("Shape group name must be a string.");
   const shapeProperties = normalizeShapeObjectProperties(source.shapeProperties);
   const groupEffects = normalizeShapeGroupEffects(source.groupEffects);
+  if (Object.hasOwn(source, "hidden") && typeof source.hidden !== "boolean")
+    throw new TypeError("Shape group visibility must be a boolean.");
   return {
     id: nonempty(source.id, "Shape group node ID"),
     name: source.name,
     rotation: normalizePictureAngle(source.rotation as number),
     ...(shapeProperties ? { shapeProperties } : {}),
     ...(groupEffects ? { groupEffects } : {}),
+    ...(source.hidden === true ? { hidden: true as const } : {}),
   };
 }
 function normalizeChildUnchecked(value: ShapeGroupChild): ShapeGroupChild {
@@ -337,4 +348,43 @@ export function collectShapeGroupAssetIds(value: ShapeGroupDrawing): Set<string>
     for (const id of getShapeTextAssetIds(node.shapeText)) ids.add(id);
   }
   return ids;
+}
+
+export type ShapeGroupVisibilityVisit = ShapeGroupVisit & {
+  /** Effective visibility after the node and all of its owners are considered. */
+  visible: boolean;
+  /** An owner is hidden even if this node's own hidden state is absent. */
+  inheritedHidden: boolean;
+};
+
+/** Bounded ownership traversal keeps hidden nodes in their exact source paths and sibling order. */
+export function traverseShapeGroupVisibility(
+  value: ShapeGroupDrawing,
+): ShapeGroupVisibilityVisit[] {
+  const visits = traverseShapeGroup(value);
+  const effective = new Map<string, boolean>();
+  return visits.map((visit) => {
+    const field = Object.getOwnPropertyDescriptor(visit.node, "hidden");
+    if (field && !("value" in field))
+      throw new TypeError("Shape visibility cannot be an accessor.");
+    if (field && typeof field.value !== "boolean")
+      throw new TypeError("Shape visibility must be a boolean.");
+    const parentId = visit.parentPath?.[visit.parentPath.length - 1];
+    const inheritedHidden = parentId !== undefined && effective.get(parentId) === false;
+    const visible = !inheritedHidden && field?.value !== true;
+    effective.set(visit.node.id, visible);
+    return { ...visit, visible, inheritedHidden };
+  });
+}
+
+/** Missing paths are not visible; admission retains all bounded path and graph validation. */
+export function isShapeGroupPathVisible(value: ShapeGroupDrawing, path: ShapeGroupPath): boolean {
+  const target = readPictureDataArray(path, "shape group path", MAX_SHAPE_GROUP_DEPTH + 1);
+  for (const id of target) nonempty(id, "Shape group path ID");
+  return traverseShapeGroupVisibility(value).some(
+    (visit) =>
+      visit.visible &&
+      visit.path.length === target.length &&
+      visit.path.every((id, index) => id === target[index]),
+  );
 }

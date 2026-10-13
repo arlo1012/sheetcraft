@@ -18,6 +18,7 @@ import {
   getShapeConnectorSiteCandidates,
   pickNearestShapeConnectorSite,
 } from "../../../modules/sheet-drawings/shape-connector-site-picking";
+import { getVisibleShapeNodeIds } from "../../../modules/sheet-drawings/shape-visibility";
 import { framedShape } from "./framed-shape-fixture";
 
 const rect = { x: 100, y: 80, width: 360, height: 240 };
@@ -356,4 +357,27 @@ describe("pure connector target-site picking", () => {
       }),
     ).toBe(contextBefore);
   });
+});
+
+test("interactive site candidates suppress hidden roots/inherited descendants without changing canonical binding sites", () => {
+  const hiddenRoot = { ...shape("hidden"), hidden: true as const };
+  const hiddenOwner = { ...group("g", [owned(shape("child"))]), hidden: true as const };
+  const visible = shape("visible");
+  const forest = [hiddenRoot, hiddenOwner, visible],
+    context = resolveSheetShapeConnections(forest, metrics());
+  expect(context.getTarget("hidden")?.status).toBe("ready");
+  expect(context.getTarget("child")?.sites.length).toBeGreaterThan(0);
+  const ids = getVisibleShapeNodeIds(forest);
+  expect([...ids]).toEqual(["visible"]);
+  expect(
+    getShapeConnectorSiteCandidates(context, { x: 200, y: 100 }, 1000, ids).every(
+      (site) => site.targetId === "visible",
+    ),
+  ).toBe(true);
+  const target = context.getTarget("hidden")!;
+  const onlyHidden = new Set<string>();
+  expect(
+    pickNearestShapeConnectorSite(context, target.sites[0]!.position, 1000, onlyHidden),
+  ).toBeUndefined();
+  expect(context.getTarget("hidden")).toBe(target);
 });

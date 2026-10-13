@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, shallowRef, watch, type CSSProperties } from "vue";
-import { collectShapeGroupAssetIds, type ShapeGroupDrawing } from "@sheetcraft/core/shape-group";
+import { traverseShapeGroupVisibility, type ShapeGroupDrawing } from "@sheetcraft/core/shape-group";
+import { isSheetDrawingVisible } from "@sheetcraft/core/sheet-drawings";
+import { getShapeStyleAssetIds } from "@sheetcraft/core/shape-style";
+import { getShapeTextAssetIds } from "@sheetcraft/core/shape-text";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import type { PageLayoutProjection } from "@sheetcraft/sheet-engine/page-layout";
@@ -53,6 +56,13 @@ const canvases = new Map<string, HTMLCanvasElement>();
 let generation = 0;
 let mounted = true;
 const images = createCanvasImageCache(() => void render());
+const visibility = computed(() => {
+  const visits = traverseShapeGroupVisibility(props.root);
+  // Core validates data descriptors without evaluating getters. Track the validated
+  // reactive values too, so adding/removing sparse hidden fields invalidates fragments.
+  for (const { node } of visits) void node.hidden;
+  return visits;
+});
 function projection() {
   if (!props.renderPass) return resolveShapeGroupProjection(props.root, props.metrics);
   const resolved = props.renderPass.getGroup(props.root.id);
@@ -61,6 +71,11 @@ function projection() {
   return resolved;
 }
 const fragments = computed(() => {
+  if (
+    !visibility.value.some(({ node, visible }) => visible && node.kind !== "shapeGroup") ||
+    presentation.value?.empty
+  )
+    return [];
   const frame = projection().layout;
   const bounds = presentation.value?.logicalBounds ?? {
     left: 0,
@@ -149,9 +164,14 @@ async function render(): Promise<void> {
   status.value = "loading";
   let owned: Extract<ShapeGroupPaintResult, { kind: "ready" }> | undefined;
   try {
+    if (!isSheetDrawingVisible(root)) {
+      images.retain(new Set());
+      status.value = "ready";
+      return;
+    }
     const resolved = projection();
     // Numeric validation and memory planning precede any new asset decoding.
-    planShapeGroupPaint({
+    const plan = planShapeGroupPaint({
       root,
       metrics,
       renderPass,
@@ -160,16 +180,51 @@ async function render(): Promise<void> {
       interactive: true,
       editingTextId,
     });
+    if (!plan.visible || plan.empty || plan.collapsed) {
+      images.retain(new Set());
+      status.value = "ready";
+      return;
+    }
+    const visits = traverseShapeGroupVisibility(root);
+    const effectiveVisibleIds = new Set(
+      visits.filter(({ visible }) => visible).map(({ node }) => node.id),
+    );
+    const paintableIds = new Set(
+      resolved.leaves
+        .filter((leaf) => {
+          if (!effectiveVisibleIds.has(leaf.sourceNode.id)) return false;
+          const connector = renderPass?.getLeaf(leaf.sourceNode.id)?.connector;
+          return (
+            !leaf.collapsed &&
+            leaf.view &&
+            connector?.status !== "suspended" &&
+            connector?.status !== "degenerate"
+          );
+        })
+        .map((leaf) => leaf.sourceNode.id),
+    );
+    const visibleIds = new Set<string>();
     const urls = new Set<string>();
-    for (const asset of collectShapeGroupAssetIds(root)) {
-      const url = assetUrls?.get(asset);
-      if (!url) throw new Error("A group paint asset is unavailable.");
-      urls.add(url);
+    for (const { node, visible } of visits) {
+      if (!visible || node.kind === "shapeGroup" || !paintableIds.has(node.id)) continue;
+      visibleIds.add(node.id);
+      for (const asset of [
+        ...getShapeStyleAssetIds(node.shapeStyle),
+        ...getShapeTextAssetIds(node.shapeText),
+      ]) {
+        const url = assetUrls?.get(asset);
+        if (!url) throw new Error("A group paint asset is unavailable.");
+        urls.add(url);
+      }
     }
     images.retain(urls);
     await Promise.all([
       ...resolved.leaves.flatMap((leaf) =>
-        leaf.view && !leaf.collapsed && leaf.view.text && leaf.sourceNode.id !== editingTextId
+        visibleIds.has(leaf.sourceNode.id) &&
+        leaf.view &&
+        !leaf.collapsed &&
+        leaf.view.text &&
+        leaf.sourceNode.id !== editingTextId
           ? [ensureDrawingShapeTextFont(leaf.view)]
           : [],
       ),

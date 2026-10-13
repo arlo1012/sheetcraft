@@ -174,13 +174,18 @@ export function resolveDrawingShapeText(
     pointsToPx: options.pointsToPx ?? 96 / 72,
   };
 }
-function resolvedLayout(resolved: ResolvedDrawingShapeText): ShapeTextLayoutResult {
-  const result = layoutShapeText({ ...resolved, layout: resolved.layoutOptions });
-  if (!resolved.drawing.shapeFlipY) return result;
+/** Reuse the actual layout for CSS and detailed text consumers. Glyphs never
+ * receive the body's reflection; V turns the text inside its own local box. */
+export function applyShapeTextVerticalFlip(
+  drawing: Readonly<{ shapeFlipY?: true }>,
+  textRect: ShapeTextRect,
+  result: ShapeTextLayoutResult,
+): ShapeTextLayoutResult {
+  if (!drawing.shapeFlipY) return result;
   // Desktop vertical flip turns the readable text by 180 degrees rather than
   // mirroring glyphs. Horizontal flip only changes the asymmetric text rect.
-  const cx = resolved.textRect.x + resolved.textRect.width / 2;
-  const cy = resolved.textRect.y + resolved.textRect.height / 2;
+  const cx = textRect.x + textRect.width / 2;
+  const cy = textRect.y + textRect.height / 2;
   const rotateRect = (rect: ShapeTextRect): ShapeTextRect => ({
     ...rect,
     x: 2 * cx - rect.x - rect.width,
@@ -206,6 +211,13 @@ function resolvedLayout(resolved: ResolvedDrawingShapeText): ShapeTextLayoutResu
     inkBounds: result.inkBounds ? rotateRect(result.inkBounds) : null,
     visibleInkBounds: result.visibleInkBounds ? rotateRect(result.visibleInkBounds) : null,
   };
+}
+function resolvedLayout(resolved: ResolvedDrawingShapeText): ShapeTextLayoutResult {
+  return applyShapeTextVerticalFlip(
+    resolved.drawing,
+    resolved.textRect,
+    layoutShapeText({ ...resolved, layout: resolved.layoutOptions }),
+  );
 }
 export function layoutDrawingShapeText(
   drawing: SheetGraphicDrawing,

@@ -2,6 +2,8 @@
 import { computed, reactive, ref, useId, watch } from "vue";
 import {
   BringToFront,
+  Eye,
+  EyeOff,
   Group,
   MoveDown,
   MoveUp,
@@ -28,6 +30,9 @@ const props = withDefaults(
     locale?: ShapeObjectControlsLocale;
     selectHandler: (path: readonly string[], additive: boolean) => boolean;
     renameHandler: (path: readonly string[], name: string) => boolean;
+    visibilityHandler?: (path: readonly string[], hidden: boolean) => boolean;
+    allVisibilityHandler?: (hidden: boolean) => boolean;
+    canToggleAllVisibility?: boolean;
     orderHandler: (action: ShapeObjectOrderAction) => boolean;
     closeHandler: () => boolean;
   }>(),
@@ -51,7 +56,15 @@ function pathKey(path: readonly string[]): string {
   return JSON.stringify(path);
 }
 function rowSource(row: ShapeSelectionPaneRow): string {
-  return JSON.stringify([row.name, row.kind, row.canEdit, row.sourceKey]);
+  return JSON.stringify([
+    row.name,
+    row.kind,
+    row.canEdit,
+    row.sourceKey,
+    row.visible,
+    row.hiddenByAncestor,
+    row.canToggleVisibility,
+  ]);
 }
 const hasSelection = computed(() => props.rows.some((row) => row.selected));
 const orderDisabled = computed(
@@ -64,6 +77,9 @@ watch(
     props.draftOwnerKey,
     props.selectHandler,
     props.renameHandler,
+    props.visibilityHandler,
+    props.allVisibilityHandler,
+    props.canToggleAllVisibility,
     props.orderHandler,
     props.closeHandler,
     props.disabled,
@@ -114,6 +130,7 @@ const paneActions = computed(() => {
   const epoch = ownerEpoch.value;
   const order = props.orderHandler;
   const close = props.closeHandler;
+  const allVisibility = props.allVisibilityHandler;
   const selection = JSON.stringify(props.rows.filter((row) => row.selected).map((row) => row.path));
   function current(): boolean {
     return key === props.ownerKey && epoch === ownerEpoch.value;
@@ -130,6 +147,18 @@ const paneActions = computed(() => {
     if (current()) failure.value = success ? "" : labels.value.rejected;
   }
   return {
+    allVisibility: (hidden: boolean) => {
+      if (
+        !current() ||
+        props.disabled ||
+        !props.canToggleAllVisibility ||
+        !allVisibility ||
+        allVisibility !== props.allVisibilityHandler
+      )
+        return;
+      const success = accepted(() => allVisibility(hidden));
+      if (current()) failure.value = success ? "" : labels.value.visibilityRejected;
+    },
     front: () => submit("bring-front"),
     forward: () => submit("bring-forward"),
     backward: () => submit("send-backward"),
@@ -146,6 +175,7 @@ const renderedRows = computed(() => {
   const epoch = ownerEpoch.value;
   const select = props.selectHandler;
   const rename = props.renameHandler;
+  const visibility = props.visibilityHandler;
   return props.rows.map((source, index) => {
     const path = [...source.path];
     const key = pathKey(path);
@@ -194,6 +224,21 @@ const renderedRows = computed(() => {
       depth: Math.max(0, Number.isFinite(source.depth) ? Math.floor(source.depth) : 0),
       selected: source.selected,
       canEdit: source.canEdit,
+      visible: source.visible !== false,
+      hiddenByAncestor: source.hiddenByAncestor === true,
+      canToggleVisibility: !!visibility && source.canToggleVisibility === true,
+      toggleVisibility: () => {
+        if (
+          !current() ||
+          props.disabled ||
+          !source.canToggleVisibility ||
+          !visibility ||
+          visibility !== props.visibilityHandler
+        )
+          return;
+        const success = accepted(() => visibility([...path], source.visible !== false));
+        if (current()) failure.value = success ? "" : labels.value.visibilityRejected;
+      },
       value: drafts.get(key)?.value ?? source.name,
       error: drafts.get(key)?.error ?? "",
       errorId: `${paneId}-name-${index}`,
@@ -300,6 +345,24 @@ const renderedRows = computed(() => {
         ><SendToBack :size="16"
       /></TButton>
     </div>
+    <div class="shape-selection-pane__visibility" role="group" :aria-label="labels.selectionPane">
+      <TButton
+        variant="text"
+        size="small"
+        :disabled="disabled || !canToggleAllVisibility"
+        data-shape-pane-show-all
+        @click="paneActions.allVisibility(false)"
+        >{{ labels.showAll }}</TButton
+      >
+      <TButton
+        variant="text"
+        size="small"
+        :disabled="disabled || !canToggleAllVisibility"
+        data-shape-pane-hide-all
+        @click="paneActions.allVisibility(true)"
+        >{{ labels.hideAll }}</TButton
+      >
+    </div>
     <p class="shape-selection-pane__hint">{{ labels.selectionHint }}</p>
     <p
       v-if="failure"
@@ -336,6 +399,25 @@ const renderedRows = computed(() => {
               v-else-if="row.kind === 'textBox'"
               :size="16"
             /><Shapes v-else :size="16" />
+          </TButton>
+          <TButton
+            variant="text"
+            shape="square"
+            size="small"
+            :disabled="disabled || !row.canToggleVisibility"
+            :aria-label="`${row.visible ? labels.hide : labels.show}: ${row.name}`"
+            :aria-pressed="row.visible"
+            :title="
+              row.hiddenByAncestor
+                ? labels.inheritedHidden
+                : row.visible
+                  ? labels.hide
+                  : labels.show
+            "
+            data-shape-pane-visibility
+            @click.stop="row.toggleVisibility"
+          >
+            <Eye v-if="row.visible" :size="16" /><EyeOff v-else :size="16" />
           </TButton>
           <TInput
             :model-value="row.value"
@@ -390,7 +472,8 @@ const renderedRows = computed(() => {
       font-weight: 600;
     }
   }
-  &__order {
+  &__order,
+  &__visibility {
     display: flex;
     gap: var(--sheetcraft-space-1);
     margin-top: var(--sheetcraft-space-2);
@@ -425,7 +508,7 @@ const renderedRows = computed(() => {
   }
   &__row-controls {
     display: grid;
-    grid-template-columns: 28px minmax(0, 1fr);
+    grid-template-columns: 28px 28px minmax(0, 1fr);
     align-items: center;
     gap: var(--sheetcraft-space-1);
     padding-left: min(calc(var(--shape-row-depth) * 14px), 84px);

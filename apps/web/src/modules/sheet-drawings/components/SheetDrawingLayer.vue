@@ -68,6 +68,7 @@ import {
 } from "../shape-group-container-editing";
 import { resolveShapeGroupFormatContext } from "../shape-group-format-planning";
 import { readShapeObjectControlPaths } from "../shape-object-control-planning";
+import { getVisibleShapeNodeIds } from "../shape-visibility";
 import type { ShapeAlignment, ShapeAlignmentReference } from "../shape-selection-actions";
 import { createBrowserIdFactory } from "../../../shared/runtime/browser-id-factory";
 import { useAppI18n } from "../../../shared/i18n";
@@ -668,13 +669,18 @@ type GroupPaintEntry = {
   stackIndex: number;
   renderPass?: ResolvedShapeForestForRender;
 };
+const visibleNodeIds = computed(() =>
+  getVisibleShapeNodeIds(
+    displayedRenderPass.value?.sourceForest ?? rootsPreview.value ?? props.drawings,
+  ),
+);
 const groupPaintEntries = computed<GroupPaintEntry[]>(() => {
   if (renderUnavailable.value) return [];
   const m = metrics.value;
   if (!m) return [];
   const pass = displayedRenderPass.value;
   return props.drawings.flatMap((source, stackIndex) => {
-    if (!isShapeGroupDrawing(source)) return [];
+    if (!isShapeGroupDrawing(source) || !visibleNodeIds.value.has(source.id)) return [];
     let displayed =
       pass?.sourceForest.find((root) => root.id === source.id) ??
       rootsPreview.value?.find((root) => root.id === source.id) ??
@@ -843,7 +849,7 @@ const fragments = computed<DrawingFragment[]>(
   () => (
     void cellTextFontRevision.value,
     legacyDrawings.value.flatMap((original) => {
-      if (resolvedOwner(original)?.collapsed) return [];
+      if (!visibleNodeIds.value.has(original.id) || resolvedOwner(original)?.collapsed) return [];
       const pass = displayedRenderPass.value;
       const leaf = pass?.getLeaf(original.id);
       if (leaf?.connector && leaf.connector.status !== "ready") return [];
@@ -931,6 +937,7 @@ function formatSelected() {
 function beginCanvasText(drawing: SheetDrawing, selection: "all" | "end", text?: string): boolean {
   if (
     !props.startTextEdit ||
+    !visibleNodeIds.value.has(drawing.id) ||
     !canChange(drawing) ||
     (drawing.kind !== "shape" && drawing.kind !== "textBox") ||
     projectionById(drawing)?.renderLeaf?.connector
@@ -958,7 +965,7 @@ function beginCanvasText(drawing: SheetDrawing, selection: "all" | "end", text?:
 const canvasTextEditor = ref<InstanceType<typeof ShapeCanvasTextEditor>>();
 const canvasTextPlacement = computed(() => {
   const state = props.textEditSnapshot;
-  if (!state) return;
+  if (!state || !visibleNodeIds.value.has(state.sourceId)) return;
   const candidates = fragments.value.filter(
     (f) => f.drawing.id === state.sourceId && sourceOwner(f.drawing) === state.root,
   );
@@ -1125,10 +1132,12 @@ const selectionDisabled = computed(
     !props.applyCollection ||
     !metrics.value ||
     props.readOnly ||
+    (selectedOwnedId.value !== null && !visibleNodeIds.value.has(selectedOwnedId.value)) ||
     selectedRoots.value.some((id) => {
       const root = props.drawings.find((d) => d.id === id);
       return (
         !root ||
+        !visibleNodeIds.value.has(id) ||
         !isShapeGroupEligibleRoot(root) ||
         (!!props.sheet && !canEditShapeObject(props.sheet, root))
       );
@@ -1181,11 +1190,20 @@ function selectObjectPaths(pathValues: readonly ShapeGroupPath[]): boolean {
 }
 defineExpose({ selectObjectPaths, getObjectSelectionPaths: objectSelectionPaths });
 const groupFragments = computed(() => {
-  if (renderUnavailable.value) return [];
+  if (
+    renderUnavailable.value ||
+    (selectedOwnedId.value && !visibleNodeIds.value.has(selectedOwnedId.value))
+  )
+    return [];
   const m = metrics.value;
   if (!m) return [];
   return props.drawings.flatMap((source) => {
-    if (!isShapeGroupDrawing(source) || !selectedRoots.value.includes(source.id)) return [];
+    if (
+      !isShapeGroupDrawing(source) ||
+      !selectedRoots.value.includes(source.id) ||
+      !visibleNodeIds.value.has(source.id)
+    )
+      return [];
     const displayed =
       displayedRenderPass.value?.sourceForest.find((d) => d.id === source.id) ??
       rootsPreview.value?.find((d) => d.id === source.id) ??
@@ -1193,7 +1211,7 @@ const groupFragments = computed(() => {
     if (!isShapeGroupDrawing(displayed)) return [];
     const projected = groupProjection(displayed, m);
     return projected.owners.flatMap((owner) =>
-      owner.layout
+      owner.layout && visibleNodeIds.value.has(owner.sourceNode.id)
         ? getShapeGroupFrameFragments(owner.layout, props.layout, m, props.pageProjection).map(
             (fragment) => ({ source, owner, layout: owner.layout!, fragment }),
           )
@@ -1223,7 +1241,12 @@ watch(
   { flush: "sync" },
 );
 const toolbarAnchor = computed<FloatingReference | null>(() => {
-  if (selectedRoots.value.length < 2 || !layerElement.value) return null;
+  if (
+    selectedRoots.value.length < 2 ||
+    !layerElement.value ||
+    selectedRoots.value.some((id) => !visibleNodeIds.value.has(id))
+  )
+    return null;
   const visible = [
     ...fragments.value
       .filter((f) => selectedRoots.value.includes(projectionById(f.drawing)?.source.id ?? ""))
@@ -1856,6 +1879,7 @@ const connectorSitePorts = computed(() => {
   const m = metrics.value;
   if (!m) return [];
   return connectorSites.value.flatMap((site) => {
+    if (!visibleNodeIds.value.has(site.targetId)) return [];
     if (props.pageProjection) {
       const projected = projectShapePointToViewport(
         site.position,
@@ -1889,7 +1913,9 @@ const connectorSitePorts = computed(() => {
 const unavailableConnectors = computed(
   () =>
     displayedRenderPass.value?.leaves.flatMap((leaf) =>
-      leaf.connector && leaf.connector.status !== "ready"
+      visibleNodeIds.value.has(leaf.sourceNode.id) &&
+      leaf.connector &&
+      leaf.connector.status !== "ready"
         ? [
             {
               id: leaf.sourceNode.id,
@@ -2027,7 +2053,12 @@ function startConnectorGesture(
     try {
       if (mode === "endpoint") {
         const position = { x: tip.x + delta.x, y: tip.y + delta.y };
-        const nearby = getShapeConnectorSiteCandidates(pass.connections!, position, 12 / scale);
+        const nearby = getShapeConnectorSiteCandidates(
+          pass.connections!,
+          position,
+          12 / scale,
+          visibleNodeIds.value,
+        );
         connectorSites.value = nearby;
         const site = nearby[0];
         const endpoint: ShapeConnectorEndpointEdit = site

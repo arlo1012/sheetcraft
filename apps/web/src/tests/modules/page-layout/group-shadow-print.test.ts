@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSheet, createSheetEvaluator, type Sheet } from "@sheetcraft/core/workbook";
-import type {
-  ShapeGroupDrawing,
-  ShapeGroupedGroup,
-  ShapeGroupLocalFrame,
-  SheetGroupedGraphicDrawing,
+import {
+  collectShapeGroupAssetIds,
+  type ShapeGroupDrawing,
+  type ShapeGroupedGroup,
+  type ShapeGroupLocalFrame,
+  type SheetGroupedGraphicDrawing,
 } from "@sheetcraft/core/shape-group";
 import { shapeFrameLocalToWorld, type ShapeFrameRect } from "@sheetcraft/core/shape-frame";
 import { DEFAULT_WORKBOOK_THEME } from "@sheetcraft/core/workbook-theme";
@@ -15,6 +16,8 @@ import * as groupPaint from "../../../modules/sheet-drawings/shape-group-paint";
 import * as textPaint from "../../../modules/sheet-drawings/shape-text-paint";
 import * as textRuntime from "../../../modules/sheet-drawings/shape-text-runtime";
 import { createCanvasImageCache } from "../../../modules/sheet-grid/canvas/image-painter";
+import { resolveShapeGroupProjection } from "../../../modules/sheet-drawings/resolved-shape-group";
+import { getPrintPictureAssetIds } from "../../../modules/page-layout/page-print-pictures";
 import {
   createPrintPreviewDocument,
   createPrintPreviewRenderer,
@@ -24,6 +27,7 @@ import {
   getPrintableShapeLeaves,
   getPrintShapeContentExtent,
   paintPrintShapes,
+  preparePrintShapeFonts,
   ShapePrintError,
 } from "../../../modules/page-layout/page-print-shapes";
 
@@ -195,6 +199,85 @@ afterEach(() => {
 });
 
 describe("owned container Shadow print integration", () => {
+  test("hidden far-off owner subtrees retain geometry and assets without expanding printed group ink or loading fonts", async () => {
+    const hidden: ShapeGroupedGroup = {
+      kind: "shapeGroup",
+      id: "hidden-owner",
+      name: "Hidden owner",
+      hidden: true,
+      rotation: 0,
+      groupFrame: local(10, 10, 1, 1),
+      groupEffects: shadow(),
+      members: [
+        leaf("hidden-texture", {
+          text: "Missing hidden font",
+          shapeStyle: { fill: { kind: "value", value: texture() } },
+        }),
+      ],
+    };
+    const root = group("visible-owner", [
+      leaf("visible", { text: "", groupFrame: local(0, 0, 0.2, 0.2) }),
+      hidden,
+    ]);
+    root.rotation = 0;
+    root.groupEffects = shadow(0);
+    const { sheet, metrics } = fixture([root]),
+      snapshot = JSON.stringify(root),
+      canonical = resolveShapeGroupProjection(root, metrics),
+      fonts = vi.spyOn(textRuntime, "ensureDrawingShapeTextFont");
+    expect(canonical.leaves[1]!.layout?.collapsed).toBe(false);
+    expect(canonical.leaves[1]!.layout!.rect.x).toBeGreaterThan(2000);
+    expect([...getPrintableShapeLeaves(sheet, metrics)].map((leaf) => leaf.sourceNode.id)).toEqual([
+      "visible",
+    ]);
+    expect(getPrintPictureAssetIds(sheet, metrics)).toEqual(new Set());
+    expect(collectShapeGroupAssetIds(root)).toEqual(new Set(["texture"]));
+    await preparePrintShapeFonts(sheet, metrics);
+    expect(fonts).not.toHaveBeenCalled();
+    const plan = groupPaint.planShapeGroupPaint({ root, metrics, density: 1 });
+    expect(plan).toMatchObject({ kind: "ready", visible: true, empty: false, collapsed: false });
+    const bounds = getPrintShapeContentExtent(sheet, metrics, undefined, undefined, true);
+    expect(metrics.rows.visiblePrefix(bounds.rowCount)).toBeLessThan(300);
+    expect(metrics.columns.visiblePrefix(bounds.columnCount)).toBeLessThan(500);
+    const prepare = vi
+      .spyOn(groupPaint, "prepareShapeGroupPaint")
+      .mockReturnValue(readyGroup(root, metrics));
+    expect(paint(sheet, metrics).drawImage).toHaveBeenCalledOnce();
+    expect(prepare).toHaveBeenCalledOnce();
+    expect(JSON.stringify(root)).toBe(snapshot);
+  });
+
+  test.each(["root", "member"] as const)(
+    "%s-hidden groups have no printed pixels, fonts, assets or content extent",
+    async (target) => {
+      const root = group("empty-owner", [
+        leaf("hidden", {
+          text: "Missing font",
+          shapeStyle: { fill: { kind: "value", value: texture() } },
+        }),
+      ]);
+      if (target === "root") root.hidden = true;
+      else root.members[0]!.hidden = true;
+      const { sheet, metrics } = fixture([root]),
+        snapshot = JSON.stringify(root),
+        prepare = vi.spyOn(groupPaint, "prepareShapeGroupPaint"),
+        fonts = vi.spyOn(textRuntime, "ensureDrawingShapeTextFont");
+      expect(resolveShapeGroupProjection(root, metrics).layout.collapsed).toBe(false);
+      expect([...getPrintableShapeLeaves(sheet, metrics)]).toEqual([]);
+      expect(getPrintPictureAssetIds(sheet, metrics)).toEqual(new Set());
+      expect(getPrintShapeContentExtent(sheet, metrics, undefined, undefined, true)).toEqual({
+        rowCount: 0,
+        columnCount: 0,
+      });
+      expect(paint(sheet, metrics).drawImage).not.toHaveBeenCalled();
+      await preparePrintShapeFonts(sheet, metrics);
+      expect(prepare).not.toHaveBeenCalled();
+      expect(fonts).not.toHaveBeenCalled();
+      expect(collectShapeGroupAssetIds(root)).toEqual(new Set(["texture"]));
+      expect(JSON.stringify(root)).toBe(snapshot);
+    },
+  );
+
   test("unavailable group assets preserve provisional ready text overflow and final pagination rejects them", () => {
     const root = group("textured", [
       leaf("overflow", {

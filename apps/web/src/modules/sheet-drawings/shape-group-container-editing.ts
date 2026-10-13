@@ -73,6 +73,7 @@ export function ungroupOwnedShapeContainer(
       child.layout,
       metrics,
       root.shapeProperties,
+      target.node.hidden,
     );
     if (released.kind !== "shapeGroup" && !isFramedShapeDrawing(released))
       throw new TypeError("Invalid released shape member.");

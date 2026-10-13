@@ -1,4 +1,5 @@
 import { computed, ref } from "vue";
+import { isShapeObjectPathVisible } from "./shape-visibility";
 import type { Workbook, Sheet } from "@sheetcraft/core/workbook";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import {
@@ -40,7 +41,8 @@ function hasConnector(node: Node): boolean {
 function canFlip(node: Node): boolean {
   return node.kind === "shapeGroup"
     ? node.members.every(canFlip)
-    : node.kind === "shape" && !!(node.shapeGeometry || node.shapePath) && !node.shapeConnector;
+    : (node.kind === "shape" || node.kind === "textBox") &&
+        !(node.kind === "shape" && node.shapeConnector);
 }
 function renamed(node: Node, path: ShapeGroupPath, depth: number, name: string): Node {
   if (node.id !== path[depth]) throw new TypeError("The object owner has changed.");
@@ -58,6 +60,37 @@ function renamed(node: Node, path: ShapeGroupPath, depth: number, name: string):
   };
 }
 
+function visibilityChanged(node: Node, hidden: boolean): Node {
+  if (node.kind !== "shape" && node.kind !== "textBox" && node.kind !== "shapeGroup")
+    throw new TypeError("This object has no shape visibility state.");
+  const { hidden: _hidden, ...source } = node;
+  return hidden ? { ...source, hidden: true } : source;
+}
+function visibilityAt(node: Node, path: ShapeGroupPath, depth: number, hidden: boolean): Node {
+  if (node.id !== path[depth]) throw new TypeError("The visibility owner has changed.");
+  if (depth === path.length - 1) return visibilityChanged(node, hidden);
+  if (node.kind !== "shapeGroup" || !node.members.some((child) => child.id === path[depth + 1]))
+    throw new TypeError("Missing visibility owner.");
+  return {
+    ...node,
+    members: node.members.map((child) =>
+      child.id === path[depth + 1]
+        ? (visibilityAt(child, path, depth + 1, hidden) as ShapeGroupChild)
+        : child,
+    ),
+  };
+}
+function allVisibility(node: Node, hidden: boolean): Node {
+  const next = visibilityChanged(node, hidden);
+  // Show All must also clear separately hidden descendants; Hide All needs only roots.
+  return !hidden && next.kind === "shapeGroup"
+    ? {
+        ...next,
+        members: next.members.map((child) => allVisibility(child, false) as ShapeGroupChild),
+      }
+    : next;
+}
+
 /** Every rendered control keeps the exact forest, worksheet, selection and metrics lease. */
 export function useShapeObjectControls(options: {
   getWorkbook: () => Workbook;
@@ -70,6 +103,12 @@ export function useShapeObjectControls(options: {
   flush: () => boolean;
   select: (paths: readonly ShapeGroupPath[]) => boolean;
   format: (path: ShapeGroupPath) => boolean;
+  replaceVisibilityCollection: (
+    next: readonly SheetDrawing[],
+    expected: readonly SheetDrawing[],
+    metrics: PictureSheetMetrics,
+    guard: () => boolean,
+  ) => boolean;
   replaceCollection: (
     next: readonly SheetDrawing[],
     expected: readonly SheetDrawing[],
@@ -120,7 +159,14 @@ export function useShapeObjectControls(options: {
           ),
         );
       const rows: ShapeSelectionPaneRow[] = [];
-      const visit = (node: Node, path: string[], depth: number, root: SheetDrawing) => {
+      const selectedPaths = new Set(paths.map((path) => JSON.stringify(path)));
+      const visit = (
+        node: Node,
+        path: string[],
+        depth: number,
+        root: SheetDrawing,
+        inheritedHidden = false,
+      ) => {
         if (!isShapeGroupEligibleRoot(node as SheetDrawing)) return;
         rows.push(
           Object.freeze({
@@ -128,14 +174,24 @@ export function useShapeObjectControls(options: {
             name: node.name,
             kind: node.kind as ShapeSelectionPaneRow["kind"],
             depth,
-            selected: paths.some((selected) => JSON.stringify(selected) === JSON.stringify(path)),
+            selected: selectedPaths.has(JSON.stringify(path)),
             canEdit: !options.isBusy() && canEditShapeObject(sheet, root),
+            visible: !inheritedHidden && !("hidden" in node && node.hidden === true),
+            hiddenByAncestor: inheritedHidden,
+            canToggleVisibility:
+              !inheritedHidden && !options.isBusy() && canEditShapeObject(sheet, root),
             sourceKey: rowOwner(node),
           }),
         );
         if (node.kind === "shapeGroup")
           for (const child of [...node.members].reverse())
-            visit(child, [...path, child.id], depth + 1, root);
+            visit(
+              child,
+              [...path, child.id],
+              depth + 1,
+              root,
+              inheritedHidden || node.hidden === true,
+            );
       };
       for (const root of [...expected].reverse()) visit(root, [root.id], 0, root);
       const current = () =>
@@ -172,6 +228,10 @@ export function useShapeObjectControls(options: {
       const formatAvailable =
         editable &&
         targets.length === 1 &&
+        isShapeObjectPathVisible(
+          expected.find((node) => node.id === paths[0]?.[0])!,
+          paths[0]!,
+        ) &&
         ((targets[0]?.kind === "shape" && !!targets[0].shapeConnector) ||
           !hasConnector(expected.find((node) => node.id === paths[0]?.[0])!));
       return Object.freeze({
@@ -213,6 +273,51 @@ export function useShapeObjectControls(options: {
                   : [...paths, path]
                 : [path];
             return options.select(next);
+          } catch {
+            return false;
+          }
+        },
+        visibilityHandler: (pathValue: ShapeGroupPath, hidden: boolean) => {
+          if (typeof hidden !== "boolean" || !prepare()) return false;
+          try {
+            const [path] = readShapeObjectControlPaths([pathValue]);
+            const row = rows.find((row) => JSON.stringify(row.path) === JSON.stringify(path));
+            const root = expected.find((node) => node.id === path?.[0]);
+            if (!path || !root || !row?.canToggleVisibility || !canEditShapeObject(sheet, root))
+              return false;
+            return options.replaceVisibilityCollection(
+              expected.map((node) =>
+                node === root ? (visibilityAt(root, path, 0, hidden) as SheetDrawing) : node,
+              ),
+              expected,
+              metrics,
+              current,
+            );
+          } catch {
+            return false;
+          }
+        },
+        canToggleAllVisibility:
+          !options.isBusy() && rows.length > 0 && rows.every((row) => row.canEdit),
+        allVisibilityHandler: (hidden: boolean) => {
+          if (
+            typeof hidden !== "boolean" ||
+            !rows.length ||
+            !rows.every((row) => row.canEdit) ||
+            !prepare()
+          )
+            return false;
+          try {
+            return options.replaceVisibilityCollection(
+              expected.map((node) =>
+                isShapeGroupEligibleRoot(node)
+                  ? (allVisibility(node, hidden) as SheetDrawing)
+                  : node,
+              ),
+              expected,
+              metrics,
+              current,
+            );
           } catch {
             return false;
           }

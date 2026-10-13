@@ -2,10 +2,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createSheet } from "@sheetcraft/core/workbook";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
-import type {
-  ShapeGroupDrawing,
-  ShapeGroupedGroup,
-  SheetGroupedGraphicDrawing,
+import {
+  collectShapeGroupAssetIds,
+  type ShapeGroupDrawing,
+  type ShapeGroupedGroup,
+  type SheetGroupedGraphicDrawing,
 } from "@sheetcraft/core/shape-group";
 import type { ShapeDetailedStyle } from "@sheetcraft/core/shape-style";
 import { shapeFrameLocalToWorld, shapeFrameWorldToLocal } from "@sheetcraft/core/shape-frame";
@@ -288,6 +289,112 @@ afterEach(() => {
 });
 
 describe("real recursive owned group source pixels", () => {
+  test("hidden descendants retain assets and geometry but never enter leaf preflight, pixels or hits", () => {
+    const hidden = leaf("blue", 0, 0, 1, 1);
+    hidden.text = "Unavailable font";
+    hidden.shapeStyle = {
+      fill: {
+        kind: "value",
+        value: {
+          kind: "picture",
+          assetId: "hidden-texture",
+          opacity: 1,
+          rotateWithShape: true,
+          layout: {
+            kind: "stretch",
+            offsetXRatio: 0,
+            offsetYRatio: 0,
+            widthRatio: 1,
+            heightRatio: 1,
+          },
+        },
+      },
+    };
+    const nested: ShapeGroupedGroup = {
+      kind: "shapeGroup",
+      id: "hidden-owner",
+      name: "Hidden owner",
+      hidden: true,
+      rotation: 0,
+      groupFrame: {
+        kind: "shape-group-local-v1",
+        rect: { xRatio: 0.6, yRatio: 0, widthRatio: 0.4, heightRatio: 0.4 },
+      },
+      groupEffects: { shadow: shadow() },
+      members: [hidden],
+    };
+    const root = group([leaf("red"), nested]);
+    root.groupEffects = { shadow: { kind: "none" } };
+    const before = structuredClone(root),
+      opts = options(root),
+      canonical = resolveShapeGroupProjection(root, opts.metrics),
+      resources = { getAssetSize: vi.fn(), getAssetImage: vi.fn() };
+    const result = prepareShapeGroupPaint({ ...opts, resources });
+    results.push(result);
+    expect(result).toMatchObject({ kind: "ready", visible: true, empty: false, collapsed: false });
+    expect(result.layout).toEqual(canonical.layout);
+    expect(canonical.leaves[1]!.layout?.collapsed).toBe(false);
+    expect(leafCalls.plan.mock.calls.map(([input]) => input.drawing.id)).toEqual(["red"]);
+    expect(leafCalls.prepare.mock.calls.map(([input]) => input.drawing.id)).toEqual(["red"]);
+    expect(resources.getAssetSize).not.toHaveBeenCalled();
+    expect(resources.getAssetImage).not.toHaveBeenCalled();
+    expect(collectShapeGroupAssetIds(root)).toEqual(new Set(["hidden-texture"]));
+    expect(collectShapeGroupAssetIds(result.snapshotRoot)).toEqual(new Set(["hidden-texture"]));
+    expect(hasActiveShapeGroupShadow(root)).toBe(false);
+    if (result.kind !== "ready") throw Error("Expected visible sibling pixels");
+    expect(sample(result, 1.5, 1.5)).toEqual([255, 0, 0, 255]);
+    expect(hitShapeGroupPaint(result, { x: 7.5, y: 1.5 })).toBeUndefined();
+    expect(root).toEqual(before);
+  });
+
+  test.each(["root", "leaf"] as const)(
+    "%s hiding leaves an empty raster without collapsing the canonical owner",
+    (target) => {
+      const root = group();
+      if (target === "root") root.hidden = true;
+      else root.members[0]!.hidden = true;
+      const opts = options(root),
+        canonical = resolveShapeGroupProjection(root, opts.metrics),
+        result = prepareShapeGroupPaint(opts);
+      results.push(result);
+      expect(result).toMatchObject({
+        kind: "ready",
+        visible: target !== "root",
+        empty: true,
+        collapsed: false,
+        layout: canonical.layout,
+      });
+      expect(leafCalls.plan).not.toHaveBeenCalled();
+      expect(leafCalls.prepare).not.toHaveBeenCalled();
+      if (result.kind !== "ready") throw Error("Expected empty ready raster");
+      expect([result.canvas.width, result.canvas.height]).toEqual([1, 1]);
+      expect(hitShapeGroupPaint(result, { x: 0.5, y: 0.5 })).toBeUndefined();
+    },
+  );
+
+  test("a hidden unavailable connector is retained in the full pass and skipped before sibling paint preflight", () => {
+    const connector: SheetGroupedGraphicDrawing = {
+      ...leaf("hidden-connector"),
+      hidden: true,
+      text: "Unsupported label",
+      shapeGeometry: { preset: "bentConnector3" },
+      shapeConnector: {
+        kind: "shape-connector-v1",
+        begin: { kind: "free", xRatio: 0, yRatio: 0 },
+        end: { kind: "free", xRatio: 1, yRatio: 1 },
+      },
+    };
+    const root = group([connector, leaf("red")]),
+      opts = options(root),
+      pass = resolveShapeForestForRender({ drawings: [root], metrics: opts.metrics, revision: 0 });
+    expect(pass.getLeaf(connector.id)!.connector?.status).toBe("unavailable");
+    const result = prepareShapeGroupPaint({ ...opts, renderPass: pass });
+    results.push(result);
+    expect(result.kind).toBe("ready");
+    expect(leafCalls.prepare.mock.calls.map(([input]) => input.drawing.id)).toEqual(["red"]);
+    expect(() => planShapeGroupPaint(opts)).toThrow(/complete worksheet relation pass/);
+  });
+
   test.each(["red", "blue", "nested", "root", "missing", undefined])(
     "active text id %s suppresses only its exact leaf through plan and pixel preparation",
     (editingTextId) => {

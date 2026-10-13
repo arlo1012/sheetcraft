@@ -215,7 +215,10 @@ export function releaseShapeGroupChild(
   world: ResolvedShapeFrame,
   metrics: PictureSheetMetrics,
   ownerProperties?: ShapeObjectProperties,
+  ownerHidden?: boolean,
 ): SheetDrawing {
+  if (ownerHidden !== undefined && typeof ownerHidden !== "boolean")
+    throw new TypeError("Released shape owner visibility must be a boolean.");
   if (world.collapsed) throw new RangeError("Expand a collapsed group before releasing its child.");
   const { groupFrame: _frame, shapeProperties: _properties, ...appearance } = member;
   const shapeProperties = inheritShapeGroupOwnerProperties(member.shapeProperties, ownerProperties);
@@ -225,6 +228,7 @@ export function releaseShapeGroupChild(
   };
   return normalizeSheetDrawing({
     ...appearance,
+    ...(ownerHidden === true ? { hidden: true as const } : {}),
     shapeFrame,
     rotation: world.angleDeg,
     ...(shapeProperties ? { shapeProperties } : {}),
@@ -246,7 +250,7 @@ export function ungroupShapeRoot(
   const released = group.members.map((member) => {
     const world = resolveShapeGroupChildLayout(parent, member);
     if (!world) throw new RangeError("Expand a collapsed group before ungrouping.");
-    return releaseShapeGroupChild(member, world, metrics, group.shapeProperties);
+    return releaseShapeGroupChild(member, world, metrics, group.shapeProperties, group.hidden);
   });
   const result = normalizeShapeDrawingForest(
     roots.flatMap((root) => (root.id === groupId ? released : [root])),

@@ -18,6 +18,7 @@ import {
   resolveShapeForestForRender,
   type ResolvedShapeForestForRender,
 } from "./resolved-shape-render-source";
+import { isShapeObjectPathVisible } from "./shape-visibility";
 import { getDrawingShapeTextRect } from "./shape-text-runtime";
 
 type TextSource = SheetGraphicDrawing | SheetFramedGraphicDrawing | SheetGroupedGraphicDrawing;
@@ -246,6 +247,7 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
         workbook.sheets.get(sheet.id) !== sheet ||
         !sheet.drawings?.includes(root) ||
         !textSource(node) ||
+        !isShapeObjectPathVisible(root, path) ||
         !canEditShapeObject(sheet, root) ||
         !options.flush()
       )

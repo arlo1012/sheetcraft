@@ -21,11 +21,13 @@ import {
   traverseShapeGroup,
   type ShapeGroupDrawing,
   type ShapeGroupPath,
+  type ShapeGroupNode,
 } from "@sheetcraft/core/shape-group";
 import {
   resolveShapeForestForRender,
   type ResolvedShapeForestForRender,
 } from "./resolved-shape-render-source";
+import { normalizeShapeDrawingForest } from "@sheetcraft/core/shape-group-planning";
 import { planDeleteShapeGroupNodes } from "@sheetcraft/core/shape-group-delete";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { frameShapeView } from "./shape-view-layout";
@@ -41,6 +43,15 @@ import {
 } from "./resolved-shape-group";
 import { useDrawingDialogTarget } from "../../shared/drawing-dialog/useDrawingDialogTarget";
 import type { Workbook, Sheet, CellAddress } from "@sheetcraft/core/workbook";
+/** Strip only the newly owned visibility metadata from already normalized trees. */
+function withoutShapeVisibility(node: SheetDrawing | ShapeGroupNode): unknown {
+  if (node.kind !== "shape" && node.kind !== "textBox" && node.kind !== "shapeGroup") return node;
+  const { hidden: _hidden, ...source } = node;
+  return node.kind === "shapeGroup"
+    ? { ...source, members: node.members.map(withoutShapeVisibility) }
+    : source;
+}
+
 export function useDrawingActions(options: {
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
@@ -262,7 +273,11 @@ export function useDrawingActions(options: {
       return undefined;
     return binding;
   }
-  function applyCollection(next: readonly SheetDrawing[], binding: CollectionBinding): boolean {
+  function applyCollection(
+    next: readonly SheetDrawing[],
+    binding: CollectionBinding,
+    visibilityOnly = false,
+  ): boolean {
     if (replacing) return false;
     replacing = true;
     try {
@@ -275,6 +290,13 @@ export function useDrawingActions(options: {
       // Equal canonical data is a legitimate no-op, including a detached clone.
       const proposed = [...next];
       if (
+        visibilityOnly &&
+        JSON.stringify(normalizeShapeDrawingForest(proposed).map(withoutShapeVisibility)) !==
+          JSON.stringify(normalizeShapeDrawingForest(binding.expected).map(withoutShapeVisibility))
+      )
+        return false;
+
+      if (
         JSON.stringify(normalizeSheetDrawings(proposed)) ===
         JSON.stringify(binding.sheet.drawings ?? [])
       )
@@ -286,8 +308,8 @@ export function useDrawingActions(options: {
           JSON.stringify(drawing),
         ]),
       );
-      const prepared: SheetDrawing[] = [];
-      for (const drawing of proposed) {
+      const prepared: SheetDrawing[] = visibilityOnly ? [...proposed] : [];
+      for (const drawing of visibilityOnly ? [] : proposed) {
         if (!currentCollection(binding)) return false;
         const id = drawing.id,
           kind = drawing.kind;
@@ -316,7 +338,7 @@ export function useDrawingActions(options: {
           metrics: binding.metrics,
           revision: binding.revision ?? 0,
         });
-        if (options.preflightConnectedCollection?.(pass) === false) return false;
+        if (!visibilityOnly && options.preflightConnectedCollection?.(pass) === false) return false;
       }
       if (
         !currentCollection(binding) ||
@@ -355,6 +377,28 @@ export function useDrawingActions(options: {
     try {
       const binding = bindCollection(expected, expectedMetrics, guard);
       return !!binding && applyCollection(next, binding);
+    } catch {
+      return false;
+    }
+  }
+  /** Hide/show never changes content, placement, appearance, ordering or identity, even on unready resources. */
+  function replaceVisibilityCollection(
+    next: readonly SheetDrawing[],
+    expected: readonly SheetDrawing[],
+    expectedMetrics?: PictureSheetMetrics,
+    guard?: () => boolean,
+  ): boolean {
+    try {
+      const sourceFingerprint = JSON.stringify(normalizeShapeDrawingForest(expected));
+      // The strict reader rejects accessors/custom iterators before this identity-preserving copy.
+      const sourceRoots = expected.slice();
+      const proposed = normalizeShapeDrawingForest(next);
+      const sourceCurrent = () =>
+        (guard?.() ?? true) &&
+        JSON.stringify(normalizeShapeDrawingForest(options.getSheet().drawings ?? [])) ===
+          sourceFingerprint;
+      const binding = bindCollection(sourceRoots, expectedMetrics, sourceCurrent);
+      return !!binding && applyCollection(proposed, binding, true);
     } catch {
       return false;
     }
@@ -452,6 +496,7 @@ export function useDrawingActions(options: {
     editGroupLeaf,
     update,
     replaceCollection,
+    replaceVisibilityCollection,
     confirm,
     remove,
     close,

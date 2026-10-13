@@ -81,8 +81,8 @@ describe("atomic sheet drawing collection CAS", () => {
       true,
     );
     expect(f.prepare.mock.calls).toEqual([
-      [changed, expected[0]],
-      [added, undefined],
+      [changed, expected[0], [changed, expected[1], added]],
+      [added, undefined, [changed, expected[1], added]],
     ]);
     expect(f.execute).toHaveBeenCalledTimes(1);
     expect(f.execute.mock.calls[0]![0]).toMatchObject({
@@ -296,4 +296,163 @@ test("detached unchanged roots do not block an independent edit on cold resource
   expect(f.prepare).toHaveBeenCalledTimes(1);
   expect(f.prepare.mock.calls[0]![0].id).toBe("shape");
   expect(f.sheet.drawings![1]).toEqual(expected[1]);
+});
+
+describe("strict metadata-only shape visibility command", () => {
+  test("hide/show preserves unavailable resources and does not prepare text or change placement", () => {
+    const f = fixture(),
+      expected = [...f.sheet.drawings!];
+    f.prepare.mockImplementation(() => {
+      throw Error("Font and glyph pixels are unavailable");
+    });
+    expect(
+      f.actions.replaceVisibilityCollection(
+        expected.map((node) =>
+          node.id === expected[0]!.id ? ({ ...node, hidden: true } as SheetDrawing) : node,
+        ),
+        expected,
+        f.metrics,
+      ),
+    ).toBe(true);
+    expect(f.sheet.drawings![0]).toEqual({ ...expected[0], hidden: true });
+    expect(f.prepare).not.toHaveBeenCalled();
+    expect(f.execute).toHaveBeenCalledOnce();
+    const hidden = [...f.sheet.drawings!],
+      first = hidden[0]!;
+    if (first.kind !== "shape" && first.kind !== "textBox") throw Error("Expected leaf");
+    const { hidden: _hidden, ...shown } = first;
+    expect(f.actions.replaceVisibilityCollection([shown, hidden[1]!], hidden, f.metrics)).toBe(
+      true,
+    );
+    expect(f.sheet.drawings).toEqual(expected);
+  });
+  test.each(["text", "geometry", "name", "style", "lock", "order", "kind", "id", "member"])(
+    "visibility-only gate rejects a forged %s edit atomically",
+    (field) => {
+      const f = fixture(),
+        expected = [...f.sheet.drawings!],
+        before = structuredClone(expected),
+        next = structuredClone(expected);
+      const target = next[0];
+      if (!target || target.kind !== "shape") throw Error("Expected shape");
+      target.hidden = true;
+      if (field === "text") target.text = "Forged";
+      if (field === "geometry") target.shapeGeometry = { preset: "ellipse" };
+      if (field === "name") target.name = "Forged";
+      if (field === "style") target.fill = "#ff0000";
+      if (field === "lock" && "shapeFrame" in target) target.shapeProperties = { locked: false };
+      if (field === "order") next.reverse();
+      if (field === "kind") target.kind = "textBox" as "shape";
+      if (field === "id") target.id = "forged";
+      if (field === "member") next.push({ ...framedShape(), id: "new" });
+      expect(f.actions.replaceVisibilityCollection(next, expected, f.metrics)).toBe(false);
+      expect(f.sheet.drawings).toEqual(before);
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.prepare).not.toHaveBeenCalled();
+    },
+  );
+  test("source mutation during final guard refuses a metadata overwrite", () => {
+    const f = fixture(),
+      expected = [...f.sheet.drawings!],
+      next = expected.map((node) => ({ ...node, hidden: true }) as SheetDrawing);
+    let calls = 0;
+    const guard = () => {
+      if (++calls === 3) expected[0]!.name = "New external name";
+      return true;
+    };
+    expect(f.actions.replaceVisibilityCollection(next, expected, f.metrics, guard)).toBe(false);
+    expect(f.sheet.drawings![0]!.name).toBe("New external name");
+    expect(f.sheet.drawings![0]).not.toHaveProperty("hidden");
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+});
+
+test.each(["expected", "next", "iterator"])(
+  "visibility metadata admission never executes %s array accessors or custom iteration",
+  (unsafe) => {
+    const f = fixture(),
+      expected = [...f.sheet.drawings!],
+      next = expected.map((node) => ({ ...node, hidden: true }) as SheetDrawing),
+      read = vi.fn(() => expected[0]);
+    const indexed = [...expected];
+    if (unsafe === "iterator")
+      Object.defineProperty(indexed, Symbol.iterator, {
+        value: vi.fn(function* () {
+          yield* expected;
+        }),
+      });
+    else Object.defineProperty(indexed, "0", { get: read });
+    expect(
+      f.actions.replaceVisibilityCollection(
+        unsafe === "next" ? indexed : next,
+        unsafe === "next" ? expected : indexed,
+        f.metrics,
+      ),
+    ).toBe(false);
+    expect(read).not.toHaveBeenCalled();
+    if (unsafe === "iterator") expect(indexed[Symbol.iterator]).not.toHaveBeenCalled();
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.sheet.drawings).toEqual(expected);
+  },
+);
+
+test("visibility metadata validates the aggregate whole-forest node budget before preparation or execute", () => {
+  const f = fixture(),
+    m = f.metrics;
+  const original = groupShapeRoots(
+    f.sheet.drawings!,
+    ["shape", "second"],
+    { id: "group", name: "Group" },
+    m,
+  )[0]!;
+  if (original.kind !== "shapeGroup") throw Error("Expected group");
+  const groups: SheetDrawing[] = [
+    {
+      ...original,
+      id: "large-group",
+      members: Array.from({ length: 9998 }, (_, index) => ({
+        ...original.members[0]!,
+        id: `child-${index}`,
+      })),
+    },
+    ...f.sheet.drawings!,
+  ];
+  f.sheet.drawings = groups;
+  const before = JSON.stringify(groups);
+  expect(
+    f.actions.replaceVisibilityCollection(
+      groups.map((group) => ({ ...group, hidden: true }) as SheetDrawing),
+      groups,
+      m,
+    ),
+  ).toBe(false);
+  expect(JSON.stringify(f.sheet.drawings)).toBe(before);
+  expect(f.execute).not.toHaveBeenCalled();
+  expect(f.prepare).not.toHaveBeenCalled();
+});
+
+test("visibility metadata admission rejects a changing legacy anchor getter before any read", () => {
+  const f = fixture(),
+    { shapeFrame: _frame, ...appearance } = framedShape();
+  const legacy: SheetDrawing = {
+    ...appearance,
+    anchor: { row: 0, column: 0 },
+    offsetX: 0,
+    offsetY: 0,
+    width: 240,
+    height: 120,
+  };
+  f.sheet.drawings = [legacy];
+  const read = vi.fn(() => 3),
+    anchor = Object.defineProperty({ column: 0 }, "row", { enumerable: true, get: read });
+  expect(
+    f.actions.replaceVisibilityCollection(
+      [{ ...legacy, anchor, hidden: true } as SheetDrawing],
+      [legacy],
+      f.metrics,
+    ),
+  ).toBe(false);
+  expect(read).not.toHaveBeenCalled();
+  expect(f.sheet.drawings).toEqual([legacy]);
+  expect(f.execute).not.toHaveBeenCalled();
 });

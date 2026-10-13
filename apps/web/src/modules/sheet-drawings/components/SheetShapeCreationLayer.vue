@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getVisibleShapeNodeIds } from "../shape-visibility";
 import {
   computed,
   onBeforeUnmount,
@@ -92,17 +93,27 @@ const creationConnections = computed(() => {
     return;
   }
 });
+const visibleNodeIds = computed(() =>
+  getVisibleShapeNodeIds(props.request.sheet.drawings ?? emptyForest),
+);
 function showSites(
   context: ResolvedSheetShapeConnections,
   point: { x: number; y: number },
   near?: ShapeConnectorSiteCandidate,
 ) {
-  let target = near ? context.getTarget(near.targetId) : undefined;
+  let target =
+    near && visibleNodeIds.value.has(near.targetId) ? context.getTarget(near.targetId) : undefined;
   if (!target) {
     for (let index = context.targets.length - 1; index >= 0; index--) {
       const candidate = context.targets[index]!;
       const carrier = context.getNode(candidate.nodeId)?.carrierLayout;
-      if (candidate.status !== "ready" || !carrier || carrier.collapsed) continue;
+      if (
+        candidate.status !== "ready" ||
+        !carrier ||
+        carrier.collapsed ||
+        !visibleNodeIds.value.has(candidate.nodeId)
+      )
+        continue;
       const local = shapeFrameWorldToLocal(carrier.rect, carrier.angleDeg, point);
       if (
         local.x >= 0 &&
@@ -137,28 +148,30 @@ const visibleSites = computed(() => {
         clip: props.layout.panes[paneId].clip,
         translation: getPicturePaneTranslation(paneId, props.layout),
       }));
-  return hoverSites.value.flatMap((site) =>
-    bands.flatMap((band) => {
-      const point = {
-        x: site.position.x + band.translation.x,
-        y: site.position.y + band.translation.y,
-      };
-      const clip = band.clip;
-      return point.x >= clip.x &&
-        point.y >= clip.y &&
-        point.x < clip.x + clip.width &&
-        point.y < clip.y + clip.height
-        ? [
-            {
-              key: `${site.targetId}:${site.siteIndex}:${band.pageKey}`,
-              point,
-              targetId: site.targetId,
-              siteIndex: site.siteIndex,
-            },
-          ]
-        : [];
-    }),
-  );
+  return hoverSites.value
+    .filter((site) => visibleNodeIds.value.has(site.targetId))
+    .flatMap((site) =>
+      bands.flatMap((band) => {
+        const point = {
+          x: site.position.x + band.translation.x,
+          y: site.position.y + band.translation.y,
+        };
+        const clip = band.clip;
+        return point.x >= clip.x &&
+          point.y >= clip.y &&
+          point.x < clip.x + clip.width &&
+          point.y < clip.y + clip.height
+          ? [
+              {
+                key: `${site.targetId}:${site.siteIndex}:${band.pageKey}`,
+                point,
+                targetId: site.targetId,
+                siteIndex: site.siteIndex,
+              },
+            ]
+          : [];
+      }),
+    );
 });
 function hover(event: PointerEvent) {
   if (
@@ -185,7 +198,7 @@ function hover(event: PointerEvent) {
   showSites(
     context,
     position.point,
-    pickNearestShapeConnectorSite(context, position.point, 10 / props.scale),
+    pickNearestShapeConnectorSite(context, position.point, 10 / props.scale, visibleNodeIds.value),
   );
 }
 const failure = ref<"invalid" | "rejected">();
@@ -317,7 +330,12 @@ function start(event: PointerEvent): void {
         metrics,
         revision: revision ?? 0,
       });
-      beginSite = pickNearestShapeConnectorSite(connectionContext, startPoint.point, 10 / scale);
+      beginSite = pickNearestShapeConnectorSite(
+        connectionContext,
+        startPoint.point,
+        10 / scale,
+        visibleNodeIds.value,
+      );
     } catch {
       failure.value = "invalid";
       return;
@@ -370,7 +388,12 @@ function start(event: PointerEvent): void {
         return;
       }
       const endSite = moved
-        ? pickNearestShapeConnectorSite(connectionContext, end.point, 10 / scale)
+        ? pickNearestShapeConnectorSite(
+            connectionContext,
+            end.point,
+            10 / scale,
+            visibleNodeIds.value,
+          )
         : undefined;
       showSites(connectionContext, end.point, endSite);
       preview.value =

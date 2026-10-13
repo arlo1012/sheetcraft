@@ -22,6 +22,7 @@ import {
   type ShapeTextRect,
 } from "./shape-text-layout";
 import {
+  applyShapeTextVerticalFlip,
   layoutDrawingShapeText,
   resolveDrawingShapeText,
   ShapeTextRuntimeError,
@@ -228,8 +229,8 @@ function source(options: ShapeLeafPixelsOptions) {
     cssBorderRects,
     richText,
     visibleText,
-    bodyFlipX: renderPolicy === "standard" && drawing.shapeFlipX === true,
-    bodyFlipY: renderPolicy === "standard" && drawing.shapeFlipY === true,
+    bodyFlipX: drawing.shapeFlipX === true,
+    bodyFlipY: drawing.shapeFlipY === true,
   };
 }
 function bodyDrawing(
@@ -285,7 +286,7 @@ function textLayout(
   const lineHeight = options.legacyLineHeightPx ?? 20;
   if (!Number.isFinite(lineHeight) || lineHeight <= 0 || lineHeight > 4096)
     throw new RangeError("Legacy shape line height exceeds its finite line-spacing budget.");
-  return layoutShapeText({
+  const layout = layoutShapeText({
     ...resolved,
     text: options.drawing.text,
     textRect: rect,
@@ -313,6 +314,7 @@ function textLayout(
     },
     pointsToPx: 4 / 3,
   });
+  return applyShapeTextVerticalFlip(options.drawing, rect, layout);
 }
 function textProjectionDrawing(
   options: ShapeLeafPixelsOptions,
