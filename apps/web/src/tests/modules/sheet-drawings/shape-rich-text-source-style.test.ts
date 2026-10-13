@@ -3,6 +3,8 @@ import { getShapeTextCharacterSegments } from "@sheetcraft/core/shape-text-chara
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { ShapeChoice, ShapeLine, ShapePaint } from "@sheetcraft/core/shape-style";
 import { DEFAULT_WORKBOOK_THEME } from "@sheetcraft/core/workbook-theme";
+import { WORDART_STYLE_PRESETS } from "../../../modules/sheet-drawings/wordart-style-presets";
+import { materializeWordArtCharacterStylePreset } from "../../../modules/sheet-drawings/wordart-style-application";
 import { shapeRichTextSourceStyle } from "../../../modules/sheet-drawings/shape-rich-text-source-style";
 import {
   createDefaultShapeText,
@@ -203,4 +205,28 @@ describe("same-model shape rich source appearance", () => {
     expect(drawingShapeTextCharacterValues(changed).values.textColor).toBe("#00ff00");
     expect(shape.shapeText!.characterRuns[0]!.fill).toEqual(solid("#ff0000"));
   });
+});
+
+test("local and inherited active glyph effects disclose source preview without fake CSS effects", () => {
+  const shape = drawing(),
+    preset = materializeWordArtCharacterStylePreset("black-soft-shadow");
+  shape.shapeText!.style = { fill: solid("#000000"), shadow: preset.shadow };
+  shape.shapeText!.characterRuns = [{ start: 0, end: 6, shadow: { kind: "none" } }];
+  const pieces = getShapeTextCharacterSegments(
+    drawingShapeTextCharacterSource(shape),
+    drawingShapeTextBaseCharacterFormat(shape),
+  );
+  const alpha = shapeRichTextSourceStyle(pieces[0]!),
+    beta = shapeRichTextSourceStyle(pieces[1]!);
+  expect(alpha.previewDiffers).toBe(false);
+  expect(beta.previewDiffers).toBe(true);
+  expect(beta.style).not.toHaveProperty("textShadow");
+  expect(beta.style).not.toHaveProperty("filter");
+  for (const category of ["reflection", "glow"] as const) {
+    const recipe = WORDART_STYLE_PRESETS.find((p) => p.style[category].kind === "value")!;
+    expect(recipe).toBeDefined();
+    expect(
+      shapeRichTextSourceStyle(materializeWordArtCharacterStylePreset(recipe.id)).previewDiffers,
+    ).toBe(true);
+  }
 });

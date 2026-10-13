@@ -4,6 +4,9 @@ import {
   type ShapeChoice,
   type ShapeLine,
   type ShapePaint,
+  type ShapeShadow,
+  type ShapeReflection,
+  type ShapeGlow,
 } from "./shape-style.js";
 
 /** Missing fields inherit the drawing's uniform typography and resolved glyph fill. */
@@ -21,6 +24,10 @@ export type ShapeTextCharacterFormat = {
   fill?: ShapeChoice<ShapePaint>;
   /** Sparse local glyph outline; explicit None suppresses the inherited uniform outline. */
   line?: ShapeChoice<ShapeLine>;
+  /** Sparse local glyph effects; explicit None suppresses only that inherited effect. */
+  shadow?: ShapeChoice<ShapeShadow>;
+  reflection?: ShapeChoice<ShapeReflection>;
+  glow?: ShapeChoice<ShapeGlow>;
 };
 export type ShapeTextCharacterProperty = keyof ShapeTextCharacterFormat;
 /** Half-open UTF-16 ranges in the authoritative drawing.text, never duplicate content. */
@@ -40,7 +47,16 @@ export const SHAPE_TEXT_CHARACTER_PROPERTIES = [
   "color",
   "fill",
   "line",
+  "shadow",
+  "reflection",
+  "glow",
 ] as const;
+const APPEARANCE_PROPERTIES = ["fill", "line", "shadow", "reflection", "glow"] as const;
+function isAppearanceProperty(
+  key: ShapeTextCharacterProperty,
+): key is (typeof APPEARANCE_PROPERTIES)[number] {
+  return APPEARANCE_PROPERTIES.some((property) => property === key);
+}
 export const SHAPE_TEXT_CHARACTER_LIMITS = {
   textUnits: 100000,
   runs: 100000,
@@ -104,10 +120,13 @@ function format(source: Record<string, unknown>): ShapeTextCharacterFormat {
       if (typeof value !== "string" || !/^(#[0-9a-f]{6}|transparent)$/i.test(value))
         throw new TypeError("Shape character color must be RGB or transparent.");
       result.color = value.toLowerCase();
-    } else if (key === "fill" || key === "line") {
+    } else if (isAppearanceProperty(key)) {
       const normalized = normalizeShapeStyle({ [key]: value })!;
       if (key === "fill") result.fill = normalized.fill!;
-      else result.line = normalized.line!;
+      else if (key === "line") result.line = normalized.line!;
+      else if (key === "shadow") result.shadow = normalized.shadow!;
+      else if (key === "reflection") result.reflection = normalized.reflection!;
+      else result.glow = normalized.glow!;
     } else {
       if (typeof value !== "boolean") throw new TypeError(`Invalid shape character ${key}.`);
       result[key] = value;
@@ -122,7 +141,7 @@ export function normalizeShapeTextCharacterFormat(value: unknown): ShapeTextChar
   return format(source);
 }
 
-/** Charge bounded paint trees before cloning; no accessor or inherited value is read. */
+/** Charge bounded appearance trees before cloning; no accessor or inherited value is read. */
 function appearanceWork(value: unknown, remaining: number): number {
   let work = 0;
   const pending = [{ value, depth: 0 }];
@@ -159,7 +178,7 @@ function formatWork(
   remaining: number = SHAPE_TEXT_CHARACTER_LIMITS.workUnits,
 ): number {
   let work = typeof source.fontFamily === "string" ? source.fontFamily.length : 0;
-  for (const key of ["fill", "line"] as const)
+  for (const key of APPEARANCE_PROPERTIES)
     if (Object.hasOwn(source, key)) work += appearanceWork(source[key], remaining - work);
   if (work > remaining) throw new RangeError("Shape character normalization work budget exceeded.");
   return work;
@@ -207,7 +226,7 @@ function sameFormat(left: ShapeTextCharacterFormat, right: ShapeTextCharacterFor
   return SHAPE_TEXT_CHARACTER_PROPERTIES.every(
     (key) =>
       Object.hasOwn(left, key) === Object.hasOwn(right, key) &&
-      (key === "fill" || key === "line"
+      (isAppearanceProperty(key)
         ? JSON.stringify(left[key]) === JSON.stringify(right[key])
         : left[key] === right[key]),
   );
@@ -217,10 +236,9 @@ function copyFormat(value: ShapeTextCharacterFormat): ShapeTextCharacterFormat {
   const result: Record<string, unknown> = {};
   for (const key of SHAPE_TEXT_CHARACTER_PROPERTIES)
     if (Object.hasOwn(value, key))
-      result[key] =
-        key === "fill" || key === "line"
-          ? normalizeShapeStyle({ [key]: value[key] })![key]
-          : value[key];
+      result[key] = isAppearanceProperty(key)
+        ? normalizeShapeStyle({ [key]: value[key] })![key]
+        : value[key];
   return result as ShapeTextCharacterFormat;
 }
 const appendedWork = new WeakMap<ShapeTextCharacterRun[], number>();

@@ -626,6 +626,13 @@ export function planShapeGroupFormatIntent(
         view = withoutDrawingShapeTextCharacterProperties(view, ["color", "fill"]);
       if (intent.target === "text" && intent.category === "line")
         view = withoutDrawingShapeTextCharacterProperties(view, ["line"]);
+      if (
+        intent.target === "text" &&
+        (intent.category === "shadow" ||
+          intent.category === "reflection" ||
+          intent.category === "glow")
+      )
+        view = withoutDrawingShapeTextCharacterProperties(view, [intent.category]);
       const text = intent.target === "text" ? materializeDrawingShapeText(view) : undefined;
       const style = { ...(text ? text.style : view.shapeStyle) };
       if (intent.value === undefined) delete style[intent.category];
@@ -745,12 +752,19 @@ export function aggregateShapeGroupFormatSnapshot(
           : resolveShapeTextPaintStyle(leaf.view!),
       );
       const glyphs =
-        target === "text" && (category === "fill" || category === "line")
+        target === "text" &&
+        (category === "fill" ||
+          category === "line" ||
+          category === "shadow" ||
+          category === "reflection" ||
+          category === "glow")
           ? leaves.map((leaf, index) => drawingShapeTextPaintValues(leaf.view!, entries[index]!))
           : undefined;
       const first = glyphs ? glyphs[0]!.style[category] : entries[0]![category];
       if (
-        !glyphs?.some((value) => value.mixed.includes(category as "fill" | "line")) &&
+        !glyphs?.some((value) =>
+          value.mixed.includes(category as "fill" | "line" | "shadow" | "reflection" | "glow"),
+        ) &&
         (glyphs ? glyphs.map((value) => value.style) : entries).every((entry) =>
           sameValue(entry[category], first),
         )
@@ -809,8 +823,25 @@ export function aggregateShapeGroupFormatSnapshot(
   const wordArtStyles = wordArtLeaves.map((leaf) => {
     const model = materializeDrawingShapeText(leaf.view!);
     const local = model.characterRuns
-      ?.map(({ start, end, color, fill, line }) => ({ start, end, color, fill, line }))
-      .filter((run) => run.color !== undefined || run.fill !== undefined || run.line !== undefined);
+      ?.map(({ start, end, color, fill, line, shadow, reflection, glow }) => ({
+        start,
+        end,
+        color,
+        fill,
+        line,
+        shadow,
+        reflection,
+        glow,
+      }))
+      .filter(
+        (run) =>
+          run.color !== undefined ||
+          run.fill !== undefined ||
+          run.line !== undefined ||
+          run.shadow !== undefined ||
+          run.reflection !== undefined ||
+          run.glow !== undefined,
+      );
     return JSON.stringify({ style: model.style, runs: local?.length ? local : undefined });
   });
   return {

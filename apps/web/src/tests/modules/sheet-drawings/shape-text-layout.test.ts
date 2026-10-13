@@ -807,3 +807,28 @@ describe("attributed native shape text layout", () => {
     expect(result.requiredExtent.width).toBe(50);
   });
 });
+
+test("effect tuples transport through native pieces without merging unlike appearance", () => {
+  const none = { kind: "none" as const },
+    base = input({ text: "abcd" }),
+    segment = { font: base.font, underline: false, strike: false };
+  const result = layoutShapeText({
+    ...base,
+    characterSegments: [
+      { ...segment, start: 0, end: 1, shadow: none, reflection: none, glow: none },
+      { ...segment, start: 1, end: 2, shadow: none, reflection: none, glow: none },
+      { ...segment, start: 2, end: 4 },
+    ],
+  });
+  expect(result.runs).toHaveLength(2);
+  expect(result.runs[0]).toMatchObject({
+    text: "ab",
+    sourceStart: 0,
+    sourceEnd: 2,
+    shadow: none,
+    reflection: none,
+    glow: none,
+  });
+  expect(result.runs[1]!.text).toBe("cd");
+  expect(result.runs[1]).not.toHaveProperty("shadow");
+});

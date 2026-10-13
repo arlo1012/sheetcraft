@@ -4,6 +4,9 @@ import {
   type ShapeDetailedStyle,
   type ShapeLine,
   type ShapePaint,
+  type ShapeShadow,
+  type ShapeReflection,
+  type ShapeGlow,
 } from "@sheetcraft/core/shape-style";
 import type {
   ShapeTextLayout as ShapeTextLayoutOptions,
@@ -47,6 +50,9 @@ export type ShapeTextCharacterSegment = {
   /** Sparse glyph appearance; absence inherits uniform text style, None removes it. */
   fill?: ShapeChoice<ShapePaint>;
   line?: ShapeChoice<ShapeLine>;
+  shadow?: ShapeChoice<ShapeShadow>;
+  reflection?: ShapeChoice<ShapeReflection>;
+  glow?: ShapeChoice<ShapeGlow>;
 };
 export type ShapeTextLayoutInput = {
   text: string;
@@ -79,6 +85,9 @@ export type ShapeTextRun = {
   /** Sparse glyph appearance; absence inherits uniform text style, None removes it. */
   fill?: ShapeChoice<ShapePaint>;
   line?: ShapeChoice<ShapeLine>;
+  shadow?: ShapeChoice<ShapeShadow>;
+  reflection?: ShapeChoice<ShapeReflection>;
+  glow?: ShapeChoice<ShapeGlow>;
   font: ShapeTextFont;
   direction: "ltr" | "rtl";
   /** Native left-aligned, alphabetic baseline; rotate around this origin. */
@@ -165,6 +174,9 @@ type Piece = {
   /** Sparse glyph appearance; absence inherits uniform text style, None removes it. */
   fill?: ShapeChoice<ShapePaint>;
   line?: ShapeChoice<ShapeLine>;
+  shadow?: ShapeChoice<ShapeShadow>;
+  reflection?: ShapeChoice<ShapeReflection>;
+  glow?: ShapeChoice<ShapeGlow>;
   direction: "ltr" | "rtl";
   metrics: Metrics;
   inlineAdvance: number;
@@ -473,9 +485,12 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
         appearance = normalizeShapeStyle({
           ...(segment.fill !== undefined ? { fill: segment.fill } : {}),
           ...(segment.line !== undefined ? { line: segment.line } : {}),
+          ...(segment.shadow !== undefined ? { shadow: segment.shadow } : {}),
+          ...(segment.reflection !== undefined ? { reflection: segment.reflection } : {}),
+          ...(segment.glow !== undefined ? { glow: segment.glow } : {}),
         });
       } catch {
-        fail("invalid-input", "Attributed glyph fill/outline is invalid.");
+        fail("invalid-input", "Attributed glyph appearance is invalid.");
       }
       const appearanceKey = JSON.stringify(appearance ?? {});
       segmentBytes += 512 + segment.font.family.length * 2 + appearanceKey.length * 2;
@@ -608,6 +623,9 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
           ...(segment.color !== undefined ? { color: segment.color } : {}),
           ...(segment.fill !== undefined ? { fill: segment.fill } : {}),
           ...(segment.line !== undefined ? { line: segment.line } : {}),
+          ...(segment.shadow !== undefined ? { shadow: segment.shadow } : {}),
+          ...(segment.reflection !== undefined ? { reflection: segment.reflection } : {}),
+          ...(segment.glow !== undefined ? { glow: segment.glow } : {}),
           direction,
           metrics,
           inlineAdvance: upright ? resolvedNormal.lineAdvance : metrics.width,
@@ -957,6 +975,9 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
         ...(piece.color !== undefined ? { color: piece.color } : {}),
         ...(piece.fill !== undefined ? { fill: piece.fill } : {}),
         ...(piece.line !== undefined ? { line: piece.line } : {}),
+        ...(piece.shadow !== undefined ? { shadow: piece.shadow } : {}),
+        ...(piece.reflection !== undefined ? { reflection: piece.reflection } : {}),
+        ...(piece.glow !== undefined ? { glow: piece.glow } : {}),
         direction: piece.direction,
         x,
         y,

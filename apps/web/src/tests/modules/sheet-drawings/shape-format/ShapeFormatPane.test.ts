@@ -1068,3 +1068,33 @@ describe("existing WordArt style and clear controls", () => {
     expect(wrapper.get("[data-clear-wordart-effects-help]").text()).toContain("二维角度");
   });
 });
+
+test.each(["selection", "caret"] as const)(
+  "WordArt %s gallery describes the exact local scope",
+  (scope) => {
+    const state: ShapeFormatSnapshot = {
+      ...snapshot(),
+      drawing: { ...framedShape(), id: "shape", wordArt: true },
+      wordArtStyleEditingScope: scope,
+      mixedWordArtStyle: scope === "selection",
+    };
+    const { wrapper } = fixture({
+      snapshot: state,
+      capabilities: {
+        ...capabilities,
+        wordArtStyle: { enabled: true },
+        clearWordArtEffects: { enabled: false, reason: "Apply first" },
+      },
+      initialTab: "text-fill-line",
+    });
+    const help = wrapper.get("[data-wordart-style-help]").text();
+    expect(help).toContain(
+      scope === "selection" ? "only the selected text" : "new text at the caret",
+    );
+    expect(help).toContain("shadow, reflection and glow");
+    expect(help).not.toContain("glyph 3-D effects");
+    expect(wrapper.get("[data-clear-wordart-effects]").attributes("disabled")).toBeDefined();
+    if (scope === "selection")
+      expect(wrapper.get("[data-wordart-style-mixed]").text()).toContain("Selected characters");
+  },
+);

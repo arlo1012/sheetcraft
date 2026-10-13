@@ -266,6 +266,9 @@ function shadowGeometry(
   return geometry;
 }
 
+/** Shared frame-relative anchors for glyph subset effects; uses the existing compositor geometry. */
+export { shadowGeometry as getDetailedPictureShadowGeometry };
+
 /** Pure, bounded preflight. Bounds are appearance-only and never change the durable frame.
  * Density is reduced uniformly to respect both finite filter support and aggregate memory.
  * Missing metadata still returns the correct appearance bounds for placeholder/culling use. */

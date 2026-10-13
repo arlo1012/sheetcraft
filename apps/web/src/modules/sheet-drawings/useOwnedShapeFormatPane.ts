@@ -489,6 +489,13 @@ export function useOwnedShapeFormatPane(options: {
           next = withoutDrawingShapeTextCharacterProperties(next, ["color", "fill"]);
         if (intent.target === "text" && intent.category === "line")
           next = withoutDrawingShapeTextCharacterProperties(next, ["line"]);
+        if (
+          intent.target === "text" &&
+          (intent.category === "shadow" ||
+            intent.category === "reflection" ||
+            intent.category === "glow")
+        )
+          next = withoutDrawingShapeTextCharacterProperties(next, [intent.category]);
         const text =
           intent.target === "text" && intent.category !== "rotation3d"
             ? materializeDrawingShapeText(next)

@@ -117,6 +117,7 @@ export interface ShapeFormatSnapshot {
   /** Actual modern WordArt or retained-warp text leaves in the selected scope. */
   textWarpScope?: Readonly<{ eligibleCount: number; descendantCount: number }>;
   /** Exact canonical preset readback; omitted when customized or mixed. */
+  wordArtStyleEditingScope?: "selection" | "caret";
   wordArtStyleId?: string;
   mixedWordArtStyle?: boolean;
   /** Only actual modern WordArt leaves are eligible for preset reapply and clear. */

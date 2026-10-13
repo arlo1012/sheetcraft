@@ -7,6 +7,8 @@ import {
   clearWordArtEffects,
   getAppliedWordArtStyleId,
   isWordArtStyleTarget,
+  materializeWordArtCharacterStylePreset,
+  getSelectedWordArtStyleId,
 } from "../../../modules/sheet-drawings/wordart-style-application";
 import {
   WORDART_STYLE_PRESETS,
@@ -122,4 +124,57 @@ test("ordinary retained warp, legacy kind and forged preset do not opt in or mut
     isWordArtStyleTarget(createGraphicDrawing("old", "wordArt", "Old", { row: 0, column: 0 })),
   ).toBe(false);
   expect(() => applyWordArtStylePreset(fixture(), "unknown")).toThrow();
+});
+
+test.each(WORDART_STYLE_PRESETS)(
+  "selection recipe $id is fresh and owns only five local categories",
+  (preset) => {
+    const local = materializeWordArtCharacterStylePreset(preset.id);
+    expect(Object.keys(local).sort()).toEqual(["fill", "glow", "line", "reflection", "shadow"]);
+    expect(local).toEqual({
+      fill: preset.style.fill,
+      line: preset.style.line,
+      shadow: preset.style.shadow,
+      reflection: preset.style.reflection,
+      glow: preset.style.glow,
+    });
+    expect(getSelectedWordArtStyleId([local, { ...local, bold: true, fontSize: 80 }])).toBe(
+      preset.id,
+    );
+    expect(
+      getSelectedWordArtStyleId([
+        local,
+        materializeWordArtCharacterStylePreset(
+          preset.id === "neutral-solid" ? "black-soft-shadow" : "neutral-solid",
+        ),
+      ]),
+    ).toBeUndefined();
+    if (local.shadow?.kind === "value") local.shadow.value.opacity = 0;
+    expect(preset.style).toEqual(materializeWordArtStylePreset(preset.id));
+  },
+);
+test("object reapply and Clear strip every local recipe effect but keep authored fonts", () => {
+  const shape = fixture();
+  Object.assign(
+    shape.shapeText!.characterRuns![0]!,
+    materializeWordArtCharacterStylePreset("black-soft-shadow"),
+  );
+  const before = structuredClone(shape);
+  for (const next of [
+    applyWordArtStylePreset(shape, "neutral-solid"),
+    clearWordArtEffects(shape),
+  ]) {
+    expect(next.shapeText!.characterRuns![0]).toEqual({
+      start: 0,
+      end: 6,
+      fontFamily: "Noto Serif",
+      fontSize: 64,
+      bold: false,
+      italic: true,
+      underline: true,
+    });
+  }
+  expect(shape).toEqual(before);
+  expect(getAppliedWordArtStyleId(shape)).toBeUndefined();
+  expect(getSelectedWordArtStyleId([])).toBeUndefined();
 });

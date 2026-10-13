@@ -1,4 +1,8 @@
-import { getAppliedWordArtStyleId, isWordArtStyleTarget } from "./wordart-style-application";
+import {
+  getSelectedWordArtStyleId,
+  materializeWordArtCharacterStylePreset,
+  isWordArtStyleTarget,
+} from "./wordart-style-application";
 import { computed, shallowRef } from "vue";
 import {
   getShapeTextCharacterSegments,
@@ -105,8 +109,8 @@ export function useShapeTextCharacterFormatPane(options: {
         });
     }
     const textStyle: ShapeDetailedStyle = { ...resolveShapeTextPaintStyle(drawing) };
-    const mixedStyles: ("fill" | "line")[] = [];
-    for (const category of ["fill", "line"] as const) {
+    const mixedStyles: ("fill" | "line" | "shadow" | "reflection" | "glow")[] = [];
+    for (const category of ["fill", "line", "shadow", "reflection", "glow"] as const) {
       const effective = candidates.map((entry) =>
         category === "fill" && entry.color !== undefined
           ? entry.color === "transparent"
@@ -142,12 +146,14 @@ export function useShapeTextCharacterFormatPane(options: {
       values,
       mixedFields,
       scopeDescription: chinese
-        ? `${start === end ? "字体、文字填充和轮廓用于光标处新输入的文字" : "字体、文字填充和轮廓仅用于选中的文字"}；段落、文本框和文字转换设置请先应用文字，再修改。`
-        : `${start === end ? "Font, text fill and outline apply to new text at the caret" : "Font, text fill and outline apply only to selected characters"}. Apply the text before changing paragraph, text-box or text-transform settings.`,
+        ? `${start === end ? "字体、文字填充、轮廓及可用局部效果用于光标处新输入的文字" : "字体、文字填充、轮廓及可用局部效果仅用于选中的文字"}；段落、文本框和文字转换设置请先应用文字，再修改。`
+        : `${start === end ? "Font, text fill, outline and available local effects apply to new text at the caret" : "Font, text fill, outline and available local effects apply only to selected characters"}. Apply the text before changing paragraph, text-box or text-transform settings.`,
       textStyle,
       ...(isWordArtStyleTarget(drawing)
         ? {
-            wordArtStyleId: getAppliedWordArtStyleId(drawing),
+            wordArtStyleId: getSelectedWordArtStyleId(candidates),
+            mixedWordArtStyle: mixedStyles.length > 0,
+            wordArtStyleEditingScope: start === end ? ("caret" as const) : ("selection" as const),
             wordArtStyleScope: { eligibleCount: 1, descendantCount: 1 },
           }
         : {}),
@@ -160,7 +166,12 @@ export function useShapeTextCharacterFormatPane(options: {
   });
   const capabilities = computed<ShapeFormatCapabilities>(() => {
     const state = options.getSnapshot(),
-      enabled = !!state && !state.error && !state.stale && !state.composing;
+      enabled = !!state && !state.error && !state.stale && !state.composing,
+      localEffects = !!state && isWordArtStyleTarget(state.draftView);
+    const localCategory = (category: string) =>
+      category === "fill" ||
+      category === "line" ||
+      (localEffects && (category === "shadow" || category === "reflection" || category === "glow"));
     const reason =
       options.getLocale() === "zh-CN"
         ? "请先应用文字，再修改形状外观、段落布局或高级文字效果。"
@@ -214,15 +225,15 @@ export function useShapeTextCharacterFormatPane(options: {
           ].map((category) => [
             category,
             {
-              enabled: enabled && (category === "fill" || category === "line"),
-              reason: enabled && (category === "fill" || category === "line") ? undefined : reason,
+              enabled: enabled && localCategory(category),
+              reason: enabled && localCategory(category) ? undefined : reason,
             },
           ]),
         ),
       },
       ...(state && isWordArtStyleTarget(state.draftView)
         ? {
-            wordArtStyle: { enabled: false, reason },
+            wordArtStyle: { enabled, reason: enabled ? undefined : reason },
             clearWordArtEffects: { enabled: false, reason },
           }
         : {}),
@@ -255,13 +266,29 @@ export function useShapeTextCharacterFormatPane(options: {
             ? intent.value === undefined
               ? callbacks.format({}, ["line"])
               : callbacks.format({ line: intent.value })
-            : false
-        : intent.type === "set-field" && capabilities.value.fields[intent.field]?.enabled === true
-          ? callbacks.editField(intent.field, intent.value)
-          : intent.type === "set-text-margins" &&
-              capabilities.value.fields.textMarginLeftPt?.enabled === true
-            ? callbacks.setMargins(intent.value)
-            : false;
+            : intent.category === "shadow" ||
+                intent.category === "reflection" ||
+                intent.category === "glow"
+              ? intent.value === undefined
+                ? callbacks.format({}, [intent.category])
+                : callbacks.format({ [intent.category]: intent.value })
+              : false
+        : intent.type === "set-wordart-style" && capabilities.value.wordArtStyle?.enabled === true
+          ? (() => {
+              try {
+                return callbacks.format(materializeWordArtCharacterStylePreset(intent.presetId), [
+                  "color",
+                ]);
+              } catch {
+                return false;
+              }
+            })()
+          : intent.type === "set-field" && capabilities.value.fields[intent.field]?.enabled === true
+            ? callbacks.editField(intent.field, intent.value)
+            : intent.type === "set-text-margins" &&
+                capabilities.value.fields.textMarginLeftPt?.enabled === true
+              ? callbacks.setMargins(intent.value)
+              : false;
     if (!accepted) return false;
     const next = options.getSnapshot();
     if (next?.sessionId === state.sessionId)

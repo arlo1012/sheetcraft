@@ -1,4 +1,5 @@
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ShapeTextCharacterFormat } from "@sheetcraft/core/shape-text-character-runs";
 import { normalizeShapeStyle } from "@sheetcraft/core/shape-style";
 import {
   materializeDrawingShapeText,
@@ -13,7 +14,14 @@ export function isWordArtStyleTarget(drawing: SheetGraphicDrawing): boolean {
 
 function source(drawing: SheetGraphicDrawing): SheetGraphicDrawing {
   if (!isWordArtStyleTarget(drawing)) throw new TypeError("A modern WordArt owner is required.");
-  return withoutDrawingShapeTextCharacterProperties(drawing, ["color", "fill", "line"]);
+  return withoutDrawingShapeTextCharacterProperties(drawing, [
+    "color",
+    "fill",
+    "line",
+    "shadow",
+    "reflection",
+    "glow",
+  ]);
 }
 
 /** The explicit recipe replaces glyph appearance, never text, typography or placement. */
@@ -54,10 +62,64 @@ export function getAppliedWordArtStyleId(drawing: SheetGraphicDrawing): string |
   const text = materializeDrawingShapeText(drawing);
   if (
     text.characterRuns?.some(
-      (run) => run.color !== undefined || run.fill !== undefined || run.line !== undefined,
+      (run) =>
+        run.color !== undefined ||
+        run.fill !== undefined ||
+        run.line !== undefined ||
+        run.shadow !== undefined ||
+        run.reflection !== undefined ||
+        run.glow !== undefined,
     )
   )
     return;
   const current = JSON.stringify(normalizeShapeStyle(text.style));
   return WORDART_STYLE_PRESETS.find((preset) => JSON.stringify(preset.style) === current)?.id;
+}
+
+/** A selection recipe owns only these supported local glyph categories. */
+export function materializeWordArtCharacterStylePreset(presetId: string): ShapeTextCharacterFormat {
+  const style = materializeWordArtStylePreset(presetId);
+  return {
+    fill: style.fill,
+    line: style.line,
+    shadow: style.shadow,
+    reflection: style.reflection,
+    glow: style.glow,
+  };
+}
+
+/** Read the effective selected/caret categories; typography never chooses an appearance tile. */
+export function getSelectedWordArtStyleId(
+  candidates: readonly ShapeTextCharacterFormat[],
+): string | undefined {
+  if (!candidates.length) return;
+  function appearance(value: ShapeTextCharacterFormat) {
+    const fill =
+      value.color !== undefined
+        ? value.color === "transparent"
+          ? { kind: "none" as const }
+          : {
+              kind: "value" as const,
+              value: {
+                kind: "solid" as const,
+                color: { kind: "rgb" as const, rgb: value.color.toUpperCase() },
+                opacity: 1,
+              },
+            }
+        : value.fill;
+    return JSON.stringify(
+      normalizeShapeStyle({
+        fill,
+        line: value.line,
+        shadow: value.shadow,
+        reflection: value.reflection,
+        glow: value.glow,
+      }),
+    );
+  }
+  const first = appearance(candidates[0]!);
+  if (!candidates.every((value) => appearance(value) === first)) return;
+  return WORDART_STYLE_PRESETS.find(
+    (preset) => appearance(materializeWordArtCharacterStylePreset(preset.id)) === first,
+  )?.id;
 }

@@ -302,6 +302,8 @@ export type WorkbookSnapshotV69 = Omit<WorkbookSnapshotV68, "version"> & { versi
 export type WorkbookSnapshotV70 = Omit<WorkbookSnapshotV69, "version"> & { version: 70 };
 /** Sparse standard text-warp geometry on ordinary shape and text-box glyphs. */
 export type WorkbookSnapshotV71 = Omit<WorkbookSnapshotV70, "version"> & { version: 71 };
+/** Sparse local glyph shadow, reflection and glow choices, including explicit None. */
+export type WorkbookSnapshotV72 = Omit<WorkbookSnapshotV71, "version"> & { version: 72 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -331,8 +333,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV68
   | WorkbookSnapshotV69
   | WorkbookSnapshotV70
-  | WorkbookSnapshotV71;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV71, "version"> & {
+  | WorkbookSnapshotV71
+  | WorkbookSnapshotV72;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV72, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -422,7 +425,8 @@ type SnapshotVersion =
   | 68
   | 69
   | 70
-  | 71;
+  | 71
+  | 72;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -459,12 +463,14 @@ function inspectShapeSnapshotFeatures(
   hasOpenArea: boolean;
   hasModernWordArt: boolean;
   hasTextWarp: boolean;
+  hasCharacterEffects: boolean;
 } {
   let hasScene = false,
     hasTextBox3d = false,
     hasOpenArea = false,
     hasModernWordArt = false,
-    hasTextWarp = false;
+    hasTextWarp = false,
+    hasCharacterEffects = false;
   const pending: { value: unknown; depth: number }[] = [{ value, depth: 0 }];
   const seen = new WeakSet<object>();
   let count = 0;
@@ -499,13 +505,24 @@ function inspectShapeSnapshotFeatures(
             SHAPE_TEXT_CHARACTER_LIMITS.runs,
           );
           for (const run of runs) {
-            if (!run || typeof run !== "object" || (!("fill" in run) && !("line" in run))) continue;
-            if (version !== undefined && version < 70)
-              return fail(
-                path,
-                "Local shape character fill and outline require snapshot version 70.",
-              );
-            hasModernWordArt = true;
+            if (!run || typeof run !== "object") continue;
+            for (const key of ["shadow", "reflection", "glow"] as const) {
+              if (!(key in run)) continue;
+              if (version !== undefined && version < 72)
+                return fail(
+                  `${path}.shapeText.characterRuns.${key}`,
+                  "Local shape character shadow, reflection and glow require snapshot version 72.",
+                );
+              hasCharacterEffects = true;
+            }
+            if ("fill" in run || "line" in run) {
+              if (version !== undefined && version < 70)
+                return fail(
+                  path,
+                  "Local shape character fill and outline require snapshot version 70.",
+                );
+              hasModernWordArt = true;
+            }
           }
         }
       }
@@ -560,7 +577,14 @@ function inspectShapeSnapshotFeatures(
     if (error instanceof WorkbookDomainError) throw error;
     return fail(path, error instanceof Error ? error.message : "Invalid shape group 3D.");
   }
-  return { hasScene, hasTextBox3d, hasOpenArea, hasModernWordArt, hasTextWarp };
+  return {
+    hasScene,
+    hasTextBox3d,
+    hasOpenArea,
+    hasModernWordArt,
+    hasTextWarp,
+    hasCharacterEffects,
+  };
 }
 
 /** Raw admission is bounded and descriptor-safe, including nested malformed owner graphs. */
@@ -1656,6 +1680,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   let hasOpenShapeArea = false;
   let hasModernWordArt = false;
   let hasTextWarp = false;
+  let hasShapeCharacterEffects = false;
   // Inspect presence before old protocols can silently drop a shape-only feature.
   if (Array.isArray(record.drawings)) {
     for (const [index, drawing] of record.drawings.entries()) {
@@ -1670,6 +1695,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       hasOpenShapeArea ||= scene.hasOpenArea;
       hasModernWordArt ||= scene.hasModernWordArt;
       hasTextWarp ||= scene.hasTextWarp;
+      hasShapeCharacterEffects ||= scene.hasCharacterEffects;
       const oldTextField = Object.getOwnPropertyDescriptor(item, "shapeText");
       if (
         "shapeText" in item &&
@@ -2060,6 +2086,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasOpenShapeArea) version = 69;
     if (hasModernWordArt) version = 70;
     if (hasTextWarp) version = 71;
+    if (hasShapeCharacterEffects) version = 72;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -2354,6 +2381,15 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 71;
+  // Local glyph effects are the final independent maximum; older features cannot lower72.
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasCharacterEffects,
+      ),
+    )
+  )
+    snapshot.version = 72;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -2432,7 +2468,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 68 &&
     record.version !== 69 &&
     record.version !== 70 &&
-    record.version !== 71
+    record.version !== 71 &&
+    record.version !== 72
   ) {
     throw new WorkbookDomainError(
       {

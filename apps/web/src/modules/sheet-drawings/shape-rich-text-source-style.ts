@@ -72,5 +72,9 @@ export function shapeRichTextSourceStyle(
     previewDiffers ||=
       line.paint.kind !== "solid" || line.compound !== "single" || line.dash !== "solid";
   }
+  previewDiffers ||=
+    format.shadow?.kind === "value" ||
+    format.reflection?.kind === "value" ||
+    format.glow?.kind === "value";
   return { style, previewDiffers };
 }

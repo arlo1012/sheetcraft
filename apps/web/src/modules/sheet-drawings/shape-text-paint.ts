@@ -14,6 +14,7 @@ import {
 import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import {
   createDetailedPicturePaintSurface,
+  getDetailedPictureShadowGeometry,
   createDetailedPictureRaster,
   planDetailedPictureRaster,
   PicturePaintAssetReadError,
@@ -29,14 +30,24 @@ import {
   type PicturePaintResources,
 } from "../../shared/images/picture-detailed-render";
 import {
+  expandPictureEffectBounds,
   getPictureLineDashIntervals,
+  getPictureReflectionBounds,
+  getPictureShadowBounds,
+  integerPictureEffectBounds,
   type PictureEffectBounds,
 } from "../../shared/images/picture-effect-geometry";
 import {
+  createPictureGlowLayer,
+  createPictureReflectionLayer,
   createPictureRgbaSurface,
+  createPictureShadowLayer,
+  pictureAlphaMaskFromSurface,
+  type PictureRasterLayer,
   softenPictureEdges,
   type PictureRgbaSurface,
 } from "../../shared/images/picture-effect-raster";
+import { resolvePictureColor } from "../../shared/images/picture-paint-color";
 import { createPictureProjectiveGeometry } from "../../shared/images/picture-projective-geometry";
 import { projectPictureShapePoint } from "../../shared/images/picture-shape-extrusion";
 import {
@@ -87,6 +98,13 @@ type ShapeTextFillSpan = Readonly<{
   fill?: ShapePaint;
 }>;
 type ShapeTextLineSpan = Readonly<{ start: number; end: number; line?: ShapeLine }>;
+type ShapeTextEffectStyle = Pick<ShapeDetailedStyle, "shadow" | "reflection" | "glow">;
+type ShapeTextEffectSpan = Readonly<{
+  start: number;
+  end: number;
+  /** Resolved sparse tuple: absence inherited before batching, explicit None stays None. */
+  style: ShapeTextEffectStyle;
+}>;
 type ShapeTextPaintSource = Readonly<{
   runs: readonly Readonly<ShapeTextRun>[];
   clipRect: Readonly<ShapeTextRect> | null;
@@ -99,6 +117,8 @@ type ShapeTextPaintSource = Readonly<{
   lineSpans: readonly ShapeTextLineSpan[];
   attributedFill: boolean;
   attributedLine: boolean;
+  attributedEffects: boolean;
+  effectSpans: readonly ShapeTextEffectSpan[];
   /** Conservative visible glyph/decoration envelope, before glyph effects or body projection. */
   sourceBounds: PictureEffectBounds;
   /** Effects contain no fill/line/body categories. Native glyph paint is a separate source. */
@@ -134,6 +154,7 @@ export type ShapeTextGlyphBudgetPreflight =
       /** This result proves glyph budgets; normal paint-resource availability stays separate. */
       proof:
         | "numeric-source"
+        | "painted-alpha-character-effects"
         | "native-alpha-outline"
         | "native-alpha-warp"
         | "painted-alpha-projection";
@@ -293,16 +314,22 @@ function prepareSource(options: ShapeTextPaintOptions) {
   if (layout.clipRect) checkRect(layout.clipRect);
   let units = 0,
     appearanceBytes = 0,
+    effectTupleBytes = 0,
     source: PictureEffectBounds | undefined;
   const attributedFill = layout.runs.some(
       (run) => run.color !== undefined || run.fill !== undefined,
     ),
     attributedLine = layout.runs.some((run) => run.line !== undefined),
+    attributedEffects = layout.runs.some(
+      (run) => run.shadow !== undefined || run.reflection !== undefined || run.glow !== undefined,
+    ),
     hasRunAppearance = layout.runs.some((run) => run.fill !== undefined || run.line !== undefined),
     fillSpans: ShapeTextFillSpan[] = [],
-    lineSpans: ShapeTextLineSpan[] = [];
+    lineSpans: ShapeTextLineSpan[] = [],
+    effectSpans: ShapeTextEffectSpan[] = [];
   let previousFillKey: string | undefined,
     previousLineKey: string | undefined,
+    previousEffectKey: string | undefined,
     contourRequired = false;
   const underline = options.drawing.shapeText?.underline === true,
     strike = options.drawing.shapeText?.strike === true;
@@ -342,6 +369,9 @@ function prepareSource(options: ShapeTextPaintOptions) {
         normalizeShapeStyle({
           ...(run.fill !== undefined ? { fill: run.fill } : {}),
           ...(run.line !== undefined ? { line: run.line } : {}),
+          ...(run.shadow !== undefined ? { shadow: run.shadow } : {}),
+          ...(run.reflection !== undefined ? { reflection: run.reflection } : {}),
+          ...(run.glow !== undefined ? { glow: run.glow } : {}),
         }) ?? {};
       freezeAppearance(appearance);
       appearanceBytes += JSON.stringify(appearance).length * 8;
@@ -370,6 +400,31 @@ function prepareSource(options: ShapeTextPaintOptions) {
       if (previousLine && previousLineKey === lineKey)
         lineSpans[lineSpans.length - 1] = { ...previousLine, end: index + 1 };
       else lineSpans.push({ start: index, end: index + 1, ...(line ? { line } : {}) });
+      if (attributedEffects) {
+        const effectStyle: ShapeTextEffectStyle = {
+          ...((appearance.shadow ?? style.shadow)
+            ? { shadow: appearance.shadow ?? style.shadow }
+            : {}),
+          ...((appearance.reflection ?? style.reflection)
+            ? { reflection: appearance.reflection ?? style.reflection }
+            : {}),
+          ...((appearance.glow ?? style.glow) ? { glow: appearance.glow ?? style.glow } : {}),
+        };
+        freezeAppearance(effectStyle);
+        const effectKey = JSON.stringify(effectStyle),
+          previous = effectSpans.at(-1);
+        if (previous && previousEffectKey === effectKey)
+          effectSpans[effectSpans.length - 1] = { ...previous, end: index + 1 };
+        else {
+          effectTupleBytes += effectKey.length * 8 + 128;
+          if (appearanceBytes + effectTupleBytes > SHAPE_TEXT_PAINT_LIMITS.memoryBytes / 4)
+            throw new ShapeTextPaintPreflightError(
+              "Glyph character effect tuples exceed their numeric memory budget.",
+            );
+          effectSpans.push({ start: index, end: index + 1, style: effectStyle });
+        }
+        previousEffectKey = effectKey;
+      }
       previousFillKey = fillKey;
       previousLineKey = lineKey;
       contourRequired ||= richLine(line);
@@ -423,6 +478,14 @@ function prepareSource(options: ShapeTextPaintOptions) {
       ...(style.format3d ? { format3d: style.format3d } : {}),
       ...(style.rotation3d ? { rotation3d: style.rotation3d } : {}),
     }) ?? {};
+  if (attributedEffects && requiresGlyphProjection)
+    throw new ShapeTextPaintPreflightError(
+      "Per-character shadow, reflection and glow cannot be combined with text 3D format or rotation. Remove text 3D before applying character effects.",
+    );
+  if (attributedEffects && style.softEdges?.kind === "value" && style.softEdges.value.sizePt > 0)
+    throw new ShapeTextPaintPreflightError(
+      "Per-character shadow, reflection and glow cannot be combined with shared text soft edges. Remove text soft edges before applying character effects.",
+    );
   return {
     runs,
     underline,
@@ -434,11 +497,13 @@ function prepareSource(options: ShapeTextPaintOptions) {
     lineSpans: Object.freeze(lineSpans.map((span) => Object.freeze(span))),
     attributedFill,
     attributedLine,
+    attributedEffects,
+    effectSpans: Object.freeze(effectSpans.map((span) => Object.freeze(span))),
     effectStyle,
     sourceBounds: source,
     contourRequired,
     requiresGlyphProjection,
-    sourceNumericBytes: runs.length * 640 + units * 4 + appearanceBytes + 8192,
+    sourceNumericBytes: runs.length * 640 + units * 4 + appearanceBytes + effectTupleBytes + 8192,
     warpPlan: undefined as ShapeTextWarpPlan | undefined,
   };
 }
@@ -565,6 +630,158 @@ function conservativeGlyphProjection(
       throw new TypeError("A conservative glyph envelope must never render pixels.");
     },
   };
+}
+
+/** Settle all character-effect envelopes at ONE shared density before any native
+ * allocation. Whole-front bounds are conservative subset support and preserve
+ * frame-relative shadow anchors and one common reflection baseline. */
+function planCharacterEffectsRaster(
+  options: PictureDetailedRasterPlanOptions,
+  spans: readonly ShapeTextEffectSpan[],
+): PictureDetailedRasterPlan {
+  let density = options.pixelDensity;
+  for (const { style } of spans) {
+    const shadow = style.shadow?.kind === "value" ? style.shadow.value : undefined,
+      reflection = style.reflection?.kind === "value" ? style.reflection.value : undefined,
+      glow = style.glow?.kind === "value" ? style.glow.value : undefined;
+    const radius =
+      (Math.max(
+        shadow && shadow.opacity > 0 ? shadow.blurPt : 0,
+        reflection && reflection.opacity > 0 && reflection.size > 0 ? reflection.blurPt : 0,
+        glow && glow.opacity > 0 ? glow.sizePt : 0,
+      ) *
+        4) /
+      3;
+    const distance =
+      (Math.max(
+        shadow && shadow.opacity > 0 ? shadow.distancePt : 0,
+        reflection && reflection.opacity > 0 && reflection.size > 0 ? reflection.distancePt : 0,
+      ) *
+        4) /
+      3;
+    density = Math.min(
+      density,
+      radius > 0 ? 256 / radius : Infinity,
+      distance > 0 ? 4096 / distance : Infinity,
+    );
+  }
+  for (let attempt = 0; attempt < 32; attempt++) {
+    const base = planDetailedPictureRaster({ ...options, pixelDensity: density, style: {} });
+    density = base.actualDensity;
+    const body = base.bodyBoundsRaster,
+      local = { left: 0, top: 0, right: base.bodyWidthRaster, bottom: base.bodyHeightRaster };
+    let output = body,
+      maxPixels = base.frontWidthRaster * base.frontHeightRaster,
+      maxSide = Math.max(base.frontWidthRaster, base.frontHeightRaster);
+    const add = (extent: PictureEffectBounds | null) => {
+      if (!extent) return;
+      const rounded = integerPictureEffectBounds(extent);
+      maxPixels = Math.max(
+        maxPixels,
+        (rounded.right - rounded.left) * (rounded.bottom - rounded.top),
+      );
+      maxSide = Math.max(maxSide, rounded.right - rounded.left, rounded.bottom - rounded.top);
+      output = union(output, {
+        left: rounded.left + body.left,
+        top: rounded.top + body.top,
+        right: rounded.right + body.left,
+        bottom: rounded.bottom + body.top,
+      });
+    };
+    for (const { style } of spans) {
+      const shadow = style.shadow?.kind === "value" ? style.shadow.value : undefined,
+        reflection = style.reflection?.kind === "value" ? style.reflection.value : undefined,
+        glow = style.glow?.kind === "value" ? style.glow.value : undefined;
+      if (shadow && shadow.opacity > 0) {
+        const geometry = getDetailedPictureShadowGeometry(
+          shadow,
+          density,
+          options.widthPx * density,
+          options.heightPx * density,
+          body,
+        );
+        add(getPictureShadowBounds(local, geometry));
+        if (shadow.kind === "inner") {
+          const scratch = expandPictureEffectBounds(local, Math.ceil(geometry.blurRadiusPx));
+          maxPixels = Math.max(
+            maxPixels,
+            (scratch.right - scratch.left) * (scratch.bottom - scratch.top),
+          );
+          maxSide = Math.max(maxSide, scratch.right - scratch.left, scratch.bottom - scratch.top);
+        }
+      }
+      if (glow && glow.opacity > 0 && glow.sizePt > 0)
+        add(expandPictureEffectBounds(local, Math.ceil(((glow.sizePt * 4) / 3) * density)));
+      if (reflection && reflection.opacity > 0 && reflection.size > 0)
+        add(
+          getPictureReflectionBounds(
+            local,
+            reflection.size,
+            ((reflection.distancePt * 4) / 3) * density,
+            ((reflection.blurPt * 4) / 3) * density,
+          ),
+        );
+    }
+    output = integerPictureEffectBounds(output);
+    const widthRaster = output.right - output.left,
+      heightRaster = output.bottom - output.top;
+    maxPixels = Math.max(maxPixels, widthRaster * heightRaster);
+    maxSide = Math.max(maxSide, widthRaster, heightRaster);
+    // Category buffers, detached readback, masks and one reused effect operation.
+    const estimatedPeakBytes = maxPixels * 64 + 4096,
+      ratio = Math.min(
+        1,
+        SHAPE_TEXT_PAINT_LIMITS.side / maxSide,
+        Math.sqrt(SHAPE_TEXT_PAINT_LIMITS.pixels / maxPixels),
+        Math.sqrt(
+          Math.max(0, (options.limits?.memoryBytes ?? SHAPE_TEXT_PAINT_LIMITS.memoryBytes) - 4096) /
+            (maxPixels * 64),
+        ),
+      );
+    if (ratio < 1) {
+      density *= ratio * 0.99;
+      continue;
+    }
+    return {
+      ...base,
+      style: options.style,
+      outputBoundsRaster: output,
+      widthRaster,
+      heightRaster,
+      logicalBounds: {
+        left: output.left / density,
+        top: output.top / density,
+        right: output.right / density,
+        bottom: output.bottom / density,
+      },
+      estimatedPeakBytes,
+    };
+  }
+  throw new ShapeTextPaintPreflightError(
+    "Per-character effects cannot settle their bounded union raster density.",
+  );
+}
+
+/** Sorted span intersection keeps subset paint work linear in actual intersections,
+ * rather than effect-count times the entire drawing's appearance span count. */
+function intersectRunSpans<T extends Readonly<{ start: number; end: number }>>(
+  spans: readonly T[],
+  start: number,
+  end: number,
+): T[] {
+  let low = 0,
+    high = spans.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (spans[middle]!.end <= start) low = middle + 1;
+    else high = middle;
+  }
+  const selected: T[] = [];
+  for (let index = low; index < spans.length && spans[index]!.start < end; index++) {
+    const span = spans[index]!;
+    selected.push({ ...span, start: Math.max(start, span.start), end: Math.min(end, span.end) });
+  }
+  return selected;
 }
 
 /** Pure preflight: no Canvas, font lookup, image decoding or paint callbacks. */
@@ -724,7 +941,7 @@ function planShapeTextPaintAtWarpDensity(
       source.sourceNumericBytes -
       priorAllocatedWarpBytes -
       (source.warpPlan?.proof.estimatedPeakBytes ?? 0)) /
-      1.5,
+      (source.attributedEffects ? 2 : 1.5),
   );
   if (memoryBytes < 8192)
     throw new ShapeTextPaintPreflightError(
@@ -773,7 +990,11 @@ function planShapeTextPaintAtWarpDensity(
       : {}),
     limits: { memoryBytes },
   };
-  let raster = planDetailedPictureRaster(rasterOptions);
+  const planRaster = (rasterOptions: PictureDetailedRasterPlanOptions) =>
+    source.attributedEffects
+      ? planCharacterEffectsRaster(rasterOptions, source.effectSpans)
+      : planDetailedPictureRaster(rasterOptions);
+  let raster = planRaster(rasterOptions);
   if (source.warpPlan && raster.actualDensity < source.warpPlan.rasterDensity * (1 - 1e-9)) {
     if (attempt >= 3)
       throw new ShapeTextPaintPreflightError(
@@ -797,7 +1018,7 @@ function planShapeTextPaintAtWarpDensity(
       right: base.right + padding,
       bottom: base.bottom + padding,
     };
-    raster = planDetailedPictureRaster({ ...rasterOptions, sourceBounds: source.sourceBounds });
+    raster = planRaster({ ...rasterOptions, sourceBounds: source.sourceBounds });
     if (padding * raster.actualDensity < 2)
       throw new ShapeTextPaintPreflightError(
         "Glyph contour reconstruction cannot fit its conservative bounds budget.",
@@ -829,8 +1050,47 @@ function planShapeTextPaintAtWarpDensity(
         "Attributed glyph fill/outline exceeds its bounded raster-span work budget.",
       );
   }
+  if (source.attributedEffects) {
+    let maskPasses =
+        1 +
+        (source.attributedFill ? source.fillSpans.length : 0) +
+        source.lineSpans.filter((span) => visibleLine(span.line)).length,
+      scans =
+        8 +
+        (source.attributedFill ? source.fillSpans.length * 8 : 0) +
+        source.lineSpans.filter((span) => visibleLine(span.line)).length * 16;
+    for (const span of source.effectSpans) {
+      const fills = intersectRunSpans(source.fillSpans, span.start, span.end).filter(
+        (fill) => fill.color !== "transparent" && (fill.color !== undefined || fill.fill),
+      );
+      const lines = intersectRunSpans(source.lineSpans, span.start, span.end).filter((line) =>
+        visibleLine(line.line),
+      );
+      maskPasses += 1 + fills.length + lines.length;
+      // Native clear/read/fill/outline plus own alpha, inner wash and final front.
+      scans += 12 + fills.length * 8 + lines.length * 16;
+      if (span.style.shadow?.kind === "value" && span.style.shadow.value.opacity > 0) scans += 20;
+      if (span.style.glow?.kind === "value" && span.style.glow.value.opacity > 0) scans += 20;
+      if (span.style.reflection?.kind === "value" && span.style.reflection.value.opacity > 0)
+        scans += 24;
+    }
+    const frontPixels = raster.frontWidthRaster * raster.frontHeightRaster,
+      outputPixels = raster.widthRaster * raster.heightRaster,
+      nativeWork = source.warpPlan
+        ? source.warpPlan.proof.preparationWork +
+          source.warpPlan.proof.rasterWork * maskPasses +
+          source.warpPlan.proof.sourceRasterBytes * (maskPasses - 1)
+        : source.runs.reduce((sum, run) => sum + run.text.length * 64, 0) * maskPasses;
+    if (
+      frontPixels * scans + outputPixels * (8 + source.effectSpans.length * 64) + nativeWork >
+      SHAPE_TEXT_PAINT_LIMITS.rasterWork
+    )
+      throw new ShapeTextPaintPreflightError(
+        "Per-character shadow, reflection and glow exceed the aggregate native/effect raster work budget.",
+      );
+  }
   const sourceScratchBytes =
-    raster.frontWidthRaster * raster.frontHeightRaster * 32 +
+    raster.frontWidthRaster * raster.frontHeightRaster * (source.attributedEffects ? 64 : 32) +
     contourBytes +
     source.sourceNumericBytes +
     priorAllocatedWarpBytes +
@@ -1111,6 +1371,172 @@ function over(target: PictureRgbaSurface, input: PictureRgbaSurface): void {
     target.data[index + 3] = alpha * 255;
   }
 }
+/** In-place layer composition. Every offset was settled by the numeric union
+ * plan; clipping here is only to transparent support, never subset ownership. */
+function overAt(
+  target: PictureRgbaSurface,
+  input: PictureRgbaSurface,
+  left: number,
+  top: number,
+): void {
+  if (!Number.isSafeInteger(left) || !Number.isSafeInteger(top))
+    throw new ShapeTextPaintPreflightError(
+      "Character effect layer offsets must be finite integer raster coordinates.",
+    );
+  for (let y = Math.max(0, top); y < Math.min(target.height, top + input.height); y++)
+    for (let x = Math.max(0, left); x < Math.min(target.width, left + input.width); x++) {
+      const source = ((y - top) * input.width + x - left) * 4,
+        index = (y * target.width + x) * 4,
+        sa = input.data[source + 3]! / 255;
+      if (!sa) continue;
+      const da = target.data[index + 3]! / 255,
+        alpha = sa + da * (1 - sa);
+      for (let channel = 0; channel < 3; channel++)
+        target.data[index + channel] =
+          (input.data[source + channel]! * sa + target.data[index + channel]! * da * (1 - sa)) /
+          alpha;
+      target.data[index + 3] = alpha * 255;
+    }
+}
+type OwnedCharacterFront = Readonly<{
+  front: PictureRgbaSurface;
+  fill: PictureRgbaSurface;
+  outline?: PictureRgbaSurface;
+}>;
+function applyOwnedInnerShadow(
+  body: PictureRgbaSurface,
+  shadow: PictureRgbaSurface,
+  owner: PictureRgbaSurface = body,
+): void {
+  if (
+    body.width !== shadow.width ||
+    body.height !== shadow.height ||
+    owner.width !== body.width ||
+    owner.height !== body.height
+  )
+    throw new TypeError("Owned inner shadow must share its genuine glyph front dimensions.");
+  for (let index = 0; index < body.data.length; index += 4) {
+    const alpha = body.data[index + 3]!;
+    if (!alpha) continue;
+    const strength = Math.min(1, shadow.data[index + 3]! / owner.data[index + 3]!);
+    for (let channel = 0; channel < 3; channel++)
+      body.data[index + channel] =
+        body.data[index + channel]! * (1 - strength) + shadow.data[index + channel]! * strength;
+  }
+}
+function paintCharacterEffects(
+  plan: ShapeTextPaintPlan & { kind: "ready" },
+  wholeFront: PictureRgbaSurface,
+  paintOwnedSubset: (start: number, end: number) => OwnedCharacterFront,
+  theme: WorkbookTheme,
+  make: (width: number, height: number) => HTMLCanvasElement,
+): Readonly<{ canvas: HTMLCanvasElement; front: PictureRgbaSurface }> {
+  // A fixed number of category buffers preserves global compositor layer order
+  // while subset scratch is reused. Never retain a canvas/surface per character.
+  const shadows = createPictureRgbaSurface(plan.widthRaster, plan.heightRaster),
+    glows = createPictureRgbaSurface(plan.widthRaster, plan.heightRaster),
+    reflections = createPictureRgbaSurface(plan.widthRaster, plan.heightRaster),
+    filledFront = createPictureRgbaSurface(plan.frontWidthRaster, plan.frontHeightRaster),
+    outlinedFront = createPictureRgbaSurface(plan.frontWidthRaster, plan.frontHeightRaster),
+    innerCoverage = new Uint8Array(plan.frontWidthRaster * plan.frontHeightRaster),
+    left = plan.frontBoundsRaster.left - plan.outputBoundsRaster.left,
+    top = plan.frontBoundsRaster.top - plan.outputBoundsRaster.top;
+  let hasInnerShadow = false;
+  const addLayer = (target: PictureRgbaSurface, layer: PictureRasterLayer | null) => {
+    if (!layer) return;
+    if (
+      left + layer.left < 0 ||
+      top + layer.top < 0 ||
+      left + layer.left + layer.surface.width > plan.widthRaster ||
+      top + layer.top + layer.surface.height > plan.heightRaster
+    )
+      throw new ShapeTextPaintPreflightError(
+        "Character effects escaped their prepared union raster bounds.",
+      );
+    overAt(target, layer.surface, left + layer.left, top + layer.top);
+  };
+  for (const span of plan.effectSpans) {
+    // Repaint the OWNED fill, outline and decorations. Masking the already
+    // composed whole front here would leak another overlapping character.
+    const owned = paintOwnedSubset(span.start, span.end),
+      subset = owned.front,
+      mask = pictureAlphaMaskFromSurface(subset),
+      shadow = span.style.shadow?.kind === "value" ? span.style.shadow.value : undefined,
+      glow = span.style.glow?.kind === "value" ? span.style.glow.value : undefined,
+      reflection =
+        span.style.reflection?.kind === "value" ? span.style.reflection.value : undefined;
+    if (shadow && shadow.opacity > 0) {
+      const layer = createPictureShadowLayer(mask, {
+        ...getDetailedPictureShadowGeometry(
+          shadow,
+          plan.actualDensity,
+          plan.widthPx * plan.actualDensity,
+          plan.heightPx * plan.actualDensity,
+          plan.frontBoundsRaster,
+        ),
+        color: resolvePictureColor(shadow.color, theme),
+        opacity: shadow.opacity,
+      });
+      if (shadow.kind === "inner") {
+        hasInnerShadow = true;
+        if (layer) {
+          // A wash is linear in RGB and leaves alpha unchanged. Use the
+          // combined OWNED alpha for the same wash on its separate fill and
+          // outline, then preserve the established all-fills-before-outlines
+          // ordering when rebuilding only affected front pixels.
+          applyOwnedInnerShadow(owned.fill, layer.surface, subset);
+          if (owned.outline) applyOwnedInnerShadow(owned.outline, layer.surface, subset);
+          applyOwnedInnerShadow(subset, layer.surface);
+          for (let index = 0; index < innerCoverage.length; index++)
+            if (layer.surface.data[index * 4 + 3]) innerCoverage[index] = 1;
+        }
+      } else addLayer(shadows, layer);
+    }
+    if (glow && glow.opacity > 0)
+      addLayer(
+        glows,
+        createPictureGlowLayer(mask, {
+          color: resolvePictureColor(glow.color, theme),
+          opacity: glow.opacity,
+          radiusPx: ((glow.sizePt * 4) / 3) * plan.actualDensity,
+        }),
+      );
+    if (reflection && reflection.opacity > 0 && reflection.size > 0)
+      // Every owned RGBA source uses the SAME whole-front height/baseline.
+      addLayer(
+        reflections,
+        createPictureReflectionLayer(subset, {
+          coverage: reflection.size,
+          opacity: reflection.opacity,
+          gapPx: ((reflection.distancePt * 4) / 3) * plan.actualDensity,
+          blurRadiusPx: ((reflection.blurPt * 4) / 3) * plan.actualDensity,
+        }),
+      );
+    over(filledFront, owned.fill);
+    if (owned.outline) over(outlinedFront, owned.outline);
+  }
+  // The common front is painted exactly once. Without inner wash retain the
+  // existing all-fill-then-all-outline front byte-for-byte, including overlap.
+  let front = wholeFront;
+  if (hasInnerShadow) {
+    over(filledFront, outlinedFront);
+    for (let index = 0; index < wholeFront.data.length; index += 4) {
+      // Uniform translucent fills are one union alpha, not repeated opacity
+      // per effect tuple. An inner wash must never change that existing alpha,
+      // or alter any pixel outside its actual owned inner-shadow support.
+      if (innerCoverage[index / 4] && wholeFront.data[index + 3])
+        wholeFront.data.set(filledFront.data.subarray(index, index + 3), index);
+    }
+    front = wholeFront;
+  }
+  over(shadows, glows);
+  over(shadows, reflections);
+  overAt(shadows, front, left, top);
+  const canvas = make(plan.widthRaster, plan.heightRaster);
+  write(canvas, shadows);
+  return { canvas, front };
+}
+
 /** Compose a single ordered mask without allocating a paint surface per character. */
 function overMaskedFill(
   target: PictureRgbaSurface,
@@ -1466,13 +1892,76 @@ function prepareShapeTextPaintAtDensity(
       }
       release(outlineCanvas);
     }
+    const ownedOutlineTotals: OutlineContourTotals = {
+      contours: 0,
+      edges: 0,
+      points: 0,
+      intervals: 0,
+    };
+    const paintOwnedSubset = (start: number, end: number): OwnedCharacterFront => {
+      const owned = createPictureRgbaSurface(plan.frontWidthRaster, plan.frontHeightRaster);
+      for (const span of intersectRunSpans(plan.fillSpans, start, end)) {
+        if (span.color === "transparent" || (span.color === undefined && !span.fill)) continue;
+        write(maskCanvas, emptyMask);
+        paintMask(plan.runs.slice(span.start, span.end));
+        overMaskedFill(
+          owned,
+          read(maskCanvas),
+          span.fill ? paintSurface(span.fill) : undefined,
+          span.color,
+        );
+      }
+      const ownFill = { ...owned, data: new Uint8ClampedArray(owned.data) };
+      const lines = intersectRunSpans(plan.lineSpans, start, end).filter((span) =>
+        visibleLine(span.line),
+      );
+      const ownOutline = lines.length
+        ? createPictureRgbaSurface(plan.frontWidthRaster, plan.frontHeightRaster)
+        : undefined;
+      if (lines.length) {
+        const canvas = make(plan.frontWidthRaster, plan.frontHeightRaster),
+          context = context2d(canvas);
+        try {
+          for (const span of lines) {
+            const line = span.line!,
+              selected = plan.runs.slice(span.start, span.end);
+            write(canvas, emptyMask);
+            if (richLine(line) || plan.warpPlan) {
+              write(maskCanvas, emptyMask);
+              paintMask(selected, false);
+              const contour = traceGlyphSilhouette(read(maskCanvas));
+              addOutlineContourWork(ownedOutlineTotals, contour, line, plan.actualDensity);
+              strokeShapeGlyphSilhouette(context, contour, line, plan.actualDensity);
+            } else {
+              context.save();
+              try {
+                context.translate(-plan.frontBoundsRaster.left, -plan.frontBoundsRaster.top);
+                context.scale(plan.actualDensity, plan.actualDensity);
+                nativeMask(context, plan, line, true, selected);
+              } finally {
+                context.restore();
+              }
+            }
+            const outlineMask = read(canvas),
+              outline = paintSurface(line.paint);
+            if (richLine(line) || plan.warpPlan) clipMask(outlineMask, plan);
+            masked(outline, outlineMask);
+            over(owned, outline);
+            over(ownOutline!, outline);
+          }
+        } finally {
+          release(canvas);
+        }
+      }
+      return { front: owned, fill: ownFill, ...(ownOutline ? { outline: ownOutline } : {}) };
+    };
     // Match the compositor's order: soft edges first, then text-own3D, then
     // text-owned shadow/glow/reflection. The contour sees that actual front alpha.
     const softEdges =
       plan.effectStyle.softEdges?.kind === "value" ? plan.effectStyle.softEdges.value : undefined;
     if (plan.requiresGlyphProjection && softEdges && softEdges.sizePt > 0)
       source = softenPictureEdges(source, (softEdges.sizePt * 4 * plan.actualDensity) / 3);
-    const composedSilhouette =
+    let composedSilhouette =
       plan.requiresGlyphProjection || options.captureSilhouette
         ? traceGlyphSilhouette(source)
         : undefined;
@@ -1525,37 +2014,46 @@ function prepareShapeTextPaintAtDensity(
       })();
     const sourceCanvas = make(source.width, source.height);
     write(sourceCanvas, source);
+    const characterRaster = plan.attributedEffects
+      ? paintCharacterEffects(plan, source, paintOwnedSubset, theme, make)
+      : undefined;
+    if (characterRaster && options.captureSilhouette)
+      composedSilhouette = traceGlyphSilhouette(characterRaster.front);
+    const raster = characterRaster
+      ? { ...plan, canvas: characterRaster.canvas }
+      : createDetailedPictureRaster({
+          widthPx: options.drawing.width,
+          heightPx: options.drawing.height,
+          pixelDensity: plan.actualDensity,
+          style:
+            plan.requiresGlyphProjection && softEdges
+              ? { ...plan.effectStyle, softEdges: { kind: "none" } }
+              : plan.effectStyle,
+          theme,
+          outerAngleDeg: plan.outerAngleDeg,
+          sourceBounds: plan.sourceBounds,
+          ...projection,
+          limits: { memoryBytes: plan.rasterMemoryBytes },
+          sourcePainter: (context) =>
+            context.drawImage(
+              sourceCanvas,
+              plan.frontBoundsRaster.left / plan.actualDensity,
+              plan.frontBoundsRaster.top / plan.actualDensity,
+              sourceCanvas.width / plan.actualDensity,
+              sourceCanvas.height / plan.actualDensity,
+            ),
+          canvasFactory: () => make(1, 1),
+        });
     release(maskCanvas);
-    const raster = createDetailedPictureRaster({
-      widthPx: options.drawing.width,
-      heightPx: options.drawing.height,
-      pixelDensity: plan.actualDensity,
-      style:
-        plan.requiresGlyphProjection && softEdges
-          ? { ...plan.effectStyle, softEdges: { kind: "none" } }
-          : plan.effectStyle,
-      theme,
-      outerAngleDeg: plan.outerAngleDeg,
-      sourceBounds: plan.sourceBounds,
-      ...projection,
-      limits: { memoryBytes: plan.rasterMemoryBytes },
-      sourcePainter: (context) =>
-        context.drawImage(
-          sourceCanvas,
-          plan.frontBoundsRaster.left / plan.actualDensity,
-          plan.frontBoundsRaster.top / plan.actualDensity,
-          sourceCanvas.width / plan.actualDensity,
-          sourceCanvas.height / plan.actualDensity,
-        ),
-      canvasFactory: () => make(1, 1),
-    });
     if (raster.kind === "unavailable") return { ...plan, ...raster };
     resultCanvas = raster.canvas;
     const renderedPlan = {
       ...plan,
       ...raster,
       assetIds: plan.assetIds,
-      estimatedPeakBytes: raster.estimatedPeakBytes + plan.sourceScratchBytes,
+      estimatedPeakBytes: characterRaster
+        ? plan.estimatedPeakBytes
+        : raster.estimatedPeakBytes + plan.sourceScratchBytes,
     };
     if (cacheable) {
       const pixels = read(resultCanvas),
@@ -1608,7 +2106,8 @@ function prepareShapeTextPaintAtDensity(
  * glyph alpha. The caller must already have resolved the same ready fonts and
  * revalidate its owner/resource revision after this work. No drawing mutation.
  *
- * Ordinary single/solid text has no contour expansion and uses numeric proof.
+ * Ordinary single/solid uniform text has no contour expansion and uses numeric proof.
+ * Attributed shadow/reflection/glow always proves actual owned painted RGBA/effects.
  * Compound/dashed outlines draw native masks and validate real contours/shared
  * dash phases WITHOUT decoding/reading paint assets. For text-own3D, paint alpha
  * can add holes/components (including picture textures), so actual composed
@@ -1636,7 +2135,7 @@ export function preflightShapeTextGlyphBudgets(
     pointCount: silhouette?.pointCount ?? 0,
     glyphCommandCount: commands,
   });
-  if (plan.requiresGlyphProjection || plan.warpPlan) {
+  if (plan.requiresGlyphProjection || plan.warpPlan || plan.attributedEffects) {
     // No cache key: a previously rendered envelope cannot bypass current native
     // glyph/paint-alpha budget proof. Owned output is released in all cases.
     const raster = prepareShapeTextPaint({ ...options, captureSilhouette: true });
@@ -1648,7 +2147,11 @@ export function preflightShapeTextGlyphBudgets(
       };
     try {
       return summary(
-        plan.requiresGlyphProjection ? "painted-alpha-projection" : "native-alpha-warp",
+        plan.requiresGlyphProjection
+          ? "painted-alpha-projection"
+          : plan.attributedEffects
+            ? "painted-alpha-character-effects"
+            : "native-alpha-warp",
         raster.silhouette,
         raster.glyphGeometry?.paths.reduce((sum, path) => sum + path.commands.length, 0) ?? 0,
         raster.actualDensity,

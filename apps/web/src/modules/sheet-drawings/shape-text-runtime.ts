@@ -205,6 +205,9 @@ export function resolveDrawingShapeText(
         ...(segment.color !== undefined ? { color: segment.color } : {}),
         ...(segment.fill !== undefined ? { fill: segment.fill } : {}),
         ...(segment.line !== undefined ? { line: segment.line } : {}),
+        ...(segment.shadow !== undefined ? { shadow: segment.shadow } : {}),
+        ...(segment.reflection !== undefined ? { reflection: segment.reflection } : {}),
+        ...(segment.glow !== undefined ? { glow: segment.glow } : {}),
       }))
     : undefined;
   const normal = options.normalLineMetrics

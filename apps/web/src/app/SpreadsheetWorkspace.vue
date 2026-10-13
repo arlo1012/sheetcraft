@@ -3458,10 +3458,11 @@ function setShowFormulaBar(visible: boolean): void {
 }
 
 function onWorkspaceShapeTextOutsideAction(event: PointerEvent | MouseEvent): void {
+  const current = shapeTextEdit.snapshot.value;
   if (
-    !shapeTextEdit.snapshot.value ||
+    !current ||
     (event.target instanceof Element &&
-      event.target.closest("[data-shape-canvas-text-editor], [data-shape-canvas-text-toolbar]"))
+      event.target.closest(`[data-shape-text-edit-session="${current.sessionId}"]`))
   )
     return;
   if (sheetGridRef.value?.flushPendingShapeTextEdit() === false) {

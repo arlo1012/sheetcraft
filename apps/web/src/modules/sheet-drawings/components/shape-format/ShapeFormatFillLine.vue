@@ -72,7 +72,13 @@ defineExpose({
       data-wordart-style-section
     >
       <p class="shape-format-fill-line__reason" data-wordart-style-help>
-        {{ wordArtLabels.reapplyHelp }}
+        {{
+          controller.props.snapshot?.wordArtStyleEditingScope === "selection"
+            ? wordArtLabels.selectionHelp
+            : controller.props.snapshot?.wordArtStyleEditingScope === "caret"
+              ? wordArtLabels.caretHelp
+              : wordArtLabels.reapplyHelp
+        }}
       </p>
       <p v-if="wordArtScope" class="shape-format-fill-line__reason" data-wordart-style-scope>
         {{ wordArtScope }}
@@ -82,7 +88,11 @@ defineExpose({
         class="shape-format-fill-line__reason"
         data-wordart-style-mixed
       >
-        {{ wordArtLabels.mixed }}
+        {{
+          controller.props.snapshot?.wordArtStyleEditingScope
+            ? wordArtLabels.selectionMixed
+            : wordArtLabels.mixed
+        }}
       </p>
       <WordArtStyleGallery v-bind="wordArtStyle" />
       <p

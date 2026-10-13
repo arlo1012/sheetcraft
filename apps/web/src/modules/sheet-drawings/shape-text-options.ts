@@ -96,6 +96,9 @@ export function drawingShapeTextBaseCharacterFormat(
     strike: drawing.shapeText?.strike === true,
     ...(style?.fill !== undefined ? { fill: style.fill } : { color: drawing.color }),
     line: style?.line ?? { kind: "none" },
+    shadow: style?.shadow ?? { kind: "none" },
+    reflection: style?.reflection ?? { kind: "none" },
+    glow: style?.glow ?? { kind: "none" },
   });
 }
 
@@ -162,8 +165,8 @@ export function drawingShapeTextPaintValues(
   const segments = getShapeTextCharacterSegments(source, base);
   const candidates = segments.length ? segments : [base];
   const style = { ...uniform };
-  const mixed: ("fill" | "line")[] = [];
-  for (const category of ["fill", "line"] as const) {
+  const mixed: ("fill" | "line" | "shadow" | "reflection" | "glow")[] = [];
+  for (const category of ["fill", "line", "shadow", "reflection", "glow"] as const) {
     const entries = candidates.map((format) =>
       category === "fill" && format.color !== undefined
         ? format.color === "transparent"

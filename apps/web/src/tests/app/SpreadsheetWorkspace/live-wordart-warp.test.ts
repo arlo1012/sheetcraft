@@ -14,6 +14,7 @@ import WordArtStyleGallery from "../../../modules/sheet-drawings/components/Word
 import WordArtTransformGallery from "../../../modules/sheet-drawings/components/WordArtTransformGallery.vue";
 import ShapeCanvasTextEditor from "../../../modules/sheet-drawings/components/ShapeCanvasTextEditor.vue";
 import { createModernWordArtDrawing } from "../../../modules/sheet-drawings/modern-wordart-insertion";
+import { materializeWordArtCharacterStylePreset } from "../../../modules/sheet-drawings/wordart-style-application";
 import { WORDART_STYLE_PRESETS } from "../../../modules/sheet-drawings/wordart-style-presets";
 import { WORDART_TRANSFORM_PRESETS } from "../../../modules/sheet-drawings/wordart-transform-presets";
 import * as measurement from "../../../modules/sheet-drawings/shape-text-measure";
@@ -563,6 +564,139 @@ test.each(["root", "owned"] as const)(
     state.redo();
     await flushPromises();
     expect(serializeWorkbook(state.session.workbook)).toEqual(cleared);
+  },
+  15_000,
+);
+
+test.each(["root", "owned"] as const)(
+  "real Workspace %s selected WordArt preset edits one rich draft and commits local effects once",
+  async (ownership) => {
+    const fixture = storedWordArt(),
+      sibling = { ...fixture.drawing, id: "sibling", name: "Sibling", text: "Other art" };
+    sibling.shapeFrame = {
+      kind: "shape-frame-v1",
+      anchor: { mode: "fixed", x: 350, y: 24, size: { width: 180, height: 100 } },
+    };
+    if (ownership === "owned")
+      fixture.sheet.drawings = groupShapeRoots(
+        [fixture.drawing, sibling],
+        ["art", "sibling"],
+        { id: "group", name: "WordArt group" },
+        fixture.metrics,
+      );
+    const { wrapper, state, sheet, snapshot } = await workspace(fixture.workbook),
+      path = ownership === "root" ? ["art"] : ["group", "art"];
+    function target() {
+      const root = sheet.drawings![0]!;
+      const drawing = isShapeGroupDrawing(root) ? root.members[0]! : root;
+      if (drawing.kind !== "shape" || !drawing.wordArt) throw Error("WordArt target");
+      return drawing;
+    }
+    expect(state.sheetGridRef.selectShapeObjects([path])).toBe(true);
+    await flushPromises();
+    if (ownership === "root")
+      await wrapper
+        .getComponent(SheetDrawingLayer)
+        .get("[data-shape-format-trigger]")
+        .trigger("click");
+    else wrapper.getComponent(SheetDrawingLayer).vm.$emit("formatGroup", sheet.drawings![0]!, path);
+    await flushPromises();
+    await wrapper
+      .getComponent(SheetDrawingLayer)
+      .get('[data-sheet-drawing-id="art"]')
+      .trigger("keydown", { key: "F2" });
+    await flushPromises();
+    const input = wrapper.getComponent(ShapeCanvasTextEditor).get("[data-shape-rich-text-input]");
+    writeTextDomSelection(input.element as HTMLElement, { start: 0, end: 4, direction: "forward" });
+    await input.trigger("select");
+    // The surface selection event uses the actual captured DOM range.
+    document.dispatchEvent(new Event("selectionchange"));
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value!.selection).toMatchObject({ start: 0, end: 4 });
+    const pane = wrapper.getComponent(ShapeFormatPane);
+    expect(pane.props("snapshot")!.wordArtStyleEditingScope).toBe("selection");
+    expect(pane.attributes("data-shape-text-edit-session")).toBe(
+      String(state.shapeTextEdit.snapshot.value!.sessionId),
+    );
+    await pane.get(".shape-format-pane__modes button:nth-child(2)").trigger("pointerdown");
+    await pane.get(".shape-format-pane__modes button:nth-child(2)").trigger("click");
+    await pane.get('[role="tab"][id$="text-fill-line-tab"]').trigger("click");
+    await flushPromises();
+    expect(pane.get('[role="tab"][id$="text-fill-line-tab"]').attributes("aria-selected")).toBe(
+      "true",
+    );
+    const gallery = pane.get(".wordart-style-gallery");
+    expect(gallery.findAll("[data-wordart-style-choice]")).toHaveLength(25);
+    expect(wrapper.getComponent(ShapeFormatPane).props("snapshot")!.wordArtStyleEditingScope).toBe(
+      "selection",
+    );
+    const choice = gallery.get('[data-wordart-style-choice="black-soft-shadow"]');
+    await input.trigger("compositionstart");
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value!.composing).toBe(true);
+    await choice.trigger("pointerdown");
+    await choice.trigger("click");
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value!.composing).toBe(true);
+    expect(state.shapeTextEdit.snapshot.value!.draftView.shapeText!.characterRuns).toBeUndefined();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(snapshot);
+    expect(state.session.history.undoStack).toHaveLength(0);
+    await input.trigger("compositionend", { data: "" });
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value!.composing).toBe(false);
+    await choice.trigger("pointerdown");
+    await choice.trigger("click");
+    await flushPromises();
+    const draft = state.shapeTextEdit.snapshot.value!;
+    expect(draft.draftText).toBe("Warp source");
+    expect(draft.draftView.shapeText!.characterRuns).toEqual([
+      { start: 0, end: 4, ...materializeWordArtCharacterStylePreset("black-soft-shadow") },
+    ]);
+    expect(target().shapeText!.characterRuns).toBeUndefined();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(snapshot);
+    expect(state.session.history.undoStack).toHaveLength(0);
+    expect(document.querySelector("[data-shape-text-source-preview-note]")?.textContent).toContain(
+      "text effects use a source text preview",
+    );
+    // Local source Undo restores both text and its effect choices together.
+    await input.trigger("keydown", { key: "z", ctrlKey: true });
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value!.draftView.shapeText!.characterRuns).toBeUndefined();
+    await input.trigger("keydown", { key: "z", ctrlKey: true, shiftKey: true });
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value!.draftView.shapeText!.characterRuns).toEqual(
+      draft.draftView.shapeText!.characterRuns,
+    );
+    await input.trigger("keydown", { key: "Enter", ctrlKey: true });
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value).toBeUndefined();
+    expect(target().shapeText!.characterRuns).toEqual(draft.draftView.shapeText!.characterRuns);
+    expect(target().shapeText!.style).toEqual(fixture.drawing.shapeText!.style);
+    const saved = serializeWorkbook(state.session.workbook);
+    expect(saved.version).toBe(72);
+    expect(state.session.history.undoStack).toHaveLength(1);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(snapshot);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(saved);
+    await wrapper
+      .getComponent(SheetDrawingLayer)
+      .get('[data-sheet-drawing-id="art"]')
+      .trigger("keydown", { key: "F2" });
+    await flushPromises();
+    const reopenedId = state.shapeTextEdit.snapshot.value!.sessionId,
+      staleAction = document.createElement("button");
+    staleAction.dataset.shapeTextEditSession = String(reopenedId - 1);
+    staleAction.dataset.staleShapeSourceAction = "";
+    const workspaceSurface = wrapper.get(".spreadsheet-workspace");
+    workspaceSurface.element.appendChild(staleAction);
+    await workspaceSurface.get("[data-stale-shape-source-action]").trigger("pointerdown");
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value).toBeUndefined();
+    expect(state.session.history.undoStack).toHaveLength(1);
+    expect(serializeWorkbook(state.session.workbook)).toEqual(saved);
   },
   15_000,
 );

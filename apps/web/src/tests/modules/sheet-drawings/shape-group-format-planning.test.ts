@@ -27,6 +27,7 @@ import { createSheet } from "@sheetcraft/core/workbook";
 import { ungroupShapeRoot } from "@sheetcraft/core/shape-group-planning";
 import type { ShapePaint } from "@sheetcraft/core/shape-style";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
+import { WORDART_STYLE_PRESETS } from "../../../modules/sheet-drawings/wordart-style-presets";
 import {
   aggregateShapeGroupFormatSnapshot,
   getShapeGroupFormatEligibleLeaves,
@@ -1042,6 +1043,45 @@ test("selected rich leaf and all-mixed subtree expose suppressed character value
     );
   }
 });
+
+test.each(["shadow", "reflection", "glow"] as const)(
+  "local text %s is read from actual characters for owned leaves and containers",
+  (category) => {
+    const f = fixture(),
+      choice = WORDART_STYLE_PRESETS.find((preset) => preset.style[category].kind === "value")!
+        .style[category];
+    f.a.shapeText = {
+      ...createDefaultShapeText(),
+      style: { [category]: { kind: "none" } },
+      characterRuns: [{ start: 0, end: 1, bold: true, [category]: choice }],
+    };
+    const before = structuredClone(f.root);
+    for (const path of [["root", "inner", "a"], ["root", "inner"], ["root"]]) {
+      const readback = aggregateShapeGroupFormatSnapshot(
+        resolveShapeGroupFormatContext(f.root, path, f.metrics),
+        { width: 160, height: 80 },
+      );
+      expect(readback.textStyle[category]).toBeUndefined();
+      expect(readback.mixedStyleCategories.text).toContain(category);
+    }
+    const updated = apply(f, ["root", "inner"], {
+      type: "set-style",
+      target: "text",
+      category,
+      value: { kind: "none" },
+    });
+    expect(node(updated.root, ["root", "inner", "a"]).shapeText?.characterRuns).toEqual([
+      { start: 0, end: 1, bold: true },
+    ]);
+    const settled = aggregateShapeGroupFormatSnapshot(
+      resolveShapeGroupFormatContext(updated.root, ["root", "inner"], f.metrics),
+      { width: 160, height: 80 },
+    );
+    expect(settled.textStyle[category]).toEqual({ kind: "none" });
+    expect(settled.mixedStyleCategories.text).not.toContain(category);
+    expect(f.root).toEqual(before);
+  },
+);
 
 describe("group text effects and shared camera alias", () => {
   test.each(["reflection", "softEdges", "format3d"] as const)(

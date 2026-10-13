@@ -540,3 +540,33 @@ describe("modern WordArt natural no-wrap AutoFit", () => {
     expect(result.drawing.shapeText?.layout.autoFit).toBe("none");
   });
 });
+
+test("literal source run effects remain sparse through resolved native character segments", () => {
+  const shape = drawing({
+    kind: "shape",
+    shapeText: {
+      ...createDefaultShapeText(),
+      characterRuns: [
+        {
+          start: 0,
+          end: 1,
+          shadow: { kind: "none" },
+          reflection: { kind: "none" },
+          glow: { kind: "none" },
+        },
+      ],
+    },
+  });
+  const resolved = resolveDrawingShapeText(shape, native);
+  expect(resolved.characterSegments![0]).toMatchObject({
+    start: 0,
+    end: 1,
+    shadow: { kind: "none" },
+    reflection: { kind: "none" },
+    glow: { kind: "none" },
+  });
+  expect(resolved.characterSegments![1]).not.toHaveProperty("shadow");
+  const layout = layoutDrawingShapeText(shape, native);
+  expect(layout.runs[0]).toHaveProperty("glow", { kind: "none" });
+  expect(layout.runs[1]).not.toHaveProperty("glow");
+});

@@ -107,7 +107,8 @@ const labels = computed(() =>
         cancel: "取消",
         rejected: "无法应用更改。已保留你的文本。",
         stale: "此形状或选区已更改。你可以复制保留的文本。",
-        sourcePreview: "编辑时，渐变、图案、图片填充和复杂轮廓使用源文本预览。应用后保留完整外观。",
+        sourcePreview:
+          "编辑时，渐变、图案、图片填充、复杂轮廓及文字效果使用源文本预览。应用后保留完整外观。",
         warpSourcePreview: "编辑的是变形前的源文字。应用后保留当前艺术字变形。",
       }
     : {
@@ -120,7 +121,7 @@ const labels = computed(() =>
         warpSourcePreview:
           "Edit the straight source text. Applying preserves the current WordArt transform.",
         sourcePreview:
-          "While editing, gradients, patterns, image fills and detailed outlines use a source text preview. Applied text keeps its full appearance.",
+          "While editing, gradients, patterns, image fills, detailed outlines and text effects use a source text preview. Applied text keeps its full appearance.",
       },
 );
 const failure = computed(
@@ -575,7 +576,8 @@ defineExpose({ focus });
         class="shape-canvas-text-editor__preview"
         data-shape-text-source-preview-note
       >
-        {{ drawing.shapeText?.warp ? labels.warpSourcePreview : labels.sourcePreview }}
+        <span v-if="drawing.shapeText?.warp">{{ labels.warpSourcePreview }}</span>
+        <span v-if="sourcePreviewDiffers">{{ labels.sourcePreview }}</span>
       </p>
     </FloatingPanelSurface>
   </Teleport>
@@ -621,6 +623,9 @@ defineExpose({ focus });
     color: var(--sheetcraft-text-primary);
     font-size: var(--sheetcraft-font-size-body-small);
     line-height: var(--sheetcraft-line-height-body-small);
+  }
+  &__preview > span {
+    display: block;
   }
   &__preview {
     max-width: 280px;
