@@ -2317,7 +2317,14 @@ function pointContext(fragment: DrawingFragment, event: MouseEvent): void {
 const shapeTextMenu = shallowRef<{
   key: string;
   canText: boolean;
-  actions: { text: () => boolean; format: () => boolean; points?: () => boolean };
+  kind: "shape" | "textBox";
+  canObject: boolean;
+  actions: {
+    object: () => boolean;
+    text: () => boolean;
+    format: () => boolean;
+    points?: () => boolean;
+  };
 }>();
 const shapeTextMenuAnchor = shallowRef<FloatingReference | null>(null);
 const shapeTextMenuSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
@@ -2355,12 +2362,21 @@ function shapeContext(fragment: DrawingFragment, event: MouseEvent | KeyboardEve
   const textRect = getDrawingShapeTextRect(drawing);
   const menu: NonNullable<typeof shapeTextMenu.value> = {
     key,
+    kind: drawing.kind,
+    canObject: !projectionById(drawing)?.renderLeaf?.connector,
     canText:
       !projectionById(drawing)?.renderLeaf?.connector &&
       !!textRect &&
       textRect.width > 0 &&
       textRect.height > 0,
     actions: {
+      object: () => {
+        if (!valid() || !menu.canObject || !finishCanvasText() || !valid()) return false;
+        if (owned) emit("editOwned", owned.sourceRoot, owned.path);
+        else emit("edit", source);
+        dismissShapeTextMenu("programmatic", false);
+        return true;
+      },
       text: () => {
         if (!valid() || !beginCanvasText(drawing, "all")) return false;
         dismissShapeTextMenu("programmatic", false);
@@ -3230,6 +3246,19 @@ watch(
           :disabled="!shapeTextMenu.canText"
           v-on="{ select: shapeTextMenu.actions.text }"
           >{{ locale === "zh-CN" ? "编辑文本" : "Edit Text" }}</MenuItem
+        >
+        <MenuItem
+          :disabled="!shapeTextMenu.canObject"
+          v-on="{ select: shapeTextMenu.actions.object }"
+          >{{
+            shapeTextMenu.kind === "shape"
+              ? locale === "zh-CN"
+                ? "更改形状…"
+                : "Change Shape…"
+              : locale === "zh-CN"
+                ? "对象属性…"
+                : "Object Properties…"
+          }}</MenuItem
         >
         <MenuItem
           v-if="shapeTextMenu.actions.points"

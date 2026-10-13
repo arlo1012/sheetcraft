@@ -1,6 +1,9 @@
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { nextTick } from "vue";
+import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
+import DrawingEditorDialog from "../../../modules/sheet-drawings/components/DrawingEditorDialog.vue";
+import ShapeGallery from "../../../modules/sheet-drawings/components/ShapeGallery.vue";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { resolveSheetShapeConnections } from "@sheetcraft/core/shape-connector-layout";
 import { planShapeConnectorRouteAdjustment } from "@sheetcraft/core/shape-connector-editing";
@@ -1190,4 +1193,192 @@ test("real Workspace direct text and AutoFit geometry are one reversible transac
   state.redo();
   await flushPromises();
   expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+});
+
+test.each([false, true])(
+  "real Workspace Change Shape context restores the genuine gallery and exact root/owned history (owned=%s)",
+  async (owned) => {
+    installNativeTextMeasurement();
+    const wrapper = fixture(
+      async () => ({
+        revision: 1,
+        savedAt: 1,
+        snapshot: serializeWorkbook(directTextWorkbook(owned)),
+      }),
+      createMemoryImageAssetStore(),
+      true,
+    );
+    await flushPromises();
+    const state = setupState(wrapper),
+      layer = wrapper.getComponent(SheetDrawingLayer),
+      before = serializeWorkbook(state.session.workbook),
+      original = directSource(state);
+    state.sheetGridRef.selectDrawing(owned ? "text-group" : "text-target");
+    await flushPromises();
+    await layer
+      .get('[data-sheet-drawing-id="text-target"]')
+      .trigger("keydown", { key: "ContextMenu" });
+    await flushPromises();
+    const menu = document.querySelector('[aria-label="Shape actions"]')!;
+    const action = Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
+      (item) => item.textContent?.trim() === "Change Shape…",
+    );
+    expect(action).toBeDefined();
+    action!.click();
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value).toBeUndefined();
+    const dialog = wrapper.getComponent(DrawingEditorDialog),
+      gallery = dialog.getComponent(ShapeGallery);
+    const choice = SHAPE_GALLERY.flatMap((group) => group.items).find(
+      (item) => item.kind === "preset" && item.preset === "ellipse",
+    )!;
+    await gallery.get(`[data-shape-choice="${choice.id}"]`).trigger("click");
+    dialog.getComponent(TDialog).vm.$emit("confirm");
+    await flushPromises();
+    expect(wrapper.findComponent(DrawingEditorDialog).exists()).toBe(false);
+    const changed = directSource(state);
+    expect(changed.shapeGeometry?.preset).toBe("ellipse");
+    expect(changed.text).toBe(original.text);
+    expect(changed.rotation).toBe(original.rotation);
+    if ("shapeFrame" in changed && "shapeFrame" in original)
+      expect(changed.shapeFrame).toEqual(original.shapeFrame);
+    else if ("groupFrame" in changed && "groupFrame" in original)
+      expect(changed.groupFrame).toEqual(original.groupFrame);
+    else throw Error("Expected preserved root frame or owned layout");
+    expect(changed.fill).toBe(original.fill);
+    const after = serializeWorkbook(state.session.workbook);
+    expect(after).not.toEqual(before);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+    // Restoring object properties must not reclaim F2 from inline text editing.
+    await layer.get('[data-sheet-drawing-id="text-target"]').trigger("keydown", { key: "F2" });
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value?.sourceId).toBe("text-target");
+    expect(wrapper.findComponent(DrawingEditorDialog).exists()).toBe(false);
+  },
+);
+test("real Workspace Change Shape is disabled for bound connectors and skips group containers", async () => {
+  const wrapper = fixture(
+    async () => ({
+      revision: 1,
+      savedAt: 1,
+      snapshot: serializeWorkbook(savedConnectorFixture(true)),
+    }),
+    createMemoryImageAssetStore(),
+    true,
+  );
+  await flushPromises();
+  const layer = wrapper.getComponent(SheetDrawingLayer);
+  setupState(wrapper).sheetGridRef.selectDrawing("group");
+  await flushPromises();
+  await layer.get('[data-sheet-drawing-id="connector"]').trigger("keydown", { key: "ContextMenu" });
+  await flushPromises();
+  const menu = document.querySelector('[aria-label="Shape actions"]')!;
+  const action = Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
+    (item) => item.textContent?.trim() === "Change Shape…",
+  )!;
+  expect(action.getAttribute("aria-disabled")).toBe("true");
+  action.click();
+  await flushPromises();
+  expect(wrapper.findComponent(DrawingEditorDialog).exists()).toBe(false);
+  await layer.get('[data-shape-group-id="group"]').trigger("keydown", { key: "ContextMenu" });
+  await flushPromises();
+  expect(wrapper.findComponent(DrawingEditorDialog).exists()).toBe(false);
+});
+test("real Workspace Change Shape retired menu action cannot edit a newly selected owner", async () => {
+  installNativeTextMeasurement();
+  const wrapper = fixture(
+    async () => ({
+      revision: 1,
+      savedAt: 1,
+      snapshot: serializeWorkbook(directTextWorkbook(false)),
+    }),
+    createMemoryImageAssetStore(),
+    true,
+  );
+  await flushPromises();
+  const state = setupState(wrapper),
+    layer = wrapper.getComponent(SheetDrawingLayer),
+    before = serializeWorkbook(state.session.workbook);
+  await layer
+    .get('[data-sheet-drawing-id="text-target"]')
+    .trigger("keydown", { key: "ContextMenu" });
+  await flushPromises();
+  const menu = document.querySelector('[aria-label="Shape actions"]')!;
+  const action = Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
+    (item) => item.textContent?.trim() === "Change Shape…",
+  )!;
+  state.sheetGridRef.selectDrawing("untouched");
+  await flushPromises();
+  action.click();
+  await flushPromises();
+  expect(wrapper.findComponent(DrawingEditorDialog).exists()).toBe(false);
+  expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+});
+
+test("real Workspace Change Shape cannot bypass composing text or reuse an owner replaced by text commit", async () => {
+  installNativeTextMeasurement();
+  const wrapper = fixture(
+    async () => ({
+      revision: 1,
+      savedAt: 1,
+      snapshot: serializeWorkbook(directTextWorkbook(false)),
+    }),
+    createMemoryImageAssetStore(),
+    true,
+  );
+  await flushPromises();
+  const state = setupState(wrapper),
+    layer = wrapper.getComponent(SheetDrawingLayer),
+    before = serializeWorkbook(state.session.workbook);
+  state.sheetGridRef.selectDrawing("text-target");
+  await flushPromises();
+  async function contextAction() {
+    await layer
+      .get('[data-sheet-drawing-id="text-target"]')
+      .trigger("keydown", { key: "ContextMenu" });
+    await flushPromises();
+    const menu = document.querySelector('[aria-label="Shape actions"]')!;
+    return Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
+      (item) => item.textContent?.trim() === "Change Shape…",
+    )!;
+  }
+  const first = await contextAction();
+  expect(
+    layer.props("startTextEdit")?.({
+      root: getActiveSheet(state.session.workbook).drawings![0]!,
+      selection: "all",
+    }),
+  ).toBe(true);
+  await flushPromises();
+  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("textarea");
+  await input.trigger("compositionstart");
+  await input.setValue("Composing retained");
+  first.click();
+  await flushPromises();
+  expect(wrapper.findComponent(DrawingEditorDialog).exists()).toBe(false);
+  expect(state.shapeTextEdit.snapshot.value?.draftText).toBe("Composing retained");
+  expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+  await input.trigger("compositionend");
+  // A menu retired when entering the editor remains inert even after IME ends.
+  first.click();
+  await flushPromises();
+  expect(wrapper.findComponent(DrawingEditorDialog).exists()).toBe(false);
+  expect(state.shapeTextEdit.snapshot.value?.draftText).toBe("Composing retained");
+  await input.trigger("keydown", { key: "Escape" });
+  await flushPromises();
+  first.click();
+  await flushPromises();
+  expect(state.shapeTextEdit.snapshot.value).toBeUndefined();
+  expect(directSource(state).text).toBe("Composing retained");
+  // The successful text command replaced the exact source captured by the old
+  // menu; its object dialog must not open against either the old or new owner.
+  expect(wrapper.findComponent(DrawingEditorDialog).exists()).toBe(false);
+  (await contextAction()).click();
+  await flushPromises();
+  expect(wrapper.findComponent(DrawingEditorDialog).exists()).toBe(true);
 });
