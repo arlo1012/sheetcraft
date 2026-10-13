@@ -160,6 +160,9 @@ import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
 import { prepareShapeTextUpdate } from "../modules/sheet-drawings/prepare-shape-text-update";
 import DrawingEditorDialog from "../modules/sheet-drawings/components/DrawingEditorDialog.vue";
 import ShapeFormatPane from "../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
+import ShapeToolsToolbar from "../modules/sheet-drawings/components/ShapeToolsToolbar.vue";
+import ShapeSelectionPane from "../modules/sheet-drawings/components/ShapeSelectionPane.vue";
+import { useShapeObjectControls } from "../modules/sheet-drawings/useShapeObjectControls";
 import { useOwnedShapeGroupFormatPane } from "../modules/sheet-drawings/useOwnedShapeGroupFormatPane";
 import { useOwnedShapeConnectorFormatPane } from "../modules/sheet-drawings/useOwnedShapeConnectorFormatPane";
 import { useShapeTextEditSession } from "../modules/sheet-drawings/useShapeTextEditSession";
@@ -2083,6 +2086,49 @@ const shapeCreation = useShapeCreation({
     if (!shapeCreation.request.value) sheetGridRef.value?.selectDrawing(drawing.id);
   },
 });
+const selectedShapeObjectPaths = shallowRef<readonly ShapeGroupPath[]>([]);
+function selectedShapeObjectsChanged(paths: readonly ShapeGroupPath[], owner: Sheet) {
+  if (owner !== activeSheet.value) return;
+  if (JSON.stringify(paths) === JSON.stringify(selectedShapeObjectPaths.value)) return;
+  selectedShapeObjectPaths.value = paths.map((path) => [...path]);
+}
+function formatShapeObjectPath(path: ShapeGroupPath): boolean {
+  const root = activeSheet.value.drawings?.find((node) => node.id === path[0]);
+  if (!root) return false;
+  if (root.kind === "shapeGroup") {
+    openShapeGroupFormat(root, path);
+    return (
+      JSON.stringify(shapeGroupFormatPane.path.value ?? shapeConnectorFormatPane.path.value) ===
+      JSON.stringify(path)
+    );
+  }
+  if (path.length !== 1 || (root.kind !== "shape" && root.kind !== "textBox")) return false;
+  openShapeFormat(root);
+  return (
+    shapeFormatPane.drawing.value?.id === root.id ||
+    shapeConnectorFormatPane.root.value?.id === root.id
+  );
+}
+const shapeObjectControls = useShapeObjectControls({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  getMetrics: () => sheetGridRef.value?.getShapeFrameContext(activeSheet.value)?.metrics,
+  getSelection: () => selectedShapeObjectPaths.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || shapeInteractionBlocked.value,
+  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+  select: (paths) => sheetGridRef.value?.selectShapeObjects(paths) ?? false,
+  format: formatShapeObjectPath,
+  replaceCollection: drawingActions.replaceCollection,
+});
+watch(
+  () => [activeSheet.value, workbookGeneration.value],
+  () => {
+    selectedShapeObjectPaths.value = [];
+    shapeObjectControls.paneVisible.value = false;
+  },
+);
 const shapeInsertHandler = computed(() => {
   const owner = shapeCreation.captureOwner();
   void workbookRevision.value;
@@ -3437,6 +3483,7 @@ watch(
     />
     <SpreadsheetRibbon
       :has-image="!!selectedPicture"
+      :has-shape="!!shapeObjectControls.snapshot.value?.paths.length"
       :pivot-id="activePivot?.id"
       :hyperlink-disabled="
         loading ||
@@ -3588,6 +3635,26 @@ watch(
               @delete="tableActions.deletePivotStyle"
           /></template>
         </PivotDesignToolbar>
+      </template>
+      <template #shape-tools>
+        <ShapeToolsToolbar
+          v-if="shapeObjectControls.snapshot.value"
+          :owner-key="shapeObjectControls.snapshot.value.ownerKey"
+          :disabled="shapeObjectControls.snapshot.value.disabled"
+          :can-flip="shapeObjectControls.snapshot.value.canFlip"
+          :can-rotate="shapeObjectControls.snapshot.value.canRotate"
+          :can-order="shapeObjectControls.snapshot.value.canOrder"
+          :can-format="shapeObjectControls.snapshot.value.canFormat"
+          :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
+          :unavailable-reason="
+            locale === 'zh-CN'
+              ? '该对象暂不支持此操作，原数据已保留。'
+              : 'This operation is unavailable for this object; its original data is preserved.'
+          "
+          :action-handler="shapeObjectControls.snapshot.value.actionHandler"
+          :format-handler="shapeObjectControls.snapshot.value.formatHandler"
+          :selection-pane-handler="shapeObjectControls.snapshot.value.selectionPaneHandler"
+        />
       </template>
       <template #image-tools>
         <PictureToolbar
@@ -4869,6 +4936,7 @@ watch(
           @format-drawing="openShapeFormat"
           @format-shape-group="openShapeGroupFormat"
           @selected-shape-group-change="selectedShapeGroupChanged"
+          @selected-shape-objects-change="selectedShapeObjectsChanged"
           @selected-drawing-change="selectedShapeChanged"
           @configure-pivot="openPivotFields"
           @update-pivot="pivotActions.update"
@@ -5016,6 +5084,18 @@ watch(
           shapeConnectorFormatPane.close();
           shapePaintAssets.cancel();
         "
+      />
+      <ShapeSelectionPane
+        v-if="shapeObjectControls.paneVisible.value && shapeObjectControls.snapshot.value"
+        :owner-key="shapeObjectControls.snapshot.value.ownerKey"
+        :draft-owner-key="shapeObjectControls.snapshot.value.draftOwnerKey"
+        :rows="shapeObjectControls.snapshot.value.rows"
+        :disabled="loading || fileBusy || xlsxBusy"
+        :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
+        :select-handler="shapeObjectControls.snapshot.value.selectHandler"
+        :rename-handler="shapeObjectControls.snapshot.value.renameHandler"
+        :order-handler="shapeObjectControls.snapshot.value.actionHandler"
+        :close-handler="shapeObjectControls.snapshot.value.closeHandler"
       />
       <PictureSelectionPane
         v-if="pictureTools.paneVisible.value"

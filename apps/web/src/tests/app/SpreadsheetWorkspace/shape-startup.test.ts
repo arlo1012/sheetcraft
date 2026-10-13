@@ -4,6 +4,8 @@ import { nextTick } from "vue";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import DrawingEditorDialog from "../../../modules/sheet-drawings/components/DrawingEditorDialog.vue";
 import ShapeGallery from "../../../modules/sheet-drawings/components/ShapeGallery.vue";
+import ShapeToolsToolbar from "../../../modules/sheet-drawings/components/ShapeToolsToolbar.vue";
+import ShapeSelectionPane from "../../../modules/sheet-drawings/components/ShapeSelectionPane.vue";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { resolveSheetShapeConnections } from "@sheetcraft/core/shape-connector-layout";
 import { planShapeConnectorRouteAdjustment } from "@sheetcraft/core/shape-connector-editing";
@@ -59,7 +61,10 @@ function setupState(wrapper: VueWrapper) {
     findDialogVisible: boolean;
     cellFormatSelection: unknown;
     shapeInteractionBlocked: boolean;
-    sheetGridRef: { selectDrawing: (id: string | null) => void };
+    sheetGridRef: {
+      selectDrawing: (id: string | null) => void;
+      selectShapeObjects: (paths: readonly (readonly string[])[]) => boolean;
+    };
     undo: () => void;
     redo: () => void;
     drawingActions: ReturnType<
@@ -1381,4 +1386,185 @@ test("real Workspace Change Shape cannot bypass composing text or reuse an owner
   (await contextAction()).click();
   await flushPromises();
   expect(wrapper.findComponent(DrawingEditorDialog).exists()).toBe(true);
+});
+
+test.each([false, true])(
+  "real Workspace daily shape controls keep pointer selection, flip/rotate and exact history (owned=%s)",
+  async (owned) => {
+    installNativeTextMeasurement();
+    const wrapper = fixture(
+      async () => ({
+        revision: 1,
+        savedAt: 1,
+        snapshot: serializeWorkbook(directTextWorkbook(owned)),
+      }),
+      createMemoryImageAssetStore(),
+      true,
+    );
+    await flushPromises();
+    const state = setupState(wrapper),
+      path = owned ? ["text-group", "text-target"] : ["text-target"];
+    expect(state.sheetGridRef.selectShapeObjects([path])).toBe(true);
+    await flushPromises();
+    const before = serializeWorkbook(state.session.workbook);
+    const rotation = wrapper.getComponent(ShapeToolsToolbar).get('[data-shape-control="rotation"]');
+    await rotation.trigger("pointerdown", { button: 0 });
+    await flushPromises();
+    await rotation.trigger("click");
+    await flushPromises();
+    const horizontal = document.querySelector<HTMLElement>(
+      '[data-shape-control-action="flip-horizontal"]',
+    );
+    expect(horizontal).not.toBeNull();
+    horizontal!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
+    horizontal!.click();
+    await flushPromises();
+    expect(directSource(state).shapeFlipX).toBe(true);
+    expect(directSource(state).rotation).toBe(37);
+    const after = serializeWorkbook(state.session.workbook);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+    await wrapper
+      .getComponent(ShapeToolsToolbar)
+      .get('[data-shape-control="rotation"]')
+      .trigger("click");
+    await flushPromises();
+    document.querySelector<HTMLElement>('[data-shape-control-action="rotate-right"]')!.click();
+    await flushPromises();
+    expect(directSource(state).rotation).toBe(127);
+    // F2 remains the canonical inline text editor after ribbon operations.
+    await wrapper
+      .getComponent(SheetDrawingLayer)
+      .get('[data-sheet-drawing-id="text-target"]')
+      .trigger("keydown", { key: "F2" });
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value?.sourceId).toBe("text-target");
+    const editorClip = wrapper.get(".sheet-drawing-layer__text-editor-clip").element as HTMLElement;
+    expect(Number(editorClip.style.zIndex)).toBeGreaterThan(
+      getActiveSheet(state.session.workbook).drawings!.length * 3,
+    );
+  },
+);
+
+test.each([false, true])(
+  "real Workspace selection pane selects, renames and orders the exact root/owned object (owned=%s)",
+  async (owned) => {
+    installNativeTextMeasurement();
+    const wrapper = fixture(
+      async () => ({
+        revision: 1,
+        savedAt: 1,
+        snapshot: serializeWorkbook(directTextWorkbook(owned)),
+      }),
+      createMemoryImageAssetStore(),
+      true,
+    );
+    await flushPromises();
+    const state = setupState(wrapper),
+      path = owned ? ["text-group", "text-target"] : ["text-target"];
+    expect(state.sheetGridRef.selectShapeObjects([path])).toBe(true);
+    await flushPromises();
+    const button = wrapper
+      .getComponent(ShapeToolsToolbar)
+      .get('[data-shape-control="selection-pane"]');
+    await button.trigger("pointerdown", { button: 0 });
+    await flushPromises();
+    await button.trigger("click");
+    await flushPromises();
+    const pane = wrapper.getComponent(ShapeSelectionPane);
+    const row = pane
+      .findAll("[data-shape-pane-path]")
+      .find((entry) => entry.attributes("data-shape-pane-path") === JSON.stringify(path))!;
+    expect(row).toBeDefined();
+    const input = row.get("input");
+    await input.trigger("pointerdown", { button: 0 });
+    await flushPromises();
+    await input.setValue("Complete renamed shape");
+    expect(directSource(state).name).not.toBe("Complete renamed shape");
+    const before = serializeWorkbook(state.session.workbook);
+    await input.trigger("keydown", { key: "Enter", code: "Enter" });
+    await flushPromises();
+    expect(directSource(state).name).toBe("Complete renamed shape");
+    const after = serializeWorkbook(state.session.workbook);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+    const order = wrapper
+      .getComponent(ShapeSelectionPane)
+      .get('[data-shape-pane-order="bring-front"]');
+    await order.trigger("pointerdown", { button: 0 });
+    await flushPromises();
+    await order.trigger("click");
+    await flushPromises();
+    const root = getActiveSheet(state.session.workbook).drawings![0]!;
+    const siblings = isShapeGroupDrawing(root)
+      ? root.members
+      : getActiveSheet(state.session.workbook).drawings!;
+    expect(siblings.at(-1)?.id).toBe("text-target");
+    await wrapper.getComponent(ShapeSelectionPane).get("[data-shape-pane-close]").trigger("click");
+    await flushPromises();
+    expect(wrapper.findComponent(ShapeSelectionPane).exists()).toBe(false);
+  },
+);
+
+test("real Workspace clears unavailable selection on sheet switch and can reselect the same object on return", async () => {
+  installNativeTextMeasurement();
+  const initial = directTextWorkbook(false),
+    other = createSheet("Other", "other-controls-sheet");
+  insertSheet(initial, other);
+  const wrapper = fixture(
+    async () => ({ revision: 1, savedAt: 1, snapshot: serializeWorkbook(initial) }),
+    createMemoryImageAssetStore(),
+    true,
+  );
+  await flushPromises();
+  const state = setupState(wrapper);
+  state.sheetGridRef.selectDrawing("text-target");
+  await flushPromises();
+  expect(wrapper.getComponent(ShapeToolsToolbar).props("canFlip")).toBe(true);
+  state.onSelectSheet(other.id);
+  await flushPromises();
+  expect(wrapper.findComponent(ShapeToolsToolbar).exists()).toBe(false);
+  state.onSelectSheet("text-sheet");
+  await flushPromises();
+  expect(wrapper.findComponent(ShapeToolsToolbar).exists()).toBe(false);
+  state.sheetGridRef.selectDrawing("text-target");
+  await flushPromises();
+  expect(wrapper.getComponent(ShapeToolsToolbar).props("canFlip")).toBe(true);
+  await wrapper
+    .getComponent(ShapeToolsToolbar)
+    .get('[data-shape-control="rotation"]')
+    .trigger("click");
+  await flushPromises();
+  document.querySelector<HTMLElement>('[data-shape-control-action="flip-vertical"]')!.click();
+  await flushPromises();
+  expect(directSource(state).shapeFlipY).toBe(true);
+});
+
+test("a real drawing layer publishes an initialized selected object without another selection event", async () => {
+  installNativeTextMeasurement();
+  const wrapper = fixture(
+    async () => ({
+      revision: 1,
+      savedAt: 1,
+      snapshot: serializeWorkbook(directTextWorkbook(false)),
+    }),
+    createMemoryImageAssetStore(),
+    true,
+  );
+  await flushPromises();
+  const layer = mount(SheetDrawingLayer, {
+    props: { ...wrapper.getComponent(SheetDrawingLayer).props(), selectedDrawingId: "text-target" },
+    global: { plugins: [createAppI18n("en-US")] },
+  });
+  mounted.push(layer);
+  await flushPromises();
+  expect(layer.emitted("objectSelectionChange")).toEqual([[[["text-target"]]]]);
 });

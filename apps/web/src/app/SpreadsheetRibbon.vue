@@ -49,6 +49,7 @@ const props = withDefaults(
     selectedTableStyleColor?: string;
     hasTable?: boolean;
     hasImage?: boolean;
+    hasShape?: boolean;
     pivotId?: string;
   }>(),
   { conditionalFormattingDisabled: undefined },
@@ -102,11 +103,12 @@ const emit = defineEmits<{
   manageTable: [];
 }>();
 
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 type Category =
   | "home"
   | "insert"
   | "image"
+  | "shape"
   | "pivot-analysis"
   | "pivot-design"
   | "page"
@@ -118,13 +120,16 @@ type Category =
   | "proofreading";
 const proofreadingOpen = ref(false);
 const activeCategory = ref<Category>("home");
-let previousCategory: Exclude<Category, "table" | "image" | "pivot-analysis" | "pivot-design"> =
-  "home";
+let previousCategory: Exclude<
+  Category,
+  "table" | "image" | "shape" | "pivot-analysis" | "pivot-design"
+> = "home";
 const homeTab = ref<HTMLButtonElement>();
 const insertTab = ref<HTMLButtonElement>();
 const pivotAnalysisTab = ref<HTMLButtonElement>();
 const pivotDesignTab = ref<HTMLButtonElement>();
 const imageTab = ref<HTMLButtonElement>();
+const shapeTab = ref<HTMLButtonElement>();
 const pageTab = ref<HTMLButtonElement>();
 const formulaTab = ref<HTMLButtonElement>();
 const dataTab = ref<HTMLButtonElement>();
@@ -138,6 +143,7 @@ watch(activeCategory, (category) => {
   if (
     category !== "table" &&
     category !== "image" &&
+    category !== "shape" &&
     category !== "pivot-analysis" &&
     category !== "pivot-design"
   )
@@ -159,9 +165,16 @@ watch(
 );
 
 watch(
+  () => props.hasShape,
+  (hasShape) => {
+    if (hasShape) activeCategory.value = "shape";
+    else if (activeCategory.value === "shape") activeCategory.value = previousCategory;
+  },
+);
+watch(
   () => props.pivotId,
   (id) => {
-    if (id && !props.hasImage) activeCategory.value = "pivot-analysis";
+    if (id && !props.hasImage && !props.hasShape) activeCategory.value = "pivot-analysis";
     else if (
       !id &&
       (activeCategory.value === "pivot-analysis" || activeCategory.value === "pivot-design")
@@ -187,6 +200,10 @@ function onCategoryKeydown(event: KeyboardEvent): void {
     tabs.push(imageTab);
   }
 
+  if (props.hasShape) {
+    categories.push("shape");
+    tabs.push(shapeTab);
+  }
   if (proofreadingOpen.value) {
     categories.push("proofreading");
     tabs.push(proofreadingTab);
@@ -223,6 +240,7 @@ defineSlots<{
   "page-tools"?: () => unknown;
   "insert-tools"?: () => unknown;
   "image-tools"?: () => unknown;
+  "shape-tools"?: () => unknown;
   "pivot-analysis-tools"?: () => unknown;
   "pivot-design-tools"?: () => unknown;
   "review-tools"?: (props: { openProofreading: () => void }) => unknown;
@@ -380,6 +398,22 @@ defineSlots<{
             {{ t("pivot.design") }}
           </button>
           <button
+            v-if="hasShape"
+            :id="`${tabId}-shape`"
+            ref="shapeTab"
+            class="spreadsheet-ribbon__category spreadsheet-ribbon__category--contextual"
+            :class="{ 'is-active': activeCategory === 'shape' }"
+            data-ribbon-category="shape"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'shape'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'shape' ? 0 : -1"
+            @click="activeCategory = 'shape'"
+          >
+            {{ locale === "zh-CN" ? "绘图工具" : "Drawing Tools" }}
+          </button>
+          <button
             v-if="hasImage"
             :id="`${tabId}-image`"
             ref="imageTab"
@@ -506,6 +540,7 @@ defineSlots<{
         </template>
       </HomeFormatToolbar>
       <slot v-else-if="activeCategory === 'image'" name="image-tools" />
+      <slot v-else-if="activeCategory === 'shape'" name="shape-tools" />
       <slot v-else-if="activeCategory === 'pivot-analysis'" name="pivot-analysis-tools" />
       <slot v-else-if="activeCategory === 'pivot-design'" name="pivot-design-tools" />
       <slot v-else-if="activeCategory === 'insert'" name="insert-tools" />

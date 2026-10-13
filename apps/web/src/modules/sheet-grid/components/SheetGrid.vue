@@ -409,6 +409,10 @@ const emit = defineEmits<{
     path: import("@sheetcraft/core/shape-group").ShapeGroupPath | null,
   ];
   selectedDrawingChange: [id: string | null];
+  selectedShapeObjectsChange: [
+    paths: readonly import("@sheetcraft/core/shape-group").ShapeGroupPath[],
+    owner: Sheet,
+  ];
   configurePivot: [id: string];
   updatePivot: [table: SheetPivotTable];
   configurePivotFilter: [id: string, index: number];
@@ -1057,6 +1061,7 @@ const selectedRange = computed(() =>
     columnCount: renderExtent.value.columnCount,
   }),
 );
+const shapeDrawingLayerRef = ref<InstanceType<typeof SheetDrawingLayer>>();
 const selectedShapeDrawingId = ref<string | null>(null);
 watch(selectedShapeDrawingId, (id) => emit("selectedDrawingChange", id), { flush: "sync" });
 watch(
@@ -4208,6 +4213,9 @@ onBeforeUnmount(() => {
 });
 
 defineExpose({
+  selectShapeObjects: (paths: readonly import("@sheetcraft/core/shape-group").ShapeGroupPath[]) =>
+    shapeDrawingLayerRef.value?.selectObjectPaths(paths) ?? false,
+  getSelectedShapeObjects: () => shapeDrawingLayerRef.value?.getObjectSelectionPaths() ?? [],
   getDrawingLayout: (sheet: Sheet) => (props.sheet === sheet ? layout.value : undefined),
   getShapeFrameContext: (sheet: Sheet) =>
     props.sheet === sheet ? { layout: layout.value, metrics: pictureViewMetrics.value } : undefined,
@@ -4584,6 +4592,7 @@ defineExpose({
       }"
     >
       <SheetDrawingLayer
+        ref="shapeDrawingLayerRef"
         :text-edit-snapshot="shapeTextEditSnapshot"
         :text-edit-callbacks="shapeTextEditCallbacks"
         :start-text-edit="shapeTextEditStart"
@@ -4616,6 +4625,7 @@ defineExpose({
         @edit-owned="(root, path) => emit('editOwnedShape', root, path)"
         @format-group="(root, path) => emit('formatShapeGroup', root, path)"
         @group-selection-change="(id, path) => emit('selectedShapeGroupChange', id, path)"
+        @object-selection-change="(paths) => emit('selectedShapeObjectsChange', paths, sheet)"
       />
       <SheetFloatingImageLayer
         :source-tools-disabled="pictureSourceBusy"

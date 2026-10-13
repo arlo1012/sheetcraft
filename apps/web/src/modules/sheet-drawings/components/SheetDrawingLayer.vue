@@ -67,6 +67,7 @@ import {
   ungroupOwnedShapeContainer,
 } from "../shape-group-container-editing";
 import { resolveShapeGroupFormatContext } from "../shape-group-format-planning";
+import { readShapeObjectControlPaths } from "../shape-object-control-planning";
 import type { ShapeAlignment, ShapeAlignmentReference } from "../shape-selection-actions";
 import { createBrowserIdFactory } from "../../../shared/runtime/browser-id-factory";
 import { useAppI18n } from "../../../shared/i18n";
@@ -186,6 +187,7 @@ const emit = defineEmits<{
   groupSelectionChange: [rootId: string | null, path: ShapeGroupPath | null];
   select: [];
   selectionChange: [id: string | null];
+  objectSelectionChange: [paths: readonly ShapeGroupPath[]];
   format: [drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing];
   backgroundPointer: [event: PointerEvent];
   controlChange: [id: string, value: unknown];
@@ -1132,6 +1134,52 @@ const selectionDisabled = computed(
       );
     }),
 );
+function objectSelectionPaths(): ShapeGroupPath[] {
+  if (selectedRoots.value.length === 1 && selectedOwnedId.value) {
+    const root = props.drawings.find((node) => node.id === selectedRoots.value[0]);
+    if (root && isShapeGroupDrawing(root)) {
+      const visit = traverseShapeGroup(root).find(({ node }) => node.id === selectedOwnedId.value);
+      if (visit) return [[...visit.path]];
+    }
+  }
+  return selectedRoots.value
+    .filter((id) => props.drawings.some((node) => node.id === id && isShapeGroupEligibleRoot(node)))
+    .map((id) => [id]);
+}
+watch(
+  [() => props.sheet, () => JSON.stringify(objectSelectionPaths())],
+  () => emit("objectSelectionChange", objectSelectionPaths()),
+  { immediate: true, flush: "post" },
+);
+function selectObjectPaths(pathValues: readonly ShapeGroupPath[]): boolean {
+  if (!finishCanvasText() || props.readOnly) return false;
+  try {
+    const paths = readShapeObjectControlPaths(pathValues);
+    const roots = paths.map((path) => props.drawings.find((node) => node.id === path[0]));
+    if (
+      roots.some(
+        (root) =>
+          !root ||
+          !isShapeGroupEligibleRoot(root) ||
+          (props.sheet && !canEditShapeObject(props.sheet, root)),
+      )
+    )
+      return false;
+    if (paths.some((path) => path.length > 1)) {
+      if (paths.length !== 1 || !isShapeGroupDrawing(roots[0]!)) return false;
+      const target = traverseShapeGroup(roots[0]!).find(
+        ({ path }) => JSON.stringify(path) === JSON.stringify(paths[0]),
+      );
+      if (!target) return false;
+      selectRoots([roots[0]!.id], target.node.id);
+    } else selectRoots(roots.map((root) => root!.id));
+    emit("select");
+    return true;
+  } catch {
+    return false;
+  }
+}
+defineExpose({ selectObjectPaths, getObjectSelectionPaths: objectSelectionPaths });
 const groupFragments = computed(() => {
   if (renderUnavailable.value) return [];
   const m = metrics.value;
@@ -2861,7 +2909,7 @@ function clearOutside(event: PointerEvent) {
     event.target instanceof Element &&
     !event.target.closest("[data-sheet-drawing-id]") &&
     !event.target.closest(
-      '[role="dialog"],[role="menu"],[role="listbox"],[data-shape-format-pane],[data-shape-format-trigger],[data-shape-selection-toolbar],[data-shape-selection-reference-menu],[data-shape-group-selection],[data-shape-canvas-text-editor],[data-shape-canvas-text-toolbar]',
+      '[role="dialog"],[role="menu"],[role="listbox"],[data-shape-format-pane],[data-shape-format-trigger],[data-shape-selection-toolbar],[data-shape-selection-reference-menu],[data-shape-group-selection],[data-shape-canvas-text-editor],[data-shape-canvas-text-toolbar],[data-shape-tools-toolbar],[data-shape-selection-pane]',
     )
   ) {
     selectRoots([]);
@@ -3273,7 +3321,7 @@ watch(
     <div
       v-if="textEditSnapshot && textEditCallbacks && canvasTextPlacement"
       class="sheet-drawing-layer__text-editor-clip"
-      :style="canvasTextPlacement.clip"
+      :style="[canvasTextPlacement.clip, { zIndex: props.drawings.length * 3 + 3 }]"
     >
       <ShapeCanvasTextEditor
         ref="canvasTextEditor"
@@ -3311,7 +3359,6 @@ watch(
     position: absolute;
     overflow: hidden;
     pointer-events: none;
-    z-index: 1000;
   }
   position: absolute;
   inset: 0;

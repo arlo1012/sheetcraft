@@ -301,6 +301,44 @@ describe("SpreadsheetRibbon", () => {
     wrapper.unmount();
   });
 
+  test.each(["en-US", "zh-CN"] as const)(
+    "shape contextual tools preserve category and keyboard navigation (%s)",
+    async (locale) => {
+      const wrapper = mount(SpreadsheetRibbon, {
+        props: { state: createDefaultSelectionCellStyleState(), disabled: false },
+        global: { plugins: [createAppI18n(locale)] },
+        slots: {
+          "shape-tools": "<div data-shape-panel>Shape controls</div>",
+          "insert-tools": "<div data-insert-panel>Insert controls</div>",
+        },
+      });
+      await wrapper.get('[data-ribbon-category="insert"]').trigger("click");
+      await wrapper.setProps({ hasShape: true });
+      const shape = wrapper.get('[data-ribbon-category="shape"]');
+      expect(shape.text()).toBe(locale === "zh-CN" ? "绘图工具" : "Drawing Tools");
+      expect(shape.attributes("aria-selected")).toBe("true");
+      expect(wrapper.get('[role="tabpanel"]').attributes("aria-labelledby")).toBe(
+        shape.attributes("id"),
+      );
+      expect(wrapper.find("[data-shape-panel]").exists()).toBe(true);
+      await wrapper.setProps({ pivotId: "pivot-does-not-reclaim-shape" });
+      expect(shape.attributes("aria-selected")).toBe("true");
+      await wrapper.setProps({ hasShape: false });
+      expect(wrapper.find('[data-ribbon-category="shape"]').exists()).toBe(false);
+      expect(wrapper.get('[data-ribbon-category="insert"]').attributes("aria-selected")).toBe(
+        "true",
+      );
+      await wrapper.setProps({ hasShape: true, pivotId: undefined });
+      await wrapper.get('[data-ribbon-category="shape"]').trigger("keydown", { key: "Home" });
+      expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
+      await wrapper.get('[data-ribbon-category="home"]').trigger("keydown", { key: "End" });
+      expect(wrapper.get('[data-ribbon-category="shape"]').attributes("aria-selected")).toBe(
+        "true",
+      );
+      wrapper.unmount();
+    },
+  );
+
   test("shows contextual Table tools and restores the previous category on leaving a table", async () => {
     const wrapper = mount(SpreadsheetRibbon, {
       props: { state: createDefaultSelectionCellStyleState(), disabled: false },
