@@ -1,3 +1,6 @@
+import { resolveShapeGroup3dSource } from "./shape-group-3d.js";
+import type { Choice, PictureRotation3d } from "./picture-detailed-style.js";
+import { normalizeShapeStyle } from "./shape-style.js";
 import type { PictureSheetMetrics } from "./picture-axis-metrics.js";
 import { readPictureDataArray } from "./picture-data-array.js";
 import { resolvePictureLayout } from "./picture-frame.js";
@@ -8,6 +11,7 @@ import {
   MAX_SHAPE_GROUP_DEPTH,
   MAX_SHAPE_GROUP_NODES,
   normalizeShapeGroup,
+  normalizeShapeGroup3d,
   normalizeShapeGroupChild,
   traverseShapeGroup,
   type ShapeGroupChild,
@@ -283,4 +287,73 @@ export function applyShapeGroupChildWorldEdit(
     assertEditableSizes(edited);
   }
   return next.node;
+}
+
+export type ShapeGroup3dRotationLease = {
+  readonly selectedNode: ShapeGroupNodeLease;
+  /** Complete canonical camera-authority subtree, not only its immediate member IDs. */
+  readonly cameraOwner: ShapeGroupNodeLease;
+};
+/** Dedicated shared-scope capture; ordinary selected-node leases keep their existing behavior. */
+export function leaseShapeGroup3dRotation(
+  value: ShapeGroupDrawing,
+  pathValue: ShapeGroupPath,
+): ShapeGroup3dRotationLease {
+  const root = normalizeShapeGroup(value);
+  const selectedNode = nodeLease(root, readPath(pathValue));
+  const effective = resolveShapeGroup3dSource(root, selectedNode.path);
+  const ownerPath =
+    effective.source === "group" && effective.rotation3d?.kind === "value"
+      ? effective.ownerPath!
+      : selectedNode.path;
+  return { selectedNode, cameraOwner: nodeLease(root, ownerPath) };
+}
+function readShapeGroup3dRotationLease(
+  value: ShapeGroup3dRotationLease,
+): ShapeGroup3dRotationLease {
+  const fields = record(value, ["selectedNode", "cameraOwner"], "shape group 3D rotation lease");
+  return {
+    selectedNode: readLease(fields.selectedNode as ShapeGroupNodeLease),
+    cameraOwner: readLease(fields.cameraOwner as ShapeGroupNodeLease),
+  };
+}
+
+export type ShapeGroup3dRotationEdit = {
+  root: ShapeGroupDrawing;
+  /** The true shared-scene owner, even when a selected leaf initiated the edit. */
+  ownerPath: ShapeGroupPath;
+  affectedLeafPaths: ShapeGroupPath[];
+};
+/** Source-only exact-lease edit. Web admission remains closed until all paint consumers agree. */
+export function applyShapeGroup3dRotationEdit(
+  value: ShapeGroupDrawing,
+  leaseValue: ShapeGroup3dRotationLease,
+  rotationValue: Choice<PictureRotation3d>,
+): ShapeGroup3dRotationEdit {
+  const root = normalizeShapeGroup(value);
+  const lease = readShapeGroup3dRotationLease(leaseValue);
+  const target = findShapeGroupNode(root, lease.selectedNode.path);
+  if (!target || !sameLease(nodeLease(root, target.path), lease.selectedNode))
+    throw new TypeError("Shape group 3D edit lease is stale, missing or reparented.");
+  const rotation3d = normalizeShapeGroup3d({ rotation3d: rotationValue })!.rotation3d;
+  const effective = resolveShapeGroup3dSource(root, target.path);
+  const ownerPath =
+    effective.source === "group" && effective.rotation3d?.kind === "value"
+      ? effective.ownerPath!
+      : target.path;
+  if (
+    !samePath(ownerPath, lease.cameraOwner.path) ||
+    !sameLease(nodeLease(root, ownerPath), lease.cameraOwner)
+  )
+    throw new TypeError(
+      "Shape group 3D camera-owner subtree lease is stale, missing or reparented.",
+    );
+  const owner = findShapeGroupNode(root, ownerPath)!.node;
+  if (owner.kind === "shapeGroup") owner.group3d = { rotation3d };
+  else owner.shapeStyle = normalizeShapeStyle({ ...owner.shapeStyle, rotation3d });
+  return {
+    root: normalizeShapeGroup(root),
+    ownerPath: [...ownerPath],
+    affectedLeafPaths: effective.affectedLeafPaths.map((path) => [...path]),
+  };
 }

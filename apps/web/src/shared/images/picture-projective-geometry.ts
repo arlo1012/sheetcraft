@@ -65,11 +65,35 @@ export type PictureProjectiveRotation = PictureProjectiveRotationParameters &
     | { projection: "perspective"; perspectiveDeg: number }
     | { projection: "oblique"; shearX: number; shearY: number }
   );
+/** Canvas-order affine: x'=a*x+c*y+e, y'=b*x+d*y+f. */
+export type PictureProjectiveAffine = Readonly<{
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  e: number;
+  f: number;
+}>;
+/** Transient common camera coordinates, never a replacement for the leaf source frame.
+ * sourceToScene includes the COMPLETE affine owner chain, including source flips.
+ * The output adapter is independent of physical world/normal transforms. By default
+ * it is inverse(sourceToScene), so the existing affine owner placement A can paint
+ * the leaf-local output A^-1*S*A and obtain the common scene projection S*A.
+ */
+export type PictureProjectiveScene = Readonly<{
+  widthPx: number;
+  heightPx: number;
+  /** Common unprojected pivot/principal point; defaults to the scene frame center. */
+  pivot?: PictureProjectivePoint;
+  sourceToScene: PictureProjectiveAffine;
+  sceneToOutput?: PictureProjectiveAffine;
+}>;
 export type PictureProjectiveGeometryInput = {
   widthPx: number;
   heightPx: number;
   depthPx?: number;
   rotation: PictureProjectiveRotation;
+  scene?: PictureProjectiveScene;
 };
 export type PictureProjectiveFacing = "front" | "back" | "edge-on";
 export type PictureProjectiveFaceKind = "front" | "back" | "top" | "right" | "bottom" | "left";
@@ -102,7 +126,19 @@ export type PictureProjectiveGeometry = Readonly<{
   selectionBounds: PictureProjectiveBounds;
   /** Paint/culling bounds only, including extrusion. Never selection bounds. */
   visualBounds: PictureProjectiveBounds;
+  /** Transient numerical guard policy; ordinary leaf-camera behavior stays unchanged. */
+  isSceneProjection: boolean;
+  sourceToSceneMatrix: PictureProjectiveMatrix4;
   sourceToWorldMatrix: PictureProjectiveMatrix4;
+  /** Physical inverse-transpose linear map. Normalize after mapping a source normal.
+   * Never use the output adapter or the model's affine linear block for lighting.
+   */
+  sourceNormalToWorldMatrix: PictureProjectiveMatrix4;
+  /** Common scene screen coordinates, before the independent output adapter. */
+  sourceToSceneScreenMatrix: PictureProjectiveMatrix4;
+  sceneToOutputMatrix: PictureProjectiveMatrix4;
+  /** Corrects screen winding for physical culling, including reflected placements. */
+  projectedOrientation: 1 | -1;
   /** Actual 4x4 homogeneous projection; screen x/y require division by w. */
   sourceToScreenMatrix: PictureProjectiveMatrix4;
   front: PictureProjectivePlane;
@@ -121,6 +157,7 @@ export const PICTURE_PROJECTIVE_LIMITS = Object.freeze({
   triangles: 8192,
   subdivisions: 64,
   minMeshErrorPx: 1e-4,
+  inverseErrorPx: 1 / 1024,
 });
 export type PictureProjectiveFailure =
   | "invalid-input"
@@ -178,6 +215,107 @@ function multiply4(
   }
   return matrix4(result);
 }
+function affineMatrix(affine: PictureProjectiveAffine): PictureProjectiveMatrix4 {
+  for (const name of ["a", "b", "c", "d", "e", "f"] as const) {
+    const value = affine[name];
+    bounded(
+      value,
+      -PICTURE_PROJECTIVE_LIMITS.coordinatePx,
+      PICTURE_PROJECTIVE_LIMITS.coordinatePx,
+      name,
+    );
+  }
+  return matrix4([
+    affine.a,
+    affine.c,
+    0,
+    affine.e,
+    affine.b,
+    affine.d,
+    0,
+    affine.f,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+  ]);
+}
+function affineDeterminant(matrix: PictureProjectiveMatrix4): number {
+  const determinant = matrix[0] * matrix[5] - matrix[1] * matrix[4];
+  if (
+    !Number.isFinite(determinant) ||
+    Math.abs(determinant) <= PICTURE_PROJECTIVE_LIMITS.degeneracy
+  )
+    fail("degenerate", "Picture projective scene placement or output adapter is singular.");
+  return determinant;
+}
+function inverseAffineMatrix(
+  matrix: PictureProjectiveMatrix4,
+  determinant: number,
+): PictureProjectiveMatrix4 {
+  const a = matrix[5] / determinant,
+    b = -matrix[4] / determinant,
+    c = -matrix[1] / determinant,
+    d = matrix[0] / determinant;
+  const inverse = matrix4(
+    [
+      a,
+      c,
+      0,
+      -a * matrix[3] - c * matrix[7],
+      b,
+      d,
+      0,
+      -b * matrix[3] - d * matrix[7],
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+    ].map((value) => (value === 0 ? 0 : value)),
+  );
+  if (inverse.some((value) => Math.abs(value) > PICTURE_PROJECTIVE_LIMITS.coordinatePx))
+    fail("coordinate-budget", "Picture projective inverse placement coordinate budget exceeded.");
+  return inverse;
+}
+function normalPlacementMatrix(inverse: PictureProjectiveMatrix4): PictureProjectiveMatrix4 {
+  return matrix4([
+    inverse[0],
+    inverse[4],
+    0,
+    0,
+    inverse[1],
+    inverse[5],
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+  ]);
+}
+function placedNormal(
+  rotation: PictureProjectiveMatrix4,
+  placement: PictureProjectiveMatrix4,
+  nx: number,
+  ny: number,
+): PictureProjectiveVector {
+  const normal = transformNormal(placement, nx, ny, 0);
+  const length = Math.hypot(normal.x, normal.y);
+  return transformNormal(rotation, normal.x / length, normal.y / length, 0);
+}
+const IDENTITY_MATRIX = matrix4([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 function transformWorld(
   matrix: PictureProjectiveMatrix4,
   x: number,
@@ -218,8 +356,14 @@ function homography(matrix: PictureProjectiveMatrix4, z: number): PictureProject
 function inverseHomography(
   matrix: PictureProjectiveHomography,
   determinant: number,
+  scenePlane = false,
 ): PictureProjectiveHomography | null {
-  if (Math.abs(determinant) <= PICTURE_PROJECTIVE_LIMITS.degeneracy) return null;
+  // A scene's physical camera determinant is guarded before affine adaptation.
+  // A small but nonsingular output area must not be mistaken for an edge-on face.
+  if (
+    scenePlane ? determinant === 0 : Math.abs(determinant) <= PICTURE_PROJECTIVE_LIMITS.degeneracy
+  )
+    return null;
   const [a, b, c, d, e, f, g, h, i] = matrix;
   const inverse = [
     e * i - f * h,
@@ -234,10 +378,87 @@ function inverseHomography(
   ].map((entry) => entry / determinant);
   if (inverse.some((entry) => !Number.isFinite(entry)))
     fail("degenerate", "Picture projective inverse is not finite.");
+  // Homogeneous coefficients are not coordinates. Bound their representation
+  // with a positive projective scale instead of rejecting a valid small map.
+  const scale = scenePlane ? Math.max(...inverse.map(Math.abs)) : 1;
+  if (scale > PICTURE_PROJECTIVE_LIMITS.coordinatePx)
+    return Object.freeze(
+      inverse.map((entry) => entry / scale),
+    ) as unknown as PictureProjectiveHomography;
   return Object.freeze(inverse) as unknown as PictureProjectiveHomography;
 }
 function denominator(matrix: PictureProjectiveHomography, x: number, y: number): number {
   return matrix[6] * x + matrix[7] * y + matrix[8];
+}
+/** Conservative floating-point evaluation budget over the whole source rectangle.
+ * This rejects ill-conditioned scene slivers explicitly rather than publishing
+ * an inverse whose finite coefficients lose meaningful source coordinates.
+ */
+function guardSceneInverse(
+  forward: PictureProjectiveHomography,
+  inverse: PictureProjectiveHomography,
+  corners: PictureProjectiveQuad,
+  width: number,
+  height: number,
+): void {
+  const sources = [
+    [0, 0],
+    [width, 0],
+    [width, height],
+    [0, height],
+  ] as const;
+  const roundoff = 64 * Number.EPSILON;
+  const maxX = Math.max(...corners.map((entry) => Math.abs(entry.x))),
+    maxY = Math.max(...corners.map((entry) => Math.abs(entry.y)));
+  const forwardSum = (offset: number) =>
+    Math.abs(forward[offset]!) * width +
+    Math.abs(forward[offset + 1]!) * height +
+    Math.abs(forward[offset + 2]!);
+  const inverseSum = (offset: number) =>
+    Math.abs(inverse[offset]!) * maxX +
+    Math.abs(inverse[offset + 1]!) * maxY +
+    Math.abs(inverse[offset + 2]!);
+  const minForwardW = Math.min(...sources.map(([x, y]) => denominator(forward, x, y)));
+  const forwardWError = roundoff * forwardSum(6);
+  const stableForwardW = minForwardW - forwardWError;
+  if (!(stableForwardW > 0))
+    fail("degenerate", "Picture projective scene forward map is ill-conditioned.");
+  const screenErrorX =
+      (roundoff * forwardSum(0) + maxX * forwardWError) / stableForwardW + roundoff * maxX,
+    screenErrorY =
+      (roundoff * forwardSum(3) + maxY * forwardWError) / stableForwardW + roundoff * maxY;
+  const inverseError = (offset: number) =>
+    roundoff * inverseSum(offset) +
+    Math.abs(inverse[offset]!) * screenErrorX +
+    Math.abs(inverse[offset + 1]!) * screenErrorY;
+  const minInverseW = Math.min(...corners.map((entry) => denominator(inverse, entry.x, entry.y)));
+  const inverseWError = inverseError(6);
+  const stableInverseW = minInverseW - inverseWError;
+  if (
+    !(stableInverseW > 0) ||
+    (inverseError(0) + width * inverseWError) / stableInverseW + roundoff * width >
+      PICTURE_PROJECTIVE_LIMITS.inverseErrorPx ||
+    (inverseError(3) + height * inverseWError) / stableInverseW + roundoff * height >
+      PICTURE_PROJECTIVE_LIMITS.inverseErrorPx
+  )
+    fail(
+      "degenerate",
+      "Picture projective scene inverse exceeds its source-coordinate precision budget.",
+    );
+  for (let index = 0; index < corners.length; index++) {
+    const screen = corners[index]!,
+      source = sources[index]!,
+      w = denominator(inverse, screen.x, screen.y);
+    const x = (inverse[0] * screen.x + inverse[1] * screen.y + inverse[2]) / w,
+      y = (inverse[3] * screen.x + inverse[4] * screen.y + inverse[5]) / w;
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      Math.abs(x - source[0]) > PICTURE_PROJECTIVE_LIMITS.inverseErrorPx ||
+      Math.abs(y - source[1]) > PICTURE_PROJECTIVE_LIMITS.inverseErrorPx
+    )
+      fail("degenerate", "Picture projective scene inverse does not round-trip its source frame.");
+  }
 }
 function project(
   matrix: PictureProjectiveHomography,
@@ -304,6 +525,42 @@ export function createPictureProjectiveGeometry(
     "height",
   );
   bounded(depth, 0, PICTURE_PROJECTIVE_LIMITS.dimensionPx, "depth");
+  const scene = input.scene;
+  const cameraWidth = scene ? scene.widthPx : width,
+    cameraHeight = scene ? scene.heightPx : height;
+  bounded(
+    cameraWidth,
+    PICTURE_PROJECTIVE_LIMITS.minDimensionPx,
+    PICTURE_PROJECTIVE_LIMITS.dimensionPx,
+    "scene width",
+  );
+  bounded(
+    cameraHeight,
+    PICTURE_PROJECTIVE_LIMITS.minDimensionPx,
+    PICTURE_PROJECTIVE_LIMITS.dimensionPx,
+    "scene height",
+  );
+  const pivotX = scene?.pivot ? scene.pivot.x : cameraWidth / 2,
+    pivotY = scene?.pivot ? scene.pivot.y : cameraHeight / 2;
+  bounded(
+    pivotX,
+    -PICTURE_PROJECTIVE_LIMITS.coordinatePx,
+    PICTURE_PROJECTIVE_LIMITS.coordinatePx,
+    "scene pivot X",
+  );
+  bounded(
+    pivotY,
+    -PICTURE_PROJECTIVE_LIMITS.coordinatePx,
+    PICTURE_PROJECTIVE_LIMITS.coordinatePx,
+    "scene pivot Y",
+  );
+  const placement = scene ? affineMatrix(scene.sourceToScene) : IDENTITY_MATRIX;
+  const placementDeterminant = scene ? affineDeterminant(placement) : 1;
+  const inversePlacement = scene
+    ? inverseAffineMatrix(placement, placementDeterminant)
+    : IDENTITY_MATRIX;
+  const output = scene?.sceneToOutput ? affineMatrix(scene.sceneToOutput) : inversePlacement;
+  const outputDeterminant = scene ? affineDeterminant(output) : 1;
   for (const [name, value] of [
     ["X rotation", values.xDeg],
     ["Y rotation", values.yDeg],
@@ -321,7 +578,8 @@ export function createPictureProjectiveGeometry(
     shearY = 0;
   if (values.projection === "perspective") {
     bounded(values.perspectiveDeg, 0, 120, "perspective angle");
-    perspective = Math.tan((values.perspectiveDeg * Math.PI) / 360) / (2 * Math.max(width, height));
+    perspective =
+      Math.tan((values.perspectiveDeg * Math.PI) / 360) / (2 * Math.max(cameraWidth, cameraHeight));
   } else if (values.projection === "oblique") {
     bounded(values.shearX, -16, 16, "oblique X shear");
     bounded(values.shearY, -16, 16, "oblique Y shear");
@@ -343,36 +601,22 @@ export function createPictureProjectiveGeometry(
   const pitch = matrix4([1, 0, 0, 0, 0, cy, sy, 0, 0, -sy, cy, 0, 0, 0, 0, 1]);
   const counterclockwise = matrix4([cz, sz, 0, 0, -sz, cz, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   const rotation = multiply4(counterclockwise, multiply4(pitch, yaw));
-  const model = multiply4(
+  const cameraModel = multiply4(
     rotation,
-    matrix4([
-      1,
-      0,
-      0,
-      -width / 2,
-      0,
-      1,
-      0,
-      -height / 2,
-      0,
-      0,
-      1,
-      values.distanceFromGroundPx,
-      0,
-      0,
-      0,
-      1,
-    ]),
+    matrix4([1, 0, 0, -pivotX, 0, 1, 0, -pivotY, 0, 0, 1, values.distanceFromGroundPx, 0, 0, 0, 1]),
   );
+  const model = scene ? multiply4(cameraModel, placement) : cameraModel;
+  const normalPlacement = scene ? normalPlacementMatrix(inversePlacement) : IDENTITY_MATRIX;
+  const normalModel = scene ? multiply4(rotation, normalPlacement) : rotation;
   const projection = matrix4([
     1,
     0,
-    shearX - (width / 2) * perspective,
-    width / 2,
+    shearX - pivotX * perspective,
+    pivotX,
     0,
     1,
-    shearY - (height / 2) * perspective,
-    height / 2,
+    shearY - pivotY * perspective,
+    pivotY,
     0,
     0,
     1,
@@ -382,7 +626,8 @@ export function createPictureProjectiveGeometry(
     -perspective,
     1,
   ]);
-  const screen = multiply4(projection, model);
+  const sceneScreen = multiply4(projection, model);
+  const screen = scene ? multiply4(output, sceneScreen) : sceneScreen;
   const frontHomography = homography(screen, 0);
   const backHomography = homography(screen, -depth);
   const source = [
@@ -391,6 +636,30 @@ export function createPictureProjectiveGeometry(
     [width, height],
     [0, height],
   ] as const;
+  // Guard the actual placed leaf footprint/depth, not merely the scene frame.
+  // The output inverse may otherwise hide out-of-budget common coordinates.
+  if (scene) {
+    const commonFront = homography(sceneScreen, 0),
+      commonBack = homography(sceneScreen, -depth);
+    for (const [px, py] of source) {
+      point(
+        placement[0] * px + placement[1] * py + placement[3],
+        placement[4] * px + placement[5] * py + placement[7],
+      );
+      project(commonFront, px, py);
+      project(commonBack, px, py);
+      for (const pz of [0, -depth]) {
+        const world = transformWorld(model, px, py, pz);
+        if (
+          [world.x, world.y, world.z].some(
+            (value) =>
+              !Number.isFinite(value) || Math.abs(value) > PICTURE_PROJECTIVE_LIMITS.coordinatePx,
+          )
+        )
+          fail("coordinate-budget", "Picture projective world coordinate budget exceeded.");
+      }
+    }
+  }
   const frontCorners = Object.freeze(
     source.map(([px, py]) => project(frontHomography, px, py)),
   ) as unknown as PictureProjectiveQuad;
@@ -405,6 +674,7 @@ export function createPictureProjectiveGeometry(
     corners: PictureProjectiveQuad,
     world: readonly PictureProjectiveVector[],
     normal: PictureProjectiveVector,
+    planeVisibility?: number,
   ): PictureProjectiveFace => {
     const center = vector(
       world.reduce((sum, entry) => sum + entry.x, 0) / 4,
@@ -412,9 +682,10 @@ export function createPictureProjectiveGeometry(
       world.reduce((sum, entry) => sum + entry.z, 0) / 4,
     );
     const visibility =
-      perspective > 0
+      planeVisibility ??
+      (perspective > 0
         ? normal.z - perspective * (normal.x * center.x + normal.y * center.y + normal.z * center.z)
-        : normal.z - shearX * normal.x - shearY * normal.y;
+        : normal.z - shearX * normal.x - shearY * normal.y);
     return Object.freeze({
       kind,
       corners,
@@ -426,28 +697,58 @@ export function createPictureProjectiveGeometry(
   };
   const frontNormal = transformNormal(rotation, 0, 0, 1);
   // The analytic determinant avoids subtracting large translated screen terms.
-  const frontDeterminant =
+  const frontCameraDeterminant =
     perspective > 0
       ? frontNormal.z - perspective * values.distanceFromGroundPx
       : frontNormal.z - shearX * frontNormal.x - shearY * frontNormal.y;
+  const adaptedDeterminant = (cameraDeterminant: number): number =>
+    Math.abs(cameraDeterminant) <= PICTURE_PROJECTIVE_LIMITS.degeneracy
+      ? 0
+      : cameraDeterminant * placementDeterminant * outputDeterminant;
+  const frontInverse = inverseHomography(
+    frontHomography,
+    adaptedDeterminant(frontCameraDeterminant),
+    !!scene,
+  );
+  if (scene && frontInverse)
+    guardSceneInverse(frontHomography, frontInverse, frontCorners, width, height);
   const front: PictureProjectivePlane = Object.freeze({
-    ...face("front", frontCorners, frontWorld, frontNormal),
+    ...face(
+      "front",
+      frontCorners,
+      frontWorld,
+      frontNormal,
+      scene ? frontCameraDeterminant : undefined,
+    ),
     homography: frontHomography,
-    inverseHomography: inverseHomography(frontHomography, frontDeterminant),
+    inverseHomography: frontInverse,
   });
   // A zero-depth plane viewed exactly edge-on legitimately has no painted area.
   // Keep its durable selection frame; hit/texture consumers use the null inverse.
   let back: PictureProjectivePlane | null = null;
   const sides: PictureProjectiveFace[] = [];
   if (depth > 0) {
-    const backDeterminant =
+    const backCameraDeterminant =
       perspective > 0
         ? frontNormal.z - perspective * (values.distanceFromGroundPx - depth)
-        : frontDeterminant;
+        : frontCameraDeterminant;
+    const backInverse = inverseHomography(
+      backHomography,
+      adaptedDeterminant(backCameraDeterminant),
+      !!scene,
+    );
+    if (scene && backInverse)
+      guardSceneInverse(backHomography, backInverse, backCorners, width, height);
     back = Object.freeze({
-      ...face("back", backCorners, backWorld, transformNormal(rotation, 0, 0, -1)),
+      ...face(
+        "back",
+        backCorners,
+        backWorld,
+        transformNormal(rotation, 0, 0, -1),
+        scene ? -backCameraDeterminant : undefined,
+      ),
       homography: backHomography,
-      inverseHomography: inverseHomography(backHomography, backDeterminant),
+      inverseHomography: backInverse,
     });
     const side = (
       kind: PictureProjectiveFaceKind,
@@ -466,7 +767,9 @@ export function createPictureProjectiveGeometry(
             frontCorners[second]!,
           ] as const),
           [frontWorld[first]!, backWorld[first]!, backWorld[second]!, frontWorld[second]!],
-          transformNormal(rotation, nx, ny, 0),
+          // Normalize in the unrotated scene. Reflections transform outward
+          // normals by inverse transpose, without reversing front/back faces.
+          placedNormal(rotation, normalPlacement, nx, ny),
         ),
       );
     };
@@ -487,7 +790,13 @@ export function createPictureProjectiveGeometry(
       depth > 0 ? [...frontCorners, ...backCorners] : frontCorners,
       depth === 0 && !front.inverseHomography,
     ),
+    isSceneProjection: !!scene,
+    sourceToSceneMatrix: placement,
     sourceToWorldMatrix: model,
+    sourceNormalToWorldMatrix: normalModel,
+    sourceToSceneScreenMatrix: sceneScreen,
+    sceneToOutputMatrix: output,
+    projectedOrientation: placementDeterminant * outputDeterminant > 0 ? 1 : -1,
     sourceToScreenMatrix: screen,
     front,
     back,
@@ -513,6 +822,8 @@ export function mapPictureProjectivePoint(
     PICTURE_PROJECTIVE_LIMITS.coordinatePx,
     "source Y",
   );
+  if (geometry.sourceToSceneScreenMatrix !== geometry.sourceToScreenMatrix)
+    project(homography(geometry.sourceToSceneScreenMatrix, 0), source.x, source.y);
   return project(geometry.front.homography, source.x, source.y);
 }
 export type PictureProjectiveHit = Readonly<{ x: number; y: number; u: number; v: number }>;
@@ -538,14 +849,15 @@ export function hitPictureProjectiveFront(
   const inverse = geometry.front.inverseHomography;
   if (!inverse || geometry.front.facing !== "front") return null;
   const w = denominator(inverse, screen.x, screen.y);
-  if (!Number.isFinite(w) || w < 1e-12) return null;
+  if (!Number.isFinite(w) || (geometry.isSceneProjection ? w <= 0 : w < 1e-12)) return null;
   const x = (inverse[0] * screen.x + inverse[1] * screen.y + inverse[2]) / w;
   const y = (inverse[3] * screen.x + inverse[4] * screen.y + inverse[5]) / w;
   // Roundoff at projected boundary vertices must not create gaps in hit coverage.
-  const epsilon =
-    64 *
-    Number.EPSILON *
-    Math.max(1, geometry.widthPx, geometry.heightPx, Math.abs(screen.x), Math.abs(screen.y));
+  const epsilon = geometry.isSceneProjection
+    ? PICTURE_PROJECTIVE_LIMITS.inverseErrorPx
+    : 64 *
+      Number.EPSILON *
+      Math.max(1, geometry.widthPx, geometry.heightPx, Math.abs(screen.x), Math.abs(screen.y));
   if (
     !Number.isFinite(x) ||
     !Number.isFinite(y) ||
@@ -557,6 +869,18 @@ export function hitPictureProjectiveFront(
     return null;
   const px = Math.min(geometry.widthPx, Math.max(0, x));
   const py = Math.min(geometry.heightPx, Math.max(0, y));
+  if (geometry.isSceneProjection) {
+    const forward = mapPictureProjectivePoint(geometry, { x: px, y: py });
+    const screenEpsilon =
+      64 *
+      Number.EPSILON *
+      Math.max(1, geometry.widthPx, geometry.heightPx, Math.abs(screen.x), Math.abs(screen.y));
+    if (
+      Math.abs(forward.x - screen.x) > screenEpsilon ||
+      Math.abs(forward.y - screen.y) > screenEpsilon
+    )
+      return null;
+  }
   return Object.freeze({ x: px, y: py, u: px / geometry.widthPx, v: py / geometry.heightPx });
 }
 
@@ -564,14 +888,6 @@ export type PictureProjectiveMeshVertex = Readonly<{
   source: PictureProjectivePoint;
   screen: PictureProjectivePoint;
   w: number;
-}>;
-export type PictureProjectiveAffine = Readonly<{
-  a: number;
-  b: number;
-  c: number;
-  d: number;
-  e: number;
-  f: number;
 }>;
 export type PictureProjectiveMeshTriangle = Readonly<{
   vertices: readonly [

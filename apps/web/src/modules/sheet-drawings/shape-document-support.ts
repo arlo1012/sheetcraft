@@ -27,10 +27,31 @@ export class UnsupportedShapeConnectorDocumentError extends UnsupportedShapeFram
     this.message = `Live shape connector rendering requires a complete worksheet relation pass (sheet ${sheetId}, objects ${drawingIds.join(", ")}).`;
   }
 }
+/** Source-only stage: a shared camera must never be rendered as independent leaf cameras. */
+export class UnsupportedShapeGroup3dDocumentError extends UnsupportedShapeFrameDocumentError {
+  constructor(sheetId: string, drawingIds: readonly string[]) {
+    super(sheetId, drawingIds);
+    this.name = "UnsupportedShapeGroup3dDocumentError";
+    this.message = `Shared group 3D scene rendering is not yet enabled for this consumer (sheet ${sheetId}, objects ${drawingIds.join(", ")}).`;
+  }
+}
+export function assertNoUnresolvedShapeGroup3d(
+  sheetId: string,
+  drawings: readonly SheetDrawing[] | undefined,
+): void {
+  const ids: string[] = [];
+  for (const root of drawings ?? []) {
+    if (!isShapeGroupDrawing(root)) continue;
+    for (const { node } of traverseShapeGroup(root))
+      if (node.kind === "shapeGroup" && Object.hasOwn(node, "group3d")) ids.push(node.id);
+  }
+  if (ids.length) throw new UnsupportedShapeGroup3dDocumentError(sheetId, ids);
+}
 export function assertNoUnresolvedShapeConnectors(
   sheetId: string,
   drawings: readonly SheetDrawing[] | undefined,
 ): void {
+  assertNoUnresolvedShapeGroup3d(sheetId, drawings);
   const ids: string[] = [];
   for (const root of drawings ?? [])
     for (const node of isShapeGroupDrawing(root)
@@ -39,10 +60,10 @@ export function assertNoUnresolvedShapeConnectors(
       if ("shapeConnector" in node) ids.push(node.id);
   if (ids.length) throw new UnsupportedShapeConnectorDocumentError(sheetId, ids);
 }
-function checkDrawings(_sheetId: string, drawings: readonly SheetDrawing[] | undefined): void {
+function checkDrawings(sheetId: string, drawings: readonly SheetDrawing[] | undefined): void {
   // Whole-forest normalization validates every reference before history or replacement.
   // Raw carrier projectors retain their independent explicit rejection above.
-  normalizeSheetDrawings(drawings);
+  assertNoUnresolvedShapeGroup3d(sheetId, normalizeSheetDrawings(drawings));
 }
 export function assertWorkbookShapeSupport(workbook: Workbook): void {
   for (const sheet of workbook.sheets.values()) {

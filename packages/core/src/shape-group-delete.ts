@@ -1,3 +1,4 @@
+import { materializeShapeGroup3dRelease } from "./shape-group-3d.js";
 import { resolveSheetShapeConnections } from "./shape-connector-layout.js";
 import { materializeShapeConnectorTargets } from "./shape-connector-materialize.js";
 import type { PictureSheetMetrics } from "./picture-axis-metrics.js";
@@ -228,8 +229,21 @@ export function planDeleteShapeGroupNodes(
     const owner = planOwner(resolved);
     if (!owner.changed) return { node: resolved.node, layout: resolved.layout, changed: false };
     if (!owner.members.length) return null;
-    if (owner.members.length === 1)
-      return inheritOwner(owner.members[0]!, resolved.node.shapeProperties, resolved.node.hidden);
+    if (owner.members.length === 1) {
+      const survivor = owner.members[0]!;
+      return inheritOwner(
+        {
+          ...survivor,
+          node: materializeShapeGroup3dRelease(
+            groups.get(resolved.path[0]!)!.node,
+            resolved.path,
+            survivor.node,
+          ),
+        },
+        resolved.node.shapeProperties,
+        resolved.node.hidden,
+      );
+    }
     return {
       node: {
         ...resolved.node,
@@ -258,7 +272,7 @@ export function planDeleteShapeGroupNodes(
       );
       next.push(
         releaseShapeGroupChild(
-          survivor.node,
+          materializeShapeGroup3dRelease(resolved.node, resolved.path, survivor.node),
           survivor.layout,
           metrics,
           resolved.node.shapeProperties,

@@ -31,6 +31,7 @@ import {
   type ResolvedShapeGroupProjection,
 } from "./resolved-shape-group";
 import { prepareResolvedShapeGeometry } from "./shape-geometry";
+import { assertNoUnresolvedShapeGroup3d } from "./shape-document-support";
 
 type GraphicSource = SheetGraphicDrawing | SheetFramedGraphicDrawing | SheetGroupedGraphicDrawing;
 export type ShapeConnectorRenderSource =
@@ -230,6 +231,8 @@ export function resolveShapeForestForRender(options: {
   if (!Number.isSafeInteger(revision) || revision < 0)
     throw new RangeError("A shape render pass requires a non-negative safe revision.");
   const snapshot = detachedSnapshot(normalizeSheetDrawings(drawings));
+  // Both static and connector relation branches must share source-stage admission.
+  assertNoUnresolvedShapeGroup3d("shape-render-pass", snapshot);
   const sourceRoots = [...drawings];
   const sourceNodes = sourceRoots.map((root) =>
     root.kind === "shapeGroup"

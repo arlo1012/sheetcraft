@@ -486,6 +486,8 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     throw new TypeError("Owned shape children cannot use root drawing placement.");
   if (Object.getOwnPropertyDescriptor(value, "kind")?.value === "shapeGroup")
     return normalizeShapeGroup(value as ShapeGroupDrawing);
+  if ("group3d" in value)
+    throw new TypeError("Shared 3D cameras require a genuine shape group owner.");
   if ("groupEffects" in value)
     throw new TypeError("Container effects require a genuine shape group owner.");
   if ("shapeFrame" in value && !isFramedShapeDrawing(value))

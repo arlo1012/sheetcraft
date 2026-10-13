@@ -9,6 +9,7 @@ import {
   type ResolvedShapeGroupNode,
 } from "@sheetcraft/core/shape-group-layout";
 import { getShapeObjectProperties } from "@sheetcraft/core/shape-object-properties";
+import { resolveShapeGroup3dSource } from "@sheetcraft/core/shape-group-3d";
 import { framedShape } from "./framed-shape-fixture";
 import {
   ungroupOwnedShapeContainer,
@@ -64,6 +65,57 @@ function expectWorld(actual: ResolvedShapeGroupNode, expected: ResolvedShapeGrou
 }
 
 describe("real nested shape container edits", () => {
+  test("nested Ungroup releases the actual shared camera to leaf and surviving subgroup owners", () => {
+    const f = fixture(),
+      inner = f.root.members.find((node) => node.id === "inner");
+    if (!inner || inner.kind !== "shapeGroup") throw Error("Expected inner owner");
+    inner.group3d = {
+      rotation3d: {
+        kind: "value",
+        value: { projection: "parallel", xDeg: 30, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+      },
+    };
+    const original = worlds(f.root, f.metrics),
+      before = structuredClone(f.root),
+      next = ungroupOwnedShapeContainer(f.root, ["root", "inner"], f.metrics),
+      projected = worlds(next, f.metrics);
+    for (const id of ["a", "sub", "d", "e", "b"])
+      expectWorld(projected.get(id)!, original.get(id)!);
+    for (const id of ["a", "b"])
+      expect(resolveShapeGroup3dSource(next, ["root", id])).toMatchObject({
+        source: "leaf",
+        ownerPath: ["root", id],
+        rotation3d: inner.group3d.rotation3d,
+      });
+    expect(resolveShapeGroup3dSource(next, ["root", "sub", "d"])).toMatchObject({
+      source: "group",
+      ownerPath: ["root", "sub"],
+      rotation3d: inner.group3d.rotation3d,
+    });
+    expect(projected.get("d")!.node).not.toHaveProperty("shapeStyle.rotation3d");
+    expect(f.root).toEqual(before);
+  });
+  test("releasing a dormant nested owner retains the live ancestor and dormant leaf sources", () => {
+    const f = fixture();
+    f.root.group3d = {
+      rotation3d: {
+        kind: "value",
+        value: { projection: "parallel", xDeg: 45, yDeg: 0, zDeg: 0, distanceFromGroundPt: 0 },
+      },
+    };
+    const before = structuredClone(f.root),
+      next = ungroupOwnedShapeContainer(f.root, ["root", "inner"], f.metrics);
+    expect(next.group3d).toEqual(f.root.group3d);
+    expect(resolveShapeGroup3dSource(next, ["root", "a"])).toMatchObject({
+      source: "group",
+      ownerPath: ["root"],
+      rotation3d: f.root.group3d.rotation3d,
+    });
+    expect(next.members.find((node) => node.id === "a")).not.toHaveProperty(
+      "shapeStyle.rotation3d",
+    );
+    expect(f.root).toEqual(before);
+  });
   test("one-level Ungroup preserves every rotated world placement, stack slot, metadata and source", () => {
     const f = fixture(),
       before = JSON.stringify(f.root),

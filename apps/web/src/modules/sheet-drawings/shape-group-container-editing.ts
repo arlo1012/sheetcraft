@@ -18,6 +18,7 @@ import {
   type ShapeGroupParentLayout,
 } from "@sheetcraft/core/shape-group-layout";
 import { releaseShapeGroupChild } from "@sheetcraft/core/shape-group-planning";
+import { materializeShapeGroup3dReleaseChildren } from "@sheetcraft/core/shape-group-3d";
 
 function resolvedNode(
   root: ResolvedShapeGroupNode,
@@ -66,10 +67,15 @@ export function ungroupOwnedShapeContainer(
     target.layout.collapsed
   )
     throw new RangeError("Expand the actual nested container before ungrouping.");
-  const promoted = target.members.map((child) => {
+  const releaseSources = materializeShapeGroup3dReleaseChildren(
+    root,
+    path,
+    target.members.map((child) => child.node),
+  );
+  const promoted = target.members.map((child, childIndex) => {
     if (!child.layout) throw new RangeError("An unplaced nested member cannot be ungrouped.");
     const released = releaseShapeGroupChild(
-      child.node,
+      releaseSources[childIndex]!,
       child.layout,
       metrics,
       root.shapeProperties,

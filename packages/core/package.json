@@ -303,6 +303,10 @@
       "types": "./dist/shape-group.d.ts",
       "import": "./dist/shape-group.js"
     },
+    "./shape-group-3d": {
+      "types": "./dist/shape-group-3d.d.ts",
+      "import": "./dist/shape-group-3d.js"
+    },
     "./shape-group-layout": {
       "types": "./dist/shape-group-layout.d.ts",
       "import": "./dist/shape-group-layout.js"

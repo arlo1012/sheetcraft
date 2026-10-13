@@ -7,10 +7,12 @@ import {
   PICTURE_PROJECTIVE_LIMITS,
   PictureProjectiveGeometryError,
   tessellatePictureProjectiveFront,
+  type PictureProjectiveAffine,
   type PictureProjectiveFailure,
   type PictureProjectiveGeometry,
   type PictureProjectiveGeometryInput,
   type PictureProjectivePoint,
+  type PictureProjectiveMatrix4,
   type PictureProjectiveRotation,
 } from "../../../shared/images/picture-projective-geometry";
 
@@ -49,6 +51,24 @@ function rejectsReason(run: () => unknown, reason: PictureProjectiveFailure): vo
     expect(error).toBeInstanceOf(PictureProjectiveGeometryError);
     expect((error as PictureProjectiveGeometryError).reason).toBe(reason);
   }
+}
+const identityPlacement: PictureProjectiveAffine = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+function placed(
+  affine: PictureProjectiveAffine,
+  source: PictureProjectivePoint,
+): PictureProjectivePoint {
+  return {
+    x: affine.a * source.x + affine.c * source.y + affine.e,
+    y: affine.b * source.x + affine.d * source.y + affine.f,
+  };
+}
+function mapped4(matrix: PictureProjectiveMatrix4, source: PictureProjectivePoint, z = 0) {
+  const w = matrix[12] * source.x + matrix[13] * source.y + matrix[14] * z + matrix[15];
+  return {
+    x: (matrix[0] * source.x + matrix[1] * source.y + matrix[2] * z + matrix[3]) / w,
+    y: (matrix[4] * source.x + matrix[5] * source.y + matrix[6] * z + matrix[7]) / w,
+    z: (matrix[8] * source.x + matrix[9] * source.y + matrix[10] * z + matrix[11]) / w,
+  };
 }
 
 describe("pure picture projective geometry", () => {
@@ -253,6 +273,452 @@ describe("pure picture projective geometry", () => {
     expect(second.front.centerWorld.z).toBeCloseTo(40 / Math.sqrt(2), 10);
     expect(second.visualBounds.left - first.visualBounds.left).toBeCloseTo(-40 / Math.sqrt(2), 10);
     expect(second.selectionBounds).toEqual(first.selectionBounds);
+  });
+});
+
+describe("one common scene camera with leaf-local output", () => {
+  test.each([
+    parallel(),
+    parallel(31, 23, 17, 13),
+    perspective(31, 23, 17, 70, 13),
+    { ...parallel(31, 23, 17), projection: "oblique" as const, shearX: 0.4, shearY: -0.3 },
+  ])(
+    "an explicit identical scene preserves the existing leaf camera exactly for %j",
+    (rotation) => {
+      const input = { widthPx: 360, heightPx: 240, depthPx: 24, rotation };
+      const ordinary = createPictureProjectiveGeometry(input);
+      const shared = createPictureProjectiveGeometry({
+        ...input,
+        scene: { widthPx: 360, heightPx: 240, sourceToScene: identityPlacement },
+      });
+      expect({ ...shared, isSceneProjection: false }).toEqual(ordinary);
+      expect(shared.isSceneProjection).toBe(true);
+      expect(shared.sourceToSceneScreenMatrix).toEqual(shared.sourceToScreenMatrix);
+      expect(shared.projectedOrientation).toBe(1);
+    },
+  );
+
+  test.each([30, 45])(
+    "X%s moves both leaf centers about the common pivot, unlike independent cameras",
+    (angle) => {
+      const cosine = Math.cos((angle * Math.PI) / 180);
+      const centers: PictureProjectivePoint[] = [];
+      for (const e of [20, 260]) {
+        const placement = { ...identityPlacement, e, f: 40 };
+        const input = { widthPx: 80, heightPx: 60, depthPx: 24, rotation: parallel(angle) };
+        const shared = createPictureProjectiveGeometry({
+          ...input,
+          scene: { widthPx: 400, heightPx: 160, sourceToScene: placement },
+        });
+        const center = placed(placement, mapPictureProjectivePoint(shared, { x: 40, y: 30 }));
+        near(center, { x: 200 + (e + 40 - 200) * cosine, y: 70 });
+        const independent = placed(
+          placement,
+          mapPictureProjectivePoint(createPictureProjectiveGeometry(input), { x: 40, y: 30 }),
+        );
+        near(independent, { x: e + 40, y: 70 });
+        expect(center.x).not.toBeCloseTo(independent.x, 8);
+        expect(shared.widthPx).toBe(80);
+        expect(shared.heightPx).toBe(60);
+        expect(shared.selectionBounds).toEqual({ left: 0, top: 0, right: 80, bottom: 60 });
+        expect(shared.depthPx).toBe(24);
+        centers.push(center);
+      }
+      expect(centers[1]!.x - centers[0]!.x).toBeCloseTo(240 * cosine, 10);
+    },
+  );
+
+  test("a supplied scene pivot controls both the common rotation origin and returned principal point", () => {
+    const placement = { ...identityPlacement, e: 20, f: 25 };
+    const shared = createPictureProjectiveGeometry({
+      widthPx: 100,
+      heightPx: 60,
+      rotation: parallel(45),
+      scene: { widthPx: 400, heightPx: 160, pivot: { x: 120, y: 70 }, sourceToScene: placement },
+    });
+    const source = { x: 75, y: 45 };
+    near(placed(placement, mapPictureProjectivePoint(shared, source)), {
+      x: 120 + (source.x + 20 - 120) / Math.sqrt(2),
+      y: source.y + 25,
+    });
+    const world = mapped4(shared.sourceToWorldMatrix, source);
+    expect(world.x).toBeCloseTo((source.x + 20 - 120) / Math.sqrt(2), 10);
+    expect(world.z).toBeCloseTo((source.x + 20 - 120) / Math.sqrt(2), 10);
+  });
+
+  test("offset, rotated, scaled and sheared source placement shares one focal calibration and exact inverse", () => {
+    const placement: PictureProjectiveAffine = { a: 1.2, b: 0.4, c: -0.25, d: 0.9, e: 145, f: 42 };
+    const rotation = perspective(31, 23, 17, 70, 13);
+    const common = createPictureProjectiveGeometry({
+      widthPx: 600,
+      heightPx: 320,
+      depthPx: 24,
+      rotation,
+    });
+    const input: PictureProjectiveGeometryInput = {
+      widthPx: 80,
+      heightPx: 60,
+      depthPx: 24,
+      rotation,
+      scene: { widthPx: 600, heightPx: 320, sourceToScene: placement },
+    };
+    const saved = JSON.stringify(input);
+    const shared = createPictureProjectiveGeometry(input);
+    for (const source of [
+      { x: 0, y: 0 },
+      { x: 80, y: 60 },
+      { x: 17.5, y: 41.25 },
+    ]) {
+      const local = mapPictureProjectivePoint(shared, source);
+      near(
+        placed(placement, local),
+        mapPictureProjectivePoint(common, placed(placement, source)),
+        8,
+      );
+      near(mapped4(shared.sourceToSceneScreenMatrix, source), placed(placement, local), 8);
+      const hit = hitPictureProjectiveFront(shared, local);
+      expect(hit).not.toBeNull();
+      near(hit!, source, 8);
+      for (const z of [0, -24]) {
+        near(
+          placed(placement, mapped4(shared.sourceToScreenMatrix, source, z)),
+          mapped4(common.sourceToScreenMatrix, placed(placement, source), z),
+          8,
+        );
+        const actualWorld = mapped4(shared.sourceToWorldMatrix, source, z);
+        const expectedWorld = mapped4(common.sourceToWorldMatrix, placed(placement, source), z);
+        near(actualWorld, expectedWorld, 8);
+        expect(actualWorld.z).toBeCloseTo(expectedWorld.z, 8);
+      }
+    }
+    expect(JSON.stringify(input)).toBe(saved);
+    expect(Object.isFrozen(shared.sourceNormalToWorldMatrix)).toBe(true);
+    expect(Object.isFrozen(shared.sceneToOutputMatrix)).toBe(true);
+  });
+
+  test("inverse-transpose normals stay perpendicular to sheared physical faces and exclude the output adapter", () => {
+    const placement = { a: 2, b: 0, c: 1, d: 1, e: 80, f: 25 };
+    const input: PictureProjectiveGeometryInput = {
+      widthPx: 80,
+      heightPx: 60,
+      depthPx: 24,
+      rotation: parallel(30, 20, 17),
+      scene: { widthPx: 400, heightPx: 240, sourceToScene: placement },
+    };
+    const local = createPictureProjectiveGeometry(input);
+    const commonOutput = createPictureProjectiveGeometry({
+      ...input,
+      scene: { ...input.scene!, sceneToOutput: identityPlacement },
+    });
+    expect(commonOutput.sourceToWorldMatrix).toEqual(local.sourceToWorldMatrix);
+    expect(commonOutput.sourceNormalToWorldMatrix).toEqual(local.sourceNormalToWorldMatrix);
+    expect(commonOutput.sourceToScreenMatrix).not.toEqual(local.sourceToScreenMatrix);
+    for (const face of [local.front, local.back!, ...local.sides]) {
+      const other = [commonOutput.front, commonOutput.back!, ...commonOutput.sides].find(
+        (entry) => entry.kind === face.kind,
+      )!;
+      expect(other.normal).toEqual(face.normal);
+      expect(other.facing).toBe(face.facing);
+      expect(other.averageDepth).toBe(face.averageDepth);
+      expect(Math.hypot(face.normal.x, face.normal.y, face.normal.z)).toBeCloseTo(1, 10);
+    }
+    const m = local.sourceToWorldMatrix;
+    const right = local.sides.find((face) => face.kind === "right")!.normal;
+    expect(right.x * m[1] + right.y * m[5] + right.z * m[9]).toBeCloseTo(0, 10);
+    expect(right.x * m[2] + right.y * m[6] + right.z * m[10]).toBeCloseTo(0, 10);
+    expect(right.x * m[0] + right.y * m[4] + right.z * m[8]).toBeGreaterThan(0);
+    const normalMatrix = local.sourceNormalToWorldMatrix;
+    const length = Math.hypot(normalMatrix[0], normalMatrix[4], normalMatrix[8]);
+    expect(right.x).toBeCloseTo(normalMatrix[0] / length, 10);
+    expect(right.y).toBeCloseTo(normalMatrix[4] / length, 10);
+    expect(right.z).toBeCloseTo(normalMatrix[8] / length, 10);
+  });
+
+  test("reflected source placement preserves physical front/back culling and swaps the exposed side", () => {
+    const placement = { a: -1, b: 0, c: 0, d: 1, e: 300, f: 30 };
+    const input: PictureProjectiveGeometryInput = {
+      widthPx: 80,
+      heightPx: 60,
+      depthPx: 24,
+      rotation: parallel(30),
+      scene: { widthPx: 400, heightPx: 160, sourceToScene: placement },
+    };
+    const local = createPictureProjectiveGeometry(input);
+    expect(local.front.facing).toBe("front");
+    expect(local.back!.facing).toBe("back");
+    expect(local.visibleFaces.map((face) => face.kind).sort()).toEqual(["front", "left"]);
+    expect(local.projectedOrientation).toBe(1);
+    const commonOutput = createPictureProjectiveGeometry({
+      ...input,
+      scene: { ...input.scene!, sceneToOutput: identityPlacement },
+    });
+    expect(commonOutput.projectedOrientation).toBe(-1);
+    expect(commonOutput.visibleFaces.map((face) => face.kind)).toEqual(
+      local.visibleFaces.map((face) => face.kind),
+    );
+    for (const shared of [local, commonOutput]) {
+      const source = { x: 17.5, y: 41.25 };
+      near(
+        hitPictureProjectiveFront(shared, mapPictureProjectivePoint(shared, source))!,
+        source,
+        9,
+      );
+      for (const face of [shared.front, shared.back!, ...shared.sides])
+        for (const corner of face.corners) {
+          expect(corner.x).toBeGreaterThanOrEqual(shared.visualBounds.left);
+          expect(corner.x).toBeLessThanOrEqual(shared.visualBounds.right);
+          expect(corner.y).toBeGreaterThanOrEqual(shared.visualBounds.top);
+          expect(corner.y).toBeLessThanOrEqual(shared.visualBounds.bottom);
+        }
+    }
+  });
+
+  test("the actual leaf front/depth and extended source points guard the scene horizon", () => {
+    const scene = { widthPx: 360, heightPx: 240, sourceToScene: { ...identityPlacement, e: 1900 } };
+    const rotation = perspective(90);
+    expect(() =>
+      createPictureProjectiveGeometry({ widthPx: 360, heightPx: 240, rotation }),
+    ).not.toThrow();
+    rejectsReason(
+      () => createPictureProjectiveGeometry({ widthPx: 80, heightPx: 60, rotation, scene }),
+      "near-plane",
+    );
+    rejectsReason(
+      () =>
+        createPictureProjectiveGeometry({
+          widthPx: 80,
+          heightPx: 60,
+          depthPx: 420,
+          rotation: perspective(180, 0, 0, 120),
+          scene: { ...scene, sourceToScene: identityPlacement },
+        }),
+      "near-plane",
+    );
+    const valid = createPictureProjectiveGeometry({
+      widthPx: 80,
+      heightPx: 60,
+      rotation,
+      scene: { ...scene, sourceToScene: identityPlacement },
+    });
+    rejectsReason(() => mapPictureProjectivePoint(valid, { x: 2000, y: 30 }), "near-plane");
+  });
+
+  test("edge-on scene planes retain the leaf frame and null inverse even with large affine scale", () => {
+    const shared = createPictureProjectiveGeometry({
+      widthPx: 80,
+      heightPx: 60,
+      rotation: parallel(90),
+      scene: {
+        widthPx: 65_536,
+        heightPx: 65_536,
+        sourceToScene: { ...identityPlacement, a: 100_000, d: 100_000 },
+      },
+    });
+    expect(shared.front.facing).toBe("edge-on");
+    expect(shared.front.inverseHomography).toBeNull();
+    expect(shared.visibleFaces).toEqual([]);
+    expect(shared.selectionBounds).toEqual({ left: 0, top: 0, right: 80, bottom: 60 });
+    rejectsReason(() => tessellatePictureProjectiveFront(shared), "degenerate");
+  });
+
+  test("a small adapted area keeps a finite inverse for a physically front-facing scene", () => {
+    const shared = createPictureProjectiveGeometry({
+      widthPx: 80,
+      heightPx: 60,
+      depthPx: 24,
+      rotation: parallel(),
+      scene: {
+        widthPx: 400,
+        heightPx: 160,
+        sourceToScene: { ...identityPlacement, a: 0.01, d: 0.01 },
+        sceneToOutput: { ...identityPlacement, a: 0.0001, d: 0.0001 },
+      },
+    });
+    expect(shared.front.facing).toBe("front");
+    expect(shared.front.inverseHomography).not.toBeNull();
+    expect(shared.back!.inverseHomography).not.toBeNull();
+    for (const source of [
+      { x: 0, y: 0 },
+      { x: 80, y: 60 },
+      { x: 17.5, y: 41.25 },
+    ])
+      near(
+        hitPictureProjectiveFront(shared, mapPictureProjectivePoint(shared, source))!,
+        source,
+        8,
+      );
+    const mesh = tessellatePictureProjectiveFront(shared, { maxTriangles: 2 });
+    expect(mesh.triangles).toHaveLength(2);
+    expect(mesh.maxErrorPx).toBe(0);
+    expect(shared.visualBounds.right).toBeCloseTo(0.00008, 12);
+    expect(shared.visualBounds.bottom).toBeCloseTo(0.00006, 12);
+  });
+
+  test("large inverse coefficients normalize projectively without rejecting a valid small output", () => {
+    const shared = createPictureProjectiveGeometry({
+      widthPx: 80,
+      heightPx: 60,
+      rotation: parallel(),
+      scene: {
+        widthPx: 400,
+        heightPx: 160,
+        sourceToScene: { ...identityPlacement, a: 0.001, d: 0.001 },
+        sceneToOutput: { ...identityPlacement, a: 0.00002, d: 0.00002 },
+      },
+    });
+    expect(shared.front.inverseHomography).not.toBeNull();
+    const source = { x: 17.5, y: 41.25 };
+    near(hitPictureProjectiveFront(shared, mapPictureProjectivePoint(shared, source))!, source, 8);
+    expect(tessellatePictureProjectiveFront(shared, { maxTriangles: 2 }).triangles).toHaveLength(2);
+  });
+
+  test("a well-conditioned scene inverse accepts positive denominators below the ordinary cutoff", () => {
+    const shared = createPictureProjectiveGeometry({
+      widthPx: 65_536,
+      heightPx: 65_536,
+      rotation: perspective(-45, 0, 45, 120, -65_536),
+      scene: {
+        widthPx: 1e-6,
+        heightPx: 1e-6,
+        pivot: { x: 0, y: 0 },
+        sourceToScene: { ...identityPlacement, e: 9_000_000 },
+        sceneToOutput: { ...identityPlacement, a: 10_000_000, d: 10_000_000 },
+      },
+    });
+    expect(shared.front.facing).toBe("front");
+    for (const source of [
+      { x: 0, y: 0 },
+      { x: 65_536, y: 65_536 },
+      { x: 32_768, y: 32_768 },
+    ]) {
+      const screen = mapPictureProjectivePoint(shared, source);
+      const hit = hitPictureProjectiveFront(shared, screen);
+      expect(hit).not.toBeNull();
+      expect(Math.abs(hit!.x - source.x)).toBeLessThan(1 / 1024);
+      expect(Math.abs(hit!.y - source.y)).toBeLessThan(1 / 1024);
+      near(mapPictureProjectivePoint(shared, hit!), screen, 10);
+    }
+  });
+
+  test("an ill-conditioned diagonal sliver fails explicitly during scene construction", () => {
+    rejectsReason(
+      () =>
+        createPictureProjectiveGeometry({
+          widthPx: 65_536,
+          heightPx: 65_536,
+          rotation: perspective(-45, 0, 45, 120),
+          scene: {
+            widthPx: 1e-6,
+            heightPx: 1e-6,
+            pivot: { x: 0, y: 0 },
+            sourceToScene: { ...identityPlacement, e: 9_000_000 },
+            sceneToOutput: { ...identityPlacement, a: 10_000_000, d: 10_000_000 },
+          },
+        }),
+      "degenerate",
+    );
+  });
+
+  test("scene dimensions, affine singularities, inverse expansion and both coordinate spaces are bounded", () => {
+    const input = { widthPx: 80, heightPx: 60, rotation: parallel() };
+    const scene = { widthPx: 400, heightPx: 160, sourceToScene: identityPlacement };
+    rejectsReason(
+      () => createPictureProjectiveGeometry({ ...input, scene: { ...scene, widthPx: 0 } }),
+      "invalid-input",
+    );
+    rejectsReason(
+      () =>
+        createPictureProjectiveGeometry({
+          ...input,
+          scene: { ...scene, pivot: { x: Number.NaN, y: 0 } },
+        }),
+      "invalid-input",
+    );
+    rejectsReason(
+      () =>
+        createPictureProjectiveGeometry({
+          ...input,
+          scene: { ...scene, sourceToScene: { ...identityPlacement, b: Number.NaN } },
+        }),
+      "invalid-input",
+    );
+    rejectsReason(
+      () =>
+        createPictureProjectiveGeometry({
+          ...input,
+          scene: { ...scene, sourceToScene: { ...identityPlacement, a: 0 } },
+        }),
+      "degenerate",
+    );
+    rejectsReason(
+      () =>
+        createPictureProjectiveGeometry({
+          ...input,
+          scene: { ...scene, sceneToOutput: { ...identityPlacement, d: 0 } },
+        }),
+      "degenerate",
+    );
+    rejectsReason(
+      () =>
+        createPictureProjectiveGeometry({
+          ...input,
+          scene: { ...scene, sourceToScene: { ...identityPlacement, a: 1e-6, e: 10_000_000 } },
+        }),
+      "coordinate-budget",
+    );
+    rejectsReason(
+      () =>
+        createPictureProjectiveGeometry({
+          ...input,
+          scene: {
+            ...scene,
+            sourceToScene: { ...identityPlacement, e: PICTURE_PROJECTIVE_LIMITS.coordinatePx - 40 },
+          },
+        }),
+      "coordinate-budget",
+    );
+    rejectsReason(
+      () =>
+        createPictureProjectiveGeometry({
+          ...input,
+          scene: { ...scene, sceneToOutput: { ...identityPlacement, a: 1_000_000 } },
+        }),
+      "coordinate-budget",
+    );
+    const valid = createPictureProjectiveGeometry({
+      ...input,
+      scene: {
+        ...scene,
+        sourceToScene: { ...identityPlacement, e: PICTURE_PROJECTIVE_LIMITS.coordinatePx - 100 },
+      },
+    });
+    rejectsReason(() => mapPictureProjectivePoint(valid, { x: 200, y: 30 }), "coordinate-budget");
+  });
+
+  test("the common perspective front uses the existing finite leaf-source mesh budget", () => {
+    const shared = createPictureProjectiveGeometry({
+      widthPx: 240,
+      heightPx: 180,
+      depthPx: 24,
+      rotation: perspective(45, 25, 17, 70, 13),
+      scene: {
+        widthPx: 600,
+        heightPx: 320,
+        sourceToScene: { a: 1.2, b: 0.4, c: -0.25, d: 0.9, e: 145, f: 42 },
+      },
+    });
+    const mesh = tessellatePictureProjectiveFront(shared, { maxErrorPx: 0.25 });
+    expect(mesh.triangles.length).toBeLessThanOrEqual(PICTURE_PROJECTIVE_LIMITS.triangles);
+    expect(mesh.maxErrorPx).toBeLessThanOrEqual(0.25);
+    for (const vertex of mesh.vertices) {
+      expect(vertex.source.x).toBeLessThanOrEqual(240);
+      expect(vertex.source.y).toBeLessThanOrEqual(180);
+      expect(Number.isFinite(vertex.screen.x + vertex.screen.y + vertex.w)).toBe(true);
+    }
+    rejectsReason(
+      () => tessellatePictureProjectiveFront(shared, { maxTriangles: 2, maxErrorPx: 0.0001 }),
+      "mesh-budget",
+    );
   });
 });
 

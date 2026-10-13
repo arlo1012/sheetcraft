@@ -1,3 +1,4 @@
+import { materializeShapeGroup3dReleaseChildren } from "./shape-group-3d.js";
 import type { PictureSheetMetrics } from "./picture-axis-metrics.js";
 import { readPictureDataArray } from "./picture-data-array.js";
 import { resolvePictureLayout } from "./picture-frame.js";
@@ -247,7 +248,8 @@ export function ungroupShapeRoot(
     throw new TypeError("Ungroup target must be a current root shape group.");
   const parent = resolveShapeGroup(group, metrics).layout;
   if (parent.collapsed) throw new RangeError("Expand a collapsed group before ungrouping.");
-  const released = group.members.map((member) => {
+  const children = materializeShapeGroup3dReleaseChildren(group, [group.id], group.members);
+  const released = children.map((member) => {
     const world = resolveShapeGroupChildLayout(parent, member);
     if (!world) throw new RangeError("Expand a collapsed group before ungrouping.");
     return releaseShapeGroupChild(member, world, metrics, group.shapeProperties, group.hidden);

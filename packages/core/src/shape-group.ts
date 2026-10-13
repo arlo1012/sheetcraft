@@ -1,3 +1,4 @@
+import type { Choice, PictureRotation3d } from "./picture-detailed-style.js";
 import { readPictureDataArray } from "./picture-data-array.js";
 import { normalizePictureAngle } from "./picture-frame.js";
 import { normalizePictureGroupLocalRect } from "./picture-group.js";
@@ -23,6 +24,8 @@ export type ShapeGroupEffects = {
   reflection?: ShapeDetailedStyle["reflection"];
   glow?: ShapeDetailedStyle["glow"];
 };
+/** Shared body camera source only; flat text and genuine body format remain leaf-owned. */
+export type ShapeGroup3d = { rotation3d: Choice<PictureRotation3d> };
 export type ShapeGroupLocalRect = {
   xRatio: number;
   yRatio: number;
@@ -46,6 +49,7 @@ export type ShapeGroupedGroup = {
   rotation: number;
   shapeProperties?: ShapeObjectProperties;
   groupEffects?: ShapeGroupEffects;
+  group3d?: ShapeGroup3d;
   /** Sparse Selection Pane state, inherited by descendants without changing ownership. */
   hidden?: true;
   /** Bottom-to-top sibling order; this array is the only ownership relation. */
@@ -60,6 +64,7 @@ export type ShapeGroupDrawing = {
   rotation: number;
   shapeProperties?: ShapeObjectProperties;
   groupEffects?: ShapeGroupEffects;
+  group3d?: ShapeGroup3d;
   /** Sparse Selection Pane state, inherited by descendants without changing ownership. */
   hidden?: true;
   members: ShapeGroupChild[];
@@ -95,6 +100,16 @@ export function normalizeShapeGroupEffects(value: unknown): ShapeGroupEffects | 
   if (value === undefined) return undefined;
   return normalizeShapeStyle(record(value, SHAPE_GROUP_EFFECT_CATEGORIES, "shape group effects"));
 }
+/** Explicit none is dormant: it neither masks an ancestor camera nor restores leaf values. */
+export function normalizeShapeGroup3d(value: unknown): ShapeGroup3d | undefined {
+  if (value === undefined) return undefined;
+  const source = record(value, ["rotation3d"], "shape group 3D");
+  if (!Object.hasOwn(source, "rotation3d"))
+    throw new TypeError("Shape group 3D requires an explicit rotation3d choice.");
+  const rotation3d = normalizeShapeStyle(source)?.rotation3d;
+  if (!rotation3d) throw new TypeError("Shape group 3D requires an explicit rotation3d choice.");
+  return { rotation3d };
+}
 function nonempty(value: unknown, name: string): string {
   if (typeof value !== "string" || !value.trim()) throw new TypeError(`${name} must be non-empty.`);
   return value;
@@ -128,6 +143,7 @@ const groupKeys = [
   "rotation",
   "shapeProperties",
   "groupEffects",
+  "group3d",
   "hidden",
   "members",
 ] as const;
@@ -173,7 +189,7 @@ function nodeRecord(value: unknown, root: boolean): Record<string, unknown> {
 /** Validate the entire ownership graph before normalizing any appearance or placement. */
 function preflight(values: readonly unknown[], roots: boolean): void {
   const entries = readPictureDataArray(values, "shape group collection", MAX_SHAPE_GROUP_NODES);
-  const pending = entries.map((value) => ({ value, depth: 0, root: roots }));
+  const pending = entries.map((value) => ({ value, depth: 0, root: roots, activeCamera: false }));
   const seen = new WeakSet<object>();
   const ids = new Set<string>();
   let count = 0;
@@ -191,6 +207,11 @@ function preflight(values: readonly unknown[], roots: boolean): void {
     if (ids.has(id)) throw new TypeError("Duplicate shape group node IDs.");
     ids.add(id);
     if (node.kind !== "shapeGroup") continue;
+    const group3d = normalizeShapeGroup3d(node.group3d);
+    const ownsCamera = group3d?.rotation3d.kind === "value";
+    if (entry.activeCamera && ownsCamera)
+      throw new TypeError("Simultaneous nested shape group 3D cameras are unsupported.");
+    const activeCamera = entry.activeCamera || ownsCamera;
     const members = readPictureDataArray(
       node.members as readonly unknown[],
       "shape group members",
@@ -204,7 +225,7 @@ function preflight(values: readonly unknown[], roots: boolean): void {
     if (count + pending.length + members.length > MAX_SHAPE_GROUP_NODES)
       throw new RangeError("Shape group node budget exceeded.");
     for (let index = members.length - 1; index >= 0; index--)
-      pending.push({ value: members[index], depth: entry.depth + 1, root: false });
+      pending.push({ value: members[index], depth: entry.depth + 1, root: false, activeCamera });
   }
 }
 
@@ -224,6 +245,7 @@ function metadata(source: Record<string, unknown>) {
   if (typeof source.name !== "string") throw new TypeError("Shape group name must be a string.");
   const shapeProperties = normalizeShapeObjectProperties(source.shapeProperties);
   const groupEffects = normalizeShapeGroupEffects(source.groupEffects);
+  const group3d = normalizeShapeGroup3d(source.group3d);
   if (Object.hasOwn(source, "hidden") && typeof source.hidden !== "boolean")
     throw new TypeError("Shape group visibility must be a boolean.");
   return {
@@ -232,6 +254,7 @@ function metadata(source: Record<string, unknown>) {
     rotation: normalizePictureAngle(source.rotation as number),
     ...(shapeProperties ? { shapeProperties } : {}),
     ...(groupEffects ? { groupEffects } : {}),
+    ...(group3d ? { group3d } : {}),
     ...(source.hidden === true ? { hidden: true as const } : {}),
   };
 }
