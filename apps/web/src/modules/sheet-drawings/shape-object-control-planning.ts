@@ -202,14 +202,14 @@ function reorder<T extends { id: string }>(
   return next;
 }
 
-function assertFlippable(node: SheetDrawing | ShapeGroupNode): void {
+function assertFlippable(node: SheetDrawing | ShapeGroupNode, reflectedMember = false): void {
   if (node.kind === "shapeGroup") {
-    for (const member of node.members) assertFlippable(member);
+    for (const member of node.members) assertFlippable(member, true);
     return;
   }
   if (node.kind !== "shape" && node.kind !== "textBox")
     throw new TypeError("Shape flips require a shape or text box.");
-  if (node.kind === "shape" && node.shapeConnector)
+  if (node.kind === "shape" && node.shapeConnector && !reflectedMember)
     throw new TypeError("A live connector cannot use ordinary shape flip geometry.");
 }
 
@@ -226,8 +226,10 @@ function toggleFlip(node: SheetDrawing | ShapeGroupNode, axis: FlipAxis): void {
  * Diagonal owner scaling commutes with F, so dimensions remain orthogonal
  * even in nonuniformly scaled, rotated groups. No world AABB or shear is
  * persisted. Ungroup retains this world visual result rather than changing
- * the reflected member angle back. Live connector descendants remain gated
- * rather than being rewritten as ordinary leaf geometry.
+ * the reflected member angle back. Connector descendants keep ordered site
+ * identities and free ratios. Their reflected carrier/flags project free tips;
+ * bound tips resolve the actual target site, even outside this selected owner.
+ * The complete forest resolver validates the resulting route before commit.
  */
 function reflectMember(member: ShapeGroupChild, axis: FlipAxis): void {
   const rect = member.groupFrame.rect;

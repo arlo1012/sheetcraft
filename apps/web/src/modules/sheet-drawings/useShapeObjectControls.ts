@@ -38,11 +38,11 @@ function hasConnector(node: Node): boolean {
     ? node.members.some(hasConnector)
     : node.kind === "shape" && !!node.shapeConnector;
 }
-function canFlip(node: Node): boolean {
+function canFlip(node: Node, reflectedMember = false): boolean {
   return node.kind === "shapeGroup"
-    ? node.members.every(canFlip)
+    ? node.members.every((member) => canFlip(member, true))
     : (node.kind === "shape" || node.kind === "textBox") &&
-        !(node.kind === "shape" && node.shapeConnector);
+        (!(node.kind === "shape" && node.shapeConnector) || reflectedMember);
 }
 function renamed(node: Node, path: ShapeGroupPath, depth: number, name: string): Node {
   if (node.id !== path[depth]) throw new TypeError("The object owner has changed.");
@@ -240,7 +240,7 @@ export function useShapeObjectControls(options: {
         rows: Object.freeze(rows),
         paths: Object.freeze(paths.map((path) => Object.freeze(path))),
         disabled: !editable || !paths.length,
-        canFlip: editable && !!targets.length && targets.every(canFlip),
+        canFlip: editable && !!targets.length && targets.every((node) => canFlip(node)),
         canRotate:
           editable &&
           !!targets.length &&

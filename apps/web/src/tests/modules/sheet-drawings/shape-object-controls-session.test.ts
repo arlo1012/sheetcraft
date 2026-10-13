@@ -15,6 +15,7 @@ import {
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import { resolveSheetShapeConnections } from "@sheetcraft/core/shape-connector-layout";
 import { groupShapeRoots } from "@sheetcraft/core/shape-group-planning";
 import { isShapeGroupDrawing, type ShapeGroupPath } from "@sheetcraft/core/shape-group";
 import { useDrawingActions } from "../../../modules/sheet-drawings/useDrawingActions";
@@ -103,6 +104,98 @@ function fixture(owned = false) {
   };
 }
 describe("shape object controls exact owner session", () => {
+  test.each([
+    ["flip-horizontal", false],
+    ["flip-vertical", false],
+    ["flip-horizontal", true],
+    ["flip-vertical", true],
+  ] as const)(
+    "%s is enabled for the owning group and restores real connector binding through exact history (nested=%s)",
+    (action, nestedOwner) => {
+      const f = fixture(true),
+        a = framedShape(),
+        b = framedShape(),
+        connection = framedShape();
+      a.id = "a";
+      a.shapeGeometry = { preset: "rightArrow" };
+      a.rotation = 37;
+      b.id = "b";
+      b.shapeGeometry = { preset: "ellipse" };
+      b.shapeFrame.anchor = { mode: "fixed", x: 400, y: 24, size: { width: 80, height: 80 } };
+      connection.id = "connection";
+      connection.shapeGeometry = { preset: "bentConnector3" };
+      connection.text = "";
+      connection.shapeConnector = {
+        kind: "shape-connector-v1",
+        begin: { kind: "site", targetId: "a", preset: "rightArrow", siteIndex: 0 },
+        end: { kind: "site", targetId: "b", preset: "ellipse", siteIndex: 0 },
+      };
+      f.sheet.drawings = groupShapeRoots(
+        [a, b, connection],
+        ["a", "b", "connection"],
+        { id: "g", name: "Bound group" },
+        f.metrics.value,
+      );
+      if (nestedOwner) {
+        const other = framedShape();
+        other.id = "other";
+        f.sheet.drawings = groupShapeRoots(
+          [...f.sheet.drawings, other],
+          ["g", "other"],
+          { id: "outer", name: "Outer" },
+          f.metrics.value,
+        );
+      }
+      const ownerPath = nestedOwner ? ["outer", "g"] : ["g"];
+      f.paths.value = [ownerPath];
+      const before = serializeWorkbook(f.core.workbook),
+        old = f.state();
+      expect(old.canFlip).toBe(true);
+      expect(old.actionHandler(action)).toBe(true);
+      const after = serializeWorkbook(f.core.workbook),
+        resolved = resolveSheetShapeConnections(f.sheet.drawings!, f.metrics.value).getConnector(
+          "connection",
+        )!;
+      expect(resolved.begin).toMatchObject({
+        status: "ready",
+        kind: "site",
+        targetId: "a",
+        identity: { preset: "rightArrow", index: 0 },
+      });
+      expect(resolved.end).toMatchObject({
+        status: "ready",
+        kind: "site",
+        targetId: "b",
+        identity: { preset: "ellipse", index: 0 },
+      });
+      expect(f.core.history.undoStack).toHaveLength(1);
+      expect(old.actionHandler(action)).toBe(false);
+      expect(serializeWorkbook(f.core.workbook)).toEqual(after);
+      expect(undoWorkbookCommand(f.core)).toBe(true);
+      f.revision.value++;
+      expect(serializeWorkbook(f.core.workbook)).toEqual(before);
+      expect(redoWorkbookCommand(f.core)).toBe(true);
+      f.revision.value++;
+      expect(serializeWorkbook(f.core.workbook)).toEqual(after);
+      f.paths.value = [[...ownerPath, "connection"]];
+      expect(f.state().canFlip).toBe(false);
+      expect(f.state().actionHandler(action)).toBe(false);
+      expect(serializeWorkbook(f.core.workbook)).toEqual(after);
+      f.paths.value = [
+        [...ownerPath, "a"],
+        [...ownerPath, "connection"],
+      ];
+      expect(f.state().canFlip).toBe(false);
+      expect(f.state().actionHandler(action)).toBe(false);
+      expect(serializeWorkbook(f.core.workbook)).toEqual(after);
+      f.paths.value = [ownerPath];
+      f.sheet.properties.protected = true;
+      f.revision.value++;
+      expect(f.state().canFlip).toBe(false);
+      expect(f.state().actionHandler(action)).toBe(false);
+      expect(f.core.history.undoStack).toHaveLength(1);
+    },
+  );
   test.each([false, true])(
     "flip and rotate use real atomic commands; Undo/Redo retain exact frame and ownership (%s)",
     (owned) => {

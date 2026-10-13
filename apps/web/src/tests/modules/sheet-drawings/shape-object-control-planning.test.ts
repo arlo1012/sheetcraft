@@ -506,7 +506,7 @@ describe("pure shape object controls", () => {
     }
   });
 
-  test("independent connector transforms and connector-containing group flips reject atomically", () => {
+  test("independent connector transforms reject atomically", () => {
     const target = shape("target"),
       connection = connector("connection", target.id),
       m = metrics();
@@ -522,14 +522,144 @@ describe("pure shape object controls", () => {
         planShapeObjectControlAction(roots, [[target.id], [connection.id]], action, m),
       ).toThrow(/connector/);
     expect(roots).toEqual(before);
-    const owner = group("g", [
-      leaf("owned-target"),
-      ownedConnector("owned-connection", "owned-target"),
-    ]);
-    expect(() => planShapeObjectControlAction([owner], [["g"]], "flip-horizontal", m)).toThrow(
-      /connector/,
-    );
   });
+
+  test.each(["flip-horizontal", "flip-vertical"] as const)(
+    "%s reflects nested connector ordered sites, free tips and actual route without detaching",
+    (action) => {
+      const m = metrics();
+      for (const preset of ["line", "bentConnector3", "curvedConnector3"] as const)
+        for (const path of [["g"], ["g", "n"]]) {
+          const connection = ownedConnector("connection", "target");
+          connection.shapeGeometry = {
+            preset,
+            ...(preset === "line" ? {} : { adjustments: { adj1: 30000 } }),
+          };
+          connection.shapeLineEnds = {
+            begin: { kind: "diamond", width: "small", length: "large" },
+            end: { kind: "triangle", width: "large", length: "small" },
+          };
+          connection.text = "Historical label retained";
+          const owner = group(
+            "g",
+            [nested("n", [leaf("target", 37), connection], 61), leaf("untouched", 13)],
+            47,
+          );
+          const before = structuredClone(owner),
+            old = resolveSheetShapeConnections([owner], m);
+          const layout = old.getNodeAtPath(path)!.carrierLayout!;
+          const reflect = (point: { x: number; y: number }) => {
+            const local = shapeFrameWorldToLocal(layout.rect, layout.angleDeg, point);
+            return shapeFrameLocalToWorld(layout.rect, layout.angleDeg, {
+              x: action === "flip-horizontal" ? layout.rect.width - local.x : local.x,
+              y: action === "flip-vertical" ? layout.rect.height - local.y : local.y,
+            });
+          };
+          const next = planShapeObjectControlAction([owner], [path], action, m);
+          const updated = resolveSheetShapeConnections(next, m),
+            a = old.getConnector("connection")!,
+            b = updated.getConnector("connection")!;
+          expect(a.status).toBe("ready");
+          expect(b.status).toBe("ready");
+          if (
+            a.status === "suspended" ||
+            b.status === "suspended" ||
+            a.route.status !== "ready" ||
+            b.route.status !== "ready" ||
+            a.begin.status !== "ready" ||
+            a.end.status !== "ready" ||
+            b.begin.status !== "ready" ||
+            b.end.status !== "ready"
+          )
+            throw Error("Expected ready nested connector");
+          expectPoint(b.begin.position, reflect(a.begin.position));
+          expectPoint(b.end.position, reflect(a.end.position));
+          expect(b.begin).toMatchObject({
+            kind: "site",
+            targetId: "target",
+            identity: a.begin.kind === "site" ? a.begin.identity : undefined,
+          });
+          const ac = a.route.geometry.paths[0]!.commands,
+            bc = b.route.geometry.paths[0]!.commands;
+          expect(bc.map((command) => command[0])).toEqual(ac.map((command) => command[0]));
+          for (let index = 0; index < ac.length; index++) {
+            const left = ac[index]!,
+              right = bc[index]!;
+            for (let coordinate = 1; coordinate < left.length; coordinate += 2) {
+              const oldPoint = shapeFrameLocalToWorld(
+                a.route.paintLayout.rect,
+                a.route.paintLayout.angleDeg,
+                { x: left[coordinate] as number, y: left[coordinate + 1] as number },
+              );
+              const newPoint = shapeFrameLocalToWorld(
+                b.route.paintLayout.rect,
+                b.route.paintLayout.angleDeg,
+                { x: right[coordinate] as number, y: right[coordinate + 1] as number },
+              );
+              expectPoint(newPoint, reflect(oldPoint));
+            }
+          }
+          const source = graphic(
+            traverseShapeGroup(asGroup(next[0])).find((visit) => visit.node.id === "connection")!
+              .node as ShapeGroupChild,
+          );
+          expect(source.shapeConnector).toEqual(connection.shapeConnector);
+          expect(source.shapeLineEnds).toEqual(connection.shapeLineEnds);
+          expect(source.text).toBe(connection.text);
+          expect(source.shapeGeometry).toEqual(connection.shapeGeometry);
+          const released = ungroupShapeRoot(ungroupShapeRoot(next, "g", m), "n", m);
+          const releasedConnector = resolveSheetShapeConnections(released, m).getConnector(
+            "connection",
+          )!;
+          if (
+            releasedConnector.begin.status !== "ready" ||
+            releasedConnector.end.status !== "ready"
+          )
+            throw Error("Expected preserved released connector");
+          expectPoint(releasedConnector.begin.position, b.begin.position);
+          expectPoint(releasedConnector.end.position, b.end.position);
+          expect(graphic(released.find((node) => node.id === "connection")).shapeConnector).toEqual(
+            connection.shapeConnector,
+          );
+          const twice = planShapeObjectControlAction(next, [path], action, m);
+          expect(twice).toEqual(normalizeShapeDrawingForest([owner]));
+          expect(owner).toEqual(before);
+        }
+    },
+  );
+
+  test.each(["flip-horizontal", "flip-vertical"] as const)(
+    "%s keeps external site associations at their true location while reflecting the owned free tip",
+    (action) => {
+      const outside = shape("outside", 13),
+        connection = ownedConnector("connection", "outside"),
+        owner = group("g", [connection, leaf("inside")], 37),
+        m = metrics();
+      const before = structuredClone([owner, outside]),
+        old = resolveSheetShapeConnections(before, m);
+      const next = planShapeObjectControlAction([owner, outside], [["g"]], action, m),
+        updated = resolveSheetShapeConnections(next, m);
+      const a = old.getConnector("connection")!,
+        b = updated.getConnector("connection")!;
+      expect(b.begin).toEqual(a.begin);
+      if (a.end.status !== "ready" || b.end.status !== "ready")
+        throw Error("Expected ready free tip");
+      const layout = old.getNode("g")!.carrierLayout!,
+        local = shapeFrameWorldToLocal(layout.rect, layout.angleDeg, a.end.position);
+      expectPoint(
+        b.end.position,
+        shapeFrameLocalToWorld(layout.rect, layout.angleDeg, {
+          x: action === "flip-horizontal" ? layout.rect.width - local.x : local.x,
+          y: action === "flip-vertical" ? layout.rect.height - local.y : local.y,
+        }),
+      );
+      expect(next[1]).toEqual(normalizeShapeDrawingForest([outside])[0]);
+      expect(graphic(asGroup(next[0]).members[0]).shapeConnector).toEqual(
+        connection.shapeConnector,
+      );
+      expect([owner, outside]).toEqual(before);
+    },
+  );
 
   test("flipping and rotating a bound target refreshes sites without rewriting the connector", () => {
     const target = shape("target"),

@@ -481,6 +481,63 @@ function savedConnectorFixture(group = false, preset: "line" | "bentConnector3" 
     );
   return workbook;
 }
+
+test.each(["flip-horizontal", "flip-vertical"] as const)(
+  "real Workspace containing connector group exposes %s and commits reversible live bindings",
+  async (action) => {
+    installNativeTextMeasurement();
+    const initial = savedConnectorFixture(true, "bentConnector3"),
+      initialSheet = getActiveSheet(initial),
+      group = initialSheet.drawings!.find(isShapeGroupDrawing)!;
+    group.rotation = 37;
+    const wrapper = fixture(
+      async () => ({ revision: 1, savedAt: 1, snapshot: serializeWorkbook(initial) }),
+      createMemoryImageAssetStore(),
+      true,
+    );
+    await flushPromises();
+    const state = setupState(wrapper);
+    expect(state.sheetGridRef.selectShapeObjects([["group"]])).toBe(true);
+    await flushPromises();
+    expect(wrapper.getComponent(ShapeToolsToolbar).props("canFlip")).toBe(true);
+    const before = serializeWorkbook(state.session.workbook),
+      sheet = getActiveSheet(state.session.workbook),
+      metrics = createPictureSheetMetrics(sheet),
+      old = resolveSheetShapeConnections(sheet.drawings!, metrics).getConnector("connector")!;
+    await wrapper
+      .getComponent(ShapeToolsToolbar)
+      .get('[data-shape-control="rotation"]')
+      .trigger("click");
+    await flushPromises();
+    const button = document.querySelector<HTMLElement>(`[data-shape-control-action="${action}"]`)!;
+    expect(button.getAttribute("aria-disabled")).not.toBe("true");
+    button.click();
+    await flushPromises();
+    const after = serializeWorkbook(state.session.workbook),
+      updated = resolveSheetShapeConnections(
+        sheet.drawings!,
+        createPictureSheetMetrics(sheet),
+      ).getConnector("connector")!;
+    expect(after).not.toEqual(before);
+    expect(updated.begin).toMatchObject({
+      status: "ready",
+      kind: "site",
+      targetId: "a",
+      identity: { preset: "rect", index: 3 },
+    });
+    // External target b stays at its actual site instead of silently detaching.
+    expect(updated.end).toEqual(old.end);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+    expect(state.sheetGridRef.selectShapeObjects([["group", "connector"]])).toBe(true);
+    await flushPromises();
+    expect(wrapper.getComponent(ShapeToolsToolbar).props("canFlip")).toBe(false);
+  },
+);
 test("snapshot65 group effects and connected group endpoint formatting use the real Workspace startup and history", async () => {
   const initial = savedConnectorFixture(true, "bentConnector3");
   const initialSheet = getActiveSheet(initial),
