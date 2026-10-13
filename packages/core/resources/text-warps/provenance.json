@@ -1,0 +1,30 @@
+{
+  "standard": "ECMA-376 Part 1, fifth edition, December 2016",
+  "sourcePage": "https://ecma-international.org/publications-and-standards/standards/ecma-376/",
+  "archiveUrl": "https://ecma-international.org/wp-content/uploads/ECMA-376-1_5th_edition_december_2016.zip",
+  "archiveSha256": "9d0bcad9cf06054785b03762fcfadbf6bab7e54a5f9d69434e34b7fd464d4129",
+  "archiveMember": "OfficeOpenXML-DrawingMLGeometries.zip/presetTextWarpDefinitions.xml",
+  "sourceFile": "presetTextWarpDefinitions.xml",
+  "sourceBytes": 51599,
+  "sourceSha256": "89640bd4aeedfa2c578d1d1acc50d569865ebdef315fd4b468087c25e36acada",
+  "sourceModification": "none",
+  "presetCount": 40,
+  "openBoundaryCount": 88,
+  "derivation": {
+    "compiler": "scripts/resources/generate_text_warps.py",
+    "outputs": [
+      "packages/core/src/text-warps/catalog.ts",
+      "packages/core/src/text-warps/definitions.ts",
+      "packages/core/resources/text-warps/compiled-default-resolutions.json"
+    ],
+    "method": "Deterministic compile-time XML extraction preserving ordered guides, open path commands and handles, with explicit baseline/pair metadata and fixed standard-angle default resolution. No runtime XML or caller-supplied formulas."
+  },
+  "notices": {
+    "file": "ECMA-NOTICES.txt",
+    "softwarePolicy": "https://ecma-international.org/policies/by-ipr/ecma-international-policy-on-submission-inclusion-and-licensing-of-software/",
+    "defaultTextPolicy": "https://ecma-international.org/policies/by-ipr/ecma-text-copyright-policy/",
+    "policyReadDate": "2026-10-13",
+    "softwareTemplatePlaceholders": "Preserved exactly; no supplied copyright author/year is present in the source XML or geometry ZIP.",
+    "binaryDistribution": "Reproduce the full applicable notices, conditions and disclaimers in distribution documentation/materials."
+  }
+}

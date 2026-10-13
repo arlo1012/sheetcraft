@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "files": [
-    "dist"
+    "dist",
+    "resources/text-warps"
   ],
   "type": "module",
   "exports": {
@@ -258,6 +259,10 @@
     "./shape-presets": {
       "types": "./dist/shape-presets.d.ts",
       "import": "./dist/shape-presets.js"
+    },
+    "./text-warps": {
+      "types": "./dist/text-warps.d.ts",
+      "import": "./dist/text-warps.js"
     },
     "./shape-connection-sites": {
       "types": "./dist/shape-connection-sites.d.ts",
