@@ -70,6 +70,7 @@ import {
   editDrawingShapeTextField,
   materializeDrawingShapeText,
   withDrawingShapeText,
+  withDrawingShapeBodyStyle,
   withoutDrawingShapeTextCharacterProperties,
 } from "./shape-text-options";
 import { resolveShapeTextPaintStyle } from "./shape-text-paint";
@@ -297,8 +298,7 @@ export function getShapeGroupFormatEligibleLeaves(
     const view = leaf.view;
     if (!view || leaf.collapsed) return false;
     if (target === "text") return hasText(leaf);
-    if (view.kind === "textBox" && (category === "format3d" || category === "rotation3d"))
-      return true;
+    if (view.kind === "textBox") return true;
     if (view.kind !== "shape") return false;
     return (
       category !== "fill" ||
@@ -317,7 +317,7 @@ export function getShapeGroupTextWarpEligibleLeaves(
     (leaf) => hasText(leaf) && !!leaf.view && isShapeFormatTextWarpTarget(leaf.view),
   );
 }
-/** Recipe/reset batches only affect exact genuine modern WordArt leaves. */
+/** Recipe/reset batches affect genuine TextBox and tagged modern WordArt leaves. */
 export function getShapeGroupWordArtStyleEligibleLeaves(
   context: ShapeGroupFormatContext,
 ): readonly ResolvedShapeGroupLeaf[] {
@@ -331,8 +331,9 @@ export function getShapeGroupLineEligibleLeaves(
 ): readonly ResolvedShapeGroupLeaf[] {
   return getShapeGroupFormatEligibleLeaves(context, "shape").filter(
     (leaf) =>
-      isLine(leaf.view!) ||
-      !!(leaf.view!.shapePath && !isShapeFreePathClosed(leaf.view!.shapePath)),
+      leaf.view!.kind === "shape" &&
+      (isLine(leaf.view!) ||
+        !!(leaf.view!.shapePath && !isShapeFreePathClosed(leaf.view!.shapePath))),
   );
 }
 /** Conditional text fields retain the same genuine per-leaf semantics as ordinary shapes. */
@@ -637,7 +638,9 @@ export function planShapeGroupFormatIntent(
       const style = { ...(text ? text.style : view.shapeStyle) };
       if (intent.value === undefined) delete style[intent.category];
       else Object.assign(style, { [intent.category]: intent.value });
-      return text ? withDrawingShapeText(view, { ...text, style }) : { ...view, shapeStyle: style };
+      return text
+        ? withDrawingShapeText(view, { ...text, style })
+        : withDrawingShapeBodyStyle(view, style);
     });
   }
   if (intent.type === "set-wordart-style" || intent.type === "clear-wordart-effects") {
@@ -654,7 +657,7 @@ export function planShapeGroupFormatIntent(
       if (warp) text.warp = normalizeShapeTextWarp(warp);
       else delete text.warp;
       // Preserve the entire leaf appearance, native layout, run styles and local frame.
-      return { ...view, shapeText: text };
+      return withDrawingShapeText(view, text);
     });
   }
   if (intent.type === "set-text-margins")

@@ -37,6 +37,18 @@ import ShapeFormatNumberField from "../../../modules/sheet-drawings/components/s
 import ShapeFormatCheckbox from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatCheckbox.vue";
 import ShapeFormatChoiceField from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatChoiceField.vue";
 import ShapeFormatTextField from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatTextField.vue";
+import {
+  createPictureShadow,
+  createPictureReflection,
+  createPictureGlow,
+  createPictureSoftEdges,
+  createPictureFormat3d,
+  createPictureRotation3d,
+  createPictureLine,
+} from "../../../modules/sheet-images/picture-effect-edit";
+import { planShapeLeafPixels } from "../../../modules/sheet-drawings/shape-leaf-pixels";
+import { resolveShapeDrawing } from "../../../modules/sheet-drawings/resolved-shape-drawing";
+import { WORDART_STYLE_PRESETS } from "../../../modules/sheet-drawings/wordart-style-presets";
 
 const cleanup: (() => void)[] = [];
 afterEach(() => {
@@ -60,7 +72,13 @@ const measurement: DrawingShapeTextRuntimeOptions = {
   normalLineMetrics: { ascent: 15, descent: 5, lineAdvance: 20 },
 };
 function fixture(
-  options: { legacy?: boolean; metrics?: boolean; kind?: "shape" | "textBox"; text?: string } = {},
+  options: {
+    legacy?: boolean;
+    plain?: boolean;
+    metrics?: boolean;
+    kind?: "shape" | "textBox";
+    text?: string;
+  } = {},
 ) {
   const workbook = ref(createWorkbook({ id: "canonical-pane", sheetId: "shapes" })),
     sheet = ref(getActiveSheet(workbook.value)),
@@ -80,6 +98,7 @@ function fixture(
     rotation: 37,
     text: options.text ?? "",
   };
+  if (options.plain) delete legacy.shapeText;
   if (options.legacy) sheet.value.drawings = [legacy];
   else {
     const { anchor, offsetX, offsetY, width, height, ...appearance } = legacy;
@@ -624,4 +643,120 @@ test("concrete pane Size/Properties controls commit canonical values and preserv
   ).toBe("error");
   expect(serializeWorkbook(f.workbook.value)).toEqual(before);
   expect(f.session.history.undoStack).toHaveLength(count);
+});
+
+describe("plain TextBox detailed body and glyph owner", () => {
+  const values = [
+    ["fill", { kind: "solid", color: { kind: "rgb", rgb: "#00AA33" }, opacity: 0.5 }],
+    ["line", createPictureLine()],
+    ["shadow", createPictureShadow()],
+    ["reflection", createPictureReflection()],
+    ["glow", createPictureGlow()],
+    ["softEdges", createPictureSoftEdges()],
+    ["format3d", createPictureFormat3d()],
+    ["rotation3d", createPictureRotation3d()],
+  ] as const;
+  test.each(values)(
+    "actual %s body value/None is an atomic TextBox owner edit",
+    (category, value) => {
+      const f = fixture({ kind: "textBox" });
+      expect(f.open()).toBe(true);
+      const before = serializeWorkbook(f.workbook.value),
+        original = f.source();
+      expect(f.pane.capabilities.value.styles?.shape?.[category]?.enabled).toBe(true);
+      expect(
+        f.pane.onIntent(
+          f.intent({
+            type: "set-style",
+            target: "shape",
+            category,
+            value: { kind: "value", value },
+          }),
+        ),
+      ).toBe(true);
+      expect(f.source().kind).toBe("textBox");
+      expect(f.source()).not.toHaveProperty("wordArt");
+      expect(f.source()).toHaveProperty(
+        "shapeText",
+        (original as SheetFramedGraphicDrawing).shapeText,
+      );
+      expect(f.pane.snapshot.value?.shapeStyle?.[category]).toEqual({ kind: "value", value });
+      expect(f.session.history.undoStack).toHaveLength(1);
+      const view = resolveShapeDrawing(f.source(), f.metrics.value).view as SheetGraphicDrawing;
+      const painted = planShapeLeafPixels({ drawing: view, density: 1 });
+      expect(painted).toBeDefined();
+      expect(undoWorkbookCommand(f.session)).toBe(true);
+      f.revision.value++;
+      expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+      expect(redoWorkbookCommand(f.session)).toBe(true);
+      f.revision.value++;
+      expect(
+        f.pane.onIntent(
+          f.intent({ type: "set-style", target: "shape", category, value: { kind: "none" } }),
+        ),
+      ).toBe(true);
+      expect(f.pane.snapshot.value?.shapeStyle?.[category]).toEqual({ kind: "none" });
+    },
+  );
+  test("old vertical textbox upgrades only on explicit body edit, preserves effective inset and Undo restores legacy", () => {
+    const f = fixture({ legacy: true, plain: true, kind: "textBox", text: "alpha" });
+    const source = f.source() as SheetGraphicDrawing;
+    source.strokeWidth = 3;
+    source.textDirection = "vertical";
+    const before = serializeWorkbook(f.workbook.value);
+    expect(f.open()).toBe(true);
+    expect(f.source()).toBe(source);
+    expect(f.pane.snapshot.value?.shapeStyle?.fill).toBeDefined();
+    expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+    expect(
+      f.pane.onIntent(
+        f.intent({
+          type: "set-style",
+          target: "shape",
+          category: "shadow",
+          value: { kind: "none" },
+        }),
+      ),
+    ).toBe(true);
+    const updated = f.source() as SheetGraphicDrawing;
+    expect(updated).not.toHaveProperty("textDirection");
+    expect(updated.shapeText!.layout).toMatchObject({
+      direction: "vertical-rl",
+      blockAlignment: "center",
+      marginsPt: { leftPt: 6.75, rightPt: 6.75, topPt: 6.75, bottomPt: 6.75 },
+    });
+    expect(updated.text).toBe(source.text);
+    expect(updated.fill).toBe(source.fill);
+    expect(updated.stroke).toBe(source.stroke);
+    expect(updated.rotation).toBe(source.rotation);
+    expect(updated).not.toHaveProperty("shapeFrame");
+    expect(serializeWorkbook(f.workbook.value).version).toBe(73);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+  });
+  test("first legacy vertical transform and recipe use plain kind and independent exact history", () => {
+    const f = fixture({ legacy: true, plain: true, kind: "textBox", text: "alpha" });
+    (f.source() as SheetGraphicDrawing).textDirection = "vertical";
+    expect(f.open()).toBe(true);
+    const before = serializeWorkbook(f.workbook.value);
+    expect(f.pane.capabilities.value.wordArtStyle?.enabled).toBe(true);
+    expect(f.pane.capabilities.value.textWarp?.enabled).toBe(true);
+    expect(
+      f.pane.onIntent(
+        f.intent({ type: "set-wordart-style", presetId: WORDART_STYLE_PRESETS[0]!.id }),
+      ),
+    ).toBe(true);
+    expect(f.source()).not.toHaveProperty("textDirection");
+    expect(f.source()).not.toHaveProperty("wordArt");
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    f.revision.value++;
+    expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+    expect(
+      f.pane.onIntent(f.intent({ type: "set-text-warp", value: { preset: "textWave1" } })),
+    ).toBe(true);
+    expect(f.source()).not.toHaveProperty("textDirection");
+    expect(f.source()).toHaveProperty("shapeText.warp", { preset: "textWave1" });
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+  });
 });

@@ -114,13 +114,13 @@ export interface ShapeFormatSnapshot {
   textWarp?: Readonly<ShapeTextWarp>;
   /** Mixed group readback never impersonates the first eligible leaf. */
   mixedTextWarp?: boolean;
-  /** Actual modern WordArt or retained-warp text leaves in the selected scope. */
+  /** Actual TextBox, modern WordArt or retained-warp text leaves in the selected scope. */
   textWarpScope?: Readonly<{ eligibleCount: number; descendantCount: number }>;
   /** Exact canonical preset readback; omitted when customized or mixed. */
   wordArtStyleEditingScope?: "selection" | "caret";
   wordArtStyleId?: string;
   mixedWordArtStyle?: boolean;
-  /** Only actual modern WordArt leaves are eligible for preset reapply and clear. */
+  /** Actual TextBox and modern WordArt leaves are eligible for preset reapply and clear. */
   wordArtStyleScope?: Readonly<{ eligibleCount: number; descendantCount: number }>;
   /** Exact intent acknowledgement allows other active drafts to survive our own accepted edit. */
   acceptedIntentId?: string;
@@ -213,15 +213,15 @@ export function shapeFormatFromDisplay(value: number, unit: PictureFormatLengthU
 export function isShapeFormatLengthField(field: ShapeFormatNumberField): boolean {
   return field.endsWith("Pt");
 }
-/** Modern WordArt and retained ordinary-shape warps share the existing text owner. */
+/** TextBox, modern WordArt and retained ordinary-shape warps share the existing text owner. */
 export function isShapeFormatTextWarpTarget(
   drawing: Readonly<Pick<SheetGraphicDrawing, "kind" | "shapeConnector" | "shapeText" | "wordArt">>,
 ): boolean {
   return (
     (drawing.kind === "shape" || drawing.kind === "textBox") &&
     !drawing.shapeConnector &&
-    !!drawing.shapeText &&
-    (drawing.wordArt === true || drawing.shapeText.warp !== undefined)
+    (drawing.kind === "textBox" ||
+      (!!drawing.shapeText && (drawing.wordArt === true || drawing.shapeText.warp !== undefined)))
   );
 }
 let intentSequence = 0;

@@ -96,11 +96,12 @@ export function resolveShapeDetailedPaintStyle(
     result: ShapeDetailedStyle = { ...own };
   if (result.fill === undefined) {
     const noDefaultFill =
-      (drawing.shapeGeometry && isShapeLinePreset(drawing.shapeGeometry.preset)) ||
-      (drawing.shapePath &&
-        !isShapeFreePathClosed(drawing.shapePath) &&
-        !drawing.shapePath.openArea) ||
-      (!drawing.shapeGeometry && !drawing.shapePath && drawing.shape === "line");
+      drawing.kind === "shape" &&
+      ((drawing.shapeGeometry && isShapeLinePreset(drawing.shapeGeometry.preset)) ||
+        (drawing.shapePath &&
+          !isShapeFreePathClosed(drawing.shapePath) &&
+          !drawing.shapePath.openArea) ||
+        (!drawing.shapeGeometry && !drawing.shapePath && drawing.shape === "line"));
     const paint = noDefaultFill ? undefined : solid(drawing.fill);
     result.fill = paint ? { kind: "value", value: paint } : { kind: "none" };
   }
@@ -155,8 +156,9 @@ function prepareSource(options: ShapeDetailedPaintOptions) {
   // A free path's explicit detailed fill requests Canvas fill closure. It never adds a Z stroke.
   const fillOpen = !!drawing.shapePath && explicit?.fill?.kind === "value";
   const lineShape =
-    (drawing.shapeGeometry && isShapeLinePreset(drawing.shapeGeometry.preset)) ||
-    (!drawing.shapeGeometry && !drawing.shapePath && drawing.shape === "line");
+    drawing.kind === "shape" &&
+    ((drawing.shapeGeometry && isShapeLinePreset(drawing.shapeGeometry.preset)) ||
+      (!drawing.shapeGeometry && !drawing.shapePath && drawing.shape === "line"));
   const input = lineShape
     ? {
         ...geometry,

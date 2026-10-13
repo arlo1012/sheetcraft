@@ -83,7 +83,7 @@ export type SheetGraphicDrawing = DrawingBase & {
   shapeFlipY?: true;
   /** Sparse Selection Pane state. Ownership, assets and connector relations remain intact. */
   hidden?: true;
-  /** Shape-only sparse paint, line and effects; absent categories keep the legacy appearance. */
+  /** Sparse body paint, line and effects; non-3D text-box choices require explicit shapeText. */
   shapeStyle?: ShapeDetailedStyle;
   /** Explicit shape/text-box layout, paragraph and glyph appearance, independent of body style. */
   shapeText?: ShapeText;
@@ -275,15 +275,8 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
   if (styleField && value.kind !== "shape" && value.kind !== "textBox")
     throw new TypeError("Only a shape drawing or a text box body may carry a shape style.");
   const shapeStyle = normalizeShapeStyle(styleField?.value);
-  // Old text boxes retain their CSS/plain-text rendering. Explicit body 3D is
-  // required when releasing a shared group scene, and has real pixel consumers.
-  if (
-    value.kind === "textBox" &&
-    styleField &&
-    (!shapeStyle ||
-      Object.keys(shapeStyle).some((key) => key !== "rotation3d" && key !== "format3d"))
-  )
-    throw new TypeError("Only a shape drawing may carry empty or non-3D body styles.");
+  if (value.kind === "textBox" && styleField && !shapeStyle)
+    throw new TypeError("Only a shape drawing may carry empty body styles.");
   const geometryField = Object.getOwnPropertyDescriptor(value, "shapeGeometry");
   if (geometryField && (geometryField.get || geometryField.set))
     throw new TypeError("Shape geometry cannot be an accessor.");
@@ -360,6 +353,17 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
   if (textField && directionField)
     throw new TypeError("Shape text and legacy text direction are mutually exclusive.");
   const shapeText = normalizeShapeText(textField?.value, value.text);
+  // Body edits opt into the shared layout only with an explicitly owned text
+  // model. Old 3D-only boxes can still retain their CSS/plain-text rendering.
+  if (
+    value.kind === "textBox" &&
+    shapeStyle &&
+    Object.keys(shapeStyle).some((key) => key !== "rotation3d" && key !== "format3d") &&
+    (!textField || !shapeText)
+  )
+    throw new TypeError(
+      "Only a shape drawing or a text box with explicit shape text may carry non-3D body styles.",
+    );
   const wordArtField = Object.getOwnPropertyDescriptor(value, "wordArt");
   if (!wordArtField && "wordArt" in value)
     throw new TypeError("WordArt semantics must be an own data field.");
@@ -491,7 +495,22 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     }
   // Newly admitted legacy controls must be data records before any appearance read.
   const ownKind = Object.getOwnPropertyDescriptor(value, "kind");
+  const styleField = Object.getOwnPropertyDescriptor(value, "shapeStyle");
+  if ("shapeStyle" in value && (!ownKind || !("value" in ownKind)))
+    throw new TypeError("Shape body styles require an own data drawing kind.");
+  const rawStyle: unknown = styleField && "value" in styleField ? styleField.value : undefined;
+  const hasTextBoxBodyStyle =
+    ownKind?.value === "textBox" &&
+    "shapeStyle" in value &&
+    (!styleField ||
+      !("value" in styleField) ||
+      (!!rawStyle &&
+        typeof rawStyle === "object" &&
+        ["fill", "line", "shadow", "reflection", "glow", "softEdges"].some(
+          (key) => key in rawStyle,
+        )));
   const hasNewControls =
+    hasTextBoxBodyStyle ||
     "hidden" in value ||
     (("shapeFlipX" in value || "shapeFlipY" in value) &&
       (ownKind?.value === "textBox" ||
@@ -518,6 +537,43 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
         throw new TypeError("Unknown shape control drawing field.");
       if (!("value" in Object.getOwnPropertyDescriptor(value, key)!))
         throw new TypeError("Shape controls require own data fields, not accessors.");
+    }
+    if (hasTextBoxBodyStyle) {
+      for (const key of [
+        "id",
+        "kind",
+        "name",
+        "text",
+        "shape",
+        "fill",
+        "stroke",
+        "strokeWidth",
+        "color",
+        "fontSize",
+        "bold",
+        "italic",
+        "rotation",
+        "anchor",
+        "offsetX",
+        "offsetY",
+        "width",
+        "height",
+      ] as const) {
+        const field = Object.getOwnPropertyDescriptor(value, key);
+        if (!field || !("value" in field))
+          throw new TypeError("Text box body styles require own source data fields.");
+      }
+      const anchor: unknown = Object.getOwnPropertyDescriptor(value, "anchor")!.value;
+      if (!anchor || typeof anchor !== "object" || Array.isArray(anchor))
+        throw new TypeError("Text box body anchors must be ordinary data records.");
+      const anchorPrototype = Object.getPrototypeOf(anchor);
+      if (anchorPrototype !== null && anchorPrototype !== Object.prototype)
+        throw new TypeError("Text box body anchors must be ordinary data records.");
+      for (const key of ["row", "column"] as const) {
+        const field = Object.getOwnPropertyDescriptor(anchor, key);
+        if (!field || !("value" in field))
+          throw new TypeError("Text box body anchors require own data fields.");
+      }
     }
   }
   if ("groupFrame" in value)

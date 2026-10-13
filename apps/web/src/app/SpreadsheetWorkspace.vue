@@ -3530,9 +3530,12 @@ function onWorkspaceNativeTextCopy(event: ClipboardEvent): void {
   });
 }
 function onWorkspaceKeydown(event: KeyboardEvent): void {
+  const currentShapeTextEdit = shapeTextEdit.snapshot.value;
   if (
     event.target instanceof Element &&
-    event.target.closest("[data-shape-canvas-text-editor], [data-shape-canvas-text-toolbar]")
+    (event.target.closest("[data-shape-canvas-text-editor], [data-shape-canvas-text-toolbar]") ||
+      (currentShapeTextEdit &&
+        event.target.closest(`[data-shape-text-edit-session="${currentShapeTextEdit.sessionId}"]`)))
   )
     return;
   if (shapeTextEdit.snapshot.value && sheetGridRef.value?.flushPendingShapeTextEdit() === false) {

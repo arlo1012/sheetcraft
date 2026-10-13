@@ -304,6 +304,8 @@ export type WorkbookSnapshotV70 = Omit<WorkbookSnapshotV69, "version"> & { versi
 export type WorkbookSnapshotV71 = Omit<WorkbookSnapshotV70, "version"> & { version: 71 };
 /** Sparse local glyph shadow, reflection and glow choices, including explicit None. */
 export type WorkbookSnapshotV72 = Omit<WorkbookSnapshotV71, "version"> & { version: 72 };
+/** Explicit text-box body paint, line and non-3D effects, paired with owned shape text. */
+export type WorkbookSnapshotV73 = Omit<WorkbookSnapshotV72, "version"> & { version: 73 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -334,8 +336,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV69
   | WorkbookSnapshotV70
   | WorkbookSnapshotV71
-  | WorkbookSnapshotV72;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV72, "version"> & {
+  | WorkbookSnapshotV72
+  | WorkbookSnapshotV73;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV73, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -426,7 +429,8 @@ type SnapshotVersion =
   | 69
   | 70
   | 71
-  | 72;
+  | 72
+  | 73;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -460,6 +464,7 @@ function inspectShapeSnapshotFeatures(
 ): {
   hasScene: boolean;
   hasTextBox3d: boolean;
+  hasTextBoxBodyStyle: boolean;
   hasOpenArea: boolean;
   hasModernWordArt: boolean;
   hasTextWarp: boolean;
@@ -467,6 +472,7 @@ function inspectShapeSnapshotFeatures(
 } {
   let hasScene = false,
     hasTextBox3d = false,
+    hasTextBoxBodyStyle = false,
     hasOpenArea = false,
     hasModernWordArt = false,
     hasTextWarp = false,
@@ -550,12 +556,26 @@ function inspectShapeSnapshotFeatures(
       if ("shapeStyle" in node && (!kindField || !("value" in kindField)))
         return fail(path, "Shape body styles require an own data drawing kind.");
       if (kindField?.value === "textBox" && "shapeStyle" in node) {
-        if (version !== undefined && version < 68)
-          return fail(path, "Text box body 3D requires snapshot version 68.");
         const styleField = Object.getOwnPropertyDescriptor(node, "shapeStyle");
         if (!styleField || !("value" in styleField))
-          return fail(path, "Text box body 3D must be an own data field.");
-        hasTextBox3d = true;
+          return fail(path, "Text box body styles must be own data fields.");
+        const rawStyle: unknown = styleField.value;
+        if (rawStyle && typeof rawStyle === "object") {
+          // Presence gates old payloads before malformed choices or inherited
+          // category accessors could be read by a normalizer.
+          if (
+            ["fill", "line", "shadow", "reflection", "glow", "softEdges"].some(
+              (key) => key in rawStyle,
+            )
+          ) {
+            if (version !== undefined && version < 73)
+              return fail(path, "Text box non-3D body styles require snapshot version 73.");
+            hasTextBoxBodyStyle = true;
+          }
+          hasTextBox3d ||= "rotation3d" in rawStyle || "format3d" in rawStyle;
+        }
+        if (version !== undefined && version < 68)
+          return fail(path, "Text box body 3D requires snapshot version 68.");
       }
       if (!hasShapeGroupSnapshotTag(node, path)) continue;
       const members = Object.getOwnPropertyDescriptor(node, "members");
@@ -580,6 +600,7 @@ function inspectShapeSnapshotFeatures(
   return {
     hasScene,
     hasTextBox3d,
+    hasTextBoxBodyStyle,
     hasOpenArea,
     hasModernWordArt,
     hasTextWarp,
@@ -1677,6 +1698,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   let hasShapeCharacterRuns = false;
   let hasShapeGroup3d = false;
   let hasTextBoxBody3d = false;
+  let hasTextBoxBodyStyle = false;
   let hasOpenShapeArea = false;
   let hasModernWordArt = false;
   let hasTextWarp = false;
@@ -1692,6 +1714,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       );
       hasShapeGroup3d ||= scene.hasScene;
       hasTextBoxBody3d ||= scene.hasTextBox3d;
+      hasTextBoxBodyStyle ||= scene.hasTextBoxBodyStyle;
       hasOpenShapeArea ||= scene.hasOpenArea;
       hasModernWordArt ||= scene.hasModernWordArt;
       hasTextWarp ||= scene.hasTextWarp;
@@ -2087,6 +2110,8 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasModernWordArt) version = 70;
     if (hasTextWarp) version = 71;
     if (hasShapeCharacterEffects) version = 72;
+    // Infer last so unrelated earlier features cannot lower the text-box body protocol.
+    if (hasTextBoxBodyStyle) version = 73;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -2390,6 +2415,15 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 72;
+  // Text-box body formatting is the final independent maximum, including explicit None.
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasTextBoxBodyStyle,
+      ),
+    )
+  )
+    snapshot.version = 73;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -2469,7 +2503,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 69 &&
     record.version !== 70 &&
     record.version !== 71 &&
-    record.version !== 72
+    record.version !== 72 &&
+    record.version !== 73
   ) {
     throw new WorkbookDomainError(
       {

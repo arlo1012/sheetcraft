@@ -41,6 +41,22 @@ afterEach(() => {
   clearShapeDetailedPaintCache();
 });
 describe("actual numeric shape source", () => {
+  test("TextBox retains rectangular inherited and explicit fill with dormant legacy line metadata", () => {
+    const source = createGraphicDrawing("t", "textBox", "TextBox", { row: 0, column: 0 });
+    source.shape = "line";
+    source.fill = "#123456";
+    source.shapeStyle = { shadow: { kind: "none" } };
+    expect(resolveShapeDetailedPaintStyle(source).fill).toMatchObject({
+      value: { color: { rgb: "#123456" } },
+    });
+    const plan = planShapeDetailedPaint({
+      drawing: source,
+      geometry: evaluateShapePreset({ preset: "rect" }, source.width, source.height),
+      density: 1,
+    });
+    expect(plan.effectiveGeometry.paths.some((path) => path.filled)).toBe(true);
+    expect(plan.effectiveStyle.fill).toMatchObject({ value: { color: { rgb: "#123456" } } });
+  });
   test("sparse categories inherit real fill/line and explicit none removes them", () => {
     const source = drawing();
     source.fill = "#123456";

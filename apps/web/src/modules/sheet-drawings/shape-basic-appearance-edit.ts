@@ -1,5 +1,6 @@
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import { resolveShapeDetailedPaintStyle } from "./shape-detailed-paint";
+import { withDrawingShapeBodyStyle } from "./shape-text-options";
 
 /** Legacy editor controls remain real edits when a detailed category already overrides them. */
 export function editShapeBasicAppearance(
@@ -8,7 +9,7 @@ export function editShapeBasicAppearance(
   value: string | number,
 ): SheetGraphicDrawing {
   const next = { ...drawing, [field]: value };
-  if (drawing.kind !== "shape" || !drawing.shapeStyle) return next;
+  if ((drawing.kind !== "shape" && drawing.kind !== "textBox") || !drawing.shapeStyle) return next;
   const style = { ...drawing.shapeStyle };
   if (field === "fill") {
     style.fill =
@@ -40,5 +41,7 @@ export function editShapeBasicAppearance(
       style.line = resolveShapeDetailedPaintStyle(plain).line;
     }
   }
-  return { ...next, shapeStyle: style };
+  return next.kind === "textBox"
+    ? withDrawingShapeBodyStyle(next, style)
+    : { ...next, shapeStyle: style };
 }

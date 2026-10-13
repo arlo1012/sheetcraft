@@ -31,6 +31,7 @@ import { WORDART_STYLE_PRESETS } from "../../../modules/sheet-drawings/wordart-s
 import {
   aggregateShapeGroupFormatSnapshot,
   getShapeGroupFormatEligibleLeaves,
+  getShapeGroupLineEligibleLeaves,
   getShapeGroupTextWarpEligibleLeaves,
   isShapeGroupFormatContextCurrent,
   planShapeGroupFormatIntent,
@@ -560,7 +561,7 @@ describe("root and nested container geometry and properties", () => {
 });
 
 describe("genuine descendant fill/line and text batches", () => {
-  test("body batch edits only eligible shapes inside the chosen subtree and preserves ownership and assets", () => {
+  test("body batch edits eligible shapes and text boxes inside the chosen subtree and preserves ownership and assets", () => {
     const f = fixture();
     f.a.shapeStyle = { line: { kind: "none" }, fill: { kind: "value", value: paint("old-body") } };
     f.a.shapeText!.style = { fill: { kind: "value", value: paint("glyph") } };
@@ -572,9 +573,12 @@ describe("genuine descendant fill/line and text batches", () => {
       category: "fill",
       value: { kind: "value", value: paint("new-body") },
     });
-    expect(plan.eligibleCount).toBe(1);
+    expect(plan.eligibleCount).toBe(2);
     expect(plan.descendantCount).toBe(2);
-    expect(plan.affectedPaths).toEqual([["root", "inner", "a"]]);
+    expect(plan.affectedPaths).toEqual([
+      ["root", "inner", "a"],
+      ["root", "inner", "b"],
+    ]);
     const changed = node(plan.root, ["root", "inner", "a"]);
     expect(changed.shapeStyle!.line).toEqual({ kind: "none" });
     expect(changed.shapeText).toEqual(f.a.shapeText);
@@ -582,7 +586,9 @@ describe("genuine descendant fill/line and text batches", () => {
     expect(changed.groupFrame).toEqual(f.a.groupFrame);
     expect(changed.text).toBe(f.a.text);
     expect(plan.root.members[0]).toEqual(before.members[0]);
-    expect(node(plan.root, ["root", "inner", "b"])).toEqual(f.b);
+    const box = node(plan.root, ["root", "inner", "b"]);
+    expect(box.shapeStyle?.fill).toEqual({ kind: "value", value: paint("new-body") });
+    expect({ ...box, shapeStyle: f.b.shapeStyle }).toMatchObject(f.b);
     expect([...collectShapeGroupAssetIds(plan.root)]).toEqual(["new-body", "glyph"]);
     expect(f.root).toEqual(before);
     for (const visit of traverseShapeGroup(plan.root))
@@ -971,12 +977,10 @@ describe("genuine descendant fill/line and text batches", () => {
     expect(aggregate.mixedFields).toEqual(
       expect.arrayContaining(["fontSizePt", "textBold", "textVerticalAlignment"]),
     );
-    expect(aggregate.bodyEligibleCount).toBe(1);
+    expect(aggregate.bodyEligibleCount).toBe(2);
     expect(aggregate.textEligibleCount).toBe(2);
-    expect(aggregate.shapeStyle.fill).toMatchObject({
-      kind: "value",
-      value: { color: { rgb: "#FF0000" } },
-    });
+    expect(aggregate.shapeStyle).not.toHaveProperty("fill");
+    expect(aggregate.mixedStyleCategories.shape).toContain("fill");
     f.root.members[0] = leaf("other");
     const outer = aggregateShapeGroupFormatSnapshot(
       resolveShapeGroupFormatContext(f.root, ["root"], f.metrics),
@@ -990,7 +994,7 @@ describe("genuine descendant fill/line and text batches", () => {
       getShapeGroupFormatEligibleLeaves(context, "shape", "fill").map(
         (entry) => entry.sourceNode.id,
       ),
-    ).toEqual(["a"]);
+    ).toEqual(["a", "b"]);
   });
 
   test("conditional text fields target only actual supported descendants and preserve the rest", () => {
@@ -1179,7 +1183,7 @@ test("retained area remains eligible for group fill/text batches while ordinary 
     category: "fill",
     value: { kind: "value", value: paint("retained-fill") },
   });
-  expect(plan.eligibleCount).toBe(1);
+  expect(plan.eligibleCount).toBe(2);
   expect(node(plan.root, ["root", "inner", "a"]).shapeStyle?.fill).toEqual({
     kind: "value",
     value: paint("retained-fill"),
@@ -1262,7 +1266,7 @@ describe("WordArt subtree transform planning", () => {
   });
   test("untagged shapes cannot gain transforms; exact selected leaf scopes remain narrow", () => {
     const f = fixture();
-    const unsupported = resolveShapeGroupFormatContext(f.root, ["root"], f.metrics);
+    const unsupported = resolveShapeGroupFormatContext(f.root, ["root", "inner", "a"], f.metrics);
     expect(getShapeGroupTextWarpEligibleLeaves(unsupported)).toEqual([]);
     expect(() =>
       planShapeGroupFormatIntent(
@@ -1292,4 +1296,53 @@ describe("WordArt subtree transform planning", () => {
     });
     expect(node(result.root, ["root", "inner", "b"])).toEqual(f.b);
   });
+});
+
+test("old owned vertical TextBox body and first transform preserve the exact leaf owner", () => {
+  const f = fixture();
+  delete f.b.shapeText;
+  f.b.textDirection = "vertical";
+  f.b.strokeWidth = 3;
+  const before = structuredClone(f.root),
+    path = ["root", "inner", "b"];
+  const plan = apply(f, path, {
+    type: "set-style",
+    target: "shape",
+    category: "fill",
+    value: { kind: "none" },
+  });
+  const updated = node(plan.root, path);
+  expect(updated.kind).toBe("textBox");
+  expect(updated).not.toHaveProperty("wordArt");
+  expect(updated).not.toHaveProperty("textDirection");
+  expect(updated.groupFrame).toEqual(f.b.groupFrame);
+  expect(updated.rotation).toBe(f.b.rotation);
+  expect(updated.text).toBe(f.b.text);
+  expect(updated.shapeText?.layout).toMatchObject({
+    direction: "vertical-rl",
+    marginsPt: { leftPt: 6.75, rightPt: 6.75, topPt: 6.75, bottomPt: 6.75 },
+  });
+  expect(plan.affectedPaths).toEqual([path]);
+  expect(node(plan.root, ["root", "inner", "a"])).toEqual(f.a);
+  const warp = apply(f, path, { type: "set-text-warp", value: { preset: "textWave1" } });
+  expect(node(warp.root, path)).not.toHaveProperty("textDirection");
+  expect(node(warp.root, path).shapeText?.warp).toEqual({ preset: "textWave1" });
+  expect(f.root).toEqual(before);
+});
+test("TextBox dormant line metadata cannot opt into connector arrow-end controls", () => {
+  const f = fixture();
+  f.b.shape = "line";
+  const context = resolveShapeGroupFormatContext(f.root, ["root", "inner", "b"], f.metrics);
+  expect(getShapeGroupFormatEligibleLeaves(context, "shape", "fill")).toHaveLength(1);
+  expect(getShapeGroupLineEligibleLeaves(context)).toEqual([]);
+  expect(() =>
+    planShapeGroupFormatIntent(
+      context,
+      {
+        type: "set-line-ends",
+        value: { begin: { kind: "triangle", width: "medium", length: "medium" } },
+      },
+      { width: 80, height: 40 },
+    ),
+  ).toThrow(/eligible/);
 });

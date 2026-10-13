@@ -14,6 +14,7 @@ import {
   WORDART_STYLE_PRESETS,
   materializeWordArtStylePreset,
 } from "../../../modules/sheet-drawings/wordart-style-presets";
+import { isShapeFormatTextWarpTarget } from "../../../modules/sheet-drawings/shape-format-pane-model";
 
 function fixture() {
   const drawing = requireLegacySheetDrawing(
@@ -48,6 +49,66 @@ function fixture() {
   };
   return drawing;
 }
+function textBoxFixture() {
+  const drawing = fixture();
+  const { wordArt: _wordArt, shapeGeometry: _geometry, ...base } = drawing;
+  return { ...base, kind: "textBox" as const };
+}
+test("plain TextBox owns styles and a first transform without a WordArt tag", () => {
+  const drawing = textBoxFixture();
+  delete drawing.shapeText!.warp;
+  expect(isWordArtStyleTarget(drawing)).toBe(true);
+  expect(isShapeFormatTextWarpTarget(drawing)).toBe(true);
+  delete drawing.shapeText;
+  expect(isShapeFormatTextWarpTarget(drawing)).toBe(true);
+});
+test.each(WORDART_STYLE_PRESETS)(
+  "TextBox recipe $id preserves body, string, typography, frame and warp",
+  (preset) => {
+    const original = textBoxFixture();
+    const before = structuredClone(original);
+    const next = applyWordArtStylePreset(original, preset.id);
+    expect(next.kind).toBe("textBox");
+    expect(next).not.toHaveProperty("wordArt");
+    expect(next.shapeText!.style).toEqual(materializeWordArtStylePreset(preset.id));
+    expect({ ...next, shapeText: original.shapeText }).toEqual(original);
+    expect(next.shapeText!.characterRuns?.[0]).toEqual({
+      start: 0,
+      end: 6,
+      fontFamily: "Noto Serif",
+      fontSize: 64,
+      bold: false,
+      italic: true,
+      underline: true,
+    });
+    expect(next.shapeText!.warp).toEqual(original.shapeText!.warp);
+    expect(getAppliedWordArtStyleId(next)).toBe(preset.id);
+    expect(original).toEqual(before);
+  },
+);
+test.each(["recipe", "clear"] as const)(
+  "legacy vertical TextBox first %s materializes direction without conflicting fields",
+  (operation) => {
+    const original = textBoxFixture();
+    delete original.shapeText;
+    original.textDirection = "vertical";
+    original.strokeWidth = 3;
+    const next =
+      operation === "recipe"
+        ? applyWordArtStylePreset(original, WORDART_STYLE_PRESETS[0]!.id)
+        : clearWordArtEffects(original);
+    expect(next.kind).toBe("textBox");
+    expect(next).not.toHaveProperty("textDirection");
+    expect(next.shapeText!.layout).toMatchObject({
+      direction: "vertical-rl",
+      blockAlignment: "center",
+      marginsPt: { leftPt: 6.75, rightPt: 6.75, topPt: 6.75, bottomPt: 6.75 },
+    });
+    expect(requireLegacySheetDrawing(next)).toEqual(next);
+    expect(original.textDirection).toBe("vertical");
+    expect(original.shapeText).toBeUndefined();
+  },
+);
 test.each(WORDART_STYLE_PRESETS)(
   "object reapply $id replaces only complete glyph appearance",
   (preset) => {

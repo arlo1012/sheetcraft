@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSheet, createSheetEvaluator } from "@sheetcraft/core/workbook";
 import { pictureFrameLocalToWorld } from "@sheetcraft/core/picture-frame";
-import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import { normalizeSheetDrawing, type SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { ShapeDetailedStyle, ShapePaint, ShapeShadow } from "@sheetcraft/core/shape-style";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
 import { createDefaultShapeText } from "../../../modules/sheet-drawings/shape-text-options";
@@ -784,132 +784,145 @@ describe("bounded real per-character effect masks", () => {
       planShapeTextPaint({ ...value, style: { rotation3d: none, softEdges: none } }),
     ).not.toThrow();
   });
-  test("actual attributed alpha drives both effect hit-testing and the genuine print painter", () => {
-    const value = input([run(), { ...run("b", 14), shadow: none, glow: none, reflection: none }]);
-    value.drawing.shapeText!.style = effectStyle;
-    value.drawing.shapeStyle = { fill: none, line: none };
-    value.drawing.offsetX = 0;
-    value.drawing.offsetY = 0;
-    const ready = paint(value),
-      frame = { x: 100, y: 80, width: 28, height: 20 };
-    const presentation = {
-      drawing: value.drawing,
-      canvas: ready.canvas,
-      density: ready.actualDensity,
-      bounds: {
-        left: ready.logicalBounds.left,
-        top: ready.logicalBounds.top,
-        width: ready.logicalBounds.right - ready.logicalBounds.left,
-        height: ready.logicalBounds.bottom - ready.logicalBounds.top,
-      },
-      unflipped: true as const,
-    };
-    for (const [x, y, hit] of [
-      [11, 5, true],
-      [3, 34, true],
-      [23, 5, false],
-      [15, 34, false],
-    ] as const)
-      expect(
-        detailedShapeContainsWorldPoint(
-          value.drawing,
-          frame,
-          pictureFrameLocalToWorld(frame, 0, { x: x + 0.5, y: y + 0.5 }),
-          presentation,
-        ),
-      ).toBe(hit);
-    const native = factory();
-    vi.stubGlobal("document", { createElement: () => native.make() });
-    // Only native metrics are injected. The actual print entry, body painter,
-    // owned character-effect compositor and final drawImage all remain real.
-    vi.spyOn(textRuntime, "layoutDrawingShapeText").mockReturnValue(value.layout);
-    const sheet = createSheet("Character effects print", "effects-print");
-    sheet.drawings = [value.drawing];
-    const metrics = createPrintShapeMetrics(sheet, createSheetEvaluator(sheet)),
-      target = new MemoryCanvas();
-    target.width = 48;
-    target.height = 48;
-    paintPrintShapes(target.context as unknown as CanvasRenderingContext2D, {
-      sheet,
-      metrics,
-      viewport: { x: 0, y: 0, width: 48, height: 48 },
-      images: createCanvasImageCache(() => {}),
-      density: 1,
-    });
-    for (let y = 0; y < 40; y++)
-      for (let x = 0; x < 28; x++) {
-        const index = (y * target.width + x) * 4;
-        expect([...target.data.subarray(index, index + 4)]).toEqual(at(ready, x, y));
-      }
-    clearShapeDetailedPaintCache();
-    expect(native.canvases.every((canvas) => canvas.width === 0 && canvas.height === 0)).toBe(true);
-  });
-  test("native envelope and follow-path warps preserve selected subset ownership", () => {
-    for (const preset of ["textArchUpPour", "textArchUp"] as const) {
-      const value = input(),
-        shapeText = createDefaultShapeText();
-      shapeText.layout.wrap = false;
-      shapeText.layout.overflow = true;
-      shapeText.layout.marginsPt = { leftPt: 0, rightPt: 0, topPt: 0, bottomPt: 0 };
-      shapeText.fontFamily = "Exact Family";
-      shapeText.warp = { preset };
-      value.drawing = {
-        ...value.drawing,
-        wordArt: true,
-        shapeGeometry: { preset: "rect" },
-        width: 48,
-        height: 24,
-        fontSize: 16,
-        shapeText,
+  test.each(["shape", "textBox"] as const)(
+    "%s attributed alpha drives effect hit-testing and the genuine print painter",
+    (kind) => {
+      const value = input([run(), { ...run("b", 14), shadow: none, glow: none, reflection: none }]);
+      value.drawing.kind = kind;
+      if (kind === "textBox") delete value.drawing.shapeGeometry;
+      value.drawing.shapeText!.style = effectStyle;
+      value.drawing.shapeStyle = { fill: none, line: none };
+      value.drawing.offsetX = 0;
+      value.drawing.offsetY = 0;
+      expect(() => normalizeSheetDrawing(value.drawing)).not.toThrow();
+      const ready = paint(value),
+        frame = { x: 100, y: 80, width: 28, height: 20 };
+      const presentation = {
+        drawing: value.drawing,
+        canvas: ready.canvas,
+        density: ready.actualDensity,
+        bounds: {
+          left: ready.logicalBounds.left,
+          top: ready.logicalBounds.top,
+          width: ready.logicalBounds.right - ready.logicalBounds.left,
+          height: ready.logicalBounds.bottom - ready.logicalBounds.top,
+        },
+        unflipped: true as const,
       };
-      value.layout = layoutDrawingShapeText(value.drawing, {
-        measurer: {
-          measure: (text) => text.length * 4,
-          measureMetrics: (text) => ({
-            width: text.length * 4,
-            ascent: text.trim() ? 4 : 0,
-            descent: 0,
-            inkLeft: 0,
-            inkRight: text.trim() ? text.length * 4 : 0,
-          }),
-        },
-        normalLineMetrics: { ascent: 4, descent: 1, lineAdvance: 5 },
+      for (const [x, y, hit] of [
+        [11, 5, true],
+        [3, 34, true],
+        [23, 5, false],
+        [15, 34, false],
+      ] as const)
+        expect(
+          detailedShapeContainsWorldPoint(
+            value.drawing,
+            frame,
+            pictureFrameLocalToWorld(frame, 0, { x: x + 0.5, y: y + 0.5 }),
+            presentation,
+          ),
+        ).toBe(hit);
+      const native = factory();
+      vi.stubGlobal("document", { createElement: () => native.make() });
+      // Only native metrics are injected. The actual print entry, body painter,
+      // owned character-effect compositor and final drawImage all remain real.
+      vi.spyOn(textRuntime, "layoutDrawingShapeText").mockReturnValue(value.layout);
+      const sheet = createSheet("Character effects print", "effects-print");
+      sheet.drawings = [value.drawing];
+      const metrics = createPrintShapeMetrics(sheet, createSheetEvaluator(sheet)),
+        target = new MemoryCanvas();
+      target.width = 48;
+      target.height = 48;
+      paintPrintShapes(target.context as unknown as CanvasRenderingContext2D, {
+        sheet,
+        metrics,
+        viewport: { x: 0, y: 0, width: 48, height: 48 },
+        images: createCanvasImageCache(() => {}),
+        density: 1,
       });
-      const baseline = value.layout.runs[0]!;
-      value.layout.runs = [
-        {
-          ...baseline,
-          text: "a",
-          sourceStart: 0,
-          sourceEnd: 1,
-          advancePx: 4,
-          inlineAdvancePx: 4,
-          inkBounds: { ...baseline.inkBounds, width: 4 },
-          reflection: effectStyle.reflection,
-        },
-        {
-          ...baseline,
-          text: "b",
-          sourceStart: 1,
-          sourceEnd: 2,
-          x: baseline.x + 4,
-          advancePx: 4,
-          inlineAdvancePx: 4,
-          inkBounds: { ...baseline.inkBounds, x: baseline.inkBounds.x + 4, width: 4 },
-          reflection: none,
-        },
-      ];
-      value.layout.lines[0]!.runs = value.layout.runs;
-      const native = factory(),
-        result = paint(value, native);
-      expect(result.warpPlan?.family).toBe(preset.endsWith("Pour") ? "envelope" : "follow-path");
-      expect(native.calls().some((call) => call.text === "a")).toBe(true);
-      expect(result.attributedEffects).toBe(true);
-      expect(
-        (result.canvas as unknown as MemoryCanvas).data.some(
-          (alpha, index) => index % 4 === 3 && alpha > 0,
-        ),
-      ).toBe(true);
-    }
-  });
+      for (let y = 0; y < 40; y++)
+        for (let x = 0; x < 28; x++) {
+          const index = (y * target.width + x) * 4;
+          expect([...target.data.subarray(index, index + 4)]).toEqual(at(ready, x, y));
+        }
+      clearShapeDetailedPaintCache();
+      expect(native.canvases.every((canvas) => canvas.width === 0 && canvas.height === 0)).toBe(
+        true,
+      );
+    },
+  );
+  test.each(["shape", "textBox"] as const)(
+    "%s envelope and follow-path warps preserve selected subset ownership",
+    (kind) => {
+      for (const preset of ["textArchUpPour", "textArchUp"] as const) {
+        const value = input(),
+          shapeText = createDefaultShapeText();
+        shapeText.layout.wrap = false;
+        shapeText.layout.overflow = true;
+        shapeText.layout.marginsPt = { leftPt: 0, rightPt: 0, topPt: 0, bottomPt: 0 };
+        shapeText.fontFamily = "Exact Family";
+        shapeText.warp = { preset };
+        value.drawing = {
+          ...value.drawing,
+          kind,
+          ...(kind === "shape" ? { wordArt: true, shapeGeometry: { preset: "rect" } } : {}),
+          width: 48,
+          height: 24,
+          fontSize: 16,
+          shapeText,
+        };
+        if (kind === "textBox") delete value.drawing.shapeGeometry;
+        expect(() => normalizeSheetDrawing(value.drawing)).not.toThrow();
+        value.layout = layoutDrawingShapeText(value.drawing, {
+          measurer: {
+            measure: (text) => text.length * 4,
+            measureMetrics: (text) => ({
+              width: text.length * 4,
+              ascent: text.trim() ? 4 : 0,
+              descent: 0,
+              inkLeft: 0,
+              inkRight: text.trim() ? text.length * 4 : 0,
+            }),
+          },
+          normalLineMetrics: { ascent: 4, descent: 1, lineAdvance: 5 },
+        });
+        const baseline = value.layout.runs[0]!;
+        value.layout.runs = [
+          {
+            ...baseline,
+            text: "a",
+            sourceStart: 0,
+            sourceEnd: 1,
+            advancePx: 4,
+            inlineAdvancePx: 4,
+            inkBounds: { ...baseline.inkBounds, width: 4 },
+            reflection: effectStyle.reflection,
+          },
+          {
+            ...baseline,
+            text: "b",
+            sourceStart: 1,
+            sourceEnd: 2,
+            x: baseline.x + 4,
+            advancePx: 4,
+            inlineAdvancePx: 4,
+            inkBounds: { ...baseline.inkBounds, x: baseline.inkBounds.x + 4, width: 4 },
+            reflection: none,
+          },
+        ];
+        value.layout.lines[0]!.runs = value.layout.runs;
+        const native = factory(),
+          result = paint(value, native);
+        expect(result.warpPlan?.family).toBe(preset.endsWith("Pour") ? "envelope" : "follow-path");
+        expect(native.calls().some((call) => call.text === "a")).toBe(true);
+        expect(result.attributedEffects).toBe(true);
+        expect(
+          (result.canvas as unknown as MemoryCanvas).data.some(
+            (alpha, index) => index % 4 === 3 && alpha > 0,
+          ),
+        ).toBe(true);
+      }
+    },
+  );
 });

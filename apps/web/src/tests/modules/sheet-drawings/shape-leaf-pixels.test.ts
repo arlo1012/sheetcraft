@@ -4,7 +4,10 @@ import { deleteClosedFreeShapeSegment } from "../../../modules/sheet-drawings/fr
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
 import type { DrawingShape, SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { DrawingShapeTextRuntimeOptions } from "../../../modules/sheet-drawings/shape-text-runtime";
-import { createDefaultShapeText } from "../../../modules/sheet-drawings/shape-text-options";
+import {
+  createDefaultShapeText,
+  withDrawingShapeBodyStyle,
+} from "../../../modules/sheet-drawings/shape-text-options";
 import {
   getDrawingShapeGeometry,
   standardShapeFlipPoint,
@@ -479,6 +482,42 @@ afterEach(() => {
   expect(getShapeLeafPixelsOwnedBytes()).toBe(0);
 });
 describe("actual leaf branch and layout policy", () => {
+  test("explicit TextBox body upgrade preserves legacy content inset and uses actual standard body/glyph pixels", () => {
+    const original = drawing({ kind: "textBox", stroke: "#BCBCBC", strokeWidth: 3 });
+    const old = planShapeLeafPixels(options(original));
+    expect(old.renderPolicy).toBe("legacy-text-box");
+    const next = withDrawingShapeBodyStyle(original, {
+      fill: {
+        kind: "value",
+        value: { kind: "solid", color: { kind: "rgb", rgb: "#0033AA" }, opacity: 0.5 },
+      },
+      shadow: { kind: "none" },
+      glow: {
+        kind: "value",
+        value: { color: { kind: "rgb", rgb: "#FF0000" }, opacity: 0.5, sizePt: 1.5 },
+      },
+    });
+    const plan = planShapeLeafPixels(options(next));
+    expect(plan.renderPolicy).toBe("standard");
+    expect(plan.richText).toBe(true);
+    expect(plan.cssBorderRects).toBeUndefined();
+    expect(plan.textLayout!.contentRect).toEqual(old.textLayout!.contentRect);
+    expect(plan.bodyPlan.effectiveStyle.fill).toMatchObject({
+      value: { color: { rgb: "#0033AA" } },
+    });
+    expect(plan.bodyPlan.effectiveStyle.glow).toMatchObject({ value: { sizePt: 1.5 } });
+    expect(plan.textPlan?.effectiveStyle.glow).toBeUndefined();
+    const boundary = factory();
+    const result = prepareShapeLeafPixels({ ...options(next), canvasFactory: boundary.make });
+    expect(result.kind).toBe("ready");
+    if (result.kind !== "ready") throw Error("Expected actual TextBox pixels");
+    expect(alpha(result, 40, 30)).toBeGreaterThan(0);
+    expect(boundary.calls().some((call) => call.text.length)).toBe(true);
+    result.dispose();
+    expect(original.shapeText).toBeUndefined();
+    expect(original.shapeStyle).toBeUndefined();
+    expect(planShapeLeafPixels(options(original)).cssBorderRects).toEqual(old.cssBorderRects);
+  });
   test.each([
     ["legacy SVG", { shapeStyle: undefined }],
     ["legacy text box", { kind: "textBox" }],

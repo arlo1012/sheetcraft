@@ -15,13 +15,13 @@ const camera = {
 function box(): SheetGraphicDrawing & { kind: "textBox" } {
   return { ...legacyShapeDrawing(), kind: "textBox" };
 }
-test("text box body 3D is sparse, genuine, detached, and other unconsumed body categories remain refused", () => {
+test("text box body 3D stays sparse and non-3D body categories require explicit shape text", () => {
   const original = { ...box(), shapeStyle: { rotation3d: camera } },
     cloned = normalizeSheetDrawing(original);
   expect(cloned).toEqual(original);
   expect((cloned as SheetGraphicDrawing).shapeStyle).not.toBe(original.shapeStyle);
   expect(() => normalizeSheetDrawing({ ...box(), shapeStyle: { fill: { kind: "none" } } })).toThrow(
-    /non-3D/,
+    /explicit shape text/,
   );
   expect(normalizeSheetDrawing(box())).toEqual(box());
 });

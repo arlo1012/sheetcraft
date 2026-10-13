@@ -42,6 +42,7 @@ import {
   editDrawingShapeTextField,
   materializeDrawingShapeText,
   withDrawingShapeText,
+  withDrawingShapeBodyStyle,
   withoutDrawingShapeTextCharacterProperties,
 } from "./shape-text-options";
 import {
@@ -181,12 +182,7 @@ export function useOwnedShapeFormatPane(options: {
         ...drawingShapeTextValues(view, theme),
       },
       mixedFields: drawingShapeTextCharacterValues(view, theme).mixedFields,
-      shapeStyle:
-        d.kind === "shape"
-          ? bodyStyle
-          : bodyStyle.rotation3d
-            ? { rotation3d: bodyStyle.rotation3d }
-            : {},
+      shapeStyle: bodyStyle,
       textStyle,
       ...(view.shapeText?.warp ? { textWarp: normalizeShapeTextWarp(view.shapeText.warp) } : {}),
       textWarpScope: {
@@ -284,7 +280,7 @@ export function useOwnedShapeFormatPane(options: {
         max: 4096,
       },
     };
-    const bodyField = { ...field, enabled: enabled && d?.kind === "shape" };
+    const bodyField = field;
     for (const key of Object.keys(fields) as ShapeFormatField[]) {
       if (
         key === "sizeWidthPt" ||
@@ -302,9 +298,10 @@ export function useOwnedShapeFormatPane(options: {
       };
     }
     const fillable =
-      d?.kind === "shape" &&
-      !(d.shapeGeometry && isShapeLinePreset(d.shapeGeometry.preset)) &&
-      !(!d.shapeGeometry && !d.shapePath && d.shape === "line");
+      d?.kind === "textBox" ||
+      (d?.kind === "shape" &&
+        !(d.shapeGeometry && isShapeLinePreset(d.shapeGeometry.preset)) &&
+        !(!d.shapeGeometry && !d.shapePath && d.shape === "line"));
     return {
       fields,
       styles: {
@@ -481,7 +478,7 @@ export function useOwnedShapeFormatPane(options: {
         if (warp) text.warp = warp;
         else delete text.warp;
         // Warp is object-level paint. Leave all layout, runs, mirrors and source text intact.
-        next = { ...next, shapeText: text };
+        next = withDrawingShapeText(next, text);
       } else if (intent.type === "set-style") {
         if (capabilities.value.styles?.[intent.target]?.[intent.category]?.enabled !== true)
           return false;
@@ -504,11 +501,7 @@ export function useOwnedShapeFormatPane(options: {
         if (intent.value === undefined) delete style[intent.category];
         else Object.assign(style, { [intent.category]: intent.value });
         if (text) next = withDrawingShapeText(next, { ...text, style });
-        else if (Object.keys(style).length) next = { ...next, shapeStyle: style };
-        else {
-          const { shapeStyle: _style, ...base } = next;
-          next = base;
-        }
+        else next = withDrawingShapeBodyStyle(next, style);
       } else if (intent.type === "set-text-margins") {
         if (
           ["textMarginLeftPt", "textMarginRightPt", "textMarginTopPt", "textMarginBottomPt"].some(
@@ -690,7 +683,8 @@ export function useOwnedShapeFormatPane(options: {
         !resolvedCandidate?.collapsed &&
         (preflight.kind === "shape" ||
           (preflight.kind === "textBox" &&
-            (preflight.shapeStyle?.rotation3d?.kind === "value" ||
+            (preflight.shapeText ||
+              preflight.shapeStyle?.rotation3d?.kind === "value" ||
               preflight.shapeStyle?.format3d?.kind === "value")))
       ) {
         const geometry =

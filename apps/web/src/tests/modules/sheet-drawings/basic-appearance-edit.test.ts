@@ -58,3 +58,24 @@ test("basic fill replaces only selected paint; old simple shapes keep no detaile
     kind: "none",
   });
 });
+test("typed TextBox basic controls replace visible body overrides while legacy reads remain plain", () => {
+  const plain = createGraphicDrawing("t", "textBox", "TextBox", { row: 0, column: 0 });
+  delete plain.shapeText;
+  expect(editShapeBasicAppearance(plain, "fill", "#123456").shapeText).toBeUndefined();
+  expect(editShapeBasicAppearance(plain, "fill", "#123456").shapeStyle).toBeUndefined();
+  const detailed = { ...plain, shapeStyle: { line: { kind: "value" as const, value: line } } };
+  const fill = editShapeBasicAppearance(detailed, "fill", "#123456");
+  expect(fill.kind).toBe("textBox");
+  expect(fill.shapeText).toBeDefined();
+  expect(fill.shapeStyle?.fill).toMatchObject({ value: { color: { rgb: "#123456" } } });
+  expect(editShapeBasicAppearance(fill, "stroke", "#654321").shapeStyle?.line).toMatchObject({
+    value: { widthPt: 5, paint: { color: { rgb: "#654321" } } },
+  });
+  expect(editShapeBasicAppearance(fill, "strokeWidth", 8).shapeStyle?.line).toMatchObject({
+    value: { widthPt: 6 },
+  });
+  expect(editShapeBasicAppearance(fill, "strokeWidth", 0).shapeStyle?.line).toEqual({
+    kind: "none",
+  });
+  expect(detailed.shapeText).toBeUndefined();
+});

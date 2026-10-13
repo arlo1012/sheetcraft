@@ -3,17 +3,22 @@ import type { ShapeTextCharacterFormat } from "@sheetcraft/core/shape-text-chara
 import { normalizeShapeStyle } from "@sheetcraft/core/shape-style";
 import {
   materializeDrawingShapeText,
+  withDrawingShapeText,
   withoutDrawingShapeTextCharacterProperties,
 } from "./shape-text-options";
 import { materializeWordArtStylePreset, WORDART_STYLE_PRESETS } from "./wordart-style-presets";
 
-/** Modern identity only; an old wordArt kind or ordinary retained warp never opts in. */
+/** TextBox and tagged modern WordArt own recipes; other legacy kinds never opt in. */
 export function isWordArtStyleTarget(drawing: SheetGraphicDrawing): boolean {
-  return drawing.kind === "shape" && drawing.wordArt === true && !drawing.shapeConnector;
+  return (
+    !drawing.shapeConnector &&
+    (drawing.kind === "textBox" || (drawing.kind === "shape" && drawing.wordArt === true))
+  );
 }
 
 function source(drawing: SheetGraphicDrawing): SheetGraphicDrawing {
-  if (!isWordArtStyleTarget(drawing)) throw new TypeError("A modern WordArt owner is required.");
+  if (!isWordArtStyleTarget(drawing))
+    throw new TypeError("A TextBox or modern WordArt owner is required.");
   return withoutDrawingShapeTextCharacterProperties(drawing, [
     "color",
     "fill",
@@ -32,7 +37,7 @@ export function applyWordArtStylePreset(
   const style = materializeWordArtStylePreset(presetId);
   const next = source(drawing),
     text = materializeDrawingShapeText(next);
-  return { ...next, shapeText: { ...text, style } };
+  return withDrawingShapeText(next, { ...text, style });
 }
 
 /** Product reset: keep authored character fonts/B/I/U, unlike desktop default-style side effects. */
@@ -53,7 +58,7 @@ export function clearWordArtEffects(drawing: SheetGraphicDrawing): SheetGraphicD
     format3d: { kind: "none" },
     rotation3d: { kind: "none" },
   });
-  return { ...next, shapeText: text };
+  return withDrawingShapeText(next, text);
 }
 
 /** Local glyph overrides are not silently represented by a uniform selected tile. */

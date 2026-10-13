@@ -9,6 +9,7 @@ import {
 } from "@sheetcraft/core/shape-text-character-runs";
 import type { ShapeFormatField, ShapeFormatValues } from "./shape-format-pane-model";
 import { cloneShapeText, normalizeShapeText, type ShapeText } from "@sheetcraft/core/shape-text";
+import { normalizeShapeStyle, type ShapeDetailedStyle } from "@sheetcraft/core/shape-style";
 import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { resolvePictureColor } from "../../shared/images/picture-paint-color";
 
@@ -45,7 +46,7 @@ export function materializeDrawingShapeText(drawing: SheetGraphicDrawing): Shape
   if (drawing.shapeText) return cloneShapeText(drawing.shapeText, drawing.text)!;
   // Legacy numeric geometry already carries the original six-pixel inset.
   // A text box has a full-frame text rectangle and retains that inset as margins.
-  const marginPt = drawing.kind === "shape" ? 0 : 4.5;
+  const marginPt = drawing.kind === "shape" ? 0 : (6 + drawing.strokeWidth) * 0.75;
   const next = createDefaultShapeText();
   next.layout.blockAlignment = "center";
   next.layout.direction = drawing.textDirection === "vertical" ? "vertical-rl" : "horizontal";
@@ -68,6 +69,24 @@ export function withDrawingShapeText(
     throw new TypeError("Shape text requires a shape or text box.");
   const { textDirection: _legacyDirection, ...base } = drawing;
   return { ...base, shapeText: normalizeShapeText(shapeText, drawing.text)! };
+}
+
+/** A body edit opts a legacy TextBox into typed paint while retaining its effective text layout. */
+export function withDrawingShapeBodyStyle(
+  drawing: SheetGraphicDrawing,
+  style: ShapeDetailedStyle,
+): SheetGraphicDrawing {
+  const normalized = normalizeShapeStyle(style);
+  if (!normalized) {
+    const { shapeStyle: _style, ...base } = drawing;
+    return base;
+  }
+  const next =
+    drawing.kind === "textBox" &&
+    Object.keys(normalized).some((key) => key !== "format3d" && key !== "rotation3d")
+      ? withDrawingShapeText(drawing, materializeDrawingShapeText(drawing))
+      : drawing;
+  return { ...next, shapeStyle: normalized };
 }
 
 export function getDrawingShapeTextFamily(drawing: SheetGraphicDrawing): string {

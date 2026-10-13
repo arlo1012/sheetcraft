@@ -747,7 +747,7 @@ describe("exact-owner actual shape group format pane", () => {
     f.revision.value++;
     expect(f.state()).toEqual(after);
   });
-  test("fill and text batches apply to real eligible subtree leaves once, retaining frame and line/textbox bodies", () => {
+  test("fill and text batches include TextBox leaves once, retaining frame and line bodies", () => {
     const f = fixture();
     expect(f.open()).toBe(true);
     const before = f.state(),
@@ -760,7 +760,9 @@ describe("exact-owner actual shape group format pane", () => {
     expect(f.graphic("a").shapeStyle?.fill).toEqual(fill());
     expect(f.graphic("b").shapeStyle?.fill).toEqual(fill());
     expect(JSON.stringify(f.graphic("line"))).toBe(line);
-    expect(JSON.stringify(f.graphic("text"))).toBe(textbox);
+    expect(f.graphic("text").shapeStyle?.fill).toEqual(fill());
+    const { shapeStyle: _newStyle, ...box } = f.graphic("text");
+    expect(box).toEqual(JSON.parse(textbox));
     expect(JSON.stringify(f.source().shapeFrame)).toBe(frame);
     expect(f.replace.mock.calls[0]![1][0]).toBe(original);
     expect(f.pane.snapshot.value!.acceptedIntentId).toBe(edit.intentId);
@@ -988,12 +990,12 @@ describe("exact-owner actual shape group format pane", () => {
     expect(f.state()).toEqual(after);
   });
 
-  test("a textBox-only container has a real body Shadow owner without eligible shape leaves", () => {
+  test("a textBox-only container has member Fill and a separate real container Shadow owner", () => {
     const root = group();
     root.members = [leaf("text-only", "textBox")];
     const f = fixture(root);
     expect(f.open()).toBe(true);
-    expect(f.pane.capabilities.value.styles?.shape?.fill?.enabled).toBe(false);
+    expect(f.pane.capabilities.value.styles?.shape?.fill?.enabled).toBe(true);
     expect(f.pane.capabilities.value.styles?.shape?.shadow?.enabled).toBe(true);
     expect(
       f.pane.onIntent(
@@ -1434,11 +1436,11 @@ test("real subtree warp command writes only eligible leaves atomically and ackno
   expect(f.graphic("b").shapeText).not.toHaveProperty("warp");
   expect(f.graphic("text").shapeText).not.toHaveProperty("warp");
   expect(f.graphic("text").wordArt).toBeUndefined();
-  expect(f.pane.snapshot.value?.textWarpScope).toEqual({ eligibleCount: 1, descendantCount: 2 });
+  expect(f.pane.snapshot.value?.textWarpScope).toEqual({ eligibleCount: 2, descendantCount: 2 });
 });
 test("warp batch rejects unsupported, failed and stale transactions without history", () => {
   const f = fixture();
-  expect(f.open()).toBe(true);
+  expect(f.open(["root", "a"])).toBe(true);
   expect(f.pane.capabilities.value.textWarp?.enabled).toBe(false);
   expect(f.pane.onIntent(f.intent({ type: "set-text-warp", value: { preset: "textPlain" } }))).toBe(
     false,
@@ -1487,7 +1489,7 @@ test("WordArt recipe root batch and owned Clear preserve genuine member frames, 
   const untouched = JSON.parse(JSON.stringify(f.graphic("text")));
   expect(f.open()).toBe(true);
   expect(f.pane.snapshot.value?.wordArtStyleScope).toEqual({
-    eligibleCount: 2,
+    eligibleCount: 3,
     descendantCount: 4,
   });
   const captured = f.intent({ type: "set-wordart-style", presetId: "accent3-solid" });
@@ -1495,7 +1497,10 @@ test("WordArt recipe root batch and owned Clear preserve genuine member frames, 
   expect(f.pane.onIntent(captured)).toBe(false);
   expect(f.pane.snapshot.value?.wordArtStyleId).toBe("accent3-solid");
   expect(f.pane.snapshot.value?.mixedWordArtStyle).toBe(false);
-  expect(f.graphic("text")).toEqual(untouched);
+  expect(f.graphic("text").kind).toBe("textBox");
+  expect(f.graphic("text").wordArt).toBeUndefined();
+  expect(f.graphic("text").shapeText?.style).toEqual(f.graphic("a").shapeText?.style);
+  expect({ ...f.graphic("text"), shapeText: untouched.shapeText }).toEqual(untouched);
   for (const id of ["a", "b"]) {
     const current = f.graphic(id);
     const old = traverseShapeGroup(initial).find(({ node }) => node.id === id)!.node;

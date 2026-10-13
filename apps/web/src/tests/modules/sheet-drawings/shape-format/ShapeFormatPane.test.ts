@@ -801,7 +801,9 @@ test("Text Effects embeds controlled Transform choices, mixed scope and the exis
   });
   const section = wrapper.get("[data-text-transform-section]");
   expect(section.text()).toContain("Text transform");
-  expect(section.text()).toContain("2 WordArt or retained-transform text members of 5 members");
+  expect(section.text()).toContain(
+    "2 TextBox, WordArt or retained-transform text members of 5 members",
+  );
   const gallery = wrapper.getComponent(WordArtTransformGallery);
   expect(gallery.props("mixed")).toBe(true);
   expect(gallery.props("menu")).toBe(false);
@@ -935,7 +937,7 @@ describe("existing WordArt style and clear controls", () => {
       initialTab: "text-fill-line",
     });
     expect(wrapper.get("[data-wordart-style-scope]").text()).toContain(
-      "2 WordArt members of 5 members",
+      "2 TextBox or WordArt members of 5 members",
     );
     expect(wrapper.get("[data-wordart-style-mixed]").text()).toContain("different styles");
     const gallery = wrapper.getComponent(WordArtStyleGallery);
@@ -1063,7 +1065,7 @@ describe("existing WordArt style and clear controls", () => {
     expect(wrapper.get("[data-clear-wordart-effects]").text()).toBe("清除艺术字效果");
     expect(wrapper.get("[data-wordart-style-help]").text()).toContain("保留文字、字体、字号");
     expect(wrapper.get("[data-wordart-style-scope]").text()).toContain(
-      "2 个艺术字成员（共 5 个成员）",
+      "2 个文本框或艺术字成员（共 5 个成员）",
     );
     expect(wrapper.get("[data-clear-wordart-effects-help]").text()).toContain("二维角度");
   });
