@@ -11,7 +11,7 @@ import { listFreeShapePoints } from "../../../modules/sheet-drawings/free-shape-
 import { standardShapeFlipPoint } from "../../../modules/sheet-drawings/shape-geometry";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 
-type PointAction = "add" | "delete" | "smooth" | "straight" | "corner" | "close" | "open" | "exit";
+import type { FreeShapePointAction as PointAction } from "../../../modules/sheet-drawings/free-shape-edit-actions";
 const wrappers: VueWrapper[] = [];
 afterEach(() => {
   wrappers.splice(0).forEach((wrapper) => wrapper.unmount());
@@ -415,4 +415,129 @@ describe("free path shared point context menu", () => {
     await nextTick();
     expect(handler).toHaveBeenCalledExactlyOnceWith("add", 0);
   });
+});
+
+describe("free path selected segment menu", () => {
+  function segmentItem(name: string): HTMLElement {
+    const item = menu()?.querySelector<HTMLElement>(`[data-free-shape-point-action="${name}"]`);
+    if (!item) throw new Error(`Missing segment action: ${name}`);
+    return item;
+  }
+  async function openSegment(wrapper: VueWrapper, index: number, keyboard = false) {
+    const segment = wrapper.get(`[data-free-shape-segment="${index}"]`);
+    if (keyboard) await segment.trigger("keydown", { key: "ContextMenu" });
+    else await segment.trigger("contextmenu", { clientX: 175, clientY: 150 });
+    await nextTick();
+    return menu()!;
+  }
+  test.each(["en-US", "zh-CN"] as const)(
+    "%s exposes the exact selected cubic and closing segment",
+    async (locale) => {
+      const { wrapper, handler } = fixture({ drawing: drawing({ shapePath: path(true) }), locale });
+      expect(wrapper.findAll("[data-free-shape-segment]")).toHaveLength(4);
+      const panel = await openSegment(wrapper, 1);
+      expect(panel.querySelector('[data-free-shape-point-action="smooth"]')).toBeNull();
+      expect(segmentItem("curved-segment").getAttribute("aria-checked")).toBe("true");
+      expect(segmentItem("straight-segment").getAttribute("aria-checked")).toBe("false");
+      expect(segmentItem("straight-segment").textContent).toContain(
+        locale === "en-US" ? "Straight Segment" : "直线段",
+      );
+      expect(segmentItem("delete-segment").getAttribute("aria-disabled")).toBe("true");
+      segmentItem("straight-segment").click();
+      await nextTick();
+      expect(handler).toHaveBeenCalledExactlyOnceWith("straight-segment", 1);
+      expect(menu()).toBeNull();
+      await openSegment(wrapper, 4, true);
+      expect(segmentItem("straight-segment").getAttribute("aria-checked")).toBe("true");
+      segmentItem("curved-segment").click();
+      await nextTick();
+      expect(handler).toHaveBeenLastCalledWith("curved-segment", 4);
+    },
+  );
+  test("segment failure keeps checked geometry and feedback; Escape dismisses without edits", async () => {
+    const { wrapper, handler, source } = fixture();
+    handler.mockReturnValue(false);
+    const before = structuredClone(source);
+    const panel = await openSegment(wrapper, 2);
+    segmentItem("straight-segment").click();
+    await nextTick();
+    expect(menu()).toBe(panel);
+    expect(segmentItem("curved-segment").getAttribute("aria-checked")).toBe("true");
+    expect(panel.querySelector('[role="status"]')).not.toBeNull();
+    expect(source).toEqual(before);
+    key(segmentItem("straight-segment"), "Escape");
+    await nextTick();
+    expect(menu()).toBeNull();
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+  test.each([
+    "drawing",
+    "handler",
+    "path",
+    "disabled",
+    "fragment",
+    "clip",
+    "opening",
+    "unmount",
+  ] as const)("%s invalidates the retained selected segment callback", async (change) => {
+    const { wrapper, handler, source } = fixture();
+    await openSegment(wrapper, 1);
+    const item = wrapper
+      .findAllComponents(MenuItem)
+      .find((entry) => entry.attributes("data-free-shape-point-action") === "straight-segment")!;
+    const old = item.vm.$.vnode.props!.onSelect as () => void;
+    const replacement = vi.fn(() => true);
+    if (change === "drawing") await wrapper.setProps({ drawing: { ...source, id: "replacement" } });
+    else if (change === "handler") await wrapper.setProps({ handler: replacement });
+    else if (change === "path")
+      await wrapper.setProps({ drawing: { ...source, shapePath: path(true) } });
+    else if (change === "disabled") await wrapper.setProps({ disabled: true });
+    else if (change === "fragment")
+      await wrapper.setProps({ fragment: { ...fragment, rect: { ...fragment.rect, x: 110 } } });
+    else if (change === "clip") await wrapper.setProps({ paneClip: { ...paneClip, x: 10 } });
+    else if (change === "opening") await openSegment(wrapper, 2);
+    else wrapper.unmount();
+    old();
+    expect(handler).not.toHaveBeenCalled();
+    expect(replacement).not.toHaveBeenCalled();
+  });
+});
+
+test("explicit curved closing seam selects the canonical start vertex while editing its segment command", async () => {
+  const { wrapper, handler } = fixture({
+    drawing: drawing({ shapePath: path(true, true) }),
+    activeVertex: 2,
+  });
+  await wrapper
+    .get('[data-free-shape-segment="4"]')
+    .trigger("contextmenu", { clientX: 120, clientY: 110 });
+  await nextTick();
+  expect(wrapper.emitted("selectVertex")!.at(-1)).toEqual([0]);
+  document.body
+    .querySelector<HTMLElement>('[data-free-shape-point-action="straight-segment"]')!
+    .click();
+  await nextTick();
+  expect(handler).toHaveBeenCalledExactlyOnceWith("straight-segment", 4);
+});
+
+test("keyboard segment menu Escape restores focus to its exact SVG segment", async () => {
+  const { wrapper, handler } = fixture();
+  const segment = wrapper.get('[data-free-shape-segment="1"]').element as SVGElement;
+  segment.focus();
+  await wrapper.get('[data-free-shape-segment="1"]').trigger("keydown", { key: "ContextMenu" });
+  await nextTick();
+  const first = document.body.querySelector<HTMLElement>('[data-free-shape-point-action="add"]')!;
+  expect(document.activeElement).toBe(first);
+  key(first, "Escape");
+  await nextTick();
+  expect(menu()).toBeNull();
+  expect(document.activeElement).toBe(segment);
+  expect(handler).not.toHaveBeenCalled();
+});
+
+test("fully clipped segments do not leave invisible keyboard targets while crossing curves remain addressable", () => {
+  const hidden = fixture({ paneClip: { x: 600, y: 500, width: 50, height: 50 } });
+  expect(hidden.wrapper.findAll("[data-free-shape-segment]")).toHaveLength(0);
+  const crossing = fixture({ paneClip: { x: 180, y: 130, width: 30, height: 25 } });
+  expect(crossing.wrapper.find('[data-free-shape-segment="2"]').exists()).toBe(true);
 });

@@ -19,8 +19,11 @@ import {
   standardShapeFlipPoint,
 } from "../shape-geometry";
 
-type PointAction = "add" | "delete" | "smooth" | "straight" | "corner" | "close" | "open" | "exit";
-type PointActionHandler = (action: PointAction, vertexIndex: number) => boolean;
+import type {
+  FreeShapePointAction as PointAction,
+  FreeShapePointActionHandler as PointActionHandler,
+} from "../free-shape-edit-actions";
+import { getFreeShapeSegmentType } from "../free-shape-point-operations";
 const props = withDefaults(
   defineProps<{
     drawing: SheetGraphicDrawing;
@@ -48,6 +51,10 @@ const messages = {
     forVertex: "for point",
     add: "Add Point",
     delete: "Delete Point",
+    segment: "Edit segment",
+    deleteSegment: "Delete Segment",
+    straightSegment: "Straight Segment",
+    curvedSegment: "Curved Segment",
     close: "Close Path",
     open: "Open Path",
     smooth: "Smooth Point",
@@ -65,6 +72,10 @@ const messages = {
     forVertex: "所属顶点",
     add: "添加顶点",
     delete: "删除顶点",
+    segment: "编辑线段",
+    deleteSegment: "删除线段",
+    straightSegment: "直线段",
+    curvedSegment: "曲线段",
     close: "闭合路径",
     open: "开放路径",
     smooth: "平滑顶点",
@@ -76,6 +87,51 @@ const messages = {
 } as const;
 const labels = computed(() => messages[props.locale]);
 const editPaths = computed(() => getStandardShapeSvgPaths(getDrawingShapeGeometry(props.drawing)));
+const segmentPaths = computed(() => {
+  const commands = getDrawingShapeGeometry(props.drawing)?.paths[0]?.commands;
+  if (!commands?.length || !props.drawing.shapePath) return [];
+  const first = commands[0]!;
+  if (first[0] !== "M") return [];
+  return commands.slice(1).flatMap((command, offset) => {
+    const index = offset + 1,
+      previous = commands[index - 1]!;
+    if (previous[0] === "Z") return [];
+    const x = previous[previous.length - 2],
+      y = previous[previous.length - 1];
+    const segment = command[0] === "Z" ? ["L", first[1], first[2]] : command;
+    if (segment.slice(1).every((value, coordinate) => value === (coordinate % 2 ? y : x)))
+      return [];
+    const hull = [{ x: Number(x), y: Number(y) }];
+    for (let coordinate = 1; coordinate < segment.length; coordinate += 2)
+      hull.push({ x: Number(segment[coordinate]), y: Number(segment[coordinate + 1]) });
+    const projected = hull.map((point) =>
+      pictureFrameLocalToWorld(
+        props.fragment.rect,
+        props.drawing.rotation,
+        standardShapeFlipPoint(props.drawing, point),
+      ),
+    );
+    const clip = props.paneClip;
+    if (
+      Math.max(...projected.map((point) => point.x)) < clip.x ||
+      Math.min(...projected.map((point) => point.x)) >= clip.x + clip.width ||
+      Math.max(...projected.map((point) => point.y)) < clip.y ||
+      Math.min(...projected.map((point) => point.y)) >= clip.y + clip.height
+    )
+      return [];
+    // Commands are normalized numeric geometry. Each hit stroke owns one exact
+    // authored segment, including the implicit closing edge, without fill hits.
+    const endpointX = command[command.length - 2],
+      endpointY = command[command.length - 1];
+    const seam =
+      command[0] === "Z" ||
+      (commands.at(-1)?.[0] === "Z" &&
+        index === commands.length - 2 &&
+        endpointX === first[1] &&
+        endpointY === first[2]);
+    return [{ index, vertexIndex: seam ? 0 : index, d: `M ${x} ${y} ${segment.join(" ")}` }];
+  });
+});
 const editTransform = computed(
   () =>
     `translate(${props.fragment.rect.x - props.paneClip.x} ${props.fragment.rect.y - props.paneClip.y}) rotate(${props.drawing.rotation} ${props.drawing.width / 2} ${props.drawing.height / 2}) ${standardShapeSvgTransform(props.drawing) ?? ""}`,
@@ -180,9 +236,12 @@ function startMove(point: FreeShapePoint, event: PointerEvent): void {
 type MenuSession = {
   owner: SheetGraphicDrawing;
   path: SheetGraphicDrawing["shapePath"];
+  fragment: FloatingImageViewportFragment;
+  clip: Rect;
   handler: PointActionHandler;
   generation: number;
   vertexIndex: number;
+  kind: "vertex" | "segment";
   actions: Record<PointAction, () => void>;
 };
 const menu = shallowRef<MenuSession | null>(null);
@@ -214,14 +273,20 @@ function isCurrent(session: MenuSession): boolean {
     generation === session.generation &&
     props.drawing === session.owner &&
     props.handler === session.handler &&
-    props.drawing.shapePath === session.path
+    props.drawing.shapePath === session.path &&
+    props.fragment === session.fragment &&
+    props.paneClip === session.clip
   );
 }
 function applyAction(session: MenuSession, action: PointAction): void {
   if (!isCurrent(session)) return;
   let accepted = false;
   try {
-    accepted = session.handler(action, session.vertexIndex) === true;
+    accepted =
+      session.handler(
+        action,
+        session.kind === "segment" && action === "close" ? 0 : session.vertexIndex,
+      ) === true;
   } catch {
     // The owner retains the model and history; rejection keeps this menu available for retry.
   }
@@ -229,18 +294,26 @@ function applyAction(session: MenuSession, action: PointAction): void {
   if (accepted) dismiss("programmatic", true);
   else rejected.value = true;
 }
-function openMenu(point: FreeShapePoint, reference: FloatingReference): void {
-  if (props.disabled || !mounted || point.role !== "vertex") return;
+function openMenuTarget(
+  index: number,
+  kind: "vertex" | "segment",
+  reference: FloatingReference,
+): void {
+  if (props.disabled || !mounted) return;
+  if (kind === "segment" && !getFreeShapeSegmentType(props.drawing, index)) return;
   generation++;
   const session: MenuSession = {
     owner: props.drawing,
     path: props.drawing.shapePath,
+    fragment: props.fragment,
+    clip: props.paneClip,
     handler: props.handler,
     generation,
-    vertexIndex: point.vertexIndex,
+    vertexIndex: index,
+    kind,
     // Each callback closes over this exact opening, rather than reading a newer menu target.
     actions: {
-      add: () => applyAction(session, "add"),
+      add: () => applyAction(session, kind === "segment" ? "add-segment" : "add"),
       delete: () => applyAction(session, "delete"),
       smooth: () => applyAction(session, "smooth"),
       straight: () => applyAction(session, "straight"),
@@ -248,12 +321,44 @@ function openMenu(point: FreeShapePoint, reference: FloatingReference): void {
       close: () => applyAction(session, "close"),
       open: () => applyAction(session, "open"),
       exit: () => applyAction(session, "exit"),
+      "add-segment": () => applyAction(session, "add-segment"),
+      "straight-segment": () => applyAction(session, "straight-segment"),
+      "curved-segment": () => applyAction(session, "curved-segment"),
     },
   };
   anchor.value = reference;
   rejected.value = false;
   menu.value = session;
-  emit("selectVertex", point.vertexIndex);
+  if (kind === "vertex") emit("selectVertex", index);
+  else
+    emit(
+      "selectVertex",
+      segmentPaths.value.find((segment) => segment.index === index)?.vertexIndex ?? 0,
+    );
+}
+function openMenu(point: FreeShapePoint, reference: FloatingReference): void {
+  if (point.role === "vertex") openMenuTarget(point.vertexIndex, "vertex", reference);
+}
+function segmentContextMenu(index: number, event: MouseEvent): void {
+  openMenuTarget(
+    index,
+    "segment",
+    createContextMenuPoint(event, event.currentTarget as Element | null),
+  );
+}
+function segmentKey(index: number, event: KeyboardEvent): void {
+  if (props.disabled || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (
+    event.key !== "ContextMenu" &&
+    !(event.key === "F10" && event.shiftKey) &&
+    event.key !== "Enter"
+  )
+    return;
+  const target = event.currentTarget;
+  if (!(target instanceof Element)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  openMenuTarget(index, "segment", target);
 }
 function contextMenu(point: FreeShapePoint, event: MouseEvent): void {
   openMenu(point, createContextMenuPoint(event, event.currentTarget as Element | null));
@@ -287,12 +392,28 @@ function handleKey(point: FreeShapePoint, event: KeyboardEvent): void {
 const menuPointType = computed(
   () => menu.value?.owner.shapePath?.pointTypes?.[menu.value.vertexIndex] ?? "corner",
 );
+const menuSegmentType = computed(() =>
+  menu.value?.kind === "segment"
+    ? getFreeShapeSegmentType(menu.value.owner, menu.value.vertexIndex)
+    : undefined,
+);
 const menuClosedPath = computed(
   () => !!menu.value?.owner.shapePath && isShapeFreePathClosed(menu.value.owner.shapePath),
 );
-watch(() => [props.drawing, props.drawing.shapePath, props.handler, props.disabled], closeMenu, {
-  flush: "sync",
-});
+watch(
+  () => [
+    props.drawing,
+    props.drawing.shapePath,
+    props.handler,
+    props.disabled,
+    props.fragment,
+    props.paneClip,
+  ],
+  closeMenu,
+  {
+    flush: "sync",
+  },
+);
 onBeforeUnmount(() => {
   mounted = false;
   closeMenu();
@@ -305,10 +426,28 @@ onBeforeUnmount(() => {
       v-if="editPaths.length || (activePoint && activeControls.length) || endpointGuides.length"
       class="free-shape-point-selection__connectors"
       :style="connectorStyle"
-      aria-hidden="true"
-      focusable="false"
     >
-      <g :transform="editTransform" aria-hidden="true">
+      <g :transform="editTransform">
+        <path
+          v-for="segment in segmentPaths"
+          :key="`segment-${segment.index}`"
+          :d="segment.d"
+          class="free-shape-point-selection__segment"
+          fill="none"
+          stroke="transparent"
+          stroke-width="12"
+          vector-effect="non-scaling-stroke"
+          role="button"
+          :tabindex="disabled ? -1 : 0"
+          :aria-label="`${labels.segment} ${segment.index}`"
+          :aria-disabled="disabled"
+          :data-free-shape-segment="segment.index"
+          @pointerdown.stop
+          @click.stop
+          @contextmenu.prevent.stop="segmentContextMenu(segment.index, $event)"
+          @keydown="segmentKey(segment.index, $event)"
+          @dblclick.prevent.stop
+        />
         <path
           v-for="(path, index) in editPaths"
           :key="index"
@@ -317,6 +456,7 @@ onBeforeUnmount(() => {
           stroke="#dc2626"
           stroke-width="1"
           vector-effect="non-scaling-stroke"
+          aria-hidden="true"
           data-free-shape-edit-path
         />
       </g>
@@ -395,15 +535,19 @@ onBeforeUnmount(() => {
           {{ labels.add }}
         </MenuItem>
         <MenuItem
+          v-if="menu.kind === 'vertex'"
           :disabled="disabled"
           data-free-shape-point-action="delete"
           @select="menu.actions.delete"
         >
           {{ labels.delete }}
         </MenuItem>
-        <MenuSeparator />
+        <MenuItem v-else disabled data-free-shape-point-action="delete-segment">
+          {{ labels.deleteSegment }}
+        </MenuItem>
+        <MenuSeparator v-if="menu.kind === 'vertex' || !menuClosedPath" />
         <MenuItem
-          v-if="menuClosedPath"
+          v-if="menuClosedPath && menu.kind === 'vertex'"
           :disabled="disabled"
           data-free-shape-point-action="open"
           @select="menu.actions.open"
@@ -411,7 +555,7 @@ onBeforeUnmount(() => {
           {{ labels.open }}
         </MenuItem>
         <MenuItem
-          v-else
+          v-else-if="!menuClosedPath"
           :disabled="disabled"
           data-free-shape-point-action="close"
           @select="menu.actions.close"
@@ -420,6 +564,7 @@ onBeforeUnmount(() => {
         </MenuItem>
         <MenuSeparator />
         <MenuItem
+          v-if="menu.kind === 'vertex'"
           role="menuitemradio"
           :aria-checked="menuPointType === 'smooth'"
           :disabled="disabled"
@@ -430,6 +575,7 @@ onBeforeUnmount(() => {
           {{ labels.smooth }}
         </MenuItem>
         <MenuItem
+          v-if="menu.kind === 'vertex'"
           role="menuitemradio"
           :aria-checked="menuPointType === 'straight'"
           :disabled="disabled"
@@ -440,6 +586,7 @@ onBeforeUnmount(() => {
           {{ labels.straight }}
         </MenuItem>
         <MenuItem
+          v-if="menu.kind === 'vertex'"
           role="menuitemradio"
           :aria-checked="menuPointType === 'corner'"
           :disabled="disabled"
@@ -448,6 +595,28 @@ onBeforeUnmount(() => {
         >
           <template #icon><Check v-if="menuPointType === 'corner'" /></template>
           {{ labels.corner }}
+        </MenuItem>
+        <MenuItem
+          v-if="menu.kind === 'segment'"
+          role="menuitemradio"
+          :aria-checked="menuSegmentType === 'straight'"
+          :disabled="disabled"
+          data-free-shape-point-action="straight-segment"
+          @select="menu.actions['straight-segment']"
+        >
+          <template #icon><Check v-if="menuSegmentType === 'straight'" /></template>
+          {{ labels.straightSegment }}
+        </MenuItem>
+        <MenuItem
+          v-if="menu.kind === 'segment'"
+          role="menuitemradio"
+          :aria-checked="menuSegmentType === 'curved'"
+          :disabled="disabled"
+          data-free-shape-point-action="curved-segment"
+          @select="menu.actions['curved-segment']"
+        >
+          <template #icon><Check v-if="menuSegmentType === 'curved'" /></template>
+          {{ labels.curvedSegment }}
         </MenuItem>
         <MenuSeparator />
         <MenuItem
@@ -478,6 +647,16 @@ onBeforeUnmount(() => {
     stroke: var(--sheetcraft-action-primary);
     stroke-width: 1;
     pointer-events: none;
+  }
+
+  &__segment {
+    pointer-events: stroke;
+    cursor: context-menu;
+
+    &:focus-visible {
+      stroke: var(--sheetcraft-action-primary);
+      stroke-opacity: 0.3;
+    }
   }
 
   &__handle {

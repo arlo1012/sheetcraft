@@ -36,7 +36,7 @@ export function useDismissibleFloatingPanel(
     if (!(target instanceof Node)) {
       return false;
     }
-    if (reference.value instanceof HTMLElement && reference.value.contains(target)) {
+    if (reference.value instanceof Element && reference.value.contains(target)) {
       return true;
     }
     if (floating.value?.contains(target)) {
@@ -49,9 +49,13 @@ export function useDismissibleFloatingPanel(
     if (!open.value) {
       return;
     }
+    const focusTarget = reference.value;
     onDismiss({ reason, restoreFocus });
-    if (restoreFocus && reference.value instanceof HTMLElement) {
-      void nextTick(() => reference.value instanceof HTMLElement && reference.value.focus());
+    if (restoreFocus && (focusTarget instanceof HTMLElement || focusTarget instanceof SVGElement)) {
+      void nextTick(() => {
+        // Do not steal focus from a menu reopened before this dismissal flushes.
+        if (!open.value && focusTarget.isConnected) focusTarget.focus();
+      });
     }
   }
 

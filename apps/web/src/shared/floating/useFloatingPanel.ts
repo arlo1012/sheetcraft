@@ -10,7 +10,7 @@ import {
 } from "@floating-ui/vue";
 import type { Ref } from "vue";
 
-export type FloatingReference = HTMLElement | VirtualElement;
+export type FloatingReference = HTMLElement | SVGElement | VirtualElement;
 
 export type FloatingPanelOptions = {
   placement?: MaybeReadonlyRefOrGetter<Placement>;

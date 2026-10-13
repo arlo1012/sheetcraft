@@ -31,6 +31,7 @@ export type NearestFreeShapeSegment = Readonly<{
   t: number;
   distance: number;
 }>;
+export type FreeShapeSegmentType = "straight" | "curved";
 const coordinateBudget = 10_000_000;
 const samplesPerCurve = 32;
 const refinementSteps = 32;
@@ -119,6 +120,168 @@ function remapPointTypes(
     if (index !== undefined) result[index] = value;
   }
   return Object.keys(result).length ? result : undefined;
+}
+
+function closingSeam(commands: readonly ShapeFreePathCommand[]): number | undefined {
+  if (commands.at(-1)?.[0] !== "Z") return;
+  const index = commands.length - 2;
+  if (samePoint(endpoint(commands[index]!)!, endpoint(commands[0]!)!)) return index;
+}
+function incidentSegments(
+  commands: readonly ShapeFreePathCommand[],
+  vertexIndex: number,
+): Readonly<{ incoming?: Segment; outgoing?: Segment }> {
+  const closed = commands.at(-1)?.[0] === "Z",
+    seam = closingSeam(commands),
+    index = vertexIndex === seam ? 0 : vertexIndex;
+  const incomingIndex = index === 0 ? (closed ? (seam ?? commands.length - 1) : undefined) : index;
+  const outgoingIndex = index + 1 < commands.length ? index + 1 : undefined;
+  return {
+    ...(incomingIndex === undefined ? {} : { incoming: segmentAt(commands, incomingIndex) }),
+    ...(outgoingIndex === undefined ? {} : { outgoing: segmentAt(commands, outgoingIndex) }),
+  };
+}
+/** Traversal direction, preferring the nearest noncoincident Bézier control. */
+function segmentTangent(segment: Segment | undefined, incoming: boolean): Point | undefined {
+  if (!segment) return;
+  const points = incoming ? [...segment.points].reverse() : segment.points,
+    node = points[0]!;
+  for (const point of points.slice(1)) {
+    const dx = incoming ? node.x - point.x : point.x - node.x,
+      dy = incoming ? node.y - point.y : point.y - node.y,
+      length = Math.hypot(dx, dy);
+    if (length > 0) return { x: dx / length, y: dy / length };
+  }
+}
+/** Lines and quadratics have the same endpoint handles as exact degree elevation. */
+function endpointHandle(segment: Segment, incoming: boolean): Point {
+  const points = segment.points,
+    node = incoming ? points.at(-1)! : points[0]!,
+    control = incoming ? points.at(-2)! : points[1]!,
+    factor = points.length === 2 ? 1 / 3 : points.length === 3 ? 2 / 3 : 1;
+  return { x: (control.x - node.x) * factor, y: (control.y - node.y) * factor };
+}
+function compatiblePointType(
+  commands: readonly ShapeFreePathCommand[],
+  index: number,
+  type: ShapeFreePathPointType,
+): boolean {
+  const { incoming, outgoing } = incidentSegments(commands, index);
+  // An open endpoint has no opposite handle to constrain.
+  if (!incoming || !outgoing) return true;
+  const left = endpointHandle(incoming, true),
+    right = endpointHandle(outgoing, false),
+    leftLength = Math.hypot(left.x, left.y),
+    rightLength = Math.hypot(right.x, right.y),
+    tolerance = 1e-8;
+  if (
+    type === "smooth" &&
+    Math.abs(leftLength - rightLength) > tolerance * Math.max(1, leftLength, rightLength)
+  )
+    return false;
+  if (leftLength === 0 || rightLength === 0) return true;
+  const lx = left.x / leftLength,
+    ly = left.y / leftLength,
+    rx = right.x / rightLength,
+    ry = right.y / rightLength;
+  return Math.abs(lx * ry - ly * rx) <= tolerance && lx * rx + ly * ry <= tolerance;
+}
+
+/** Classifies an actual authored edge, including a nondegenerate implicit Z chord. */
+export function getFreeShapeSegmentType(
+  drawing: SheetGraphicDrawing,
+  commandIndex: number,
+): FreeShapeSegmentType | undefined {
+  try {
+    const prepared = preparedPath(drawing);
+    if (!prepared || !segmentAt(prepared.commands, commandIndex)) return;
+    const operation = prepared.commands[commandIndex]![0];
+    return operation === "L" || operation === "Z" ? "straight" : "curved";
+  } catch {
+    return;
+  }
+}
+
+/**
+ * Changes only the selected edge. Straight drops Q/C controls for its chord;
+ * curved creates a cubic using adjacent endpoint tangent directions and handles
+ * of chord/3. Missing or collapsed adjacent tangents use the selected chord.
+ * Existing vertices and every neighboring control keep their world positions.
+ * A curved closing Z becomes an authored C to the initial M, followed by Z.
+ * Endpoint types survive when their incident handle pair still satisfies its
+ * rule; conflicting types become sparse corners instead of moving neighbors.
+ * There is no saved-curve cache: the caller's Undo restores the original path.
+ */
+export function setFreeShapeSegmentType(
+  drawing: SheetGraphicDrawing,
+  commandIndex: number,
+  type: FreeShapeSegmentType,
+  layout: SheetViewportLayout,
+  options?: ShapePointEditOptions,
+): SheetGraphicDrawing | undefined {
+  if (type !== "straight" && type !== "curved") return;
+  try {
+    const prepared = preparedPath(drawing),
+      rect = getFloatingImageSheetRect(drawing, layout);
+    if (
+      !prepared ||
+      !rect ||
+      !validRect(drawing, rect, layout, options) ||
+      [rect.width, rect.height].some((extent) => (options ? extent <= 0 : extent < 1))
+    )
+      return;
+    const segment = segmentAt(prepared.commands, commandIndex);
+    if (!segment) return;
+    const start = segment.points[0]!,
+      end = segment.points.at(-1)!,
+      length = Math.hypot(end.x - start.x, end.y - start.y);
+    if (length === 0 || !Number.isFinite(length)) return;
+    const operation = prepared.commands[commandIndex]![0];
+    if ((type === "straight") === (operation === "L" || operation === "Z")) return drawing;
+    const closing = operation === "Z";
+    if (closing && prepared.commands.length >= MAX_SHAPE_FREE_PATH_COMMANDS) return;
+    let replacement: ShapeFreePathCommand;
+    if (type === "straight") replacement = ["L", end.x, end.y];
+    else {
+      const chord = { x: (end.x - start.x) / length, y: (end.y - start.y) / length },
+        incoming = incidentSegments(prepared.commands, commandIndex - 1).incoming,
+        outgoing = incidentSegments(prepared.commands, closing ? 0 : commandIndex).outgoing,
+        startTangent = segmentTangent(incoming, true) ?? chord,
+        endTangent = segmentTangent(outgoing, false) ?? chord,
+        handleLength = length / 3;
+      replacement = [
+        "C",
+        start.x + startTangent.x * handleLength,
+        start.y + startTangent.y * handleLength,
+        end.x - endTangent.x * handleLength,
+        end.y - endTangent.y * handleLength,
+        end.x,
+        end.y,
+      ];
+    }
+    const commands = [...prepared.commands];
+    commands.splice(commandIndex, 1, replacement, ...(closing ? [["Z"] as const] : []));
+    const indices = new Map<number, number>();
+    prepared.commands.forEach((command, index) => {
+      if (command[0] !== "Z") indices.set(index, index);
+    });
+    const pointTypes = { ...remapPointTypes(prepared.path.pointTypes, indices) },
+      seam = closingSeam(commands);
+    for (const endpointIndex of [commandIndex - 1, closing ? 0 : commandIndex]) {
+      const index = endpointIndex === seam ? 0 : endpointIndex,
+        pointType = pointTypes[index];
+      if (pointType && !compatiblePointType(commands, index, pointType)) delete pointTypes[index];
+    }
+    return replaceFreeShapeCommands(
+      drawing,
+      commands,
+      Object.keys(pointTypes).length ? pointTypes : undefined,
+      layout,
+      options,
+    );
+  } catch {
+    return;
+  }
 }
 
 /**

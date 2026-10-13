@@ -41,6 +41,7 @@ import { materializeDrawingShapeText } from "../../../modules/sheet-drawings/sha
 import type { useShapeCreation } from "../../../modules/sheet-drawings/useShapeCreation";
 import { SHAPE_GALLERY } from "../../../modules/sheet-drawings/shape-gallery";
 import { createAppI18n } from "../../../shared/i18n";
+import FreeShapePointSelection from "../../../modules/sheet-drawings/components/FreeShapePointSelection.vue";
 import ShapeCanvasTextEditor from "../../../modules/sheet-drawings/components/ShapeCanvasTextEditor.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import * as shapeMeasure from "../../../modules/sheet-drawings/shape-text-measure";
@@ -1863,3 +1864,84 @@ test("real Workspace can Hide All and Show All when a group text texture is unav
   expect(serializeWorkbook(state.session.workbook)).toEqual(before);
   expect(directSource(state).shapeText?.style?.fill).toEqual(target.shapeText.style.fill);
 });
+
+test.each([false, true])(
+  "saved free path starts real Workspace; selected segment command preserves root/owned identity and exact Undo (owned=%s)",
+  async (owned) => {
+    const initial = createWorkbook({ id: "segment-book", sheetId: "segment-sheet" });
+    const initialSheet = getActiveSheet(initial);
+    const source = framedShape();
+    source.id = "segment-target";
+    source.text = "";
+    source.rotation = 0;
+    delete source.shapeGeometry;
+    source.shapeFrame.anchor = { mode: "fixed", x: 80, y: 24, size: { width: 180, height: 90 } };
+    source.shapePath = {
+      tool: "curve",
+      viewBox: { width: 180, height: 90 },
+      commands: [
+        ["M", 0, 30],
+        ["L", 30, 0],
+        ["C", 60, 90, 90, 80, 120, 45],
+        ["C", 140, 0, 150, 90, 180, 30],
+      ],
+    };
+    const sibling = framedShape();
+    sibling.id = "segment-sibling";
+    sibling.text = "";
+    sibling.rotation = 0;
+    sibling.shapeFrame.anchor = { mode: "fixed", x: 350, y: 50, size: { width: 100, height: 70 } };
+    initialSheet.drawings = owned
+      ? groupShapeRoots(
+          [source, sibling],
+          [source.id, sibling.id],
+          { id: "segment-group", name: "Group" },
+          createPictureSheetMetrics(initialSheet),
+        )
+      : [source, sibling];
+    const wrapper = fixture(
+      async () => ({ revision: 1, savedAt: 1, snapshot: serializeWorkbook(initial) }),
+      createMemoryImageAssetStore(),
+      true,
+    );
+    await flushPromises();
+    const state = setupState(wrapper),
+      layer = wrapper.getComponent(SheetDrawingLayer);
+    expect(
+      state.sheetGridRef.selectShapeObjects([owned ? ["segment-group", source.id] : [source.id]]),
+    ).toBe(true);
+    await flushPromises();
+    layer
+      .get('[data-sheet-drawing-id="segment-target"]')
+      .element.dispatchEvent(connectorInput(layer, "dblclick", { x: 95, y: 39 }));
+    await flushPromises();
+    expect(layer.findComponent(FreeShapePointSelection).exists()).toBe(true);
+    const before = serializeWorkbook(state.session.workbook);
+    await layer
+      .get('[data-free-shape-segment="2"]')
+      .trigger("contextmenu", { clientX: 200, clientY: 200 });
+    await flushPromises();
+    document
+      .querySelector<HTMLElement>('[data-free-shape-point-action="straight-segment"]')!
+      .click();
+    await flushPromises();
+    const after = serializeWorkbook(state.session.workbook);
+    expect(after).not.toEqual(before);
+    const owner = getActiveSheet(state.session.workbook).drawings![0]!;
+    const target = isShapeGroupDrawing(owner)
+      ? owner.members.find((member) => member.id === source.id)!
+      : owner;
+    expect(target).toHaveProperty("shapePath.commands.2.0", "L");
+    if (owned) {
+      expect(owner.id).toBe("segment-group");
+      expect(isShapeGroupDrawing(owner)).toBe(true);
+    }
+    expect(state.shapeTextEdit.snapshot.value).toBeUndefined();
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+  },
+);

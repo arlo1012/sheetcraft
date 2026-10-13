@@ -13,7 +13,7 @@ export type ContextMenuPoint = {
 /**
  * Creates the Floating UI reference for a pointer-opened context menu.
  *
- * Keyboard-opened menus should use their triggering HTMLElement directly so
+ * Keyboard-opened menus should use their triggering focusable HTML/SVG element directly so
  * dismissal can restore focus. Point references deliberately do not focus a
  * background element when dismissed.
  */

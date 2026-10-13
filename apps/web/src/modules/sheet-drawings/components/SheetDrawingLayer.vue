@@ -139,7 +139,12 @@ import {
   type FreeShapePointDescriptor,
   type ShapePointEditOptions,
 } from "../free-shape-point-layout";
-import { addFreeShapePoint, deleteFreeShapePoint } from "../free-shape-point-operations";
+import {
+  addFreeShapePoint,
+  deleteFreeShapePoint,
+  setFreeShapeSegmentType,
+} from "../free-shape-point-operations";
+import type { FreeShapePointAction as PointAction } from "../free-shape-edit-actions";
 import DrawingContent from "./DrawingContent.vue";
 import ShapeGroupDetailedContent from "./ShapeGroupDetailedContent.vue";
 import {
@@ -2543,7 +2548,6 @@ function nudgeFreePoint(
   );
   if (next) commitUpdate(next, drawing);
 }
-type PointAction = "add" | "delete" | "smooth" | "straight" | "corner" | "close" | "open" | "exit";
 const pointHandlers = new WeakMap<
   SheetGraphicDrawing,
   { key: string; handler: (action: PointAction, index: number) => boolean }
@@ -2573,11 +2577,7 @@ function selectFreeVertex(drawing: SheetGraphicDrawing, index: number): void {
     return;
   activeVertex.value = index;
 }
-function pointAction(
-  drawing: SheetGraphicDrawing,
-  action: "add" | "delete" | "smooth" | "straight" | "corner" | "close" | "open" | "exit",
-  index: number,
-): boolean {
+function pointAction(drawing: SheetGraphicDrawing, action: PointAction, index: number): boolean {
   if (
     !canChange(drawing) ||
     legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing ||
@@ -2591,9 +2591,21 @@ function pointAction(
   }
   const vertices = listFreeShapePoints(drawing).filter((p) => p.role === "vertex");
   const at = vertices.findIndex((p) => p.commandIndex === index);
-  if (at < 0) return false;
+  const segmentAction =
+    action === "add-segment" || action === "straight-segment" || action === "curved-segment";
+  if (at < 0 && !segmentAction) return false;
   let next: SheetGraphicDrawing | undefined;
-  if (action === "add") {
+  if (action === "straight-segment" || action === "curved-segment")
+    next = setFreeShapeSegmentType(
+      drawing,
+      index,
+      action === "straight-segment" ? "straight" : "curved",
+      viewLayout(drawing),
+      pointEditOptions(drawing),
+    );
+  else if (action === "add-segment")
+    next = addFreeShapePoint(drawing, index, viewLayout(drawing), 0.5, pointEditOptions(drawing));
+  else if (action === "add") {
     const segment = drawing.shapePath!.commands[index + 1] ? index + 1 : undefined;
     if (segment !== undefined)
       next = addFreeShapePoint(
@@ -2623,8 +2635,12 @@ function pointAction(
     );
   if (!next || !drawingGeometry(next)) return false;
   const nextVertices = listFreeShapePoints(next).filter((p) => p.role === "vertex");
-  const nextIndex =
-    action === "open"
+  const nextIndex = segmentAction
+    ? Math.max(
+        0,
+        nextVertices.findIndex((point) => point.commandIndex === index),
+      )
+    : action === "open"
       ? 0
       : action === "add"
         ? at + 1

@@ -30,7 +30,7 @@ import { createAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 
 type Point = { x: number; y: number };
-type PointAction = "add" | "delete" | "smooth" | "straight" | "corner" | "close" | "open" | "exit";
+import type { FreeShapePointAction as PointAction } from "../../../modules/sheet-drawings/free-shape-edit-actions";
 const scale = 2;
 const layout = createSheetViewportLayout({
   geometry: createSheetGeometry({ rowCount: 40, columnCount: 20, rowHeight: 24, columnWidth: 80 }),
@@ -583,5 +583,78 @@ describe("free path actual layer cancellation and stale ownership", () => {
     expect(wrapper.find("[data-free-shape-point-selection]").exists()).toBe(false);
     expect(session.history.undoStack).toHaveLength(0);
     expect(serializeWorkbook(workbook)).toEqual(before);
+  });
+});
+
+describe("free segment exact Core layer lifecycle", () => {
+  async function segmentMenu(wrapper: VueWrapper, index: number) {
+    await wrapper
+      .get(`[data-free-shape-segment="${index}"]`)
+      .trigger("contextmenu", { clientX: 300, clientY: 200 });
+    await nextTick();
+  }
+  test("selected curve changes to chord, then editable cubic, with exact independent history", async () => {
+    const source = freeDrawing();
+    const { wrapper, workbook, sheet, session, current, publish, other } = fixture(source);
+    const before = serializeWorkbook(workbook);
+    const oldVertices = listFreeShapePoints(source)
+      .filter((p) => p.role === "vertex")
+      .map((p) => ({ point: p, world: world(source, p) }));
+    const nextControls = listFreeShapePoints(source)
+      .filter((p) => p.commandIndex === 3 && p.role !== "vertex")
+      .map((p) => ({ point: p, world: world(source, p) }));
+    await enter(wrapper, source);
+    await segmentMenu(wrapper, 2);
+    menuAction("straight-segment").click();
+    await nextTick();
+    expect(current().shapePath!.commands[2]![0]).toBe("L");
+    expect(session.history.undoStack).toHaveLength(1);
+    for (const item of [...oldVertices, ...nextControls])
+      expectPoint(world(current(), item.point), item.world);
+    expect(sheet.drawings![1]).toEqual(other);
+    expect(current().shapeLineEnds).toEqual(source.shapeLineEnds);
+    expect(current().text).toBe(source.text);
+    const straight = serializeWorkbook(workbook);
+    await segmentMenu(wrapper, 2);
+    menuAction("straight-segment").click();
+    await nextTick();
+    expect(session.history.undoStack).toHaveLength(1);
+    await segmentMenu(wrapper, 2);
+    menuAction("curved-segment").click();
+    await nextTick();
+    expect(current().shapePath!.commands[2]![0]).toBe("C");
+    expect(session.history.undoStack).toHaveLength(2);
+    const curved = serializeWorkbook(workbook);
+    expect(serializeWorkbook(deserializeWorkbook(curved))).toEqual(curved);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    await publish();
+    expect(serializeWorkbook(workbook)).toEqual(straight);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    await publish();
+    expect(serializeWorkbook(workbook)).toEqual(before);
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(redoWorkbookCommand(session)).toBe(true);
+    await publish();
+    expect(serializeWorkbook(workbook)).toEqual(curved);
+  });
+  test("failed segment application preserves forest, history and the same retry menu", async () => {
+    const source = freeDrawing();
+    const { wrapper, workbook, session, applyUpdate } = fixture(source);
+    await enter(wrapper, source);
+    await segmentMenu(wrapper, 3);
+    const panel = document.body.querySelector("[data-free-shape-point-menu]");
+    const before = serializeWorkbook(workbook);
+    await wrapper.setProps({ applyUpdate: () => false });
+    menuAction("straight-segment").click();
+    await nextTick();
+    expect(serializeWorkbook(workbook)).toEqual(before);
+    expect(session.history.undoStack).toHaveLength(0);
+    expect(document.body.querySelector("[data-free-shape-point-menu]")).toBe(panel);
+    expect(panel!.querySelector('[role="status"]')).not.toBeNull();
+    expect(menuAction("curved-segment").getAttribute("aria-checked")).toBe("true");
+    await wrapper.setProps({ applyUpdate });
+    menuAction("straight-segment").click();
+    await nextTick();
+    expect(session.history.undoStack).toHaveLength(1);
   });
 });
