@@ -1,4 +1,5 @@
 import { normalizeSheetDrawing, type SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import { getShapeTextCharacterSegments } from "@sheetcraft/core/shape-text-character-runs";
 import {
   cloneShapeText,
   type ShapeTextLayout,
@@ -14,6 +15,8 @@ import { getDrawingShapeGeometry } from "./shape-geometry";
 import { getLegacyShapeGeometry } from "./legacy-shape-geometry";
 import {
   layoutShapeText,
+  shapeTextFontKey,
+  type ShapeTextCharacterSegment,
   type ShapeTextFont,
   type ShapeTextLayoutResult,
   type ShapeTextMeasurer,
@@ -52,6 +55,8 @@ export type DrawingShapeTextRuntimeOptions = {
   /** Both injected fields are required together; no canvas/approximate fallback. */
   measurer?: ShapeTextMeasurer;
   normalLineMetrics?: ShapeTextNormalLineMetrics;
+  /** Native normal metrics for attributed tuples; the base pair still supports uniform sources. */
+  resolveNormalLineMetrics?: (font: ShapeTextFont) => ShapeTextNormalLineMetrics;
   normalLineMetricPolicy?: ShapeTextNormalMetricPolicy;
   pointsToPx?: number;
   /** A caller with a different geometry adapter can supply its actual local rect. */
@@ -64,6 +69,10 @@ export type ResolvedDrawingShapeText = {
   layoutOptions: ShapeTextLayout;
   paragraph: ShapeTextParagraph;
   font: ShapeTextFont;
+  characterSegments?: readonly ShapeTextCharacterSegment[];
+  underline: boolean;
+  strike: boolean;
+  resolveNormalLineMetrics: (font: ShapeTextFont) => ShapeTextNormalLineMetrics;
   measurer: ShapeTextMeasurer;
   normalLineMetrics: ShapeTextNormalLineMetrics;
   normalLineMetricPolicy: ShapeTextNormalMetricPolicy;
@@ -78,8 +87,25 @@ function assertTextDrawing(drawing: SheetGraphicDrawing): void {
       "Shape text is available only on a shape or text box.",
     );
 }
+export function getDrawingShapeTextResourceFamilies(
+  drawing: SheetGraphicDrawing,
+): readonly string[] {
+  assertTextDrawing(drawing);
+  const families = new Set(getCellFontResourceFamilies(getDrawingShapeTextFamily(drawing)));
+  // Strict Core segmentation validates sparse source offsets before resource enumeration.
+  const segments = drawing.shapeText?.characterRuns?.length
+    ? getShapeTextCharacterSegments({
+        text: drawing.text,
+        characterRuns: drawing.shapeText.characterRuns,
+      })
+    : [];
+  for (const segment of segments)
+    if (segment.fontFamily !== undefined)
+      for (const family of getCellFontResourceFamilies(segment.fontFamily)) families.add(family);
+  return [...families];
+}
 function assertFontReady(drawing: SheetGraphicDrawing): void {
-  for (const family of getCellFontResourceFamilies(getDrawingShapeTextFamily(drawing))) {
+  for (const family of getDrawingShapeTextResourceFamilies(drawing)) {
     const status = getCellFontResourceStatus(family);
     if (status.state !== "ready")
       throw new ShapeTextRuntimeError(
@@ -93,9 +119,7 @@ function assertFontReady(drawing: SheetGraphicDrawing): void {
 /** Explicit loading of packaged/persisted aliases only, never queryLocalFonts. */
 export async function ensureDrawingShapeTextFont(drawing: SheetGraphicDrawing): Promise<void> {
   assertTextDrawing(drawing);
-  await Promise.all(
-    getCellFontResourceFamilies(getDrawingShapeTextFamily(drawing)).map(ensureCellFontResource),
-  );
+  await Promise.all(getDrawingShapeTextResourceFamilies(drawing).map(ensureCellFontResource));
   assertFontReady(drawing);
 }
 export function getDrawingShapeTextRect(drawing: SheetGraphicDrawing): ShapeTextRect | undefined {
@@ -154,12 +178,55 @@ export function resolveDrawingShapeText(
       "A native measurer and native normal-line metrics must be injected together.",
     );
   const browser = options.measurer ? undefined : getBrowserShapeTextMeasurement();
+  const characterSegments: ShapeTextCharacterSegment[] | undefined = shapeText.characterRuns?.length
+    ? getShapeTextCharacterSegments(
+        { text: drawing.text, characterRuns: shapeText.characterRuns },
+        {
+          fontFamily: font.family,
+          fontSize: font.size,
+          bold: drawing.bold,
+          italic: drawing.italic,
+          underline: shapeText.underline === true,
+          strike: shapeText.strike === true,
+        },
+      ).map((segment) => ({
+        start: segment.start,
+        end: segment.end,
+        font: {
+          family: segment.fontFamily!,
+          size: segment.fontSize!,
+          weight: segment.bold ? 700 : 400,
+          italic: segment.italic!,
+        },
+        underline: segment.underline!,
+        strike: segment.strike!,
+        ...(segment.color !== undefined ? { color: segment.color } : {}),
+      }))
+    : undefined;
   const normal = options.normalLineMetrics
     ? {
         metrics: options.normalLineMetrics,
         policy: options.normalLineMetricPolicy ?? "provided-native",
       }
     : browser!.resolveNormalLineMetrics(font);
+  const normalCache = new Map<string, ShapeTextNormalLineMetrics>([
+    [shapeTextFontKey(font), { ...normal.metrics }],
+  ]);
+  const resolveNormalLineMetrics = (nextFont: ShapeTextFont): ShapeTextNormalLineMetrics => {
+    const key = shapeTextFontKey(nextFont),
+      cached = normalCache.get(key);
+    if (cached) return { ...cached };
+    const metrics =
+      options.resolveNormalLineMetrics?.(nextFont) ??
+      browser?.resolveNormalLineMetrics(nextFont).metrics;
+    if (!metrics)
+      throw new ShapeTextRuntimeError(
+        "invalid-input",
+        "Mixed attributed fonts require an injected native normal-line metric resolver.",
+      );
+    normalCache.set(key, { ...metrics });
+    return { ...metrics };
+  };
   return {
     drawing,
     text: drawing.text,
@@ -167,6 +234,10 @@ export function resolveDrawingShapeText(
     layoutOptions: shapeText.layout,
     paragraph: shapeText.paragraph,
     font,
+    ...(characterSegments ? { characterSegments } : {}),
+    underline: shapeText.underline === true,
+    strike: shapeText.strike === true,
+    resolveNormalLineMetrics,
     measurer: options.measurer ?? browser!.measurer,
     normalLineMetrics: { ...normal.metrics },
     normalLineMetricPolicy: normal.policy,
@@ -268,7 +339,7 @@ export function prepareDrawingShapeTextCandidate(
     : (normalizeSheetDrawing(drawing) as SheetGraphicDrawing);
   let candidate = drawing;
   if (options.manualHeightChange && normalized.shapeText?.layout.autoFit === "resize-shape") {
-    const text = cloneShapeText(normalized.shapeText)!;
+    const text = cloneShapeText(normalized.shapeText, normalized.text)!;
     text.layout.autoFit = "none";
     candidate = withDrawingShapeText(normalized, text);
   }

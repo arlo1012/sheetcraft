@@ -343,7 +343,7 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
   const directionField = Object.getOwnPropertyDescriptor(value, "textDirection");
   if (textField && directionField)
     throw new TypeError("Shape text and legacy text direction are mutually exclusive.");
-  const shapeText = normalizeShapeText(textField?.value);
+  const shapeText = normalizeShapeText(textField?.value, value.text);
   if (directionField && (directionField.get || directionField.set))
     throw new TypeError("Text direction cannot be an accessor.");
   if (directionField && (value.kind !== "textBox" || directionField.value !== "vertical"))
@@ -425,6 +425,32 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing;
 export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new RangeError("Invalid sheet drawing.");
+  // Attributed legacy drawings need the same descriptor-safe source fields as canonical shapes.
+  const textModelField = Object.getOwnPropertyDescriptor(value, "shapeText");
+  const rawTextModel: unknown =
+    textModelField && "value" in textModelField ? textModelField.value : undefined;
+  const hasCharacterRuns =
+    !!rawTextModel && typeof rawTextModel === "object" && "characterRuns" in rawTextModel;
+  if (hasCharacterRuns)
+    for (const key of [
+      "id",
+      "kind",
+      "name",
+      "text",
+      "shape",
+      "fill",
+      "stroke",
+      "strokeWidth",
+      "color",
+      "fontSize",
+      "bold",
+      "italic",
+      "rotation",
+    ] as const) {
+      const field = Object.getOwnPropertyDescriptor(value, key);
+      if (!field || !("value" in field))
+        throw new TypeError("Attributed shape drawings require own source data fields.");
+    }
   // Newly admitted legacy controls must be data records before any appearance read.
   const ownKind = Object.getOwnPropertyDescriptor(value, "kind");
   const hasNewControls =
@@ -433,7 +459,11 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
       (ownKind?.value === "textBox" ||
         (Object.getOwnPropertyDescriptor(value, "shapeGeometry")?.value === undefined &&
           Object.getOwnPropertyDescriptor(value, "shapePath")?.value === undefined)));
-  if (hasNewControls && ownKind?.value !== "shapeGroup" && !("shapeFrame" in value)) {
+  if (
+    (hasNewControls || hasCharacterRuns) &&
+    ownKind?.value !== "shapeGroup" &&
+    !("shapeFrame" in value)
+  ) {
     const prototype = Object.getPrototypeOf(value);
     if (prototype !== null && prototype !== Object.prototype)
       throw new TypeError("Shape controls require ordinary records with own data fields.");

@@ -58,6 +58,8 @@ export const SHAPE_TEXT_PAINT_LIMITS = Object.freeze({
   liveCanvasBytes: 64 * 1024 * 1024,
   runs: 100_000,
   textUnits: 100_000,
+  /** Full-raster span scans, including clear/read/composition, are explicitly bounded. */
+  rasterWork: 128_000_000,
 });
 export type ShapeTextPaintOptions = Readonly<{
   drawing: SheetGraphicDrawing;
@@ -268,7 +270,10 @@ function prepareSource(options: ShapeTextPaintOptions) {
         [run.advancePx, run.inlineAdvancePx, run.ascentPx, run.descentPx].some((n) => n < 0) ||
         ![0, 90, 180, 270].includes(run.angle) ||
         !["ltr", "rtl"].includes(run.direction) ||
-        Math.max(Math.abs(run.x), Math.abs(run.y)) > 10_000_000
+        Math.max(Math.abs(run.x), Math.abs(run.y)) > 10_000_000 ||
+        (run.underline !== undefined && typeof run.underline !== "boolean") ||
+        (run.strike !== undefined && typeof run.strike !== "boolean") ||
+        (run.color !== undefined && !/^(?:#[\da-f]{6}|transparent)$/iu.test(run.color))
       )
         throw new ShapeTextPaintPreflightError(
           "Glyph layout contains invalid native run coordinates.",
@@ -287,9 +292,10 @@ function prepareSource(options: ShapeTextPaintOptions) {
       shapeTextCanvasFont(run.font);
       checkRect(run.inkBounds);
       source = union(source, bounds(run.inkBounds));
-      if (underline)
+      if (run.underline ?? underline)
         source = union(source, transformedDecoration(run, decoration(run, "underline")));
-      if (strike) source = union(source, transformedDecoration(run, decoration(run, "strike")));
+      if (run.strike ?? strike)
+        source = union(source, transformedDecoration(run, decoration(run, "strike")));
       return Object.freeze({
         ...run,
         font: Object.freeze({ ...run.font }),
@@ -567,6 +573,23 @@ export function planShapeTextPaint(options: ShapeTextPaintOptions): ShapeTextPai
         "Glyph contour reconstruction cannot fit its conservative bounds budget.",
       );
   }
+  if (source.runs.some((run) => run.color !== undefined)) {
+    let spans = 0,
+      previousColor: string | undefined,
+      first = true;
+    for (const run of source.runs) {
+      if (first || run.color !== previousColor) spans++;
+      first = false;
+      previousColor = run.color;
+    }
+    if (
+      raster.frontWidthRaster * raster.frontHeightRaster * (4 + spans * 4) >
+      SHAPE_TEXT_PAINT_LIMITS.rasterWork
+    )
+      throw new ShapeTextPaintPreflightError(
+        "Attributed glyph fill exceeds its bounded raster-span work budget.",
+      );
+  }
   const sourceScratchBytes =
     raster.frontWidthRaster * raster.frontHeightRaster * 32 +
     contourBytes +
@@ -594,6 +617,7 @@ function nativeMask(
   plan: ShapeTextPaintPlan,
   outline?: ShapeLine,
   clip = true,
+  runs: readonly Readonly<ShapeTextRun>[] = plan.runs,
 ): void {
   context.save();
   try {
@@ -615,7 +639,7 @@ function nativeMask(
       context.miterLimit = outline.miterLimit;
       context.setLineDash([]);
     }
-    for (const run of plan.runs) {
+    for (const run of runs) {
       context.save();
       try {
         context.translate(run.x, run.y);
@@ -625,7 +649,7 @@ function nativeMask(
         if (outline) context.strokeText(run.text, 0, 0);
         else context.fillText(run.text, 0, 0);
         for (const kind of ["underline", "strike"] as const) {
-          if (!plan[kind]) continue;
+          if (!(run[kind] ?? plan[kind])) continue;
           const rect = decoration(run, kind);
           if (outline) context.strokeRect(rect.x, rect.y, rect.width, rect.height);
           else context.fillRect(rect.x, rect.y, rect.width, rect.height);
@@ -694,6 +718,35 @@ function over(target: PictureRgbaSurface, input: PictureRgbaSurface): void {
     for (let channel = 0; channel < 3; channel++)
       target.data[index + channel] =
         (input.data[index + channel]! * sa + target.data[index + channel]! * da * (1 - sa)) / alpha;
+    target.data[index + 3] = alpha * 255;
+  }
+}
+/** Compose a single ordered mask without allocating a paint surface per character. */
+function overMaskedFill(
+  target: PictureRgbaSurface,
+  mask: PictureRgbaSurface,
+  fill: PictureRgbaSurface | undefined,
+  color: string | undefined,
+): void {
+  if (color === "transparent" || (color === undefined && !fill)) return;
+  const rgb =
+    color !== undefined
+      ? [
+          parseInt(color.slice(1, 3), 16),
+          parseInt(color.slice(3, 5), 16),
+          parseInt(color.slice(5, 7), 16),
+        ]
+      : undefined;
+  for (let index = 0; index < target.data.length; index += 4) {
+    const sa = (mask.data[index + 3]! / 255) * (rgb ? 1 : fill!.data[index + 3]! / 255);
+    if (!sa) continue;
+    const da = target.data[index + 3]! / 255,
+      alpha = sa + da * (1 - sa);
+    for (let channel = 0; channel < 3; channel++)
+      target.data[index + channel] =
+        ((rgb ? rgb[channel]! : fill!.data[index + channel]!) * sa +
+          target.data[index + channel]! * da * (1 - sa)) /
+        alpha;
     target.data[index + 3] = alpha * 255;
   }
 }
@@ -964,15 +1017,30 @@ function prepareShapeTextPaintAtDensity(
         limits: { memoryBytes: SHAPE_TEXT_PAINT_LIMITS.memoryBytes },
       });
     let source: PictureRgbaSurface;
-    if (fill) {
-      source = paintSurface(fill);
-      masked(source, glyphMask);
-    } else
-      source = {
-        width: glyphMask.width,
-        height: glyphMask.height,
-        data: new Uint8ClampedArray(glyphMask.data.length),
-      };
+    if (!plan.runs.some((run) => run.color !== undefined)) {
+      if (fill) {
+        source = paintSurface(fill);
+        masked(source, glyphMask);
+      } else source = createPictureRgbaSurface(glyphMask.width, glyphMask.height);
+    } else {
+      // Keep the original aggregate mask for the one uniform outline/effect pass.
+      // Reuse its Canvas for contiguous front-fill spans in source painter order.
+      source = createPictureRgbaSurface(glyphMask.width, glyphMask.height);
+      const inheritedFill = fill ? paintSurface(fill) : undefined;
+      const emptyMask = createPictureRgbaSurface(glyphMask.width, glyphMask.height);
+      let start = 0;
+      while (start < plan.runs.length) {
+        let end = start + 1;
+        const color = plan.runs[start]!.color;
+        while (end < plan.runs.length && plan.runs[end]!.color === color) end++;
+        if (color !== "transparent" && (color !== undefined || inheritedFill)) {
+          write(maskCanvas, emptyMask);
+          nativeMask(maskContext, plan, undefined, true, plan.runs.slice(start, end));
+          overMaskedFill(source, read(maskCanvas), inheritedFill, color);
+        }
+        start = end;
+      }
+    }
     if (line && line.widthPt > 0 && line.paint.opacity > 0) {
       const outlineCanvas = make(plan.frontWidthRaster, plan.frontHeightRaster),
         outlineContext = context2d(outlineCanvas);

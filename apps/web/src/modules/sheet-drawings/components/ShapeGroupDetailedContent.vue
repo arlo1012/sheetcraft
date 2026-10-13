@@ -210,7 +210,7 @@ async function render(): Promise<void> {
       visibleIds.add(node.id);
       for (const asset of [
         ...getShapeStyleAssetIds(node.shapeStyle),
-        ...getShapeTextAssetIds(node.shapeText),
+        ...getShapeTextAssetIds(node.shapeText, node.text),
       ]) {
         const url = assetUrls?.get(asset);
         if (!url) throw new Error("A group paint asset is unavailable.");

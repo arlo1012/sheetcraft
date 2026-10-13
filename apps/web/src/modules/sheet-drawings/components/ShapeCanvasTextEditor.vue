@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, useId, watch, type CSSProperties } from "vue";
 import { Button } from "tdesign-vue-next/es/button";
+import {
+  getShapeTextCharacterSegments,
+  getShapeTextCharacterOverride,
+  type ShapeTextCharacterFormat,
+} from "@sheetcraft/core/shape-text-character-runs";
+import type { ShapeTextRichDraft } from "../shape-text-edit-model";
+import { shapeTextDraftSource } from "../shape-text-edit-model";
+import { drawingShapeTextBaseCharacterFormat } from "../shape-text-options";
+import ShapeRichTextInput from "./ShapeRichTextInput.vue";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
@@ -28,6 +37,14 @@ const props = withDefaults(
     toolbarStyle?: CSSProperties;
     scale?: number;
     update: (text: string) => boolean;
+    rich?: boolean;
+    pendingFormat?: ShapeTextCharacterFormat;
+    updateRich?: (value: ShapeTextRichDraft) => boolean;
+    format?: (patch: ShapeTextCharacterFormat) => boolean;
+    setSelection?: (
+      selection: { start: number; end: number; direction: "forward" | "backward" | "none" },
+      pendingFormat?: ShapeTextCharacterFormat,
+    ) => boolean;
     composition: (active: boolean) => boolean;
     commit: () => boolean;
     cancel: () => void;
@@ -43,12 +60,14 @@ const props = withDefaults(
 const emit = defineEmits<{ requestCommit: [reason: "blur"] }>();
 const root = ref<HTMLElement>();
 const input = ref<HTMLTextAreaElement>();
+const richInput = ref<InstanceType<typeof ShapeRichTextInput>>();
+const editableElement = computed(() => richInput.value?.rootElement ?? input.value);
 const surface = ref<InstanceType<typeof FloatingPanelSurface>>();
 const toolbar = computed(() => surface.value?.rootElement ?? null);
 const { floatingStyles } = useFloatingPanel(
-  computed(() => input.value ?? null),
+  computed(() => editableElement.value ?? null),
   toolbar,
-  computed(() => !!input.value),
+  computed(() => !!editableElement.value),
   { placement: "bottom-end", offset: 6 },
 );
 const errorId = `shape-canvas-text-error-${useId()}`;
@@ -111,6 +130,10 @@ let selection = {
 };
 
 function captureSelection(): void {
+  if (richInput.value) {
+    selection = richInput.value.captureSelection();
+    return;
+  }
   const element = input.value;
   if (!element) return;
   selection = {
@@ -118,9 +141,15 @@ function captureSelection(): void {
     end: element.selectionEnd,
     direction: element.selectionDirection,
   };
+  props.setSelection?.(selection);
 }
 function focus(expectedSession = props.sessionId): void {
-  if (expectedSession !== props.sessionId || !input.value) return;
+  if (expectedSession !== props.sessionId) return;
+  if (richInput.value) {
+    richInput.value.focus(selection);
+    return;
+  }
+  if (!input.value) return;
   const element = input.value;
   element.focus({ preventScroll: true });
   const limit = element.value.length;
@@ -131,9 +160,16 @@ function focus(expectedSession = props.sessionId): void {
   );
 }
 function owns(target: EventTarget | null): boolean {
-  return (
-    target instanceof Node && !!(root.value?.contains(target) || toolbar.value?.contains(target))
-  );
+  if (!(target instanceof Node)) return false;
+  if (root.value?.contains(target) || toolbar.value?.contains(target)) return true;
+  // A pane and its explicitly ARIA-controlled popups belong to this draft owner.
+  // Generic menus never qualify, so unrelated worksheet interactions still commit.
+  const owner = `[data-shape-text-edit-session="${props.sessionId}"]`;
+  if (target instanceof Element && target.closest(owner)) return true;
+  for (const control of document.querySelectorAll(`${owner} [aria-controls]`))
+    for (const id of (control.getAttribute("aria-controls") ?? "").split(/\s+/))
+      if (id && document.getElementById(id)?.contains(target)) return true;
+  return false;
 }
 function reset(): void {
   localDraft.value = props.draft;
@@ -148,8 +184,43 @@ function reset(): void {
   void nextTick(() => focus(sessionId));
 }
 watch(() => props.sessionId, reset);
+watch(
+  () => props.rich,
+  () => {
+    const id = props.sessionId;
+    void nextTick(() => focus(id));
+  },
+);
 onMounted(reset);
 
+// Rich transactions need stable bridges for the whole edit lease. A parent may
+// refresh Apply/Escape actions after a rejected blur without replacing that lease.
+const richActions = computed(() => {
+  const sessionId = props.sessionId,
+    updateRich = props.updateRich,
+    setSelection = props.setSelection,
+    composition = props.composition;
+  const current = () => sessionId === props.sessionId;
+  return {
+    update: (value: ShapeTextRichDraft) => current() && !!updateRich?.(value),
+    selection: (value: Pick<ShapeTextRichDraft, "selection" | "pendingFormat">) => {
+      if (current()) {
+        selection = value.selection;
+        setSelection?.(value.selection, value.pendingFormat);
+      }
+    },
+    composition: (active: boolean) => {
+      if (!current()) return false;
+      localComposing.value = active;
+      const accepted = composition(active);
+      if (!active) void nextTick(() => actions.value.finishCompositionBlur());
+      return accepted;
+    },
+    error: (message: string | undefined) => {
+      if (current()) localFailure.value = message;
+    },
+  };
+});
 // Handlers retain their exact owner. Old saved handlers cannot edit a new session.
 const actions = computed(() => {
   const sessionId = props.sessionId;
@@ -158,6 +229,7 @@ const actions = computed(() => {
   const commit = props.commit;
   const cancel = props.cancel;
   const escape = props.escape;
+  const format = props.format;
   const current = () => sessionId === props.sessionId;
   const currentInput = (event: Event) => current() && event.target === input.value;
   function publish(value: string): boolean {
@@ -183,7 +255,7 @@ const actions = computed(() => {
     if (!current() || !blurPending || composing.value || owns(document.activeElement)) return;
     blurPending = false;
     if (readOnly.value) return;
-    if (input.value && !publish(input.value.value)) {
+    if (richInput.value ? !richInput.value.flush() : input.value && !publish(input.value.value)) {
       void nextTick(() => focus(sessionId));
       return;
     }
@@ -193,7 +265,7 @@ const actions = computed(() => {
     if (!current() || readOnly.value || composing.value) return;
     captureSelection();
     blurPending = false;
-    if (!input.value || !publish(input.value.value)) {
+    if (richInput.value ? !richInput.value.flush() : !input.value || !publish(input.value.value)) {
       void nextTick(() => focus(sessionId));
       return;
     }
@@ -249,14 +321,47 @@ const actions = computed(() => {
         event.keyCode === 229
       )
         return;
-      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+      const property =
+        event.key.toLowerCase() === "b"
+          ? "bold"
+          : event.key.toLowerCase() === "i"
+            ? "italic"
+            : event.key.toLowerCase() === "u"
+              ? "underline"
+              : undefined;
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        !event.altKey &&
+        property &&
+        format &&
+        !readOnly.value
+      ) {
+        event.preventDefault();
+        captureSelection();
+        const source = shapeTextDraftSource(props.drawing),
+          base = drawingShapeTextBaseCharacterFormat(props.drawing);
+        const candidates =
+          selection.start === selection.end
+            ? [
+                {
+                  ...base,
+                  ...(props.pendingFormat ??
+                    getShapeTextCharacterOverride(source, selection.start)),
+                },
+              ]
+            : getShapeTextCharacterSegments(source, base).filter(
+                (run) => run.start < selection.end && run.end > selection.start,
+              );
+        if (!format({ [property]: !candidates.every((run) => run[property] === true) }))
+          localFailure.value = labels.value.rejected;
+      } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
         event.preventDefault();
         apply();
       } else if (event.key === "Escape" && escape && !readOnly.value) {
         event.preventDefault();
         captureSelection();
         blurPending = false;
-        if (input.value && publish(input.value.value)) {
+        if (richInput.value ? richInput.value.flush() : input.value && publish(input.value.value)) {
           localFailure.value = undefined;
           try {
             if (escape() !== false) return;
@@ -282,6 +387,7 @@ const actions = computed(() => {
       event.preventDefault();
       if (current()) captureSelection();
     },
+    finishCompositionBlur: requestBlurCommit,
     apply,
     cancel: () => {
       if (!current()) return;
@@ -302,6 +408,7 @@ const inputEvents = computed(() => ({
   compositionend: actions.value.compositionEnd,
 }));
 const frameEvents = computed(() => ({
+  keydown: actions.value.keydown,
   focusout: actions.value.focusout,
   focusin: actions.value.focusin,
 }));
@@ -347,7 +454,34 @@ defineExpose({ focus });
     @beforeinput.stop
     @keypress.stop
   >
+    <ShapeRichTextInput
+      v-if="rich"
+      ref="richInput"
+      :key="`${sessionId}-rich`"
+      :session-id="sessionId"
+      :source="shapeTextDraftSource(drawing)"
+      :base-format="drawingShapeTextBaseCharacterFormat(drawing)"
+      :pending-format="pendingFormat"
+      :selection="
+        initialSelection
+          ? { ...initialSelection, direction: initialSelection.direction ?? 'none' }
+          : selection
+      "
+      :read-only="readOnly"
+      :ariaLabel="labels.text"
+      :style="[
+        style,
+        { lineHeight: textOptions.paragraph.lineSpacing.kind === 'normal' ? 'normal' : undefined },
+      ]"
+      class="shape-canvas-text-editor__input"
+      :data-shape-text-edit-session="sessionId"
+      data-shape-canvas-text-input
+      :update="richActions.update"
+      :composition="richActions.composition"
+      v-on="{ selection: richActions.selection, error: richActions.error }"
+    />
     <textarea
+      v-else
       :key="sessionId"
       ref="input"
       v-on="inputEvents"

@@ -62,6 +62,8 @@ export interface ShapeFormatValues {
   textItalic: boolean;
   textUnderline: boolean;
   textStrike: boolean;
+  /** RGB/transparent character color; empty inherits the existing glyph fill. */
+  textColor: string;
   paragraphAlignment: ShapeTextParagraph["alignment"];
   paragraphBeforePt: number;
   paragraphAfterPt: number;

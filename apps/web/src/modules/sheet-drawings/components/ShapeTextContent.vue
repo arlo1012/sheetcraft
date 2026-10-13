@@ -44,7 +44,7 @@ async function render() {
     await nextTick();
     if (request !== generation || drawing !== props.drawing || !canvas.value) return;
     const retained = new Set<string>();
-    for (const id of getShapeTextAssetIds(drawing.shapeText)) {
+    for (const id of getShapeTextAssetIds(drawing.shapeText, drawing.text)) {
       const url = props.assetUrls?.get(id);
       if (url) {
         retained.add(url);

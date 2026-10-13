@@ -32,6 +32,7 @@ export const measurement: DrawingShapeTextRuntimeOptions = {
     }),
   },
   normalLineMetrics: { ascent: 15, descent: 5, lineAdvance: 20 },
+  resolveNormalLineMetrics: () => ({ ascent: 15, descent: 5, lineAdvance: 20 }),
 };
 const viewport = createSheetViewportLayout({
   geometry: createSheetGeometry({ rowCount: 100, columnCount: 30, rowHeight: 24, columnWidth: 80 }),

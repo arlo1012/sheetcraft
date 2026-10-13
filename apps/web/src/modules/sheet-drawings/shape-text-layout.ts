@@ -29,6 +29,15 @@ export type ShapeTextNormalLineMetrics = {
   descent: number;
   lineAdvance: number;
 };
+export type ShapeTextCharacterSegment = {
+  start: number;
+  end: number;
+  font: ShapeTextFont;
+  underline: boolean;
+  strike: boolean;
+  /** Absence inherits the actual uniform glyph fill, including advanced paint. */
+  color?: string;
+};
 export type ShapeTextLayoutInput = {
   text: string;
   /** Actual preset textRect or text-box frame, before physical margins. */
@@ -37,6 +46,12 @@ export type ShapeTextLayoutInput = {
   paragraph: ShapeTextParagraph;
   font: ShapeTextFont;
   measurer: ShapeTextMeasurer;
+  /** Full effective source coverage; absent keeps the legacy uniform path. */
+  characterSegments?: readonly ShapeTextCharacterSegment[];
+  underline?: boolean;
+  strike?: boolean;
+  /** Required for font tuples different from the base when native metrics are injected. */
+  resolveNormalLineMetrics?: (font: ShapeTextFont) => ShapeTextNormalLineMetrics;
   /** Resolved from the same ready font resource used by the painter. */
   normalLineMetrics: ShapeTextNormalLineMetrics;
   /** Defaults to 96/72; apply density here once, never again in margins. */
@@ -44,6 +59,13 @@ export type ShapeTextLayoutInput = {
 };
 export type ShapeTextRun = {
   text: string;
+  /** Original drawing.text UTF-16 offsets, never normalized newline offsets. */
+  sourceStart?: number;
+  sourceEnd?: number;
+  /** Legacy manually constructed layouts may omit these and inherit drawing flags. */
+  underline?: boolean;
+  strike?: boolean;
+  color?: string;
   font: ShapeTextFont;
   direction: "ltr" | "rtl";
   /** Native left-aligned, alphabetic baseline; rotate around this origin. */
@@ -113,11 +135,21 @@ export const SHAPE_TEXT_LAYOUT_LIMITS = {
   measuredUnits: 2_000_000,
   cachedMeasurements: 8_192,
   cachedUnits: 200_000,
+  fontTuples: 8_192,
+  segmentBytes: 16 * 1024 * 1024,
 } as const;
 
 type Metrics = ShapeTextMeasurementMetrics & { inkLeft: number; inkRight: number };
 type Piece = {
   text: string;
+  sourceStart: number;
+  sourceEnd: number;
+  font: ShapeTextFont;
+  normal: ShapeTextNormalLineMetrics;
+  underline: boolean;
+  strike: boolean;
+  color?: string;
+  direction: "ltr" | "rtl";
   metrics: Metrics;
   inlineAdvance: number;
   upright: boolean;
@@ -138,9 +170,44 @@ const RTL_PATTERN =
   /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufeff\u200e\u200f\u202a-\u202e\u2066-\u206f\u{10800}-\u{10fff}\u{1e800}-\u{1efff}]/u;
 const STACKED_COMPLEX_PATTERN =
   /[\u0590-\u0fff\u1000-\u109f\u1780-\u18af\ua800-\ua8ff\u{11000}-\u{11fff}\u{1e800}-\u{1efff}]/u;
+// Only these native independently shaped attributed scripts are admitted. Other
+// letter scripts stay available on the unchanged one-font paragraph path.
+const SIMPLE_ATTRIBUTED_LETTER =
+  /[\p{Script=Latin}\p{Script=Greek}\p{Script=Cyrillic}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Common}]/u;
+function requiresAttributedParagraphShaping(text: string): boolean {
+  if (RTL_PATTERN.test(text)) return true;
+  for (const scalar of text)
+    if (/\p{Letter}/u.test(scalar) && !SIMPLE_ATTRIBUTED_LETTER.test(scalar)) return true;
+  return false;
+}
 const UNSUPPORTED_VERTICAL_SCRIPT = /[\u1680-\u169f\u{10c00}-\u{10c4f}]/u;
 function fail(code: ShapeTextLayoutErrorCode, message: string): never {
   throw new ShapeTextLayoutError(code, message);
+}
+export function shapeTextFontKey(font: ShapeTextFont): string {
+  return JSON.stringify([font.family, font.size, font.weight, font.italic]);
+}
+function validFont(font: ShapeTextFont): boolean {
+  return (
+    !!font &&
+    typeof font.family === "string" &&
+    !!font.family &&
+    font.family.length <= 1024 &&
+    Number.isFinite(font.size) &&
+    font.size > 0 &&
+    font.size <= 512 &&
+    [400, 700].includes(font.weight) &&
+    typeof font.italic === "boolean"
+  );
+}
+function validNormal(normal: ShapeTextNormalLineMetrics): boolean {
+  return (
+    [normal.ascent, normal.descent].every(validNonnegative) &&
+    Number.isFinite(normal.ascent + normal.descent) &&
+    normal.ascent + normal.descent > 0 &&
+    Number.isFinite(normal.lineAdvance) &&
+    normal.lineAdvance > 0
+  );
 }
 function validNonnegative(value: number): boolean {
   return Number.isFinite(value) && value >= 0;
@@ -203,7 +270,7 @@ function rotatedInk(x: number, y: number, angle: 0 | 90 | 270, m: Metrics): Shap
 }
 
 /**
- * Numeric, transient uniform shape text layout. The measurer and painter must use
+ * Numeric, transient uniform or attributed shape text layout. The measurer and painter must use
  * the same native shaping/font resource. No drawing mutation, 2D rotation, body
  * projection, font loading, DOM ownership or AutoFit solving occurs here.
  *
@@ -320,10 +387,115 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
     graphemeCount = 0;
   let inkAccurate = Boolean(measurer.measureMetrics);
   let layoutUnits = 0;
-  const cache = new Map<string, Metrics>();
-  const measure = (value: string): Metrics => {
-    const cached = cache.get(value);
+  const fontKeys = new WeakMap<ShapeTextFont, string>();
+  const fontKey = (resolvedFont: ShapeTextFont): string => {
+    let key = fontKeys.get(resolvedFont);
+    if (key === undefined) {
+      key = shapeTextFontKey(resolvedFont);
+      fontKeys.set(resolvedFont, key);
+    }
+    return key;
+  };
+  const baseFontKey = fontKey(font);
+  const normalCache = new Map<string, ShapeTextNormalLineMetrics>([[baseFontKey, normal]]);
+  const normalFor = (resolvedFont: ShapeTextFont): ShapeTextNormalLineMetrics => {
+    const key = fontKey(resolvedFont),
+      cached = normalCache.get(key);
     if (cached) return cached;
+    if (normalCache.size >= SHAPE_TEXT_LAYOUT_LIMITS.fontTuples)
+      fail("layout-budget", "Attributed text exceeds its native font-tuple budget.");
+    if (!input.resolveNormalLineMetrics)
+      fail(
+        "unavailable-metrics",
+        "Attributed text needs native normal metrics for every font tuple.",
+      );
+    let resolved: ShapeTextNormalLineMetrics;
+    try {
+      resolved = input.resolveNormalLineMetrics(resolvedFont);
+    } catch {
+      fail("unavailable-metrics", "Attributed font normal metrics are unavailable.");
+    }
+    if (!validNormal(resolved!))
+      fail("unavailable-metrics", "Attributed font normal metrics are invalid.");
+    const detached = { ...resolved! };
+    normalCache.set(key, detached);
+    return detached;
+  };
+  const segments: ShapeTextCharacterSegment[] = [];
+  if (input.characterSegments !== undefined) {
+    if (
+      !Array.isArray(input.characterSegments) ||
+      input.characterSegments.length > SHAPE_TEXT_LAYOUT_LIMITS.graphemes
+    )
+      fail("layout-budget", "Attributed text exceeds its segment budget.");
+    const boundaries = new Set<number>([0, text.length]);
+    for (const segment of new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text))
+      boundaries.add(segment.index);
+    let cursor = 0,
+      segmentBytes = 0;
+    for (const segment of input.characterSegments) {
+      if (
+        !segment ||
+        segment.start !== cursor ||
+        !Number.isInteger(segment.end) ||
+        segment.end <= segment.start ||
+        segment.end > text.length ||
+        !boundaries.has(segment.start) ||
+        !boundaries.has(segment.end) ||
+        !validFont(segment.font) ||
+        typeof segment.underline !== "boolean" ||
+        typeof segment.strike !== "boolean" ||
+        (segment.color !== undefined && !/^(?:#[\da-f]{6}|transparent)$/iu.test(segment.color))
+      )
+        fail(
+          "invalid-input",
+          "Attributed text requires ordered full grapheme-safe effective coverage.",
+        );
+      segmentBytes += 512 + segment.font.family.length * 2;
+      if (segmentBytes > SHAPE_TEXT_LAYOUT_LIMITS.segmentBytes)
+        fail("layout-budget", "Attributed text exceeds its bounded numeric-segment memory budget.");
+      const copy = { ...segment, font: { ...segment.font } };
+      const previous = segments.at(-1);
+      if (
+        previous &&
+        fontKey(previous.font) === fontKey(copy.font) &&
+        previous.underline === copy.underline &&
+        previous.strike === copy.strike &&
+        previous.color === copy.color
+      )
+        previous.end = copy.end;
+      else segments.push(copy);
+      cursor = segment.end;
+    }
+    if (cursor !== text.length)
+      fail("invalid-input", "Attributed text does not cover the source text.");
+  } else if (text.length)
+    segments.push({
+      start: 0,
+      end: text.length,
+      font,
+      underline: input.underline === true,
+      strike: input.strike === true,
+    });
+  const segmentAt = (offset: number): number => {
+    let low = 0,
+      high = segments.length - 1;
+    while (low <= high) {
+      const middle = (low + high) >>> 1;
+      if (segments[middle]!.end <= offset) low = middle + 1;
+      else high = middle - 1;
+    }
+    return low;
+  };
+  const cache = new Map<string, { metrics: Metrics; units: number }>();
+  const measure = (
+    value: string,
+    resolvedFont: ShapeTextFont,
+    resolvedNormal: ShapeTextNormalLineMetrics,
+  ): Metrics => {
+    const key = fontKey(resolvedFont) + ":" + value;
+    const cached = cache.get(key);
+    if (cached) return cached.metrics;
     if (
       ++measurementCount > SHAPE_TEXT_LAYOUT_LIMITS.measurements ||
       (measuredUnits += value.length) > SHAPE_TEXT_LAYOUT_LIMITS.measuredUnits
@@ -332,8 +504,8 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
     let raw: ShapeTextMeasurementMetrics | undefined;
     let width: number;
     try {
-      raw = measurer.measureMetrics?.(value, font);
-      width = raw ? raw.width : measurer.measure(value, font);
+      raw = measurer.measureMetrics?.(value, resolvedFont);
+      width = raw ? raw.width : measurer.measure(value, resolvedFont);
     } catch {
       fail("unavailable-metrics", "Native metrics are unavailable for the resolved shape font.");
     }
@@ -357,65 +529,86 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
     if (!exactInk) inkAccurate = false;
     const result: Metrics = {
       width: width!,
-      ascent: raw?.ascent ?? normal.ascent,
-      descent: raw?.descent ?? normal.descent,
+      ascent: raw?.ascent ?? resolvedNormal.ascent,
+      descent: raw?.descent ?? resolvedNormal.descent,
       inkLeft: exactInk ? raw!.inkLeft! : 0,
       inkRight: exactInk ? raw!.inkRight! : width!,
     };
-    if (value.length <= SHAPE_TEXT_LAYOUT_LIMITS.cachedUnits) {
+    if (key.length <= SHAPE_TEXT_LAYOUT_LIMITS.cachedUnits) {
       while (
         cache.size >= SHAPE_TEXT_LAYOUT_LIMITS.cachedMeasurements ||
-        cachedUnits + value.length > SHAPE_TEXT_LAYOUT_LIMITS.cachedUnits
+        cachedUnits + key.length > SHAPE_TEXT_LAYOUT_LIMITS.cachedUnits
       ) {
         const oldest = cache.keys().next().value as string;
+        cachedUnits -= cache.get(oldest)!.units;
         cache.delete(oldest);
-        cachedUnits -= oldest.length;
       }
-      cache.set(value, result);
-      cachedUnits += value.length;
+      cache.set(key, { metrics: result, units: key.length });
+      cachedUnits += key.length;
     }
     return result;
   };
-  const piecesFor = (value: string): Piece[] => {
+  const piecesFor = (value: string, sourceStart: number, direction: "ltr" | "rtl"): Piece[] => {
     if (!value) return [];
     if ((layoutUnits += value.length) > SHAPE_TEXT_LAYOUT_LIMITS.measuredUnits * 2)
       fail("layout-budget", "Shape text exhausted its bounded segmentation work budget.");
-    if (!mixed && !stacked) {
-      const metrics = measure(value);
-      return [{ text: value, metrics, inlineAdvance: metrics.width, upright: false }];
-    }
     const pieces: Piece[] = [];
-    let sideways = "";
-    const flush = () => {
-      if (!sideways) return;
-      const metrics = measure(sideways);
-      pieces.push({
-        text: sideways,
-        metrics,
-        inlineAdvance: metrics.width,
-        upright: false,
-        orientation: "R",
-      });
-      sideways = "";
-    };
-    for (const cluster of getCellTextGraphemes(value)) {
-      const orientation = getShapeTextVerticalOrientation(cluster.codePointAt(0)!);
-      const upright = stacked || orientation === "U" || orientation === "Tu";
-      if (!upright && orientation === "R") {
-        sideways += cluster;
+    const sourceEnd = sourceStart + value.length;
+    let index = segmentAt(sourceStart);
+    while (index < segments.length && segments[index]!.start < sourceEnd) {
+      const segment = segments[index++]!;
+      const start = Math.max(sourceStart, segment.start),
+        end = Math.min(sourceEnd, segment.end);
+      const part = value.slice(start - sourceStart, end - sourceStart);
+      const resolvedNormal = normalFor(segment.font);
+      const makePiece = (
+        pieceText: string,
+        offset: number,
+        upright: boolean,
+        orientation?: ShapeTextVerticalOrientation,
+      ) => {
+        const metrics = measure(pieceText, segment.font, resolvedNormal);
+        pieces.push({
+          text: pieceText,
+          sourceStart: offset,
+          sourceEnd: offset + pieceText.length,
+          font: segment.font,
+          normal: resolvedNormal,
+          underline: segment.underline,
+          strike: segment.strike,
+          ...(segment.color !== undefined ? { color: segment.color } : {}),
+          direction,
+          metrics,
+          inlineAdvance: upright ? resolvedNormal.lineAdvance : metrics.width,
+          upright,
+          ...(orientation ? { orientation } : {}),
+        });
+      };
+      if (!mixed && !stacked) {
+        makePiece(part, start, false);
         continue;
       }
+      let sideways = "",
+        sidewaysStart = start,
+        cursor = start;
+      const flush = () => {
+        if (sideways) makePiece(sideways, sidewaysStart, false, "R");
+        sideways = "";
+      };
+      for (const cluster of getCellTextGraphemes(part)) {
+        const orientation = getShapeTextVerticalOrientation(cluster.codePointAt(0)!);
+        const upright = stacked || orientation === "U" || orientation === "Tu";
+        if (!upright && orientation === "R") {
+          if (!sideways) sidewaysStart = cursor;
+          sideways += cluster;
+        } else {
+          flush();
+          makePiece(cluster, cursor, upright, orientation);
+        }
+        cursor += cluster.length;
+      }
       flush();
-      const metrics = measure(cluster);
-      pieces.push({
-        text: cluster,
-        metrics,
-        inlineAdvance: upright ? normal.lineAdvance : metrics.width,
-        upright,
-        orientation,
-      });
     }
-    flush();
     if (mixed && pieces.some((piece) => piece.upright && STACKED_COMPLEX_PATTERN.test(piece.text)))
       fail(
         "unavailable-script",
@@ -431,9 +624,30 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
   const draftLines: DraftLine[] = [];
   let blockCursor = 0,
     maxInline = 0;
-  const paragraphs = text.replace(/\r\n?/gu, "\n").split("\n");
+  // Split original newlines without rewriting the authoritative UTF-16 offsets.
+  const paragraphs: { text: string; start: number }[] = [];
+  let paragraphStart = 0;
+  for (const match of text.matchAll(/\r\n?|\n/gu)) {
+    paragraphs.push({ text: text.slice(paragraphStart, match.index), start: paragraphStart });
+    paragraphStart = match.index! + match[0].length;
+  }
+  paragraphs.push({ text: text.slice(paragraphStart), start: paragraphStart });
   for (let paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex++) {
-    const source = paragraphs[paragraphIndex]!;
+    const paragraphSource = paragraphs[paragraphIndex]!;
+    const source = paragraphSource.text,
+      sourceStart = paragraphSource.start;
+    const paragraphDirection = getShapeTextNativeDirection(source);
+    const blankSegment = segments[Math.min(segmentAt(sourceStart), segments.length - 1)];
+    const paragraphNormal = source || !blankSegment ? normal : normalFor(blankSegment.font);
+    if (requiresAttributedParagraphShaping(source)) {
+      const first = segmentAt(sourceStart),
+        last = segmentAt(sourceStart + Math.max(0, source.length - 1));
+      if (source && first !== last)
+        fail(
+          "unavailable-script",
+          "Mixed-font or styled complex/bidirectional paragraphs need a native attributed shaping adapter.",
+        );
+    }
     const clusters = getCellTextGraphemes(source);
     graphemeCount += clusters.length;
     if (graphemeCount > SHAPE_TEXT_LAYOUT_LIMITS.graphemes)
@@ -448,12 +662,15 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
     }
     const range = (start: number, end: number) => source.slice(offsets[start]!, offsets[end]!);
     const widthOf = (start: number, end: number) =>
-      piecesFor(range(start, end)).reduce((sum, piece) => sum + piece.inlineAdvance, 0);
+      piecesFor(range(start, end), sourceStart + offsets[start]!, paragraphDirection).reduce(
+        (sum, piece) => sum + piece.inlineAdvance,
+        0,
+      );
     const append = (start: number, end: number, paragraphEnd: boolean) => {
       if (draftLines.length >= SHAPE_TEXT_LAYOUT_LIMITS.lines)
         fail("layout-budget", "Shape text exceeds 4096 output lines.");
       const value = range(start, end),
-        pieces = piecesFor(value);
+        pieces = piecesFor(value, sourceStart + offsets[start]!, paragraphDirection);
       let width = pieces.reduce((sum, piece) => sum + piece.inlineAdvance, 0);
       if (paragraph.alignment === "justify" && !paragraphEnd && width < inlineAvailable) {
         if (RTL_PATTERN.test(value))
@@ -469,13 +686,29 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
           let cursor = 0;
           const gaps: number[] = [];
           for (const match of matches) {
-            justified.push(...piecesFor(value.slice(cursor, match.index!)));
-            const gap = piecesFor(match[0]);
+            justified.push(
+              ...piecesFor(
+                value.slice(cursor, match.index!),
+                sourceStart + offsets[start]! + cursor,
+                paragraphDirection,
+              ),
+            );
+            const gap = piecesFor(
+              match[0],
+              sourceStart + offsets[start]! + match.index!,
+              paragraphDirection,
+            );
             if (gap.length) gaps.push(justified.length + gap.length - 1);
             justified.push(...gap);
             cursor = match.index! + match[0].length;
           }
-          justified.push(...piecesFor(value.slice(cursor)));
+          justified.push(
+            ...piecesFor(
+              value.slice(cursor),
+              sourceStart + offsets[start]! + cursor,
+              paragraphDirection,
+            ),
+          );
           const nativeWidth = justified.reduce((sum, piece) => sum + piece.inlineAdvance, 0);
           if (nativeWidth > inlineAvailable)
             fail(
@@ -504,7 +737,12 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
                   getShapeTextVerticalOrientation(cluster.codePointAt(0)!) !== "R"),
             )
           ) {
-            const justified = clusters.flatMap(piecesFor);
+            let clusterOffset = sourceStart + offsets[start]!;
+            const justified = clusters.flatMap((cluster) => {
+              const result = piecesFor(cluster, clusterOffset, paragraphDirection);
+              clusterOffset += cluster.length;
+              return result;
+            });
             const nativeWidth = justified.reduce((sum, piece) => sum + piece.inlineAdvance, 0);
             if (nativeWidth > inlineAvailable)
               fail(
@@ -521,12 +759,14 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
       }
       // Glyph ink extents never establish independent baselines for words.
       const baselineAscent = pieces.reduce(
-        (value, piece) => (piece.upright ? value : Math.max(value, piece.metrics.ascent)),
-        normal.ascent,
+        (value, piece) =>
+          piece.upright ? value : Math.max(value, piece.metrics.ascent, piece.normal.ascent),
+        pieces.length ? 0 : paragraphNormal.ascent,
       );
       const baselineDescent = pieces.reduce(
-        (value, piece) => (piece.upright ? value : Math.max(value, piece.metrics.descent)),
-        normal.descent,
+        (value, piece) =>
+          piece.upright ? value : Math.max(value, piece.metrics.descent, piece.normal.descent),
+        pieces.length ? 0 : paragraphNormal.descent,
       );
       const inkThickness = pieces.reduce(
         (extent, piece) => Math.max(extent, piece.upright ? piece.metrics.width : 0),
@@ -535,7 +775,13 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
       const advance =
         paragraph.lineSpacing.kind === "exact"
           ? paragraph.lineSpacing.pt * scale
-          : Math.max(normal.lineAdvance, inkThickness);
+          : Math.max(
+              pieces.reduce(
+                (advance, piece) => Math.max(advance, piece.normal.lineAdvance),
+                pieces.length ? 0 : paragraphNormal.lineAdvance,
+              ),
+              inkThickness,
+            );
       draftLines.push({
         text: value,
         paragraphIndex,
@@ -639,6 +885,7 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
     let inlineCursor = 0;
     for (const piece of line.pieces) {
       const m = piece.metrics,
+        pieceNormal = piece.normal,
         u = inlineStart + inlineCursor;
       const leading = (line.advance - line.baselineAscent - line.baselineDescent) / 2;
       let x: number, y: number, angle: 0 | 90 | 270;
@@ -654,8 +901,8 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
         y =
           contentRect.y +
           u +
-          (normal.lineAdvance - normal.ascent - normal.descent) / 2 +
-          normal.ascent;
+          (pieceNormal.lineAdvance - pieceNormal.ascent - pieceNormal.descent) / 2 +
+          pieceNormal.ascent;
         angle = 0;
       } else if (mode === "rotate-270") {
         x = contentRect.x + v + leading + line.baselineAscent;
@@ -671,15 +918,20 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
       const runInk = rotatedInk(x, y, angle, m);
       const run: ShapeTextRun = {
         text: piece.text,
-        font: { ...font },
-        direction: getShapeTextNativeDirection(piece.text),
+        sourceStart: piece.sourceStart,
+        sourceEnd: piece.sourceEnd,
+        font: { ...piece.font },
+        underline: piece.underline,
+        strike: piece.strike,
+        ...(piece.color !== undefined ? { color: piece.color } : {}),
+        direction: piece.direction,
         x,
         y,
         angle,
         advancePx: !piece.upright && !/\S/u.test(piece.text) ? piece.inlineAdvance : m.width,
         inlineAdvancePx: piece.inlineAdvance,
-        ascentPx: normal.ascent,
-        descentPx: normal.descent,
+        ascentPx: pieceNormal.ascent,
+        descentPx: pieceNormal.descent,
         inkBounds: runInk,
         ...(piece.orientation ? { verticalOrientation: piece.orientation } : {}),
         ...(mixed && (piece.orientation === "Tu" || piece.orientation === "Tr")
@@ -693,8 +945,8 @@ export function layoutShapeText(input: ShapeTextLayoutInput): ShapeTextLayoutRes
       // Natural requirements ignore alignment offsets and painting permission.
       const inlineInkMin = piece.upright
         ? inlineCursor +
-          (normal.lineAdvance - normal.ascent - normal.descent) / 2 +
-          normal.ascent -
+          (pieceNormal.lineAdvance - pieceNormal.ascent - pieceNormal.descent) / 2 +
+          pieceNormal.ascent -
           m.ascent
         : inlineCursor + m.inkLeft;
       const inlineInkMax = piece.upright

@@ -1,4 +1,4 @@
-import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
+import { mount, flushPromises, type VueWrapper, type DOMWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { nextTick, toRaw } from "vue";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
@@ -43,6 +43,10 @@ import { SHAPE_GALLERY } from "../../../modules/sheet-drawings/shape-gallery";
 import { createAppI18n } from "../../../shared/i18n";
 import FreeShapePointSelection from "../../../modules/sheet-drawings/components/FreeShapePointSelection.vue";
 import ShapeCanvasTextEditor from "../../../modules/sheet-drawings/components/ShapeCanvasTextEditor.vue";
+import {
+  readTextDomSelection,
+  writeTextDomSelection,
+} from "../../../shared/cell-editing/text-dom-selection";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import * as shapeMeasure from "../../../modules/sheet-drawings/shape-text-measure";
 import type { useShapeTextEditSession } from "../../../modules/sheet-drawings/useShapeTextEditSession";
@@ -1082,6 +1086,34 @@ function directSource(state: ReturnType<typeof setupState>) {
   if (target.kind !== "shape") throw Error("Expected text shape");
   return target;
 }
+async function replaceShapeInput(
+  input: Pick<DOMWrapper<Element>, "element" | "trigger">,
+  text: string,
+  composing = false,
+) {
+  const element = input.element as HTMLElement;
+  if (composing) {
+    element.textContent = text;
+    await input.trigger("input", { isComposing: true });
+    return;
+  }
+  element.focus();
+  writeTextDomSelection(element, {
+    start: 0,
+    end: element.textContent?.length ?? 0,
+    direction: "forward",
+  });
+  await input.trigger("beforeinput", { inputType: "insertText", data: text });
+}
+async function finishShapeComposition(
+  input: Pick<DOMWrapper<Element>, "element" | "trigger">,
+  text: string,
+) {
+  const event = new CompositionEvent("compositionend", { bubbles: true });
+  Object.defineProperty(event, "data", { value: text });
+  input.element.dispatchEvent(event);
+  await nextTick();
+}
 test.each([false, true])(
   "real Workspace F2 edits canonical inline text, IME, Escape and history (owned=%s)",
   async (owned) => {
@@ -1103,17 +1135,16 @@ test.each([false, true])(
     await flushPromises();
     expect(state.shapeTextEdit.snapshot.value?.sourceId).toBe("text-target");
     const editor = wrapper.getComponent(ShapeCanvasTextEditor),
-      input = editor.get("textarea"),
-      element = input.element as HTMLTextAreaElement;
-    expect(element.selectionStart).toBe(0);
-    expect(element.selectionEnd).toBe(8);
+      input = editor.get("[data-shape-rich-text-input]"),
+      element = input.element as HTMLElement;
+    expect(readTextDomSelection(element)).toMatchObject({ start: 0, end: 8 });
     expect(editor.props("frameStyle")?.transform).toBe("rotate(37deg)");
     await input.trigger("compositionstart");
-    await input.setValue("新しい\ntext");
+    await replaceShapeInput(input, "新しい\ntext", true);
     await input.trigger("keydown", { key: "Escape", isComposing: true });
     expect(serializeWorkbook(state.session.workbook)).toEqual(before);
     expect(wrapper.getComponent(SheetGrid).vm.flushPendingEdit()).toBe(false);
-    await input.trigger("compositionend");
+    await finishShapeComposition(input, "新しい\ntext");
     await input.trigger("keydown", { key: "Enter" });
     expect(state.shapeTextEdit.snapshot.value).toBeDefined();
     expect(serializeWorkbook(state.session.workbook)).toEqual(before);
@@ -1149,7 +1180,7 @@ test("real Workspace typing appends, explicit Cancel keeps history clean, and an
   await layer.get('[data-sheet-drawing-id="text-target"]').trigger("keydown", { key: "x" });
   await flushPromises();
   expect(state.shapeTextEdit.snapshot.value?.draftText).toBe("Originalx");
-  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("textarea");
+  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("[data-shape-rich-text-input]");
   for (const key of ["z", "k", "t", "1", "f", "h", "g"])
     await input.trigger("keydown", { key, ctrlKey: true });
   expect(state.findDialogVisible).toBe(false);
@@ -1179,14 +1210,14 @@ test("real Workspace tab navigation blocks composing text and commits the comple
     layer = wrapper.getComponent(SheetDrawingLayer);
   await layer.get('[data-sheet-drawing-id="text-target"]').trigger("keydown", { key: "F2" });
   await flushPromises();
-  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("textarea");
+  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("[data-shape-rich-text-input]");
   await input.trigger("compositionstart");
-  await input.setValue("Final composed text");
+  await replaceShapeInput(input, "Final composed text", true);
   state.onSelectSheet("second");
   await flushPromises();
   expect(getActiveSheet(state.session.workbook).id).toBe("text-sheet");
-  expect(state.shapeTextEdit.snapshot.value?.draftText).toBe("Final composed text");
-  await input.trigger("compositionend");
+  expect(input.element.textContent).toBe("Final composed text");
+  await finishShapeComposition(input, "Final composed text");
   state.onSelectSheet("second");
   await flushPromises();
   expect(getActiveSheet(state.session.workbook).id).toBe("second");
@@ -1220,8 +1251,8 @@ test("real Workspace failed native preparation retains the draft and blocks outs
     before = serializeWorkbook(state.session.workbook);
   await layer.get('[data-sheet-drawing-id="text-target"]').trigger("keydown", { key: "F2" });
   await flushPromises();
-  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("textarea");
-  await input.setValue("Retained draft");
+  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("[data-shape-rich-text-input]");
+  await replaceShapeInput(input, "Retained draft");
   const failure = vi
     .spyOn(shapeMeasure, "getBrowserShapeTextMeasurement")
     .mockImplementation(() => {
@@ -1274,9 +1305,9 @@ test("real Workspace outside-cell blur commits without stealing focus; object co
   )!;
   editText.click();
   await flushPromises();
-  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("textarea");
-  expect((input.element as HTMLTextAreaElement).selectionStart).toBe(0);
-  await input.setValue("Outside saved text");
+  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("[data-shape-rich-text-input]");
+  expect(readTextDomSelection(input.element as HTMLElement)?.start).toBe(0);
+  await replaceShapeInput(input, "Outside saved text");
   const outside = document.createElement("input");
   document.body.append(outside);
   outside.focus();
@@ -1337,8 +1368,8 @@ test("real Workspace direct text and AutoFit geometry are one reversible transac
     before = serializeWorkbook(state.session.workbook);
   await layer.get('[data-sheet-drawing-id="text-target"]').trigger("keydown", { key: "F2" });
   await flushPromises();
-  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("textarea");
-  await input.setValue("one\ntwo\nthree\nfour");
+  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("[data-shape-rich-text-input]");
+  await replaceShapeInput(input, "one\ntwo\nthree\nfour");
   await input.trigger("keydown", { key: "Escape" });
   await flushPromises();
   expect(directSource(state).text).toBe("one\ntwo\nthree\nfour");
@@ -1516,15 +1547,15 @@ test("real Workspace Change Shape cannot bypass composing text or reuse an owner
     }),
   ).toBe(true);
   await flushPromises();
-  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("textarea");
+  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("[data-shape-rich-text-input]");
   await input.trigger("compositionstart");
-  await input.setValue("Composing retained");
+  await replaceShapeInput(input, "Composing retained", true);
   first.click();
   await flushPromises();
   expect(wrapper.findComponent(DrawingEditorDialog).exists()).toBe(false);
-  expect(state.shapeTextEdit.snapshot.value?.draftText).toBe("Composing retained");
+  expect(input.element.textContent).toBe("Composing retained");
   expect(serializeWorkbook(state.session.workbook)).toEqual(before);
-  await input.trigger("compositionend");
+  await finishShapeComposition(input, "Composing retained");
   // A menu retired when entering the editor remains inert even after IME ends.
   first.click();
   await flushPromises();
@@ -1943,5 +1974,129 @@ test.each([false, true])(
     state.redo();
     await flushPromises();
     expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+  },
+);
+
+test.each([false, true])(
+  "real Workspace selected character format, private Undo and one committed history (owned=%s)",
+  async (owned) => {
+    installNativeTextMeasurement();
+    const initial = directTextWorkbook(owned),
+      root = getActiveSheet(initial).drawings![0]!;
+    const leaf = isShapeGroupDrawing(root)
+      ? root.members.find((node) => node.id === "text-target")!
+      : root;
+    if (leaf.kind !== "shape") throw Error("text leaf");
+    leaf.text = "alpha beta";
+    const wrapper = fixture(
+      async () => ({ revision: 1, savedAt: 1, snapshot: serializeWorkbook(initial) }),
+      createMemoryImageAssetStore(),
+      true,
+    );
+    await flushPromises();
+    const state = setupState(wrapper),
+      layer = wrapper.getComponent(SheetDrawingLayer),
+      before = serializeWorkbook(state.session.workbook);
+    await layer.get('[data-sheet-drawing-id="text-target"]').trigger("keydown", { key: "F2" });
+    await flushPromises();
+    const input = wrapper.getComponent(ShapeCanvasTextEditor).get("[data-shape-rich-text-input]");
+    await input.trigger("compositionstart");
+    await replaceShapeInput(input, "alpha beta", true);
+    await input.trigger("keydown", { key: "Enter", ctrlKey: true });
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value?.composing).toBe(true);
+    await wrapper
+      .getComponent(ShapeToolsToolbar)
+      .get('[data-shape-control="format"]')
+      .trigger("click");
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value?.composing).toBe(true);
+    expect(wrapper.getComponent(ShapeFormatPane).attributes("data-shape-text-edit-session")).toBe(
+      String(state.shapeTextEdit.snapshot.value!.sessionId),
+    );
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    expect(
+      wrapper.getComponent(ShapeFormatPane).props("capabilities").fields.textBold?.enabled,
+    ).toBe(false);
+    await finishShapeComposition(input, "alpha beta");
+    writeTextDomSelection(input.element as HTMLElement, { start: 0, end: 6, direction: "forward" });
+    await input.trigger("keyup", { key: "Shift" });
+    await flushPromises();
+    const pane = wrapper.getComponent(ShapeFormatPane);
+    expect(pane.attributes("data-shape-text-edit-session")).toBe(
+      String(state.shapeTextEdit.snapshot.value!.sessionId),
+    );
+    expect(pane.props("capabilities").fields.textWrap?.enabled).toBe(false);
+    expect(pane.props("capabilities").fields.paragraphAlignment?.enabled).toBe(false);
+    await pane.get('[data-shape-format-field="textBold"] input').setValue(true);
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value!.draftView.shapeText!.characterRuns).toEqual([
+      { start: 0, end: 6, bold: true },
+    ]);
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    (input.element as HTMLElement).focus();
+    await input.trigger("keydown", { key: "z", ctrlKey: true });
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value!.draftView.shapeText!.characterRuns).toBeUndefined();
+    await input.trigger("keydown", { key: "z", ctrlKey: true, shiftKey: true });
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value!.draftView.shapeText!.characterRuns).toEqual([
+      { start: 0, end: 6, bold: true },
+    ]);
+    await input.trigger("keydown", { key: "i", ctrlKey: true });
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value!.draftView.shapeText!.characterRuns).toEqual([
+      { start: 0, end: 6, bold: true, italic: true },
+    ]);
+    await input.trigger("keydown", { key: "Enter", ctrlKey: true });
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value).toBeUndefined();
+    const after = serializeWorkbook(state.session.workbook);
+    expect(after.version).toBe(66);
+    expect(directSource(state).shapeText!.characterRuns).toEqual([
+      { start: 0, end: 6, bold: true, italic: true },
+    ]);
+    await wrapper
+      .getComponent(ShapeToolsToolbar)
+      .get('[data-shape-control="format"]')
+      .trigger("click");
+    await flushPromises();
+    const objectPane = wrapper.getComponent(ShapeFormatPane);
+    expect(objectPane.attributes("data-shape-text-edit-session")).toBeUndefined();
+    expect(objectPane.props("capabilities").fields.textWrap?.enabled).toBe(true);
+    expect(objectPane.props("capabilities").fields.paragraphAlignment?.enabled).toBe(true);
+    await objectPane.get(".shape-format-pane__modes").findAll("button")[1]!.trigger("click");
+    await objectPane.findAll('[role="tab"]')[2]!.trigger("click");
+    objectPane
+      .get('[data-shape-format-field="paragraphAlignment"]')
+      .getComponent(TSelect)
+      .vm.$emit("change", "right");
+    await flushPromises();
+    expect(directSource(state).shapeText!.paragraph.alignment).toBe("right");
+    expect(directSource(state).shapeText!.characterRuns).toEqual([
+      { start: 0, end: 6, bold: true, italic: true },
+    ]);
+    const paragraphAfter = serializeWorkbook(state.session.workbook);
+    if (owned) {
+      const group = getActiveSheet(state.session.workbook).drawings![0]!;
+      if (!isShapeGroupDrawing(group)) throw Error("group");
+      expect(group.members.find((node) => node.id === "untouched")).toEqual(
+        root.kind === "shapeGroup"
+          ? root.members.find((node) => node.id === "untouched")
+          : undefined,
+      );
+    }
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(paragraphAfter);
   },
 );

@@ -46,7 +46,7 @@ export function getPrintPictureAssetIds(
   if (metrics)
     for (const { drawing } of getPrintableShapeLeaves(sheet, metrics, renderPass)) {
       for (const id of getShapeStyleAssetIds(drawing.shapeStyle)) ids.add(id);
-      for (const id of getShapeTextAssetIds(drawing.shapeText)) ids.add(id);
+      for (const id of getShapeTextAssetIds(drawing.shapeText, drawing.text)) ids.add(id);
     }
   const watermark = sheet.pageDecoration?.watermark?.image?.assetId;
   if (watermark) ids.add(watermark);

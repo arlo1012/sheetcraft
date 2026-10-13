@@ -7,6 +7,7 @@ import {
   type DirectiveBinding,
   type ObjectDirective,
 } from "vue";
+import ColorPaletteSelect from "../../../../shared/color/ColorPaletteSelect.vue";
 import FontFormatField from "../../../home-tools/components/FontFormatField.vue";
 import { useFontCatalog } from "../../../../shared/cell-text/useFontCatalog";
 import { resolveFontFamilyName } from "../../../../shared/cell-text/font-catalog";
@@ -22,6 +23,8 @@ import ShapeFormatCheckbox from "./ShapeFormatCheckbox.vue";
 import ShapeFormatChoiceField from "./ShapeFormatChoiceField.vue";
 import type { ShapeFormatController } from "./useShapeFormatPane";
 const props = defineProps<{ controller: ShapeFormatController }>();
+const fieldRoot = ref<HTMLElement>();
+const colorAction = computed(() => props.controller.session.fieldAction("textColor"));
 const family = computed(() =>
   props.controller.isMixedField("fontFamily")
     ? undefined
@@ -123,7 +126,7 @@ function escape(event: KeyboardEvent) {
 }
 </script>
 <template>
-  <div class="shape-format-font-fields">
+  <div ref="fieldRoot" class="shape-format-font-fields">
     <PictureFormatSection :title="controller.s.value('font')" initially-open>
       <PictureFormatField
         :label="controller.s.value('fontFamily')"
@@ -139,6 +142,7 @@ function escape(event: KeyboardEvent) {
                 : undefined
             "
             :model-value="draft"
+            :popup-attach="() => fieldRoot!"
             :options="options"
             :label="controller.s.value('fontFamily')"
             :search-label="controller.s.value('fontSearch')"
@@ -150,6 +154,19 @@ function escape(event: KeyboardEvent) {
         </div>
       </PictureFormatField>
       <ShapeFormatNumberField :controller="controller" field="fontSizePt" />
+      <PictureFormatField
+        :label="controller.s.value('textColor')"
+        data-shape-format-field="textColor"
+      >
+        <ColorPaletteSelect
+          :model-value="controller.props.snapshot?.values.textColor || null"
+          :mixed="controller.isMixedField('textColor')"
+          :label="controller.s.value('textColor')"
+          :disabled="!controller.fieldCapability('textColor').enabled"
+          show-value
+          @select="(color) => colorAction(color ?? '')"
+        />
+      </PictureFormatField>
       <div class="shape-format-font-fields__toggles">
         <ShapeFormatCheckbox :controller="controller" field="textBold" />
         <ShapeFormatCheckbox :controller="controller" field="textItalic" />

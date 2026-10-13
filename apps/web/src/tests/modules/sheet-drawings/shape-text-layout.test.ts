@@ -622,3 +622,155 @@ describe("bounded numeric shape text layout", () => {
     expect(getShapeTextNativeDirection("\u200f123")).toBe("rtl");
   });
 });
+
+describe("attributed native shape text layout", () => {
+  const baseFont = { family: "Small", size: 10, weight: 400 as const, italic: false };
+  const largeFont = { family: "Large", size: 30, weight: 700 as const, italic: true };
+  const native: ShapeTextMeasurer = {
+    measure: (value, font) => getCellTextGraphemes(value).length * font.size,
+    measureMetrics: (value, font) => ({
+      width: getCellTextGraphemes(value).length * font.size,
+      ascent: font.size * 0.8,
+      descent: font.size * 0.2,
+      inkLeft: 0,
+      inkRight: getCellTextGraphemes(value).length * font.size,
+    }),
+  };
+  const normal = (font: typeof baseFont | typeof largeFont) => ({
+    ascent: font.size * 0.8,
+    descent: font.size * 0.2,
+    lineAdvance: font.size,
+  });
+  function attributed(text = "aa", direction: ShapeTextDirection = "horizontal") {
+    const result = withLayout(
+      { wrap: false, direction },
+      {
+        text,
+        font: baseFont,
+        normalLineMetrics: normal(baseFont),
+        measurer: native,
+        resolveNormalLineMetrics: (font) => ({
+          ascent: font.size * 0.8,
+          descent: font.size * 0.2,
+          lineAdvance: font.size,
+        }),
+        textRect: { x: 0, y: 0, width: 300, height: 300 },
+        characterSegments: [
+          { start: 0, end: 1, font: largeFont, underline: true, strike: false, color: "#ff0000" },
+          { start: 1, end: text.length, font: baseFont, underline: false, strike: true },
+        ],
+      },
+    );
+    return result;
+  }
+  test("same text is measured separately for full resolved font tuples", () => {
+    const result = layoutShapeText(attributed());
+    expect(result.runs.map((run) => run.advancePx)).toEqual([30, 10]);
+    expect(result.runs.map((run) => [run.sourceStart, run.sourceEnd])).toEqual([
+      [0, 1],
+      [1, 2],
+    ]);
+    expect(result.runs.map((run) => [run.underline, run.strike, run.color])).toEqual([
+      [true, false, "#ff0000"],
+      [false, true, undefined],
+    ]);
+    expect(result.runs[0]!.y).toBe(result.runs[1]!.y);
+    expect(result.lines[0]!.blockAdvance).toBe(30);
+    expect(result.runs.map((run) => run.ascentPx)).toEqual([24, 8]);
+  });
+  test("equal strings isolate family, weight and italic cache keys even at equal size", () => {
+    const source = attributed("aaa");
+    source.characterSegments = [
+      { start: 0, end: 1, font: baseFont, underline: false, strike: false },
+      { start: 1, end: 2, font: { ...baseFont, family: "Other" }, underline: false, strike: false },
+      {
+        start: 2,
+        end: 3,
+        font: { ...baseFont, family: "Other", weight: 700, italic: true },
+        underline: false,
+        strike: false,
+      },
+    ];
+    const width = (
+      font: import("../../../modules/sheet-drawings/shape-text-layout").ShapeTextFont,
+    ) => (font.family === "Other" ? 2 : 1) + (font.weight === 700 ? 1 : 0) + (font.italic ? 1 : 0);
+    source.measurer = {
+      measure: (_, font) => width(font),
+      measureMetrics: (_, font) => ({
+        width: width(font),
+        ascent: 8,
+        descent: 2,
+        inkLeft: 0,
+        inkRight: width(font),
+      }),
+    };
+    const result = layoutShapeText(source);
+    expect(result.runs.map((run) => run.advancePx)).toEqual([1, 2, 4]);
+    expect(result.measurementCount).toBe(3);
+  });
+  test("blank and trailing paragraphs retain their effective font extents", () => {
+    const source = attributed("a\n\nb\n");
+    source.characterSegments![0]!.end = 3;
+    source.characterSegments![1]!.start = 3;
+    expect(layoutShapeText(source).lines.map((line) => line.blockAdvance)).toEqual([
+      30, 30, 10, 10,
+    ]);
+  });
+  test("heterogeneous tuples require a real injected normal resolver", () => {
+    const source = attributed();
+    delete source.resolveNormalLineMetrics;
+    expect(errorCode(source)).toBe("unavailable-metrics");
+  });
+  test.each([
+    "horizontal",
+    "vertical-rl",
+    "vertical-lr",
+    "rotate-90",
+    "rotate-270",
+    "stacked",
+  ] as const)("%s preserves original source offsets and heterogeneous fonts", (direction) => {
+    const result = layoutShapeText(attributed("a中", direction));
+    expect(result.runs.map((run) => [run.sourceStart, run.sourceEnd, run.font.size])).toEqual([
+      [0, 1, 30],
+      [1, 2, 10],
+    ]);
+    expect(result.lines[0]!.blockAdvance).toBe(30);
+  });
+  test("CRLF source offsets survive wrapping and trailing blank paragraphs", () => {
+    const source = attributed("a\r\nbc\r\n");
+    source.layout.wrap = true;
+    source.textRect!.width = 15;
+    const result = layoutShapeText(source);
+    expect(result.lines.map((line) => line.text)).toEqual(["a", "b", "c", ""]);
+    expect(result.runs.map((run) => [run.text, run.sourceStart, run.sourceEnd])).toEqual([
+      ["a", 0, 1],
+      ["b", 3, 4],
+      ["c", 4, 5],
+    ]);
+  });
+  test("graphemes cannot be split by color or font boundaries", () => {
+    expect(errorCode(attributed("a\u0301b"))).toBe("invalid-input");
+    const source = attributed("👩‍💻a");
+    source.characterSegments![0]!.end = 5;
+    source.characterSegments![1]!.start = 5;
+    expect(layoutShapeText(source).runs.map((run) => run.text)).toEqual(["👩‍💻", "a"]);
+  });
+  test("mixed complex/bidi paragraphs fail before wrong fragment shaping", () => {
+    expect(errorCode(attributed("אב"))).toBe("unavailable-script");
+    expect(errorCode(attributed("कख"))).toBe("unavailable-script");
+    expect(errorCode(attributed("ᬅᬆ"))).toBe("unavailable-script");
+    const source = attributed("אב");
+    source.characterSegments = [
+      { start: 0, end: 1, font: baseFont, underline: false, strike: false },
+      { start: 1, end: 2, font: baseFont, underline: false, strike: false },
+    ];
+    expect(layoutShapeText(source).runs).toHaveLength(1);
+    expect(layoutShapeText(source).runs[0]!.direction).toBe("rtl");
+  });
+  test("Latin math and CJK symbols use real attributed measurements", () => {
+    const source = attributed("a∑中");
+    const result = layoutShapeText(source);
+    expect(result.runs.map((run) => run.text)).toEqual(["a", "∑中"]);
+    expect(result.requiredExtent.width).toBe(50);
+  });
+});

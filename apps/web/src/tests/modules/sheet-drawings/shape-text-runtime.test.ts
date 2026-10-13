@@ -366,3 +366,70 @@ describe("atomic fixed-width shape-text AutoFit candidates", () => {
     ).toThrow(ShapeTextLayoutError);
   });
 });
+
+describe("attributed shape-text runtime and native AutoFit", () => {
+  test("loads all distinct owned fonts across uniform and selected ranges", async () => {
+    const alias = `SheetcraftLocal_${"c".repeat(64)}`;
+    const source = autoFit({ text: "abc" });
+    source.shapeText!.fontFamily = "Noto Sans";
+    source.shapeText!.characterRuns = [
+      { start: 0, end: 1, fontFamily: alias },
+      { start: 1, end: 2, fontFamily: alias, color: "#ff0000" },
+    ];
+    await ensureDrawingShapeTextFont(source);
+    expect(resource.ensure.mock.calls.map(([family]) => family)).toEqual(["Noto Sans", alias]);
+    const result = resolveDrawingShapeText(source, {
+      ...native,
+      resolveNormalLineMetrics: () => native.normalLineMetrics!,
+    });
+    expect(result.characterSegments!.map((segment) => segment.font.family)).toEqual([
+      alias,
+      alias,
+      "Noto Sans",
+    ]);
+    expect(result.characterSegments!.map((segment) => segment.color)).toEqual([
+      undefined,
+      "#ff0000",
+      undefined,
+    ]);
+  });
+  test("missing selected local resource blocks real layout and preserves the entire source", () => {
+    const source = autoFit();
+    const alias = `SheetcraftLocal_${"d".repeat(64)}`;
+    source.shapeText!.characterRuns = [
+      { start: 0, end: 1, fontFamily: alias, bold: true, color: "#ff0000" },
+    ];
+    const before = structuredClone(source);
+    expect(() => layoutDrawingShapeText(source, native)).toThrowError(
+      expect.objectContaining({ code: "font-not-ready", family: alias }),
+    );
+    expect(source).toEqual(before);
+  });
+  test("selected large native font contributes real geometry to one fixed-width AutoFit candidate", () => {
+    const source = autoFit({ width: 100, height: 10, text: "ab" });
+    source.shapeText!.characterRuns = [{ start: 0, end: 1, fontSize: 60, italic: true }];
+    const prepared = prepareDrawingShapeTextCandidate(source, {
+      ...native,
+      resolveNormalLineMetrics: (font) => ({
+        ascent: font.size * 0.75,
+        descent: font.size * 0.25,
+        lineAdvance: font.size,
+      }),
+    });
+    expect(prepared.drawing.height).toBeGreaterThanOrEqual(60);
+    expect(prepared.layout.runs.map((run) => run.font.size)).toEqual([60, 20]);
+    expect(prepared.drawing.shapeText!.characterRuns).toEqual(source.shapeText!.characterRuns);
+    expect(source.height).toBe(10);
+  });
+  test("vertical flip keeps attributed fields and authoritative offsets", () => {
+    const source = autoFit({ shapeFlipY: true });
+    source.shapeText!.characterRuns = [{ start: 0, end: 1, underline: true, color: "#ff0000" }];
+    const result = layoutDrawingShapeText(source, native);
+    expect(result.runs.map((run) => [run.sourceStart, run.sourceEnd, run.angle])).toEqual([
+      [0, 1, 180],
+      [1, 3, 180],
+    ]);
+    expect(result.runs[0]!.color).toBe("#ff0000");
+    expect(result.runs[0]!.underline).toBe(true);
+  });
+});

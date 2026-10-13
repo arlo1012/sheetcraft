@@ -9,6 +9,7 @@ import {
   isShapeGroupDrawing,
   type ShapeGroupDrawing,
   type ShapeGroupedGroup,
+  type SheetGroupedGraphicDrawing,
   type ShapeGroupPath,
 } from "@sheetcraft/core/shape-group";
 import { normalizeSheetDrawings, type SheetDrawing } from "@sheetcraft/core/sheet-drawings";
@@ -56,7 +57,7 @@ const marginFields: readonly ShapeFormatField[] = [
   "textMarginBottomPt",
 ];
 
-/** The selected container remains an actual owned node. Leaf views are never pane owners. */
+/** The selected container or ordinary leaf remains an actual owned node, never its view. */
 export function useOwnedShapeGroupFormatPane(options: {
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
@@ -96,7 +97,7 @@ export function useOwnedShapeGroupFormatPane(options: {
   const acknowledged = shallowRef<{
     id: string;
     root: ShapeGroupDrawing;
-    drawing: ShapeGroupDrawing | ShapeGroupedGroup;
+    drawing: ShapeGroupDrawing | ShapeGroupedGroup | SheetGroupedGraphicDrawing;
     revision: number;
   }>();
   let sequence = 0;
@@ -126,7 +127,9 @@ export function useOwnedShapeGroupFormatPane(options: {
     if (!source || !owner) return;
     try {
       const target = findShapeGroupNode(source, owner.path)?.node;
-      return target?.kind === "shapeGroup" ? target : undefined;
+      return target && (target.kind === "shapeGroup" || !target.shapeConnector)
+        ? target
+        : undefined;
     } catch {
       return;
     }
@@ -279,6 +282,7 @@ export function useOwnedShapeGroupFormatPane(options: {
       fontFamily: text,
       textUnderline: text,
       textStrike: text,
+      textColor: text,
       paragraphAlignment: text,
       paragraphBeforePt: { ...text, min: 0, max: 4096 },
       paragraphAfterPt: { ...text, min: 0, max: 4096 },
@@ -297,9 +301,12 @@ export function useOwnedShapeGroupFormatPane(options: {
       for (const category of styleCategories)
         styles[target]![category] = capability(
           !!captured &&
-            ((target === "shape" &&
-              SHAPE_GROUP_EFFECT_CATEGORIES.some((entry) => entry === category) &&
-              !captured.collapsed) ||
+            ((captured.sourceNode.kind !== "shapeGroup" &&
+              getShapeGroupFormatEligibleLeaves(captured, target, category).length > 0) ||
+              (captured.sourceNode.kind === "shapeGroup" &&
+                target === "shape" &&
+                SHAPE_GROUP_EFFECT_CATEGORIES.some((entry) => entry === category) &&
+                !captured.collapsed) ||
               ((category === "fill" ||
                 category === "line" ||
                 (target === "text" && category === "shadow")) &&
@@ -513,7 +520,7 @@ export function useOwnedShapeGroupFormatPane(options: {
       )
         return false;
       const target = findShapeGroupNode(applied, selection.path)?.node;
-      if (!target || target.kind !== "shapeGroup") return false;
+      if (!target || (target.kind === "shape" && target.shapeConnector)) return false;
       const appliedMetrics = options.getMetrics?.();
       if (!appliedMetrics) return false;
       selection.lease = {

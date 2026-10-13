@@ -753,9 +753,8 @@ describe("exact-owner actual shape group format pane", () => {
     expect(f.prepare).not.toHaveBeenCalled();
     expect(f.session.history.undoStack).toEqual([]);
   });
-  test("unknown/leaf path, stale root and missing world metrics never create a synthetic owner", () => {
+  test("unknown path, stale root and missing world metrics never create a synthetic owner", () => {
     const f = fixture();
-    expect(f.open(["root", "a"])).toBe(false);
     expect(f.open(["root", "missing"])).toBe(false);
     expect(f.pane.open({ ...f.source() })).toBe(false);
     f.metricsAvailable.value = false;
@@ -787,4 +786,24 @@ describe("exact-owner actual shape group format pane", () => {
     expect(f.pane.snapshot.value).toBeNull();
     expect(f.pane.root.value).toBeUndefined();
   });
+});
+
+test("explicit ordinary leaf pane keeps canonical owner, sibling styles and exact text history", () => {
+  const f = fixture(),
+    before = f.state();
+  const sibling = JSON.stringify(f.graphic("b"));
+  expect(f.open(["root", "a"])).toBe(true);
+  expect(f.pane.drawing.value).toBe(f.graphic("a"));
+  expect(f.pane.capabilities.value.fields.locked?.enabled).toBe(false);
+  expect(f.pane.capabilities.value.fields.paragraphAlignment?.enabled).toBe(true);
+  expect(f.pane.capabilities.value.styles?.shape?.softEdges?.enabled).toBe(true);
+  const old = f.intent({ type: "set-field", field: "paragraphAlignment", value: "right" });
+  expect(f.pane.onIntent(old)).toBe(true);
+  expect(f.graphic("a").shapeText?.paragraph.alignment).toBe("right");
+  expect(JSON.stringify(f.graphic("b"))).toBe(sibling);
+  expect(f.session.history.undoStack).toHaveLength(1);
+  expect(f.pane.onIntent(old)).toBe(false);
+  expect(undoWorkbookCommand(f.session)).toBe(true);
+  f.revision.value++;
+  expect(f.state()).toEqual(before);
 });

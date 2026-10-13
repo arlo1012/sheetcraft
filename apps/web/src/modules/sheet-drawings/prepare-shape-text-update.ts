@@ -125,6 +125,7 @@ function autoFitInputs(drawing: SheetGraphicDrawing) {
     layout = text.layout;
   return {
     family: text.fontFamily,
+    characterRuns: text.characterRuns,
     direction: layout.direction,
     lineOrder: layout.lineOrder,
     margins: layout.marginsPt,

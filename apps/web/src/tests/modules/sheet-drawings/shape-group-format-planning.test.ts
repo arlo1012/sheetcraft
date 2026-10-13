@@ -1,3 +1,4 @@
+import { createDefaultShapeText } from "../../../modules/sheet-drawings/shape-text-options";
 // @vitest-environment node
 import { describe, expect, test } from "vitest";
 import { reactive } from "vue";
@@ -121,9 +122,11 @@ describe("actual container formatting context", () => {
     expect(outer.leaves.map((entry) => entry.sourceNode.id)).toEqual(["first", "a", "b", "last"]);
     for (const field of ["view", "fill", "stroke", "fontSize", "text"])
       expect(nested).not.toHaveProperty(field);
-    expect(() => resolveShapeGroupFormatContext(root, ["root", "inner", "a"], f.metrics)).toThrow(
-      /container/,
+    const selectedLeaf = resolveShapeGroupFormatContext(root, ["root", "inner", "a"], f.metrics);
+    expect(selectedLeaf.sourceNode).toBe(
+      root.members[1]!.kind === "shapeGroup" ? root.members[1]!.members[0] : undefined,
     );
+    expect(selectedLeaf.leaves.map((entry) => entry.sourceNode.id)).toEqual(["a"]);
     expect(() => resolveShapeGroupFormatContext(root, ["root", "missing"], f.metrics)).toThrow(
       /missing/,
     );
@@ -776,4 +779,27 @@ describe("genuine descendant fill/line and text batches", () => {
     expect(spacing.affectedPaths).toEqual([["root", "inner", "b"]]);
     expect(node(spacing.root, ["root", "inner", "a"])).toEqual(f.a);
   });
+});
+
+test("selected rich leaf and all-mixed subtree expose suppressed character values as mixed", () => {
+  const f = fixture();
+  for (const target of [f.a, f.b]) {
+    target.text = "alpha beta";
+    target.shapeText = {
+      ...createDefaultShapeText(),
+      characterRuns: [{ start: 0, end: 6, fontSize: 40, bold: true, underline: true }],
+    };
+  }
+  for (const path of [
+    ["root", "inner", "a"],
+    ["root", "inner"],
+  ]) {
+    const context = resolveShapeGroupFormatContext(f.root, path, f.metrics);
+    const values = aggregateShapeGroupFormatSnapshot(context, { width: 80, height: 40 });
+    expect(values.values.fontSizePt).toBeUndefined();
+    expect(values.values.textBold).toBeUndefined();
+    expect(values.mixedFields).toEqual(
+      expect.arrayContaining(["fontSizePt", "textBold", "textUnderline"]),
+    );
+  }
 });

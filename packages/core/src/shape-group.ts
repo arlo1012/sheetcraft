@@ -347,7 +347,7 @@ export function collectShapeGroupAssetIds(value: ShapeGroupDrawing): Set<string>
   for (const { node } of traverseShapeGroup(value)) {
     if (node.kind === "shapeGroup") continue;
     for (const id of getShapeStyleAssetIds(node.shapeStyle)) ids.add(id);
-    for (const id of getShapeTextAssetIds(node.shapeText)) ids.add(id);
+    for (const id of getShapeTextAssetIds(node.shapeText, node.text)) ids.add(id);
   }
   return ids;
 }

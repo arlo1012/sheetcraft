@@ -54,18 +54,20 @@ import type {
 } from "./shape-format-pane-model";
 import {
   drawingShapeTextValues,
+  drawingShapeTextCharacterValues,
   editDrawingShapeTextField,
   materializeDrawingShapeText,
   withDrawingShapeText,
+  withoutDrawingShapeTextCharacterProperties,
 } from "./shape-text-options";
 import { resolveShapeTextPaintStyle } from "./shape-text-paint";
 import { getDrawingShapeTextRect } from "./shape-text-runtime";
 
 export type ShapeGroupFormatBaseline = Readonly<{ width: number; height: number }>;
-/** Selection ownership is the actual container, never one of its descendants. */
+/** Selection ownership is the exact container or explicitly selected ordinary leaf. */
 export type ShapeGroupFormatContext = {
   readonly sourceRoot: ShapeGroupDrawing;
-  readonly sourceNode: ShapeGroupDrawing | ShapeGroupedGroup;
+  readonly sourceNode: ShapeGroupDrawing | ShapeGroupedGroup | SheetGroupedGraphicDrawing;
   readonly path: ShapeGroupPath;
   readonly metrics: PictureSheetMetrics;
   readonly layout: ResolvedShapeFrame | null;
@@ -162,8 +164,11 @@ export function resolveShapeGroupFormatContext(
     throw new TypeError("Shape group formatting requires its exact whole-forest projection.");
   // Core's path reader rejects malformed arrays and paths before owner lookup.
   const targetLease = leaseShapeGroupNode(root, path);
-  const owner = projection.owners.find((entry) => samePath(entry.path, targetLease.path));
-  if (!owner) throw new TypeError("Shape group formatting requires an exact container path.");
+  const owner =
+    projection.owners.find((entry) => samePath(entry.path, targetLease.path)) ??
+    projection.leaves.find((entry) => samePath(entry.path, targetLease.path));
+  if (!owner || (owner.sourceNode.kind === "shape" && owner.sourceNode.shapeConnector))
+    throw new TypeError("Shape formatting requires an exact container or ordinary leaf path.");
   const rootLease = path.length === 1 ? targetLease : leaseShapeGroupNode(root, [root.id]);
   const context: ShapeGroupFormatContext = {
     sourceRoot: root,
@@ -172,7 +177,9 @@ export function resolveShapeGroupFormatContext(
     metrics,
     layout: owner.layout,
     collapsed: owner.collapsed,
-    leaves: projection.leaves.filter((leaf) => beneath(leaf.path, targetLease.path)),
+    leaves: projection.leaves.filter(
+      (leaf) => samePath(leaf.path, targetLease.path) || beneath(leaf.path, targetLease.path),
+    ),
     projection,
     ...(renderPass ? { renderPass } : {}),
     rootLease,
@@ -384,8 +391,7 @@ function metadataPlan(
 ): ShapeGroupFormatPlan {
   const root = normalizeShapeGroup(context.sourceRoot);
   const node = findShapeGroupNode(root, context.path)?.node;
-  if (!node || node.kind !== "shapeGroup")
-    throw new TypeError("Shape group metadata requires its exact container.");
+  if (!node) throw new TypeError("Shape metadata requires its exact owned node.");
   if (field === "anchor") {
     if (context.path.length !== 1)
       throw new TypeError("Nested shape groups inherit the outer root anchor.");
@@ -487,16 +493,6 @@ export function planShapeGroupFormatIntent(
     if (objectFields.has(intent.field)) return metadataPlan(context, intent.field, intent.value);
     const leaves = getShapeGroupFormatFieldEligibleLeaves(context, intent.field);
     return batchPlan(context, leaves, (view) => {
-      if (intent.field === "fontSizePt")
-        return {
-          ...view,
-          fontSize: (boundedNumber(intent.value, 0.75, 384, "Shape font size") * 4) / 3,
-        };
-      if (intent.field === "textBold" || intent.field === "textItalic") {
-        if (typeof intent.value !== "boolean")
-          throw new TypeError("Shape text flags require boolean values.");
-        return { ...view, [intent.field === "textBold" ? "bold" : "italic"]: intent.value };
-      }
       const edited = editDrawingShapeTextField(view, intent.field, intent.value);
       if (!edited) throw new TypeError("Unsupported shape group text field.");
       return edited;
@@ -504,6 +500,7 @@ export function planShapeGroupFormatIntent(
   }
   if (intent.type === "set-style") {
     if (
+      context.sourceNode.kind === "shapeGroup" &&
       intent.target === "shape" &&
       SHAPE_GROUP_EFFECT_CATEGORIES.some((category) => category === intent.category)
     ) {
@@ -522,6 +519,7 @@ export function planShapeGroupFormatIntent(
     // Reference behavior has a separate group-level effect owner. Do not turn a
     // group shadow into per-member shadows, or invent a container bitmap source.
     if (
+      context.sourceNode.kind === "shapeGroup" &&
       intent.category !== "fill" &&
       intent.category !== "line" &&
       !(intent.target === "text" && intent.category === "shadow")
@@ -531,6 +529,8 @@ export function planShapeGroupFormatIntent(
       );
     const leaves = getShapeGroupFormatEligibleLeaves(context, intent.target, intent.category);
     return batchPlan(context, leaves, (view) => {
+      if (intent.target === "text" && intent.category === "fill")
+        view = withoutDrawingShapeTextCharacterProperties(view, ["color"]);
       const text = intent.target === "text" ? materializeDrawingShapeText(view) : undefined;
       const style = { ...(text ? text.style : view.shapeStyle) };
       if (intent.value === undefined) delete style[intent.category];
@@ -593,12 +593,12 @@ export function aggregateShapeGroupFormatSnapshot(
     });
   const mixedFields: ShapeFormatField[] = [];
   const textValues = text.map((leaf) => ({
-    fontSizePt: leaf.view!.fontSize * 0.75,
-    textBold: leaf.view!.bold,
-    textItalic: leaf.view!.italic,
     ...drawingShapeTextValues(leaf.view!),
   }));
-  const fields = new Set(textValues.flatMap((entry) => Object.keys(entry) as ShapeFormatField[]));
+  const fields = new Set([
+    ...textValues.flatMap((entry) => Object.keys(entry) as ShapeFormatField[]),
+    ...text.flatMap((leaf) => drawingShapeTextCharacterValues(leaf.view!).mixedFields),
+  ]);
   for (const field of fields) {
     const eligible =
       field === "textLineOrder"
@@ -608,7 +608,12 @@ export function aggregateShapeGroupFormatSnapshot(
           : textValues;
     if (!eligible.length) continue;
     const first = eligible[0]![field as keyof (typeof textValues)[number]];
-    if (eligible.every((entry) => sameValue(entry[field as keyof typeof entry], first)))
+    if (
+      !text.some((leaf) =>
+        drawingShapeTextCharacterValues(leaf.view!).mixedFields.includes(field),
+      ) &&
+      eligible.every((entry) => sameValue(entry[field as keyof typeof entry], first))
+    )
       Object.assign(values, { [field]: first });
     else mixedFields.push(field);
   }
@@ -637,10 +642,15 @@ export function aggregateShapeGroupFormatSnapshot(
     glyph = styles("text");
   // Body Shadow belongs to this selected container, even when all leaves are
   // text boxes. It never impersonates a mixed aggregate of member shadows.
-  for (const category of SHAPE_GROUP_EFFECT_CATEGORIES) {
+  for (const category of context.sourceNode.kind === "shapeGroup"
+    ? SHAPE_GROUP_EFFECT_CATEGORIES
+    : []) {
     delete shape.style[category];
     shape.mixed = shape.mixed.filter((entry) => entry !== category);
-    const value = context.sourceNode.groupEffects?.[category];
+    const value =
+      context.sourceNode.kind === "shapeGroup"
+        ? context.sourceNode.groupEffects?.[category]
+        : undefined;
     if (value) Object.assign(shape.style, { [category]: value });
   }
   const lineLeaves = getShapeGroupLineEligibleLeaves(context);

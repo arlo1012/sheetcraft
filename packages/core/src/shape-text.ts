@@ -1,4 +1,9 @@
 import {
+  normalizeShapeTextCharacterRuns,
+  normalizeShapeTextFontFamily,
+  type ShapeTextCharacterRun,
+} from "./shape-text-character-runs.js";
+import {
   getShapeStyleAssetIds,
   normalizeShapeStyle,
   type ShapeDetailedStyle,
@@ -39,7 +44,7 @@ export type ShapeTextParagraph = {
 };
 /** Independently owned glyph appearance; never aliases the drawing's body style. */
 export type ShapeTextStyle = ShapeDetailedStyle;
-/** Opt-in uniform shape/text-box formatting. Content and base font fields stay on the drawing. */
+/** Opt-in shape/text-box formatting. Content and base font fields stay on the drawing. */
 export type ShapeText = {
   layout: ShapeTextLayout;
   paragraph: ShapeTextParagraph;
@@ -47,6 +52,7 @@ export type ShapeText = {
   underline?: true;
   strike?: true;
   style?: ShapeTextStyle;
+  characterRuns?: readonly ShapeTextCharacterRun[];
 };
 export const SHAPE_TEXT_LIMITS = { lengthPt: 4096, fontFamilyLength: 256 } as const;
 
@@ -156,35 +162,30 @@ function paragraph(value: unknown): ShapeTextParagraph {
     lineSpacing: lineSpacing(required(source, "lineSpacing")),
   };
 }
-function fontFamily(value: unknown): string {
-  if (typeof value !== "string") throw new TypeError("Shape text font family must be a string.");
-  if (!value || value !== value.trim() || value.length > SHAPE_TEXT_LIMITS.fontFamilyLength)
-    throw new RangeError("Shape text font family must contain 1..256 trimmed UTF-16 units.");
-  for (let index = 0; index < value.length; index++) {
-    const unit = value.charCodeAt(index);
-    if (unit <= 0x1f || (unit >= 0x7f && unit <= 0x9f))
-      throw new TypeError("Shape text font family cannot contain control characters.");
-    if (unit >= 0xd800 && unit <= 0xdbff) {
-      const next = value.charCodeAt(++index);
-      if (!(next >= 0xdc00 && next <= 0xdfff))
-        throw new TypeError("Shape text font family cannot contain unpaired surrogates.");
-    } else if (unit >= 0xdc00 && unit <= 0xdfff)
-      throw new TypeError("Shape text font family cannot contain unpaired surrogates.");
-  }
-  return value;
-}
 
 /** Strict validation and canonical deep copy. Even default-valued explicit models survive. */
-export function normalizeShapeText(value: unknown): ShapeText | undefined {
+export function normalizeShapeText(value: unknown, ownerText?: string): ShapeText | undefined {
   if (value === undefined) return undefined;
   const source = record(
     value,
-    ["layout", "paragraph", "fontFamily", "underline", "strike", "style"],
+    ["layout", "paragraph", "fontFamily", "underline", "strike", "style", "characterRuns"],
     "model",
   );
+  if ("characterRuns" in source && !Object.hasOwn(source, "characterRuns"))
+    throw new TypeError("Shape character runs must be own data fields.");
+  const hasRuns = Object.hasOwn(source, "characterRuns");
+  if (hasRuns && typeof ownerText !== "string")
+    throw new TypeError("Shape character runs require the actual drawing text.");
+  if (hasRuns && source.characterRuns === undefined)
+    throw new TypeError("An explicit shape character-runs field must be a data array.");
+  const characterRuns = hasRuns
+    ? normalizeShapeTextCharacterRuns(ownerText!, source.characterRuns)
+    : undefined;
   const normalizedLayout = layout(required(source, "layout"));
   const normalizedParagraph = paragraph(required(source, "paragraph"));
-  const family = Object.hasOwn(source, "fontFamily") ? fontFamily(source.fontFamily) : undefined;
+  const family = Object.hasOwn(source, "fontFamily")
+    ? normalizeShapeTextFontFamily(source.fontFamily)
+    : undefined;
   const underline = Object.hasOwn(source, "underline")
     ? boolean(source.underline, "underline")
     : false;
@@ -197,17 +198,25 @@ export function normalizeShapeText(value: unknown): ShapeText | undefined {
     ...(underline ? { underline: true as const } : {}),
     ...(strike ? { strike: true as const } : {}),
     ...(style ? { style } : {}),
+    ...(characterRuns ? { characterRuns } : {}),
   };
 }
-export function cloneShapeText(value: ShapeText | undefined): ShapeText | undefined {
-  return normalizeShapeText(value);
+export function cloneShapeText(
+  value: ShapeText | undefined,
+  ownerText?: string,
+): ShapeText | undefined {
+  return normalizeShapeText(value, ownerText);
 }
 export function areShapeTextsEqual(
   left: ShapeText | undefined,
   right: ShapeText | undefined,
+  ownerText?: string,
 ): boolean {
-  return JSON.stringify(normalizeShapeText(left)) === JSON.stringify(normalizeShapeText(right));
+  return (
+    JSON.stringify(normalizeShapeText(left, ownerText)) ===
+    JSON.stringify(normalizeShapeText(right, ownerText))
+  );
 }
-export function getShapeTextAssetIds(value: ShapeText | undefined): string[] {
-  return getShapeStyleAssetIds(normalizeShapeText(value)?.style);
+export function getShapeTextAssetIds(value: ShapeText | undefined, ownerText?: string): string[] {
+  return getShapeStyleAssetIds(normalizeShapeText(value, ownerText)?.style);
 }

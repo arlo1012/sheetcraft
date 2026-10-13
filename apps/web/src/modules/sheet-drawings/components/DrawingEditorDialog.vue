@@ -19,7 +19,16 @@ import { isShapeFreePathClosed } from "@sheetcraft/core/shape-free-path";
 import ShapeLineEndsControls from "./ShapeLineEndsControls.vue";
 import { getDrawingShapeGeometry } from "../shape-geometry";
 import { editShapeBasicAppearance } from "../shape-basic-appearance-edit";
-import { materializeDrawingShapeText, withDrawingShapeText } from "../shape-text-options";
+import {
+  editDrawingShapeTextField,
+  materializeDrawingShapeText,
+  withDrawingShapeText,
+} from "../shape-text-options";
+import {
+  replaceShapeTextDraftByDiff,
+  withShapeTextDraftSource,
+  shapeTextDraftSource,
+} from "../shape-text-edit-model";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
@@ -61,6 +70,44 @@ function setHeight(height: number) {
 }
 function setAppearance(field: "fill" | "stroke" | "strokeWidth", value: string | number) {
   if (!props.disabled) draft.value = editShapeBasicAppearance(draft.value, field, value);
+}
+function setText(value: string) {
+  if (props.disabled) return;
+  try {
+    draft.value = withShapeTextDraftSource(
+      draft.value,
+      draft.value.shapeText?.characterRuns?.length
+        ? replaceShapeTextDraftByDiff(shapeTextDraftSource(draft.value), value)
+        : { text: value },
+    );
+  } catch {
+    applyError.value = true;
+  }
+}
+function setTypography(
+  field: "fontSizePt" | "textBold" | "textItalic" | "textColor",
+  value: number | boolean | string,
+) {
+  if (props.disabled) return;
+  if (draft.value.kind !== "shape" && draft.value.kind !== "textBox") {
+    draft.value = {
+      ...draft.value,
+      [field === "fontSizePt"
+        ? "fontSize"
+        : field === "textBold"
+          ? "bold"
+          : field === "textItalic"
+            ? "italic"
+            : "color"]: field === "fontSizePt" ? ((value as number) * 4) / 3 : value,
+    };
+    return;
+  }
+  try {
+    const next = editDrawingShapeTextField(draft.value, field, value as never);
+    if (next) draft.value = next;
+  } catch {
+    applyError.value = true;
+  }
 }
 const galleryError = ref(false);
 const selectedChoice = computed(() =>
@@ -190,7 +237,8 @@ const shapes: DrawingShape[] = [
         <label v-if="!lineGeometry"
           >{{ t(drawing.kind === "equation" ? "drawing.equationSource" : "drawing.text")
           }}<Textarea
-            v-model="draft.text"
+            :model-value="draft.text"
+            @update:model-value="setText"
             :maxlength="100000"
             :autosize="{ minRows: 2, maxRows: 5 }"
         /></label>
@@ -240,22 +288,36 @@ const shapes: DrawingShape[] = [
           :handler="lineEndsHandler"
         />
         <div v-if="!lineGeometry" class="drawing-editor__row">
-          <label>{{ t("drawing.color") }}<input v-model="draft.color" type="color" /></label>
+          <label
+            >{{ t("drawing.color")
+            }}<input
+              :value="draft.color"
+              type="color"
+              @input="setTypography('textColor', ($event.target as HTMLInputElement).value)"
+          /></label>
           <label
             >{{ t("drawing.fontSize")
             }}<InputNumber
               class="drawing-editor__number"
-              v-model="draft.fontSize"
+              :model-value="draft.fontSize"
+              @update:model-value="
+                typeof $event === 'number' && setTypography('fontSizePt', $event * 0.75)
+              "
               :min="1"
               :max="512"
               size="small"
           /></label>
-          <Checkbox v-if="drawing.kind !== 'equation'" v-model="draft.bold">{{
-            t("drawing.bold")
-          }}</Checkbox
-          ><Checkbox v-if="drawing.kind !== 'equation'" v-model="draft.italic">{{
-            t("drawing.italic")
-          }}</Checkbox>
+          <Checkbox
+            v-if="drawing.kind !== 'equation'"
+            :model-value="draft.bold"
+            @update:model-value="setTypography('textBold', $event)"
+            >{{ t("drawing.bold") }}</Checkbox
+          ><Checkbox
+            v-if="drawing.kind !== 'equation'"
+            :model-value="draft.italic"
+            @update:model-value="setTypography('textItalic', $event)"
+            >{{ t("drawing.italic") }}</Checkbox
+          >
         </div>
         <div class="drawing-editor__row">
           <label

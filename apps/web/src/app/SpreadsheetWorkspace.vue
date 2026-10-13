@@ -173,6 +173,7 @@ import {
   type ShapeGroupDrawing,
   type ShapeGroupPath,
 } from "@sheetcraft/core/shape-group";
+import { useShapeTextCharacterFormatPane } from "../modules/sheet-drawings/useShapeTextCharacterFormatPane";
 import { useOwnedShapeFormatPane } from "../modules/sheet-drawings/useOwnedShapeFormatPane";
 import { createShapePaintAssetSource } from "../modules/sheet-drawings/shape-paint-asset-source";
 import InsertToolbar from "../modules/insert-tools/components/InsertToolbar.vue";
@@ -1932,6 +1933,13 @@ const shapeTextEditCallbacks = computed(() => {
   const current = shapeTextEdit.snapshot.value;
   return current ? shapeTextEdit.callbacks(current.sessionId) : undefined;
 });
+const shapeTextCharacterPane = useShapeTextCharacterFormatPane({
+  getSnapshot: () => shapeTextEdit.snapshot.value,
+  getCallbacks: () => shapeTextEditCallbacks.value,
+  getWorkbookId: () => session.workbook.id,
+  getSheetId: () => activeSheet.value.id,
+  getLocale: () => (locale.value === "zh-CN" ? "zh-CN" : "en-US"),
+});
 function startShapeTextEdit(request: ShapeCanvasTextEditRequest): boolean {
   const previous = shapeTextEdit.snapshot.value;
   if (previous && !shapeTextEdit.commit(previous.sessionId)) return false;
@@ -1944,6 +1952,11 @@ function startShapeTextEdit(request: ShapeCanvasTextEditRequest): boolean {
     return false;
   const length = shapeTextEdit.snapshot.value!.draftText.length;
   shapeTextEditSelection.value = { start: request.selection === "all" ? 0 : length, end: length };
+  shapeTextEdit.setSelection(opened.sessionId, {
+    ...shapeTextEditSelection.value,
+    direction: request.selection === "all" ? "forward" : "none",
+  });
+  shapeTextCharacterPane.open();
   shapeFormatPane.close();
   shapeGroupFormatPane.close();
   shapeConnectorFormatPane.close();
@@ -1959,7 +1972,7 @@ function openShapeGroupFormat(root: ShapeGroupDrawing, path: ShapeGroupPath) {
       shapeGroupFormatPane.close();
       shapeFormatPane.close();
       drawingActions.close();
-      sheetGridRef.value?.selectDrawing(root.id);
+      sheetGridRef.value?.selectShapeObjects([path]);
     }
     return;
   }
@@ -1967,7 +1980,7 @@ function openShapeGroupFormat(root: ShapeGroupDrawing, path: ShapeGroupPath) {
     shapeConnectorFormatPane.close();
     shapeFormatPane.close();
     drawingActions.close();
-    sheetGridRef.value?.selectDrawing(root.id);
+    sheetGridRef.value?.selectShapeObjects([path]);
   }
 }
 function selectedShapeGroupChanged(rootId: string | null, path: ShapeGroupPath | null) {
@@ -2021,11 +2034,11 @@ watch(
     const retained = new Set<string>();
     const groupText = group
       ? traverseShapeGroup(group).flatMap((visit) =>
-          visit.node.kind !== "shapeGroup" ? [visit.node.shapeText] : [],
+          visit.node.kind !== "shapeGroup" ? [visit.node] : [],
         )
       : [];
-    for (const text of [selected?.shapeText, edited?.shapeText, ...groupText])
-      for (const id of getShapeTextAssetIds(text)) {
+    for (const textOwner of [selected, edited, ...groupText])
+      for (const id of getShapeTextAssetIds(textOwner?.shapeText, textOwner?.text)) {
         const url = urls.get(id);
         if (url) {
           retained.add(url);
@@ -5052,35 +5065,48 @@ watch(
         @close="closeOwnedPictureFormat"
       />
       <ShapeFormatPane
+        :key="
+          shapeTextEdit.snapshot.value
+            ? `character-${shapeTextEdit.snapshot.value.sessionId}`
+            : 'object-format'
+        "
         v-if="
+          shapeTextCharacterPane.snapshot.value ||
           shapeConnectorFormatPane.snapshot.value ||
           shapeGroupFormatPane.snapshot.value ||
           shapeFormatPane.snapshot.value
         "
         :snapshot="
+          shapeTextCharacterPane.snapshot.value ??
           shapeConnectorFormatPane.snapshot.value ??
           shapeGroupFormatPane.snapshot.value ??
           shapeFormatPane.snapshot.value
         "
         :capabilities="
-          shapeConnectorFormatPane.snapshot.value
-            ? shapeConnectorFormatPane.capabilities.value
-            : shapeGroupFormatPane.snapshot.value
-              ? shapeGroupFormatPane.capabilities.value
-              : shapeFormatPane.capabilities.value
+          shapeTextCharacterPane.snapshot.value
+            ? shapeTextCharacterPane.capabilities.value
+            : shapeConnectorFormatPane.snapshot.value
+              ? shapeConnectorFormatPane.capabilities.value
+              : shapeGroupFormatPane.snapshot.value
+                ? shapeGroupFormatPane.capabilities.value
+                : shapeFormatPane.capabilities.value
         "
         :on-intent="
-          shapeConnectorFormatPane.snapshot.value
-            ? shapeConnectorFormatPane.onIntent
-            : shapeGroupFormatPane.snapshot.value
-              ? shapeGroupFormatPane.onIntent
-              : shapeFormatPane.onIntent
+          shapeTextCharacterPane.snapshot.value
+            ? shapeTextCharacterPane.onIntent
+            : shapeConnectorFormatPane.snapshot.value
+              ? shapeConnectorFormatPane.onIntent
+              : shapeGroupFormatPane.snapshot.value
+                ? shapeGroupFormatPane.onIntent
+                : shapeFormatPane.onIntent
         "
         :load-paint-asset="shapePaintAssets.load"
         :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
         :t="pictureFormatLabel"
-        initial-tab="fill-line"
+        :initial-tab="shapeTextCharacterPane.snapshot.value ? 'text-box' : 'fill-line'"
+        :data-shape-text-edit-session="shapeTextEdit.snapshot.value?.sessionId"
         @close="
+          shapeTextCharacterPane.close();
           shapeFormatPane.close();
           shapeGroupFormatPane.close();
           shapeConnectorFormatPane.close();

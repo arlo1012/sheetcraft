@@ -35,9 +35,11 @@ import {
 } from "./shape-format-pane-model";
 import {
   drawingShapeTextValues,
+  drawingShapeTextCharacterValues,
   editDrawingShapeTextField,
   materializeDrawingShapeText,
   withDrawingShapeText,
+  withoutDrawingShapeTextCharacterProperties,
 } from "./shape-text-options";
 import {
   prepareDrawingShapeTextCandidate,
@@ -153,11 +155,9 @@ export function useOwnedShapeFormatPane(options: {
         ...properties,
         anchor: anchorValue(isFramedShapeDrawing(d) ? d.shapeFrame.anchor.mode : "move-only"),
         rotationDeg: d.rotation,
-        fontSizePt: d.fontSize * 0.75,
-        textBold: d.bold,
-        textItalic: d.italic,
         ...drawingShapeTextValues(view),
       },
+      mixedFields: drawingShapeTextCharacterValues(view).mixedFields,
       shapeStyle: d.kind === "shape" ? resolveShapeDetailedPaintStyle(view) : undefined,
       textStyle: resolveShapeTextPaintStyle(view),
       ...(acknowledged.value?.drawing === d && acknowledged.value.revision === revision
@@ -231,6 +231,7 @@ export function useOwnedShapeFormatPane(options: {
       fontFamily: field,
       textUnderline: field,
       textStrike: field,
+      textColor: field,
       paragraphAlignment: field,
       paragraphBeforePt: { ...field, min: 0, max: 4096 },
       paragraphAfterPt: { ...field, min: 0, max: 4096 },
@@ -418,6 +419,8 @@ export function useOwnedShapeFormatPane(options: {
       if (intent.type === "set-style") {
         if (capabilities.value.styles?.[intent.target]?.[intent.category]?.enabled !== true)
           return false;
+        if (intent.target === "text" && intent.category === "fill")
+          next = withoutDrawingShapeTextCharacterProperties(next, ["color"]);
         const text = intent.target === "text" ? materializeDrawingShapeText(next) : undefined;
         const style = { ...(text ? text.style : next.shapeStyle) };
         if (intent.value === undefined) delete style[intent.category];
@@ -516,9 +519,6 @@ export function useOwnedShapeFormatPane(options: {
             sizeWidthPt: "width",
             sizeHeightPt: "height",
             rotationDeg: "rotation",
-            fontSizePt: "fontSize",
-            textBold: "bold",
-            textItalic: "italic",
           };
           const key = fields[intent.field];
           if (key) {
@@ -616,9 +616,9 @@ export function useOwnedShapeFormatPane(options: {
         [
           ...new Set([
             ...getShapeStyleAssetIds(candidate.shapeStyle),
-            ...getShapeTextAssetIds(candidate.shapeText),
+            ...getShapeTextAssetIds(candidate.shapeText, candidate.text),
             ...getShapeStyleAssetIds(preflight.shapeStyle),
-            ...getShapeTextAssetIds(preflight.shapeText),
+            ...getShapeTextAssetIds(preflight.shapeText, preflight.text),
           ]),
         ].some((id) => !options.isAssetAvailable?.(id))
       )

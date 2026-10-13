@@ -1319,3 +1319,156 @@ describe("detached cache and returned Canvas ownership", () => {
     expect(native.canvases).toHaveLength(0);
   });
 });
+
+describe("attributed actual glyph and decoration pixels", () => {
+  const attributedRuns = (): ShapeTextRun[] => [
+    { ...run("a"), sourceStart: 0, sourceEnd: 1, underline: true, strike: false, color: "#ff0000" },
+    {
+      ...run("b"),
+      sourceStart: 1,
+      sourceEnd: 2,
+      x: 10,
+      inkBounds: { x: 10, y: 2, width: 4, height: 5 },
+      underline: false,
+      strike: true,
+    },
+  ];
+  test("selected RGB colors actual glyphs and decorations and explicit false overrides base", () => {
+    const input = options(),
+      native = factory();
+    input.drawing.shapeText!.underline = true;
+    input.layout = layout(attributedRuns());
+    const result = paint(input, native.make);
+    expect(pixel(result.canvas, 3, 3)).toEqual([255, 0, 0, 255]);
+    expect(pixel(result.canvas, 11, 3)).toEqual([18, 52, 86, 255]);
+    expect(pixel(result.canvas, 3, 6)).toEqual([255, 0, 0, 255]);
+    expect(pixel(result.canvas, 11, 6)[3]).toBe(0);
+    expect(native.calls().map((call) => call.text)).toEqual(["a", "b", "a", "b"]);
+  });
+  test("selected strike draws real colored alpha on a whitespace run", () => {
+    const input = options();
+    input.layout = layout([{ ...run(" "), underline: false, strike: true, color: "#00ff00" }]);
+    const result = paint(input, factory().make);
+    expect(pixel(result.canvas, 3, 4)).toEqual([0, 255, 0, 255]);
+    expect(pixel(result.canvas, 3, 3)[3]).toBe(0);
+  });
+  test("native glyph calls consume the selected family, size, weight and italic tuple", () => {
+    const input = options(),
+      native = factory();
+    input.layout = layout([
+      {
+        ...run("a"),
+        font: { family: "Selected Family", size: 24, weight: 700, italic: true },
+        color: "#ff0000",
+      },
+      {
+        ...run("b"),
+        font: { family: "Ordinary Family", size: 12, weight: 400, italic: false },
+        x: 10,
+      },
+    ]);
+    paint(input, native.make);
+    expect(native.calls().map((call) => call.font)).toEqual([
+      'italic 700 24px "Selected Family"',
+      '400 12px "Ordinary Family"',
+      'italic 700 24px "Selected Family"',
+      '400 12px "Ordinary Family"',
+    ]);
+  });
+  test("uncolored spans retain detailed gradient fill while selected RGB overrides it", () => {
+    const input = options();
+    input.layout = layout(attributedRuns());
+    const result = paint(
+      {
+        ...input,
+        style: {
+          fill: {
+            kind: "value",
+            value: {
+              kind: "linear",
+              opacity: 1,
+              rotateWithShape: true,
+              angleDeg: 0,
+              stops: [
+                { offset: 0, color: { kind: "rgb", rgb: "#0000ff" }, opacity: 1, brightness: 0 },
+                { offset: 1, color: { kind: "rgb", rgb: "#00ff00" }, opacity: 1, brightness: 0 },
+              ],
+            },
+          },
+        },
+      },
+      factory().make,
+    );
+    expect(pixel(result.canvas, 3, 3)).toEqual([255, 0, 0, 255]);
+    const inherited = pixel(result.canvas, 11, 3);
+    expect(inherited[0]).toBe(0);
+    expect(inherited[1]).toBeGreaterThan(0);
+    expect(inherited[2]).toBeGreaterThan(0);
+    expect(inherited[3]).toBe(255);
+  });
+  test("transparent range has no front alpha while inherited glyphs remain", () => {
+    const input = options();
+    input.layout = layout(
+      attributedRuns().map((value, index) => (index ? value : { ...value, color: "transparent" })),
+    );
+    const result = paint(input, factory().make);
+    expect(pixel(result.canvas, 3, 3)).toEqual([0, 0, 0, 0]);
+    expect(pixel(result.canvas, 3, 6)).toEqual([0, 0, 0, 0]);
+    expect(pixel(result.canvas, 11, 3)[3]).toBe(255);
+  });
+  test("front spans retain source painter order when glyphs overlap", () => {
+    const input = options();
+    input.layout = layout([
+      { ...run("a"), color: "#ff0000" },
+      { ...run("b"), color: "#0000ff" },
+      { ...run("c"), color: "#00ff00" },
+    ]);
+    const result = paint(input, factory().make);
+    expect(pixel(result.canvas, 3, 3)).toEqual([0, 255, 0, 255]);
+  });
+  test("uniform outline is retained on a transparent colored range", () => {
+    const input = options();
+    input.layout = layout([{ ...run("a"), color: "transparent" }]);
+    const result = paint(
+      {
+        ...input,
+        style: {
+          line: {
+            kind: "value",
+            value: {
+              paint: solid("#00ff00"),
+              widthPt: 1.5,
+              compound: "single",
+              dash: "solid",
+              cap: "butt",
+              join: "round",
+              miterLimit: 4,
+            },
+          },
+        },
+      },
+      factory().make,
+    );
+    const at = (x: number, y: number) =>
+      pixel(
+        result.canvas,
+        Math.floor((x - result.logicalBounds.left) * result.actualDensity),
+        Math.floor((y - result.logicalBounds.top) * result.actualDensity),
+      );
+    expect(at(2, 3)).toEqual([0, 255, 0, 255]);
+    expect(at(4, 4)[3]).toBe(0);
+  });
+  test("raster span scans fail explicitly at the aggregate work limit", () => {
+    const input = options();
+    input.drawing.width = 1024;
+    input.drawing.height = 1024;
+    input.layout = layout(
+      Array.from({ length: 100 }, (_, index) => ({
+        ...run("x"),
+        color: index % 2 ? "#ff0000" : "#0000ff",
+        inkBounds: { x: 0, y: 0, width: 1024, height: 1024 },
+      })),
+    );
+    expect(() => planShapeTextPaint(input)).toThrow(/raster-span work budget/);
+  });
+});
