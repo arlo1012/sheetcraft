@@ -13,10 +13,8 @@ import {
 } from "./shape-style.js";
 import { getShapeTextAssetIds } from "./shape-text.js";
 import { normalizeSheetDrawing, type SheetFramedGraphicDrawing } from "./sheet-drawings.js";
-
-/** Ownership budgets, not producer-format limits. The worksheet root has depth zero. */
-export const MAX_SHAPE_GROUP_DEPTH = 32;
-export const MAX_SHAPE_GROUP_NODES = 10_000;
+import { MAX_SHAPE_GROUP_DEPTH, MAX_SHAPE_GROUP_NODES } from "./shape-group-limits.js";
+export { MAX_SHAPE_GROUP_DEPTH, MAX_SHAPE_GROUP_NODES } from "./shape-group-limits.js";
 
 /** Document-owned body effects only; containers do not own fill, line or theme styles. */
 export type ShapeGroupEffects = {

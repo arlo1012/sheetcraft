@@ -20,13 +20,8 @@ import {
   normalizeShapeDrawingForest,
   resolveShapeRootLayout,
 } from "./shape-group-planning.js";
-import {
-  MAX_SHAPE_GROUP_DEPTH,
-  MAX_SHAPE_GROUP_NODES,
-  type ShapeGroupChild,
-  type ShapeGroupPath,
-  type SheetGroupedGraphicDrawing,
-} from "./shape-group.js";
+import { MAX_SHAPE_GROUP_DEPTH, MAX_SHAPE_GROUP_NODES } from "./shape-group-limits.js";
+import type { ShapeGroupChild, ShapeGroupPath, SheetGroupedGraphicDrawing } from "./shape-group.js";
 import { isShapeLinePreset } from "./shape-line-ends.js";
 import { SHAPE_PRESET_DEFINITIONS } from "./shape-presets/definitions.js";
 import type { ShapePresetName } from "./shape-presets/catalog.js";
