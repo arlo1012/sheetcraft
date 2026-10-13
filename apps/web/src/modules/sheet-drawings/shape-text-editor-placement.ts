@@ -45,7 +45,9 @@ export function shapeTextEditorPlacement(
       top: `${rect.y * sy}px`,
       width: `${rect.width * sx}px`,
       height: `${rect.height * sy}px`,
-      ...(drawing.shapeFlipY ? { transform: "rotate(180deg)", transformOrigin: "50% 50%" } : {}),
+      ...(drawing.shapeFlipY && !drawing.shapeText?.warp
+        ? { transform: "rotate(180deg)", transformOrigin: "50% 50%" }
+        : {}),
     },
   };
 }

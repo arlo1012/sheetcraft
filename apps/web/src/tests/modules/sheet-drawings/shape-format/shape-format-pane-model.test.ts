@@ -53,6 +53,7 @@ function fixture() {
         textMarginBottomPt: { enabled: true, min: 0 },
       },
       styles: { shape: { fill: { enabled: true } } },
+      textWarp: { enabled: true },
       lineEnds: { enabled: true },
     },
     handler: ShapeFormatIntentHandler = vi.fn(() => true);
@@ -308,4 +309,62 @@ test("a value-only scene restriction rejects projection without trapping None or
   expect(action({ kind: "none" })).toBe(true);
   expect(action(undefined)).toBe(true);
   expect(f.handler).toHaveBeenCalledTimes(2);
+});
+
+describe("exact-owner text transform actions", () => {
+  test("normalizes and detaches exact adjustments; absence is a sparse clear intent", () => {
+    const f = fixture();
+    const warp = { preset: "textWave1" as const, adjustments: { adj1: 12500, adj2: 123 } };
+    expect(f.session.textWarpAction()(warp)).toBe(true);
+    expect(f.handler).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: "set-text-warp",
+        value: { preset: "textWave1", adjustments: { adj2: 123 } },
+        owner: f.snapshot!.owner,
+        baseRevision: 2,
+      }),
+    );
+    warp.adjustments.adj2 = 456;
+    const dispatched = vi.mocked(f.handler).mock.calls[0]![0];
+    expect(dispatched).toMatchObject({ value: { adjustments: { adj2: 123 } } });
+    expect(f.session.textWarpAction()(undefined)).toBe(true);
+    expect(vi.mocked(f.handler).mock.calls[1]![0]).not.toHaveProperty("value");
+    expect(f.snapshot).not.toHaveProperty("textWarp");
+  });
+  test("rejects stale owner, revision, handler and cancellation without acknowledgement", () => {
+    for (const change of ["owner", "revision", "handler", "drawing", "cancel"] as const) {
+      const f = fixture();
+      const action = f.session.textWarpAction(),
+        original = f.handler;
+      if (change === "owner")
+        f.snapshot = { ...f.snapshot!, owner: { ...f.snapshot!.owner, sessionId: "new" } };
+      if (change === "revision") f.snapshot = { ...f.snapshot!, revision: 3 };
+      if (change === "handler") f.handler = vi.fn(() => true);
+      if (change === "drawing")
+        f.snapshot = { ...f.snapshot!, drawing: { ...f.snapshot!.drawing } };
+      if (change === "cancel") f.session.cancel();
+      expect(action({ preset: "textPlain" })).toBe(false);
+      expect(original).not.toHaveBeenCalled();
+      expect(f.accepted).toEqual([]);
+      expect(f.failures.at(-1)).toBe("stale-owner");
+    }
+  });
+  test("invalid values, narrowed capabilities and failed handlers preserve selected warp", () => {
+    const f = fixture();
+    f.snapshot = { ...f.snapshot!, textWarp: { preset: "textPlain" } };
+    expect(f.session.textWarpAction()({ preset: "textWave1", adjustments: { adj1: NaN } })).toBe(
+      false,
+    );
+    expect(f.failures.at(-1)).toBe("out-of-range");
+    expect(f.handler).not.toHaveBeenCalled();
+    f.capabilities.textWarp = { enabled: false };
+    expect(f.session.textWarpAction()({ preset: "textPlain" })).toBe(false);
+    expect(f.failures.at(-1)).toBe("unsupported");
+    f.capabilities.textWarp = { enabled: true };
+    f.handler = vi.fn(() => false);
+    expect(f.session.textWarpAction()({ preset: "textCirclePour" })).toBe(false);
+    expect(f.failures.at(-1)).toBe("apply-rejected");
+    expect(f.snapshot.textWarp).toEqual({ preset: "textPlain" });
+    expect(f.accepted).toEqual([]);
+  });
 });

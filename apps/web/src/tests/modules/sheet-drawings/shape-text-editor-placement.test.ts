@@ -5,6 +5,7 @@ import type { FloatingImageViewportFragment } from "@sheetcraft/sheet-engine/flo
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
 import { getDrawingShapeGeometry } from "../../../modules/sheet-drawings/shape-geometry";
 import { shapeTextEditorPlacement } from "../../../modules/sheet-drawings/shape-text-editor-placement";
+import { createDefaultShapeText } from "../../../modules/sheet-drawings/shape-text-options";
 
 function drawing(changes: Partial<SheetGraphicDrawing> = {}): SheetGraphicDrawing {
   return {
@@ -27,6 +28,25 @@ function fragment(
 }
 
 describe("direct shape text editor placement", () => {
+  test("active WordArt edits its straight unmirrored source while retaining stored flips and warp", () => {
+    const source = drawing({
+      shapeGeometry: { preset: "rightArrow" },
+      shapeFlipX: true,
+      shapeFlipY: true,
+      shapeText: { ...createDefaultShapeText(), warp: { preset: "textArchUp" } },
+    });
+    const before = structuredClone(source),
+      rect = getDrawingShapeGeometry(source)!.textRect!;
+    const placement = shapeTextEditorPlacement(source, fragment())!;
+    expect(placement.input).toEqual({
+      left: `${rect.left}px`,
+      top: `${rect.top}px`,
+      width: `${rect.right - rect.left}px`,
+      height: `${rect.bottom - rect.top}px`,
+    });
+    expect(placement.frame.transform).toBe("rotate(37deg)");
+    expect(source).toEqual(before);
+  });
   test("uses the complete pane fragment and rotates its frame by the real 37-degree angle", () => {
     const source = drawing(),
       viewport = fragment(),

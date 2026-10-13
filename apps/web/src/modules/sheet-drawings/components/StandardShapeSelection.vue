@@ -11,6 +11,7 @@ import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 import { getDrawingShapeGeometry, standardShapeFlipPoint } from "../shape-geometry";
 import { getShapeLineLocalEndpoints } from "../shape-endpoint-layout";
 import { getShapeEndPaint } from "../shape-line-paint";
+import { getDrawingShapeTextWarpAdjustments } from "../shape-text-warp-adjustment";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
@@ -26,6 +27,8 @@ const emit = defineEmits<{
   nudgeEndpoint: [index: 0 | 1, delta: { x: number; y: number }];
   adjust: [index: number, event: PointerEvent];
   nudgeAdjustment: [index: number, delta: { x: number; y: number }];
+  warpAdjust: [index: number, event: PointerEvent];
+  nudgeWarpAdjustment: [index: number, delta: { x: number; y: number }];
   nudgeRotation: [degrees: number];
 }>();
 const { t } = useAppI18n();
@@ -100,7 +103,16 @@ const adjustments = computed(
       )
       .filter((h) => owns(h.point)) ?? [],
 );
-function handleKey(index: number, event: KeyboardEvent, endpoint = false): void {
+const warpAdjustments = computed(() =>
+  getDrawingShapeTextWarpAdjustments(props.drawing)
+    .map((handle) => ({ index: handle.index, point: point(handle.paintedPosition) }))
+    .filter((handle) => owns(handle.point)),
+);
+function handleKey(
+  index: number,
+  event: KeyboardEvent,
+  target: "body" | "endpoint" | "warp" = "body",
+): void {
   if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
   const d = event.shiftKey ? 10 : 1;
   const delta = {
@@ -112,7 +124,8 @@ function handleKey(index: number, event: KeyboardEvent, endpoint = false): void 
   if (!delta) return;
   event.preventDefault();
   event.stopPropagation();
-  if (endpoint) emit("nudgeEndpoint", index as 0 | 1, delta);
+  if (target === "endpoint") emit("nudgeEndpoint", index as 0 | 1, delta);
+  else if (target === "warp") emit("nudgeWarpAdjustment", index, delta);
   else emit("nudgeAdjustment", index, delta);
 }
 function rotateKey(event: KeyboardEvent): void {
@@ -171,12 +184,12 @@ function rotateKey(event: KeyboardEvent): void {
       :data-shape-endpoint="h.index"
       :data-shape-endpoint-bound="connectorRoute ? (boundEndpoints?.[h.index] ?? false) : undefined"
       @pointerdown.prevent.stop="emit('endpoint', h.index, $event)"
-      @keydown="handleKey(h.index, $event, true)"
+      @keydown="handleKey(h.index, $event, 'endpoint')"
       @dblclick.prevent.stop
     />
     <button
       v-for="h in adjustments"
-      :key="h.index"
+      :key="`body-adjustment-${h.index}`"
       type="button"
       class="standard-shape-selection__handle is-adjustment"
       :style="style(h.point)"
@@ -184,6 +197,18 @@ function rotateKey(event: KeyboardEvent): void {
       :data-shape-adjustment="h.index"
       @pointerdown.prevent.stop="emit('adjust', h.index, $event)"
       @keydown="handleKey(h.index, $event)"
+      @dblclick.prevent.stop
+    />
+    <button
+      v-for="h in warpAdjustments"
+      :key="`text-warp-adjustment-${h.index}`"
+      type="button"
+      class="standard-shape-selection__handle is-adjustment is-text-warp-adjustment"
+      :style="style(h.point)"
+      :aria-label="t('drawing.adjustShape', { index: h.index + 1 })"
+      :data-shape-text-warp-adjustment="h.index"
+      @pointerdown.prevent.stop="emit('warpAdjust', h.index, $event)"
+      @keydown="handleKey(h.index, $event, 'warp')"
       @dblclick.prevent.stop
     />
   </div>

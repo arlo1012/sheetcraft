@@ -20,6 +20,7 @@ import {
 } from "@sheetcraft/core/sheet-drawings";
 import { getShapeStyleAssetIds } from "@sheetcraft/core/shape-style";
 import { getShapeTextAssetIds } from "@sheetcraft/core/shape-text";
+import { normalizeShapeTextWarp } from "@sheetcraft/core/text-warps";
 import { isShapeLinePreset } from "@sheetcraft/core/shape-line-ends";
 import { isShapeFreePathClosed } from "@sheetcraft/core/shape-free-path";
 import type { Sheet, Workbook } from "@sheetcraft/core/workbook";
@@ -28,6 +29,7 @@ import { getLegacyShapeGeometry } from "./legacy-shape-geometry";
 import { planShapeDetailedPaint, resolveShapeDetailedPaintStyle } from "./shape-detailed-paint";
 import {
   shapeFormatOwnerKey,
+  isShapeFormatTextWarpTarget,
   type ShapeFormatSnapshot,
   type ShapeFormatCapabilities,
   type ShapeFormatIntent,
@@ -44,6 +46,7 @@ import {
 } from "./shape-text-options";
 import {
   prepareDrawingShapeTextCandidate,
+  layoutDrawingShapeText,
   getDrawingShapeTextRect,
   type PreparedDrawingShapeTextCandidate,
 } from "./shape-text-runtime";
@@ -174,6 +177,11 @@ export function useOwnedShapeFormatPane(options: {
             ? { rotation3d: bodyStyle.rotation3d }
             : {},
       textStyle,
+      ...(view.shapeText?.warp ? { textWarp: normalizeShapeTextWarp(view.shapeText.warp) } : {}),
+      textWarpScope: {
+        eligibleCount: isShapeFormatTextWarpTarget(view) ? 1 : 0,
+        descendantCount: 1,
+      },
       ...(glyph.mixed.length ? { mixedStyleCategories: { text: glyph.mixed } } : {}),
       independentTextCameraCount: view.shapeText?.style?.rotation3d?.kind === "value" ? 1 : 0,
       ...(acknowledged.value?.drawing === d && acknowledged.value.revision === revision
@@ -307,6 +315,13 @@ export function useOwnedShapeFormatPane(options: {
           rotation3d: field,
         },
       },
+      textWarp: {
+        enabled: textEnabled && !!d && isShapeFormatTextWarpTarget(d),
+        reason:
+          textEnabled && d && isShapeFormatTextWarpTarget(d)
+            ? undefined
+            : options.getUnsupportedReason(),
+      },
       lineEnds: {
         ...field,
         enabled:
@@ -432,7 +447,16 @@ export function useOwnedShapeFormatPane(options: {
       return framed;
     };
     try {
-      if (intent.type === "set-style") {
+      if (intent.type === "set-text-warp") {
+        if (capabilities.value.textWarp?.enabled !== true || !isShapeFormatTextWarpTarget(next))
+          return false;
+        const warp = normalizeShapeTextWarp(intent.value);
+        const text = materializeDrawingShapeText(next);
+        if (warp) text.warp = warp;
+        else delete text.warp;
+        // Warp is object-level paint. Leave all layout, runs, mirrors and source text intact.
+        next = { ...next, shapeText: text };
+      } else if (intent.type === "set-style") {
         if (capabilities.value.styles?.[intent.target]?.[intent.category]?.enabled !== true)
           return false;
         if (intent.target === "text" && intent.category === "fill")
@@ -593,18 +617,25 @@ export function useOwnedShapeFormatPane(options: {
           : (normalizeSheetDrawing(current) as SheetGraphicDrawing);
         const prepared = options.prepareText
           ? options.prepareText(candidateView, currentView)
-          : prepareDrawingShapeTextCandidate(
-              candidateView,
-              resolvedCandidate && captured.metrics
-                ? {
-                    normalizeView: (view: SheetGraphicDrawing) =>
-                      resolveShapeDrawing(
-                        updateResolvedShapeDrawing(resolvedCandidate, view, captured.metrics!),
-                        captured.metrics!,
-                      ).view as SheetGraphicDrawing,
-                  }
-                : {},
-            );
+          : intent.type === "set-text-warp"
+            ? {
+                drawing: candidateView,
+                layout: layoutDrawingShapeText(candidateView),
+                resized: false,
+                evaluations: 1,
+              }
+            : prepareDrawingShapeTextCandidate(
+                candidateView,
+                resolvedCandidate && captured.metrics
+                  ? {
+                      normalizeView: (view: SheetGraphicDrawing) =>
+                        resolveShapeDrawing(
+                          updateResolvedShapeDrawing(resolvedCandidate, view, captured.metrics!),
+                          captured.metrics!,
+                        ).view as SheetGraphicDrawing,
+                    }
+                  : {},
+              );
 
         // The command owner fits the original candidate once. This detached
         // view only proves the candidate's text/paint budgets before the CAS.

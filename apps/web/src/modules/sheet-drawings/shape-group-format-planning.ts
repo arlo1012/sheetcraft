@@ -46,6 +46,7 @@ import {
   normalizeShapeObjectProperties,
 } from "@sheetcraft/core/shape-object-properties";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import { normalizeShapeTextWarp, type ShapeTextWarp } from "@sheetcraft/core/text-warps";
 import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import {
   resolveShapeGroupProjection,
@@ -54,12 +55,13 @@ import {
 } from "./resolved-shape-group";
 import type { ResolvedShapeForestForRender } from "./resolved-shape-render-source";
 import { resolveShapeDetailedPaintStyle } from "./shape-detailed-paint";
-import type {
-  ShapeFormatField,
-  ShapeFormatIntent,
-  ShapeFormatMode,
-  ShapeFormatStyleCategory,
-  ShapeFormatValues,
+import {
+  isShapeFormatTextWarpTarget,
+  type ShapeFormatField,
+  type ShapeFormatIntent,
+  type ShapeFormatMode,
+  type ShapeFormatStyleCategory,
+  type ShapeFormatValues,
 } from "./shape-format-pane-model";
 import {
   drawingShapeTextValues,
@@ -120,6 +122,9 @@ export type ShapeGroupFormatAggregate = {
   readonly lineEnds?: ShapeLineEnds;
   readonly mixedLineEnds: readonly ("begin" | "end")[];
   readonly lineEligibleCount: number;
+  readonly textWarp?: ShapeTextWarp;
+  readonly mixedTextWarp: boolean;
+  readonly textWarpEligibleCount: number;
 };
 type WithoutIdentity<T> = T extends ShapeFormatIntent
   ? Omit<T, "owner" | "baseRevision" | "intentId">
@@ -294,6 +299,14 @@ export function getShapeGroupFormatEligibleLeaves(
       )
     );
   });
+}
+/** Transform batches touch genuine text leaves, never containers or legacy wordArt kinds. */
+export function getShapeGroupTextWarpEligibleLeaves(
+  context: ShapeGroupFormatContext,
+): readonly ResolvedShapeGroupLeaf[] {
+  return context.leaves.filter(
+    (leaf) => hasText(leaf) && !!leaf.view && isShapeFormatTextWarpTarget(leaf.view),
+  );
 }
 /** Arrowheads belong to real open line descendants, never the container itself. */
 export function getShapeGroupLineEligibleLeaves(
@@ -603,6 +616,16 @@ export function planShapeGroupFormatIntent(
       return text ? withDrawingShapeText(view, { ...text, style }) : { ...view, shapeStyle: style };
     });
   }
+  if (intent.type === "set-text-warp") {
+    const warp = normalizeShapeTextWarp(intent.value);
+    return batchPlan(context, getShapeGroupTextWarpEligibleLeaves(context), (view) => {
+      const text = materializeDrawingShapeText(view);
+      if (warp) text.warp = normalizeShapeTextWarp(warp);
+      else delete text.warp;
+      // Preserve the entire leaf appearance, native layout, run styles and local frame.
+      return { ...view, shapeText: text };
+    });
+  }
   if (intent.type === "set-text-margins")
     return batchPlan(context, getShapeGroupFormatEligibleLeaves(context, "text"), (view) => {
       const text = materializeDrawingShapeText(view);
@@ -753,6 +776,11 @@ export function aggregateShapeGroupFormatSnapshot(
     else if (first) ends[endpoint] = first;
   }
   const lineEnds = normalizeShapeLineEnds(ends);
+  const warpLeaves = getShapeGroupTextWarpEligibleLeaves(context);
+  const firstWarp = warpLeaves[0]?.sourceNode.shapeText?.warp;
+  const mixedTextWarp = warpLeaves.some(
+    (leaf) => !sameValue(leaf.sourceNode.shapeText?.warp, firstWarp),
+  );
   return {
     values,
     mixedFields,
@@ -772,5 +800,8 @@ export function aggregateShapeGroupFormatSnapshot(
     ...(lineEnds ? { lineEnds } : {}),
     mixedLineEnds,
     lineEligibleCount: lineLeaves.length,
+    ...(!mixedTextWarp && firstWarp ? { textWarp: normalizeShapeTextWarp(firstWarp) } : {}),
+    mixedTextWarp,
+    textWarpEligibleCount: warpLeaves.length,
   };
 }

@@ -6,6 +6,7 @@ import type {
 import type { ShapeLineEnds, ShapeLineEnd } from "@sheetcraft/core/shape-line-ends";
 import type { ShapeGroupNode } from "@sheetcraft/core/shape-group";
 import type { ShapeTextDirection, ShapeTextParagraph } from "@sheetcraft/core/shape-text";
+import { normalizeShapeTextWarp, type ShapeTextWarp } from "@sheetcraft/core/text-warps";
 import type {
   PictureFormatCapability,
   PictureFormatLengthUnit,
@@ -108,6 +109,12 @@ export interface ShapeFormatSnapshot {
   mixedStyleCategories?: Readonly<
     Partial<Record<ShapeFormatMode, readonly ShapeFormatStyleCategory[]>>
   >;
+  /** Sparse exact text transform; absence means No Transform, never textPlain. */
+  textWarp?: Readonly<ShapeTextWarp>;
+  /** Mixed group readback never impersonates the first eligible leaf. */
+  mixedTextWarp?: boolean;
+  /** Actual modern WordArt or retained-warp text leaves in the selected scope. */
+  textWarpScope?: Readonly<{ eligibleCount: number; descendantCount: number }>;
   /** Exact intent acknowledgement allows other active drafts to survive our own accepted edit. */
   acceptedIntentId?: string;
 }
@@ -118,6 +125,7 @@ export interface ShapeFormatCapabilities {
   styles?: Partial<
     Record<ShapeFormatMode, Partial<Record<ShapeFormatStyleCategory, ShapeFormatStyleCapability>>>
   >;
+  textWarp?: PictureFormatCapability;
   lineEnds?: PictureFormatCapability;
   disconnectConnector?: PictureFormatCapability;
 }
@@ -150,6 +158,7 @@ export interface ShapeFormatTextMargins {
 export type ShapeFormatIntent =
   | (ShapeFormatIntentIdentity & { type: "disconnect-connector" })
   | (ShapeFormatIntentIdentity & { type: "set-text-margins"; value: ShapeFormatTextMargins })
+  | (ShapeFormatIntentIdentity & { type: "set-text-warp"; value?: ShapeTextWarp })
   | ShapeFormatFieldIntent
   | ShapeFormatStyleIntent
   | (ShapeFormatIntentIdentity & { type: "set-line-ends"; value: ShapeLineEnds | undefined })
@@ -177,6 +186,7 @@ export type ShapeFormatFailure =
 export interface ShapeFormatCapture {
   owner: ShapeFormatOwner;
   revision: number;
+  drawing: ShapeFormatSnapshot["drawing"];
   handler: ShapeFormatIntentHandler;
   generation: number;
 }
@@ -191,6 +201,17 @@ export function shapeFormatFromDisplay(value: number, unit: PictureFormatLengthU
 }
 export function isShapeFormatLengthField(field: ShapeFormatNumberField): boolean {
   return field.endsWith("Pt");
+}
+/** Modern WordArt and retained ordinary-shape warps share the existing text owner. */
+export function isShapeFormatTextWarpTarget(
+  drawing: Readonly<Pick<SheetGraphicDrawing, "kind" | "shapeConnector" | "shapeText" | "wordArt">>,
+): boolean {
+  return (
+    (drawing.kind === "shape" || drawing.kind === "textBox") &&
+    !drawing.shapeConnector &&
+    !!drawing.shapeText &&
+    (drawing.wordArt === true || drawing.shapeText.warp !== undefined)
+  );
 }
 let intentSequence = 0;
 /** Runtime-neutral exact-owner/revision gate, also used to invalidate asynchronous asset work. */
@@ -208,6 +229,7 @@ export function createShapeFormatSession(source: {
       ? {
           owner: { ...snapshot.owner },
           revision: snapshot.revision,
+          drawing: snapshot.drawing,
           handler: source.handler(),
           generation,
         }
@@ -221,6 +243,7 @@ export function createShapeFormatSession(source: {
       token.generation === generation &&
       token.handler === source.handler() &&
       token.revision === snapshot.revision &&
+      token.drawing === snapshot.drawing &&
       shapeFormatOwnerKey(token.owner) === shapeFormatOwnerKey(snapshot.owner) &&
       token.owner.drawingId === snapshot.drawing.id
     );
@@ -297,6 +320,23 @@ export function createShapeFormatSession(source: {
       );
     };
   }
+  function textWarpAction() {
+    const token = capture();
+    return (value?: ShapeTextWarp): boolean => {
+      let normalized: ShapeTextWarp | undefined;
+      try {
+        normalized = normalizeShapeTextWarp(value);
+      } catch {
+        source.feedback("out-of-range");
+        return false;
+      }
+      return send(token, source.capabilities().textWarp, (identity) => ({
+        ...identity,
+        type: "set-text-warp",
+        ...(normalized ? { value: normalized } : {}),
+      }));
+    };
+  }
   function lineEndsAction() {
     const token = capture();
     return (value: ShapeLineEnds | undefined): boolean =>
@@ -360,6 +400,7 @@ export function createShapeFormatSession(source: {
     current,
     fieldAction,
     styleAction,
+    textWarpAction,
     lineEndsAction,
     lineEndAction,
     disconnectConnectorAction,

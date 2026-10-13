@@ -5,6 +5,7 @@ export {
 } from "./text-warps/catalog.js";
 export { isTextWarpPresetName, normalizeShapeTextWarp } from "./text-warps/contract.js";
 export { evaluateTextWarp, TEXT_WARP_GEOMETRY_LIMITS } from "./text-warps/evaluate.js";
+export { moveTextWarpAdjustment } from "./text-warps/adjustment.js";
 export {
   TextWarpSamplingError,
   sampleTextWarpBoundary,

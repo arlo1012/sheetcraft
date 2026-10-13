@@ -15,6 +15,7 @@ import PicturePaintNumber from "../../../../modules/sheet-images/components/form
 import PicturePaintEditor from "../../../../modules/sheet-images/components/format-pane/PicturePaintEditor.vue";
 import PictureLineEditor from "../../../../modules/sheet-images/components/format-pane/PictureLineEditor.vue";
 import PictureFormat3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureFormat3dEditor.vue";
+import WordArtTransformGallery from "../../../../modules/sheet-drawings/components/WordArtTransformGallery.vue";
 import ShapeFormatEffects from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatEffects.vue";
 import PictureRotation3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureRotation3dEditor.vue";
 import { framedShape } from "../framed-shape-fixture";
@@ -782,4 +783,70 @@ test("a related-connector restriction disables camera values, explains why, and 
   expect(onIntent).toHaveBeenLastCalledWith(
     expect.objectContaining({ category: "rotation3d", value: undefined }),
   );
+});
+
+test("Text Effects embeds controlled Transform choices, mixed scope and the existing owner intent", async () => {
+  const state = {
+    ...groupSnapshot(),
+    mixedTextWarp: true,
+    textWarpScope: { eligibleCount: 2, descendantCount: 5 },
+  };
+  const { wrapper, onIntent } = fixture({
+    snapshot: state,
+    capabilities: { ...capabilities, textWarp: { enabled: true } },
+    initialTab: "text-effects",
+  });
+  const section = wrapper.get("[data-text-transform-section]");
+  expect(section.text()).toContain("Text transform");
+  expect(section.text()).toContain("2 WordArt or retained-transform text members of 5 members");
+  const gallery = wrapper.getComponent(WordArtTransformGallery);
+  expect(gallery.props("mixed")).toBe(true);
+  expect(gallery.props("menu")).toBe(false);
+  const choose = gallery.props("onSelect")!;
+  expect(
+    choose(
+      {
+        id: "textWave1",
+        family: "envelope",
+        label: { "en-US": "Wave", "zh-CN": "波浪" },
+        warp: { preset: "textWave1" },
+      },
+      { isCurrent: () => true },
+    ),
+  ).toBe(true);
+  expect(onIntent).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: "set-text-warp",
+      owner: state.owner,
+      baseRevision: 2,
+      value: { preset: "textWave1" },
+    }),
+  );
+  await wrapper.setProps({
+    snapshot: { ...state, revision: 3, mixedTextWarp: false, textWarp: { preset: "textWave1" } },
+  });
+  expect(
+    choose(
+      { id: "textNoShape", family: "none", label: { "en-US": "None", "zh-CN": "无" } },
+      { isCurrent: () => true },
+    ),
+  ).toBe(false);
+  expect(onIntent).toHaveBeenCalledTimes(1);
+  expect(wrapper.getComponent(WordArtTransformGallery).props("selectedWarp")).toEqual({
+    preset: "textWave1",
+  });
+});
+test("unsupported transform exposes the apply-text-first reason without an editable command", () => {
+  const { wrapper, onIntent } = fixture({
+    capabilities: {
+      fields: {},
+      textWarp: { enabled: false, reason: "Apply the text before changing advanced text effects." },
+    },
+    initialTab: "text-effects",
+  });
+  const gallery = wrapper.getComponent(WordArtTransformGallery);
+  expect(gallery.props("disabled")).toBe(true);
+  expect(gallery.props("disabledReason")).toContain("Apply the text");
+  expect(wrapper.get("[data-text-transform-section]").text()).toContain("Apply the text");
+  expect(onIntent).not.toHaveBeenCalled();
 });

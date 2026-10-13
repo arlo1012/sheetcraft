@@ -77,6 +77,10 @@ import type { ShapeTextEditSnapshot, ShapeTextEditCallbacks } from "../useShapeT
 import type { ShapeCanvasTextEditRequest } from "../shape-canvas-text-edit-contract";
 import { shapeTextEditorPlacement } from "../shape-text-editor-placement";
 import { getDrawingShapeTextRect } from "../shape-text-runtime";
+import {
+  moveDrawingShapeTextWarpAdjustment,
+  nudgeDrawingShapeTextWarpAdjustment,
+} from "../shape-text-warp-adjustment";
 import ShapeCanvasTextEditor from "./ShapeCanvasTextEditor.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -2140,7 +2144,7 @@ function start(
   fragment: DrawingFragment,
   event: PointerEvent,
   direction?: FloatingImageResizeDirection,
-  mode: "move" | "rotate" | "adjust" | "endpoint" | "point" = "move",
+  mode: "move" | "rotate" | "adjust" | "text-warp-adjust" | "endpoint" | "point" = "move",
   index?: number,
   freePoint?: FreeShapePointDescriptor,
 ): void {
@@ -2324,6 +2328,12 @@ function start(
         },
         currentLayout,
         pointEditOptions(drawing),
+      );
+    } else if (isStandard(drawing) && mode === "text-warp-adjust" && index !== undefined) {
+      nextView = moveDrawingShapeTextWarpAdjustment(
+        drawing,
+        index,
+        standardShapeWorldToLocal(referenceRect, drawing.rotation, target),
       );
     } else if (isStandard(drawing) && mode === "adjust" && index !== undefined) {
       const local = standardShapeFlipPoint(
@@ -2797,6 +2807,24 @@ function nudgeAdjustment(
   );
   if (geometry) commitUpdate({ ...drawing, shapeGeometry: geometry }, drawing);
 }
+function nudgeWarpAdjustment(
+  drawing: SheetGraphicDrawing,
+  index: number,
+  delta: { x: number; y: number },
+): void {
+  if (
+    !canChange(drawing) ||
+    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing
+  )
+    return;
+  const angle = (drawing.rotation * Math.PI) / 180;
+  const localDelta = {
+    x: Math.cos(angle) * delta.x + Math.sin(angle) * delta.y,
+    y: -Math.sin(angle) * delta.x + Math.cos(angle) * delta.y,
+  };
+  const next = nudgeDrawingShapeTextWarpAdjustment(drawing, index, localDelta);
+  if (next) commitUpdate(next, drawing);
+}
 function nudgeEndpoint(
   drawing: SheetGraphicDrawing,
   index: 0 | 1,
@@ -3044,6 +3072,12 @@ function standardSelectionHandlers(fragment: DrawingFragment) {
     },
     nudgeAdjustment: (index: number, delta: { x: number; y: number }) => {
       if (valid() && isStandard(drawing)) nudgeAdjustment(drawing, index, delta);
+    },
+    warpAdjust: (index: number, event: PointerEvent) => {
+      if (valid()) start(fragment, event, undefined, "text-warp-adjust", index);
+    },
+    nudgeWarpAdjustment: (index: number, delta: { x: number; y: number }) => {
+      if (valid() && isStandard(drawing)) nudgeWarpAdjustment(drawing, index, delta);
     },
     nudgeRotation: (degrees: number) => {
       if (valid() && isStandard(drawing)) nudgeRotation(drawing, degrees);

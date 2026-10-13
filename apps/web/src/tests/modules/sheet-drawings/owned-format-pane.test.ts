@@ -12,7 +12,11 @@ import { serializeWorkbook, deserializeWorkbook } from "@sheetcraft/core/seriali
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
 import { useOwnedShapeFormatPane } from "../../../modules/sheet-drawings/useOwnedShapeFormatPane";
 import { createDefaultShapeText } from "../../../modules/sheet-drawings/shape-text-options";
-import { requireLegacySheetDrawing, type SheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import {
+  normalizeSheetDrawing,
+  requireLegacySheetDrawing,
+  type SheetDrawing,
+} from "@sheetcraft/core/sheet-drawings";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
   createPictureFormat3d,
@@ -304,6 +308,85 @@ test("existing 3D body accepts and removes projection while preserving legacy te
     expect(undoWorkbookCommand(f.session)).toBe(true);
     expect(undoWorkbookCommand(f.session)).toBe(true);
     expect(serializeWorkbook(f.wb.value)).toEqual(original);
+  } finally {
+    f.scope.stop();
+  }
+});
+
+test("modern transform and adjustment-only intents preserve fixed geometry, full text and one history owner", () => {
+  const f = fixture();
+  try {
+    const original = requireLegacySheetDrawing(f.sheet.value.drawings![0]!);
+    if (original.kind !== "shape") throw Error("shape");
+    original.wordArt = true;
+    original.shapeText = createDefaultShapeText();
+    original.shapeText.layout.autoFit = "resize-shape";
+    original.shapeText.layout.direction = "vertical-lr";
+    original.shapeFlipX = true;
+    original.shapeFlipY = true;
+    f.sheet.value.drawings = [normalizeSheetDrawing(original)];
+    f.revision.value++;
+    const before = serializeWorkbook(f.wb.value),
+      beforeDrawing = f.sheet.value.drawings![0]!;
+    if (beforeDrawing.kind !== "shape") throw Error("shape");
+    const stale = f.intent({ type: "set-text-warp", value: { preset: "textWave1" } });
+    expect(f.pane.capabilities.value.textWarp?.enabled).toBe(true);
+    expect(f.pane.snapshot.value?.textWarp).toBeUndefined();
+    expect(f.pane.onIntent(stale)).toBe(true);
+    const first = serializeWorkbook(f.wb.value);
+    expect(first.version).toBe(71);
+    expect(f.pane.snapshot.value?.textWarp).toEqual({ preset: "textWave1" });
+    expect(f.pane.snapshot.value?.acceptedIntentId).toBe(stale.intentId);
+    expect(f.pane.onIntent(stale)).toBe(false);
+    expect(
+      f.pane.onIntent(
+        f.intent({
+          type: "set-text-warp",
+          value: { preset: "textWave1", adjustments: { adj2: 567 } },
+        }),
+      ),
+    ).toBe(true);
+    const actual = f.sheet.value.drawings![0]!;
+    if (actual.kind !== "shape") throw Error("shape");
+    expect({ ...actual, shapeText: beforeDrawing.shapeText }).toEqual(beforeDrawing);
+    const { warp: _warp, ...actualText } = actual.shapeText!;
+    expect(actualText).toEqual(beforeDrawing.shapeText);
+    expect(actual.shapeText?.layout.autoFit).toBe("resize-shape");
+    expect(f.session.history.undoStack).toHaveLength(2);
+    expect(f.pane.onIntent(f.intent({ type: "set-text-warp" }))).toBe(true);
+    expect(f.pane.snapshot.value!.drawing.shapeText).not.toHaveProperty("warp");
+    expect(f.pane.capabilities.value.textWarp?.enabled).toBe(true);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.wb.value)).toEqual(first);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.wb.value)).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.wb.value)).toEqual(first);
+  } finally {
+    f.scope.stop();
+  }
+});
+test("ordinary retained warp reads and clears without tagging; untagged and legacy WordArt stay blocked", () => {
+  const f = fixture();
+  try {
+    expect(f.pane.capabilities.value.textWarp?.enabled).toBe(false);
+    expect(
+      f.pane.onIntent(f.intent({ type: "set-text-warp", value: { preset: "textPlain" } })),
+    ).toBe(false);
+    const source = requireLegacySheetDrawing(f.sheet.value.drawings![0]!);
+    if (source.kind !== "shape") throw Error("shape");
+    source.shapeText = { ...createDefaultShapeText(), warp: { preset: "textPlain" } };
+    f.revision.value++;
+    expect(f.pane.snapshot.value?.textWarp).toEqual({ preset: "textPlain" });
+    expect(f.pane.capabilities.value.textWarp?.enabled).toBe(true);
+    expect(f.pane.onIntent(f.intent({ type: "set-text-warp" }))).toBe(true);
+    expect(f.sheet.value.drawings![0]!).not.toHaveProperty("wordArt");
+    expect(f.pane.snapshot.value!.drawing.shapeText).not.toHaveProperty("warp");
+    expect(f.pane.capabilities.value.textWarp?.enabled).toBe(false);
+    const legacy = createGraphicDrawing("old", "wordArt", "Old", { row: 0, column: 0 });
+    expect(f.pane.open(legacy)).toBe(false);
+    expect(f.session.history.undoStack).toHaveLength(1);
   } finally {
     f.scope.stop();
   }

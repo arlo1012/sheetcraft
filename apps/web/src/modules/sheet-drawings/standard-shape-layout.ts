@@ -18,6 +18,7 @@ import {
 } from "./shape-geometry";
 import { getShapeEndPaint, standardShapeAppearance } from "./shape-line-paint";
 import { detailedShapeLocalBounds } from "./shape-detailed-presentation";
+import { getDrawingShapeTextWarpAdjustments } from "./shape-text-warp-adjustment";
 
 export function standardShapeResizeRect(
   rect: PictureFrameRect,
@@ -220,6 +221,7 @@ export function getStandardShapeViewportFragments(
               { x: drawing.width / 2, y: -24 },
             ]),
         ...shape.handles.map((h) => standardShapeFlipPoint(drawing, h.position)),
+        ...getDrawingShapeTextWarpAdjustments(drawing).map((handle) => handle.paintedPosition),
       ].map((p) => pictureFrameLocalToWorld(rect, drawing.rotation, p)),
     );
   }

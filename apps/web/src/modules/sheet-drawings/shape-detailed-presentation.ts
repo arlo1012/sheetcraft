@@ -128,6 +128,8 @@ export function detailedShapeLocalBounds(
       density: 1,
     });
     const unflippedText = projectedShapeTextBounds(drawing, textPlan);
+    // The fragment caller reflects this combined body-carrier envelope once.
+    // Put the already-painted glyph bounds back into that carrier here.
     const text = {
       left: drawing.shapeFlipX ? drawing.width - unflippedText.right : unflippedText.left,
       right: drawing.shapeFlipX ? drawing.width - unflippedText.left : unflippedText.right,

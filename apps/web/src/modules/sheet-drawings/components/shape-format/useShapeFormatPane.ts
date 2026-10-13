@@ -5,6 +5,10 @@ import type {
   PictureFormatTranslate,
 } from "../../../sheet-images/picture-format-pane-model";
 import type { PictureTextureId } from "../../../sheet-images/picture-texture";
+import type {
+  WordArtTransformPreset,
+  WordArtTransformSelectionContext,
+} from "../../wordart-transform-presets";
 import {
   createShapeFormatSession,
   shapeFormatOwnerKey,
@@ -136,6 +140,26 @@ export function useShapeFormatPane(props: ShapeFormatPaneInput) {
       onCommit: session.styleAction(target, category),
     };
   }
+  function textWarpCapability(): PictureFormatCapability {
+    return props.snapshot
+      ? (props.capabilities.textWarp ?? { enabled: false, reason: s.value("unsupported") })
+      : { enabled: false, reason: s.value("missingSelection") };
+  }
+  function textWarpBinding() {
+    const capability = textWarpCapability();
+    const apply = session.textWarpAction();
+    return {
+      ownerId: `${ownerKey.value}:text-warp:${props.snapshot?.revision ?? "none"}`,
+      selectedWarp: props.snapshot?.mixedTextWarp ? undefined : props.snapshot?.textWarp,
+      mixed: props.snapshot?.mixedTextWarp === true,
+      locale: props.locale ?? "en-US",
+      disabled: !capability.enabled,
+      disabledReason: capability.reason,
+      menu: false,
+      onSelect: (choice: WordArtTransformPreset, context: WordArtTransformSelectionContext) =>
+        context.isCurrent() && apply(choice.warp),
+    };
+  }
   function assetLoader(target: ShapeFormatMode, category: "fill" | "line") {
     const token = session.capture(),
       loader = props.loadPaintAsset;
@@ -191,6 +215,8 @@ export function useShapeFormatPane(props: ShapeFormatPaneInput) {
     fieldLabel,
     styleCapability,
     styleBinding,
+    textWarpCapability,
+    textWarpBinding,
     assetLoader,
   };
 }

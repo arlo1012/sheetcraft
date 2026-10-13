@@ -300,6 +300,8 @@ export type WorkbookSnapshotV68 = Omit<WorkbookSnapshotV67, "version"> & { versi
 export type WorkbookSnapshotV69 = Omit<WorkbookSnapshotV68, "version"> & { version: 69 };
 /** Modern ordinary-shape WordArt semantics and local glyph fill/outline choices. */
 export type WorkbookSnapshotV70 = Omit<WorkbookSnapshotV69, "version"> & { version: 70 };
+/** Sparse standard text-warp geometry on ordinary shape and text-box glyphs. */
+export type WorkbookSnapshotV71 = Omit<WorkbookSnapshotV70, "version"> & { version: 71 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -328,8 +330,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV67
   | WorkbookSnapshotV68
   | WorkbookSnapshotV69
-  | WorkbookSnapshotV70;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV70, "version"> & {
+  | WorkbookSnapshotV70
+  | WorkbookSnapshotV71;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV71, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -418,7 +421,8 @@ type SnapshotVersion =
   | 67
   | 68
   | 69
-  | 70;
+  | 70
+  | 71;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -449,11 +453,18 @@ function inspectShapeSnapshotFeatures(
   value: SheetDrawing,
   path: string,
   version?: SnapshotVersion,
-): { hasScene: boolean; hasTextBox3d: boolean; hasOpenArea: boolean; hasModernWordArt: boolean } {
+): {
+  hasScene: boolean;
+  hasTextBox3d: boolean;
+  hasOpenArea: boolean;
+  hasModernWordArt: boolean;
+  hasTextWarp: boolean;
+} {
   let hasScene = false,
     hasTextBox3d = false,
     hasOpenArea = false,
-    hasModernWordArt = false;
+    hasModernWordArt = false,
+    hasTextWarp = false;
   const pending: { value: unknown; depth: number }[] = [{ value, depth: 0 }];
   const seen = new WeakSet<object>();
   let count = 0;
@@ -465,13 +476,19 @@ function inspectShapeSnapshotFeatures(
       const node = asRecord(entry.value, path);
       if (seen.has(node)) throw new TypeError("Cyclic or shared shape group ownership.");
       seen.add(node);
+      const textField = Object.getOwnPropertyDescriptor(node, "shapeText");
+      const textModel: unknown = textField && "value" in textField ? textField.value : undefined;
+      if (textModel && typeof textModel === "object" && "warp" in textModel) {
+        if (version !== undefined && version < 71)
+          return fail(`${path}.shapeText.warp`, "Shape text warps require snapshot version 71.");
+        // Writing scans normalized drawings; raw payload validation belongs to their owner.
+        hasTextWarp ||= !!Object.getOwnPropertyDescriptor(textModel, "warp")?.value;
+      }
       if ("wordArt" in node) {
         if (version !== undefined && version < 70)
           return fail(path, "Modern WordArt semantics require snapshot version 70.");
         hasModernWordArt ||= Object.getOwnPropertyDescriptor(node, "wordArt")?.value === true;
       }
-      const textField = Object.getOwnPropertyDescriptor(node, "shapeText");
-      const textModel: unknown = textField && "value" in textField ? textField.value : undefined;
       if (textModel && typeof textModel === "object") {
         const runsField = Object.getOwnPropertyDescriptor(textModel, "characterRuns");
         const rawRuns: unknown = runsField && "value" in runsField ? runsField.value : undefined;
@@ -543,7 +560,7 @@ function inspectShapeSnapshotFeatures(
     if (error instanceof WorkbookDomainError) throw error;
     return fail(path, error instanceof Error ? error.message : "Invalid shape group 3D.");
   }
-  return { hasScene, hasTextBox3d, hasOpenArea, hasModernWordArt };
+  return { hasScene, hasTextBox3d, hasOpenArea, hasModernWordArt, hasTextWarp };
 }
 
 /** Raw admission is bounded and descriptor-safe, including nested malformed owner graphs. */
@@ -1638,6 +1655,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   let hasTextBoxBody3d = false;
   let hasOpenShapeArea = false;
   let hasModernWordArt = false;
+  let hasTextWarp = false;
   // Inspect presence before old protocols can silently drop a shape-only feature.
   if (Array.isArray(record.drawings)) {
     for (const [index, drawing] of record.drawings.entries()) {
@@ -1651,6 +1669,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       hasTextBoxBody3d ||= scene.hasTextBox3d;
       hasOpenShapeArea ||= scene.hasOpenArea;
       hasModernWordArt ||= scene.hasModernWordArt;
+      hasTextWarp ||= scene.hasTextWarp;
       const oldTextField = Object.getOwnPropertyDescriptor(item, "shapeText");
       if (
         "shapeText" in item &&
@@ -2040,6 +2059,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasTextBoxBody3d) version = 68;
     if (hasOpenShapeArea) version = 69;
     if (hasModernWordArt) version = 70;
+    if (hasTextWarp) version = 71;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -2326,6 +2346,14 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 70;
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasTextWarp,
+      ),
+    )
+  )
+    snapshot.version = 71;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -2403,7 +2431,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 67 &&
     record.version !== 68 &&
     record.version !== 69 &&
-    record.version !== 70
+    record.version !== 70 &&
+    record.version !== 71
   ) {
     throw new WorkbookDomainError(
       {

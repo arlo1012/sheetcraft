@@ -108,6 +108,7 @@ const labels = computed(() =>
         rejected: "无法应用更改。已保留你的文本。",
         stale: "此形状或选区已更改。你可以复制保留的文本。",
         sourcePreview: "编辑时，渐变、图案、图片填充和复杂轮廓使用源文本预览。应用后保留完整外观。",
+        warpSourcePreview: "编辑的是变形前的源文字。应用后保留当前艺术字变形。",
       }
     : {
         text: "Edit shape text",
@@ -116,6 +117,8 @@ const labels = computed(() =>
         cancel: "Cancel",
         rejected: "The change could not be applied. Your text has been kept.",
         stale: "The shape or selection changed. You can copy the retained text.",
+        warpSourcePreview:
+          "Edit the straight source text. Applying preserves the current WordArt transform.",
         sourcePreview:
           "While editing, gradients, patterns, image fills and detailed outlines use a source text preview. Applied text keeps its full appearance.",
       },
@@ -568,11 +571,11 @@ defineExpose({ focus });
         {{ failure }}
       </p>
       <p
-        v-if="sourcePreviewDiffers"
+        v-if="sourcePreviewDiffers || drawing.shapeText?.warp"
         class="shape-canvas-text-editor__preview"
         data-shape-text-source-preview-note
       >
-        {{ labels.sourcePreview }}
+        {{ drawing.shapeText?.warp ? labels.warpSourcePreview : labels.sourcePreview }}
       </p>
     </FloatingPanelSurface>
   </Teleport>

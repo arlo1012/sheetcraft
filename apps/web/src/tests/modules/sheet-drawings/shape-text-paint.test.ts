@@ -2,6 +2,16 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { ShapeDetailedStyle, ShapePaint } from "@sheetcraft/core/shape-style";
+import { TEXT_WARP_PRESET_NAMES, type TextWarpPresetName } from "@sheetcraft/core/text-warps";
+import {
+  layoutDrawingShapeText,
+  getDrawingShapeTextNativeWarpSource,
+} from "../../../modules/sheet-drawings/shape-text-runtime";
+import { prepareShapeLeafPixels } from "../../../modules/sheet-drawings/shape-leaf-pixels";
+import { detailedShapeContainsWorldPoint } from "../../../modules/sheet-drawings/shape-detailed-presentation";
+import { pictureFrameLocalToWorld } from "@sheetcraft/core/picture-frame";
+import { shapeDrawingContainsWorldPoint } from "../../../modules/sheet-drawings/shape-line-paint";
+import { getDrawingShapeGeometry } from "../../../modules/sheet-drawings/shape-geometry";
 import type {
   ShapeTextLayoutResult,
   ShapeTextRun,
@@ -268,7 +278,32 @@ class MemoryContext {
   }
   fill() {
     const dot = this.circle;
-    if (!dot) return;
+    if (!dot) {
+      if (this.points.length < 3) return;
+      const left = Math.floor(Math.min(...this.points.map((point) => point.x))),
+        right = Math.ceil(Math.max(...this.points.map((point) => point.x))),
+        top = Math.floor(Math.min(...this.points.map((point) => point.y))),
+        bottom = Math.ceil(Math.max(...this.points.map((point) => point.y)));
+      for (let y = top; y < bottom; y++)
+        for (let x = left; x < right; x++) {
+          let inside = false;
+          for (
+            let index = 0, previous = this.points.length - 1;
+            index < this.points.length;
+            previous = index++
+          ) {
+            const a = this.points[index]!,
+              b = this.points[previous]!;
+            if (
+              a.y > y + 0.5 !== b.y > y + 0.5 &&
+              x + 0.5 < ((b.x - a.x) * (y + 0.5 - a.y)) / (b.y - a.y) + a.x
+            )
+              inside = !inside;
+          }
+          if (inside) this.pixel(x, y, [255, 255, 255, 255]);
+        }
+      return;
+    }
     for (let y = Math.floor(dot.y - dot.radius); y < Math.ceil(dot.y + dot.radius); y++)
       for (let x = Math.floor(dot.x - dot.radius); x < Math.ceil(dot.x + dot.radius); x++)
         if (Math.hypot(x + 0.5 - dot.x, y + 0.5 - dot.y) <= dot.radius)
@@ -293,9 +328,22 @@ class MemoryContext {
         this.pixel(px, py, image.data.subarray(source, source + 4));
       }
   }
-  getImageData() {
+  getImageData(x = 0, y = 0, width = this.canvas.width, height = this.canvas.height) {
     if (this.canvas.failRead) throw new Error("tainted");
-    return { data: this.canvas.data.slice() };
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let row = 0; row < height; row++)
+      for (let column = 0; column < width; column++) {
+        if (
+          x + column < 0 ||
+          y + row < 0 ||
+          x + column >= this.canvas.width ||
+          y + row >= this.canvas.height
+        )
+          continue;
+        const source = ((y + row) * this.canvas.width + x + column) * 4;
+        data.set(this.canvas.data.subarray(source, source + 4), (row * width + column) * 4);
+      }
+    return { width, height, data };
   }
   createImageData(width: number, height: number) {
     return { width, height, data: new Uint8ClampedArray(width * height * 4) };
@@ -358,6 +406,223 @@ function options() {
   };
   return { drawing, layout: layout(), density: 1 } satisfies ShapeTextPaintOptions;
 }
+function warpOptions(preset: TextWarpPresetName, text = "ab", flipX = false, flipY = false) {
+  const base = options(),
+    shapeText = createDefaultShapeText();
+  shapeText.layout.wrap = false;
+  shapeText.layout.overflow = true;
+  shapeText.layout.marginsPt = { leftPt: 0, rightPt: 0, topPt: 0, bottomPt: 0 };
+  shapeText.fontFamily = "Exact Family";
+  shapeText.warp = { preset };
+  const drawing: SheetGraphicDrawing = {
+    ...base.drawing,
+    wordArt: true,
+    shapeGeometry: { preset: "rect" },
+    text,
+    width: 48,
+    height: 24,
+    fontSize: 16,
+    shapeText,
+    ...(flipX ? { shapeFlipX: true } : {}),
+    ...(flipY ? { shapeFlipY: true } : {}),
+  };
+  return {
+    drawing,
+    density: 1,
+    layout: layoutDrawingShapeText(drawing, {
+      measurer: {
+        measure: (value) => value.length * 4,
+        measureMetrics: (value) => ({
+          width: value.length * 4,
+          ascent: value.trim() ? 4 : 0,
+          descent: 0,
+          inkLeft: 0,
+          inkRight: value.trim() ? value.length * 4 : 0,
+        }),
+      },
+      normalLineMetrics: { ascent: 4, descent: 1, lineAdvance: 5 },
+    }),
+  } satisfies ShapeTextPaintOptions;
+}
+
+describe("actual native WordArt mask consumers", () => {
+  test("active warp body fallback never promotes its empty text rectangle to an alpha hit", () => {
+    const input = warpOptions("textWave1");
+    const drawing = {
+      ...input.drawing,
+      fill: "transparent",
+      stroke: "transparent",
+      strokeWidth: 0,
+    };
+    expect(drawing.shapeStyle).toBeUndefined();
+    const geometry = getDrawingShapeGeometry(drawing, false);
+    const frame = { x: 100, y: 80, width: drawing.width, height: drawing.height };
+    const point = { x: 124, y: 92 };
+    expect(shapeDrawingContainsWorldPoint(drawing, geometry, frame, point)).toBe(false);
+    expect(
+      shapeDrawingContainsWorldPoint({ ...drawing, fill: "#ff0000" }, geometry, frame, point),
+    ).toBe(true);
+  });
+  test("attributed envelopes charge every full native source Canvas/readback pass", () => {
+    const input = warpOptions("textPlain", "abcdefghijklm");
+    const drawing = { ...input.drawing, width: 200, height: 100, fontSize: 500 };
+    const tuple = {
+      measurer: {
+        measure: (text: string) => text.length * 300,
+        measureMetrics: (text: string) => ({
+          width: text.length * 300,
+          ascent: 450,
+          descent: 50,
+          inkLeft: 0,
+          inkRight: text.length * 300,
+        }),
+      },
+      normalLineMetrics: { ascent: 450, descent: 50, lineAdvance: 500 },
+    };
+    const uniform = planShapeTextPaint({
+      drawing,
+      density: 1,
+      layout: layoutDrawingShapeText(drawing, tuple),
+    });
+    expect(uniform.warpPlan!.proof.sourceRasterBytes).toBeGreaterThan(15_000_000);
+    drawing.shapeText = {
+      ...drawing.shapeText!,
+      characterRuns: Array.from(drawing.text, (_, index) => ({
+        start: index,
+        end: index + 1,
+        color: `#${(index + 1).toString(16).padStart(6, "0")}`,
+      })),
+    };
+    expect(() =>
+      planShapeTextPaint({ drawing, density: 1, layout: layoutDrawingShapeText(drawing, tuple) }),
+    ).toThrow(/aggregate raster-span work budget/);
+  });
+  test.each(TEXT_WARP_PRESET_NAMES)(
+    "%s has real source calls, alpha and bounded owned release",
+    (preset) => {
+      const native = factory(),
+        input = warpOptions(preset);
+      const plan = planShapeTextPaint(input);
+      expect(plan.warpPlan?.family).toBeDefined();
+      const result = prepareShapeTextPaint({ ...input, canvasFactory: native.make });
+      expect(result.kind).toBe("ready");
+      if (result.kind !== "ready") throw new Error("Expected native WordArt pixels.");
+      try {
+        const pixels = (result.canvas as unknown as MemoryCanvas).data;
+        expect(pixels.some((alpha, index) => index % 4 === 3 && alpha > 0)).toBe(true);
+        const calls = native.calls().filter((call) => call.mode === "fill");
+        if (plan.warpPlan!.family === "envelope")
+          expect(calls.map((call) => call.text)).toEqual(["ab"]);
+        else {
+          expect(calls.map((call) => call.text)).toEqual(["a", "b"]);
+          for (const { matrix, font } of calls) {
+            expect(matrix[0] * matrix[3] - matrix[1] * matrix[2]).toBeCloseTo(1, 10);
+            expect(font).toContain("16px");
+          }
+        }
+        expect(result.estimatedPeakBytes).toBeLessThanOrEqual(SHAPE_TEXT_PAINT_LIMITS.memoryBytes);
+      } finally {
+        result.dispose();
+      }
+      expect(native.canvases.every((canvas) => canvas.width === 0 && canvas.height === 0)).toBe(
+        true,
+      );
+    },
+  );
+  test.each(["textArchUp", "textCircle"] as const)(
+    "%s H reflection mirrors actual rigid glyph axes once",
+    (preset) => {
+      const native = factory();
+      const result = prepareShapeTextPaint({
+        ...warpOptions(preset, "ab", true),
+        canvasFactory: native.make,
+      });
+      if (result.kind !== "ready") throw new Error("Expected reflected glyphs.");
+      try {
+        expect(native.calls().map((call) => call.text)).toEqual(["a", "b"]);
+        for (const { matrix } of native.calls())
+          expect(matrix[0] * matrix[3] - matrix[1] * matrix[2]).toBeCloseTo(-1, 10);
+      } finally {
+        result.dispose();
+      }
+    },
+  );
+  test("every active warp requires actual native alpha preflight and rejects stale or unsupported sources", () => {
+    const native = factory(),
+      input = warpOptions("textWave1");
+    expect(preflightShapeTextGlyphBudgets({ ...input, canvasFactory: native.make })).toMatchObject({
+      kind: "ready",
+      proof: "native-alpha-warp",
+    });
+    input.drawing.text = "changed";
+    expect(() => planShapeTextPaint(input)).toThrow(/prepare its layout/);
+    expect(() => planShapeTextPaint(warpOptions("textArchUp", "中文"))).toThrow(/printable ASCII/);
+    expect(native.canvases.every((canvas) => canvas.width === 0 && canvas.height === 0)).toBe(true);
+  });
+  test.each(["textWave1", "textCircle"] as const)(
+    "%s consumes the united leaf and actual reflected alpha hit source",
+    (preset) => {
+      const input = warpOptions(preset, "ab", true),
+        native = factory();
+      const tuple = getDrawingShapeTextNativeWarpSource(input.drawing, input.layout);
+      const drawing = {
+        ...input.drawing,
+        shapeStyle: { fill: { kind: "none" as const }, line: { kind: "none" as const } },
+      };
+      const result = prepareShapeLeafPixels({
+        drawing,
+        density: 1,
+        canvasFactory: native.make,
+        textRuntimeOptions: {
+          measurer: tuple.measurer,
+          normalLineMetrics: tuple.normalLineMetrics,
+          resolveNormalLineMetrics: tuple.resolveNormalLineMetrics,
+        },
+      });
+      if (result.kind !== "ready") throw new Error("Expected actual united WordArt leaf.");
+      try {
+        expect(result.textPlan?.warpPlan?.family).toBeDefined();
+        const pixels = result.canvas
+          .getContext("2d")!
+          .getImageData(0, 0, result.canvas.width, result.canvas.height).data;
+        const ink = pixels.findIndex((value, index) => index % 4 === 3 && value > 1);
+        expect(ink).toBeGreaterThanOrEqual(3);
+        const pixelIndex = Math.floor(ink / 4);
+        const frame = { x: 100, y: 80, width: drawing.width, height: drawing.height };
+        const point = pictureFrameLocalToWorld(frame, drawing.rotation, {
+          x:
+            result.logicalBounds.left +
+            ((pixelIndex % result.canvas.width) + 0.5) / result.actualDensity,
+          y:
+            result.logicalBounds.top +
+            (Math.floor(pixelIndex / result.canvas.width) + 0.5) / result.actualDensity,
+        });
+        expect(
+          detailedShapeContainsWorldPoint(drawing, frame, point, {
+            drawing,
+            canvas: result.canvas,
+            density: result.actualDensity,
+            bounds: {
+              left: result.logicalBounds.left,
+              top: result.logicalBounds.top,
+              width: result.logicalBounds.right - result.logicalBounds.left,
+              height: result.logicalBounds.bottom - result.logicalBounds.top,
+            },
+            unflipped: true,
+          }),
+        ).toBe(true);
+        expect(native.calls().map((call) => call.text)).toContain(
+          preset === "textCircle" ? "a" : "ab",
+        );
+      } finally {
+        result.dispose();
+      }
+      expect(native.canvases.every((canvas) => canvas.width === 0 && canvas.height === 0)).toBe(
+        true,
+      );
+    },
+  );
+});
 function solid(rgb: string, opacity = 1): ShapePaint {
   return { kind: "solid", color: { kind: "rgb", rgb }, opacity };
 }

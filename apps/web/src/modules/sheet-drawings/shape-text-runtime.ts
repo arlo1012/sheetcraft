@@ -134,8 +134,10 @@ export function getDrawingShapeTextRect(drawing: SheetGraphicDrawing): ShapeText
   const rect = geometry?.textRect;
   return rect
     ? {
-        x: drawing.shapeFlipX ? drawing.width - rect.right : rect.left,
-        y: drawing.shapeFlipY ? drawing.height - rect.bottom : rect.top,
+        // Active WordArt mirrors the finished glyph surface. Its native source
+        // and the straight F2 editor keep one unreflected normalization rect.
+        x: drawing.shapeFlipX && !drawing.shapeText?.warp ? drawing.width - rect.right : rect.left,
+        y: drawing.shapeFlipY && !drawing.shapeText?.warp ? drawing.height - rect.bottom : rect.top,
         width: rect.right - rect.left,
         height: rect.bottom - rect.top,
       }
@@ -250,11 +252,11 @@ export function resolveDrawingShapeText(
 /** Reuse the actual layout for CSS and detailed text consumers. Glyphs never
  * receive the body's reflection; V turns the text inside its own local box. */
 export function applyShapeTextVerticalFlip(
-  drawing: Readonly<{ shapeFlipY?: true }>,
+  drawing: Readonly<{ shapeFlipY?: true; shapeText?: { warp?: unknown } }>,
   textRect: ShapeTextRect,
   result: ShapeTextLayoutResult,
 ): ShapeTextLayoutResult {
-  if (!drawing.shapeFlipY) return result;
+  if (!drawing.shapeFlipY || drawing.shapeText?.warp) return result;
   // Desktop vertical flip turns the readable text by 180 degrees rather than
   // mirroring glyphs. Horizontal flip only changes the asymmetric text rect.
   const cx = textRect.x + textRect.width / 2;
@@ -285,12 +287,68 @@ export function applyShapeTextVerticalFlip(
     visibleInkBounds: result.visibleInkBounds ? rotateRect(result.visibleInkBounds) : null,
   };
 }
+const nativeWarpSources = new WeakMap<
+  ShapeTextLayoutResult,
+  Readonly<{
+    resolved: ResolvedDrawingShapeText;
+    signature: string;
+  }>
+>();
+function nativeSourceSignature(drawing: SheetGraphicDrawing): string {
+  return JSON.stringify(
+    [
+      drawing.text,
+      drawing.width,
+      drawing.height,
+      drawing.fontSize,
+      drawing.bold,
+      drawing.italic,
+      drawing.shapeGeometry,
+      drawing.shapePath,
+      drawing.shapeText,
+      drawing.shapeFlipX,
+      drawing.shapeFlipY,
+    ],
+    (_key, value: unknown) =>
+      value && typeof value === "object" && !Array.isArray(value)
+        ? Object.fromEntries(
+            Object.keys(value)
+              .sort()
+              .map((key) => [key, (value as Record<string, unknown>)[key]]),
+          )
+        : value,
+  );
+}
+/** Only actual native layouts can supply the measurement tuple to a warp.
+ * No remeasurement fallback can silently substitute another font/provider. */
+export function getDrawingShapeTextNativeWarpSource(
+  drawing: SheetGraphicDrawing,
+  layout: ShapeTextLayoutResult,
+): ResolvedDrawingShapeText {
+  const retained = nativeWarpSources.get(layout);
+  if (
+    !retained ||
+    retained.signature !== nativeSourceSignature(drawing) ||
+    retained.resolved.fontRevision !== cellTextFontRevision.value
+  )
+    throw new ShapeTextRuntimeError(
+      "invalid-input",
+      "The native WordArt source or ready font changed; prepare its layout again.",
+    );
+  return retained.resolved;
+}
 function resolvedLayout(resolved: ResolvedDrawingShapeText): ShapeTextLayoutResult {
-  return applyShapeTextVerticalFlip(
+  const result = applyShapeTextVerticalFlip(
     resolved.drawing,
     resolved.textRect,
     layoutShapeText({ ...resolved, layout: resolved.layoutOptions }),
   );
+  if (resolved.drawing.shapeText?.warp)
+    nativeWarpSources.set(result, {
+      resolved,
+      signature: nativeSourceSignature(resolved.drawing),
+    });
+  return result;
 }
 export function layoutDrawingShapeText(
   drawing: SheetGraphicDrawing,

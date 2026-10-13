@@ -6,6 +6,7 @@ import { getDrawingShapeGeometry } from "../../../modules/sheet-drawings/shape-g
 import {
   ensureDrawingShapeTextFont,
   getDrawingShapeTextRect,
+  getDrawingShapeTextNativeWarpSource,
   layoutDrawingShapeText,
   prepareDrawingShapeTextCandidate,
   resolveDrawingShapeText,
@@ -89,6 +90,66 @@ beforeEach(() => {
 });
 
 describe("drawing shape-text resolution", () => {
+  test("active warp retains the genuine native tuple and an unreflected straight editor source", () => {
+    const source = autoFit({
+      kind: "shape",
+      shapeGeometry: { preset: "rightArrow" },
+      shapeFlipX: true,
+      shapeFlipY: true,
+      width: 240,
+      height: 160,
+    });
+    source.shapeText!.warp = { preset: "textWave1" };
+    const rect = getDrawingShapeGeometry(source)!.textRect!;
+    expect(getDrawingShapeTextRect(source)).toEqual({
+      x: rect.left,
+      y: rect.top,
+      width: rect.right - rect.left,
+      height: rect.bottom - rect.top,
+    });
+    const layout = layoutDrawingShapeText(source, native);
+    expect(layout.runs[0]!.angle).toBe(0);
+    const retained = getDrawingShapeTextNativeWarpSource(source, layout);
+    expect(retained.measurer).toBe(native.measurer);
+    expect(retained.text).toBe(source.text);
+    expect(retained.fontRevision).toBe(0);
+    expect(getDrawingShapeTextNativeWarpSource(structuredClone(source), layout)).toBe(retained);
+    for (const changed of [
+      { ...source, text: "changed" },
+      { ...source, fontSize: source.fontSize + 1 },
+      { ...source, width: source.width + 1 },
+      { ...source, shapeText: { ...source.shapeText!, warp: { preset: "textPlain" as const } } },
+    ])
+      expect(() => getDrawingShapeTextNativeWarpSource(changed, layout)).toThrow(
+        /prepare its layout/,
+      );
+    resource.fontRevision.value++;
+    expect(() => getDrawingShapeTextNativeWarpSource(source, layout)).toThrow(/ready font changed/);
+  });
+  test("None restores ordinary V180 and never manufactures a native warp lease", () => {
+    const source = autoFit({ shapeFlipY: true });
+    const layout = layoutDrawingShapeText(source, native);
+    expect(layout.runs[0]!.angle).toBe(180);
+    expect(() => getDrawingShapeTextNativeWarpSource(source, layout)).toThrow(/prepare its layout/);
+  });
+  test("AutoFit normalization preserves its final native source lease and retained warp", () => {
+    const source = autoFit({
+      kind: "shape",
+      wordArt: true,
+      shapeGeometry: { preset: "rect" },
+      width: 100,
+      height: 100,
+    });
+    source.shapeText!.layout.wrap = false;
+    source.shapeText!.layout.overflow = true;
+    source.shapeText!.warp = { preset: "textWave1" };
+    // Deliberately distinct input property order is not a stale owner change.
+    source.shapeText!.style = { fill: { kind: "none" } };
+    const prepared = prepareDrawingShapeTextCandidate(source, native);
+    expect(prepared.resized).toBe(true);
+    expect(prepared.drawing.shapeText!.warp).toEqual(source.shapeText!.warp);
+    expect(getDrawingShapeTextNativeWarpSource(prepared.drawing, prepared.layout).text).toBe("abc");
+  });
   test("legacy reads preserve absent models and existing effective inset/layout", () => {
     const source = drawing({ kind: "shape", height: 60 });
     const before = structuredClone(source);

@@ -157,3 +157,35 @@ describe("WordArt range glyph appearance shares the leased text draft", () => {
     }
   });
 });
+
+test("text transform remains object-level during a leased draft and composing never partially commits", () => {
+  const f = setup();
+  try {
+    f.callbacks.setSelection({ start: 0, end: 5, direction: "forward" });
+    expect(f.style("fill", red)).toBe(true);
+    const draft = f.editor.snapshot.value!.draftView;
+    const snapshot = f.pane.snapshot.value!;
+    expect(f.pane.capabilities.value.textWarp?.enabled).toBe(false);
+    expect(f.pane.capabilities.value.textWarp?.reason).toContain("Apply the text");
+    expect(snapshot.scopeDescription).toContain("text-transform");
+    const transform = () =>
+      f.pane.onIntent({
+        type: "set-text-warp",
+        value: { preset: "textWave1" },
+        owner: snapshot.owner,
+        baseRevision: snapshot.revision,
+        intentId: "object-transform",
+      });
+    expect(transform()).toBe(false);
+    f.callbacks.setComposing(true);
+    expect(transform()).toBe(false);
+    expect(f.editor.snapshot.value!.draftView).toBe(draft);
+    expect(f.editor.snapshot.value!.draftView.shapeText!.characterRuns).toEqual([
+      { start: 0, end: 5, fill: red },
+    ]);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.core.history.undoStack).toHaveLength(0);
+  } finally {
+    f.scope.stop();
+  }
+});

@@ -141,9 +141,10 @@ export function useShapeTextCharacterFormatPane(options: {
       values,
       mixedFields,
       scopeDescription: chinese
-        ? `${start === end ? "字体、文字填充和轮廓用于光标处新输入的文字" : "字体、文字填充和轮廓仅用于选中的文字"}；段落和文本框设置请先应用文字，再修改。`
-        : `${start === end ? "Font, text fill and outline apply to new text at the caret" : "Font, text fill and outline apply only to selected characters"}. Apply the text before changing paragraph or text-box settings.`,
+        ? `${start === end ? "字体、文字填充和轮廓用于光标处新输入的文字" : "字体、文字填充和轮廓仅用于选中的文字"}；段落、文本框和文字转换设置请先应用文字，再修改。`
+        : `${start === end ? "Font, text fill and outline apply to new text at the caret" : "Font, text fill and outline apply only to selected characters"}. Apply the text before changing paragraph, text-box or text-transform settings.`,
       textStyle,
+      ...(drawing.shapeText?.warp ? { textWarp: drawing.shapeText.warp } : {}),
       ...(mixedStyles.length ? { mixedStyleCategories: { text: mixedStyles } } : {}),
       ...(acknowledged.value?.revision === state.formatRevision
         ? { acceptedIntentId: acknowledged.value.id }
@@ -212,6 +213,7 @@ export function useShapeTextCharacterFormatPane(options: {
           ]),
         ),
       },
+      textWarp: { enabled: false, reason },
       lineEnds: { enabled: false, reason },
     };
   });

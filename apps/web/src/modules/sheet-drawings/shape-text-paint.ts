@@ -51,6 +51,10 @@ import {
   type ShapeTextRect,
   type ShapeTextRun,
 } from "./shape-text-layout";
+import { getDrawingShapeTextNativeWarpSource } from "./shape-text-runtime";
+import { prepareShapeTextWarpPlan, type ShapeTextWarpPlan } from "./shape-text-warp-plan";
+import { getShapeTextWarpNativeSource } from "./shape-text-warp-source";
+import { rasterizeTextWarpAlpha } from "./text-warp-mesh";
 
 export const SHAPE_TEXT_PAINT_LIMITS = Object.freeze({
   side: 4096,
@@ -104,6 +108,8 @@ type ShapeTextPaintSource = Readonly<{
   rasterMemoryBytes: number;
   requiresGlyphProjection: boolean;
   sourceNumericBytes: number;
+  /** A prepared, native-source-owned geometry consumer. Never a document field. */
+  warpPlan?: ShapeTextWarpPlan;
 }>;
 export type ShapeTextPaintPlan = PictureDetailedRasterPlan & ShapeTextPaintSource;
 export type ShapeTextPaintReady = PictureDetailedRasterReadyPlan &
@@ -126,7 +132,11 @@ export type ShapeTextGlyphBudgetPreflight =
   | Readonly<{
       kind: "ready";
       /** This result proves glyph budgets; normal paint-resource availability stays separate. */
-      proof: "numeric-source" | "native-alpha-outline" | "painted-alpha-projection";
+      proof:
+        | "numeric-source"
+        | "native-alpha-outline"
+        | "native-alpha-warp"
+        | "painted-alpha-projection";
       actualDensity: number;
       estimatedPeakBytes: number;
       contourCount: number;
@@ -429,6 +439,7 @@ function prepareSource(options: ShapeTextPaintOptions) {
     contourRequired,
     requiresGlyphProjection,
     sourceNumericBytes: runs.length * 640 + units * 4 + appearanceBytes + 8192,
+    warpPlan: undefined as ShapeTextWarpPlan | undefined,
   };
 }
 
@@ -558,6 +569,15 @@ function conservativeGlyphProjection(
 
 /** Pure preflight: no Canvas, font lookup, image decoding or paint callbacks. */
 export function planShapeTextPaint(options: ShapeTextPaintOptions): ShapeTextPaintPlan {
+  return planShapeTextPaintAtWarpDensity(options, 0, 0);
+}
+function planShapeTextPaintAtWarpDensity(
+  options: ShapeTextPaintOptions,
+  attempt: number,
+  priorAllocatedWarpBytes: number,
+): ShapeTextPaintPlan {
+  if (!Number.isFinite(options.density) || options.density <= 0 || options.density > 64)
+    throw new ShapeTextPaintPreflightError("Glyph pixel density must be finite within (0,64].");
   const source = prepareSource(options),
     assetIds = [
       ...new Set([
@@ -585,21 +605,131 @@ export function planShapeTextPaint(options: ShapeTextPaintOptions): ShapeTextPai
     )
       throw new ShapeTextPaintPreflightError("Glyph paint asset metadata is invalid.");
   }
+  if (options.drawing.shapeText?.warp)
+    source.contourRequired ||= source.lineSpans.some((span) => visibleLine(span.line));
   const contourBytes =
     source.contourRequired || source.requiresGlyphProjection || options.captureSilhouette
       ? SHAPE_GLYPH_CONTOUR_LIMITS.scratchBytes
       : 0;
+  const warp = options.drawing.shapeText?.warp;
+  if (warp) {
+    const native = getDrawingShapeTextNativeWarpSource(options.drawing, options.layout);
+    const normalization = getShapeTextWarpNativeSource(options.layout);
+    const nativeBounds =
+      normalization.kind === "native-text"
+        ? union(source.sourceBounds, {
+            left: normalization.left,
+            top: normalization.top,
+            right: normalization.left + normalization.width,
+            bottom: normalization.top + normalization.height,
+          })
+        : source.sourceBounds;
+    const sourceWidth = nativeBounds.right - nativeBounds.left,
+      sourceHeight = nativeBounds.bottom - nativeBounds.top;
+    // Source Canvas limits apply before allocation. Four texels cover both
+    // independent floor/ceil edges and the sampler's transparent support.
+    const fitsNativeSource = (density: number) =>
+      sourceWidth * density + 4 <= SHAPE_TEXT_PAINT_LIMITS.side &&
+      sourceHeight * density + 4 <= SHAPE_TEXT_PAINT_LIMITS.side &&
+      (sourceWidth * density + 4) * (sourceHeight * density + 4) <= SHAPE_TEXT_PAINT_LIMITS.pixels;
+    let sourceDensity = options.density;
+    if (!fitsNativeSource(sourceDensity)) {
+      let low = 0,
+        high = sourceDensity;
+      for (let index = 0; index < 48; index++) {
+        const middle = (low + high) / 2;
+        if (fitsNativeSource(middle)) low = middle;
+        else high = middle;
+      }
+      sourceDensity = low;
+    }
+    if (!(sourceDensity > 0))
+      throw new ShapeTextPaintPreflightError("WordArt native source cannot fit its Canvas budget.");
+    source.warpPlan = prepareShapeTextWarpPlan({
+      warp,
+      textRect: native.textRect,
+      layout: options.layout,
+      rasterDensity: sourceDensity,
+      sourceText: native.text,
+      measurer: native.measurer,
+      font: native.font,
+      normalLineMetrics: native.normalLineMetrics,
+      resolveNormalLineMetrics: native.resolveNormalLineMetrics,
+      horizontalFlip: options.drawing.shapeFlipX === true,
+      verticalFlip: options.drawing.shapeFlipY === true,
+      reflectionRect: { x: 0, y: 0, width: options.drawing.width, height: options.drawing.height },
+      decorations: source.runs.flatMap((run, sourceRunIndex) =>
+        (["underline", "strike"] as const).flatMap((kind) => {
+          if (!(run[kind] ?? source[kind])) return [];
+          const rect = transformedDecoration(run, decoration(run, kind));
+          return [
+            {
+              sourceRunIndex,
+              bounds: {
+                x: rect.left,
+                y: rect.top,
+                width: rect.right - rect.left,
+                height: rect.bottom - rect.top,
+              },
+            },
+          ];
+        }),
+      ),
+      budget: {
+        reservedBytes: source.sourceNumericBytes + contourBytes + priorAllocatedWarpBytes,
+        maxBytes: SHAPE_TEXT_PAINT_LIMITS.memoryBytes,
+        maxWork: SHAPE_TEXT_PAINT_LIMITS.rasterWork,
+        maxSourceSide: SHAPE_TEXT_PAINT_LIMITS.side,
+        maxSourcePixels: SHAPE_TEXT_PAINT_LIMITS.pixels,
+      },
+    });
+    const destination = source.warpPlan.destinationBounds;
+    if (source.clipRect)
+      source.clipRect = Object.freeze({
+        ...source.clipRect,
+        x: options.drawing.shapeFlipX
+          ? options.drawing.width - source.clipRect.x - source.clipRect.width
+          : source.clipRect.x,
+        y: options.drawing.shapeFlipY
+          ? options.drawing.height - source.clipRect.y - source.clipRect.height
+          : source.clipRect.y,
+      });
+    source.sourceBounds = destination
+      ? bounds(destination)
+      : { left: 0, top: 0, right: 1, bottom: 1 };
+    // Outline widths are applied to the finished glyph contour, rather than
+    // being stretched by a text envelope. Reserve their real destination units.
+    const padding = Math.max(
+      0,
+      ...source.lineSpans.map(({ line }) =>
+        visibleLine(line)
+          ? ((line.widthPt * 4) / 3 / 2) *
+            Math.max(line.miterLimit, line.cap === "square" ? Math.SQRT2 : 1)
+          : 0,
+      ),
+    );
+    source.sourceBounds = {
+      left: source.sourceBounds.left - padding,
+      top: source.sourceBounds.top - padding,
+      right: source.sourceBounds.right + padding,
+      bottom: source.sourceBounds.bottom + padding,
+    };
+    source.sourceNumericBytes += source.warpPlan.proof.retainedNumericBytes;
+  }
   // Compositor reserves 64 bytes/pixel. Glyph masks, two paint surfaces, own source
   // Canvas/readback and cache detach additionally reserve 32 bytes/front pixel.
   const memoryBytes = Math.floor(
-    (SHAPE_TEXT_PAINT_LIMITS.memoryBytes - contourBytes - source.sourceNumericBytes) / 1.5,
+    (SHAPE_TEXT_PAINT_LIMITS.memoryBytes -
+      contourBytes -
+      source.sourceNumericBytes -
+      priorAllocatedWarpBytes -
+      (source.warpPlan?.proof.estimatedPeakBytes ?? 0)) /
+      1.5,
   );
   if (memoryBytes < 8192)
     throw new ShapeTextPaintPreflightError(
       "Glyph ordered numeric source exceeds its aggregate memory budget.",
     );
-  if (!Number.isFinite(options.density) || options.density <= 0 || options.density > 64)
-    throw new ShapeTextPaintPreflightError("Glyph pixel density must be finite within (0,64].");
   const format =
       source.effectiveStyle.format3d?.kind === "value"
         ? source.effectiveStyle.format3d.value
@@ -613,6 +743,7 @@ export function planShapeTextPaint(options: ShapeTextPaintOptions): ShapeTextPai
   const initialDensity = source.requiresGlyphProjection
     ? Math.min(
         options.density,
+        source.warpPlan?.rasterDensity ?? options.density,
         4096 /
           Math.max(
             1,
@@ -623,7 +754,7 @@ export function planShapeTextPaint(options: ShapeTextPaintOptions): ShapeTextPai
             ((rotation?.distanceFromGroundPt ?? 0) * 4) / 3,
           ),
       )
-    : options.density;
+    : Math.min(options.density, source.warpPlan?.rasterDensity ?? options.density);
   const rasterOptions = {
     widthPx: options.drawing.width,
     heightPx: options.drawing.height,
@@ -643,6 +774,17 @@ export function planShapeTextPaint(options: ShapeTextPaintOptions): ShapeTextPai
     limits: { memoryBytes },
   };
   let raster = planDetailedPictureRaster(rasterOptions);
+  if (source.warpPlan && raster.actualDensity < source.warpPlan.rasterDensity * (1 - 1e-9)) {
+    if (attempt >= 3)
+      throw new ShapeTextPaintPreflightError(
+        "WordArt cannot settle its bounded native raster density.",
+      );
+    return planShapeTextPaintAtWarpDensity(
+      { ...options, density: raster.actualDensity },
+      attempt + 1,
+      priorAllocatedWarpBytes + source.warpPlan.proof.preparationAllocatedNumericBytes,
+    );
+  }
   if (source.contourRequired) {
     // Quantized alpha cells add at most sqrt(2) raster pixels beyond the
     // mathematical ink contour. Reserve two pixels after adaptive sampling;
@@ -660,6 +802,17 @@ export function planShapeTextPaint(options: ShapeTextPaintOptions): ShapeTextPai
       throw new ShapeTextPaintPreflightError(
         "Glyph contour reconstruction cannot fit its conservative bounds budget.",
       );
+  }
+  if (source.warpPlan && raster.actualDensity < source.warpPlan.rasterDensity * (1 - 1e-9)) {
+    if (attempt >= 3)
+      throw new ShapeTextPaintPreflightError(
+        "WordArt cannot settle its bounded contour raster density.",
+      );
+    return planShapeTextPaintAtWarpDensity(
+      { ...options, density: raster.actualDensity },
+      attempt + 1,
+      priorAllocatedWarpBytes + source.warpPlan.proof.preparationAllocatedNumericBytes,
+    );
   }
   if (source.attributedFill || source.attributedLine) {
     // Bound every span clear/read/sample/mask/compose and contour scan. Scratch
@@ -679,12 +832,31 @@ export function planShapeTextPaint(options: ShapeTextPaintOptions): ShapeTextPai
   const sourceScratchBytes =
     raster.frontWidthRaster * raster.frontHeightRaster * 32 +
     contourBytes +
-    source.sourceNumericBytes;
+    source.sourceNumericBytes +
+    priorAllocatedWarpBytes +
+    (source.warpPlan?.proof.estimatedPeakBytes ?? 0);
   const estimatedPeakBytes = raster.estimatedPeakBytes + sourceScratchBytes;
   if (estimatedPeakBytes > SHAPE_TEXT_PAINT_LIMITS.memoryBytes)
     throw new ShapeTextPaintPreflightError(
       "Glyph paint exceeds its aggregate 64MiB presentation budget.",
     );
+  if (source.warpPlan) {
+    const maskPasses =
+      1 +
+      (source.attributedFill ? source.fillSpans.length : 0) +
+      (source.attributedLine
+        ? source.lineSpans.filter((span) => visibleLine(span.line)).length
+        : 0);
+    const work =
+      source.warpPlan.proof.preparationWork +
+      source.warpPlan.proof.rasterWork * maskPasses +
+      source.warpPlan.proof.sourceRasterBytes * (maskPasses - 1) +
+      raster.frontWidthRaster * raster.frontHeightRaster * (4 + maskPasses * 8);
+    if (work > SHAPE_TEXT_PAINT_LIMITS.rasterWork)
+      throw new ShapeTextPaintPreflightError(
+        "WordArt native masks exceed the aggregate raster-span work budget.",
+      );
+  }
   const result = {
     ...raster,
     ...source,
@@ -746,6 +918,109 @@ function nativeMask(
     }
   } finally {
     context.restore();
+  }
+}
+/** Warp only genuine native alpha, then sample appearance and stroke contours
+ * in the final drawing coordinate system. Four FollowPath choices draw each
+ * admitted ASCII grapheme independently with its exact native font and rigid
+ * tangent axes; an envelope never substitutes that flexible route for it. */
+function warpedNativeMask(
+  plan: ShapeTextPaintPlan,
+  runs: readonly Readonly<ShapeTextRun>[],
+  make: (width: number, height: number) => HTMLCanvasElement,
+): PictureRgbaSurface {
+  const warp = plan.warpPlan;
+  if (!warp) throw new TypeError("A native WordArt mask requires its prepared geometry.");
+  const selected = new Set<number>(),
+    selectedRuns = new Set(runs);
+  for (let index = 0; index < plan.runs.length; index++)
+    if (selectedRuns.has(plan.runs[index]!)) selected.add(index);
+  const output = createPictureRgbaSurface(plan.frontWidthRaster, plan.frontHeightRaster);
+  if (warp.family === "envelope") {
+    for (const group of warp.groups) {
+      if (group.kind !== "envelope") continue;
+      const groupRuns = group.runIndices
+        .filter((index) => selected.has(index))
+        .map((index) => plan.runs[index]!);
+      if (!groupRuns.length) continue;
+      const canvas = make(group.sourcePixelWidth, group.sourcePixelHeight);
+      try {
+        const context = context2d(canvas);
+        context.scale(plan.actualDensity, plan.actualDensity);
+        context.translate(-group.sourceRasterRect.left, -group.sourceRasterRect.top);
+        nativeMask(context, plan, undefined, false, groupRuns);
+        const alpha = rasterizeTextWarpAlpha({
+          mesh: group.mesh,
+          source: { ...read(canvas), format: "rgba" },
+          budget: group.meshBudget,
+        });
+        const offsetX = alpha.left - plan.frontBoundsRaster.left,
+          offsetY = alpha.top - plan.frontBoundsRaster.top;
+        if (
+          !Number.isSafeInteger(offsetX) ||
+          !Number.isSafeInteger(offsetY) ||
+          offsetX < 0 ||
+          offsetY < 0 ||
+          offsetX + alpha.width > output.width ||
+          offsetY + alpha.height > output.height
+        )
+          throw new ShapeTextPaintPreflightError(
+            "Warped native glyphs escaped their prepared front bounds.",
+          );
+        for (let y = 0; y < alpha.height; y++)
+          for (let x = 0; x < alpha.width; x++) {
+            const sourceAlpha = alpha.data[y * alpha.width + x]! / 255,
+              index = ((y + offsetY) * output.width + x + offsetX) * 4,
+              targetAlpha = output.data[index + 3]! / 255;
+            output.data[index + 3] = (sourceAlpha + targetAlpha * (1 - sourceAlpha)) * 255;
+            if (output.data[index + 3]) output.data.fill(255, index, index + 3);
+          }
+      } finally {
+        release(canvas);
+      }
+    }
+    return output;
+  }
+  const canvas = make(plan.frontWidthRaster, plan.frontHeightRaster);
+  try {
+    const context = context2d(canvas);
+    context.translate(-plan.frontBoundsRaster.left, -plan.frontBoundsRaster.top);
+    context.scale(plan.actualDensity, plan.actualDensity);
+    context.fillStyle = "#ffffff";
+    context.textAlign = "left";
+    context.textBaseline = "alphabetic";
+    context.direction = "ltr";
+    for (const glyph of warp.placements) {
+      if (!selected.has(glyph.sourceRunIndex) || glyph.text === " ") continue;
+      const { inlineAxis, blockAxis } = glyph,
+        determinant = inlineAxis.x * blockAxis.y - inlineAxis.y * blockAxis.x;
+      context.save();
+      try {
+        context.translate(glyph.x, glyph.y);
+        context.rotate(Math.atan2(inlineAxis.y, inlineAxis.x));
+        context.scale(1, determinant);
+        context.font = shapeTextCanvasFont(glyph.font);
+        // One admitted character per call deliberately excludes cross-character
+        // kerning/ligatures; it never claims Canvas exposed a shaped cluster.
+        context.fillText(glyph.text, 0, 0);
+      } finally {
+        context.restore();
+      }
+    }
+    for (const quad of warp.decorationQuads) {
+      if (!selected.has(quad.sourceRunIndex)) continue;
+      context.beginPath();
+      for (let index = 0; index < quad.points.length; index++) {
+        const point = quad.points[index]!;
+        if (index === 0) context.moveTo(point.x, point.y);
+        else context.lineTo(point.x, point.y);
+      }
+      context.closePath();
+      context.fill();
+    }
+    return read(canvas);
+  } finally {
+    release(canvas);
   }
 }
 type OutlineContourTotals = { contours: number; edges: number; points: number; intervals: number };
@@ -1050,6 +1325,7 @@ function prepareShapeTextPaintAtDensity(
       plan.underline,
       plan.strike,
       plan.effectiveStyle,
+      options.drawing.shapeText?.warp,
       plan.actualDensity,
       plan.outerAngleDeg,
       options.drawing.width,
@@ -1101,10 +1377,15 @@ function prepareShapeTextPaintAtDensity(
       maskContext = context2d(maskCanvas);
     maskContext.translate(-plan.frontBoundsRaster.left, -plan.frontBoundsRaster.top);
     maskContext.scale(plan.actualDensity, plan.actualDensity);
-    nativeMask(
-      maskContext,
-      plan,
-      undefined,
+    const paintMask = (runs: readonly Readonly<ShapeTextRun>[] = plan.runs, clip = true) => {
+      if (plan.warpPlan) {
+        const warped = warpedNativeMask(plan, runs, make);
+        if (clip) clipMask(warped, plan);
+        write(maskCanvas, warped);
+      } else nativeMask(maskContext, plan, undefined, clip, runs);
+    };
+    paintMask(
+      plan.runs,
       !plan.contourRequired && (!options.captureSilhouette || plan.requiresGlyphProjection),
     );
     const glyphMask = read(maskCanvas),
@@ -1141,7 +1422,7 @@ function prepareShapeTextPaintAtDensity(
       for (const span of plan.fillSpans) {
         if (span.color === "transparent" || (span.color === undefined && !span.fill)) continue;
         write(maskCanvas, emptyMask);
-        nativeMask(maskContext, plan, undefined, true, plan.runs.slice(span.start, span.end));
+        paintMask(plan.runs.slice(span.start, span.end));
         overMaskedFill(
           source,
           read(maskCanvas),
@@ -1158,11 +1439,11 @@ function prepareShapeTextPaintAtDensity(
       for (const span of outlineSpans) {
         const line = span.line!;
         write(outlineCanvas, emptyMask);
-        if (richLine(line)) {
+        if (richLine(line) || plan.warpPlan) {
           let localSilhouette = silhouette;
           if (plan.attributedLine) {
             write(maskCanvas, emptyMask);
-            nativeMask(maskContext, plan, undefined, false, plan.runs.slice(span.start, span.end));
+            paintMask(plan.runs.slice(span.start, span.end), false);
             localSilhouette = traceGlyphSilhouette(read(maskCanvas));
           }
           addOutlineContourWork(totals, localSilhouette!, line, plan.actualDensity);
@@ -1179,7 +1460,7 @@ function prepareShapeTextPaintAtDensity(
         }
         const outline = paintSurface(line.paint),
           outlineMask = read(outlineCanvas);
-        if (richLine(line)) clipMask(outlineMask, plan);
+        if (richLine(line) || plan.warpPlan) clipMask(outlineMask, plan);
         masked(outline, outlineMask);
         over(source, outline);
       }
@@ -1355,7 +1636,7 @@ export function preflightShapeTextGlyphBudgets(
     pointCount: silhouette?.pointCount ?? 0,
     glyphCommandCount: commands,
   });
-  if (plan.requiresGlyphProjection) {
+  if (plan.requiresGlyphProjection || plan.warpPlan) {
     // No cache key: a previously rendered envelope cannot bypass current native
     // glyph/paint-alpha budget proof. Owned output is released in all cases.
     const raster = prepareShapeTextPaint({ ...options, captureSilhouette: true });
@@ -1367,7 +1648,7 @@ export function preflightShapeTextGlyphBudgets(
       };
     try {
       return summary(
-        "painted-alpha-projection",
+        plan.requiresGlyphProjection ? "painted-alpha-projection" : "native-alpha-warp",
         raster.silhouette,
         raster.glyphGeometry?.paths.reduce((sum, path) => sum + path.commands.length, 0) ?? 0,
         raster.actualDensity,

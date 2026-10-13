@@ -8,6 +8,8 @@ import {
   normalizeShapeStyle,
   type ShapeDetailedStyle,
 } from "./shape-style.js";
+import { normalizeShapeTextWarp } from "./text-warps/contract.js";
+import type { ShapeTextWarp } from "./text-warps/types.js";
 
 export type ShapeTextDirection =
   | "horizontal"
@@ -53,6 +55,8 @@ export type ShapeText = {
   strike?: true;
   style?: ShapeTextStyle;
   characterRuns?: readonly ShapeTextCharacterRun[];
+  /** Sparse glyph geometry, independent of the drawing's body shape. */
+  warp?: ShapeTextWarp;
 };
 export const SHAPE_TEXT_LIMITS = { lengthPt: 4096, fontFamilyLength: 256 } as const;
 
@@ -168,9 +172,15 @@ export function normalizeShapeText(value: unknown, ownerText?: string): ShapeTex
   if (value === undefined) return undefined;
   const source = record(
     value,
-    ["layout", "paragraph", "fontFamily", "underline", "strike", "style", "characterRuns"],
+    ["layout", "paragraph", "fontFamily", "underline", "strike", "style", "characterRuns", "warp"],
     "model",
   );
+  if ("warp" in source && !Object.hasOwn(source, "warp"))
+    throw new TypeError("Shape text warp must be an own data field.");
+  const hasWarp = Object.hasOwn(source, "warp");
+  if (hasWarp && source.warp === undefined)
+    throw new TypeError("An explicit shape text warp field must contain a warp model.");
+  const warp = hasWarp ? normalizeShapeTextWarp(source.warp as ShapeTextWarp) : undefined;
   if ("characterRuns" in source && !Object.hasOwn(source, "characterRuns"))
     throw new TypeError("Shape character runs must be own data fields.");
   const hasRuns = Object.hasOwn(source, "characterRuns");
@@ -199,6 +209,7 @@ export function normalizeShapeText(value: unknown, ownerText?: string): ShapeTex
     ...(strike ? { strike: true as const } : {}),
     ...(style ? { style } : {}),
     ...(characterRuns ? { characterRuns } : {}),
+    ...(warp ? { warp } : {}),
   };
 }
 export function cloneShapeText(

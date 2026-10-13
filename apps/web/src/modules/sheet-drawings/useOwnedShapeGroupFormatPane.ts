@@ -29,6 +29,7 @@ import {
   getShapeGroupFormatEligibleLeaves,
   getShapeGroupFormatFieldEligibleLeaves,
   getShapeGroupLineEligibleLeaves,
+  getShapeGroupTextWarpEligibleLeaves,
   isShapeGroupMemberStyleCategory,
   planShapeGroupFormatIntent,
   resolveShapeGroupFormatContext,
@@ -42,6 +43,7 @@ export type ShapeGroupFormatScope = {
   descendantCount: number;
   bodyEligibleCount: number;
   textEligibleCount: number;
+  textWarpEligibleCount: number;
   rotation3dAffectedCount: number;
   rotation3dInherited: boolean;
   rotation3dShared: boolean;
@@ -238,12 +240,19 @@ export function useOwnedShapeGroupFormatPane(options: {
       lineEnds: values.lineEnds,
       mixedLineEnds: values.mixedLineEnds,
       mixedStyleCategories: values.mixedStyleCategories,
+      ...(values.textWarp ? { textWarp: values.textWarp } : {}),
+      mixedTextWarp: values.mixedTextWarp,
+      textWarpScope: {
+        eligibleCount: values.textWarpEligibleCount,
+        descendantCount: values.descendantCount,
+      },
       ...(options.getScopeDescription
         ? {
             scopeDescription: options.getScopeDescription({
               descendantCount: values.descendantCount,
               bodyEligibleCount: values.bodyEligibleCount,
               textEligibleCount: values.textEligibleCount,
+              textWarpEligibleCount: values.textWarpEligibleCount,
               rotation3dAffectedCount: values.rotation3dAffectedCount,
               rotation3dInherited: values.rotation3dInherited,
               rotation3dShared: values.rotation3dShared,
@@ -387,6 +396,7 @@ export function useOwnedShapeGroupFormatPane(options: {
     return {
       fields,
       styles,
+      textWarp: capability(!!captured && getShapeGroupTextWarpEligibleLeaves(captured).length > 0),
       lineEnds: capability(!!captured && getShapeGroupLineEligibleLeaves(captured).length > 0),
     };
   });
@@ -532,6 +542,8 @@ export function useOwnedShapeGroupFormatPane(options: {
           !allowsCameraValue(captured, intent.value)
         )
           return false;
+      } else if (intent.type === "set-text-warp") {
+        if (capabilities.value.textWarp?.enabled !== true) return false;
       } else if (intent.type === "set-text-margins") {
         const lengths = [
           intent.value.leftPt,

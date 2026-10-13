@@ -30,6 +30,7 @@ import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-de
 import {
   aggregateShapeGroupFormatSnapshot,
   getShapeGroupFormatEligibleLeaves,
+  getShapeGroupTextWarpEligibleLeaves,
   isShapeGroupFormatContextCurrent,
   planShapeGroupFormatIntent,
   resolveShapeGroupFormatContext,
@@ -1153,4 +1154,102 @@ test("retained area remains eligible for group fill/text batches while ordinary 
   expect(text.eligibleCount).toBe(2);
   expect(node(text.root, ["root", "inner", "a"]).shapeText?.layout.blockAlignment).toBe("end");
   expect(node(text.root, ["root", "inner", "ordinary-open"])).toEqual(open);
+});
+
+describe("WordArt subtree transform planning", () => {
+  test("aggregates real eligible leaves and batches only modern or retained-warp owners", () => {
+    const f = fixture();
+    f.a.wordArt = true;
+    f.a.shapeText = {
+      ...createDefaultShapeText(),
+      warp: { preset: "textWave1", adjustments: { adj2: 123 } },
+      characterRuns: [{ start: 0, end: 7, bold: true, color: "#112233" }],
+    };
+    f.a.shapeFlipX = true;
+    f.b.shapeText = { ...createDefaultShapeText(), warp: { preset: "textPlain" } };
+    f.root = normalizeShapeGroup(f.root);
+    const context = resolveShapeGroupFormatContext(f.root, ["root"], f.metrics);
+    expect(
+      getShapeGroupTextWarpEligibleLeaves(context).map((entry) => entry.sourceNode.id),
+    ).toEqual(["a", "b"]);
+    const readback = aggregateShapeGroupFormatSnapshot(context, { width: 320, height: 160 });
+    expect(readback.textWarpEligibleCount).toBe(2);
+    expect(readback.descendantCount).toBe(4);
+    expect(readback.mixedTextWarp).toBe(true);
+    expect(readback.textWarp).toBeUndefined();
+    const before = structuredClone(f.root);
+    const planned = planShapeGroupFormatIntent(
+      context,
+      {
+        type: "set-text-warp",
+        value: { preset: "textCirclePour" },
+      },
+      { width: 320, height: 160 },
+    );
+    expect(planned.affectedPaths).toEqual([
+      ["root", "inner", "a"],
+      ["root", "inner", "b"],
+    ]);
+    expect(planned.eligibleCount).toBe(2);
+    expect(planned.root.shapeFrame).toEqual(before.shapeFrame);
+    expect(planned.root.members[0]).toEqual(before.members[0]);
+    expect(planned.root.members[2]).toEqual(before.members[2]);
+    for (const id of ["a", "b"]) {
+      const previous = node(before, ["root", "inner", id]);
+      const next = node(planned.root, ["root", "inner", id]);
+      expect(next.shapeText!.warp).toEqual({ preset: "textCirclePour" });
+      const { warp: _oldWarp, ...oldText } = previous.shapeText!;
+      const { warp: _nextWarp, ...nextText } = next.shapeText!;
+      expect(nextText).toEqual(oldText);
+      expect({ ...next, shapeText: previous.shapeText }).toEqual(previous);
+    }
+    const common = aggregateShapeGroupFormatSnapshot(
+      resolveShapeGroupFormatContext(planned.root, ["root"], f.metrics),
+      { width: 320, height: 160 },
+    );
+    expect(common.mixedTextWarp).toBe(false);
+    expect(common.textWarp).toEqual({ preset: "textCirclePour" });
+    const cleared = planShapeGroupFormatIntent(
+      resolveShapeGroupFormatContext(planned.root, ["root", "inner"], f.metrics),
+      { type: "set-text-warp" },
+      { width: 160, height: 80 },
+    );
+    expect(node(cleared.root, ["root", "inner", "a"]).shapeText).not.toHaveProperty("warp");
+    expect(node(cleared.root, ["root", "inner", "b"]).shapeText).not.toHaveProperty("warp");
+    expect(node(cleared.root, ["root", "inner", "a"]).wordArt).toBe(true);
+    expect(node(cleared.root, ["root", "inner", "b"]).wordArt).toBeUndefined();
+    expect(f.root).toEqual(before);
+  });
+  test("untagged shapes cannot gain transforms; exact selected leaf scopes remain narrow", () => {
+    const f = fixture();
+    const unsupported = resolveShapeGroupFormatContext(f.root, ["root"], f.metrics);
+    expect(getShapeGroupTextWarpEligibleLeaves(unsupported)).toEqual([]);
+    expect(() =>
+      planShapeGroupFormatIntent(
+        unsupported,
+        {
+          type: "set-text-warp",
+          value: { preset: "textPlain" },
+        },
+        { width: 320, height: 160 },
+      ),
+    ).toThrow(/eligible/);
+    f.a.wordArt = true;
+    f.a.shapeText = createDefaultShapeText();
+    const selected = resolveShapeGroupFormatContext(f.root, ["root", "inner", "a"], f.metrics);
+    const result = planShapeGroupFormatIntent(
+      selected,
+      {
+        type: "set-text-warp",
+        value: { preset: "textWave1", adjustments: { adj1: 12500, adj2: 234 } },
+      },
+      { width: 80, height: 40 },
+    );
+    expect(result.affectedPaths).toEqual([["root", "inner", "a"]]);
+    expect(node(result.root, ["root", "inner", "a"]).shapeText?.warp).toEqual({
+      preset: "textWave1",
+      adjustments: { adj2: 234 },
+    });
+    expect(node(result.root, ["root", "inner", "b"])).toEqual(f.b);
+  });
 });

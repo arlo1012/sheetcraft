@@ -329,7 +329,10 @@ export function shapeDrawingContainsWorldPoint(
     standardShapeWorldToLocal(rect, drawing.rotation, point),
   );
   return (
-    standardShapeContainsLocalPoint(geometry, standardShapeAppearance(drawing), local) ||
-    getShapeEndPaint(drawing, geometry, route).some((p) => p.contains(local))
+    standardShapeContainsLocalPoint(
+      geometry,
+      standardShapeAppearance(drawing.shapeText?.warp ? { ...drawing, text: "" } : drawing),
+      local,
+    ) || getShapeEndPaint(drawing, geometry, route).some((p) => p.contains(local))
   );
 }

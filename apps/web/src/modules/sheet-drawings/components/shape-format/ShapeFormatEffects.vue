@@ -8,6 +8,8 @@ import PictureSoftEdgesEditor from "../../../sheet-images/components/format-pane
 import PictureFormat3dEditor from "../../../sheet-images/components/format-pane/PictureFormat3dEditor.vue";
 import PictureRotation3dEditor from "../../../sheet-images/components/format-pane/PictureRotation3dEditor.vue";
 import ShapeFormatCheckbox from "./ShapeFormatCheckbox.vue";
+import WordArtTransformGallery from "../WordArtTransformGallery.vue";
+import { WORDART_TRANSFORM_GALLERY_LABELS } from "../../wordart-transform-presets";
 import ShapeFormatMixedEffect from "./ShapeFormatMixedEffect.vue";
 import type { ShapeFormatMode, ShapeFormatStyleCategory } from "../../shape-format-pane-model";
 import type { ShapeFormatController } from "./useShapeFormatPane";
@@ -21,6 +23,17 @@ const glow = computed(() => props.controller.styleBinding(props.target, "glow"))
 const softEdges = computed(() => props.controller.styleBinding(props.target, "softEdges"));
 const format3d = computed(() => props.controller.styleBinding(props.target, "format3d"));
 const rotation3d = computed(() => props.controller.styleBinding(props.target, "rotation3d"));
+const textWarp = computed(() => props.controller.textWarpBinding());
+const transformTitle = computed(
+  () => WORDART_TRANSFORM_GALLERY_LABELS[props.controller.props.locale ?? "en-US"].gallery,
+);
+const transformScope = computed(() => {
+  const scope = props.controller.props.snapshot?.textWarpScope;
+  if (!scope || props.controller.props.snapshot?.drawing.kind !== "shapeGroup") return;
+  return props.controller.props.locale === "zh-CN"
+    ? `转换适用于所选组合中的 ${scope.eligibleCount} 个艺术字或保留转换的文字成员（共 ${scope.descendantCount} 个成员）。`
+    : `Transform applies to ${scope.eligibleCount} WordArt or retained-transform text members of ${scope.descendantCount} members in the selected group.`;
+});
 const isConnector = computed(
   () =>
     props.controller.props.snapshot?.drawing.kind === "shape" &&
@@ -114,6 +127,16 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
         {{ reason("rotation3d") }}
       </p>
       <ShapeFormatCheckbox :controller="controller" field="shapeKeepTextFlat" />
+    </PictureFormatSection>
+    <PictureFormatSection
+      v-if="target === 'text'"
+      :title="transformTitle"
+      data-text-transform-section
+    >
+      <p v-if="transformScope" class="shape-format-effects__reason" data-text-transform-scope>
+        {{ transformScope }}
+      </p>
+      <WordArtTransformGallery v-bind="textWarp" />
     </PictureFormatSection>
   </div>
 </template>

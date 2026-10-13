@@ -461,14 +461,15 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing;
 export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new RangeError("Invalid sheet drawing.");
-  // Attributed legacy drawings need the same descriptor-safe source fields as canonical shapes.
+  // Attributed or warped legacy drawings need the canonical descriptor-safe source fields.
   const textModelField = Object.getOwnPropertyDescriptor(value, "shapeText");
   const rawTextModel: unknown =
     textModelField && "value" in textModelField ? textModelField.value : undefined;
   const hasCharacterRuns =
     !!rawTextModel && typeof rawTextModel === "object" && "characterRuns" in rawTextModel;
+  const hasTextWarp = !!rawTextModel && typeof rawTextModel === "object" && "warp" in rawTextModel;
   const hasWordArt = "wordArt" in value;
-  if (hasCharacterRuns || hasWordArt)
+  if (hasCharacterRuns || hasTextWarp || hasWordArt)
     for (const key of [
       "id",
       "kind",
@@ -497,7 +498,7 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
         (Object.getOwnPropertyDescriptor(value, "shapeGeometry")?.value === undefined &&
           Object.getOwnPropertyDescriptor(value, "shapePath")?.value === undefined)));
   if (
-    (hasNewControls || hasCharacterRuns || hasWordArt) &&
+    (hasNewControls || hasCharacterRuns || hasTextWarp || hasWordArt) &&
     ownKind?.value !== "shapeGroup" &&
     !("shapeFrame" in value)
   ) {

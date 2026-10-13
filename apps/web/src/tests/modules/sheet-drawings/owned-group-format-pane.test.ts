@@ -1383,3 +1383,68 @@ describe("group glyph effects and actual Text Rotation source", () => {
     expect(f.source().group3d).toEqual({ rotation3d: { kind: "none" } });
   });
 });
+
+test("real subtree warp command writes only eligible leaves atomically and acknowledges the surviving owner", () => {
+  const f = fixture();
+  f.graphic("a").wordArt = true;
+  f.graphic("b").wordArt = true;
+  f.graphic("b").shapeText = { ...createDefaultShapeText(), warp: { preset: "textPlain" } };
+  f.graphic("text").shapeText = { ...createDefaultShapeText(), warp: { preset: "textWave1" } };
+  f.sheet.value.drawings![0] = normalizeShapeGroup(f.source());
+  f.revision.value++;
+  expect(f.open(["root", "inner"])).toBe(true);
+  const before = f.state(),
+    owner = f.pane.snapshot.value!.owner;
+  const untouched = JSON.parse(JSON.stringify(f.graphic("a"))),
+    line = JSON.parse(JSON.stringify(f.graphic("line")));
+  const bFrame = JSON.parse(JSON.stringify(f.graphic("b").groupFrame));
+  expect(f.pane.snapshot.value?.textWarpScope).toEqual({ eligibleCount: 2, descendantCount: 2 });
+  expect(f.pane.snapshot.value?.mixedTextWarp).toBe(true);
+  expect(f.pane.snapshot.value?.textWarp).toBeUndefined();
+  const old = f.intent({ type: "set-text-warp", value: { preset: "textCirclePour" } });
+  expect(f.pane.onIntent(old)).toBe(true);
+  expect(f.pane.snapshot.value?.owner).toEqual(owner);
+  expect(f.pane.snapshot.value?.acceptedIntentId).toBe(old.intentId);
+  expect(f.pane.snapshot.value?.mixedTextWarp).toBe(false);
+  expect(f.pane.snapshot.value?.textWarp).toEqual({ preset: "textCirclePour" });
+  expect(f.graphic("a")).toEqual(untouched);
+  expect(f.graphic("line")).toEqual(line);
+  expect(f.graphic("b").groupFrame).toEqual(bFrame);
+  expect(f.session.history.undoStack).toHaveLength(1);
+  const after = f.state();
+  expect(f.pane.onIntent(old)).toBe(false);
+  expect(f.state()).toEqual(after);
+  expect(undoWorkbookCommand(f.session)).toBe(true);
+  f.revision.value++;
+  expect(f.state()).toEqual(before);
+  expect(redoWorkbookCommand(f.session)).toBe(true);
+  f.revision.value++;
+  expect(f.state()).toEqual(after);
+  expect(f.pane.onIntent(f.intent({ type: "set-text-warp" }))).toBe(true);
+  expect(f.graphic("b").shapeText).not.toHaveProperty("warp");
+  expect(f.graphic("text").shapeText).not.toHaveProperty("warp");
+  expect(f.graphic("text").wordArt).toBeUndefined();
+  expect(f.pane.snapshot.value?.textWarpScope).toEqual({ eligibleCount: 1, descendantCount: 2 });
+});
+test("warp batch rejects unsupported, failed and stale transactions without history", () => {
+  const f = fixture();
+  expect(f.open()).toBe(true);
+  expect(f.pane.capabilities.value.textWarp?.enabled).toBe(false);
+  expect(f.pane.onIntent(f.intent({ type: "set-text-warp", value: { preset: "textPlain" } }))).toBe(
+    false,
+  );
+  f.pane.close();
+  f.graphic("a").wordArt = true;
+  f.sheet.value.drawings![0] = normalizeShapeGroup(f.source());
+  f.revision.value++;
+  expect(f.open(["root", "a"])).toBe(true);
+  const before = f.state(),
+    old = f.intent({ type: "set-text-warp", value: { preset: "textPlain" } });
+  f.replace.mockReturnValueOnce(false);
+  expect(f.pane.onIntent(old)).toBe(false);
+  expect(f.state()).toEqual(before);
+  expect(f.session.history.undoStack).toHaveLength(0);
+  f.generation.value++;
+  expect(f.pane.onIntent(old)).toBe(false);
+  expect(f.state()).toEqual(before);
+});
