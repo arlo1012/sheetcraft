@@ -165,7 +165,7 @@ describe("internal shape group reflection and glow snapshot65", () => {
     const input = { ...group(), groupEffects: { reflection: { kind: "none" as const } } };
     for (let version = 25; version < 61; version++)
       expect(() => deserializeWorkbook(rawSnapshot(input, version))).toThrow(/version 61/);
-    expect(() => deserializeWorkbook(rawSnapshot(input, 68))).toThrow(/Unsupported/);
+    expect(() => deserializeWorkbook(rawSnapshot(input, 70))).toThrow(/Unsupported/);
   });
 
   test("65 still rejects malformed, inherited, symbol and unknown categories at every owner depth", () => {

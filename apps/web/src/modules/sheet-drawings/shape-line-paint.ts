@@ -25,7 +25,7 @@ export type ShapeEndPaint = Readonly<{
 }>;
 export function standardShapeAppearance(drawing: SheetGraphicDrawing): SheetGraphicDrawing {
   return (drawing.shapeGeometry && isShapeLinePreset(drawing.shapeGeometry.preset)) ||
-    (drawing.shapePath && !isShapeFreePathClosed(drawing.shapePath))
+    (drawing.shapePath && !isShapeFreePathClosed(drawing.shapePath) && !drawing.shapePath.openArea)
     ? { ...drawing, fill: "transparent" }
     : drawing;
 }

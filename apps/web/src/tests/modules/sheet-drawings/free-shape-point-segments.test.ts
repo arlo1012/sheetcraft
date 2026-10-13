@@ -21,9 +21,16 @@ import { getFreeShapeGeometry } from "../../../modules/sheet-drawings/free-shape
 import {
   getFreeShapeSegmentType,
   setFreeShapeSegmentType,
+  deleteClosedFreeShapeSegment,
+  canDeleteClosedFreeShapeSegment,
+  addFreeShapePoint,
 } from "../../../modules/sheet-drawings/free-shape-point-operations";
+import { standardShapeAppearance } from "../../../modules/sheet-drawings/shape-line-paint";
+import { resolveShapeDetailedPaintStyle } from "../../../modules/sheet-drawings/shape-detailed-paint";
+import { getDrawingShapeTextRect } from "../../../modules/sheet-drawings/shape-text-runtime";
 import {
   listFreeShapePoints,
+  toggleClosedFreeShape,
   type FreeShapePointPosition,
 } from "../../../modules/sheet-drawings/free-shape-point-layout";
 import { frameShapeView, shapeViewLayout } from "../../../modules/sheet-drawings/shape-view-layout";
@@ -62,6 +69,14 @@ function viewport(merge = false): SheetViewportLayout {
   });
 }
 const layout = viewport();
+function closedRectangle(): ShapeFreePath {
+  return {
+    tool: "freeform",
+    viewBox: { width: 100, height: 80 },
+    commands: [["M", 0, 0], ["L", 100, 0], ["L", 100, 80], ["L", 0, 80], ["Z"]],
+    pointTypes: { 0: "smooth", 2: "straight" },
+  };
+}
 function path(): ShapeFreePath {
   return {
     tool: "curve",
@@ -718,4 +733,156 @@ describe("bounded segment conversion rejection", () => {
     expect(setFreeShapeSegmentType(excessive, 1, "curved", layout)).toBeUndefined();
     expect(source.shapePath!.commands).toHaveLength(MAX_SHAPE_FREE_PATH_COMMANDS);
   });
+});
+
+describe("desktop closed-path Delete Segment", () => {
+  test.each([1, 2, 3, 4])(
+    "deletes only edge %d, preserves every node and the original text/frame/fill area",
+    (index) => {
+      for (const rotation of [0, 37])
+        for (const shapeFlipX of [false, true]) {
+          const source = drawing({
+            shapePath: closedRectangle(),
+            shapeLineEnds: undefined,
+            rotation,
+            shapeFlipX: shapeFlipX || undefined,
+          });
+          const before = structuredClone(source);
+          expect(canDeleteClosedFreeShapeSegment(source, index)).toBe(true);
+          const next = deleteClosedFreeShapeSegment(source, index)!;
+          expect(next).toBeDefined();
+          expect(source).toEqual(before);
+          expect(next).toMatchObject({
+            id: source.id,
+            text: source.text,
+            width: source.width,
+            height: source.height,
+            anchor: source.anchor,
+            offsetX: source.offsetX,
+            offsetY: source.offsetY,
+            rotation,
+            shapeFlipX: shapeFlipX || undefined,
+          });
+          expect(next.shapeStyle).toEqual(source.shapeStyle);
+          expect(next.shapePath!.viewBox).toEqual(source.shapePath!.viewBox);
+          expect(next.shapePath!.openArea).toBe(true);
+          expect(next.shapePath!.commands.map((command) => command[0])).toEqual([
+            "M",
+            "L",
+            "L",
+            "L",
+          ]);
+          const positions = (value: SheetGraphicDrawing) =>
+            listFreeShapePoints(value)
+              .filter((point) => point.role === "vertex")
+              .map((point) => `${point.position.x},${point.position.y}`)
+              .sort();
+          expect(positions(next)).toEqual(positions(source));
+          expect(getDrawingShapeTextRect(next)).toEqual(getDrawingShapeTextRect(source));
+          expect(
+            getFreeShapeGeometry(next.shapePath, next.width, next.height)!.paths[0]!.filled,
+          ).toBe(true);
+          expect(canDeleteClosedFreeShapeSegment(next, 1)).toBe(false);
+          expect(deleteClosedFreeShapeSegment(next, 1)).toBeUndefined();
+        }
+    },
+  );
+  test("closing Bézier seam deletion retains other authored controls and never selects a zero-length Z", () => {
+    const source = drawing({
+      shapeLineEnds: undefined,
+      shapePath: {
+        tool: "curve",
+        viewBox: { width: 100, height: 80 },
+        commands: [["M", 0, 40], ["C", 10, 0, 80, 0, 100, 40], ["C", 90, 80, 10, 80, 0, 40], ["Z"]],
+        pointTypes: { 0: "smooth", 1: "straight" },
+      },
+    });
+    expect(canDeleteClosedFreeShapeSegment(source, 3)).toBe(false);
+    expect(deleteClosedFreeShapeSegment(source, 3)).toBeUndefined();
+    const next = deleteClosedFreeShapeSegment(source, 2)!;
+    expect(next.shapePath!.commands).toEqual([
+      ["M", 0, 40],
+      ["C", 10, 0, 80, 0, 100, 40],
+    ]);
+    expect(next.shapePath!.pointTypes).toEqual({ 0: "smooth", 1: "straight" });
+    expect(next.text).toBe(source.text);
+    expect(next.width).toBe(source.width);
+    expect(next.height).toBe(source.height);
+  });
+  test("open/invalid/degenerate deletion never manufactures a gap, area or changed source", () => {
+    const source = drawing({ shapePath: closedRectangle(), shapeLineEnds: undefined });
+    const before = structuredClone(source);
+    for (const index of [0, -1, 5, NaN, 0.5]) {
+      expect(canDeleteClosedFreeShapeSegment(source, index)).toBe(false);
+      expect(deleteClosedFreeShapeSegment(source, index)).toBeUndefined();
+    }
+    const open = drawing({
+      shapePath: { ...closedRectangle(), commands: closedRectangle().commands.slice(0, -1) },
+    });
+    expect(canDeleteClosedFreeShapeSegment(open, 1)).toBe(false);
+    expect(deleteClosedFreeShapeSegment(open, 1)).toBeUndefined();
+    const flat = drawing({
+      shapePath: {
+        tool: "freeform",
+        viewBox: { width: 100, height: 80 },
+        commands: [["M", 0, 0], ["L", 50, 0], ["L", 100, 0], ["Z"]],
+      },
+    });
+    expect(deleteClosedFreeShapeSegment(flat, 1)).toBeUndefined();
+    expect(source).toEqual(before);
+  });
+});
+
+test("retained open area survives subsequent point/segment edits and closes without a stale flag", () => {
+  const source = drawing({ shapePath: closedRectangle(), shapeLineEnds: undefined });
+  const open = deleteClosedFreeShapeSegment(source, 1)!;
+  const added = addFreeShapePoint(open, 1, layout)!;
+  expect(added).toBeDefined();
+  expect(added.shapePath?.openArea).toBe(true);
+  expect(getDrawingShapeTextRect(added)).toBeDefined();
+  const curved = setFreeShapeSegmentType(added, 2, "curved", layout)!;
+  expect(curved.shapePath?.openArea).toBe(true);
+  expect(
+    getFreeShapeGeometry(curved.shapePath, curved.width, curved.height)!.paths[0]!.filled,
+  ).toBe(true);
+  const closed = toggleClosedFreeShape(curved, true, layout)!;
+  expect(closed.shapePath?.openArea).toBeUndefined();
+  expect(closed.shapePath?.commands.at(-1)).toEqual(["Z"]);
+  const normallyOpened = toggleClosedFreeShape(closed, false, layout)!;
+  expect(normallyOpened.shapePath?.openArea).toBeUndefined();
+  expect(getDrawingShapeTextRect(normallyOpened)).toBeUndefined();
+});
+
+test("retained area keeps ordinary fill and hit policy without manufacturing a detailed-style override", () => {
+  const source = drawing({
+    shapePath: closedRectangle(),
+    shapeLineEnds: undefined,
+    shapeStyle: undefined,
+  });
+  const next = deleteClosedFreeShapeSegment(source, 1)!;
+  expect(next.shapeStyle).toBeUndefined();
+  expect(standardShapeAppearance(next).fill).toBe(source.fill);
+  expect(resolveShapeDetailedPaintStyle(next).fill?.kind).toBe("value");
+  expect(standardShapeAppearance(drawing()).fill).toBe("transparent");
+});
+
+test("deleting a shallow closing edge keeps source-unit curve area visible at a large frame scale", () => {
+  const source = drawing({
+    width: 1000,
+    height: 1000,
+    shapeLineEnds: undefined,
+    shapePath: {
+      tool: "curve",
+      viewBox: { width: 1, height: 1 },
+      commands: [["M", 0, 0], ["Q", 0.5, 0.001, 1, 0], ["Z"]],
+    },
+  });
+  const next = deleteClosedFreeShapeSegment(source, 2)!;
+  expect(next).toBeDefined();
+  expect(next.shapePath?.openArea).toBe(true);
+  expect(getFreeShapeGeometry(next.shapePath, 1000, 1000)?.paths[0]?.commands).toEqual([
+    ["M", 0, 0],
+    ["Q", 500, 1, 1000, 0],
+  ]);
+  expect(getDrawingShapeTextRect(next)).toEqual(getDrawingShapeTextRect(source));
 });

@@ -2236,3 +2236,89 @@ test.each([false, true])(
     expect(serializeWorkbook(state.session.workbook)).toEqual(paragraphAfter);
   },
 );
+
+test.each([false, true])(
+  "closed Delete Segment starts real Workspace and retains root/owned text, area, owner and exact Undo (owned=%s)",
+  async (owned) => {
+    installNativeTextMeasurement();
+    const initial = createWorkbook({ id: "segment-book", sheetId: "segment-sheet" });
+    const initialSheet = getActiveSheet(initial);
+    const source = framedShape();
+    source.id = "segment-target";
+    source.text = "alpha beta\ngamma";
+    source.rotation = 0;
+    delete source.shapeGeometry;
+    source.shapeFrame.anchor = { mode: "fixed", x: 80, y: 24, size: { width: 180, height: 90 } };
+    source.shapePath = {
+      tool: "curve",
+      viewBox: { width: 180, height: 90 },
+      commands: [["M", 0, 0], ["L", 180, 0], ["L", 180, 90], ["L", 0, 90], ["Z"]],
+    };
+    const sibling = framedShape();
+    sibling.id = "segment-sibling";
+    sibling.text = "";
+    sibling.rotation = 0;
+    sibling.shapeFrame.anchor = { mode: "fixed", x: 350, y: 50, size: { width: 100, height: 70 } };
+    initialSheet.drawings = owned
+      ? groupShapeRoots(
+          [source, sibling],
+          [source.id, sibling.id],
+          { id: "segment-group", name: "Group" },
+          createPictureSheetMetrics(initialSheet),
+        )
+      : [source, sibling];
+    const wrapper = fixture(
+      async () => ({ revision: 1, savedAt: 1, snapshot: serializeWorkbook(initial) }),
+      createMemoryImageAssetStore(),
+      true,
+    );
+    await flushPromises();
+    const state = setupState(wrapper),
+      layer = wrapper.getComponent(SheetDrawingLayer);
+    expect(
+      state.sheetGridRef.selectShapeObjects([owned ? ["segment-group", source.id] : [source.id]]),
+    ).toBe(true);
+    await flushPromises();
+    layer
+      .get('[data-sheet-drawing-id="segment-target"]')
+      .element.dispatchEvent(connectorInput(layer, "dblclick", { x: 95, y: 39 }));
+    await flushPromises();
+    expect(layer.findComponent(FreeShapePointSelection).exists()).toBe(true);
+    const before = serializeWorkbook(state.session.workbook);
+    await layer
+      .get('[data-free-shape-segment="1"]')
+      .trigger("contextmenu", { clientX: 200, clientY: 200 });
+    await flushPromises();
+    document.querySelector<HTMLElement>('[data-free-shape-point-action="delete-segment"]')!.click();
+    await flushPromises();
+    const after = serializeWorkbook(state.session.workbook);
+    expect(after).not.toEqual(before);
+    const owner = getActiveSheet(state.session.workbook).drawings![0]!;
+    const target = isShapeGroupDrawing(owner)
+      ? owner.members.find((member) => member.id === source.id)!
+      : owner;
+    expect(target).toHaveProperty("shapePath.openArea", true);
+    expect(target).toHaveProperty("text", source.text);
+    expect(target).toHaveProperty("shapePath.viewBox", source.shapePath.viewBox);
+    expect(after.version).toBe(69);
+    if (target.kind !== "shape") throw Error("Expected retained area shape");
+    expect(target.shapePath?.commands).toEqual([
+      ["M", 180, 0],
+      ["L", 180, 90],
+      ["L", 0, 90],
+      ["L", 0, 0],
+    ]);
+    expect(layer.find('[data-free-shape-vertex="0"]').exists()).toBe(true);
+    if (owned) {
+      expect(owner.id).toBe("segment-group");
+      expect(isShapeGroupDrawing(owner)).toBe(true);
+    }
+    expect(state.shapeTextEdit.snapshot.value).toBeUndefined();
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+  },
+);

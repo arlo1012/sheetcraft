@@ -7,6 +7,7 @@ export type FreeShapePointAction =
   | "close"
   | "open"
   | "exit"
+  | "delete-segment"
   | "add-segment"
   | "straight-segment"
   | "curved-segment";

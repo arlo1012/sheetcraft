@@ -142,6 +142,7 @@ import {
 import {
   addFreeShapePoint,
   deleteFreeShapePoint,
+  deleteClosedFreeShapeSegment,
   setFreeShapeSegmentType,
 } from "../free-shape-point-operations";
 import type { FreeShapePointAction as PointAction } from "../free-shape-edit-actions";
@@ -2592,7 +2593,10 @@ function pointAction(drawing: SheetGraphicDrawing, action: PointAction, index: n
   const vertices = listFreeShapePoints(drawing).filter((p) => p.role === "vertex");
   const at = vertices.findIndex((p) => p.commandIndex === index);
   const segmentAction =
-    action === "add-segment" || action === "straight-segment" || action === "curved-segment";
+    action === "delete-segment" ||
+    action === "add-segment" ||
+    action === "straight-segment" ||
+    action === "curved-segment";
   if (at < 0 && !segmentAction) return false;
   let next: SheetGraphicDrawing | undefined;
   if (action === "straight-segment" || action === "curved-segment")
@@ -2603,6 +2607,7 @@ function pointAction(drawing: SheetGraphicDrawing, action: PointAction, index: n
       viewLayout(drawing),
       pointEditOptions(drawing),
     );
+  else if (action === "delete-segment") next = deleteClosedFreeShapeSegment(drawing, index);
   else if (action === "add-segment")
     next = addFreeShapePoint(drawing, index, viewLayout(drawing), 0.5, pointEditOptions(drawing));
   else if (action === "add") {
@@ -2635,18 +2640,21 @@ function pointAction(drawing: SheetGraphicDrawing, action: PointAction, index: n
     );
   if (!next || !drawingGeometry(next)) return false;
   const nextVertices = listFreeShapePoints(next).filter((p) => p.role === "vertex");
-  const nextIndex = segmentAction
-    ? Math.max(
-        0,
-        nextVertices.findIndex((point) => point.commandIndex === index),
-      )
-    : action === "open"
+  const nextIndex =
+    action === "delete-segment"
       ? 0
-      : action === "add"
-        ? at + 1
-        : action === "delete"
-          ? Math.min(at, nextVertices.length - 1)
-          : at;
+      : segmentAction
+        ? Math.max(
+            0,
+            nextVertices.findIndex((point) => point.commandIndex === index),
+          )
+        : action === "open"
+          ? 0
+          : action === "add"
+            ? at + 1
+            : action === "delete"
+              ? Math.min(at, nextVertices.length - 1)
+              : at;
   if (!commitUpdate(next, drawing)) return false;
   activeVertex.value = nextVertices[nextIndex]?.commandIndex ?? 0;
   return true;

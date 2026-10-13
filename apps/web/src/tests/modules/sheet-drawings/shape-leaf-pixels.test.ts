@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { deleteClosedFreeShapeSegment } from "../../../modules/sheet-drawings/free-shape-point-operations";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
 import type { DrawingShape, SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { DrawingShapeTextRuntimeOptions } from "../../../modules/sheet-drawings/shape-text-runtime";
@@ -1670,4 +1671,43 @@ describe("owned actual source pixels", () => {
     expect(cached.width).toBe(80);
     expect(cached.height).toBe(60);
   });
+});
+
+test("closed edge deletion keeps actual fill/glyph layout while omitting only that stroke", () => {
+  const source = drawing({
+    shape: "line",
+    shapeGeometry: undefined,
+    shapePath: {
+      tool: "freeform",
+      viewBox: { width: 80, height: 60 },
+      commands: [["M", 0, 0], ["L", 80, 0], ["L", 80, 60], ["L", 0, 60], ["Z"]],
+    },
+    stroke: "#ff0000",
+    strokeWidth: 4,
+    text: "abc\ndef",
+  });
+  const next = deleteClosedFreeShapeSegment(source, 1)!;
+  expect(next).toBeDefined();
+  const beforePlan = planShapeLeafPixels(options(source));
+  const afterPlan = planShapeLeafPixels(options(next));
+  expect(beforePlan.kind).toBe("ready");
+  expect(afterPlan.kind).toBe("ready");
+  expect(afterPlan.textLayout).toEqual(beforePlan.textLayout);
+  expect(afterPlan.textPlan).toEqual(beforePlan.textPlan);
+  const boundary = factory();
+  const before = prepareShapeLeafPixels({ ...options(source), canvasFactory: boundary.make });
+  const after = prepareShapeLeafPixels({ ...options(next), canvasFactory: boundary.make });
+  expect(before.kind).toBe("ready");
+  expect(after.kind).toBe("ready");
+  if (before.kind !== "ready" || after.kind !== "ready") return;
+  expect(alpha(before, 40, 40)).toBe(255);
+  expect(alpha(after, 40, 40)).toBe(255);
+  expect(alpha(before, 40, -1)).toBeGreaterThan(0);
+  expect(alpha(after, 40, -1)).toBe(0);
+  expect(alpha(after, -1, 30)).toBeGreaterThan(0);
+  const glyphCalls = boundary.canvases.flatMap((canvas) => canvas.context.calls);
+  expect(glyphCalls.some((call) => call.text.includes("abc"))).toBe(true);
+  expect(glyphCalls.some((call) => call.text.includes("def"))).toBe(true);
+  before.dispose();
+  after.dispose();
 });

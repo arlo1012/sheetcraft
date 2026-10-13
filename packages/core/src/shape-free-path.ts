@@ -1,3 +1,6 @@
+import { FREE_SHAPE_PATH_WORK_BUDGET } from "./shape-presets/path-budget.js";
+import { flattenShapePath } from "./shape-presets/path.js";
+
 /** Numeric, single-contour geometry for the three free-drawing tools. */
 export type ShapeFreePathTool = "curve" | "freeform" | "scribble";
 /** Corner points use the sparse default and have no persisted entry. */
@@ -11,6 +14,8 @@ export type ShapeFreePath = {
   tool: ShapeFreePathTool;
   viewBox: { width: number; height: number };
   commands: readonly ShapeFreePathCommand[];
+  /** Retained fill/text area after a closed contour is opened by removing one stroke edge. */
+  openArea?: true;
   /** Command-index vertex types; a closed coincident final vertex uses the initial M index 0. */
   pointTypes?: Readonly<Record<string, ShapeFreePathPointType>>;
 };
@@ -81,13 +86,17 @@ function dimension(value: unknown): number {
 
 /** Validate and deeply detach all geometry. No strings containing executable path data are accepted. */
 export function normalizeShapeFreePath(value: unknown): ShapeFreePath {
-  const path = dataRecord(value, ["tool", "viewBox", "commands", "pointTypes"], "free shape path", [
-    "tool",
-    "viewBox",
-    "commands",
-  ]);
+  const path = dataRecord(
+    value,
+    ["tool", "viewBox", "commands", "pointTypes", "openArea"],
+    "free shape path",
+    ["tool", "viewBox", "commands"],
+  );
   if (path.tool !== "curve" && path.tool !== "freeform" && path.tool !== "scribble")
     throw new RangeError("Invalid free shape tool.");
+  const openArea = Object.hasOwn(path, "openArea");
+  if (openArea && path.openArea !== true)
+    throw new TypeError("A retained free shape area must use the sparse literal true flag.");
   const box = dataRecord(path.viewBox, ["width", "height"], "free shape viewBox");
   const width = dimension(box.width),
     height = dimension(box.height),
@@ -143,6 +152,34 @@ export function normalizeShapeFreePath(value: unknown): ShapeFreePath {
   }
   if (!distinct)
     throw new RangeError("Free shape paths require a coordinate distinct from their start.");
+  if (openArea) {
+    if (commands[commands.length - 1]?.[0] === "Z")
+      throw new TypeError("A retained free shape area requires an open stroke path.");
+    // Retain the shared flatten budget independently of the exact area proof.
+    // A tolerance in source units can collapse a shallow curve that becomes
+    // visible after frame scaling; its finite Bernstein controls still prove
+    // whether the authored contour lies on one line.
+    flattenShapePath({ commands, filled: true, stroke: true }, 0.01, FREE_SHAPE_PATH_WORK_BUDGET);
+    const points = commands.flatMap((command) => {
+        const coordinates: { x: number; y: number }[] = [];
+        for (let index = 1; index < command.length; index += 2)
+          coordinates.push({ x: command[index] as number, y: command[index + 1] as number });
+        return coordinates;
+      }),
+      first = points[0]!,
+      second = points.find((point) => point.x !== first.x || point.y !== first.y);
+    // Two-knot curves can enclose area, and crossed contours can have zero
+    // signed area. Noncollinear authored controls avoid both false negatives.
+    const hasArea =
+      second &&
+      points.some((point) => {
+        const a = (second.x - first.x) * (point.y - first.y),
+          b = (second.y - first.y) * (point.x - first.x);
+        return Math.abs(a - b) > Number.EPSILON * (Math.abs(a) + Math.abs(b)) * 16;
+      });
+    if (!hasArea)
+      throw new RangeError("A retained free shape area requires noncollinear filled geometry.");
+  }
   const pointTypes: Record<string, ShapeFreePathPointType> = {};
   if (Object.hasOwn(path, "pointTypes")) {
     const allowedKeys = commands.flatMap((command, index) =>
@@ -177,6 +214,7 @@ export function normalizeShapeFreePath(value: unknown): ShapeFreePath {
     tool: path.tool,
     viewBox: { width, height },
     commands,
+    ...(openArea ? { openArea: true as const } : {}),
     ...(Object.keys(pointTypes).length ? { pointTypes } : {}),
   };
 }

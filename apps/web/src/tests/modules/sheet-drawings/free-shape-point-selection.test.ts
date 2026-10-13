@@ -442,7 +442,7 @@ describe("free path selected segment menu", () => {
       expect(segmentItem("straight-segment").textContent).toContain(
         locale === "en-US" ? "Straight Segment" : "直线段",
       );
-      expect(segmentItem("delete-segment").getAttribute("aria-disabled")).toBe("true");
+      expect(segmentItem("delete-segment").getAttribute("aria-disabled")).toBe("false");
       segmentItem("straight-segment").click();
       await nextTick();
       expect(handler).toHaveBeenCalledExactlyOnceWith("straight-segment", 1);
@@ -454,6 +454,25 @@ describe("free path selected segment menu", () => {
       expect(handler).toHaveBeenLastCalledWith("curved-segment", 4);
     },
   );
+  test("closed Delete Segment uses the captured edge once; rejection preserves retry and open paths stay disabled", async () => {
+    const { wrapper, handler } = fixture({ drawing: drawing({ shapePath: path(true) }) });
+    handler.mockReturnValue(false);
+    const panel = await openSegment(wrapper, 4);
+    const stale = staleAction(wrapper, "delete-segment");
+    segmentItem("delete-segment").click();
+    await nextTick();
+    expect(handler).toHaveBeenCalledExactlyOnceWith("delete-segment", 4);
+    expect(menu()).toBe(panel);
+    expect(panel.querySelector('[role="status"]')).not.toBeNull();
+    await wrapper.setProps({ drawing: drawing() });
+    stale();
+    expect(handler).toHaveBeenCalledTimes(1);
+    await openSegment(wrapper, 1);
+    expect(segmentItem("delete-segment").getAttribute("aria-disabled")).toBe("true");
+    segmentItem("delete-segment").click();
+    await nextTick();
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
   test("segment failure keeps checked geometry and feedback; Escape dismisses without edits", async () => {
     const { wrapper, handler, source } = fixture();
     handler.mockReturnValue(false);

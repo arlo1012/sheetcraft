@@ -286,7 +286,10 @@ export function getShapeGroupFormatEligibleLeaves(
     if (view.kind !== "shape") return false;
     return (
       category !== "fill" ||
-      !(isLine(view) || (view.shapePath && !isShapeFreePathClosed(view.shapePath)))
+      !(
+        isLine(view) ||
+        (view.shapePath && !isShapeFreePathClosed(view.shapePath) && !view.shapePath.openArea)
+      )
     );
   });
 }

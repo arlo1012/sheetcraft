@@ -365,6 +365,7 @@ export function replaceFreeShapeCommands(
     if (!rectWithinSheet(nextRect, layout, options)) return;
     const shapePath = normalizeShapeFreePath({
       tool: path.tool,
+      ...(path.openArea ? { openArea: true } : {}),
       viewBox: { width, height },
       commands: commands.map((command) => translatedCommand(command, origin)),
       ...(pointTypes ? { pointTypes } : {}),
@@ -690,6 +691,7 @@ export function toggleClosedFreeShape(
       });
     }
     const nextPath: ShapeFreePath = { ...path, commands };
+    if (closed) delete nextPath.openArea;
     delete nextPath.pointTypes;
     if (Object.keys(pointTypes).length) nextPath.pointTypes = pointTypes;
     const shapePath = normalizeShapeFreePath(nextPath);

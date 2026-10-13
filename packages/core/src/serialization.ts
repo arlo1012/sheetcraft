@@ -295,6 +295,8 @@ export type WorkbookSnapshotV66 = Omit<WorkbookSnapshotV65, "version"> & { versi
 export type WorkbookSnapshotV67 = Omit<WorkbookSnapshotV66, "version"> & { version: 67 };
 /** Explicit text-box body 3D, including a released group camera. */
 export type WorkbookSnapshotV68 = Omit<WorkbookSnapshotV67, "version"> & { version: 68 };
+/** Retained free-path fill and text area independent of the open stroke contour. */
+export type WorkbookSnapshotV69 = Omit<WorkbookSnapshotV68, "version"> & { version: 69 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -321,8 +323,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV65
   | WorkbookSnapshotV66
   | WorkbookSnapshotV67
-  | WorkbookSnapshotV68;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV68, "version"> & {
+  | WorkbookSnapshotV68
+  | WorkbookSnapshotV69;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV69, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -409,7 +412,8 @@ type SnapshotVersion =
   | 65
   | 66
   | 67
-  | 68;
+  | 68
+  | 69;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -436,13 +440,14 @@ function hasShapeGroupSnapshotTag(value: UnknownRecord, path: string): boolean {
 }
 
 /** Presence is checked before normalizing malformed choices or visiting any accessor. */
-function inspectShapeGroupSnapshot3d(
+function inspectShapeSnapshotFeatures(
   value: SheetDrawing,
   path: string,
   version?: SnapshotVersion,
-): { hasScene: boolean; hasTextBox3d: boolean } {
+): { hasScene: boolean; hasTextBox3d: boolean; hasOpenArea: boolean } {
   let hasScene = false,
-    hasTextBox3d = false;
+    hasTextBox3d = false,
+    hasOpenArea = false;
   const pending: { value: unknown; depth: number }[] = [{ value, depth: 0 }];
   const seen = new WeakSet<object>();
   let count = 0;
@@ -454,6 +459,13 @@ function inspectShapeGroupSnapshot3d(
       const node = asRecord(entry.value, path);
       if (seen.has(node)) throw new TypeError("Cyclic or shared shape group ownership.");
       seen.add(node);
+      const shapePath = Object.getOwnPropertyDescriptor(node, "shapePath");
+      const rawPath: unknown = shapePath && "value" in shapePath ? shapePath.value : undefined;
+      if (rawPath && typeof rawPath === "object" && "openArea" in rawPath) {
+        if (version !== undefined && version < 69)
+          return fail(path, "Retained free shape areas require snapshot version 69.");
+        hasOpenArea ||= Object.getOwnPropertyDescriptor(rawPath, "openArea")?.value === true;
+      }
       const field = Object.getOwnPropertyDescriptor(node, "group3d");
       if (field || "group3d" in node) {
         if (version !== undefined && version < 67)
@@ -498,7 +510,7 @@ function inspectShapeGroupSnapshot3d(
     if (error instanceof WorkbookDomainError) throw error;
     return fail(path, error instanceof Error ? error.message : "Invalid shape group 3D.");
   }
-  return { hasScene, hasTextBox3d };
+  return { hasScene, hasTextBox3d, hasOpenArea };
 }
 
 /** Raw admission is bounded and descriptor-safe, including nested malformed owner graphs. */
@@ -1591,17 +1603,19 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   let hasShapeCharacterRuns = false;
   let hasShapeGroup3d = false;
   let hasTextBoxBody3d = false;
+  let hasOpenShapeArea = false;
   // Inspect presence before old protocols can silently drop a shape-only feature.
   if (Array.isArray(record.drawings)) {
     for (const [index, drawing] of record.drawings.entries()) {
       const item = asRecord(drawing, path);
-      const scene = inspectShapeGroupSnapshot3d(
+      const scene = inspectShapeSnapshotFeatures(
         item as SheetDrawing,
         `${path}.drawings[${index}]`,
         version,
       );
       hasShapeGroup3d ||= scene.hasScene;
       hasTextBoxBody3d ||= scene.hasTextBox3d;
+      hasOpenShapeArea ||= scene.hasOpenArea;
       const oldTextField = Object.getOwnPropertyDescriptor(item, "shapeText");
       if (
         "shapeText" in item &&
@@ -1989,6 +2003,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasShapeCharacterRuns) version = 66;
     if (hasShapeGroup3d) version = 67;
     if (hasTextBoxBody3d) version = 68;
+    if (hasOpenShapeArea) version = 69;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -2107,7 +2122,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     // Preserve the existing protocol for documents that do not use the new feature.
     version: sheets.some((sheet) =>
       sheet.drawings?.some(
-        (drawing) => inspectShapeGroupSnapshot3d(drawing, "$.drawings").hasScene,
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasScene,
       ),
     )
       ? 67
@@ -2253,11 +2268,20 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   if (
     sheets.some((sheet) =>
       sheet.drawings?.some(
-        (drawing) => inspectShapeGroupSnapshot3d(drawing, "$.drawings").hasTextBox3d,
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasTextBox3d,
       ),
     )
   )
     snapshot.version = 68;
+  // Retained areas are inferred after68 so mixed body formatting cannot downgrade them.
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasOpenArea,
+      ),
+    )
+  )
+    snapshot.version = 69;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -2333,7 +2357,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 65 &&
     record.version !== 66 &&
     record.version !== 67 &&
-    record.version !== 68
+    record.version !== 68 &&
+    record.version !== 69
   ) {
     throw new WorkbookDomainError(
       {

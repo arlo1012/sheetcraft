@@ -97,7 +97,9 @@ export function resolveShapeDetailedPaintStyle(
   if (result.fill === undefined) {
     const noDefaultFill =
       (drawing.shapeGeometry && isShapeLinePreset(drawing.shapeGeometry.preset)) ||
-      (drawing.shapePath && !isShapeFreePathClosed(drawing.shapePath)) ||
+      (drawing.shapePath &&
+        !isShapeFreePathClosed(drawing.shapePath) &&
+        !drawing.shapePath.openArea) ||
       (!drawing.shapeGeometry && !drawing.shapePath && drawing.shape === "line");
     const paint = noDefaultFill ? undefined : solid(drawing.fill);
     result.fill = paint ? { kind: "value", value: paint } : { kind: "none" };

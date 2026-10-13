@@ -147,18 +147,19 @@ function chooseShape(choice: ShapeGalleryChoice): void {
   }
   draft.value = next;
 }
-const lineGeometry = computed(
+const strokeGeometry = computed(
   () =>
     (!!draft.value.shapeGeometry && isShapeLinePreset(draft.value.shapeGeometry.preset)) ||
     (!!draft.value.shapePath && !isShapeFreePathClosed(draft.value.shapePath)),
 );
+const lineGeometry = computed(() => strokeGeometry.value && !draft.value.shapePath?.openArea);
 const lineEndsHandler = computed(() => {
   const sourceGeometry = draft.value.shapeGeometry,
     sourcePath = draft.value.shapePath;
   return (ends: ShapeLineEnds | undefined): boolean => {
     if (
       props.disabled ||
-      !lineGeometry.value ||
+      !strokeGeometry.value ||
       draft.value.shapeGeometry !== sourceGeometry ||
       draft.value.shapePath !== sourcePath
     )
@@ -281,7 +282,7 @@ const shapes: DrawingShape[] = [
           /></label>
         </div>
         <ShapeLineEndsControls
-          v-if="lineGeometry"
+          v-if="strokeGeometry"
           :ends="draft.shapeLineEnds"
           :disabled="disabled"
           :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
@@ -325,7 +326,7 @@ const shapes: DrawingShape[] = [
             }}<InputNumber
               class="drawing-editor__number"
               v-model="draft.width"
-              :min="lineGeometry ? 1 : 16"
+              :min="strokeGeometry ? 1 : 16"
               :max="16384"
               size="small"
           /></label>
@@ -335,7 +336,7 @@ const shapes: DrawingShape[] = [
               class="drawing-editor__number"
               :model-value="draft.height"
               @update:model-value="setHeight"
-              :min="lineGeometry ? 1 : 16"
+              :min="strokeGeometry ? 1 : 16"
               :max="16384"
               size="small"
           /></label>

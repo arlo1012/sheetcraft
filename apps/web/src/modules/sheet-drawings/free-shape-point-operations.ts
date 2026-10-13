@@ -203,6 +203,71 @@ export function getFreeShapeSegmentType(
 }
 
 /**
+ * Removes one real edge from a closed contour, retaining every authored vertex
+ * and the original frame/text area. The open outline follows the remaining
+ * cycle; its fill still closes implicitly, without creating a closing stroke.
+ * No coordinate rebasing or materialization of inherited paint is performed.
+ */
+export function deleteClosedFreeShapeSegment(
+  drawing: SheetGraphicDrawing,
+  commandIndex: number,
+): SheetGraphicDrawing | undefined {
+  try {
+    const prepared = preparedPath(drawing);
+    if (
+      !prepared ||
+      prepared.path.commands.at(-1)?.[0] !== "Z" ||
+      !segmentAt(prepared.commands, commandIndex)
+    )
+      return;
+    const path = prepared.path,
+      first = endpoint(path.commands[0]!)!,
+      seam = closingSeam(path.commands);
+    const edges = path.commands.slice(1, -1).map((command, index) => ({
+      command,
+      commandIndex: index + 1,
+      endVertex: index + 1 === seam ? 0 : index + 1,
+    }));
+    if (seam === undefined)
+      edges.push({
+        command: ["L", first.x, first.y],
+        commandIndex: path.commands.length - 1,
+        endVertex: 0,
+      });
+    const selected = edges.findIndex((edge) => edge.commandIndex === commandIndex);
+    if (selected < 0) return;
+    const removed = edges[selected]!,
+      start = endpoint(removed.command)!,
+      ordered = [...edges.slice(selected + 1), ...edges.slice(0, selected)],
+      commands: ShapeFreePathCommand[] = [
+        ["M", start.x, start.y],
+        ...ordered.map((edge) => [...edge.command] as ShapeFreePathCommand),
+      ],
+      pointTypes: Record<string, ShapeFreePathPointType> = {};
+    const addType = (oldIndex: number, newIndex: number) => {
+      const type = path.pointTypes?.[oldIndex];
+      if (type) pointTypes[newIndex] = type;
+    };
+    addType(removed.endVertex, 0);
+    ordered.forEach((edge, index) => addType(edge.endVertex, index + 1));
+    const nextPath: ShapeFreePath = { ...path, commands, openArea: true };
+    delete nextPath.pointTypes;
+    if (Object.keys(pointTypes).length) nextPath.pointTypes = pointTypes;
+    return { ...drawing, shapePath: normalizeShapeFreePath(nextPath) };
+  } catch {
+    return;
+  }
+}
+
+/** Closed contours only; invalid, collapsed or area-less changes stay disabled. */
+export function canDeleteClosedFreeShapeSegment(
+  drawing: SheetGraphicDrawing,
+  commandIndex: number,
+): boolean {
+  return deleteClosedFreeShapeSegment(drawing, commandIndex) !== undefined;
+}
+
+/**
  * Changes only the selected edge. Straight drops Q/C controls for its chord;
  * curved creates a cubic using adjacent endpoint tangent directions and handles
  * of chord/3. Missing or collapsed adjacent tangents use the selected chord.

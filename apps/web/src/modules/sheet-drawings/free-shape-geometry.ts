@@ -34,8 +34,9 @@ function scaledCommand(
 
 /**
  * One numeric contour in the actual unflipped drawing frame. Closure is an
- * explicit final Z: coincident endpoints never silently gain fill or a closing
- * stroke. No SVG strings, arbitrary evaluators or legacy fallbacks are accepted.
+ * explicit final Z; an explicit retained openArea preserves fill/text after
+ * edge deletion without restoring its closing stroke. Coincident endpoints
+ * alone never gain fill or text. No SVG strings, arbitrary evaluators or legacy fallbacks are accepted.
  * The bounded LRU contains only detached, deeply frozen numeric geometry.
  */
 export function getFreeShapeGeometry(
@@ -59,14 +60,14 @@ export function getFreeShapeGeometry(
       geometryCache.set(key, cached);
       return cached;
     }
-    const closed = isShapeFreePathClosed(normalized);
+    const area = isShapeFreePathClosed(normalized) || normalized.openArea === true;
     const geometry: EvaluatedShapePresetGeometry = Object.freeze({
       width,
       height,
       paths: Object.freeze([
         Object.freeze({
-          filled: closed,
-          fillMode: closed ? "norm" : "none",
+          filled: area,
+          fillMode: area ? "norm" : "none",
           stroke: true,
           commands: Object.freeze(
             normalized.commands.map((command) =>
@@ -81,7 +82,7 @@ export function getFreeShapeGeometry(
       ]),
       handles: Object.freeze([]),
       adjustments: Object.freeze({}),
-      textRect: closed ? Object.freeze({ left: 0, top: 0, right: width, bottom: height }) : null,
+      textRect: area ? Object.freeze({ left: 0, top: 0, right: width, bottom: height }) : null,
       connectionSites: Object.freeze([]),
     });
     geometryCache.set(key, geometry);

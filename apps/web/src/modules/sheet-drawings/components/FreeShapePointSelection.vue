@@ -23,7 +23,10 @@ import type {
   FreeShapePointAction as PointAction,
   FreeShapePointActionHandler as PointActionHandler,
 } from "../free-shape-edit-actions";
-import { getFreeShapeSegmentType } from "../free-shape-point-operations";
+import {
+  canDeleteClosedFreeShapeSegment,
+  getFreeShapeSegmentType,
+} from "../free-shape-point-operations";
 const props = withDefaults(
   defineProps<{
     drawing: SheetGraphicDrawing;
@@ -321,6 +324,7 @@ function openMenuTarget(
       close: () => applyAction(session, "close"),
       open: () => applyAction(session, "open"),
       exit: () => applyAction(session, "exit"),
+      "delete-segment": () => applyAction(session, "delete-segment"),
       "add-segment": () => applyAction(session, "add-segment"),
       "straight-segment": () => applyAction(session, "straight-segment"),
       "curved-segment": () => applyAction(session, "curved-segment"),
@@ -542,7 +546,12 @@ onBeforeUnmount(() => {
         >
           {{ labels.delete }}
         </MenuItem>
-        <MenuItem v-else disabled data-free-shape-point-action="delete-segment">
+        <MenuItem
+          v-else
+          :disabled="disabled || !canDeleteClosedFreeShapeSegment(menu.owner, menu.vertexIndex)"
+          data-free-shape-point-action="delete-segment"
+          @select="menu.actions['delete-segment']"
+        >
           {{ labels.deleteSegment }}
         </MenuItem>
         <MenuSeparator v-if="menu.kind === 'vertex' || !menuClosedPath" />

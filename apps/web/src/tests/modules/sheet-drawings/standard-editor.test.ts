@@ -202,3 +202,35 @@ test("3D body text is submitted to the command owner without mutating the origin
     w.unmount();
   }
 });
+
+test("retained free area exposes real text/fill controls alongside independent open-outline ends", async () => {
+  const source: SheetGraphicDrawing = {
+    ...shape,
+    shapeGeometry: undefined,
+    shapePath: {
+      tool: "freeform",
+      viewBox: { width: 180, height: 90 },
+      openArea: true,
+      commands: [
+        ["M", 180, 0],
+        ["L", 180, 90],
+        ["L", 0, 90],
+        ["L", 0, 0],
+      ],
+    },
+  };
+  delete source.shapeGeometry;
+  const w = fixture(source);
+  expect(w.findComponent(Textarea).exists()).toBe(true);
+  expect(w.findAll('input[type="color"]')).toHaveLength(3);
+  const ends = { end: { kind: "triangle" as const } };
+  expect(w.getComponent(ShapeLineEndsControls).props("handler")(ends)).toBe(true);
+  w.getComponent(Dialog).vm.$emit("confirm");
+  await nextTick();
+  const saved = w.emitted("confirm")![0]![0] as SheetGraphicDrawing;
+  expect(saved.text).toBe(source.text);
+  expect(saved.fill).toBe(source.fill);
+  expect(saved.shapePath?.openArea).toBe(true);
+  expect(saved.shapeLineEnds).toEqual(ends);
+  w.unmount();
+});

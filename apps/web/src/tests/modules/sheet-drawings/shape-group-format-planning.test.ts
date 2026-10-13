@@ -1106,3 +1106,51 @@ describe("group text effects and shared camera alias", () => {
     },
   );
 });
+
+test("retained area remains eligible for group fill/text batches while ordinary open paths do not", () => {
+  const f = fixture();
+  delete f.a.shapeGeometry;
+  f.a.shapePath = {
+    tool: "freeform",
+    viewBox: { width: 100, height: 100 },
+    openArea: true,
+    commands: [
+      ["M", 100, 0],
+      ["L", 100, 100],
+      ["L", 0, 100],
+      ["L", 0, 0],
+    ],
+  };
+  const open = leaf("ordinary-open");
+  delete open.shapeGeometry;
+  open.shapePath = {
+    tool: "freeform",
+    viewBox: { width: 100, height: 100 },
+    commands: [
+      ["M", 0, 0],
+      ["L", 100, 100],
+    ],
+  };
+  f.inner.members.push(open);
+  const plan = apply(f, ["root", "inner"], {
+    type: "set-style",
+    target: "shape",
+    category: "fill",
+    value: { kind: "value", value: paint("retained-fill") },
+  });
+  expect(plan.eligibleCount).toBe(1);
+  expect(node(plan.root, ["root", "inner", "a"]).shapeStyle?.fill).toEqual({
+    kind: "value",
+    value: paint("retained-fill"),
+  });
+  expect(node(plan.root, ["root", "inner", "ordinary-open"])).toEqual(open);
+  f.root = plan.root;
+  const text = apply(f, ["root", "inner"], {
+    type: "set-field",
+    field: "textVerticalAlignment",
+    value: "bottom",
+  });
+  expect(text.eligibleCount).toBe(2);
+  expect(node(text.root, ["root", "inner", "a"]).shapeText?.layout.blockAlignment).toBe("end");
+  expect(node(text.root, ["root", "inner", "ordinary-open"])).toEqual(open);
+});

@@ -637,6 +637,47 @@ describe("free segment exact Core layer lifecycle", () => {
     await publish();
     expect(serializeWorkbook(workbook)).toEqual(curved);
   });
+  test("Delete Segment retains the closed contour text/fill/frame and all nodes in one exact history", async () => {
+    const source = freeDrawing({
+      shapeLineEnds: undefined,
+      shapePath: {
+        tool: "freeform",
+        viewBox: { width: 180, height: 90 },
+        commands: [["M", 0, 0], ["L", 180, 0], ["L", 180, 90], ["L", 0, 90], ["Z"]],
+      },
+    });
+    delete source.shapeLineEnds;
+    const { wrapper, workbook, sheet, session, current, publish, other } = fixture(source);
+    const before = serializeWorkbook(workbook);
+    const object = wrapper.get('[data-sheet-drawing-id="free"]');
+    object.element.dispatchEvent(
+      mouse("contextmenu", viewport(localWorld(source, { x: 90, y: 0 })), { button: 2 }),
+    );
+    await nextTick();
+    expect(wrapper.findComponent(FreeShapePointSelection).exists()).toBe(true);
+    await segmentMenu(wrapper, 1);
+    expect(menuAction("delete-segment").getAttribute("aria-disabled")).toBe("false");
+    menuAction("delete-segment").click();
+    await nextTick();
+    expect(current().shapePath?.openArea).toBe(true);
+    expect(current().text).toBe(source.text);
+    expect(current().width).toBe(source.width);
+    expect(current().height).toBe(source.height);
+    expect(sheet.drawings![1]).toEqual(other);
+    expect(session.history.undoStack).toHaveLength(1);
+    expectActive(wrapper, current(), 0);
+    const after = serializeWorkbook(workbook);
+    expect(after.version).toBe(69);
+    expect(serializeWorkbook(deserializeWorkbook(after))).toEqual(after);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    await publish();
+    expect(serializeWorkbook(workbook)).toEqual(before);
+    expect(redoWorkbookCommand(session)).toBe(true);
+    await publish();
+    expect(serializeWorkbook(workbook)).toEqual(after);
+    await segmentMenu(wrapper, 1);
+    expect(menuAction("delete-segment").getAttribute("aria-disabled")).toBe("true");
+  });
   test("failed segment application preserves forest, history and the same retry menu", async () => {
     const source = freeDrawing();
     const { wrapper, workbook, session, applyUpdate } = fixture(source);
