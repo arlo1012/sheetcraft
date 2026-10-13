@@ -230,6 +230,169 @@ const effects: ShapeDetailedStyle = {
   softEdges: { kind: "value", value: { sizePt: 1 } },
 };
 
+function makeFree(f: ReturnType<typeof fixture>, horizontal = false) {
+  if (horizontal) f.drawing().rotation = 0;
+  f.drawing().shapeConnector = {
+    kind: "shape-connector-v1",
+    begin: { kind: "free", xRatio: 0.2, yRatio: 0.25 },
+    end: { kind: "free", xRatio: 0.8, yRatio: horizontal ? 0.25 : 0.75 },
+  };
+}
+function readyTips(f: ReturnType<typeof fixture>) {
+  const connection = f.route();
+  if (connection?.status !== "ready" || connection.route.status !== "ready")
+    throw Error("Expected ready ordered tips");
+  return { begin: connection.route.begin, end: connection.route.end };
+}
+
+describe("truthful connector numeric size and explicit disconnection", () => {
+  test.each([false, true])(
+    "free root/owned=%s uses true span, fixed begin, same selection scale, exact undo/redo",
+    (owned) => {
+      const f = fixture(owned);
+      makeFree(f);
+      expect(f.open()).toBe(true);
+      const original = f.state(),
+        before = readyTips(f),
+        sessionId = f.pane.snapshot.value!.owner.sessionId;
+      const structural = JSON.stringify(f.drawing(), (key, value) =>
+        key === "shapeConnector" ? undefined : value,
+      );
+      const widthPt = f.pane.snapshot.value!.values.sizeWidthPt!,
+        heightPt = f.pane.snapshot.value!.values.sizeHeightPt!;
+      expect(widthPt).toBeCloseTo(84 * 0.75, 9);
+      expect(heightPt).toBeCloseTo(40 * 0.75, 9);
+      expect(f.pane.capabilities.value.fields.sizeWidthPt!.enabled).toBe(true);
+      expect(f.field("sizeWidthPt", widthPt * 1.5)).toBe(true);
+      expect(f.pane.snapshot.value!.values.sizeHeightPt).toBeCloseTo(heightPt, 9);
+      expect(readyTips(f).begin.x).toBeCloseTo(before.begin.x, 9);
+      expect(readyTips(f).begin.y).toBeCloseTo(before.begin.y, 9);
+      expect(f.pane.snapshot.value!.values.scaleWidthPercent).toBeCloseTo(150, 9);
+      expect(f.field("scaleWidthPercent", 200)).toBe(true);
+      expect(f.pane.snapshot.value!.values.sizeWidthPt).toBeCloseTo(widthPt * 2, 9);
+      expect(f.pane.snapshot.value!.values.scaleWidthPercent).toBeCloseTo(200, 9);
+      expect(f.pane.snapshot.value!.owner.sessionId).toBe(sessionId);
+      expect(
+        JSON.stringify(f.drawing(), (key, value) => (key === "shapeConnector" ? undefined : value)),
+      ).toBe(structural);
+      expect(f.session.history.undoStack).toHaveLength(2);
+      const applied = f.state();
+      expect(undoWorkbookCommand(f.session)).toBe(true);
+      f.revision.value++;
+      expect(undoWorkbookCommand(f.session)).toBe(true);
+      f.revision.value++;
+      expect(f.state()).toEqual(original);
+      expect(redoWorkbookCommand(f.session)).toBe(true);
+      f.revision.value++;
+      expect(redoWorkbookCommand(f.session)).toBe(true);
+      f.revision.value++;
+      expect(f.state()).toEqual(applied);
+      expect(f.pane.snapshot.value!.values.scaleWidthPercent).toBeCloseTo(100, 9);
+      f.pane.close();
+      expect(f.open()).toBe(true);
+      expect(f.pane.snapshot.value!.values.scaleWidthPercent).toBeCloseTo(100, 9);
+    },
+  );
+
+  test.each([false, true])(
+    "bound root/owned=%s stays bound until explicit detach, keeps tips, and undo restores binding",
+    (owned) => {
+      const f = fixture(owned);
+      expect(f.open()).toBe(true);
+      const before = f.state(),
+        tips = readyTips(f),
+        width = f.pane.snapshot.value!.values.sizeWidthPt!;
+      expect(f.pane.snapshot.value!.connectorBindings).toEqual([
+        { endpoint: "begin", targetName: "Shape" },
+      ]);
+      expect(f.field("sizeWidthPt", width * 1.5)).toBe(false);
+      expect(f.state()).toEqual(before);
+      expect(f.pane.capabilities.value.disconnectConnector!.enabled).toBe(true);
+      expect(f.pane.onIntent(f.intent({ type: "disconnect-connector" }))).toBe(true);
+      const detached = f.state();
+      expect(f.drawing().shapeConnector!.begin.kind).toBe("free");
+      expect(f.pane.snapshot.value!.connectorBindings).toEqual([]);
+      expect(readyTips(f).begin.x).toBeCloseTo(tips.begin.x, 9);
+      expect(readyTips(f).begin.y).toBeCloseTo(tips.begin.y, 9);
+      expect(readyTips(f).end.x).toBeCloseTo(tips.end.x, 9);
+      expect(readyTips(f).end.y).toBeCloseTo(tips.end.y, 9);
+      expect(f.field("sizeWidthPt", width * 1.25)).toBe(true);
+      expect(f.session.history.undoStack).toHaveLength(2);
+      expect(undoWorkbookCommand(f.session)).toBe(true);
+      f.revision.value++;
+      expect(f.state()).toEqual(detached);
+      expect(undoWorkbookCommand(f.session)).toBe(true);
+      f.revision.value++;
+      expect(f.state()).toEqual(before);
+      expect(f.drawing().shapeConnector!.begin.kind).toBe("site");
+    },
+  );
+
+  test.each([false, true])(
+    "owned numeric aspect belongs to the connector, not its outer group (leafLock=%s)",
+    (leafLock) => {
+      const f = fixture(true);
+      makeFree(f);
+      const root = f.root();
+      if (root.kind !== "shapeGroup") throw Error("Expected owner");
+      root.shapeProperties = leafLock ? undefined : { lockAspectRatio: true };
+      f.drawing().shapeProperties = leafLock ? { lockAspectRatio: true } : undefined;
+      expect(f.open()).toBe(true);
+      const width = f.pane.snapshot.value!.values.sizeWidthPt!,
+        height = f.pane.snapshot.value!.values.sizeHeightPt!;
+      expect(f.pane.snapshot.value!.values.lockAspectRatio).toBe(leafLock);
+      expect(f.pane.capabilities.value.fields.lockAspectRatio!.enabled).toBe(true);
+      expect(f.field("sizeWidthPt", width * 1.5)).toBe(true);
+      expect(f.pane.snapshot.value!.values.sizeHeightPt).toBeCloseTo(
+        height * (leafLock ? 1.5 : 1),
+        9,
+      );
+      expect(f.field("lockAspectRatio", !leafLock)).toBe(true);
+      expect(f.pane.snapshot.value!.values.lockAspectRatio).toBe(!leafLock);
+      expect((f.root() as typeof root).shapeProperties).toEqual(root.shapeProperties);
+    },
+  );
+
+  test("zero-axis size and scale stay truthful and disabled while the other axis remains writable", () => {
+    const f = fixture();
+    makeFree(f, true);
+    expect(f.open()).toBe(true);
+    const before = f.state();
+    expect(f.pane.snapshot.value!.values.sizeHeightPt).toBe(0);
+    expect(f.pane.snapshot.value!.values.scaleHeightPercent).toBeUndefined();
+    expect(f.pane.capabilities.value.fields.sizeHeightPt!.enabled).toBe(false);
+    expect(f.field("sizeHeightPt", 30)).toBe(false);
+    expect(f.state()).toEqual(before);
+    expect(f.field("scaleWidthPercent", 150)).toBe(true);
+    expect(f.pane.snapshot.value!.values.sizeHeightPt).toBe(0);
+  });
+
+  test("no-op, refused and stale numeric/disconnect intents leave source and history exact", () => {
+    const f = fixture();
+    makeFree(f);
+    expect(f.open()).toBe(true);
+    const before = f.state(),
+      width = f.pane.snapshot.value!.values.sizeWidthPt!;
+    expect(f.field("sizeWidthPt", width)).toBe(true);
+    expect(f.state()).toEqual(before);
+    expect(f.session.history.undoStack).toHaveLength(0);
+    f.replace.mockReturnValue(false);
+    expect(f.field("sizeWidthPt", width * 1.2)).toBe(false);
+    expect(f.state()).toEqual(before);
+    expect(f.session.history.undoStack).toHaveLength(0);
+    for (const value of [NaN, Infinity, -1, 1000000])
+      expect(f.field("sizeWidthPt", value)).toBe(false);
+    const g = fixture();
+    expect(g.open()).toBe(true);
+    const old = g.intent({ type: "disconnect-connector" });
+    g.drawing().rotation++;
+    const original = g.state();
+    expect(g.pane.onIntent(old)).toBe(false);
+    expect(g.state()).toEqual(original);
+    expect(g.replace).not.toHaveBeenCalled();
+  });
+});
+
 describe("exact canonical connector format session", () => {
   test.each([false, true])(
     "root/owned=%s snapshots expose actual sources and explicit closed controls",
@@ -352,7 +515,7 @@ describe("exact canonical connector format session", () => {
     expect(g.pane.snapshot.value!.values).toMatchObject({
       locked: false,
       printObject: false,
-      lockAspectRatio: false,
+      lockAspectRatio: true,
       altTitle: "Owner title",
     });
     const before = g.state();

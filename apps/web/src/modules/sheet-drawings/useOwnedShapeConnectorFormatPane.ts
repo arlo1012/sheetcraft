@@ -12,6 +12,12 @@ import {
   normalizeShapeObjectProperties,
 } from "@sheetcraft/core/shape-object-properties";
 import { normalizeShapeLineEnds } from "@sheetcraft/core/shape-line-ends";
+import {
+  getShapeConnectorNumericSize,
+  planShapeConnectorSizeChange,
+  type ShapeConnectorNumericSize,
+} from "@sheetcraft/core/shape-connector-editing";
+import { materializeShapeConnectorTargets } from "@sheetcraft/core/shape-connector-materialize";
 import { getShapeStyleAssetIds, normalizeShapeStyle } from "@sheetcraft/core/shape-style";
 import {
   normalizeSheetDrawings,
@@ -37,6 +43,7 @@ import {
   type ShapeFormatSnapshot,
   type ShapeFormatStyleCategory,
 } from "./shape-format-pane-model";
+import { createShapeFormatTranslate } from "./components/shape-format/shape-format-labels";
 
 type ConnectorSource = (SheetFramedGraphicDrawing | SheetGroupedGraphicDrawing) & { kind: "shape" };
 type ReadyLeaf = ResolvedShapeRenderLeaf & {
@@ -66,6 +73,12 @@ const objectFields = new Set<ShapeFormatField>([
   "locked",
   "altTitle",
   "altDescription",
+]);
+const numericFields = new Set<ShapeFormatField>([
+  "sizeWidthPt",
+  "sizeHeightPt",
+  "scaleWidthPercent",
+  "scaleHeightPercent",
 ]);
 const fields: readonly ShapeFormatField[] = [
   "sizeWidthPt",
@@ -154,6 +167,7 @@ export function useOwnedShapeConnectorFormatPane(options: {
     guard?: () => boolean,
   ) => boolean;
   getUnsupportedReason?: () => string;
+  getLocale?: () => "en-US" | "zh-CN";
   isAssetAvailable?: (id: string) => boolean;
   getPaintResources?: () => ShapePaintResources;
 }) {
@@ -166,6 +180,7 @@ export function useOwnedShapeConnectorFormatPane(options: {
     path: ShapeGroupPath;
     sessionId: string;
     baseline: { width: number; height: number };
+    size: ShapeConnectorNumericSize;
     pass: ResolvedShapeForestForRender;
     leaf: ReadyLeaf;
   };
@@ -236,7 +251,17 @@ export function useOwnedShapeConnectorFormatPane(options: {
           pass,
           leaf,
           sessionId: `shape-connector-owner-${++sequence}`,
+          size: getShapeConnectorNumericSize(
+            pass.sourceSnapshot,
+            { connectorId: leaf.sourceNode.id, path: leaf.path },
+            metrics,
+          ),
         };
+        if (revision !== owner.pass.revision)
+          replacement.baseline = {
+            width: replacement.size.widthPx,
+            height: replacement.size.heightPx,
+          };
         selected.value = replacement;
         acknowledged.value = undefined;
         return replacement;
@@ -276,17 +301,32 @@ export function useOwnedShapeConnectorFormatPane(options: {
       revision: owner.pass.revision,
       drawing: source,
       values: {
-        sizeWidthPt: carrier.width * 0.75,
-        sizeHeightPt: carrier.height * 0.75,
+        sizeWidthPt: owner.size.widthPx * 0.75,
+        sizeHeightPt: owner.size.heightPx * 0.75,
         scaleWidthPercent:
-          owner.baseline.width > 0 ? (carrier.width / owner.baseline.width) * 100 : 100,
+          owner.baseline.width > 0 ? (owner.size.widthPx / owner.baseline.width) * 100 : undefined,
         scaleHeightPercent:
-          owner.baseline.height > 0 ? (carrier.height / owner.baseline.height) * 100 : 100,
+          owner.baseline.height > 0
+            ? (owner.size.heightPx / owner.baseline.height) * 100
+            : undefined,
         rotationDeg: carrier.rotation,
         ...properties,
+        lockAspectRatio: getShapeObjectProperties(source.shapeProperties).lockAspectRatio,
         anchor: anchorValue(leaf.sourceRoot),
       },
       shapeStyle: resolveShapeDetailedPaintStyle(leaf.connector.paintView),
+      connectorBindings: (["begin", "end"] as const).flatMap((endpoint) => {
+        const binding = source.shapeConnector![endpoint];
+        return binding.kind === "site"
+          ? [
+              {
+                endpoint,
+                targetName:
+                  owner.pass.getLeaf(binding.targetId)?.sourceNode.name ?? binding.targetId,
+              },
+            ]
+          : [];
+      }),
       ...(acknowledged.value?.source === source &&
       acknowledged.value.revision === owner.pass.revision
         ? { acceptedIntentId: acknowledged.value.id }
@@ -306,14 +346,42 @@ export function useOwnedShapeConnectorFormatPane(options: {
       fields: {},
       styles: { shape: {}, text: {} },
       lineEnds: capability(true),
+      disconnectConnector: capability(
+        !!owner &&
+          [
+            owner.leaf.sourceNode.shapeConnector!.begin,
+            owner.leaf.sourceNode.shapeConnector!.end,
+          ].some((endpoint) => endpoint.kind === "site"),
+      ),
     };
     for (const field of fields)
       result.fields[field] = capability(
         !!owner &&
-          owner.path.length === 1 &&
+          (owner.path.length === 1 || field === "lockAspectRatio") &&
           objectFields.has(field) &&
           (field !== "locked" || canUseSheetPermission(owner.sheet, "editObjects")),
       );
+    const bound = (snapshot.value?.connectorBindings?.length ?? 0) > 0;
+    const text = createShapeFormatTranslate(options.getLocale?.() ?? "en-US");
+    for (const axis of ["width", "height"] as const) {
+      const allowed =
+        !!owner && (axis === "width" ? owner.size.canResizeWidth : owner.size.canResizeHeight);
+      const field = capability(allowed);
+      if (enabled && !allowed)
+        field.reason = text(bound ? "connectorBoundSizeReason" : "connectorZeroSizeReason");
+      result.fields[axis === "width" ? "sizeWidthPt" : "sizeHeightPt"] = {
+        ...field,
+        min: 0.75,
+        max: 16384 * 0.75,
+      };
+      const denominator = owner?.baseline[axis] ?? 0;
+      result.fields[axis === "width" ? "scaleWidthPercent" : "scaleHeightPercent"] = {
+        ...field,
+        enabled: field.enabled && denominator > 0,
+        min: denominator > 0 ? 100 / denominator : undefined,
+        max: denominator > 0 ? (16384 / denominator) * 100 : undefined,
+      };
+    }
     for (const category of categories) {
       result.styles!.shape![category] = capability(openCategories.has(category));
       result.styles!.text![category] = capability(false);
@@ -350,6 +418,11 @@ export function useOwnedShapeConnectorFormatPane(options: {
       pass.assertCurrent(sheet.drawings!, metrics, revision);
       const carrier = leaf.carrierRoot?.view ?? leaf.carrierLeaf?.view;
       if (!carrier) return false;
+      const size = getShapeConnectorNumericSize(
+        pass.sourceSnapshot,
+        { connectorId: leaf.sourceNode.id, path: leaf.path },
+        metrics,
+      );
       selected.value = {
         workbook,
         sheet,
@@ -358,7 +431,8 @@ export function useOwnedShapeConnectorFormatPane(options: {
         rootKind: source.kind,
         path: Object.freeze([...leaf.path]),
         sessionId: `shape-connector-owner-${++sequence}`,
-        baseline: { width: carrier.width, height: carrier.height },
+        baseline: { width: size.widthPx, height: size.heightPx },
+        size,
         pass,
         leaf,
       };
@@ -412,12 +486,20 @@ export function useOwnedShapeConnectorFormatPane(options: {
       } else if (intent.type === "set-line-ends") {
         // A ready canonical connector always supports its ordered endpoint decorations.
       } else if (intent.type === "set-field") {
-        if (!objectFields.has(intent.field) || owner.path.length !== 1) return false;
+        if (numericFields.has(intent.field)) {
+          if (capabilities.value.fields[intent.field]?.enabled !== true) return false;
+        } else if (
+          !objectFields.has(intent.field) ||
+          (owner.path.length !== 1 && intent.field !== "lockAspectRatio")
+        )
+          return false;
+      } else if (intent.type === "disconnect-connector") {
+        if (capabilities.value.disconnectConnector?.enabled !== true) return false;
       } else return false;
       if (!stillCurrent() || !options.flush() || !stillCurrent()) return false;
 
       // Only the canonical owner path is modified. Placement and relationships are untouched.
-      const canonical = normalizeSheetDrawings(pass.sourceSnapshot);
+      let canonical = normalizeSheetDrawings(pass.sourceSnapshot);
       const index = canonical.findIndex((item) => item.id === source.id);
       const candidateRoot = canonical[index]!;
       const target = canonicalNode(candidateRoot, owner.path);
@@ -433,6 +515,29 @@ export function useOwnedShapeConnectorFormatPane(options: {
         const ends = normalizeShapeLineEnds(intent.value);
         if (ends) target.shapeLineEnds = ends;
         else delete target.shapeLineEnds;
+      } else if (intent.type === "disconnect-connector") {
+        const ids = new Set<string>();
+        for (const endpoint of [target.shapeConnector!.begin, target.shapeConnector!.end])
+          if (endpoint.kind === "site") ids.add(endpoint.targetId);
+        canonical = materializeShapeConnectorTargets(canonical, [...ids], metrics, {
+          connectorIds: [target.id],
+        });
+      } else if (intent.type === "set-field" && numericFields.has(intent.field)) {
+        if (typeof intent.value !== "number" || !Number.isFinite(intent.value)) return false;
+        const axis =
+          intent.field === "sizeWidthPt" || intent.field === "scaleWidthPercent"
+            ? "width"
+            : "height";
+        const sizePx = intent.field.endsWith("Pt")
+          ? intent.value / 0.75
+          : (owner.baseline[axis] * intent.value) / 100;
+        const properties = getShapeObjectProperties(target.shapeProperties);
+        canonical = planShapeConnectorSizeChange(
+          canonical,
+          { connectorId: target.id, path: owner.path },
+          { axis, sizePx, lockAspectRatio: properties.lockAspectRatio },
+          metrics,
+        );
       } else {
         const properties = normalizeShapeObjectProperties({
           ...target.shapeProperties,
@@ -485,7 +590,16 @@ export function useOwnedShapeConnectorFormatPane(options: {
       const appliedLeaf = readyLeaf(appliedPass, appliedRoot, owner.path);
       if (!appliedLeaf) return false;
       appliedPass.assertCurrent(live, metrics, revision);
-      selected.value = { ...owner, pass: appliedPass, leaf: appliedLeaf };
+      selected.value = {
+        ...owner,
+        pass: appliedPass,
+        leaf: appliedLeaf,
+        size: getShapeConnectorNumericSize(
+          appliedPass.sourceSnapshot,
+          { connectorId: appliedLeaf.sourceNode.id, path: appliedLeaf.path },
+          metrics,
+        ),
+      };
       acknowledged.value = { id: intent.intentId, source: appliedLeaf.sourceNode, revision };
       return true;
     } catch {

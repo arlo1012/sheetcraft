@@ -23,6 +23,9 @@ import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics
 import { framedShape } from "../../modules/sheet-drawings/framed-shape-fixture";
 import SheetDrawingLayer from "../../../modules/sheet-drawings/components/SheetDrawingLayer.vue";
 import ShapeFormatPane from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
+import ShapeFormatNumberField from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatNumberField.vue";
+import PicturePaintNumber from "../../../modules/sheet-images/components/format-pane/PicturePaintNumber.vue";
+import { Input as TInput } from "tdesign-vue-next/es/input";
 import ShapeLineEndsControls from "../../../modules/sheet-drawings/components/ShapeLineEndsControls.vue";
 import { isFramedShapeDrawing } from "@sheetcraft/core/sheet-drawings";
 import { normalizeSheetDrawings } from "@sheetcraft/core/sheet-drawings";
@@ -685,8 +688,8 @@ test.each([false, true])(
       canonical = control.drawing.value!;
     expect(canonical.id).toBe("connector");
     expect(pane.props("snapshot")?.drawing).toBe(canonical);
-    expect(pane.find("[data-shape-connector-size-limit]").text()).toContain("bound ends");
-    expect(pane.find("[data-shape-format-units]").exists()).toBe(false);
+    expect(pane.find("[data-shape-connector-size-limit]").text()).toContain("endpoint span");
+    expect(pane.find("[data-shape-format-units]").exists()).toBe(true);
     expect(pane.findAll(".shape-format-pane__modes button")).toHaveLength(1);
     expect(pane.find('[id$="-text-box-panel"]').exists()).toBe(false);
     const before = serializeWorkbook(state.session.workbook);
@@ -729,6 +732,93 @@ test.each([false, true])(
     await flushPromises();
     expect(serializeWorkbook(state.session.workbook)).toEqual(changed);
     expect(obsolete({ begin: { kind: "diamond" } })).toBe(false);
+    expect(serializeWorkbook(state.session.workbook)).toEqual(changed);
+  },
+);
+
+test.each([false, true])(
+  "real Workspace connector explicit disconnect and numeric fields preserve geometry, owned identity and reversible binding (owned=%s)",
+  async (group) => {
+    const initial = savedConnectorFixture(group),
+      initialSnapshot = serializeWorkbook(initial);
+    const wrapper = fixture(async () => ({ revision: 1, savedAt: 1, snapshot: initialSnapshot }));
+    await flushPromises();
+    const state = setupState(wrapper),
+      sheet = getActiveSheet(state.session.workbook),
+      layer = wrapper.getComponent(SheetDrawingLayer);
+    const original = resolveSheetShapeConnections(
+      sheet.drawings!,
+      layer.props("metrics")!,
+    ).getConnector("connector")!;
+    if (
+      original.status !== "ready" ||
+      original.begin.status !== "ready" ||
+      original.end.status !== "ready"
+    )
+      throw Error("Expected ready original tips");
+    const middle = {
+      x: (original.begin.position.x + original.end.position.x) / 2,
+      y: (original.begin.position.y + original.end.position.y) / 2,
+    };
+    const object = layer.get('[data-sheet-drawing-id="connector"]').element;
+    for (let count = 0; count < (group ? 2 : 1); count++) {
+      object.dispatchEvent(connectorInput(layer, "pointerdown", middle));
+      window.dispatchEvent(connectorInput(layer, "pointerup", middle));
+      await nextTick();
+    }
+    await layer.get("[data-shape-format-trigger]").trigger("click");
+    await flushPromises();
+    const pane = wrapper.getComponent(ShapeFormatPane),
+      control = state.shapeConnectorFormatPane;
+    const before = serializeWorkbook(state.session.workbook),
+      source = control.drawing.value!,
+      path = control.path.value!;
+    const numeric = (field: "sizeWidthPt" | "rotationDeg" | "scaleWidthPercent") =>
+      pane
+        .findAllComponents(ShapeFormatNumberField)
+        .find((c) => c.props("field") === field)!
+        .getComponent(PicturePaintNumber);
+    expect(pane.get("[data-shape-connector-bindings]").findAll("li")).toHaveLength(2);
+    expect(numeric("sizeWidthPt").props("disabled")).toBe(true);
+    expect(numeric("rotationDeg").props("disabled")).toBe(true);
+    const actualWidth = Math.abs(original.end.position.x - original.begin.position.x) * 0.75;
+    expect(control.snapshot.value!.values.sizeWidthPt).toBeCloseTo(actualWidth, 9);
+    await pane.get("[data-shape-connector-disconnect]").trigger("click");
+    await flushPromises();
+    expect(control.drawing.value!.shapeConnector!.begin.kind).toBe("free");
+    expect(control.drawing.value!.shapeConnector!.end.kind).toBe("free");
+    expect(control.path.value).toEqual(path);
+    expect(numeric("sizeWidthPt").props("disabled")).toBe(false);
+    const detached = serializeWorkbook(state.session.workbook);
+    const widthInput = numeric("sizeWidthPt").getComponent(TInput);
+    widthInput.vm.$emit("change", String(actualWidth * 1.25));
+    widthInput.vm.$emit("enter");
+    await flushPromises();
+    expect(control.snapshot.value!.values.sizeWidthPt).toBeCloseTo(actualWidth * 1.25, 9);
+    expect(control.snapshot.value!.values.scaleWidthPercent).toBeCloseTo(125, 9);
+    expect(control.drawing.value!.rotation).toBe(source.rotation);
+    expect(
+      "groupFrame" in control.drawing.value!
+        ? control.drawing.value!.groupFrame
+        : control.drawing.value!.shapeFrame,
+    ).toEqual("groupFrame" in source ? source.groupFrame : source.shapeFrame);
+    const changed = serializeWorkbook(state.session.workbook);
+    const current = resolveSheetShapeConnections(
+      sheet.drawings!,
+      layer.props("metrics")!,
+    ).getConnector("connector")!;
+    expect(current.begin).toMatchObject({ status: "ready", position: original.begin.position });
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(detached);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    expect(control.drawing.value!.shapeConnector).toEqual(source.shapeConnector);
+    state.redo();
+    await flushPromises();
+    state.redo();
+    await flushPromises();
     expect(serializeWorkbook(state.session.workbook)).toEqual(changed);
   },
 );

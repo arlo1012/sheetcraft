@@ -93,6 +93,8 @@ export interface ShapeFormatSnapshot {
   mixedFields?: readonly ShapeFormatField[];
   /** Optional host-localized explanation, such as exact selected-subtree member counts. */
   scopeDescription?: string;
+  /** Actual associations affected only by an explicit connector-disconnect action. */
+  connectorBindings?: readonly { endpoint: "begin" | "end"; targetName: string }[];
   shapeStyle?: Readonly<PictureDetailedStyle>;
   textStyle?: Readonly<PictureDetailedStyle>;
   /** Common arrowheads across actual line descendants; omitted mixed endpoints are explicit. */
@@ -111,6 +113,7 @@ export interface ShapeFormatCapabilities {
     Record<ShapeFormatMode, Partial<Record<ShapeFormatStyleCategory, PictureFormatCapability>>>
   >;
   lineEnds?: PictureFormatCapability;
+  disconnectConnector?: PictureFormatCapability;
 }
 export interface ShapeFormatIntentIdentity {
   owner: ShapeFormatOwner;
@@ -139,6 +142,7 @@ export interface ShapeFormatTextMargins {
   bottomPt: number;
 }
 export type ShapeFormatIntent =
+  | (ShapeFormatIntentIdentity & { type: "disconnect-connector" })
   | (ShapeFormatIntentIdentity & { type: "set-text-margins"; value: ShapeFormatTextMargins })
   | ShapeFormatFieldIntent
   | ShapeFormatStyleIntent
@@ -300,6 +304,14 @@ export function createShapeFormatSession(source: {
         value,
       }));
   }
+  function disconnectConnectorAction() {
+    const token = capture();
+    return (): boolean =>
+      send(token, source.capabilities().disconnectConnector, (identity) => ({
+        ...identity,
+        type: "disconnect-connector",
+      }));
+  }
   function marginsAction() {
     const token = capture();
     return (value: ShapeFormatTextMargins): boolean => {
@@ -338,6 +350,7 @@ export function createShapeFormatSession(source: {
     styleAction,
     lineEndsAction,
     lineEndAction,
+    disconnectConnectorAction,
     marginsAction,
     cancel: () => {
       generation++;

@@ -197,20 +197,28 @@ describe("shape format pane desktop reference surface", () => {
     const state = { ...snapshot(), drawing: source };
     const { wrapper, onIntent } = fixture({
       snapshot: state,
-      capabilities: { ...capabilities, lineEnds: { enabled: true } },
+      capabilities: {
+        ...capabilities,
+        fields: { ...capabilities.fields, rotationDeg: { enabled: false } },
+        lineEnds: { enabled: true },
+      },
       initialMode: "text",
       initialTab: "text-box",
     });
     expect(wrapper.findAll(".shape-format-pane__modes button")).toHaveLength(1);
     expect(wrapper.findAll('[role="tabpanel"]')).toHaveLength(3);
-    expect(wrapper.find("[data-shape-format-units]").exists()).toBe(false);
-    expect(wrapper.findAllComponents(ShapeFormatNumberField)).toHaveLength(0);
+    expect(wrapper.find("[data-shape-format-units]").exists()).toBe(true);
+    expect(wrapper.findAllComponents(ShapeFormatNumberField)).toHaveLength(5);
+    expect(number(wrapper, "rotationDeg").getComponent(PicturePaintNumber).props("disabled")).toBe(
+      true,
+    );
     expect(wrapper.findAllComponents(ShapeFormatChoiceField)).toHaveLength(0);
     expect(wrapper.findAllComponents(PictureFormat3dEditor)).toHaveLength(0);
     expect(wrapper.findAllComponents(PictureRotation3dEditor)).toHaveLength(0);
     expect(wrapper.findAllComponents(PictureLineEditor)).toHaveLength(1);
     expect(wrapper.findAllComponents(PicturePaintEditor)).toHaveLength(1); // The real outline paint only.
-    expect(wrapper.get("[data-shape-connector-size-limit]").text()).toContain("actual shape sites");
+    expect(wrapper.get("[data-shape-connector-size-limit]").text()).toContain("endpoint span");
+    expect(wrapper.find("[data-shape-connector-disconnect]").exists()).toBe(false);
     const selects = wrapper.getComponent(ShapeLineEndsControls).findAllComponents(Select);
     selects[1]!.vm.$emit("change", "oval");
     await flushPromises();
@@ -223,6 +231,57 @@ describe("shape format pane desktop reference surface", () => {
     await wrapper.setProps({ snapshot: snapshot(), initialMode: "shape" });
     expect(wrapper.findAll(".shape-format-pane__modes button")).toHaveLength(2);
     expect(wrapper.findAll('[role="tabpanel"]')).toHaveLength(6);
+  });
+  test("bound connector lists exact associations and requires its explicit leased disconnect action", async () => {
+    const source = framedShape();
+    source.text = "";
+    source.shapeGeometry = { preset: "bentConnector3" };
+    source.shapeConnector = {
+      kind: "shape-connector-v1",
+      begin: { kind: "site", targetId: "rect", preset: "rect", siteIndex: 3 },
+      end: { kind: "site", targetId: "oval", preset: "ellipse", siteIndex: 0 },
+    };
+    const state: ShapeFormatSnapshot = {
+      ...snapshot(),
+      drawing: source,
+      owner: { ...snapshot().owner, drawingId: source.id },
+      connectorBindings: [
+        { endpoint: "begin", targetName: "Rectangle <one>" },
+        { endpoint: "end", targetName: "Ellipse two" },
+      ],
+    };
+    const { wrapper, onIntent } = fixture({
+      snapshot: state,
+      capabilities: {
+        fields: { sizeWidthPt: { enabled: false }, sizeHeightPt: { enabled: false } },
+        disconnectConnector: { enabled: true },
+      },
+      locale: "zh-CN",
+    });
+    expect(wrapper.get("[data-shape-connector-bindings]").text()).toContain(
+      "起点: Rectangle <one>",
+    );
+    expect(wrapper.get("[data-shape-connector-bindings]").text()).toContain("终点: Ellipse two");
+    expect(wrapper.get("[data-shape-connector-bindings]").find("one").exists()).toBe(false);
+    expect(number(wrapper, "sizeWidthPt").getComponent(PicturePaintNumber).props("disabled")).toBe(
+      true,
+    );
+    expect(onIntent).not.toHaveBeenCalled();
+    await wrapper.get("[data-shape-connector-disconnect]").trigger("click");
+    expect(onIntent).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        type: "disconnect-connector",
+        owner: state.owner,
+        baseRevision: state.revision,
+      }),
+    );
+    onIntent.mockClear();
+    await wrapper.setProps({
+      capabilities: { fields: {}, disconnectConnector: { enabled: false } },
+    });
+    expect(wrapper.get("[data-shape-connector-disconnect]").attributes("disabled")).toBeDefined();
+    await wrapper.get("[data-shape-connector-disconnect]").trigger("click");
+    expect(onIntent).not.toHaveBeenCalled();
   });
   test("two real modes each expose three tabs, six concrete panels and generic structured editors", async () => {
     const { wrapper } = fixture();

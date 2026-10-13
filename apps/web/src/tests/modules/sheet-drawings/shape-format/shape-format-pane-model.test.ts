@@ -90,6 +90,20 @@ function fixture() {
   };
 }
 describe("shape-owned canonical format contract", () => {
+  test("disconnect is an explicit capability-gated owner intent, and stale actions cannot retarget", () => {
+    const f = fixture();
+    expect(f.session.disconnectConnectorAction()()).toBe(false);
+    expect(f.handler).not.toHaveBeenCalled();
+    f.capabilities = { fields: {}, disconnectConnector: { enabled: true } };
+    const old = f.session.disconnectConnectorAction();
+    expect(old()).toBe(true);
+    expect(f.handler).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "disconnect-connector" }),
+    );
+    f.snapshot = { ...f.snapshot!, revision: 3 };
+    expect(old()).toBe(false);
+    expect(f.failures.at(-1)).toBe("stale-owner");
+  });
   test("physical lengths round-trip exactly without pixels or hidden clamps", () => {
     expect(shapeFormatToDisplay(216, "in")).toBe(3);
     expect(shapeFormatFromDisplay(2.54, "cm")).toBe(72);

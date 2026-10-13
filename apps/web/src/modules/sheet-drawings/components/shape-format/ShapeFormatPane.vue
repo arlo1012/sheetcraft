@@ -245,7 +245,7 @@ defineExpose({
         }}</span>
       </button>
     </div>
-    <div v-if="snapshot && !isConnector" class="shape-format-pane__units">
+    <div v-if="snapshot" class="shape-format-pane__units">
       <span>{{ t("units") }}</span
       ><TSelect
         :model-value="unit"

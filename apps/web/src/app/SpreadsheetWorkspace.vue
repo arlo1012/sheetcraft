@@ -1901,6 +1901,7 @@ const shapeGroupFormatPane = useOwnedShapeGroupFormatPane({
     }),
 });
 const shapeConnectorFormatPane = useOwnedShapeConnectorFormatPane({
+  getLocale: () => (locale.value === "zh-CN" ? "zh-CN" : "en-US"),
   getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,

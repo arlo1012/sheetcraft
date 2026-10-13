@@ -76,7 +76,14 @@ const en = {
   justify: "Justify",
   unsupported: "This field is not supported for this drawing yet.",
   connectorSizeReason:
-    "Use the endpoints or yellow route handles to edit this connector. Numeric size and rotation are not enabled here; bound ends stay on their actual shape sites.",
+    "Size measures the ordered endpoint span along the connector's axes. Resizing keeps its beginning fixed. Rotation remains available through a containing group.",
+  connectorBoundSizeReason:
+    "Connected endpoints follow their shape sites. Disconnect the listed bindings before resizing; their current positions are kept. Undo restores the bindings.",
+  connectorDisconnect: "Disconnect bindings to resize",
+  connectorBegin: "Beginning",
+  connectorEnd: "End",
+  connectorZeroSizeReason:
+    "This axis has no reliably measurable span. Move an endpoint to give it a direction before entering a size or scale.",
   missingValue: "The selected drawing does not supply this value.",
   relativeOriginal: "Relative to original picture size",
   relativeOriginalReason: "Shapes do not have an original picture size.",
@@ -96,7 +103,13 @@ export type ShapeFormatLabelKey = keyof typeof en;
 export type ShapeFormatTranslate = (key: ShapeFormatLabelKey) => string;
 const zh: Record<ShapeFormatLabelKey, string> = {
   connectorSizeReason:
-    "请用端点或黄色路线调整柄编辑连接线。此处暂不开放数值尺寸与旋转，绑定端始终位于形状的实际连接点。",
+    "尺寸表示连接线自身坐标轴上两个有序端点的跨度，调整时固定起点。旋转可通过所在组合进行。",
+  connectorBoundSizeReason:
+    "绑定端随形状连接点移动。调整尺寸前须明确解除下列绑定，端点保持当前位置；撤销可恢复绑定。",
+  connectorDisconnect: "断开绑定并调整尺寸",
+  connectorBegin: "起点",
+  connectorEnd: "终点",
+  connectorZeroSizeReason: "此轴没有可可靠测量的跨度。请先移动端点确定方向，再输入尺寸或缩放比例。",
   paneTitle: "设置形状格式",
   groupPaneTitle: "设置组合格式",
   groupScope: "所选组合",

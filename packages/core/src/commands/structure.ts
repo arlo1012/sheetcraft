@@ -6,6 +6,14 @@ import { createPictureSheetMetrics } from "../picture-axis-metrics.js";
 import type { PictureSheetMetrics } from "../picture-axis-metrics.js";
 import { transformShapeFrameAxis } from "../shape-frame.js";
 import { assertShapeObjectsForSheet } from "../shape-object-sheet.js";
+import { materializeShapeConnectorTargets } from "../shape-connector-materialize.js";
+import {
+  isShapeGroupDrawing,
+  traverseShapeGroupVisibility,
+  type ShapeGroupNode,
+} from "../shape-group.js";
+import { canEditShapeObject } from "../shape-protection.js";
+import { WorkbookDomainError, toWorkbookErrorDetail } from "../errors.js";
 import { clonePictureFrame } from "../picture-frame.js";
 import { transformPictureFrameAxis } from "../picture-frame-axis-edit.js";
 import {
@@ -636,6 +644,114 @@ function transformFilterForAxis(
   };
 }
 
+function mapSheetDrawingsForAxis(
+  drawings: readonly SheetDrawing[],
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  maximum: number,
+  operation: "insert" | "delete",
+  nextMetrics: PictureSheetMetrics,
+): SheetDrawing[] {
+  return drawings.flatMap<SheetDrawing>((drawing) => {
+    if (hasShapeObjectFrame(drawing)) {
+      const shapeFrame = transformShapeFrameAxis(
+        drawing.shapeFrame,
+        { axis, operation, index, count },
+        nextMetrics,
+      );
+      return shapeFrame === null ? [] : [{ ...drawing, shapeFrame }];
+    }
+    const target = transformAxisIndex(drawing.anchor[axis], index, count, maximum, operation);
+    return target === null
+      ? []
+      : [
+          mapDrawingSource({ ...drawing, anchor: { ...drawing.anchor, [axis]: target } }, (range) =>
+            transformRangeForAxis(range, axis, index, count, maximum, operation),
+          ),
+        ];
+  });
+}
+
+function indexAxisDrawingForest(drawings: readonly SheetDrawing[]) {
+  const entries = new Map<
+    string,
+    { node: SheetDrawing | ShapeGroupNode; root: SheetDrawing; visible: boolean }
+  >();
+  for (const root of drawings) {
+    if (isShapeGroupDrawing(root)) {
+      for (const { node, visible } of traverseShapeGroupVisibility(root))
+        entries.set(node.id, { node, root, visible });
+    } else
+      entries.set(root.id, {
+        node: root,
+        root,
+        visible: !("hidden" in root && root.hidden === true),
+      });
+  }
+  return entries;
+}
+
+function transformSheetDrawingsForAxis(
+  drawings: readonly SheetDrawing[] | undefined,
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  maximum: number,
+  operation: "insert" | "delete",
+  previousMetrics: PictureSheetMetrics,
+  nextMetrics: PictureSheetMetrics,
+  permissionSheet?: Sheet,
+): SheetDrawing[] {
+  const original = normalizeSheetDrawings(drawings);
+  const map = (forest: readonly SheetDrawing[]) =>
+    mapSheetDrawingsForAxis(forest, axis, index, count, maximum, operation, nextMetrics);
+  const planned = map(original);
+  const before = indexAxisDrawingForest(original);
+  const after = indexAxisDrawingForest(planned);
+  const removedIds = new Set([...before.keys()].filter((id) => !after.has(id)));
+  const affected = [...before.values()].filter(
+    ({ node }) =>
+      after.has(node.id) &&
+      node.kind === "shape" &&
+      node.shapeConnector &&
+      [node.shapeConnector.begin, node.shapeConnector.end].some(
+        (endpoint) => endpoint.kind === "site" && removedIds.has(endpoint.targetId),
+      ),
+  );
+  if (!affected.length) return planned;
+  // Only an explicit endpoint detachment needs object-edit permission. Ordinary
+  // structural movement of other anchored objects keeps its existing policy.
+  if (permissionSheet && affected.some(({ root }) => !canEditShapeObject(permissionSheet, root)))
+    throw new WorkbookDomainError(
+      { code: "sheet_protected", details: { sheetId: toWorkbookErrorDetail(permissionSheet.id) } },
+      `Sheet ${permissionSheet.id} has a protected connector requiring endpoint detachment.`,
+    );
+  // Connection layout intentionally resolves hidden source data too. Capturing
+  // an invisible source/site here would guess a tip the user cannot inspect.
+  for (const { node, visible } of affected) {
+    if (node.kind !== "shape" || !node.shapeConnector) continue;
+    if (
+      !visible ||
+      [node.shapeConnector.begin, node.shapeConnector.end].some(
+        (endpoint) =>
+          endpoint.kind === "site" &&
+          removedIds.has(endpoint.targetId) &&
+          !before.get(endpoint.targetId)!.visible,
+      )
+    )
+      throw new RangeError(`Connector ${node.id} cannot materialize an unavailable hidden tip.`);
+  }
+  // Capture against the old worksheet, before changing dimensions or removing
+  // an owner and all of its descendants. Reapply the same carrier transform so
+  // fixed, moving and stretching anchors retain their structural semantics.
+  return map(
+    materializeShapeConnectorTargets(original, [...removedIds], previousMetrics, {
+      connectorIds: affected.map(({ node }) => node.id),
+    }),
+  );
+}
+
 function transformSheetMetadataForAxis(
   metadata: SheetMetadata,
   axis: SheetDimensionAxis,
@@ -644,7 +760,9 @@ function transformSheetMetadataForAxis(
   maximum: number,
   operation: "insert" | "delete",
   sheetName: string,
+  previousMetrics: PictureSheetMetrics,
   nextMetrics: PictureSheetMetrics,
+  permissionSheet?: Sheet,
 ): SheetMetadata {
   const transformTableColumns = (table: SheetTable) => {
     if (axis !== "column") return table.columns.map((column) => ({ ...column }));
@@ -709,28 +827,17 @@ function transformSheetMetadataForAxis(
   );
   return {
     pivotTables: normalizePivotTables(metadata.pivotTables),
-    drawings: normalizeSheetDrawings(metadata.drawings).flatMap<SheetDrawing>((drawing) => {
-      if (hasShapeObjectFrame(drawing)) {
-        const shapeFrame = transformShapeFrameAxis(
-          drawing.shapeFrame,
-          { axis, operation, index, count },
-          nextMetrics,
-        );
-        return shapeFrame === null ? [] : [{ ...drawing, shapeFrame }];
-      }
-      const source = drawing.anchor[axis];
-      const target = transformAxisIndex(source, index, count, maximum, operation);
-      return target === null
-        ? []
-        : [
-            {
-              ...mapDrawingSource(
-                { ...drawing, anchor: { ...drawing.anchor, [axis]: target } },
-                (range) => transformRangeForAxis(range, axis, index, count, maximum, operation),
-              ),
-            },
-          ];
-    }),
+    drawings: transformSheetDrawingsForAxis(
+      metadata.drawings,
+      axis,
+      index,
+      count,
+      maximum,
+      operation,
+      previousMetrics,
+      nextMetrics,
+      permissionSheet,
+    ),
     freezePanes:
       axis === "row"
         ? { rows: nextFreezeValue, columns: metadata.freezePanes.columns }
@@ -1435,6 +1542,15 @@ function validateSheetAxisSlice(
     if (JSON.stringify(current) !== JSON.stringify(expected))
       throw invalidCommandPayload("slice.sparklineSources", entry);
   }
+  const originalMetricSheet = createAxisEditMetricSheet(
+    sheet,
+    command.axis,
+    command.index,
+    command.count,
+    maximum,
+    command.operation === "insert" ? "delete" : "insert",
+    command.slice,
+  );
   const expectedMetadata = transformSheetMetadataForAxis(
     command.slice.metadata,
     command.axis,
@@ -1443,6 +1559,7 @@ function validateSheetAxisSlice(
     maximum,
     command.operation,
     sheet.name,
+    createPictureSheetMetrics(originalMetricSheet),
     createPictureSheetMetrics(sheet),
   );
   if (command.slice.pivotTables)
@@ -1724,10 +1841,12 @@ export function applySheetAxisCommand(
     maximum,
     operation,
     sheet.name,
+    createPictureSheetMetrics(sheet),
     createPictureSheetMetrics(nextMetricSheet),
+    sheet,
   );
-  // Removing a root can invalidate a surviving connector's target reference.
-  // Normalize the complete planned forest before cells or dimensions are moved.
+  // Validate the complete detached/transformed forest before cells or dimensions
+  // are moved, including route budgets under the next worksheet metrics.
   nextMetadata.drawings = normalizeSheetDrawings(nextMetadata.drawings);
   assertShapeObjectsForSheet(nextMetadata.drawings, nextMetricSheet);
   let inherited: import("./contracts.js").CellContentChange[] = [];

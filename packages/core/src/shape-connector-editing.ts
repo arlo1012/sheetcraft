@@ -37,6 +37,18 @@ export type ShapeConnectorEndpointEdit =
       siteIndex: number;
     }>;
 export type ShapeConnectorEndName = "begin" | "end";
+/** Actual ordered-tip spans in the resolved source carrier's rotation axes. */
+export type ShapeConnectorNumericSize = Readonly<{
+  widthPx: number;
+  heightPx: number;
+  canResizeWidth: boolean;
+  canResizeHeight: boolean;
+}>;
+export type ShapeConnectorSizeEdit = Readonly<{
+  axis: "width" | "height";
+  sizePx: number;
+  lockAspectRatio?: boolean;
+}>;
 
 type ForestNode = SheetDrawing | ShapeGroupChild;
 type SourceShape = Extract<ForestNode, { kind: "shape" | "textBox" }>;
@@ -349,6 +361,134 @@ function routeRotation(angle: number): ShapeConnectorPoint {
   if (turn === 270) return { x: 0, y: -1 };
   const radians = (turn * Math.PI) / 180;
   return { x: Math.cos(radians), y: Math.sin(radians) };
+}
+
+function numericSpan(value: ReadyConnector): ShapeConnectorPoint {
+  const positions = tips(value);
+  const rotation = routeRotation(value.carrierLayout!.angleDeg);
+  const x = positions.end.x - positions.begin.x;
+  const y = positions.end.y - positions.begin.y;
+  return { x: x * rotation.x + y * rotation.y, y: -x * rotation.y + y * rotation.x };
+}
+function spanRoundoff(value: ShapeConnectorPoint): number {
+  return 8 * Number.EPSILON * Math.max(Math.abs(value.x), Math.abs(value.y));
+}
+function hasFreeTips(node: SourceShape & { shapeConnector: ShapeConnector }): boolean {
+  return node.shapeConnector.begin.kind === "free" && node.shapeConnector.end.kind === "free";
+}
+function sizeEdit(value: ShapeConnectorSizeEdit): ShapeConnectorSizeEdit {
+  const fields = record(value, ["axis", "sizePx", "lockAspectRatio"], "connector size edit");
+  if (fields.axis !== "width" && fields.axis !== "height")
+    throw new TypeError("Unknown connector size axis.");
+  if (
+    typeof fields.sizePx !== "number" ||
+    !Number.isFinite(fields.sizePx) ||
+    fields.sizePx <= 0 ||
+    fields.sizePx > SHAPE_CONNECTOR_ROUTE_LIMITS.extent
+  )
+    throw new RangeError(
+      `Connector numeric size must be positive and at most ${SHAPE_CONNECTOR_ROUTE_LIMITS.extent} pixels.`,
+    );
+  if (fields.lockAspectRatio !== undefined && typeof fields.lockAspectRatio !== "boolean")
+    throw new TypeError("Connector aspect-ratio lock must be a boolean.");
+  return {
+    axis: fields.axis,
+    sizePx: fields.sizePx,
+    ...(fields.lockAspectRatio !== undefined ? { lockAspectRatio: fields.lockAspectRatio } : {}),
+  };
+}
+
+/**
+ * Read actual endpoint dimensions, including bound endpoints. Disposable paint
+ * padding, source carrier size and preset direction never substitute for a span.
+ * Bindings and unreliable zero/thin axes are readable but cannot be resized.
+ */
+export function getShapeConnectorNumericSize(
+  forest: readonly SheetDrawing[],
+  sourceValue: ShapeConnectorEditSource,
+  metrics: PictureSheetMetrics,
+): ShapeConnectorNumericSize {
+  const selected = source(sourceValue);
+  const roots = normalizeShapeDrawingForest(forest);
+  const node = sourceNode(index(roots), selected);
+  const original = ready(resolveSheetShapeConnections(roots, metrics).getConnector(node.id)!);
+  const span = numericSpan(original);
+  const roundoff = spanRoundoff(span);
+  const free = hasFreeTips(node);
+  return {
+    widthPx: Math.abs(span.x),
+    heightPx: Math.abs(span.y),
+    canResizeWidth: free && Math.abs(span.x) > roundoff,
+    canResizeHeight: free && Math.abs(span.y) > roundoff,
+  };
+}
+
+/**
+ * Resize a fully free connector's signed endpoint vector in the resolved carrier
+ * axes. The ordered begin and its exact stored relation stay fixed; only the end
+ * relation changes. Carrier geometry, flips, route adjustments and appearance
+ * are retained. Bound/mixed connectors require an explicit disconnect first.
+ */
+export function planShapeConnectorSizeChange(
+  forest: readonly SheetDrawing[],
+  sourceValue: ShapeConnectorEditSource,
+  editValue: ShapeConnectorSizeEdit,
+  metrics: PictureSheetMetrics,
+): SheetDrawing[] {
+  const selected = source(sourceValue);
+  const edit = sizeEdit(editValue);
+  const roots = normalizeShapeDrawingForest(forest);
+  const node = sourceNode(index(roots), selected);
+  if (!hasFreeTips(node))
+    throw new TypeError("Connector numeric resizing requires both endpoints to be free.");
+  const original = ready(resolveSheetShapeConnections(roots, metrics).getConnector(node.id)!);
+  const old = numericSpan(original);
+  const axis = edit.axis === "width" ? "x" : "y";
+  const currentSize = Math.abs(old[axis]);
+  // Preserve exact stored ratios on a no-op, including rotated/inherited bases.
+  if (edit.sizePx === currentSize) return roots;
+  if (currentSize <= spanRoundoff(old))
+    throw new RangeError("Connector numeric size axis has no reliably representable span.");
+  const scale = edit.sizePx / currentSize;
+  if (!Number.isFinite(scale) || scale <= 0)
+    throw new RangeError("Connector numeric size scale cannot be represented reliably.");
+  const next = edit.lockAspectRatio ? { x: old.x * scale, y: old.y * scale } : { ...old };
+  next[axis] = old[axis] < 0 ? -edit.sizePx : edit.sizePx;
+  for (const component of [next.x, next.y])
+    if (!Number.isFinite(component) || Math.abs(component) > SHAPE_CONNECTOR_ROUTE_LIMITS.extent)
+      throw new RangeError("Connector numeric size exceeds its route-extent budget.");
+  if (Math.abs(next[axis]) <= spanRoundoff(next))
+    throw new RangeError("Connector numeric size axis has no reliably representable span.");
+  const rotation = routeRotation(original.carrierLayout!.angleDeg);
+  const begin = tips(original).begin;
+  const position = point(
+    {
+      x: begin.x + next.x * rotation.x - next.y * rotation.y,
+      y: begin.y + next.x * rotation.y + next.y * rotation.x,
+    },
+    "Resized connector endpoint",
+  );
+  const result = planShapeConnectorEndpointChange(
+    roots,
+    selected,
+    "end",
+    { kind: "free", position },
+    metrics,
+  );
+  const actual = numericSpan(
+    ready(resolveSheetShapeConnections(result, metrics).getConnector(node.id)!),
+  );
+  // The endpoint inverse also verifies painted and resolved worksheet tips.
+  // Verify the requested carrier-axis components independently, so cancellation
+  // cannot silently replace a requested thin dimension or drift the other axis.
+  const roundoff = spanRoundoff(next);
+  for (const component of ["x", "y"] as const)
+    if (
+      Math.abs(actual[component] - next[component]) >
+      Math.abs(next[component]) * SHAPE_CONNECTOR_ROUTE_LIMITS.spanRelativeError + roundoff
+    )
+      throw new RangeError("Connector numeric size cannot preserve its exact signed span.");
+  return result;
 }
 
 /**
