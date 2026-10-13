@@ -25,6 +25,7 @@ const props = defineProps<{
   theme?: WorkbookTheme;
   assetUrls?: ReadonlyMap<string, string>;
   density?: number;
+  hideText?: boolean;
 }>();
 const emit = defineEmits<{
   paint: [presentation: ShapeDetailedPresentation | undefined];
@@ -38,13 +39,13 @@ const canvasText = computed(
     (props.drawing.shapeStyle?.rotation3d?.kind === "value" && !!props.drawing.text.trim()),
 );
 watch(
-  () => [props.drawing, props.connectorRoute, bodyPaint.value, textPaint.value],
+  () => [props.drawing, props.connectorRoute, props.hideText, bodyPaint.value, textPaint.value],
   () =>
     emit(
       "paint",
       combineShapePresentations(
         props.drawing,
-        [bodyPaint.value, textPaint.value],
+        [bodyPaint.value, props.hideText ? undefined : textPaint.value],
         props.connectorRoute,
       ),
     ),
@@ -134,7 +135,7 @@ const textStyle = computed<CSSProperties | undefined>(() => {
         </g>
       </svg>
       <ShapeTextContent
-        v-if="canvasText"
+        v-if="canvasText && !hideText"
         :drawing="drawing"
         :theme="theme"
         :asset-urls="assetUrls"
@@ -142,7 +143,13 @@ const textStyle = computed<CSSProperties | undefined>(() => {
         @paint="textPaint = $event"
       />
       <div
-        v-if="drawing.text.trim() && drawing.color !== 'transparent' && textStyle && !canvasText"
+        v-if="
+          !hideText &&
+          drawing.text.trim() &&
+          drawing.color !== 'transparent' &&
+          textStyle &&
+          !canvasText
+        "
         class="standard-shape-content__text"
         :style="textStyle"
         data-standard-shape-text

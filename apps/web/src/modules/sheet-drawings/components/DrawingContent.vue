@@ -29,6 +29,7 @@ const props = defineProps<{
   dateSystem?: "1900" | "1904";
   density?: number;
   legacyHitSurface?: boolean;
+  hideText?: boolean;
 }>();
 const emit = defineEmits<{
   controlChange: [value: unknown];
@@ -59,6 +60,7 @@ const textStyle = computed(() => ({
       :theme="theme"
       :asset-urls="imageAssetUrls"
       :density="density"
+      :hide-text="hideText"
       @paint="emit('detailedPaint', $event)"
     />
     <svg
@@ -159,6 +161,7 @@ const textStyle = computed(() => ({
     <div
       v-else
       v-show="
+        !hideText &&
         !(
           (drawing.kind === 'shape' &&
             (connectorRoute ||

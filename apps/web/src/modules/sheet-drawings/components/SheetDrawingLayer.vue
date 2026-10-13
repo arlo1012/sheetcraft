@@ -71,6 +71,14 @@ import type { ShapeAlignment, ShapeAlignmentReference } from "../shape-selection
 import { createBrowserIdFactory } from "../../../shared/runtime/browser-id-factory";
 import { useAppI18n } from "../../../shared/i18n";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
+import type { ShapeTextEditSnapshot, ShapeTextEditCallbacks } from "../useShapeTextEditSession";
+import type { ShapeCanvasTextEditRequest } from "../shape-canvas-text-edit-contract";
+import { shapeTextEditorPlacement } from "../shape-text-editor-placement";
+import { getDrawingShapeTextRect } from "../shape-text-runtime";
+import ShapeCanvasTextEditor from "./ShapeCanvasTextEditor.vue";
+import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import { createContextMenuPoint, useContextMenu } from "../../../shared/menu/useContextMenu";
 import SheetShapeSelectionToolbar from "./SheetShapeSelectionToolbar.vue";
 import ShapeGroupSelection from "./ShapeGroupSelection.vue";
 import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
@@ -164,6 +172,10 @@ const props = defineProps<{
   layout: SheetViewportLayout;
   scale: number;
   readOnly: boolean;
+  textEditSnapshot?: ShapeTextEditSnapshot | null;
+  textEditCallbacks?: ShapeTextEditCallbacks;
+  startTextEdit?: (request: ShapeCanvasTextEditRequest) => boolean;
+  textEditSelection?: { start: number; end: number };
 }>();
 const emit = defineEmits<{
   update: [drawing: SourceSheetDrawing];
@@ -210,6 +222,7 @@ watch(
     if (pointEditingId.value && pointEditingId.value !== id) pointEditingId.value = null;
     if (id)
       void nextTick(() => {
+        if (props.textEditSnapshot) return;
         const element = [
           ...(layerElement.value?.querySelectorAll<HTMLElement>("[data-sheet-drawing-id]") ?? []),
         ].find((item) => item.dataset.sheetDrawingId === id);
@@ -224,6 +237,7 @@ watch(
     const id = owned ?? root;
     if (!id) return;
     void nextTick(() => {
+      if (props.textEditSnapshot) return;
       if ((selectedOwnedId.value ?? selectedId.value) !== id) return;
       const target = [
         ...(layerElement.value?.querySelectorAll<HTMLElement>("[data-sheet-drawing-id]") ?? []),
@@ -762,6 +776,11 @@ function startGroupPixels(
   fragment: ShapeGroupFrameFragment,
   event: PointerEvent,
 ): void {
+  if (!finishCanvasText()) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   const hit = groupHit(entry, fragment, event);
   if (!hit) {
     if (event.target instanceof Element && event.target.closest('[role="status"]'))
@@ -812,7 +831,7 @@ function groupPixelContext(
   if (!hit) return;
   if (hit.kind === "leaf") {
     const target = groupLeafFragment(entry, fragment, hit.path.at(-1)!);
-    if (target) pointContext(target, event);
+    if (target) shapeContext(target, event);
   } else {
     event.preventDefault();
     formatGroup(entry.source, hit.path);
@@ -906,6 +925,130 @@ function formatSelected() {
     const source = sourceOwner(d);
     if (source && (source.kind === "shape" || source.kind === "textBox")) emit("format", source);
   }
+}
+function beginCanvasText(drawing: SheetDrawing, selection: "all" | "end", text?: string): boolean {
+  if (
+    !props.startTextEdit ||
+    !canChange(drawing) ||
+    (drawing.kind !== "shape" && drawing.kind !== "textBox") ||
+    projectionById(drawing)?.renderLeaf?.connector
+  )
+    return false;
+  const owner = projectionById(drawing),
+    source = sourceOwner(drawing);
+  if (!owner || !source || legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing)
+    return false;
+  selectRoots([source.id], owner.groupLeaf ? drawing.id : null);
+  pointEditingId.value = null;
+  session?.cancel();
+  if (
+    !props.startTextEdit({
+      root: source,
+      path: owner.groupLeaf?.path,
+      selection,
+      ...(text !== undefined ? { text } : {}),
+    })
+  )
+    return false;
+  emit("select");
+  return true;
+}
+const canvasTextEditor = ref<InstanceType<typeof ShapeCanvasTextEditor>>();
+const canvasTextPlacement = computed(() => {
+  const state = props.textEditSnapshot;
+  if (!state) return;
+  const candidates = fragments.value.filter(
+    (f) => f.drawing.id === state.sourceId && sourceOwner(f.drawing) === state.root,
+  );
+  const fragment = candidates.sort(
+    (a, b) =>
+      b.clippedRect.width * b.clippedRect.height - a.clippedRect.width * a.clippedRect.height,
+  )[0];
+  const pane = Object.values(props.layout.panes).sort(
+    (a, b) => b.clip.width * b.clip.height - a.clip.width * a.clip.height,
+  )[0];
+  const clip =
+    fragment?.pageClip ?? (fragment ? props.layout.panes[fragment.paneId].clip : pane?.clip);
+  if (!clip) return;
+  const placement = fragment && shapeTextEditorPlacement(state.view, fragment);
+  return {
+    clip: {
+      left: `${clip.x}px`,
+      top: `${clip.y}px`,
+      width: `${clip.width}px`,
+      height: `${clip.height}px`,
+    },
+    frame: placement
+      ? {
+          ...placement.frame,
+          left: `${fragment!.rect.x - clip.x}px`,
+          top: `${fragment!.rect.y - clip.y}px`,
+        }
+      : {
+          left: "16px",
+          top: "16px",
+          width: `${Math.max(80, Math.min(420, clip.width - 32))}px`,
+          height: "160px",
+        },
+    input: placement?.input ?? { left: "0px", top: "0px", width: "100%", height: "100%" },
+  };
+});
+function restoreCanvasTextObjectFocus(id: string, sheet: Sheet | undefined): void {
+  void nextTick(() => {
+    if (props.sheet !== sheet || props.textEditSnapshot) return;
+    Array.from(layerElement.value?.querySelectorAll<HTMLElement>("[data-sheet-drawing-id]") ?? [])
+      .find((element) => element.dataset.sheetDrawingId === id)
+      ?.focus({ preventScroll: true });
+  });
+}
+function finishCanvasText(restoreObjectFocus = false): boolean {
+  const state = props.textEditSnapshot,
+    callbacks = props.textEditCallbacks;
+  if (!state) return true;
+  if (callbacks && !callbacks.isActive()) return true;
+  if (!callbacks || callbacks.sessionId !== state.sessionId || !callbacks.commit()) {
+    void nextTick(() => canvasTextEditor.value?.focus());
+    return false;
+  }
+  if (restoreObjectFocus) restoreCanvasTextObjectFocus(state.sourceId, props.sheet);
+  return true;
+}
+const canvasTextOwnerActions = computed(() => {
+  const state = props.textEditSnapshot,
+    callbacks = props.textEditCallbacks,
+    sheet = props.sheet;
+  const current = () =>
+    !!state &&
+    !!callbacks &&
+    callbacks.isActive() &&
+    props.sheet === sheet &&
+    props.textEditCallbacks === callbacks &&
+    props.textEditSnapshot?.sessionId === state.sessionId &&
+    callbacks.sessionId === state.sessionId;
+  const finish = (restoreFocus: boolean): boolean => {
+    if (!current() || !state || !callbacks) return false;
+    if (!callbacks.commit()) {
+      void nextTick(() => canvasTextEditor.value?.focus());
+      return false;
+    }
+    if (restoreFocus) restoreCanvasTextObjectFocus(state.sourceId, sheet);
+    return true;
+  };
+  return {
+    commit: () => finish(true),
+    escape: () => finish(true),
+    blur: () => finish(false),
+    cancel: () => {
+      if (current() && state && callbacks?.cancel())
+        restoreCanvasTextObjectFocus(state.sourceId, sheet);
+    },
+  };
+});
+function hideCanvasText(drawing: SheetDrawing): boolean {
+  const state = props.textEditSnapshot;
+  return (
+    !!state && !state.stale && state.sourceId === drawing.id && sourceOwner(drawing) === state.root
+  );
 }
 function formatConnector(drawing: SheetDrawing): boolean {
   const pass = renderPass.value,
@@ -1261,6 +1404,11 @@ function startRootGesture(
   onClick?: () => void,
   ownedPath?: ShapeGroupPath,
 ): void {
+  if (!finishCanvasText()) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   const m = metrics.value;
   const root = props.drawings.find((d) => d.id === id);
   if (
@@ -1436,6 +1584,11 @@ function startGroupFrame(
   mode: "move" | "rotate" = "move",
   path: ShapeGroupPath = [source.id],
 ): void {
+  if (!finishCanvasText()) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   if (props.drawings.find((d) => d.id === source.id) !== source) return;
   const nestedId = path.length > 1 ? path.at(-1)! : null;
   if (nestedId !== null) {
@@ -1896,6 +2049,11 @@ function start(
   index?: number,
   freePoint?: FreeShapePointDescriptor,
 ): void {
+  if (props.textEditSnapshot && !finishCanvasText()) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   const drawing = fragment.drawing;
   const owner = legacyDrawings.value.find((item) => item.id === drawing.id);
   if (!owner || owner !== drawing || (mode === "point" && pointEditingId.value !== drawing.id))
@@ -2130,6 +2288,7 @@ function edit(fragment: DrawingFragment, event: MouseEvent): void {
     activeVertex.value = 0;
     emit("select");
   } else {
+    if (beginCanvasText(fragment.drawing, "end")) return;
     const source = sourceOwner(fragment.drawing);
     const owned = resolvedOwner(fragment.drawing)?.groupLeaf;
     if (owned) emit("editOwned", owned.sourceRoot, owned.path);
@@ -2155,6 +2314,110 @@ function pointContext(fragment: DrawingFragment, event: MouseEvent): void {
   activeVertex.value = 0;
   emit("select");
 }
+const shapeTextMenu = shallowRef<{
+  key: string;
+  canText: boolean;
+  actions: { text: () => boolean; format: () => boolean; points?: () => boolean };
+}>();
+const shapeTextMenuAnchor = shallowRef<FloatingReference | null>(null);
+const shapeTextMenuSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
+const { floatingStyles: shapeTextMenuStyles, dismiss: dismissShapeTextMenu } = useContextMenu({
+  anchor: shapeTextMenuAnchor,
+  panelRef: computed(() => shapeTextMenuSurface.value?.rootElement ?? null),
+  surfaceRef: shapeTextMenuSurface,
+  open: computed(() => !!shapeTextMenu.value),
+  onDismiss: () => {
+    shapeTextMenu.value = undefined;
+  },
+});
+function shapeContext(fragment: DrawingFragment, event: MouseEvent | KeyboardEvent): void {
+  const drawing = fragment.drawing;
+  if (!props.startTextEdit) {
+    if (event instanceof MouseEvent) pointContext(fragment, event);
+    return;
+  }
+  if (
+    (drawing.kind !== "shape" && drawing.kind !== "textBox") ||
+    !canChange(drawing) ||
+    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing ||
+    (event instanceof MouseEvent && !hits(fragment, event))
+  )
+    return;
+  const source = sourceOwner(drawing),
+    owned = resolvedOwner(drawing)?.groupLeaf;
+  if (!source) return;
+  event.preventDefault();
+  event.stopPropagation();
+  selectRoots([source.id], owned ? drawing.id : null);
+  const key = selectionKey.value,
+    m = metrics.value,
+    rev = props.revision;
+  const textRect = getDrawingShapeTextRect(drawing);
+  const menu: NonNullable<typeof shapeTextMenu.value> = {
+    key,
+    canText:
+      !projectionById(drawing)?.renderLeaf?.connector &&
+      !!textRect &&
+      textRect.width > 0 &&
+      textRect.height > 0,
+    actions: {
+      text: () => {
+        if (!valid() || !beginCanvasText(drawing, "all")) return false;
+        dismissShapeTextMenu("programmatic", false);
+        return true;
+      },
+      format: () => {
+        if (!valid()) return false;
+        if (projectionById(drawing)?.renderLeaf?.connector) {
+          if (!formatConnector(drawing)) return false;
+        } else if (owned) emit("formatGroup", owned.sourceRoot, owned.path);
+        else if (source.kind === "shape" || source.kind === "textBox") emit("format", source);
+        else return false;
+        dismissShapeTextMenu("programmatic", false);
+        return true;
+      },
+      ...(drawing.kind === "shape" && drawing.shapePath
+        ? {
+            points: () => {
+              if (!valid()) return false;
+              pointEditingId.value = drawing.id;
+              activeVertex.value = 0;
+              dismissShapeTextMenu("programmatic", false);
+              emit("select");
+              return true;
+            },
+          }
+        : {}),
+    },
+  };
+  function valid() {
+    return (
+      shapeTextMenu.value === menu &&
+      key === selectionKey.value &&
+      metrics.value === m &&
+      props.revision === rev &&
+      canChange(drawing) &&
+      legacyDrawings.value.includes(drawing) &&
+      sourceOwner(drawing) === source
+    );
+  }
+  shapeTextMenuAnchor.value =
+    event instanceof MouseEvent
+      ? createContextMenuPoint(event, event.currentTarget as Element | null)
+      : event.currentTarget instanceof HTMLElement
+        ? event.currentTarget
+        : null;
+  shapeTextMenu.value = menu;
+}
+watch(
+  () => [props.drawings, props.sheet, props.revision, metrics.value, props.readOnly],
+  () => {
+    shapeTextMenu.value = undefined;
+  },
+);
+watch(selectionKey, (key) => {
+  if (shapeTextMenu.value?.key !== key) shapeTextMenu.value = undefined;
+});
 function nudgeFreePoint(
   drawing: SheetGraphicDrawing,
   point: FreeShapePointDescriptor,
@@ -2424,6 +2687,24 @@ function keydown(drawing: SheetDrawing, event: KeyboardEvent) {
     return;
   }
   if (!canChange(drawing)) return;
+  if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
+    const fragment = fragments.value.find((f) => f.drawing === drawing);
+    if (fragment) shapeContext(fragment, event);
+    return;
+  }
+  if (event.key === "Process" || event.keyCode === 229 || Array.from(event.key).length === 1) {
+    if (
+      beginCanvasText(
+        drawing,
+        "end",
+        event.key === "Process" || event.keyCode === 229 ? undefined : event.key,
+      )
+    ) {
+      if (event.key !== "Process" && event.keyCode !== 229) event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+  }
   if (event.key === "Delete" || event.key === "Backspace") {
     event.preventDefault();
     event.stopPropagation();
@@ -2443,6 +2724,7 @@ function keydown(drawing: SheetDrawing, event: KeyboardEvent) {
       formatConnector(drawing);
       return;
     }
+    if (beginCanvasText(drawing, "all")) return;
     const source = sourceOwner(drawing),
       owned = resolvedOwner(drawing)?.groupLeaf;
     if (owned && selectedOwnedId.value === drawing.id)
@@ -2563,7 +2845,7 @@ function clearOutside(event: PointerEvent) {
     event.target instanceof Element &&
     !event.target.closest("[data-sheet-drawing-id]") &&
     !event.target.closest(
-      '[role="dialog"],[role="menu"],[role="listbox"],[data-shape-format-pane],[data-shape-format-trigger],[data-shape-selection-toolbar],[data-shape-selection-reference-menu],[data-shape-group-selection]',
+      '[role="dialog"],[role="menu"],[role="listbox"],[data-shape-format-pane],[data-shape-format-trigger],[data-shape-selection-toolbar],[data-shape-selection-reference-menu],[data-shape-group-selection],[data-shape-canvas-text-editor],[data-shape-canvas-text-toolbar]',
     )
   ) {
     selectRoots([]);
@@ -2787,7 +3069,7 @@ watch(
       "
       @pointerdown="start(fragment, $event)"
       @dblclick="edit(fragment, $event)"
-      @contextmenu="pointContext(fragment, $event)"
+      @contextmenu="shapeContext(fragment, $event)"
       @keydown="keydown(fragment.drawing, $event)"
     >
       <div class="sheet-drawing-layer__clip">
@@ -2797,6 +3079,7 @@ watch(
             @detailed-paint="acceptDetailedPaint(fragment, $event)"
             @control-change="emit('controlChange', fragment.drawing.id, $event)"
             :drawing="fragment.drawing"
+            :hide-text="hideCanvasText(fragment.drawing)"
             :connector-route="fragment.connectorRoute"
             :legacy-hit-surface="legacyHitSurface(fragment.drawing)"
             :density="rasterDensity"
@@ -2857,6 +3140,11 @@ watch(
       :theme="theme"
       :asset-urls="imageAssetUrls"
       :stack-index="entry.stackIndex"
+      :editing-text-id="
+        textEditSnapshot && !textEditSnapshot.stale && textEditSnapshot.root === entry.source
+          ? textEditSnapshot.sourceId
+          : undefined
+      "
       @paint="acceptGroupPaint(entry, $event)"
       @pointerdown="(fragment, event) => startGroupPixels(entry, fragment, event)"
       @doubleclick="(fragment, event) => editGroupPixels(entry, fragment, event)"
@@ -2931,10 +3219,71 @@ watch(
         @format="formatGroup(item.source, item.owner.path)"
       />
     </div>
+    <Teleport to="body">
+      <MenuSurface
+        v-if="shapeTextMenu"
+        ref="shapeTextMenuSurface"
+        :style="shapeTextMenuStyles"
+        :label="locale === 'zh-CN' ? '形状操作' : 'Shape actions'"
+      >
+        <MenuItem
+          :disabled="!shapeTextMenu.canText"
+          v-on="{ select: shapeTextMenu.actions.text }"
+          >{{ locale === "zh-CN" ? "编辑文本" : "Edit Text" }}</MenuItem
+        >
+        <MenuItem
+          v-if="shapeTextMenu.actions.points"
+          v-on="{ select: shapeTextMenu.actions.points }"
+          >{{ locale === "zh-CN" ? "编辑顶点" : "Edit Points" }}</MenuItem
+        >
+        <MenuItem v-on="{ select: shapeTextMenu.actions.format }">{{
+          locale === "zh-CN" ? "设置形状格式" : "Format Shape"
+        }}</MenuItem>
+      </MenuSurface>
+    </Teleport>
+    <div
+      v-if="textEditSnapshot && textEditCallbacks && canvasTextPlacement"
+      class="sheet-drawing-layer__text-editor-clip"
+      :style="canvasTextPlacement.clip"
+    >
+      <ShapeCanvasTextEditor
+        ref="canvasTextEditor"
+        :key="textEditSnapshot.sessionId"
+        :drawing="textEditSnapshot.view"
+        :session-id="textEditSnapshot.sessionId"
+        :draft="textEditSnapshot.draftText"
+        :composing="textEditSnapshot.composing"
+        :stale="textEditSnapshot.stale"
+        :disabled="readOnly"
+        :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
+        :error="
+          textEditSnapshot.error
+            ? locale === 'zh-CN'
+              ? '无法应用文本更改。草稿已保留，可重试或复制。'
+              : textEditSnapshot.error.message
+            : undefined
+        "
+        :frame-style="canvasTextPlacement.frame"
+        :textarea-style="canvasTextPlacement.input"
+        :initial-selection="textEditSelection"
+        :update="textEditCallbacks.update"
+        :composition="textEditCallbacks.setComposing"
+        :commit="canvasTextOwnerActions.commit"
+        :escape="canvasTextOwnerActions.escape"
+        :cancel="canvasTextOwnerActions.cancel"
+        v-on="{ requestCommit: canvasTextOwnerActions.blur }"
+      />
+    </div>
   </div>
 </template>
 <style scoped lang="scss">
 .sheet-drawing-layer {
+  &__text-editor-clip {
+    position: absolute;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1000;
+  }
   position: absolute;
   inset: 0;
   pointer-events: none;

@@ -414,6 +414,72 @@ afterEach(() => {
   expect(getShapeLeafPixelsOwnedBytes()).toBe(0);
 });
 describe("actual leaf branch and layout policy", () => {
+  test.each([
+    ["legacy SVG", { shapeStyle: undefined }],
+    ["legacy text box", { kind: "textBox" }],
+    ["standard plain shape", { shapeGeometry: { preset: "rightArrow" } }],
+    [
+      "rich shape",
+      { shapeGeometry: { preset: "rightArrow" }, shapeText: createDefaultShapeText() },
+    ],
+  ] satisfies readonly (readonly [string, Partial<SheetGraphicDrawing>])[])(
+    "a live editor hides only %s glyph layout and paint while preserving the detailed body and source",
+    (_policy, changes) => {
+      const source = drawing({
+          text: "Saved text",
+          shapeFlipX: true,
+          shapeFlipY: true,
+          shapeStyle: {
+            glow: {
+              kind: "value",
+              value: { color: { kind: "rgb", rgb: "#ff0000" }, opacity: 0.5, sizePt: 3 },
+            },
+          },
+          ...changes,
+        }),
+        before = structuredClone(source),
+        measure = vi.fn(native.measurer!.measure),
+        measureMetrics = vi.fn(native.measurer!.measureMetrics!),
+        input = {
+          ...options(source),
+          angleDeg: 37,
+          textRuntimeOptions: {
+            ...native,
+            measurer: { measure, measureMetrics },
+          },
+        },
+        visible = planShapeLeafPixels(input);
+      expect(visible.kind).toBe("ready");
+      expect(visible.renderPolicy).toBe(
+        _policy === "legacy SVG"
+          ? "legacy-svg"
+          : _policy === "legacy text box"
+            ? "legacy-text-box"
+            : "standard",
+      );
+      expect(visible.textLayout).toBeDefined();
+      expect(visible.textPlan).toBeDefined();
+      expect(measureMetrics).toHaveBeenCalled();
+      measure.mockClear();
+      measureMetrics.mockClear();
+      const hidden = planShapeLeafPixels({ ...input, hideText: true });
+      expect(hidden.kind).toBe("ready");
+      expect(hidden.textLayout).toBeUndefined();
+      expect(hidden.textPlan).toBeUndefined();
+      expect(hidden.bodyPlan).toEqual(visible.bodyPlan);
+      expect(hidden.renderPolicy).toBe(visible.renderPolicy);
+      expect(hidden.bodyFlipX).toBe(visible.bodyFlipX);
+      expect(hidden.bodyFlipY).toBe(visible.bodyFlipY);
+      expect(hidden.richText).toBe(visible.richText);
+      expect(measure).not.toHaveBeenCalled();
+      expect(measureMetrics).not.toHaveBeenCalled();
+      expect(source).toEqual(before);
+      const restored = planShapeLeafPixels({ ...input, hideText: false });
+      expect(restored.textLayout).toEqual(visible.textLayout);
+      expect(restored.textPlan).toEqual(visible.textPlan);
+      expect(source).toEqual(before);
+    },
+  );
   test("plain standard line history text without a text rectangle stays hidden without blocking its body", () => {
     const source = drawing({
       shape: "line",
@@ -629,6 +695,34 @@ describe("resource and aggregate preflight", () => {
       },
     },
   };
+  test("hidden glyph resources stay dormant while body resource failures remain explicit", () => {
+    const shapeText = createDefaultShapeText();
+    shapeText.style = texture;
+    const source = drawing({ shapeGeometry: { preset: "rect" }, shapeText }),
+      before = structuredClone(source),
+      getAssetSize = vi.fn(),
+      input = { ...options(source), resources: { getAssetSize } };
+    expect(planShapeLeafPixels(input)).toMatchObject({
+      kind: "unavailable",
+      missingAssetIds: ["paint"],
+    });
+    getAssetSize.mockClear();
+    const hidden = planShapeLeafPixels({ ...input, hideText: true });
+    expect(hidden.kind).toBe("ready");
+    expect(hidden.textLayout).toBeUndefined();
+    expect(hidden.textPlan).toBeUndefined();
+    expect(hidden.bodyPlan.assetIds).toEqual([]);
+    expect(getAssetSize).not.toHaveBeenCalled();
+    expect(source).toEqual(before);
+    expect(
+      planShapeLeafPixels({
+        ...input,
+        drawing: { ...source, shapeStyle: texture },
+        hideText: true,
+      }),
+    ).toMatchObject({ kind: "unavailable", missingAssetIds: ["paint"] });
+    expect(getAssetSize).toHaveBeenCalledWith("paint");
+  });
   test("missing body/text metadata or pixels stay explicit and do not paint, decode or allocate", () => {
     const decode = vi.fn(),
       make = vi.fn(),
@@ -731,6 +825,46 @@ describe("resource and aggregate preflight", () => {
   });
 });
 describe("owned actual source pixels", () => {
+  test("hiding active-editor glyph pixels keeps the real body border and saved text", () => {
+    const source = drawing({
+        shapeGeometry: { preset: "rect" },
+        text: "abc",
+        fill: "transparent",
+        stroke: "#111111",
+        strokeWidth: 3,
+      }),
+      before = structuredClone(source),
+      visibleBoundary = factory(),
+      hiddenBoundary = factory(),
+      visible = prepareShapeLeafPixels({
+        ...options(source),
+        canvasFactory: visibleBoundary.make,
+      }),
+      hidden = prepareShapeLeafPixels({
+        ...options(source),
+        hideText: true,
+        canvasFactory: hiddenBoundary.make,
+      });
+    try {
+      expect(visible.kind).toBe("ready");
+      expect(hidden.kind).toBe("ready");
+      if (visible.kind !== "ready" || hidden.kind !== "ready") return;
+      expect(visibleBoundary.calls().some((call) => call.text === "abc")).toBe(true);
+      expect(hiddenBoundary.calls()).toEqual([]);
+      expect(hidden.textLayout).toBeUndefined();
+      expect(hidden.textPlan).toBeUndefined();
+      expect(hidden.bodyPlan).toEqual(visible.bodyPlan);
+      expect(alpha(visible, 1, 20)).toBe(255);
+      expect(alpha(hidden, 1, 20)).toBe(255);
+      const run = visible.textLayout!.runs[0]!;
+      expect(alpha(visible, run.x + 1, run.y - 1)).toBe(255);
+      expect(alpha(hidden, run.x + 1, run.y - 1)).toBe(0);
+      expect(source).toEqual(before);
+    } finally {
+      if (visible.kind === "ready") visible.dispose();
+      if (hidden.kind === "ready") hidden.dispose();
+    }
+  });
   test("CSS inside-border sourcePainter paints only genuine inside strips and preserves transparent center", () => {
     const boundary = factory(),
       source = drawing({

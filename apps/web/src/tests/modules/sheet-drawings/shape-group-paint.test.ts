@@ -288,6 +288,60 @@ afterEach(() => {
 });
 
 describe("real recursive owned group source pixels", () => {
+  test.each(["red", "blue", "nested", "root", "missing", undefined])(
+    "active text id %s suppresses only its exact leaf through plan and pixel preparation",
+    (editingTextId) => {
+      const selected = leaf("red"),
+        sibling = leaf("blue", 0.5, 0.5);
+      selected.text = "Same saved text";
+      sibling.text = "Same saved text";
+      const nested: ShapeGroupedGroup = {
+          kind: "shapeGroup",
+          id: "nested",
+          name: "Nested",
+          rotation: 23,
+          groupFrame: {
+            kind: "shape-group-local-v1",
+            rect: { xRatio: 0, yRatio: 0, widthRatio: 0.5, heightRatio: 0.5 },
+          },
+          members: [selected],
+        },
+        root = group([nested, sibling], 40, 30),
+        before = structuredClone(root),
+        result = prepareShapeGroupPaint({ ...options(root), editingTextId });
+      results.push(result);
+      expect(result.kind).toBe("ready");
+      const expected = [
+        ["red", editingTextId === "red", "Same saved text"],
+        ["blue", editingTextId === "blue", "Same saved text"],
+      ];
+      for (const calls of [leafCalls.plan.mock.calls, leafCalls.prepare.mock.calls])
+        expect(
+          calls.map(([input]) => {
+            const supplied = input as ShapeLeafPixelsOptions;
+            return [supplied.drawing.id, supplied.hideText, supplied.drawing.text];
+          }),
+        ).toEqual(expected);
+      const supplied = leafCalls.prepare.mock.calls[0]![0] as ShapeLeafPixelsOptions;
+      expect(supplied.sourceIdentity).toMatchObject({
+        sourceRoot: root,
+        sourceNode: selected,
+        path: ["root", "nested", "red"],
+      });
+      expect(
+        (
+          (result.snapshotRoot.members[0] as ShapeGroupedGroup)
+            .members[0] as SheetGroupedGraphicDrawing
+        ).text,
+      ).toBe("Same saved text");
+      expect((result.snapshotRoot.members[1] as SheetGroupedGraphicDrawing).text).toBe(
+        "Same saved text",
+      );
+      expect(root).toEqual(before);
+      expect(selected.text).toBe("Same saved text");
+      expect(sibling.text).toBe("Same saved text");
+    },
+  );
   test("whole-sheet connector paint uses actual route layout without replacing its owner carrier", () => {
     const connector = {
       ...leaf("connector", 0.1, 0.2, 0.4, 0.3),

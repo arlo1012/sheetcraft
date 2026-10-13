@@ -6,7 +6,12 @@ import { resolveSheetShapeConnections } from "@sheetcraft/core/shape-connector-l
 import { planShapeConnectorRouteAdjustment } from "@sheetcraft/core/shape-connector-editing";
 import { shapeFrameLocalToWorld } from "@sheetcraft/core/shape-frame";
 import { getPicturePaneTranslation } from "@sheetcraft/sheet-engine/picture-frame-layout";
-import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
+import {
+  createWorkbook,
+  createSheet,
+  insertSheet,
+  getActiveSheet,
+} from "@sheetcraft/core/workbook";
 import { isShapeGroupDrawing } from "@sheetcraft/core/shape-group";
 import { groupShapeRoots, ungroupShapeRoot } from "@sheetcraft/core/shape-group-planning";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
@@ -28,6 +33,10 @@ import { materializeDrawingShapeText } from "../../../modules/sheet-drawings/sha
 import type { useShapeCreation } from "../../../modules/sheet-drawings/useShapeCreation";
 import { SHAPE_GALLERY } from "../../../modules/sheet-drawings/shape-gallery";
 import { createAppI18n } from "../../../shared/i18n";
+import ShapeCanvasTextEditor from "../../../modules/sheet-drawings/components/ShapeCanvasTextEditor.vue";
+import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
+import * as shapeMeasure from "../../../modules/sheet-drawings/shape-text-measure";
+import type { useShapeTextEditSession } from "../../../modules/sheet-drawings/useShapeTextEditSession";
 import { actualPng } from "../../modules/image-assets/image-header-fixtures";
 
 const mounted: VueWrapper[] = [];
@@ -41,6 +50,11 @@ afterEach(() => {
 function setupState(wrapper: VueWrapper) {
   return (wrapper.vm.$ as unknown as { setupState: unknown }).setupState as {
     shapeCreation: ReturnType<typeof useShapeCreation>;
+    shapeTextEdit: ReturnType<typeof useShapeTextEditSession>;
+    onSelectSheet: (id: string) => void;
+    cellEditSession: { state: { active: boolean; composing: boolean; draft: string } };
+    findDialogVisible: boolean;
+    cellFormatSelection: unknown;
     shapeInteractionBlocked: boolean;
     sheetGridRef: { selectDrawing: (id: string | null) => void };
     undo: () => void;
@@ -73,8 +87,10 @@ function fixture(
     | { revision: number; savedAt: number; snapshot: ReturnType<typeof serializeWorkbook> }
   >,
   imageAssetStore: ImageAssetStore = createMemoryImageAssetStore(),
+  attached = false,
 ) {
   const wrapper = mount(SpreadsheetWorkspace, {
+    ...(attached ? { attachTo: document.body } : {}),
     props: {
       workbookStore: {
         load,
@@ -850,3 +866,328 @@ test.each([false, true])(
     expect(serializeWorkbook(state.session.workbook)).toEqual(after);
   },
 );
+
+function directTextWorkbook(owned: boolean) {
+  const workbook = createWorkbook({ id: "direct-text", sheetId: "text-sheet" }),
+    sheet = getActiveSheet(workbook),
+    a = framedShape(),
+    b = framedShape();
+  a.id = "text-target";
+  a.text = "Original";
+  a.rotation = 37;
+  a.shapeGeometry = { preset: "rect" };
+  b.id = "untouched";
+  b.text = "Sibling";
+  b.shapeFrame.anchor = { mode: "fixed", x: 350, y: 60, size: { width: 100, height: 80 } };
+  sheet.drawings = owned
+    ? groupShapeRoots(
+        [a, b],
+        [a.id, b.id],
+        { id: "text-group", name: "Text group" },
+        createPictureSheetMetrics(sheet),
+      )
+    : [a, b];
+  return workbook;
+}
+function installNativeTextMeasurement() {
+  // Supply only native glyph metrics absent from HappyDOM. Initialization,
+  // real layout/AutoFit, exact collection commands and history remain genuine.
+  vi.spyOn(shapeMeasure, "getBrowserShapeTextMeasurement").mockReturnValue({
+    measurer: {
+      measure: (text) => Array.from(text).length * 10,
+      measureMetrics: (text) => ({
+        width: Array.from(text).length * 10,
+        ascent: 15,
+        descent: 5,
+        inkLeft: 0,
+        inkRight: Array.from(text).length * 10,
+      }),
+    },
+    resolveNormalLineMetrics: () => ({
+      metrics: { ascent: 15, descent: 5, lineAdvance: 20 },
+      policy: "provided-native",
+    }),
+  });
+}
+function directSource(state: ReturnType<typeof setupState>) {
+  const roots = getActiveSheet(state.session.workbook).drawings!,
+    root = roots.find((node) => node.id === "text-group" || node.id === "text-target")!;
+  const target = isShapeGroupDrawing(root)
+    ? root.members.find((node) => node.id === "text-target")!
+    : root;
+  if (target.kind !== "shape") throw Error("Expected text shape");
+  return target;
+}
+test.each([false, true])(
+  "real Workspace F2 edits canonical inline text, IME, Escape and history (owned=%s)",
+  async (owned) => {
+    installNativeTextMeasurement();
+    const wrapper = fixture(
+      async () => ({
+        revision: 1,
+        savedAt: 1,
+        snapshot: serializeWorkbook(directTextWorkbook(owned)),
+      }),
+      createMemoryImageAssetStore(),
+      true,
+    );
+    await flushPromises();
+    const state = setupState(wrapper),
+      layer = wrapper.getComponent(SheetDrawingLayer),
+      before = serializeWorkbook(state.session.workbook);
+    await layer.get('[data-sheet-drawing-id="text-target"]').trigger("keydown", { key: "F2" });
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value?.sourceId).toBe("text-target");
+    const editor = wrapper.getComponent(ShapeCanvasTextEditor),
+      input = editor.get("textarea"),
+      element = input.element as HTMLTextAreaElement;
+    expect(element.selectionStart).toBe(0);
+    expect(element.selectionEnd).toBe(8);
+    expect(editor.props("frameStyle")?.transform).toBe("rotate(37deg)");
+    await input.trigger("compositionstart");
+    await input.setValue("新しい\ntext");
+    await input.trigger("keydown", { key: "Escape", isComposing: true });
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    expect(wrapper.getComponent(SheetGrid).vm.flushPendingEdit()).toBe(false);
+    await input.trigger("compositionend");
+    await input.trigger("keydown", { key: "Enter" });
+    expect(state.shapeTextEdit.snapshot.value).toBeDefined();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    await input.trigger("keydown", { key: "Escape" });
+    await flushPromises();
+    expect(state.shapeTextEdit.snapshot.value).toBeUndefined();
+    expect(directSource(state).text).toBe("新しい\ntext");
+    expect(document.activeElement?.getAttribute("data-sheet-drawing-id")).toBe("text-target");
+    const after = serializeWorkbook(state.session.workbook);
+    state.undo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+    state.redo();
+    await flushPromises();
+    expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+  },
+);
+test("real Workspace typing appends, explicit Cancel keeps history clean, and ancestor shortcuts stay shielded", async () => {
+  installNativeTextMeasurement();
+  const wrapper = fixture(
+    async () => ({
+      revision: 1,
+      savedAt: 1,
+      snapshot: serializeWorkbook(directTextWorkbook(false)),
+    }),
+    createMemoryImageAssetStore(),
+    true,
+  );
+  await flushPromises();
+  const state = setupState(wrapper),
+    layer = wrapper.getComponent(SheetDrawingLayer),
+    before = serializeWorkbook(state.session.workbook);
+  await layer.get('[data-sheet-drawing-id="text-target"]').trigger("keydown", { key: "x" });
+  await flushPromises();
+  expect(state.shapeTextEdit.snapshot.value?.draftText).toBe("Originalx");
+  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("textarea");
+  for (const key of ["z", "k", "t", "1", "f", "h", "g"])
+    await input.trigger("keydown", { key, ctrlKey: true });
+  expect(state.findDialogVisible).toBe(false);
+  expect(state.cellFormatSelection).toBeUndefined();
+  expect(state.cellEditSession.state.active).toBe(false);
+  expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+  document.querySelector<HTMLElement>('[data-shape-text-action="cancel"]')!.click();
+  await flushPromises();
+  expect(state.shapeTextEdit.snapshot.value).toBeUndefined();
+  expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+  state.undo();
+  await flushPromises();
+  expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+});
+test("real Workspace tab navigation blocks composing text and commits the complete draft before switching", async () => {
+  installNativeTextMeasurement();
+  const initial = directTextWorkbook(false),
+    second = createSheet("Second", "second");
+  insertSheet(initial, second);
+  const wrapper = fixture(
+    async () => ({ revision: 1, savedAt: 1, snapshot: serializeWorkbook(initial) }),
+    createMemoryImageAssetStore(),
+    true,
+  );
+  await flushPromises();
+  const state = setupState(wrapper),
+    layer = wrapper.getComponent(SheetDrawingLayer);
+  await layer.get('[data-sheet-drawing-id="text-target"]').trigger("keydown", { key: "F2" });
+  await flushPromises();
+  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("textarea");
+  await input.trigger("compositionstart");
+  await input.setValue("Final composed text");
+  state.onSelectSheet("second");
+  await flushPromises();
+  expect(getActiveSheet(state.session.workbook).id).toBe("text-sheet");
+  expect(state.shapeTextEdit.snapshot.value?.draftText).toBe("Final composed text");
+  await input.trigger("compositionend");
+  state.onSelectSheet("second");
+  await flushPromises();
+  expect(getActiveSheet(state.session.workbook).id).toBe("second");
+  expect(state.shapeTextEdit.snapshot.value).toBeUndefined();
+  const first = state.session.workbook.sheets.get("text-sheet")!;
+  const savedTarget = () => {
+    const node = first.drawings!.find((value) => value.id === "text-target");
+    if (node?.kind !== "shape") throw Error("Expected text target");
+    return node.text;
+  };
+  expect(savedTarget()).toBe("Final composed text");
+  state.undo();
+  await flushPromises();
+  expect(savedTarget()).toBe("Original");
+});
+
+test("real Workspace failed native preparation retains the draft and blocks outside ribbon actions until recovery", async () => {
+  installNativeTextMeasurement();
+  const wrapper = fixture(
+    async () => ({
+      revision: 1,
+      savedAt: 1,
+      snapshot: serializeWorkbook(directTextWorkbook(false)),
+    }),
+    createMemoryImageAssetStore(),
+    true,
+  );
+  await flushPromises();
+  const state = setupState(wrapper),
+    layer = wrapper.getComponent(SheetDrawingLayer),
+    before = serializeWorkbook(state.session.workbook);
+  await layer.get('[data-sheet-drawing-id="text-target"]').trigger("keydown", { key: "F2" });
+  await flushPromises();
+  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("textarea");
+  await input.setValue("Retained draft");
+  const failure = vi
+    .spyOn(shapeMeasure, "getBrowserShapeTextMeasurement")
+    .mockImplementation(() => {
+      throw Error("Synthetic native metrics unavailable");
+    });
+  expect(wrapper.getComponent(SheetGrid).vm.hasPendingEdit()).toBe(true);
+  expect(wrapper.getComponent(SheetGrid).vm.flushPendingEdit()).toBe(false);
+  expect(state.shapeTextEdit.snapshot.value?.draftText).toBe("Retained draft");
+  expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+  const action = document.createElement("button"),
+    activate = vi.fn();
+  wrapper.get("section.spreadsheet-workspace").element.append(action);
+  action.addEventListener("click", activate);
+  action.click();
+  await flushPromises();
+  expect(activate).not.toHaveBeenCalled();
+  expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+  failure.mockRestore();
+  installNativeTextMeasurement();
+  await input.trigger("keydown", { key: "Escape" });
+  await flushPromises();
+  expect(directSource(state).text).toBe("Retained draft");
+  expect(state.shapeTextEdit.snapshot.value).toBeUndefined();
+  state.undo();
+  await flushPromises();
+  expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+});
+
+test("real Workspace outside-cell blur commits without stealing focus; object context menu enters all-text editing", async () => {
+  installNativeTextMeasurement();
+  const wrapper = fixture(
+    async () => ({
+      revision: 1,
+      savedAt: 1,
+      snapshot: serializeWorkbook(directTextWorkbook(false)),
+    }),
+    createMemoryImageAssetStore(),
+    true,
+  );
+  await flushPromises();
+  const state = setupState(wrapper),
+    layer = wrapper.getComponent(SheetDrawingLayer);
+  await layer
+    .get('[data-sheet-drawing-id="text-target"]')
+    .trigger("keydown", { key: "ContextMenu" });
+  await flushPromises();
+  const menu = document.querySelector('[aria-label="Shape actions"]')!;
+  const editText = Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
+    (element) => element.textContent?.trim() === "Edit Text",
+  )!;
+  editText.click();
+  await flushPromises();
+  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("textarea");
+  expect((input.element as HTMLTextAreaElement).selectionStart).toBe(0);
+  await input.setValue("Outside saved text");
+  const outside = document.createElement("input");
+  document.body.append(outside);
+  outside.focus();
+  await input.trigger("focusout", { relatedTarget: outside });
+  await flushPromises();
+  expect(state.shapeTextEdit.snapshot.value).toBeUndefined();
+  expect(directSource(state).text).toBe("Outside saved text");
+  expect(document.activeElement).toBe(outside);
+});
+
+test("retired canvas toolbar DOM cannot apply or cancel a newer real Workspace text session", async () => {
+  installNativeTextMeasurement();
+  const wrapper = fixture(
+    async () => ({
+      revision: 1,
+      savedAt: 1,
+      snapshot: serializeWorkbook(directTextWorkbook(false)),
+    }),
+    createMemoryImageAssetStore(),
+    true,
+  );
+  await flushPromises();
+  const state = setupState(wrapper),
+    layer = wrapper.getComponent(SheetDrawingLayer);
+  await layer.get('[data-sheet-drawing-id="text-target"]').trigger("keydown", { key: "F2" });
+  await flushPromises();
+  const oldCancel = document.querySelector<HTMLElement>('[data-shape-text-action="cancel"]')!,
+    oldApply = document.querySelector<HTMLElement>('[data-shape-text-action="apply"]')!;
+  oldCancel.click();
+  await flushPromises();
+  await layer.get('[data-sheet-drawing-id="untouched"]').trigger("keydown", { key: "F2" });
+  await flushPromises();
+  const current = state.shapeTextEdit.snapshot.value!;
+  expect(current.sourceId).toBe("untouched");
+  oldApply.click();
+  oldCancel.click();
+  await flushPromises();
+  expect(state.shapeTextEdit.snapshot.value?.sessionId).toBe(current.sessionId);
+  expect(state.shapeTextEdit.snapshot.value?.sourceId).toBe("untouched");
+  expect(state.shapeTextEdit.snapshot.value?.draftText).toBe("Sibling");
+});
+
+test("real Workspace direct text and AutoFit geometry are one reversible transaction", async () => {
+  installNativeTextMeasurement();
+  const initial = directTextWorkbook(false),
+    a = getActiveSheet(initial).drawings![0]!;
+  if (!isFramedShapeDrawing(a)) throw Error("Expected framed text target");
+  a.shapeText!.layout.autoFit = "resize-shape";
+  a.shapeFrame.anchor = { mode: "fixed", x: 80, y: 24, size: { width: 240, height: 30 } };
+  const wrapper = fixture(
+    async () => ({ revision: 1, savedAt: 1, snapshot: serializeWorkbook(initial) }),
+    createMemoryImageAssetStore(),
+    true,
+  );
+  await flushPromises();
+  const state = setupState(wrapper),
+    layer = wrapper.getComponent(SheetDrawingLayer),
+    before = serializeWorkbook(state.session.workbook);
+  await layer.get('[data-sheet-drawing-id="text-target"]').trigger("keydown", { key: "F2" });
+  await flushPromises();
+  const input = wrapper.getComponent(ShapeCanvasTextEditor).get("textarea");
+  await input.setValue("one\ntwo\nthree\nfour");
+  await input.trigger("keydown", { key: "Escape" });
+  await flushPromises();
+  expect(directSource(state).text).toBe("one\ntwo\nthree\nfour");
+  const source = directSource(state);
+  expect(source).toHaveProperty("shapeFrame");
+  if (!("shapeFrame" in source) || source.shapeFrame.anchor.mode !== "fixed")
+    throw Error("Expected fixed frame");
+  expect(source.shapeFrame.anchor.size.height).toBeGreaterThan(30);
+  const after = serializeWorkbook(state.session.workbook);
+  state.undo();
+  await flushPromises();
+  expect(serializeWorkbook(state.session.workbook)).toEqual(before);
+  state.redo();
+  await flushPromises();
+  expect(serializeWorkbook(state.session.workbook)).toEqual(after);
+});

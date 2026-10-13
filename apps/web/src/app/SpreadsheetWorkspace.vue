@@ -162,6 +162,8 @@ import DrawingEditorDialog from "../modules/sheet-drawings/components/DrawingEdi
 import ShapeFormatPane from "../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
 import { useOwnedShapeGroupFormatPane } from "../modules/sheet-drawings/useOwnedShapeGroupFormatPane";
 import { useOwnedShapeConnectorFormatPane } from "../modules/sheet-drawings/useOwnedShapeConnectorFormatPane";
+import { useShapeTextEditSession } from "../modules/sheet-drawings/useShapeTextEditSession";
+import type { ShapeCanvasTextEditRequest } from "../modules/sheet-drawings/shape-canvas-text-edit-contract";
 import { preflightShapeConnectorPaint } from "../modules/sheet-drawings/shape-connector-paint-preflight";
 import {
   traverseShapeGroup,
@@ -1122,6 +1124,7 @@ function clearConditionalFormatRules(scope: "selection" | "sheet"): void {
 }
 
 function onSelectSheet(sheetId: string): void {
+  if (sheetGridRef.value?.flushPendingShapeTextEdit() === false) return;
   if (cellEditSession.state.composing) return;
   if (cellEditSession.state.active && cellEditSession.state.draft.startsWith("=")) {
     cellEditSession.activateSurface("formula-bar");
@@ -1910,6 +1913,39 @@ const shapeConnectorFormatPane = useOwnedShapeConnectorFormatPane({
     getAssetSize: getShapePaintAssetSize,
   }),
 });
+const shapeTextEditSelection = shallowRef<{ start: number; end: number }>();
+const shapeTextEdit = useShapeTextEditSession({
+  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => sheetGridRef.value?.flushPendingCellEdit() ?? cellEditSession.finish(),
+  replaceCollection: drawingActions.replaceCollection,
+});
+const shapeTextEditCallbacks = computed(() => {
+  const current = shapeTextEdit.snapshot.value;
+  return current ? shapeTextEdit.callbacks(current.sessionId) : undefined;
+});
+function startShapeTextEdit(request: ShapeCanvasTextEditRequest): boolean {
+  const previous = shapeTextEdit.snapshot.value;
+  if (previous && !shapeTextEdit.commit(previous.sessionId)) return false;
+  if (!shapeTextEdit.begin(request.root, request.path)) return false;
+  const opened = shapeTextEdit.snapshot.value!;
+  if (
+    request.text !== undefined &&
+    !shapeTextEdit.update(opened.sessionId, opened.text + request.text)
+  )
+    return false;
+  const length = shapeTextEdit.snapshot.value!.draftText.length;
+  shapeTextEditSelection.value = { start: request.selection === "all" ? 0 : length, end: length };
+  shapeFormatPane.close();
+  shapeGroupFormatPane.close();
+  shapeConnectorFormatPane.close();
+  drawingActions.close();
+  return true;
+}
 function openShapeGroupFormat(root: ShapeGroupDrawing, path: ShapeGroupPath) {
   const selected = traverseShapeGroup(root).find(
     ({ path: current }) => JSON.stringify(current) === JSON.stringify(path),
@@ -2681,6 +2717,11 @@ function openFind(mode: WorkbookFindMode = "find"): void {
 useWorkbookFindShortcuts({
   canOpen: (event) => {
     if (
+      event.target instanceof Element &&
+      event.target.closest("[data-shape-canvas-text-editor], [data-shape-canvas-text-toolbar]")
+    )
+      return false;
+    if (
       cellEditSession.state.composing ||
       formulaEditorVisible.value ||
       formulaInsertVisible.value ||
@@ -3171,7 +3212,29 @@ function setShowFormulaBar(visible: boolean): void {
   if (transferDraft) void nextTick(focusCellEditor);
 }
 
+function onWorkspaceShapeTextOutsideAction(event: PointerEvent | MouseEvent): void {
+  if (
+    !shapeTextEdit.snapshot.value ||
+    (event.target instanceof Element &&
+      event.target.closest("[data-shape-canvas-text-editor], [data-shape-canvas-text-toolbar]"))
+  )
+    return;
+  if (sheetGridRef.value?.flushPendingShapeTextEdit() === false) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+}
 function onWorkspaceKeydown(event: KeyboardEvent): void {
+  if (
+    event.target instanceof Element &&
+    event.target.closest("[data-shape-canvas-text-editor], [data-shape-canvas-text-toolbar]")
+  )
+    return;
+  if (shapeTextEdit.snapshot.value && sheetGridRef.value?.flushPendingShapeTextEdit() === false) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
   if (symbolVisible.value) return;
   if (
     themeDialogVisible.value ||
@@ -3358,6 +3421,8 @@ watch(
     :aria-label="t('workspace.editor')"
     :aria-busy="loading || fileBusy || imageBusy || xlsxBusy"
     @keydown.capture="onWorkspaceKeydown"
+    @pointerdown.capture="onWorkspaceShapeTextOutsideAction"
+    @click.capture="onWorkspaceShapeTextOutsideAction"
     @wheel.capture="onWorkspaceWheel"
   >
     <input
@@ -4789,6 +4854,10 @@ watch(
             }
           "
           :shape-creation-request="shapeCreation.request.value"
+          :shape-text-edit-snapshot="shapeTextEdit.snapshot.value"
+          :shape-text-edit-callbacks="shapeTextEditCallbacks"
+          :shape-text-edit-start="startShapeTextEdit"
+          :shape-text-edit-selection="shapeTextEditSelection"
           :shape-creation-commit="shapeCreation.commit"
           :shape-creation-cancel="shapeCreation.cancel"
           :apply-drawing-update="drawingActions.update"

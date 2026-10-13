@@ -37,6 +37,7 @@ const props = defineProps<{
   theme?: WorkbookTheme;
   assetUrls?: ReadonlyMap<string, string>;
   stackIndex: number;
+  editingTextId?: string;
 }>();
 const emit = defineEmits<{
   paint: [result: Extract<ShapeGroupPaintResult, { kind: "ready" }> | undefined];
@@ -132,7 +133,8 @@ async function render(): Promise<void> {
     renderPass = props.renderPass,
     theme = props.theme,
     assetUrls = props.assetUrls,
-    density = props.density;
+    density = props.density,
+    editingTextId = props.editingTextId;
   const current = () =>
     mounted &&
     request === generation &&
@@ -141,7 +143,8 @@ async function render(): Promise<void> {
     renderPass === props.renderPass &&
     theme === props.theme &&
     assetUrls === props.assetUrls &&
-    density === props.density;
+    density === props.density &&
+    editingTextId === props.editingTextId;
   releasePresentation();
   status.value = "loading";
   let owned: Extract<ShapeGroupPaintResult, { kind: "ready" }> | undefined;
@@ -155,6 +158,7 @@ async function render(): Promise<void> {
       density,
       resources: { theme },
       interactive: true,
+      editingTextId,
     });
     const urls = new Set<string>();
     for (const asset of collectShapeGroupAssetIds(root)) {
@@ -165,7 +169,7 @@ async function render(): Promise<void> {
     images.retain(urls);
     await Promise.all([
       ...resolved.leaves.flatMap((leaf) =>
-        leaf.view && !leaf.collapsed && leaf.view.text
+        leaf.view && !leaf.collapsed && leaf.view.text && leaf.sourceNode.id !== editingTextId
           ? [ensureDrawingShapeTextFont(leaf.view)]
           : [],
       ),
@@ -181,6 +185,7 @@ async function render(): Promise<void> {
         renderPass,
         density: requestedDensity,
         interactive: true,
+        editingTextId,
         resources: createPicturePaintResources(theme, assetUrls, images),
       });
       if (result.kind !== "ready") throw new Error("The complete group appearance is unavailable.");
@@ -240,6 +245,7 @@ watch(
     props.theme,
     props.assetUrls,
     props.density,
+    props.editingTextId,
     cellTextFontRevision.value,
   ],
   () => void render(),

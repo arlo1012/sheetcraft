@@ -29,6 +29,11 @@ import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer
 import SheetFreeShapeCreationLayer from "../../sheet-drawings/components/SheetFreeShapeCreationLayer.vue";
 import SheetShapeCreationLayer from "../../sheet-drawings/components/SheetShapeCreationLayer.vue";
 import type { ShapeCreationRequest } from "../../sheet-drawings/useShapeCreation";
+import type { ShapeCanvasTextEditRequest } from "../../sheet-drawings/shape-canvas-text-edit-contract";
+import type {
+  ShapeTextEditSnapshot,
+  ShapeTextEditCallbacks,
+} from "../../sheet-drawings/useShapeTextEditSession";
 import type {
   SheetGraphicDrawing,
   SheetFramedGraphicDrawing,
@@ -316,6 +321,10 @@ const props = withDefaults(
       drawing: import("../../sheet-drawings/useShapeCreation").ShapeCreationDraft,
     ) => boolean;
     shapeCreationCancel?: (request: ShapeCreationRequest) => void;
+    shapeTextEditSnapshot?: ShapeTextEditSnapshot | null;
+    shapeTextEditCallbacks?: ShapeTextEditCallbacks;
+    shapeTextEditStart?: (request: ShapeCanvasTextEditRequest) => boolean;
+    shapeTextEditSelection?: { start: number; end: number };
     gridId?: string;
     externalHorizontalScrollbar?: boolean;
     zoom?: number;
@@ -1920,6 +1929,15 @@ function isRulerPoint(point: { x: number; y: number }): boolean {
   return inset > 0 && (point.x < inset || point.y < inset);
 }
 function onSurfacePointerDown(event: PointerEvent): void {
+  if (
+    props.shapeTextEditSnapshot &&
+    props.shapeTextEditCallbacks?.isActive() &&
+    !props.shapeTextEditCallbacks.commit()
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   if (pageBreakDrag.start(event)) return;
   const point = surfacePoint(event);
   if (isRulerPoint(point)) return;
@@ -2648,6 +2666,8 @@ function convertSelectedFloatingImageToCell(id: string, path?: PictureGroupPath)
 }
 
 function onImageCopy(event: ClipboardEvent): void {
+  if (event.target instanceof Element && event.target.closest("[data-shape-canvas-text-editor]"))
+    return;
   if (pictureCrop.active.value && !finishPictureCrop()) {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -2667,6 +2687,8 @@ function onImageCopy(event: ClipboardEvent): void {
 }
 
 function onImageCut(event: ClipboardEvent): void {
+  if (event.target instanceof Element && event.target.closest("[data-shape-canvas-text-editor]"))
+    return;
   if (pictureCrop.active.value && !finishPictureCrop()) {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -2710,6 +2732,8 @@ async function requestFloatingImagePaste(id: string): Promise<void> {
 }
 
 function onImagePaste(event: ClipboardEvent): void {
+  if (event.target instanceof Element && event.target.closest("[data-shape-canvas-text-editor]"))
+    return;
   if (pictureCrop.active.value && !finishPictureCrop()) {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -3238,6 +3262,8 @@ function onDimensionResizeStart(
 }
 
 function onGridKeydown(event: KeyboardEvent): void {
+  if (event.target instanceof Element && event.target.closest("[data-shape-canvas-text-editor]"))
+    return;
   if (pictureCrop.active.value) {
     onPictureCropKeydown(event);
     return;
@@ -4082,7 +4108,18 @@ function clearClipboard(): void {
   clearPendingClipboard();
 }
 
+function flushPendingShapeTextEdit(): boolean {
+  if (props.shapeTextEditSnapshot && props.shapeTextEditCallbacks?.isActive()) {
+    if (!props.shapeTextEditCallbacks.commit()) return false;
+  }
+  return true;
+}
+
 function flushPendingEdit(): boolean {
+  return flushPendingShapeTextEdit() && flushPendingCellEdit();
+}
+
+function flushPendingCellEdit(): boolean {
   if (pictureCrop.active.value && !finishPictureCrop()) return false;
   if (isComposing.value) {
     return false;
@@ -4094,7 +4131,12 @@ function flushPendingEdit(): boolean {
 }
 
 function hasPendingEdit(): boolean {
-  return pictureCrop.active.value || isComposing.value || isEditing.value;
+  return (
+    !!props.shapeTextEditSnapshot ||
+    pictureCrop.active.value ||
+    isComposing.value ||
+    isEditing.value
+  );
 }
 
 watch(
@@ -4212,6 +4254,8 @@ defineExpose({
   fillSelection,
   clearClipboard,
   flushPendingEdit,
+  flushPendingCellEdit,
+  flushPendingShapeTextEdit,
   focusGrid: focusEditor,
   handleReferenceKeydown,
   hasPendingEdit,
@@ -4540,6 +4584,10 @@ defineExpose({
       }"
     >
       <SheetDrawingLayer
+        :text-edit-snapshot="shapeTextEditSnapshot"
+        :text-edit-callbacks="shapeTextEditCallbacks"
+        :start-text-edit="shapeTextEditStart"
+        :text-edit-selection="shapeTextEditSelection"
         @selection-change="selectedShapeDrawingId = $event"
         @format="emit('formatDrawing', $event)"
         @background-pointer="onSurfacePointerDown"

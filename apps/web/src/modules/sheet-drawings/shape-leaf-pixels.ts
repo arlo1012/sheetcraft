@@ -63,6 +63,8 @@ export type ShapeLeafPixelsOptions = Readonly<{
   /** Reuse genuine ready native metrics, including in deterministic Canvas-boundary tests. */
   textRuntimeOptions?: DrawingShapeTextRuntimeOptions;
   resolvedText?: ResolvedDrawingShapeText;
+  /** A live editor replaces this leaf's glyph surface; source text stays untouched. */
+  hideText?: boolean;
 }>;
 type LeafBase = Readonly<{
   renderPolicy: ShapeLeafRenderPolicy;
@@ -215,6 +217,7 @@ function source(options: ShapeLeafPixelsOptions) {
       ? !!drawing.text
       : !!drawing.text.trim();
   const visibleText =
+    !options.hideText &&
     hasText &&
     (richText || drawing.color !== "transparent") &&
     (renderPolicy !== "standard" || richText || plainTextRect);

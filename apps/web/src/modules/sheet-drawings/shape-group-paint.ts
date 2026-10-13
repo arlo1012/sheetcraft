@@ -56,6 +56,8 @@ export type ShapeGroupPaintOptions = Readonly<{
   canvasFactory?: () => HTMLCanvasElement;
   textRuntimeOptions?: DrawingShapeTextRuntimeOptions;
   legacyLineHeightPx?: number;
+  /** Suppress the active editor's glyphs, never its body or saved text. */
+  editingTextId?: string;
 }>;
 type GroupPlanBase = Readonly<{
   root: ShapeGroupDrawing;
@@ -365,6 +367,7 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
           sourceIdentity: identities.get(key(path)),
           textRuntimeOptions: options.textRuntimeOptions,
           legacyLineHeightPx: options.legacyLineHeightPx,
+          hideText: options.editingTextId === leaf.sourceNode.id,
         };
         const paint = planShapeLeafPixels(leafOptions);
         if (paint.kind === "unavailable") unavailable.push(paint);
