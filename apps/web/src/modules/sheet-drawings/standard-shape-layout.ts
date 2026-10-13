@@ -2,6 +2,7 @@ import { getShapeLineLocalEndpoints } from "./shape-endpoint-layout";
 import { isShapeLinePreset } from "@sheetcraft/core/shape-line-ends";
 import { pictureFrameLocalToWorld, type PictureFrameRect } from "@sheetcraft/core/picture-frame";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import {
   getFloatingImageSheetRect,
   reanchorFloatingImageAtSheetRect,
@@ -116,6 +117,7 @@ export function getStandardShapeViewportFragments(
   layout: SheetViewportLayout,
   selected = false,
   includeLegacyView = false,
+  connectorRoute?: ReadyShapeConnectorRoute,
 ): FloatingImageViewportFragment[] {
   const rect = getFloatingImageSheetRect(drawing, layout);
   if (
@@ -127,7 +129,9 @@ export function getStandardShapeViewportFragments(
       !drawing.shapeText)
   )
     return [];
-  const shape = getDrawingShapeGeometry(drawing, includeLegacyView);
+  const shape = getDrawingShapeGeometry(drawing, includeLegacyView, connectorRoute?.geometry);
+  // Validate the exact bundle even when all line ends are visually disabled.
+  const ends = getShapeEndPaint(drawing, shape, connectorRoute);
   const bounds = getStandardShapeWorldBounds(
     shape,
     drawing.shapeStyle || drawing.shapeText
@@ -161,7 +165,7 @@ export function getStandardShapeViewportFragments(
   }
   if (drawing.shapeStyle || drawing.shapeText) {
     try {
-      const local = detailedShapeLocalBounds(drawing);
+      const local = detailedShapeLocalBounds(drawing, connectorRoute);
       if (local)
         points.push(
           ...[
@@ -187,9 +191,7 @@ export function getStandardShapeViewportFragments(
       );
     }
   }
-  for (const paint of drawing.shapeStyle || drawing.shapeText
-    ? []
-    : getShapeEndPaint(drawing, shape)) {
+  for (const paint of drawing.shapeStyle || drawing.shapeText ? [] : ends) {
     points.push(
       ...[
         { x: paint.bounds.x, y: paint.bounds.y },
@@ -205,7 +207,7 @@ export function getStandardShapeViewportFragments(
     );
   }
   if (selected) {
-    const endpoints = getShapeLineLocalEndpoints(drawing);
+    const endpoints = connectorRoute?.localEndpoints ?? getShapeLineLocalEndpoints(drawing);
     points.push(
       ...[
         ...(endpoints

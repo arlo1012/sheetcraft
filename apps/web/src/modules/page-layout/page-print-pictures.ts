@@ -3,6 +3,7 @@ import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detail
 import { requireStandalonePictures } from "../sheet-images/picture-document-support";
 import { createSheetEvaluator, type FloatingImage, type Sheet } from "@sheetcraft/core/workbook";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import type { ResolvedShapeForestForRender } from "../sheet-drawings/resolved-shape-render-source";
 import { getShapeStyleAssetIds } from "@sheetcraft/core/shape-style";
 import { getShapeTextAssetIds } from "@sheetcraft/core/shape-text";
 import {
@@ -18,6 +19,7 @@ export function getPrintablePictureRoots(sheet: Pick<Sheet, "floatingImages">): 
 export function getPrintPictureAssetIds(
   sheet: Sheet,
   shapeMetrics?: PictureSheetMetrics,
+  renderPass?: ResolvedShapeForestForRender,
 ): Set<string> {
   const ids = new Set<string>();
   for (const image of requireStandalonePictures(getPrintablePictureRoots(sheet))) {
@@ -35,11 +37,14 @@ export function getPrintPictureAssetIds(
       ids.add(id);
   }
   const shapes = getPrintableShapeRoots(sheet);
-  const metrics = shapes.length
-    ? (shapeMetrics ?? createPrintShapeMetrics(sheet, createSheetEvaluator(sheet)))
-    : undefined;
+  const metrics =
+    shapes.length || renderPass
+      ? (shapeMetrics ??
+        renderPass?.metrics ??
+        createPrintShapeMetrics(sheet, createSheetEvaluator(sheet)))
+      : undefined;
   if (metrics)
-    for (const { drawing } of getPrintableShapeLeaves(sheet, metrics)) {
+    for (const { drawing } of getPrintableShapeLeaves(sheet, metrics, renderPass)) {
       for (const id of getShapeStyleAssetIds(drawing.shapeStyle)) ids.add(id);
       for (const id of getShapeTextAssetIds(drawing.shapeText)) ids.add(id);
     }

@@ -147,6 +147,7 @@ export function updateResolvedShapeDrawing(
   nextView: SheetLegacyDrawing,
   metrics: PictureSheetMetrics,
 ): SheetDrawing {
+  assertNoUnresolvedShapeConnectors("shape-view-edit", [resolved.source]);
   if (metrics !== resolved.metrics)
     throw new TypeError("A shape view edit must use its original metrics snapshot.");
   const source = resolved.source;

@@ -1,4 +1,5 @@
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import type {
   EvaluatedShapePresetGeometry,
   ShapePathCommand,
@@ -50,6 +51,8 @@ export type ShapeLeafRenderPolicy = "legacy-svg" | "legacy-text-box" | "standard
 export type ShapeLeafPixelsOptions = Readonly<{
   /** The real disposable world-view leaf; never a synthetic image/document asset. */
   drawing: SheetGraphicDrawing;
+  /** Exact Core numeric source; never re-evaluate a preset in its padded paint frame. */
+  connectorRoute?: ReadyShapeConnectorRoute;
   density: number;
   resources?: PicturePaintResources;
   /** Full owning-tree world angle. It informs fixed-direction paints; pixels stay local. */
@@ -151,8 +154,9 @@ function policy(drawing: SheetGraphicDrawing): ShapeLeafRenderPolicy {
 function source(options: ShapeLeafPixelsOptions) {
   const drawing = options.drawing,
     renderPolicy = policy(drawing);
-  const geometry =
-    renderPolicy === "legacy-text-box"
+  const geometry = options.connectorRoute
+    ? options.connectorRoute.geometry
+    : renderPolicy === "legacy-text-box"
       ? getDrawingShapeGeometry(drawing, true)
       : renderPolicy === "legacy-svg"
         ? getLegacyShapeGeometry(drawing.shape, drawing.width, drawing.height)
@@ -356,6 +360,7 @@ export function planShapeLeafPixels(options: ShapeLeafPixelsOptions): ShapeLeafP
     const bodyPlan = planShapeDetailedPaint({
       drawing: bodyDrawing(options, prepared.renderPolicy),
       geometry: prepared.geometry,
+      connectorRoute: options.connectorRoute,
       style: prepared.style,
       density,
       resources: options.resources,
@@ -582,7 +587,10 @@ export function prepareShapeLeafPixels(options: ShapeLeafPixelsOptions): ShapeLe
     try {
       const body = prepareShapeDetailedPaint({
         drawing: bodyDrawing(options, plan.renderPolicy),
-        geometry: plan.bodyPlan.effectiveGeometry,
+        geometry: options.connectorRoute
+          ? options.connectorRoute.geometry
+          : plan.bodyPlan.effectiveGeometry,
+        connectorRoute: options.connectorRoute,
         style: plan.bodyPlan.effectiveStyle,
         density: plan.actualDensity,
         resources,

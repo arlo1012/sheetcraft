@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { getShapeStyleAssetIds } from "@sheetcraft/core/shape-style";
 import { createCanvasImageCache } from "../../sheet-grid/canvas/image-painter";
@@ -9,6 +10,7 @@ import { prepareShapeDetailedPaint } from "../shape-detailed-paint";
 import { getDrawingShapeGeometry } from "../shape-geometry";
 import {
   shapePresentationBounds,
+  isShapeConnectorContentSupported,
   resizeShapePresentationCanvas,
   releaseShapePresentationCanvas,
   type ShapeDetailedPresentation,
@@ -16,6 +18,7 @@ import {
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
+  connectorRoute?: ReadyShapeConnectorRoute;
   theme?: WorkbookTheme;
   assetUrls?: ReadonlyMap<string, string>;
   density?: number;
@@ -46,14 +49,19 @@ const mirror = computed(() => ({
 async function render() {
   const request = ++generation;
   const drawing = props.drawing;
+  const connectorRoute = props.connectorRoute;
+  const current = () =>
+    request === generation && drawing === props.drawing && connectorRoute === props.connectorRoute;
   status.value = "loading";
   emit("paint", undefined);
   try {
     // Wait for our own canvas before acquiring a shared cache result: eviction can
     // zero that result, so the subsequent prepare/copy segment must never yield.
     await nextTick();
-    if (request !== generation || drawing !== props.drawing || !canvas.value) return;
-    const geometry = getDrawingShapeGeometry(drawing);
+    if (!current() || !canvas.value) return;
+    if (!isShapeConnectorContentSupported(drawing, connectorRoute))
+      throw new Error("Connector source requires its supported ready paint view.");
+    const geometry = getDrawingShapeGeometry(drawing, false, connectorRoute?.geometry);
     if (!geometry) throw new Error("Shape geometry unavailable.");
     const retained = new Set<string>();
     for (const id of getShapeStyleAssetIds(drawing.shapeStyle)) {
@@ -67,9 +75,11 @@ async function render() {
     const result = prepareShapeDetailedPaint({
       drawing,
       geometry,
+      ...(connectorRoute ? { connectorRoute } : {}),
       density: props.density ?? 1,
       resources: createPicturePaintResources(props.theme, props.assetUrls, images),
     });
+    if (!current() || !canvas.value) return;
     if (result.kind !== "ready") {
       status.value = result.missingAssetIds.every((id) => {
         const url = props.assetUrls?.get(id);
@@ -88,18 +98,20 @@ async function render() {
     status.value = "ready";
     emit("paint", {
       drawing,
+      ...(connectorRoute ? { connectorRoute } : {}),
       canvas: canvas.value,
       density: result.actualDensity,
       bounds: { ...bounds.value },
     });
   } catch {
-    if (request === generation) status.value = "unavailable";
+    if (current()) status.value = "unavailable";
   }
 }
 watch(
   () =>
     [
       props.drawing,
+      props.connectorRoute,
       props.drawing.width,
       props.drawing.height,
       props.drawing.rotation,
@@ -110,6 +122,7 @@ watch(
       props.drawing.shape,
       props.drawing.shapeGeometry,
       props.drawing.shapePath,
+      props.drawing.shapeConnector,
       props.drawing.shapeStyle,
       props.drawing.shapeLineEnds,
       props.drawing.shapeFlipX,

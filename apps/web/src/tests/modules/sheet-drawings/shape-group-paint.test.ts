@@ -10,6 +10,8 @@ import type {
 import type { ShapeDetailedStyle } from "@sheetcraft/core/shape-style";
 import { shapeFrameLocalToWorld, shapeFrameWorldToLocal } from "@sheetcraft/core/shape-frame";
 import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
+import { resolveShapeForestForRender } from "../../../modules/sheet-drawings/resolved-shape-render-source";
+import { framedShape } from "./framed-shape-fixture";
 import { resolveShapeGroupProjection } from "../../../modules/sheet-drawings/resolved-shape-group";
 import type {
   ShapeLeafPixelsOptions,
@@ -286,6 +288,94 @@ afterEach(() => {
 });
 
 describe("real recursive owned group source pixels", () => {
+  test("whole-sheet connector paint uses actual route layout without replacing its owner carrier", () => {
+    const connector = {
+      ...leaf("connector", 0.1, 0.2, 0.4, 0.3),
+      shapeGeometry: { preset: "bentConnector3" as const },
+      shapeConnector: {
+        kind: "shape-connector-v1" as const,
+        begin: {
+          kind: "site" as const,
+          targetId: "outside",
+          preset: "rect" as const,
+          siteIndex: 3,
+        },
+        end: { kind: "free" as const, xRatio: 1, yRatio: 1 },
+      },
+    };
+    const root = group([connector, leaf("blue", 0.6, 0.6)], 20, 20);
+    root.rotation = 37;
+    const outside = {
+      ...framedShape(),
+      id: "outside",
+      text: "",
+      shapeGeometry: { preset: "rect" as const },
+    };
+    const opts = options(root);
+    const drawings = [outside, root];
+    const pass = resolveShapeForestForRender({ drawings, metrics: opts.metrics, revision: 4 });
+    const resolved = pass.getLeaf("connector")!;
+    if (resolved.connector?.status !== "ready") throw Error("Expected actual route");
+    const { route, paintView } = resolved.connector;
+    const plan = planShapeGroupPaint({ ...opts, renderPass: pass });
+    expect(plan.kind).toBe("ready");
+    expect(plan.renderPass).toBe(pass);
+    const called = leafCalls.plan.mock.calls.find(
+      ([call]) => call.drawing.id === "connector",
+    )![0] as ShapeLeafPixelsOptions;
+    expect(called.drawing).toBe(paintView);
+    expect(called.connectorRoute).toBe(route);
+    expect(called.angleDeg).toBe(route.paintLayout.angleDeg);
+    expect(called.sourceIdentity).toMatchObject({
+      sourceRoot: root,
+      sourceNode: connector,
+      path: [root.id, connector.id],
+      contextIdentity: pass.contextIdentity,
+    });
+    expect(resolved.carrierLeaf!.view!.width).toBeCloseTo(8);
+    expect(resolved.carrierLeaf!.sourceNode).toBe(connector);
+    expect(called.drawing.width).not.toBeCloseTo(8);
+    expect(plan.snapshotRoot.members[0]).toHaveProperty("shapeConnector", connector.shapeConnector);
+    outside.rotation = 20;
+    expect(() => planShapeGroupPaint({ ...opts, renderPass: pass })).toThrow(/outdated/);
+    expect(created).toHaveLength(0);
+  });
+  test("a supplied whole-sheet pass cannot be attached to an equal-looking different owner", () => {
+    const root = group(),
+      opts = options(root);
+    const pass = resolveShapeForestForRender({
+      drawings: [root],
+      metrics: opts.metrics,
+      revision: 0,
+    });
+    expect(() =>
+      planShapeGroupPaint({ ...opts, root: structuredClone(root), renderPass: pass }),
+    ).toThrow(/exact owner/);
+    expect(created).toHaveLength(0);
+    expect(leafCalls.plan).not.toHaveBeenCalled();
+  });
+  test("a connector label is refused before any group leaf plan or canvas", () => {
+    const connector = {
+      ...leaf("connector"),
+      text: "legacy label",
+      shapeGeometry: { preset: "bentConnector3" as const },
+      shapeConnector: {
+        kind: "shape-connector-v1" as const,
+        begin: { kind: "free" as const, xRatio: 0, yRatio: 0 },
+        end: { kind: "free" as const, xRatio: 1, yRatio: 1 },
+      },
+    };
+    const root = group([connector]),
+      opts = options(root);
+    const pass = resolveShapeForestForRender({
+      drawings: [root],
+      metrics: opts.metrics,
+      revision: 0,
+    });
+    expect(() => planShapeGroupPaint({ ...opts, renderPass: pass })).toThrow(/connector-text/);
+    expect(leafCalls.plan).not.toHaveBeenCalled();
+    expect(created).toHaveLength(0);
+  });
   test("composes an actual leaf adapter's CSS-body pixels with no synthetic image source", async () => {
     const actual = await vi.importActual<
       typeof import("../../../modules/sheet-drawings/shape-leaf-pixels")

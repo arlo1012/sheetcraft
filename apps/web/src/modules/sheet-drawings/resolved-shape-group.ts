@@ -240,6 +240,10 @@ export function updateResolvedShapeGroupLeaf(
   nextView: SheetGraphicDrawing,
   metrics: PictureSheetMetrics,
 ): ShapeGroupDrawing {
+  if ("shapeConnector" in leaf.sourceNode)
+    throw new TypeError(
+      "A connector requires its endpoint edit plan, never a generic view inverse.",
+    );
   if (metrics !== leaf.metrics)
     throw new TypeError("A shape group view edit must use its original metrics snapshot.");
   const fields = readDataRecord(nextView, viewFields);

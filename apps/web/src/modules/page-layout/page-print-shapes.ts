@@ -1,9 +1,11 @@
 import {
   isFramedShapeDrawing,
+  type SheetDrawing,
   type SheetFramedGraphicDrawing,
   type SheetGraphicDrawing,
 } from "@sheetcraft/core/sheet-drawings";
 import { getShapeObjectProperties } from "@sheetcraft/core/shape-object-properties";
+import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import type {
   ShapeGroupDrawing,
   ShapeGroupPath,
@@ -38,6 +40,10 @@ import {
 } from "../sheet-grid/data-visibility";
 import { resolveShapeDrawing } from "../sheet-drawings/resolved-shape-drawing";
 import { resolveShapeGroupProjection } from "../sheet-drawings/resolved-shape-group";
+import type {
+  ResolvedShapeForestForRender,
+  ShapeConnectorRenderSource,
+} from "../sheet-drawings/resolved-shape-render-source";
 import {
   getDrawingShapeGeometry,
   getStandardShapeGeometry,
@@ -71,6 +77,14 @@ import {
 
 type PrintableShape = SheetGraphicDrawing | SheetFramedGraphicDrawing | ShapeGroupDrawing;
 type Bounds = { left: number; top: number; right: number; bottom: number };
+const emptyPrintShapeForest: readonly SheetDrawing[] = Object.freeze([]);
+
+/** An absent forest has a stable identity, distinct from deleting a captured array. */
+export function getPrintShapeSourceDrawings(
+  sheet: Pick<Sheet, "drawings">,
+): readonly SheetDrawing[] {
+  return sheet.drawings ?? emptyPrintShapeForest;
+}
 
 /** Preserve the real owners and their sheet drawing order. Other graphic kinds are separate consumers. */
 export function getPrintableShapeRoots(sheet: Pick<Sheet, "drawings">): PrintableShape[] {
@@ -94,6 +108,8 @@ export type PrintableShapeLeaf = {
   drawingId: string;
   drawing: SheetGraphicDrawing;
   rect: ShapeFrameRect;
+  /** Exact whole-sheet Core route; the source/path identity remains the real carrier. */
+  connectorRoute?: ReadyShapeConnectorRoute;
 };
 const groupedPrintIdentities = new WeakMap<
   ShapeGroupDrawing,
@@ -127,46 +143,96 @@ function groupedPrintIdentity(
 export function* getPrintableShapeLeaves(
   sheet: Pick<Sheet, "drawings">,
   metrics: PictureSheetMetrics,
+  renderPass?: ResolvedShapeForestForRender,
 ): Generator<PrintableShapeLeaf> {
-  for (const sourceRoot of getPrintableShapeRoots(sheet)) {
-    if (sourceRoot.kind === "shapeGroup") {
-      const projection = checked(sourceRoot.id, () =>
-        resolveShapeGroupProjection(sourceRoot, metrics),
-      );
-      for (const leaf of projection.leaves) {
-        if (leaf.collapsed || !leaf.view || !leaf.layout) continue;
-        yield {
-          sourceRoot,
-          sourceNode: leaf.sourceNode,
-          sourceIdentity: groupedPrintIdentity(sourceRoot, leaf.sourceNode, leaf.path),
-          path: leaf.path,
-          drawingId: leaf.path.join("/"),
-          drawing: leaf.view,
-          rect: leaf.layout.rect,
-        };
-      }
-      continue;
-    }
-    const resolved = checked(sourceRoot.id, () => resolveShapeDrawing(sourceRoot, metrics));
-    if (resolved.collapsed) continue;
-    yield {
-      sourceRoot,
-      sourceNode: sourceRoot,
-      sourceIdentity: sourceRoot,
-      path: [sourceRoot.id],
-      drawingId: sourceRoot.id,
-      drawing: resolved.view as SheetGraphicDrawing,
-      rect: resolved.rect,
-    };
-  }
+  assertPrintShapeRenderPass(sheet, metrics, renderPass);
+  for (const sourceRoot of getPrintableShapeRoots(sheet))
+    yield* printableShapeLeavesForRoot(sourceRoot, metrics, renderPass);
 }
 
-function* printablePaintEntries(sheet: Pick<Sheet, "drawings">, metrics: PictureSheetMetrics) {
+/** Every pass includes nonprinting relation targets. Never resolve a filtered owner subset. */
+export function assertPrintShapeRenderPass(
+  sheet: Pick<Sheet, "drawings">,
+  metrics: PictureSheetMetrics,
+  renderPass?: ResolvedShapeForestForRender,
+  revision = renderPass?.revision,
+): void {
+  if (renderPass)
+    checked("render-pass", () =>
+      renderPass.assertCurrent(getPrintShapeSourceDrawings(sheet), metrics, revision!),
+    );
+}
+function connectorPaintSource(connector: ShapeConnectorRenderSource | undefined) {
+  if (connector?.status === "unavailable")
+    throw new Error(`The actual connector appearance is unavailable: ${connector.reason}.`);
+  return connector?.status === "ready" ? connector : undefined;
+}
+function* printableShapeLeavesForRoot(
+  sourceRoot: PrintableShape,
+  metrics: PictureSheetMetrics,
+  renderPass?: ResolvedShapeForestForRender,
+): Generator<PrintableShapeLeaf> {
+  if (sourceRoot.kind === "shapeGroup") {
+    const projection = checked(sourceRoot.id, () => {
+      const result = renderPass
+        ? renderPass.getGroup(sourceRoot.id)
+        : resolveShapeGroupProjection(sourceRoot, metrics);
+      if (!result || result.sourceRoot !== sourceRoot)
+        throw new TypeError("Printing requires the exact group owner of its whole-sheet pass.");
+      return result;
+    });
+    for (const leaf of projection.leaves) {
+      const connector = renderPass?.getLeaf(leaf.sourceNode.id)?.connector;
+      if (connector?.status === "suspended" || connector?.status === "degenerate") continue;
+      const paint = checked(leaf.path.join("/"), () => connectorPaintSource(connector));
+      if (!paint && (leaf.collapsed || !leaf.view || !leaf.layout)) continue;
+      yield {
+        sourceRoot,
+        sourceNode: leaf.sourceNode,
+        sourceIdentity: groupedPrintIdentity(sourceRoot, leaf.sourceNode, leaf.path),
+        path: leaf.path,
+        drawingId: leaf.path.join("/"),
+        drawing: paint?.paintView ?? leaf.view!,
+        rect: paint?.route.paintLayout.rect ?? leaf.layout!.rect,
+        ...(paint ? { connectorRoute: paint.route } : {}),
+      };
+    }
+    return;
+  }
+  const passLeaf = renderPass?.getLeaf(sourceRoot.id);
+  const resolved = checked(sourceRoot.id, () => {
+    if (!renderPass) return resolveShapeDrawing(sourceRoot, metrics);
+    if (passLeaf?.sourceRoot !== sourceRoot || !passLeaf.carrierRoot)
+      throw new TypeError("Printing requires the exact shape owner of its whole-sheet pass.");
+    return passLeaf.carrierRoot;
+  });
+  const connector = passLeaf?.connector;
+  if (connector?.status === "suspended" || connector?.status === "degenerate") return;
+  const paint = checked(sourceRoot.id, () => connectorPaintSource(connector));
+  if (!paint && resolved.collapsed) return;
+  yield {
+    sourceRoot,
+    sourceNode: sourceRoot,
+    sourceIdentity: sourceRoot,
+    path: [sourceRoot.id],
+    drawingId: sourceRoot.id,
+    drawing: paint?.paintView ?? (resolved.view as SheetGraphicDrawing),
+    rect: paint?.route.paintLayout.rect ?? resolved.rect,
+    ...(paint ? { connectorRoute: paint.route } : {}),
+  };
+}
+
+function* printablePaintEntries(
+  sheet: Pick<Sheet, "drawings">,
+  metrics: PictureSheetMetrics,
+  renderPass?: ResolvedShapeForestForRender,
+) {
+  assertPrintShapeRenderPass(sheet, metrics, renderPass);
   for (const root of getPrintableShapeRoots(sheet)) {
     if (root.kind === "shapeGroup" && checked(root.id, () => hasActiveShapeGroupShadow(root))) {
       yield { kind: "group" as const, root };
     } else {
-      for (const leaf of getPrintableShapeLeaves({ drawings: [root] }, metrics))
+      for (const leaf of printableShapeLeavesForRoot(root, metrics, renderPass))
         yield { kind: "leaf" as const, leaf };
     }
   }
@@ -299,16 +365,18 @@ export function getPrintShapeContentExtent(
   theme?: WorkbookTheme,
   resources?: PicturePaintResources,
   requireReadyGroupPaint = false,
+  renderPass?: ResolvedShapeForestForRender,
 ) {
   let rowCount = 0,
     columnCount = 0;
   const activeRoots = new Set<ShapeGroupDrawing>();
-  for (const entry of printablePaintEntries(sheet, metrics)) {
+  for (const entry of printablePaintEntries(sheet, metrics, renderPass)) {
     if (entry.kind !== "group") continue;
     checked(entry.root.id, () => {
       const plan = planShapeGroupPaint({
         root: entry.root,
         metrics,
+        renderPass,
         density: 1,
         resources: { ...resources, theme },
       });
@@ -318,7 +386,7 @@ export function getPrintShapeContentExtent(
         return;
       }
       activeRoots.add(entry.root);
-      if (plan.layout.collapsed) return;
+      if (plan.collapsed || plan.layout.collapsed) return;
       const bounds = groupWorldBounds(
         plan.layout.rect,
         plan.layout.angleDeg,
@@ -333,13 +401,14 @@ export function getPrintShapeContentExtent(
       rowCount = Math.max(rowCount, axisCount(bounds.bottom, metrics.rows));
     });
   }
-  for (const leaf of getPrintableShapeLeaves(sheet, metrics))
+  for (const leaf of getPrintableShapeLeaves(sheet, metrics, renderPass))
     checked(leaf.drawingId, () => {
       if (leaf.sourceRoot.kind === "shapeGroup" && activeRoots.has(leaf.sourceRoot)) return;
       const { drawing, rect } = leaf;
       const plan = planShapeDetailedPaint({
         drawing,
-        geometry: geometryFor(drawing),
+        geometry: leaf.connectorRoute?.geometry ?? geometryFor(drawing),
+        connectorRoute: leaf.connectorRoute,
         density: 1,
         resources: { theme },
       });
@@ -380,15 +449,19 @@ export function getPrintShapeContentExtent(
 export async function preparePrintShapeFonts(
   sheet: Sheet,
   metrics: PictureSheetMetrics,
+  renderPass?: ResolvedShapeForestForRender,
 ): Promise<void> {
-  for (const leaf of getPrintableShapeLeaves(sheet, metrics)) {
+  const fonts: Promise<void>[] = [];
+  for (const leaf of getPrintableShapeLeaves(sheet, metrics, renderPass)) {
     if (!leaf.drawing.text) continue;
-    try {
-      await ensureDrawingShapeTextFont(leaf.drawing);
-    } catch (error) {
-      throw new ShapePrintError(leaf.drawingId, error);
-    }
+    fonts.push(
+      ensureDrawingShapeTextFont(leaf.drawing).catch((error: unknown) => {
+        throw new ShapePrintError(leaf.drawingId, error);
+      }),
+    );
   }
+  await Promise.all(fonts);
+  assertPrintShapeRenderPass(sheet, metrics, renderPass);
 }
 
 /** The genuine shape raster pipeline. It owns no document assets or source geometry mutations. */
@@ -402,6 +475,7 @@ export function paintPrintShapes(
     assetUrls?: ReadonlyMap<string, string>;
     images: CanvasImageCache;
     density?: number;
+    renderPass?: ResolvedShapeForestForRender;
   },
 ): void {
   const resources = createPicturePaintResources(options.theme, options.assetUrls, options.images);
@@ -411,12 +485,13 @@ export function paintPrintShapes(
     context.beginPath();
     context.rect(0, 0, options.viewport.width, options.viewport.height);
     context.clip();
-    for (const entry of printablePaintEntries(options.sheet, options.metrics)) {
+    for (const entry of printablePaintEntries(options.sheet, options.metrics, options.renderPass)) {
       if (entry.kind === "group") {
         checked(entry.root.id, () => {
           const result = prepareShapeGroupPaint({
             root: entry.root,
             metrics: options.metrics,
+            renderPass: options.renderPass,
             density,
             resources,
             interactive: false,
@@ -424,7 +499,7 @@ export function paintPrintShapes(
           if (result.kind !== "ready")
             throw new Error("The complete group appearance is unavailable for printing.");
           try {
-            if (result.layout.collapsed) return;
+            if (result.collapsed || result.layout.collapsed) return;
             const rect = result.layout.rect;
             const bounds = groupWorldBounds(rect, result.layout.angleDeg, result.logicalBounds);
             if (
@@ -457,7 +532,8 @@ export function paintPrintShapes(
         const { drawing, rect, sourceIdentity } = leaf;
         const bodyOptions = {
           drawing,
-          geometry: geometryFor(drawing),
+          geometry: leaf.connectorRoute?.geometry ?? geometryFor(drawing),
+          connectorRoute: leaf.connectorRoute,
           density,
           resources,
           sourceIdentity,

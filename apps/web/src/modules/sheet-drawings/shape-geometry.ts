@@ -117,6 +117,7 @@ function hasFillArea({ points }: ShapePolyline): boolean {
 function prepareGeometry(
   geometry: EvaluatedShapePresetGeometry,
   budget?: ShapePathWorkBudget,
+  exactSvgCoordinates = false,
 ): PreparedGeometry {
   if (geometry.paths.length < 1 || geometry.paths.length > STANDARD_SHAPE_GEOMETRY_LIMITS.paths)
     throw new RangeError("Standard shape exceeds its path budget.");
@@ -174,7 +175,12 @@ function prepareGeometry(
     svg: Object.freeze(
       geometry.paths.map((path) =>
         Object.freeze({
-          d: shapePresetPathToSvg(path, budget),
+          // Core connector routes use M/L/Q/C. Preserve their representable tiny
+          // padded tips; flattening above has already validated every number.
+          d:
+            exactSvgCoordinates && path.commands.every((command) => command[0] !== "A")
+              ? path.commands.map((command) => command[0] + command.slice(1).join(" ")).join("")
+              : shapePresetPathToSvg(path, budget),
           fillMode: path.fillMode,
           filled: path.filled,
           stroke: path.stroke,
@@ -182,6 +188,117 @@ function prepareGeometry(
       ),
     ),
   });
+}
+
+function assertStableResolvedGeometryData(value: unknown, work: { remaining: number }, depth = 0) {
+  if (--work.remaining < 0 || depth > 6)
+    throw new RangeError("Resolved shape exceeds its numeric-data budget.");
+  if (value === null || typeof value === "boolean") return;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || Math.abs(value) > 2_147_483_647)
+      throw new RangeError("Resolved shape metadata must be finite and bounded.");
+    return;
+  }
+  if (typeof value === "string" && value.length <= 256) return;
+  if (!value || typeof value !== "object" || !Object.isFrozen(value))
+    throw new TypeError("Resolved shape geometry must be deeply frozen numeric data.");
+  const array = Array.isArray(value),
+    prototype = Object.getPrototypeOf(value);
+  if (
+    (array &&
+      (prototype !== Array.prototype || value.length > STANDARD_SHAPE_GEOMETRY_LIMITS.commands)) ||
+    (!array && prototype !== Object.prototype && prototype !== null)
+  )
+    throw new TypeError("Resolved shape geometry requires bounded ordinary data containers.");
+  const keys = Reflect.ownKeys(value);
+  if (keys.length > work.remaining)
+    throw new RangeError("Resolved shape exceeds its numeric-data budget.");
+  for (const key of keys) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
+    if (typeof key !== "string" || !("value" in descriptor))
+      throw new TypeError("Resolved shape geometry cannot contain accessors or symbol fields.");
+    assertStableResolvedGeometryData(descriptor.value, work, depth + 1);
+  }
+}
+function resolvedCoordinate(value: number): boolean {
+  return Number.isFinite(value) && Math.abs(value) <= STANDARD_SHAPE_GEOMETRY_LIMITS.coordinate;
+}
+
+/** Prepare trusted Core runtime geometry without evaluating its source preset again.
+ * Only deeply frozen, bounded numeric data is admitted; the exact geometry identity,
+ * padded local coordinates and metadata survive. Failure is explicit absence, never
+ * a legacy rectangle. The WeakMap retains no drawing or persisted source state. */
+export function prepareResolvedShapeGeometry(
+  geometry: EvaluatedShapePresetGeometry | undefined,
+): EvaluatedShapePresetGeometry | undefined {
+  if (!geometry) return;
+  try {
+    if (preparedGeometries.has(geometry)) return geometry;
+    assertStableResolvedGeometryData(geometry, {
+      remaining: STANDARD_SHAPE_GEOMETRY_LIMITS.commands * 8 + 4096,
+    });
+    if (
+      extentScale(geometry.width, geometry.height) === undefined ||
+      !Array.isArray(geometry.paths) ||
+      !Array.isArray(geometry.handles) ||
+      geometry.handles.length > 16 ||
+      !Array.isArray(geometry.connectionSites) ||
+      geometry.connectionSites.length > 16 ||
+      !geometry.adjustments ||
+      typeof geometry.adjustments !== "object" ||
+      Array.isArray(geometry.adjustments) ||
+      Object.keys(geometry.adjustments).length > 16 ||
+      Object.values(geometry.adjustments).some((value) => typeof value !== "number") ||
+      Object.keys(geometry).some(
+        (key) =>
+          ![
+            "width",
+            "height",
+            "paths",
+            "handles",
+            "adjustments",
+            "textRect",
+            "connectionSites",
+          ].includes(key),
+      ) ||
+      geometry.paths.some(
+        (path) =>
+          typeof path.filled !== "boolean" ||
+          typeof path.stroke !== "boolean" ||
+          !["norm", "none", "lighten", "lightenLess", "darken", "darkenLess"].includes(
+            path.fillMode,
+          ) ||
+          !Array.isArray(path.commands) ||
+          !path.commands.length ||
+          path.commands[0]?.[0] !== "M",
+      ) ||
+      [...geometry.handles, ...geometry.connectionSites].some(
+        ({ position }) => !position || ![position.x, position.y].every(resolvedCoordinate),
+      ) ||
+      (geometry.textRect !== null &&
+        (!geometry.textRect ||
+          ![
+            geometry.textRect.left,
+            geometry.textRect.top,
+            geometry.textRect.right,
+            geometry.textRect.bottom,
+          ].every(resolvedCoordinate)))
+    )
+      return;
+    const prepared = prepareGeometry(geometry, undefined, true);
+    if (
+      prepared.paths.some((path) =>
+        path.polylines.some((polyline) =>
+          polyline.points.some((point) => ![point.x, point.y].every(resolvedCoordinate)),
+        ),
+      )
+    )
+      return;
+    preparedGeometries.set(geometry, prepared);
+    return geometry;
+  } catch {
+    return;
+  }
 }
 
 /** Standard geometry only. Absence/failure never silently becomes a legacy rectangle.
@@ -217,11 +334,19 @@ export function getStandardShapeGeometry(
   }
 }
 
-/** Explicit preset and bounded numeric free paths share paint/hit preparation. */
+/** Explicit preset and bounded numeric free paths share paint/hit preparation.
+ * Supplied runtime geometry must match the paint frame and never falls back. */
 export function getDrawingShapeGeometry(
   drawing: SheetGraphicDrawing,
   includeLegacyView = false,
+  resolvedGeometry?: EvaluatedShapePresetGeometry,
 ): EvaluatedShapePresetGeometry | undefined {
+  if (resolvedGeometry !== undefined) {
+    const geometry = prepareResolvedShapeGeometry(resolvedGeometry);
+    return geometry?.width === drawing.width && geometry.height === drawing.height
+      ? geometry
+      : undefined;
+  }
   if (drawing.kind === "textBox" && (drawing.shapeText || includeLegacyView))
     return getStandardShapeGeometry({ preset: "rect" }, drawing.width, drawing.height);
   if (drawing.shapeGeometry && drawing.shapePath) return;

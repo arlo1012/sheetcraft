@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch, type CSSProperties } from "vue";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import {
   getDrawingShapeGeometry,
   getStandardShapeSvgPaths,
@@ -13,12 +14,14 @@ import { useAppI18n } from "../../../shared/i18n";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import {
   combineShapePresentations,
+  isShapeConnectorContentSupported,
   type ShapeDetailedPresentation,
 } from "../shape-detailed-presentation";
 import ShapeDetailedContent from "./ShapeDetailedContent.vue";
 import ShapeTextContent from "./ShapeTextContent.vue";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
+  connectorRoute?: ReadyShapeConnectorRoute;
   theme?: WorkbookTheme;
   assetUrls?: ReadonlyMap<string, string>;
   density?: number;
@@ -35,14 +38,26 @@ const canvasText = computed(
     (props.drawing.shapeStyle?.rotation3d?.kind === "value" && !!props.drawing.text.trim()),
 );
 watch(
-  () => [props.drawing, bodyPaint.value, textPaint.value],
-  () => emit("paint", combineShapePresentations(props.drawing, [bodyPaint.value, textPaint.value])),
+  () => [props.drawing, props.connectorRoute, bodyPaint.value, textPaint.value],
+  () =>
+    emit(
+      "paint",
+      combineShapePresentations(
+        props.drawing,
+        [bodyPaint.value, textPaint.value],
+        props.connectorRoute,
+      ),
+    ),
   { flush: "sync" },
 );
-const geometry = computed(() => getDrawingShapeGeometry(props.drawing));
+const geometry = computed(() =>
+  isShapeConnectorContentSupported(props.drawing, props.connectorRoute)
+    ? getDrawingShapeGeometry(props.drawing, false, props.connectorRoute?.geometry)
+    : undefined,
+);
 const paths = computed(() => getStandardShapeSvgPaths(geometry.value));
 const appearance = computed(() => standardShapeAppearance(props.drawing));
-const ends = computed(() => getShapeEndPaint(props.drawing, geometry.value));
+const ends = computed(() => getShapeEndPaint(props.drawing, geometry.value, props.connectorRoute));
 const textStyle = computed<CSSProperties | undefined>(() => {
   const rect = geometry.value?.textRect;
   if (!rect || rect.right <= rect.left || rect.bottom <= rect.top) return;
@@ -72,6 +87,7 @@ const textStyle = computed<CSSProperties | undefined>(() => {
       <ShapeDetailedContent
         v-if="drawing.shapeStyle"
         :drawing="drawing"
+        :connector-route="connectorRoute"
         :theme="theme"
         :asset-urls="assetUrls"
         :density="density"

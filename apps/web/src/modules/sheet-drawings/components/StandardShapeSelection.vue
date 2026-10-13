@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import { pictureFrameLocalToWorld } from "@sheetcraft/core/picture-frame";
 import type {
   FloatingImageResizeDirection,
@@ -9,9 +10,11 @@ import type {
 import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 import { getDrawingShapeGeometry, standardShapeFlipPoint } from "../shape-geometry";
 import { getShapeLineLocalEndpoints } from "../shape-endpoint-layout";
+import { getShapeEndPaint } from "../shape-line-paint";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 const props = defineProps<{
   drawing: SheetGraphicDrawing;
+  connectorRoute?: ReadyShapeConnectorRoute;
   fragment: FloatingImageViewportFragment;
   paneClip: Rect;
 }>();
@@ -66,7 +69,16 @@ const sizes = computed(() =>
     }))
     .filter((h) => owns(h.point)),
 );
-const lineEndpoints = computed(() => getShapeLineLocalEndpoints(props.drawing));
+const geometry = computed(() => {
+  const value = getDrawingShapeGeometry(props.drawing, false, props.connectorRoute?.geometry);
+  if (props.connectorRoute) getShapeEndPaint(props.drawing, value, props.connectorRoute);
+  return value;
+});
+const lineEndpoints = computed(() =>
+  props.connectorRoute
+    ? geometry.value && props.connectorRoute.localEndpoints
+    : getShapeLineLocalEndpoints(props.drawing),
+);
 const endpoints = computed(
   () =>
     lineEndpoints.value
@@ -79,8 +91,8 @@ const endpoints = computed(
 const rotation = computed(() => point({ x: props.drawing.width / 2, y: -24 }));
 const adjustments = computed(
   () =>
-    getDrawingShapeGeometry(props.drawing)
-      ?.handles.flatMap((h, index) =>
+    geometry.value?.handles
+      .flatMap((h, index) =>
         h.fields.some((f) => f.disabled)
           ? []
           : [{ index, point: point(standardShapeFlipPoint(props.drawing, h.position)) }],

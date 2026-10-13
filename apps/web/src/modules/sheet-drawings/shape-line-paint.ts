@@ -1,6 +1,7 @@
 import { isShapeFreePathClosed } from "@sheetcraft/core/shape-free-path";
 import { isShapeLinePreset, type ShapeLineEnd } from "@sheetcraft/core/shape-line-ends";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import {
   flattenShapePath,
   FREE_SHAPE_PATH_WORK_BUDGET,
@@ -101,8 +102,18 @@ function marker(
   const length = Math.hypot(tip.x - previous.x, tip.y - previous.y);
   if (length < 1e-8) return;
   const ux = (tip.x - previous.x) / length,
-    uy = (tip.y - previous.y) / length,
-    nx = -uy,
+    uy = (tip.y - previous.y) / length;
+  return directionMarker(end, tip, ux, uy, strokeWidth);
+}
+/** A resolved tangent needs no artificial previous point or minimum path length. */
+function directionMarker(
+  end: ShapeLineEnd,
+  tip: Point,
+  ux: number,
+  uy: number,
+  strokeWidth: number,
+): ShapeEndPaint {
+  const nx = -uy,
     ny = ux;
   const factors = { small: 2, medium: 3, large: 5 };
   const w = Math.max(2, strokeWidth) * factors[end.width ?? "medium"],
@@ -193,11 +204,53 @@ function marker(
     },
   };
 }
+function assertReadyRoute(
+  drawing: SheetGraphicDrawing,
+  geometry: EvaluatedShapePresetGeometry | undefined,
+  route: ReadyShapeConnectorRoute,
+  rect?: PictureFrameRect,
+): void {
+  if (
+    geometry !== route.geometry ||
+    drawing.width !== route.geometry.width ||
+    drawing.height !== route.geometry.height ||
+    route.paintLayout.rect.width !== route.geometry.width ||
+    route.paintLayout.rect.height !== route.geometry.height ||
+    (rect && (rect.width !== route.geometry.width || rect.height !== route.geometry.height)) ||
+    drawing.rotation !== route.paintLayout.angleDeg ||
+    drawing.shapeFlipX ||
+    drawing.shapeFlipY ||
+    route.shapeFlipX ||
+    route.shapeFlipY
+  )
+    throw new TypeError(
+      "Resolved connector marker paint requires its exact neutral paint frame and geometry.",
+    );
+}
+function routeLocalDirection(route: ReadyShapeConnectorRoute, direction: Point): Point {
+  const turn = ((route.paintLayout.angleDeg % 360) + 360) % 360;
+  // Exact cardinal bases avoid introducing an extra component into zero-axis routes.
+  const radians = (turn * Math.PI) / 180;
+  const cos =
+    turn === 0 ? 1 : turn === 180 ? -1 : turn === 90 || turn === 270 ? 0 : Math.cos(radians);
+  const sin =
+    turn === 90 ? 1 : turn === 270 ? -1 : turn === 0 || turn === 180 ? 0 : Math.sin(radians);
+  const x = direction.x * cos + direction.y * sin,
+    y = -direction.x * sin + direction.y * cos,
+    length = Math.hypot(x, y);
+  if (!Number.isFinite(length) || length === 0)
+    throw new RangeError("Resolved connector marker paint requires a finite nonzero tangent.");
+  return { x: x / length, y: y / length };
+}
 /** Endpoint paint is product-owned, bounded numeric geometry, never user SVG. */
 export function getShapeEndPaint(
   drawing: SheetGraphicDrawing,
   geometry: EvaluatedShapePresetGeometry | undefined,
+  route?: ReadyShapeConnectorRoute,
 ): readonly ShapeEndPaint[] {
+  // Validate even invisible/undecorated routes: a missing or stale bundle cannot
+  // quietly resume the static preset path when appearance changes later.
+  if (route) assertReadyRoute(drawing, geometry, route);
   if (
     !geometry ||
     !(
@@ -209,6 +262,34 @@ export function getShapeEndPaint(
     drawing.stroke === "transparent"
   )
     return [];
+  if (route) {
+    const result: ShapeEndPaint[] = [];
+    if (drawing.shapeLineEnds.begin) {
+      const direction = routeLocalDirection(route, route.beginTangent);
+      result.push(
+        directionMarker(
+          drawing.shapeLineEnds.begin,
+          route.localEndpoints[0],
+          -direction.x,
+          -direction.y,
+          drawing.strokeWidth,
+        ),
+      );
+    }
+    if (drawing.shapeLineEnds.end) {
+      const direction = routeLocalDirection(route, route.endTangent);
+      result.push(
+        directionMarker(
+          drawing.shapeLineEnds.end,
+          route.localEndpoints[1],
+          direction.x,
+          direction.y,
+          drawing.strokeWidth,
+        ),
+      );
+    }
+    return result;
+  }
   const lines = geometry.paths
     .filter((p) => p.stroke)
     .flatMap((p) =>
@@ -240,13 +321,15 @@ export function shapeDrawingContainsWorldPoint(
   geometry: EvaluatedShapePresetGeometry | undefined,
   rect: PictureFrameRect,
   point: Point,
+  route?: ReadyShapeConnectorRoute,
 ): boolean {
+  if (route) assertReadyRoute(drawing, geometry, route, rect);
   const local = standardShapeFlipPoint(
     drawing,
     standardShapeWorldToLocal(rect, drawing.rotation, point),
   );
   return (
     standardShapeContainsLocalPoint(geometry, standardShapeAppearance(drawing), local) ||
-    getShapeEndPaint(drawing, geometry).some((p) => p.contains(local))
+    getShapeEndPaint(drawing, geometry, route).some((p) => p.contains(local))
   );
 }

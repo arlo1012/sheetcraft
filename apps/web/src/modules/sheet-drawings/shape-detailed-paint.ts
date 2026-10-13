@@ -1,6 +1,7 @@
 import { isShapeLinePreset } from "@sheetcraft/core/shape-line-ends";
 import { isShapeFreePathClosed } from "@sheetcraft/core/shape-free-path";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import {
   normalizeShapeStyle,
   type ShapeDetailedStyle,
@@ -34,6 +35,8 @@ export type ShapeDetailedPaintOptions = Readonly<{
   drawing: SheetGraphicDrawing;
   /** The actual evaluated preset/free/legacy numeric source, before flip/outer rotation. */
   geometry: EvaluatedShapePresetGeometry;
+  /** Exact Core runtime route; geometry must be the same route.geometry object. */
+  connectorRoute?: ReadyShapeConnectorRoute;
   /** Explicit preview style; omitted means drawing.shapeStyle. */
   style?: ShapeDetailedStyle;
   density: number;
@@ -126,6 +129,19 @@ function prepareSource(options: ShapeDetailedPaintOptions) {
   const { drawing, geometry } = options;
   const explicit = normalizeShapeStyle(options.style ?? drawing.shapeStyle);
   const style = resolveShapeDetailedPaintStyle(drawing, explicit);
+  if (options.connectorRoute) {
+    if (
+      options.angleDeg !== undefined &&
+      options.angleDeg !== options.connectorRoute.paintLayout.angleDeg
+    )
+      throw new RangeError("Resolved connector paint requires its exact world angle.");
+    if (drawing.text !== "")
+      throw new RangeError(
+        "Resolved connector text is unsupported by the numeric route transport.",
+      );
+    if (style.format3d?.kind === "value" || style.rotation3d?.kind === "value")
+      throw new RangeError("Resolved connector 3D is unsupported by the numeric route transport.");
+  }
   const workBudget = drawing.shapePath ? FREE_SHAPE_PATH_WORK_BUDGET : undefined;
   // A free path's explicit detailed fill requests Canvas fill closure. It never adds a Z stroke.
   const fillOpen = !!drawing.shapePath && explicit?.fill?.kind === "value";
@@ -176,7 +192,11 @@ function prepareSource(options: ShapeDetailedPaintOptions) {
     stroke: line && line.paint.opacity > 0 ? "#000000" : "transparent",
     strokeWidth: line ? (line.widthPt * 4) / 3 : 0,
   };
-  const markers = getShapeEndPaint(markerDrawing, detached);
+  // Numeric raster preflight detaches its body, but marker validation/tangents
+  // belong to the original Core route, never that detached geometry identity.
+  const markers = options.connectorRoute
+    ? getShapeEndPaint(markerDrawing, geometry, options.connectorRoute)
+    : getShapeEndPaint(markerDrawing, detached);
   const sourceProfile: PictureShapeSourceProfile = Object.freeze({
     kind: "drawing",
     workBudget,

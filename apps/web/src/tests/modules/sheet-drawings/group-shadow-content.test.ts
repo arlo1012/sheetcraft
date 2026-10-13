@@ -1,5 +1,5 @@
 import { mount, type VueWrapper } from "@vue/test-utils";
-import { nextTick, reactive } from "vue";
+import { defineComponent, h, nextTick, reactive, shallowRef } from "vue";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createSheet } from "@sheetcraft/core/workbook";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
@@ -22,6 +22,8 @@ import type { CanvasImageCache } from "../../../modules/sheet-grid/canvas/image-
 import { createAppI18n } from "../../../shared/i18n";
 import { framedShape } from "./framed-shape-fixture";
 import { shapePageFixture } from "./shape-page-fixture";
+import { createGraphicDrawing } from "../../../modules/sheet-drawings/drawing-defaults";
+import { resolveShapeForestForRender } from "../../../modules/sheet-drawings/resolved-shape-render-source";
 
 const boundary = vi.hoisted(() => ({ prepare: vi.fn(), images: vi.fn(), font: vi.fn() }));
 vi.mock("../../../modules/sheet-drawings/shape-group-paint", async (original) => ({
@@ -197,6 +199,56 @@ afterEach(() => {
 });
 
 describe("owned group Shadow component presentation", () => {
+  test("watches the whole-sheet pass by identity without reading unrelated camera extras", async () => {
+    let reads = 0;
+    const extra = Object.defineProperty({}, "probe", {
+      enumerable: true,
+      get: () => ++reads,
+    });
+    const camera = {
+      ...createGraphicDrawing("camera", "wordArt", "Camera", { row: 0, column: 0 }),
+      kind: "camera" as const,
+      camera: {
+        range: { start: { row: 0, column: 0, extra }, end: { row: 0, column: 0 } },
+        gridLines: false,
+      },
+    };
+    const source = reactive(root()),
+      m = reactive(metrics()),
+      drawings = [source, camera];
+    const pass = resolveShapeForestForRender({ drawings, metrics: m, revision: 0 });
+    const currentPass = shallowRef(pass),
+      viewport = layout();
+    // Pass via a real parent render: test-utils' mount props inspection would
+    // itself read optional accessors before Vue starts the child watchers.
+    const host = mount(
+      defineComponent({
+        setup: () => () =>
+          h(ShapeGroupDetailedContent, {
+            root: source,
+            metrics: m,
+            layout: viewport,
+            density: 1,
+            stackIndex: 2,
+            renderPass: currentPass.value,
+          }),
+      }),
+      { global: { plugins: [createAppI18n("en-US")] } },
+    );
+    wrappers.add(host);
+    const wrapper = host.findComponent(ShapeGroupDetailedContent);
+    await settle();
+    expect(reads).toBe(0);
+    expect(boundary.prepare).toHaveBeenCalledOnce();
+    expect(latest(wrapper)?.renderPass).toBe(pass);
+    const next = resolveShapeForestForRender({ drawings, metrics: m, revision: 1 });
+    currentPass.value = next;
+    await settle();
+    expect(boundary.prepare).toHaveBeenCalledTimes(2);
+    expect(latest(wrapper)?.renderPass).toBe(next);
+    expect(reads).toBe(0);
+    expect(Object.isFrozen(extra)).toBe(false);
+  });
   test("pane copies share the remaining raster budget and retry the complete owner at lower density", async () => {
     vi.spyOn(groupPaint, "getShapeGroupPaintAvailableBytes")
       .mockReturnValueOnce(0)

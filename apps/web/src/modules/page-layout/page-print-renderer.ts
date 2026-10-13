@@ -1,12 +1,18 @@
 import { requireLegacyPictures } from "../sheet-images/picture-document-support";
 import { getPrintablePictureRoots } from "./page-print-pictures";
 import {
+  assertPrintShapeRenderPass,
   createPrintShapeMetrics,
   getPrintableShapeRoots,
+  getPrintShapeSourceDrawings,
   getPrintShapeContentExtent,
   paintPrintShapes,
   preparePrintShapeFonts,
 } from "./page-print-shapes";
+import {
+  resolveShapeForestForRender,
+  type ResolvedShapeForestForRender,
+} from "../sheet-drawings/resolved-shape-render-source";
 import { getPictureProperties } from "@sheetcraft/core/picture-properties";
 import { isFormulaError, type FormulaValue } from "@sheetcraft/core/formula";
 import {
@@ -68,6 +74,7 @@ export type PrintPreviewDocument = {
   geometry: ReturnType<typeof createSheetGeometry>;
   rows: ReturnType<typeof createRowVisibilityIndex>;
   shapeMetrics: ReturnType<typeof createPrintShapeMetrics>;
+  shapeRenderPass: ResolvedShapeForestForRender;
   sheetName: string;
   fileName: string;
   locale: string;
@@ -249,12 +256,20 @@ export function createPrintPreviewDocument(options: {
     },
   };
   const shapeMetrics = createPrintShapeMetrics(options.sheet, options.evaluator);
+  // Capture the entire worksheet before filtering printObject. Connectors may
+  // attach to a nonprinting target or a leaf owned by a different group.
+  const shapeRenderPass = resolveShapeForestForRender({
+    drawings: getPrintShapeSourceDrawings(options.sheet),
+    metrics: shapeMetrics,
+    revision: options.revision ?? 0,
+  });
   const shapeExtent = getPrintShapeContentExtent(
     options.sheet,
     shapeMetrics,
     options.theme,
     options.shapePaintResources,
     options.requireReadyGroupPaint,
+    shapeRenderPass,
   );
   const contentRowCount = Math.max(
     1,
@@ -338,6 +353,7 @@ export function createPrintPreviewDocument(options: {
     geometry,
     rows,
     shapeMetrics,
+    shapeRenderPass,
     sheetName: options.sheetName ?? options.sheet.name,
     fileName: options.fileName ?? "workbook.xlsx",
     locale: options.locale ?? "en-US",
@@ -551,6 +567,7 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
     scale?: number;
     density?: number;
   }): void {
+    assertShapeDocumentCurrent(options.document);
     const printableRoots = getPrintablePictureRoots(options.document.sheet);
     requireLegacyPictures(printableRoots);
     const previewScale = options.scale ?? 1;
@@ -704,6 +721,7 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
       paintPrintShapes(context, {
         sheet: document.sheet,
         metrics: document.shapeMetrics,
+        renderPass: document.shapeRenderPass,
         viewport: {
           x: document.geometry.getColumnOffset(columns.start),
           y: document.rows.getBoundaryOffset(rows.start) ?? 0,
@@ -728,13 +746,28 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
     images.dispose();
     floatingImages.dispose();
   }
-  async function prepareImages(urls: Iterable<string>): Promise<void> {
+  function assertShapeDocumentCurrent(document: PrintPreviewDocument): void {
+    assertPrintShapeRenderPass(
+      document.sheet,
+      document.shapeMetrics,
+      document.shapeRenderPass,
+      document.display.revision ?? 0,
+    );
+  }
+  async function prepareImages(
+    urls: Iterable<string>,
+    document?: PrintPreviewDocument,
+  ): Promise<void> {
+    if (document) assertShapeDocumentCurrent(document);
     await Promise.all(
       [...new Set(urls)].flatMap((url) => [images.load(url), floatingImages.load(url)]),
     );
+    if (document) assertShapeDocumentCurrent(document);
   }
   async function prepareShapes(document: PrintPreviewDocument): Promise<void> {
-    await preparePrintShapeFonts(document.sheet, document.shapeMetrics);
+    assertShapeDocumentCurrent(document);
+    await preparePrintShapeFonts(document.sheet, document.shapeMetrics, document.shapeRenderPass);
+    assertShapeDocumentCurrent(document);
   }
   function getShapePaintResources(theme?: WorkbookTheme, urls?: ReadonlyMap<string, string>) {
     return createPicturePaintResources(theme, urls, images);

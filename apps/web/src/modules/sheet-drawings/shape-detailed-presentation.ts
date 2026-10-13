@@ -1,4 +1,6 @@
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
+import { isShapeLinePreset } from "@sheetcraft/core/shape-line-ends";
 import type { PictureFrameRect } from "@sheetcraft/core/picture-frame";
 import type { ShapePresetBounds } from "@sheetcraft/core/shape-presets";
 import { planShapeDetailedPaint, type ShapeDetailedPaintRaster } from "./shape-detailed-paint";
@@ -14,6 +16,8 @@ import { projectedShapeTextBounds } from "./shape-text-projection";
 /** This canvas is the component's own presentation copy, never an evictable shared cache entry. */
 export interface ShapeDetailedPresentation {
   drawing: SheetGraphicDrawing;
+  /** Disposable connector body identity; never part of the persisted drawing. */
+  connectorRoute?: ReadyShapeConnectorRoute;
   canvas: HTMLCanvasElement;
   density: number;
   bounds: ShapePresetBounds;
@@ -25,9 +29,11 @@ export interface ShapeDetailedPresentation {
 export function combineShapePresentations(
   drawing: SheetGraphicDrawing,
   presentations: readonly (ShapeDetailedPresentation | undefined)[],
+  connectorRoute?: ReadyShapeConnectorRoute,
 ): ShapeDetailedPresentation | undefined {
   const layers = presentations.filter(
-    (p): p is ShapeDetailedPresentation => !!p && p.drawing === drawing,
+    (p): p is ShapeDetailedPresentation =>
+      !!p && p.drawing === drawing && p.connectorRoute === connectorRoute,
   );
   const first = layers[0];
   if (!first) return;
@@ -37,6 +43,31 @@ export function combineShapePresentations(
   const right = Math.max(...layers.map((p) => p.bounds.left + p.bounds.width));
   const bottom = Math.max(...layers.map((p) => p.bounds.top + p.bounds.height));
   return { ...first, bounds: { left, top, width: right - left, height: bottom - top }, layers };
+}
+
+/** Ordinary content is unchanged. Runtime connectors cannot fall back to a
+ * carrier preset, lose a label or move bound tips through another 3D/flip transform. */
+export function isShapeConnectorContentSupported(
+  drawing: SheetGraphicDrawing,
+  connectorRoute?: ReadyShapeConnectorRoute,
+): boolean {
+  if (!connectorRoute) return !drawing.shapeConnector;
+  return Boolean(
+    drawing.kind === "shape" &&
+    drawing.shapeGeometry &&
+    isShapeLinePreset(drawing.shapeGeometry.preset) &&
+    !drawing.shapePath &&
+    !drawing.text.length &&
+    drawing.shapeStyle?.rotation3d?.kind !== "value" &&
+    drawing.shapeStyle?.format3d?.kind !== "value" &&
+    !drawing.shapeFlipX &&
+    !drawing.shapeFlipY &&
+    drawing.rotation === connectorRoute.paintLayout.angleDeg &&
+    drawing.width === connectorRoute.geometry.width &&
+    drawing.height === connectorRoute.geometry.height &&
+    drawing.width === connectorRoute.paintLayout.rect.width &&
+    drawing.height === connectorRoute.paintLayout.rect.height,
+  );
 }
 export const SHAPE_PRESENTATION_BYTE_LIMIT = 64 * 1024 * 1024;
 const presentationBytes = new WeakMap<HTMLCanvasElement, number>();
@@ -77,11 +108,18 @@ export function releaseShapePresentationCanvas(canvas: HTMLCanvasElement) {
 }
 export function detailedShapeLocalBounds(
   drawing: SheetGraphicDrawing,
+  connectorRoute?: ReadyShapeConnectorRoute,
 ): ShapePresetBounds | undefined {
+  if (!isShapeConnectorContentSupported(drawing, connectorRoute)) return;
   if (!drawing.shapeStyle && !drawing.shapeText) return;
-  const geometry = getDrawingShapeGeometry(drawing);
+  const geometry = getDrawingShapeGeometry(drawing, false, connectorRoute?.geometry);
   if (!geometry) return;
-  const plan = planShapeDetailedPaint({ drawing, geometry, density: 1 });
+  const plan = planShapeDetailedPaint({
+    drawing,
+    geometry,
+    density: 1,
+    ...(connectorRoute ? { connectorRoute } : {}),
+  });
   let bounds = plan.logicalBounds;
   if (drawing.shapeText && drawing.text) {
     const textPlan = planShapeTextPaint({

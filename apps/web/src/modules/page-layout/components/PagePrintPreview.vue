@@ -152,10 +152,14 @@ async function print(): Promise<void> {
       fileName = props.fileName,
       locale = props.locale,
       dateSystem = props.dateSystem;
-    const assetIds = getPrintPictureAssetIds(document.sheet, document.shapeMetrics);
+    const assetIds = getPrintPictureAssetIds(
+      document.sheet,
+      document.shapeMetrics,
+      document.shapeRenderPass,
+    );
     const urls = [...assetIds].map((id) => props.imageAssetUrls?.get(id));
     if (urls.some((url) => !url)) throw new Error("Image assets are not ready.");
-    await renderer.prepareImages(urls as string[]);
+    await renderer.prepareImages(urls as string[], document);
     await renderer.prepareShapes(document);
     if (
       !props.visible ||
@@ -258,13 +262,13 @@ watch(
     if (!props.visible) return;
     const document = documentPreview.value;
     if (!document) return;
-    const urls = [...getPrintPictureAssetIds(document.sheet, document.shapeMetrics)].map((id) =>
-      props.imageAssetUrls?.get(id),
-    );
     try {
+      const urls = [
+        ...getPrintPictureAssetIds(document.sheet, document.shapeMetrics, document.shapeRenderPass),
+      ].map((id) => props.imageAssetUrls?.get(id));
       if (urls.some((url) => !url)) throw new Error("Print paint resources are unavailable.");
       await Promise.all([
-        renderer.prepareImages(urls as string[]),
+        renderer.prepareImages(urls as string[], document),
         renderer.prepareShapes(document),
       ]);
       if (request === resourceGeneration && props.visible) repaint.value++;

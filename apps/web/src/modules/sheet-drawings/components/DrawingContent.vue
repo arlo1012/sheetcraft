@@ -3,6 +3,7 @@ import { computed, defineAsyncComponent } from "vue";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import type { SheetLegacyDrawing as SheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import StandardShapeContent from "./StandardShapeContent.vue";
 import type { ShapeDetailedPresentation } from "../shape-detailed-presentation";
 const FormControlContent = defineAsyncComponent(
@@ -18,6 +19,7 @@ const ChartContent = defineAsyncComponent(() => import("../../charts/components/
 const EquationContent = defineAsyncComponent(() => import("./EquationContent.vue"));
 const props = defineProps<{
   drawing: SheetDrawing;
+  connectorRoute?: ReadyShapeConnectorRoute;
   sheet?: Sheet;
   evaluator?: SheetEvaluator;
   revision?: number;
@@ -44,13 +46,16 @@ const textStyle = computed(() => ({
     <StandardShapeContent
       v-if="
         (drawing.kind === 'shape' &&
-          (drawing.shapeGeometry ||
+          (connectorRoute ||
+            drawing.shapeConnector ||
+            drawing.shapeGeometry ||
             drawing.shapePath ||
             drawing.shapeStyle ||
             drawing.shapeText)) ||
         (drawing.kind === 'textBox' && drawing.shapeText)
       "
       :drawing="drawing"
+      :connector-route="connectorRoute"
       :theme="theme"
       :asset-urls="imageAssetUrls"
       :density="density"
@@ -156,7 +161,9 @@ const textStyle = computed(() => ({
       v-show="
         !(
           (drawing.kind === 'shape' &&
-            (drawing.shapeGeometry ||
+            (connectorRoute ||
+              drawing.shapeConnector ||
+              drawing.shapeGeometry ||
               drawing.shapePath ||
               drawing.shapeStyle ||
               drawing.shapeText)) ||

@@ -10,6 +10,7 @@ import { createPicturePaintResources } from "../../../shared/images/picture-pain
 import { cellTextFontRevision } from "../../../shared/cell-text/text-metrics";
 import { useAppI18n } from "../../../shared/i18n";
 import { resolveShapeGroupProjection } from "../resolved-shape-group";
+import type { ResolvedShapeForestForRender } from "../resolved-shape-render-source";
 import { ensureDrawingShapeTextFont } from "../shape-text-runtime";
 import {
   getShapeGroupPaintFragments,
@@ -29,6 +30,7 @@ import {
 const props = defineProps<{
   root: ShapeGroupDrawing;
   metrics: PictureSheetMetrics;
+  renderPass?: ResolvedShapeForestForRender;
   layout: SheetViewportLayout;
   pageProjection?: PageLayoutProjection;
   density: number;
@@ -50,8 +52,15 @@ const canvases = new Map<string, HTMLCanvasElement>();
 let generation = 0;
 let mounted = true;
 const images = createCanvasImageCache(() => void render());
+function projection() {
+  if (!props.renderPass) return resolveShapeGroupProjection(props.root, props.metrics);
+  const resolved = props.renderPass.getGroup(props.root.id);
+  if (!resolved || resolved.sourceRoot !== props.root || props.renderPass.metrics !== props.metrics)
+    throw new TypeError("The group presentation requires its exact whole-sheet pass.");
+  return resolved;
+}
 const fragments = computed(() => {
-  const frame = resolveShapeGroupProjection(props.root, props.metrics).layout;
+  const frame = projection().layout;
   const bounds = presentation.value?.logicalBounds ?? {
     left: 0,
     top: 0,
@@ -120,6 +129,7 @@ async function render(): Promise<void> {
   const request = ++generation;
   const root = props.root,
     metrics = props.metrics,
+    renderPass = props.renderPass,
     theme = props.theme,
     assetUrls = props.assetUrls,
     density = props.density;
@@ -128,6 +138,7 @@ async function render(): Promise<void> {
     request === generation &&
     root === props.root &&
     metrics === props.metrics &&
+    renderPass === props.renderPass &&
     theme === props.theme &&
     assetUrls === props.assetUrls &&
     density === props.density;
@@ -135,9 +146,16 @@ async function render(): Promise<void> {
   status.value = "loading";
   let owned: Extract<ShapeGroupPaintResult, { kind: "ready" }> | undefined;
   try {
-    const projection = resolveShapeGroupProjection(root, metrics);
+    const resolved = projection();
     // Numeric validation and memory planning precede any new asset decoding.
-    planShapeGroupPaint({ root, metrics, density, resources: { theme }, interactive: true });
+    planShapeGroupPaint({
+      root,
+      metrics,
+      renderPass,
+      density,
+      resources: { theme },
+      interactive: true,
+    });
     const urls = new Set<string>();
     for (const asset of collectShapeGroupAssetIds(root)) {
       const url = assetUrls?.get(asset);
@@ -146,7 +164,7 @@ async function render(): Promise<void> {
     }
     images.retain(urls);
     await Promise.all([
-      ...projection.leaves.flatMap((leaf) =>
+      ...resolved.leaves.flatMap((leaf) =>
         leaf.view && !leaf.collapsed && leaf.view.text
           ? [ensureDrawingShapeTextFont(leaf.view)]
           : [],
@@ -154,11 +172,13 @@ async function render(): Promise<void> {
       ...[...urls].map((url) => images.load(url)),
     ]);
     if (!current()) return;
+    renderPass?.assertCurrent(renderPass.sourceForest, metrics, renderPass.revision);
     let requestedDensity = density;
     for (let attempt = 0; attempt < 6; attempt++) {
       const result = prepareShapeGroupPaint({
         root,
         metrics,
+        renderPass,
         density: requestedDensity,
         interactive: true,
         resources: createPicturePaintResources(theme, assetUrls, images),
@@ -187,6 +207,7 @@ async function render(): Promise<void> {
     presentation.value = result;
     await nextTick();
     if (!current()) return;
+    renderPass?.assertCurrent(renderPass.sourceForest, metrics, renderPass.revision);
     const copyBytes = result.canvas.width * result.canvas.height * 4 * canvases.size;
     if (copyBytes > getShapeGroupPaintAvailableBytes())
       throw new RangeError("Group pane copies exceed the presentation memory budget.");
@@ -223,6 +244,12 @@ watch(
   ],
   () => void render(),
   { immediate: true, deep: true },
+);
+// A complete pass also captures unrelated worksheet drawings. Observe its
+// identity without traversing optional caller data on those other sources.
+watch(
+  () => props.renderPass,
+  () => void render(),
 );
 watch(
   () => [props.layout, props.pageProjection],

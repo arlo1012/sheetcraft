@@ -1,4 +1,5 @@
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import type { SheetPage, PageLayoutProjection } from "@sheetcraft/sheet-engine/page-layout";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
@@ -137,6 +138,7 @@ export function getShapePageFragments(
   projection: PageLayoutProjection,
   metrics: PictureSheetMetrics,
   selected = false,
+  connectorRoute?: ReadyShapeConnectorRoute,
 ): ShapePageFragment[] {
   const output: ShapePageFragment[] = [];
   for (const band of getShapePageProjectionBands(viewport, projection, metrics)) {
@@ -159,7 +161,13 @@ export function getShapePageFragments(
       },
       metrics,
     );
-    for (const fragment of getStandardShapeViewportFragments(view, layout, selected, true))
+    for (const fragment of getStandardShapeViewportFragments(
+      view,
+      layout,
+      selected,
+      true,
+      connectorRoute,
+    ))
       output.push({
         ...fragment,
         pageKey: band.pageKey,

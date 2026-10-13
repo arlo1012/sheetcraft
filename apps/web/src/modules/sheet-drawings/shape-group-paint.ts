@@ -35,6 +35,8 @@ import {
   resizeShapePresentationCanvas,
 } from "./shape-detailed-presentation";
 import type { DrawingShapeTextRuntimeOptions } from "./shape-text-runtime";
+import type { ResolvedShapeForestForRender } from "./resolved-shape-render-source";
+import type { ShapeConnectorPaintLayout } from "@sheetcraft/core/shape-connector-route";
 
 export const SHAPE_GROUP_PAINT_LIMITS = Object.freeze({
   side: 4096,
@@ -45,6 +47,8 @@ export const SHAPE_GROUP_PAINT_LIMITS = Object.freeze({
 export type ShapeGroupPaintOptions = Readonly<{
   root: ShapeGroupDrawing;
   metrics: PictureSheetMetrics;
+  /** Whole-sheet relation pass; filtering owners must not remove external targets. */
+  renderPass?: ResolvedShapeForestForRender;
   density: number;
   resources?: PicturePaintResources;
   /** Printing has no hit surfaces. Worksheet interaction includes every node's alpha. */
@@ -59,6 +63,7 @@ type GroupPlanBase = Readonly<{
   /** Detached canonical snapshot; no private descendant is promoted to a worksheet root. */
   snapshotRoot: ShapeGroupDrawing;
   metrics: PictureSheetMetrics;
+  renderPass?: ResolvedShapeForestForRender;
   layout: ResolvedShapeFrame;
   resolvedRootLayout: ResolvedShapeFrame;
   actualDensity: number;
@@ -88,9 +93,10 @@ export type ShapeGroupPaintResult =
 export type ShapeGroupPaintHit = Readonly<{ kind: "leaf" | "owner"; path: ShapeGroupPath }>;
 type Point = Readonly<{ x: number; y: number }>;
 type Matrix = Readonly<{ a: number; b: number; c: number; d: number; e: number; f: number }>;
+type PaintLayout = ResolvedShapeFrame | ShapeConnectorPaintLayout;
 type NodeBase = {
   path: ShapeGroupPath;
-  layout: ResolvedShapeFrame | null;
+  layout: PaintLayout | null;
   bounds: PictureEffectBounds;
   density: number;
   width: number;
@@ -167,7 +173,7 @@ function freezeSnapshot(root: ShapeGroupDrawing): ShapeGroupDrawing {
   return root;
 }
 /** inverse(world owner) * world child, using resolved sizes exactly once. */
-function childToOwner(owner: ResolvedShapeFrame, child: ResolvedShapeFrame): Matrix {
+function childToOwner(owner: PaintLayout, child: PaintLayout): Matrix {
   const radians = ((child.angleDeg - owner.angleDeg) * Math.PI) / 180;
   const a = Math.cos(radians),
     b = Math.sin(radians),
@@ -254,7 +260,7 @@ function availableBytes(pendingPresentationBytes = 0): number {
     throw new RangeError("Live shape group presentations exhaust their 64MiB budget.");
   return bytes;
 }
-function baseNode(path: ShapeGroupPath, layout: ResolvedShapeFrame | null): NodeBase {
+function baseNode(path: ShapeGroupPath, layout: PaintLayout | null): NodeBase {
   return {
     path: Object.freeze([...path]),
     layout,
@@ -280,6 +286,7 @@ function rootMetadata(
     sourceRoot: options.root,
     snapshotRoot,
     metrics: options.metrics,
+    ...(options.renderPass ? { renderPass: options.renderPass } : {}),
     layout: projection.layout,
     resolvedRootLayout: projection.layout,
     actualDensity: tree.density,
@@ -300,7 +307,13 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
   if (!Number.isFinite(options.density) || options.density <= 0 || options.density > 64)
     throw new RangeError("Shape group density must be positive, finite and at most 64.");
   // Both calls validate the complete genuine owned graph before any resource lookup or Canvas.
-  const projection = resolveShapeGroupProjection(options.root, options.metrics);
+  const pass = options.renderPass;
+  if (pass) pass.assertCurrent(pass.sourceForest, options.metrics, pass.revision);
+  const projection = pass
+    ? pass.getGroup(options.root.id)
+    : resolveShapeGroupProjection(options.root, options.metrics);
+  if (!projection || projection.sourceRoot !== options.root)
+    throw new TypeError("Shape group paint requires the exact owner of its whole-sheet pass.");
   const snapshotRoot = freezeSnapshot(cloneShapeGroup(options.root));
   const snapshots = new Map(
     traverseShapeGroup(snapshotRoot).map((visit) => [key(visit.path), visit.node]),
@@ -315,6 +328,7 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
         sourceNode: leaf.sourceNode,
         path: leaf.path,
         snapshotRoot,
+        ...(pass ? { contextIdentity: pass.contextIdentity } : {}),
       }),
     ]),
   );
@@ -329,13 +343,25 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
       if (!owner) {
         const leaf = leaves.get(key(path));
         if (!leaf) throw new TypeError("Shape group paint requires its exact genuine member path.");
-        const result: LeafPlan = { ...baseNode(path, leaf.layout), kind: "leaf", leaf };
-        if (leaf.collapsed || !leaf.view || !leaf.layout) return result;
+        const connector = pass?.getLeaf(leaf.sourceNode.id)?.connector;
+        if (connector?.status === "unavailable")
+          throw new TypeError(`Shape connector paint is unavailable: ${connector.reason}.`);
+        const suspended = connector?.status === "suspended" || connector?.status === "degenerate";
+        const paintLayout =
+          connector?.status === "ready" ? connector.route.paintLayout : leaf.layout;
+        const result: LeafPlan = { ...baseNode(path, paintLayout), kind: "leaf", leaf };
+        if (suspended) {
+          result.collapsed = true;
+          return result;
+        }
+        const drawing = connector?.status === "ready" ? connector.paintView : leaf.view;
+        if (leaf.collapsed || !drawing || !paintLayout) return result;
         const leafOptions: ShapeLeafPixelsOptions = {
-          drawing: leaf.view,
+          drawing,
+          ...(connector?.status === "ready" ? { connectorRoute: connector.route } : {}),
           density,
           resources: options.resources,
-          angleDeg: leaf.layout.angleDeg,
+          angleDeg: paintLayout.angleDeg,
           sourceIdentity: identities.get(key(path)),
           textRuntimeOptions: options.textRuntimeOptions,
           legacyLineHeightPx: options.legacyLineHeightPx,
@@ -388,6 +414,10 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
       }
       if (owner.collapsed || !owner.layout) return result;
       const visible = result.children.filter(({ node }) => !node.collapsed);
+      if (pass?.connections && !visible.length) {
+        result.collapsed = true;
+        return result;
+      }
       const sourceBounds = sourceUnion(
         visible.map(({ node, matrix }) => ({ bounds: node.bounds, matrix })),
         density,
@@ -509,6 +539,11 @@ export function prepareShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGr
         missingAssetIds: missing,
       };
     const resources = { ...options.resources, getAssetImage: (id: string) => images.get(id) };
+    options.renderPass?.assertCurrent(
+      options.renderPass.sourceForest,
+      options.metrics,
+      options.renderPass.revision,
+    );
     const budget = availableBytes();
     const made = new Set<HTMLCanvasElement>();
     const live = new Set<OwnedNode>();
