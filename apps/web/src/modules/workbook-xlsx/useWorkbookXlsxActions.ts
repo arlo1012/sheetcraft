@@ -20,6 +20,7 @@ import {
 
 export type XlsxFeedbackKey =
   | "xlsx.feedback.blocked"
+  | "chart.elementExportBlocked"
   | "xlsx.feedback.numericTableTotals"
   | "xlsx.feedback.exported"
   | "xlsx.feedback.failed"
@@ -136,9 +137,28 @@ export function useWorkbookXlsxActions(options: {
     return false;
   }
 
+  function setChartElementFailure(report?: XlsxCompatibilityReport): boolean {
+    const locations = report?.issues.flatMap((issue) =>
+      issue.code === "feature-omitted" && issue.severity === "block"
+        ? issue.locations.filter((location) => location.endsWith(".chart.elements"))
+        : [],
+    );
+    if (!locations?.length) return false;
+    feedback.value = {
+      key: "chart.elementExportBlocked",
+      error: true,
+      locations: locations.join("; "),
+    };
+    return true;
+  }
+
   function setFailure(error: unknown): void {
     if (error instanceof XlsxWorkerAbortError || disposed) return;
-    if (error instanceof XlsxWorkerFailure && setNumericTotalsFailure(error.report)) return;
+    if (
+      error instanceof XlsxWorkerFailure &&
+      (setNumericTotalsFailure(error.report) || setChartElementFailure(error.report))
+    )
+      return;
     if (error instanceof XlsxWorkerFailure && error.report && hasBlockingIssue(error.report)) {
       feedback.value = { key: "xlsx.feedback.blocked", error: true };
       return;
@@ -282,7 +302,7 @@ export function useWorkbookXlsxActions(options: {
       clearTimeout(timeout);
       if (disposed || response.type !== "encode") return;
       if (hasBlockingIssue(response.report)) {
-        if (!setNumericTotalsFailure(response.report))
+        if (!setNumericTotalsFailure(response.report) && !setChartElementFailure(response.report))
           feedback.value = { key: "xlsx.feedback.blocked", error: true };
         return;
       }

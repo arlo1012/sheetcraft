@@ -1088,6 +1088,14 @@ const shapeDrawingLayerRef = ref<InstanceType<typeof SheetDrawingLayer>>();
 const selectedShapeDrawingId = ref<string | null>(null);
 watch(selectedShapeDrawingId, (id) => emit("selectedDrawingChange", id), { flush: "sync" });
 watch(
+  () => props.sheet,
+  () => {
+    // Drawing IDs are sheet-local; a same-ID drawing on another sheet is a new owner.
+    selectedShapeDrawingId.value = null;
+  },
+  { flush: "sync" },
+);
+watch(
   () => props.shapeCreationRequest,
   (next, previous) => {
     const focused = document.activeElement;

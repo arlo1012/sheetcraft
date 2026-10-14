@@ -51,6 +51,7 @@ const props = withDefaults(
     hasImage?: boolean;
     hasShape?: boolean;
     hasEquation?: boolean;
+    hasChart?: boolean;
     pivotId?: string;
   }>(),
   { conditionalFormattingDisabled: undefined },
@@ -111,6 +112,7 @@ type Category =
   | "image"
   | "shape"
   | "equation"
+  | "chart"
   | "pivot-analysis"
   | "pivot-design"
   | "page"
@@ -124,7 +126,7 @@ const proofreadingOpen = ref(false);
 const activeCategory = ref<Category>("home");
 let previousCategory: Exclude<
   Category,
-  "table" | "image" | "shape" | "equation" | "pivot-analysis" | "pivot-design"
+  "table" | "image" | "shape" | "equation" | "chart" | "pivot-analysis" | "pivot-design"
 > = "home";
 const homeTab = ref<HTMLButtonElement>();
 const insertTab = ref<HTMLButtonElement>();
@@ -132,6 +134,7 @@ const pivotAnalysisTab = ref<HTMLButtonElement>();
 const pivotDesignTab = ref<HTMLButtonElement>();
 const imageTab = ref<HTMLButtonElement>();
 const equationTab = ref<HTMLButtonElement>();
+const chartTab = ref<HTMLButtonElement>();
 const shapeTab = ref<HTMLButtonElement>();
 const pageTab = ref<HTMLButtonElement>();
 const formulaTab = ref<HTMLButtonElement>();
@@ -148,6 +151,7 @@ watch(activeCategory, (category) => {
     category !== "image" &&
     category !== "shape" &&
     category !== "equation" &&
+    category !== "chart" &&
     category !== "pivot-analysis" &&
     category !== "pivot-design"
   )
@@ -172,7 +176,7 @@ watch(
   () => props.hasShape,
   (hasShape) => {
     if (hasShape) {
-      if (!props.hasEquation) activeCategory.value = "shape";
+      if (!props.hasEquation && !props.hasChart) activeCategory.value = "shape";
     } else if (activeCategory.value === "shape") activeCategory.value = previousCategory;
   },
 );
@@ -185,9 +189,17 @@ watch(
   },
 );
 watch(
+  () => props.hasChart,
+  (active) => {
+    if (active) activeCategory.value = "chart";
+    else if (activeCategory.value === "chart") activeCategory.value = previousCategory;
+  },
+);
+watch(
   () => props.pivotId,
   (id) => {
-    if (id && !props.hasImage && !props.hasShape) activeCategory.value = "pivot-analysis";
+    if (id && !props.hasImage && !props.hasShape && !props.hasEquation && !props.hasChart)
+      activeCategory.value = "pivot-analysis";
     else if (
       !id &&
       (activeCategory.value === "pivot-analysis" || activeCategory.value === "pivot-design")
@@ -220,6 +232,10 @@ function onCategoryKeydown(event: KeyboardEvent): void {
   if (props.hasEquation) {
     categories.push("equation");
     tabs.push(equationTab);
+  }
+  if (props.hasChart) {
+    categories.push("chart");
+    tabs.push(chartTab);
   }
   if (proofreadingOpen.value) {
     categories.push("proofreading");
@@ -259,6 +275,7 @@ defineSlots<{
   "image-tools"?: () => unknown;
   "shape-tools"?: () => unknown;
   "equation-tools"?: () => unknown;
+  "chart-tools"?: () => unknown;
   "pivot-analysis-tools"?: () => unknown;
   "pivot-design-tools"?: () => unknown;
   "review-tools"?: (props: { openProofreading: () => void }) => unknown;
@@ -414,6 +431,22 @@ defineSlots<{
             @click="activeCategory = 'pivot-design'"
           >
             {{ t("pivot.design") }}
+          </button>
+          <button
+            v-if="hasChart"
+            :id="`${tabId}-chart`"
+            ref="chartTab"
+            class="spreadsheet-ribbon__category spreadsheet-ribbon__category--contextual"
+            :class="{ 'is-active': activeCategory === 'chart' }"
+            data-ribbon-category="chart"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'chart'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'chart' ? 0 : -1"
+            @click="activeCategory = 'chart'"
+          >
+            {{ t("chart.contextTools") }}
           </button>
           <button
             v-if="hasEquation"
@@ -576,6 +609,7 @@ defineSlots<{
       <slot v-else-if="activeCategory === 'image'" name="image-tools" />
       <slot v-else-if="activeCategory === 'shape'" name="shape-tools" />
       <slot v-else-if="activeCategory === 'equation'" name="equation-tools" />
+      <slot v-else-if="activeCategory === 'chart'" name="chart-tools" />
       <slot v-else-if="activeCategory === 'pivot-analysis'" name="pivot-analysis-tools" />
       <slot v-else-if="activeCategory === 'pivot-design'" name="pivot-design-tools" />
       <slot v-else-if="activeCategory === 'insert'" name="insert-tools" />

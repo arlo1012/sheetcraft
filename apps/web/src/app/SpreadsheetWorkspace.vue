@@ -139,6 +139,8 @@ import { useCameraActions } from "../modules/camera/useCameraActions";
 import CameraEditorDialog from "../modules/camera/components/CameraEditorDialog.vue";
 import SparklineDialog from "../modules/sparklines/components/SparklineDialog.vue";
 import { useChartActions } from "../modules/charts/useChartActions";
+import { useChartObjectControls } from "../modules/charts/useChartObjectControls";
+import ChartElementsToolbar from "../modules/charts/components/ChartElementsToolbar.vue";
 import { defineAsyncComponent } from "vue";
 const ChartEditorDialog = defineAsyncComponent(
   () => import("../modules/charts/components/ChartEditorDialog.vue"),
@@ -1562,6 +1564,14 @@ watch(
   },
   { flush: "sync" },
 );
+const selectedChartId = ref<string | null>(null);
+watch(
+  [activeSheet, workbookGeneration],
+  () => {
+    selectedChartId.value = null;
+  },
+  { flush: "sync" },
+);
 const chartActions = useChartActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1576,6 +1586,18 @@ const chartActions = useChartActions({
   onEditPivot: openPivotFields,
 });
 const { dialog: chartDialog, editing: editingChart, error: chartError } = chartActions;
+const chartObjectControls = useChartObjectControls({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  getSelectedId: () => selectedChartId.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || !!chartDialog.value,
+  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+  execute: executeCommand,
+  edit: chartActions.edit,
+});
+const chartObjectContext = chartObjectControls.snapshot;
 const chartRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingChartRange, reference: pickedChartReference } = chartRangePicker;
 let chartPickerId = 0;
@@ -2350,6 +2372,11 @@ function openShapeFormat(drawing: SheetGraphicDrawing | SheetFramedGraphicDrawin
   }
 }
 function selectedShapeChanged(id: string | null) {
+  selectedChartId.value = activeSheet.value.drawings?.some(
+    (node) => node.id === id && node.kind === "chart",
+  )
+    ? id
+    : null;
   if (shapeConnectorFormatPane.root.value && shapeConnectorFormatPane.root.value.id !== id) {
     shapeConnectorFormatPane.close();
     shapePaintAssets.cancel();
@@ -4130,6 +4157,7 @@ watch(
       @cancel="imageActions.onFileCancel"
     />
     <SpreadsheetRibbon
+      :has-chart="!!chartObjectContext"
       :has-image="!!selectedPicture"
       :has-shape="!!shapeObjectControls.snapshot.value?.paths.length"
       :has-equation="!!equationEdit.snapshot.value"
@@ -4499,6 +4527,19 @@ watch(
           @flip="sheetGridRef?.flipImage($event)"
           @selection-pane="pictureTools.paneVisible.value = !pictureTools.paneVisible.value"
           @format="openOwnedPictureFormat()"
+        />
+      </template>
+      <template #chart-tools>
+        <ChartElementsToolbar
+          v-if="chartObjectContext"
+          :key="chartObjectContext.drawing.id"
+          :chart="chartObjectContext.drawing.chart"
+          :disabled="loading || fileBusy || xlsxBusy || chartObjectContext.disabled"
+          :apply="chartObjectContext.apply"
+          :apply-and-run="chartObjectContext.applyAndRun"
+          :on-edit="chartObjectContext.edit"
+          :on-source="chartObjectContext.source"
+          :on-switch-direction="chartObjectContext.switchDirection"
         />
       </template>
       <template #insert-tools>

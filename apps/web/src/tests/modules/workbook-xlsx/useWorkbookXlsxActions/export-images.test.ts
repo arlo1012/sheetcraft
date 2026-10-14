@@ -3,6 +3,7 @@ import { effectScope, ref } from "vue";
 import { describe, expect, test, vi } from "vitest";
 import { createWorkbook, getActiveSheet, setCellContent } from "@sheetcraft/core/workbook";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { ImageAsset, ImageAssetStore } from "../../../../modules/image-assets/imageAssetStore";
 import { useWorkbookXlsxActions } from "../../../../modules/workbook-xlsx/useWorkbookXlsxActions";
 import type { XlsxWorkerPort } from "../../../../modules/workbook-xlsx/workbookXlsxWorker";
@@ -79,6 +80,57 @@ function mountActions(assetStore?: ImageAssetStore, timeoutMs?: number) {
 }
 
 describe("XLSX export image preparation", () => {
+  test("new chart element settings show blocked feedback before flush, assets, worker or download", async () => {
+    const get = vi.fn(async () => imageAsset()),
+      f = mountActions({ get, put: vi.fn() });
+    const drawing: SheetChartDrawing = {
+      id: "chart",
+      kind: "chart",
+      name: "Chart",
+      anchor: { row: 0, column: 0 },
+      offsetX: 0,
+      offsetY: 0,
+      width: 480,
+      height: 300,
+      text: "",
+      shape: "rectangle",
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeWidth: 1,
+      color: "#000000",
+      fontSize: 14,
+      bold: false,
+      italic: false,
+      rotation: 0,
+      chart: {
+        type: "column",
+        range: null,
+        title: "Chart",
+        headerRow: true,
+        headerColumn: true,
+        seriesBy: "columns",
+        legend: true,
+        labels: false,
+        stacked: false,
+        showHidden: false,
+        elements: { titlePosition: "overlay" },
+      },
+    };
+    getActiveSheet(f.workbook).drawings = [drawing];
+    const before = serializeWorkbook(f.workbook);
+    await f.actions.exportXlsx();
+    expect(f.actions.feedback.value).toEqual({
+      key: "chart.elementExportBlocked",
+      error: true,
+      locations: 'Sheet1.drawings["chart"].chart.elements',
+    });
+    expect(f.flushPendingEdits).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    expect(f.workerFactory).not.toHaveBeenCalled();
+    expect(f.download).not.toHaveBeenCalled();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    f.scope.stop();
+  });
   test("unsupported frame export rejects before committing a cell draft, worker or resource work", async () => {
     const get = vi.fn(async () => imageAsset()),
       f = mountActions({ get, put: vi.fn() });

@@ -108,7 +108,14 @@ describe("detached pivot charts", () => {
     const locked = () =>
       wrapper
         .findAllComponents(Checkbox)
-        .filter((_, index) => [0, 1, 2, 6].includes(index))
+        .filter((control) =>
+          [
+            "First row contains series names",
+            "First column contains categories",
+            "Series in rows",
+            "Include hidden data",
+          ].includes(control.text()),
+        )
         .map((control) => !!control.props("disabled"));
     expect(locked()).toEqual([true, true, true, true]);
     const link = wrapper

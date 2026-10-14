@@ -95,6 +95,13 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
     );
   };
   for (const sheet of getWorkbookSheets(workbook)) {
+    for (const drawing of sheet.drawings ?? []) {
+      if (drawing.kind !== "chart" || !("elements" in drawing.chart)) continue;
+      const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.elements`;
+      throw new XlsxWorkerFailure("Chart element settings are not yet supported by XLSX export.", {
+        issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [location] }],
+      });
+    }
     for (const image of sheet.floatingImages) {
       if (isFramedPictureObject(image) || isPictureGroup(image)) {
         const location = `${sheet.name}.floatingImages[${JSON.stringify(image.id)}].frame`;

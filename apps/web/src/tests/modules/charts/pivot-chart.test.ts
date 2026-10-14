@@ -142,7 +142,7 @@ describe("pivot charts", () => {
         linked,
         linked,
       ]);
-      const showHidden = checkboxes[6]!;
+      const showHidden = checkboxes.find((control) => control.text() === "Include hidden data")!;
       expect(!!showHidden.props("disabled")).toBe(false);
       showHidden.vm.$emit("update:modelValue", true);
       await flushPromises();

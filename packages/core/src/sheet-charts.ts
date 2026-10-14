@@ -21,6 +21,14 @@ export type ChartType =
   | "sankey"
   | "river"
   | "wordCloud";
+/** Sparse element layout choices; omission retains the existing chart behavior. */
+export type ChartElementSettings = {
+  titlePosition?: "none" | "above" | "overlay";
+  legendPosition?: "top" | "bottom" | "left" | "right" | "topRight";
+  /** False reserves plot space for the legend. */
+  legendOverlay?: boolean;
+  labelPosition?: "center" | "insideEnd" | "insideBase" | "outsideEnd";
+};
 export type SheetChart = {
   pivotTableId?: string;
   /** Values retained when a PivotTable is removed; no worksheet data dependency. */
@@ -36,6 +44,7 @@ export type SheetChart = {
   labels: boolean;
   stacked: boolean;
   showHidden: boolean;
+  elements?: ChartElementSettings;
 };
 const types = new Set([
   "column",
@@ -51,7 +60,58 @@ const types = new Set([
   "river",
   "wordCloud",
 ]);
+function normalizeChartElementSettings(value: unknown): ChartElementSettings {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new TypeError("Invalid chart element settings.");
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype !== null && prototype !== Object.prototype)
+    throw new TypeError("Chart element settings must be an ordinary data record.");
+  const keys = ["titlePosition", "legendPosition", "legendOverlay", "labelPosition"] as const;
+  for (const key of keys)
+    if (key in value && !Object.hasOwn(value, key))
+      throw new TypeError("Chart element settings must be own data fields.");
+  const source: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+  for (const key of Reflect.ownKeys(value)) {
+    const field = Object.getOwnPropertyDescriptor(value, key)!;
+    if (typeof key !== "string" || !keys.includes(key as (typeof keys)[number]))
+      throw new TypeError("Unknown chart element setting.");
+    if (!("value" in field))
+      throw new TypeError("Chart element settings require own data fields, not accessors.");
+    source[key] = field.value as unknown;
+  }
+  const result: ChartElementSettings = {};
+  if (Object.hasOwn(source, "titlePosition")) {
+    if (!["none", "above", "overlay"].includes(source.titlePosition as string))
+      throw new RangeError("Invalid chart title position.");
+    result.titlePosition = source.titlePosition as ChartElementSettings["titlePosition"];
+  }
+  if (Object.hasOwn(source, "legendPosition")) {
+    if (!["top", "bottom", "left", "right", "topRight"].includes(source.legendPosition as string))
+      throw new RangeError("Invalid chart legend position.");
+    result.legendPosition = source.legendPosition as ChartElementSettings["legendPosition"];
+  }
+  if (Object.hasOwn(source, "legendOverlay")) {
+    if (typeof source.legendOverlay !== "boolean")
+      throw new TypeError("Chart legend overlay must be a boolean.");
+    result.legendOverlay = source.legendOverlay;
+  }
+  if (Object.hasOwn(source, "labelPosition")) {
+    if (
+      !["center", "insideEnd", "insideBase", "outsideEnd"].includes(source.labelPosition as string)
+    )
+      throw new RangeError("Invalid chart label position.");
+    result.labelPosition = source.labelPosition as ChartElementSettings["labelPosition"];
+  }
+  return result;
+}
 export function normalizeSheetChart(chart: SheetChart): SheetChart {
+  let elements: ChartElementSettings | undefined;
+  if (chart && typeof chart === "object" && "elements" in chart) {
+    const field = Object.getOwnPropertyDescriptor(chart, "elements");
+    if (!field || !("value" in field))
+      throw new TypeError("Chart elements must be an own data field, not an accessor.");
+    elements = normalizeChartElementSettings(field.value);
+  }
   if (
     !chart ||
     (chart.pivotTableId !== undefined && chart.dataCache !== undefined) ||
@@ -97,6 +157,7 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
     labels: chart.labels,
     stacked: chart.stacked,
     showHidden: chart.showHidden,
+    ...(elements !== undefined ? { elements } : {}),
   };
 }
 export type ChartSeries = {

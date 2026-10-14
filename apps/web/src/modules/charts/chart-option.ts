@@ -2,8 +2,147 @@ import type { EChartsOption, SeriesOption } from "echarts";
 import { formatCellNumberValue } from "@sheetcraft/core/number-format";
 import type { CellNumberFormat } from "@sheetcraft/core/style";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
+import { getChartElementCapabilities, getChartElementSettings } from "./chart-elements";
 const colors = ["#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#db2777"];
-function buildChartOption(chart: SheetChart, data: ChartData): EChartsOption {
+type ChartDimensions = { width: number; height: number };
+
+function createElementLayout(chart: SheetChart, data: ChartData, dimensions?: ChartDimensions) {
+  const capabilities = getChartElementCapabilities(chart.type);
+  const elements = chart.elements;
+  // An old chart, or a label-only edit, keeps the original renderer's geometry.
+  if (
+    !elements ||
+    (elements.titlePosition === undefined &&
+      (!capabilities.legend ||
+        (elements.legendPosition === undefined && elements.legendOverlay === undefined)))
+  )
+    return undefined;
+  const settings = getChartElementSettings(chart);
+  const width = Math.max(1, dimensions?.width ?? 480);
+  const height = Math.max(1, dimensions?.height ?? 300);
+  const margin = Math.min(8, width / 10, height / 10);
+  const titleHeight =
+    chart.title && settings.titlePosition === "above" ? Math.min(30, height * 0.24) : 0;
+  const plot = {
+    left: margin,
+    top: margin + titleHeight,
+    right: margin,
+    bottom: margin,
+    width: width - margin * 2,
+    height: height - margin * 2 - titleHeight,
+  };
+  const title: EChartsOption["title"] = {
+    text: chart.title,
+    show: settings.titlePosition !== "none",
+    top: margin,
+    left: "center",
+    textStyle: {
+      fontSize: 15,
+      fontWeight: "normal",
+      width: plot.width,
+      height: Math.max(1, Math.min(20, height * 0.2)),
+      overflow: "truncate",
+      lineOverflow: "truncate",
+    },
+  };
+  const legend: EChartsOption["legend"] = {
+    show: chart.legend && capabilities.legend,
+    type: "scroll",
+  };
+  if (chart.legend && capabilities.legend) {
+    const names =
+      chart.type === "pie" || chart.type === "doughnut"
+        ? data.categories
+        : data.series.slice(chart.type === "scatter" ? 1 : 0).map((entry) => entry.name);
+    const vertical = ["left", "right", "topRight"].includes(settings.legendPosition);
+    const gap = Math.min(8, plot.width * 0.04, plot.height * 0.04);
+    // A bounded scroll viewport and truncated one-line names keep even very long
+    // legends in their reserved strip. Moving legend coordinates alone cannot do this.
+    const legendWidth = vertical
+      ? Math.min(144, Math.max(64, ...names.map((name) => name.length * 7 + 22)), plot.width * 0.3)
+      : plot.width;
+    const legendHeight = vertical
+      ? Math.min(plot.height, Math.max(16, names.length * 20))
+      : Math.min(28, plot.height * 0.22);
+    const left = settings.legendPosition === "left" ? plot.left : width - plot.right - legendWidth;
+    const top =
+      settings.legendPosition === "bottom"
+        ? height - plot.bottom - legendHeight
+        : settings.legendPosition === "left" || settings.legendPosition === "right"
+          ? plot.top + (plot.height - legendHeight) / 2
+          : plot.top;
+    const itemWidth = Math.min(12, legendWidth * 0.2);
+    Object.assign(legend, {
+      orient: vertical ? "vertical" : "horizontal",
+      left: vertical ? left : "center",
+      top,
+      width: legendWidth,
+      height: legendHeight,
+      padding: 0,
+      itemWidth,
+      itemHeight: Math.min(10, legendHeight * 0.5),
+      itemGap: 8,
+      formatter: (name: string) => name.replace(/[\r\n]+/g, " "),
+      textStyle: {
+        fontSize: Math.max(1, Math.min(12, legendHeight - 4)),
+        width: Math.max(1, Math.min(140, legendWidth - itemWidth - 7)),
+        overflow: "truncate",
+      },
+      pageIconSize: Math.min(8, legendWidth / 8),
+      pageButtonItemGap: 2,
+      pageButtonGap: 4,
+      pageFormatter: "{current}",
+      pageTextStyle: { fontSize: Math.min(10, legendWidth / 7) },
+    });
+    if (!settings.legendOverlay) {
+      if (vertical) {
+        if (settings.legendPosition === "left") plot.left += legendWidth + gap;
+        else plot.right += legendWidth + gap;
+        plot.width -= legendWidth + gap;
+      } else {
+        if (settings.legendPosition === "top") plot.top += legendHeight + gap;
+        else plot.bottom += legendHeight + gap;
+        plot.height -= legendHeight + gap;
+      }
+    }
+  }
+  return { title, legend, plot };
+}
+
+function getBarLabelPosition(
+  type: "column" | "bar",
+  position: ReturnType<typeof getChartElementSettings>["labelPosition"],
+  value: number,
+) {
+  if (position === "center") return "inside";
+  const positive = value >= 0;
+  if (position === "outsideEnd")
+    return type === "bar" ? (positive ? "right" : "left") : positive ? "top" : "bottom";
+  const end = position === "insideEnd";
+  // Positions are relative to each rendered segment, including signed stacks.
+  return type === "bar"
+    ? positive === end
+      ? "insideRight"
+      : "insideLeft"
+    : positive === end
+      ? "insideTop"
+      : "insideBottom";
+}
+
+function buildChartOption(
+  chart: SheetChart,
+  data: ChartData,
+  dimensions?: ChartDimensions,
+): EChartsOption {
+  const layout = createElementLayout(chart, data, dimensions);
+  const plotBounds = layout
+    ? {
+        left: layout.plot.left,
+        right: layout.plot.right,
+        top: layout.plot.top,
+        bottom: layout.plot.bottom,
+      }
+    : undefined;
   const common: EChartsOption = {
     animation: false,
     color: colors,
@@ -12,6 +151,7 @@ function buildChartOption(chart: SheetChart, data: ChartData): EChartsOption {
     tooltip: { trigger: "item", renderMode: "richText", confine: true },
     legend: { show: chart.legend, bottom: 0, type: "scroll" },
     textStyle: { fontFamily: "Arial, sans-serif" },
+    ...(layout ? { title: layout.title, legend: layout.legend } : {}),
   };
   if (chart.type === "pie" || chart.type === "doughnut")
     return {
@@ -19,6 +159,7 @@ function buildChartOption(chart: SheetChart, data: ChartData): EChartsOption {
       series: [
         {
           type: "pie",
+          ...plotBounds,
           radius: chart.type === "doughnut" ? ["35%", "65%"] : "65%",
           center: ["50%", "50%"],
           label: { show: chart.labels },
@@ -40,7 +181,8 @@ function buildChartOption(chart: SheetChart, data: ChartData): EChartsOption {
           roam: false,
           nodeClick: false,
           breadcrumb: { show: false },
-          label: { show: true },
+          ...plotBounds,
+          label: { show: chart.labels },
           data: data.categories.flatMap((name, index) => {
             const value = data.series[0]?.values[index];
             return value !== null && value !== undefined && value > 0 ? [{ name, value }] : [];
@@ -84,7 +226,8 @@ function buildChartOption(chart: SheetChart, data: ChartData): EChartsOption {
           type: "sankey",
           top: chart.title ? 40 : 12,
           bottom: 18,
-          label: { show: true },
+          ...plotBounds,
+          label: { show: chart.labels },
           data: visited === nodes.length ? nodes.map((name) => ({ name })) : [],
           links: visited === nodes.length ? links : [],
           lineStyle: { color: "source", curveness: 0.5 },
@@ -101,7 +244,24 @@ function buildChartOption(chart: SheetChart, data: ChartData): EChartsOption {
     );
     return {
       ...common,
-      radar: { radius: "60%", indicator: data.categories.map((name) => ({ name, max: maximum })) },
+      radar: {
+        radius: "60%",
+        ...(layout
+          ? {
+              center: [
+                layout.plot.left + layout.plot.width / 2,
+                layout.plot.top + layout.plot.height / 2,
+              ],
+              radius: Math.min(layout.plot.width, layout.plot.height) * 0.3,
+              axisNameGap: 5,
+              axisName: {
+                width: Math.max(1, Math.min(layout.plot.width, layout.plot.height) * 0.2 - 5),
+                overflow: "truncate" as const,
+              },
+            }
+          : {}),
+        indicator: data.categories.map((name) => ({ name, max: maximum })),
+      },
       series: [
         {
           type: "radar",
@@ -117,7 +277,7 @@ function buildChartOption(chart: SheetChart, data: ChartData): EChartsOption {
   if (chart.type === "river")
     return {
       ...common,
-      singleAxis: { type: "category", data: data.categories, top: 40, bottom: 45 },
+      singleAxis: { type: "category", data: data.categories, top: 40, bottom: 45, ...plotBounds },
       series: [
         {
           type: "themeRiver",
@@ -132,6 +292,19 @@ function buildChartOption(chart: SheetChart, data: ChartData): EChartsOption {
     };
   const horizontal = chart.type === "bar";
   const scatter = chart.type === "scatter";
+  const labelPosition = chart.elements?.labelPosition;
+  const outsideLabels =
+    chart.labels &&
+    (chart.type === "bar" || chart.type === "column") &&
+    labelPosition === "outsideEnd";
+  const labelClearance = outsideLabels
+    ? Math.min(
+        36,
+        (horizontal
+          ? (layout?.plot.width ?? dimensions?.width ?? 480)
+          : (layout?.plot.height ?? dimensions?.height ?? 300)) * 0.2,
+      )
+    : 0;
   const series: SeriesOption[] = scatter
     ? data.series.slice(1).map((series) => ({
         type: "scatter",
@@ -157,14 +330,53 @@ function buildChartOption(chart: SheetChart, data: ChartData): EChartsOption {
           : {
               type: "bar",
               name: series.name,
-              data: series.values,
+              data:
+                labelPosition !== undefined
+                  ? series.values.map((value) =>
+                      value === null
+                        ? null
+                        : {
+                            value,
+                            label: {
+                              position: getBarLabelPosition(
+                                horizontal ? "bar" : "column",
+                                labelPosition,
+                                value,
+                              ),
+                            },
+                          },
+                    )
+                  : series.values,
               ...(chart.stacked ? { stack: "total" } : {}),
-              label: { show: chart.labels },
+              label: {
+                show: chart.labels,
+                ...(outsideLabels && horizontal
+                  ? { width: Math.max(1, labelClearance - 5), overflow: "truncate" as const }
+                  : {}),
+              },
             },
       );
   return {
     ...common,
-    grid: { top: chart.title ? 45 : 15, left: 48, right: 22, bottom: chart.legend ? 58 : 35 },
+    grid: plotBounds
+      ? {
+          ...plotBounds,
+          ...(outsideLabels
+            ? horizontal
+              ? { left: plotBounds.left + labelClearance, right: plotBounds.right + labelClearance }
+              : { top: plotBounds.top + labelClearance, bottom: plotBounds.bottom + labelClearance }
+            : {}),
+          containLabel: true,
+        }
+      : {
+          top: Math.max(chart.title ? 45 : 15, outsideLabels && !horizontal ? labelClearance : 0),
+          left: 48,
+          right: Math.max(22, outsideLabels && horizontal ? labelClearance : 0),
+          bottom: Math.max(
+            chart.legend ? 58 : 35,
+            outsideLabels && !horizontal ? labelClearance : 0,
+          ),
+        },
     xAxis: horizontal || scatter ? { type: "value" } : { type: "category", data: data.categories },
     yAxis: horizontal ? { type: "category", data: data.categories } : { type: "value" },
     series,
@@ -172,8 +384,12 @@ function buildChartOption(chart: SheetChart, data: ChartData): EChartsOption {
 }
 
 /** Keep chart calculations numeric; format only their presentation. */
-export function createChartOption(chart: SheetChart, data: ChartData): EChartsOption {
-  const option = buildChartOption(chart, data);
+export function createChartOption(
+  chart: SheetChart,
+  data: ChartData,
+  dimensions?: ChartDimensions,
+): EChartsOption {
+  const option = buildChartOption(chart, data, dimensions);
   const formatValue = (value: unknown, format?: CellNumberFormat): string => {
     if (Array.isArray(value)) return value.map((entry) => formatValue(entry, format)).join(" / ");
     return typeof value === "number"

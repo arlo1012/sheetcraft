@@ -5,6 +5,7 @@ import { getSheetChartData } from "@sheetcraft/core/sheet-charts";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import { init, type EChartsType } from "../chart-runtime";
 import { createChartOption } from "../chart-option";
+import { getChartElementSettings } from "../chart-elements";
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{
   drawing: SheetChartDrawing;
@@ -42,12 +43,31 @@ function render() {
       height: props.drawing.height,
     });
     chart.resize({ width: props.drawing.width, height: props.drawing.height });
-    chart.setOption(createChartOption(props.drawing.chart, data.value), { notMerge: true });
+    chart.setOption(
+      createChartOption(props.drawing.chart, data.value, {
+        width: props.drawing.width,
+        height: props.drawing.height,
+      }),
+      { notMerge: true },
+    );
     error.value = false;
   } catch {
     error.value = true;
   }
 }
+const wordTitle = computed(() => {
+  const position = getChartElementSettings(props.drawing.chart).titlePosition;
+  return {
+    show: position !== "none",
+    // Preserve the original word layout until a title placement is explicitly chosen.
+    offset:
+      props.drawing.chart.elements?.titlePosition === undefined
+        ? 30
+        : position === "above" && props.drawing.chart.title
+          ? Math.min(30, props.drawing.height * 0.24)
+          : 0,
+  };
+});
 const words = computed(() => {
   const source = data.value.categories
     .map((text, index) => ({ text, value: data.value.series[0]?.values[index] ?? 0 }))
@@ -60,12 +80,15 @@ const words = computed(() => {
   );
   const rows = Math.ceil(source.length / columns);
   const width = props.drawing.width / columns;
-  const height = Math.max(1, (props.drawing.height - 35) / Math.max(1, rows));
+  const height = Math.max(
+    1,
+    (props.drawing.height - wordTitle.value.offset - 5) / Math.max(1, rows),
+  );
   const max = source[0]?.value ?? 1;
   return source.map((word, index) => ({
     ...word,
     x: ((index % columns) + 0.5) * width,
-    y: (Math.floor(index / columns) + 0.5) * height + 30,
+    y: (Math.floor(index / columns) + 0.5) * height + wordTitle.value.offset,
     size: Math.max(
       6,
       Math.min(
@@ -99,7 +122,7 @@ onBeforeUnmount(() => {
       :aria-label="drawing.chart.title"
     >
       <rect width="100%" height="100%" fill="white" />
-      <text :x="drawing.width / 2" y="22" text-anchor="middle" font-size="15">
+      <text v-if="wordTitle.show" :x="drawing.width / 2" y="22" text-anchor="middle" font-size="15">
         {{ drawing.chart.title }}
       </text>
       <text

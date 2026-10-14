@@ -1129,6 +1129,23 @@ export async function encodeWithNativeXlsx(
       );
     }
   }
+  // Element placement is internal document data until the native chart writer can
+  // encode it. Block before resource reads instead of exporting a different chart.
+  for (const sheet of sheets) {
+    for (const drawing of sheet.drawings ?? []) {
+      if (drawing.kind !== "chart" || !("elements" in drawing.chart)) continue;
+      report.add(
+        "feature-omitted",
+        "block",
+        `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.elements`,
+      );
+    }
+  }
+  if (report.hasBlocks())
+    throw new XlsxCompatibilityError(
+      "Chart element settings are not yet supported by XLSX export.",
+      report.build(),
+    );
   assertSupportedXlsxTableTotals(sheets, report);
   for (const sheet of sheets) {
     if (typeof sheet.properties.hidden !== "boolean")

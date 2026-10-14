@@ -314,6 +314,8 @@ export type WorkbookSnapshotV75 = Omit<WorkbookSnapshotV74, "version"> & { versi
 export type WorkbookSnapshotV76 = Omit<WorkbookSnapshotV75, "version"> & { version: 76 };
 /** Conditional envelope for Equation-owned group children and dedicated math flip state. */
 export type WorkbookSnapshotV77 = Omit<WorkbookSnapshotV76, "version"> & { version: 77 };
+/** Conditional envelope for sparse chart title, legend and data-label layout choices. */
+export type WorkbookSnapshotV78 = Omit<WorkbookSnapshotV77, "version"> & { version: 78 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -349,8 +351,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV74
   | WorkbookSnapshotV75
   | WorkbookSnapshotV76
-  | WorkbookSnapshotV77;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV77, "version"> & {
+  | WorkbookSnapshotV77
+  | WorkbookSnapshotV78;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV78, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -446,7 +449,8 @@ type SnapshotVersion =
   | 74
   | 75
   | 76
-  | 77;
+  | 77
+  | 78;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -485,6 +489,7 @@ function inspectShapeSnapshotFeatures(
   hasEquationDocument: boolean;
   hasEquationFrame: boolean;
   hasEquationGroupFlip: boolean;
+  hasChartElements: boolean;
   hasOpenArea: boolean;
   hasModernWordArt: boolean;
   hasTextWarp: boolean;
@@ -497,6 +502,7 @@ function inspectShapeSnapshotFeatures(
     hasEquationDocument = false,
     hasEquationFrame = false,
     hasEquationGroupFlip = false,
+    hasChartElements = false,
     hasOpenArea = false,
     hasModernWordArt = false,
     hasTextWarp = false,
@@ -513,6 +519,26 @@ function inspectShapeSnapshotFeatures(
       if (seen.has(node)) throw new TypeError("Cyclic or shared shape group ownership.");
       seen.add(node);
       const drawingKind = Object.getOwnPropertyDescriptor(node, "kind")?.value;
+      const chartField = Object.getOwnPropertyDescriptor(node, "chart");
+      if (chartField || "chart" in node) {
+        if (!chartField || !("value" in chartField))
+          return fail(`${path}.chart`, "Chart payloads must be own data fields, not accessors.");
+        const chart = asRecord(chartField.value, `${path}.chart`);
+        if ("elements" in chart) {
+          // Presence gates old envelopes before malformed, inherited or accessor choices.
+          if (version !== undefined && version < 78)
+            return fail(`${path}.chart.elements`, "Chart elements require snapshot version 78.");
+          if (drawingKind !== "chart")
+            return fail(
+              `${path}.chart.elements`,
+              "Chart elements require an own chart drawing kind.",
+            );
+          const elementsField = Object.getOwnPropertyDescriptor(chart, "elements");
+          if (!elementsField || !("value" in elementsField))
+            return fail(`${path}.chart.elements`, "Chart elements must be own data fields.");
+          hasChartElements = true;
+        }
+      }
       const hasMathFlipField = "equationFlipX" in node || "equationFlipY" in node;
       const hasOwnedEquation =
         drawingKind === "equation" && (entry.depth > 0 || "groupFrame" in node);
@@ -683,6 +709,7 @@ function inspectShapeSnapshotFeatures(
     hasEquationDocument,
     hasEquationFrame,
     hasEquationGroupFlip,
+    hasChartElements,
     hasOpenArea,
     hasModernWordArt,
     hasTextWarp,
@@ -1785,6 +1812,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   let hasEquationDocument = false;
   let hasEquationFrame = false;
   let hasEquationGroupFlip = false;
+  let hasChartElements = false;
   let hasOpenShapeArea = false;
   let hasModernWordArt = false;
   let hasTextWarp = false;
@@ -1805,6 +1833,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       hasEquationDocument ||= scene.hasEquationDocument;
       hasEquationFrame ||= scene.hasEquationFrame;
       hasEquationGroupFlip ||= scene.hasEquationGroupFlip;
+      hasChartElements ||= scene.hasChartElements;
       hasOpenShapeArea ||= scene.hasOpenArea;
       hasModernWordArt ||= scene.hasModernWordArt;
       hasTextWarp ||= scene.hasTextWarp;
@@ -2206,6 +2235,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasEquationDocument) version = 75;
     if (hasEquationFrame) version = 76;
     if (hasEquationGroupFlip) version = 77;
+    if (hasChartElements) version = 78;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -2550,6 +2580,15 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 77;
+  // Infer last so mixed equation and shape features cannot lower chart-element admission.
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasChartElements,
+      ),
+    )
+  )
+    snapshot.version = 78;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -2634,7 +2673,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 74 &&
     record.version !== 75 &&
     record.version !== 76 &&
-    record.version !== 77
+    record.version !== 77 &&
+    record.version !== 78
   ) {
     throw new WorkbookDomainError(
       {
