@@ -8,6 +8,7 @@ import {
 } from "@sheetcraft/core/history";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { createSheet, getActiveSheet, type Workbook } from "@sheetcraft/core/workbook";
+import type { ChartData } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useChartObjectControls } from "../../../modules/charts/useChartObjectControls";
 
@@ -45,7 +46,7 @@ function drawing(id = "chart-one"): SheetChartDrawing {
     },
   };
 }
-function fixture() {
+function fixture(tableData?: ChartData) {
   const session = createWorkbookSession({ idFactory: createSequentialIdFactory() });
   const workbook = shallowRef<Workbook>(session.workbook);
   const sheet = shallowRef(getActiveSheet(workbook.value));
@@ -75,6 +76,12 @@ function fixture() {
       flush,
       execute,
       edit,
+      getData: () =>
+        tableData ?? {
+          categories: Array.from({ length: 33 }, (_, i) => `c${i}`),
+          series: [{ name: "data", values: Array.from({ length: 33 }, () => 1) }],
+          records: [],
+        },
     }),
   )!;
   const current = () => {
@@ -376,4 +383,52 @@ describe("chart owner presentation actions", () => {
     expect(f.session.history.undoStack).toHaveLength(1);
     f.scope.stop();
   });
+});
+
+describe("chart data table atomic preflight", () => {
+  test("table budget refusal preserves owner, source and history; preview never becomes stored data", () => {
+    const f = fixture(),
+      owner = f.first,
+      context = f.controls.snapshot.value!;
+    expect(context.applyLayout(5)).toBe(false);
+    expect(context.apply({ elements: { dataTable: "withLegendKeys" } })).toBe(false);
+    expect(context.previewLayout(5)).toBe(false);
+    expect(f.controls.paintPreview.value).toBeUndefined();
+    expect(f.current()).toBe(owner);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.session.history.undoStack).toHaveLength(0);
+    expect(context.previewLayout(1)).toBe(true);
+    expect(f.controls.paintPreview.value?.owner).toBe(owner);
+    f.busy.value = true;
+    expect(f.controls.paintPreview.value).toBeUndefined();
+    expect(context.applyLayout(1)).toBe(false);
+    f.scope.stop();
+  });
+});
+
+test("a native second-pass fit failure refuses apply and preview before any owner/history write", () => {
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((kind: string) =>
+    kind === "2d"
+      ? ({
+          font: "12px Arial",
+          measureText: (value: string) => ({ width: value.length * 7.2 }),
+        } as CanvasRenderingContext2D)
+      : null,
+  );
+  const f = fixture({
+    categories: ["a", "b", "c"],
+    series: [
+      { name: "wide", values: [1, 2, 3], numberFormat: { kind: "custom", code: "0".repeat(40) } },
+    ],
+    records: [],
+  });
+  const original = structuredClone(f.current());
+  expect(f.controls.snapshot.value!.applyLayout(5)).toBe(false);
+  expect(f.controls.snapshot.value!.previewLayout(5)).toBe(false);
+  expect(f.current()).toEqual(original);
+  expect(f.execute).not.toHaveBeenCalled();
+  expect(f.session.history.undoStack).toHaveLength(0);
+  expect(f.session.history.redoStack).toHaveLength(0);
+  f.scope.stop();
+  vi.restoreAllMocks();
 });

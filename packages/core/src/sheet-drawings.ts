@@ -275,7 +275,19 @@ export function normalizeSheetShapeGeometry(
   return normalizeShapePresetParameters(value) ?? { preset: "rect" };
 }
 
+/** Reject chart payloads before any drawing discriminator or payload accessor is consumed. */
+function assertChartPayloadOwnership(value: object): void {
+  const kind = Object.getOwnPropertyDescriptor(value, "kind");
+  if (!("chart" in value) && kind?.value !== "chart") return;
+  if (!kind || !("value" in kind) || kind.value !== "chart")
+    throw new TypeError("Chart payloads require an own chart drawing kind.");
+  const chart = Object.getOwnPropertyDescriptor(value, "chart");
+  if (!chart || !("value" in chart))
+    throw new TypeError("Chart payloads must be own data fields, not accessors.");
+}
+
 function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance {
+  if (value && typeof value === "object") assertChartPayloadOwnership(value);
   if (value && typeof value === "object" && "shapeStyle" in value) {
     const discriminator = Object.getOwnPropertyDescriptor(value, "kind");
     if (!discriminator || !("value" in discriminator))
@@ -630,6 +642,7 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing;
 export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new RangeError("Invalid sheet drawing.");
+  assertChartPayloadOwnership(value);
   if (isFramedEquationDrawing(value)) return normalizeFramedEquationDrawing(value);
   // Attributed or warped legacy drawings need the canonical descriptor-safe source fields.
   const textModelField = Object.getOwnPropertyDescriptor(value, "shapeText");

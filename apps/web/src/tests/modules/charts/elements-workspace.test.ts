@@ -26,6 +26,7 @@ import ChartElementsControls from "../../../modules/charts/components/ChartEleme
 import ChartElementsToolbar from "../../../modules/charts/components/ChartElementsToolbar.vue";
 import ChartSubtypeControls from "../../../modules/charts/components/ChartSubtypeControls.vue";
 import ChartStyleGallery from "../../../modules/charts/components/ChartStyleGallery.vue";
+import ChartQuickLayoutGallery from "../../../modules/charts/components/ChartQuickLayoutGallery.vue";
 import type { ChartElementPatch } from "../../../modules/charts/chart-element-controls";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { createAppI18n } from "../../../shared/i18n";
@@ -226,7 +227,7 @@ describe("chart design real Workspace context", () => {
 // observes the exact live sheet, evaluator, drawing and revision reaching it.
 const ChartContentProbe = defineComponent({
   name: "ChartContent",
-  props: ["drawing", "sheet", "evaluator", "revision"],
+  props: ["drawing", "paintChart", "sheet", "evaluator", "revision"],
   setup: () => () => h("div", { "data-chart-content-probe": "" }),
 });
 const mounted: VueWrapper[] = [];
@@ -915,4 +916,135 @@ describe("chart elements real Workspace context", () => {
       expect(f.controller.session.history.redoStack).toHaveLength(redoCount);
     },
   );
+});
+
+// Same production Workspace, menus and controller as the other entry tests.
+describe("quick layouts real Workspace context", () => {
+  async function openLayouts(wrapper: VueWrapper) {
+    const trigger = wrapper.getComponent(ChartElementsToolbar).get('[aria-label="Quick Layout"]');
+    await trigger.trigger("pointerdown");
+    await trigger.trigger("click");
+    await flushPromises();
+    return new DOMWrapper(document.body).get('[role="menu"][aria-label="Quick Layout"]');
+  }
+  test("hover paints only the captured original owner; Escape restores without history", async () => {
+    const f = await fixture();
+    await selectChart(f.wrapper);
+    const before = serializeWorkbook(f.workbook),
+      owner = chart(f.sheet);
+    const menu = await openLayouts(f.wrapper);
+    expect(menu.findAll("[data-chart-quick-layout]")).toHaveLength(11);
+    await menu.get('[data-chart-quick-layout="1"]').trigger("pointerenter");
+    await nextTick();
+    expect(chart(f.sheet)).toBe(owner);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+    const paint = renderProbe(f.wrapper).props("paintChart");
+    expect(paint?.elements).toMatchObject({ legendPosition: "right" });
+    expect(renderProbe(f.wrapper).props("drawing")).toEqual(owner);
+    await menu.trigger("keydown", { key: "Escape" });
+    await flushPromises();
+    expect(renderProbe(f.wrapper).props("paintChart")).toBeUndefined();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
+  test("actual layout click applies one reversible patch and retains frame/raw sources", async () => {
+    const f = await fixture();
+    await selectChart(f.wrapper);
+    const before = serializeWorkbook(f.workbook),
+      owner = chart(f.sheet);
+    const raw = renderData(renderProbe(f.wrapper));
+    const menu = await openLayouts(f.wrapper);
+    await menu.get('[data-chart-quick-layout="8"]').trigger("pointerdown");
+    await menu.get('[data-chart-quick-layout="8"]').trigger("click");
+    await flushPromises();
+    expect(chart(f.sheet).chart.format?.bar).toEqual({ gapWidth: 0, overlap: 0 });
+    expect({ ...chart(f.sheet), chart: owner.chart }).toEqual(owner);
+    expect(renderData(renderProbe(f.wrapper))).toEqual(raw);
+    expect(f.controller.session.history.undoStack).toHaveLength(1);
+    expect(renderProbe(f.wrapper).props("paintChart")).toBeUndefined();
+    expect(f.controller.undo()).toBe(true);
+    await nextTick();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.redo()).toBe(true);
+    expect(chart(f.sheet).chart.format?.bar?.gapWidth).toBe(0);
+  });
+  test("pending title and layout share one command; unfinished composition cannot commit", async () => {
+    const f = await fixture();
+    await selectChart(f.wrapper);
+    const before = serializeWorkbook(f.workbook);
+    const controls = await openElements(f.wrapper);
+    const title = controls.get<HTMLInputElement>('[aria-label="Title text"] input');
+    await title.trigger("compositionstart");
+    await title.setValue("季度标题");
+    const menu = await openLayouts(f.wrapper);
+    await menu.get('[data-chart-quick-layout="9"]').trigger("click");
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+    await title.trigger("compositionend");
+    await menu.get('[data-chart-quick-layout="9"]').trigger("pointerdown");
+    await menu.get('[data-chart-quick-layout="9"]').trigger("click");
+    await flushPromises();
+    expect(chart(f.sheet).chart.title).toBe("季度标题");
+    expect(chart(f.sheet).chart.format?.valueAxis?.title).toBe("Axis Title");
+    expect(f.controller.session.history.undoStack).toHaveLength(1);
+    expect(f.controller.undo()).toBe(true);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
+  test("old gallery callbacks cannot target a newly selected chart or revive its preview", async () => {
+    const f = await fixture();
+    await selectChart(f.wrapper);
+    await openLayouts(f.wrapper);
+    const gallery = f.wrapper.getComponent(ChartQuickLayoutGallery);
+    const apply = gallery.props("apply"),
+      preview = gallery.props("preview");
+    expect(preview(1)).toBe(true);
+    await selectChart(f.wrapper, "chart-two");
+    await flushPromises();
+    const before = serializeWorkbook(f.workbook);
+    expect(apply(8)).toBe(false);
+    expect(preview(9)).toBe(false);
+    expect(renderProbe(f.wrapper).props("paintChart")).toBeUndefined();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
+});
+
+test("real table field and layout5 use the same complete native preflight and one reversible owner command", async () => {
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function (
+    this: HTMLCanvasElement,
+    kind: string,
+  ) {
+    if (kind !== "2d" || this.width !== 1 || this.height !== 1) return null;
+    return {
+      font: "12px Arial",
+      measureText: (value: string) => ({ width: value.length * 7.2 }),
+    } as CanvasRenderingContext2D;
+  });
+  const f = await fixture();
+  await selectChart(f.wrapper);
+  const before = serializeWorkbook(f.workbook);
+  const controls = await openElements(f.wrapper);
+  const table = controls.element.closest('[role="menu"]') ?? controls.element.parentElement!;
+  const choice = new DOMWrapper(table).get('[data-chart-data-table="withLegendKeys"]');
+  await choice.trigger("pointerdown");
+  await choice.trigger("click");
+  await flushPromises();
+  expect(chart(f.sheet).chart.elements?.dataTable).toBe("withLegendKeys");
+  expect(f.controller.session.history.undoStack).toHaveLength(1);
+  expect(f.controller.undo()).toBe(true);
+  await nextTick();
+  expect(serializeWorkbook(f.workbook)).toEqual(before);
+  await selectChart(f.wrapper);
+  const trigger = f.wrapper.getComponent(ChartElementsToolbar).get('[aria-label="Quick Layout"]');
+  await trigger.trigger("pointerdown");
+  await trigger.trigger("click");
+  await flushPromises();
+  const layout = new DOMWrapper(document.body).get('[data-chart-quick-layout="5"]');
+  await layout.trigger("pointerdown");
+  await layout.trigger("click");
+  await flushPromises();
+  expect(chart(f.sheet).chart.elements?.dataTable).toBe("withLegendKeys");
+  expect(chart(f.sheet).chart.format?.valueAxis?.titleVisible).toBe(true);
+  expect(f.controller.session.history.undoStack).toHaveLength(1);
+  expect(f.controller.undo()).toBe(true);
+  expect(serializeWorkbook(f.workbook)).toEqual(before);
 });

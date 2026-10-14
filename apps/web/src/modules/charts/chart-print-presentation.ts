@@ -6,6 +6,11 @@ import { normalizeChartDataCache, type ChartData } from "@sheetcraft/core/sheet-
 import { normalizeChartFormat } from "@sheetcraft/core/chart-format";
 import { init, type EChartsType } from "./chart-runtime";
 import { createChartOption } from "./chart-option";
+import {
+  createChartDataTablePlan,
+  prepareChartDataTableOption,
+  applyChartDataTableGraphics,
+} from "./chart-data-table";
 import { createWordCloudLayout } from "./chart-wordcloud-layout";
 import {
   getChartPresentationBackground,
@@ -274,6 +279,7 @@ export function renderChartPrintPresentation(
     drawing.chart.type === "wordCloud"
       ? undefined
       : printOption(createChartOption(drawing.chart, data, options), options.resolveFontFamily);
+  const table = createChartDataTablePlan(drawing.chart, data, options);
   const output = canvas2D(options.document, size.width, size.height);
   let engineCanvas: HTMLCanvasElement | undefined;
   let instance: EChartsType | undefined;
@@ -293,7 +299,11 @@ export function renderChartPrintPresentation(
       });
       if (instance.getZr().painter.getType() !== "canvas")
         throw new Error("Native chart print canvas renderer is unavailable.");
-      instance.setOption(option!, { notMerge: true, lazyUpdate: false });
+      instance.setOption(prepareChartDataTableOption(option!, table), {
+        notMerge: true,
+        lazyUpdate: false,
+      });
+      if (table) applyChartDataTableGraphics(instance, table);
       instance.getZr().flush();
       // The native single-canvas root is the completed flush target. In ZRender
       // 6.1 renderToCanvas creates a redundant full-size surface even for this

@@ -2,6 +2,7 @@ import { DOMWrapper, flushPromises, mount, type VueWrapper } from "@vue/test-uti
 import { defineComponent, h, nextTick } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { Select } from "tdesign-vue-next/es/select";
+import { createSetSheetDrawingsCommand } from "@sheetcraft/core/commands";
 import { normalizeSheetChart } from "@sheetcraft/core/sheet-charts";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
@@ -326,4 +327,122 @@ describe("chart formatting real Workspace", () => {
     expect(f.wrapper.findComponent(ChartFormatPane).exists()).toBe(false);
     expect(serializeWorkbook(f.controller.session.workbook)).toEqual(before);
   });
+});
+
+test("real format-pane edit cannot commit before table native numeric-fit validation", async () => {
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function (
+    this: HTMLCanvasElement,
+    kind: string,
+  ) {
+    return kind === "2d" && this.width === 1 && this.height === 1
+      ? ({
+          font: "12px Arial",
+          measureText: (value: string) => ({ width: value.length * 7.2 }),
+        } as CanvasRenderingContext2D)
+      : null;
+  });
+  const f = await fixture(),
+    original = chart(f.sheet);
+  const { source: _source, ...unlinked } = original.chart;
+  const updated: SheetChartDrawing = {
+    ...original,
+    chart: {
+      ...unlinked,
+      elements: { dataTable: "withLegendKeys" },
+      dataCache: {
+        categories: ["a", "b", "c"],
+        series: [
+          {
+            name: "wide",
+            values: [1, 2, 3],
+            numberFormat: { kind: "custom", code: "0".repeat(40) },
+          },
+        ],
+        records: [],
+      },
+    },
+  };
+  expect(
+    f.controller.executeCommand(
+      createSetSheetDrawingsCommand(
+        f.sheet.id,
+        f.sheet.drawings!.map((node) => (node === original ? updated : node)),
+      ),
+    ),
+  ).toBe(true);
+  await nextTick();
+  await select(f.wrapper);
+  const before = serializeWorkbook(f.controller.session.workbook),
+    count = f.controller.session.history.undoStack.length;
+  const pane = await chooseElement(f.wrapper, "categoryAxis");
+  await number(pane, "fontSize", "14");
+  expect(serializeWorkbook(f.controller.session.workbook)).toEqual(before);
+  expect(f.controller.session.history.undoStack).toHaveLength(count);
+  expect(pane.get('[data-chart-format-field="fontSize"] input').element).toHaveProperty(
+    "value",
+    "14",
+  );
+});
+
+test("real hidden axis-title and grid controls remain discoverable after a layout and are reversible", async () => {
+  const f = await fixture(),
+    original = chart(f.sheet);
+  expect(
+    f.controller.executeCommand(
+      createSetSheetDrawingsCommand(
+        f.sheet.id,
+        f.sheet.drawings!.map((node) =>
+          node === original
+            ? {
+                ...original,
+                chart: {
+                  ...original.chart,
+                  format: {
+                    valueAxis: {
+                      title: "Saved axis title",
+                      titleVisible: false,
+                      majorGridlines: true,
+                      minorGridlines: false,
+                    },
+                  },
+                },
+              }
+            : node,
+        ),
+      ),
+    ),
+  ).toBe(true);
+  await nextTick();
+  await select(f.wrapper);
+  const pane = await chooseElement(f.wrapper, "valueAxis");
+  const before = serializeWorkbook(f.controller.session.workbook);
+  await pane.get('[data-chart-format-field="titleVisible"] input').setValue(true);
+  expect(chart(f.sheet).chart.format?.valueAxis?.titleVisible).toBe(true);
+  expect(chart(f.sheet).chart.format?.valueAxis?.title).toBe("Saved axis title");
+  expect(f.controller.undo()).toBe(true);
+  await nextTick();
+  expect(serializeWorkbook(f.controller.session.workbook)).toEqual(before);
+  await chooseElement(f.wrapper, "valueAxis");
+  const title = f.wrapper
+    .getComponent(ChartFormatPane)
+    .get('[data-chart-format-field="axisTitle"] input');
+  await title.setValue("Visible edited title");
+  await title.trigger("keydown", { key: "Enter", code: "Enter" });
+  await flushPromises();
+  expect(chart(f.sheet).chart.format?.valueAxis).toMatchObject({
+    title: "Visible edited title",
+    titleVisible: true,
+  });
+  expect(f.controller.undo()).toBe(true);
+  await nextTick();
+  expect(serializeWorkbook(f.controller.session.workbook)).toEqual(before);
+  await chooseElement(f.wrapper, "valueAxis");
+  const grid = f.wrapper
+    .getComponent(ChartFormatPane)
+    .get('[data-chart-format-field="minorGridlines"] input');
+  await grid.setValue(true);
+  await flushPromises();
+  expect(chart(f.sheet).chart.format?.valueAxis?.minorGridlines).toBe(true);
+  expect(f.controller.undo()).toBe(true);
+  expect(serializeWorkbook(f.controller.session.workbook)).toEqual(before);
 });

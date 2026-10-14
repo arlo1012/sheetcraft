@@ -16,6 +16,7 @@ import {
   GridComponent,
   RadarComponent,
   SingleAxisComponent,
+  GraphicComponent,
 } from "echarts/components";
 import { SVGRenderer } from "echarts/renderers";
 use([
@@ -33,6 +34,7 @@ use([
   GridComponent,
   RadarComponent,
   SingleAxisComponent,
+  GraphicComponent,
   SVGRenderer,
 ]);
 export { init, type EChartsType };

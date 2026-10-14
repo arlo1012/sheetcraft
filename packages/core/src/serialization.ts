@@ -322,6 +322,8 @@ export type WorkbookSnapshotV79 = Omit<WorkbookSnapshotV78, "version"> & { versi
 export type WorkbookSnapshotV80 = Omit<WorkbookSnapshotV79, "version"> & { version: 80 };
 /** Conditional envelope for sparse chart-wide presentation choices. */
 export type WorkbookSnapshotV81 = Omit<WorkbookSnapshotV80, "version"> & { version: 81 };
+/** Conditional envelope for sparse chart table, label and axis-layout choices. */
+export type WorkbookSnapshotV82 = Omit<WorkbookSnapshotV81, "version"> & { version: 82 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -361,8 +363,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV78
   | WorkbookSnapshotV79
   | WorkbookSnapshotV80
-  | WorkbookSnapshotV81;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV81, "version"> & {
+  | WorkbookSnapshotV81
+  | WorkbookSnapshotV82;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV82, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -462,7 +465,8 @@ type SnapshotVersion =
   | 78
   | 79
   | 80
-  | 81;
+  | 81
+  | 82;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -488,6 +492,37 @@ function hasShapeGroupSnapshotTag(value: UnknownRecord, path: string): boolean {
   return field?.value === "shapeGroup";
 }
 
+/** Read only data descriptors, including malformed inherited containers, without calling getters. */
+function chartLayoutContainer(value: unknown, key: string): unknown {
+  if (!value || (typeof value !== "object" && typeof value !== "function")) return;
+  let owner: object | null = value;
+  const seen = new WeakSet<object>();
+  while (owner) {
+    if (seen.has(owner)) throw new TypeError("Cyclic chart layout container prototype.");
+    seen.add(owner);
+    const field = Object.getOwnPropertyDescriptor(owner, key);
+    if (field) return "value" in field ? (field.value as unknown) : undefined;
+    owner = Object.getPrototypeOf(owner) as object | null;
+  }
+}
+
+/** Presence gates version82 before earlier feature admission or nested accessor consumption. */
+function chartLayoutFeaturePath(chart: UnknownRecord): string | undefined {
+  const elements = chartLayoutContainer(chart, "elements");
+  if (elements && (typeof elements === "object" || typeof elements === "function"))
+    for (const key of ["dataTable", "labelContent", "labelScope"])
+      if (key in elements) return `elements.${key}`;
+  const format = chartLayoutContainer(chart, "format");
+  for (const axis of ["categoryAxis", "valueAxis", "secondaryValueAxis"]) {
+    const settings = chartLayoutContainer(format, axis);
+    if (!settings || (typeof settings !== "object" && typeof settings !== "function")) continue;
+    for (const key of axis === "categoryAxis"
+      ? ["titleVisible"]
+      : ["majorGridlines", "minorGridlines", "titleVisible"])
+      if (key in settings) return `format.${axis}.${key}`;
+  }
+}
+
 /** Presence is checked before normalizing malformed choices or visiting any accessor. */
 function inspectShapeSnapshotFeatures(
   value: SheetDrawing,
@@ -505,6 +540,7 @@ function inspectShapeSnapshotFeatures(
   hasChartSource: boolean;
   hasChartFormat: boolean;
   hasChartPresentation: boolean;
+  hasChartLayout: boolean;
   hasOpenArea: boolean;
   hasModernWordArt: boolean;
   hasTextWarp: boolean;
@@ -521,6 +557,7 @@ function inspectShapeSnapshotFeatures(
     hasChartSource = false,
     hasChartFormat = false,
     hasChartPresentation = false,
+    hasChartLayout = false,
     hasOpenArea = false,
     hasModernWordArt = false,
     hasTextWarp = false,
@@ -542,6 +579,20 @@ function inspectShapeSnapshotFeatures(
         if (!chartField || !("value" in chartField))
           return fail(`${path}.chart`, "Chart payloads must be own data fields, not accessors.");
         const chart = asRecord(chartField.value, `${path}.chart`);
+        const layoutFeature = chartLayoutFeaturePath(chart);
+        if (layoutFeature) {
+          if (version !== undefined && version < 82)
+            return fail(
+              `${path}.chart.${layoutFeature}`,
+              "Chart layout choices require snapshot version 82.",
+            );
+          if (drawingKind !== "chart")
+            return fail(
+              `${path}.chart.${layoutFeature}`,
+              "Chart layout choices require an own chart drawing kind.",
+            );
+          hasChartLayout = true;
+        }
         if ("presentation" in chart) {
           // Gate presence before earlier features, malformed choices or accessor reads.
           if (version !== undefined && version < 81)
@@ -775,6 +826,7 @@ function inspectShapeSnapshotFeatures(
     hasChartSource,
     hasChartFormat,
     hasChartPresentation,
+    hasChartLayout,
     hasOpenArea,
     hasModernWordArt,
     hasTextWarp,
@@ -1881,6 +1933,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   let hasChartSource = false;
   let hasChartFormat = false;
   let hasChartPresentation = false;
+  let hasChartLayout = false;
   let hasOpenShapeArea = false;
   let hasModernWordArt = false;
   let hasTextWarp = false;
@@ -1905,6 +1958,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       hasChartSource ||= scene.hasChartSource;
       hasChartFormat ||= scene.hasChartFormat;
       hasChartPresentation ||= scene.hasChartPresentation;
+      hasChartLayout ||= scene.hasChartLayout;
       hasOpenShapeArea ||= scene.hasOpenArea;
       hasModernWordArt ||= scene.hasModernWordArt;
       hasTextWarp ||= scene.hasTextWarp;
@@ -2310,6 +2364,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasChartSource) version = 79;
     if (hasChartFormat) version = 80;
     if (hasChartPresentation) version = 81;
+    if (hasChartLayout) version = 82;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -2687,6 +2742,14 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 81;
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasChartLayout,
+      ),
+    )
+  )
+    snapshot.version = 82;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -2775,7 +2838,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 78 &&
     record.version !== 79 &&
     record.version !== 80 &&
-    record.version !== 81
+    record.version !== 81 &&
+    record.version !== 82
   ) {
     throw new WorkbookDomainError(
       {

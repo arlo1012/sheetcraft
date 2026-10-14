@@ -478,8 +478,15 @@ function setFill(value: string | null): void {
       format: setChartFormatField(chart.value.format?.plot ?? {}, "fill", value ?? undefined),
     });
 }
-function setAxisBoolean(field: "show" | "reverse", value: unknown): void {
-  const intent = axisIntent({ ...axis.value, [field]: !!value });
+function setAxisBoolean(
+  field: "show" | "reverse" | "titleVisible" | "majorGridlines" | "minorGridlines",
+  value: unknown,
+): void {
+  if ((field === "majorGridlines" || field === "minorGridlines") && !isValueAxis.value) return;
+  const format = { ...axis.value, [field]: !!value };
+  if (field === "titleVisible" && value && !format.title?.trim())
+    format.title = t("chart.axisTitlePlaceholder");
+  const intent = axisIntent(format);
   if (intent) submit(intent);
 }
 function commitText(
@@ -502,7 +509,10 @@ function commitText(
   if (field === "title" && kind.value === "title")
     intent = { kind: "elements", patch: { title: draft.text } };
   if (field === "axisTitle" && isAxis.value)
-    intent = axisIntent(setChartFormatField(axis.value, "title", draft.text || undefined) ?? {});
+    intent = axisIntent({
+      ...setChartFormatField(axis.value, "title", draft.text || undefined),
+      titleVisible: !!draft.text.trim(),
+    });
   if (field === "formatCode" && isValueAxis.value) {
     if (!validateCellNumberFormatCode(draft.text)) {
       draft.error = "format";
@@ -911,6 +921,29 @@ function escapeDraft(event: KeyboardEvent): void {
             :onChange="captureAction((value: unknown) => setAxisBoolean('reverse', value))"
             >{{ t("chart.formatReverse") }}</TCheckbox
           >
+          <TCheckbox
+            :checked="axis.titleVisible ?? !!axis.title"
+            :disabled="disabled"
+            data-chart-format-field="titleVisible"
+            :onChange="captureAction((value: unknown) => setAxisBoolean('titleVisible', value))"
+            >{{ t("chart.formatShowAxisTitle") }}</TCheckbox
+          >
+          <template v-if="isValueAxis">
+            <TCheckbox
+              :checked="valueAxis.majorGridlines ?? true"
+              :disabled="disabled"
+              data-chart-format-field="majorGridlines"
+              :onChange="captureAction((value: unknown) => setAxisBoolean('majorGridlines', value))"
+              >{{ t("chart.formatMajorGridlines") }}</TCheckbox
+            >
+            <TCheckbox
+              :checked="valueAxis.minorGridlines ?? false"
+              :disabled="disabled"
+              data-chart-format-field="minorGridlines"
+              :onChange="captureAction((value: unknown) => setAxisBoolean('minorGridlines', value))"
+              >{{ t("chart.formatMinorGridlines") }}</TCheckbox
+            >
+          </template>
           <div class="chart-format-pane__field" data-chart-format-field="axisTitle">
             <label :for="`${paneId}-axis-title`">{{ t("chart.formatAxisTitle") }}</label
             ><TInput

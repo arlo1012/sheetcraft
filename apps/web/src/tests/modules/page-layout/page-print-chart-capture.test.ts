@@ -159,7 +159,8 @@ describe("validated Chart print capture", () => {
   test("retains real owners, complete drawing order, stable IDs and palette positions", () => {
     const first = chart("first"),
       second = chart("second");
-    const shape: SheetDrawing = { ...chart("shape"), kind: "shape" };
+    const { chart: _chart, ...shapeBase } = chart("shape");
+    const shape: SheetDrawing = { ...shapeBase, kind: "shape" };
     const f = fixture([shape, first, second]);
     const before = JSON.stringify(f.sheet.drawings);
     const pass = f.capture();
@@ -915,4 +916,12 @@ describe("Chart print input and resource limits", () => {
       /text or value budget/,
     );
   });
+});
+
+test("printing rejects disguised chart payload instead of dropping it from a non-chart root", () => {
+  const drawing: SheetDrawing = { ...chart("disguised"), kind: "shape" };
+  const f = fixture([drawing]);
+  const before = JSON.stringify(f.sheet.drawings);
+  expect(() => f.capture()).toThrow(/Chart payloads require an own chart drawing kind/);
+  expect(JSON.stringify(f.sheet.drawings)).toBe(before);
 });

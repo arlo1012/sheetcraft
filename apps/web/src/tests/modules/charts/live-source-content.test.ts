@@ -199,13 +199,13 @@ describe("live chart content lifecycle", () => {
   });
   test("word-cloud SVG also consumes saved title formatting and native title selection", async () => {
     const f = fixture();
+    const { source: _source, ...unlinked } = f.drawing.chart;
     await f.wrapper.setProps({
       drawing: {
         ...f.drawing,
         chart: {
-          ...f.drawing.chart,
+          ...unlinked,
           type: "wordCloud",
-          source: undefined,
           dataCache: {
             categories: ["word"],
             series: [{ name: "weight", values: [20] }],
@@ -326,4 +326,45 @@ describe("live chart content lifecycle", () => {
     expect(f.wrapper.find(".chart-content__error").exists()).toBe(false);
     expect(f.svg()).toContain(">extra<");
   });
+});
+
+test("table error cannot leak into a later invalid source or word-cloud render on the same component", async () => {
+  const f = fixture();
+  await f.wrapper.setProps({
+    drawing: {
+      ...f.drawing,
+      chart: { ...f.drawing.chart, elements: { dataTable: "withLegendKeys" } },
+    },
+  });
+  expect(f.wrapper.text()).toContain("data table");
+  await f.wrapper.setProps({
+    drawing: {
+      ...f.drawing,
+      chart: {
+        ...f.drawing.chart,
+        source: {
+          ...f.source,
+          categories: {
+            kind: "range",
+            sheetId: "deleted",
+            range: { start: { row: 0, column: 0 }, end: { row: 2, column: 0 } },
+          },
+        },
+      },
+    },
+  });
+  expect(f.wrapper.text()).not.toContain("data table");
+  const { source: _source, ...unlinked } = f.drawing.chart;
+  await f.wrapper.setProps({
+    drawing: {
+      ...f.drawing,
+      chart: {
+        ...unlinked,
+        type: "wordCloud",
+        dataCache: { categories: ["word"], series: [{ name: "weight", values: [4] }], records: [] },
+        range: null,
+      },
+    },
+  });
+  expect(f.wrapper.find(".chart-content__error").exists()).toBe(false);
 });

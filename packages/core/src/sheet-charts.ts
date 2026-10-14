@@ -39,6 +39,10 @@ export type ChartElementSettings = {
   /** False reserves plot space for the legend. */
   legendOverlay?: boolean;
   labelPosition?: "center" | "insideEnd" | "insideBase" | "outsideEnd";
+  /** Stored independently of the chart type; unsupported consumers leave it dormant. */
+  dataTable?: "none" | "withLegendKeys" | "withoutLegendKeys";
+  labelContent?: "value" | "seriesAndValue";
+  labelScope?: "all" | "lastCategory" | "lastSeries";
 };
 export type SheetChart = {
   /** Ordered live sources, exclusive of rectangle and PivotTable/cache sources. */
@@ -81,7 +85,15 @@ function normalizeChartElementSettings(value: unknown): ChartElementSettings {
   const prototype: unknown = Object.getPrototypeOf(value);
   if (prototype !== null && prototype !== Object.prototype)
     throw new TypeError("Chart element settings must be an ordinary data record.");
-  const keys = ["titlePosition", "legendPosition", "legendOverlay", "labelPosition"] as const;
+  const keys = [
+    "titlePosition",
+    "legendPosition",
+    "legendOverlay",
+    "labelPosition",
+    "dataTable",
+    "labelContent",
+    "labelScope",
+  ] as const;
   for (const key of keys)
     if (key in value && !Object.hasOwn(value, key))
       throw new TypeError("Chart element settings must be own data fields.");
@@ -116,6 +128,21 @@ function normalizeChartElementSettings(value: unknown): ChartElementSettings {
     )
       throw new RangeError("Invalid chart label position.");
     result.labelPosition = source.labelPosition as ChartElementSettings["labelPosition"];
+  }
+  if (Object.hasOwn(source, "dataTable")) {
+    if (!["none", "withLegendKeys", "withoutLegendKeys"].includes(source.dataTable as string))
+      throw new RangeError("Invalid chart data table choice.");
+    result.dataTable = source.dataTable as ChartElementSettings["dataTable"];
+  }
+  if (Object.hasOwn(source, "labelContent")) {
+    if (!["value", "seriesAndValue"].includes(source.labelContent as string))
+      throw new RangeError("Invalid chart label content.");
+    result.labelContent = source.labelContent as ChartElementSettings["labelContent"];
+  }
+  if (Object.hasOwn(source, "labelScope")) {
+    if (!["all", "lastCategory", "lastSeries"].includes(source.labelScope as string))
+      throw new RangeError("Invalid chart label scope.");
+    result.labelScope = source.labelScope as ChartElementSettings["labelScope"];
   }
   return result;
 }

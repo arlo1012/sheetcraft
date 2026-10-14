@@ -1,4 +1,6 @@
 export const chartsEnUS = {
+  "chart.dataTableUnavailable":
+    "The complete data table cannot be rendered. Enlarge the chart, reduce the source to at most 32 categories and 8 series, or shorten number formats; check that the chosen font is available.",
   "chart.tools": "Charts",
   "chart.contextTools": "Chart Tools",
   "chart.elements": "Chart elements",
@@ -150,6 +152,9 @@ export const chartsEnUS = {
   "chart.formatAuto": "Auto",
   "chart.formatReset": "Reset to automatic",
   "chart.formatResetAll": "Reset element format",
+  "chart.formatShowAxisTitle": "Show axis title",
+  "chart.formatMajorGridlines": "Major gridlines",
+  "chart.formatMinorGridlines": "Minor gridlines",
   "chart.formatShowAxis": "Show axis",
   "chart.formatReverse": "Reverse order",
   "chart.formatAxisTitle": "Axis title",
@@ -182,7 +187,7 @@ export const chartsEnUS = {
     "Minimum must be less than maximum. Units must be positive; an explicit minor unit must evenly divide the major unit, with at most 100 divisions.",
   "chart.formatInvalidFormat": "Check the format value. Your draft is retained.",
   "chart.formatApplyFailed":
-    "The change was not applied. Your draft is retained; check that this chart is still editable and retry.",
+    "The change was not applied. Your draft is retained. Check editability; if a data table is enabled, enlarge the chart or shorten its formatted values.",
   "chart.formatFinishComposition": "Finish composing the input before applying it.",
   "chart.formatFontHint": "Unavailable fonts may be substituted on this device.",
   "chart.formatClose": "Close",
@@ -193,6 +198,36 @@ export const chartsEnUS = {
   "chart.formatFontRetry": "Retry font",
   "chart.subtypes": "Chart subtypes",
   "chart.styles": "Chart styles",
+  "chart.quickLayout": "Quick Layout",
+  "chart.axisTitlePlaceholder": "Axis Title",
+  "chart.quickLayout1": "Layout 1",
+  "chart.quickLayout2": "Layout 2",
+  "chart.quickLayout3": "Layout 3",
+  "chart.quickLayout4": "Layout 4",
+  "chart.quickLayout5": "Layout 5",
+  "chart.quickLayout6": "Layout 6",
+  "chart.quickLayout7": "Layout 7",
+  "chart.quickLayout8": "Layout 8",
+  "chart.quickLayout9": "Layout 9",
+  "chart.quickLayout10": "Layout 10",
+  "chart.quickLayout11": "Layout 11",
+  "chart.quickLayoutHint":
+    "Hover or focus to preview; choose a layout to apply it. The source data and existing text are retained.",
+  "chart.quickLayoutCustomHint": "This chart does not match a preset layout.",
+  "chart.quickLayoutApplyFailed":
+    "The layout was not applied. Check the current chart, enlarge it or reduce table data/number-format length, then retry.",
+  "chart.quickLayoutPreviewFailed":
+    "The layout preview is unavailable. Check the current chart and its available plot/table space.",
+  "chart.dataTable": "Data table",
+  "chart.dataTableNone": "None",
+  "chart.dataTableWithLegendKeys": "With legend keys",
+  "chart.dataTableWithoutLegendKeys": "Without legend keys",
+  "chart.dataTableHint":
+    "Data tables support column, line and area charts and use the current series and categories. All values are retained; up to 32 categories and 8 series must fit the readable plot/table area.",
+  "chart.dataTableBarHint":
+    "Bar charts use a vertical category axis; a bottom data table is not supported yet.",
+  "chart.dataTableApplyFailed":
+    "The data table was not changed. Check editability, enlarge the chart, or reduce categories/series and formatted-number length.",
   "chart.variantMenu": "{type} subtypes",
   "chart.variant.column.standard": "Clustered Column",
   "chart.variant.column.stacked": "Stacked Column",

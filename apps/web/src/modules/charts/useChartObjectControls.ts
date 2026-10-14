@@ -1,13 +1,20 @@
-import { computed, getCurrentScope, onScopeDispose, ref } from "vue";
+import { computed, getCurrentScope, onScopeDispose, ref, shallowRef, watch } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
-import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-charts";
+import {
+  normalizeSheetChart,
+  type SheetChart,
+  type ChartData,
+} from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, Workbook } from "@sheetcraft/core/workbook";
 import type { ChartElementPatch } from "./chart-element-controls";
 import { getChartElementCapabilities } from "./chart-elements";
 import type { ChartFormatTarget } from "./chart-format-pane";
 import { applyChartDesignIntent, type ChartDesignIntent } from "./chart-design-intents";
+import { applyChartQuickLayout, type ChartQuickLayoutId } from "./chart-quick-layout";
+import { preflightChartDataTable } from "./chart-data-table-preflight";
+import type { ChartLayoutPreview } from "./chart-layout-preview";
 
 /** Only rendered element fields may cross this object-level action boundary. */
 export function applyElementPatch(chart: SheetChart, patch: ChartElementPatch): SheetChart {
@@ -71,14 +78,18 @@ export function useChartObjectControls(options: {
   edit: (drawing: SheetChartDrawing) => void;
   source?: (drawing: SheetChartDrawing) => void;
   format?: (drawing: SheetChartDrawing, target: ChartFormatTarget) => void;
+  getData?: (drawing: SheetChartDrawing, chart: SheetChart) => ChartData;
+  getAxisTitle?: () => string;
 }) {
   const error = ref(false);
+  const preview = shallowRef<(ChartLayoutPreview & { lease: object }) | undefined>();
   let disposed = false;
   let applying = false;
   let preparing = false;
   if (getCurrentScope())
     onScopeDispose(() => {
       disposed = true;
+      preview.value = undefined;
     });
   const snapshot = computed(() => {
     const workbook = options.getWorkbook(),
@@ -89,6 +100,7 @@ export function useChartObjectControls(options: {
     const forest = sheet.drawings;
     const drawing = forest?.find((node) => node.id === id);
     if (!drawing || drawing.kind !== "chart") return;
+    const lease = {};
     const isCurrent = () =>
       !disposed &&
       workbook === options.getWorkbook() &&
@@ -101,6 +113,13 @@ export function useChartObjectControls(options: {
       forest?.includes(drawing) === true;
     const allowed = () =>
       isCurrent() && !options.isBusy() && canUseSheetPermission(sheet, "editObjects");
+    const validateTable = (chart: SheetChart) => {
+      if (chart.elements?.dataTable && chart.elements.dataTable !== "none") {
+        if (!options.getData) throw new Error("Chart table source is unavailable.");
+        preflightChartDataTable(chart, options.getData(drawing, chart), drawing);
+      }
+      return chart;
+    };
     const prepare = () => {
       if (applying || preparing || !allowed()) return false;
       preparing = true;
@@ -126,6 +145,7 @@ export function useChartObjectControls(options: {
           if (allowed()) after?.(drawing);
           return true;
         }
+        validateTable(chart);
         const next = { ...drawing, chart };
         const command = createSetSheetDrawingsCommand(
           sheet.id,
@@ -174,6 +194,7 @@ export function useChartObjectControls(options: {
     return {
       drawing,
       isCurrent,
+      allowed,
       disabled: !canUseSheetPermission(sheet, "editObjects"),
       apply: (patch: ChartElementPatch) => change(() => applyElementPatch(drawing.chart, patch)),
       applyDesign: (intent: ChartDesignIntent, pendingTitle?: string) =>
@@ -183,6 +204,39 @@ export function useChartObjectControls(options: {
             ? chart
             : applyElementPatch(chart, { title: pendingTitle });
         }),
+      applyLayout: (layout: ChartQuickLayoutId, pendingTitle?: string) =>
+        change(() => {
+          const chart = applyChartQuickLayout(
+            drawing.chart,
+            layout,
+            options.getAxisTitle?.() ?? "Axis Title",
+          );
+          return pendingTitle === undefined
+            ? chart
+            : applyElementPatch(chart, { title: pendingTitle });
+        }),
+      previewLayout: (layout?: ChartQuickLayoutId, pendingTitle?: string): boolean => {
+        if (layout === undefined) {
+          if (preview.value?.lease === lease) preview.value = undefined;
+          return true;
+        }
+        if (!allowed() || preparing || applying) return false;
+        try {
+          let chart = applyChartQuickLayout(
+            drawing.chart,
+            layout,
+            options.getAxisTitle?.() ?? "Axis Title",
+          );
+          if (pendingTitle !== undefined) chart = applyElementPatch(chart, { title: pendingTitle });
+          validateTable(chart);
+          if (!allowed()) return false;
+          preview.value = { owner: drawing, chart, lease };
+          return true;
+        } catch {
+          if (preview.value?.lease === lease) preview.value = undefined;
+          return false;
+        }
+      },
       edit,
       source: () => {
         if (prepare()) (options.source ?? options.edit)(drawing);
@@ -234,5 +288,22 @@ export function useChartObjectControls(options: {
         : undefined,
     };
   });
-  return { snapshot, error };
+  // Busy dependencies belong to an active preview; setup has not initialized
+  // every host callback yet. No delayed/ignored busy state once a preview exists.
+  watch(
+    [snapshot, () => (preview.value ? options.isBusy() : false)],
+    () => {
+      preview.value = undefined;
+    },
+    { flush: "sync" },
+  );
+  return {
+    snapshot,
+    error,
+    paintPreview: computed<ChartLayoutPreview | undefined>(() =>
+      preview.value && snapshot.value?.allowed() && preview.value.owner === snapshot.value.drawing
+        ? preview.value
+        : undefined,
+    ),
+  };
 }

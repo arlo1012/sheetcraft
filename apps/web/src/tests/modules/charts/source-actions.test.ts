@@ -461,3 +461,49 @@ describe("chart source captured owner actions", () => {
     expect(f.execute).not.toHaveBeenCalled();
   });
 });
+
+describe("active chart data table source budget", () => {
+  test("a source edit that exceeds complete table budget keeps the draft and both history branches", () => {
+    const f = fixture();
+    f.ownerSheet.drawings = [
+      {
+        ...f.first,
+        chart: {
+          ...f.first.chart,
+          elements: { ...f.first.chart.elements, dataTable: "withLegendKeys" },
+        },
+      },
+      f.other,
+    ];
+    f.revision.value++;
+    const owner = f.open(),
+      before = serializeWorkbook(f.workbook.value);
+    const categories = Array.from({ length: 33 }, (_, i) => `category${i}`);
+    const draft: SheetChartDrawing = {
+      ...owner.initial,
+      chart: {
+        ...owner.initial.chart,
+        range: null,
+        source: {
+          kind: "series",
+          categories: { kind: "generated" },
+          series: [
+            {
+              id: "series-1",
+              colorIndex: 0,
+              name: { kind: "literal", text: "Apple" },
+              values: { kind: "literal", values: categories.map(() => 1) },
+            },
+          ],
+        },
+      },
+    };
+    expect(owner.commit(draft)).toBe(false);
+    expect(f.actions.dialog.value).toBe(owner);
+    expect(f.actions.error.value).toBe(true);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+    expect(f.session.history.undoStack).toHaveLength(0);
+    expect(f.session.history.redoStack).toHaveLength(0);
+  });
+});

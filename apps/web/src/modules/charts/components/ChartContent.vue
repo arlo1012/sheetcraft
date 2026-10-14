@@ -1,10 +1,20 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
-import { getSheetChartData, normalizeSheetChart } from "@sheetcraft/core/sheet-charts";
+import {
+  getSheetChartData,
+  normalizeSheetChart,
+  type SheetChart,
+} from "@sheetcraft/core/sheet-charts";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import { init, type EChartsType } from "../chart-runtime";
 import { createChartOption } from "../chart-option";
+import {
+  createChartDataTablePlan,
+  prepareChartDataTableOption,
+  applyChartDataTableGraphics,
+  ChartDataTableUnavailableError,
+} from "../chart-data-table";
 import { createWordCloudLayout } from "../chart-wordcloud-layout";
 import { getChartPresentationBackground } from "../chart-presentation-render";
 import { getChartFormatClickTarget } from "../chart-format-selection";
@@ -18,6 +28,7 @@ import {
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{
   drawing: SheetChartDrawing;
+  paintChart?: SheetChart;
   sheet: Sheet;
   evaluator: SheetEvaluator;
   resolveSheet?: (sheetId: string) => Sheet | undefined;
@@ -28,12 +39,13 @@ const { t } = useAppI18n();
 const root = ref<HTMLElement>();
 let chart: EChartsType | undefined;
 let observer: ResizeObserver | undefined;
+const paintChart = computed(() => props.paintChart ?? props.drawing.chart);
 const result = computed(() => {
   void props.revision;
   try {
     const data = getSheetChartData(
       props.sheet,
-      normalizeSheetChart(props.drawing.chart),
+      normalizeSheetChart(paintChart.value),
       props.evaluator,
       props.resolveSheet,
     );
@@ -51,11 +63,12 @@ const result = computed(() => {
 });
 const data = computed(() => result.value.data);
 const error = ref(false);
+const tableError = ref(false);
 const fontError = ref(false);
 let eventCleanup: (() => void) | undefined;
 let fontRequest = 0;
 const fontFamilies = computed(() => {
-  const format = props.drawing.chart.format;
+  const format = paintChart.value.format;
   return [
     ...new Set(
       [
@@ -70,6 +83,7 @@ const fontFamilies = computed(() => {
 function loadFonts(retry = false) {
   const owner = props.drawing,
     revision = props.revision,
+    paint = paintChart.value,
     request = ++fontRequest;
   const pending = fontFamilies.value.filter(
     (family) => retry || getCellFontResourceStatus(family).state !== "ready",
@@ -86,13 +100,23 @@ function loadFonts(retry = false) {
     ),
   ).then(
     () => {
-      if (request === fontRequest && owner === props.drawing && revision === props.revision) {
+      if (
+        request === fontRequest &&
+        owner === props.drawing &&
+        revision === props.revision &&
+        paint === paintChart.value
+      ) {
         fontError.value = false;
         render();
       }
     },
     () => {
-      if (request === fontRequest && owner === props.drawing && revision === props.revision)
+      if (
+        request === fontRequest &&
+        owner === props.drawing &&
+        revision === props.revision &&
+        paint === paintChart.value
+      )
         fontError.value = true;
     },
   );
@@ -102,12 +126,14 @@ function bindEvents(instance: EChartsType) {
   const owner = props.drawing,
     revision = props.revision,
     sheet = props.sheet,
+    paint = paintChart.value,
     source = data.value;
   const current = () =>
     chart === instance &&
     owner === props.drawing &&
     revision === props.revision &&
-    sheet === props.sheet;
+    sheet === props.sheet &&
+    paint === paintChart.value;
   const handled = new WeakSet<object>();
   const component = (openPane: boolean) => (event: unknown) => {
     if (!current()) return;
@@ -153,11 +179,13 @@ function bindEvents(instance: EChartsType) {
   };
 }
 function render() {
-  if (!root.value || props.drawing.chart.type === "wordCloud") {
+  if (!root.value || paintChart.value.type === "wordCloud") {
     eventCleanup?.();
     eventCleanup = undefined;
     chart?.dispose();
     chart = undefined;
+    error.value = false;
+    tableError.value = false;
     return;
   }
   try {
@@ -170,9 +198,10 @@ function render() {
     if (result.value.invalid) {
       chart.clear();
       error.value = false;
+      tableError.value = false;
       return;
     }
-    const option = createChartOption(props.drawing.chart, data.value, {
+    const option = createChartOption(paintChart.value, data.value, {
       width: props.drawing.width,
       height: props.drawing.height,
     });
@@ -183,21 +212,25 @@ function render() {
       if (Array.isArray(axis)) for (const item of axis) item.triggerEvent = true;
       else if (axis) axis.triggerEvent = true;
     }
-    chart.setOption(option, { notMerge: true });
+    const table = createChartDataTablePlan(paintChart.value, data.value, props.drawing);
+    chart.setOption(prepareChartDataTableOption(option, table), { notMerge: true });
+    if (table) applyChartDataTableGraphics(chart, table);
     bindEvents(chart);
     error.value = false;
-  } catch {
+    tableError.value = false;
+  } catch (cause) {
     chart?.clear();
     error.value = true;
+    tableError.value = cause instanceof ChartDataTableUnavailableError;
   }
 }
 const wordLayout = computed(() =>
   result.value.invalid
     ? { title: { show: false, offset: 0 }, words: [] }
-    : createWordCloudLayout(props.drawing.chart, data.value, props.drawing),
+    : createWordCloudLayout(paintChart.value, data.value, props.drawing),
 );
 const wordBackground = computed(() =>
-  result.value.invalid ? "#ffffff" : getChartPresentationBackground(props.drawing.chart),
+  result.value.invalid ? "#ffffff" : getChartPresentationBackground(paintChart.value),
 );
 const wordTitle = computed(() => wordLayout.value.title);
 const words = computed(() => wordLayout.value.words);
@@ -206,8 +239,8 @@ onMounted(() => {
   observer = new ResizeObserver(render);
   if (root.value) observer.observe(root.value);
 });
-watch([() => props.drawing, result], render, { deep: true, flush: "post" });
-watch([fontFamilies, () => props.drawing, () => props.revision], () => loadFonts(), {
+watch([() => props.drawing, result, paintChart], render, { deep: true, flush: "post" });
+watch([fontFamilies, () => props.drawing, () => props.revision, paintChart], () => loadFonts(), {
   immediate: true,
   flush: "post",
 });
@@ -274,7 +307,7 @@ onBeforeUnmount(() => {
       class="chart-content__error"
       role="status"
     >
-      {{ t("chart.invalidSource") }}
+      {{ t(tableError ? "chart.dataTableUnavailable" : "chart.invalidSource") }}
     </div>
   </div>
 </template>

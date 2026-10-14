@@ -567,3 +567,41 @@ describe("native chart print presentation", () => {
     }
   });
 });
+
+test("real print data table paints raw values using the leased font before copy and disposal", () => {
+  const source: ChartData = {
+    categories: ["Alpha", "Beta"],
+    series: [
+      {
+        id: "sales",
+        name: "Sales",
+        colorIndex: 0,
+        values: [2, 4],
+        numberFormat: { kind: "custom", code: '0" kg"' },
+      },
+    ],
+    records: [],
+  };
+  const alias = "Leased table font";
+  const result = renderChartPrintPresentation(
+    drawing({
+      stacked: true,
+      presentation: { percentStacked: true },
+      elements: { dataTable: "withLegendKeys" },
+      format: { categoryAxis: { text: { fontFamily: "Source font" } } },
+    }),
+    source,
+    { ...options, resolveFontFamily: (family) => (family === "Source font" ? alias : family) },
+  );
+  try {
+    const copied = contexts.get(result.canvas)!.copies[0]!.paints;
+    const table = copied.filter(
+      (p) => p.operation === "text" && ["Sales", "2 kg", "4 kg"].includes(p.text ?? ""),
+    );
+    expect(table).toHaveLength(3);
+    expect(table.every((p) => p.font.includes(alias))).toBe(true);
+    expect(instances[0]!.isDisposed()).toBe(true);
+  } finally {
+    result.dispose();
+  }
+});

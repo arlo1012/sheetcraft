@@ -9,6 +9,7 @@ import type {
 import { getEquationMathRotationDeg } from "@sheetcraft/core/equation-flip";
 import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import type { ChartFormatTarget } from "../../charts/chart-format-pane";
+import type { SheetChart } from "@sheetcraft/core/sheet-charts";
 import { useAppI18n } from "../../../shared/i18n";
 import ShapeLeafPixelContent from "./ShapeLeafPixelContent.vue";
 import StandardShapeContent from "./StandardShapeContent.vue";
@@ -27,6 +28,7 @@ const ChartContent = defineAsyncComponent(() => import("../../charts/components/
 const EquationContent = defineAsyncComponent(() => import("./EquationContent.vue"));
 const props = defineProps<{
   drawing: SheetDrawing;
+  paintChart?: SheetChart;
   /** Disposable glyph projection; drawing remains the actual editable carrier. */
   paintDrawing?: SheetGraphicDrawing;
   textReferenceUnavailable?: boolean;
@@ -193,6 +195,7 @@ const legacyBodyTransform = computed(() =>
     <ChartContent
       v-if="drawing.kind === 'chart' && sheet && evaluator"
       :drawing="drawing"
+      :paint-chart="paintChart"
       :sheet="sheet"
       :evaluator="evaluator"
       :resolve-sheet="resolveSheet"

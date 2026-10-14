@@ -1,7 +1,11 @@
 import type { EChartsOption, SeriesOption } from "echarts";
 import { formatCellNumberValue } from "@sheetcraft/core/number-format";
 import type { CellNumberFormat } from "@sheetcraft/core/style";
-import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
+import {
+  normalizeSheetChart,
+  type ChartData,
+  type SheetChart,
+} from "@sheetcraft/core/sheet-charts";
 import type { ChartPresentationSettings } from "@sheetcraft/core/chart-presentation";
 import { getChartElementCapabilities, getChartElementSettings } from "./chart-elements";
 import { applyChartCommonFormat } from "./chart-format-render";
@@ -441,6 +445,7 @@ export function createChartOption(
   data: ChartData,
   dimensions?: ChartDimensions,
 ): EChartsOption {
+  chart = normalizeSheetChart(chart);
   const presentation = getChartRenderPresentation(chart);
   const renderedData = createChartPresentationData(chart, data, presentation);
   const percent = presentation?.percentStacked === true;
@@ -452,6 +457,10 @@ export function createChartOption(
       : String(value ?? "");
   };
   const plotted = chart.type === "scatter" ? data.series.slice(1) : data.series;
+  const cartesianLabels = ["column", "bar", "line", "area"].includes(chart.type);
+  const customLabels =
+    cartesianLabels &&
+    (chart.elements?.labelContent !== undefined || chart.elements?.labelScope !== undefined);
   const uniformFormat = (entries: ChartData["series"]) => {
     const format = entries[0]?.numberFormat;
     return format &&
@@ -462,8 +471,20 @@ export function createChartOption(
   if (Array.isArray(option.series))
     option.series = option.series.map((series, index) => {
       const format = plotted[index]?.numberFormat;
-      if (!format && chart.type !== "radar" && !percent) return series;
+      if (!format && chart.type !== "radar" && !percent && !customLabels) return series;
       const formatLabel = (params: { value?: unknown; dataIndex?: number }) => {
+        if (
+          customLabels &&
+          chart.elements?.labelScope === "lastCategory" &&
+          params.dataIndex !== data.categories.length - 1
+        )
+          return "";
+        if (
+          customLabels &&
+          chart.elements?.labelScope === "lastSeries" &&
+          index !== plotted.length - 1
+        )
+          return "";
         const numberFormat =
           chart.type === "radar" ? data.series[params.dataIndex ?? 0]?.numberFormat : format;
         const value = percent
@@ -471,7 +492,11 @@ export function createChartOption(
           : chart.type === "scatter" && Array.isArray(params.value)
             ? params.value[1]
             : params.value;
-        return formatValue(value, numberFormat);
+        const text = formatValue(value, numberFormat);
+        if (customLabels && (value === null || value === undefined)) return "";
+        return customLabels && chart.elements?.labelContent === "seriesAndValue"
+          ? `${plotted[index]?.name ?? ""}, ${text}`
+          : text;
       };
       return {
         ...series,

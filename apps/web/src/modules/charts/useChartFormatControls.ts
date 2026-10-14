@@ -12,6 +12,7 @@ import {
   type ChartFormatTarget,
 } from "./chart-format-pane";
 import { createChartOption } from "./chart-option";
+import { preflightChartDataTable } from "./chart-data-table-preflight";
 
 /** Each form callback owns an exact drawing and element, including after flushing edits. */
 export function useChartFormatControls(options: {
@@ -90,6 +91,8 @@ export function useChartFormatControls(options: {
             error.value = false;
             return true;
           }
+          preflightChartDataTable(chart, capturedData, drawing);
+          if (!allowed()) return false;
           const next = { ...drawing, chart };
           const command = createSetSheetDrawingsCommand(
             sheet.id,

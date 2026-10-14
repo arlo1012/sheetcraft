@@ -12,6 +12,7 @@ import { resolvePictureLayout } from "@sheetcraft/core/picture-frame";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import type { ShapeFrameRect } from "@sheetcraft/core/shape-frame";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
+import { countChartDataTableText } from "../charts/chart-data-table";
 
 const MAX_PRINT_CHARTS = 128;
 const MAX_BATCH_VALUES = 100_000;
@@ -239,6 +240,7 @@ export function capturePrintChartPass(options: {
           );
         textSize += value.length;
       }
+      textSize += countChartDataTableText(drawing.chart, data);
       totalText += textSize;
       totalValues +=
         data.series.reduce((count, entry) => count + entry.values.length, 0) +

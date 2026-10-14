@@ -18,6 +18,8 @@ export type ChartCategoryAxisFormat = {
   reverse?: boolean;
   labelAngle?: number;
   title?: string;
+  /** False hides the title without discarding its text; omission retains visibility. */
+  titleVisible?: boolean;
   text?: ChartTextFormat;
   line?: ChartAxisLineFormat;
 };
@@ -27,8 +29,12 @@ export type ChartValueAxisFormat = {
   max?: number;
   majorUnit?: number;
   minorUnit?: number;
+  majorGridlines?: boolean;
+  minorGridlines?: boolean;
   reverse?: boolean;
   title?: string;
+  /** False hides the title without discarding its text; omission retains visibility. */
+  titleVisible?: boolean;
   text?: ChartTextFormat;
   line?: ChartAxisLineFormat;
   numberFormat?: CellNumberFormat;
@@ -138,13 +144,22 @@ function axisLine(value: unknown): ChartAxisLineFormat {
   return result;
 }
 function categoryAxis(value: unknown): ChartCategoryAxisFormat {
-  const source = record(value, ["show", "reverse", "labelAngle", "title", "text", "line"]);
+  const source = record(value, [
+    "show",
+    "reverse",
+    "labelAngle",
+    "title",
+    "titleVisible",
+    "text",
+    "line",
+  ]);
   const result: ChartCategoryAxisFormat = {};
   if (Object.hasOwn(source, "show")) result.show = boolean(source.show);
   if (Object.hasOwn(source, "reverse")) result.reverse = boolean(source.reverse);
   if (Object.hasOwn(source, "labelAngle"))
     result.labelAngle = number(source.labelAngle, -90, 90, "label angle");
   if (Object.hasOwn(source, "title")) result.title = title(source.title);
+  if (Object.hasOwn(source, "titleVisible")) result.titleVisible = boolean(source.titleVisible);
   if (Object.hasOwn(source, "text")) result.text = text(source.text);
   if (Object.hasOwn(source, "line")) result.line = axisLine(source.line);
   return result;
@@ -200,8 +215,11 @@ function valueAxis(value: unknown): ChartValueAxisFormat {
     "max",
     "majorUnit",
     "minorUnit",
+    "majorGridlines",
+    "minorGridlines",
     "reverse",
     "title",
+    "titleVisible",
     "text",
     "line",
     "numberFormat",
@@ -209,6 +227,10 @@ function valueAxis(value: unknown): ChartValueAxisFormat {
   ]);
   const result: ChartValueAxisFormat = {};
   if (Object.hasOwn(source, "show")) result.show = boolean(source.show);
+  if (Object.hasOwn(source, "majorGridlines"))
+    result.majorGridlines = boolean(source.majorGridlines);
+  if (Object.hasOwn(source, "minorGridlines"))
+    result.minorGridlines = boolean(source.minorGridlines);
   if (Object.hasOwn(source, "min"))
     result.min = number(source.min, -Number.MAX_VALUE, Number.MAX_VALUE, "axis minimum");
   if (Object.hasOwn(source, "max"))
@@ -246,6 +268,7 @@ function valueAxis(value: unknown): ChartValueAxisFormat {
   }
   if (Object.hasOwn(source, "reverse")) result.reverse = boolean(source.reverse);
   if (Object.hasOwn(source, "title")) result.title = title(source.title);
+  if (Object.hasOwn(source, "titleVisible")) result.titleVisible = boolean(source.titleVisible);
   if (Object.hasOwn(source, "text")) result.text = text(source.text);
   if (Object.hasOwn(source, "line")) result.line = axisLine(source.line);
   if (Object.hasOwn(source, "numberFormat"))

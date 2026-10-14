@@ -9,6 +9,7 @@ import {
 import { normalizeSheetDrawings, type SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import type { ChartSourceReferenceRole } from "./chart-source-editor";
+import { preflightChartDataTable } from "./chart-data-table-preflight";
 
 type SourceOwner = {
   dialogId: number;
@@ -119,6 +120,7 @@ export function useChartSourceActions(options: {
         close(target);
         return true;
       }
+      preflightChartDataTable(chart, data, target.initial);
       const forest = target.sheet.drawings;
       if (!forest?.includes(target.initial)) return false;
       const next = { ...target.initial, chart };

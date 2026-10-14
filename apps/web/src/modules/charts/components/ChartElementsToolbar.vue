@@ -8,6 +8,7 @@ import {
   SlidersHorizontal,
   Palette,
   ChartNoAxesCombined,
+  LayoutDashboard,
 } from "lucide-vue-next";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
@@ -20,6 +21,9 @@ import { useMenu } from "../../../shared/menu/useMenu";
 import ChartElementsControls from "./ChartElementsControls.vue";
 import ChartSubtypeControls from "./ChartSubtypeControls.vue";
 import ChartStyleGallery from "./ChartStyleGallery.vue";
+import ChartQuickLayoutGallery from "./ChartQuickLayoutGallery.vue";
+import ChartDataTableControls from "./ChartDataTableControls.vue";
+import { getChartQuickLayout, type ChartQuickLayoutId } from "../chart-quick-layout";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import {
   getChartVariant,
@@ -34,6 +38,8 @@ const props = defineProps<{
   disabled: boolean;
   apply: (patch: ChartElementPatch) => boolean;
   applyDesign?: (intent: ChartDesignIntent, pendingTitle?: string) => boolean;
+  applyLayout?: (id: ChartQuickLayoutId, pendingTitle?: string) => boolean;
+  previewLayout?: (id?: ChartQuickLayoutId, pendingTitle?: string) => boolean;
   applyAndRun?: (
     patch: ChartElementPatch,
     action: "edit" | "source" | "switchDirection",
@@ -56,6 +62,9 @@ const subtypeTrigger = ref<InstanceType<typeof RibbonMenuButton>>();
 const styleTrigger = ref<InstanceType<typeof RibbonMenuButton>>();
 const subtypeSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
 const styleSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
+const layoutTrigger = ref<InstanceType<typeof RibbonMenuButton>>();
+const layoutSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
+const layoutMenuId = `chart-layouts-${useId()}`;
 const subtypeMenuId = `chart-subtypes-${useId()}`;
 const styleMenuId = `chart-styles-${useId()}`;
 const commonType = computed(() =>
@@ -66,7 +75,7 @@ let lastRejectedTitle: string | undefined;
 let shouldRestoreFocus = true;
 type ElementSession = {
   apply: (patch: ChartElementPatch) => boolean;
-  commit: (patch: ChartElementPatch) => void;
+  commit: (patch: ChartElementPatch) => boolean;
 };
 const session = shallowRef<ElementSession>();
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
@@ -78,6 +87,7 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
     toolbarRef.value?.$el,
     subtypeSurface.value?.rootElement,
     styleSurface.value?.rootElement,
+    layoutSurface.value?.rootElement,
     ...(controlsRef.value?.popupElements() ?? []),
   ],
   onOpen() {
@@ -89,7 +99,7 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
       commit(patch) {
         // A delayed blur or popup event must never use a newly selected chart's callback.
         if (!open.value || session.value !== current || props.disabled || props.apply !== apply) {
-          return;
+          return false;
         }
         let applied = false;
         try {
@@ -100,6 +110,7 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
         failed.value = !applied;
         lastRejectedTitle = applied ? undefined : patch.title;
         if (applied) dismiss("programmatic", shouldRestoreFocus);
+        return applied;
       },
     };
     session.value = current;
@@ -123,6 +134,7 @@ function containsTarget(target: EventTarget | null): boolean {
     !!menuSurfaceRef.value?.rootElement?.contains(target) ||
     !!subtypeSurface.value?.rootElement?.contains(target) ||
     !!styleSurface.value?.rootElement?.contains(target) ||
+    !!layoutSurface.value?.rootElement?.contains(target) ||
     (controlsRef.value?.popupElements() ?? []).some((popup) => popup.contains(target))
   );
 }
@@ -248,6 +260,7 @@ function createDesignMenu(triggerRef: typeof subtypeTrigger, surfaceRef: typeof 
       menuSurfaceRef.value?.rootElement,
       subtypeSurface.value?.rootElement,
       styleSurface.value?.rootElement,
+      layoutSurface.value?.rootElement,
       ...(controlsRef.value?.popupElements() ?? []),
     ],
     onOpen() {
@@ -292,6 +305,100 @@ function createDesignMenu(triggerRef: typeof subtypeTrigger, surfaceRef: typeof 
 }
 const subtypeMenu = createDesignMenu(subtypeTrigger, subtypeSurface);
 const styleMenu = createDesignMenu(styleTrigger, styleSurface);
+type LayoutSession = {
+  preview: (id?: ChartQuickLayoutId) => boolean;
+  apply: (id: ChartQuickLayoutId) => boolean;
+};
+const layoutSession = shallowRef<LayoutSession>();
+const layoutMenu = useMenu({
+  triggerRef: computed(() => layoutTrigger.value?.rootElement ?? null),
+  menuSurfaceRef: layoutSurface,
+  disabled: computed(
+    () =>
+      props.disabled || !props.applyLayout || !props.previewLayout || props.chart.type !== "column",
+  ),
+  defaultFocus: "selected",
+  additionalInside: () => [
+    toolbarRef.value?.$el,
+    menuSurfaceRef.value?.rootElement,
+    subtypeSurface.value?.rootElement,
+    styleSurface.value?.rootElement,
+    ...(controlsRef.value?.popupElements() ?? []),
+  ],
+  onOpen() {
+    const chart = props.chart,
+      apply = props.applyLayout,
+      preview = props.previewLayout;
+    const current = () =>
+      layoutMenu.open.value &&
+      layoutSession.value === callbacks &&
+      props.chart === chart &&
+      props.applyLayout === apply &&
+      props.previewLayout === preview &&
+      !props.disabled &&
+      chart.type === "column";
+    const callbacks: LayoutSession = {
+      preview(id) {
+        if (id === undefined) return preview?.(undefined) ?? true;
+        if (!current() || controlsRef.value?.blockComposition()) return false;
+        return preview?.(id, controlsRef.value?.pendingTitle()) ?? false;
+      },
+      apply(id) {
+        if (!current() || controlsRef.value?.blockComposition()) return false;
+        const title = controlsRef.value?.pendingTitle();
+        let accepted = false;
+        try {
+          accepted = apply?.(id, title) ?? false;
+        } catch {
+          /* Keep the draft. */
+        }
+        failed.value = !accepted;
+        lastRejectedTitle = accepted ? undefined : title;
+        if (accepted) {
+          dismiss("programmatic", false);
+          layoutMenu.dismiss("programmatic", true);
+        }
+        return accepted;
+      },
+    };
+    layoutSession.value = callbacks;
+  },
+  onDismiss() {
+    layoutSession.value?.preview(undefined);
+    layoutSession.value = undefined;
+  },
+});
+watch(
+  [() => props.applyLayout, () => props.previewLayout, () => props.apply],
+  () => {
+    layoutMenu.dismiss("programmatic", false);
+  },
+  { flush: "sync" },
+);
+function toggleLayoutMenu(event?: MouseEvent): void {
+  subtypeMenu.dismiss("programmatic", false);
+  styleMenu.dismiss("programmatic", false);
+  layoutMenu.toggleMenu(event);
+}
+const tableApply = computed(() => {
+  const current = session.value,
+    chart = props.chart;
+  return (dataTable: "none" | "withLegendKeys" | "withoutLegendKeys"): boolean => {
+    if (
+      !current ||
+      current !== session.value ||
+      props.chart !== chart ||
+      props.disabled ||
+      controlsRef.value?.blockComposition()
+    )
+      return false;
+    const title = controlsRef.value?.pendingTitle();
+    return current.commit({
+      elements: { ...chart.elements, dataTable },
+      ...(title !== undefined ? { title } : {}),
+    });
+  };
+});
 watch(
   () => props.applyDesign,
   () => {
@@ -309,10 +416,12 @@ watch(
   { flush: "sync" },
 );
 function toggleSubtypeMenu(event?: MouseEvent): void {
+  layoutMenu.dismiss("programmatic", false);
   styleMenu.dismiss("programmatic", false);
   subtypeMenu.toggleMenu(event);
 }
 function toggleStyleMenu(event?: MouseEvent): void {
+  layoutMenu.dismiss("programmatic", false);
   subtypeMenu.dismiss("programmatic", false);
   styleMenu.toggleMenu(event);
 }
@@ -379,6 +488,45 @@ onBeforeUnmount(() => {
       class="chart-elements-toolbar__group"
       data-ribbon-group="chart-design"
     >
+      <div
+        v-if="applyLayout && previewLayout && chart.type === 'column'"
+        class="chart-elements-toolbar__menu"
+      >
+        <RibbonMenuButton
+          ref="layoutTrigger"
+          variant="tall"
+          :label="t('chart.quickLayout')"
+          :text="t('chart.quickLayout')"
+          :disabled="disabled"
+          :expanded="layoutMenu.open.value"
+          :menu-id="layoutMenuId"
+          popup-role="menu"
+          @activate="toggleLayoutMenu"
+          @keydown="layoutMenu.onTriggerKeydown"
+          ><LayoutDashboard
+        /></RibbonMenuButton>
+        <Teleport to="body">
+          <MenuSurface
+            v-if="layoutMenu.open.value && layoutSession"
+            :id="layoutMenuId"
+            ref="layoutSurface"
+            :style="layoutMenu.floatingStyles.value"
+            :label="t('chart.quickLayout')"
+            data-chart-tools-toolbar
+          >
+            <template #body
+              ><GallerySection :title="t('chart.quickLayout')">
+                <ChartQuickLayoutGallery
+                  :chart="chart"
+                  :disabled="disabled"
+                  :selected="getChartQuickLayout(chart)"
+                  :preview="layoutSession.preview"
+                  :apply="layoutSession.apply"
+                /> </GallerySection
+            ></template>
+          </MenuSurface>
+        </Teleport>
+      </div>
       <div v-if="commonType" class="chart-elements-toolbar__menu">
         <RibbonMenuButton
           ref="subtypeTrigger"
@@ -478,6 +626,7 @@ onBeforeUnmount(() => {
                   :disabled="disabled"
                   @patch="session.commit"
                 />
+                <ChartDataTableControls :chart="chart" :disabled="disabled" :apply="tableApply" />
                 <p v-if="failed" class="chart-elements-toolbar__error" role="alert">
                   {{ t("chart.elementApplyFailed") }}
                 </p>

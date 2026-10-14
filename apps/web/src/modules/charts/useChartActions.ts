@@ -20,6 +20,7 @@ import {
   type SheetEvaluator,
 } from "@sheetcraft/core/workbook";
 import { resolveDataRange } from "@sheetcraft/core/data-range";
+import { preflightChartDataTable } from "./chart-data-table-preflight";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
 import {
@@ -323,6 +324,7 @@ export function useChartActions(options: {
         error.value = true;
         return;
       }
+      preflightChartDataTable(next.chart, data, next);
       if (!isCurrent(target) || !allowed(target.sheet)) return;
       const current = target.sheet.drawings ?? [];
       let drawings: SheetDrawing[];

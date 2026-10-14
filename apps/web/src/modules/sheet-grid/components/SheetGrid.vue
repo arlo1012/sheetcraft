@@ -31,6 +31,7 @@ import PivotEmptyReports from "../../pivot-tables/components/PivotEmptyReports.v
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { ChartFormatTarget } from "../../charts/chart-format-pane";
+import type { ChartLayoutPreview } from "../../charts/chart-layout-preview";
 import type { TextBoxReferenceResolver } from "../../sheet-drawings/textbox-reference-display";
 import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer.vue";
 import SheetFreeShapeCreationLayer from "../../sheet-drawings/components/SheetFreeShapeCreationLayer.vue";
@@ -339,6 +340,7 @@ const props = withDefaults(
     captureClipboardCopy?: () => () => void;
     equationPlaceholdersHidden?: boolean;
     equationEditSnapshot?: EquationEditSnapshot;
+    chartLayoutPreview?: ChartLayoutPreview;
     equationEditCallbacks?: EquationEditCallbacks;
     shapeTextEditSnapshot?: ShapeTextEditSnapshot | null;
     shapeTextEditCallbacks?: ShapeTextEditCallbacks;
@@ -4664,6 +4666,7 @@ defineExpose({
         :can-paste-objects="canPasteShapeObjects"
         :equation-placeholders-hidden="equationPlaceholdersHidden"
         :equation-edit-snapshot="equationEditSnapshot"
+        :chart-layout-preview="chartLayoutPreview"
         :equation-edit-callbacks="equationEditCallbacks"
         :text-edit-snapshot="shapeTextEditSnapshot"
         :text-edit-callbacks="shapeTextEditCallbacks"

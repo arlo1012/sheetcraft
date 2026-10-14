@@ -2,6 +2,7 @@
 import EquationCanvasEditor from "../equation/EquationCanvasEditor.vue";
 import type { ChartFormatTarget } from "../../charts/chart-format-pane";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ChartLayoutPreview } from "../../charts/chart-layout-preview";
 import type {
   EquationEditSnapshot,
   EquationEditCallbacks,
@@ -174,6 +175,7 @@ import {
 import type { TextBoxReferenceResolver } from "../textbox-reference-display";
 const props = defineProps<{
   drawings: readonly SourceSheetDrawing[];
+  chartLayoutPreview?: ChartLayoutPreview;
   applyUpdate?: (drawing: SourceSheetDrawing, expected: SourceSheetDrawing) => boolean;
   applyCollection?: (
     drawings: readonly SourceSheetDrawing[],
@@ -3473,6 +3475,11 @@ watch(
               }
             "
             :drawing="equationPaintView(fragment.drawing)"
+            :paint-chart="
+              chartLayoutPreview?.owner === sourceOwner(fragment.drawing)
+                ? chartLayoutPreview?.chart
+                : undefined
+            "
             :paint-drawing="displayedRenderPass?.getLeaf(fragment.drawing.id)?.paintView"
             :text-reference-unavailable="
               displayedRenderPass?.getLeaf(fragment.drawing.id)?.textReference?.status ===

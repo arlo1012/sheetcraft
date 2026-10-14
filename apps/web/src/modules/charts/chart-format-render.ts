@@ -188,8 +188,12 @@ function valueAxis(
     ...(settings?.min !== undefined ? { min: settings.min } : {}),
     ...(settings?.max !== undefined ? { max: settings.max } : {}),
     ...(settings?.reverse !== undefined ? { inverse: settings.reverse } : {}),
-    ...(settings?.title !== undefined
-      ? { name: settings.title, nameLocation: "middle", nameGap: 42 }
+    ...(settings?.titleVisible === false || settings?.title !== undefined
+      ? {
+          name: settings.titleVisible === false ? "" : settings.title,
+          nameLocation: "middle",
+          nameGap: 42,
+        }
       : {}),
     nameTextStyle: { ...base.nameTextStyle, ...textStyle(settings?.text) },
     axisLabel: {
@@ -230,6 +234,17 @@ function valueAxis(
       ? {
           minorTick: { show: minorDivisions > 1, splitNumber: minorDivisions },
           minorSplitLine: { show: minorDivisions > 1 },
+        }
+      : {}),
+    ...(settings?.majorGridlines !== undefined
+      ? { splitLine: { ...base.splitLine, show: settings.majorGridlines } }
+      : {}),
+    ...(settings?.minorGridlines !== undefined
+      ? {
+          minorSplitLine: { ...base.minorSplitLine, show: settings.minorGridlines },
+          ...(settings.minorGridlines
+            ? { minorTick: { ...base.minorTick, show: true, splitNumber: minorDivisions ?? 5 } }
+            : {}),
         }
       : {}),
   };
@@ -434,8 +449,12 @@ export function applyChartCommonFormat(
       ...category,
       ...(settings.show !== undefined ? { show: settings.show } : {}),
       ...(settings.reverse !== undefined ? { inverse: settings.reverse } : {}),
-      ...(settings.title !== undefined
-        ? { name: settings.title, nameLocation: "middle", nameGap: 32 }
+      ...(settings.titleVisible === false || settings.title !== undefined
+        ? {
+            name: settings.titleVisible === false ? "" : settings.title,
+            nameLocation: "middle",
+            nameGap: 32,
+          }
         : {}),
       nameTextStyle: { ...category.nameTextStyle, ...textStyle(settings.text) },
       axisLabel: {

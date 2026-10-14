@@ -1648,8 +1648,14 @@ const chartObjectControls = useChartObjectControls({
   edit: chartActions.edit,
   source: openChartSource,
   format: openChartFormat,
+  getData: (_drawing, chart) =>
+    getSheetChartData(activeSheet.value, chart, activeSheetEvaluator.value, (sheetId) =>
+      session.workbook.sheets.get(sheetId),
+    ),
+  getAxisTitle: () => t("chart.axisTitlePlaceholder"),
 });
 const chartObjectContext = chartObjectControls.snapshot;
+const chartLayoutPreview = chartObjectControls.paintPreview;
 const chartFormatControls = useChartFormatControls({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -4755,6 +4761,8 @@ watch(
           :disabled="loading || fileBusy || xlsxBusy || chartObjectContext.disabled"
           :apply="chartObjectContext.apply"
           :apply-design="chartObjectContext.applyDesign"
+          :apply-layout="chartObjectContext.applyLayout"
+          :preview-layout="chartObjectContext.previewLayout"
           :apply-and-run="chartObjectContext.applyAndRun"
           :on-edit="chartObjectContext.edit"
           :on-source="chartObjectContext.source"
@@ -5846,6 +5854,7 @@ watch(
           :key="workbookGeneration"
           :ref="setSheetGridRef"
           :sheet="activeSheet"
+          :chart-layout-preview="chartLayoutPreview"
           :workbook="session.workbook"
           :evaluator="activeSheetEvaluator"
           :context-menu-state="contextMenuState"
