@@ -13,7 +13,12 @@ import {
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import { deserializeWorkbook, serializeWorkbook } from "../../serialization.js";
 import { cloneShapeRootsForClipboard } from "../../shape-group-copy.js";
-import { getSheetChartData, normalizeSheetChart, type SheetChart } from "../../sheet-charts.js";
+import {
+  getSheetChartData,
+  normalizeChartDataCache,
+  normalizeSheetChart,
+  type SheetChart,
+} from "../../sheet-charts.js";
 import { normalizeSheetDrawings, type SheetChartDrawing } from "../../sheet-drawings.js";
 import {
   createSheet,
@@ -213,7 +218,8 @@ describe("chart layout lifecycle and unchanged authoritative data", () => {
         elements: chartLayoutElements(),
         format: chartLayoutFormat(),
       });
-    expect(read(cached)).toEqual(beforeCache);
+    expect(read(cached)).toEqual(normalizeChartDataCache(beforeCache));
+    expect(read(cached).series.every((entry) => entry.rangeBand === undefined)).toBe(true);
     cached.dataCache!.series[0]!.values[0] = 999;
     cached.elements!.dataTable = "none";
     expect(cache).toEqual(beforeCache);

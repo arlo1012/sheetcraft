@@ -3,6 +3,11 @@ import {
   type ChartSeriesSource,
   type ChartSourceDiagnostic,
 } from "./chart-source.js";
+import {
+  normalizeChartRectangleSeries,
+  type ChartRectangleSeries,
+  type ChartRangeSeriesBand,
+} from "./chart-range-series.js";
 import { getChartSourceData } from "./chart-source-data.js";
 import { normalizeChartFormat, type ChartFormatSettings } from "./chart-format.js";
 import {
@@ -45,6 +50,8 @@ export type ChartElementSettings = {
   labelScope?: "all" | "lastCategory" | "lastSeries";
 };
 export type SheetChart = {
+  /** Sparse identities owned by a live ordinary rectangle, including inactive bands. */
+  rectangleSeries?: ChartRectangleSeries;
   /** Ordered live sources, exclusive of rectangle and PivotTable/cache sources. */
   source?: ChartSeriesSource;
   pivotTableId?: string;
@@ -147,6 +154,16 @@ function normalizeChartElementSettings(value: unknown): ChartElementSettings {
   return result;
 }
 export function normalizeSheetChart(chart: SheetChart): SheetChart {
+  let rectangleSeriesValue: unknown;
+  const hasRectangleSeries = !!chart && typeof chart === "object" && "rectangleSeries" in chart;
+  if (hasRectangleSeries) {
+    const field = Object.getOwnPropertyDescriptor(chart, "rectangleSeries");
+    if (!field || !("value" in field) || field.value === undefined)
+      throw new TypeError(
+        "Chart rectangle series must be an explicit own data field, not an accessor.",
+      );
+    rectangleSeriesValue = field.value as unknown;
+  }
   let presentation: ChartPresentationSettings | undefined;
   if (chart && typeof chart === "object" && "presentation" in chart) {
     const field = Object.getOwnPropertyDescriptor(chart, "presentation");
@@ -217,7 +234,19 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
       (range.end.row - range.start.row + 1) * (range.end.column - range.start.column + 1) > 10000)
   )
     throw new RangeError("Chart source must contain at most 10,000 cells.");
+  if (
+    hasRectangleSeries &&
+    (range === null ||
+      source !== undefined ||
+      chart.pivotTableId !== undefined ||
+      chart.dataCache !== undefined)
+  )
+    throw new RangeError("Chart rectangle series require an ordinary live rectangle source.");
+  const rectangleSeries = hasRectangleSeries
+    ? normalizeChartRectangleSeries(rectangleSeriesValue, range!)
+    : undefined;
   return {
+    ...(rectangleSeries !== undefined ? { rectangleSeries } : {}),
     ...(source !== undefined ? { source } : {}),
     ...(chart.pivotTableId ? { pivotTableId: chart.pivotTableId } : {}),
     ...(chart.dataCache !== undefined
@@ -239,6 +268,8 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
   };
 }
 export type ChartSeries = {
+  /** Transient physical selection descriptor, never persisted in static caches. */
+  rangeBand?: ChartRangeSeriesBand;
   id?: string;
   colorIndex?: number;
   name: string;
@@ -366,7 +397,8 @@ export function getSheetChartData(
     }
     return { categories, series, records };
   }
-  const { range } = normalizeSheetChart(chart);
+  const normalized = normalizeSheetChart(chart);
+  const { range } = normalized;
   if (!range) return { categories: [], series: [], records: [] };
   const rows: number[] = [];
   const columns: number[] = [];
@@ -403,12 +435,28 @@ export function getSheetChartData(
       ? { numberFormat: { ...first } }
       : {};
   };
+  const identities = ["column", "bar", "line", "area", "radar"].includes(chart.type)
+    ? new Map(
+        (normalized.rectangleSeries?.[chart.seriesBy] ?? []).map((entry) => [
+          entry.index,
+          entry.id,
+        ]),
+      )
+    : undefined;
+  const identity = (index: number) =>
+    identities === undefined
+      ? {}
+      : {
+          rangeBand: { seriesBy: chart.seriesBy, index },
+          ...(identities.has(index) ? { id: identities.get(index)! } : {}),
+        };
   if (chart.seriesBy === "rows")
     return {
       categories: columns.map((column, index) =>
         chart.headerRow ? String(read(range.start.row, column) ?? "") : String(index + 1),
       ),
       series: rows.map((row, index) => ({
+        ...identity(row),
         ...seriesFormat(columns.map((column) => ({ row, column }))),
         name: chart.headerColumn ? String(read(row, range.start.column) ?? "") : String(index + 1),
         values: columns.map((column) => numeric(row, column)),
@@ -420,6 +468,7 @@ export function getSheetChartData(
       chart.headerColumn ? String(read(row, range.start.column) ?? "") : String(index + 1),
     ),
     series: columns.map((column, index) => ({
+      ...identity(column),
       ...seriesFormat(rows.map((row) => ({ row, column }))),
       name: chart.headerRow ? String(read(range.start.row, column) ?? "") : String(index + 1),
       values: rows.map((row) => numeric(row, column)),

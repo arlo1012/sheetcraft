@@ -43,6 +43,28 @@ export function getEditableChartSource(
     ? normalizeChartSource(chart.source)
     : createChartSourceFromRange(sheetId, chart, sourceSheet);
 }
+/** Promotion transfers bound identities into source series and drops owner-relative metadata. */
+export function createChartSourceCandidate(
+  chart: SheetChart,
+  source: ChartSeriesSource,
+): SheetChart & { source: ChartSeriesSource } {
+  const { rectangleSeries: _rectangleSeries, ...rest } = chart;
+  return { ...rest, range: null, source: normalizeChartSource(source) };
+}
+
+/** New series must never reactivate an inactive or removed series' formatting. */
+export function allocateChartSourceSeriesId(chart: SheetChart, source: ChartSeriesSource): string {
+  const used = new Set([
+    ...source.series.map((entry) => entry.id),
+    ...(chart.format?.series ?? []).map((entry) => entry.id),
+    ...(chart.rectangleSeries?.rows ?? []).map((entry) => entry.id),
+    ...(chart.rectangleSeries?.columns ?? []).map((entry) => entry.id),
+  ]);
+  let ordinal = 1;
+  while (used.has(`series-${ordinal}`)) ordinal++;
+  return `series-${ordinal}`;
+}
+
 export function readChartSourcePreview(
   sheet: Sheet,
   chart: SheetChart,

@@ -1,3 +1,5 @@
+import { mapDrawingSource } from "../sheet-drawings.js";
+import { mapChartSourceVectorCells } from "../chart-source-references.js";
 import {
   planExternalTextReferenceChanges,
   commitExternalDrawingCollections,
@@ -974,7 +976,24 @@ export function applyMoveCellRangeCommand(
     const address = parseCellKey(key);
     if (isIn(address, source) || isIn(address, destination)) affected.set(key, address);
   }
-  const nextDrawings = mapLocalTextReferences(previous.drawings, sheet.id, moveAddress);
+  // Rectangular sources keep their established cut-move coordinates. Identity
+  // maintenance follows complete physical bands only, retiring overwritten cells.
+  const moveIdentityCell = (address: CellAddress): CellAddress | null =>
+    contains(source, address)
+      ? moveAddress(address)
+      : contains(destination, address)
+        ? null
+        : { ...address };
+  const nextDrawings = mapLocalTextReferences(previous.drawings, sheet.id, moveAddress).map(
+    (drawing) =>
+      drawing.kind === "chart" && drawing.chart.rectangleSeries !== undefined
+        ? mapDrawingSource(
+            drawing,
+            (range) => range,
+            (band) => mapChartSourceVectorCells(band, moveIdentityCell),
+          )
+        : drawing,
+  );
   const localDrawingReferencesChanged =
     JSON.stringify(nextDrawings) !== JSON.stringify(previous.drawings ?? []);
   assertShapeObjectsForSheet(nextDrawings, sheet);

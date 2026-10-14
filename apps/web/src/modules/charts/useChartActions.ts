@@ -21,6 +21,7 @@ import {
 } from "@sheetcraft/core/workbook";
 import { resolveDataRange } from "@sheetcraft/core/data-range";
 import { preflightChartDataTable } from "./chart-data-table-preflight";
+import { reconcileChartRangeSeriesForRange } from "@sheetcraft/core/chart-range-series";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
 import {
@@ -278,12 +279,14 @@ export function useChartActions(options: {
       const next: SheetChartDrawing = {
         ...drawing,
         chart: normalizeSheetChart({
-          ...drawing.chart,
-          range: drawing.chart.source
-            ? null
-            : target.report
-              ? target.report.outputRange
-              : (reference?.range ?? drawing.chart.range),
+          ...reconcileChartRangeSeriesForRange(
+            drawing.chart,
+            drawing.chart.source
+              ? null
+              : target.report
+                ? target.report.outputRange
+                : (reference?.range ?? drawing.chart.range),
+          ),
           ...(target.report
             ? {
                 pivotTableId: target.report.id,

@@ -11,7 +11,7 @@ import { createChartSourceFromRange, type ChartSeriesSource } from "@sheetcraft/
 import { createSetSheetDrawingsCommand } from "@sheetcraft/core/commands";
 import { getSheetChartData } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
-import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
 import {
   createSheet,
   createWorkbookEvaluator,
@@ -20,6 +20,8 @@ import {
   setCellContent,
   type Workbook,
 } from "@sheetcraft/core/workbook";
+import { reconcileChartRangeSeriesForRange } from "@sheetcraft/core/chart-range-series";
+import { createChartSourceCandidate } from "../../../modules/charts/chart-source-editor";
 import { useChartSourceActions } from "../../../modules/charts/useChartSourceActions";
 
 const scopes: EffectScope[] = [];
@@ -61,7 +63,7 @@ function drawing(id = "chart-one"): SheetChartDrawing {
     },
   };
 }
-function fixture() {
+function fixture(withBindings = false) {
   const session = createWorkbookSession({ idFactory: createSequentialIdFactory() });
   const workbook = shallowRef<Workbook>(session.workbook);
   const sheet = shallowRef(getActiveSheet(workbook.value));
@@ -82,6 +84,25 @@ function fixture() {
   }
   const first = drawing(),
     other = drawing("chart-two");
+  if (withBindings) {
+    first.chart.rectangleSeries = {
+      rows: [{ index: 2, id: "row-style" }],
+      columns: [
+        { index: 0, id: "header-style" },
+        { index: 1, id: "apple-style" },
+        { index: 2, id: "pear-style" },
+      ],
+    };
+    first.chart.format = {
+      series: [
+        { id: "row-style", color: "#112233" },
+        { id: "header-style", color: "#223344" },
+        { id: "apple-style", color: "#ff0000" },
+        { id: "pear-style", color: "#00ff00" },
+        { id: "dormant-style", color: "#0000ff" },
+      ],
+    };
+  }
   ownerSheet.drawings = [first, other];
   // Same ID on a different sheet must never satisfy the captured chart owner.
   otherSheet.drawings = [drawing()];
@@ -125,7 +146,7 @@ function fixture() {
   };
   const candidate = (source = createChartSourceFromRange(ownerSheet.id, first.chart)) => ({
     ...first,
-    chart: { ...first.chart, range: null, source },
+    chart: createChartSourceCandidate(first.chart, source),
   });
   function open() {
     actions.edit(current());
@@ -506,4 +527,141 @@ describe("active chart data table source budget", () => {
     expect(f.session.history.undoStack).toHaveLength(0);
     expect(f.session.history.redoStack).toHaveLength(0);
   });
+});
+
+describe("source action rectangular identity authority", () => {
+  test("same-range Cancel and final restored draft leave identity and history unchanged", () => {
+    const f = fixture(true),
+      before = serializeWorkbook(f.workbook.value);
+    f.open().close();
+    expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+    expect(f.session.history.undoStack).toHaveLength(0);
+    const owner = f.open();
+    expect(owner.commit(structuredClone(owner.initial))).toBe(true);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.session.history.undoStack).toHaveLength(0);
+    expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+  });
+
+  test.each(["replace-id", "remove", "add", "move-band"] as const)(
+    "rejects arbitrary %s metadata edits",
+    (kind) => {
+      const f = fixture(true),
+        owner = f.open(),
+        candidate = structuredClone(f.first);
+      const before = serializeWorkbook(f.workbook.value);
+      if (kind === "replace-id") candidate.chart.rectangleSeries!.columns[1]!.id = "dormant-style";
+      if (kind === "remove") delete candidate.chart.rectangleSeries;
+      if (kind === "add") candidate.chart.rectangleSeries!.rows.push({ index: 1, id: "arbitrary" });
+      if (kind === "move-band") candidate.chart.rectangleSeries!.rows[0]!.index = 1;
+      expect(owner.commit(candidate)).toBe(false);
+      expect(f.actions.dialog.value).toBe(owner);
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+    },
+  );
+
+  test("overlap reconciliation commits once and survives snapshot/UndoRedo exactly", () => {
+    const f = fixture(true),
+      owner = f.open(),
+      before = serializeWorkbook(f.workbook.value);
+    const range = { start: { row: 0, column: 0 }, end: { row: 3, column: 1 } };
+    const candidate = {
+      ...f.first,
+      chart: reconcileChartRangeSeriesForRange(f.first.chart, range),
+    };
+    expect(owner.commit(candidate)).toBe(true);
+    expect(f.current().chart.rectangleSeries).toEqual(candidate.chart.rectangleSeries);
+    expect(f.current().chart.format).toEqual(f.first.chart.format);
+    const after = serializeWorkbook(f.workbook.value);
+    expect(after.version).toBe(83);
+    expect(serializeWorkbook(deserializeWorkbook(after))).toEqual(after);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.workbook.value)).toEqual(after);
+  });
+
+  test("disjoint range drops identities without dropping dormant formatting", () => {
+    const f = fixture(true),
+      owner = f.open();
+    const range = { start: { row: 19, column: 0 }, end: { row: 22, column: 2 } };
+    const candidate = {
+      ...f.first,
+      chart: reconcileChartRangeSeriesForRange(f.first.chart, range),
+    };
+    expect(owner.commit(candidate)).toBe(true);
+    expect(f.current().chart.rectangleSeries).toBeUndefined();
+    expect(f.current().chart.format).toEqual(f.first.chart.format);
+  });
+
+  test("bound promotion allows explicit name/values edits across sheets and keeps style seeds", () => {
+    const f = fixture(true),
+      owner = f.open(),
+      candidate = f.candidate();
+    candidate.chart.source!.series[0]!.name = { kind: "literal", text: "new name" };
+    candidate.chart.source!.series[0]!.values = {
+      kind: "range",
+      sheetId: f.otherSheet.id,
+      range: { start: { row: 1, column: 2 }, end: { row: 3, column: 2 } },
+    };
+    expect(owner.commit(candidate)).toBe(true);
+    expect(f.current().chart.rectangleSeries).toBeUndefined();
+    expect(f.current().chart.source?.series.map((entry) => entry.id)).toEqual([
+      "apple-style",
+      "pear-style",
+    ]);
+    expect(f.current().chart.format).toEqual(f.first.chart.format);
+    expect(f.session.history.undoStack).toHaveLength(1);
+  });
+
+  test.each(["row-style", "header-style", "dormant-style"])(
+    "promotion cannot activate unrelated %s",
+    (id) => {
+      const f = fixture(true),
+        owner = f.open(),
+        candidate = f.candidate();
+      const before = serializeWorkbook(f.workbook.value);
+      candidate.chart.source!.series[0]!.id = id;
+      expect(owner.commit(candidate)).toBe(false);
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+    },
+  );
+
+  test("a final direction change permits its active bound row and keeps column styles dormant", () => {
+    const f = fixture(true),
+      owner = f.open();
+    const chart = { ...f.first.chart, seriesBy: "rows" as const };
+    const candidate = {
+      ...f.first,
+      chart: createChartSourceCandidate(chart, createChartSourceFromRange(f.ownerSheet.id, chart)),
+    };
+    expect(owner.commit(candidate)).toBe(true);
+    expect(f.current().chart.source?.series.map((entry) => entry.id)).toContain("row-style");
+    expect(f.current().chart.source?.series.map((entry) => entry.id)).not.toContain("apple-style");
+    expect(f.current().chart.format).toEqual(f.first.chart.format);
+  });
+
+  test.each(["protection", "stale-owner", "execute-false"] as const)(
+    "identity source %s failure preserves exact state",
+    (kind) => {
+      const f = fixture(true),
+        owner = f.open(),
+        candidate = f.candidate();
+      if (kind === "protection") f.ownerSheet.properties.protected = true;
+      if (kind === "stale-owner") f.ownerSheet.drawings = [structuredClone(f.first), f.other];
+      if (kind === "execute-false") f.execute.mockImplementationOnce(() => false);
+      const before = serializeWorkbook(f.workbook.value);
+      expect(owner.commit(candidate)).toBe(false);
+      expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+      expect(f.session.history.undoStack).toHaveLength(0);
+      if (kind === "execute-false") {
+        expect(f.actions.dialog.value).toBe(owner);
+        expect(owner.commit(candidate)).toBe(true);
+        expect(f.session.history.undoStack).toHaveLength(1);
+      }
+    },
+  );
 });

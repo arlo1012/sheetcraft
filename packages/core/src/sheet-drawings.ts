@@ -1,3 +1,4 @@
+import { mapChartRangeSeries } from "./chart-range-series.js";
 import { normalizeEquationFlipState, type EquationFlipState } from "./equation-flip.js";
 import {
   normalizeEquationDocument,
@@ -212,6 +213,7 @@ export function normalizeCameraRange(range: CellRange | null): CellRange | null 
 export function mapDrawingSource(
   drawing: SheetDrawing,
   map: (range: CellRange) => CellRange | null,
+  mapChartBand: (range: CellRange) => CellRange | null = map,
 ): SheetDrawing {
   const bounded = (range: CellRange | null, limit: number): CellRange | null => {
     const next = range ? map(range) : null;
@@ -223,7 +225,7 @@ export function mapDrawingSource(
   if (drawing.kind === "chart")
     return {
       ...drawing,
-      chart: { ...drawing.chart, range: bounded(drawing.chart.range, 10000) },
+      chart: mapChartRangeSeries(drawing.chart, bounded(drawing.chart.range, 10000), mapChartBand),
     };
   if (drawing.kind === "camera")
     return {

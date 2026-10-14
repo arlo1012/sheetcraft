@@ -139,7 +139,7 @@ export const chartsEnUS = {
   "chart.formatSeriesName": "Series: {name}",
   "chart.formatSelectHint": "Choose an element to format its text, axes or appearance.",
   "chart.formatSeriesUnavailable":
-    "Individual series formatting needs stable worksheet-source series IDs. PivotTable, retained-data and rectangle-source charts can still format titles, plots and axes.",
+    "This source or chart type does not support individual series formatting yet. Applicable titles, plots and axes remain editable. Ordinary ranges and worksheet-series sources support direct series formatting.",
   "chart.formatNoData": "Axis and plot settings are available when the chart has data.",
   "chart.formatText": "Text",
   "chart.formatAppearance": "Appearance",

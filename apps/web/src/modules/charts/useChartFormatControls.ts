@@ -84,14 +84,18 @@ export function useChartFormatControls(options: {
           )
             throw new TypeError("Chart element is unavailable.");
           const chart = applyChartFormatIntent(drawing.chart, target, intent);
+          // A first range-series edit creates its identity in this same candidate, never on read.
+          const preparedData = getSheetChartData(sheet, chart, options.getEvaluator(), (sheetId) =>
+            workbook.sheets.get(sheetId),
+          );
           // Validate real mathematical domain/interval budgets before a history write.
-          createChartOption(chart, capturedData, { width: drawing.width, height: drawing.height });
+          createChartOption(chart, preparedData, { width: drawing.width, height: drawing.height });
           if (!allowed()) return false;
           if (JSON.stringify(chart) === JSON.stringify(drawing.chart)) {
             error.value = false;
             return true;
           }
-          preflightChartDataTable(chart, capturedData, drawing);
+          preflightChartDataTable(chart, preparedData, drawing);
           if (!allowed()) return false;
           const next = { ...drawing, chart };
           const command = createSetSheetDrawingsCommand(

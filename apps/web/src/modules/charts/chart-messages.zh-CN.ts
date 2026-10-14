@@ -122,7 +122,7 @@ export const chartsZhCN = {
   "chart.formatSeriesName": "系列：{name}",
   "chart.formatSelectHint": "选择元素，设置文字、坐标轴或外观。",
   "chart.formatSeriesUnavailable":
-    "单个系列格式需要稳定的工作表数据源系列标识。数据透视图、缓存数据图表和矩形区域图表仍可设置标题、绘图区与坐标轴。",
+    "此来源或图型暂不支持单个系列格式；仍可设置适用的标题、绘图区与坐标轴。普通区域图表和工作表系列来源可直接设置单个系列。",
   "chart.formatNoData": "图表有数据时可设置坐标轴与绘图区。",
   "chart.formatText": "文字",
   "chart.formatAppearance": "外观",

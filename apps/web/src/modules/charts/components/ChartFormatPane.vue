@@ -37,6 +37,7 @@ import {
   getChartFormatSeries,
   getChartFormatTargets,
   getChartSeriesFormat,
+  resolveChartFormatSeriesId,
   isChartValueAxisDraftValid,
   setChartFormatField,
   syncChartFormatDraft,
@@ -128,9 +129,11 @@ const categoryAxis = computed(() => chart.value.format?.categoryAxis ?? {});
 const axis = computed<ChartCategoryAxisFormat | ChartValueAxisFormat>(() =>
   kind.value === "categoryAxis" ? categoryAxis.value : valueAxis.value,
 );
-const series = computed(() =>
-  props.target.kind === "series" ? getChartSeriesFormat(chart.value, props.target.seriesId) : {},
-);
+const series = computed(() => {
+  if (props.target.kind !== "series") return {};
+  const id = resolveChartFormatSeriesId(chart.value, props.target);
+  return id ? getChartSeriesFormat(chart.value, id) : {};
+});
 const textFormat = computed<ChartTextFormat>(() =>
   kind.value === "title" ? (chart.value.format?.title ?? {}) : (axis.value.text ?? {}),
 );
@@ -315,8 +318,11 @@ function targetLabel(target: ChartFormatTarget): string {
     case "series":
       return t("chart.formatSeriesName", {
         name:
-          getChartFormatSeries(chart.value, props.data).find(
-            (entry) => entry.id === target.seriesId,
+          getChartFormatSeries(chart.value, props.data).find((entry) =>
+            target.rangeBand
+              ? entry.rangeBand?.seriesBy === target.rangeBand.seriesBy &&
+                entry.rangeBand.index === target.rangeBand.index
+              : entry.id === target.seriesId,
           )?.name ?? target.seriesId,
       });
   }
@@ -865,7 +871,7 @@ function escapeDraft(event: KeyboardEvent): void {
         </p>
       </template>
       <p
-        v-if="!chart.source && capabilities.hasData && (kind === 'chart' || isAxis)"
+        v-if="!capabilities.series && capabilities.hasData && (kind === 'chart' || isAxis)"
         class="chart-format-pane__hint"
       >
         {{ t("chart.formatSeriesUnavailable") }}

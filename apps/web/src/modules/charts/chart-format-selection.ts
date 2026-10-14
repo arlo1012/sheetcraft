@@ -13,6 +13,7 @@ export function getChartFormatClickTarget(
 ): ChartFormatTarget | undefined {
   if (!event || typeof event !== "object") return;
   const record = event as Record<string, unknown>;
+  const targets = getChartFormatTargets(chart, data);
   let target: ChartFormatTarget | undefined;
   if (record.componentType === "title") target = { kind: "title" };
   else if (record.componentType === "xAxis" || record.componentType === "yAxis") {
@@ -26,12 +27,28 @@ export function getChartFormatClickTarget(
       chart.type === "radar" && item && typeof item === "object" && "id" in item
         ? item.id
         : record.seriesId;
-    if (typeof id === "string") target = { kind: "series", seriesId: id };
+    if (typeof id === "string")
+      target = targets.find((entry) => entry.kind === "series" && entry.seriesId === id);
+    const visibleIndex = chart.type === "radar" ? record.dataIndex : record.seriesIndex;
+    if (
+      !target &&
+      !chart.source &&
+      typeof visibleIndex === "number" &&
+      Number.isInteger(visibleIndex)
+    ) {
+      const index = visibleIndex;
+      const band = index >= 0 ? data.series[index]?.rangeBand : undefined;
+      if (band)
+        target = targets.find(
+          (entry) =>
+            entry.kind === "series" &&
+            entry.rangeBand?.seriesBy === band.seriesBy &&
+            entry.rangeBand.index === band.index,
+        );
+    }
   }
   return target &&
-    getChartFormatTargets(chart, data).some(
-      (entry) => chartFormatTargetKey(entry) === chartFormatTargetKey(target),
-    )
+    targets.some((entry) => chartFormatTargetKey(entry) === chartFormatTargetKey(target))
     ? target
     : undefined;
 }

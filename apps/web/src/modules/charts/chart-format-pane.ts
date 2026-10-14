@@ -9,11 +9,15 @@ import type {
   ChartValueAxisFormat,
 } from "@sheetcraft/core/chart-format";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
+import {
+  lookupChartRangeSeriesId,
+  type ChartRangeSeriesBand,
+} from "@sheetcraft/core/chart-range-series";
 import type { ChartElementPatch } from "./chart-element-controls";
 
 export type ChartFormatTarget =
   | { kind: "chart" | "title" | "plot" | "categoryAxis" | "valueAxis" | "secondaryValueAxis" }
-  | { kind: "series"; seriesId: string };
+  | { kind: "series"; seriesId: string; rangeBand?: ChartRangeSeriesBand };
 export type ChartFormatIntent =
   | { kind: "chart"; format: ChartBarFormat | undefined }
   | { kind: "title"; format: ChartTextFormat | undefined }
@@ -42,15 +46,57 @@ export interface ChartFormatDraft {
 }
 
 export function chartFormatTargetKey(target: ChartFormatTarget): string {
+  if (target.kind === "series" && target.rangeBand)
+    return `range-series:${target.rangeBand.seriesBy}:${target.rangeBand.index}`;
   return target.kind === "series" ? `series:${target.seriesId}` : target.kind;
 }
 
-/** Only source-backed IDs are editable; names and array positions never create identity. */
+/** Range bands identify a captured physical vector; their temporary UI token is never painted. */
 export function getChartFormatSeries(chart: SheetChart, data: ChartData) {
   const sourceIds = new Set(chart.source?.series.map((entry) => entry.id) ?? []);
-  return data.series.filter(
-    (entry): entry is typeof entry & { id: string } => !!entry.id && sourceIds.has(entry.id),
+  const rangeIds = new Map(
+    chart.rectangleSeries?.[chart.seriesBy].map((entry) => [entry.index, entry.id]) ?? [],
   );
+  return data.series.flatMap((entry) => {
+    if (entry.id && sourceIds.has(entry.id)) return [{ ...entry, id: entry.id }];
+    if (!entry.rangeBand || !isChartRangeBandEditable(chart, entry.rangeBand)) return [];
+    return [
+      {
+        ...entry,
+        id:
+          rangeIds.get(entry.rangeBand.index) ??
+          `unbound-range:${entry.rangeBand.seriesBy}:${entry.rangeBand.index}`,
+      },
+    ];
+  });
+}
+
+export function isChartRangeBandEditable(chart: SheetChart, band: ChartRangeSeriesBand): boolean {
+  if (
+    chart.source ||
+    chart.pivotTableId ||
+    chart.dataCache ||
+    !chart.range ||
+    !["column", "bar", "line", "area", "radar"].includes(chart.type) ||
+    band.seriesBy !== chart.seriesBy ||
+    !Number.isInteger(band.index)
+  )
+    return false;
+  const rows = band.seriesBy === "rows";
+  const axis = rows ? "row" : "column";
+  const start = chart.range.start[axis] + Number(rows ? chart.headerRow : chart.headerColumn);
+  return band.index >= start && band.index <= chart.range.end[axis];
+}
+
+export function resolveChartFormatSeriesId(
+  chart: SheetChart,
+  target: Extract<ChartFormatTarget, { kind: "series" }>,
+): string | undefined {
+  return target.rangeBand
+    ? lookupChartRangeSeriesId(chart, target.rangeBand)
+    : chart.source?.series.some((entry) => entry.id === target.seriesId)
+      ? target.seriesId
+      : undefined;
 }
 
 export function getChartFormatCapabilities(chart: SheetChart, data?: ChartData) {
@@ -60,6 +106,7 @@ export function getChartFormatCapabilities(chart: SheetChart, data?: ChartData) 
   const lines = chart.type === "line" || chart.type === "area";
   const cartesian = bars || lines || chart.type === "scatter";
   const series = data ? getChartFormatSeries(chart, data) : (chart.source?.series ?? []);
+  const boundIds = new Set(chart.rectangleSeries?.[chart.seriesBy].map((entry) => entry.id) ?? []);
   return {
     hasData,
     title: !!chart.title.trim() && chart.elements?.titlePosition !== "none",
@@ -69,10 +116,12 @@ export function getChartFormatCapabilities(chart: SheetChart, data?: ChartData) 
     secondaryValueAxis:
       hasData &&
       (bars || lines) &&
-      series.some((entry) =>
-        chart.format?.series?.some(
-          (format) => format.id === entry.id && format.axis === "secondary",
-        ),
+      series.some(
+        (entry) =>
+          (chart.source !== undefined || boundIds.has(entry.id)) &&
+          chart.format?.series?.some(
+            (format) => format.id === entry.id && format.axis === "secondary",
+          ),
       ),
     bar: hasData && bars,
     series: hasData && series.length > 0 && (bars || lines || chart.type === "radar"),
@@ -96,6 +145,7 @@ export function getChartFormatTargets(chart: SheetChart, data: ChartData): Chart
       ...getChartFormatSeries(chart, data).map((entry) => ({
         kind: "series" as const,
         seriesId: entry.id,
+        ...(entry.rangeBand ? { rangeBand: { ...entry.rangeBand } } : {}),
       })),
     );
   return targets;

@@ -12,13 +12,16 @@ import {
   type ChartSourceCategories,
   type ChartSourceSeries,
 } from "@sheetcraft/core/chart-source";
+import { reconcileChartRangeSeriesForRange } from "@sheetcraft/core/chart-range-series";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import { formatRangeReference } from "../../../shared/range-reference/formatRangeReference";
 import {
+  allocateChartSourceSeriesId,
   cloneChartSourceDrawing,
+  createChartSourceCandidate,
   formatChartSourceName,
   getChartSourceApplicability,
   getEditableChartSource,
@@ -97,7 +100,7 @@ const preview = computed(() => {
   void props.revision;
   return readChartSourcePreview(
     props.sheet,
-    source.value ? { ...draft.value.chart, range: null, source: source.value } : draft.value.chart,
+    source.value ? createChartSourceCandidate(draft.value.chart, source.value) : draft.value.chart,
     props.evaluator,
     props.workbook,
   );
@@ -135,7 +138,7 @@ function syncInput(): void {
   if (input) sourceText.value = input.value;
 }
 function setSource(next: NonNullable<typeof source.value>): void {
-  draft.value.chart = { ...draft.value.chart, range: null, source: normalizeChartSource(next) };
+  draft.value.chart = createChartSourceCandidate(draft.value.chart, next);
   sourceText.value = "";
   invalidRange.value = false;
   feedback.value = false;
@@ -183,16 +186,26 @@ function resetRange(): boolean {
     invalidRange.value = true;
     return false;
   }
-  const chart: SheetChart = { ...draft.value.chart, range: resolved.range };
-  delete chart.source;
+  // Reconcile the final rectangle against the captured owner. Intermediate draft
+  // resets never make arbitrary identity edits or acquire new formatting identities.
+  const base: SheetChart = { ...draft.value.chart, range: props.drawing.chart.range };
+  delete base.source;
+  if (props.drawing.chart.rectangleSeries)
+    base.rectangleSeries = props.drawing.chart.rectangleSeries;
+  else delete base.rectangleSeries;
   try {
+    let chart = reconcileChartRangeSeriesForRange(
+      base,
+      resolved.range,
+      resolved.sheetId === props.sheet.id,
+    );
     if (resolved.sheetId !== props.sheet.id) {
-      chart.source = createChartSourceFromRange(
+      const source = createChartSourceFromRange(
         resolved.sheetId,
         chart,
         props.workbook.sheets.get(resolved.sheetId),
       );
-      chart.range = null;
+      chart = createChartSourceCandidate(chart, source);
     }
     const result = readChartSourcePreview(props.sheet, chart, props.evaluator, props.workbook);
     if (result.invalid) {
@@ -276,15 +289,14 @@ function openSeries(adding: boolean): void {
   const entries = source.value.series;
   let entry: ChartSourceSeries;
   if (adding) {
-    let ordinal = 1;
-    while (entries.some((item) => item.id === `series-${ordinal}`)) ordinal++;
+    const id = allocateChartSourceSeriesId(draft.value.chart, source.value);
     let colorIndex = Math.max(-1, ...entries.map((item) => item.colorIndex)) + 1;
     if (colorIndex > 9999) {
       colorIndex = 0;
       while (entries.some((item) => item.colorIndex === colorIndex)) colorIndex++;
     }
     entry = {
-      id: `series-${ordinal}`,
+      id,
       colorIndex,
       name: { kind: "literal", text: "" },
       values: { kind: "literal", values: [1] },
@@ -329,7 +341,7 @@ function openSeries(adding: boolean): void {
       }
       const result = readChartSourcePreview(
         props.sheet,
-        { ...draft.value.chart, range: null, source: next },
+        createChartSourceCandidate(draft.value.chart, next),
         props.evaluator,
         props.workbook,
       );
@@ -359,7 +371,7 @@ function openCategories(): void {
       if (
         readChartSourcePreview(
           props.sheet,
-          { ...draft.value.chart, range: null, source: next },
+          createChartSourceCandidate(draft.value.chart, next),
           props.evaluator,
           props.workbook,
         ).invalid

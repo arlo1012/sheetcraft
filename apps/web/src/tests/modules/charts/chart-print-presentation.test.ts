@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
-import type { ChartData } from "@sheetcraft/core/sheet-charts";
+import { getSheetChartData, type ChartData } from "@sheetcraft/core/sheet-charts";
+import { createSheetEvaluator, createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
+import { applyChartFormatIntent } from "../../../modules/charts/chart-format-intents";
+import { getChartFormatTargets } from "../../../modules/charts/chart-format-pane";
 import { getInstanceByDom } from "echarts/core";
 import * as chartRuntime from "../../../modules/charts/chart-runtime";
 import {
@@ -323,6 +326,49 @@ describe("native chart print presentation", () => {
         paints.filter((paint) => paint.operation === "fill" && paint.fill === "#445566"),
       ).toHaveLength(2);
       expect(instances[0]!.isDisposed()).toBe(true);
+    } finally {
+      result.dispose();
+    }
+  });
+
+  test("range-bound formatting paints through the native print data clone without promoting its source", () => {
+    const workbook = createWorkbook({ id: "range-print", sheetId: "data" });
+    const sheet = getActiveSheet(workbook);
+    const values = [
+      ["region", "same", "same"],
+      ["Alpha", 2, 200],
+      ["Beta", 4, 400],
+    ];
+    values.forEach((row, r) =>
+      row.forEach((value, c) =>
+        sheet.cells.set(`${r}:${c}`, { content: { kind: "literal", value } }),
+      ),
+    );
+    const source = drawing({ range: { start: { row: 0, column: 0 }, end: { row: 2, column: 2 } } });
+    const evaluator = createSheetEvaluator(sheet);
+    const initial = getSheetChartData(sheet, source.chart, evaluator);
+    const target = getChartFormatTargets(source.chart, initial).find(
+      (entry) => entry.kind === "series" && entry.rangeBand?.index === 2,
+    );
+    if (!target || target.kind !== "series") throw new Error("Missing physical range series");
+    const chart = applyChartFormatIntent(source.chart, target, {
+      kind: "series",
+      seriesId: target.seriesId,
+      format: { color: "#445566", axis: "secondary" },
+    });
+    const derived = getSheetChartData(sheet, chart, evaluator);
+    const before = structuredClone({ chart, derived });
+    const result = renderChartPrintPresentation({ ...source, chart }, derived, options);
+    try {
+      const paints = contexts.get(result.canvas)!.copies[0]!.paints;
+      expect(
+        paints.filter((paint) => paint.operation === "fill" && paint.fill === "#445566"),
+      ).toHaveLength(2);
+      expect(paints.some((paint) => paint.operation === "text" && paint.text === "400")).toBe(true);
+      expect(instances[0]!.isDisposed()).toBe(true);
+      expect({ chart, derived }).toEqual(before);
+      expect(chart.source).toBeUndefined();
+      expect(chart.range).toEqual(source.chart.range);
     } finally {
       result.dispose();
     }

@@ -1,7 +1,7 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { normalizeSheetChart } from "@sheetcraft/core/sheet-charts";
+import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   createSheet,
@@ -36,6 +36,7 @@ function fixture(
     commitResult?: boolean;
     selectReference?: ChartSourceReferencePicker;
     locale?: "en-US" | "zh-CN";
+    chart?: Partial<SheetChart>;
   } = {},
 ) {
   vi.stubGlobal(
@@ -109,6 +110,7 @@ function fixture(
       elements: { titlePosition: "overlay" },
     },
   };
+  Object.assign(drawing.chart, options.chart);
   const original = structuredClone(drawing);
   let result = options.commitResult ?? true;
   let valid = true;
@@ -475,5 +477,135 @@ describe("Select Data actual TDesign DOM", () => {
     expect(chart.source!.categories).toMatchObject({ kind: "range", sheetId: f.second.id });
     expect(chart.source!.series[0]!.values).toMatchObject({ kind: "range", sheetId: f.second.id });
     expect(f.drawing).toEqual(f.original);
+  });
+});
+
+const identityChart: Partial<SheetChart> = {
+  rectangleSeries: {
+    rows: [{ index: 2, id: "bound-row" }],
+    columns: [
+      { index: 0, id: "header-column" },
+      { index: 1, id: "bound-apple" },
+      { index: 2, id: "bound-pear" },
+    ],
+  },
+  format: {
+    series: [
+      { id: "bound-row", color: "#112233" },
+      { id: "header-column", color: "#223344" },
+      { id: "bound-apple", color: "#ff0000" },
+      { id: "bound-pear", color: "#00ff00" },
+      { id: "series-1", color: "#0000ff" },
+    ],
+  },
+};
+
+describe("Select Data sparse rectangle identity", () => {
+  test("bound preview and staged promotion keep formatting, while Cancel changes nothing", async () => {
+    const f = fixture({ chart: identityChart });
+    await settle();
+    expect(names()).toEqual(["apple", "pear"]);
+    expect(f.drawing).toEqual(f.original);
+    await click("[data-source-down]");
+    expect(names()).toEqual(["pear", "apple"]);
+    await footer(parent, "cancel");
+    expect(f.commit).not.toHaveBeenCalled();
+    expect(f.drawing).toEqual(f.original);
+  });
+
+  test("promotion transfers only active IDs and retry keeps the same detached draft", async () => {
+    const f = fixture({ chart: identityChart, commitResult: false });
+    await settle();
+    await click("[data-source-down]");
+    await footer(parent, "confirm");
+    const chart = f.commit.mock.calls[0]![0].chart;
+    expect(chart.range).toBeNull();
+    expect(chart.rectangleSeries).toBeUndefined();
+    expect(chart.source?.series.map((entry) => entry.id)).toEqual(["bound-pear", "bound-apple"]);
+    expect(chart.format).toEqual(f.original.chart.format);
+    f.accept();
+    await footer(parent, "confirm");
+    expect(f.commit.mock.calls[1]![0]).toEqual(f.commit.mock.calls[0]![0]);
+    expect(f.drawing).toEqual(f.original);
+  });
+
+  test("same-sheet shrink keeps only intersecting bands and disjoint drafts can return to initial identity", async () => {
+    const f = fixture({ chart: identityChart });
+    await settle();
+    await input(`${parent} [data-chart-source-range] input`, "=Sheet1!A1:B4");
+    await click("[data-reset-chart-range]");
+    await footer(parent, "confirm");
+    const chart = f.commit.mock.calls[0]![0].chart;
+    expect(chart.source).toBeUndefined();
+    expect(chart.rectangleSeries).toEqual({
+      rows: [{ index: 2, id: "bound-row" }],
+      columns: [
+        { index: 0, id: "header-column" },
+        { index: 1, id: "bound-apple" },
+      ],
+    });
+    expect(chart.format).toEqual(f.original.chart.format);
+    f.wrapper.unmount();
+    const returned = fixture({ chart: identityChart });
+    await settle();
+    await input(`${parent} [data-chart-source-range] input`, "=Sheet1!A20:C23");
+    await click("[data-reset-chart-range]");
+    await input(`${parent} [data-chart-source-range] input`, "=Sheet1!A1:C4");
+    await click("[data-reset-chart-range]");
+    await footer(parent, "confirm");
+    expect(returned.commit.mock.calls[0]![0]).toEqual(returned.original);
+  });
+
+  test("cross-sheet same coordinates never inherit owner bindings or dormant styles", async () => {
+    const f = fixture({ chart: identityChart });
+    await settle();
+    await input(`${parent} [data-chart-source-range] input`, "=Sheet2!A1:C4");
+    await click("[data-reset-chart-range]");
+    await footer(parent, "confirm");
+    const chart = f.commit.mock.calls[0]![0].chart;
+    expect(chart.rectangleSeries).toBeUndefined();
+    expect(chart.range).toBeNull();
+    expect(chart.source?.series.map((entry) => entry.id)).toEqual(["series-2", "series-3"]);
+    expect(
+      chart.source?.series.every(
+        (entry) => entry.values.kind === "range" && entry.values.sheetId === f.second.id,
+      ),
+    ).toBe(true);
+    expect(chart.format).toEqual(f.original.chart.format);
+  });
+
+  test("Remove followed by Add skips the removed series' dormant formatting ID", async () => {
+    const f = fixture({
+      chart: {
+        range: null,
+        source: {
+          kind: "series",
+          categories: { kind: "generated" },
+          series: [
+            {
+              id: "series-1",
+              colorIndex: 0,
+              name: { kind: "literal", text: "remove" },
+              values: { kind: "literal", values: [1, 2, 3] },
+            },
+            {
+              id: "series-2",
+              colorIndex: 1,
+              name: { kind: "literal", text: "keep" },
+              values: { kind: "literal", values: [4, 5, 6] },
+            },
+          ],
+        },
+        format: { series: [{ id: "series-1", color: "#ff0000" }] },
+      },
+    });
+    await settle();
+    await click("[data-source-remove]");
+    await add("replacement", "={10,20,30}");
+    await footer(parent, "confirm");
+    const chart = f.commit.mock.calls[0]![0].chart;
+    expect(chart.source?.series.map((entry) => entry.id)).toEqual(["series-2", "series-3"]);
+    expect(chart.source?.series.some((entry) => entry.id === "series-1")).toBe(false);
+    expect(chart.format).toEqual(f.original.chart.format);
   });
 });

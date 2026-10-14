@@ -1,5 +1,10 @@
 import { getCurrentScope, nextTick, onScopeDispose, ref, shallowRef, watch } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
+import { reconcileChartRangeSeriesForRange } from "@sheetcraft/core/chart-range-series";
+import {
+  createChartSourceFromRange,
+  getChartSourceApplicability,
+} from "@sheetcraft/core/chart-source";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import {
   getSheetChartData,
@@ -87,8 +92,42 @@ export function useChartSourceActions(options: {
       )
         throw new TypeError("Data selection cannot alter drawing geometry or identity.");
       const chart = normalizeSheetChart(candidate.chart);
+      const initialChart = normalizeSheetChart(target.initial.chart);
+      const rectangleBase = { ...initialChart };
+      delete rectangleBase.source;
+      const expectedBindings = chart.source
+        ? undefined
+        : reconcileChartRangeSeriesForRange(rectangleBase, chart.range).rectangleSeries;
+      if (JSON.stringify(chart.rectangleSeries) !== JSON.stringify(expectedBindings))
+        throw new TypeError("Data selection cannot edit rectangle series identities.");
+      if (chart.source) {
+        // Only actual source seeds may keep identities whose formatting is already
+        // present. Inactive bands and removed formats cannot be activated by Add.
+        const reserved = new Set([
+          ...(initialChart.format?.series ?? []).map((entry) => entry.id),
+          ...(initialChart.rectangleSeries?.rows ?? []).map((entry) => entry.id),
+          ...(initialChart.rectangleSeries?.columns ?? []).map((entry) => entry.id),
+        ]);
+        const seedChart = {
+          ...initialChart,
+          seriesBy: chart.seriesBy,
+          headerRow: chart.headerRow,
+          headerColumn: chart.headerColumn,
+          showHidden: chart.showHidden,
+        };
+        const seeds = initialChart.source
+          ? initialChart.source.series
+          : getChartSourceApplicability(seedChart) === "editable"
+            ? createChartSourceFromRange(target.sheet.id, seedChart, target.sheet).series
+            : [];
+        const seedIds = new Set(seeds.map((entry) => entry.id));
+        if (chart.source.series.some((entry) => reserved.has(entry.id) && !seedIds.has(entry.id)))
+          throw new TypeError(
+            "Data selection cannot activate an unrelated dormant series identity.",
+          );
+      }
       const preserved: Partial<SheetChart> = { ...chart };
-      const original: Partial<SheetChart> = normalizeSheetChart(target.initial.chart);
+      const original: Partial<SheetChart> = { ...initialChart };
       for (const key of [
         "range",
         "headerRow",
@@ -96,6 +135,7 @@ export function useChartSourceActions(options: {
         "seriesBy",
         "showHidden",
         "source",
+        "rectangleSeries",
       ] as const) {
         delete preserved[key];
         delete original[key];

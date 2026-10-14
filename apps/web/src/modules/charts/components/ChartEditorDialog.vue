@@ -6,6 +6,7 @@ import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import { normalizeSheetChart, type ChartType } from "@sheetcraft/core/sheet-charts";
+import { reconcileChartRangeSeriesForRange } from "@sheetcraft/core/chart-range-series";
 import type { Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
@@ -121,16 +122,16 @@ const previewDrawing = computed(() => {
     ...draft.value,
     width: 540,
     height: 260,
-    chart: {
-      ...draft.value.chart,
-      range: draft.value.chart.source
+    chart: reconcileChartRangeSeriesForRange(
+      draft.value.chart,
+      draft.value.chart.source
         ? null
         : draft.value.chart.pivotTableId
           ? draft.value.chart.range
           : resolved?.sheetId === props.sheet.id
             ? resolved.range
             : null,
-    },
+    ),
   };
 });
 const types: ChartType[] = [

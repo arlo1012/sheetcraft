@@ -2,6 +2,7 @@
 import { describe, expect, test, vi } from "vitest";
 import type { ChartFormatSettings } from "@sheetcraft/core/chart-format";
 import { createChartSourceFromRange } from "@sheetcraft/core/chart-source";
+import * as chartSourceApi from "@sheetcraft/core/chart-source";
 import { createWorkbookSession } from "@sheetcraft/core/history";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { getSheetChartData, type ChartData, type ChartType } from "@sheetcraft/core/sheet-charts";
@@ -22,6 +23,8 @@ import {
   ChartClipboardSourceErrorReason as Reason,
   planChartClipboardSourceForTarget,
 } from "../../../modules/charts/chart-clipboard-source";
+
+import { createChartOption } from "../../../modules/charts/chart-option";
 
 const allTypes: ChartType[] = [
   "column",
@@ -581,13 +584,18 @@ describe("pure Chart clipboard source provenance", () => {
   );
 
   test.each(["series-1", "series-2"])(
-    "refuses dormant format collision %s, including hidden sources",
+    "allocates around dormant format %s, including hidden sources",
     (id) => {
       const f = fixture();
       f.sourceSheet.hiddenColumns = new Set([2]);
       f.chartDrawing.chart.format!.series!.push({ id, color: "#ff0000" });
       const snapshot = f.before();
-      expectReason(() => f.plan(), Reason.DormantSeriesIdCollision);
+      const planned = f.plan();
+      expect(planned.chart.source!.series.some((entry) => entry.id === id)).toBe(false);
+      expect(planned.chart.format).toEqual(f.chartDrawing.chart.format);
+      expect(presentation(f.read(f.targetSheet, planned))).toEqual(
+        presentation(f.read(f.sourceSheet, f.chartDrawing)),
+      );
       expect(f.before()).toEqual(snapshot);
       // The unchanged same-sheet payload never activates dormant identities.
       expect(f.plan(f.sourceSheet)).toEqual(f.chartDrawing);
@@ -718,5 +726,148 @@ describe("pure Chart clipboard source provenance", () => {
       expectReason(() => f.plan(f.targetSheet, candidate), Reason.InvalidChartPayload);
     expect(reads).toBe(0);
     expect(f.before()).toEqual(snapshot);
+  });
+});
+
+function visibleOptions(value: ReturnType<typeof createChartOption>): unknown {
+  type PaintEntry = {
+    itemStyle?: Record<string, unknown>;
+    lineStyle?: Record<string, unknown>;
+    areaStyle?: Record<string, unknown>;
+  };
+  const option = JSON.parse(
+    JSON.stringify(value, (key, entry: unknown) => (key === "id" ? undefined : entry)),
+  ) as {
+    color: string[];
+    series: Array<PaintEntry & { type: string; data?: PaintEntry[] }>;
+  };
+  // Legacy rectangles let ECharts apply the visible-ordinal palette implicitly.
+  // Promotion makes that same palette explicit; compare their effective paint.
+  const paint = (entry: PaintEntry, index: number, line: boolean, area: boolean) => {
+    const color = option.color[index % option.color.length];
+    entry.itemStyle = { color, ...entry.itemStyle };
+    if (line) entry.lineStyle = { color, ...entry.lineStyle };
+    else delete entry.lineStyle; // ECharts bars do not consume lineStyle.
+    if (area) entry.areaStyle = { color, ...entry.areaStyle };
+  };
+  option.series.forEach((series, index) => {
+    if (series.type === "radar")
+      series.data?.forEach((entry, ordinal) => paint(entry, ordinal, true, false));
+    else paint(series, index, series.type === "line", Object.hasOwn(series, "areaStyle"));
+  });
+  return option;
+}
+
+describe("Chart clipboard bound range identity", () => {
+  test.each(
+    promotableTypes.flatMap((type) =>
+      (["rows", "columns"] as const).flatMap((seriesBy) =>
+        [false, true].map((hidden) => ({ type, seriesBy, hidden })),
+      ),
+    ),
+  )(
+    "$type/$seriesBy hidden=$hidden transfers bound styles and proves actual renderer color/axis/format",
+    ({ type, seriesBy, hidden }) => {
+      const f = fixture(type);
+      const chart = f.chartDrawing.chart;
+      chart.seriesBy = seriesBy;
+      const active = [
+        { index: 0, id: "header" },
+        { index: 1, id: "active-one" },
+        { index: 2, id: "active-two" },
+      ];
+      const inactive = [{ index: 2, id: "inactive" }];
+      chart.rectangleSeries =
+        seriesBy === "rows"
+          ? { rows: active, columns: inactive }
+          : { rows: inactive, columns: active };
+      chart.format!.series!.push(
+        { id: "header", color: "#333333" },
+        { id: "inactive", color: "#444444" },
+        { id: "active-one", color: "#ff0000", strokeWidth: 3, markers: true, smooth: true },
+        { id: "active-two", color: "#00ff00", strokeWidth: 4, markers: false, axis: "secondary" },
+        { id: "series-1", color: "#0000ff" },
+      );
+      if (hidden) {
+        if (seriesBy === "rows") f.sourceSheet.hiddenRows = new Set([1]);
+        else f.sourceSheet.hiddenColumns = new Set([1]);
+      }
+      const before = f.before();
+      const originalData = f.read(f.sourceSheet, f.chartDrawing);
+      expect(f.plan(f.sourceSheet)).toEqual(f.chartDrawing);
+      const result = f.plan();
+      expect(result.chart.range).toBeNull();
+      expect(result.chart.rectangleSeries).toBeUndefined();
+      expect(result.chart.format).toEqual(chart.format);
+      expect(result.chart.source?.series.map((entry) => entry.id)).toEqual([
+        "active-one",
+        "active-two",
+        "series-2",
+      ]);
+      expect(
+        result.chart.source?.series.some((entry) =>
+          ["header", "inactive", "series-1", "dormant"].includes(entry.id),
+        ),
+      ).toBe(false);
+      const promotedData = f.read(f.targetSheet, result);
+      expect(presentation(promotedData)).toEqual(presentation(originalData));
+      expect(visibleOptions(createChartOption(result.chart, promotedData))).toEqual(
+        visibleOptions(createChartOption(chart, originalData)),
+      );
+      expect(f.before()).toEqual(before);
+    },
+  );
+
+  test.each(["inactive", "header", "dormant"])(
+    "rejects a source planner that activates unrelated %s formatting",
+    (id) => {
+      const f = fixture();
+      const chart = f.chartDrawing.chart;
+      chart.rectangleSeries = {
+        rows: [{ index: 2, id: "inactive" }],
+        columns: [
+          { index: 0, id: "header" },
+          { index: 1, id: "active" },
+        ],
+      };
+      chart.format!.series!.push(
+        { id: "inactive", color: "#112233" },
+        { id: "header", color: "#223344" },
+        { id: "active", color: "#ff0000" },
+      );
+      const source = createChartSourceFromRange(f.sourceSheet.id, chart, f.sourceSheet);
+      source.series[0]!.id = id;
+      const before = f.before();
+      const read = vi.spyOn(f.evaluator, "getComputedValue");
+      const planner = vi
+        .spyOn(chartSourceApi, "createChartSourceFromRange")
+        .mockReturnValue(source);
+      try {
+        expectReason(() => f.plan(), Reason.DormantSeriesIdCollision);
+        expect(read).not.toHaveBeenCalled();
+        expect(f.before()).toEqual(before);
+      } finally {
+        planner.mockRestore();
+        read.mockRestore();
+      }
+    },
+  );
+
+  test("malformed bound metadata is refused before evaluating or mutating clipboard state", () => {
+    const f = fixture();
+    Object.assign(f.chartDrawing.chart, {
+      rectangleSeries: {
+        rows: [],
+        columns: [
+          { index: 1, id: "duplicate" },
+          { index: 2, id: "duplicate" },
+        ],
+      },
+    });
+    const read = vi.spyOn(f.evaluator, "getComputedValue");
+    const before = f.before();
+    expectReason(() => f.plan(), Reason.InvalidChartPayload);
+    expect(read).not.toHaveBeenCalled();
+    expect(f.before()).toEqual(before);
   });
 });

@@ -11,7 +11,11 @@ import {
   parseChartSourceValues,
   formatChartSourceName,
   formatChartSourceValues,
+  allocateChartSourceSeriesId,
+  createChartSourceCandidate,
 } from "../../../modules/charts/chart-source-editor";
+import { createChartSourceFromRange } from "@sheetcraft/core/chart-source";
+import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-charts";
 function fixture() {
   const workbook = createWorkbook({ id: "parse", sheetId: "first", sheetName: "Sheet1" });
   const sheet = getActiveSheet(workbook);
@@ -60,5 +64,78 @@ describe("bounded chart source input", () => {
     expect(parseChartSourceName(f.workbook, "=A1:A2", f.sheet.id)).toBeUndefined();
     expect(parseChartSourceCategories(f.workbook, "={1,2,3}", f.sheet.id)).toBeUndefined();
     expect(parseChartSourceCategories(f.workbook, "=A1:B2", f.sheet.id)).toBeUndefined();
+  });
+});
+
+describe("range source identity drafts", () => {
+  test("promotion removes rectangle metadata while retaining live IDs and every format", () => {
+    const chart: SheetChart = {
+      type: "column",
+      range: { start: { row: 0, column: 0 }, end: { row: 3, column: 2 } },
+      title: "Identity source",
+      headerRow: true,
+      headerColumn: true,
+      seriesBy: "columns",
+      legend: true,
+      labels: false,
+      stacked: false,
+      showHidden: false,
+      rectangleSeries: {
+        rows: [{ index: 2, id: "inactive-row" }],
+        columns: [{ index: 1, id: "bound" }],
+      },
+      format: {
+        series: [
+          { id: "bound", color: "#ff0000" },
+          { id: "series-1", color: "#00ff00" },
+        ],
+      },
+    };
+    const before = structuredClone(chart);
+    const source = createChartSourceFromRange("first", chart);
+    expect(source.series.map((entry) => entry.id)).toEqual(["bound", "series-2"]);
+    const promoted = createChartSourceCandidate(chart, source);
+    expect(promoted.rectangleSeries).toBeUndefined();
+    expect(promoted.range).toBeNull();
+    expect(promoted.source?.series).toEqual(source.series);
+    expect(promoted.format).toEqual(chart.format);
+    expect(() => normalizeSheetChart(promoted)).not.toThrow();
+    expect(chart).toEqual(before);
+  });
+
+  test("Add cannot reuse a removed formatted ID or any current source ID", () => {
+    const chart = normalizeSheetChart({
+      type: "column",
+      range: null,
+      title: "Add draft",
+      headerRow: true,
+      headerColumn: true,
+      seriesBy: "columns",
+      legend: true,
+      labels: false,
+      stacked: false,
+      showHidden: false,
+      source: {
+        kind: "series",
+        categories: { kind: "generated" },
+        series: [
+          {
+            id: "series-2",
+            colorIndex: 1,
+            name: { kind: "literal", text: "survivor" },
+            values: { kind: "literal", values: [1] },
+          },
+        ],
+      },
+      format: {
+        series: [
+          { id: "series-1", color: "#ff0000" },
+          { id: "series-3", strokeWidth: 4 },
+        ],
+      },
+    });
+    expect(allocateChartSourceSeriesId(chart, chart.source!)).toBe("series-4");
+    expect(chart.source!.series).toHaveLength(1);
+    expect(chart.format?.series).toHaveLength(2);
   });
 });

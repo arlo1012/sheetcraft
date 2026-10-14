@@ -1,6 +1,12 @@
 import { normalizeChartFormat } from "@sheetcraft/core/chart-format";
 import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-charts";
-import type { ChartFormatIntent, ChartFormatTarget } from "./chart-format-pane";
+import { ensureChartRangeSeriesIdentity } from "@sheetcraft/core/chart-range-series";
+import {
+  isChartRangeBandEditable,
+  resolveChartFormatSeriesId,
+  type ChartFormatIntent,
+  type ChartFormatTarget,
+} from "./chart-format-pane";
 import { applyElementPatch } from "./useChartObjectControls";
 
 function validateDataRecord(value: unknown, keys: readonly string[]): void {
@@ -41,23 +47,38 @@ export function applyChartFormatIntent(
     intent.kind === "chart" &&
     target.kind === "series" &&
     (chart.type === "column" || chart.type === "bar") &&
-    chart.source?.series.some((entry) => entry.id === target.seriesId);
+    (target.rangeBand
+      ? isChartRangeBandEditable(chart, target.rangeBand)
+      : chart.source?.series.some((entry) => entry.id === target.seriesId));
   if (intent.kind !== target.kind && !sharedBarControls)
     throw new TypeError("Chart format belongs to another element.");
   const format = normalizeChartFormat(chart.format ?? {});
+  let prepared = chart;
   if (intent.kind === "series") {
     if (
       target.kind !== "series" ||
       intent.seriesId !== target.seriesId ||
-      !chart.source?.series.some((entry) => entry.id === intent.seriesId)
+      (target.rangeBand
+        ? !isChartRangeBandEditable(chart, target.rangeBand)
+        : !chart.source?.series.some((entry) => entry.id === intent.seriesId))
     )
       throw new TypeError("Chart series identity is unavailable.");
-    const remaining = format.series ?? [];
-    const index = remaining.findIndex((entry) => entry.id === intent.seriesId);
-    if (intent.format !== undefined) {
+    let id = resolveChartFormatSeriesId(chart, target);
+    if (intent.format !== undefined)
       validateDataRecord(intent.format, ["axis", "color", "strokeWidth", "smooth", "markers"]);
+    if (!id) {
+      if (intent.format === undefined || Object.keys(intent.format).length === 0)
+        return normalizeSheetChart(chart);
+      if (!target.rangeBand) throw new TypeError("Chart series identity is unavailable.");
+      const initialized = ensureChartRangeSeriesIdentity(chart, target.rangeBand);
+      prepared = initialized.chart;
+      id = initialized.id;
+    }
+    const remaining = format.series ?? [];
+    const index = remaining.findIndex((entry) => entry.id === id);
+    if (intent.format !== undefined) {
       // The stable ID is supplied by the captured target, never by form data.
-      const next = { ...intent.format, id: intent.seriesId };
+      const next = { ...intent.format, id };
       if (index < 0) remaining.push(next);
       else remaining[index] = next;
     } else if (index >= 0) remaining.splice(index, 1);
@@ -88,7 +109,7 @@ export function applyChartFormatIntent(
     if (intent.format === undefined) delete format.secondaryValueAxis;
     else format.secondaryValueAxis = intent.format;
   } else throw new TypeError("Unknown chart format target.");
-  const next = normalizeSheetChart(chart);
+  const next = normalizeSheetChart(prepared);
   if (Object.keys(format).length) next.format = normalizeChartFormat(format);
   else delete next.format;
   return normalizeSheetChart(next);

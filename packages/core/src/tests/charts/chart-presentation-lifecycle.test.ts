@@ -13,7 +13,12 @@ import {
 import type { RestoreSheetAxisSliceCommand } from "../../commands/contracts.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import { deserializeWorkbook, serializeWorkbook } from "../../serialization.js";
-import { getSheetChartData, normalizeSheetChart, type SheetChart } from "../../sheet-charts.js";
+import {
+  getSheetChartData,
+  normalizeChartDataCache,
+  normalizeSheetChart,
+  type SheetChart,
+} from "../../sheet-charts.js";
 import { normalizeSheetDrawings, type SheetChartDrawing } from "../../sheet-drawings.js";
 import {
   createSheet,
@@ -212,7 +217,8 @@ describe("chart presentation lifecycle, isolation and unchanged raw values", () 
       dataCache: cache,
       presentation: chartPresentation(),
     });
-    expect(read(cached)).toEqual(beforeCache);
+    expect(read(cached)).toEqual(normalizeChartDataCache(beforeCache));
+    expect(read(cached).series.every((entry) => entry.rangeBand === undefined)).toBe(true);
     cached.dataCache!.series[0]!.values[0] = 999;
     cached.presentation!.palette![0] = "#fff";
     expect(cache).toEqual(beforeCache);

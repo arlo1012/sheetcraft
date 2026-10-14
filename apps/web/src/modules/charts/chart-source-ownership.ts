@@ -102,14 +102,22 @@ export function assertChartClipboardSourcePrepared(
   )
     throw new TypeError("Chart source planning cannot promote this legacy source.");
   const source = createChartSourceFromRange(sourceSheet.id, expected.chart, sourceSheet);
+  const axis = expected.chart.seriesBy === "rows" ? "row" : "column";
+  const header =
+    expected.chart.seriesBy === "rows" ? expected.chart.headerRow : expected.chart.headerColumn;
+  const first = expected.chart.range.start[axis] + Number(header);
+  const transferred = new Set(
+    expected.chart.rectangleSeries?.[expected.chart.seriesBy]
+      .filter((binding) => binding.index >= first)
+      .map((binding) => binding.id) ?? [],
+  );
   if (
-    expected.chart.format?.series?.some((entry) =>
-      source.series.some((series) => series.id === entry.id),
+    expected.chart.format?.series?.some(
+      (entry) =>
+        source.series.some((series) => series.id === entry.id) && !transferred.has(entry.id),
     )
   )
     throw new TypeError("Chart source planning cannot activate dormant series styles.");
-  assertChartDrawingPreserved(
-    { ...expected, chart: { ...expected.chart, range: null, source } },
-    candidate,
-  );
+  const { rectangleSeries: _bindings, ...chart } = expected.chart;
+  assertChartDrawingPreserved({ ...expected, chart: { ...chart, range: null, source } }, candidate);
 }

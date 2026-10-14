@@ -252,8 +252,20 @@ export function getChartStyleRecipe(style: ChartStyleId): ChartStyleRecipe {
   return { ...recipe, palette: [...recipe.palette] };
 }
 function clearDefinedSeriesField(chart: SheetChart, field: "color" | "markers"): void {
-  const active = new Set(chart.source?.series.map((entry) => entry.id) ?? []);
+  const active = activeChartSeriesIds(chart);
   for (const series of chart.format?.series ?? []) if (active.has(series.id)) delete series[field];
+}
+function activeChartSeriesIds(chart: SheetChart): Set<string> {
+  if (chart.source) return new Set(chart.source.series.map((entry) => entry.id));
+  if (!chart.range || chart.pivotTableId || chart.dataCache) return new Set();
+  const rows = chart.seriesBy === "rows",
+    axis = rows ? "row" : "column";
+  const first = chart.range.start[axis] + Number(rows ? chart.headerRow : chart.headerColumn);
+  return new Set(
+    chart.rectangleSeries?.[chart.seriesBy]
+      .filter((entry) => entry.index >= first)
+      .map((entry) => entry.id) ?? [],
+  );
 }
 function applyRecipe(chart: SheetChart, recipe: ChartStyleRecipe): void {
   chart.presentation = {
@@ -351,7 +363,7 @@ export function matchesChartStyle(chart: SheetChart, style: ChartStyleId): boole
     )
       return false;
   }
-  const active = new Set(chart.source?.series.map((entry) => entry.id) ?? []);
+  const active = activeChartSeriesIds(chart);
   return !(format.series ?? []).some(
     (series) => active.has(series.id) && series.color !== undefined,
   );

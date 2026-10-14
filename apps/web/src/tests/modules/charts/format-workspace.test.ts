@@ -16,6 +16,7 @@ import PagePrintPreview from "../../../modules/page-layout/components/PagePrintP
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { createAppI18n } from "../../../shared/i18n";
 import { triggerCanvasCell } from "../../app/canvas-interaction";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 const captured = vi.hoisted(() => ({
   controller: undefined as
     | ReturnType<
@@ -110,6 +111,26 @@ function savedWorkbook() {
   sheet.drawings = [drawing("one", "Sales"), drawing("two", "Other")];
   return { revision: 1, savedAt: 1, snapshot: serializeWorkbook(workbook) };
 }
+function savedRangeWorkbook() {
+  const workbook = createWorkbook({ id: "range-workspace", sheetId: "source" });
+  const sheet = getActiveSheet(workbook),
+    node = drawing("one", "Sales");
+  delete node.chart.source;
+  node.chart.range = { start: { row: 0, column: 0 }, end: { row: 3, column: 2 } };
+  sheet.drawings = [node];
+  const values = [
+    ["region", "same", "same"],
+    ["east", 10, 100],
+    ["north", 20, 200],
+    ["south", 30, 300],
+  ];
+  values.forEach((row, r) =>
+    row.forEach((value, c) =>
+      sheet.cells.set(`${r}:${c}`, { content: { kind: "literal", value } }),
+    ),
+  );
+  return { revision: 1, savedAt: 1, snapshot: serializeWorkbook(workbook) };
+}
 function mountWorkspace(load: () => Promise<ReturnType<typeof savedWorkbook> | undefined>) {
   const wrapper = mount(SpreadsheetWorkspace, {
     attachTo: document.body,
@@ -174,6 +195,43 @@ async function number(pane: Pick<VueWrapper, "get">, field: string, value: strin
   await flushPromises();
 }
 describe("chart formatting real Workspace", () => {
+  test("ordinary range series opens through the real ribbon, applies one identity and preserves selection and one Undo", async () => {
+    const wrapper = mountWorkspace(async () => savedRangeWorkbook());
+    await flushPromises();
+    const controller = captured.controller!,
+      sheet = getActiveSheet(controller.session.workbook);
+    await select(wrapper);
+    const before = serializeWorkbook(controller.session.workbook);
+    const pane = await chooseElement(wrapper, "range-series:columns:2");
+    expect(chart(sheet).chart.rectangleSeries).toBeUndefined();
+    expect(controller.session.history.undoStack).toHaveLength(0);
+    expect(pane.props("target")).toMatchObject({
+      kind: "series",
+      rangeBand: { seriesBy: "columns", index: 2 },
+    });
+    const color = pane
+      .findAllComponents(ColorPaletteSelect)
+      .find((item) => item.props("label") === "Series color");
+    if (!color) throw new Error("Missing ordinary series color control");
+    color.vm.$emit("select", "#f12345");
+    await flushPromises();
+    const styled = chart(sheet).chart,
+      id = styled.rectangleSeries?.columns[0]?.id;
+    expect(styled.source).toBeUndefined();
+    expect(styled.range).toEqual({ start: { row: 0, column: 0 }, end: { row: 3, column: 2 } });
+    expect(styled.format?.series).toEqual([{ id, color: "#f12345" }]);
+    expect(wrapper.getComponent(ChartFormatPane).props("target")).toMatchObject({
+      rangeBand: { seriesBy: "columns", index: 2 },
+    });
+    expect(
+      wrapper.getComponent(ChartFormatPane).getComponent(ColorPaletteSelect).props("modelValue"),
+    ).toBe("#f12345");
+    expect(controller.session.history.undoStack).toHaveLength(1);
+    expect(controller.undo()).toBe(true);
+    expect(serializeWorkbook(controller.session.workbook)).toEqual(before);
+    expect(controller.redo()).toBe(true);
+    expect(chart(sheet).chart.format?.series).toEqual([{ id, color: "#f12345" }]);
+  });
   test("ribbon and native chart element departures preserve an active IME draft", async () => {
     const f = await fixture(),
       pane = await chooseElement(f.wrapper, "valueAxis");

@@ -1,5 +1,5 @@
 import { createChartSourceFromRange } from "@sheetcraft/core/chart-source";
-import { getSheetChartData, type ChartData } from "@sheetcraft/core/sheet-charts";
+import { getSheetChartData, type ChartData, type SheetChart } from "@sheetcraft/core/sheet-charts";
 import { normalizeSheetDrawing, type SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 
@@ -104,13 +104,16 @@ function sheetIdentity(sheet: Sheet | undefined): string | undefined {
  * row-oriented/headerless/hidden-column records therefore need not be equal.
  * Other chart types that consume those records must never use this proof.
  */
-function visiblePresentation(data: ChartData): unknown {
+function visiblePresentation(chart: SheetChart, data: ChartData): unknown {
   return {
     categories: data.categories,
     series: data.series.map((entry) => ({
       name: entry.name,
       values: entry.values,
       numberFormat: entry.numberFormat,
+      // The same stable ID must resolve exactly the same per-series paint/axis
+      // settings after promotion; newly allocated IDs have no dormant format.
+      format: chart.format?.series?.find((format) => format.id === entry.id),
     })),
   };
 }
@@ -187,20 +190,33 @@ export function planChartClipboardSourceForTarget(
   try {
     const source = createChartSourceFromRange(sourceId, chart, sourceSheet);
     const sourceIds = new Set(source.series.map((entry) => entry.id));
-    if (chart.format?.series?.some((entry) => sourceIds.has(entry.id)))
+    const range = chart.range!;
+    const axis = chart.seriesBy === "rows" ? "row" : "column";
+    const header = chart.seriesBy === "rows" ? chart.headerRow : chart.headerColumn;
+    const activeBindings = new Set(
+      (chart.rectangleSeries?.[chart.seriesBy] ?? [])
+        .filter((entry) => entry.index >= range.start[axis] + Number(header))
+        .map((entry) => entry.id),
+    );
+    if (
+      chart.format?.series?.some(
+        (entry) => sourceIds.has(entry.id) && !activeBindings.has(entry.id),
+      )
+    )
       fail(
         ChartClipboardSourceErrorReason.DormantSeriesIdCollision,
         "Promotion would activate a dormant Chart series format.",
       );
-    const promoted = { ...chart, range: null, source };
+    const { rectangleSeries: _rectangleSeries, ...rectangle } = chart;
+    const promoted = { ...rectangle, range: null, source };
     const legacyData = getSheetChartData(sourceSheet, chart, evaluator, resolveSheet);
     const promotedData = getSheetChartData(sourceSheet, promoted, evaluator, resolveSheet);
     if (
       promotedData.diagnostics?.some(
         (entry) => entry.code === "broken-reference" || entry.code === "length-mismatch",
       ) ||
-      JSON.stringify(visiblePresentation(legacyData)) !==
-        JSON.stringify(visiblePresentation(promotedData)) ||
+      JSON.stringify(visiblePresentation(chart, legacyData)) !==
+        JSON.stringify(visiblePresentation(promoted, promotedData)) ||
       promotedData.series.some((entry, index) => entry.colorIndex !== index)
     )
       fail(

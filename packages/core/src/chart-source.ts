@@ -246,6 +246,23 @@ export function createChartSourceFromRange(
   const visible = indices.filter((index) => !isHidden(index));
   const hidden = indices.filter(isHidden);
   const palette = new Map([...visible, ...hidden].map((index, slot) => [index, slot]));
+  const reservedIds = new Set([
+    ...(chart.rectangleSeries?.rows ?? []).map((entry) => entry.id),
+    ...(chart.rectangleSeries?.columns ?? []).map((entry) => entry.id),
+    ...(chart.format?.series ?? []).map((entry) => entry.id),
+  ]);
+  const bindings = new Map(
+    (chart.rectangleSeries?.[chart.seriesBy] ?? []).map((entry) => [entry.index, entry.id]),
+  );
+  let generatedSuffix = 1;
+  const nextId = (fixed: number): string => {
+    const existing = bindings.get(fixed);
+    if (existing !== undefined) return existing;
+    while (reservedIds.has(`series-${generatedSuffix}`)) generatedSuffix++;
+    const result = `series-${generatedSuffix++}`;
+    reservedIds.add(result);
+    return result;
+  };
   const vector = (fixed: number): CellRange | null =>
     valuesStart > valuesEnd
       ? null
@@ -261,7 +278,7 @@ export function createChartSourceFromRange(
     series: indices.map((index) => {
       const fixed = seriesStart + index;
       return {
-        id: `series-${index + 1}`,
+        id: nextId(fixed),
         colorIndex: palette.get(index)!,
         name: (rows ? chart.headerColumn : chart.headerRow)
           ? {

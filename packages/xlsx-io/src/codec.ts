@@ -1135,6 +1135,14 @@ export async function encodeWithNativeXlsx(
   let detailedChartFormat = false;
   for (const sheet of sheets) {
     for (const drawing of sheet.drawings ?? []) {
+      if (drawing.kind === "chart" && "rectangleSeries" in drawing.chart) {
+        detailedChartFormat = true;
+        report.add(
+          "feature-omitted",
+          "block",
+          `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.rectangleSeries`,
+        );
+      }
       if (drawing.kind === "chart" && "presentation" in drawing.chart) {
         detailedChartFormat = true;
         report.add(

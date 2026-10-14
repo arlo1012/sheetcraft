@@ -91,7 +91,9 @@ describe("strict ordered chart source and authoritative derived data", () => {
     };
     const derived = getSheetChartData(f.sheet, explicit, createSheetEvaluator(f.sheet));
     expect(derived.categories).toEqual(legacy.categories);
-    expect(derived.series.map(({ name, values }) => ({ name, values }))).toEqual(legacy.series);
+    expect(derived.series.map(({ name, values }) => ({ name, values }))).toEqual(
+      legacy.series.map(({ name, values }) => ({ name, values })),
+    );
     expect(explicit.source.series).toHaveLength(3);
   });
   test("first promotion preserves visible headerless names and palette slots with hidden-first vectors", () => {
@@ -106,7 +108,9 @@ describe("strict ordered chart source and authoritative derived data", () => {
     ]);
     const explicit = { ...rectangular, range: null, source };
     const read = () => getSheetChartData(f.sheet, explicit, createSheetEvaluator(f.sheet));
-    expect(read().series.map(({ name, values }) => ({ name, values }))).toEqual(legacy.series);
+    expect(read().series.map(({ name, values }) => ({ name, values }))).toEqual(
+      legacy.series.map(({ name, values }) => ({ name, values })),
+    );
     expect(read().series[0]).toMatchObject({ id: "series-2", colorIndex: 0 });
     source.series[1]!.name = { kind: "literal", text: "revised" };
     expect(read().series[0]).toMatchObject({ name: "revised", colorIndex: 0 });
@@ -147,7 +151,9 @@ describe("strict ordered chart source and authoritative derived data", () => {
     const explicit = { ...rectangular, range: null, source };
     const read = () => getSheetChartData(f.sheet, explicit, createSheetEvaluator(f.sheet));
     expect(read().categories).toEqual(legacy.categories);
-    expect(read().series.map(({ name, values }) => ({ name, values }))).toEqual(legacy.series);
+    expect(read().series.map(({ name, values }) => ({ name, values }))).toEqual(
+      legacy.series.map(({ name, values }) => ({ name, values })),
+    );
     expect(read().series[0]).toMatchObject({ id: "series-2", colorIndex: 0, values: [30] });
     expect(read().diagnostics).toEqual([{ code: "hidden", role: "values", seriesId: "series-1" }]);
     source.series[1]!.name = { kind: "literal", text: "revised" };
@@ -171,7 +177,9 @@ describe("strict ordered chart source and authoritative derived data", () => {
         createSheetEvaluator(f.sheet),
       );
       expect(explicit.categories).toEqual(legacy.categories);
-      expect(explicit.series.map(({ name, values }) => ({ name, values }))).toEqual(legacy.series);
+      expect(explicit.series.map(({ name, values }) => ({ name, values }))).toEqual(
+        legacy.series.map(({ name, values }) => ({ name, values })),
+      );
       expect(
         explicit.diagnostics?.some(
           ({ role, code }) => role === "categories" && code === "hidden",
@@ -192,7 +200,9 @@ describe("strict ordered chart source and authoritative derived data", () => {
       createSheetEvaluator(f.sheet),
     );
     expect(explicit.categories).toEqual(legacy.categories);
-    expect(explicit.series.map(({ name, values }) => ({ name, values }))).toEqual(legacy.series);
+    expect(explicit.series.map(({ name, values }) => ({ name, values }))).toEqual(
+      legacy.series.map(({ name, values }) => ({ name, values })),
+    );
     expect(explicit.records).toEqual(legacy.records);
     expect(explicit.diagnostics).toEqual([
       { code: "text", role: "name", seriesId: "series-1" },
