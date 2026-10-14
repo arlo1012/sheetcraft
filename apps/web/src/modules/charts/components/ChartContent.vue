@@ -5,7 +5,7 @@ import { getSheetChartData } from "@sheetcraft/core/sheet-charts";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import { init, type EChartsType } from "../chart-runtime";
 import { createChartOption } from "../chart-option";
-import { getChartElementSettings } from "../chart-elements";
+import { createWordCloudLayout } from "../chart-wordcloud-layout";
 import { getChartFormatClickTarget } from "../chart-format-selection";
 import { getChartFormatTargets, type ChartFormatTarget } from "../chart-format-pane";
 import {
@@ -190,51 +190,11 @@ function render() {
     error.value = true;
   }
 }
-const wordTitle = computed(() => {
-  const position = getChartElementSettings(props.drawing.chart).titlePosition;
-  return {
-    show: position !== "none",
-    // Preserve the original word layout until a title placement is explicitly chosen.
-    offset:
-      props.drawing.chart.elements?.titlePosition === undefined
-        ? 30
-        : position === "above" && props.drawing.chart.title
-          ? Math.min(30, props.drawing.height * 0.24)
-          : 0,
-  };
-});
-const words = computed(() => {
-  const source = data.value.categories
-    .map((text, index) => ({ text, value: data.value.series[0]?.values[index] ?? 0 }))
-    .filter((word) => word.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 100);
-  const columns = Math.max(
-    1,
-    Math.ceil(Math.sqrt((source.length * props.drawing.width) / Math.max(1, props.drawing.height))),
-  );
-  const rows = Math.ceil(source.length / columns);
-  const width = props.drawing.width / columns;
-  const height = Math.max(
-    1,
-    (props.drawing.height - wordTitle.value.offset - 5) / Math.max(1, rows),
-  );
-  const max = source[0]?.value ?? 1;
-  return source.map((word, index) => ({
-    ...word,
-    x: ((index % columns) + 0.5) * width,
-    y: (Math.floor(index / columns) + 0.5) * height + wordTitle.value.offset,
-    size: Math.max(
-      6,
-      Math.min(
-        height * 0.8,
-        (width / Math.max(1, [...word.text].length)) * 1.5,
-        12 + 36 * Math.sqrt(word.value / max),
-      ),
-    ),
-    color: ["#2563eb", "#16a34a", "#8b5cf6", "#ef4444", "#f59e0b"][index % 5],
-  }));
-});
+const wordLayout = computed(() =>
+  createWordCloudLayout(props.drawing.chart, data.value, props.drawing),
+);
+const wordTitle = computed(() => wordLayout.value.title);
+const words = computed(() => wordLayout.value.words);
 onMounted(() => {
   render();
   observer = new ResizeObserver(render);

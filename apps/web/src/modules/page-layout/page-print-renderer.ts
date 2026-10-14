@@ -1,3 +1,11 @@
+import {
+  assertChartPrintConsumer,
+  capturePrintChartPass,
+  getPrintChartContentExtent,
+  ChartPrintUnavailableError,
+  type PrintChartPass,
+} from "./page-print-charts";
+import { createPrintChartPixels, preparePrintChartFonts } from "./page-print-chart-pixels";
 import { requireLegacyPictures } from "../sheet-images/picture-document-support";
 import {
   assertEquationPrintConsumer,
@@ -84,6 +92,7 @@ export type PrintPreviewDocument = {
   shapeMetrics: ReturnType<typeof createPrintShapeMetrics>;
   shapeRenderPass: ResolvedShapeForestForRender;
   equationPrintPass?: PrintEquationPass;
+  chartPrintPass?: PrintChartPass;
   sheetName: string;
   fileName: string;
   locale: string;
@@ -229,7 +238,11 @@ export function createPrintPreviewDocument(options: {
   textBoxReferenceResolver?: TextBoxReferenceResolver;
   /** Requires the actual native consumer; rendering still refuses pending/failed math. */
   nativeEquationConsumer?: boolean;
+  nativeChartConsumer?: boolean;
+  resolveChartSheet?: (id: string) => Sheet | undefined;
+  isChartSourceCurrent?: () => boolean;
 }): PrintPreviewDocument {
+  assertChartPrintConsumer(options.sheet, options.nativeChartConsumer);
   assertEquationPrintConsumer(options.sheet, options.nativeEquationConsumer);
   requireLegacyPictures(getPrintablePictureRoots(options.sheet));
   const requested = pageSetupForPrint(
@@ -291,11 +304,25 @@ export function createPrintPreviewDocument(options: {
   const equationExtent = equationPrintPass
     ? getPrintEquationContentExtent(equationPrintPass, shapeMetrics)
     : { rowCount: 0, columnCount: 0 };
+  const chartPrintPass = options.nativeChartConsumer
+    ? capturePrintChartPass({
+        sheet: options.sheet,
+        metrics: shapeMetrics,
+        evaluator: options.evaluator,
+        resolveSheet: options.resolveChartSheet,
+        revision: options.revision,
+        isCurrent: options.isChartSourceCurrent,
+      })
+    : undefined;
+  const chartExtent = chartPrintPass
+    ? getPrintChartContentExtent(chartPrintPass, shapeMetrics)
+    : { rowCount: 0, columnCount: 0 };
   const contentRowCount = Math.max(
     1,
     display.contentExtent.rowCount,
     shapeExtent.rowCount,
     equationExtent.rowCount,
+    chartExtent.rowCount,
     (requested.printArea?.end.row ?? -1) + 1,
   );
   const contentColumnCount = Math.max(
@@ -303,6 +330,7 @@ export function createPrintPreviewDocument(options: {
     display.contentExtent.columnCount,
     shapeExtent.columnCount,
     equationExtent.columnCount,
+    chartExtent.columnCount,
     (requested.printArea?.end.column ?? -1) + 1,
   );
   const rowCount = Math.max(contentRowCount, (requested.printTitles?.rows?.end ?? -1) + 1);
@@ -377,6 +405,7 @@ export function createPrintPreviewDocument(options: {
     shapeMetrics,
     shapeRenderPass,
     equationPrintPass,
+    chartPrintPass,
     sheetName: options.sheetName ?? options.sheet.name,
     fileName: options.fileName ?? "workbook.xlsx",
     locale: options.locale ?? "en-US",
@@ -580,11 +609,13 @@ function drawPrintHeadings(
 export function createPrintPreviewRenderer(
   onImageLoad?: () => void,
   onEquationInvalidated?: () => void,
+  onChartInvalidated?: () => void,
 ) {
   const presentationCache = createCellPresentationCache(browserCellTextMeasurer);
   const images = createCanvasImageCache(() => onImageLoad?.());
   const floatingImages = createFloatingImageCanvasCache(() => onImageLoad?.());
   const equationPixels = createPrintEquationPixels({ onInvalidate: onEquationInvalidated });
+  const chartPixels = createPrintChartPixels({ onInvalidate: onChartInvalidated });
   function render(options: {
     canvas: HTMLCanvasElement;
     document: PrintPreviewDocument;
@@ -601,9 +632,15 @@ export function createPrintPreviewRenderer(
     const density = options.density ?? window.devicePixelRatio ?? 1;
     const { document, page, canvas } = options;
     const equationPass = document.equationPrintPass;
+    const chartPass = document.chartPrintPass;
     const equationDensity = document.pagination.printScale * previewScale * density;
     if (equationPass && !equationPixels.isReady(equationPass, equationDensity))
       throw new Error("Mathematical print layout and fonts are not ready.");
+    if (chartPass && !chartPixels.isReady(chartPass, equationDensity))
+      throw new ChartPrintUnavailableError(
+        chartPass.entries.map((entry) => entry.sourceRoot.id),
+        "Chart print layout and fonts are not ready.",
+      );
     const paperWidth =
       document.pagination.paperSize.width * document.pagination.printScale * previewScale;
     const paperHeight =
@@ -614,6 +651,11 @@ export function createPrintPreviewRenderer(
     canvas.style.height = `${paperHeight}px`;
     const context = canvas.getContext("2d");
     if (!context) {
+      if (chartPass?.entries.length)
+        throw new ChartPrintUnavailableError(
+          chartPass.entries.map((entry) => entry.sourceRoot.id),
+          "The chart page canvas is unavailable.",
+        );
       if (getPrintableShapeRoots(document.sheet).length || equationPass?.entries.length)
         throw new Error("Shape print canvas is unavailable.");
       return;
@@ -754,17 +796,25 @@ export function createPrintPreviewRenderer(
         y: document.rows.getBoundaryOffset(rows.start) ?? 0,
         ...viewportSize,
       };
-      let equationIndex = 0;
-      const paintEquationsBefore = (rootOrder: number) => {
-        if (!equationPass) return;
-        while (
-          equationIndex < equationPass.entries.length &&
-          equationPass.entries[equationIndex]!.order < rootOrder
-        ) {
-          const entry = equationPass.entries[equationIndex++]!;
-          if (entry.root !== entry.sourceNode)
-            throw new Error("A native Equation group leaf was not painted at its source position.");
-          equationPixels.paint(context, equationPass, entry, viewport, equationDensity);
+      let equationIndex = 0,
+        chartIndex = 0;
+      const paintObjectsBefore = (rootOrder: number) => {
+        while (true) {
+          const equation = equationPass?.entries[equationIndex];
+          const chart = chartPass?.entries[chartIndex];
+          const next = Math.min(equation?.order ?? Infinity, chart?.order ?? Infinity);
+          if (next >= rootOrder) return;
+          if (chart && chart.order === next) {
+            chartPixels.paint(context, chartPass!, chart, viewport, equationDensity);
+            chartIndex++;
+          } else if (equation) {
+            if (equation.root !== equation.sourceNode)
+              throw new Error(
+                "A native Equation group leaf was not painted at its source position.",
+              );
+            equationPixels.paint(context, equationPass!, equation, viewport, equationDensity);
+            equationIndex++;
+          }
         }
       };
       const rootOrder = new Map(
@@ -775,7 +825,7 @@ export function createPrintPreviewRenderer(
         metrics: document.shapeMetrics,
         renderPass: document.shapeRenderPass,
         viewport,
-        beforeRoot: (root) => paintEquationsBefore(rootOrder.get(root)!),
+        beforeRoot: (root) => paintObjectsBefore(rootOrder.get(root)!),
         paintEquationLeaf: (leaf) => {
           const entry = equationPass?.entries[equationIndex];
           if (
@@ -796,7 +846,7 @@ export function createPrintPreviewRenderer(
         assetUrls: options.imageAssetUrls,
         images,
       });
-      paintEquationsBefore(Infinity);
+      paintObjectsBefore(Infinity);
       context.restore();
     };
     if (page.titleRows && page.titleColumns) paintFragment(page.titleRows, page.titleColumns, 0, 0);
@@ -813,8 +863,10 @@ export function createPrintPreviewRenderer(
     images.dispose();
     floatingImages.dispose();
     equationPixels.dispose();
+    chartPixels.dispose();
   }
   function assertShapeDocumentCurrent(document: PrintPreviewDocument): void {
+    document.chartPrintPass?.assertCurrent();
     assertPrintShapeRenderPass(
       document.sheet,
       document.shapeMetrics,
@@ -853,6 +905,24 @@ export function createPrintPreviewRenderer(
       equationPixels.isReady(preview.equationPrintPass, preview.pagination.printScale * 2)
     );
   }
+  async function prepareChartFonts(preview: PrintPreviewDocument, owner: { isCurrent(): boolean }) {
+    assertShapeDocumentCurrent(preview);
+    if (preview.chartPrintPass?.entries.length)
+      await preparePrintChartFonts(preview.chartPrintPass, globalThis.document, owner);
+    assertShapeDocumentCurrent(preview);
+  }
+  async function prepareCharts(preview: PrintPreviewDocument, owner: { isCurrent(): boolean }) {
+    assertShapeDocumentCurrent(preview);
+    if (preview.chartPrintPass)
+      await chartPixels.prepare(preview.chartPrintPass, preview.pagination.printScale * 2, owner);
+    assertShapeDocumentCurrent(preview);
+  }
+  function chartsReady(preview: PrintPreviewDocument) {
+    return (
+      !preview.chartPrintPass ||
+      chartPixels.isReady(preview.chartPrintPass, preview.pagination.printScale * 2)
+    );
+  }
   function getShapePaintResources(theme?: WorkbookTheme, urls?: ReadonlyMap<string, string>) {
     return createPicturePaintResources(theme, urls, images);
   }
@@ -862,6 +932,10 @@ export function createPrintPreviewRenderer(
     prepareShapes,
     prepareEquations,
     equationsReady,
+    prepareChartFonts,
+    prepareCharts,
+    chartsReady,
+    clearCharts: () => chartPixels.clear(),
     getShapePaintResources,
     dispose,
   };

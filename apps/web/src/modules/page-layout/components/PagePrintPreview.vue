@@ -13,6 +13,7 @@ import {
 } from "../../sheet-drawings/textbox-reference-display";
 import { ShapePrintError } from "../page-print-shapes";
 import { EquationPrintUnavailableError } from "../page-print-equations";
+import { ChartPrintUnavailableError } from "../page-print-charts";
 import type { SheetPageSetup } from "@sheetcraft/core/page-setup";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { useAppI18n } from "../../../shared/i18n";
@@ -33,6 +34,7 @@ const props = withDefaults(
     dateSystem?: "1900" | "1904";
     workbookRevision?: number;
     textBoxReferenceResolver?: TextBoxReferenceResolver;
+    resolveChartSheet?: (id: string) => Sheet | undefined;
     imageAssetUrls?: ReadonlyMap<string, string>;
     theme?: WorkbookTheme;
   }>(),
@@ -44,6 +46,7 @@ const selected = ref(0);
 const printing = ref(false);
 const renderFailure = ref<string>();
 const equationFailure = ref<string>();
+const chartFailure = ref<string>();
 const thumbnailCanvases = new Map<number, HTMLCanvasElement>();
 const pageCanvas = ref<HTMLCanvasElement>();
 const repaint = ref(0);
@@ -57,13 +60,31 @@ const renderer = createPrintPreviewRenderer(
     equationResourceRevision.value += 1;
     repaint.value += 1;
   },
+  () => {
+    equationResourceRevision.value += 1;
+    repaint.value += 1;
+  },
 );
+
+function captureChartOwner() {
+  const sheet = props.sheet,
+    evaluator = props.evaluator,
+    revision = props.workbookRevision,
+    resolver = props.resolveChartSheet;
+  return () =>
+    props.visible &&
+    props.sheet === sheet &&
+    props.evaluator === evaluator &&
+    props.workbookRevision === revision &&
+    props.resolveChartSheet === resolver;
+}
 
 const previewResult = computed<{
   document?: PrintPreviewDocument;
   errorKey?:
     | "pagePrint.unsupportedPictures"
     | "pagePrint.unsupportedEquations"
+    | "pagePrint.unsupportedCharts"
     | "pagePrint.invalidRange"
     | "drawing.textBoxReferenceUnavailable";
 }>(() => {
@@ -82,19 +103,24 @@ const previewResult = computed<{
       textBoxReferenceResolver: props.textBoxReferenceResolver,
       shapePaintResources: renderer.getShapePaintResources(props.theme, props.imageAssetUrls),
       nativeEquationConsumer: true,
+      nativeChartConsumer: true,
+      resolveChartSheet: props.resolveChartSheet,
+      isChartSourceCurrent: captureChartOwner(),
     });
     return { document: result };
   } catch (error) {
     return {
       errorKey:
-        error instanceof EquationPrintUnavailableError
-          ? "pagePrint.unsupportedEquations"
-          : error instanceof UnsupportedPictureDocumentError
-            ? "pagePrint.unsupportedPictures"
-            : error instanceof ShapePrintError &&
-                error.cause instanceof TextBoxReferenceUnavailableError
-              ? "drawing.textBoxReferenceUnavailable"
-              : "pagePrint.invalidRange",
+        error instanceof ChartPrintUnavailableError
+          ? "pagePrint.unsupportedCharts"
+          : error instanceof EquationPrintUnavailableError
+            ? "pagePrint.unsupportedEquations"
+            : error instanceof UnsupportedPictureDocumentError
+              ? "pagePrint.unsupportedPictures"
+              : error instanceof ShapePrintError &&
+                  error.cause instanceof TextBoxReferenceUnavailableError
+                ? "drawing.textBoxReferenceUnavailable"
+                : "pagePrint.invalidRange",
     };
   }
 });
@@ -103,12 +129,17 @@ const equationPreparing = computed(() => {
   void repaint.value;
   return Boolean(documentPreview.value && !renderer.equationsReady(documentPreview.value));
 });
+const chartPreparing = computed(() => {
+  void repaint.value;
+  return Boolean(documentPreview.value && !renderer.chartsReady(documentPreview.value));
+});
+const preparing = computed(() => equationPreparing.value || chartPreparing.value);
 const pages = computed(() => documentPreview.value?.pages ?? []);
 const activePage = computed(() => pages.value[selected.value] ?? pages.value[0]);
 const canPrevious = computed(() => selected.value > 0);
 const canNext = computed(() => selected.value < pages.value.length - 1);
 const thumbnailPages = computed(() => {
-  if (equationPreparing.value || equationFailure.value) return [];
+  if (preparing.value || equationFailure.value || chartFailure.value) return [];
   const count = pages.value.length;
   const start = Math.max(
     0,
@@ -121,7 +152,7 @@ const thumbnailPages = computed(() => {
 });
 
 function render(): void {
-  if (equationPreparing.value) return;
+  if (preparing.value) return;
   renderFailure.value = undefined;
   try {
     renderPages();
@@ -162,10 +193,18 @@ function setThumbnail(pageNumber: number, element: unknown): void {
   else thumbnailCanvases.delete(pageNumber);
 }
 function close(): void {
+  renderer.clearCharts();
   emit("update:visible", false);
 }
 async function print(): Promise<void> {
-  if (printing.value || !documentPreview.value || equationPreparing.value || renderFailure.value)
+  if (
+    printing.value ||
+    !documentPreview.value ||
+    preparing.value ||
+    equationFailure.value ||
+    chartFailure.value ||
+    renderFailure.value
+  )
     return;
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
@@ -185,7 +224,8 @@ async function print(): Promise<void> {
       fileName = props.fileName,
       locale = props.locale,
       dateSystem = props.dateSystem,
-      textBoxReferenceResolver = props.textBoxReferenceResolver;
+      textBoxReferenceResolver = props.textBoxReferenceResolver,
+      resolveChartSheet = props.resolveChartSheet;
     const isCurrent = () =>
       props.visible &&
       !printWindow.closed &&
@@ -198,7 +238,8 @@ async function print(): Promise<void> {
       props.fileName === fileName &&
       props.locale === locale &&
       props.dateSystem === dateSystem &&
-      props.textBoxReferenceResolver === textBoxReferenceResolver;
+      props.textBoxReferenceResolver === textBoxReferenceResolver &&
+      props.resolveChartSheet === resolveChartSheet;
     const assetIds = getPrintPictureAssetIds(
       document.sheet,
       document.shapeMetrics,
@@ -220,7 +261,8 @@ async function print(): Promise<void> {
       props.fileName !== fileName ||
       props.locale !== locale ||
       props.dateSystem !== dateSystem ||
-      props.textBoxReferenceResolver !== textBoxReferenceResolver
+      props.textBoxReferenceResolver !== textBoxReferenceResolver ||
+      props.resolveChartSheet !== resolveChartSheet
     ) {
       printWindow.close();
       return;
@@ -241,8 +283,13 @@ async function print(): Promise<void> {
       requireReadyGroupPaint: true,
       textBoxReferenceResolver,
       nativeEquationConsumer: true,
+      nativeChartConsumer: true,
+      resolveChartSheet,
+      isChartSourceCurrent: isCurrent,
     });
+    await renderer.prepareChartFonts(document, { isCurrent });
     await renderer.prepareEquations(document, { isCurrent });
+    await renderer.prepareCharts(document, { isCurrent });
     if (!isCurrent()) {
       printWindow.close();
       return;
@@ -319,6 +366,7 @@ watch(
     props.theme,
     props.evaluator,
     props.textBoxReferenceResolver,
+    props.resolveChartSheet,
     props.locale,
     props.dateSystem,
     props.setup,
@@ -327,11 +375,16 @@ watch(
   ],
   async () => {
     const request = ++resourceGeneration;
-    if (!props.visible) return;
+    if (!props.visible) {
+      renderer.clearCharts();
+      return;
+    }
     const document = documentPreview.value;
     if (!document) return;
     equationFailure.value = undefined;
-    const isCurrent = () => request === resourceGeneration && props.visible;
+    chartFailure.value = undefined;
+    const sourceCurrent = captureChartOwner();
+    const isCurrent = () => request === resourceGeneration && sourceCurrent();
     try {
       const urls = [
         ...getPrintPictureAssetIds(document.sheet, document.shapeMetrics, document.shapeRenderPass),
@@ -342,12 +395,16 @@ watch(
         renderer.prepareShapes(document),
       ]);
       if (!isCurrent()) return;
+      await renderer.prepareChartFonts(document, { isCurrent });
       await renderer.prepareEquations(document, { isCurrent });
+      await renderer.prepareCharts(document, { isCurrent });
       if (request === resourceGeneration && props.visible) repaint.value++;
     } catch (error) {
       if (request === resourceGeneration && props.visible) {
         renderFailure.value = error instanceof Error ? error.message : String(error);
-        if (document.equationPrintPass?.entries.length) equationFailure.value = renderFailure.value;
+        if (error instanceof ChartPrintUnavailableError) chartFailure.value = renderFailure.value;
+        else if (document.equationPrintPass?.entries.length)
+          equationFailure.value = renderFailure.value;
       }
     }
   },
@@ -388,6 +445,12 @@ onBeforeUnmount(() => {
         <p v-if="!documentPreview" role="alert">
           {{ t(previewResult.errorKey ?? "pagePrint.invalidRange") }}
         </p>
+        <p v-else-if="chartFailure" role="alert">
+          {{ t("pagePrint.unsupportedCharts") }} {{ chartFailure }}
+        </p>
+        <p v-else-if="chartPreparing && !equationFailure" role="status">
+          {{ t("pagePrint.preparingCharts") }}
+        </p>
         <p v-else-if="equationPreparing && !equationFailure" role="status">
           {{ t("pagePrint.preparingEquations") }}
         </p>
@@ -395,7 +458,7 @@ onBeforeUnmount(() => {
           {{ t("pagePrint.unsupportedEquations") }} {{ equationFailure }}
         </p>
         <canvas v-else ref="pageCanvas" />
-        <p v-if="renderFailure && !equationFailure" role="alert">
+        <p v-if="renderFailure && !equationFailure && !chartFailure" role="alert">
           {{ t("pagePrint.failed") }} {{ renderFailure }}
         </p>
         <p v-if="activePage">
@@ -416,7 +479,13 @@ onBeforeUnmount(() => {
         <TButton
           theme="primary"
           :loading="printing"
-          :disabled="!documentPreview || equationPreparing || Boolean(renderFailure)"
+          :disabled="
+            !documentPreview ||
+            preparing ||
+            Boolean(renderFailure) ||
+            Boolean(equationFailure) ||
+            Boolean(chartFailure)
+          "
           @click="print"
           ><Printer :size="15" aria-hidden="true" />{{ t("pagePrint.print") }}</TButton
         >

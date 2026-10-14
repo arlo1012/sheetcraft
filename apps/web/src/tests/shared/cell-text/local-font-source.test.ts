@@ -380,6 +380,101 @@ describe("explicit local Symbol font source", () => {
     expect(storage.readOne).toHaveBeenCalledWith("a".repeat(64));
   });
 
+  test("print source reads only an exact loaded alias and re-verifies a fresh chosen-file copy", async () => {
+    const chosen = file();
+    const read = vi.spyOn(chosen, "arrayBuffer");
+    const query = vi.fn();
+    Object.assign(window, { queryLocalFonts: query });
+    const font = await module.importLocalSymbolFont(chosen);
+    const originalFace = add.mock.calls[0]![0];
+    const source = await module.readLoadedLocalSymbolFontSource(font.family, bytes.byteLength);
+    expect(source).toMatchObject({ id: font.id, family: font.family, face: originalFace });
+    expect(source?.bytes).toEqual(bytes);
+    expect(source?.bytes).not.toBe(bytes);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(
+      await module.readLoadedLocalSymbolFontSource(font.displayFamily, bytes.byteLength),
+    ).toBeUndefined();
+    expect(await module.readLoadedLocalSymbolFontSource("Arial", bytes.byteLength)).toBeUndefined();
+    expect(
+      await module.readLoadedLocalSymbolFontSource(
+        `SheetcraftLocal_${"a".repeat(64)}`,
+        bytes.byteLength,
+      ),
+    ).toBeUndefined();
+    expect(query).not.toHaveBeenCalled();
+    expect(storage.readOne).not.toHaveBeenCalled();
+    expect(storage.read).not.toHaveBeenCalled();
+    expect(storage.save).not.toHaveBeenCalled();
+  });
+
+  test("print source rejects the remaining-byte cap before reading a chosen Blob", async () => {
+    const chosen = file();
+    const read = vi.spyOn(chosen, "arrayBuffer");
+    const font = await module.importLocalSymbolFont(chosen);
+    read.mockClear();
+    await expect(
+      module.readLoadedLocalSymbolFontSource(font.family, bytes.byteLength - 1),
+    ).rejects.toMatchObject({ code: "size" });
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  test("print source retains only the explicitly selected system Blob, never queries or invokes other handles", async () => {
+    const chosen = file();
+    const selected = systemChoice();
+    selected.blob.mockResolvedValue(chosen);
+    const other = systemChoice("OtherFont");
+    const query = vi.fn(async () => [selected, other]);
+    Object.assign(window, { queryLocalFonts: query });
+    const choices = await module.requestSystemFontChoices();
+    const font = await module.loadSystemFont(choices[0]!.id);
+    expect(
+      await module.readLoadedLocalSymbolFontSource(font.family, bytes.byteLength),
+    ).toMatchObject({ id: font.id });
+    expect(query).toHaveBeenCalledOnce();
+    expect(selected.blob).toHaveBeenCalledOnce();
+    expect(other.blob).not.toHaveBeenCalled();
+  });
+
+  test("print source rereads only a restored exact persisted id, respects metadata cap, and refuses changed bytes", async () => {
+    const id = createHash("sha256").update(new Uint8Array(bytes)).digest("hex");
+    const record = { version: 1, id, bytes, source: "file" };
+    storage.read.mockResolvedValue([record]);
+    const [font] = await module.restoreStoredLocalSymbolFonts();
+    if (!font) throw new Error("Expected restored fixture");
+    await expect(
+      module.readLoadedLocalSymbolFontSource(font.family, bytes.byteLength - 1),
+    ).rejects.toMatchObject({ code: "size" });
+    expect(storage.readOne).not.toHaveBeenCalled();
+    storage.readOne.mockResolvedValue(record);
+    const source = await module.readLoadedLocalSymbolFontSource(font.family, bytes.byteLength);
+    expect(source?.bytes).toEqual(bytes);
+    expect(source?.bytes).not.toBe(bytes);
+    expect(storage.readOne).toHaveBeenCalledWith(id);
+    const changed = bytes.slice(0);
+    new Uint8Array(changed)[16] = new Uint8Array(changed)[16]! ^ 1;
+    storage.readOne.mockResolvedValue({ ...record, bytes: changed });
+    await expect(
+      module.readLoadedLocalSymbolFontSource(font.family, bytes.byteLength),
+    ).rejects.toMatchObject({ code: "storage-corrupt" });
+    expect(storage.save).not.toHaveBeenCalled();
+  });
+
+  test("print source rejects changed selected-file bytes and an unloaded original face", async () => {
+    const chosen = file();
+    const font = await module.importLocalSymbolFont(chosen);
+    const changed = bytes.slice(0);
+    new Uint8Array(changed)[16] = new Uint8Array(changed)[16]! ^ 1;
+    vi.spyOn(chosen, "arrayBuffer").mockResolvedValue(changed);
+    await expect(
+      module.readLoadedLocalSymbolFontSource(font.family, bytes.byteLength),
+    ).rejects.toMatchObject({ code: "storage-corrupt" });
+    add.mock.calls[0]![0].status = "error";
+    expect(
+      await module.readLoadedLocalSymbolFontSource(font.family, bytes.byteLength),
+    ).toBeUndefined();
+  });
+
   test("saved bytes with changed hash are rejected without adding a false alias", async () => {
     storage.readOne.mockResolvedValue({ version: 1, id: "a".repeat(64), bytes, source: "file" });
     await expect(

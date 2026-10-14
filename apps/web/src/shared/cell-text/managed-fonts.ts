@@ -29,6 +29,13 @@ export type ManagedCellFont = (typeof MANAGED_CELL_FONTS)[number];
 export type ManagedCellFontId = ManagedCellFont["id"];
 
 const loading = new Map<string, Promise<void>>();
+const ownedFaces = new Map<string, FontFace>();
+
+/** Read-only identity of an already loaded packaged face; never starts loading. */
+export function getLoadedManagedCellFontFace(family: string): FontFace | undefined {
+  const face = ownedFaces.get(family);
+  return face?.status === "loaded" ? face : undefined;
+}
 
 /** Register/load the exact packaged face, never an unverified local() match. */
 export function ensureManagedCellFont(family: string): Promise<void> {
@@ -44,11 +51,13 @@ export function ensureManagedCellFont(family: string): Promise<void> {
     display: "swap",
   });
   document.fonts.add(face);
+  ownedFaces.set(family, face);
   const promise = face.load().then(
     () => undefined,
     (error: unknown) => {
       document.fonts.delete(face);
       loading.delete(family);
+      ownedFaces.delete(family);
       throw error;
     },
   );

@@ -11,6 +11,7 @@ import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import ChartElementsToolbar from "../../../modules/charts/components/ChartElementsToolbar.vue";
 import ChartElementsControls from "../../../modules/charts/components/ChartElementsControls.vue";
 import ChartFormatPane from "../../../modules/charts/components/ChartFormatPane.vue";
+import PagePrintPreview from "../../../modules/page-layout/components/PagePrintPreview.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { createAppI18n } from "../../../shared/i18n";
 import { triggerCanvasCell } from "../../app/canvas-interaction";
@@ -212,6 +213,22 @@ describe("chart formatting real Workspace", () => {
       chart(getActiveSheet(captured.controller!.session.workbook)).chart.format,
     ).toBeUndefined();
   });
+  test("native print-preview entry supplies the current workbook resolver and fails visibly without verified fonts", async () => {
+    const f = await fixture();
+    const before = serializeWorkbook(f.controller.session.workbook);
+    await f.wrapper.get('[data-ribbon-category="page"]').trigger("click");
+    await f.wrapper.get('[data-page-tool="print-preview"]').trigger("click");
+    await flushPromises();
+    const preview = f.wrapper.getComponent(PagePrintPreview);
+    const resolver = preview.props("resolveChartSheet");
+    expect(resolver).toBeTypeOf("function");
+    expect(resolver?.(f.sheet.id)).toBe(preview.props("sheet"));
+    expect(resolver?.("missing-sheet")).toBeUndefined();
+    expect(document.querySelector('[role="alert"]')?.textContent).toMatch(/Chart/i);
+    expect(serializeWorkbook(f.controller.session.workbook)).toEqual(before);
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+  });
+
   test("real portal keeps owner selection, full numeric draft, one Undo/Redo and source", async () => {
     const f = await fixture(),
       source = normalizeSheetChart(chart(f.sheet).chart).source;

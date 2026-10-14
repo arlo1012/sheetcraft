@@ -2043,6 +2043,11 @@ function getShapePaintAssetSize(id: string) {
       : undefined);
   return image ? { width: image.naturalWidth, height: image.naturalHeight } : undefined;
 }
+const chartPrintSheetResolver = computed(() => {
+  void workbookRevision.value;
+  const workbook = session.workbook;
+  return (id: string) => workbook.sheets.get(id);
+});
 const textBoxReferenceResolver = computed(() => {
   void workbookRevision.value;
   return createTextBoxReferenceResolver({
@@ -6152,6 +6157,7 @@ watch(
       v-model:visible="printPreviewVisible"
       :sheet="activeSheet"
       :evaluator="activeSheetEvaluator"
+      :resolve-chart-sheet="chartPrintSheetResolver"
       :text-box-reference-resolver="textBoxReferenceResolver"
       :setup="activePageSetup"
       :workbook-revision="workbookRevision"

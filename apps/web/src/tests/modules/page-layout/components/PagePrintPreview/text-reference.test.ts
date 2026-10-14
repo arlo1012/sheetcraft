@@ -10,6 +10,12 @@ import { createAppI18n } from "../../../../../shared/i18n";
 
 const renderer = vi.hoisted(() => ({
   render: vi.fn(),
+  chartsReady: () => true,
+  clearCharts: vi.fn(),
+  prepareChartFonts: vi.fn(),
+  prepareCharts: vi.fn(),
+  equationsReady: () => true,
+  prepareEquations: vi.fn(),
   prepareImages: vi.fn(),
   prepareShapes: vi.fn(),
   getShapePaintResources: vi.fn(),

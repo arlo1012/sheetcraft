@@ -51,6 +51,12 @@ const status = shallowRef<LocalSymbolFontStatus>({ state: "idle" });
 const queryStatus = shallowRef<SystemFontQueryStatus>({ state: "idle" });
 const handles = new Map<string, SystemFontData>();
 const pending = new Map<string, Promise<LocalSymbolFont>>();
+// Keep the explicitly selected immutable Blob, not another retained byte buffer.
+// Restored resources retain only their exact persisted identity and byte length.
+const loadedSources = new Map<
+  string,
+  Readonly<{ face: FontFace; blob?: Blob; byteLength: number }>
+>();
 let operationVersion = 0;
 let queryVersion = 0;
 let queryPromise: Promise<readonly SystemSymbolFontChoice[]> | undefined;
@@ -217,6 +223,7 @@ async function register(
   source: "system" | "file",
   options: LocalSymbolFontOptions,
   expected?: Readonly<{ id?: string; postscriptName?: string }>,
+  sourceBlob?: Blob,
 ): Promise<LocalSymbolFont> {
   if (bytes.byteLength <= 0 || bytes.byteLength > LOCAL_FONT_MAX_BYTES)
     throw new LocalSymbolFontError("size");
@@ -271,6 +278,10 @@ async function register(
       source,
       persisted: options.persist === true,
     });
+    loadedSources.set(
+      family,
+      Object.freeze({ face, blob: sourceBlob, byteLength: bytes.byteLength }),
+    );
     fonts.value = Object.freeze([...fonts.value, font]);
     return font;
   })();
@@ -291,19 +302,67 @@ export function loadSystemFont(
     async () => {
       const selected = handles.get(choiceId);
       if (!selected) throw new LocalSymbolFontError("invalid-choice");
-      const bytes = await readBytes(await selected.blob());
-      return register(bytes, "system", options, { postscriptName: selected.postscriptName });
+      const blob = await selected.blob();
+      const bytes = await readBytes(blob);
+      return register(bytes, "system", options, { postscriptName: selected.postscriptName }, blob);
     },
     "file-read",
   );
 }
 
-/** TTF/OTF bytes remain in memory unless this call explicitly requests device storage. */
+/** The chosen TTF/OTF Blob remains available; device storage requires explicit opt-in. */
 export function importLocalSymbolFont(
   file: File,
   options: LocalSymbolFontOptions = {},
 ): Promise<LocalSymbolFont> {
-  return run("loading", async () => register(await readBytes(file), "file", options), "file-read");
+  return run(
+    "loading",
+    async () => register(await readBytes(file), "file", options, undefined, file),
+    "file-read",
+  );
+}
+
+export type LoadedLocalSymbolFontSource = Readonly<{
+  id: string;
+  family: string;
+  face: FontFace;
+  /** Caller-owned copy, verified again against the loaded content-addressed identity. */
+  bytes: ArrayBuffer;
+}>;
+
+/**
+ * Exact already-loaded aliases only. Never scans OS fonts, requests permission,
+ * loads a new face, or writes storage. The cap is checked before reading a Blob
+ * or the one explicitly persisted resource; no print byte buffers are cached.
+ */
+export async function readLoadedLocalSymbolFontSource(
+  family: string,
+  maxBytes: number,
+): Promise<LoadedLocalSymbolFontSource | undefined> {
+  const font = fonts.value.find((entry) => entry.family === family);
+  const source = loadedSources.get(family);
+  if (!font || !source || source.face.status !== "loaded") return undefined;
+  if (
+    !Number.isSafeInteger(maxBytes) ||
+    maxBytes <= 0 ||
+    source.byteLength > Math.min(maxBytes, LOCAL_FONT_MAX_BYTES)
+  )
+    throw new LocalSymbolFontError("size");
+  let bytes: ArrayBuffer;
+  if (source.blob) bytes = await readBytes(source.blob);
+  else {
+    if (!font.persisted) return undefined;
+    const record = await readStoredLocalSymbolFont(font.id);
+    if (!record || record.id !== font.id || record.source !== font.source)
+      throw new LocalSymbolFontError("storage-corrupt");
+    bytes = record.bytes;
+  }
+  if (bytes.byteLength !== source.byteLength || bytes.byteLength > maxBytes)
+    throw new LocalSymbolFontError("storage-corrupt");
+  if ((await fingerprint(bytes)) !== font.id) throw new LocalSymbolFontError("storage-corrupt");
+  if (loadedSources.get(family) !== source || source.face.status !== "loaded")
+    throw new LocalSymbolFontError("font-load");
+  return Object.freeze({ id: font.id, family, face: source.face, bytes: bytes.slice(0) });
 }
 
 async function restore(record: StoredLocalSymbolFont): Promise<LocalSymbolFont> {

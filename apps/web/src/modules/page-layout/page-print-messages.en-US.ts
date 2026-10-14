@@ -2,6 +2,10 @@ import type { PagePrintMessageSchema } from "./page-print-messages";
 
 export const pagePrintEnUS = {
   pagePrint: {
+    unsupportedCharts:
+      "Chart data, fonts or pixels could not be verified. Printing is stopped so charts are not silently omitted. Your workbook is unchanged.",
+    preparingCharts: "Preparing chart layout and fonts…",
+
     unsupportedEquations:
       "Equation printing is unavailable because mathematical layout or fonts could not be verified. No blank print will be generated, and your workbook is unchanged.",
     preparingEquations: "Preparing mathematical layout and fonts…",

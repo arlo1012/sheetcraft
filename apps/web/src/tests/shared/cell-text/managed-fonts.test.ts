@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { MANAGED_CELL_FONTS, ensureManagedCellFont } from "../../../shared/cell-text/managed-fonts";
+import {
+  MANAGED_CELL_FONTS,
+  ensureManagedCellFont,
+  getLoadedManagedCellFontFace,
+} from "../../../shared/cell-text/managed-fonts";
 
 const originalFonts = Object.getOwnPropertyDescriptor(document, "fonts");
 afterEach(() => {
@@ -13,11 +17,14 @@ function fixture(load: () => Promise<unknown>) {
   const removed: unknown[] = [];
   const constructed: unknown[][] = [];
   class Face {
+    status = "unloaded";
     constructor(...args: unknown[]) {
       constructed.push(args);
     }
-    load() {
-      return load();
+    async load() {
+      await load();
+      this.status = "loaded";
+      return this;
     }
   }
   vi.stubGlobal("FontFace", Face);
@@ -43,6 +50,25 @@ describe("exact managed cell-font loading", () => {
     await ensureManagedCellFont("Unverified System Font");
     expect(state.constructed).toEqual([]);
     expect(state.added).toEqual([]);
+    expect(getLoadedManagedCellFontFace("Unverified System Font")).toBeUndefined();
+    expect(getLoadedManagedCellFontFace("Noto Sans")).toBeUndefined();
+  });
+  test("trusted source lookup never loads and returns only the exact successfully loaded owned face", async () => {
+    let finish!: () => void;
+    const state = fixture(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    expect(getLoadedManagedCellFontFace("Noto Sans")).toBeUndefined();
+    expect(state.constructed).toEqual([]);
+    const pending = ensureManagedCellFont("Noto Sans");
+    expect(getLoadedManagedCellFontFace("Noto Sans")).toBeUndefined();
+    finish();
+    await pending;
+    expect(getLoadedManagedCellFontFace("Noto Sans")).toBe(state.added[0]);
+    expect(state.constructed).toHaveLength(1);
   });
   test("loads packaged bytes once, without local(), and only resolves after actual load", async () => {
     let resolve!: () => void;
@@ -76,6 +102,7 @@ describe("exact managed cell-font loading", () => {
       failed ? Promise.reject(new Error("font asset failed")) : Promise.resolve(),
     );
     await expect(ensureManagedCellFont("Noto Sans Symbols")).rejects.toThrow("font asset failed");
+    expect(getLoadedManagedCellFontFace("Noto Sans Symbols")).toBeUndefined();
     expect(state.removed).toEqual(state.added);
     failed = false;
     await ensureManagedCellFont("Noto Sans Symbols");

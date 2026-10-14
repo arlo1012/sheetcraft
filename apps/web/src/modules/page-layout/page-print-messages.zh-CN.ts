@@ -2,6 +2,10 @@ import type { PagePrintMessageSchema } from "./page-print-messages";
 
 export const pagePrintZhCN = {
   pagePrint: {
+    unsupportedCharts:
+      "无法核验图表数据、字体或实际画面，已停止打印，避免图表被静默省略。工作簿未改动。",
+    preparingCharts: "正在准备图表排版与字体…",
+
     unsupportedEquations:
       "无法核验公式排版或字体，当前不能打印。不会生成缺失公式的空白打印，工作簿未改动。",
     preparingEquations: "正在准备公式排版与字体…",
