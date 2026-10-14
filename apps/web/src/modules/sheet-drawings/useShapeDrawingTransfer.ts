@@ -1,4 +1,10 @@
 import {
+  assertChartDrawingPreserved,
+  captureChartDrawingForest,
+  assertChartForestPreserved,
+  detachChartDrawingForest,
+} from "../charts/chart-source-ownership";
+import {
   createReplaceSheetDrawingCollectionsCommand,
   type WorkbookCommand,
 } from "@sheetcraft/core/commands";
@@ -6,7 +12,7 @@ import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics"
 import { isShapeGroupDrawing, traverseShapeGroup } from "@sheetcraft/core/shape-group";
 import { normalizeShapeDrawingForest } from "@sheetcraft/core/shape-group-planning";
 import { canEditSheetDrawingCollection } from "@sheetcraft/core/shape-protection";
-import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import { normalizeSheetDrawing, type SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, Workbook } from "@sheetcraft/core/workbook";
 import {
   assertEquationForestSourcesPreserved,
@@ -90,9 +96,11 @@ export function useShapeDrawingTransfer(options: {
           }
         return result;
       };
+      const capturedChartForests = leases.map((lease) => captureChartDrawingForest(lease.next));
       const prepared = leases.map((lease, index) => {
         const proposed = normalizeShapeDrawingForest(lease.next);
         assertEquationForestSourcesPreserved(lease.expected, proposed);
+        const capturedCharts = captureChartDrawingForest(proposed);
         const priorNodes = nodes(lease.expected),
           incoming = nodes(proposed);
         const sourceNodes = nodes(leases[1 - index]!.expected);
@@ -133,13 +141,21 @@ export function useShapeDrawingTransfer(options: {
           const candidate =
             owner && fingerprints.get(drawing.id) === JSON.stringify(drawing)
               ? owner
-              : options.prepareDrawing(lease.sheet, lease.metrics, drawing, owner, proposed);
+              : options.prepareDrawing(
+                  lease.sheet,
+                  lease.metrics,
+                  drawing,
+                  owner?.kind === "chart" ? normalizeSheetDrawing(owner) : owner,
+                  proposed,
+                );
           if (candidate.id !== drawing.id || candidate.kind !== drawing.kind || !current())
             throw new Error("The transfer changed an object identity.");
           assertEquationSourcePreserved(drawing, candidate);
+          assertChartDrawingPreserved(drawing, candidate);
           return candidate;
         });
         assertEquationForestSourcesPreserved(proposed, drawings);
+        assertChartForestPreserved(capturedCharts, drawings);
         const preparedNodes = nodes(drawings);
         for (const [id, node] of incoming)
           if (node.kind === "equation") {
@@ -148,7 +164,11 @@ export function useShapeDrawingTransfer(options: {
               throw new TypeError("A prepared mathematical transfer lost its source.");
             assertEquationGeometryPreserved(node, preparedNode);
           }
-        const pass = resolveShapeForestForRender({ drawings, metrics: lease.metrics, revision });
+        const pass = resolveShapeForestForRender({
+          drawings: detachChartDrawingForest(drawings),
+          metrics: lease.metrics,
+          revision,
+        });
         const connected = drawings.some((root) =>
           isShapeGroupDrawing(root)
             ? traverseShapeGroup(root).some(({ node }) => "shapeConnector" in node)
@@ -160,6 +180,9 @@ export function useShapeDrawingTransfer(options: {
           throw new Error("The transfer owner or permissions changed.");
         return { sheetId: lease.sheet.id, expectedDrawings: lease.expected, drawings };
       });
+      prepared.forEach((entry, index) =>
+        assertChartForestPreserved(capturedChartForests[index]!, entry.drawings),
+      );
       const command = createReplaceSheetDrawingCollectionsCommand(prepared);
       const applied = () =>
         options.getWorkbook() === workbook &&
@@ -171,6 +194,9 @@ export function useShapeDrawingTransfer(options: {
               JSON.stringify(entry.drawings),
         );
       if (!current()) return false;
+      command.collections.forEach((entry, index) =>
+        assertChartForestPreserved(capturedChartForests[index]!, entry.drawings),
+      );
       try {
         options.execute(command);
       } catch {

@@ -136,6 +136,57 @@ function fixture(drawings: SheetDrawing[] = [group(), wordArt()]) {
 }
 
 describe("guarded document-local shape clipboard", () => {
+  test.each(["copy", "cut"] as const)("%s cannot retarget a stale capture during flush", (mode) => {
+    const f = fixture([shape("same-id")]);
+    try {
+      f.select([["same-id"]]);
+      f.destination.drawings = [shape("same-id", 400, 250)];
+      f.flush.mockImplementationOnce(() => {
+        f.switchSheet();
+        return true;
+      });
+      const before = serializeWorkbook(f.workbook);
+      expect(f.clipboard[mode]()).toBe(false);
+      expect(f.clipboard.hasPending()).toBe(false);
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+      expect(f.core.history.undoStack).toHaveLength(0);
+    } finally {
+      f.scope.stop();
+    }
+  });
+
+  test("paste cannot silently use an address changed by flush", () => {
+    const f = fixture();
+    try {
+      expect(f.clipboard.copy()).toBe(true);
+      const identity = f.clipboard.getIdentity();
+      f.flush.mockImplementationOnce(() => {
+        f.address({ row: 15, column: 12 });
+        return true;
+      });
+      const before = serializeWorkbook(f.workbook);
+      expect(f.clipboard.paste()).toBe(false);
+      expect(f.clipboard.getIdentity()).toEqual(identity);
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+      expect(f.core.history.undoStack).toHaveLength(0);
+    } finally {
+      f.scope.stop();
+    }
+  });
+
+  test("normal cell flush revision changes do not reject Copy", () => {
+    const f = fixture();
+    try {
+      f.flush.mockImplementationOnce(() => {
+        f.change("revision");
+        return true;
+      });
+      expect(f.clipboard.copy()).toBe(true);
+      expect(f.clipboard.hasPending()).toBe(true);
+    } finally {
+      f.scope.stop();
+    }
+  });
   test("copy is detached, repeatable and commits each complete group in one reversible transaction", () => {
     const f = fixture();
     try {

@@ -6,7 +6,10 @@ import {
   traverseShapeGroup,
   type ShapeGroupPath,
 } from "@sheetcraft/core/shape-group";
-import { normalizeShapeDrawingForest } from "@sheetcraft/core/shape-group-planning";
+import {
+  normalizeChartClipboardForest as normalizeShapeDrawingForest,
+  assertChartClipboardSourcePrepared,
+} from "../charts/chart-source-ownership";
 import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { CellAddress, Sheet, Workbook } from "@sheetcraft/core/workbook";
@@ -43,6 +46,12 @@ export type ShapeClipboardOptions = {
     collections: readonly [ShapeDrawingTransferCollection, ShapeDrawingTransferCollection],
     guard: () => boolean,
   ) => boolean;
+  /** Detached source-only planning before placement; legacy Charts must keep their originating data. */
+  prepareRootsForTarget?: (
+    roots: readonly SheetDrawing[],
+    sourceSheet: Sheet,
+    targetSheet: Sheet,
+  ) => readonly SheetDrawing[];
   createId?: () => string;
   flush?: () => boolean;
   isBusy?: () => boolean;
@@ -173,6 +182,7 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
       options.getGeneration() === expected.generation &&
       options.getRevision() === expected.revision &&
       options.getMetrics() === expected.metrics &&
+      geometryFingerprint(expected.sheet) === expected.geometryFingerprint &&
       current.length === expected.expected.length &&
       current.every((root, index) => root === expected.expected[index]) &&
       fingerprint === expected.fingerprint
@@ -205,6 +215,44 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
       );
     });
   }
+  function sameNavigation(before: Owner): boolean {
+    return (
+      options.getWorkbook() === before.workbook &&
+      options.getSheet() === before.sheet &&
+      options.getGeneration() === before.generation &&
+      before.workbook.sheets.get(before.sheetId) === before.sheet
+    );
+  }
+  function prepareSelection(captured: Pending, target: Owner): ShapeClipboardSelection {
+    const original = normalizeShapeDrawingForest(captured.selection.roots);
+    if (!options.prepareRootsForTarget) {
+      if (target.sheet !== captured.owner.sheet && original.some((root) => root.kind === "chart"))
+        throw new ShapeClipboardError("chart-source-unsupported");
+      return captured.selection;
+    }
+    // A host source planner cannot mutate the captured clipboard or a non-Chart sibling.
+    const prepared = normalizeShapeDrawingForest(
+      options.prepareRootsForTarget(
+        normalizeShapeDrawingForest(original),
+        captured.owner.sheet,
+        target.sheet,
+      ),
+    );
+    if (prepared.length !== original.length) throw new ShapeClipboardError("chart-source-invalid");
+    try {
+      prepared.forEach((root, index) =>
+        assertChartClipboardSourcePrepared(
+          original[index]!,
+          root,
+          captured.owner.sheet,
+          target.sheet,
+        ),
+      );
+    } catch {
+      throw new ShapeClipboardError("chart-source-invalid");
+    }
+    return { ...captured.selection, roots: prepared };
+  }
   function sameIdentity(identity: ShapeClipboardIdentity): boolean {
     return (
       !!pending &&
@@ -225,14 +273,25 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
     working = true;
     const started = operation;
     try {
+      const before = owner();
+      if (!before) throw new ShapeClipboardError("unavailable-owner");
+      const requested = captureShapeClipboardSelection(
+        before.expected,
+        paths ?? options.getSelectedPaths(),
+        before.metrics,
+      ).selectedPaths;
+      const selectedOwners = requested.map((path) =>
+        before.expected.find((root) => root.id === path[0]),
+      );
       if (options.flush?.() === false) throw new ShapeClipboardError("unavailable-owner");
+      if (
+        !sameNavigation(before) ||
+        selectedOwners.some((root) => !root || !before.sheet.drawings?.includes(root))
+      )
+        throw new ShapeClipboardError("stale-owner");
       const source = owner();
       if (!source) throw new ShapeClipboardError("unavailable-owner");
-      const selection = captureShapeClipboardSelection(
-        source.expected,
-        paths ?? options.getSelectedPaths(),
-        source.metrics,
-      );
+      const selection = captureShapeClipboardSelection(source.expected, requested, source.metrics);
       const next: Pending = {
         identity: Object.freeze({
           token: idFactory("shape-clipboard"),
@@ -268,7 +327,17 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
     working = true;
     const started = operation;
     try {
+      const before = owner();
+      const navigationAddress = { ...options.getTargetAddress() };
+      const requestedAddress = { ...(address ?? navigationAddress) };
+      if (!before) throw new ShapeClipboardError("unavailable-owner");
       if (options.flush?.() === false) throw new ShapeClipboardError("unavailable-owner");
+      if (
+        !sameNavigation(before) ||
+        options.getTargetAddress().row !== navigationAddress.row ||
+        options.getTargetAddress().column !== navigationAddress.column
+      )
+        throw new ShapeClipboardError("stale-owner");
       const target = owner();
       if (!target) throw new ShapeClipboardError("unavailable-owner");
       if (
@@ -284,7 +353,6 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
       if (!sourceAllowed(captured)) throw new ShapeClipboardError("source-protected");
       if (!canUseSheetPermission(target.sheet, "editObjects"))
         throw new ShapeClipboardError("target-protected");
-      const navigationAddress = { ...options.getTargetAddress() };
       const guard = () =>
         operation === started &&
         pending === captured &&
@@ -294,6 +362,8 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
         (captured.mode !== "cut" || currentCutSource(captured.owner)) &&
         sourceAllowed(captured) &&
         canUseSheetPermission(target.sheet, "editObjects");
+      const selection = prepareSelection(captured, target);
+      if (!guard()) throw new ShapeClipboardError("stale-owner");
       const complete = () => {
         if (captured.mode === "cut" && pending === captured) clear(captured.identity);
         try {
@@ -305,11 +375,11 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
       let placedPaths: readonly ShapeGroupPath[] = [];
       if (crossSheet) {
         const plan = planCrossSheetShapeClipboardCut({
-          selection: captured.selection,
+          selection,
           targetForest: target.expected,
           sourceMetrics: captured.owner.metrics,
           targetMetrics: target.metrics,
-          address: address ?? options.getTargetAddress(),
+          address: requestedAddress,
           createId,
         });
         placedPaths = plan.roots.map((root) => [root.id]);
@@ -368,12 +438,12 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
         return false;
       }
       const plan = planShapeClipboardPaste({
-        selection: captured.selection,
+        selection,
         mode: captured.mode,
         targetForest: target.expected,
         sourceMetrics: captured.owner.metrics,
         targetMetrics: target.metrics,
-        address: address ?? options.getTargetAddress(),
+        address: requestedAddress,
         createId,
       });
       placedPaths = plan.roots.map((root) => [root.id]);

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PictureContextSourceAction } from "../modules/sheet-images/picture-context-source-action";
 import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
-import { getCellContent, getCellStyle } from "@sheetcraft/core/workbook";
+import { getCellContent, getCellStyle, createWorkbookEvaluator } from "@sheetcraft/core/workbook";
 import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
 import { useWordProofreading } from "../modules/text-proofreading/useWordProofreading";
 import ProofreadingToolbar from "../modules/text-proofreading/components/ProofreadingToolbar.vue";
@@ -200,6 +200,11 @@ import {
   type ShapeGroupPath,
 } from "@sheetcraft/core/shape-group";
 import { useWordArtActions } from "../modules/sheet-drawings/useWordArtActions";
+import {
+  planChartClipboardSourceForTarget,
+  ChartClipboardSourceError,
+} from "../modules/charts/chart-clipboard-source";
+import { ShapeClipboardError } from "../modules/sheet-drawings/shape-clipboard-planning";
 import { useShapeClipboard } from "../modules/sheet-drawings/useShapeClipboard";
 import { useShapeDrawingTransfer } from "../modules/sheet-drawings/useShapeDrawingTransfer";
 import ShapeClipboardTransferDialog from "../modules/sheet-drawings/components/ShapeClipboardTransferDialog.vue";
@@ -2693,6 +2698,34 @@ const shapeClipboard = useShapeClipboard({
   getTargetAddress: () => activeAddress.value,
   replaceCollection: drawingActions.replaceCollectionPreservingGeometry,
   replaceCollections: shapeDrawingTransfer.replaceCollections,
+  prepareRootsForTarget: (roots, sourceSheet, targetSheet) => {
+    if (!roots.some((drawing) => drawing.kind === "chart")) return roots;
+    const workbook = session.workbook;
+    try {
+      const evaluator = createWorkbookEvaluator(workbook, sourceSheet.id);
+      return roots.map((drawing) =>
+        drawing.kind === "chart"
+          ? planChartClipboardSourceForTarget({
+              drawing,
+              sourceSheet,
+              targetSheet,
+              evaluator,
+              resolveSheet: (id) => workbook.sheets.get(id),
+            })
+          : drawing,
+      );
+    } catch (error) {
+      throw new ShapeClipboardError(
+        error instanceof ChartClipboardSourceError &&
+          (error.reason === "unsupported-legacy-source" ||
+            error.reason === "unsupported-pivot-source" ||
+            error.reason === "dormant-series-id-collision" ||
+            error.reason === "non-equivalent-source")
+          ? "chart-source-unsupported"
+          : "chart-source-invalid",
+      );
+    }
+  },
   flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || !!shapeTextEdit.snapshot.value,
   onSelect: (paths) => {
@@ -2746,14 +2779,22 @@ const shapeClipboard = useShapeClipboard({
       locale.value === "zh-CN"
         ? owningGroup
           ? "此成员继承组的三维场景或组合效果。请复制所属组以保留完整外观。"
-          : reason === "cross-sheet-cut"
-            ? "暂不支持跨工作表剪切形状。请使用复制；原对象已保留。"
-            : "无法复制、剪切或粘贴此形状。请检查对象权限及当前选区，原对象和剪贴板已保留。"
+          : reason === "chart-source-unsupported"
+            ? "此图表的旧范围或透视来源暂不能跨表移动而保持数据含义。请在当前工作表粘贴，或先在选择数据中设置明确的系列来源；原图和剪贴板已保留。"
+            : reason === "chart-source-invalid"
+              ? "图表来源或所在工作表已变化，未执行粘贴。请重新复制图表；原图和剪贴板已保留。"
+              : reason === "cross-sheet-cut"
+                ? "此对象暂不能跨工作表剪切。请使用复制；原对象已保留。"
+                : "无法复制、剪切或粘贴此形状。请检查对象权限及当前选区，原对象和剪贴板已保留。"
         : owningGroup
           ? "Copy the owning group to retain its shared 3D scene and composited effects."
-          : reason === "cross-sheet-cut"
-            ? "Cross-sheet shape cut is not supported yet. Use Copy; the original is kept."
-            : "The shape clipboard action was not applied. Check permissions and selection; the original and clipboard are kept.",
+          : reason === "chart-source-unsupported"
+            ? "This legacy or Pivot chart cannot move across sheets while preserving its data meaning. Paste on its original sheet or configure explicit series in Select Data first; the original and clipboard are kept."
+            : reason === "chart-source-invalid"
+              ? "The chart source or owning sheet changed. Copy the chart again; the original and clipboard are kept."
+              : reason === "cross-sheet-cut"
+                ? "This object cannot be cut across sheets yet. Use Copy; the original is kept."
+                : "The shape clipboard action was not applied. Check permissions and selection; the original and clipboard are kept.",
     );
   },
 });

@@ -6,7 +6,11 @@ import {
   resolveShapeRootLayout,
   type ShapeGroupEligibleRoot,
 } from "@sheetcraft/core/shape-group-planning";
-import type { SheetDrawing, SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type {
+  SheetDrawing,
+  SheetGraphicDrawing,
+  SheetChartDrawing,
+} from "@sheetcraft/core/sheet-drawings";
 import {
   isFramedEquationDrawing,
   type SheetFramedEquationDrawing,
@@ -15,23 +19,25 @@ import { resolveShapeFrame } from "@sheetcraft/core/shape-frame";
 
 export type DrawingClipboardEligibleRoot =
   | ShapeGroupEligibleRoot
+  | SheetChartDrawing
   | SheetFramedEquationDrawing
   | (SheetGraphicDrawing & { kind: "equation" });
 
-/** Clipboard admission preserves Equation source across independent and owned objects. */
+/** Clipboard admission preserves Chart and Equation source across independent and owned objects. */
 export function isDrawingClipboardEligibleRoot(
   value: SheetDrawing,
 ): value is DrawingClipboardEligibleRoot {
-  return isShapeGroupEligibleRoot(value) || value.kind === "equation";
+  return isShapeGroupEligibleRoot(value) || value.kind === "equation" || value.kind === "chart";
 }
 
-/** Legacy equation placement is resolved without promoting it into a shape frame or member. */
+/** Legacy equation/chart placement is resolved without promoting it into a shape frame or member. */
 export function resolveDrawingClipboardRootLayout(
   value: DrawingClipboardEligibleRoot,
   metrics: PictureSheetMetrics,
 ): ResolvedShapeFrame {
-  if (value.kind !== "equation") return resolveShapeRootLayout(value, metrics);
-  if (isFramedEquationDrawing(value))
+  if (value.kind !== "equation" && value.kind !== "chart")
+    return resolveShapeRootLayout(value, metrics);
+  if (value.kind === "equation" && isFramedEquationDrawing(value))
     return resolveShapeFrame(value.shapeFrame, metrics, value.rotation);
   return resolvePictureLayout(
     {

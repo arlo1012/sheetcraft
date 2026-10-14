@@ -1,3 +1,9 @@
+import {
+  assertChartDrawingPreserved,
+  captureChartDrawingForest,
+  assertChartForestPreserved,
+  detachChartDrawingForest,
+} from "../charts/chart-source-ownership";
 import { computed, ref } from "vue";
 import {
   assertEquationSourcePreserved,
@@ -308,8 +314,9 @@ export function useDrawingActions(options: {
       )
         return false;
       // Equal canonical data is a legitimate no-op, including a detached clone.
-      const proposed = [...next];
+      const proposed = detachChartDrawingForest(next);
       assertEquationForestSourcesPreserved(binding.expected, proposed, rawEquationEditorOwner);
+      const capturedCharts = captureChartDrawingForest(proposed);
       if (visibilityOnly) {
         const nextVisibility = normalizeShapeDrawingForest(proposed);
         const oldVisibility = normalizeShapeDrawingForest(binding.expected).map((root, index) => {
@@ -357,17 +364,20 @@ export function useDrawingActions(options: {
           !!owner &&
           (drawing === owner ||
             canonicalOwners.get(id) === JSON.stringify(normalizeSheetDrawing(drawing)));
+        const preparationOwner = owner?.kind === "chart" ? normalizeSheetDrawing(owner) : owner;
         const candidate = unchanged
           ? owner
           : ((preparationMode
-              ? options.prepareDrawing?.(drawing, owner, proposed, preparationMode)
-              : options.prepareDrawing?.(drawing, owner, proposed)) ?? drawing);
+              ? options.prepareDrawing?.(drawing, preparationOwner, proposed, preparationMode)
+              : options.prepareDrawing?.(drawing, preparationOwner, proposed)) ?? drawing);
         if (candidate.id !== id || candidate.kind !== kind || !currentCollection(binding))
           return false;
         assertEquationGeometryPreserved(drawing, candidate);
+        assertChartDrawingPreserved(drawing, candidate);
         prepared.push(candidate);
       }
       assertEquationForestGeometryPreserved(proposed, prepared);
+      assertChartForestPreserved(capturedCharts, prepared);
       const command = createSetSheetDrawingsCommand(binding.sheet.id, prepared);
       const connected = command.drawings.some((root) =>
         isShapeGroupDrawing(root)
@@ -377,7 +387,7 @@ export function useDrawingActions(options: {
       if (connected) {
         if (!binding.metrics) return false;
         const pass = resolveShapeForestForRender({
-          drawings: command.drawings,
+          drawings: detachChartDrawingForest(command.drawings),
           metrics: binding.metrics,
           revision: binding.revision ?? 0,
         });
@@ -389,6 +399,7 @@ export function useDrawingActions(options: {
         !currentCollection(binding)
       )
         return false;
+      assertChartForestPreserved(capturedCharts, command.drawings);
       const appliedData = JSON.stringify(command.drawings);
       const applied = () =>
         options.getWorkbook() === binding.workbook &&
@@ -399,6 +410,7 @@ export function useDrawingActions(options: {
       if (applied()) return true;
       // Recheck the complete lease immediately before the single atomic command.
       if (!currentCollection(binding)) return false;
+      assertChartForestPreserved(capturedCharts, command.drawings);
       try {
         options.execute(command);
       } catch {

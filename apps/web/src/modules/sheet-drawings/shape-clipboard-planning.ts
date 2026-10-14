@@ -43,6 +43,8 @@ export type ShapeClipboardFailure =
   | "source-protected"
   | "target-protected"
   | "cross-sheet-cut"
+  | "chart-source-unsupported"
+  | "chart-source-invalid"
   | "command-rejected";
 
 export class ShapeClipboardError extends Error {

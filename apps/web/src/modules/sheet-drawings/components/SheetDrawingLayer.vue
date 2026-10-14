@@ -256,9 +256,17 @@ watch(
       selectedId.value = id ?? null;
     }
     if (pointEditingId.value && pointEditingId.value !== id) pointEditingId.value = null;
+    const sheet = props.sheet;
     if (id)
       void nextTick(() => {
-        if (props.textEditSnapshot) return;
+        if (
+          props.textEditSnapshot ||
+          shapeTextMenu.value ||
+          props.sheet !== sheet ||
+          props.selectedDrawingId !== id ||
+          selectedId.value !== id
+        )
+          return;
         const element = [
           ...(layerElement.value?.querySelectorAll<HTMLElement>("[data-sheet-drawing-id]") ?? []),
         ].find((item) => item.dataset.sheetDrawingId === id);
@@ -270,10 +278,11 @@ watch(
 watch(
   () => [selectedId.value, selectedOwnedId.value],
   ([root, owned]) => {
-    const id = owned ?? root;
+    const id = owned ?? root,
+      sheet = props.sheet;
     if (!id) return;
     void nextTick(() => {
-      if (props.textEditSnapshot) return;
+      if (props.textEditSnapshot || shapeTextMenu.value || props.sheet !== sheet) return;
       if ((selectedOwnedId.value ?? selectedId.value) !== id) return;
       const target = [
         ...(layerElement.value?.querySelectorAll<HTMLElement>("[data-sheet-drawing-id]") ?? []),
@@ -2475,7 +2484,7 @@ function pointContext(fragment: DrawingFragment, event: MouseEvent): void {
 const shapeTextMenu = shallowRef<{
   key: string;
   canText: boolean;
-  kind: "shape" | "textBox" | "shapeGroup";
+  kind: "shape" | "textBox" | "shapeGroup" | "chart";
   canObject: boolean;
   actions: {
     object: () => boolean;
@@ -2571,8 +2580,66 @@ function groupClipboardContext(
   shapeTextMenuAnchor.value = createContextMenuPoint(event, event.currentTarget as Element | null);
   shapeTextMenu.value = menu;
 }
+function chartClipboardContext(fragment: DrawingFragment, event: MouseEvent | KeyboardEvent): void {
+  const drawing = fragment.drawing;
+  const sheet = props.sheet;
+  const source = sourceOwner(drawing);
+  if (
+    drawing.kind !== "chart" ||
+    source?.kind !== "chart" ||
+    !sheet ||
+    !canChange(drawing) ||
+    !props.drawings.includes(source) ||
+    (event instanceof MouseEvent && !hits(fragment, event))
+  )
+    return;
+  const capturedSource = source;
+  event.preventDefault();
+  event.stopPropagation();
+  if (!selectedRoots.value.includes(source.id) || selectedOwnedId.value) selectRoots([source.id]);
+  const paths = objectSelectionPaths();
+  const key = selectionKey.value,
+    m = metrics.value,
+    rev = props.revision;
+  const menu: NonNullable<typeof shapeTextMenu.value> = {
+    key,
+    kind: "chart",
+    canObject: false,
+    canText: false,
+    actions: {
+      object: () => false,
+      text: () => false,
+      format: () => false,
+      ...clipboardMenuActions(paths, valid),
+    },
+  };
+  function valid(): boolean {
+    return (
+      shapeTextMenu.value === menu &&
+      key === selectionKey.value &&
+      metrics.value === m &&
+      props.revision === rev &&
+      props.sheet === sheet &&
+      props.drawings.includes(capturedSource) &&
+      sourceOwner(drawing) === capturedSource &&
+      legacyDrawings.value.includes(drawing) &&
+      canChange(drawing)
+    );
+  }
+  shapeTextMenuAnchor.value =
+    event instanceof MouseEvent
+      ? createContextMenuPoint(event, event.currentTarget as Element | null)
+      : event.currentTarget instanceof HTMLElement
+        ? event.currentTarget
+        : null;
+  shapeTextMenu.value = menu;
+}
 function shapeContext(fragment: DrawingFragment, event: MouseEvent | KeyboardEvent): void {
   const drawing = fragment.drawing;
+  if (drawing.kind === "chart") {
+    chartClipboardContext(fragment, event);
+    return;
+  }
   if (!props.startTextEdit) {
     if (event instanceof MouseEvent) pointContext(fragment, event);
     return;
@@ -3557,7 +3624,15 @@ watch(
         v-if="shapeTextMenu"
         ref="shapeTextMenuSurface"
         :style="shapeTextMenuStyles"
-        :label="locale === 'zh-CN' ? '形状操作' : 'Shape actions'"
+        :label="
+          shapeTextMenu.kind === 'chart'
+            ? locale === 'zh-CN'
+              ? '图表操作'
+              : 'Chart actions'
+            : locale === 'zh-CN'
+              ? '形状操作'
+              : 'Shape actions'
+        "
       >
         <MenuItem v-if="shapeTextMenu.actions.copy" v-on="{ select: shapeTextMenu.actions.copy }">{{
           t("cellMenu.copy")
@@ -3577,13 +3652,13 @@ watch(
           >{{ t("drawing.textBoxReferenceMenu") }}</MenuItem
         >
         <MenuItem
-          v-if="shapeTextMenu.kind !== 'shapeGroup'"
+          v-if="shapeTextMenu.kind !== 'shapeGroup' && shapeTextMenu.kind !== 'chart'"
           :disabled="!shapeTextMenu.canText"
           v-on="{ select: shapeTextMenu.actions.text }"
           >{{ locale === "zh-CN" ? "编辑文本" : "Edit Text" }}</MenuItem
         >
         <MenuItem
-          v-if="shapeTextMenu.kind !== 'shapeGroup'"
+          v-if="shapeTextMenu.kind !== 'shapeGroup' && shapeTextMenu.kind !== 'chart'"
           :disabled="!shapeTextMenu.canObject"
           v-on="{ select: shapeTextMenu.actions.object }"
           >{{
@@ -3601,9 +3676,11 @@ watch(
           v-on="{ select: shapeTextMenu.actions.points }"
           >{{ locale === "zh-CN" ? "编辑顶点" : "Edit Points" }}</MenuItem
         >
-        <MenuItem v-on="{ select: shapeTextMenu.actions.format }">{{
-          locale === "zh-CN" ? "设置形状格式" : "Format Shape"
-        }}</MenuItem>
+        <MenuItem
+          v-if="shapeTextMenu.kind !== 'chart'"
+          v-on="{ select: shapeTextMenu.actions.format }"
+          >{{ locale === "zh-CN" ? "设置形状格式" : "Format Shape" }}</MenuItem
+        >
       </MenuSurface>
     </Teleport>
     <div
