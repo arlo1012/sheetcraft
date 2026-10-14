@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue";
-import { ChartColumn, Database, ListPlus, Rows3 } from "lucide-vue-next";
+import { ChartColumn, Database, ListPlus, Rows3, SlidersHorizontal } from "lucide-vue-next";
+import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
@@ -10,6 +11,7 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import ChartElementsControls from "./ChartElementsControls.vue";
 import type { ChartElementPatch } from "../chart-element-controls";
+import { chartFormatTargetKey, type ChartFormatTarget } from "../chart-format-pane";
 
 const props = defineProps<{
   chart: SheetChart;
@@ -22,6 +24,10 @@ const props = defineProps<{
   onEdit?: () => void;
   onSource?: () => void;
   onSwitchDirection?: () => void;
+  onFormat?: (target?: ChartFormatTarget) => void;
+  applyAndFormat?: (patch: ChartElementPatch, target: ChartFormatTarget) => boolean;
+  formatTarget?: ChartFormatTarget;
+  formatTargets?: readonly { target: ChartFormatTarget; label: string }[];
 }>();
 const { t } = useAppI18n();
 const toolbarRef = ref<InstanceType<typeof RibbonToolbar>>();
@@ -134,6 +140,8 @@ const ownerCallbacks = computed(() => {
   const edit = props.onEdit;
   const source = props.onSource;
   const switchDirection = props.onSwitchDirection;
+  const format = props.onFormat;
+  const applyAndFormat = props.applyAndFormat;
   function run(
     action: "edit" | "source" | "switchDirection",
     callback: (() => void) | undefined,
@@ -167,6 +175,50 @@ const ownerCallbacks = computed(() => {
     edit: () => run("edit", edit),
     source: () => run("source", source),
     switchDirection: () => run("switchDirection", switchDirection),
+    format: (target: ChartFormatTarget = props.formatTarget ?? { kind: "chart" }) => {
+      if (
+        props.disabled ||
+        props.apply !== apply ||
+        props.onFormat !== format ||
+        props.applyAndFormat !== applyAndFormat ||
+        !format
+      )
+        return;
+      const controls = controlsRef.value;
+      if (controls?.blockComposition()) return;
+      const title = controls?.pendingTitle();
+      if (title === undefined) {
+        format(target);
+        return;
+      }
+      let applied = false;
+      try {
+        applied = applyAndFormat?.({ title }, target) ?? false;
+      } catch {
+        /* owner rejects */
+      }
+      failed.value = !applied;
+      lastRejectedTitle = applied ? undefined : title;
+      if (applied) dismiss("programmatic", false);
+    },
+  };
+});
+const formatOptions = computed(() =>
+  (props.formatTargets ?? []).map((entry) => ({
+    value: chartFormatTargetKey(entry.target),
+    label: entry.label,
+  })),
+);
+const selectFormat = computed(() => {
+  const choices = props.formatTargets,
+    apply = props.apply,
+    callback = props.onFormat,
+    owner = ownerCallbacks.value;
+  return (value: unknown) => {
+    if (props.formatTargets !== choices || props.apply !== apply || props.onFormat !== callback)
+      return;
+    const entry = choices?.find((candidate) => chartFormatTargetKey(candidate.target) === value);
+    if (entry) owner.format(entry.target);
   };
 });
 watch(
@@ -190,6 +242,25 @@ onBeforeUnmount(() => {
 
 <template>
   <RibbonToolbar ref="toolbarRef" :label="t('chart.contextTools')" data-chart-tools-toolbar>
+    <section v-if="onFormat" class="chart-elements-toolbar__group" data-ribbon-group="chart-format">
+      <TSelect
+        :aria-label="t('chart.formatElement')"
+        :value="formatTarget ? chartFormatTargetKey(formatTarget) : 'chart'"
+        :options="formatOptions"
+        :disabled="disabled"
+        :popup-props="{ overlayClassName: 'chart-format-options-popup' }"
+        style="width: 190px"
+        :onChange="selectFormat"
+      />
+      <RibbonButton
+        variant="tall"
+        :label="t('chart.formatSelection')"
+        :text="t('chart.formatSelection')"
+        :disabled="disabled"
+        @activate="ownerCallbacks.format()"
+        ><SlidersHorizontal
+      /></RibbonButton>
+    </section>
     <section class="chart-elements-toolbar__group" data-ribbon-group="chart-elements">
       <div class="chart-elements-toolbar__menu">
         <RibbonMenuButton

@@ -8,6 +8,7 @@ import type {
 } from "@sheetcraft/core/sheet-drawings";
 import { getEquationMathRotationDeg } from "@sheetcraft/core/equation-flip";
 import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
+import type { ChartFormatTarget } from "../../charts/chart-format-pane";
 import { useAppI18n } from "../../../shared/i18n";
 import ShapeLeafPixelContent from "./ShapeLeafPixelContent.vue";
 import StandardShapeContent from "./StandardShapeContent.vue";
@@ -45,6 +46,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   controlChange: [value: unknown];
   detailedPaint: [presentation: ShapeDetailedPresentation | undefined];
+  chartElementSelect: [target: ChartFormatTarget, openPane: boolean];
 }>();
 const { t } = useAppI18n();
 const paintSource = computed(() => props.paintDrawing ?? props.drawing);
@@ -195,6 +197,7 @@ const legacyBodyTransform = computed(() =>
       :evaluator="evaluator"
       :resolve-sheet="resolveSheet"
       :revision="revision ?? 0"
+      @select-element="(target, openPane) => emit('chartElementSelect', target, openPane)"
     />
     <FormControlContent
       v-else-if="drawing.kind === 'control' && sheet && evaluator"

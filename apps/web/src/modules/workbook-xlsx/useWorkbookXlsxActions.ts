@@ -22,6 +22,7 @@ export type XlsxFeedbackKey =
   | "xlsx.feedback.blocked"
   | "chart.elementExportBlocked"
   | "chart.sourceExportBlocked"
+  | "chart.formatExportBlocked"
   | "xlsx.feedback.numericTableTotals"
   | "xlsx.feedback.exported"
   | "xlsx.feedback.failed"
@@ -138,6 +139,20 @@ export function useWorkbookXlsxActions(options: {
     return false;
   }
 
+  function setChartFormatFailure(report?: XlsxCompatibilityReport): boolean {
+    const locations = report?.issues.flatMap((issue) =>
+      issue.code === "feature-omitted" && issue.severity === "block"
+        ? issue.locations.filter((location) => location.endsWith(".chart.format"))
+        : [],
+    );
+    if (!locations?.length) return false;
+    feedback.value = {
+      key: "chart.formatExportBlocked",
+      error: true,
+      locations: locations.join("; "),
+    };
+    return true;
+  }
   function setChartSourceFailure(report?: XlsxCompatibilityReport): boolean {
     const locations = report?.issues.flatMap((issue) =>
       issue.code === "feature-omitted" && issue.severity === "block"
@@ -173,6 +188,7 @@ export function useWorkbookXlsxActions(options: {
     if (
       error instanceof XlsxWorkerFailure &&
       (setNumericTotalsFailure(error.report) ||
+        setChartFormatFailure(error.report) ||
         setChartSourceFailure(error.report) ||
         setChartElementFailure(error.report))
     )
@@ -320,7 +336,12 @@ export function useWorkbookXlsxActions(options: {
       clearTimeout(timeout);
       if (disposed || response.type !== "encode") return;
       if (hasBlockingIssue(response.report)) {
-        if (!setNumericTotalsFailure(response.report) && !setChartElementFailure(response.report))
+        if (
+          !setNumericTotalsFailure(response.report) &&
+          !setChartFormatFailure(response.report) &&
+          !setChartSourceFailure(response.report) &&
+          !setChartElementFailure(response.report)
+        )
           feedback.value = { key: "xlsx.feedback.blocked", error: true };
         return;
       }

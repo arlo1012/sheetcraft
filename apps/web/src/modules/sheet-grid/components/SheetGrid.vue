@@ -29,6 +29,8 @@ import PivotReportFilters from "../../pivot-tables/components/PivotReportFilters
 import { isPivotValueCell, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import PivotEmptyReports from "../../pivot-tables/components/PivotEmptyReports.vue";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ChartFormatTarget } from "../../charts/chart-format-pane";
 import type { TextBoxReferenceResolver } from "../../sheet-drawings/textbox-reference-display";
 import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer.vue";
 import SheetFreeShapeCreationLayer from "../../sheet-drawings/components/SheetFreeShapeCreationLayer.vue";
@@ -431,6 +433,7 @@ const emit = defineEmits<{
     path: import("@sheetcraft/core/shape-group").ShapeGroupPath | null,
   ];
   selectedDrawingChange: [id: string | null];
+  selectChartElement: [drawing: SheetChartDrawing, target: ChartFormatTarget, openPane: boolean];
   selectedShapeObjectsChange: [
     paths: readonly import("@sheetcraft/core/shape-group").ShapeGroupPath[],
     owner: Sheet,
@@ -4672,6 +4675,9 @@ defineExpose({
         @format="emit('formatDrawing', $event)"
         @background-pointer="onSurfacePointerDown"
         @control-change="(id, value) => emit('changeControl', id, value)"
+        @chart-element-select="
+          (drawing, target, openPane) => emit('selectChartElement', drawing, target, openPane)
+        "
         :key="sheet.id"
         :drawings="sheet.drawings ?? []"
         :metrics="pictureViewMetrics"

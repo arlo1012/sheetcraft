@@ -11,6 +11,7 @@ const props = withDefaults(
     valueLabel: string;
     disabled?: boolean;
     panelWidth?: "trigger" | "content";
+    panelClass?: string;
   }>(),
   { disabled: false, panelWidth: "trigger" },
 );
@@ -119,6 +120,7 @@ watch(
           :id="panelId"
           ref="panel"
           class="panel-select__panel"
+          :class="panelClass"
           role="dialog"
           :aria-label="label"
           @keydown="onPanelKeydown"

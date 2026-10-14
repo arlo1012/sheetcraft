@@ -80,7 +80,7 @@ function mountActions(assetStore?: ImageAssetStore, timeoutMs?: number) {
 }
 
 describe("XLSX export image preparation", () => {
-  test.each(["elements", "source"] as const)(
+  test.each(["elements", "source", "format"] as const)(
     "new chart %s show blocked feedback before flush, assets, worker or download",
     async (field) => {
       const get = vi.fn(async () => imageAsset()),
@@ -122,11 +122,20 @@ describe("XLSX export image preparation", () => {
         delete drawing.chart.elements;
         drawing.chart.source = { kind: "series", categories: { kind: "generated" }, series: [] };
       }
+      if (field === "format") {
+        delete drawing.chart.elements;
+        drawing.chart.format = { valueAxis: { min: 20, max: 180, majorUnit: 40 } };
+      }
       getActiveSheet(f.workbook).drawings = [drawing];
       const before = serializeWorkbook(f.workbook);
       await f.actions.exportXlsx();
       expect(f.actions.feedback.value).toEqual({
-        key: field === "source" ? "chart.sourceExportBlocked" : "chart.elementExportBlocked",
+        key:
+          field === "format"
+            ? "chart.formatExportBlocked"
+            : field === "source"
+              ? "chart.sourceExportBlocked"
+              : "chart.elementExportBlocked",
         error: true,
         locations: `Sheet1.drawings["chart"].chart.${field}`,
       });

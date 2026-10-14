@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import EquationCanvasEditor from "../equation/EquationCanvasEditor.vue";
+import type { ChartFormatTarget } from "../../charts/chart-format-pane";
+import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type {
   EquationEditSnapshot,
   EquationEditCallbacks,
@@ -221,6 +223,7 @@ const emit = defineEmits<{
   backgroundPointer: [event: PointerEvent];
   controlChange: [id: string, value: unknown];
   clipboardCopy: [];
+  chartElementSelect: [drawing: SheetChartDrawing, target: ChartFormatTarget, openPane: boolean];
 }>();
 const { t } = useAppI18n();
 const createId = createBrowserIdFactory();
@@ -3151,7 +3154,7 @@ function clearOutside(event: PointerEvent) {
     event.target instanceof Element &&
     !event.target.closest("[data-sheet-drawing-id]") &&
     !event.target.closest(
-      '[role="dialog"],[role="menu"],[role="listbox"],[data-chart-tools-toolbar],.chart-element-options-popup,.chart-source-options-popup,.chart-editor-options-popup,[data-shape-format-pane],[data-shape-format-trigger],[data-shape-selection-toolbar],[data-shape-selection-reference-menu],[data-shape-group-selection],[data-shape-canvas-text-editor],[data-shape-canvas-text-toolbar],[data-shape-tools-toolbar],[data-shape-selection-pane]',
+      '[role="dialog"],[role="menu"],[role="listbox"],[data-chart-tools-toolbar],[data-chart-format-pane],.chart-format-options-popup,.chart-element-options-popup,.chart-source-options-popup,.chart-editor-options-popup,[data-shape-format-pane],[data-shape-format-trigger],[data-shape-selection-toolbar],[data-shape-selection-reference-menu],[data-shape-group-selection],[data-shape-canvas-text-editor],[data-shape-canvas-text-toolbar],[data-shape-tools-toolbar],[data-shape-selection-pane]',
     )
   ) {
     selectRoots([]);
@@ -3396,6 +3399,12 @@ watch(
             v-else-if="!groupPaintEntry(fragment.drawing)"
             @detailed-paint="acceptDetailedPaint(fragment, $event)"
             @control-change="emit('controlChange', fragment.drawing.id, $event)"
+            @chart-element-select="
+              (target, openPane) => {
+                if (fragment.drawing.kind === 'chart')
+                  emit('chartElementSelect', fragment.drawing, target, openPane);
+              }
+            "
             :drawing="equationPaintView(fragment.drawing)"
             :paint-drawing="displayedRenderPass?.getLeaf(fragment.drawing.id)?.paintView"
             :text-reference-unavailable="

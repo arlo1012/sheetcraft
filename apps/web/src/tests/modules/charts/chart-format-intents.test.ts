@@ -1,0 +1,332 @@
+import { describe, expect, test, vi } from "vitest";
+import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-charts";
+import { applyChartFormatIntent } from "../../../modules/charts/chart-format-intents";
+import type {
+  ChartFormatIntent,
+  ChartFormatTarget,
+} from "../../../modules/charts/chart-format-pane";
+
+function chart(): SheetChart {
+  return normalizeSheetChart({
+    type: "column",
+    range: null,
+    title: "Sales",
+    headerRow: true,
+    headerColumn: true,
+    seriesBy: "columns",
+    legend: true,
+    labels: false,
+    stacked: false,
+    showHidden: false,
+    source: {
+      kind: "series",
+      categories: { kind: "generated" },
+      series: [
+        {
+          id: "apples",
+          colorIndex: 5,
+          name: { kind: "literal", text: "Same name" },
+          values: { kind: "literal", values: [10, 20] },
+        },
+        {
+          id: "pears",
+          colorIndex: 2,
+          name: { kind: "literal", text: "Same name" },
+          values: { kind: "literal", values: [30, 40] },
+        },
+      ],
+    },
+    elements: {
+      titlePosition: "overlay",
+      legendPosition: "right",
+      legendOverlay: false,
+      labelPosition: "outsideEnd",
+    },
+    format: {
+      title: { color: "#123456", bold: true },
+      plot: { fill: "transparent", stroke: "#234567", strokeWidth: 2 },
+      categoryAxis: { title: "Region", reverse: true, text: { italic: true } },
+      valueAxis: { title: "Primary", line: { stroke: "#345678" } },
+      secondaryValueAxis: { title: "Secondary", text: { color: "#456789" } },
+      bar: { gapWidth: 50, overlap: 25 },
+      series: [
+        { id: "apples", color: "#56789a", smooth: true, markers: false },
+        { id: "pears", axis: "secondary", color: "#6789ab" },
+        { id: "dormant", axis: "secondary", color: "#789abc", strokeWidth: 3 },
+      ],
+    },
+  });
+}
+
+const branchIntents: Exclude<ChartFormatIntent, { kind: "series" | "elements" }>[] = [
+  { kind: "title", format: { fontSize: 24, color: "#abcdef" } },
+  { kind: "plot", format: { fill: "#abcdef", strokeWidth: 0 } },
+  { kind: "categoryAxis", format: { show: false, labelAngle: -45 } },
+  { kind: "valueAxis", format: { min: -10, max: 100, majorUnit: 20, minorUnit: 5 } },
+  { kind: "secondaryValueAxis", format: { reverse: true, linkedToSource: false } },
+  { kind: "chart", format: { gapWidth: 125, overlap: -25 } },
+];
+
+describe("pure chart format intents", () => {
+  test.each(branchIntents)(
+    "$kind replaces only its sparse branch and preserves source identity",
+    (intent) => {
+      const original = chart(),
+        before = structuredClone(original),
+        branch = intent.kind === "chart" ? "bar" : intent.kind;
+      const result = applyChartFormatIntent(original, { kind: intent.kind }, intent);
+      expect(result).not.toBe(original);
+      expect(result.format).toEqual({ ...before.format, [branch]: intent.format });
+      expect({ ...result, format: before.format }).toEqual(before);
+      expect(result.source?.series.map((entry) => [entry.id, entry.colorIndex])).toEqual([
+        ["apples", 5],
+        ["pears", 2],
+      ]);
+      expect(original).toEqual(before);
+    },
+  );
+
+  test.each(branchIntents)("$kind reset deletes only the selected branch", (intent) => {
+    const original = chart(),
+      before = structuredClone(original),
+      branch = intent.kind === "chart" ? "bar" : intent.kind;
+    const result = applyChartFormatIntent(
+      original,
+      { kind: intent.kind },
+      {
+        ...intent,
+        format: undefined,
+      },
+    );
+    const expected = { ...before.format };
+    delete expected[branch];
+    expect(result.format).toEqual(expected);
+    expect({ ...result, format: before.format }).toEqual(before);
+    expect(original).toEqual(before);
+  });
+
+  test("equal branch replacement remains equal complete chart data", () => {
+    const original = chart();
+    expect(
+      applyChartFormatIntent(
+        original,
+        { kind: "title" },
+        {
+          kind: "title",
+          format: { ...original.format!.title! },
+        },
+      ),
+    ).toEqual(original);
+  });
+
+  test("editing title text/position preserves format, source and unrelated element branches", () => {
+    const original = chart(),
+      before = structuredClone(original);
+    const result = applyChartFormatIntent(
+      original,
+      { kind: "title" },
+      {
+        kind: "elements",
+        patch: { title: "2026 Sales", elements: { titlePosition: "above" } },
+      },
+    );
+    expect(result).toEqual({
+      ...before,
+      title: "2026 Sales",
+      elements: { ...before.elements, titlePosition: "above" },
+    });
+    expect(original).toEqual(before);
+  });
+
+  test("series replacement follows stable source ID after reorder and preserves dormant settings", () => {
+    const original = chart();
+    original.source!.series.reverse();
+    const before = structuredClone(original);
+    const result = applyChartFormatIntent(
+      original,
+      { kind: "series", seriesId: "apples" },
+      {
+        kind: "series",
+        seriesId: "apples",
+        format: { axis: "primary", color: "#abcdef" },
+      },
+    );
+    expect(result.source).toEqual(before.source);
+    expect(result.source?.series.map((entry) => [entry.id, entry.colorIndex])).toEqual([
+      ["pears", 2],
+      ["apples", 5],
+    ]);
+    expect(result.format).toEqual({
+      ...before.format,
+      series: [
+        { id: "apples", axis: "primary", color: "#abcdef" },
+        ...before.format!.series!.slice(1),
+      ],
+    });
+    expect(original).toEqual(before);
+  });
+
+  test("series reset removes only its stable ID and retains other and dormant formats", () => {
+    const original = chart(),
+      before = structuredClone(original);
+    const result = applyChartFormatIntent(
+      original,
+      { kind: "series", seriesId: "apples" },
+      {
+        kind: "series",
+        seriesId: "apples",
+        format: undefined,
+      },
+    );
+    expect(result.format).toEqual({ ...before.format, series: before.format!.series!.slice(1) });
+    expect(result.source).toEqual(before.source);
+    expect(original).toEqual(before);
+  });
+
+  test.each(["column", "bar"] as const)(
+    "%s shared global bar intent is valid for a source-backed selected series",
+    (type) => {
+      const original = { ...chart(), type },
+        before = structuredClone(original);
+      const result = applyChartFormatIntent(
+        original,
+        { kind: "series", seriesId: "pears" },
+        {
+          kind: "chart",
+          format: { gapWidth: 125, overlap: -25 },
+        },
+      );
+      expect(result.format).toEqual({ ...before.format, bar: { gapWidth: 125, overlap: -25 } });
+      expect({ ...result, format: before.format }).toEqual(before);
+      expect(original).toEqual(before);
+    },
+  );
+
+  test.each<ChartFormatTarget>([
+    { kind: "title" },
+    { kind: "plot" },
+    { kind: "categoryAxis" },
+    { kind: "valueAxis" },
+    { kind: "secondaryValueAxis" },
+    { kind: "series", seriesId: "foreign" },
+    { kind: "series", seriesId: "dormant" },
+  ])("shared bar intent rejects unrelated target $kind", (target) => {
+    const original = chart(),
+      before = structuredClone(original);
+    expect(() =>
+      applyChartFormatIntent(original, target, { kind: "chart", format: { gapWidth: 125 } }),
+    ).toThrow();
+    expect(original).toEqual(before);
+  });
+
+  test.each(["line", "area", "radar"] as const)(
+    "%s never accepts chart-wide bar settings from a selected series",
+    (type) => {
+      const original = { ...chart(), type },
+        before = structuredClone(original);
+      expect(() =>
+        applyChartFormatIntent(
+          original,
+          { kind: "series", seriesId: "apples" },
+          {
+            kind: "chart",
+            format: { gapWidth: 125 },
+          },
+        ),
+      ).toThrow();
+      expect(original).toEqual(before);
+    },
+  );
+
+  test.each([
+    [
+      "another series",
+      { kind: "series", seriesId: "pears" },
+      { kind: "series", seriesId: "apples", format: { color: "#abcdef" } },
+    ],
+    [
+      "foreign series",
+      { kind: "series", seriesId: "foreign" },
+      { kind: "series", seriesId: "foreign", format: { color: "#abcdef" } },
+    ],
+    ["title branch", { kind: "plot" }, { kind: "title", format: { fontSize: 24 } }],
+    ["plot branch", { kind: "title" }, { kind: "plot", format: { fill: "#abcdef" } }],
+    ["axis branch", { kind: "valueAxis" }, { kind: "categoryAxis", format: { reverse: true } }],
+    [
+      "secondary axis branch",
+      { kind: "valueAxis" },
+      { kind: "secondaryValueAxis", format: { reverse: true } },
+    ],
+    ["title elements", { kind: "plot" }, { kind: "elements", patch: { title: "Rogue" } }],
+  ] as const)("%s cannot alter a different captured target", (_name, target, intent) => {
+    const original = chart(),
+      before = structuredClone(original);
+    expect(() => applyChartFormatIntent(original, target, intent)).toThrow();
+    expect(original).toEqual(before);
+  });
+
+  test("series form data cannot forge a stable ID or mutate source/order", () => {
+    const original = chart(),
+      before = structuredClone(original);
+    const intent = {
+      kind: "series",
+      seriesId: "apples",
+      format: { id: "pears", color: "#abcdef" },
+    } as unknown as ChartFormatIntent;
+    expect(() =>
+      applyChartFormatIntent(original, { kind: "series", seriesId: "apples" }, intent),
+    ).toThrow();
+    expect(original).toEqual(before);
+  });
+
+  test.each([
+    { title: "Rogue", legend: false },
+    { elements: { titlePosition: "above", legendPosition: "left" } },
+    { elements: { titlePosition: "above", labelPosition: "center" } },
+  ] as const)("title intent rejects unrelated element fields", (patch) => {
+    const original = chart(),
+      before = structuredClone(original);
+    expect(() =>
+      applyChartFormatIntent(original, { kind: "title" }, { kind: "elements", patch }),
+    ).toThrow();
+    expect(original).toEqual(before);
+  });
+
+  test("intent and nested accessors are rejected before executing any getter", () => {
+    const original = chart(),
+      before = structuredClone(original),
+      getter = vi.fn(() => "#abcdef");
+    const badIntents = [
+      Object.defineProperty({}, "kind", { get: getter }),
+      { kind: "title", format: Object.defineProperty({}, "color", { get: getter }) },
+      {
+        kind: "series",
+        seriesId: "apples",
+        format: Object.defineProperty({}, "color", { get: getter }),
+      },
+      { kind: "elements", patch: Object.defineProperty({}, "title", { get: getter }) },
+    ];
+    for (const intent of badIntents) {
+      const target: ChartFormatTarget =
+        "seriesId" in intent ? { kind: "series", seriesId: "apples" } : { kind: "title" };
+      expect(() => applyChartFormatIntent(original, target, intent as ChartFormatIntent)).toThrow();
+    }
+    expect(getter).not.toHaveBeenCalled();
+    expect(original).toEqual(before);
+  });
+
+  test("removing the final sparse branch removes the empty format container", () => {
+    const original = { ...chart(), format: { title: { bold: true } } };
+    const result = applyChartFormatIntent(
+      original,
+      { kind: "title" },
+      {
+        kind: "title",
+        format: undefined,
+      },
+    );
+    expect(result).not.toHaveProperty("format");
+    expect(result.source).toEqual(original.source);
+    expect(original.format).toEqual({ title: { bold: true } });
+  });
+});

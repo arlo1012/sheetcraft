@@ -16,6 +16,7 @@ export * from "./search.js";
 export * from "./selection-summary.js";
 export * from "./serialization.js";
 export * from "./style.js";
+export * from "./chart-format.js";
 export * from "./style-state.js";
 export * from "./workbook.js";
 export * from "./workbook-theme.js";

@@ -15,6 +15,7 @@ const props = withDefaults(
     disabled?: boolean;
     showValue?: boolean;
     showDefault?: boolean;
+    panelClass?: string;
   }>(),
   { defaultColor: "#000000", mixed: false, disabled: false, showValue: false, showDefault: true },
 );
@@ -50,6 +51,7 @@ function select(
     :value-label="valueLabel"
     :disabled="disabled"
     panel-width="content"
+    :panel-class="panelClass"
   >
     <template #value>
       <span v-if="mixed || disabled" class="color-palette-select__label">{{ valueLabel }}</span>

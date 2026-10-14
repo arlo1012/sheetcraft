@@ -141,6 +141,14 @@ import CameraEditorDialog from "../modules/camera/components/CameraEditorDialog.
 import SparklineDialog from "../modules/sparklines/components/SparklineDialog.vue";
 import { useChartActions } from "../modules/charts/useChartActions";
 import { useChartObjectControls } from "../modules/charts/useChartObjectControls";
+import { useChartFormatControls } from "../modules/charts/useChartFormatControls";
+import { getSheetChartData } from "@sheetcraft/core/sheet-charts";
+import {
+  getChartFormatTargets,
+  chartFormatTargetKey,
+  type ChartFormatTarget,
+} from "../modules/charts/chart-format-pane";
+import ChartFormatPane from "../modules/charts/components/ChartFormatPane.vue";
 import { useChartSourceActions } from "../modules/charts/useChartSourceActions";
 import {
   getChartSourceApplicability,
@@ -1574,10 +1582,15 @@ watch(
   { flush: "sync" },
 );
 const selectedChartId = ref<string | null>(null);
+const chartFormatPaneVisible = ref(false);
+const chartFormatPaneRef = ref<InstanceType<typeof ChartFormatPane>>();
+const chartFormatTarget = shallowRef<ChartFormatTarget>({ kind: "chart" });
 watch(
   [activeSheet, workbookGeneration],
   () => {
     selectedChartId.value = null;
+    chartFormatPaneVisible.value = false;
+    chartFormatTarget.value = { kind: "chart" };
   },
   { flush: "sync" },
 );
@@ -1629,8 +1642,107 @@ const chartObjectControls = useChartObjectControls({
   execute: executeCommand,
   edit: chartActions.edit,
   source: openChartSource,
+  format: openChartFormat,
 });
 const chartObjectContext = chartObjectControls.snapshot;
+const chartFormatControls = useChartFormatControls({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  getSelectedId: () => selectedChartId.value,
+  getTarget: () => chartFormatTarget.value,
+  getEvaluator: () => activeSheetEvaluator.value,
+  isOpen: () => chartFormatPaneVisible.value,
+  isBusy: () =>
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    !!chartDialog.value ||
+    !!chartSourceDialog.value,
+  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+  execute: executeCommand,
+});
+const chartFormatContext = chartFormatControls.snapshot;
+const chartFormatChoices = computed(() => {
+  void workbookRevision.value;
+  const owner = chartObjectContext.value;
+  if (!owner) return [];
+  try {
+    const data = getSheetChartData(
+      activeSheet.value,
+      owner.drawing.chart,
+      activeSheetEvaluator.value,
+      (sheetId) => session.workbook.sheets.get(sheetId),
+    );
+    return getChartFormatTargets(owner.drawing.chart, data).map((target) => ({
+      target,
+      label:
+        target.kind === "series"
+          ? t("chart.formatSeriesName", {
+              name:
+                data.series.find((series) => series.id === target.seriesId)?.name ??
+                target.seriesId,
+            })
+          : target.kind === "chart"
+            ? t("chart.formatChartArea")
+            : target.kind === "title"
+              ? t("chart.title")
+              : target.kind === "plot"
+                ? t("chart.formatPlotArea")
+                : target.kind === "categoryAxis"
+                  ? t("chart.formatCategoryAxis")
+                  : target.kind === "secondaryValueAxis"
+                    ? t("chart.formatSecondaryValueAxis")
+                    : t("chart.formatValueAxis"),
+    }));
+  } catch {
+    return [{ target: { kind: "chart" } as ChartFormatTarget, label: t("chart.formatChartArea") }];
+  }
+});
+function openChartFormat(drawing: SheetChartDrawing, target: ChartFormatTarget): void {
+  if (
+    drawing !== chartObjectContext.value?.drawing ||
+    !activeSheet.value.drawings?.includes(drawing)
+  )
+    return;
+  if (
+    !chartFormatChoices.value.some(
+      (entry) => chartFormatTargetKey(entry.target) === chartFormatTargetKey(target),
+    )
+  )
+    return;
+  if (
+    chartFormatPaneVisible.value &&
+    chartFormatTargetKey(target) !== chartFormatTargetKey(chartFormatTarget.value) &&
+    chartFormatPaneRef.value?.canChangeTarget() === false
+  )
+    return;
+  shapeFormatPane.close();
+  shapeGroupFormatPane.close();
+  shapeConnectorFormatPane.close();
+  pictureTools.paneVisible.value = false;
+  chartFormatTarget.value = target;
+  chartFormatPaneVisible.value = true;
+}
+function selectChartFormatElement(
+  drawing: SheetChartDrawing,
+  target: ChartFormatTarget,
+  openPane: boolean,
+): void {
+  if (
+    !activeSheet.value.drawings?.includes(drawing) ||
+    drawing !== chartObjectContext.value?.drawing
+  )
+    return;
+  if (openPane || chartFormatPaneVisible.value) chartObjectContext.value?.format?.(target);
+  else if (
+    chartFormatChoices.value.some(
+      (entry) => chartFormatTargetKey(entry.target) === chartFormatTargetKey(target),
+    )
+  )
+    chartFormatTarget.value = target;
+}
 const chartRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingChartRange, reference: pickedChartReference } = chartRangePicker;
 let chartPickerId = 0;
@@ -2428,6 +2540,10 @@ function openShapeFormat(drawing: SheetGraphicDrawing | SheetFramedGraphicDrawin
   }
 }
 function selectedShapeChanged(id: string | null) {
+  if (selectedChartId.value !== id) {
+    chartFormatPaneVisible.value = false;
+    chartFormatTarget.value = { kind: "chart" };
+  }
   selectedChartId.value = activeSheet.value.drawings?.some(
     (node) => node.id === id && node.kind === "chart",
   )
@@ -4596,6 +4712,10 @@ watch(
           :on-edit="chartObjectContext.edit"
           :on-source="chartObjectContext.source"
           :on-switch-direction="chartObjectContext.switchDirection"
+          :on-format="chartObjectContext.format"
+          :apply-and-format="chartObjectContext.applyAndFormat"
+          :format-target="chartFormatTarget"
+          :format-targets="chartFormatChoices"
         />
       </template>
       <template #insert-tools>
@@ -5749,6 +5869,7 @@ watch(
           @selected-shape-group-change="selectedShapeGroupChanged"
           @selected-shape-objects-change="selectedShapeObjectsChanged"
           @selected-drawing-change="selectedShapeChanged"
+          @select-chart-element="selectChartFormatElement"
           @configure-pivot="openPivotFields"
           @update-pivot="pivotActions.update"
           @show-pivot-details="(id, address) => pivotActions.showDetails(id, address)"
@@ -5859,6 +5980,22 @@ watch(
         }"
         :t="pictureFormatLabel"
         @close="closeOwnedPictureFormat"
+      />
+      <ChartFormatPane
+        ref="chartFormatPaneRef"
+        v-if="chartFormatContext"
+        :drawing="chartFormatContext.drawing"
+        :data="chartFormatContext.data"
+        :target="chartFormatContext.target"
+        :apply="chartFormatContext.apply"
+        :disabled="loading || fileBusy || xlsxBusy || chartFormatContext.disabled"
+        :error="chartFormatControls.error.value ? t('chart.formatApplyFailed') : undefined"
+        @update:target="(target) => chartObjectContext?.format?.(target)"
+        @close="
+          () => {
+            if (chartFormatPaneRef?.canChangeTarget() !== false) chartFormatPaneVisible = false;
+          }
+        "
       />
       <ShapeFormatPane
         :key="

@@ -4,6 +4,7 @@ import {
   type ChartSourceDiagnostic,
 } from "./chart-source.js";
 import { getChartSourceData } from "./chart-source-data.js";
+import { normalizeChartFormat, type ChartFormatSettings } from "./chart-format.js";
 import {
   getCellStyle,
   MAX_SHEET_COLUMNS,
@@ -53,6 +54,7 @@ export type SheetChart = {
   stacked: boolean;
   showHidden: boolean;
   elements?: ChartElementSettings;
+  format?: ChartFormatSettings;
 };
 const types = new Set([
   "column",
@@ -127,6 +129,13 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
       throw new TypeError("Chart elements must be an own data field, not an accessor.");
     elements = normalizeChartElementSettings(field.value);
   }
+  let format: ChartFormatSettings | undefined;
+  if (chart && typeof chart === "object" && "format" in chart) {
+    const field = Object.getOwnPropertyDescriptor(chart, "format");
+    if (!field || !("value" in field))
+      throw new TypeError("Chart format must be an own data field, not an accessor.");
+    format = normalizeChartFormat(field.value);
+  }
   if (
     !chart ||
     (source !== undefined &&
@@ -179,6 +188,7 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
     stacked: chart.stacked,
     showHidden: chart.showHidden,
     ...(elements !== undefined ? { elements } : {}),
+    ...(format !== undefined ? { format } : {}),
   };
 }
 export type ChartSeries = {

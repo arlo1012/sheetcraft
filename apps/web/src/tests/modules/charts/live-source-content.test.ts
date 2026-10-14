@@ -10,6 +10,7 @@ import {
   insertSheet,
   setCellContent,
 } from "@sheetcraft/core/workbook";
+import type { ECElementEvent } from "echarts";
 import type { EChartsType } from "../../../modules/charts/chart-runtime";
 import ChartContent from "../../../modules/charts/components/ChartContent.vue";
 import { createAppI18n } from "../../../shared/i18n";
@@ -123,7 +124,106 @@ function fixture() {
   return { workbook, sheet, second, source, drawing, resolveSheet, wrapper, svg };
 }
 
+function nativeEvent(input: Partial<ECElementEvent>): ECElementEvent {
+  return {
+    type: "click",
+    componentType: "series",
+    componentSubType: "bar",
+    componentIndex: 0,
+    name: "point",
+    dataIndex: 0,
+    data: 1,
+    value: 1,
+    $vars: ["name", "value"],
+    ...input,
+  };
+}
 describe("live chart content lifecycle", () => {
+  test("native component events resolve stable elements and do not target a series index", async () => {
+    const f = fixture(),
+      instance = rendered.instances.at(-1)!;
+    // Chart content must opt back into input beneath the drawing layer's
+    // pointer-transparent common content wrapper.
+    expect(f.wrapper.get(".chart-content").attributes("style")).toContain("pointer-events: auto");
+    instance.trigger(
+      "click",
+      nativeEvent({ componentType: "series", seriesId: "extra", seriesIndex: 99 }),
+    );
+    expect(f.wrapper.emitted("selectElement")).toEqual([
+      [{ kind: "series", seriesId: "extra" }, false],
+    ]);
+    instance.trigger(
+      "dblclick",
+      nativeEvent({ type: "dblclick", componentType: "yAxis", componentIndex: 0 }),
+    );
+    expect(f.wrapper.emitted("selectElement")?.at(-1)).toEqual([{ kind: "valueAxis" }, true]);
+    instance.trigger(
+      "click",
+      nativeEvent({ componentType: "series", seriesIndex: 0, seriesId: "stale" }),
+    );
+    expect(f.wrapper.emitted("selectElement")).toHaveLength(2);
+    const replacement = {
+      ...f.drawing,
+      chart: { ...f.drawing.chart, source: { ...f.source, series: [] } },
+    };
+    await f.wrapper.setProps({ drawing: replacement, revision: 1 });
+    instance.trigger("click", nativeEvent({ componentType: "series", seriesId: "extra" }));
+    expect(f.wrapper.emitted("selectElement")).toHaveLength(2);
+  });
+  test("actual chart title and value-axis format redraw without changing source", async () => {
+    const f = fixture();
+    await f.wrapper.setProps({
+      drawing: {
+        ...f.drawing,
+        chart: {
+          ...f.drawing.chart,
+          format: {
+            title: { color: "#ff0000", fontSize: 22, bold: true },
+            valueAxis: {
+              min: 20,
+              max: 180,
+              majorUnit: 40,
+              minorUnit: 8,
+              numberFormat: { kind: "number", fractionDigits: 1, useGrouping: false },
+            },
+          },
+        },
+      },
+      revision: 1,
+    });
+    const svg = f.svg();
+    expect(svg).toContain(">180.0<");
+    expect(svg).toContain("#ff0000");
+    expect(svg).toContain("22px");
+    expect(f.wrapper.find(".chart-content__error").exists()).toBe(false);
+  });
+  test("word-cloud SVG also consumes saved title formatting and native title selection", async () => {
+    const f = fixture();
+    await f.wrapper.setProps({
+      drawing: {
+        ...f.drawing,
+        chart: {
+          ...f.drawing.chart,
+          type: "wordCloud",
+          source: undefined,
+          dataCache: {
+            categories: ["word"],
+            series: [{ name: "weight", values: [20] }],
+            records: [],
+          },
+          format: { title: { color: "#ff0000", fontSize: 22, bold: true, italic: true } },
+        },
+      },
+      revision: 1,
+    });
+    const title = f.wrapper.findAll("svg text")[0]!;
+    expect(title.attributes("font-size")).toBe("22");
+    expect(title.attributes("fill")).toBe("#ff0000");
+    expect(title.attributes("font-weight")).toBe("bold");
+    await title.trigger("dblclick");
+    expect(f.wrapper.emitted("selectElement")?.at(-1)).toEqual([{ kind: "title" }, true]);
+  });
+
   test("passes the workbook resolver and redraws values, name and labels on revision", async () => {
     const f = fixture();
     expect(f.resolveSheet).toHaveBeenCalledWith(f.second.id);

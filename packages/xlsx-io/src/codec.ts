@@ -1132,8 +1132,17 @@ export async function encodeWithNativeXlsx(
   // Element placement is internal document data until the native chart writer can
   // encode it. Block before resource reads instead of exporting a different chart.
   let customChartSource = false;
+  let detailedChartFormat = false;
   for (const sheet of sheets) {
     for (const drawing of sheet.drawings ?? []) {
+      if (drawing.kind === "chart" && "format" in drawing.chart) {
+        detailedChartFormat = true;
+        report.add(
+          "feature-omitted",
+          "block",
+          `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.format`,
+        );
+      }
       if (drawing.kind === "chart" && "source" in drawing.chart) {
         customChartSource = true;
         report.add(
@@ -1152,9 +1161,11 @@ export async function encodeWithNativeXlsx(
   }
   if (report.hasBlocks())
     throw new XlsxCompatibilityError(
-      customChartSource
-        ? "Custom chart series sources are not yet supported by XLSX export."
-        : "Chart element settings are not yet supported by XLSX export.",
+      detailedChartFormat
+        ? "Detailed chart formatting is not yet supported by XLSX export."
+        : customChartSource
+          ? "Custom chart series sources are not yet supported by XLSX export."
+          : "Chart element settings are not yet supported by XLSX export.",
       report.build(),
     );
   assertSupportedXlsxTableTotals(sheets, report);

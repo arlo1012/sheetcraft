@@ -1,0 +1,285 @@
+import type {
+  ChartAxisLineFormat,
+  ChartBarFormat,
+  ChartCategoryAxisFormat,
+  ChartFormatSettings,
+  ChartSeriesFormat,
+  ChartSurfaceFormat,
+  ChartTextFormat,
+  ChartValueAxisFormat,
+} from "@sheetcraft/core/chart-format";
+import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
+import type { ChartElementPatch } from "./chart-element-controls";
+
+export type ChartFormatTarget =
+  | { kind: "chart" | "title" | "plot" | "categoryAxis" | "valueAxis" | "secondaryValueAxis" }
+  | { kind: "series"; seriesId: string };
+export type ChartFormatIntent =
+  | { kind: "chart"; format: ChartBarFormat | undefined }
+  | { kind: "title"; format: ChartTextFormat | undefined }
+  | { kind: "plot"; format: ChartSurfaceFormat | undefined }
+  | { kind: "categoryAxis"; format: ChartCategoryAxisFormat | undefined }
+  | { kind: "valueAxis" | "secondaryValueAxis"; format: ChartValueAxisFormat | undefined }
+  | { kind: "series"; seriesId: string; format: Omit<ChartSeriesFormat, "id"> | undefined }
+  | { kind: "elements"; patch: ChartElementPatch };
+export type ChartFormatIntentHandler = (intent: ChartFormatIntent) => boolean;
+export type ChartFormatNumericField =
+  | "min"
+  | "max"
+  | "majorUnit"
+  | "minorUnit"
+  | "labelAngle"
+  | "fontSize"
+  | "strokeWidth"
+  | "gapWidth"
+  | "overlap";
+export type ChartFormatDraftError = "number" | "bounds" | "format" | "rejected" | "composition";
+export interface ChartFormatDraft {
+  text: string;
+  dirty: boolean;
+  composing: boolean;
+  error?: ChartFormatDraftError;
+}
+
+export function chartFormatTargetKey(target: ChartFormatTarget): string {
+  return target.kind === "series" ? `series:${target.seriesId}` : target.kind;
+}
+
+/** Only source-backed IDs are editable; names and array positions never create identity. */
+export function getChartFormatSeries(chart: SheetChart, data: ChartData) {
+  const sourceIds = new Set(chart.source?.series.map((entry) => entry.id) ?? []);
+  return data.series.filter(
+    (entry): entry is typeof entry & { id: string } => !!entry.id && sourceIds.has(entry.id),
+  );
+}
+
+export function getChartFormatCapabilities(chart: SheetChart, data?: ChartData) {
+  const plotSeries = chart.type === "scatter" ? data?.series.slice(1) : data?.series;
+  const hasData = data === undefined || !!plotSeries?.some((entry) => entry.values.length > 0);
+  const bars = chart.type === "column" || chart.type === "bar";
+  const lines = chart.type === "line" || chart.type === "area";
+  const cartesian = bars || lines || chart.type === "scatter";
+  const series = data ? getChartFormatSeries(chart, data) : (chart.source?.series ?? []);
+  return {
+    hasData,
+    title: !!chart.title.trim() && chart.elements?.titlePosition !== "none",
+    plot: hasData && cartesian,
+    categoryAxis: hasData && (bars || lines) && (data === undefined || data.categories.length > 0),
+    valueAxis: hasData && cartesian,
+    secondaryValueAxis:
+      hasData &&
+      (bars || lines) &&
+      series.some((entry) =>
+        chart.format?.series?.some(
+          (format) => format.id === entry.id && format.axis === "secondary",
+        ),
+      ),
+    bar: hasData && bars,
+    series: hasData && series.length > 0 && (bars || lines || chart.type === "radar"),
+    seriesAxis: bars || lines,
+    seriesStroke: lines || chart.type === "radar",
+    seriesSmooth: lines,
+    seriesMarkers: lines || chart.type === "radar",
+  };
+}
+
+export function getChartFormatTargets(chart: SheetChart, data: ChartData): ChartFormatTarget[] {
+  const capabilities = getChartFormatCapabilities(chart, data);
+  const targets: ChartFormatTarget[] = [{ kind: "chart" }];
+  if (capabilities.title) targets.push({ kind: "title" });
+  if (capabilities.plot) targets.push({ kind: "plot" });
+  if (capabilities.categoryAxis) targets.push({ kind: "categoryAxis" });
+  if (capabilities.valueAxis) targets.push({ kind: "valueAxis" });
+  if (capabilities.secondaryValueAxis) targets.push({ kind: "secondaryValueAxis" });
+  if (capabilities.series)
+    targets.push(
+      ...getChartFormatSeries(chart, data).map((entry) => ({
+        kind: "series" as const,
+        seriesId: entry.id,
+      })),
+    );
+  return targets;
+}
+
+export function getChartSeriesFormat(chart: SheetChart, id: string): Omit<ChartSeriesFormat, "id"> {
+  const entry = chart.format?.series?.find((format) => format.id === id);
+  if (!entry) return {};
+  const { id: _id, ...format } = entry;
+  return format;
+}
+
+/** Produces detached branch data. Host validates/normalizes and owns the workbook command. */
+export function getChartFormatIntentSettings(
+  current: ChartFormatSettings | undefined,
+  intent: Exclude<ChartFormatIntent, { kind: "elements" }>,
+): ChartFormatSettings | undefined {
+  const result: ChartFormatSettings = { ...current };
+  if (intent.kind === "series") {
+    const previous = current?.series ?? [];
+    const index = previous.findIndex((entry) => entry.id === intent.seriesId);
+    const series = previous.map((entry) => ({ ...entry }));
+    if (intent.format === undefined) {
+      if (index >= 0) series.splice(index, 1);
+    } else {
+      const next = { id: intent.seriesId, ...intent.format };
+      if (index < 0) series.push(next);
+      else series[index] = next;
+    }
+    if (series.length) result.series = series;
+    else delete result.series;
+  } else {
+    const key = intent.kind === "chart" ? "bar" : intent.kind;
+    if (intent.format === undefined) delete result[key];
+    else {
+      // Narrow each branch separately so union assignment cannot cross their contracts.
+      switch (intent.kind) {
+        case "chart":
+          result.bar = { ...intent.format };
+          break;
+        case "title":
+          result.title = { ...intent.format };
+          break;
+        case "plot":
+          result.plot = { ...intent.format };
+          break;
+        case "categoryAxis":
+          result.categoryAxis = cloneAxis(intent.format);
+          break;
+        case "valueAxis":
+          result.valueAxis = cloneAxis(intent.format);
+          break;
+        case "secondaryValueAxis":
+          result.secondaryValueAxis = cloneAxis(intent.format);
+          break;
+      }
+    }
+  }
+  return Object.keys(result).length ? result : undefined;
+}
+function cloneAxis<T extends ChartCategoryAxisFormat | ChartValueAxisFormat>(axis: T): T {
+  return {
+    ...axis,
+    ...(axis.text ? { text: { ...axis.text } } : {}),
+    ...(axis.line ? { line: { ...axis.line } } : {}),
+    ...("numberFormat" in axis && axis.numberFormat
+      ? { numberFormat: { ...axis.numberFormat } }
+      : {}),
+  };
+}
+
+export function createChartFormatDraft(value?: string | number): ChartFormatDraft {
+  return { text: value === undefined ? "" : String(value), dirty: false, composing: false };
+}
+export function editChartFormatDraft(draft: ChartFormatDraft, text: string): void {
+  draft.text = text;
+  draft.dirty = true;
+  delete draft.error;
+}
+export function syncChartFormatDraft(draft: ChartFormatDraft, value?: string | number): void {
+  if (draft.dirty || draft.composing) return;
+  draft.text = value === undefined ? "" : String(value);
+  delete draft.error;
+}
+
+/** Empty means auto, not zero. Incomplete exponents/signs and non-decimal syntax stay drafts. */
+export function parseChartFormatNumber(
+  text: string,
+  field: ChartFormatNumericField,
+): { valid: true; value: number | undefined } | { valid: false } {
+  const trimmed = text.trim();
+  if (!trimmed) return { valid: true, value: undefined };
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(trimmed)) return { valid: false };
+  const value = Number(trimmed);
+  if (!Number.isFinite(value)) return { valid: false };
+  if (
+    (field === "fontSize" && (value < 1 || value > 256)) ||
+    (field === "strokeWidth" && (value < 0 || value > 32)) ||
+    (field === "labelAngle" && (value < -90 || value > 90)) ||
+    (field === "gapWidth" && (value < 0 || value > 500)) ||
+    (field === "overlap" && (value < -100 || value > 100)) ||
+    ((field === "majorUnit" || field === "minorUnit") && value <= 0)
+  )
+    return { valid: false };
+  return { valid: true, value: Object.is(value, -0) ? 0 : value };
+}
+export function isChartValueAxisDraftValid(axis: ChartValueAxisFormat): boolean {
+  if (
+    [axis.min, axis.max, axis.majorUnit, axis.minorUnit].some(
+      (value) => value !== undefined && !Number.isFinite(value),
+    )
+  )
+    return false;
+  if (axis.min !== undefined && axis.max !== undefined && axis.min >= axis.max) return false;
+  if (axis.majorUnit !== undefined && axis.majorUnit <= 0) return false;
+  if (axis.minorUnit !== undefined && axis.minorUnit <= 0) return false;
+  if (axis.majorUnit !== undefined && axis.minorUnit !== undefined) {
+    const divisions = axis.majorUnit / axis.minorUnit;
+    if (
+      !Number.isFinite(divisions) ||
+      divisions < 1 ||
+      divisions > 100 ||
+      Math.abs(divisions - Math.round(divisions)) > 1e-9
+    )
+      return false;
+  }
+  return true;
+}
+
+export function commitChartFormatNumberDraft(
+  draft: ChartFormatDraft,
+  field: ChartFormatNumericField,
+  apply: (value: number | undefined) => boolean,
+  validate?: (value: number | undefined) => boolean,
+): boolean {
+  if (draft.composing) {
+    draft.error = "composition";
+    return false;
+  }
+  if (!draft.dirty) return true;
+  const parsed = parseChartFormatNumber(draft.text, field);
+  if (!parsed.valid) {
+    draft.error = "number";
+    return false;
+  }
+  if (validate && !validate(parsed.value)) {
+    draft.error = "bounds";
+    return false;
+  }
+  let accepted = false;
+  try {
+    accepted = apply(parsed.value);
+  } catch {
+    /* Keep the exact draft on a stale owner. */
+  }
+  if (!accepted) {
+    draft.error = "rejected";
+    return false;
+  }
+  draft.dirty = false;
+  delete draft.error;
+  return true;
+}
+
+export function setChartFormatField<T extends object, K extends keyof T>(
+  current: T,
+  field: K,
+  value: T[K] | undefined,
+): T | undefined {
+  const next = { ...current };
+  if (value === undefined) delete next[field];
+  else next[field] = value;
+  return Object.keys(next).length ? next : undefined;
+}
+export function compactChartAxis<T extends ChartCategoryAxisFormat | ChartValueAxisFormat>(
+  axis: T,
+): T | undefined {
+  const next = cloneAxis(axis);
+  if (next.text && !Object.keys(next.text).length) delete next.text;
+  if (next.line && !Object.keys(next.line).length) delete next.line;
+  return Object.keys(next).length ? next : undefined;
+}
+export function chartAxisLine(
+  axis: ChartCategoryAxisFormat | ChartValueAxisFormat,
+): ChartAxisLineFormat {
+  return axis.line ?? {};
+}

@@ -96,6 +96,17 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
   };
   for (const sheet of getWorkbookSheets(workbook)) {
     for (const drawing of sheet.drawings ?? []) {
+      if (drawing.kind === "chart" && "format" in drawing.chart) {
+        const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.format`;
+        throw new XlsxWorkerFailure(
+          "Detailed chart formatting is not yet supported by XLSX export.",
+          {
+            issues: [
+              { code: "feature-omitted", severity: "block", count: 1, locations: [location] },
+            ],
+          },
+        );
+      }
       if (drawing.kind === "chart" && "source" in drawing.chart) {
         const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.source`;
         throw new XlsxWorkerFailure(

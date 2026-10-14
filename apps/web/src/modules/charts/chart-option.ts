@@ -3,6 +3,7 @@ import { formatCellNumberValue } from "@sheetcraft/core/number-format";
 import type { CellNumberFormat } from "@sheetcraft/core/style";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 import { getChartElementCapabilities, getChartElementSettings } from "./chart-elements";
+import { applyChartCommonFormat } from "./chart-format-render";
 const colors = ["#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#db2777"];
 type ChartDimensions = { width: number; height: number };
 
@@ -474,5 +475,5 @@ export function createChartOption(
     );
   if (option.yAxis && !Array.isArray(option.yAxis) && option.yAxis.type === "value")
     option.yAxis = valueAxis(uniformFormat(plotted));
-  return option;
+  return applyChartCommonFormat(option, chart, data);
 }

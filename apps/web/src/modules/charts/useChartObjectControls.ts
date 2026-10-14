@@ -6,9 +6,10 @@ import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, Workbook } from "@sheetcraft/core/workbook";
 import type { ChartElementPatch } from "./chart-element-controls";
 import { getChartElementCapabilities } from "./chart-elements";
+import type { ChartFormatTarget } from "./chart-format-pane";
 
 /** Only rendered element fields may cross this object-level action boundary. */
-function applyElementPatch(chart: SheetChart, patch: ChartElementPatch): SheetChart {
+export function applyElementPatch(chart: SheetChart, patch: ChartElementPatch): SheetChart {
   if (!patch || typeof patch !== "object" || Array.isArray(patch))
     throw new TypeError("Invalid chart element change.");
   const prototype: unknown = Object.getPrototypeOf(patch);
@@ -63,6 +64,7 @@ export function useChartObjectControls(options: {
   execute: (command: WorkbookCommand) => unknown;
   edit: (drawing: SheetChartDrawing) => void;
   source?: (drawing: SheetChartDrawing) => void;
+  format?: (drawing: SheetChartDrawing, target: ChartFormatTarget) => void;
 }) {
   const error = ref(false);
   let disposed = false;
@@ -172,6 +174,18 @@ export function useChartObjectControls(options: {
       source: () => {
         if (prepare()) (options.source ?? options.edit)(drawing);
       },
+      format: options.format
+        ? (target: ChartFormatTarget = { kind: "chart" }) => {
+            if (prepare()) options.format?.(drawing, target);
+          }
+        : undefined,
+      applyAndFormat: options.format
+        ? (patch: ChartElementPatch, target: ChartFormatTarget): boolean =>
+            change(
+              () => applyElementPatch(drawing.chart, patch),
+              (replacement) => options.format?.(replacement, target),
+            )
+        : undefined,
       applyAndRun: (
         patch: ChartElementPatch,
         action: "edit" | "source" | "switchDirection",
