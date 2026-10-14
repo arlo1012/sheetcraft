@@ -69,4 +69,62 @@ export const chartsEnUS = {
   "chart.dashboard": "Dashboard",
   "chart.more": "Dynamic charts",
   "chart.finishTitleComposition": "Finish composing the title first.",
+  "chart.sourceAddSeries": "Add series",
+  "chart.sourceEditSeries": "Edit series",
+  "chart.sourceEditCategories": "Edit category labels",
+  "chart.sourceSeriesName": "Series name",
+  "chart.sourceSeriesValues": "Series values",
+  "chart.sourceCategoryRange": "Category label range",
+  "chart.sourcePickName": "Pick a name cell",
+  "chart.sourcePickValues": "Pick a values range",
+  "chart.sourcePickCategories": "Pick a category range",
+  "chart.sourcePickRange": "Pick a chart data range",
+  "chart.sourceNameHint": "Enter a name or a one-cell reference, such as =Sheet2!$B$1.",
+  "chart.sourceValuesHint": "Use one row or column in this workbook, or numbers such as {example}.",
+  "chart.sourceCategoriesHint":
+    "Use a one-row or one-column reference in this workbook. Cross-sheet references are supported.",
+  "chart.sourcePreviewUnavailable": "No valid preview",
+  "chart.sourceFinishComposition": "Finish composing the input first.",
+  "chart.sourceInvalidSeries":
+    "Enter a valid name and numeric vector. Values must match the category count.",
+  "chart.sourceInvalidCategories":
+    "Enter a valid row or column reference with one label for each value.",
+  "chart.sourceApplyFailed":
+    "The chart could not be updated. Your draft is retained; check that the chart is still editable, then retry.",
+  "chart.sourceSeries": "Series",
+  "chart.sourceColumns": "Each column is a series",
+  "chart.sourceRows": "Each row is a series",
+  "chart.sourcePivotUnavailable":
+    "The linked PivotTable controls these series. Use Edit PivotTable to change the source.",
+  "chart.sourceCachedUnavailable":
+    "This chart uses retained data. Use worksheet data before editing individual series.",
+  "chart.sourceTypeUnavailable":
+    "Individual series editing is available for column, bar, line, area and radar charts. This chart keeps its existing range-based editor.",
+  "chart.sourceChartRange": "Chart data range",
+  "chart.sourceComplexPlaceholder": "Enter a range to rebuild the series",
+  "chart.sourceResetRange": "Rebuild from range",
+  "chart.sourceComplexHint":
+    "The data range is too complex to display. Row/column and header settings are unavailable. Rebuilding from a range replaces all custom series and labels.",
+  "chart.sourceResetHint":
+    "Changing the range, direction or headers rebuilds the series and category labels. Changes stay in this draft until you confirm.",
+  "chart.sourceDirection": "Series direction",
+  "chart.sourceLegendEntries": "Legend entries (series)",
+  "chart.sourceAxisCategories": "Axis labels (categories)",
+  "chart.sourceAdd": "Add",
+  "chart.sourceEdit": "Edit",
+  "chart.sourceRemove": "Remove",
+  "chart.sourceRemoveSeries": "Remove selected series",
+  "chart.sourceMoveUp": "Move series up",
+  "chart.sourceMoveDown": "Move series down",
+  "chart.sourceNoSeries": "No series. Confirming keeps a blank chart.",
+  "chart.sourceNoCategories": "No category labels",
+  "chart.sourceInvalidRange":
+    "Enter a valid range in this workbook. Broken references and mismatched vector lengths cannot be applied.",
+  "chart.sourcePreview": "Chart preview",
+  "chart.sourceExportBlocked":
+    "XLSX does not yet support independent live chart series ({locations}). Export was stopped; your worksheet and chart sources have not changed.",
+  "chart.customSourceHint":
+    "This chart uses independent series references. Use Select Data to edit them.",
+  "chart.sourceBrokenUnavailable":
+    "The original source range is unavailable. Restore a worksheet range in the chart editor first.",
 };

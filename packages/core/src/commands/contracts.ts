@@ -539,6 +539,8 @@ export type UngroupSheetRangeCommand = {
 };
 
 export type AddSheetCommand = {
+  /** Chart reference owners restored by a source-sheet deletion inverse. */
+  externalDrawingCollections?: TextReferenceDrawingState[];
   pivotTables?: PivotTablesSnapshot;
   type: "addSheet";
   sheet: SheetSnapshot;

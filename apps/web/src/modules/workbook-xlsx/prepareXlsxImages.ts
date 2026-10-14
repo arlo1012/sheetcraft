@@ -96,6 +96,17 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
   };
   for (const sheet of getWorkbookSheets(workbook)) {
     for (const drawing of sheet.drawings ?? []) {
+      if (drawing.kind === "chart" && "source" in drawing.chart) {
+        const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.source`;
+        throw new XlsxWorkerFailure(
+          "Custom chart series sources are not yet supported by XLSX export.",
+          {
+            issues: [
+              { code: "feature-omitted", severity: "block", count: 1, locations: [location] },
+            ],
+          },
+        );
+      }
       if (drawing.kind !== "chart" || !("elements" in drawing.chart)) continue;
       const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.elements`;
       throw new XlsxWorkerFailure("Chart element settings are not yet supported by XLSX export.", {

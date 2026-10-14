@@ -586,8 +586,15 @@ export function applyCellShiftCommand(
   const nextPivots = transformPivotReferences(pivotTables, sheet.id, map, (source) =>
     transformFormulaRange(source, map, range, command.direction),
   );
-  nextState.drawings = mapLocalTextReferences(nextState.drawings, sheet.id, map);
-  const externalDrawings = planExternalTextReferenceChanges(workbook, sheet.id, map);
+  const mapReferenceRange = (source: Range) =>
+    transformFormulaRange(source, map, range, command.direction);
+  nextState.drawings = mapLocalTextReferences(nextState.drawings, sheet.id, map, mapReferenceRange);
+  const externalDrawings = planExternalTextReferenceChanges(
+    workbook,
+    sheet.id,
+    map,
+    mapReferenceRange,
+  );
   preflightTextReferenceSparseState(sheet, nextState);
   const stateChanged = validateCommandPayload("range", command.range, () =>
     replaceSheetSparseState(sheet, nextState),
@@ -661,7 +668,17 @@ export function applyRestoreCellShiftCommand(
     workbook,
     sheet.id,
     readExternalDrawingCollections(command),
-    { direction: "restore", mapCell: createMap(validate(original), original.direction) },
+    {
+      direction: "restore",
+      mapCell: createMap(validate(original), original.direction),
+      mapRange: (source) =>
+        transformFormulaRange(
+          source,
+          createMap(validate(original), original.direction),
+          validate(original),
+          original.direction,
+        ),
+    },
   );
   preflightTextReferenceSparseState(sheet, command.state);
   const changed = validateCommandPayload("state", command.state, () =>

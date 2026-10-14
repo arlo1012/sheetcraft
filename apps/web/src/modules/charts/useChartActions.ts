@@ -237,6 +237,7 @@ export function useChartActions(options: {
       if (
         !target.report &&
         !drawing.chart.dataCache &&
+        !drawing.chart.source &&
         (!reference || reference.sheetId !== target.sheet.id)
       ) {
         error.value = true;
@@ -246,9 +247,11 @@ export function useChartActions(options: {
         ...drawing,
         chart: normalizeSheetChart({
           ...drawing.chart,
-          range: target.report
-            ? target.report.outputRange
-            : (reference?.range ?? drawing.chart.range),
+          range: drawing.chart.source
+            ? null
+            : target.report
+              ? target.report.outputRange
+              : (reference?.range ?? drawing.chart.range),
           ...(target.report
             ? {
                 pivotTableId: target.report.id,
@@ -259,9 +262,20 @@ export function useChartActions(options: {
             : {}),
         }),
       };
-      const data = getSheetChartData(target.sheet, next.chart, options.getEvaluator());
+      const data = getSheetChartData(target.sheet, next.chart, options.getEvaluator(), (sheetId) =>
+        target.workbook.sheets.get(sheetId),
+      );
+      if (
+        data.diagnostics?.some(
+          (item) => item.code === "broken-reference" || item.code === "length-mismatch",
+        )
+      ) {
+        error.value = true;
+        return;
+      }
       if (
         !data.series.some((series) => series.values.some((value) => value !== null)) &&
+        !(next.chart.source?.kind === "series" && next.chart.source.series.length === 0) &&
         next.chart.type !== "sankey"
       ) {
         error.value = true;

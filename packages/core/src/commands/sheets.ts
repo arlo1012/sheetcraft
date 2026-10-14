@@ -1,3 +1,9 @@
+import { mapSheetDrawingChartReferences } from "../chart-source-references.js";
+import {
+  prepareExternalDrawingCollections,
+  readExternalDrawingCollections,
+  commitExternalDrawingCollections,
+} from "./text-references.js";
 import { mapSheetDrawingTextReferences } from "../text-box-reference.js";
 import {
   capturePivotTables,
@@ -197,6 +203,18 @@ export function createDuplicateSheetCommand(
       ...reference,
       sheetId: reference.sheetId === sourceSheetId ? sheetId : reference.sheetId,
     }));
+  if (sheet.drawings?.length)
+    sheet.drawings = mapSheetDrawingChartReferences(
+      sheet.drawings,
+      (reference) => ({
+        ...reference,
+        sheetId: reference.sheetId === sourceSheetId ? sheetId : reference.sheetId,
+      }),
+      (reference) => ({
+        ...reference,
+        sheetId: reference.sheetId === sourceSheetId ? sheetId : reference.sheetId,
+      }),
+    );
   const usedTableIds = new Set(
     [...workbook.sheets.values()].flatMap((entry) => (entry.tables ?? []).map((table) => table.id)),
   );
@@ -364,8 +382,30 @@ export function applyAddSheetCommand(
   if (!activeSheet) throw sheetNotFound(command.activeSheetId);
   if (activeSheet.properties.hidden)
     throw invalidCommandPayload("activeSheetId", command.activeSheetId);
+  const externalDrawings = prepareExternalDrawingCollections(
+    workbook,
+    sheet.id,
+    readExternalDrawingCollections(command),
+  );
+  for (const entry of externalDrawings.next) {
+    const expected = mapSheetDrawingChartReferences(
+      entry.drawings,
+      (reference) => (reference.sheetId === sheet.id ? { ...reference, cell: null } : reference),
+      (reference) => (reference.sheetId === sheet.id ? { ...reference, range: null } : reference),
+    );
+    if (
+      JSON.stringify(expected) !==
+      JSON.stringify(workbook.sheets.get(entry.sheetId)!.drawings ?? [])
+    )
+      throw invalidCommandPayload(
+        "externalDrawingCollections",
+        entry.sheetId,
+        "Chart reference restore is not associated with this deleted source sheet.",
+      );
+  }
   const previousActiveSheetId = workbook.activeSheetId;
   insertSheet(workbook, sheet, command.index);
+  commitExternalDrawingCollections(workbook, externalDrawings);
   workbook.activeSheetId = command.activeSheetId;
   for (const definition of command.definedNames ?? []) {
     workbook.definedNames.set(definition.id, {
@@ -467,11 +507,29 @@ export function applyDeleteSheetCommand(
     workbook,
     command.sheetId,
   );
+  const externalDrawings = prepareExternalDrawingCollections(
+    workbook,
+    command.sheetId,
+    [...workbook.sheets.values()].flatMap((owner) => {
+      if (owner.id === command.sheetId) return [];
+      const drawings = mapSheetDrawingChartReferences(
+        owner.drawings,
+        (reference) =>
+          reference.sheetId === command.sheetId ? { ...reference, cell: null } : reference,
+        (reference) =>
+          reference.sheetId === command.sheetId ? { ...reference, range: null } : reference,
+      );
+      return JSON.stringify(drawings) === JSON.stringify(owner.drawings ?? [])
+        ? []
+        : [{ sheetId: owner.id, drawings }];
+    }),
+  );
   const removedSheetSnapshot = serializeSheet(workbook.sheets.get(command.sheetId)!);
   rewriteQualifiedReferencesForSheet(workbook, command.sheetId, null);
   rewriteConditionalFormatQualifiedReferencesForSheet(workbook, command.sheetId, null);
   rewriteTableCalculatedColumnSheetReferences(workbook, command.sheetId, null);
   for (const definition of definedNames) workbook.definedNames.delete(definition.id);
+  commitExternalDrawingCollections(workbook, externalDrawings);
   const { index } = removeSheet(workbook, command.sheetId);
   setActiveSheet(workbook, command.activeSheetId);
   restorePivotTables(
@@ -487,6 +545,9 @@ export function applyDeleteSheetCommand(
     type: "addSheet",
     pivotTables,
     sheet: removedSheetSnapshot,
+    ...(externalDrawings.previous.length
+      ? { externalDrawingCollections: externalDrawings.previous }
+      : {}),
     index,
     activeSheetId: previousActiveSheetId,
     formulaSources,

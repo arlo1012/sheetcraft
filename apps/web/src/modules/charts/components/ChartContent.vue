@@ -11,6 +11,7 @@ const props = defineProps<{
   drawing: SheetChartDrawing;
   sheet: Sheet;
   evaluator: SheetEvaluator;
+  resolveSheet?: (sheetId: string) => Sheet | undefined;
   revision: number;
 }>();
 const { t } = useAppI18n();
@@ -20,9 +21,19 @@ let observer: ResizeObserver | undefined;
 const result = computed(() => {
   void props.revision;
   try {
+    const data = getSheetChartData(
+      props.sheet,
+      props.drawing.chart,
+      props.evaluator,
+      props.resolveSheet,
+    );
     return {
-      data: getSheetChartData(props.sheet, props.drawing.chart, props.evaluator),
-      invalid: false,
+      data,
+      invalid: Boolean(
+        data.diagnostics?.some(
+          (entry) => entry.code === "broken-reference" || entry.code === "length-mismatch",
+        ),
+      ),
     };
   } catch {
     return { data: { categories: [], series: [], records: [] }, invalid: true };
@@ -43,6 +54,11 @@ function render() {
       height: props.drawing.height,
     });
     chart.resize({ width: props.drawing.width, height: props.drawing.height });
+    if (result.value.invalid) {
+      chart.clear();
+      error.value = false;
+      return;
+    }
     chart.setOption(
       createChartOption(props.drawing.chart, data.value, {
         width: props.drawing.width,
@@ -105,7 +121,7 @@ onMounted(() => {
   observer = new ResizeObserver(render);
   if (root.value) observer.observe(root.value);
 });
-watch([() => props.drawing, data], render, { deep: true, flush: "post" });
+watch([() => props.drawing, result], render, { deep: true, flush: "post" });
 onBeforeUnmount(() => {
   observer?.disconnect();
   chart?.dispose();
@@ -141,8 +157,13 @@ onBeforeUnmount(() => {
     </svg>
     <div v-else ref="root" class="chart-content__canvas" />
     <div
-      v-if="(!drawing.chart.range && !drawing.chart.dataCache) || error || result.invalid"
+      v-if="
+        (!drawing.chart.source && !drawing.chart.range && !drawing.chart.dataCache) ||
+        error ||
+        result.invalid
+      "
       class="chart-content__error"
+      role="status"
     >
       {{ t("chart.invalidSource") }}
     </div>

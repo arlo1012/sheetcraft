@@ -62,6 +62,7 @@ export function useChartObjectControls(options: {
   flush: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
   edit: (drawing: SheetChartDrawing) => void;
+  source?: (drawing: SheetChartDrawing) => void;
 }) {
   const error = ref(false);
   let disposed = false;
@@ -168,7 +169,9 @@ export function useChartObjectControls(options: {
       disabled: !canUseSheetPermission(sheet, "editObjects"),
       apply: (patch: ChartElementPatch) => change(() => applyElementPatch(drawing.chart, patch)),
       edit,
-      source: edit,
+      source: () => {
+        if (prepare()) (options.source ?? options.edit)(drawing);
+      },
       applyAndRun: (
         patch: ChartElementPatch,
         action: "edit" | "source" | "switchDirection",
@@ -185,7 +188,12 @@ export function useChartObjectControls(options: {
                 })
               : chart;
           },
-          action === "switchDirection" ? undefined : (replacement) => options.edit(replacement),
+          action === "switchDirection"
+            ? undefined
+            : (replacement) =>
+                (action === "source" ? (options.source ?? options.edit) : options.edit)(
+                  replacement,
+                ),
         );
       },
       switchDirection: canSwitchDirection

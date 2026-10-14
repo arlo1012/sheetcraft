@@ -6,6 +6,16 @@ import { getChartElementCapabilities, getChartElementSettings } from "./chart-el
 const colors = ["#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#db2777"];
 type ChartDimensions = { width: number; height: number };
 
+/** Explicit sources keep each series' original palette slot when reordered. */
+function seriesAppearance(series: ChartData["series"][number]) {
+  const color =
+    series.colorIndex === undefined ? undefined : colors[series.colorIndex % colors.length];
+  return {
+    ...(series.id !== undefined ? { id: series.id } : {}),
+    ...(color ? { itemStyle: { color }, lineStyle: { color } } : {}),
+  };
+}
+
 function createElementLayout(chart: SheetChart, data: ChartData, dimensions?: ChartDimensions) {
   const capabilities = getChartElementCapabilities(chart.type);
   const elements = chart.elements;
@@ -134,6 +144,19 @@ function buildChartOption(
   data: ChartData,
   dimensions?: ChartDimensions,
 ): EChartsOption {
+  if (chart.source !== undefined) {
+    if (!["column", "bar", "line", "area", "radar"].includes(chart.type))
+      throw new RangeError("This chart type does not support an ordered series source.");
+    if (
+      data.diagnostics?.some(
+        (entry) => entry.code === "broken-reference" || entry.code === "length-mismatch",
+      )
+    )
+      throw new RangeError("The chart series source is unavailable or has mismatched lengths.");
+    // Removing the last series retains the drawing, but clears its entire interior.
+    if (chart.source.series.length === 0)
+      return { animation: false, backgroundColor: "#ffffff", series: [] };
+  }
   const layout = createElementLayout(chart, data, dimensions);
   const plotBounds = layout
     ? {
@@ -266,6 +289,7 @@ function buildChartOption(
         {
           type: "radar",
           data: data.series.map((series) => ({
+            ...seriesAppearance(series),
             name: series.name,
             value: series.values.map((value) => value ?? "-"),
           })),
@@ -319,16 +343,25 @@ function buildChartOption(
         chart.type === "line" || chart.type === "area"
           ? {
               type: "line",
+              ...seriesAppearance(series),
               name: series.name,
               data: series.values,
               showSymbol: true,
               connectNulls: false,
-              ...(chart.type === "area" ? { areaStyle: {} } : {}),
+              ...(chart.type === "area"
+                ? {
+                    areaStyle:
+                      series.colorIndex === undefined
+                        ? {}
+                        : { color: colors[series.colorIndex % colors.length] },
+                  }
+                : {}),
               ...(chart.stacked ? { stack: "total" } : {}),
               label: { show: chart.labels },
             }
           : {
               type: "bar",
+              ...seriesAppearance(series),
               name: series.name,
               data:
                 labelPosition !== undefined

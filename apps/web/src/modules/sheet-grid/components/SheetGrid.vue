@@ -4683,6 +4683,7 @@ defineExpose({
         :date-system="dateSystem"
         :sheet="sheet"
         :evaluator="sheetEvaluator"
+        :resolve-sheet="(sheetId) => workbook?.sheets.get(sheetId)"
         :revision="workbookRevision"
         :layout="layout"
         :scale="scale"

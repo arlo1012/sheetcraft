@@ -21,6 +21,7 @@ import {
 export type XlsxFeedbackKey =
   | "xlsx.feedback.blocked"
   | "chart.elementExportBlocked"
+  | "chart.sourceExportBlocked"
   | "xlsx.feedback.numericTableTotals"
   | "xlsx.feedback.exported"
   | "xlsx.feedback.failed"
@@ -137,6 +138,21 @@ export function useWorkbookXlsxActions(options: {
     return false;
   }
 
+  function setChartSourceFailure(report?: XlsxCompatibilityReport): boolean {
+    const locations = report?.issues.flatMap((issue) =>
+      issue.code === "feature-omitted" && issue.severity === "block"
+        ? issue.locations.filter((location) => location.endsWith(".chart.source"))
+        : [],
+    );
+    if (!locations?.length) return false;
+    feedback.value = {
+      key: "chart.sourceExportBlocked",
+      error: true,
+      locations: locations.join("; "),
+    };
+    return true;
+  }
+
   function setChartElementFailure(report?: XlsxCompatibilityReport): boolean {
     const locations = report?.issues.flatMap((issue) =>
       issue.code === "feature-omitted" && issue.severity === "block"
@@ -156,7 +172,9 @@ export function useWorkbookXlsxActions(options: {
     if (error instanceof XlsxWorkerAbortError || disposed) return;
     if (
       error instanceof XlsxWorkerFailure &&
-      (setNumericTotalsFailure(error.report) || setChartElementFailure(error.report))
+      (setNumericTotalsFailure(error.report) ||
+        setChartSourceFailure(error.report) ||
+        setChartElementFailure(error.report))
     )
       return;
     if (error instanceof XlsxWorkerFailure && error.report && hasBlockingIssue(error.report)) {

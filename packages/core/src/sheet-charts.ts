@@ -1,4 +1,10 @@
 import {
+  normalizeChartSource,
+  type ChartSeriesSource,
+  type ChartSourceDiagnostic,
+} from "./chart-source.js";
+import { getChartSourceData } from "./chart-source-data.js";
+import {
   getCellStyle,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
@@ -30,6 +36,8 @@ export type ChartElementSettings = {
   labelPosition?: "center" | "insideEnd" | "insideBase" | "outsideEnd";
 };
 export type SheetChart = {
+  /** Ordered live sources, exclusive of rectangle and PivotTable/cache sources. */
+  source?: ChartSeriesSource;
   pivotTableId?: string;
   /** Values retained when a PivotTable is removed; no worksheet data dependency. */
   dataCache?: ChartData;
@@ -105,6 +113,13 @@ function normalizeChartElementSettings(value: unknown): ChartElementSettings {
   return result;
 }
 export function normalizeSheetChart(chart: SheetChart): SheetChart {
+  let source: ChartSeriesSource | undefined;
+  if (chart && typeof chart === "object" && "source" in chart) {
+    const field = Object.getOwnPropertyDescriptor(chart, "source");
+    if (!field || !("value" in field))
+      throw new TypeError("Chart source must be an own data field, not an accessor.");
+    source = normalizeChartSource(field.value);
+  }
   let elements: ChartElementSettings | undefined;
   if (chart && typeof chart === "object" && "elements" in chart) {
     const field = Object.getOwnPropertyDescriptor(chart, "elements");
@@ -114,6 +129,11 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
   }
   if (
     !chart ||
+    (source !== undefined &&
+      (chart.range !== null ||
+        chart.pivotTableId !== undefined ||
+        chart.dataCache !== undefined ||
+        !["column", "bar", "line", "area", "radar"].includes(chart.type))) ||
     (chart.pivotTableId !== undefined && chart.dataCache !== undefined) ||
     (chart.pivotTableId !== undefined &&
       (typeof chart.pivotTableId !== "string" || !chart.pivotTableId.trim())) ||
@@ -143,6 +163,7 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
   )
     throw new RangeError("Chart source must contain at most 10,000 cells.");
   return {
+    ...(source !== undefined ? { source } : {}),
     ...(chart.pivotTableId ? { pivotTableId: chart.pivotTableId } : {}),
     ...(chart.dataCache !== undefined
       ? { dataCache: normalizeChartDataCache(chart.dataCache) }
@@ -161,11 +182,15 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
   };
 }
 export type ChartSeries = {
+  id?: string;
+  colorIndex?: number;
   name: string;
   values: Array<number | null>;
   numberFormat?: CellNumberFormat;
 };
 export type ChartData = {
+  /** Derived only; not part of static caches or snapshots. */
+  diagnostics?: ChartSourceDiagnostic[];
   categories: string[];
   series: ChartSeries[];
   records: Array<Array<string | number | null>>;
@@ -216,7 +241,10 @@ export function getSheetChartData(
   sheet: Sheet,
   chart: SheetChart,
   evaluator: SheetEvaluator,
+  resolveSheet?: (sheetId: string) => Sheet | undefined,
 ): ChartData {
+  if ("source" in chart)
+    return getChartSourceData(sheet, normalizeSheetChart(chart), evaluator, resolveSheet);
   if (chart.dataCache !== undefined) return normalizeChartDataCache(chart.dataCache);
   if (chart.pivotTableId) {
     const pivot = sheet.pivotTables?.find((table) => table.id === chart.pivotTableId);

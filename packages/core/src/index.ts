@@ -98,3 +98,22 @@ export {
   applyShapeGroupEquationSourceEdit,
   type ShapeGroupEquationSourceEdit,
 } from "./shape-group-edit.js";
+
+export {
+  MAX_CHART_SOURCE_CELLS,
+  MAX_CHART_SOURCE_SERIES,
+  normalizeChartSource,
+  normalizeChartSourceRange,
+  getChartSourceRangeLength,
+  createChartSourceFromRange,
+  getChartSourceApplicability,
+  mapChartSourceReferences,
+} from "./chart-source.js";
+export type {
+  ChartSeriesSource,
+  ChartSourceSeries,
+  ChartSourceName,
+  ChartSourceValues,
+  ChartSourceCategories,
+  ChartSourceDiagnostic,
+} from "./chart-source.js";

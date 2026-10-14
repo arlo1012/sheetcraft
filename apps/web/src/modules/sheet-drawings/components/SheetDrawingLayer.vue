@@ -184,6 +184,7 @@ const props = defineProps<{
   selectedDrawingId?: string | null;
   sheet?: Sheet;
   evaluator?: SheetEvaluator;
+  resolveSheet?: (sheetId: string) => Sheet | undefined;
   revision?: number;
   theme?: WorkbookTheme;
   imageAssetUrls?: ReadonlyMap<string, string>;
@@ -3150,7 +3151,7 @@ function clearOutside(event: PointerEvent) {
     event.target instanceof Element &&
     !event.target.closest("[data-sheet-drawing-id]") &&
     !event.target.closest(
-      '[role="dialog"],[role="menu"],[role="listbox"],[data-chart-tools-toolbar],.chart-element-options-popup,[data-shape-format-pane],[data-shape-format-trigger],[data-shape-selection-toolbar],[data-shape-selection-reference-menu],[data-shape-group-selection],[data-shape-canvas-text-editor],[data-shape-canvas-text-toolbar],[data-shape-tools-toolbar],[data-shape-selection-pane]',
+      '[role="dialog"],[role="menu"],[role="listbox"],[data-chart-tools-toolbar],.chart-element-options-popup,.chart-source-options-popup,.chart-editor-options-popup,[data-shape-format-pane],[data-shape-format-trigger],[data-shape-selection-toolbar],[data-shape-selection-reference-menu],[data-shape-group-selection],[data-shape-canvas-text-editor],[data-shape-canvas-text-toolbar],[data-shape-tools-toolbar],[data-shape-selection-pane]',
     )
   ) {
     selectRoots([]);
@@ -3407,6 +3408,7 @@ watch(
             :density="rasterDensity"
             :sheet="sheet"
             :evaluator="evaluator"
+            :resolve-sheet="resolveSheet"
             :revision="revision"
             :theme="theme"
             :image-asset-urls="imageAssetUrls"

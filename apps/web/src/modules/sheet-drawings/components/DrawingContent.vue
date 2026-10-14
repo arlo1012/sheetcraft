@@ -32,6 +32,7 @@ const props = defineProps<{
   connectorRoute?: ReadyShapeConnectorRoute;
   sheet?: Sheet;
   evaluator?: SheetEvaluator;
+  resolveSheet?: (sheetId: string) => Sheet | undefined;
   revision?: number;
   theme?: WorkbookTheme;
   imageAssetUrls?: ReadonlyMap<string, string>;
@@ -192,6 +193,7 @@ const legacyBodyTransform = computed(() =>
       :drawing="drawing"
       :sheet="sheet"
       :evaluator="evaluator"
+      :resolve-sheet="resolveSheet"
       :revision="revision ?? 0"
     />
     <FormControlContent

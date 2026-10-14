@@ -19,12 +19,13 @@ import {
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SpreadsheetRibbon from "../../../app/SpreadsheetRibbon.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
+import SheetDrawingLayer from "../../../modules/sheet-drawings/components/SheetDrawingLayer.vue";
 import ChartEditorDialog from "../../../modules/charts/components/ChartEditorDialog.vue";
+import ChartSourceDialog from "../../../modules/charts/components/ChartSourceDialog.vue";
 import ChartElementsControls from "../../../modules/charts/components/ChartElementsControls.vue";
 import ChartElementsToolbar from "../../../modules/charts/components/ChartElementsToolbar.vue";
 import type { ChartElementPatch } from "../../../modules/charts/chart-element-controls";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
-import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { createAppI18n } from "../../../shared/i18n";
 import { triggerCanvasCell } from "../../app/canvas-interaction";
 
@@ -239,12 +240,14 @@ async function openSource(wrapper: VueWrapper) {
   await trigger.trigger("pointerdown");
   await trigger.trigger("click");
   await flushPromises();
-  return wrapper.getComponent(ChartEditorDialog);
+  return wrapper.getComponent(ChartSourceDialog);
 }
-async function clickDialogFooter(label: "OK" | "Cancel") {
+async function clickDialogFooter(label: "OK" | "Cancel", source = false) {
   // Workspace also owns mounted-but-hidden library dialogs. Target the real
   // chart editor's enclosing native dialog, never a document-wide first match.
-  const dialog = document.querySelector(".chart-editor")?.closest(".t-dialog");
+  const dialog = document
+    .querySelector(source ? "[data-chart-source-dialog]" : ".chart-editor")
+    ?.closest(".t-dialog");
   expect(dialog).toBeDefined();
   const button = new DOMWrapper(dialog!)
     .findAll(".t-dialog__footer button")
@@ -497,14 +500,18 @@ describe("chart elements real Workspace context", () => {
         expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(false);
         expect(renderData(renderProbe(f.wrapper)).categories).toEqual(["apple", "pear"]);
       } else {
-        const editor = f.wrapper.getComponent(ChartEditorDialog);
-        expect(editor.props("drawing")).toBe(replacement);
+        const editor =
+          action === "source"
+            ? f.wrapper.getComponent(ChartSourceDialog)
+            : f.wrapper.getComponent(ChartEditorDialog);
+        expect(editor.props().drawing).toBe(replacement);
         expect(
           (editor.getComponent(ChartContentProbe).props("drawing") as SheetChartDrawing).chart
             .title,
         ).toBe(complete);
-        await clickDialogFooter("Cancel");
+        await clickDialogFooter("Cancel", action === "source");
         expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(false);
+        expect(f.wrapper.findComponent(ChartSourceDialog).exists()).toBe(false);
         expect(f.controller.session.history.undoStack).toHaveLength(1);
       }
       const changed = serializeWorkbook(f.workbook);
@@ -547,7 +554,7 @@ describe("chart elements real Workspace context", () => {
     expect(chart(f.sheet).chart.elements).toEqual(elements);
   });
 
-  test("source editor stages direction, range and title then real Cancel restores the original chart and history", async () => {
+  test("source dialog stages direction and range, retaining title/elements until real Cancel", async () => {
     const elements = {
       titlePosition: "overlay",
       legendPosition: "right",
@@ -557,74 +564,84 @@ describe("chart elements real Workspace context", () => {
     await selectChart(f.wrapper);
     const before = serializeWorkbook(f.workbook);
     const editor = await openSource(f.wrapper);
-    await editor.getComponent(RangeReferenceInput).get("input").setValue("'Source Data'!A1:B4");
+    await editor.get("[data-chart-source-range] input").setValue("='Source Data'!$A$1:$B$4");
     const direction = editor
-      .findAllComponents(Checkbox)
-      .find((item) => item.text() === "Series in rows")!;
-    await direction.get('input[type="checkbox"]').setValue(true);
-    await editor
-      .getComponent(ChartElementsControls)
-      .get('[aria-label="Title text"] input')
-      .setValue("Discarded source draft");
-    await editor
-      .getComponent(ChartElementsControls)
-      .get('[aria-label="Title text"] input')
-      .trigger("blur");
+      .findAllComponents(Select)
+      .find((item) => item.attributes("aria-label") === "Series direction")!;
+    await direction
+      .get(".t-input__inner")
+      .trigger("keydown", { key: "ArrowDown", code: "ArrowDown" });
+    await expect
+      .poll(() =>
+        new DOMWrapper(document.body).findAll(".t-select-option").map((item) => item.text()),
+      )
+      .toContain("Each row is a series");
+    const option = new DOMWrapper(document.body)
+      .findAll(".t-select-option")
+      .find((item) => item.text() === "Each row is a series")!;
+    expect(option).toBeDefined();
+    expect(
+      f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId"),
+      "before source direction portal pointerdown",
+    ).toBe("chart-one");
+    expect(f.wrapper.getComponent(SpreadsheetRibbon).props("hasChart")).toBe(true);
+    await option.trigger("pointerdown");
+    expect(
+      f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId"),
+      "after source direction portal pointerdown",
+    ).toBe("chart-one");
+    expect(f.wrapper.getComponent(SpreadsheetRibbon).props("hasChart")).toBe(true);
+    await option.trigger("click");
+    await flushPromises();
+    expect(f.wrapper.getComponent(SpreadsheetRibbon).props("hasChart")).toBe(true);
     const preview = editor.getComponent(ChartContentProbe);
     expect((preview.props("drawing") as SheetChartDrawing).chart).toMatchObject({
       seriesBy: "rows",
-      title: "Discarded source draft",
+      title: "Sales",
       range: { start: { row: 0, column: 0 }, end: { row: 3, column: 1 } },
       elements,
     });
+    expect(editor.find('[aria-label="Title text"]').exists()).toBe(false);
     expect(serializeWorkbook(f.workbook)).toEqual(before);
     expect(f.controller.session.history.undoStack).toHaveLength(0);
-    await clickDialogFooter("Cancel");
-    expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(false);
+    await clickDialogFooter("Cancel", true);
+    expect(f.wrapper.findComponent(ChartSourceDialog).exists()).toBe(false);
     expect(serializeWorkbook(f.workbook)).toEqual(before);
     expect(f.controller.session.history.undoStack).toHaveLength(0);
+    expect(
+      f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId"),
+      "after source Cancel",
+    ).toBe("chart-one");
+    expect(f.wrapper.getComponent(SpreadsheetRibbon).props("hasChart")).toBe(true);
     const reopened = await openSource(f.wrapper);
     expect(
-      reopened
-        .getComponent(ChartElementsControls)
-        .get<HTMLInputElement>('[aria-label="Title text"] input').element.value,
-    ).toBe("Sales");
-    expect(
-      reopened
-        .findAllComponents(Checkbox)
-        .find((item) => item.text() === "Series in rows")!
-        .get<HTMLInputElement>('input[type="checkbox"]').element.checked,
-    ).toBe(false);
-    expect(
-      (reopened.getComponent(ChartContentProbe).props("drawing") as SheetChartDrawing).chart
-        .seriesBy,
-    ).toBe("columns");
-    await clickDialogFooter("Cancel");
+      (reopened.getComponent(ChartContentProbe).props("drawing") as SheetChartDrawing).chart,
+    ).toMatchObject({ seriesBy: "columns", title: "Sales", elements });
+    await clickDialogFooter("Cancel", true);
   });
 
-  test("source editor OK flushes an unblurred complete title into exactly one real command", async () => {
+  test("source dialog OK flushes an unblurred complete range into one command, preserving title", async () => {
     const f = await fixture({ elements: { legendPosition: "right" } });
     await selectChart(f.wrapper);
     const before = serializeWorkbook(f.workbook);
     const editor = await openSource(f.wrapper);
-    await editor
-      .getComponent(ChartElementsControls)
-      .get('[aria-label="Title text"] input')
-      .setValue("Whole pending title");
+    await editor.get("[data-chart-source-range] input").setValue("='Source Data'!$A$1:$B$4");
     expect(f.controller.session.history.undoStack).toHaveLength(0);
     expect(chart(f.sheet).chart.title).toBe("Sales");
-    await clickDialogFooter("OK");
-    expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(false);
+    await clickDialogFooter("OK", true);
+    expect(f.wrapper.findComponent(ChartSourceDialog).exists()).toBe(false);
     expect(chart(f.sheet).chart).toMatchObject({
-      title: "Whole pending title",
+      title: "Sales",
       elements: { legendPosition: "right" },
+      range: { start: { row: 0, column: 0 }, end: { row: 3, column: 1 } },
     });
     expect(f.sheet.drawings).toHaveLength(2);
     expect(f.controller.session.history.undoStack).toHaveLength(1);
     expect(f.controller.undo()).toBe(true);
     expect(serializeWorkbook(f.workbook)).toEqual(before);
     expect(f.controller.redo()).toBe(true);
-    expect(chart(f.sheet).chart.title).toBe("Whole pending title");
+    expect(chart(f.sheet).chart.title).toBe("Sales");
+    expect(chart(f.sheet).chart.range?.end.column).toBe(1);
   });
 
   test("real Switch row/column retains title, legend and labels in one reversible command", async () => {
@@ -725,6 +742,7 @@ describe("chart elements real Workspace context", () => {
       oldDirection();
       await flushPromises();
       expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(false);
+      expect(f.wrapper.findComponent(ChartSourceDialog).exists()).toBe(false);
       expect(serializeWorkbook(f.workbook)).toEqual(before);
       expect(f.controller.session.history.undoStack).toHaveLength(undoCount);
       expect(f.controller.session.history.redoStack).toHaveLength(redoCount);

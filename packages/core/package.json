@@ -156,6 +156,10 @@
       "types": "./dist/sheet-drawings.d.ts",
       "import": "./dist/sheet-drawings.js"
     },
+    "./chart-source": {
+      "types": "./dist/chart-source.d.ts",
+      "import": "./dist/chart-source.js"
+    },
     "./sheet-charts": {
       "types": "./dist/sheet-charts.d.ts",
       "import": "./dist/sheet-charts.js"

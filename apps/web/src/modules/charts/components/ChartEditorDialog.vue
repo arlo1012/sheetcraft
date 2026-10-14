@@ -5,7 +5,7 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
-import type { ChartType } from "@sheetcraft/core/sheet-charts";
+import { normalizeSheetChart, type ChartType } from "@sheetcraft/core/sheet-charts";
 import type { Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
@@ -16,6 +16,7 @@ import {
 import ChartContent from "./ChartContent.vue";
 import ChartElementsControls from "./ChartElementsControls.vue";
 import type { ChartElementPatch } from "../chart-element-controls";
+import { getChartSourceApplicability } from "../chart-source-editor";
 const props = defineProps<{
   drawing: SheetChartDrawing;
   sheet: Sheet;
@@ -35,10 +36,7 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 const draft = ref<SheetChartDrawing>({
   ...props.drawing,
-  chart: {
-    ...props.drawing.chart,
-    ...(props.drawing.chart.elements ? { elements: { ...props.drawing.chart.elements } } : {}),
-  },
+  chart: normalizeSheetChart(props.drawing.chart),
 });
 const elementsControls = ref<InstanceType<typeof ChartElementsControls>>();
 function patchElements(patch: ChartElementPatch): void {
@@ -67,11 +65,13 @@ const previewDrawing = computed(() => {
     height: 260,
     chart: {
       ...draft.value.chart,
-      range: draft.value.chart.pivotTableId
-        ? draft.value.chart.range
-        : resolved?.sheetId === props.sheet.id
-          ? resolved.range
-          : null,
+      range: draft.value.chart.source
+        ? null
+        : draft.value.chart.pivotTableId
+          ? draft.value.chart.range
+          : resolved?.sheetId === props.sheet.id
+            ? resolved.range
+            : null,
     },
   };
 });
@@ -89,7 +89,15 @@ const types: ChartType[] = [
   "river",
   "wordCloud",
 ];
-const options = computed(() => types.map((type) => ({ label: t(`chart.${type}`), value: type })));
+const options = computed(() =>
+  types.map((type) => ({
+    label: t(`chart.${type}`),
+    value: type,
+    disabled:
+      !!draft.value.chart.source &&
+      getChartSourceApplicability({ ...draft.value.chart, type }) !== "editable",
+  })),
+);
 </script>
 <template>
   <Dialog
@@ -122,15 +130,22 @@ const options = computed(() => types.map((type) => ({ label: t(`chart.${type}`),
         >{{ t("chart.source")
         }}<RangeReferenceInput
           v-model="source"
-          :disabled="disabled || !!draft.chart.pivotTableId || !!draft.chart.dataCache"
+          :disabled="
+            disabled ||
+            !!draft.chart.pivotTableId ||
+            !!draft.chart.dataCache ||
+            !!draft.chart.source
+          "
           :label="t('chart.source')"
           :select-reference="selectReference"
       /></label>
+      <p v-if="draft.chart.source" class="chart-editor__hint">{{ t("chart.customSourceHint") }}</p>
       <div class="chart-editor__field">
         <span>{{ t("chart.type") }}</span>
         <Select
           v-model="draft.chart.type"
           :options="options"
+          :popup-props="{ overlayClassName: 'chart-editor-options-popup' }"
           :disabled="disabled"
           :aria-label="t('chart.type')"
         />
@@ -138,19 +153,34 @@ const options = computed(() => types.map((type) => ({ label: t(`chart.${type}`),
       <div class="chart-editor__row">
         <Checkbox
           v-model="draft.chart.headerRow"
-          :disabled="disabled || !!draft.chart.pivotTableId || !!draft.chart.dataCache"
+          :disabled="
+            disabled ||
+            !!draft.chart.pivotTableId ||
+            !!draft.chart.dataCache ||
+            !!draft.chart.source
+          "
           >{{
             t(draft.chart.seriesBy === "rows" ? "chart.headerRowCategories" : "chart.headerRow")
           }}</Checkbox
         ><Checkbox
           v-model="draft.chart.headerColumn"
-          :disabled="disabled || !!draft.chart.pivotTableId || !!draft.chart.dataCache"
+          :disabled="
+            disabled ||
+            !!draft.chart.pivotTableId ||
+            !!draft.chart.dataCache ||
+            !!draft.chart.source
+          "
           >{{
             t(draft.chart.seriesBy === "rows" ? "chart.headerColumnSeries" : "chart.headerColumn")
           }}</Checkbox
         ><Checkbox
           :checked="draft.chart.seriesBy === 'rows'"
-          :disabled="disabled || !!draft.chart.pivotTableId || !!draft.chart.dataCache"
+          :disabled="
+            disabled ||
+            !!draft.chart.pivotTableId ||
+            !!draft.chart.dataCache ||
+            !!draft.chart.source
+          "
           @change="draft.chart.seriesBy = $event ? 'rows' : 'columns'"
           >{{ t("chart.seriesByRows") }}</Checkbox
         >
@@ -188,6 +218,7 @@ const options = computed(() => types.map((type) => ({ label: t(`chart.${type}`),
           :sheet="sheet"
           :evaluator="evaluator"
           :revision="revision"
+          :resolve-sheet="(sheetId) => workbook.sheets.get(sheetId)"
         />
       </div>
     </div>

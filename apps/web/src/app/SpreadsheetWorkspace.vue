@@ -113,6 +113,7 @@ import { usePictureToolbarOwner } from "../modules/sheet-images/usePictureToolba
 import {
   normalizeSheetDrawing,
   type SheetFramedGraphicDrawing,
+  type SheetChartDrawing,
   type SheetDrawing,
   type SheetGraphicDrawing,
 } from "@sheetcraft/core/sheet-drawings";
@@ -140,10 +141,18 @@ import CameraEditorDialog from "../modules/camera/components/CameraEditorDialog.
 import SparklineDialog from "../modules/sparklines/components/SparklineDialog.vue";
 import { useChartActions } from "../modules/charts/useChartActions";
 import { useChartObjectControls } from "../modules/charts/useChartObjectControls";
+import { useChartSourceActions } from "../modules/charts/useChartSourceActions";
+import {
+  getChartSourceApplicability,
+  type ChartSourceReferenceRole,
+} from "../modules/charts/chart-source-editor";
 import ChartElementsToolbar from "../modules/charts/components/ChartElementsToolbar.vue";
 import { defineAsyncComponent } from "vue";
 const ChartEditorDialog = defineAsyncComponent(
   () => import("../modules/charts/components/ChartEditorDialog.vue"),
+);
+const ChartSourceDialog = defineAsyncComponent(
+  () => import("../modules/charts/components/ChartSourceDialog.vue"),
 );
 import SymbolDialog from "../modules/insert-tools/components/SymbolDialog.vue";
 import {
@@ -1586,16 +1595,40 @@ const chartActions = useChartActions({
   onEditPivot: openPivotFields,
 });
 const { dialog: chartDialog, editing: editingChart, error: chartError } = chartActions;
+const chartSourceActions = useChartSourceActions({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  getEvaluator: () => activeSheetEvaluator.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || !!chartDialog.value,
+  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+  execute: executeCommand,
+  selectSheet,
+  selectDrawing: (drawingId) => sheetGridRef.value?.selectDrawing(drawingId),
+  selectReference: (current, role) => selectChartSourceReference(current, role),
+});
+const { dialog: chartSourceDialog, error: chartSourceError } = chartSourceActions;
+function openChartSource(drawing: SheetChartDrawing): void {
+  if (getChartSourceApplicability(drawing.chart) === "editable") chartSourceActions.edit(drawing);
+  else chartActions.edit(drawing);
+}
 const chartObjectControls = useChartObjectControls({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
   getGeneration: () => workbookGeneration.value,
   getRevision: () => workbookRevision.value,
   getSelectedId: () => selectedChartId.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || !!chartDialog.value,
+  isBusy: () =>
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    !!chartDialog.value ||
+    !!chartSourceDialog.value,
   flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
   execute: executeCommand,
   edit: chartActions.edit,
+  source: openChartSource,
 });
 const chartObjectContext = chartObjectControls.snapshot;
 const chartRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
@@ -1622,8 +1655,31 @@ const selectChartReference = computed(() => {
     return dialog.isCurrent() ? result : undefined;
   };
 });
+async function selectChartSourceReference(
+  current: string,
+  role: ChartSourceReferenceRole,
+): Promise<string | undefined> {
+  const dialog = chartSourceDialog.value;
+  if (!dialog?.isCurrent()) return undefined;
+  const selected = chartRangePicker.selectReference(current, {
+    singleCell: role === "series-name",
+  });
+  const picker = {
+    id: ++chartPickerId,
+    confirm: () => {
+      if (chartPicker.value === picker && dialog.isCurrent()) chartRangePicker.confirm();
+    },
+    cancel: () => {
+      if (chartPicker.value === picker && dialog.isCurrent()) chartRangePicker.cancel();
+    },
+  };
+  chartPicker.value = picker;
+  const result = await selected;
+  if (chartPicker.value === picker) chartPicker.value = undefined;
+  return dialog.isCurrent() ? result : undefined;
+}
 watch(
-  chartDialog,
+  [chartDialog, chartSourceDialog],
   () => {
     chartRangePicker.cancel();
     chartPicker.value = undefined;
@@ -4108,7 +4164,7 @@ const gridInert = computed(
     (!!textBoxReferenceDialog.value && !pickingTextBoxReference.value) ||
     !!shapeClipboardTransferConfirmation.value ||
     symbolVisible.value ||
-    (!!editingChart.value && !pickingChartRange.value) ||
+    ((!!editingChart.value || !!chartSourceDialog.value) && !pickingChartRange.value) ||
     (!!sparklineDraft.value && !pickingSparklineRange.value) ||
     cellStylesModalOpen.value ||
     (tableModalOpen.value && !pickingTableRange.value) ||
@@ -4214,7 +4270,7 @@ watch(
         !!textBoxReferenceDialog ||
         !!shapeClipboardTransferConfirmation ||
         symbolVisible ||
-        (!!editingChart && !pickingChartRange) ||
+        ((!!editingChart || !!chartSourceDialog) && !pickingChartRange) ||
         (!!sparklineDraft && !pickingSparklineRange) ||
         cellStylesModalOpen ||
         tableModalOpen ||
@@ -5468,7 +5524,7 @@ watch(
         !!textBoxReferenceDialog ||
         !!shapeClipboardTransferConfirmation ||
         symbolVisible ||
-        (!!editingChart && !pickingChartRange) ||
+        ((!!editingChart || !!chartSourceDialog) && !pickingChartRange) ||
         (!!sparklineDraft && !pickingSparklineRange) ||
         cellStylesModalOpen ||
         tableModalOpen ||
@@ -6030,7 +6086,7 @@ watch(
     <WorkbookStatusBar
       :sheet-tabs-disabled="
         pickingTableRange ||
-        pickingChartRange ||
+        (pickingChartRange && !chartSourceDialog) ||
         pickingSparklineRange ||
         pickingCameraRange ||
         pickingControlRange
@@ -6065,7 +6121,7 @@ watch(
         !!viewingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
-        (!!editingChart && !pickingChartRange) ||
+        ((!!editingChart || !!chartSourceDialog) && !pickingChartRange) ||
         (!!sparklineDraft && !pickingSparklineRange) ||
         cellStylesModalOpen ||
         (tableModalOpen && !pickingTableRange)
@@ -6200,6 +6256,27 @@ watch(
     @edit-pivot="chartDialog.editPivot"
     @confirm="chartDialog.confirm"
     @close="chartDialog.close"
+  />
+  <ChartSourceDialog
+    v-if="chartSourceDialog"
+    :key="chartSourceDialog.dialogId"
+    :drawing="chartSourceDialog.initial"
+    :workbook="chartSourceDialog.workbook"
+    :sheet="chartSourceDialog.sheet"
+    :evaluator="activeSheetEvaluator.forSheet?.(chartSourceDialog.sheet.id) ?? activeSheetEvaluator"
+    :revision="workbookRevision"
+    :disabled="
+      loading ||
+      fileBusy ||
+      xlsxBusy ||
+      !canUseSheetPermission(chartSourceDialog.sheet, 'editObjects')
+    "
+    :owner-valid="chartSourceDialog.isCurrent"
+    :error="chartSourceError"
+    :suspended="pickingChartRange"
+    :commit="chartSourceDialog.commit"
+    :select-reference="chartSourceDialog.selectReference"
+    @close="chartSourceDialog.close"
   />
   <RangeReferencePicker
     v-if="pickingChartRange && chartPicker"

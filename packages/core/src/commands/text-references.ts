@@ -1,10 +1,13 @@
+import {
+  mapSheetDrawingChartReferences,
+  mapChartSourceVectorCells,
+} from "../chart-source-references.js";
 import { MAX_SHEET_ROWS, MAX_SHEET_COLUMNS } from "../sheet-limits.js";
 import { readPictureDataArray } from "../picture-data-array.js";
 import { normalizeSheetDrawings, type SheetDrawing } from "../sheet-drawings.js";
 import { assertShapeObjectsForSheet } from "../shape-object-sheet.js";
 import {
   mapSheetDrawingTextReferences,
-  mapWorkbookTextReferences,
   MAX_TEXT_BOX_REFERENCE_SHEET_ID_LENGTH,
   normalizeTextBoxTextReference,
   type TextReferenceDrawingState,
@@ -12,6 +15,7 @@ import {
 import {
   normalizeSheetSparseState,
   type CellAddress,
+  type CellRange,
   type Sheet,
   type SheetSparseState,
   type Workbook,
@@ -82,8 +86,16 @@ function referenceMaintenanceSignature(
   targetSheetId: string,
 ): string {
   return JSON.stringify(
-    mapSheetDrawingTextReferences(drawings, (reference) =>
-      reference.sheetId === targetSheetId ? { sheetId: reference.sheetId, cell: null } : reference,
+    mapSheetDrawingChartReferences(
+      mapSheetDrawingTextReferences(drawings, (reference) =>
+        reference.sheetId === targetSheetId
+          ? { sheetId: reference.sheetId, cell: null }
+          : reference,
+      ),
+      (reference) =>
+        reference.sheetId === targetSheetId ? { ...reference, cell: null } : reference,
+      (reference) =>
+        reference.sheetId === targetSheetId ? { ...reference, range: null } : reference,
     ),
   );
 }
@@ -97,6 +109,7 @@ export function prepareExternalDrawingCollections(
   values: readonly TextReferenceDrawingState[] | undefined,
   association?: {
     mapCell: (cell: CellAddress) => CellAddress | null;
+    mapRange?: (range: CellRange) => CellRange | null;
     direction: "restore" | "reapply";
   },
 ): PreparedExternalDrawingCollections {
@@ -122,7 +135,12 @@ export function prepareExternalDrawingCollections(
       );
     if (association) {
       const prior = association.direction === "restore" ? entry.drawings : original;
-      const expected = mapLocalTextReferences(prior, ownSheetId, association.mapCell);
+      const expected = mapLocalTextReferences(
+        prior,
+        ownSheetId,
+        association.mapCell,
+        association.mapRange,
+      );
       const current = association.direction === "restore" ? original : entry.drawings;
       if (JSON.stringify(expected) !== JSON.stringify(current))
         throw invalidCommandPayload(
@@ -142,11 +160,17 @@ export function prepareExternalDrawingCollections(
 /** Batch admission scans source data only, including dormant tombstones and hidden descendants. */
 export function hasWorkbookTextReferencesToSheet(workbook: Workbook, sheetId: string): boolean {
   let found = false;
-  for (const sheet of workbook.sheets.values())
-    mapSheetDrawingTextReferences(sheet.drawings, (reference) => {
+  for (const sheet of workbook.sheets.values()) {
+    const inspect = <T extends { sheetId: string }>(reference: T): T => {
       found ||= reference.sheetId === sheetId;
       return reference;
-    });
+    };
+    mapSheetDrawingChartReferences(
+      mapSheetDrawingTextReferences(sheet.drawings, inspect),
+      inspect,
+      inspect,
+    );
+  }
   return found;
 }
 
@@ -154,13 +178,19 @@ export function planExternalTextReferenceChanges(
   workbook: Workbook,
   targetSheetId: string,
   mapCell: (cell: CellAddress) => CellAddress | null,
+  mapRange?: (range: CellRange) => CellRange | null,
 ): PreparedExternalDrawingCollections {
   return prepareExternalDrawingCollections(
     workbook,
     targetSheetId,
-    mapWorkbookTextReferences(workbook, targetSheetId, mapCell).filter(
-      (entry) => entry.sheetId !== targetSheetId,
-    ),
+    [...workbook.sheets.values()].flatMap((sheet) => {
+      if (sheet.id === targetSheetId) return [];
+      const original = normalizeSheetDrawings(sheet.drawings);
+      const drawings = mapLocalTextReferences(original, targetSheetId, mapCell, mapRange);
+      return JSON.stringify(drawings) === JSON.stringify(original)
+        ? []
+        : [{ sheetId: sheet.id, drawings }];
+    }),
   );
 }
 export function commitExternalDrawingCollections(
@@ -175,11 +205,29 @@ export function mapLocalTextReferences(
   drawings: readonly SheetDrawing[] | undefined,
   targetSheetId: string,
   mapCell: (cell: CellAddress) => CellAddress | null,
+  mapRange: (range: CellRange) => CellRange | null = (range) =>
+    mapChartSourceVectorCells(range, mapCell),
 ): SheetDrawing[] {
-  return mapSheetDrawingTextReferences(drawings, (reference) =>
-    reference.sheetId === targetSheetId && reference.cell !== null
-      ? { sheetId: reference.sheetId, cell: mapCell({ ...reference.cell }) }
-      : reference,
+  return mapSheetDrawingChartReferences(
+    mapSheetDrawingTextReferences(drawings, (reference) =>
+      reference.sheetId === targetSheetId && reference.cell !== null
+        ? { sheetId: reference.sheetId, cell: mapCell({ ...reference.cell }) }
+        : reference,
+    ),
+    (reference) =>
+      reference.sheetId === targetSheetId && reference.cell !== null
+        ? { ...reference, cell: mapCell({ ...reference.cell }) }
+        : reference,
+    (reference) =>
+      reference.sheetId === targetSheetId && reference.range !== null
+        ? {
+            ...reference,
+            range: mapRange({
+              start: { ...reference.range.start },
+              end: { ...reference.range.end },
+            }),
+          }
+        : reference,
   );
 }
 /** Resolve the final whole forest against next metrics without mutating any sheet. */

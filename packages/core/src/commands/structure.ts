@@ -1587,6 +1587,15 @@ function validateSheetAxisSlice(
       );
       return target === null ? null : { ...address, [command.axis]: target };
     },
+    (range) =>
+      transformRangeForAxis(
+        range,
+        command.axis,
+        command.index,
+        command.count,
+        maximum,
+        command.operation,
+      ),
   );
   if (command.slice.pivotTables)
     expectedMetadata.pivotTables =
@@ -1675,6 +1684,15 @@ export function applyRestoreSheetStateCommand(
           );
           return target === null ? null : { ...address, [command.axis]: target };
         },
+        mapRange: (range) =>
+          transformRangeForAxis(
+            range,
+            command.axis,
+            command.index,
+            command.count,
+            maximum,
+            command.operation,
+          ),
       },
     );
     const transformed = transformSheetAxis(
@@ -1933,8 +1951,20 @@ export function applySheetAxisCommand(
     );
     return target === null ? null : { ...address, [command.axis]: target };
   };
-  nextMetadata.drawings = mapLocalTextReferences(nextMetadata.drawings, sheet.id, mapReferenceCell);
-  const externalDrawings = planExternalTextReferenceChanges(workbook, sheet.id, mapReferenceCell);
+  const mapReferenceRange = (range: CellRange) =>
+    transformRangeForAxis(range, command.axis, command.index, command.count, maximum, operation);
+  nextMetadata.drawings = mapLocalTextReferences(
+    nextMetadata.drawings,
+    sheet.id,
+    mapReferenceCell,
+    mapReferenceRange,
+  );
+  const externalDrawings = planExternalTextReferenceChanges(
+    workbook,
+    sheet.id,
+    mapReferenceCell,
+    mapReferenceRange,
+  );
   if (externalDrawings.previous.length)
     slice.externalDrawingCollections = externalDrawings.previous;
   // Validate the complete detached/transformed forest before cells or dimensions
