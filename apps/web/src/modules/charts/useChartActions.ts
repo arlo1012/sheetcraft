@@ -22,6 +22,12 @@ import {
 import { resolveDataRange } from "@sheetcraft/core/data-range";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
+import {
+  applyChartDesignIntent,
+  changeChartType,
+  normalizeChartInsertIntent,
+  type ChartInsertIntent,
+} from "./chart-design-intents";
 
 type ChartTarget = {
   workbook: Workbook;
@@ -173,16 +179,41 @@ export function useChartActions(options: {
       },
     };
   }
-  function insert(type: ChartType | "dashboard") {
+  function insert(intent: ChartInsertIntent) {
+    let request: ChartInsertIntent;
+    try {
+      request = normalizeChartInsertIntent(intent);
+    } catch {
+      error.value = true;
+      return;
+    }
     const target = capture();
     if (!target || !prepare(target)) return;
     const selection = options.getRange();
     const range = resolveDataRange(target.sheet, selection) ?? selection;
-    open(
-      target,
-      createDrawing(type === "dashboard" ? "column" : type, options.name(), range, selection.start),
-      type === "dashboard",
+    const type = typeof request === "string" ? request : request.type;
+    const drawing = createDrawing(
+      type === "dashboard" ? "column" : type,
+      options.name(),
+      range,
+      selection.start,
     );
+    let invalidSelection = false;
+    try {
+      drawing.chart = normalizeSheetChart(drawing.chart);
+    } catch {
+      // A too-large selection remains a recoverable source edit, never an
+      // invalid chart model passed into the editor's setup or persisted data.
+      drawing.chart = normalizeSheetChart({ ...drawing.chart, range: null });
+      invalidSelection = true;
+    }
+    if (typeof request !== "string")
+      drawing.chart = applyChartDesignIntent(drawing.chart, {
+        kind: "variant",
+        variant: request.variant,
+      });
+    open(target, drawing, type === "dashboard");
+    if (invalidSelection) error.value = true;
   }
   function insertPivot(id: string) {
     const target = capture(id);
@@ -305,7 +336,7 @@ export function useChartActions(options: {
             id: index ? idFactory("chart") : next.id,
             offsetX: next.offsetX + (index % 2) * 500,
             offsetY: next.offsetY + Math.floor(index / 2) * 320,
-            chart: { ...next.chart, type },
+            chart: changeChartType(next.chart, type),
           })),
         ];
       else {

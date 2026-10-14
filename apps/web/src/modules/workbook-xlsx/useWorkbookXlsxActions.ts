@@ -142,7 +142,11 @@ export function useWorkbookXlsxActions(options: {
   function setChartFormatFailure(report?: XlsxCompatibilityReport): boolean {
     const locations = report?.issues.flatMap((issue) =>
       issue.code === "feature-omitted" && issue.severity === "block"
-        ? issue.locations.filter((location) => location.endsWith(".chart.format"))
+        ? issue.locations.filter((location) =>
+            [".chart.format", ".chart.presentation", ".chart.stacked"].some((suffix) =>
+              location.endsWith(suffix),
+            ),
+          )
         : [],
     );
     if (!locations?.length) return false;

@@ -230,6 +230,42 @@ function presentation(f: ReturnType<typeof fixture>, sheet: Sheet) {
 }
 
 describe("native chart object clipboard transactions", () => {
+  test.each(["copy", "cut"] as const)(
+    "percentage presentation survives cross-sheet %s with live source and exact Undo",
+    (mode) => {
+      const f = fixture("line");
+      try {
+        const original = drawing(f.source);
+        original.chart.stacked = true;
+        original.chart.presentation = {
+          percentStacked: true,
+          lineMarkers: false,
+          palette: ["#ffccaa", "#33aabb"],
+          background: "#202936",
+        };
+        const appearance = structuredClone(original.chart.presentation);
+        const expected = presentation(f, f.source);
+        expect(f.clipboard[mode]()).toBe(true);
+        f.navigate();
+        const before = snapshot(f);
+        expect(f.clipboard.paste()).toBe(true);
+        expect(drawing(f.target).chart.presentation).toEqual(appearance);
+        expect(presentation(f, f.target)).toEqual(expected);
+        expect(drawing(f.target).chart.source?.series).toHaveLength(2);
+        const after = snapshot(f);
+        expect(serializeWorkbook(deserializeWorkbook(after))).toEqual(after);
+        expect(undoWorkbookCommand(f.session)).toBe(true);
+        expect(snapshot(f)).toEqual(before);
+        expect(redoWorkbookCommand(f.session)).toBe(true);
+        expect(snapshot(f)).toEqual(after);
+        setCellValue(f.source, { row: 1, column: 1 }, 99);
+        expect(presentation(f, f.target).series[0]!.values[0]).toBe(99);
+        expect(drawing(f.target).chart.presentation).toEqual(appearance);
+      } finally {
+        f.scope.stop();
+      }
+    },
+  );
   test.each(allTypes)(
     "same-sheet %s copy retains full source/styles and gets only fresh outer identity",
     (type) => {

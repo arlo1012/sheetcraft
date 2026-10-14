@@ -117,6 +117,7 @@ const kind = computed(() => (available.value ? props.target.kind : "chart"));
 const isValueAxis = computed(
   () => kind.value === "valueAxis" || kind.value === "secondaryValueAxis",
 );
+const percentageAxis = computed(() => !!chart.value.presentation?.percentStacked);
 const isAxis = computed(() => kind.value === "categoryAxis" || isValueAxis.value);
 const valueAxis = computed<ChartValueAxisFormat>(() =>
   kind.value === "secondaryValueAxis"
@@ -186,7 +187,9 @@ const sourceSeries = computed(() =>
   ),
 );
 const linkedToSource = computed(
-  () => valueAxis.value.linkedToSource ?? valueAxis.value.numberFormat === undefined,
+  () =>
+    !percentageAxis.value &&
+    (valueAxis.value.linkedToSource ?? valueAxis.value.numberFormat === undefined),
 );
 const sourceNumberFormat = computed(() => {
   const first = sourceSeries.value[0]?.numberFormat;
@@ -198,9 +201,22 @@ const sourceNumberFormat = computed(() => {
     : undefined;
 });
 const numberFormat = computed<CellNumberFormat | undefined>(() =>
-  linkedToSource.value ? sourceNumberFormat.value : valueAxis.value.numberFormat,
+  percentageAxis.value
+    ? ((valueAxis.value.linkedToSource !== true ? valueAxis.value.numberFormat : undefined) ?? {
+        kind: "percent",
+        fractionDigits: 0,
+      })
+    : linkedToSource.value
+      ? sourceNumberFormat.value
+      : valueAxis.value.numberFormat,
 );
-const numberCategory = computed(() => numberFormat.value?.kind ?? "general");
+const numberCategory = computed(() =>
+  percentageAxis.value &&
+  numberFormat.value?.kind === "custom" &&
+  numberFormat.value.code === "General"
+    ? "general"
+    : (numberFormat.value?.kind ?? "general"),
+);
 const numberCode = computed(() =>
   numberFormat.value && "code" in numberFormat.value ? numberFormat.value.code : "",
 );
@@ -567,6 +583,9 @@ function numberIntent(format: CellNumberFormat | undefined): ChartFormatIntent |
   if (format) {
     next.numberFormat = format;
     next.linkedToSource = false;
+  } else if (percentageAxis.value) {
+    next.numberFormat = { kind: "custom", code: "General" };
+    next.linkedToSource = false;
   } else {
     delete next.numberFormat;
     delete next.linkedToSource;
@@ -578,6 +597,7 @@ function applyNumberFormat(format: CellNumberFormat | undefined): boolean {
   return !!intent && submit(intent);
 }
 function toggleSourceLink(value: unknown): void {
+  if (percentageAxis.value) return;
   const intent = axisIntent({ ...valueAxis.value, linkedToSource: !!value });
   if (intent) submit(intent);
 }
@@ -720,10 +740,11 @@ const currencyOptions = computed(() =>
   ].map((value) => ({ value, label: value || t("cellFormat.noCurrency") })),
 );
 const numberPreview = computed(() => {
-  const sample =
-    sourceSeries.value
-      .flatMap((entry) => entry.values)
-      .find((value): value is number => value !== null) ?? 1234.56;
+  const sample = percentageAxis.value
+    ? 0.375
+    : (sourceSeries.value
+        .flatMap((entry) => entry.values)
+        .find((value): value is number => value !== null) ?? 1234.56);
   try {
     return formatCellNumberValue(sample, numberFormat.value, { locale: locale.value });
   } catch {
@@ -947,6 +968,9 @@ function escapeDraft(event: KeyboardEvent): void {
       <details v-if="isValueAxis" class="chart-format-pane__section" open>
         <summary>{{ t("chart.formatBounds") }}</summary>
         <div class="chart-format-pane__section-body">
+          <p v-if="percentageAxis" class="chart-format-pane__hint">
+            {{ t("chart.formatPercentAxisHint") }}
+          </p>
           <div class="chart-format-pane__field" data-chart-format-field="min">
             <label :for="`${paneId}-min`">{{ t("chart.formatMinimum") }}</label>
             <div class="chart-format-pane__number">
@@ -1229,12 +1253,15 @@ function escapeDraft(event: KeyboardEvent): void {
         <summary>{{ t("chart.formatNumber") }}</summary>
         <div class="chart-format-pane__section-body">
           <TCheckbox
+            v-if="!percentageAxis"
             :checked="linkedToSource"
             :disabled="disabled"
             :onChange="captureAction(toggleSourceLink)"
             >{{ t("chart.formatLinkedToSource") }}</TCheckbox
           >
-          <p class="chart-format-pane__hint">{{ t("chart.formatNumberSourceHint") }}</p>
+          <p class="chart-format-pane__hint">
+            {{ t(percentageAxis ? "chart.formatPercentAxisHint" : "chart.formatNumberSourceHint") }}
+          </p>
           <div class="chart-format-pane__preview">
             <span>{{ t("cellFormat.preview") }}</span
             ><output :style="{ color: numberPreview.color }">{{ numberPreview.text }}</output>
@@ -1412,7 +1439,7 @@ function escapeDraft(event: KeyboardEvent): void {
           >
           <TCheckbox
             v-if="capabilities.seriesMarkers"
-            :checked="series.markers ?? true"
+            :checked="series.markers ?? chart.presentation?.lineMarkers ?? true"
             :disabled="disabled"
             :onChange="captureAction((value: unknown) => setSeries('markers', !!value))"
             >{{ t("chart.formatMarkers") }}</TCheckbox

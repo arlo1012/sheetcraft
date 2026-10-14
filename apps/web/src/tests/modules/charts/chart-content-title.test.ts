@@ -72,6 +72,34 @@ describe("word cloud title placement", () => {
       expect(Number(texts()[0]!.attributes("y"))).toBe(overlayY);
       expect(wrapper.find("svg").attributes("aria-label")).toBe("Retained title");
       expect(drawing.chart.title).toBe("Retained title");
+
+      await wrapper.setProps({
+        drawing: {
+          ...drawing,
+          chart: {
+            ...drawing.chart,
+            presentation: { palette: ["#ffccaa"], background: "#202936" },
+            format: { title: { color: "#e8eef7" } },
+          },
+        },
+      });
+      expect(wrapper.get("svg > rect").attributes("fill")).toBe("#202936");
+      expect(texts()[0]!.attributes("fill")).toBe("#e8eef7");
+      expect(texts()[1]!.attributes("fill")).toBe("#ffccaa");
+      expect(
+        [...texts()[1]!.element.childNodes]
+          .filter((node) => node.nodeType === Node.TEXT_NODE)
+          .map((node) => node.textContent)
+          .join("")
+          .trim(),
+      ).toBe("Apple");
+      expect(texts()[1]!.get("title").text()).toBe("Apple: 60");
+      await wrapper.setProps({
+        drawing: { ...drawing, chart: { ...drawing.chart, presentation: { palette: [] } } },
+      });
+      expect(wrapper.get('[role="status"]').text()).toContain("valid source range");
+      expect(texts()).toHaveLength(0);
+      expect(wrapper.get("svg > rect").attributes("fill")).toBe("#ffffff");
     } finally {
       wrapper.unmount();
     }

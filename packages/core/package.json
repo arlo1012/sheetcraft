@@ -160,6 +160,10 @@
       "types": "./dist/chart-format.d.ts",
       "import": "./dist/chart-format.js"
     },
+    "./chart-presentation": {
+      "types": "./dist/chart-presentation.d.ts",
+      "import": "./dist/chart-presentation.js"
+    },
     "./chart-source": {
       "types": "./dist/chart-source.d.ts",
       "import": "./dist/chart-source.js"

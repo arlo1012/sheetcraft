@@ -24,6 +24,8 @@ import ChartEditorDialog from "../../../modules/charts/components/ChartEditorDia
 import ChartSourceDialog from "../../../modules/charts/components/ChartSourceDialog.vue";
 import ChartElementsControls from "../../../modules/charts/components/ChartElementsControls.vue";
 import ChartElementsToolbar from "../../../modules/charts/components/ChartElementsToolbar.vue";
+import ChartSubtypeControls from "../../../modules/charts/components/ChartSubtypeControls.vue";
+import ChartStyleGallery from "../../../modules/charts/components/ChartStyleGallery.vue";
 import type { ChartElementPatch } from "../../../modules/charts/chart-element-controls";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { createAppI18n } from "../../../shared/i18n";
@@ -53,6 +55,171 @@ vi.mock("../../../app/composables/useSpreadsheetWorkspaceController", async (imp
       return controller;
     },
   };
+});
+
+describe("chart design real Workspace context", () => {
+  async function openDesign(wrapper: VueWrapper, label: "Chart subtypes" | "Chart styles") {
+    const trigger = wrapper
+      .getComponent(ChartElementsToolbar)
+      .get<HTMLButtonElement>(`[aria-label="${label}"]`);
+    await trigger.trigger("pointerdown");
+    trigger.element.focus();
+    await trigger.trigger("click");
+    await flushPromises();
+    const menu = new DOMWrapper(document.body).get(`[role="menu"][aria-label="${label}"]`);
+    return { trigger, menu };
+  }
+
+  test.each([
+    { label: "Chart subtypes", selector: '[data-chart-variant="percentStacked"]' },
+    { label: "Chart styles", selector: '[data-chart-style="dark"]' },
+  ] as const)(
+    "actual $label popup preserves source/frame and commits one exact Undo/Redo",
+    async ({ label, selector }) => {
+      const f = await fixture();
+      await selectChart(f.wrapper);
+      const before = serializeWorkbook(f.workbook);
+      const original = chart(f.sheet);
+      const other = chart(f.sheet, "chart-two");
+      const raw = renderData(renderProbe(f.wrapper));
+      const { menu } = await openDesign(f.wrapper, label);
+      const option = menu.get(selector);
+      await option.trigger("pointerdown");
+      await option.trigger("click");
+      await flushPromises();
+      expect(chart(f.sheet).chart.presentation).toMatchObject(
+        label === "Chart subtypes" ? { percentStacked: true } : { background: "#202936" },
+      );
+      expect({ ...chart(f.sheet), chart: original.chart }).toEqual(original);
+      expect(chart(f.sheet, "chart-two")).toEqual(other);
+      expect(renderData(renderProbe(f.wrapper))).toEqual(raw);
+      expect(f.controller.session.history.undoStack).toHaveLength(1);
+      expect(document.querySelector(`[role="menu"][aria-label="${label}"]`)).toBeNull();
+      const changed = serializeWorkbook(f.workbook);
+      expect(f.controller.undo()).toBe(true);
+      await nextTick();
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+      expect(f.controller.redo()).toBe(true);
+      await nextTick();
+      expect(serializeWorkbook(f.workbook)).toEqual(changed);
+    },
+  );
+
+  test("pending title and actual gallery click are atomic; composition never commits a partial title", async () => {
+    const f = await fixture();
+    await selectChart(f.wrapper);
+    const before = serializeWorkbook(f.workbook);
+    const controls = await openElements(f.wrapper);
+    const title = controls.get<HTMLInputElement>('[aria-label="Title text"] input');
+    title.element.focus();
+    await title.trigger("compositionstart");
+    await title.setValue("Quarter draft");
+    const { menu } = await openDesign(f.wrapper, "Chart styles");
+    const option = menu.get('[data-chart-style="forest"]');
+    await option.trigger("pointerdown");
+    await option.trigger("click");
+    await flushPromises();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+    await title.trigger("compositionend");
+    await title.setValue("Quarter complete");
+    await option.trigger("pointerdown");
+    await option.trigger("click");
+    await flushPromises();
+    expect(chart(f.sheet).chart).toMatchObject({
+      title: "Quarter complete",
+      presentation: { background: "#f6faf5" },
+    });
+    expect(f.controller.session.history.undoStack).toHaveLength(1);
+    expect(f.controller.undo()).toBe(true);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
+
+  test.each(["Chart subtypes", "Chart styles"] as const)(
+    "keyboard %s opens and Escape returns focus without history",
+    async (label) => {
+      const f = await fixture();
+      await selectChart(f.wrapper);
+      const before = serializeWorkbook(f.workbook);
+      const trigger = f.wrapper
+        .getComponent(ChartElementsToolbar)
+        .get<HTMLButtonElement>(`[aria-label="${label}"]`);
+      trigger.element.focus();
+      await trigger.trigger("keydown", { key: "ArrowDown", code: "ArrowDown" });
+      await flushPromises();
+      const menu = new DOMWrapper(document.body).get(`[role="menu"][aria-label="${label}"]`);
+      expect(menu.element.contains(document.activeElement)).toBe(true);
+      await menu.trigger("keydown", { key: "Escape", code: "Escape" });
+      await flushPromises();
+      expect(document.activeElement).toBe(trigger.element);
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+      expect(f.controller.session.history.undoStack).toHaveLength(0);
+    },
+  );
+
+  test.each(["sheet", "selection", "same-id", "undo"] as const)(
+    "retained real design menu and owner reject after %s",
+    async (change) => {
+      const f = await fixture();
+      await selectChart(f.wrapper);
+      const oldOwner = f.wrapper.getComponent(ChartElementsToolbar).props("applyDesign")!;
+      await openDesign(f.wrapper, "Chart styles");
+      const oldStyle = f.wrapper.getComponent(ChartStyleGallery).props("apply");
+      if (change === "sheet") {
+        await f.wrapper
+          .findAll(".workbook-sheet-tabs__tab")
+          .find((item) => item.text() === "Other Sheet")!
+          .trigger("click");
+        await selectChart(f.wrapper);
+      } else if (change === "selection") {
+        await selectChart(f.wrapper, "chart-two");
+      } else if (change === "same-id") {
+        const original = chart(f.sheet);
+        expect(
+          f.controller.executeCommand(
+            createSetSheetDrawingsCommand(
+              f.sheet.id,
+              f.sheet.drawings!.map((item) =>
+                item.id === original.id
+                  ? { ...original, chart: { ...original.chart, title: "Replaced" } }
+                  : item,
+              ),
+            ),
+          ),
+        ).toBe(true);
+      } else {
+        expect(oldOwner({ kind: "style", style: "forest" })).toBe(true);
+        expect(f.controller.undo()).toBe(true);
+      }
+      await flushPromises();
+      const before = serializeWorkbook(f.workbook);
+      const undoCount = f.controller.session.history.undoStack.length;
+      const redoCount = f.controller.session.history.redoStack.length;
+      expect(oldStyle({ kind: "style", style: "dark" })).toBe(false);
+      expect(oldOwner({ kind: "variant", variant: "percentStacked" })).toBe(false);
+      await flushPromises();
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+      expect(f.controller.session.history.undoStack).toHaveLength(undoCount);
+      expect(f.controller.session.history.redoStack).toHaveLength(redoCount);
+    },
+  );
+
+  test("real line submenu presents all six variants and switches markers without changing raw data", async () => {
+    const f = await fixture({ type: "line" });
+    await selectChart(f.wrapper);
+    const raw = renderData(renderProbe(f.wrapper));
+    const { menu } = await openDesign(f.wrapper, "Chart subtypes");
+    expect(menu.findAll("[data-chart-variant]")).toHaveLength(6);
+    expect(f.wrapper.getComponent(ChartSubtypeControls).props("variant")).toBe("standardMarkers");
+    await menu.get('[data-chart-variant="percentStacked"]').trigger("click");
+    await flushPromises();
+    expect(chart(f.sheet).chart).toMatchObject({
+      stacked: true,
+      presentation: { percentStacked: true, lineMarkers: false },
+    });
+    expect(renderData(renderProbe(f.wrapper))).toEqual(raw);
+    expect(f.controller.session.history.undoStack).toHaveLength(1);
+  });
 });
 
 // ECharts SVG/option behavior has its own real-renderer regressions. This probe

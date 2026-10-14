@@ -78,9 +78,13 @@ export function applyChartFormatIntent(
     if (intent.format === undefined) delete format.categoryAxis;
     else format.categoryAxis = intent.format;
   } else if (intent.kind === "valueAxis") {
+    if (chart.presentation?.percentStacked && intent.format?.linkedToSource === true)
+      throw new TypeError("A percentage axis uses ratios, not the source cell number format.");
     if (intent.format === undefined) delete format.valueAxis;
     else format.valueAxis = intent.format;
   } else if (intent.kind === "secondaryValueAxis") {
+    if (chart.presentation?.percentStacked && intent.format?.linkedToSource === true)
+      throw new TypeError("A percentage axis uses ratios, not the source cell number format.");
     if (intent.format === undefined) delete format.secondaryValueAxis;
     else format.secondaryValueAxis = intent.format;
   } else throw new TypeError("Unknown chart format target.");

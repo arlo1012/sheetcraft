@@ -1,5 +1,6 @@
 import type {
   EChartsOption,
+  ScrollableLegendComponentOption,
   SeriesOption,
   XAXisComponentOption,
   YAXisComponentOption,
@@ -12,6 +13,13 @@ import {
 import { formatCellNumberValue } from "@sheetcraft/core/number-format";
 import type { CellNumberFormat } from "@sheetcraft/core/style";
 import type { ChartData, ChartSeries, SheetChart } from "@sheetcraft/core/sheet-charts";
+import type { ChartPresentationSettings } from "@sheetcraft/core/chart-presentation";
+import {
+  chartPercentAxisDomain,
+  chartPercentAxisSettings,
+  getChartPresentationTextColor,
+  getChartRenderPresentation,
+} from "./chart-presentation-render";
 
 type AxisWithoutMainType<T> = T extends unknown ? Omit<T, "mainType"> : never;
 type AxisOption = AxisWithoutMainType<XAXisComponentOption | YAXisComponentOption>;
@@ -149,14 +157,24 @@ function valueAxis(
   entries: ChartSeries[],
   stacked: boolean,
   sourceGroupChanged = false,
+  percent = false,
 ): ValueAxisOption {
-  const intervals = resolveChartAxisIntervals(settings, axisValues(entries, stacked));
+  if (percent) settings = chartPercentAxisSettings(settings);
+  const percentageDomain = percent ? chartPercentAxisDomain(entries) : undefined;
+  const intervals = resolveChartAxisIntervals(
+    settings,
+    percentageDomain ? [percentageDomain.min, percentageDomain.max] : axisValues(entries, stacked),
+  );
   const overrideNumber =
+    percent ||
     sourceGroupChanged ||
     settings?.numberFormat !== undefined ||
     settings?.linkedToSource !== undefined;
-  const numberFormat =
-    settings?.linkedToSource === true
+  const numberFormat: CellNumberFormat | undefined = percent
+    ? settings?.linkedToSource === true
+      ? { kind: "percent", fractionDigits: 0 }
+      : (settings?.numberFormat ?? { kind: "percent", fractionDigits: 0 })
+    : settings?.linkedToSource === true
       ? uniformFormat(entries)
       : (settings?.numberFormat ??
         (settings?.linkedToSource === false ? undefined : uniformFormat(entries)));
@@ -164,6 +182,7 @@ function valueAxis(
   const result: ValueAxisOption = {
     ...base,
     type: "value",
+    ...percentageDomain,
     ...domain,
     ...(settings?.show !== undefined ? { show: settings.show } : {}),
     ...(settings?.min !== undefined ? { min: settings.min } : {}),
@@ -233,12 +252,113 @@ export function chartBarGapRatios(
   };
 }
 
-/** The option has native numeric presentation already. No-format returns it unchanged. */
+/** Seed surface-readable defaults without coupling separately editable elements. */
+function presentationText(
+  option: EChartsOption,
+  presentation: ChartPresentationSettings | undefined,
+  color: string | undefined,
+): EChartsOption {
+  if (!presentation || color === undefined) return option;
+  // Empty explicit sources intentionally keep the entire interior cleared.
+  if (Array.isArray(option.series) && !option.series.length && !option.title) return option;
+  const legend = (entry: ScrollableLegendComponentOption) => ({
+    ...entry,
+    textStyle: { color, ...entry.textStyle },
+    pageTextStyle: { color, ...entry.pageTextStyle },
+  });
+  const tooltip = (entry: Exclude<EChartsOption["tooltip"], undefined | unknown[]>) => {
+    // Keep an explicit tooltip scheme together; changing only its other half
+    // could turn readable custom dark-on-light text into light-on-light text.
+    if (entry.backgroundColor !== undefined || entry.textStyle?.color !== undefined) return entry;
+    return {
+      ...entry,
+      // A light recipe text color must travel with its opaque panel background.
+      ...(presentation.background !== undefined
+        ? { backgroundColor: presentation.background }
+        : {}),
+      textStyle: { color, ...entry.textStyle },
+    };
+  };
+  const labels = (entry: SeriesOption): SeriesOption => {
+    switch (entry.type) {
+      case "bar":
+        return { ...entry, label: { color, ...entry.label } };
+      case "line":
+        return { ...entry, label: { color, ...entry.label } };
+      case "scatter":
+        return { ...entry, label: { color, ...entry.label } };
+      case "pie":
+        return { ...entry, label: { color, ...entry.label } };
+      case "radar":
+        return { ...entry, label: { color, ...entry.label } };
+      case "treemap":
+        return { ...entry, label: { color, ...entry.label } };
+      case "sankey":
+        return { ...entry, label: { color, ...entry.label } };
+      case "themeRiver":
+        return { ...entry, label: { color, ...entry.label } };
+      default:
+        return entry;
+    }
+  };
+  const singleAxis = <T extends Exclude<EChartsOption["singleAxis"], undefined | unknown[]>>(
+    entry: T,
+  ): T => {
+    const next = { ...entry };
+    next.axisLabel = { color, ...entry.axisLabel };
+    next.nameTextStyle = { color, ...entry.nameTextStyle };
+    return next;
+  };
+  const axis = <T extends AxisOption>(entry: T): T => {
+    const next = { ...entry };
+    next.axisLabel = { color, ...entry.axisLabel };
+    next.nameTextStyle = { color, ...entry.nameTextStyle };
+    return next;
+  };
+  return {
+    ...option,
+    textStyle: { color, ...option.textStyle },
+    ...(option.legend
+      ? { legend: Array.isArray(option.legend) ? option.legend.map(legend) : legend(option.legend) }
+      : {}),
+    ...(option.tooltip
+      ? {
+          tooltip: Array.isArray(option.tooltip)
+            ? option.tooltip.map(tooltip)
+            : tooltip(option.tooltip),
+        }
+      : {}),
+    ...(option.series
+      ? { series: Array.isArray(option.series) ? option.series.map(labels) : labels(option.series) }
+      : {}),
+    ...(option.radar && !Array.isArray(option.radar)
+      ? { radar: { ...option.radar, axisName: { color, ...option.radar.axisName } } }
+      : {}),
+    ...(option.singleAxis
+      ? {
+          singleAxis: Array.isArray(option.singleAxis)
+            ? option.singleAxis.map(singleAxis)
+            : singleAxis(option.singleAxis),
+        }
+      : {}),
+    ...(option.xAxis
+      ? { xAxis: Array.isArray(option.xAxis) ? option.xAxis.map(axis) : axis(option.xAxis) }
+      : {}),
+    ...(option.yAxis
+      ? { yAxis: Array.isArray(option.yAxis) ? option.yAxis.map(axis) : axis(option.yAxis) }
+      : {}),
+  };
+}
+
+/** Keep the original option when neither format nor surface text defaults are requested. */
 export function applyChartCommonFormat(
   option: EChartsOption,
   chart: SheetChart,
   data: ChartData,
 ): EChartsOption {
+  const presentation = getChartRenderPresentation(chart);
+  const percent = presentation?.percentStacked === true;
+  option = presentationText(option, presentation, getChartPresentationTextColor(chart));
   const field = Object.getOwnPropertyDescriptor(chart, "format");
   if (!field) return option;
   if (!("value" in field)) throw new TypeError("Chart format requires an own data field.");
@@ -306,7 +426,7 @@ export function applyChartCommonFormat(
   const mainBase = horizontal ? x : y;
   if (mainBase.type !== "value")
     throw new TypeError("Chart formatting requires an actual value axis.");
-  const mainAxis = valueAxis(mainBase, format.valueAxis, primary, isStacked, hasSecondary);
+  const mainAxis = valueAxis(mainBase, format.valueAxis, primary, isStacked, hasSecondary, percent);
   let category: AxisOption = horizontal ? y : x;
   if (format.categoryAxis && chart.type !== "scatter" && category.type === "category") {
     const settings = format.categoryAxis;
@@ -353,6 +473,7 @@ export function applyChartCommonFormat(
         secondaryEntries,
         isStacked,
         true,
+        percent,
       )
     : undefined;
   if (horizontal) {

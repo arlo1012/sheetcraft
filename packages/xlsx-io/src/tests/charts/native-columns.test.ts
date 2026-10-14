@@ -121,7 +121,6 @@ describe("ordinary native clustered-column charts", () => {
   });
 
   test.each([
-    "stacked",
     "rotated",
     "detached",
     "empty",
@@ -134,7 +133,6 @@ describe("ordinary native clustered-column charts", () => {
     "out-of-bounds-anchor",
   ])("omits unsupported %s without dangling parts", async (mode) => {
     const f = nativeColumnFixture();
-    if (mode === "stacked") f.drawing.chart.stacked = true;
     if (mode === "rotated") f.drawing.rotation = 30;
     if (mode === "detached")
       f.drawing.chart.dataCache = getSheetChartData(

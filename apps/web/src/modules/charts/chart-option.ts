@@ -2,15 +2,21 @@ import type { EChartsOption, SeriesOption } from "echarts";
 import { formatCellNumberValue } from "@sheetcraft/core/number-format";
 import type { CellNumberFormat } from "@sheetcraft/core/style";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
+import type { ChartPresentationSettings } from "@sheetcraft/core/chart-presentation";
 import { getChartElementCapabilities, getChartElementSettings } from "./chart-elements";
 import { applyChartCommonFormat } from "./chart-format-render";
+import {
+  chartPercentAxisDomain,
+  createChartPresentationData,
+  getChartRenderPresentation,
+} from "./chart-presentation-render";
 const colors = ["#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#db2777"];
 type ChartDimensions = { width: number; height: number };
 
 /** Explicit sources keep each series' original palette slot when reordered. */
-function seriesAppearance(series: ChartData["series"][number]) {
+function seriesAppearance(series: ChartData["series"][number], palette: readonly string[]) {
   const color =
-    series.colorIndex === undefined ? undefined : colors[series.colorIndex % colors.length];
+    series.colorIndex === undefined ? undefined : palette[series.colorIndex % palette.length];
   return {
     ...(series.id !== undefined ? { id: series.id } : {}),
     ...(color ? { itemStyle: { color }, lineStyle: { color } } : {}),
@@ -144,7 +150,10 @@ function buildChartOption(
   chart: SheetChart,
   data: ChartData,
   dimensions?: ChartDimensions,
+  presentation?: ChartPresentationSettings,
 ): EChartsOption {
+  const palette = presentation?.palette ?? colors;
+  const background = presentation?.background ?? "#ffffff";
   if (chart.source !== undefined) {
     if (!["column", "bar", "line", "area", "radar"].includes(chart.type))
       throw new RangeError("This chart type does not support an ordered series source.");
@@ -156,7 +165,7 @@ function buildChartOption(
       throw new RangeError("The chart series source is unavailable or has mismatched lengths.");
     // Removing the last series retains the drawing, but clears its entire interior.
     if (chart.source.series.length === 0)
-      return { animation: false, backgroundColor: "#ffffff", series: [] };
+      return { animation: false, backgroundColor: background, series: [] };
   }
   const layout = createElementLayout(chart, data, dimensions);
   const plotBounds = layout
@@ -169,8 +178,8 @@ function buildChartOption(
     : undefined;
   const common: EChartsOption = {
     animation: false,
-    color: colors,
-    backgroundColor: "#ffffff",
+    color: palette,
+    backgroundColor: background,
     title: { text: chart.title, left: "center", textStyle: { fontSize: 15, fontWeight: "normal" } },
     tooltip: { trigger: "item", renderMode: "richText", confine: true },
     legend: { show: chart.legend, bottom: 0, type: "scroll" },
@@ -252,7 +261,15 @@ function buildChartOption(
           bottom: 18,
           ...plotBounds,
           label: { show: chart.labels },
-          data: visited === nodes.length ? nodes.map((name) => ({ name })) : [],
+          data:
+            visited === nodes.length
+              ? nodes.map((name, index) => ({
+                  name,
+                  ...(presentation?.palette
+                    ? { itemStyle: { color: palette[index % palette.length] } }
+                    : {}),
+                }))
+              : [],
           links: visited === nodes.length ? links : [],
           lineStyle: { color: "source", curveness: 0.5 },
         },
@@ -290,7 +307,7 @@ function buildChartOption(
         {
           type: "radar",
           data: data.series.map((series) => ({
-            ...seriesAppearance(series),
+            ...seriesAppearance(series, palette),
             name: series.name,
             value: series.values.map((value) => value ?? "-"),
           })),
@@ -344,17 +361,18 @@ function buildChartOption(
         chart.type === "line" || chart.type === "area"
           ? {
               type: "line",
-              ...seriesAppearance(series),
+              ...seriesAppearance(series, palette),
               name: series.name,
               data: series.values,
-              showSymbol: true,
+              showSymbol: presentation?.lineMarkers ?? true,
+              ...(presentation?.lineMarkers === false ? { symbol: "none" } : {}),
               connectNulls: false,
               ...(chart.type === "area"
                 ? {
                     areaStyle:
                       series.colorIndex === undefined
                         ? {}
-                        : { color: colors[series.colorIndex % colors.length] },
+                        : { color: palette[series.colorIndex % palette.length] },
                   }
                 : {}),
               ...(chart.stacked ? { stack: "total" } : {}),
@@ -362,7 +380,7 @@ function buildChartOption(
             }
           : {
               type: "bar",
-              ...seriesAppearance(series),
+              ...seriesAppearance(series, palette),
               name: series.name,
               data:
                 labelPosition !== undefined
@@ -423,7 +441,10 @@ export function createChartOption(
   data: ChartData,
   dimensions?: ChartDimensions,
 ): EChartsOption {
-  const option = buildChartOption(chart, data, dimensions);
+  const presentation = getChartRenderPresentation(chart);
+  const renderedData = createChartPresentationData(chart, data, presentation);
+  const percent = presentation?.percentStacked === true;
+  const option = buildChartOption(chart, renderedData, dimensions, presentation);
   const formatValue = (value: unknown, format?: CellNumberFormat): string => {
     if (Array.isArray(value)) return value.map((entry) => formatValue(entry, format)).join(" / ");
     return typeof value === "number"
@@ -441,12 +462,15 @@ export function createChartOption(
   if (Array.isArray(option.series))
     option.series = option.series.map((series, index) => {
       const format = plotted[index]?.numberFormat;
-      if (!format && chart.type !== "radar") return series;
+      if (!format && chart.type !== "radar" && !percent) return series;
       const formatLabel = (params: { value?: unknown; dataIndex?: number }) => {
         const numberFormat =
           chart.type === "radar" ? data.series[params.dataIndex ?? 0]?.numberFormat : format;
-        const value =
-          chart.type === "scatter" && Array.isArray(params.value) ? params.value[1] : params.value;
+        const value = percent
+          ? plotted[index]?.values[params.dataIndex ?? 0]
+          : chart.type === "scatter" && Array.isArray(params.value)
+            ? params.value[1]
+            : params.value;
         return formatValue(value, numberFormat);
       };
       return {
@@ -454,7 +478,8 @@ export function createChartOption(
         label: { ...("label" in series ? series.label : {}), formatter: formatLabel },
         tooltip: {
           ...series.tooltip,
-          valueFormatter: (value: unknown) => {
+          valueFormatter: (value: unknown, dataIndex: number) => {
+            if (percent) return formatValue(plotted[index]?.values[dataIndex], format);
             if (Array.isArray(value) && chart.type === "scatter")
               return `${formatValue(value[0], data.series[0]?.numberFormat)} / ${formatValue(value[1], format)}`;
             return formatValue(
@@ -467,13 +492,20 @@ export function createChartOption(
     });
   const valueAxis = (format?: CellNumberFormat) => ({
     type: "value" as const,
+    ...(percent ? chartPercentAxisDomain(renderedData.series) : {}),
     ...(format ? { axisLabel: { formatter: (value: number) => formatValue(value, format) } } : {}),
   });
   if (option.xAxis && !Array.isArray(option.xAxis) && option.xAxis.type === "value")
     option.xAxis = valueAxis(
-      chart.type === "scatter" ? data.series[0]?.numberFormat : uniformFormat(plotted),
+      percent
+        ? { kind: "percent", fractionDigits: 0 }
+        : chart.type === "scatter"
+          ? data.series[0]?.numberFormat
+          : uniformFormat(plotted),
     );
   if (option.yAxis && !Array.isArray(option.yAxis) && option.yAxis.type === "value")
-    option.yAxis = valueAxis(uniformFormat(plotted));
-  return applyChartCommonFormat(option, chart, data);
+    option.yAxis = valueAxis(
+      percent ? { kind: "percent", fractionDigits: 0 } : uniformFormat(plotted),
+    );
+  return applyChartCommonFormat(option, chart, renderedData);
 }

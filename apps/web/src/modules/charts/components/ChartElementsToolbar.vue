@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue";
-import { ChartColumn, Database, ListPlus, Rows3, SlidersHorizontal } from "lucide-vue-next";
+import {
+  ChartColumn,
+  Database,
+  ListPlus,
+  Rows3,
+  SlidersHorizontal,
+  Palette,
+  ChartNoAxesCombined,
+} from "lucide-vue-next";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
 import { useAppI18n } from "../../../shared/i18n";
@@ -10,6 +18,14 @@ import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import ChartElementsControls from "./ChartElementsControls.vue";
+import ChartSubtypeControls from "./ChartSubtypeControls.vue";
+import ChartStyleGallery from "./ChartStyleGallery.vue";
+import GallerySection from "../../../shared/gallery/GallerySection.vue";
+import {
+  getChartVariant,
+  isCommonChartType,
+  type ChartDesignIntent,
+} from "../chart-design-intents";
 import type { ChartElementPatch } from "../chart-element-controls";
 import { chartFormatTargetKey, type ChartFormatTarget } from "../chart-format-pane";
 
@@ -17,6 +33,7 @@ const props = defineProps<{
   chart: SheetChart;
   disabled: boolean;
   apply: (patch: ChartElementPatch) => boolean;
+  applyDesign?: (intent: ChartDesignIntent, pendingTitle?: string) => boolean;
   applyAndRun?: (
     patch: ChartElementPatch,
     action: "edit" | "source" | "switchDirection",
@@ -35,6 +52,15 @@ const trigger = ref<InstanceType<typeof RibbonMenuButton>>();
 const controlsRef = ref<InstanceType<typeof ChartElementsControls>>();
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `chart-elements-${useId()}`;
+const subtypeTrigger = ref<InstanceType<typeof RibbonMenuButton>>();
+const styleTrigger = ref<InstanceType<typeof RibbonMenuButton>>();
+const subtypeSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
+const styleSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
+const subtypeMenuId = `chart-subtypes-${useId()}`;
+const styleMenuId = `chart-styles-${useId()}`;
+const commonType = computed(() =>
+  isCommonChartType(props.chart.type) ? props.chart.type : undefined,
+);
 const failed = ref(false);
 let lastRejectedTitle: string | undefined;
 let shouldRestoreFocus = true;
@@ -48,7 +74,12 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   menuSurfaceRef,
   disabled: computed(() => props.disabled),
   defaultFocus: "menu",
-  additionalInside: () => [toolbarRef.value?.$el, ...(controlsRef.value?.popupElements() ?? [])],
+  additionalInside: () => [
+    toolbarRef.value?.$el,
+    subtypeSurface.value?.rootElement,
+    styleSurface.value?.rootElement,
+    ...(controlsRef.value?.popupElements() ?? []),
+  ],
   onOpen() {
     failed.value = false;
     lastRejectedTitle = undefined;
@@ -90,6 +121,8 @@ function containsTarget(target: EventTarget | null): boolean {
   return (
     (toolbar instanceof HTMLElement && toolbar.contains(target)) ||
     !!menuSurfaceRef.value?.rootElement?.contains(target) ||
+    !!subtypeSurface.value?.rootElement?.contains(target) ||
+    !!styleSurface.value?.rootElement?.contains(target) ||
     (controlsRef.value?.popupElements() ?? []).some((popup) => popup.contains(target))
   );
 }
@@ -203,6 +236,86 @@ const ownerCallbacks = computed(() => {
     },
   };
 });
+function createDesignMenu(triggerRef: typeof subtypeTrigger, surfaceRef: typeof subtypeSurface) {
+  const applyIntent = shallowRef<(intent: ChartDesignIntent) => boolean>();
+  const menu = useMenu({
+    triggerRef: computed(() => triggerRef.value?.rootElement ?? null),
+    menuSurfaceRef: surfaceRef,
+    disabled: computed(() => props.disabled || !props.applyDesign),
+    defaultFocus: "selected",
+    additionalInside: () => [
+      toolbarRef.value?.$el,
+      menuSurfaceRef.value?.rootElement,
+      subtypeSurface.value?.rootElement,
+      styleSurface.value?.rootElement,
+      ...(controlsRef.value?.popupElements() ?? []),
+    ],
+    onOpen() {
+      const apply = props.apply,
+        design = props.applyDesign,
+        type = props.chart.type;
+      const current = (intent: ChartDesignIntent): boolean => {
+        if (
+          !menu.open.value ||
+          applyIntent.value !== current ||
+          props.disabled ||
+          props.apply !== apply ||
+          props.applyDesign !== design ||
+          !design ||
+          (intent.kind === "variant" && props.chart.type !== type)
+        )
+          return false;
+        const controls = controlsRef.value;
+        if (controls?.blockComposition()) return false;
+        const title = controls?.pendingTitle();
+        let applied = false;
+        try {
+          applied = design(intent, title);
+        } catch {
+          /* The captured owner may reject the edit. */
+        }
+        failed.value = !applied;
+        lastRejectedTitle = applied ? undefined : title;
+        if (applied) {
+          dismiss("programmatic", false);
+          menu.dismiss("programmatic", true);
+        }
+        return applied;
+      };
+      applyIntent.value = current;
+    },
+    onDismiss() {
+      applyIntent.value = undefined;
+    },
+  });
+  return { ...menu, applyIntent };
+}
+const subtypeMenu = createDesignMenu(subtypeTrigger, subtypeSurface);
+const styleMenu = createDesignMenu(styleTrigger, styleSurface);
+watch(
+  () => props.applyDesign,
+  () => {
+    subtypeMenu.dismiss("programmatic", false);
+    styleMenu.dismiss("programmatic", false);
+  },
+  { flush: "sync" },
+);
+watch(
+  () => props.apply,
+  () => {
+    subtypeMenu.dismiss("programmatic", false);
+    styleMenu.dismiss("programmatic", false);
+  },
+  { flush: "sync" },
+);
+function toggleSubtypeMenu(event?: MouseEvent): void {
+  styleMenu.dismiss("programmatic", false);
+  subtypeMenu.toggleMenu(event);
+}
+function toggleStyleMenu(event?: MouseEvent): void {
+  subtypeMenu.dismiss("programmatic", false);
+  styleMenu.toggleMenu(event);
+}
 const formatOptions = computed(() =>
   (props.formatTargets ?? []).map((entry) => ({
     value: chartFormatTargetKey(entry.target),
@@ -260,6 +373,79 @@ onBeforeUnmount(() => {
         @activate="ownerCallbacks.format()"
         ><SlidersHorizontal
       /></RibbonButton>
+    </section>
+    <section
+      v-if="applyDesign"
+      class="chart-elements-toolbar__group"
+      data-ribbon-group="chart-design"
+    >
+      <div v-if="commonType" class="chart-elements-toolbar__menu">
+        <RibbonMenuButton
+          ref="subtypeTrigger"
+          variant="tall"
+          :label="t('chart.subtypes')"
+          :text="t('chart.subtypes')"
+          :disabled="disabled"
+          :expanded="subtypeMenu.open.value"
+          :menu-id="subtypeMenuId"
+          popup-role="menu"
+          @activate="toggleSubtypeMenu"
+          @keydown="subtypeMenu.onTriggerKeydown"
+          ><ChartNoAxesCombined
+        /></RibbonMenuButton>
+        <Teleport to="body">
+          <MenuSurface
+            v-if="subtypeMenu.open.value && subtypeMenu.applyIntent.value"
+            :id="subtypeMenuId"
+            ref="subtypeSurface"
+            :style="subtypeMenu.floatingStyles.value"
+            :label="t('chart.subtypes')"
+            data-chart-tools-toolbar
+          >
+            <template #body
+              ><GallerySection :title="t('chart.subtypes')"
+                ><ChartSubtypeControls
+                  :type="commonType"
+                  :variant="getChartVariant(chart)"
+                  :disabled="disabled"
+                  :apply="subtypeMenu.applyIntent.value" /></GallerySection
+            ></template>
+          </MenuSurface>
+        </Teleport>
+      </div>
+      <div class="chart-elements-toolbar__menu">
+        <RibbonMenuButton
+          ref="styleTrigger"
+          variant="tall"
+          :label="t('chart.styles')"
+          :text="t('chart.styles')"
+          :disabled="disabled"
+          :expanded="styleMenu.open.value"
+          :menu-id="styleMenuId"
+          popup-role="menu"
+          @activate="toggleStyleMenu"
+          @keydown="styleMenu.onTriggerKeydown"
+          ><Palette
+        /></RibbonMenuButton>
+        <Teleport to="body">
+          <MenuSurface
+            v-if="styleMenu.open.value && styleMenu.applyIntent.value"
+            :id="styleMenuId"
+            ref="styleSurface"
+            :style="styleMenu.floatingStyles.value"
+            :label="t('chart.styles')"
+            data-chart-tools-toolbar
+          >
+            <template #body
+              ><GallerySection :title="t('chart.styles')"
+                ><ChartStyleGallery
+                  :chart="chart"
+                  :disabled="disabled"
+                  :apply="styleMenu.applyIntent.value" /></GallerySection
+            ></template>
+          </MenuSurface>
+        </Teleport>
+      </div>
     </section>
     <section class="chart-elements-toolbar__group" data-ribbon-group="chart-elements">
       <div class="chart-elements-toolbar__menu">

@@ -292,3 +292,88 @@ describe("chart owner element controls", () => {
     expect(f.current().chart.title).toBe("Sales");
   });
 });
+
+describe("chart owner presentation actions", () => {
+  test("style and pending title share one owner command with exact UndoRedo", () => {
+    const f = fixture(),
+      before = structuredClone(f.first),
+      other = structuredClone(f.other);
+    expect(
+      f.controls.snapshot.value!.applyDesign({ kind: "style", style: "dark" }, "Draft title"),
+    ).toBe(true);
+    expect(f.current().chart).toMatchObject({
+      title: "Draft title",
+      presentation: { background: "#202936" },
+    });
+    expect(f.current().chart.range).toEqual(before.chart.range);
+    expect(f.sheet.value.drawings![1]).toEqual(other);
+    expect(f.current().anchor).toEqual(before.anchor);
+    expect(f.current().width).toBe(before.width);
+    expect(f.execute).toHaveBeenCalledTimes(1);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    const after = structuredClone(f.current());
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(f.current()).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    expect(f.current()).toEqual(after);
+    f.scope.stop();
+  });
+
+  test("an old stacked checkbox exits percentage mode without a contradictory payload", () => {
+    const f = fixture();
+    expect(
+      f.controls.snapshot.value!.applyDesign({ kind: "variant", variant: "percentStacked" }),
+    ).toBe(true);
+    expect(f.current().chart.presentation).toEqual({ percentStacked: true });
+    expect(f.controls.snapshot.value!.apply({ stacked: false })).toBe(true);
+    expect(f.current().chart.stacked).toBe(false);
+    expect(f.current().chart.presentation).toBeUndefined();
+    expect(f.session.history.undoStack).toHaveLength(2);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(f.current().chart.presentation?.percentStacked).toBe(true);
+    f.scope.stop();
+  });
+
+  test.each(["selection", "generation", "revision", "replacement", "protection"] as const)(
+    "a retained design callback refuses %s changes without side effects",
+    (change) => {
+      const f = fixture(),
+        apply = f.controls.snapshot.value!.applyDesign;
+      if (change === "selection") f.selected.value = f.other.id;
+      if (change === "generation") f.generation.value++;
+      if (change === "revision") f.revision.value++;
+      if (change === "replacement") f.sheet.value.drawings = [...f.sheet.value.drawings!];
+      if (change === "protection") f.sheet.value.properties.protected = true;
+      const before = JSON.stringify(f.sheet.value.drawings);
+      expect(apply({ kind: "style", style: "dark" })).toBe(false);
+      expect(JSON.stringify(f.sheet.value.drawings)).toBe(before);
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.session.history.undoStack).toHaveLength(0);
+      f.scope.stop();
+    },
+  );
+
+  test("a target changed during flush never receives the captured chart's style", () => {
+    const f = fixture();
+    f.flush.mockImplementationOnce(() => {
+      f.selected.value = f.other.id;
+      return true;
+    });
+    expect(f.controls.snapshot.value!.applyDesign({ kind: "style", style: "forest" })).toBe(false);
+    expect(f.sheet.value.drawings).toEqual([f.first, f.other]);
+    expect(f.execute).not.toHaveBeenCalled();
+    f.scope.stop();
+  });
+
+  test("a refused design keeps the original and can retry the same owner callback", () => {
+    const f = fixture(),
+      apply = f.controls.snapshot.value!.applyDesign;
+    f.execute.mockImplementationOnce(() => false);
+    expect(apply({ kind: "variant", variant: "percentStacked" })).toBe(false);
+    expect(f.current()).toEqual(f.first);
+    expect(f.session.history.undoStack).toHaveLength(0);
+    expect(apply({ kind: "variant", variant: "percentStacked" })).toBe(true);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    f.scope.stop();
+  });
+});

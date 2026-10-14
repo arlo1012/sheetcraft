@@ -1,5 +1,9 @@
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 import { getChartElementSettings } from "./chart-elements";
+import {
+  createChartPresentationData,
+  getChartRenderPresentation,
+} from "./chart-presentation-render";
 
 export type WordCloudLayout = {
   title: { show: boolean; offset: number };
@@ -19,6 +23,8 @@ export function createWordCloudLayout(
   data: ChartData,
   dimensions: { width: number; height: number },
 ): WordCloudLayout {
+  const presentation = getChartRenderPresentation(chart);
+  createChartPresentationData(chart, data, presentation);
   const position = getChartElementSettings(chart).titlePosition;
   const title = {
     show: position !== "none",
@@ -42,7 +48,7 @@ export function createWordCloudLayout(
   const width = dimensions.width / columns;
   const height = Math.max(1, (dimensions.height - title.offset - 5) / Math.max(1, rows));
   const max = source[0]?.value ?? 1;
-  const palette = ["#2563eb", "#16a34a", "#8b5cf6", "#ef4444", "#f59e0b"];
+  const palette = presentation?.palette ?? ["#2563eb", "#16a34a", "#8b5cf6", "#ef4444", "#f59e0b"];
   return {
     title,
     words: source.map((word, index) => ({

@@ -15,6 +15,15 @@ import {
 } from "../../../shared/range-reference/formatRangeReference";
 import ChartContent from "./ChartContent.vue";
 import ChartElementsControls from "./ChartElementsControls.vue";
+import ChartSubtypeControls from "./ChartSubtypeControls.vue";
+import ChartStyleGallery from "./ChartStyleGallery.vue";
+import {
+  applyChartDesignIntent,
+  changeChartType,
+  getChartVariant,
+  isCommonChartType,
+  type ChartDesignIntent,
+} from "../chart-design-intents";
 import type { ChartElementPatch } from "../chart-element-controls";
 import { getChartSourceApplicability } from "../chart-source-editor";
 const props = defineProps<{
@@ -41,11 +50,60 @@ const draft = ref<SheetChartDrawing>({
 const elementsControls = ref<InstanceType<typeof ChartElementsControls>>();
 function patchElements(patch: ChartElementPatch): void {
   if (props.disabled) return;
-  draft.value.chart = {
+  const next = {
     ...draft.value.chart,
     ...patch,
     ...(patch.elements ? { elements: { ...patch.elements } } : {}),
   };
+  if (patch.stacked === false && next.presentation?.percentStacked) {
+    const presentation = { ...next.presentation };
+    delete presentation.percentStacked;
+    if (Object.keys(presentation).length) next.presentation = presentation;
+    else delete next.presentation;
+  }
+  draft.value.chart = normalizeSheetChart(next);
+}
+const designFailed = ref(false);
+const commonType = computed(() =>
+  isCommonChartType(draft.value.chart.type) ? draft.value.chart.type : undefined,
+);
+function applyDesign(intent: ChartDesignIntent): boolean {
+  if (props.disabled || elementsControls.value?.blockComposition()) return false;
+  try {
+    const next = applyChartDesignIntent(draft.value.chart, intent);
+    const title = elementsControls.value?.pendingTitle();
+    if (title !== undefined) next.title = title;
+    draft.value.chart = normalizeSheetChart(next);
+    designFailed.value = false;
+    return true;
+  } catch {
+    designFailed.value = true;
+    return false;
+  }
+}
+function changeType(value: unknown): void {
+  if (
+    props.disabled ||
+    typeof value !== "string" ||
+    !types.includes(value as ChartType) ||
+    elementsControls.value?.blockComposition()
+  )
+    return;
+  const type = value as ChartType;
+  if (
+    draft.value.chart.source &&
+    getChartSourceApplicability({ ...draft.value.chart, type }) !== "editable"
+  )
+    return;
+  try {
+    const next = changeChartType(draft.value.chart, type);
+    const title = elementsControls.value?.pendingTitle();
+    if (title !== undefined) next.title = title;
+    draft.value.chart = normalizeSheetChart(next);
+    designFailed.value = false;
+  } catch {
+    designFailed.value = true;
+  }
 }
 function confirm(): void {
   if (props.disabled) return;
@@ -110,7 +168,7 @@ const options = computed(() =>
     @confirm="confirm"
     @close="emit('close')"
   >
-    <div class="chart-editor">
+    <div class="chart-editor" data-chart-tools-toolbar>
       <p v-if="draft.chart.pivotTableId">
         {{ t("pivot.cachedChart") }}
         <Button
@@ -143,13 +201,25 @@ const options = computed(() =>
       <div class="chart-editor__field">
         <span>{{ t("chart.type") }}</span>
         <Select
-          v-model="draft.chart.type"
+          :value="draft.chart.type"
+          @change="changeType"
           :options="options"
           :popup-props="{ overlayClassName: 'chart-editor-options-popup' }"
           :disabled="disabled"
           :aria-label="t('chart.type')"
         />
       </div>
+      <ChartSubtypeControls
+        v-if="commonType"
+        :type="commonType"
+        :variant="getChartVariant(draft.chart)"
+        :disabled="disabled"
+        :apply="applyDesign"
+      />
+      <ChartStyleGallery :chart="draft.chart" :disabled="disabled" :apply="applyDesign" />
+      <p v-if="designFailed" class="chart-editor__error" role="alert">
+        {{ t("chart.designApplyFailed") }}
+      </p>
       <div class="chart-editor__row">
         <Checkbox
           v-model="draft.chart.headerRow"

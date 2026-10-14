@@ -7,6 +7,10 @@ import { normalizeChartFormat } from "@sheetcraft/core/chart-format";
 import { init, type EChartsType } from "./chart-runtime";
 import { createChartOption } from "./chart-option";
 import { createWordCloudLayout } from "./chart-wordcloud-layout";
+import {
+  getChartPresentationBackground,
+  getChartRenderPresentation,
+} from "./chart-presentation-render";
 
 // Registration is additive. Screen ChartContent continues to request SVG explicitly.
 use([CanvasRenderer]);
@@ -65,6 +69,7 @@ function rasterSize(options: ChartPrintPresentationOptions) {
 }
 
 function validateDrawing(drawing: SheetChartDrawing, data: ChartData) {
+  getChartRenderPresentation(drawing.chart);
   if (
     !Number.isFinite(drawing.width) ||
     !Number.isFinite(drawing.height) ||
@@ -231,7 +236,7 @@ function paintWordCloud(
   context.save();
   try {
     context.scale(options.density, options.density);
-    context.fillStyle = "#ffffff";
+    context.fillStyle = getChartPresentationBackground(drawing.chart);
     context.fillRect(0, 0, options.width, options.height);
     context.textAlign = "center";
     if (layout.title.show) {
@@ -260,8 +265,8 @@ export function renderChartPrintPresentation(
   data: ChartData,
   options: ChartPrintPresentationOptions,
 ): ChartPrintPresentation {
-  const size = rasterSize(options);
   validateDrawing(drawing, data);
+  const size = rasterSize(options);
   if (typeof globalThis.document === "undefined" || options.document !== globalThis.document)
     throw new Error("Chart print fonts must belong to the original application document.");
   // Axis bounds, tick counts and graph validity are checked before native init.
@@ -302,7 +307,7 @@ export function renderChartPrintPresentation(
         throw new Error(
           `Native chart print did not produce the expected bounded canvas (${rendered.width}×${rendered.height}).`,
         );
-      output.context.fillStyle = "#ffffff";
+      output.context.fillStyle = getChartPresentationBackground(drawing.chart);
       output.context.fillRect(0, 0, size.width, size.height);
       // Copy without rescaling: preserve native coordinates for fractional sizes,
       // with only the final sub-pixel edge rounded up on the owned destination.

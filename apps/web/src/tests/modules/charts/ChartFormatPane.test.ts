@@ -439,3 +439,58 @@ describe("chart format right pane", () => {
     expect(wrapper.emitted("update:target")?.at(-1)).toEqual([{ kind: "chart" }]);
   });
 });
+
+describe("percentage chart format pane", () => {
+  test("uses percentage-point controls and a ratio preview without a no-op source-format toggle", () => {
+    const { wrapper } = fixture(
+      { kind: "valueAxis" },
+      {
+        drawing: drawing({
+          stacked: true,
+          presentation: { percentStacked: true },
+          format: { valueAxis: { min: 20, majorUnit: 10, linkedToSource: true } },
+        }),
+      },
+    );
+    expect(wrapper.text()).toContain("percentage points");
+    expect(wrapper.text()).not.toContain("Linked to source");
+    expect(input(wrapper, "min").element.value).toBe("20");
+    expect(input(wrapper, "majorUnit").element.value).toBe("10");
+    expect(select(wrapper, "Category").props("value")).toBe("percent");
+    expect(wrapper.get("output").text()).toBe("38%");
+  });
+
+  test("General is an explicit ratio format and does not fall back to auto percentages", async () => {
+    const { wrapper, apply } = fixture(
+      { kind: "valueAxis" },
+      { drawing: drawing({ stacked: true, presentation: { percentStacked: true } }) },
+    );
+    select(wrapper, "Category").vm.$emit("change", "general");
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "valueAxis",
+      format: { numberFormat: { kind: "custom", code: "General" }, linkedToSource: false },
+    });
+    await wrapper.setProps({
+      drawing: drawing({
+        stacked: true,
+        presentation: { percentStacked: true },
+        format: {
+          valueAxis: {
+            numberFormat: { kind: "custom", code: "General" },
+            linkedToSource: false,
+          },
+        },
+      }),
+    });
+    expect(select(wrapper, "Category").props("value")).toBe("general");
+    expect(wrapper.get("output").text()).toBe("0.375");
+  });
+
+  test("a series marker control starts from the chart-wide line variant", () => {
+    const { wrapper } = fixture(
+      { kind: "series", seriesId: "apples" },
+      { drawing: drawing({ type: "line", presentation: { lineMarkers: false } }) },
+    );
+    expect(checkbox(wrapper, "Show markers").props("checked")).toBe(false);
+  });
+});

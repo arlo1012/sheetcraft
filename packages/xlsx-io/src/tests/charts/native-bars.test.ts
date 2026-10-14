@@ -116,7 +116,6 @@ describe("ordinary native horizontal clustered bars", () => {
     "boolean",
     "formula-error",
     "text-formula",
-    "stacked",
     "detached",
     "rotated",
     "hidden",
@@ -139,7 +138,6 @@ describe("ordinary native horizontal clustered bars", () => {
         { row: 2, column: 1 },
         { kind: "formula", formula: { source: mode === "formula-error" ? "=1/0" : '="text"' } },
       );
-    if (mode === "stacked") f.drawing.chart.stacked = true;
     if (mode === "detached")
       f.drawing.chart.dataCache = getSheetChartData(
         f.sheet,

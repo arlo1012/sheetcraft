@@ -4754,6 +4754,7 @@ watch(
           :chart="chartObjectContext.drawing.chart"
           :disabled="loading || fileBusy || xlsxBusy || chartObjectContext.disabled"
           :apply="chartObjectContext.apply"
+          :apply-design="chartObjectContext.applyDesign"
           :apply-and-run="chartObjectContext.applyAndRun"
           :on-edit="chartObjectContext.edit"
           :on-source="chartObjectContext.source"

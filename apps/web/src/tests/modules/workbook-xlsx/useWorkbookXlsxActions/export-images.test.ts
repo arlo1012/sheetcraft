@@ -80,7 +80,7 @@ function mountActions(assetStore?: ImageAssetStore, timeoutMs?: number) {
 }
 
 describe("XLSX export image preparation", () => {
-  test.each(["elements", "source", "format"] as const)(
+  test.each(["elements", "source", "format", "presentation", "stacked"] as const)(
     "new chart %s show blocked feedback before flush, assets, worker or download",
     async (field) => {
       const get = vi.fn(async () => imageAsset()),
@@ -126,12 +126,20 @@ describe("XLSX export image preparation", () => {
         delete drawing.chart.elements;
         drawing.chart.format = { valueAxis: { min: 20, max: 180, majorUnit: 40 } };
       }
+      if (field === "presentation") {
+        delete drawing.chart.elements;
+        drawing.chart.presentation = { background: "#202020" };
+      }
+      if (field === "stacked") {
+        delete drawing.chart.elements;
+        drawing.chart.stacked = true;
+      }
       getActiveSheet(f.workbook).drawings = [drawing];
       const before = serializeWorkbook(f.workbook);
       await f.actions.exportXlsx();
       expect(f.actions.feedback.value).toEqual({
         key:
-          field === "format"
+          field === "format" || field === "presentation" || field === "stacked"
             ? "chart.formatExportBlocked"
             : field === "source"
               ? "chart.sourceExportBlocked"

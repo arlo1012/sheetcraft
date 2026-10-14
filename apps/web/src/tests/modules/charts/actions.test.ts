@@ -10,7 +10,8 @@ import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useChartActions } from "../../../modules/charts/useChartActions";
-function fixture() {
+import { applyChartDesignIntent } from "../../../modules/charts/chart-design-intents";
+function fixture(range = { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } }) {
   let workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
   let sheet = getActiveSheet(workbook);
   [
@@ -26,7 +27,7 @@ function fixture() {
   const actions = useChartActions({
     getWorkbook: () => workbook,
     getSheet: () => sheet,
-    getRange: () => ({ start: { row: 0, column: 0 }, end: { row: 2, column: 1 } }),
+    getRange: () => range,
     getEvaluator: () => createSheetEvaluator(sheet),
     isBusy: () => false,
     flush: () => true,
@@ -105,5 +106,99 @@ describe("chart actions", () => {
     expect(f.execute).not.toHaveBeenCalled();
     expect(f.actions.error.value).toBe(true);
     expect(f.actions.editing.value).toBeDefined();
+  });
+});
+
+describe("chart subtype insertion", () => {
+  test.each(["standard", "percentStacked"] as const)(
+    "oversized selection opens recoverable %s draft without throwing or committing",
+    (variant) => {
+      const f = fixture({ start: { row: 0, column: 0 }, end: { row: 3999, column: 2 } });
+      expect(() => f.actions.insert({ type: "column", variant })).not.toThrow();
+      expect(f.actions.error.value).toBe(true);
+      expect(f.actions.editing.value?.chart.range).toBeNull();
+      expect(f.actions.editing.value?.chart.presentation?.percentStacked).toBe(
+        variant === "percentStacked" ? true : undefined,
+      );
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.getSheet().drawings ?? []).toEqual([]);
+      f.actions.confirm(f.actions.editing.value!, "A1:B3");
+      expect(f.execute).toHaveBeenCalledTimes(1);
+      expect(f.actions.error.value).toBe(false);
+    },
+  );
+
+  test("dashboard line markers apply only to the line child", () => {
+    const f = fixture();
+    f.actions.insert("dashboard");
+    const draft = f.actions.editing.value!;
+    const line = applyChartDesignIntent(
+      { ...draft.chart, type: "line" },
+      { kind: "variant", variant: "stackedMarkers" },
+    );
+    f.actions.confirm({ ...draft, chart: line }, "A1:B3");
+    expect(f.getSheet().drawings).toHaveLength(4);
+    for (const node of f.getSheet().drawings ?? []) {
+      if (node.kind !== "chart") throw Error("dashboard child is not a chart");
+      expect(node.chart.presentation?.lineMarkers).toBe(
+        node.chart.type === "line" ? true : undefined,
+      );
+    }
+  });
+  test("dashboard confirmation retires incompatible subtype flags per child and retains owned appearance", () => {
+    const f = fixture();
+    f.actions.insert("dashboard");
+    const draft = f.actions.editing.value!;
+    const styled = applyChartDesignIntent(
+      applyChartDesignIntent(draft.chart, { kind: "variant", variant: "percentStacked" }),
+      { kind: "style", style: "dark" },
+    );
+    f.actions.confirm({ ...draft, chart: styled }, "A1:B3");
+    const drawings = f.getSheet().drawings;
+    expect(drawings).toHaveLength(4);
+    expect(f.actions.error.value).toBe(false);
+    expect(f.execute).toHaveBeenCalledTimes(1);
+    for (const node of drawings ?? []) {
+      if (node.kind !== "chart") throw Error("dashboard child is not a chart");
+      expect(node.chart.presentation?.background).toBe("#202936");
+      expect(node.chart.presentation?.percentStacked).toBe(
+        node.chart.type === "pie" ? undefined : true,
+      );
+      expect(node.chart.format?.title?.color).toBe("#e8eef7");
+      expect(node.chart.presentation?.lineMarkers).toBeUndefined();
+    }
+  });
+  test.each(["column", "bar", "area"] as const)(
+    "%s percentage choice starts a real draft and persists only on confirmation",
+    (type) => {
+      const f = fixture();
+      f.actions.insert({ type, variant: "percentStacked" });
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.actions.editing.value?.chart).toMatchObject({
+        type,
+        stacked: true,
+        presentation: { percentStacked: true },
+      });
+      f.actions.confirm(f.actions.editing.value!, "A1:B3");
+      const inserted = f.getSheet().drawings?.[0];
+      expect(inserted?.kind).toBe("chart");
+      if (!inserted || inserted.kind !== "chart") throw Error("missing inserted chart");
+      expect(inserted.chart.presentation?.percentStacked).toBe(true);
+      expect(f.execute).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test("line marker and stacking choices do not require stable source-series IDs", () => {
+    const f = fixture();
+    f.actions.insert({ type: "line", variant: "stackedMarkers" });
+    expect(f.actions.editing.value?.chart).toMatchObject({
+      type: "line",
+      stacked: true,
+      presentation: { lineMarkers: true },
+    });
+    expect(f.actions.editing.value?.chart.source).toBeUndefined();
+    f.actions.close();
+    expect(f.getSheet().drawings ?? []).toEqual([]);
+    expect(f.execute).not.toHaveBeenCalled();
   });
 });

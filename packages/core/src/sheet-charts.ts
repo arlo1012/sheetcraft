@@ -6,6 +6,10 @@ import {
 import { getChartSourceData } from "./chart-source-data.js";
 import { normalizeChartFormat, type ChartFormatSettings } from "./chart-format.js";
 import {
+  normalizeChartPresentation,
+  type ChartPresentationSettings,
+} from "./chart-presentation.js";
+import {
   getCellStyle,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
@@ -55,6 +59,7 @@ export type SheetChart = {
   showHidden: boolean;
   elements?: ChartElementSettings;
   format?: ChartFormatSettings;
+  presentation?: ChartPresentationSettings;
 };
 const types = new Set([
   "column",
@@ -115,6 +120,20 @@ function normalizeChartElementSettings(value: unknown): ChartElementSettings {
   return result;
 }
 export function normalizeSheetChart(chart: SheetChart): SheetChart {
+  let presentation: ChartPresentationSettings | undefined;
+  if (chart && typeof chart === "object" && "presentation" in chart) {
+    const field = Object.getOwnPropertyDescriptor(chart, "presentation");
+    if (!field || !("value" in field))
+      throw new TypeError("Chart presentation must be an own data field, not an accessor.");
+    presentation = normalizeChartPresentation(field.value);
+    if (
+      presentation.percentStacked === true &&
+      (chart.stacked !== true || !["column", "bar", "line", "area"].includes(chart.type))
+    )
+      throw new RangeError("Percent stacking requires a stacked column, bar, line or area chart.");
+    if (presentation.lineMarkers !== undefined && chart.type !== "line")
+      throw new RangeError("Line markers require a line chart.");
+  }
   let source: ChartSeriesSource | undefined;
   if (chart && typeof chart === "object" && "source" in chart) {
     const field = Object.getOwnPropertyDescriptor(chart, "source");
@@ -189,6 +208,7 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
     showHidden: chart.showHidden,
     ...(elements !== undefined ? { elements } : {}),
     ...(format !== undefined ? { format } : {}),
+    ...(presentation !== undefined ? { presentation } : {}),
   };
 }
 export type ChartSeries = {

@@ -7,6 +7,7 @@ import type { Sheet, Workbook } from "@sheetcraft/core/workbook";
 import type { ChartElementPatch } from "./chart-element-controls";
 import { getChartElementCapabilities } from "./chart-elements";
 import type { ChartFormatTarget } from "./chart-format-pane";
+import { applyChartDesignIntent, type ChartDesignIntent } from "./chart-design-intents";
 
 /** Only rendered element fields may cross this object-level action boundary. */
 export function applyElementPatch(chart: SheetChart, patch: ChartElementPatch): SheetChart {
@@ -27,9 +28,14 @@ export function applyElementPatch(chart: SheetChart, patch: ChartElementPatch): 
       next.legend = value;
     else if (key === "labels" && typeof value === "boolean" && capabilities.labels)
       next.labels = value;
-    else if (key === "stacked" && typeof value === "boolean" && capabilities.stacked)
+    else if (key === "stacked" && typeof value === "boolean" && capabilities.stacked) {
       next.stacked = value;
-    else if (key === "elements" && value && typeof value === "object") {
+      if (!value && next.presentation?.percentStacked) {
+        const { percentStacked: _percentStacked, ...presentation } = next.presentation;
+        if (Object.keys(presentation).length) next.presentation = presentation;
+        else delete next.presentation;
+      }
+    } else if (key === "elements" && value && typeof value === "object") {
       // The Core normalizer verifies settings before we inspect their values.
       const normalized = normalizeSheetChart({
         ...next,
@@ -170,6 +176,13 @@ export function useChartObjectControls(options: {
       isCurrent,
       disabled: !canUseSheetPermission(sheet, "editObjects"),
       apply: (patch: ChartElementPatch) => change(() => applyElementPatch(drawing.chart, patch)),
+      applyDesign: (intent: ChartDesignIntent, pendingTitle?: string) =>
+        change(() => {
+          const chart = applyChartDesignIntent(drawing.chart, intent);
+          return pendingTitle === undefined
+            ? chart
+            : applyElementPatch(chart, { title: pendingTitle });
+        }),
       edit,
       source: () => {
         if (prepare()) (options.source ?? options.edit)(drawing);

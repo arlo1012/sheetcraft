@@ -1135,6 +1135,26 @@ export async function encodeWithNativeXlsx(
   let detailedChartFormat = false;
   for (const sheet of sheets) {
     for (const drawing of sheet.drawings ?? []) {
+      if (drawing.kind === "chart" && "presentation" in drawing.chart) {
+        detailedChartFormat = true;
+        report.add(
+          "feature-omitted",
+          "block",
+          `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.presentation`,
+        );
+      }
+      if (
+        drawing.kind === "chart" &&
+        drawing.chart.stacked &&
+        ["column", "bar", "line", "area"].includes(drawing.chart.type)
+      ) {
+        detailedChartFormat = true;
+        report.add(
+          "feature-omitted",
+          "block",
+          `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.stacked`,
+        );
+      }
       if (drawing.kind === "chart" && "format" in drawing.chart) {
         detailedChartFormat = true;
         report.add(
@@ -1162,7 +1182,7 @@ export async function encodeWithNativeXlsx(
   if (report.hasBlocks())
     throw new XlsxCompatibilityError(
       detailedChartFormat
-        ? "Detailed chart formatting is not yet supported by XLSX export."
+        ? "Chart subtypes and detailed presentation are not yet supported by XLSX export."
         : customChartSource
           ? "Custom chart series sources are not yet supported by XLSX export."
           : "Chart element settings are not yet supported by XLSX export.",

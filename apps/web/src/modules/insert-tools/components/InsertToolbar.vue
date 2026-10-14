@@ -5,7 +5,7 @@ import SymbolInsertMenu from "./SymbolInsertMenu.vue";
 import type { SymbolInsertion } from "../symbols/symbol-preferences";
 import PivotInsertTools from "../../pivot-tables/components/PivotInsertTools.vue";
 import ChartInsertTools from "../../charts/components/ChartInsertTools.vue";
-import type { ChartType } from "@sheetcraft/core/sheet-charts";
+import type { ChartInsertIntent } from "../../charts/chart-design-intents";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import WordArtInsertMenu from "../../sheet-drawings/components/WordArtInsertMenu.vue";
 import type { WordArtStylePreset } from "../../sheet-drawings/wordart-style-presets";
@@ -55,7 +55,7 @@ const emit = defineEmits<{
   refreshPivot: [];
   editPivot: [];
   removePivot: [];
-  insertChart: [type: ChartType | "dashboard"];
+  insertChart: [intent: ChartInsertIntent];
   insertAttachment: [display: "icon" | "document"];
   insertCamera: [];
   insertControl: [];

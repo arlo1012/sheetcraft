@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
-import { getSheetChartData } from "@sheetcraft/core/sheet-charts";
+import { getSheetChartData, normalizeSheetChart } from "@sheetcraft/core/sheet-charts";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import { init, type EChartsType } from "../chart-runtime";
 import { createChartOption } from "../chart-option";
 import { createWordCloudLayout } from "../chart-wordcloud-layout";
+import { getChartPresentationBackground } from "../chart-presentation-render";
 import { getChartFormatClickTarget } from "../chart-format-selection";
 import { getChartFormatTargets, type ChartFormatTarget } from "../chart-format-pane";
 import {
@@ -32,7 +33,7 @@ const result = computed(() => {
   try {
     const data = getSheetChartData(
       props.sheet,
-      props.drawing.chart,
+      normalizeSheetChart(props.drawing.chart),
       props.evaluator,
       props.resolveSheet,
     );
@@ -191,7 +192,12 @@ function render() {
   }
 }
 const wordLayout = computed(() =>
-  createWordCloudLayout(props.drawing.chart, data.value, props.drawing),
+  result.value.invalid
+    ? { title: { show: false, offset: 0 }, words: [] }
+    : createWordCloudLayout(props.drawing.chart, data.value, props.drawing),
+);
+const wordBackground = computed(() =>
+  result.value.invalid ? "#ffffff" : getChartPresentationBackground(props.drawing.chart),
 );
 const wordTitle = computed(() => wordLayout.value.title);
 const words = computed(() => wordLayout.value.words);
@@ -222,7 +228,7 @@ onBeforeUnmount(() => {
       role="img"
       :aria-label="drawing.chart.title"
     >
-      <rect width="100%" height="100%" fill="white" />
+      <rect width="100%" height="100%" :fill="wordBackground" />
       <text
         v-if="wordTitle.show"
         :x="drawing.width / 2"
